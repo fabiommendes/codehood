@@ -1,0 +1,12 @@
+procs:
+  server:
+    cmd: ["uv", "run", "inv", "run"]
+    cwd: "../server"
+  frontend:
+    cmd: ["npx", "elm-land", "server"]
+  browser-api:
+    cmd: ["xdg-open", "http://localhost:8000/api/v1/docs"]
+  browser-admin:
+    cmd: ["xdg-open", "http://localhost:8000/admin"]
+  browser-frontend:
+    cmd: ["xdg-open", "http://localhost:1234"]

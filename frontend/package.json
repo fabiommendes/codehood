@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "autoprefixer": "^10.4.21",
+    "daisyui": "^5.1.13",
+    "elm-land": "file:elm-land/projects/cli",
+    "elm-localstorage": "^1.0.1",
+    "elm-taskport": "^2.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "tailwindcss": "^4.1.13"
+  },
+  "scripts": {
+    "api": "cd ../server; uv run dev",
+    "debug-on": "rm -f src/Effect/Log.elm; cp codegen/LogDebug.elm src/Effect/Log.elm",
+    "debug-off": "rm -f src/Effect/Log.elm; cp codegen/LogNoDebug.elm src/Effect/Log.elm",
+    "build": "npm run debug-off; npx elm-land build; npm run debug-off",
+    "clean": "rm -fR elm-stuff; rm -fR .elm-land",
+    "dev": "npm run debug-on; npx elm-land server"
+  }
+}
