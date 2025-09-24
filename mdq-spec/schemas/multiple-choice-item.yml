@@ -1,0 +1,15 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "multiple-choice-item"
+title: Multiple choice item
+description: >-
+  A choice for the multiple choices question. It is a text with an optional feedback.
+allOf:
+  - $ref: "base-choice"
+  - type: object
+    properties:
+      grade:
+        description: >
+          Typically a numeric value between 0 and 100, interpreted as a percentage. If 
+          not specified, uses the penalty field as the default grading value.
+        type: number
+        default: 0

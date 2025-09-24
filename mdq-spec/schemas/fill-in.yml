@@ -1,0 +1,122 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "fill-in"
+
+title: Fill-in-the-blank question
+description: >-
+  Fill-in-the-blank questions display a paragraph of text intercalated with input fields to
+  representing blanks the user must fill in. The blanks can be of several different types.
+# type: object
+# additionalProperties: false
+allOf:
+  - $ref: "base-question"
+  - type: object
+    required: [body]
+    properties:
+      body:
+        description: >-
+          The body of the question is formed by text snippets intercalated with input fields that
+          represent blanks the user must fill in. The blanks can be of several different types.
+        type: array
+        minItems: 1
+        items:
+          oneOf:
+            - $ref: "#/$defs/fill-in-input-selection"
+            - $ref: "#/$defs/fill-in-input-numeric"
+            - $ref: "#/$defs/fill-in-input-text"
+
+$defs:
+  fill-in-input-selection:
+    description: >-
+      It is used to display a selection box with a list of choices.
+    type: object
+    required: [choices]
+    properties:
+      type:
+        const: selection
+
+        placeholder:
+          description: >-
+            The placeholder text displayed for unselected choices.
+          type: string
+          default: ""
+
+        shuffle:
+          description: >-
+            Whether it is possible to shuffle the order of choices in selection boxes.
+          type: boolean
+          default: true
+
+      choices:
+        description: The list of choices for the question
+        type: array
+        minItems: 2
+        items:
+          $ref: "multiple-choice-item"
+
+  fill-in-input-numeric:
+    description: >-
+      Used for numeric inputs. The answer is a number and the grading is done by
+      comparing the answer with the correct answer within a tolerance.
+    type: object
+    required: [answer-key]
+    properties:
+      type:
+        const: numeric
+
+      answer-key:
+        description: >-
+          The correct answer. This is a number and the grading is done by comparing
+          the answer with the correct answer within a tolerance.
+        type: number
+
+      tol:
+        description: >-
+          The tolerance for the answer. The answer is correct if it is within this
+          tolerance of the correct answer.
+        type: number
+        default: 0
+
+      relative-tol:
+        description: >-
+          The relative tolerance for the answer. The answer is correct if it is within this
+          relative tolerance of the correct answer.
+        type: number
+        default: 0
+
+      unit:
+        description: >
+          The unit for the answer. It is usually displayed in the input box after the number.
+        type: string
+        default: ""
+        examples:
+          - m
+          - kg
+          - s
+          - meters
+
+  fill-in-input-text:
+    description: >-
+      Used for text based inputs. The answer is a short string of text and the grading is done by
+      comparing it with the reference answer key. For longer answers, please use the "essay" 
+      question type.
+    type: object
+    required: [answer-key]
+    properties:
+      type:
+        const: text
+
+      # TODO: make better answer key options
+      answer-key:
+        description: >-
+          The answer key. It can be specified in different ways:
+          - A single string, which is the correct answer.
+          - An array of strings, which are all correct answers.
+          - A regular expression, which is used to match the answer.
+          - A null value, which denotes that the question must be graded manually.
+        type: string
+
+      case-sensitive:
+        description: >
+          Whether to consider case when comparing the answer with the reference value.
+        type: boolean
+        default: false

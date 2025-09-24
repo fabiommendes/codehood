@@ -15,6 +15,7 @@ frontend.
   defined as Markdown files
 - [MDQ-Spec](./mdq-spec/README.md) - Questions are parsed according to this spec
   to JSON files. This defines the format using a JSON Schema.
-- [Django Katana](./django-katana/README.md) - Smarter routers for Django Ninja.
-- [Django Shuriken](./django-shuriken/README.md) - JSON-RPC integration with
-  Django Ninja.
+- [Django Katana](./django-katana/README.md) - JSON-RPC integration with Django
+  Ninja.
+- [Django Shuriken](./django-shuriken/README.md) - Smarter routers for Django
+  Ninja.

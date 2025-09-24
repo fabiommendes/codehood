@@ -1,0 +1,156 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "base-question"
+
+title: Base question
+description: >-
+  Common fields for all question types. This is a base schema and should not be instantiated
+  directly since it does not correspond to any concrete question type.
+type: object
+required: [id, type, stem]
+
+properties:
+  id:
+    description: A unique identifier for the question in the set.
+    type: string
+    minLength: 1
+
+  type:
+    description: Discriminator for the question type.
+    type: string
+
+  title:
+    description: >-
+      The question title. It is used to display a friendly name in the user interface. It is 
+      different from the ID in that it is a human-readable name which is intended for displaying
+      to the user.
+    type: string
+    default: ""
+    minLength: 1
+
+  stem:
+    description: >-
+      The main command for the question. It should be short and objective and 
+      fits in a single paragraph. It can be written as a question or an incomplete sentence.
+      Longer paragraphs of introductory text can be added in the preamble.
+    type: string
+    minLength: 1
+    examples:
+      - Select the correct answer.
+      - How much is 2 + 2?
+      - The capital of France is...
+
+  format:
+    $ref: "#/$defs/text-format"
+
+  weight:
+    description: >-
+      The weight of the question in points. It is used to compute the final grade. The default 
+      value is 100. The weight is multiplied by the grade of the question to compute the final 
+      grade.
+    type: number
+    default: 100
+
+  preamble:
+    description: An optional text introducing the subject matter of the question.
+    type: string
+    default: ""
+
+  epilogue:
+    description: An optional text that is shown after the question.
+    type: string
+    default: ""
+
+  comment:
+    description: An optional text that is shown only to the teacher.
+    type: string
+    default: ""
+
+  grade-range:
+    $ref: "#/grade-range"
+
+  footnotes:
+    description: >-
+      A list of footnotes declared in the preamble, epilogue or in the main text of the question.
+    type: array
+    default: []
+    items:
+      $ref: "#/$defs/footnote"
+
+  media:
+    description: >-
+      A list of media objects like images and videos that can be referenced in the question.
+    type: array
+    default: []
+    items:
+      $ref: "#/$defs/media-object"
+
+  shuffle:
+    description: Whether it is possible to shuffle the order of the choices.
+    type: boolean
+    default: true
+
+  tags:
+    description: Some arbitrary tags that can be attached to the question.
+    type: array
+    items:
+      type: string
+    default: []
+    uniqueItems: true
+
+$defs:
+  text-format:
+    title: Text format
+    description: How to interpret textual strings.
+    enum: [md, text]
+    default: md
+
+  media-type:
+    title: Media type
+    description: The type of media asset.
+    enum: [image, video, audio]
+
+  media-object:
+    title: Media object
+    description: >-
+      A media object like an image or a video that can be referenced in the question.
+    type: object
+    required: [id, type, url]
+
+    properties:
+      id:
+        description: An identifier for the media object.
+        type: string
+        minLength: 1
+
+      type:
+        $ref: "#/$defs/media-type"
+
+      url:
+        description: The URL for the media asset.
+        type: string
+        minLength: 1
+
+      caption:
+        description: An optional caption for the media object.
+        type: string
+        default: ""
+
+  footnote:
+    title: Footnote
+    description: >-
+      A footnote is a reference to a note at the bottom of the page. It is used to provide 
+      additional information about a word or phrase in the text. They can be referenced in the
+      preamble, epilogue or in the main text of the question.
+    type: object
+    required: [id, text]
+
+    properties:
+      id:
+        description: An identifier for the footnote.
+        type: string
+        minLength: 1
+
+      text:
+        description: The text associated with the footnote.
+        type: string
+        minLength: 1

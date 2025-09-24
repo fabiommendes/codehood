@@ -1,0 +1,153 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "base-programming-question"
+
+title: Base programming question
+description: Common fields for programming questions.
+required: [supported-languages]
+allOf:
+  - $ref: "base-question"
+  - type: object
+    required: [supported-languages]
+    properties:
+      supported-languages:
+        description: >-
+          A list of programming languages that can be used in the question. The list of supported
+          languages depends on the platform. It should be a some slug-like identifier such as 
+          python, cpp, etc.
+
+          Empty arrays (default) implies that only the languages with a declared placeholder or answer 
+          key code are supported. The special array [""] implies that all supported languages are allowed.
+        type: array
+        default: []
+        items:
+          type: string
+
+      placeholder:
+        description: >-
+          A placeholder for the code snippet. It is used to display an initial structure to students.
+          The special wildcard key "" defines the placeholder to all all other languages.
+        $ref: "#/$defs/dict-str-str"
+        examples:
+          - python: |
+              def main():
+                  x = ... # your code here
+                  print("x =", x)
+
+      answer-key:
+        description: >-
+          Reference implementation used to grade the question. It is a code snippet that might be 
+          executed to compute the expected output from some given inputs. It is a dictionary
+          mapping programming languages with their corresponding code snippet.
+        $ref: "#/$defs/dict-str-str"
+
+      timeout:
+        description: >
+          The maximum time in seconds that the answer key can run. If the answer key runs for more
+          than this time, it is considered to be stuck and the execution is aborted.
+        oneOf:
+          - const: null
+          - type: number
+          - type: string
+            pattern: "[0-9]+(.[0-9]+)?%"
+
+      compilation:
+        description: >
+          A dictionary mapping programming languages with their corresponding compilation environments.
+          The options vary on a per-language basis and are encoded as somewhat arbitrary JSON objects.
+        type: object
+        properties:
+          type:
+            description: Encodes the type of environment selected for the language.
+            type: string
+            minLength: 1
+          artifact:
+            description: Name of the produced artifact.
+            type: string
+            minLength: 1
+          artifact-type:
+            description: >
+              The type of artifact produced by the compilation. It is used to determine how to
+              execute the code.
+            enum: [lib, executable]
+            default: executable
+
+      environment:
+        description: >
+          A dictionary mapping programming languages with their corresponding execution environment.
+          The options vary on a per-language basis and are encoded as arbitrary JSON objects with a
+          required "type" key. Each language is associated with a single environment. It is up
+          to the execution environment interpret how the environment options affect how code is 
+          executed.
+        type: object
+        properties:
+          type:
+            description: Encodes the type of environment selected for the language.
+            type: string
+            minLength: 1
+
+      linting:
+        description: >
+          A dictionary mapping programming languages with their corresponding linting options.
+          Linting is executed on successful submissions and can discount points for style and
+          poor practices.
+        type: object
+        properties:
+          type:
+            description: The selected linter mechanism and their options.
+            type: string
+            minLength: 1
+
+      forbidden-functions:
+        description: >
+          A list of fully qualified functions that cannot be used by the student.
+        $ref: "#/$defs/dict-str-array-str"
+
+      forbidden-modules:
+        description: >
+          A list of fully qualified functions modules that cannot be used by the student.
+        $ref: "#/$defs/dict-str-array-str"
+
+      forbidden-types:
+        description: >
+          A list of fully qualified types or classes that cannot be used by the student.
+        $ref: "#/$defs/dict-str-array-str"
+
+      forbidden-syntax:
+        description: >
+          A mapping of languages to a map of keywords (if, for, etc) with the maximum number of 
+          times they can occur in the code.
+        examples:
+          - "":
+              if: 2
+              for: 1
+              while: 0
+            cpp:
+              if: 3
+              for: 2
+        type: object
+        default: {}
+        additionalProperties:
+          $ref: "#/$defs/dict-str-nat"
+
+$defs:
+  dict-str-nat:
+    type: object
+    default: {}
+    additionalProperties:
+      type: integer
+      minValue: 0
+
+  dict-str-str:
+    type: object
+    default: {}
+    additionalProperties:
+      type: str
+
+  dict-str-array-str:
+    type: object
+    default: {}
+    additionalProperties:
+      type: array
+      default: []
+      items:
+        type: string

@@ -1,0 +1,104 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "associative"
+
+title: Associative question
+description: >-
+  Associative questions display a list of items and the user must associate each item with
+  their corresponding answer.
+# type: object
+# additionalProperties: false
+required: [keys, values]
+allOf:
+  - $ref: "base-question"
+  - type: object
+    properties:
+      type:
+        const: associative
+
+      shuffle:
+        description: >-
+          Whether it is possible to shuffle the order of the items in the association.
+        default: both
+        enum: [both, keys, values, none]
+
+      values:
+        description: >-
+          An object with items corresponding to the right hand side of each association. The 
+          keys represent unique identifiers.
+        type: object
+        minProperties: 2
+        additionalProperties:
+          oneOf:
+            - $ref: "#/$defs/associative-item-text"
+            - $ref: "#/$defs/associative-item-image"
+
+      keys:
+        description: >-
+          A list of objects representing the left hand side of the association.
+        type: array
+        minItems: 1
+        items:
+          anyOf:
+            - $ref: "#/$defs/associative-item-key-text"
+            - $ref: "#/$defs/associative-item-key-image"
+
+$defs:
+  associative-item-text:
+    type: object
+    required: [text]
+    properties:
+      text:
+        description: The text to be displayed.
+        type: string
+
+      style:
+        description: >-
+          Apply styles on how the text should be displayed. Can be one of "simple",
+          "headline" or a programming language.
+        default: simple
+        type: string
+
+  associative-item-image:
+    type: object
+    required: [url, alt]
+    properties:
+      url:
+        description: An url relative to the question file.
+        type: string
+
+      alt:
+        description: >-
+          The "alt" tag for the image. It is used to display a text when the image cannot be loaded
+          and for assistive technology. The alt text is never formatted as Markdown.
+        type: string
+
+  associative-item-key:
+    description: Properties for association keys.
+    type: object
+    required: [answer-key]
+    properties:
+      answer-key:
+        description: A list of ids representing correct associations.
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+
+      feedback:
+        description: >-
+          The feedback text shown to students that selected each specific associations.
+        type: object
+        default: {}
+        additionalProperties:
+          type: string
+
+  associative-item-key-text:
+    allOf:
+      - $ref: "#/$defs/associative-item-key"
+      - $ref: "#/$defs/associative-item-text"
+
+  associative-item-key-image:
+    allOf:
+      - $ref: "#/$defs/associative-item-key"
+      - $ref: "#/$defs/associative-item-image"

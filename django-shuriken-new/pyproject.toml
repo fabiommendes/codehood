@@ -1,0 +1,20 @@
+[project]
+name = "django-shuriken"
+version = "0.1.0"
+description = "An extension for Django Ninja that add support for controllers."
+readme = "README.md"
+authors = [
+    { name = "Fábio Macêdo Mendes", email = "fabiomacedomendes@gmail.com" },
+]
+requires-python = ">=3.13"
+dependencies = ["django>=5.2.5", "django-ninja>=1.4.3"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = ["examples/employee"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shuriken"]

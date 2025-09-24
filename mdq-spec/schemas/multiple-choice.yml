@@ -1,0 +1,52 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "multiple-choice"
+
+title: Multiple choice question
+description: >-
+  Multiple choice questions accept a single correct answer, which yields full grade.
+# type: object
+# additionalProperties: false
+required: [choices, grade-range]
+allOf:
+  - $ref: "base-question"
+  - type: object
+    properties:
+      type:
+        const: multiple-choice
+
+      penalty:
+        description: >-
+          A penalty given when grading wrong answers. Penalty is a positive value that
+          corresponds to the negative grade assigned to the wrong answers.
+        type: number
+        default: 0
+        minValue: 0
+
+      choices:
+        description: The list of choices for the question
+        type: array
+        minItems: 2
+        items:
+          $ref: "multiple-choice-item"
+
+      grading-strategy:
+        $ref: "#/$defs/multiple-choice-grading-strategy"
+
+$defs:
+  multiple-choice-grading-strategy:
+    title: Multiple choice grading strategy
+    description: >-
+      Describes how grades are computed from answers. Some strategies allow for multiple selections.
+
+      * simple: 
+          Student select a single choice, grade is assigned base on the "value" of the selected choice.
+      * required:
+          Like before, but the student must select a choice. If no choice is selected, the question 
+          receives an explicit penalty.
+      * average:
+          Student can select multiple choices. The grade is the average of the selected choices.
+    enum:
+      - simple
+      - required
+      - average
+    default: simple

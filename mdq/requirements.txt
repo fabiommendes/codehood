@@ -1,0 +1,4 @@
+flit ~= 3
+pdoc3 ~= 3
+pytest ~= 8
+pydantic ~= 2.11

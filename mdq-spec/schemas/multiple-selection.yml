@@ -1,0 +1,42 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "multiple-selection"
+
+title: Multiple selection question
+description: >-
+  Multiple selection questions display a list of choices and a full grade is 
+  given if the user computes all correct answers and none of the incorrect ones.
+# type: object
+# additionalProperties: false
+required: [choices, grade-range]
+allOf:
+  - $ref: "base-question"
+  - type: object
+    properties:
+      type:
+        const: multiple-selection
+
+      grading:
+        description: >
+          The strategy used for grading. 
+          - strict: The user must select all correct answers and none of the incorrect ones. 
+            the grade is all or nothing.
+          - lenient: Each selected correct answer gives a point and each selected incorrect 
+            answer subtracts a point. The grade is the number of points divided by the number 
+            of correct answers.
+          - true-false: Each choice is treated as a true-false question.
+        type: string
+        default: strict
+
+      choices:
+        description: The list of choices for the question
+        type: array
+        minItems: 2
+        items:
+          allOf:
+            - $ref: "base-selection-item"
+            - type: object
+              properties:
+                correct:
+                  description: Specify if the choice is correct or not.
+                  type: boolean
+                  default: false

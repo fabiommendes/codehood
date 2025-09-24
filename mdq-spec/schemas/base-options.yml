@@ -1,0 +1,32 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "base-options"
+
+title: Base options
+description: >-
+  Control how questions are graded and analyzed.
+type: object
+additionalProperties: false
+properties:
+  average-multiple-choices:
+    description: >-
+      If selected, multiple-choice questions accept multiple answers (even though only one is 
+      considered correct) and the final grade is the average of all selected answers.
+    type: boolean
+    default: false
+
+  partial-multiple-choices:
+    description: >-
+      If set to false, all choices in a multiple choice question with a grade lower than 100% are
+      are reset to the multiple-choice-penalty value.
+    type: boolean
+    default: true
+
+  multiple-choice-penalty:
+    description: >-
+      The penalty for selecting a wrong answer in a multiple-choice question. This value is 
+      subtracted from the total grade of the question. If set to "auto", the penalty is calculated
+      to make the average payoff of guessing an answer equal to 0.
+    default: 0
+    anyOf:
+      - type: number
+      - const: "auto"

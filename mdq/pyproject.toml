@@ -1,0 +1,16 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "mdq"
+authors = [
+    { name = "Fábio Macêdo Mendes", email = "fabiomacedomendes@gmail.com" },
+]
+license = { file = "LICENSE" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+dynamic = ["version", "description"]
+dependencies = ["mistune ~=3.1", "pydantic ~=2.11", "python-slugify ~= 8.0"]
+
+[project.urls]
+Home = "https://github.com/fabiommendes/mdq"

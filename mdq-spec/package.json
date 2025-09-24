@@ -1,0 +1,8 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@sourcemeta/jsonschema": "^9.1.1",
+    "expand-json-schema": "^1.0.1",
+    "js-yaml": "^4.1.0"
+  }
+}
