@@ -1,0 +1,8 @@
+__pycache__/
+*.sqlite3
+debug.log
+/collect/
+/codehood/*/migrations/
+.vscode/
+.idea/
+.mypy_cache/
