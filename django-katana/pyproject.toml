@@ -1,0 +1,55 @@
+[project]
+name = "django-katana"
+version = "0.1.0"
+description = "A Django-ninja compatible RPC API"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.2",
+    "django-ninja>=1.4.1",
+    
+]
+
+[tool.uv]
+dev-dependencies = [
+    "ruff",
+    "django-stubs[compatible-mypy]",
+    "django-types",
+    "mypy",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+ignore = [
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+    "E501", # line too long, handled by black
+]
+preview = true
+select = [
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "D",    # pydocstyle
+    "DOC",  # pydoclint
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "FAST", # fastapi
+    "FLY",  # flynt
+    "FURB", # refurb
+    "I",    # isort
+    "N",    # pep8-naming
+    "PERF", # perflint
+    "RUF",  # ruff
+    "UP",   # pyupgrade
+    "W",    # pycodestyle warnings
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+force-single-line = true
+lines-after-imports = 2
