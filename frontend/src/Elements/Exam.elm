@@ -1,15 +1,15 @@
-module Components.Exam exposing (Model, Msg(..), init, loadData, update, view)
+module Elements.Exam exposing (Model, Msg(..), init, loadData, update, view)
 
 {-| An empty template component
 -}
 
-import Components.Question as Question
 import Data.Answer as Answer
 import Data.Datetime exposing (dueDate)
 import Data.Exam as Data exposing (Exam)
 import Data.Question as Question
 import Data.Question.Essay as Essay
 import Effect exposing (Effect, withEff, withEffs, withNoEff)
+import Elements.Question as Question
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import List.Extra as List exposing (..)

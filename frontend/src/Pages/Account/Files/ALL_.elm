@@ -3,9 +3,9 @@ module Pages.Account.Files.ALL_ exposing (Model, Msg, page)
 import Api
 import Api.Files
 import Auth
+import Components.Directory as Directory
 import Data.Files as Files
 import Effect exposing (Effect, withNoEff)
-import Elements.Directory as Directory
 import Html as H
 import Layouts
 import Layouts.Main as Layout
@@ -69,7 +69,7 @@ view : Model -> View Msg
 view model =
     { title = "Directory: " ++ (model.directory |> Directory.path)
     , body =
-        [ Ui.contentHeader
+        [ Ui.hero
             { title = "/files/" ++ (model.directory |> Directory.path)
             , description = "View your personal files"
             }

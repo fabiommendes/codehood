@@ -1,4 +1,4 @@
-module Elements.Discipline exposing (Model, Msg(..), init, update, view)
+module Components.Discipline exposing (Model, Msg(..), init, update, view)
 
 {-| An empty template component
 -}
@@ -44,7 +44,7 @@ view : Model -> Html Msg
 view { data, classrooms, loaded } =
     let
         header =
-            Ui.contentHeader
+            Ui.hero
                 { title = data.name
                 , description = data.description
                 }

@@ -4,10 +4,10 @@ import Api
 import Api.Disciplines
 import Api.Task as Task
 import Auth
+import Components.Discipline as Discipline
 import Data.Classroom exposing (Classroom)
 import Data.Discipline as Data
 import Effect exposing (Effect, withApiError, withEff, withNoEff)
-import Elements.Discipline as Discipline
 import Html as H
 import Layouts
 import Layouts.Main as Layout

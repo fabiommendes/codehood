@@ -1,20 +1,29 @@
 module Pages.System.Styles exposing (Model, Msg, page)
 
 import Auth
+import Data.Link as Link
 import Effect exposing (Effect)
-import Html exposing (..)
+import Html as H exposing (..)
 import Html.Attributes exposing (..)
 import Layouts
 import Layouts.Main as Layout
 import Page exposing (Page)
 import Route exposing (Route)
+import Route.Path as Path
 import Shared
+import Ui
+import Ui.Container as Ui
 import Ui.Icons as Icons
 import View exposing (View)
 
 
 lorem : String
 lorem =
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+
+
+loremLong : String
+loremLong =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
 
 
@@ -72,27 +81,13 @@ subscriptions _ =
 
 view : Model -> View Msg
 view _ =
-    { title = "List of CodeHood styles"
-    , body =
-        [ div [ class "z-0" ]
-            [ div [ class "breadcrumbs text-sm my-2 mx-8 overflow-y" ]
-                [ ul []
-                    [ li []
-                        [ a [ href "/" ]
-                            [ text "Home" ]
-                        ]
-                    , li []
-                        [ a [ href "/system" ]
-                            [ text "System" ]
-                        ]
-                    , li []
-                        [ text "Styles" ]
-                    ]
-                ]
-            , main_ [ class "content prose px-8" ]
-                [ h2
-                    []
-                    [ text "Prose styles and typography" ]
+    let
+        breadcrumbs =
+            Ui.breadcrumbs [ Link.link "System" Path.System_Styles ] "Styles"
+
+        paragraph =
+            Ui.flat [ class "prose" ]
+                [ h2 [] [ text "Prose styles and typography" ]
                 , p []
                     [ text "A paragraph with semantic "
                     , strong [] [ text "bold" ]
@@ -108,7 +103,42 @@ view _ =
                     , a [ href "#", class "no-underline" ] [ text "no-underline" ]
                     , text "."
                     ]
+                ]
+
+        sections =
+            [ Ui.base [ class "prose" ]
+                [ h2 [] [ text "Primary container color" ]
+                , p [] [ text loremLong ]
+                ]
+            , Ui.primary [ class "prose" ]
+                [ h2 [] [ text "Primary container color" ]
                 , p [] [ text lorem ]
+                ]
+            , Ui.secondary [ class "prose" ]
+                [ h2 [] [ text "Secondary container color" ]
+                , p [] [ text lorem ]
+                ]
+            , Ui.accent [ class "prose" ]
+                [ h2 [] [ text "Accent container color" ]
+                , p [] [ text lorem ]
+                ]
+            , Ui.info [ class "prose" ]
+                [ h2 [] [ text "Info container color" ]
+                , p [] [ text lorem ]
+                ]
+            , Ui.warning [ class "prose" ]
+                [ h2 [] [ text "Warning container color" ]
+                , p [] [ text lorem ]
+                ]
+            , Ui.error [ class "prose" ]
+                [ h2 [] [ text "Error container color" ]
+                , p [] [ text lorem ]
+                ]
+            ]
+
+        typography =
+            Ui.flat [ class "prose" ]
+                [ p [] [ text lorem ]
                 , h1 [] [ text "The Big Heading, for the Page Title" ]
                 , h2 [] [ text "Second Heading, for the Page Subtitle" ]
                 , h3 [] [ text "Third Heading, usually for the Section Title" ]
@@ -146,7 +176,12 @@ view _ =
                             ]
                         ]
                     ]
-                , h2 [] [ text "Colors" ]
+                ]
+
+        colors =
+            Ui.flat
+                [ class "prose" ]
+                [ h2 [] [ text "Colors" ]
                 , p []
                     [ spanClass "text-primary"
                     , text ", "
@@ -173,44 +208,50 @@ view _ =
                     , showColor "error" -- bg-error text-error-content
                     ]
                 ]
-            , siteFooter
-            ]
-        ]
-    }
 
-
-siteFooter : Html msg
-siteFooter =
-    footer
-        [ class "footer sm:footer-horizontal bg-primary text-primary-content p-10 mt-8"
-        , style "background" "url(/static/img/bg/congruent_outline.png)"
-        ]
-        [ nav []
-            [ h6 [ class "footer-title" ]
-                [ text "Services" ]
-            , a [ class "link link-hover" ]
-                [ text "Branding" ]
-            , a [ class "link link-hover" ]
-                [ text "Advertisement" ]
-            ]
-        , nav []
-            [ h6 [ class "footer-title" ]
-                [ text "Company" ]
-            , a [ class "link link-hover" ]
-                [ text "About us" ]
-            , a [ class "link link-hover" ]
-                [ text "Contact" ]
-            ]
-        , nav []
-            [ h6 [ class "footer-title" ]
-                [ text "Social" ]
-            , div [ class "grid grid-flow-col gap-4" ]
-                [ a [] [ Icons.view Icons.Twitter ]
-                , a [] [ Icons.view Icons.Youtube ]
-                , a [] [ Icons.view Icons.Github ]
+        footer =
+            H.footer
+                [ class "footer sm:footer-horizontal bg-primary text-primary-content p-10 mt-8"
+                , style "background" "url(/static/img/bg/congruent_outline.png)"
                 ]
+                [ nav []
+                    [ h6 [ class "footer-title" ]
+                        [ text "Services" ]
+                    , a [ class "link link-hover" ]
+                        [ text "Branding" ]
+                    , a [ class "link link-hover" ]
+                        [ text "Advertisement" ]
+                    ]
+                , nav []
+                    [ h6 [ class "footer-title" ]
+                        [ text "Company" ]
+                    , a [ class "link link-hover" ]
+                        [ text "About us" ]
+                    , a [ class "link link-hover" ]
+                        [ text "Contact" ]
+                    ]
+                , nav []
+                    [ h6 [ class "footer-title" ]
+                        [ text "Social" ]
+                    , div [ class "grid grid-flow-col gap-4" ]
+                        [ a [] [ Icons.view Icons.Twitter ]
+                        , a [] [ Icons.view Icons.Youtube ]
+                        , a [] [ Icons.view Icons.Github ]
+                        ]
+                    ]
+                ]
+    in
+    { title = "List of CodeHood styles"
+    , body =
+        List.concat
+            [ [ breadcrumbs ]
+            , [ paragraph ]
+            , sections
+            , [ typography ]
+            , [ colors ]
+            , [ footer ]
             ]
-        ]
+    }
 
 
 spanClass : String -> Html msg

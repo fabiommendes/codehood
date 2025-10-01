@@ -28,12 +28,11 @@ type Step
     | ValidatingEmail
     | AskPassword
     | InvalidEmail String
-    | InvalidPassword
 
 
 type Msg
-    = UpdateEmail String
-    | UpdatePassword String
+    = UpdateEmail_ String
+    | UpdatePassword_ String
     | VerifyLogin String
     | UserVerified
     | UserInvalid
@@ -54,10 +53,10 @@ init =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        UpdateEmail value ->
+        UpdateEmail_ value ->
             L.email.set value model
 
-        UpdatePassword value ->
+        UpdatePassword_ value ->
             L.password.set value model
 
         VerifyLogin _ ->
@@ -99,12 +98,6 @@ view model =
                     askPassword model
             ]
         ]
-
-
-
--- withErrors : List Api.FieldError -> Model -> Model
--- withErrors error model =
---     { model | errors = error ++ model.errors }
 
 
 clearErrors : Model -> Model
@@ -166,7 +159,7 @@ askEmail errors model =
                         , id "email"
                         , required True
                         , placeholder "Digite aqui"
-                        , onInput UpdateEmail
+                        , onInput UpdateEmail_
                         , autofocus True
                         ]
                         []
@@ -207,7 +200,7 @@ askPassword model =
                     , id "password"
                     , required True
                     , placeholder "Digite aqui"
-                    , onInput UpdatePassword
+                    , onInput UpdatePassword_
                     , autofocus True
                     , disabled (model.step /= AskPassword)
                     ]

@@ -1,7 +1,7 @@
 module Data.Exam exposing
     ( Exam
+    , Kind(..)
     , PathParams
-    , Role(..)
     , decoder
     , empty
     , encode
@@ -34,7 +34,7 @@ type alias Exam =
     , instructorName : String
     , slug : String
     , title : String
-    , role : Role
+    , kind : Kind
     , description : String
     , preamble : String
     , start : Posix
@@ -44,12 +44,12 @@ type alias Exam =
     }
 
 
-type Role
-    = RoleQuiz
-    | RoleExam
-    | RolePractice
-    | RoleArchived
-    | RoleInactive
+type Kind
+    = Quiz
+    | Standard
+    | Practice
+    | Archived
+    | Draft
 
 
 empty : Exam
@@ -61,7 +61,7 @@ empty =
     , instructorName = ""
     , slug = ""
     , title = ""
-    , role = RoleInactive
+    , kind = Practice
     , description = ""
     , preamble = ""
     , start = Time.millisToPosix 0
@@ -74,14 +74,14 @@ empty =
 type alias PathParams =
     { discipline : String
     , classroom : String
-    , role : String
+    , kind : String
     , exam : String
     }
 
 
 paramsToNaturalId : PathParams -> String
-paramsToNaturalId { discipline, classroom, role, exam } =
-    "(" ++ String.join "," [ discipline, classroom, role, exam ] ++ ")"
+paramsToNaturalId { discipline, classroom, kind, exam } =
+    "(" ++ String.join "," [ discipline, classroom, kind, exam ] ++ ")"
 
 
 toPathParams : Classroom -> Exam -> PathParams
@@ -93,13 +93,13 @@ toPathParams cls exam =
     { discipline = discipline
     , classroom = classroom
     , exam = exam.slug
-    , role = roleToString exam.role
+    , kind = kindToString exam.kind
     }
 
 
 toPath : Classroom -> Exam -> Path.Path
 toPath cls exam =
-    Path.Discipline__Classroom__Role__Exam_ (toPathParams cls exam)
+    Path.Discipline__Classroom__Kind__Exam_ (toPathParams cls exam)
 
 
 toLink : Classroom -> Exam -> Link msg
@@ -117,7 +117,7 @@ decoder =
         |> D.required "instructor_name" D.string
         |> D.required "slug" D.string
         |> D.required "title" D.string
-        |> D.required "role" decodeRole
+        |> D.required "kind" decodeKind
         |> D.required "description" D.string
         |> D.required "preamble" D.string
         |> D.required "start" posixDecoder
@@ -136,7 +136,7 @@ encode exam =
         , ( "instructor_name", E.string exam.instructorName )
         , ( "slug", E.string exam.slug )
         , ( "title", E.string exam.title )
-        , ( "role", encodeRole exam.role )
+        , ( "kind", encodeRole exam.kind )
         , ( "description", E.string exam.description )
         , ( "preamble", E.string exam.preamble )
         , ( "start", encodePosix exam.start )
@@ -146,26 +146,26 @@ encode exam =
         ]
 
 
-roleMap : List ( Role, String )
-roleMap =
-    [ ( RoleQuiz, "quiz" )
-    , ( RoleExam, "exam" )
-    , ( RolePractice, "practice" )
-    , ( RoleArchived, "archived" )
-    , ( RoleInactive, "inactive" )
+kindMap : List ( Kind, String )
+kindMap =
+    [ ( Quiz, "quiz" )
+    , ( Standard, "exam" )
+    , ( Practice, "practice" )
+    , ( Archived, "archived" )
+    , ( Draft, "draft" )
     ]
 
 
-decodeRole : D.Decoder Role
-decodeRole =
-    enumDecode roleMap D.string
+decodeKind : D.Decoder Kind
+decodeKind =
+    enumDecode kindMap D.string
 
 
-encodeRole : Role -> E.Value
+encodeRole : Kind -> E.Value
 encodeRole =
-    enumEncode roleMap E.string
+    enumEncode kindMap E.string
 
 
-roleToString : Role -> String
-roleToString role =
-    fromEnum roleMap role
+kindToString : Kind -> String
+kindToString kind =
+    fromEnum kindMap kind

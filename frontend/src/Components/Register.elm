@@ -1,20 +1,17 @@
-module Elements.Register exposing (Model, Msg(..), init, update, view)
+module Components.Register exposing (Model, Msg(..), init, update, view)
 
 {-| An empty template element
 -}
 
 import Components.Login exposing (Msg(..))
 import Data.RegisterUser exposing (RegisterUser)
-import Data.User as User exposing (Role(..), User)
+import Data.User as User exposing (Role(..))
 import Dict exposing (Dict)
 import Html as H exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onSubmit)
 import Maybe.Extra
-import Ui.Cards as Cards
-import Ui.Icons as Icons
 import Util exposing (..)
-import Util.Lens as L exposing (password)
 
 
 type alias Key =
@@ -64,9 +61,6 @@ update msg model =
 view : Model -> Html Msg
 view model =
     let
-        renderErrors key m =
-            Dict.get key m.errors
-
         render data =
             let
                 errors =

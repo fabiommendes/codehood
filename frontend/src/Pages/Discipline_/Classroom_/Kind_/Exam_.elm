@@ -1,11 +1,10 @@
-module Pages.Discipline_.Classroom_.Role_.Exam_ exposing (Model, Msg, page)
+module Pages.Discipline_.Classroom_.Kind_.Exam_ exposing (Model, Msg, page)
 
 import Api
 import Api.Classrooms
 import Api.Exams
 import Api.Task as Task
 import Auth
-import Components.Exam as Inner
 import Data.Answer as Answer
 import Data.Classroom as Classroom
 import Data.Discipline as Discipline
@@ -13,6 +12,7 @@ import Data.Exam as Exam
 import Data.Link as Link
 import Effect exposing (Effect, withApiError, withEffs, withInnerEff)
 import Effect.Log exposing (LogLevel(..))
+import Elements.Exam as Inner
 import Html as H
 import Layouts
 import Layouts.Main as Layout
@@ -21,12 +21,13 @@ import Route exposing (Route)
 import Route.Path as Path
 import Shared
 import Ui
+import Ui.Classroom
 import Util exposing (..)
 import Util.Lens as L
 import View exposing (View)
 
 
-page : Auth.User -> Shared.Model -> Route { discipline : String, classroom : String, role : String, exam : String } -> Page Model Msg
+page : Auth.User -> Shared.Model -> Route { discipline : String, classroom : String, kind : String, exam : String } -> Page Model Msg
 page user _ route =
     Page.new
         { init = init route.params
@@ -130,7 +131,7 @@ view : Model -> View Msg
 view { inner, classroom } =
     { title = "Pages.Classroom_"
     , body =
-        [ Ui.contentHeader { description = "", title = "Inners" } [] []
+        [ Ui.Classroom.hero classroom
         , Ui.breadcrumbs
             [ Discipline.toLink classroom.discipline
             , Classroom.toLink classroom

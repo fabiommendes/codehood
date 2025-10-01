@@ -2,21 +2,25 @@ module Pages.Discipline_.Classroom_ exposing (Model, Msg, page)
 
 import Api
 import Api.Classrooms
+import Api.Exams
 import Api.Task as Task
 import Auth
-import Data.Classroom as Data exposing (Classroom)
+import Data.Classroom as Classroom exposing (Classroom)
 import Data.Discipline as Discipline
-import Data.Schedule exposing (Schedule)
+import Data.Exam as Exam exposing (Exam)
+import Data.Schedule as Schedule exposing (Schedule)
+import Data.User as User
 import Effect exposing (..)
-import Elements.Classroom as Inner
-import Html as H
-import Html.Attributes as HA
+import Html exposing (..)
+import Html.Attributes exposing (..)
 import Layouts
 import Layouts.Main as Layout
 import Page exposing (Page)
 import Route exposing (Route)
 import Shared
 import Ui
+import Ui.Classroom
+import Ui.Container
 import Util.Lens as L
 import View exposing (View)
 
@@ -33,10 +37,22 @@ page user _ route =
 
 
 type alias Model =
-    { inner : Inner.Model
+    { classroom : Classroom
+    , schedule : Schedule
+    , subscriptionCode : String
+    , subscriptionCodeOverlay : Bool
+    , exercises : List Exam
+    , exams : List Exam
+    , quizzes : List Exam
     , isLoading : Bool
     , user : Auth.User
     }
+
+
+type Msg
+    = DataReceived (Result Api.Error ( Classroom, Schedule ))
+    | ExamsReceived (Result Api.Error (Api.Paginated Exam))
+    | ToggleSubscriptionCodeOverlay
 
 
 init : Auth.User -> { discipline : String, classroom : String } -> () -> ( Model, Effect Msg )
@@ -50,35 +66,73 @@ init user params () =
                             |> Task.map (\schedule -> ( cls, schedule ))
                     )
     in
-    { inner = Inner.empty, user = user, isLoading = True }
+    { classroom = Classroom.empty
+    , schedule = Schedule.empty
+    , subscriptionCode = ""
+    , subscriptionCodeOverlay = False
+    , isLoading = True
+    , exercises = []
+    , exams = []
+    , quizzes = []
+    , user = user
+    }
         |> withEffs [ Effect.attemptHttp DataReceived task ]
-
-
-type Msg
-    = InnerMsg Inner.Msg
-    | DataReceived (Result Api.Error ( Classroom, Schedule ))
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
 update msg_ model =
     case msg_ of
-        InnerMsg msg ->
-            model
-                |> L.update L.inner (Inner.update msg)
+        DataReceived (Ok ( cls, schedule )) ->
+            { model
+                | classroom = cls
+                , isLoading = False
+                , schedule = schedule
+            }
+                |> withEff
+                    (Effect.batch
+                        [ Effect.navbarSections [ Classroom.contextualMenu cls ]
+                        , Effect.sendRequest ExamsReceived (Api.Exams.getExamsForClassroom cls.id)
+                        ]
+                    )
+
+        ExamsReceived (Ok paginated) ->
+            let
+                categorize e ( xs, ys, zs ) =
+                    case e.kind of
+                        Exam.Practice ->
+                            ( e :: xs, ys, zs )
+
+                        Exam.Quiz ->
+                            ( xs, e :: ys, zs )
+
+                        Exam.Standard ->
+                            ( xs, ys, e :: zs )
+
+                        _ ->
+                            ( xs, ys, zs )
+
+                ( exercises, exams, quizzes ) =
+                    List.foldr categorize ( [], [], [] ) paginated.items
+            in
+            { model
+                | exercises = exercises
+                , exams = exams
+                , quizzes = quizzes
+            }
                 |> withNoEff
 
-        DataReceived (Ok ( cls, schedule )) ->
+        ExamsReceived (Err err) ->
             model
-                |> L.inner.set (Inner.init model.user cls)
-                |> L.isLoading.set False
-                |> withEffs
-                    [ Effect.sendMsg (InnerMsg (Inner.UpdateSchedule schedule))
-                    , Effect.navbarSections [ Data.contextualMenu cls ]
-                    ]
+                |> withApiError err
 
         DataReceived (Err err) ->
             model
                 |> withApiError err
+
+        ToggleSubscriptionCodeOverlay ->
+            model
+                |> L.map not L.subscriptionCodeOverlay
+                |> withNoEff
 
 
 subscriptions : Model -> Sub Msg
@@ -87,21 +141,38 @@ subscriptions _ =
 
 
 view : Model -> View Msg
-view { inner } =
+view model =
     let
-        classroom =
-            inner.data
+        { classroom, schedule, user } =
+            model
     in
     { title = "Pages.Classroom_"
     , body =
-        [ Ui.contentHeader
-            { title = classroom.title
-            , description = classroom.description
-            }
-            []
-            [ H.span [ HA.class "badge badge-primary" ] [ H.text (String.fromInt inner.studentsCount ++ " Students") ]
-            ]
+        [ Ui.Classroom.hero classroom
         , Ui.breadcrumbs [ Discipline.toLink classroom.discipline ] classroom.edition
-        , H.map InnerMsg (Inner.view inner)
+        , div []
+            (Ui.Classroom.subscriptionCodeDialog
+                { isOpen = model.subscriptionCodeOverlay
+                , isInstructor = user.role == User.Instructor
+                , subscriptionCode = model.subscriptionCode
+                , onToggle = ToggleSubscriptionCodeOverlay
+                }
+            )
+        , Ui.Container.flat []
+            [ h2 [ class "h2 pb-4" ] [ text "Schedule" ]
+            , Ui.Classroom.schedule [ id "classroom-schedule" ] schedule
+            ]
+        , div [ class "join join-vertical" ]
+            [ Ui.Container.primary [ class "collapse collapse-plus join-item" ]
+                [ input [ type_ "radio", name "classroom-accordion" ] []
+                , h2 [ class "h2 collapse-title p-0" ] [ text "Exercises" ]
+                , p [ class "collapse-content p-0" ] [ text "Coming soon..." ]
+                ]
+            , Ui.Container.secondary [ class "collapse collapse-plus join-item" ]
+                [ input [ type_ "radio", name "classroom-accordion" ] []
+                , h2 [ class "h2 collapse-title p-0" ] [ text "Exams" ]
+                , p [ class "collapse-content p-0" ] [ text "Coming soon..." ]
+                ]
+            ]
         ]
     }

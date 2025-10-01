@@ -1,11 +1,11 @@
-module Data.Schedule exposing (..)
+module Data.Schedule exposing (Event, Schedule, TimeSlot, decoder, empty)
 
 import Data.Datetime exposing (dateDecoder, posixDecoder)
 import Date exposing (Date)
 import Hour as Time exposing (Time(..))
 import Json.Decode as D
 import Json.Decode.Pipeline as D
-import Time exposing (Posix, Weekday(..))
+import Time exposing (Month(..), Posix, Weekday(..))
 import Util.EnumDecode exposing (enumDecode)
 
 
@@ -31,6 +31,15 @@ type alias Event =
     , isHoliday : Bool
     , start : Posix
     , end : Posix
+    }
+
+
+empty : Schedule
+empty =
+    { start = Date.fromCalendarDate 1970 Jan 1
+    , end = Date.fromCalendarDate 1970 Jan 1
+    , events = []
+    , timeSlots = []
     }
 
 

@@ -1,4 +1,4 @@
-module Elements.Directory exposing (Model(..), Msg(..), init, path, update, view)
+module Components.Directory exposing (Model(..), Msg(..), init, path, update, view)
 
 {-| View Directories in a file
 -}
@@ -61,6 +61,16 @@ viewFiles files =
                 [ td [] [ a [ class "link", href "../" ] [ text "..." ] ]
                 , td [] []
                 ]
+
+        viewFile file =
+            let
+                name =
+                    Files.name file
+            in
+            tr []
+                [ td [] [ a [ class "link", href name ] [ text name ] ]
+                , td [] [ text (Files.showKind file.kind) ]
+                ]
     in
     table [ class "table" ]
         [ thead []
@@ -70,16 +80,4 @@ viewFiles files =
                 ]
             ]
         , tbody [] (firstRow :: List.map viewFile files)
-        ]
-
-
-viewFile : Files.File -> Html msg
-viewFile file =
-    let
-        name =
-            Files.name file
-    in
-    tr []
-        [ td [] [ a [ class "link", href name ] [ text name ] ]
-        , td [] [ text (Files.showKind file.kind) ]
         ]

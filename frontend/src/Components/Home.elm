@@ -1,4 +1,4 @@
-module Elements.Home exposing (Model, Msg(..), init, update, view)
+module Components.Home exposing (Model, Msg(..), init, update, view)
 
 {-| An empty template element
 -}
@@ -8,7 +8,9 @@ import Data.Classroom exposing (Classroom)
 import Html as H exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onSubmit)
+import Ui
 import Ui.Cards as Cards exposing (classrooms)
+import Ui.Container as Ui
 import Util exposing (..)
 
 
@@ -20,8 +22,8 @@ type alias Model =
 
 
 type Msg
-    = ClassroomsReceived (List Classroom)
-    | RegistrationReceived (Result String Classroom)
+    = UpdateClassrooms (List Classroom)
+    | UpdateRegistration (Result String Classroom)
     | UpdateRegistrationId String
     | SendRegistrationCode String
 
@@ -37,7 +39,7 @@ init _ classrooms =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        ClassroomsReceived cls ->
+        UpdateClassrooms cls ->
             { model | classrooms = Just cls }
 
         UpdateRegistrationId id ->
@@ -46,40 +48,42 @@ update msg model =
         SendRegistrationCode _ ->
             model
 
-        RegistrationReceived (Ok cls) ->
+        UpdateRegistration (Ok cls) ->
             { model
                 | classrooms = Just (cls :: (model.classrooms |> Maybe.withDefault []))
                 , registrationId = ""
                 , error = ""
             }
 
-        RegistrationReceived (Err err) ->
+        UpdateRegistration (Err err) ->
             { model | error = err }
 
 
 view : Model -> Html Msg
 view m =
     div []
-        [ Cards.classrooms m.classrooms
-        , viewNewClassroom m
+        [ viewNewClassroom m
+        , Cards.classrooms m.classrooms
         ]
 
 
 viewNewClassroom : Model -> Html Msg
 viewNewClassroom m =
-    H.form [ id "new-classroom", class "p-4 shadow-md bg-base-300", onSubmit (SendRegistrationCode m.registrationId) ]
-        [ fieldset [ class "fieldset" ]
-            [ legend [ class "fieldset-legend" ] [ text "Enrollment code" ]
-            , input
-                [ type_ "text"
-                , class "input w-full"
-                , onInput UpdateRegistrationId
-                , placeholder "Code"
-                , name "class-id"
-                , maxlength 8
+    Ui.base []
+        [ H.form [ id "new-classroom", onSubmit (SendRegistrationCode m.registrationId) ]
+            [ fieldset [ class "fieldset" ]
+                [ legend [ class "fieldset-legend" ] [ text "Enrollment code" ]
+                , input
+                    [ type_ "text"
+                    , class "input w-full"
+                    , onInput UpdateRegistrationId
+                    , placeholder "Code"
+                    , name "class-id"
+                    , maxlength 8
+                    ]
+                    []
+                , p [ class "label" ] [ text "Ask the enrollment code to the classroom instructor." ]
                 ]
-                []
-            , p [ class "label" ] [ text "Ask the enrollment code to the classroom instructor." ]
+            , div [ class "text-right" ] [ button [ class "btn btn-secondary" ] [ text "Register" ] ]
             ]
-        , div [ class "text-right" ] [ button [ class "btn btn-primary" ] [ text "Register" ] ]
         ]

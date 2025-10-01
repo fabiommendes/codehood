@@ -2,10 +2,10 @@ module Pages.Home_ exposing (Model, Msg, page)
 
 import Api
 import Api.Classrooms exposing (getEnrolled)
+import Components.Home as Home
+import Components.LandingPage as LandingPage
 import Data.Classroom exposing (Classroom)
 import Effect exposing (Effect, withEff, withNoEff)
-import Elements.Home as Home
-import Elements.LandingPage as LandingPage
 import Html as H
 import Layouts
 import Layouts.Main as Layout
@@ -72,12 +72,12 @@ update msg_ model_ =
                 |> withNoEff
 
         ( ClassroomsReceived (Ok classrooms), Home model ) ->
-            Home.update (Home.ClassroomsReceived classrooms) model
+            Home.update (Home.UpdateClassrooms classrooms) model
                 |> Home
                 |> withNoEff
 
         ( EnrolledToClassroom (Ok classroom), Home model ) ->
-            Home.update (Home.RegistrationReceived (Ok classroom)) model
+            Home.update (Home.UpdateRegistration (Ok classroom)) model
                 |> Home
                 |> withNoEff
 

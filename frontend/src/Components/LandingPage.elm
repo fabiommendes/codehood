@@ -1,4 +1,4 @@
-module Elements.LandingPage exposing (..)
+module Components.LandingPage exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -35,7 +35,7 @@ view model =
 
 
 heroSection : Model -> Html msg
-heroSection model =
+heroSection _ =
     section
         [ class "text-white py-20 bg-cover bg-no-repeat"
         , style "background" "linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.25)), url(/static/img/pics/people.jpg)"

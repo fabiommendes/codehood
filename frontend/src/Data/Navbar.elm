@@ -9,10 +9,10 @@ module Data.Navbar exposing
 {-| This module describes the Navbar component to the left of Codhood's UI.
 -}
 
+import Components.Directory exposing (Msg(..))
 import Data.Classroom as Classroom exposing (Classroom)
 import Data.Link as Link
 import Data.Menu as Menu exposing (Menu)
-import Elements.Directory exposing (Msg(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import List.Extra as List

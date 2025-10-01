@@ -14,6 +14,7 @@ type Icon
     | Home
     | Search
     | Person
+    | Menu
       -- SOCIAL
     | Facebook
     | Twitter
@@ -65,6 +66,9 @@ viewWithAttrs attrs icon =
         Person ->
             Ui.Svg.person attrs
 
+        Menu ->
+            Ui.Svg.menu attrs
+
         -- SOCIAL
         Facebook ->
             Ui.Svg.facebook attrs
@@ -114,12 +118,19 @@ iconsMap =
     , ( Home, "home" )
     , ( Search, "search" )
     , ( Person, "person" )
+    , ( Menu, "menu" )
+
+    -- SOCIAL
     , ( Facebook, "facebook" )
     , ( Twitter, "twitter" )
     , ( Github, "github" )
     , ( Youtube, "youtube" )
+
+    -- NAVIGATION
     , ( ArrowRight, "arrow-right" )
     , ( ArrowLeft, "arrow-left" )
+
+    -- MISC
     , ( Sun, "sun" )
     , ( Moon, "moon" )
     , ( Plus, "plus" )

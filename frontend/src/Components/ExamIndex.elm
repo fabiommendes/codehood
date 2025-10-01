@@ -1,4 +1,4 @@
-module Elements.ExamIndex exposing (Model, Msg(..), init, update, view)
+module Components.ExamIndex exposing (Model, Msg(..), init, update, view)
 
 {-| An empty template component
 -}
@@ -39,6 +39,21 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
+    let
+        examCard : Classroom -> Exam -> Html msg
+        examCard cls exam =
+            let
+                endTime =
+                    exam.end
+                        |> Maybe.map (Date.fromPosix Time.utc >> Date.format "dd/MM/yyyy")
+                        |> Maybe.withDefault "never"
+            in
+            li [ class "card bg-base-100 shadow-md p-4 border border-base-300 rounded-lg" ]
+                [ div [ class "text-xl font-bold text-primary" ] [ text exam.title ]
+                , div [ class "text-secondary" ] [ text ("Due: " ++ endTime) ]
+                , a [ Path.href (Data.toPath cls exam), class "btn btn-primary text-accent mt-2" ] [ text "GO" ]
+                ]
+    in
     case model.data of
         [] ->
             viewWarning "No exam happening right now!"
@@ -49,21 +64,6 @@ view model =
                 , ul [ class "space-y-4" ]
                     (List.map (examCard model.classroom) exams)
                 ]
-
-
-examCard : Classroom -> Exam -> Html msg
-examCard cls exam =
-    let
-        endTime =
-            exam.end
-                |> Maybe.map (Date.fromPosix Time.utc >> Date.format "dd/MM/yyyy")
-                |> Maybe.withDefault "never"
-    in
-    li [ class "card bg-base-100 shadow-md p-4 border border-base-300 rounded-lg" ]
-        [ div [ class "text-xl font-bold text-primary" ] [ text exam.title ]
-        , div [ class "text-secondary" ] [ text ("Due: " ++ endTime) ]
-        , a [ Path.href (Data.toPath cls exam), class "btn btn-primary text-accent mt-2" ] [ text "GO" ]
-        ]
 
 
 viewWarning : String -> Html msg

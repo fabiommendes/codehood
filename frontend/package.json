@@ -2,7 +2,7 @@
   "dependencies": {
     "autoprefixer": "^10.4.21",
     "daisyui": "^5.1.13",
-    "elm-land": "file:elm-land/projects/cli",
+    "elm-land": "file:../elm-land/projects/cli",
     "elm-localstorage": "^1.0.1",
     "elm-taskport": "^2.0.1"
   },

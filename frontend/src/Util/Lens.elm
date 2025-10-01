@@ -183,6 +183,11 @@ logout =
     Lens .logout (\v m -> { m | logout = v })
 
 
+logoutDialog : Lens { a | logoutDialog : b } b
+logoutDialog =
+    Lens .logoutDialog (\v m -> { m | logoutDialog = v })
+
+
 model : Lens { a | model : b } b
 model =
     Lens .model (\v m -> { m | model = v })
@@ -218,14 +223,19 @@ register =
     Lens .register (\v m -> { m | register = v })
 
 
-sidebar : Lens { a | sidebar : b } b
-sidebar =
-    Lens .sidebar (\v m -> { m | sidebar = v })
+schedule : Lens { a | schedule : b } b
+schedule =
+    Lens .schedule (\v m -> { m | schedule = v })
 
 
 selected : Lens { a | selected : b } b
 selected =
     Lens .selected (\v m -> { m | selected = v })
+
+
+sidebar : Lens { a | sidebar : b } b
+sidebar =
+    Lens .sidebar (\v m -> { m | sidebar = v })
 
 
 schoolId : Lens { a | schoolId : b } b

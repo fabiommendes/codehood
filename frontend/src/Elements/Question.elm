@@ -1,4 +1,4 @@
-module Components.Question exposing
+module Elements.Question exposing
     ( Model
     , Msg(..)
     , init
@@ -12,23 +12,16 @@ module Components.Question exposing
 import Data.Answer as Answer exposing (Answer(..))
 import Data.Question as Question exposing (Question)
 import Data.Question.Essay as Essay
-import Data.Question.FillIn as FillIn
 import Data.Question.MultipleChoice as MultipleChoice
 import Data.Question.MultipleSelection as MultipleSelection
 import Data.Question.TrueFalse as TrueFalse
-import Dict exposing (Dict)
 import Effect exposing (Effect, withNoEff)
 import Html as H exposing (..)
-import Html.Attributes as HA exposing (..)
+import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Set exposing (Set)
 import Ui
 import Util exposing (iff)
 import Util.Lens as L
-
-
-type alias Id =
-    String
 
 
 type alias Model =
@@ -152,7 +145,7 @@ view options ({ data } as model) =
 
 
 viewInput : { isSelected : Bool, isStandalone : Bool } -> Model -> Html Msg
-viewInput options { data } =
+viewInput _ { data } =
     let
         makeOptions tag =
             { onSetAnswer = tag >> SetAnswer }

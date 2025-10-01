@@ -1,4 +1,4 @@
-module Elements.Footer exposing (..)
+module Components.Footer exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (class, style)

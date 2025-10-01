@@ -48,8 +48,11 @@ the application are:
 * **Api** - functions to interact with the backend API. Each section in the
   swagger documentation has a corresponding module here, e.g., `Api.Auth` has all
   routes related to authentication.
+* **Ui** - simple UI elements like buttons, inputs, etc. that are used across
+  different pages and components. Ui do not have their own Model and Msg types,
+  and usully correspond to a single view function. 
 * **Elements/Components** - reusable UI elements that can be used across
-  different pages. Elements obbey a simple Elm architecture pattern with
+  different pages. They obbey a simple Elm architecture pattern with
   `Model`, `Msg` types. Components and Elements differ in the signature of the
   `init` and `update` functions:
 
@@ -75,15 +78,9 @@ the application are:
   Components are favored to Elements. And usually if an UI element needs to
   interact with the backend API, it should be implemented as a Component used by
   a Page which is then responsible to manage the API interactions.
-* **Components** - more complex UI elements that can be used across different
-  pages. Components obbey a more complex Elm architecture pattern with `Model`,
-  `Msg` types and functions:
 * **Pages** - the main views of the application, each page corresponds to a
   specific route. Usually pages implement the Api interactions and control the
   corresponding Element/Components passing the necessary messages.
-* **Ui** - simple UI elements like buttons, inputs, etc. that are used across
-  different pages and components. Ui do not have their own Model or Msg types,
-  and usully correspond to a single view function. 
 * **Util** - utility functions that can be used across different parts of the
   application. 
 * **Util.Lens** - define lenses to work with nested records. Lenses are defined

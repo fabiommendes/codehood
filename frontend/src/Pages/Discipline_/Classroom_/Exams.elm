@@ -5,11 +5,11 @@ import Api.Classrooms as Api
 import Api.Exams as Api
 import Api.Task as Task
 import Auth
+import Components.ExamIndex as Exams
 import Data.Classroom as Classroom
 import Data.Discipline as Discipline
 import Data.Exam as Data
 import Effect exposing (Effect, withApiError, withEffs, withNoEff)
-import Elements.ExamIndex as Exams
 import Html as H
 import Layouts
 import Layouts.Main as Layout
@@ -17,6 +17,7 @@ import Page exposing (Page)
 import Route exposing (Route)
 import Shared
 import Ui
+import Ui.Classroom
 import Util exposing (..)
 import Util.Lens as L
 import View exposing (View)
@@ -38,6 +39,11 @@ type alias Model =
     , isLoading : Bool
     , user : Auth.User
     }
+
+
+classroom : Model -> Classroom.Classroom
+classroom model =
+    model.data.classroom
 
 
 init : Auth.User -> { discipline : String, classroom : String } -> () -> ( Model, Effect Msg )
@@ -93,7 +99,7 @@ view model =
     in
     { title = "Pages.Classroom_"
     , body =
-        [ Ui.contentHeader { description = "", title = "Exams" } [] []
+        [ Ui.Classroom.hero (classroom model)
         , Ui.breadcrumbs
             [ Discipline.toLink data.classroom.discipline
             , Classroom.toLink data.classroom

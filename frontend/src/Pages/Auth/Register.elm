@@ -4,10 +4,10 @@ import Api
 import Api.Auth
 import Api.Classrooms exposing (getEnrolled)
 import Components.Login exposing (Msg(..))
+import Components.Register as Register
 import Data.Credentials exposing (Credentials)
 import Data.RegisterUser exposing (RegisterUser)
 import Effect exposing (Effect, withEff, withNoEff)
-import Elements.Register as Register
 import Html as H
 import Html.Attributes as HA
 import Page exposing (Page)
