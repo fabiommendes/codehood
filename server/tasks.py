@@ -1,7 +1,8 @@
 # type: ignore
 from pathlib import Path
 
-from invoke import task, Context as Ctx
+from invoke import Context as Ctx
+from invoke import task
 
 BASE_DIR = Path(__file__).parent
 CODEHOOD_DIR = BASE_DIR / "codehood"
@@ -55,11 +56,11 @@ def clear_migrations(ctx):
 
         # Only the first migration is created. Safely remove, because we can reconstruct it
         # with makemigrations
-        if all(key.endswith("_initial") for key in migrations.keys()):
-            for key, path in migrations.items():
-                print(f"removing migration {app_name}/{key}")
-                path.unlink()
-            continue
+        # if all(key.endswith("_initial") for key in migrations.keys()):
+        #     for key, path in migrations.items():
+        #         print(f"removing migration {app_name}/{key}")
+        #         path.unlink()
+        #     continue
 
         # Remove the auto migrations
         if migrations:

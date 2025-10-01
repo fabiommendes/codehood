@@ -1,14 +1,13 @@
-from functools import cache
 import itertools
+from functools import cache
 
 from ..classrooms.models import Classroom
-from .models import Exam
 from ..questions.fixtures import question
 from ..questions.models import Question
 from ..utils import repr_number
+from .models import Exam
 
-
-ROLES = itertools.cycle(Exam.Role)
+KINDS = itertools.cycle(Exam.Kind)
 
 
 @cache
@@ -25,7 +24,7 @@ def exam(
         slug=f"exam-{index}{suffix}",
         title=f"Exam {index}{suffix}",
         description=f"Exam {index}{suffix} description",
-        role=next(ROLES),
+        kind=next(KINDS),
     )
     defaults.update(kwargs)
     exam = Exam.objects.create(**defaults)

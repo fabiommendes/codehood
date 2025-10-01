@@ -1,16 +1,17 @@
 from __future__ import annotations
-from typing import Any
-import hashlib
 
+import hashlib
+from typing import Any
 
 import mdq
+from django.core.files import File
 from django.core.validators import MinLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from ..types import TaggableManager, Tags
-from ..exams.models import Exam
 from .. import yaml as _yaml
+from ..exams.models import Exam
+from ..types import TaggableManager, Tags
 
 
 class Question(models.Model):
@@ -32,12 +33,12 @@ class Question(models.Model):
         TRUE_FALSE = mdq.QuestionType.TRUE_FALSE, _("True/False")
         UNIT_TEST = mdq.QuestionType.UNIT_TEST, _("Unit tests")
 
-    exam = models.ForeignKey(
+    exam = models.ForeignKey[Exam](
         to=Exam,
         on_delete=models.CASCADE,
         related_name="questions",
     )
-    slug = models.SlugField(
+    slug = models.SlugField[str, str](
         _("id"),
         help_text=_("Unique identifier per exam."),
     )
@@ -47,49 +48,49 @@ class Question(models.Model):
         max_length=20,
         help_text=_("Question type"),
     )
-    title = models.CharField(
+    title = models.CharField[str, str](
         _("title"),
         max_length=255,
         validators=[MinLengthValidator(1)],
         help_text=_("Title of the question"),
     )
-    stem = models.TextField(
+    stem = models.TextField[str, str](
         _("stem"),
         validators=[MinLengthValidator(1)],
         help_text=_("A short prompt or question to be answered."),
     )
-    format = models.CharField(
+    format = models.CharField[str, str](
         _("format"),
         choices=Format.choices,
         default=Format.MARKDOWN,
         max_length=4,
         help_text=_("Format of textual data used in the question"),
     )
-    points = models.FloatField(
+    points = models.FloatField[float, float](
         _("points"),
         default=1.0,
         help_text=_("How much the question is worth in the exam"),
     )
-    preamble = models.TextField(
+    preamble = models.TextField[str, str](
         _("preamble"),
         blank=True,
         help_text=_("A short introduction to the question"),
     )
-    epilogue = models.TextField(
+    epilogue = models.TextField[str, str](
         _("epilogue"),
         blank=True,
         help_text=_(
             "A short conclusion to the question. This text will be shown after the main prompt."
         ),
     )
-    comments = models.TextField(
+    comments = models.TextField[str, str](
         _("comments"),
         blank=True,
         help_text=_(
             "Private observations about the question. It will not be shown to students."
         ),
     )
-    shuffle = models.BooleanField(
+    shuffle = models.BooleanField[bool, bool](
         _("shuffle"),
         default=True,
         help_text=_(
@@ -157,6 +158,41 @@ class Question(models.Model):
                 return hash_true_false_answer_set(data)
             case _:
                 raise NotImplementedError(f"Hashing not implemented for {self.type}")
+
+
+class Attatchment(models.Model):
+    """
+    A file attatchment for a question.
+    """
+
+    question = models.ForeignKey[Question](
+        to=Question,
+        on_delete=models.CASCADE,
+        related_name="attatchments",
+    )
+    path = models.TextField[str, str](
+        _("path"),
+        help_text=_("The attatched file."),
+    )
+    file = models.FileField[File, File](
+        _("file"),
+        upload_to="questions/attatchments/",
+        help_text=_("The attatched file."),
+    )
+    description = models.CharField(
+        _("description"),
+        max_length=255,
+        blank=True,
+        help_text=_("A short description of the attatchment."),
+    )
+
+    class Meta:
+        verbose_name = _("Attatchment")
+        verbose_name_plural = _("Attatchments")
+        unique_together = [("question", "path")]
+
+    def __str__(self) -> str:
+        return f"Attatchment for {self.question.slug}: {self.path}"
 
 
 def hash_choices_answer_set(data: set[str]) -> bytes:

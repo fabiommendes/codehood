@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Self
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.core.validators import MinLengthValidator
 from django.db import models
 from django.forms import ValidationError
 from django.utils import timezone
@@ -31,9 +32,8 @@ class Discipline(models.Model):
         primary_key=True,
         auto_created=False,
         max_length=32,
-        min_length=2,
         help_text=_("Unique identifier used to construct urls"),
-        validators=[validators.discipline_slug],
+        validators=[validators.discipline_slug, MinLengthValidator(2)],
     )
     name = models.CharField(
         _("name"),
@@ -184,9 +184,12 @@ class Classroom(LoggingModel, StatusModel, TimeStampedModel):
     def __str__(self) -> str:
         return self.slug
 
-    def enroll_student(self, user: User):
+    def enroll_student(self, user: User, strict: bool = False):
         """
         Register a new student in the classroom.
+
+        If strict is True, raise ValidationError if student is already enrolled
+        or if classroom is not active.
         """
         if self.disable_enrollment:
             raise ValidationError(
@@ -208,12 +211,12 @@ class Classroom(LoggingModel, StatusModel, TimeStampedModel):
                 _("Administrative accounts cannot enroll in classrooms."),
                 code="enroll-as-admin",
             )
-        elif self.students.filter(username=user.username):
+        elif strict and self.students.filter(username=user.username):
             raise ValidationError(
                 _("Already enrolled as student."),
                 code="enroll-already-enrolled",
             )
-        elif self.status != self.Status.ACTIVE:
+        elif strict and self.status != self.Status.ACTIVE:
             name = self.Status(self.status).name
             raise ValidationError(
                 _("Classroom is not active"),

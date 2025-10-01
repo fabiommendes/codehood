@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -11,9 +12,10 @@ from model_utils.models import TimeStampedModel
 
 from codehood import fields
 
-from ..text import gettext_lazy as _
-from ..types import TaggableManager, AuthenticatedRequest as HttpRequest
 from ..classrooms.models import Classroom
+from ..text import gettext_lazy as _
+from ..types import AuthenticatedRequest as HttpRequest
+from ..types import TaggableManager
 from ..users.models import User
 
 if TYPE_CHECKING:
@@ -24,12 +26,12 @@ if TYPE_CHECKING:
 NOW = Now()
 
 
-class Role(models.TextChoices):
+class Kind(models.TextChoices):
     QUIZ = "quiz", _("Quiz")
     EXAM = "exam", _("Exam")
     PRACTICE = "practice", _("Practice")
     ARCHIVED = "archived", _("Archived")
-    INACTIVE = "inactive", _("Inactive")
+    DRAFT = "draft", _("Draft")
 
     def slug(self) -> str:
         match self:
@@ -41,13 +43,13 @@ class Role(models.TextChoices):
                 return "exercises"
             case self.ARCHIVED:
                 return "archived"
-            case self.INACTIVE:
-                return "inactive"
+            case self.DRAFT:
+                return "draft"
             case _:
                 raise RuntimeError(f"should not happen: {self}")
 
 
-PUBLIC_ROLES = (Role.QUIZ, Role.EXAM, Role.PRACTICE)
+PUBLIC_EXAMS = (Kind.QUIZ, Kind.EXAM, Kind.PRACTICE)
 
 
 class Exam(TimeStampedModel):
@@ -56,7 +58,7 @@ class Exam(TimeStampedModel):
     """
 
     PUBLIC_ID_SIZE = 8
-    Role: ClassVar[type[Role]] = Role
+    Kind: ClassVar[type[Kind]] = Kind
     public_id = fields.public_id(PUBLIC_ID_SIZE)
     classroom = models.ForeignKey[Classroom | None, Classroom | None](
         to=Classroom,
@@ -81,11 +83,11 @@ class Exam(TimeStampedModel):
         validators=[MinLengthValidator(1)],
         help_text=_("Title for the exam"),
     )
-    role = models.CharField(
+    kind = models.CharField(
         _("role"),
         max_length=8,
-        choices=Role.choices,
-        default=Role.INACTIVE,
+        choices=Kind.choices,
+        default=Kind.DRAFT,
         help_text=_("What is the question set used for in the system."),
     )
     description = models.TextField(
@@ -119,17 +121,17 @@ class Exam(TimeStampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["classroom", "slug", "role"],
-                name="unique_slug_per_classroom_and_role",
+                fields=["classroom", "slug", "kind"],
+                name="unique_slug_per_classroom_and_kind",
             ),
         ]
 
     @property
-    def has_public_role(self) -> bool:
+    def is_public(self) -> bool:
         """
-        Return True if the exam is public.
+        Return True if the exam is visible to students.
         """
-        return self.role in PUBLIC_ROLES
+        return self.kind in PUBLIC_EXAMS
 
     @property
     def is_accepting_responses(self) -> bool:

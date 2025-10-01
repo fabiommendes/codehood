@@ -8,7 +8,7 @@ from . import models
 @admin.register(models.Exam)
 class ExamAdmin(admin.ModelAdmin):
     list_display = ["classroom", "title", "owner", "num_questions"]
-    list_filter = ["classroom", "classroom__discipline", "start", "end", "role"]
+    list_filter = ["classroom", "classroom__discipline", "start", "end", "kind"]
 
     @display(description=_("Number of Questions"))
     def num_questions(self, obj: models.Exam) -> int:

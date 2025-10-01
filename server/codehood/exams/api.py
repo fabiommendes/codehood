@@ -1,23 +1,24 @@
 from typing import Any
-from django.db.models import F, Count, QuerySet
+
+from django.db.models import Count, F, QuerySet
 from django.db.models.functions import Now
 from django.utils.translation import gettext as _
-from django.views.decorators.csrf import csrf_exempt
-from ninja.pagination import paginate
 from ninja import Router
+from ninja.pagination import paginate
 
-from ..users.models import User
-from . import models
-from ..questions.models import Question as QuestionModel
 from ..api import rest
+from ..questions.models import Question as QuestionModel
 from ..types import (
     AuthenticatedRequest as HttpRequest,
+)
+from ..types import (
     PaginatedView,
     Redacted,
     redacted,
 )
-from .schemas import Exam, Answer
-
+from ..users.models import User
+from . import models
+from .schemas import Answer, Exam
 
 router = Router(tags=[_("Exams")])
 
@@ -81,15 +82,15 @@ def id_to_params(id: str) -> dict[str, str]:
         raise ValueError(f"Invalid id: {id}")
 
     id = id[1:-1]
-    discipline, instructor_and_edition, role, slug = id.split(",")
+    discipline, instructor_and_edition, kind, slug = id.split(",")
     instructor, _, edition = instructor_and_edition.rpartition("_")
-    role = models.Exam.Role(role)
+    kind = models.Exam.Kind(kind)
 
     return {
         "classroom__discipline__slug": discipline,
         "classroom__instructor__username": instructor,
         "classroom__edition": edition,
-        "role": role,
+        "kind": kind,
         "slug": slug,
     }
 
@@ -109,10 +110,10 @@ def get_queryset(request: HttpRequest) -> QuerySet[models.Exam]:
             queryset = models.Exam.objects.filter(
                 start__lte=Now(),
                 classroom__in=classes,
-                role__in=[
-                    models.Exam.Role.QUIZ,
-                    models.Exam.Role.EXAM,
-                    models.Exam.Role.PRACTICE,
+                kind__in=[
+                    models.Exam.Kind.QUIZ,
+                    models.Exam.Kind.EXAM,
+                    models.Exam.Kind.PRACTICE,
                 ],
             )
 
