@@ -1,137 +1,97 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import tomllib
 from pathlib import Path
-from gettext import gettext as _
-from typing import Any, Literal
-from tomlkit.container import Item, Container
-from tomlkit import document, item, parse, dumps, table
-from codehood_cli.errors import ConfigError
+from typing import TextIO
 
-from logging import getLogger
+import tomlkit
+from pydantic import BaseModel as Model
+from pydantic import field_validator
+
+CONFIG_TEMPLATE = """[server]
+url = "{url}"
+
+[user]
+email = "{email}"
+username = "{username}"
+token = "{token}"
+"""
 
 
-REQUIRED_FIELDS = {"url"}
-CODEHOOD_BASE_SERVER = "http://codehood.dev"
-type Types = Literal["str", "int", "table"]
-type Role = Literal["instructor", "student"]
-
-log = getLogger("codehood")
+class Config(Model):
+    server: Server
+    user: User
+    path: Path = Path()
 
 
-@dataclass
-class Config:
+class Server(Model):
     url: str
-    auth: PasswordLogin | ApiTokenAuthentication
-    path: Path = Path(".")
-    role: Role = "student"
 
+    @field_validator("url")
     @classmethod
-    def read_config(cls, path: Path) -> Config:
-        """
-        Read the config file and return a Config object.
-        """
-        with open(path / "codehood.toml", "rb") as fd:
-            data = parse(fd.read())
-
-        if extra := data.keys() - {"codehood"}:
-            msg = _("Invalid sections on config file: {}").format(extra)
-            raise ConfigError(msg)
-        if "codehood" not in data:
-            msg = _("Could not find the [codehood] section in the config file")
-            raise ConfigError(msg)
-
-        if isinstance(data["codehood"], Item):
-            msg = _("The [codehood] section must be a table")
-            raise ConfigError(msg)
-
-        config: Container = data["codehood"]
-        kwargs: dict[str, Any] = {}
-        for required in REQUIRED_FIELDS:
-            try:
-                kwargs[required] = config[required]
-            except KeyError:
-                msg = _("Missing required field: {}".format(required))
-                raise ConfigError(msg)
-
-        return cls(path=path, **kwargs)
-
-    def save_config(self) -> None:
-        """
-        Write the config file.
-        """
-        config_file = self.path / "codehood.toml"
-        if config_file.exists():
-            with open(config_file, "r") as fd:
-                doc = parse(fd.read())
-        else:
-            doc = document()
-
-        root: Container = doc.setdefault("codehood", table())
-
-        root.add("url", item(self.url or CODEHOOD_BASE_SERVER))
-        root.setdefault("role", self.role)
-        self.auth.dump(root.get("auth", table()))
-
-        # Save data
-        with open(config_file, "w") as fd:
-            config_src = dumps(doc)
-            log.debug(config_src)
-            fd.write(config_src)
+    def _trim_trailing_slash(cls, v: str) -> str:
+        return v.removesuffix("/")
 
 
-@dataclass
-class PasswordLogin:
+class User(Model):
     email: str
-    password: str
-    trusted: bool = False
-
-    def dump(self, config: Container) -> None:
-        config["email"] = self.email
-        if self.trusted:
-            config["password"] = self.password
-        else:
-            config["password"] = "*"
-
-
-@dataclass
-class ApiTokenAuthentication:
+    username: str
     token: str
-    trusted: bool = False
-
-    def dump(self, config: Container) -> None:
-        if self.trusted:
-            config["token"] = self.token
-        else:
-            config["token"] = "*"
 
 
-def read_as(root: Item | Container, field: str, kind: Types) -> Any:
+def load(fp: Path | TextIO | None = None) -> Config:
     """
-    Read a field from a root object and return it as the specified kind.
+    Load configuration from a file or file-like object.
+
+    Args:
+        fp: Path to the configuration file or a file-like object.
     """
+    if fp is None:
+        fp = Path("codehood.toml")
 
-    if isinstance(root, Item):
-        raise ValueError("root must be a table")
+    if hasattr(fp, "read"):
+        data = tomllib.load(fp)
+        value = Config.model_validate(data)
 
-    data = read_item(root, field)
+        if hasattr(fp, "name"):
+            value.path = Path(fp.name).parent
+        return value
 
-    match kind:
-        case "str":
-            return str(data)
-
-        case _:
-            raise TypeError("unknown kind")
+    with open(fp, "rb") as fp:
+        return load(fp)
 
 
-def read_item(root: Container, field: str) -> Item:
-    try:
-        data = root[field]
-    except TypeError:
-        data = NotImplemented
+def load_document(fp: Path | TextIO | None = None) -> tomlkit.TOMLDocument:
+    """
+    Load raw configuration and return a TOMLDocument.
 
-    if data is not NotImplemented and isinstance(data, Item):
+    The returning data structure operates as dicts/lists and supports round trip
+    editing of the config file.
+
+    Args:
+        fp: Path to the configuration file or a file-like object.
+    """
+    if fp is None:
+        fp = Path("codehood.toml")
+
+    if hasattr(fp, "read"):
+        data = tomlkit.load(fp)
+        Config.model_validate(data)  # validate
         return data
+    with open(fp, "rb") as fp:
+        return load_document(fp)
 
-    msg = _("Expect a table, got: {}").format(data)
-    raise ConfigError(msg)
+
+def save_document(fp: Path | TextIO, doc: tomlkit.TOMLDocument) -> None:
+    """
+    Save a TOMLDocument to a file or file-like object.
+
+    Args:
+        fp: Path to the configuration file or a file-like object.
+        doc: The TOMLDocument to save.
+    """
+    if hasattr(fp, "write"):
+        tomlkit.dump(doc, fp)
+        return
+    with open(fp, "w", encoding="utf-8") as fp:
+        tomlkit.dump(doc, fp)

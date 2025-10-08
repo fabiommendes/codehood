@@ -1,3 +1,7 @@
-[codehood]
-url = "http://codehood.dev"
-role = "student"
+[server]
+url = "http://localhost:8000"
+
+[user]
+email = "student@student.com"
+username = "student"
+token = "Pu1FfxCnAP5TM-jLJOP6zdGhAytXvg"
