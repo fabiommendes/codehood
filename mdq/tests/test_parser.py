@@ -1,9 +1,11 @@
 import builtins
 import pprint
-import pytest
 from pathlib import Path
-from mdq.questions import MultipleChoiceQuestion
+
+import pytest
+
 from mdq.parser import parse_question
+from mdq.questions import MultipleChoiceQuestion
 
 builtins.dbg = pprint.pprint  # type: ignore
 REPO_DIR = Path(__file__).parent.parent
@@ -11,8 +13,9 @@ REPO_DIR = Path(__file__).parent.parent
 
 @pytest.fixture
 def mdq():
-    def get_src(path):
-        path = REPO_DIR / "examples" / (path + ".q.md")
+    def get_src(path, exam: bool = False):
+        ext = ".md" if exam else ".q.md"
+        path = REPO_DIR / "examples" / (path + ext)
         return open(path)
 
     return get_src

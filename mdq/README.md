@@ -15,59 +15,90 @@ respective syntax.
 Questions formats
 =================
 
+## Generic structure
+
+```md
+# [exam-id] Exam title
+## Optional subtitle is a small description to show in listings, tables, etc.
+
+One or more descriptive paragraphs. Any inline **markdown** *markup* is ~~valid~~.
+These optional paragraphs are stored in the `preamble` attribute of the exam.
+
+---
+
+## [question-`id`] Question `title`
+
+    # Yaml configuration section
+    # This is an indented block of code interpreted as YAML and is used to
+    # specify advanced options. The first block of comment in this section is
+    # stored in the `comment` attribute for the question.
+    type: multiple-choice  # (usually can be inferred from the body)
+    format: md
+    weight: 1.0
+    grading: all-or-nothing
+    shuffle: true
+
+One or more descriptive paragraphs. Any inline **markdown** *markup* is ~~valid~~.
+Those optional paragraphs are stored in the `preamble` attribute of the question.
+
+The `stem` is the last paragraph before the question body. It usually commands the 
+student to do some action (e.g., "Select all correct answers", "Write a program that...").
+
+<QUESTION BODY, this depends on the question type>
+
+The text after the body is stored in the `epilogue` attribute of the question.
+```
+
+## Multiple selection questions
+
+```md
+[Q1] What are the even numbers?
+* [x] 2
+* [ ] 3
+* [x] 4
+* [ ] 5
+```
+
 ## Multiple choice
 
 Multiple choice questions are declared using an unordered list:
 
 ```md
 [Q1] How much is 2 + 2?
-- 2
-- 3
-* 4
-- 5
+* 2
+* 3
+* 4 ✅
+* 5
 ```
 
-The question is optionally titled [Q1], and the correct answer is designated
-by the bullet character. Either  `*` or `+` represent correct answers and `-`
-is used for the incorrect ones.
-
-## Multiple selection questions
-
-```md
-[Q1] What are the even numbers?
-- [x] 2
-- [ ] 3
-- [x] 4
-- [ ] 5
-```
 
 ## True/False questions
 
 ```md
 [Q1] Judge the statements.
-- [T] Markdown is a lightweight markup.
-- [F] I'd rather be writing XML.
-- [T] MDQ accepts True/False questions.
-- [F] The Earth is flat.
+* [T] Markdown is a lightweight markup.
+* [F] I'd rather be writing XML.
+* [T] MDQ accepts True/False questions.
+* [F] The Earth is flat.
 ```
 
-## Ask inputs
+## Fill in the blanks
 
 ```md
 [Q1] 2 + 2 = [^value], which is an [^oddity]
 
 [^value]:
-  - 1 
-  - 2 
-  - 3
-  * 4
+  * 1 
+  * 2 
+  * 3
+  * 4 ✅
 
 [^oddity]:
-  - odd
-  * even
+  * odd
+  * even ✅
 ```
 
-## Matching
+## Associative questions
 
 ```md
 [Q1] Associate the computations with their respective results
@@ -85,8 +116,7 @@ is used for the incorrect ones.
 ## I/O based E-judge questions
 
 ````md
-[Q1] Create a program that ask the user name a prints "Hello <name>!".
-
+[Q1] Create a program that asks the user for their name and prints "Hello <name>!".
 
 ## [io]
 

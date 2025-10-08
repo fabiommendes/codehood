@@ -2,12 +2,11 @@
 A simple Markdown-based format to declare questions for a LMS.
 """
 
-import re
 import os
+import re
 
-from .parser import parse_question, parse_exam
-from .questions import Question, QuestionType, Format, MultipleChoiceQuestion
-from .exam import Exam
+from .models import Exam, Question
+from .parser import parse_exam, parse_question
 
 __version__ = "0.1"
 __author__ = "Fábio Macêdo Mendes"
@@ -15,9 +14,6 @@ __all__ = [
     "parse_question",
     "parse_exam",
     "Question",
-    "QuestionType",
-    "Format",
-    "MultipleChoiceQuestion",
     "Exam",
 ]
 

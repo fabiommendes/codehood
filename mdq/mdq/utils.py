@@ -1,6 +1,12 @@
+import re
+import unicodedata
 from types import MappingProxyType
 from typing import Iterable, Mapping
+
 import mdq
+
+SPACE_REGEX = re.compile(r"[-\s]+")
+SYMBOL_REGEX = re.compile(rb"[^\w\s-]")
 
 
 def remove_extensions(name: str) -> str:
@@ -86,3 +92,19 @@ def _render_markdown(ast, info: Mapping) -> Iterable[str]:
             yield "\n\n"
         case _:
             raise NotImplementedError(ast)
+
+
+def slugify(string: str) -> str:
+    """
+    Slugify a unicode string.
+
+    Example:
+
+        >>> slugify(u"Héllø Wörld")
+        u"hello-world"
+
+    """
+
+    normalized = unicodedata.normalize("NFKD", string).encode("ascii", "ignore")
+    no_symbols = str(SYMBOL_REGEX.sub(b"", normalized).strip().lower())
+    return SPACE_REGEX.sub("-", no_symbols)

@@ -1,6 +1,8 @@
+# Exam 
+
 What is the correct answer?
 
-- 0
-- 1
-- 2
-* 42
+* 0
+* 1
+* [Google](https://www.google.com)
+* [x] 42

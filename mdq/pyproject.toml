@@ -1,16 +1,24 @@
-[build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
-
 [project]
 name = "mdq"
-authors = [
-    { name = "Fábio Macêdo Mendes", email = "fabiomacedomendes@gmail.com" },
+version = "0.1.0"
+description = "A Markdown/JSON Question format for the Codehood project."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "linkify-it-py>=2.0.3",
+    "markdown-it-py[plugins]>=4.0.0",
+    "pydantic>=2.11.10",
+    "rich>=14.1.0",
 ]
-license = { file = "LICENSE" }
-classifiers = ["License :: OSI Approved :: MIT License"]
-dynamic = ["version", "description"]
-dependencies = ["mistune ~=3.1", "pydantic ~=2.11", "python-slugify ~= 8.0"]
+[project.optional-dependencies]
+dev = []
 
-[project.urls]
-Home = "https://github.com/fabiommendes/mdq"
+[project.scripts]
+mdq = "mdq.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4.2"]
