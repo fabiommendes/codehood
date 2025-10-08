@@ -5,23 +5,25 @@ import Api.Classrooms
 import Api.Exams
 import Api.Task as Task
 import Auth
-import Data.Answer as Answer
-import Data.Classroom as Classroom
+import Components.Question as Question
+import Data.Classroom as Classroom exposing (Classroom)
 import Data.Discipline as Discipline
-import Data.Exam as Exam
+import Data.Exam as Exam exposing (Exam)
 import Data.Link as Link
-import Effect exposing (Effect, withApiError, withEffs, withInnerEff)
+import Effect exposing (Effect, withApiError, withEff, withEffs, withNoEff)
 import Effect.Log exposing (LogLevel(..))
-import Elements.Exam as Inner
-import Html as H
+import Html as H exposing (..)
+import Html.Attributes exposing (..)
 import Layouts
 import Layouts.Main as Layout
+import List.Extra as List exposing (..)
 import Page exposing (Page)
 import Route exposing (Route)
 import Route.Path as Path
 import Shared
 import Ui
-import Ui.Classroom
+import Ui.Container as Ui
+import Ui.Exam
 import Util exposing (..)
 import Util.Lens as L
 import View exposing (View)
@@ -39,76 +41,57 @@ page user _ route =
 
 
 type alias Model =
-    { inner : Inner.Model
-    , params : Exam.PathParams
-    , classroom : Classroom.Classroom
+    { exam : Exam
+    , pathParams : Exam.PathParams
+    , classroom : Classroom
+    , questions : List QuestionState
+    }
+
+
+type alias QuestionState =
+    { question : Question.Model
+    , isSelected : Bool
     }
 
 
 init : Exam.PathParams -> () -> ( Model, Effect Msg )
 init params () =
     let
-        ( inner, eff ) =
-            Inner.init
-
-        task1 =
-            Api.Classrooms.getClassroomFromParams params
-
-        task2 =
-            Api.Exams.getExam (Exam.paramsToNaturalId params)
-                |> Task.fromRequest
-
-        taskCombined =
-            Task.map2 Tuple.pair task1 task2
+        fetchData =
+            Effect.attemptHttp DataReceived <|
+                Task.map2 Tuple.pair
+                    (Api.Classrooms.getClassroomFromParams params)
+                    (Task.fromRequest <| Api.Exams.getExam (Exam.paramsToNaturalId params))
     in
-    { inner = inner
-    , params = params
+    { exam = Exam.empty
+    , pathParams = params
     , classroom = Classroom.empty
+    , questions = []
     }
-        |> withEffs
-            [ taskCombined
-                |> Effect.attemptHttp DataReceived
-            , Effect.map InnerMsg eff
-            ]
+        |> withEff fetchData
 
 
 type Msg
-    = InnerMsg Inner.Msg
-    | DataReceived (Result Api.Error ( Classroom.Classroom, Exam.Exam ))
+    = DataReceived (Result Api.Error ( Classroom.Classroom, Exam.Exam ))
     | AnswerSubmitted (Result Api.Error String)
+    | QuestionMsg Int Question.Msg
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
 update msg_ model =
     case msg_ of
-        InnerMsg (Inner.Submit ( id, answer )) ->
-            let
-                -- _ =
-                --     Debug.log "Submit" ( id, answer )
-                request =
-                    Api.Exams.postAnswer
-                        { params = model.params
-                        , answer = Answer.encode id answer
-                        }
-            in
-            model
-                |> withEffs [ Effect.sendRequest AnswerSubmitted request ]
-
-        InnerMsg msg ->
-            model
-                |> withInnerEff L.inner
-                    { update = Inner.update msg
-                    , msg = InnerMsg
-                    }
-
         DataReceived (Ok ( cls, exam )) ->
-            model
-                |> L.classroom.set cls
-                |> withInnerEff L.inner
-                    { update = Inner.loadData exam
-                    , msg = InnerMsg
-                    }
+            { model
+                | classroom = cls
+                , exam = exam
+                , questions = List.map (\q -> { question = q, isSelected = False }) exam.questions
+            }
+                |> withNoEff
 
+        --|> withInnerEff L.inner
+        --    { update = Inner.loadData exam
+        --    , msg = InnerMsg
+        --    }
         DataReceived (Err err) ->
             model
                 |> withApiError err
@@ -121,6 +104,15 @@ update msg_ model =
             model
                 |> withApiError err
 
+        QuestionMsg idx msg ->
+            { model
+                | questions =
+                    List.updateAt idx
+                        (L.map (Question.update msg) L.question)
+                        model.questions
+            }
+                |> withNoEff
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
@@ -128,17 +120,35 @@ subscriptions _ =
 
 
 view : Model -> View Msg
-view { inner, classroom } =
+view { exam, classroom, questions } =
+    let
+        viewQuestion : Int -> QuestionState -> Html Msg
+        viewQuestion i { question } =
+            Question.view { isSelected = False, isStandalone = False } question
+                |> H.map (QuestionMsg i)
+
+        questionsHtml =
+            List.indexedMap viewQuestion questions
+                |> List.intersperse (div [ class "divider" ] [])
+    in
     { title = "Pages.Classroom_"
     , body =
-        [ Ui.Classroom.hero classroom
+        [ Ui.Exam.hero exam
         , Ui.breadcrumbs
             [ Discipline.toLink classroom.discipline
             , Classroom.toLink classroom
             , Link.link "Exams"
                 (Path.Discipline__Classroom__Exams <| Classroom.toPathParams classroom)
             ]
-            inner.data.title
-        , H.map InnerMsg (Inner.view inner)
+            exam.title
+        , if String.isEmpty exam.preamble then
+            text ""
+
+          else
+            Ui.flat [] [ Ui.md exam.preamble ]
+        , Ui.flat []
+            (h2 [ class "h2" ] [ text "Questions" ]
+                :: questionsHtml
+            )
         ]
     }

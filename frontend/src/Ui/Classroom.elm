@@ -1,12 +1,14 @@
 module Ui.Classroom exposing (..)
 
 import Data.Classroom exposing (Classroom)
+import Data.Exam as Exam exposing (Exam)
 import Data.Schedule exposing (Schedule)
 import Date
 import Hour
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Route.Path as Path
 import Time
 import Ui
 import Util exposing (..)
@@ -21,11 +23,12 @@ hero classroom =
     Ui.hero
         { title = classroom.title
         , description = classroom.description
+        , attrs = []
+        , children =
+            [ span [ class "badge badge-primary" ]
+                [ text (String.fromInt studentsCount ++ " Students") ]
+            ]
         }
-        []
-        [ span [ class "badge badge-primary" ]
-            [ text (String.fromInt studentsCount ++ " Students") ]
-        ]
 
 
 subscriptionCodeDialog :
@@ -111,3 +114,27 @@ schedule attrs model =
                 ]
     in
     div attrs [ div [] (List.indexedMap viewEvent model.events) ]
+
+
+examsList : Classroom -> List (Attribute msg) -> List Exam -> Html msg
+examsList cls attrs exams =
+    if List.isEmpty exams then
+        p (class "p-4" :: attrs) [ text "None for today :)" ]
+
+    else
+        ul (class "menu menu-compact" :: attrs)
+            (exams
+                |> List.map
+                    (\exam ->
+                        li []
+                            [ a [ Path.href (Exam.toPath cls exam) ]
+                                [ span [ class "font-bold" ] [ text exam.title ]
+                                , if exam.description /= "" then
+                                    p [ class "text-sm" ] [ Ui.md exam.description ]
+
+                                  else
+                                    text ""
+                                ]
+                            ]
+                    )
+            )

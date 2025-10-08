@@ -145,6 +145,27 @@ view model =
     let
         { classroom, schedule, user } =
             model
+
+        examList =
+            Ui.Classroom.examsList classroom
+
+        assignments =
+            if List.isEmpty model.exams && List.isEmpty model.quizzes then
+                examList [ class "collapse-content p-0" ] []
+
+            else if List.isEmpty model.exams then
+                examList [ class "collapse-content p-0" ] model.quizzes
+
+            else if List.isEmpty model.quizzes then
+                examList [ class "collapse-content p-0" ] model.exams
+
+            else
+                div [ class "collapse-content p-0" ]
+                    [ h3 [ class "h3" ] [ text "Exams" ]
+                    , examList [] model.exams
+                    , h3 [ class "h3" ] [ text "Quizzes" ]
+                    , examList [] model.quizzes
+                    ]
     in
     { title = "Pages.Classroom_"
     , body =
@@ -163,15 +184,15 @@ view model =
             , Ui.Classroom.schedule [ id "classroom-schedule" ] schedule
             ]
         , div [ class "join join-vertical" ]
-            [ Ui.Container.primary [ class "collapse collapse-plus join-item" ]
-                [ input [ type_ "radio", name "classroom-accordion" ] []
-                , h2 [ class "h2 collapse-title p-0" ] [ text "Exercises" ]
-                , p [ class "collapse-content p-0" ] [ text "Coming soon..." ]
+            [ Ui.Container.primary [ class "collapse collapse-arrow join-item" ]
+                [ input [ type_ "radio", name "classroom-accordion", checked True ] []
+                , h2 [ class "h2 collapse-title p-0" ] [ text "Practice" ]
+                , examList [ class "collapse-content p-0" ] model.exercises
                 ]
-            , Ui.Container.secondary [ class "collapse collapse-plus join-item" ]
+            , Ui.Container.secondary [ class "collapse collapse-arrow join-item" ]
                 [ input [ type_ "radio", name "classroom-accordion" ] []
-                , h2 [ class "h2 collapse-title p-0" ] [ text "Exams" ]
-                , p [ class "collapse-content p-0" ] [ text "Coming soon..." ]
+                , h2 [ class "h2 collapse-title p-0" ] [ text "Assessments" ]
+                , assignments
                 ]
             ]
         ]

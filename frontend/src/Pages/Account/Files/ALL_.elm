@@ -72,9 +72,9 @@ view model =
         [ Ui.hero
             { title = "/files/" ++ (model.directory |> Directory.path)
             , description = "View your personal files"
+            , attrs = []
+            , children = []
             }
-            []
-            []
         , H.map DirectoryMsg (Directory.view model.directory)
         ]
     }

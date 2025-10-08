@@ -47,11 +47,12 @@ view { data, classrooms, loaded } =
             Ui.hero
                 { title = data.name
                 , description = data.description
+                , attrs = []
+                , children =
+                    [ span [ class "badge badge-accent" ]
+                        [ Html.text (String.fromInt (List.length classrooms) ++ " Classrooms Available") ]
+                    ]
                 }
-                []
-                [ span [ class "badge badge-accent" ]
-                    [ Html.text (String.fromInt (List.length classrooms) ++ " Classrooms Available") ]
-                ]
 
         breadcrumbs =
             div [ class "breadcrumbs text-sm" ]

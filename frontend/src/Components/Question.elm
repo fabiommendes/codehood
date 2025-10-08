@@ -1,4 +1,4 @@
-module Elements.Question exposing
+module Components.Question exposing
     ( Model
     , Msg(..)
     , init
@@ -21,11 +21,10 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Ui
 import Util exposing (iff)
-import Util.Lens as L
 
 
 type alias Model =
-    { data : Question }
+    Question
 
 
 type Msg
@@ -37,20 +36,19 @@ type Msg
 
 init : Question -> ( Model, Effect Msg )
 init question =
-    { data = question }
+    question
         |> withNoEff
 
 
-update : Msg -> Model -> ( Model, Effect Msg )
+update : Msg -> Model -> Model
 update msg model =
     case msg of
         SetAnswer f ->
             model
-                |> L.update L.data (Question.answer.set f)
-                |> withNoEff
+                |> Question.answer.set f
 
         _ ->
-            model |> withNoEff
+            model
 
 
 {-| Returns an Html (Either msgExam msg)!
@@ -60,7 +58,7 @@ their parents
 
 -}
 view : { isSelected : Bool, isStandalone : Bool } -> Model -> Html Msg
-view options ({ data } as model) =
+view options model =
     let
         render =
             Ui.md
@@ -69,37 +67,17 @@ view options ({ data } as model) =
             div [ class "mdq-footnote" ]
                 [ text (footnote.id ++ ": " ++ footnote.text) ]
 
-        preamble =
-            p [] [ render (Question.preamble data) ]
-
-        stem =
-            p [] [ render (Question.stem data) ]
-
-        epilogue =
-            p [] [ render (Question.epilogue data) ]
-
         footnotes =
-            div [ class "mdq-footnotes" ] (List.map viewFootnote (Question.footnotes data))
+            div [ class "mdq-footnotes" ] (List.map viewFootnote (Question.footnotes model))
 
         title =
-            h3
-                [ class "flex relative" ]
-                [ span
-                    [ class "text-accent z-1 text-4xl transition-transform duration-200 opacity-50"
-                    , class (iff options.isSelected "transform-[rotate(-25deg)]" "transform-[rotate(25deg)]")
-                    , class "bg-base-300 absolute rounded-full px-3 -left-8"
-                    ]
-                    [ text "#" ]
-                , span [ class "z-1" ] [ render (Question.title data) ]
-                ]
+            h3 [ class "h3 text-primary" ] [ text (Question.title model) ]
 
-        commands =
+        actions =
             div
-                [ class "flex w-full justify-end my-4 rounded-lg"
-                , class "bg-linear-15 from-base-100 to-base-200"
-                ]
+                [ class "flex w-full justify-end" ]
                 [ button
-                    [ class "btn btn-primary m-2 min-w-25 rounded-full hover:bg-primary-focus hover:transform-[scale(105%)] hover:shadow-lg"
+                    [ class "btn btn-primary mx-2 min-w-25 rounded-full hover:bg-primary-focus hover:transform-[scale(105%)] hover:shadow-lg"
                     , onClick Submit
                     ]
                     [ text "Send" ]
@@ -109,13 +87,18 @@ view options ({ data } as model) =
             viewInput options model
 
         body =
-            if options.isStandalone then
-                [ div [ class "prose mb-4" ] [ title, preamble, stem ]
-                , content
-                , div [ class "prose" ] [ epilogue ]
-                , footnotes
-                , commands
-                ]
+            [ render (Question.preamble model)
+            , render (Question.stem model)
+            , content
+            , render (Question.epilogue model)
+            , footnotes
+            , actions
+            ]
+
+        html =
+            -- if options.isStandalone then
+            if True then
+                title :: body
 
             else
                 [ div
@@ -127,30 +110,26 @@ view options ({ data } as model) =
                         , onClick RequestFocus
                         ]
                         [ title ]
-                    , div [ class "collapse-content" ] <|
-                        [ div [ class "prose mb-4" ] [ preamble, stem ]
-                        , content
-                        , div [ class "prose" ] [ epilogue ]
-                        , footnotes
-                        , commands
-                        ]
+                    , div [ class "collapse-content" ] body
                     ]
                 ]
     in
     H.form
         [ onSubmit Submit
-        , class (iff options.isStandalone "overflow-visible" "join join-vertical")
+
+        -- , class (iff options.isStandalone "overflow-visible" "join join-vertical")
+        , class "w-full"
         ]
-        body
+        html
 
 
 viewInput : { isSelected : Bool, isStandalone : Bool } -> Model -> Html Msg
-viewInput _ { data } =
+viewInput _ model =
     let
         makeOptions tag =
             { onSetAnswer = tag >> SetAnswer }
     in
-    case data of
+    case model of
         Question.EssayQuestion essay ->
             essay
                 |> Essay.view (makeOptions Answer.EssayAnswer)

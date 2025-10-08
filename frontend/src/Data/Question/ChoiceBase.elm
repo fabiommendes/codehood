@@ -116,7 +116,7 @@ view { input, class, isSelected } { choices } =
             |> List.map
                 (\{ id, text } ->
                     H.li
-                        [ HA.class "mx-2 w-full p-4 transition-background duration-500"
+                        [ HA.class "w-full p-4 transition-background duration-500"
                         , HA.class (iff (isSelected id) "bg-base-200 text-base-content" "")
                         ]
                         [ H.label [ HA.class "flex w-full items-start" ]

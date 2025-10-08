@@ -1,6 +1,5 @@
 module Ui exposing (..)
 
-import Data.Classroom exposing (Classroom)
 import Data.Link as Link exposing (Link)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -25,15 +24,15 @@ type Color
     | Base300
 
 
-hero : { title : String, description : String } -> List (Html.Attribute msg) -> List (Html msg) -> Html msg
-hero data attrs children =
+hero : { title : String, description : String, attrs : List (Html.Attribute msg), children : List (Html msg) } -> Html msg
+hero { title, description, attrs, children } =
     div
         (class "bg-linear-to-br from-primary to-secondary text-primary-content p-8 -mb-2"
             :: attrs
         )
-        ([ h1 [ class "h1 mb-4" ] [ text data.title ]
-         , if data.description /= "" then
-            p [ class "text-lg mb-4" ] [ md data.description ]
+        ([ h1 [ class "h1 mb-4" ] [ text title ]
+         , if description /= "" then
+            p [ class "text-lg mb-4" ] [ md description ]
 
            else
             text ""
@@ -67,5 +66,9 @@ breadcrumbs data last =
 
 
 md : String -> Html msg
-md =
-    Html.Lazy.lazy (Markdown.toHtml [ class "prose" ])
+md src =
+    if String.isEmpty src then
+        text ""
+
+    else
+        Html.Lazy.lazy (Markdown.toHtml [ class "prose" ]) src
