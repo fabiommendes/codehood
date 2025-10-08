@@ -1,12 +1,12 @@
-from functools import partial
 import random
-from typing import Any, Callable, Type
 import string
+from functools import partial
+from typing import Any, Callable, Type
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
-from django.utils.translation import gettext as _
 from django.db.models.fields import NOT_PROVIDED, SmallIntegerField
+from django.utils.translation import gettext as _
 from model_utils.managers import QueryManager
 
 
@@ -14,7 +14,9 @@ class DummyChoices(models.IntegerChoices):
     NOT_SET = 0
 
 
-RANDOM_POOL = string.ascii_letters + string.digits + "-_$+!*"
+RANDOM_POOL = string.ascii_letters + string.digits + "-$+!*"
+RANDOM_POOL_UNDERSCORE = RANDOM_POOL + "_"
+PUBLIC_ID_FIELD_SIZE = 10
 
 
 class StatusField(SmallIntegerField):
@@ -65,7 +67,7 @@ class StatusField(SmallIntegerField):
         return name, path, args, kwargs
 
 
-def public_id(size: int = 8, **kwargs) -> models.CharField[str, str]:
+def public_id(size: int = PUBLIC_ID_FIELD_SIZE, **kwargs) -> models.CharField[str, str]:
     return models.CharField(
         editable=False,
         unique=True,
@@ -87,4 +89,11 @@ def gen_random_id(size: int) -> str:
     """
     Generate a random ID of given size.
     """
-    return "".join(random.choice(RANDOM_POOL) for _ in range(size))
+    if random.random() < 0.25:
+        pool = RANDOM_POOL_UNDERSCORE
+        size -= 1
+        prefix = "_"
+    else:
+        pool = RANDOM_POOL
+        prefix = ""
+    return prefix + "".join(random.choice(pool) for _ in range(size))

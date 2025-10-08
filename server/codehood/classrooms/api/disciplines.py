@@ -1,7 +1,6 @@
 from django.utils.translation import gettext as _
-from ninja.pagination import paginate
 from ninja import Router
-
+from ninja.pagination import paginate
 
 from .. import models
 from . import schemas
@@ -18,9 +17,9 @@ def list_disciplines(request):
     return models.Discipline.objects.all()
 
 
-@router.get("/{id}", response=schemas.Discipline)
-def get_discipline(request, id: str):
+@router.get("/{slug}", response=schemas.Discipline)
+def get_discipline(request, slug: str):
     """
     Show discipline details.
     """
-    return models.Discipline.objects.get(slug=id)
+    return models.Discipline.objects.get(slug=slug)

@@ -1,13 +1,15 @@
+from ...api import rest
+from .classrooms import (
+    classrooms,
+    enrolled_classrooms,
+    get_queryset,
+    view_classroom,
+)
 from .classrooms import (
     router as classrooms_router,
-    get_queryset,
-    classrooms,
-    view_classroom,
-    get_id,
-    enrolled_classrooms,
 )
-from .disciplines import router as disciplines_router, get_discipline, list_disciplines
-from ...api import rest
+from .disciplines import get_discipline, list_disciplines
+from .disciplines import router as disciplines_router
 
 __all__ = [
     "classrooms_router",

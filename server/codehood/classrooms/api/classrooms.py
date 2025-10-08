@@ -8,7 +8,7 @@ from ninja.pagination import paginate
 
 from ...types import AuthenticatedRequest as HttpRequest
 from ...types import PaginatedView, redacted
-from .. import models
+from .. import models, util
 from ..rules import Perms
 from . import schemas
 
@@ -91,32 +91,25 @@ def view_classroom(request: HttpRequest, id: str):
     """
     Show basic data from a single classroom. Uses ID.
     """
-    classroom = get_queryset(request).get(public_id=id)
+    classroom = get_queryset(request).get(**util.public_id_params(id))
     if request.user.has_perm(Perms.VIEW_CLASSROOM, classroom):
         return classroom
     return public_classroom(classroom)
 
 
-@router.get("/id/{discipline}/{classroom}")
-def get_id(request: HttpRequest, discipline: str, classroom: str) -> str:
+@router.post("/", response={201: schemas.Classroom})
+def create_classroom(request: HttpRequest, classroom: schemas.ClassroomCreate):
     """
-    Return id from natural key formed by a discipline/instructor_edition
-    combination.
+    Create a new classroom.
     """
-    params = natural_key(discipline, classroom)
-    return get_queryset(request).get(**params).public_id
-
-
-def natural_key(discipline: str, classroom: str) -> dict[str, str]:
-    """
-    Returns a dictionary with the discipline and edition as keys.
-    """
-    instructor, _, edition = classroom.rpartition("_")
-    return {
-        "discipline__slug": discipline,
-        "instructor__username": instructor,
-        "edition": edition,
-    }
+    data = classroom.dict()
+    data["instructor"] = request.user
+    data["status"] = models.Classroom.Status[data["status"].upper()]
+    discipline = data.pop("discipline")
+    data["discipline_id" if isinstance(discipline, str) else "discipline"] = discipline
+    instance = models.Classroom(**data)
+    instance.save()
+    return 201, schemas.Classroom.from_orm(instance)
 
 
 def public_classroom(

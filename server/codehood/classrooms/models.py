@@ -181,6 +181,14 @@ class Classroom(LoggingModel, StatusModel, TimeStampedModel):
         expires = self.disable_enrollment_at
         return expires is not None and expires < timezone.now()
 
+    @property
+    def natural_public_id(self) -> str:
+        """
+        A natural public id for the classroom, in the form
+        discipline__instructor_edition.
+        """
+        return f"{self.discipline_id}__{self.instructor.username}_{self.edition}"
+
     def __str__(self) -> str:
         return self.slug
 
