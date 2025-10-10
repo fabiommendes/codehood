@@ -65,7 +65,8 @@ Multiple choice questions are declared using an unordered list:
 
 ```md
 [Q1] How much is 2 + 2?
-* 2
+* 2 
+ B  
 * 3
 * 4 ✅
 * 5

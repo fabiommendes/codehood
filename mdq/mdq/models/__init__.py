@@ -6,6 +6,7 @@ from .question import (
     FillIn,
     MultipleChoice,
     MultipleSelection,
+    QuestionType,
     TrueFalse,
     UnitTest,
 )
@@ -33,4 +34,5 @@ __all__ = [
     "MultipleSelection",
     "TrueFalse",
     "UnitTest",
+    "QuestionType",
 ]

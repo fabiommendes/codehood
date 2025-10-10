@@ -1,11 +1,10 @@
-Final Exam
-==========
+# Final Exam
 
     format: md
     shuffle: true
     grading: all-or-nothing
 
------
+--------------------------------------------------------------------------------
 
 ## [q1] Multiple choice question
 
@@ -96,4 +95,3 @@ What is the answer to life, the universe and everything? [42]
     max_length: 20
 
 What is the answer to life, the universe and everything? {42}
-

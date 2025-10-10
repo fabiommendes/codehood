@@ -3,7 +3,7 @@ from pathlib import Path
 import rich
 import rich.pretty
 
-from mdq import parse_question
+from mdq import parse_exam
 
-ast = parse_question(Path("examples/exam-a.md"))
+ast = parse_exam(Path("examples/exam-a.md"))
 rich.pretty.pprint(ast)

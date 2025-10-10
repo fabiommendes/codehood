@@ -27,6 +27,15 @@ from .shared import (
     TrueFalseGrading,
 )
 
+type QuestionType = Literal[
+    "multiple-choice",
+    "true-false",
+    "numerical",
+    "matching",
+    "essay",
+    "fill-in",
+]
+
 
 class BaseQuestion[Grading = IntervalGrading](Model, ABC):
     """
@@ -59,15 +68,7 @@ class BaseQuestion[Grading = IntervalGrading](Model, ABC):
         ),
     ]
     type: Annotated[
-        Literal[
-            "multiple-choice",
-            "true-false",
-            "short-answer",
-            "numerical",
-            "matching",
-            "essay",
-            "fill-in",
-        ],
+        QuestionType,
         Field(description="Discriminator for the question type."),
     ]
     preamble: Annotated[

@@ -1,0 +1,5 @@
+class NOT_GIVEN_TYPE:
+    pass
+
+
+NOT_GIVEN = NOT_GIVEN_TYPE()

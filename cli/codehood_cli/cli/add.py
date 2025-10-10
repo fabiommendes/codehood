@@ -2,7 +2,6 @@ from typing import Annotated
 
 import typer
 
-from .. import config
 from ..classroom import parse_classroom_slug
 
 app = typer.Typer(help="Add  resources to classroom.")
@@ -63,7 +62,6 @@ def exam(
     """
     Add a new exam to the classroom.
     """
-    cfg = config.load()
     cls = parse_classroom_slug(classroom)
 
     # Normalize config
