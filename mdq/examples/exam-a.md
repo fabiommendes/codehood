@@ -12,8 +12,9 @@
 
 What is the correct answer?
 
-* 0
 * 1
+* [50%] 0
+  > Feedback
 * [Google it](https://www.google.com)
 * [x] 42
 
@@ -27,7 +28,7 @@ Numbers are either even or odd. This is a fundamental property of integers.
 What are the even numbers? Mark all the correct answers.
 
 * [x] 2
-  > Two is the smallest and first even prime number. 
+  > Two is the smallest and first even prime number.
 * [ ] 3
 * [x] 4
 * [ ] 5
@@ -53,7 +54,7 @@ Mark the following statements as true or false.
 
     weight: 3.0
 
-Complete the following sentences by filling in the blanks.  
+Complete the following sentences by filling in the blanks.
 
 2 + 2 = [^value], which is an [^oddity]
 
@@ -69,9 +70,9 @@ Complete the following sentences by filling in the blanks.
 
 ## [q5] Associative question
 
-    weight: 3.0 
+    weight: 3.0
 
-Associate the computations with their respective results.   
+Associate the computations with their respective results.
 
 1 + 1 =
 : 2

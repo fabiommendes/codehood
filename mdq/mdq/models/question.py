@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Annotated, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import Field
 
@@ -26,14 +26,19 @@ from .shared import (
     MediaItem,
     TrueFalseGrading,
 )
+from ..types import NOT_GIVEN
 
 type QuestionType = Literal[
     "multiple-choice",
+    "multiple-selection",
+    "associative",
     "true-false",
     "numerical",
     "matching",
     "essay",
     "fill-in",
+    "code-io",
+    "unit-test",
 ]
 
 
@@ -54,7 +59,7 @@ class BaseQuestion[Grading = IntervalGrading](Model, ABC):
             description="The question title. It is used to display a friendly name in the user interface. It is  different from the ID in that it is a human-readable name which is intended for displaying to the user.\n",
             min_length=1,
         ),
-    ] = None
+    ] = ""
     stem: Annotated[
         str,
         Field(
@@ -124,6 +129,16 @@ class BaseQuestion[Grading = IntervalGrading](Model, ABC):
         ),
     ] = None
 
+    INFO_FIELDS: ClassVar = [
+        "id",
+        "type",
+        "comment",
+        "media",
+        "format",
+        "grading",
+        "shuffle",
+    ]
+
 
 class BaseProgrammingQuestion(BaseQuestion, ABC):
     """
@@ -156,15 +171,14 @@ class BaseProgrammingQuestion(BaseQuestion, ABC):
         ),
     ]
     answer_key: Annotated[
-        dict[str, str] | None,
+        Any,
         Field(
             alias="answer-key",
             description="Reference implementation used to grade the question. "
             "Each code snippet might be executed to compute the expected output from some given inputs. "
             "This field is a dictionary mapping programming languages with their corresponding code snippet.",
-            default_factory=dict,
         ),
-    ]
+    ] = NOT_GIVEN
     timeout: Annotated[
         float | dict[str, float | None],
         Field(
@@ -178,7 +192,7 @@ class BaseProgrammingQuestion(BaseQuestion, ABC):
             description="A dictionary mapping programming languages with their corresponding compilation environments. The options vary on a per-language basis and are encoded as somewhat arbitrary JSON objects.\n",
             default_factory=dict,
         ),
-    ] = None
+    ]
     environment: Annotated[
         dict[str, Environment],
         Field(
@@ -196,7 +210,7 @@ class BaseProgrammingQuestion(BaseQuestion, ABC):
             description="A dictionary mapping programming languages with their corresponding linting options. Linting is executed on successful submissions and can discount points for style and poor practices.",
             default_factory=dict,
         ),
-    ] = None
+    ]
     forbidden_functions: Annotated[
         dict[str, list[str]],
         Field(
@@ -230,6 +244,18 @@ class BaseProgrammingQuestion(BaseQuestion, ABC):
         ),
     ]
 
+    INFO_FIELDS: ClassVar = [
+        *BaseQuestion.INFO_FIELDS,
+        "supported_languages",
+        "timeout",
+        "compilation",
+        "environment",
+        "linting",
+        "forbidden_functions",
+        "forbidden_types",
+        "forbidden_syntax",
+    ]
+
 
 class MultipleChoice(BaseQuestion):
     """
@@ -244,6 +270,7 @@ class MultipleChoice(BaseQuestion):
         list[Choice],
         Field(description="The list of choices for the question", min_items=2),
     ]
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS, "penalty"]
 
 
 class MultipleSelection(BaseQuestion[TrueFalseGrading]):
@@ -257,6 +284,8 @@ class MultipleSelection(BaseQuestion[TrueFalseGrading]):
         list[Choice],
         Field(description="The list of choices for the question", min_items=2),
     ]
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS]
+
 
 
 class TrueFalse(BaseQuestion[TrueFalseGrading]):
@@ -270,6 +299,8 @@ class TrueFalse(BaseQuestion[TrueFalseGrading]):
         list[Choice],
         Field(description="The list of choices for the question", min_items=2),
     ]
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS]
+
 
 
 class Essay(BaseQuestion):
@@ -285,7 +316,8 @@ class Essay(BaseQuestion):
             description="The type of input field to be used for the essay.",
             examples=["text", "richtext", "python"],
         ),
-    ] = "richtext"
+    ] = InputType.RICHTEXT
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS, "input"]
 
 
 class FillIn(BaseQuestion):
@@ -303,6 +335,7 @@ class FillIn(BaseQuestion):
             min_items=1,
         ),
     ]
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS]
 
 
 class Associative(BaseQuestion):
@@ -326,6 +359,7 @@ class Associative(BaseQuestion):
             "The  keys represent unique identifiers."
         ),
     ] = None
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS]
 
 
 class CodeIo(BaseProgrammingQuestion):
@@ -349,12 +383,12 @@ class CodeIo(BaseProgrammingQuestion):
             min_items=1,
         ),
     ]
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS]
 
 
 class UnitTest(BaseProgrammingQuestion):
     """
     A programming question that is evaluated running some unit tests.
-
     """
 
     type: Literal["unit-test"] = "unit-test"
@@ -366,3 +400,5 @@ class UnitTest(BaseProgrammingQuestion):
             min_items=1,
         ),
     ]
+    INFO_FIELDS: ClassVar = [*BaseQuestion.INFO_FIELDS]
+
