@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           Int               @id @default(autoincrement())
+  publicId     String            @unique
+  username     String            @unique
+  email        String            @unique
+  schoolId     String            @unique
+  githubId     String            @unique
+  name         String
+  passwordHash String
+  role         Role
+  image        String?
+  createdAt    DateTime          @default(now())
+  apiKeys      ApiKey[]
+  invitesSent  Invite[]          @relation("InviteCreatedBy")
+  redemption   InviteRedemption?
+  sessions     Session[]
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiKey {
+  id         Int        @id @default(autoincrement())
+  keyHash    String     @unique
+  name       String
+  kind       ApiKeyKind
+  userId     Int
+  lastUsedAt DateTime?
+  createdAt  DateTime   @default(now())
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invite {
+  id          Int                @id @default(autoincrement())
+  tokenHash   String             @unique
+  kind        InviteKind
+  email       String?
+  role        Role
+  courseId    Int?
+  maxUses     Int?
+  expiresAt   DateTime
+  createdById Int
+  createdAt   DateTime           @default(now())
+  createdBy   User               @relation("InviteCreatedBy", fields: [createdById], references: [id])
+  redemptions InviteRedemption[]
+}
+
+model InviteRedemption {
+  id         Int      @id @default(autoincrement())
+  inviteId   Int
+  userId     Int      @unique
+  redeemedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  invite     Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum ApiKeyKind {
+  CLI
+  BOT
+}
+
+enum InviteKind {
+  PERSONAL
+  CLASSROOM
+}
