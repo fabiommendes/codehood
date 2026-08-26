@@ -1,5 +1,12 @@
 import { generateToken, hashToken } from "@/auth/token";
-import { type InviteKind, prisma, type Role } from "./client";
+import type { Create, FindOne, ServiceMethodOpts } from "./base-service";
+import {
+	type Invite,
+	type InviteKind,
+	type PrismaClient,
+	prisma,
+	type Role,
+} from "./client";
 
 const DEFAULT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -16,34 +23,26 @@ export class InviteError extends Error {
 	}
 }
 
-interface CreateInviteInput {
+export interface CreateInviteInput {
 	kind: InviteKind;
 	email?: string;
-	role: Role;
+	role?: Role;
 	courseId?: number;
 	maxUses?: number | null;
 	createdById: number;
 	expiresInMs?: number;
 }
 
-async function createInvite(input: CreateInviteInput) {
-	const token = generateToken();
-	const invite = await prisma.invite.create({
-		data: {
-			tokenHash: hashToken(token),
-			kind: input.kind,
-			email: input.email,
-			role: input.role,
-			courseId: input.courseId,
-			maxUses: input.maxUses ?? null,
-			expiresAt: new Date(
-				Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
-			),
-			createdById: input.createdById,
-		},
-	});
-	return { token, invite };
+export interface CreateInviteResult {
+	token: string;
+	invite: Invite;
 }
+
+export interface FindInviteBy {
+	token: string;
+}
+
+export type InviteWithCount = Invite & { _count: { redemptions: number } };
 
 type RedeemableInvite = {
 	kind: InviteKind;
@@ -53,38 +52,85 @@ type RedeemableInvite = {
 	_count: { redemptions: number };
 };
 
-export const inviteService = {
+class InviteService
+	implements
+	Create<CreateInviteInput, CreateInviteResult>,
+	FindOne<FindInviteBy, InviteWithCount> {
+	prisma: PrismaClient;
+
+	constructor(client: PrismaClient = prisma) {
+		this.prisma = client;
+	}
+
+	/**
+	 * Create a new invite, returning the plaintext token and the invite row.
+	 */
+	async create(
+		input: CreateInviteInput,
+		opts?: ServiceMethodOpts,
+	): Promise<CreateInviteResult> {
+		const client = opts?.tx ?? this.prisma;
+		const token = generateToken();
+		const invite = await client.invite.create({
+			data: {
+				tokenHash: hashToken(token),
+				kind: input.kind,
+				email: input.email,
+				role: input.role ?? "STUDENT",
+				courseId: input.courseId,
+				maxUses: input.maxUses ?? null,
+				expiresAt: new Date(
+					Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
+				),
+				createdById: input.createdById,
+			},
+		});
+		return { token, invite };
+	}
+
 	/**
 	 * Single-email, single-use invite (instructor→student, admin→instructor).
 	 */
-	createPersonalCode(input: {
-		email: string;
-		role: Role;
-		courseId?: number;
-		createdById: number;
-		expiresInMs?: number;
-	}) {
-		return createInvite({ ...input, kind: "PERSONAL", maxUses: 1 });
-	},
+	// TODO: refactor only create() exists. This should be a parameterized call.
+	createPersonalCode(
+		input: {
+			email: string;
+			role: Role;
+			courseId?: number;
+			createdById: number;
+			expiresInMs?: number;
+		},
+		opts?: ServiceMethodOpts,
+	) {
+		return this.create({ ...input, kind: "PERSONAL", maxUses: 1 }, opts);
+	}
 
 	/**
 	 * Reusable join code for a course; any STUDENT can redeem it until expiry/capacity.
 	 */
-	createClassroomCode(input: {
-		courseId: number;
-		createdById: number;
-		maxUses?: number;
-		expiresInMs?: number;
-	}) {
-		return createInvite({ ...input, kind: "CLASSROOM", role: "STUDENT" });
-	},
+	// TODO: refactor only create() exists. This should be a parameterized call.
+	createClassroomCode(
+		input: {
+			courseId: number;
+			createdById: number;
+			maxUses?: number;
+			expiresInMs?: number;
+		},
+		opts?: ServiceMethodOpts,
+	) {
+		return this.create({ ...input, kind: "CLASSROOM", role: "STUDENT" }, opts);
+	}
 
-	findByToken(token: string) {
-		return prisma.invite.findUnique({
-			where: { tokenHash: hashToken(token) },
+	findOne(
+		filter: FindInviteBy,
+		opts?: ServiceMethodOpts,
+	): Promise<InviteWithCount | null> {
+		const client = opts?.tx ?? this.prisma;
+		return client.invite.findUnique({
+			where: { tokenHash: hashToken(filter.token) },
 			include: { _count: { select: { redemptions: true } } },
 		});
-	},
+	}
 
 	/**
 	 * Redeems an invite for `userId`, atomically re-checking expiry/capacity/email match.
@@ -94,7 +140,7 @@ export const inviteService = {
 	redeem(token: string, userId: number, email: string) {
 		const tokenHash = hashToken(token);
 
-		return prisma.$transaction(async (tx) => {
+		return this.prisma.$transaction(async (tx) => {
 			const invite = await tx.invite.findUnique({
 				where: { tokenHash },
 				include: { _count: { select: { redemptions: true } } },
@@ -117,8 +163,10 @@ export const inviteService = {
 
 			return invite;
 		});
-	},
-};
+	}
+}
+
+export const inviteService = new InviteService();
 
 /**
  * Pure check reused as a cheap pre-check (before creating a User) and as the

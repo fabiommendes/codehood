@@ -1,7 +1,19 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../generated/prisma/client";
 
-export type { ApiKeyKind, InviteKind, Role, User } from "../generated/prisma/client";
+export type {
+	ApiKey,
+	ApiKeyKind,
+	Invite,
+	InviteKind,
+	Role,
+	Session,
+	User,
+} from "../generated/prisma/client";
+export { PrismaClient } from "../generated/prisma/client";
+
+type PrismaTxFn = Parameters<PrismaClient["$transaction"]>[0];
+export type PrismaTx = Parameters<PrismaTxFn>[0];
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

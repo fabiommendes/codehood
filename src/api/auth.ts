@@ -23,6 +23,10 @@ export async function cliLogin(context: APIContext): Promise<Response> {
 		return Response.json({ error: "invalid credentials" }, { status: 401 });
 	}
 
-	const { token } = await apiKeyService.create(user.id, "CLI login", "CLI");
+	const { token } = await apiKeyService.create({
+		userId: user.id,
+		name: "CLI login",
+		kind: "CLI",
+	});
 	return Response.json({ token });
 }

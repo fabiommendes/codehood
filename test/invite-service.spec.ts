@@ -32,7 +32,7 @@ test("personal invite: redeems for the invited email, rejects others, then is ex
 		createdById: admin.id,
 	});
 
-	const invite = await inviteService.findByToken(token);
+	const invite = await inviteService.findOne({ token });
 	expect(invite).not.toBeNull();
 	// biome-ignore lint/style/noNonNullAssertion: asserted above
 	expect(checkRedeemable(invite!, "wrong@codehood.test")).toBe(
@@ -82,7 +82,7 @@ test("expired invite is rejected before redemption", async () => {
 		expiresInMs: -1,
 	});
 
-	const invite = await inviteService.findByToken(token);
+	const invite = await inviteService.findOne({ token });
 	// biome-ignore lint/style/noNonNullAssertion: asserted below
 	expect(checkRedeemable(invite!, "late@codehood.test")).toBe("expired");
 

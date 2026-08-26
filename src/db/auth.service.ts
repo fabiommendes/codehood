@@ -7,7 +7,9 @@ import {
 	InviteError,
 	inviteService,
 } from "@/db/invite.service";
+import { validate } from "./base-service";
 import type { Role } from "./client";
+import { type PrismaClient, prisma } from "./client";
 import { sessionService } from "./session.service";
 import { type User, userService } from "./user.service";
 
@@ -57,11 +59,18 @@ export type AcceptInvite = z.infer<typeof acceptInvite>;
 export type CreateClassroomInvite = z.infer<typeof createClassroomInvite>;
 export type CreatePersonalInvite = z.infer<typeof createPersonalInvite>;
 
-export const authService = {
+class AuthService {
+	prisma: PrismaClient;
+
+	constructor(client: PrismaClient = prisma) {
+		this.prisma = client;
+	}
+
 	/**
 	 * Email/username and password login. Returns the user, session token, and
 	 * session object if successful.
 	 */
+	@validate(login)
 	async login(input: Login) {
 		const user = await userService.findOne({ login: input.login });
 		const passwordHash = user?.passwordHash ?? "";
@@ -72,22 +81,26 @@ export const authService = {
 				message: "Invalid email/username or password.",
 			});
 		}
-		const { token, session } = await sessionService.create(user.id);
+		const { token, session } = await sessionService.create({
+			userId: user.id,
+		});
 		return { user, token, session };
-	},
+	}
 
 	/**
 	 * Logout the current session.
 	 */
+	@validate(logout)
 	async logout(input: Logout) {
 		if (input.token) await sessionService.revokeByToken(input.token);
-	},
+	}
 
 	/**
 	 * Accept an invite to create a new user account.
 	 */
+	@validate(acceptInvite)
 	async acceptInvite(input: AcceptInvite) {
-		const invite = await inviteService.findByToken(input.token);
+		const invite = await inviteService.findOne({ token: input.token });
 		if (!invite)
 			throw new ActionError({
 				code: "NOT_FOUND",
@@ -123,10 +136,13 @@ export const authService = {
 			throw error;
 		}
 
-		const { token, session } = await sessionService.create(user.id);
+		const { token, session } = await sessionService.create({
+			userId: user.id,
+		});
 		return { user, token, session };
-	},
+	}
 
+	@validate(createPersonalInvite)
 	async createPersonalInvite(input: CreatePersonalInvite, user: User) {
 		if (!canInvite(user, input.role)) {
 			throw new ActionError({
@@ -139,8 +155,9 @@ export const authService = {
 			createdById: user.id,
 		});
 		return { token };
-	},
+	}
 
+	@validate(createClassroomInvite)
 	async createClassroomInvite(input: CreateClassroomInvite, user: User) {
 		if (!canInvite(user, "STUDENT")) {
 			throw new ActionError({
@@ -153,8 +170,10 @@ export const authService = {
 			createdById: user.id,
 		});
 		return { token };
-	},
-};
+	}
+}
+
+export const authService = new AuthService();
 
 function inviteErrorMessage(code: InviteError["code"]): string {
 	switch (code) {

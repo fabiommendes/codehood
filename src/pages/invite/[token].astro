@@ -3,7 +3,7 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import { inviteService } from "@/db/invite.service";
-import Layout from "@/layouts/Layout.astro";
+import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 const { token } = Astro.params;
 const result = Astro.getActionResult(actions.auth.acceptInvite);
@@ -11,154 +11,102 @@ if (result && !result.error) {
 	return Astro.redirect("/");
 }
 
-const invite = token ? await inviteService.findByToken(token) : null;
+const invite = token ? await inviteService.findOne({ token }) : null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
 	invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
 ---
 
-<Layout>
-  <main class="flex min-h-screen items-center justify-center">
-    <div class="card card-border w-full max-w-sm">
-      <div class="card-body">
-        <h2 class="card-title">Accept invite</h2>
-
-        {
-          !isValid && (
-            <div role="alert" class="alert alert-error">
-              <span>
-                {!invite && "This invite link is invalid."}
-                {invite && isExpired && "This invite has expired."}
-                {invite &&
-                  isExhausted &&
-                  "This invite has already been fully used."}
-              </span>
-            </div>
-          )
-        }
-
-        {
-          isValid && invite && (
-            <>
-              {result?.error && (
-                <div role="alert" class="alert alert-error">
-                  <span>{result.error.message}</span>
-                </div>
-              )}
-
-              <p class="text-sm text-base-content/60">
-                You're accepting an invite to join as{" "}
-                <strong>{invite.role.toLowerCase()}</strong>.
-              </p>
-
-              <form
-                method="POST"
-                action={actions.auth.acceptInvite}
-                class="flex flex-col gap-4"
-              >
-                <input type="hidden" name="token" value={token} />
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Email</legend>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    class="input w-full"
-                    value={invite.email ?? ""}
-                    readonly={invite.kind === "PERSONAL"}
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Username</legend>
-                  <input
-                    type="text"
-                    name="username"
-                    required
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Name</legend>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">GitHub username</legend>
-                  <input
-                    type="text"
-                    name="githubId"
-                    required
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">School id</legend>
-                  <input
-                    type="text"
-                    name="schoolId"
-                    required
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Password</legend>
-                  <input
-                    type="password"
-                    name="password"
-                    id="password"
-                    required
-                    minlength="8"
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Confirm password</legend>
-                  <input
-                    type="password"
-                    id="passwordConfirm"
-                    required
-                    minlength="8"
-                    class="input w-full"
-                  />
-                  <p class="label" id="passwordMismatch" hidden>
-                    Passwords do not match.
-                  </p>
-                </fieldset>
-
-                <div class="card-actions">
-                  <button type="submit" class="btn btn-block">
-                    Create account
-                  </button>
-                </div>
-              </form>
-            </>
-          )
-        }
+<CenteredLayout title="Accept invite">
+  {
+    !isValid && (
+      <div role="alert" class="alert alert-error">
+        <span>
+          {!invite && "This invite link is invalid."}
+          {invite && isExpired && "This invite has expired."}
+          {invite && isExhausted && "This invite has already been fully used."}
+        </span>
       </div>
-    </div>
-  </main>
-</Layout>
+    )
+  }
+
+  {
+    isValid && invite && (
+      <>
+        {result?.error && (
+          <div role="alert" class="alert alert-error">
+            <span>{result.error.message}</span>
+          </div>
+        )}
+
+        <p class="text-sm text-base-content/60">
+          You're accepting an invite to join as <strong>{invite.role.toLowerCase()}</strong>.
+        </p>
+
+        <form method="POST" action={actions.auth.acceptInvite} class="flex flex-col gap-4">
+          <input type="hidden" name="token" value={token} />
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Email</legend>
+            <input
+              type="email"
+              name="email"
+              required
+              class="input w-full"
+              value={invite.email ?? ""}
+              readonly={invite.kind === "PERSONAL"}
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Username</legend>
+            <input type="text" name="username" required class="input w-full" />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Name</legend>
+            <input type="text" name="name" required class="input w-full" />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">GitHub username</legend>
+            <input type="text" name="githubId" required class="input w-full" />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">School id</legend>
+            <input type="text" name="schoolId" required class="input w-full" />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Password</legend>
+            <input type="password" name="password" id="password" required minlength="8" class="input w-full" />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Confirm password</legend>
+            <input type="password" id="passwordConfirm" required minlength="8" class="input w-full" />
+            <p class="label" id="passwordMismatch" hidden>
+              Passwords do not match.
+            </p>
+          </fieldset>
+
+          <div class="card-actions">
+            <button type="submit" class="btn btn-primary btn-block rounded-full">
+              Create account
+            </button>
+          </div>
+        </form>
+      </>
+    )
+  }
+</CenteredLayout>
 
 <script>
   const form = document.querySelector("form");
-  const password = document.getElementById(
-    "password",
-  ) as HTMLInputElement | null;
-  const confirm = document.getElementById(
-    "passwordConfirm",
-  ) as HTMLInputElement | null;
+  const password = document.getElementById("password") as HTMLInputElement | null;
+  const confirm = document.getElementById("passwordConfirm") as HTMLInputElement | null;
   const mismatch = document.getElementById("passwordMismatch");
 
   form?.addEventListener("submit", (event) => {

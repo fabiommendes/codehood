@@ -2,6 +2,7 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { verifyPassword } from "@/auth/password";
 import { canInvite, canManageApiKeys } from "@/auth/permissions";
+import { requireUser } from "@/auth/require-user";
 import { apiKeyService } from "@/db/api-key.service";
 import {
 	checkRedeemable,
@@ -19,13 +20,13 @@ const SESSION_COOKIE_OPTS = {
 	path: "/",
 };
 
-
 export type User = Omit<ServiceUser, "passwordHash" | "id" | "publicId"> & {
 	id: string;
 };
 
 export const auth = {
 	login: defineAction({
+		accept: "form",
 		input: z.object({
 			login: z.string().min(1),
 			password: z.string().min(1),
@@ -38,7 +39,9 @@ export const auth = {
 					message: "Invalid email/username or password.",
 				});
 			}
-			const { token, session } = await sessionService.create(user.id);
+			const { token, session } = await sessionService.create({
+				userId: user.id,
+			});
 			context.cookies.set(SESSION_COOKIE, token, {
 				...SESSION_COOKIE_OPTS,
 				expires: session.expiresAt,
@@ -48,6 +51,7 @@ export const auth = {
 	}),
 
 	logout: defineAction({
+		accept: "form",
 		handler: async (_input, context) => {
 			const token = context.cookies.get(SESSION_COOKIE)?.value;
 			if (token) await sessionService.revokeByToken(token);
@@ -56,6 +60,7 @@ export const auth = {
 	}),
 
 	acceptInvite: defineAction({
+		accept: "form",
 		input: z.object({
 			token: z.string(),
 			email: z.email(),
@@ -66,7 +71,7 @@ export const auth = {
 			schoolId: z.string().min(1),
 		}),
 		handler: async (input, context) => {
-			const invite = await inviteService.findByToken(input.token);
+			const invite = await inviteService.findOne({ token: input.token });
 			if (!invite)
 				throw new ActionError({
 					code: "NOT_FOUND",
@@ -102,9 +107,9 @@ export const auth = {
 				throw error;
 			}
 
-			const { token: sessionToken, session } = await sessionService.create(
-				user.id,
-			);
+			const { token: sessionToken, session } = await sessionService.create({
+				userId: user.id,
+			});
 			context.cookies.set(SESSION_COOKIE, sessionToken, {
 				...SESSION_COOKIE_OPTS,
 				expires: session.expiresAt,
@@ -157,23 +162,25 @@ export const auth = {
 	}),
 
 	createApiKey: defineAction({
+		accept: "form",
 		input: z.object({ name: z.string().min(1), kind: z.enum(["CLI", "BOT"]) }),
 		handler: async (input, context) => {
 			const actor = requireUser(context);
-			const { token } = await apiKeyService.create(
-				actor.id,
-				input.name,
-				input.kind,
-			);
+			const { token } = await apiKeyService.create({
+				userId: actor.id,
+				name: input.name,
+				kind: input.kind,
+			});
 			return { token };
 		},
 	}),
 
 	revokeApiKey: defineAction({
-		input: z.object({ id: z.number().int() }),
+		accept: "form",
+		input: z.object({ id: z.coerce.number().int() }),
 		handler: async (input, context) => {
 			const actor = requireUser(context);
-			const apiKey = await apiKeyService.findById(input.id);
+			const apiKey = await apiKeyService.findOne({ id: input.id });
 			if (!apiKey || !canManageApiKeys(actor, apiKey.userId)) {
 				throw new ActionError({ code: "FORBIDDEN" });
 			}
@@ -181,12 +188,6 @@ export const auth = {
 		},
 	}),
 };
-
-function requireUser(context: { locals: App.Locals }) {
-	const user = context.locals.user;
-	if (!user) throw new ActionError({ code: "UNAUTHORIZED" });
-	return user;
-}
 
 function inviteErrorMessage(code: InviteError["code"]): string {
 	switch (code) {
