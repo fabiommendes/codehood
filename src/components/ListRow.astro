@@ -1,0 +1,28 @@
+---
+// A single-row card: optional leading icon/chip/dot, main content, optional
+// trailing badge/link/date. Renders as an <a> when href is given, a <div>
+// otherwise. Used for exam, resource, and "upcoming" list rows across the app.
+interface Props {
+	href?: string;
+	muted?: boolean;
+	class?: string;
+}
+
+const { href, muted = false, class: className } = Astro.props;
+
+const cardClass = ["card card-border bg-base-100", href && "transition-colors hover:border-primary", muted && "opacity-70", className]
+	.filter(Boolean)
+	.join(" ");
+
+const Tag = href ? "a" : "div";
+---
+
+<Tag href={href} class={cardClass}>
+  <div class="card-body flex-row items-center gap-4 py-4">
+    <slot name="leading" />
+    <div class="min-w-0 flex-1">
+      <slot />
+    </div>
+    <slot name="trailing" />
+  </div>
+</Tag>

@@ -1,3 +1,4 @@
-import { ensureDevAdmin } from "@/auth/bootstrap";
+import { ensureDemoCourses, ensureDevAdmin } from "@/auth/bootstrap";
 
 await ensureDevAdmin();
+await ensureDemoCourses();

@@ -1,0 +1,73 @@
+---
+import PageKicker from "@/components/PageKicker.astro";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const sections = [
+	{
+		href: "/design/typography",
+		title: "Typography",
+		description:
+			"Font families, the heading scale, body copy, and code styles.",
+	},
+	{
+		href: "/design/colors",
+		title: "Colors",
+		description:
+			"The theme's semantic color palette, from the base surfaces to the status colors.",
+	},
+	{
+		href: "/design/layouts",
+		title: "Layouts",
+		description:
+			"The page shells the app is built from — Layout, AppLayout, CenteredLayout, DesignLayout.",
+	},
+	{
+		href: "/design/elements",
+		title: "Elements",
+		description:
+			"Buttons, badges, alerts, cards — the small reusable pieces pages are assembled from.",
+	},
+	{
+		href: "/design/forms",
+		title: "Forms",
+		description: "Input fields, selects, and validation states.",
+		comingSoon: true,
+	},
+];
+---
+
+<DesignLayout title="Overview" active="overview">
+  <div class="mb-10 max-w-2xl">
+    <PageKicker text="Reference" />
+    <h1 class="text-3xl font-bold">Codehood design system</h1>
+    <p class="mt-3 text-base-content/70">
+      A living reference for the tokens and reusable pieces the app is built from. Every color, font, and
+      component shown here is the real thing &mdash; the same theme and components used across the app, not a
+      separate mockup.
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    {
+      sections.map((section) => (
+        <a
+          href={section.href}
+          class:list={[
+            "card card-border bg-base-100 transition-colors hover:border-primary",
+            section.comingSoon && "opacity-70",
+          ]}
+        >
+          <div class="card-body">
+            <div class="flex items-center justify-between">
+              <h2 class="card-title">{section.title}</h2>
+              {section.comingSoon && <span class="badge badge-warning badge-sm">coming soon</span>}
+            </div>
+            <p class="text-sm text-base-content/70">{section.description}</p>
+          </div>
+        </a>
+      ))
+    }
+  </div>
+</DesignLayout>

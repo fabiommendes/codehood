@@ -1,0 +1,15 @@
+---
+// The landing page's hero flourish (src/pages/index.astro), reused wherever the app
+// wants that same brand-mark echo: four 10px squares in the logo's non-gray colors.
+interface Props {
+	class?: string;
+}
+
+const { class: className } = Astro.props;
+
+const colors = ["bg-primary", "bg-error", "bg-warning", "bg-success"];
+---
+
+<span class:list={["inline-flex gap-1", className]}>
+  {colors.map((color) => <span class:list={["inline-block h-2.5 w-2.5 rounded-[3px]", color]} />)}
+</span>

@@ -1,0 +1,19 @@
+---
+import Alert from "@/components/ui/Alert";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+---
+
+<DesignLayout title="Forms" active="forms">
+  <section class="max-w-2xl">
+    <h1 class="text-3xl font-bold">Forms</h1>
+    <p class="mt-3 text-base-content/70">
+      Inputs, selects, fieldsets, and validation states &mdash; used today on the login, invite-acceptance, and
+      profile pages, but not yet pulled together into a documented, reusable set here.
+    </p>
+    <Alert variant="info" class="mt-6">
+      <span>This page is under construction. Come back once the form patterns settle.</span>
+    </Alert>
+  </section>
+</DesignLayout>

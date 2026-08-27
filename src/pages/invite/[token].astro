@@ -2,6 +2,7 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
+import { FULL_ACCESS } from "@/db/base-service";
 import { inviteService } from "@/db/invite.service";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
@@ -11,7 +12,9 @@ if (result && !result.error) {
 	return Astro.redirect("/");
 }
 
-const invite = token ? await inviteService.findOne({ token }) : null;
+const invite = token
+	? await inviteService.findOne({ token }, FULL_ACCESS)
+	: null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
 	invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;

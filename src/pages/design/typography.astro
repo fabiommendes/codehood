@@ -1,0 +1,129 @@
+---
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const headings = [
+	{ tag: "h1", classes: "text-5xl font-bold", label: "text-5xl · font-bold" },
+	{ tag: "h2", classes: "text-4xl font-bold", label: "text-4xl · font-bold" },
+	{
+		tag: "h3",
+		classes: "text-3xl font-semibold",
+		label: "text-3xl · font-semibold",
+	},
+	{
+		tag: "h4",
+		classes: "text-2xl font-semibold",
+		label: "text-2xl · font-semibold",
+	},
+	{
+		tag: "h5",
+		classes: "text-xl font-semibold",
+		label: "text-xl · font-semibold",
+	},
+	{
+		tag: "h6",
+		classes: "text-lg font-semibold",
+		label: "text-lg · font-semibold",
+	},
+] as const;
+---
+
+<DesignLayout title="Typography" active="typography">
+  <section class="mb-14">
+    <h1 class="text-3xl font-bold">Typography</h1>
+    <p class="mt-3 max-w-2xl text-base-content/70">
+      Three typefaces, each with one job: a display face for headings, a body face for everything you read, and a
+      monospace face for anything that's code.
+    </p>
+  </section>
+
+  <section class="mb-14 grid grid-cols-1 gap-5 sm:grid-cols-3">
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <span class="badge badge-outline badge-sm font-mono">font-display</span>
+        <p class="font-display mt-3 text-2xl font-semibold">Space Grotesk</p>
+        <p class="text-sm text-base-content/60">Headings only.</p>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <span class="badge badge-outline badge-sm font-mono">font-sans</span>
+        <p class="font-sans mt-3 text-2xl font-semibold">IBM Plex Sans</p>
+        <p class="text-sm text-base-content/60">Body copy, UI labels, buttons.</p>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <span class="badge badge-outline badge-sm font-mono">font-mono</span>
+        <p class="font-mono mt-3 text-2xl font-semibold">IBM Plex Mono</p>
+        <p class="text-sm text-base-content/60">Code, tokens, terminal output.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-5 text-xl font-semibold">Heading scale</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body divide-y divide-base-300">
+        {
+          headings.map((heading) => {
+            const Tag = heading.tag;
+            return (
+              <div class="flex flex-wrap items-baseline justify-between gap-2 py-4 first:pt-0 last:pb-0">
+                <Tag class={heading.classes}>Run your course like a Git repo</Tag>
+                <span class="badge badge-ghost badge-sm font-mono">{heading.label}</span>
+              </div>
+            );
+          })
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-5 text-xl font-semibold">Body text</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body gap-5">
+        <div>
+          <p class="text-lg">
+            Lead paragraph &mdash; <code class="font-mono text-sm">text-lg</code>. Used for the first paragraph
+            under a page heading, where a little more presence helps.
+          </p>
+        </div>
+        <div>
+          <p class="text-base">
+            Body text &mdash; <code class="font-mono text-sm">text-base</code>. The default for everything you
+            read: descriptions, form help text, card bodies.
+          </p>
+        </div>
+        <div>
+          <p class="text-sm text-base-content/70">
+            Small text &mdash; <code class="font-mono text-sm">text-sm text-base-content/70</code>. Captions,
+            timestamps, secondary details.
+          </p>
+        </div>
+        <div>
+          <p class="text-xs text-base-content/60">
+            Muted / fine print &mdash; <code class="font-mono text-sm">text-xs text-base-content/60</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-5 text-xl font-semibold">Code</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body gap-4">
+        <p>
+          Inline code, like <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code>,
+          sits inside a sentence with a subtle background.
+        </p>
+        <pre class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
+  syncing content/questions/*.q.md
+  live for your students</code></pre>
+      </div>
+    </div>
+  </section>
+</DesignLayout>

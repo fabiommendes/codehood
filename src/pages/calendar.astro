@@ -1,0 +1,87 @@
+---
+import ListRow from "@/components/ListRow.astro";
+import PageKicker from "@/components/PageKicker.astro";
+import SectionHeader from "@/components/SectionHeader.astro";
+import Alert from "@/components/ui/Alert";
+import AppLayout from "@/layouts/AppLayout.astro";
+
+export const prerender = false;
+
+// Same mock term used across /courses — dot colors match the sidebar's course markers.
+const events = [
+	{ day: 15, code: "CS 101", title: "Midterm Exam", dot: "bg-primary" },
+	{ day: 20, code: "CS 201", title: "Quiz 2", dot: "bg-error" },
+	{ day: 22, code: "CS 301", title: "Problem Set 4", dot: "bg-warning" },
+];
+const eventsByDay = new Map(events.map((event) => [event.day, event]));
+
+const daysInMonth = 31;
+const startWeekday = 6; // March 1 falls on a Sunday in this mock term.
+const cells: (number | null)[] = [
+	...Array(startWeekday).fill(null),
+	...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+];
+const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+---
+
+<AppLayout title="Calendar">
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <PageKicker text="Term overview" squares />
+    <h1 class="text-3xl font-bold">Calendar</h1>
+    <p class="mt-2 text-base-content/70">Exams and assignments due across all your courses.</p>
+
+    <Alert variant="info" class="mt-6">
+      <span>This is a static preview of the calendar — dates shown aren't tied to the real term yet.</span>
+    </Alert>
+
+    <div class="mt-8 rounded-box border border-base-300 bg-base-100 p-5">
+      <p class="font-display text-lg font-semibold">March</p>
+
+      <div class="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-base-content/50">
+        {weekdays.map((day) => <div class="py-1">{day}</div>)}
+      </div>
+      <div class="grid grid-cols-7 gap-1">
+        {
+          cells.map((day) => {
+            const event = day ? eventsByDay.get(day) : undefined;
+            return (
+              <div
+                class:list={[
+                  "flex h-16 flex-col items-center gap-1 rounded-field p-1 text-sm",
+                  day && "border border-base-300",
+                  event && "border-primary/40 bg-primary/5",
+                ]}
+              >
+                {day && <span class={event ? "font-semibold" : "text-base-content/70"}>{day}</span>}
+                {event && (
+                  <span class="flex items-center gap-1 text-[10px] text-base-content/60">
+                    <span class:list={["inline-block h-1.5 w-1.5 rounded-full", event.dot]} />
+                    {event.code}
+                  </span>
+                )}
+              </div>
+            );
+          })
+        }
+      </div>
+    </div>
+
+    <section class="mt-10">
+      <SectionHeader title="Upcoming" />
+      <div class="mt-4 flex flex-col gap-3">
+        {
+          events.map((event) => (
+            <ListRow>
+              <span slot="leading" class:list={["inline-block h-2.5 w-2.5 shrink-0 rounded-full", event.dot]} />
+              <p class="font-medium">{event.title}</p>
+              <p class="text-sm text-base-content/60">{event.code}</p>
+              <p slot="trailing" class="text-sm text-base-content/60">
+                March {event.day}
+              </p>
+            </ListRow>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+</AppLayout>

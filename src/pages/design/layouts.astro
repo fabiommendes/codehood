@@ -1,0 +1,129 @@
+---
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const layouts = [
+	{
+		name: "Layout",
+		path: "src/layouts/Layout.astro",
+		description:
+			"The base HTML shell: <html>/<head>, global CSS, fonts, favicon. Every other layout wraps this one — pages never use it directly.",
+		usage: `<Layout title="Page title">\n  ...\n</Layout>`,
+		demo: "/design/layouts/layout",
+	},
+	{
+		name: "AppLayout",
+		path: "src/layouts/AppLayout.astro",
+		description:
+			"The logged-in app shell: a navbar (logo, Log in/Log out) plus a sidebar (Home, My courses, Profile, and a static course list — mocked, not real enrollment data yet). Sidebar is always visible on large screens, a checkbox-driven drawer on small ones. Used by the homepage, profile page, and the course mockups.",
+		usage: `<AppLayout title="Profile">\n  ...\n</AppLayout>`,
+		demo: "/design/layouts/app-layout",
+	},
+	{
+		name: "CenteredLayout",
+		path: "src/layouts/CenteredLayout.astro",
+		description:
+			"A single centered card on a muted background, with the logo and a heading above a slot. Used by login and invite-acceptance — anywhere a page's whole job is one form.",
+		usage: `<CenteredLayout title="Log in">\n  <form>...</form>\n</CenteredLayout>`,
+		demo: "/design/layouts/centered-layout",
+	},
+	{
+		name: "DesignLayout",
+		path: "src/layouts/DesignLayout.astro",
+		description:
+			"This page's own shell: a slim navbar plus the Overview/Typography/Colors/Layouts/Elements/Forms tab strip.",
+		usage: `<DesignLayout title="Layouts" active="layouts">\n  ...\n</DesignLayout>`,
+		demo: "/design/layouts/design-layout",
+	},
+];
+---
+
+<DesignLayout title="Layouts" active="layouts">
+  <section class="mb-14">
+    <h1 class="text-3xl font-bold">Layouts</h1>
+    <p class="mt-3 max-w-2xl text-base-content/70">
+      Four page shells cover the whole app so far. Pick the one that matches
+      what the page is for, rather than rebuilding a header or a centered card
+      from scratch.
+    </p>
+  </section>
+
+  <section class="mb-14 flex flex-col gap-5">
+    {
+      layouts.map((layout) => (
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 class="card-title font-mono text-lg">{layout.name}</h2>
+              <span class="text-xs text-base-content/50">{layout.path}</span>
+            </div>
+            <p class="text-base-content/70">{layout.description}</p>
+              <!-- prettier-ignore -->
+              <pre class="mt-2 overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>{layout.usage}</code></pre>
+            <div class="card-actions mt-1">
+              <a href={layout.demo} class="btn btn-sm btn-outline">
+                View demo →
+              </a>
+            </div>
+          </div>
+        </div>
+      ))
+    }
+  </section>
+
+  <section>
+    <h2 class="mb-5 text-xl font-semibold">Structural patterns</h2>
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="font-semibold">Content width</h3>
+          <p class="text-sm text-base-content/70">
+            Reading-width content (forms, settings) caps at{" "}
+            <code class="font-mono text-xs">max-w-2xl</code>, wider layouts
+            (this page, dashboards) at{" "}
+            <code class="font-mono text-xs">max-w-5xl</code>, both centered with{
+              " "
+            }
+            <code class="font-mono text-xs">mx-auto</code>.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="font-semibold">Stacking sections</h3>
+          <p class="text-sm text-base-content/70">
+            Vertically stacked cards (see the profile page) use{" "}
+            <code class="font-mono text-xs">flex flex-col gap-8</code> on the parent
+            rather than margins on each card, so spacing survives reordering.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="font-semibold">Responsive grids</h3>
+          <p class="text-sm text-base-content/70">
+            Card grids go single-column on small screens and widen with a
+            breakpoint prefix, e.g.{" "}
+            <code class="font-mono text-xs"
+              >grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4</code
+            >.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="font-semibold">Navbar</h3>
+          <p class="text-sm text-base-content/70">
+            <code class="font-mono text-xs">navbar</code> with{" "}
+            <code class="font-mono text-xs">navbar-start</code>/<code
+              class="font-mono text-xs">navbar-end</code
+            >, a bottom border, and <code class="font-mono text-xs"
+              >bg-base-100</code
+            > — see AppLayout and DesignLayout above.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</DesignLayout>

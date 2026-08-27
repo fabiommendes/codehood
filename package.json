@@ -7,16 +7,22 @@
 	},
 	"scripts": {
 		"dev": "astro dev",
-		"build": "astro build",
+		"build": "pnpm run openapi && astro build",
 		"preview": "astro preview",
 		"manage": "tsx src/commands/index.ts",
+		"openapi": "tsx scripts/generate-openapi.ts",
 		"seed": "prisma db seed",
 		"test": "tsx test/run.ts",
+		"test-e2e": "tsx test/run.ts",
+		"test-ui": "tsx test/run.ts --ui",
+		"ui-report": "playwright show-report",
 		"studio": "pnpm prisma studio --url file://./dev.db",
 		"astro": "astro"
 	},
 	"dependencies": {
+		"@asteasolutions/zod-to-openapi": "^9.1.0",
 		"@astrojs/node": "^11.1.4",
+		"@astrojs/solid-js": "^7.0.2",
 		"@faker-js/faker": "^10.6.0",
 		"@inquirer/prompts": "^8.6.0",
 		"@node-rs/argon2": "^2.1.0",
@@ -27,6 +33,8 @@
 		"dotenv": "^17.4.2",
 		"markdown-it": "^15.0.0",
 		"nanoid": "^6.0.1",
+		"solid-js": "^1.9.15",
+		"swagger-ui-dist": "^5.32.14",
 		"zod": "^4.4.3"
 	},
 	"allowScripts": {
@@ -35,11 +43,13 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.10",
 		"@playwright/test": "^1.62.1",
+		"@tailwindcss/typography": "^0.5.20",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/express": "^5.0.6",
 		"@types/markdown-it": "^14.2.0",
 		"@types/node": "^26.3.0",
 		"@types/supertest": "^7.2.1",
+		"@types/swagger-ui-dist": "^3.30.6",
 		"daisyui": "^5.7.22",
 		"prisma": "7.10.0",
 		"tailwindcss": "^4.3.3",

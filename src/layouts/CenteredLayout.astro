@@ -1,0 +1,27 @@
+---
+import Logo from "@/components/Logo.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
+import Layout from "./Layout.astro";
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<Layout title={`${title} — Codehood`}>
+  <main class="relative flex min-h-screen items-center justify-center bg-base-200 p-4">
+    <ThemeToggle class="absolute top-4 right-4" />
+    <div class="card card-border w-full max-w-sm overflow-hidden bg-base-100 shadow-md">
+      <div class="stripe-brand h-1.5"></div>
+      <div class="card-body">
+        <a href="/" class="mb-2">
+          <Logo height={34} />
+        </a>
+        <h2 class="card-title">{title}</h2>
+        <slot />
+      </div>
+    </div>
+  </main>
+</Layout>

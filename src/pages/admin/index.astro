@@ -1,0 +1,101 @@
+---
+// Real page: gated by the actual role system (isAtLeast/canManageUsers in
+// auth/permissions.ts), reading real users from the database — the first page
+// in the app that actually redirects to /403 on a real permission failure.
+export const prerender = false;
+
+import { canManageUsers } from "@/auth/permissions";
+import PageKicker from "@/components/PageKicker.astro";
+import { type User, userService } from "@/db/user.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+
+if (!Astro.locals.user) return Astro.redirect("/login");
+if (!canManageUsers(Astro.locals.user)) return Astro.redirect("/403");
+
+const users = (await userService.findMany(
+	{},
+	{ actor: Astro.locals.user },
+)) as Array<User & { createdAt: Date }>;
+
+const counts = {
+	ADMIN: users.filter((u) => u.role === "ADMIN").length,
+	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
+	STUDENT: users.filter((u) => u.role === "STUDENT").length,
+};
+
+const roleBadge = {
+	ADMIN: "badge-warning",
+	INSTRUCTOR: "badge-primary",
+	STUDENT: "badge-outline",
+} as const;
+
+function formatDate(date: Date): string {
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+}
+---
+
+<AppLayout title="Admin · Users">
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <PageKicker text="Admin" />
+    <h1 class="text-3xl font-bold">Users</h1>
+    <p class="mt-2 text-base-content/60">
+      Every account on this Codehood instance — {users.length} total.
+    </p>
+
+    <div
+      class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100"
+    >
+      <div class="stat">
+        <div class="stat-title">Admins</div>
+        <div class="stat-value text-2xl">{counts.ADMIN}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Instructors</div>
+        <div class="stat-value text-2xl">{counts.INSTRUCTOR}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Students</div>
+        <div class="stat-value text-2xl">{counts.STUDENT}</div>
+      </div>
+    </div>
+
+    <div
+      class="mt-8 overflow-x-auto rounded-box border border-base-300 bg-base-100"
+    >
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            users.map((u) => (
+              <tr>
+                <td class="font-medium">{u.name}</td>
+                <td class="font-mono text-sm text-base-content/60">
+                  @{u.username}
+                </td>
+                <td class="text-base-content/60">{u.email}</td>
+                <td>
+                  <span class:list={["badge badge-sm", roleBadge[u.role]]}>
+                    {u.role.toLowerCase()}
+                  </span>
+                </td>
+                <td class="text-base-content/60">{formatDate(u.createdAt)}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</AppLayout>

@@ -1,0 +1,27 @@
+---
+// Reached via Astro.rewrite (see src/utils/load-course.ts), which keeps the
+// original URL in the browser while rendering this page — so a course page a
+// visitor isn't enrolled in or doesn't teach ends up here with `?course=` set
+// to the segment they asked for, letting the message name it.
+import ErrorLayout from "@/layouts/ErrorLayout.astro";
+
+export const prerender = false;
+
+Astro.response.status = 403;
+const course = Astro.url.searchParams.get("course");
+---
+
+<ErrorLayout code="403" title="Access denied" codeClass="text-warning/30">
+  {
+    course ? (
+      <>
+        You don't have permission to view <strong>{course}</strong>. If you think this is a mistake, contact your instructor or admin.
+      </>
+    ) : (
+      "You don't have permission to view this page. If you think this is a mistake, contact your instructor or admin."
+    )
+  }
+  <div slot="actions">
+    <a href="/courses" class="btn btn-primary rounded-full">← Back to my courses</a>
+  </div>
+</ErrorLayout>

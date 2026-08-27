@@ -1,9 +1,11 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { verifyPassword } from "@/auth/password";
-import { canInvite, canManageApiKeys } from "@/auth/permissions";
 import { requireUser } from "@/auth/require-user";
 import { apiKeyService } from "@/db/api-key.service";
+import { FULL_ACCESS } from "@/db/base-service";
+import { prisma } from "@/db/client";
+import { courseService } from "@/db/course.service";
 import {
 	checkRedeemable,
 	InviteError,
@@ -12,6 +14,8 @@ import {
 import { sessionService } from "@/db/session.service";
 import { type User as ServiceUser, userService } from "@/db/user.service";
 import { SESSION_COOKIE } from "@/middleware/session";
+import { USERNAME_RE } from "@/utils/course-url";
+import { withActionErrors } from "./helpers";
 
 const SESSION_COOKIE_OPTS = {
 	httpOnly: true,
@@ -32,16 +36,20 @@ export const auth = {
 			password: z.string().min(1),
 		}),
 		handler: async (input, context) => {
-			const user = await userService.findOne({ login: input.login });
+			const user = await userService.findOne(
+				{ login: input.login },
+				FULL_ACCESS,
+			);
 			if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
 				throw new ActionError({
 					code: "UNAUTHORIZED",
 					message: "Invalid email/username or password.",
 				});
 			}
-			const { token, session } = await sessionService.create({
-				userId: user.id,
-			});
+			const { token, session } = await sessionService.create(
+				{ userId: user.id },
+				FULL_ACCESS,
+			);
 			context.cookies.set(SESSION_COOKIE, token, {
 				...SESSION_COOKIE_OPTS,
 				expires: session.expiresAt,
@@ -54,7 +62,7 @@ export const auth = {
 		accept: "form",
 		handler: async (_input, context) => {
 			const token = context.cookies.get(SESSION_COOKIE)?.value;
-			if (token) await sessionService.revokeByToken(token);
+			if (token) await sessionService.delete({ token }, FULL_ACCESS);
 			context.cookies.delete(SESSION_COOKIE, { path: "/" });
 		},
 	}),
@@ -64,14 +72,17 @@ export const auth = {
 		input: z.object({
 			token: z.string(),
 			email: z.email(),
-			username: z.string().min(1),
+			username: z.string().regex(USERNAME_RE, "Invalid username."),
 			name: z.string().min(1),
 			password: z.string().min(8),
 			githubId: z.string().min(1),
 			schoolId: z.string().min(1),
 		}),
 		handler: async (input, context) => {
-			const invite = await inviteService.findOne({ token: input.token });
+			const invite = await inviteService.findOne(
+				{ token: input.token },
+				FULL_ACCESS,
+			);
 			if (!invite)
 				throw new ActionError({
 					code: "NOT_FOUND",
@@ -85,18 +96,34 @@ export const auth = {
 				});
 			}
 
-			const user = await userService.create({
-				email: input.email,
-				username: input.username,
-				name: input.name,
-				role: invite.role,
-				password: input.password,
-				githubId: input.githubId,
-				schoolId: input.schoolId,
-			});
-
+			// One transaction: a redemption failure (race on maxUses, etc.) must not
+			// leave behind a User row with no invite and no course to show for it.
+			let user: ServiceUser;
 			try {
-				await inviteService.redeem(input.token, user.id, input.email);
+				user = await prisma.$transaction(async (tx) => {
+					const createdUser = await userService.create(
+						{
+							email: input.email,
+							username: input.username,
+							name: input.name,
+							role: invite.role,
+							password: input.password,
+							githubId: input.githubId,
+							schoolId: input.schoolId,
+						},
+						{ ...FULL_ACCESS, tx },
+					);
+					await inviteService.redeem(input.token, createdUser.id, input.email, {
+						tx,
+					});
+					if (invite.courseId) {
+						await courseService.enroll(
+							{ courseId: invite.courseId, userId: createdUser.id },
+							{ ...FULL_ACCESS, tx },
+						);
+					}
+					return createdUser;
+				});
 			} catch (error) {
 				if (error instanceof InviteError) {
 					throw new ActionError({
@@ -107,9 +134,10 @@ export const auth = {
 				throw error;
 			}
 
-			const { token: sessionToken, session } = await sessionService.create({
-				userId: user.id,
-			});
+			const { token: sessionToken, session } = await sessionService.create(
+				{ userId: user.id },
+				FULL_ACCESS,
+			);
 			context.cookies.set(SESSION_COOKIE, sessionToken, {
 				...SESSION_COOKIE_OPTS,
 				expires: session.expiresAt,
@@ -124,20 +152,19 @@ export const auth = {
 			role: z.enum(["INSTRUCTOR", "STUDENT"]),
 			courseId: z.number().int().optional(),
 		}),
-		handler: async (input, context) => {
+		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			if (!canInvite(actor, input.role)) {
-				throw new ActionError({
-					code: "FORBIDDEN",
-					message: `You cannot invite a ${input.role}.`,
-				});
-			}
-			const { token } = await inviteService.createPersonalCode({
-				...input,
-				createdById: actor.id,
-			});
+			const { token } = await inviteService.create(
+				{
+					...input,
+					kind: "PERSONAL",
+					maxUses: 1,
+					createdById: actor.id,
+				},
+				{ actor },
+			);
 			return { token };
-		},
+		}),
 	}),
 
 	createClassroomInvite: defineAction({
@@ -145,47 +172,45 @@ export const auth = {
 			courseId: z.number().int(),
 			maxUses: z.number().int().positive().optional(),
 		}),
-		handler: async (input, context) => {
+		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			if (!canInvite(actor, "STUDENT")) {
-				throw new ActionError({
-					code: "FORBIDDEN",
-					message: "You cannot invite students.",
-				});
-			}
-			const { token } = await inviteService.createClassroomCode({
-				...input,
-				createdById: actor.id,
-			});
+			const { token } = await inviteService.create(
+				{
+					...input,
+					kind: "CLASSROOM",
+					role: "STUDENT",
+					createdById: actor.id,
+				},
+				{ actor },
+			);
 			return { token };
-		},
+		}),
 	}),
 
 	createApiKey: defineAction({
 		accept: "form",
 		input: z.object({ name: z.string().min(1), kind: z.enum(["CLI", "BOT"]) }),
-		handler: async (input, context) => {
+		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { token } = await apiKeyService.create({
-				userId: actor.id,
-				name: input.name,
-				kind: input.kind,
-			});
+			const { token } = await apiKeyService.create(
+				{
+					userId: actor.id,
+					name: input.name,
+					kind: input.kind,
+				},
+				{ actor },
+			);
 			return { token };
-		},
+		}),
 	}),
 
 	revokeApiKey: defineAction({
 		accept: "form",
 		input: z.object({ id: z.coerce.number().int() }),
-		handler: async (input, context) => {
+		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const apiKey = await apiKeyService.findOne({ id: input.id });
-			if (!apiKey || !canManageApiKeys(actor, apiKey.userId)) {
-				throw new ActionError({ code: "FORBIDDEN" });
-			}
-			await apiKeyService.revoke(input.id);
-		},
+			await apiKeyService.revoke(input.id, { actor });
+		}),
 	}),
 };
 

@@ -1,0 +1,98 @@
+---
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const surfaces = [
+	{
+		name: "base-100",
+		bg: "bg-base-100",
+		fg: "text-base-content",
+		border: true,
+	},
+	{
+		name: "base-200",
+		bg: "bg-base-200",
+		fg: "text-base-content",
+		border: true,
+	},
+	{
+		name: "base-300",
+		bg: "bg-base-300",
+		fg: "text-base-content",
+		border: true,
+	},
+];
+
+const brand = [
+	{ name: "primary", bg: "bg-primary", fg: "text-primary-content" },
+	{ name: "secondary", bg: "bg-secondary", fg: "text-secondary-content" },
+	{ name: "accent", bg: "bg-accent", fg: "text-accent-content" },
+	{ name: "neutral", bg: "bg-neutral", fg: "text-neutral-content" },
+];
+
+const status = [
+	{ name: "info", bg: "bg-info", fg: "text-info-content" },
+	{ name: "success", bg: "bg-success", fg: "text-success-content" },
+	{ name: "warning", bg: "bg-warning", fg: "text-warning-content" },
+	{ name: "error", bg: "bg-error", fg: "text-error-content" },
+];
+---
+
+<DesignLayout title="Colors" active="colors">
+  <section class="mb-14">
+    <h1 class="text-3xl font-bold">Colors</h1>
+    <p class="mt-3 max-w-2xl text-base-content/70">
+      Semantic color names, not hex codes. Every color below is a daisyUI theme token defined once in{" "}
+      <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/styles/global.css</code>, so pages
+      stay correct if the theme ever changes.
+    </p>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-5 text-xl font-semibold">Base surfaces</h2>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {
+        surfaces.map((color) => (
+          <div class:list={["rounded-box p-5", color.bg, color.fg, color.border && "border border-base-300"]}>
+            <p class="font-medium">{color.name}</p>
+            <p class="font-mono text-xs opacity-70">{color.bg}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-5 text-xl font-semibold">Brand colors</h2>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {
+        brand.map((color) => (
+          <div class:list={["rounded-box p-5", color.bg, color.fg]}>
+            <p class="font-medium">{color.name}</p>
+            <p class="font-mono text-xs opacity-80">{color.bg}</p>
+          </div>
+        ))
+      }
+    </div>
+    <p class="mt-4 text-sm text-base-content/60">
+      Use <code class="font-mono">primary</code> for the one most important action on a page. Reach for{" "}
+      <code class="font-mono">secondary</code>/<code class="font-mono">accent</code> sparingly &mdash; most of a
+      page should stay in the base surfaces above.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="mb-5 text-xl font-semibold">Status colors</h2>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {
+        status.map((color) => (
+          <div class:list={["rounded-box p-5", color.bg, color.fg]}>
+            <p class="font-medium">{color.name}</p>
+            <p class="font-mono text-xs opacity-80">{color.bg}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</DesignLayout>

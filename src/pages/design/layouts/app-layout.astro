@@ -1,0 +1,16 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+
+export const prerender = false;
+---
+
+<AppLayout title="AppLayout demo">
+  <a href="/design/layouts" class="btn btn-sm btn-ghost fixed bottom-4 right-4 shadow">← Layouts</a>
+  <main class="mx-auto max-w-2xl p-8">
+    <h1 class="text-3xl font-bold">A page in the app shell</h1>
+    <p class="mt-3 text-base-content/70">
+      This page renders <code class="font-mono">&lt;AppLayout&gt;</code>. The navbar above is the real one — it's
+      showing whatever your actual session state is right now, not a mockup.
+    </p>
+  </main>
+</AppLayout>

@@ -2,7 +2,7 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import Layout from "@/layouts/Layout.astro";
+import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 const result = Astro.getActionResult(actions.auth.login);
 if (result && !result.error) {
@@ -10,36 +10,28 @@ if (result && !result.error) {
 }
 ---
 
-<Layout>
-  <main class="flex min-h-screen items-center justify-center">
-    <div class="card card-border w-full max-w-sm">
-      <div class="card-body">
-        <h2 class="card-title">Log in</h2>
-
-        {
-          result?.error && (
-            <div role="alert" class="alert alert-error">
-              <span>{result.error.message}</span>
-            </div>
-          )
-        }
-
-        <form method="POST" action={actions.auth.login} class="flex flex-col gap-4">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Email or username</legend>
-            <input type="text" name="identifier" required class="input w-full" />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Password</legend>
-            <input type="password" name="password" required class="input w-full" />
-          </fieldset>
-
-          <div class="card-actions">
-            <button type="submit" class="btn btn-block">Log in</button>
-          </div>
-        </form>
+<CenteredLayout title="Log in">
+  {
+    result?.error && (
+      <div role="alert" class="alert alert-error">
+        <span>{result.error.message}</span>
       </div>
+    )
+  }
+
+  <form method="POST" action={actions.auth.login} class="flex flex-col gap-4">
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">Email or username</legend>
+      <input type="text" name="login" required class="input w-full" />
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">Password</legend>
+      <input type="password" name="password" required class="input w-full" />
+    </fieldset>
+
+    <div class="card-actions">
+      <button type="submit" class="btn btn-primary btn-block rounded-full">Log in</button>
     </div>
-  </main>
-</Layout>
+  </form>
+</CenteredLayout>

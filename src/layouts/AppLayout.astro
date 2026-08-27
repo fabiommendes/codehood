@@ -1,0 +1,201 @@
+---
+import { actions } from "astro:actions";
+import Logo from "@/components/Logo.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
+import { courseService } from "@/db/course.service";
+import { courseHref } from "@/utils/course-url";
+import Layout from "./Layout.astro";
+
+interface Props {
+	title?: string;
+}
+
+const { title } = Astro.props;
+const user = Astro.locals.user;
+
+// Static for now — not tied to real enrollment data yet. Each item carries its own
+// accent color so the icon chip and active-state border stay in sync.
+const nav = [
+	{
+		label: "Home",
+		href: "/",
+		icon: "M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9",
+		chip: "bg-primary/10 text-primary",
+		active: "border-primary",
+		glow: "from-primary/10",
+	},
+	{
+		label: "My courses",
+		href: "/courses",
+		icon: "M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 17.5A2.5 2.5 0 0 1 6.5 15H20",
+		chip: "bg-secondary/10 text-secondary",
+		active: "border-secondary",
+		glow: "from-secondary/10",
+	},
+	{
+		label: "Calendar",
+		href: "/calendar",
+		icon: "M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z",
+		chip: "bg-info/10 text-info",
+		active: "border-info",
+		glow: "from-info/10",
+	},
+	{
+		label: "Profile",
+		href: "/profile",
+		icon: "M12 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM4.5 20c1.2-3.5 4.2-5.5 7.5-5.5s6.3 2 7.5 5.5",
+		chip: "bg-accent/10 text-accent",
+		active: "border-accent",
+		glow: "from-accent/10",
+	},
+	...(user?.role === "ADMIN"
+		? [
+				{
+					label: "Admin",
+					href: "/admin",
+					icon: "M12 3.5 4.5 6.5v5c0 5 3.2 8.5 7.5 9.5 4.3-1 7.5-4.5 7.5-9.5v-5L12 3.5Z",
+					chip: "bg-warning/10 text-warning",
+					active: "border-warning",
+					glow: "from-warning/10",
+				},
+			]
+		: []),
+];
+
+// Cycle the logo's colors for course markers.
+const DOT_COLORS = [
+	"bg-primary",
+	"bg-error",
+	"bg-warning",
+	"bg-secondary",
+	"bg-info",
+];
+const courses = user
+	? (await courseService.findMany({}, { actor: user })).map((course, i) => ({
+			code: course.disciplineSlug,
+			href: courseHref({
+				disciplineSlug: course.disciplineSlug,
+				username: course.instructor.username,
+				edition: course.edition,
+			}),
+			dot: DOT_COLORS[i % DOT_COLORS.length],
+		}))
+	: [];
+
+const currentPath = Astro.url.pathname;
+function isActive(href: string): boolean {
+	return href === "/" ? currentPath === "/" : currentPath.startsWith(href);
+}
+---
+
+<Layout title={title ? `${title} — Codehood` : undefined}>
+  <div class="flex min-h-screen flex-col">
+    <div class="navbar sticky top-0 z-30 border-b border-base-300 bg-base-100 p-0">
+      <div class="navbar-start gap-2 px-4 lg:w-64 lg:shrink-0 lg:border-r lg:border-base-300">
+        <label for="app-drawer" aria-label="Open sidebar" class="btn btn-square btn-ghost btn-sm lg:hidden">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </label>
+        <a href="/" class="flex items-center gap-2">
+          <Logo height={36} />
+        </a>
+      </div>
+      <div class="navbar-end w-auto flex-1 gap-2 px-4">
+        <ThemeToggle />
+        {
+          user ? (
+            <form method="POST" action={actions.auth.logout}>
+              <button type="submit" class="btn btn-square btn-ghost" aria-label="Log out">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M15 4H8a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7M18.5 12H10m8.5 0-3-3m3 3-3 3"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </form>
+          ) : (
+            <a href="/login" class="btn btn-primary btn-sm rounded-full">
+              Log in
+            </a>
+          )
+        }
+      </div>
+    </div>
+
+    <div class="drawer lg:drawer-open flex-1">
+      <input id="app-drawer" type="checkbox" class="drawer-toggle" autocomplete="off" />
+
+      <div class="drawer-content relative flex flex-col bg-base-100">
+        <div class="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 bg-gradient-to-b from-base-200 to-transparent"></div>
+        <div class="relative z-10 flex-1">
+          <slot />
+        </div>
+        <footer class="relative z-10 border-t border-base-300 px-6 py-8 text-center">
+          <Logo height={32} class="mx-auto opacity-60" />
+          <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+            <a href="/courses" class="text-base-content/60 hover:text-primary">My courses</a>
+            <a href="/profile" class="text-base-content/60 hover:text-primary">Profile</a>
+            <a href="/design" class="text-base-content/60 hover:text-primary">Design system</a>
+          </nav>
+          <p class="mt-4 text-xs text-base-content/50">the learning community</p>
+        </footer>
+      </div>
+
+      <div class="drawer-side top-16 z-20 h-[calc(100vh-4rem)] overflow-hidden">
+        <label for="app-drawer" aria-label="Close sidebar" class="drawer-overlay"></label>
+        <ul class="menu min-h-full w-64 gap-1 border-r border-base-300 bg-gradient-to-b from-base-100 via-base-100 to-base-200 p-4 shadow-sm">
+        {
+          nav.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                aria-current={isActive(item.href) ? "page" : undefined}
+                class:list={[
+                  "gap-3 border-l-4 border-transparent pl-2 text-base-content hover:bg-base-200",
+                  isActive(item.href) && ["bg-gradient-to-r to-transparent font-semibold", item.active, item.glow],
+                ]}
+              >
+                <span class:list={["grid h-8 w-8 shrink-0 place-items-center rounded-field", item.chip]}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d={item.icon} stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+
+        {courses.length > 0 && <li class="menu-title mt-4">Courses</li>}
+        {
+          courses.map((course) => (
+            <li>
+              <a href={course.href} class="gap-3 text-base-content hover:bg-base-200">
+                <span class:list={["inline-block h-2.5 w-2.5 rounded-full", course.dot]} />
+                {course.code}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+
+      <div
+        class="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full opacity-70"
+        style="background:radial-gradient(circle, color-mix(in srgb, var(--color-primary) 18%, transparent) 0%, transparent 70%)"
+      >
+      </div>
+      <svg viewBox="0 0 200 200" class="pointer-events-none absolute -bottom-10 -left-10 z-0 h-52 w-52" aria-hidden="true">
+        <circle cx="70" cy="150" r="46" fill="#2980b9" style="mix-blend-mode:multiply" />
+        <rect x="88" y="70" width="62" height="62" rx="8" fill="#c0392b" style="mix-blend-mode:multiply" transform="rotate(10 119 101)" />
+        <circle cx="150" cy="140" r="34" fill="#f1c40f" style="mix-blend-mode:multiply" />
+        <rect x="30" y="60" width="46" height="46" rx="6" fill="#27ae60" style="mix-blend-mode:multiply" transform="rotate(-14 53 83)" />
+      </svg>
+      </div>
+    </div>
+  </div>
+</Layout>

@@ -7,6 +7,9 @@ export default defineConfig({
 	workers: 1,
 	use: {
 		baseURL: "http://localhost:4322",
+		// Astro's CSRF protection for form-accepting actions checks the Origin header,
+		// which a real browser always sends but Playwright's bare `request` fixture doesn't.
+		extraHTTPHeaders: { origin: "http://localhost:4322" },
 	},
 	webServer: {
 		// `astro dev` refuses a second concurrent instance for the project (see AGENTS.md:

@@ -7,22 +7,71 @@ datasource db {
   provider = "sqlite"
 }
 
+//==============================================================================
+// Auth system
+//==============================================================================
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum ApiKeyKind {
+  CLI
+  BOT
+}
+
+enum InviteKind {
+  PERSONAL
+  CLASSROOM
+}
+
 model User {
-  id           Int               @id @default(autoincrement())
-  publicId     String            @unique
-  username     String            @unique
-  email        String            @unique
-  schoolId     String            @unique
-  githubId     String            @unique
-  name         String
-  passwordHash String
-  role         Role
-  image        String?
-  createdAt    DateTime          @default(now())
-  apiKeys      ApiKey[]
-  invitesSent  Invite[]          @relation("InviteCreatedBy")
-  redemption   InviteRedemption?
-  sessions     Session[]
+  id               Int               @id @default(autoincrement())
+  publicId         String            @unique
+  username         String            @unique
+  email            String            @unique
+  schoolId         String            @unique
+  githubId         String            @unique
+  name             String
+  passwordHash     String
+  role             Role
+  image            String?
+  createdAt        DateTime          @default(now())
+  apiKeys          ApiKey[]
+  invitesSent      Invite[]          @relation("InviteCreatedBy")
+  redemption       InviteRedemption?
+  sessions         Session[]
+  groupMemberships GroupMembership[]
+  courses          Course[]
+  enrollments      Enrollment[]
+  questionRefs     QuestionRef[]
+  responses        Response[]
+  submissions      Submission[]
+  exams            Exam[]
+}
+
+model Group {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
+  name     String
+
+  members      GroupMembership[]
+  questionRefs QuestionRef[]
+}
+
+model GroupMembership {
+  id Int @id @default(autoincrement())
+
+  groupId Int
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isAdmin Boolean @default(false)
+
+  @@unique([groupId, userId])
 }
 
 model Session {
@@ -69,18 +118,375 @@ model InviteRedemption {
   invite     Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
 }
 
-enum Role {
-  ADMIN
-  INSTRUCTOR
-  STUDENT
+//==============================================================================
+// System data
+//==============================================================================
+model File {
+  id       String @id @default(cuid())
+  filename String
+  slugHash  String @unique
+  path     String @unique
+  mimeType String
+  size     Int
+
+  createdAt DateTime @default(now())
 }
 
-enum ApiKeyKind {
-  CLI
-  BOT
+// =============================================================================
+// Course related Models
+// =============================================================================
+enum WEEKDAY {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
 }
 
-enum InviteKind {
-  PERSONAL
-  CLASSROOM
+model Course {
+  id          Int     @id @default(autoincrement())
+  description String?
+  edition     String
+
+  discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
+  disciplineSlug String
+
+  instructorSlug String @map("instructorRef")
+  instructor     User   @relation(fields: [instructorSlug], references: [username])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  startAt DateTime
+  endAt   DateTime
+
+  schedule           TimeSlot[]
+  passphrases        Passphrase[]
+  exams              Exam[]
+  questionForCourses QuestionForCourse[]
+  enrollments        Enrollment[]
+
+  @@unique([disciplineSlug, instructorSlug, edition])
+}
+
+model Discipline {
+  slug      String   @id
+  name      String
+  createdAt DateTime @default(now())
+
+  courses   Course[]
+  questions QuestionRef[]
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  DROPPED
+}
+
+model Enrollment {
+  id     Int              @id @default(autoincrement())
+  status EnrollmentStatus @default(ACTIVE)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+model Passphrase {
+  id Int @id @default(autoincrement())
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id])
+
+  value String @unique
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model TimeSlot {
+  id Int @id @default(autoincrement())
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id])
+
+  day WEEKDAY
+
+  /// Minutes since 00:00, e.g. 14:30 -> 870
+  startMin Int
+  endMin   Int
+
+  events Event[]
+}
+
+model Event {
+  id Int @id @default(autoincrement())
+
+  timeSlotId Int
+  timeSlot   TimeSlot @relation(fields: [timeSlotId], references: [id])
+
+  slug String
+
+  week        Int
+  title       String
+  description String?
+
+  start DateTime
+  end   DateTime
+
+  isHoliday Boolean @default(false)
+}
+
+// =============================================================================
+// Question Models
+// =============================================================================
+enum QuestionStatus {
+  DRAFT
+  ARCHIVED
+  PUBLISHED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MULTIPLE_SELECTION
+  TRUE_FALSE
+  ESSAY
+}
+
+/// A QuestionRef is the main entity representing a unique question in the system.
+/// It holds metadata about the question, including its author, status, type,
+/// and a reference to its latest version of content stored in QuestionData.
+///
+/// QuestionData lives in a separate table to allow for versioning of question 
+/// content. Each time a question is edited, a new QuestionData entry is created,
+/// and the QuestionRef.latestId is updated to point to the new version. This
+/// allows us to maintain a history of changes while keeping the main question
+/// entity lightweight and focused on metadata.
+///
+/// This also means that exams can reference specific question versions if needed,
+/// ensuring that the content remains consistent even if the question is updated
+/// later on.
+model QuestionRef {
+  id       Int    @id @default(autoincrement())
+  publicId String
+  slug     String
+
+  status QuestionStatus @default(DRAFT)
+  type   QuestionType
+
+  disciplineSlug String
+  discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
+
+  authorId Int
+  author   User @relation(fields: [authorId], references: [id])
+
+  groupId Int?
+  group   Group? @relation(fields: [groupId], references: [id])
+
+  latestId Int?
+  latest   QuestionData? @relation(fields: [latestId], references: [id], name: "latestVersion")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions           QuestionData[]
+  questionTags       QuestionTags[]
+  questionsForExams  QuestionsForExam[]
+  questionForCourses QuestionForCourse[]
+  responses          Response[]
+
+  @@unique([slug, authorId, disciplineSlug])
+}
+
+model QuestionData {
+  id          Int    @id @default(autoincrement())
+  versionHash String
+
+  refId Int
+  ref   QuestionRef @relation(fields: [refId], references: [id])
+
+  title   String
+  stem    String
+  payload Json
+
+  createdAt DateTime @default(now())
+
+  refAsLatest QuestionRef[] @relation(name: "latestVersion")
+
+  @@unique([refId, versionHash])
+}
+
+model QuestionTags {
+  questionId Int
+  question   QuestionRef @relation(fields: [questionId], references: [id])
+
+  tag String
+
+  @@id([questionId, tag])
+}
+
+model QuestionForCourse {
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id])
+
+  questionId Int
+  question   QuestionRef @relation(fields: [questionId], references: [id])
+
+  version String?
+
+  @@id([courseId, questionId])
+}
+
+// =============================================================================
+// Response Models
+// =============================================================================
+enum SubmissionStatus {
+  PENDING_GRADE
+  WILL_NOT_GRADE
+  GRADED_AUTOMATICALLY
+  GRADED_MANUALLY
+}
+
+/// A student response to a single question in a exam or practice session.
+model Response {
+  id Int @id @default(autoincrement())
+
+  acceptingSubmissions Boolean @default(true)
+
+  questionId Int
+  question   QuestionRef @relation(fields: [questionId], references: [id])
+
+  authorId Int
+  author   User @relation(fields: [authorId], references: [id])
+
+  examId Int?
+  exam   Exam? @relation(fields: [examId], references: [id])
+
+  practiceSession DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submissions Submission[]
+
+  @@map("ResponseRef")
+}
+
+model Submission {
+  id Int @id @default(autoincrement())
+
+  status     SubmissionStatus @default(PENDING_GRADE)
+  responseId Int
+  response   Response         @relation(fields: [responseId], references: [id])
+
+  payload Json
+
+  feedbackData Json?
+  feedback     String?
+  scorePercent Float?
+
+  graderId Int?
+  grader   User? @relation(fields: [graderId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =============================================================================
+// Exam Models
+// =============================================================================
+enum ExamStatus {
+  /// Exam is being created, and not yet public.
+  DRAFT
+
+  /// Exam is no longer visible to students.
+  ARCHIVED
+
+  /// Exam is public, but not yet started.
+  /// A Scheduled exam with no `scheduledAt` is pending a manual approval by
+  /// an instructor.
+  ///
+  /// Students can see the title and description of an scheduled exam, but
+  /// cannot view questions or submit responses until it starts.
+  SCHEDULED
+
+  /// Exam is currently ongoing, and open for submissions.
+  ONGOING
+
+  /// Exam has ended, and is no longer accepting submissions. But it is still
+  /// public and visible to students.
+  COMPLETED
+}
+
+enum ExamType {
+  PRACTICE
+  QUIZ
+  EXAM
+  FINAL
+}
+
+enum TextFormat {
+  PLAINTEXT
+  MARKDOWN
+  HTML
+}
+
+model Exam {
+  id     Int        @id @default(autoincrement())
+  type   ExamType   @default(EXAM)
+  status ExamStatus @default(DRAFT)
+  slug   String
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id])
+
+  title       String
+  description String?
+  preamble    String?
+  format      TextFormat @default(MARKDOWN)
+
+  scheduledAt DateTime?
+  durationMs  Int?
+
+  authorId Int
+  author   User @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examTags          ExamTags[]
+  questionsForExams QuestionsForExam[]
+  responses         Response[]
+}
+
+/// A M2M relation table linking Exams to their Questions (QuestionRefs).
+/// This relation also specifies which version of the question was used in each 
+/// exam.
+model QuestionsForExam {
+  examId Int
+  exam   Exam @relation(fields: [examId], references: [id])
+
+  questionRefId Int
+  questionRef   QuestionRef @relation(fields: [questionRefId], references: [id])
+
+  version String?
+
+  @@id([examId, questionRefId])
+}
+
+model ExamTags {
+  examId Int
+  exam   Exam @relation(fields: [examId], references: [id])
+
+  tag String
+
+  @@id([examId, tag])
 }

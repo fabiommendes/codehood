@@ -1,0 +1,177 @@
+---
+import Alert from "@/components/ui/Alert";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/utils/course-url";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course } = result;
+
+const href = courseHref({
+	disciplineSlug: course.disciplineSlug,
+	username: course.instructor.username,
+	edition: course.edition,
+});
+
+// Same three questions modeled on the exam-taking pages — now shown with the
+// student's own submitted answer and how it was graded.
+const questions = [
+	{
+		kind: "Multiple choice",
+		prompt: "What does the following expression evaluate to?",
+		code: "3 + 4 * 2",
+		studentAnswer: "14",
+		correctAnswer: "14",
+		isCorrect: true,
+		points: "2 / 2",
+	},
+	{
+		kind: "Multiple choice",
+		prompt: "Which of these is not a primitive type in most languages?",
+		studentAnswer: "Boolean",
+		correctAnswer: "Array",
+		isCorrect: false,
+		points: "0 / 2",
+	},
+	{
+		kind: "Short answer",
+		prompt:
+			"In one or two sentences, explain the difference between a stack and a queue.",
+		studentAnswer:
+			"A stack is last-in-first-out, like a pile of plates. A queue is first-in-first-out, like a line at a store.",
+		feedback:
+			"Good — you could also name them LIFO and FIFO explicitly next time.",
+		points: "3 / 3",
+		isCorrect: false,
+	},
+] as const;
+
+const earnedShown = questions.reduce(
+	(sum, q) => sum + Number(q.points.split(" / ")[0]),
+	0,
+);
+const totalShown = questions.reduce(
+	(sum, q) => sum + Number(q.points.split(" / ")[1]),
+	0,
+);
+---
+
+<AppLayout title="Results — Midterm Exam">
+  <main class="mx-auto max-w-2xl px-4 py-10">
+    <a
+      href={`${href}/exams`}
+      class="text-sm text-base-content/60 hover:text-primary">← {course.discipline.name} exams</a
+    >
+
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-3xl font-bold">Midterm Exam</h1>
+      <span class="badge badge-neutral">Graded · 8 / 10</span>
+    </div>
+    <p class="mt-2 text-base-content/60">
+      {course.discipline.name} · Submitted Mar 14
+    </p>
+
+    <Alert variant="info" class="mt-6">
+      <span
+        >Preview data — only the first {
+          questions.length
+        } of 10 questions are modeled here.</span
+      >
+    </Alert>
+
+    <div
+      class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100"
+    >
+      <div class="stat">
+        <div class="stat-title">Score</div>
+        <div class="stat-value text-2xl">8 / 10</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Shown below</div>
+        <div class="stat-value text-2xl">
+          {earnedShown} / {totalShown}
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Class average</div>
+        <div class="stat-value text-2xl">9 / 10</div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-col gap-4">
+      {
+        questions.map((question, i) => (
+          <div
+            class:list={[
+              "card border bg-base-100",
+              question.isCorrect ? "border-success/40" : "border-error/40",
+            ]}
+          >
+            <div class="card-body gap-3 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <span class="text-sm font-medium text-base-content/60">
+                  Question {i + 1} · {question.kind}
+                </span>
+                <span
+                  class:list={[
+                    "badge badge-sm",
+                    question.isCorrect
+                      ? "badge-success"
+                      : !question.isCorrect
+                        ? "badge-error"
+                        : "badge-neutral",
+                  ]}
+                >
+                  {question.points}
+                </span>
+              </div>
+
+              <p class="font-medium">
+                {question.prompt}
+                {"code" in question && (
+                  <code class="ml-1 rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">
+                    {question.code}
+                  </code>
+                )}
+              </p>
+
+              <div class="flex flex-col gap-2 text-sm">
+                <p>
+                  <span class="text-base-content/60">Your answer: </span>
+                  <span
+                    class:list={[
+                      "font-medium",
+                      !question.isCorrect && "text-error",
+                    ]}
+                  >
+                    {question.studentAnswer}
+                  </span>
+                </p>
+                {"correctAnswer" in question && !question.isCorrect && (
+                  <p>
+                    <span class="text-base-content/60">Correct answer: </span>
+                    <span class="font-medium text-success">
+                      {question.correctAnswer}
+                    </span>
+                  </p>
+                )}
+                {"feedback" in question && (
+                  <p class="rounded-field bg-base-200 p-3 text-base-content/70">
+                    <span class="font-medium text-base-content">
+                      Instructor note:{" "}
+                    </span>
+                    {question.feedback}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </main>
+</AppLayout>

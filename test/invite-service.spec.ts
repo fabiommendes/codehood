@@ -1,38 +1,50 @@
 import { expect, test } from "@playwright/test";
+import { FULL_ACCESS } from "@/db/base-service";
 import { checkRedeemable, inviteService } from "@/db/invite.service";
 import { userService } from "@/db/user.service";
 
 function makeAdmin(email: string) {
-	return userService.create({
-		email,
-		username: email.split("@")[0],
-		name: "Admin",
-		role: "ADMIN",
-		password: "x",
-	});
+	return userService.create(
+		{
+			email,
+			username: email.split("@")[0],
+			name: "Admin",
+			role: "ADMIN",
+			password: "x",
+		},
+		FULL_ACCESS,
+	);
 }
 
 function makeStudent(email: string, tag: string) {
-	return userService.create({
-		email,
-		username: tag,
-		name: tag,
-		role: "STUDENT",
-		password: "x",
-		githubId: tag,
-		schoolId: tag,
-	});
+	return userService.create(
+		{
+			email,
+			username: tag,
+			name: tag,
+			role: "STUDENT",
+			password: "x",
+			githubId: tag,
+			schoolId: tag,
+		},
+		FULL_ACCESS,
+	);
 }
 
 test("personal invite: redeems for the invited email, rejects others, then is exhausted", async () => {
 	const admin = await makeAdmin("inviter1@codehood.test");
-	const { token } = await inviteService.createPersonalCode({
-		email: "invitee1@codehood.test",
-		role: "STUDENT",
-		createdById: admin.id,
-	});
+	const { token } = await inviteService.create(
+		{
+			kind: "PERSONAL",
+			maxUses: 1,
+			email: "invitee1@codehood.test",
+			role: "STUDENT",
+			createdById: admin.id,
+		},
+		{ actor: admin },
+	);
 
-	const invite = await inviteService.findOne({ token });
+	const invite = await inviteService.findOne({ token }, FULL_ACCESS);
 	expect(invite).not.toBeNull();
 	// biome-ignore lint/style/noNonNullAssertion: asserted above
 	expect(checkRedeemable(invite!, "wrong@codehood.test")).toBe(
@@ -54,11 +66,16 @@ test("personal invite: redeems for the invited email, rejects others, then is ex
 
 test("classroom invite: redeemable up to maxUses, then exhausted", async () => {
 	const admin = await makeAdmin("inviter2@codehood.test");
-	const { token } = await inviteService.createClassroomCode({
-		courseId: 1,
-		createdById: admin.id,
-		maxUses: 2,
-	});
+	const { token } = await inviteService.create(
+		{
+			kind: "CLASSROOM",
+			role: "STUDENT",
+			courseId: 1,
+			createdById: admin.id,
+			maxUses: 2,
+		},
+		{ actor: admin },
+	);
 
 	for (const i of [1, 2]) {
 		const user = await makeStudent(`class${i}@codehood.test`, `class${i}`);
@@ -75,14 +92,19 @@ test("classroom invite: redeemable up to maxUses, then exhausted", async () => {
 
 test("expired invite is rejected before redemption", async () => {
 	const admin = await makeAdmin("inviter3@codehood.test");
-	const { token } = await inviteService.createPersonalCode({
-		email: "late@codehood.test",
-		role: "STUDENT",
-		createdById: admin.id,
-		expiresInMs: -1,
-	});
+	const { token } = await inviteService.create(
+		{
+			kind: "PERSONAL",
+			maxUses: 1,
+			email: "late@codehood.test",
+			role: "STUDENT",
+			createdById: admin.id,
+			expiresInMs: -1,
+		},
+		{ actor: admin },
+	);
 
-	const invite = await inviteService.findOne({ token });
+	const invite = await inviteService.findOne({ token }, FULL_ACCESS);
 	// biome-ignore lint/style/noNonNullAssertion: asserted below
 	expect(checkRedeemable(invite!, "late@codehood.test")).toBe("expired");
 

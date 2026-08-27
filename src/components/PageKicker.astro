@@ -1,0 +1,24 @@
+---
+import BrandSquares from "./BrandSquares.astro";
+
+interface Props {
+	text: string;
+	// The landing page only pairs the brand-squares flourish with its very first
+	// hero kicker — every other section kicker (here and there) is text-only.
+	squares?: boolean;
+	class?: string;
+}
+
+const { text, squares = false, class: className } = Astro.props;
+---
+
+{
+  squares ? (
+    <div class:list={["mb-2 flex items-center gap-2", className]}>
+      <BrandSquares />
+      <span class="kicker">{text}</span>
+    </div>
+  ) : (
+    <span class:list={["kicker", className]}>{text}</span>
+  )
+}

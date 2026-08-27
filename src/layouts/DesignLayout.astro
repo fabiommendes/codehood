@@ -1,0 +1,57 @@
+---
+import Logo from "@/components/Logo.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
+import Layout from "./Layout.astro";
+
+interface Props {
+	title: string;
+	active:
+		| "overview"
+		| "typography"
+		| "colors"
+		| "layouts"
+		| "elements"
+		| "forms";
+}
+
+const { title, active } = Astro.props;
+
+const tabs = [
+	{ key: "overview", label: "Overview", href: "/design" },
+	{ key: "typography", label: "Typography", href: "/design/typography" },
+	{ key: "colors", label: "Colors", href: "/design/colors" },
+	{ key: "layouts", label: "Layouts", href: "/design/layouts" },
+	{ key: "elements", label: "Elements", href: "/design/elements" },
+	{ key: "forms", label: "Forms", href: "/design/forms" },
+] as const;
+---
+
+<Layout title={`Design: ${title} — Codehood`}>
+  <div class="border-b border-base-300 bg-base-100">
+    <div class="navbar mx-auto max-w-5xl px-4">
+      <div class="navbar-start">
+        <a href="/" class="flex items-center gap-2">
+          <Logo height={30} />
+        </a>
+        <span class="badge badge-outline ml-3">design system</span>
+      </div>
+      <div class="navbar-end">
+        <ThemeToggle />
+      </div>
+    </div>
+    <div class="mx-auto max-w-5xl px-4">
+      <div role="tablist" class="tabs tabs-lift">
+        {
+          tabs.map((tab) => (
+            <a role="tab" class:list={["tab", { "tab-active": tab.key === active }]} href={tab.href}>
+              {tab.label}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+  <main class="mx-auto max-w-5xl px-4 py-10">
+    <slot />
+  </main>
+</Layout>

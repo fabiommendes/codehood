@@ -1,5 +1,13 @@
+import { canManageSessions } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
-import type { Create, ServiceMethodOpts } from "./base-service";
+import type { FillUndefineds } from "@/utils/types";
+import {
+	type ActingOpts,
+	type CreateAs,
+	type DeleteAs,
+	ForbiddenError,
+	type ServiceMethodOpts,
+} from "./base-service";
 import { type PrismaClient, prisma, type Session } from "./client";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -14,7 +22,15 @@ export interface CreateSessionResult {
 	session: Session;
 }
 
-class SessionService implements Create<CreateSession, CreateSessionResult> {
+export type DeleteSessionFilter = FillUndefineds<
+	{ token: string } | { userId: number }
+>;
+
+class SessionService
+	implements
+		CreateAs<CreateSession, CreateSessionResult>,
+		DeleteAs<DeleteSessionFilter>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -23,14 +39,17 @@ class SessionService implements Create<CreateSession, CreateSessionResult> {
 
 	/**
 	 * Creates a new session for user.
-	 * 
+	 *
 	 * This is the RESTful equivalent of logging in.
 	 */
 	async create(
 		input: CreateSession,
-		opts?: ServiceMethodOpts,
+		opts: ActingOpts,
 	): Promise<CreateSessionResult> {
-		const client = opts?.tx ?? this.prisma;
+		if (!canManageSessions(opts.actor, input.userId)) {
+			throw new ForbiddenError();
+		}
+		const client = opts.tx ?? this.prisma;
 		const token = generateToken();
 		const session = await client.session.create({
 			data: {
@@ -44,7 +63,9 @@ class SessionService implements Create<CreateSession, CreateSessionResult> {
 
 	/**
 	 * Looks up the session for `token`, dropping it if expired and sliding its
-	 * expiry otherwise.
+	 * expiry otherwise. Not actor-gated: the raw token itself is the
+	 * credential, and validating one is how an actor's identity gets
+	 * established in the first place.
 	 * */
 	async validate(token: string, opts?: ServiceMethodOpts) {
 		const client = opts?.tx ?? this.prisma;
@@ -71,17 +92,24 @@ class SessionService implements Create<CreateSession, CreateSessionResult> {
 		return session;
 	}
 
-	// TODO: refactor revoke methods to use the delete interface
-	revokeByToken(token: string, opts?: ServiceMethodOpts) {
-		const client = opts?.tx ?? this.prisma;
-		return client.session.deleteMany({
-			where: { tokenHash: hashToken(token) },
-		});
-	}
-
-	revokeAllForUser(userId: number, opts?: ServiceMethodOpts) {
-		const client = opts?.tx ?? this.prisma;
-		return client.session.deleteMany({ where: { userId } });
+	/**
+	 * Revokes the session matching `token`, or every session for `userId`.
+	 * A `token` deletion needs no actor check — holding the raw token is
+	 * itself the proof of ownership (logout). A `userId` deletion ("log out
+	 * everywhere") is gated by {@link canManageSessions}.
+	 */
+	async delete(filter: DeleteSessionFilter, opts: ActingOpts): Promise<void> {
+		const client = opts.tx ?? this.prisma;
+		if (filter.token) {
+			await client.session.deleteMany({
+				where: { tokenHash: hashToken(filter.token) },
+			});
+		} else if (filter.userId) {
+			if (!canManageSessions(opts.actor, filter.userId)) {
+				throw new ForbiddenError();
+			}
+			await client.session.deleteMany({ where: { userId: filter.userId } });
+		}
 	}
 }
 

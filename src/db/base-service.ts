@@ -1,21 +1,47 @@
-import { ActionError } from "astro:actions";
-import type * as z from "zod";
-import type { User as DbUser, PrismaTx } from "./client";
-
-// biome-ignore lint/suspicious/noExplicitAny: Using 'any' for the 'this' context in the decorator.
-type This = any;
+import type { PrismaTx, Role } from "./client";
 
 //
 // Types and interfaces
 //
-export type UserId = DbUser["id"]; // use brands? & { __brand: "UserId" };
-export type User = Omit<DbUser, "id" | "createdAt"> & {
-	privateId: UserId;
-};
+
+/**
+ * The shape of `Astro.locals.user`, and the identity every service call is
+ * made on behalf of. Lives here (not `@/auth/permissions`, which needs
+ * `Actor`/`SYSTEM` from this file) so the two modules don't import each
+ * other.
+ */
+export interface AuthUser {
+	id: number;
+	role: Role;
+}
+
+/**
+ * Sentinel actor for callers with no user behind them: seeds, `manage`
+ * commands, `ensureDevAdmin`, and the inside of the invite-redemption
+ * transaction, which enrolls an account that does not have a session yet.
+ * A symbol so it can never arrive by accident from parsed JSON or a
+ * forgotten variable — writing `SYSTEM` is a decision you can see in a diff.
+ */
+export const SYSTEM = Symbol("system");
+
+export type Actor = AuthUser | typeof SYSTEM;
+
+/**
+ * Shorthand for `{ actor: SYSTEM }`, for trusted call sites with no
+ * transaction. Frozen because it is a single object shared by every trusted
+ * call site — one caller doing `FULL_ACCESS.tx = tx` to save a keystroke
+ * would silently route unrelated queries through a finished transaction.
+ */
+export const FULL_ACCESS = Object.freeze({ actor: SYSTEM } as const);
 
 export type ServiceMethodOpts = {
 	tx?: PrismaTx;
-	asUser?: User;
+	actor?: Actor;
+};
+
+export type ActingOpts = {
+	tx?: PrismaTx;
+	actor: Actor;
 };
 
 export interface Create<In, Out> {
@@ -57,36 +83,43 @@ export interface Update<FilterIn, UpdateIn, Out> {
 	): Promise<Out>;
 }
 
-//
-// UTILITY FUNCTIONS
-//
+/**
+ * Access-controlled counterparts of the interfaces above: `opts` and
+ * `opts.actor` are required, so a call site that forgets the actor fails to
+ * compile instead of silently getting system-level access. Trusted callers
+ * running as `SYSTEM` pass `FULL_ACCESS` rather than nothing.
+ */
+export interface FindOneAs<FilterIn, Out> {
+	findOne(filter: FilterIn, opts: ActingOpts): Promise<Out | null>;
+}
+
+export interface FindManyAs<FilterIn, Out> {
+	findMany(filter: FilterIn, opts: ActingOpts): Promise<Out[]>;
+}
+
+export interface CreateAs<In, Out> {
+	create(input: In, opts: ActingOpts): Promise<Out>;
+}
+
+export interface UpdateAs<FilterIn, UpdateIn, Out> {
+	update(filter: FilterIn, update: UpdateIn, opts: ActingOpts): Promise<Out>;
+}
+
+export interface DeleteAs<FilterIn> {
+	delete(filter: FilterIn, opts: ActingOpts): Promise<void>;
+}
 
 /**
- * Decorate a function to validate its first argument against a Zod schema.
- *
- * If the validation fails, an ActionError is thrown with a BAD_REQUEST code and
- * the validation error message.
- *
- * @param schema The Zod schema to validate against.
- * @returns A decorator function that validates the first argument of the decorated method.
+ * Thrown by a service when `opts.actor` may not perform the requested
+ * operation. Framework-agnostic on purpose: services are imported directly by
+ * unit tests (outside Astro's Vite pipeline), so this file cannot depend on
+ * `astro:actions`, which only resolves inside it. The Astro Actions/API
+ * layer is what turns this into an `ActionError({ code: "FORBIDDEN" })` —
+ * see `src/actions/helpers.ts`.
  */
-export function validate<T extends z.ZodTypeAny>(schema: T) {
-	function decorator<R extends object[], U>(
-		method: (first: z.infer<T>, ...args: R) => U,
-	) {
-		const originalMethod = method;
-		function decorated(this: This, first: z.infer<T>, ...args: R): U {
-			const result = schema.safeParse(first);
-			if (!result.success) {
-				throw new ActionError({
-					code: "BAD_REQUEST",
-					message: result.error.message,
-				});
-			}
-			return originalMethod.apply(this, [result.data, ...args]);
-		}
-		return decorated;
+export class ForbiddenError extends Error {
+	constructor(message = "Forbidden") {
+		super(message);
+		this.name = "ForbiddenError";
 	}
-
-	return decorator;
 }

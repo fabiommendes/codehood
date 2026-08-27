@@ -1,0 +1,13 @@
+---
+import CenteredLayout from "@/layouts/CenteredLayout.astro";
+
+export const prerender = false;
+---
+
+<CenteredLayout title="Example">
+  <a href="/design/layouts" class="btn btn-sm btn-ghost fixed bottom-4 right-4 shadow">← Layouts</a>
+  <p class="text-sm text-base-content/70">
+    This card is <code class="font-mono">&lt;CenteredLayout&gt;</code> &mdash; a logo, a heading, and a slot for
+    whatever single-purpose content goes in the middle. Login and invite-acceptance both use this shell.
+  </p>
+</CenteredLayout>

@@ -1,0 +1,41 @@
+---
+export const prerender = false;
+
+// Deliberately not using src/layouts/Layout.astro: that pulls in global.css,
+// and Tailwind's preflight reset strips the default styling (buttons, lists,
+// tables) Swagger UI's own CSS depends on. This page stays fully isolated so
+// the two stylesheets never fight.
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Reference — Codehood</title>
+    <link rel="icon" href="/api/docs/vendor/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" href="/api/docs/vendor/favicon-16x16.png" sizes="16x16" />
+    <link rel="stylesheet" href="/api/docs/vendor/swagger-ui.css" />
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+
+    <script src="/api/docs/vendor/swagger-ui-bundle.js" is:inline></script>
+    <script src="/api/docs/vendor/swagger-ui-standalone-preset.js" is:inline></script>
+    <script is:inline>
+      window.onload = () => {
+        window.ui = SwaggerUIBundle({
+          url: "/openapi.json",
+          dom_id: "#swagger-ui",
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          layout: "StandaloneLayout",
+        });
+      };
+    </script>
+  </body>
+</html>

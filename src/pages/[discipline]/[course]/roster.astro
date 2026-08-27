@@ -1,0 +1,71 @@
+---
+import { courseService } from "@/db/course.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/utils/course-url";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
+const actor = Astro.locals.user!;
+const students = await courseService.listStudents(course.id, { actor });
+
+const href = courseHref({
+	disciplineSlug: course.disciplineSlug,
+	username: course.instructor.username,
+	edition: course.edition,
+});
+---
+
+<AppLayout title={`Roster · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <a href={`${href}/manage`} class="text-sm text-base-content/60 hover:text-primary">← {course.discipline.name} · Manage</a>
+
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-3xl font-bold">Roster</h1>
+      <span class="badge badge-primary badge-sm">Instructor view</span>
+    </div>
+    <p class="mt-2 text-base-content/60">{course.discipline.name} · {students.length} enrolled</p>
+    <a href={`${href}/invite`} class="mt-1 inline-block text-sm text-primary hover:underline">
+      Invite students →
+    </a>
+
+    <div class="mt-8 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            students.length === 0 ? (
+              <tr>
+                <td colspan="3" class="py-6 text-center text-base-content/50">
+                  No students enrolled yet.
+                </td>
+              </tr>
+            ) : (
+              students.map((student) => (
+                <tr>
+                  <td class="font-medium">{student.name}</td>
+                  <td class="font-mono text-sm text-base-content/60">@{student.username}</td>
+                  <td class="text-base-content/60">{student.email}</td>
+                </tr>
+              ))
+            )
+          }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</AppLayout>

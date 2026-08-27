@@ -1,0 +1,33 @@
+---
+import Logo from "@/components/Logo.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
+import Layout from "./Layout.astro";
+
+interface Props {
+	code: string;
+	title: string;
+	// Tailwind text-color utility for the big background numeral, e.g. "text-error/30".
+	codeClass?: string;
+}
+
+const { code, title, codeClass = "text-primary/25" } = Astro.props;
+---
+
+<Layout title={`${code} — ${title} — Codehood`}>
+  <main class="relative flex min-h-screen flex-col items-center justify-center gap-10 bg-base-200 p-4 text-center">
+    <ThemeToggle class="absolute top-4 right-4" />
+    <a href="/">
+      <Logo height={52} />
+    </a>
+    <div>
+      <p class:list={["font-display text-8xl leading-none font-bold", codeClass]}>{code}</p>
+      <h1 class="mt-4 text-2xl font-bold">{title}</h1>
+      <p class="mt-2 max-w-sm text-base-content/60">
+        <slot />
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-3">
+      <slot name="actions" />
+    </div>
+  </main>
+</Layout>

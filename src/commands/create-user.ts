@@ -1,5 +1,6 @@
 import { input, password as passwordPrompt } from "@inquirer/prompts";
 import { Command } from "commander";
+import { FULL_ACCESS } from "@/db/base-service";
 import type { Role } from "@/db/client";
 import { userService } from "@/db/user.service";
 
@@ -24,14 +25,14 @@ export const createUserCommand = new Command("create-user")
 			email = await input({ message: "Email address:" });
 		}
 
-		if (await userService.findOne({ email })) {
+		if (await userService.findOne({ email }, FULL_ACCESS)) {
 			console.error(`A user with email ${email} already exists.`);
 			process.exitCode = 1;
 			return;
 		}
 
 		const username = await input({ message: "Username:" });
-		if (await userService.findOne({ username })) {
+		if (await userService.findOne({ username }, FULL_ACCESS)) {
 			console.error(`A user with username ${username} already exists.`);
 			process.exitCode = 1;
 			return;
@@ -59,15 +60,18 @@ export const createUserCommand = new Command("create-user")
 			return;
 		}
 
-		const user = await userService.create({
-			email,
-			name,
-			role,
-			username,
-			password: plainPassword,
-			githubId,
-			schoolId,
-		});
+		const user = await userService.create(
+			{
+				email,
+				name,
+				role,
+				username,
+				password: plainPassword,
+				githubId,
+				schoolId,
+			},
+			FULL_ACCESS,
+		);
 
 		console.log(
 			`Created ${user.role.toLowerCase()} ${user.email} (id=${user.id}).`,

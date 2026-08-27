@@ -1,0 +1,28 @@
+---
+// Astro renders this automatically for unhandled SSR errors and passes the error
+// as a prop — see https://docs.astro.build/en/basics/astro-pages/#custom-500-error-page.
+// It's also just a normal route, reachable directly at /500 for previewing.
+import ErrorLayout from "@/layouts/ErrorLayout.astro";
+
+const error = Astro.props.error as Error | undefined;
+---
+
+<ErrorLayout code="500" title="Something went wrong" codeClass="text-error/25">
+  An unexpected error occurred on our end. Try again in a moment — if it keeps happening, let us know.
+  <div slot="actions" class="flex flex-col items-center gap-4">
+    <div class="flex flex-wrap items-center justify-center gap-3">
+      <button type="button" class="btn btn-primary rounded-full" onclick="location.reload()">
+        Try again
+      </button>
+      <a href="/courses" class="btn btn-ghost">← Back to my courses</a>
+    </div>
+    {
+      import.meta.env.DEV && error && (
+        <details class="mt-2 w-full max-w-lg text-left">
+          <summary class="cursor-pointer text-sm text-base-content/60">Error details (dev only)</summary>
+          <pre class="mt-2 overflow-x-auto rounded-box bg-neutral p-4 font-mono text-xs text-neutral-content">{error.stack ?? error.message}</pre>
+        </details>
+      )
+    }
+  </div>
+</ErrorLayout>

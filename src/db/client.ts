@@ -4,8 +4,13 @@ import { PrismaClient } from "../generated/prisma/client";
 export type {
 	ApiKey,
 	ApiKeyKind,
+	Course,
+	Discipline,
+	Enrollment,
+	EnrollmentStatus,
 	Invite,
 	InviteKind,
+	Prisma,
 	Role,
 	Session,
 	User,

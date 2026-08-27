@@ -1,0 +1,209 @@
+---
+import MarkdownIt from "markdown-it";
+import ListRow from "@/components/ListRow.astro";
+import SectionHeader from "@/components/SectionHeader.astro";
+import Alert from "@/components/ui/Alert";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/utils/course-url";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course } = result;
+
+const href = courseHref({
+	disciplineSlug: course.disciplineSlug,
+	username: course.instructor.username,
+	edition: course.edition,
+});
+const isInstructor = Astro.locals.user?.id === course.instructor.id;
+
+const md = new MarkdownIt();
+
+// Still mocked — TimeSlot/Event exist in the schema but nothing writes them yet.
+const schedule = [
+	{
+		weekday: "Mon",
+		day: "10",
+		month: "Mar",
+		kind: "class" as const,
+		title: "Recursion and higher-order functions",
+		description:
+			"Writing functions that call themselves, and functions that take other functions as arguments.",
+		details: `Bring your laptop — we'll live-code a few examples together.
+
+- Read [Chapter 4: Recursion](https://example.com/reading/ch4) before class
+- Review the \`factorial\` and \`fibonacci\` examples from lecture 3
+- Optional: attempt exercises 4.1–4.4 in the workbook`,
+	},
+	{
+		weekday: "Wed",
+		day: "12",
+		month: "Mar",
+		kind: "class" as const,
+		title: "Review session",
+		description: "Open Q&A ahead of the midterm — bring your questions.",
+		details: `Drop-in format, no fixed agenda. Come with specific questions.
+
+- A TA will be present to help debug practice problems
+- Held in the same room as usual lecture
+- Can't make it? Post questions in the course forum instead`,
+	},
+	{
+		weekday: "Fri",
+		day: "15",
+		month: "Mar",
+		kind: "event" as const,
+		title: "Midterm Exam",
+		description:
+			"Covers everything through recursion. Multiple-choice and short-answer, taken in class.",
+		href: `${href}/exams/midterm`,
+		details: `Closed-book, calculators not needed. **Bring a photo ID.**
+
+- Covers lectures 1 through the review session (recursion inclusive)
+- 7 multiple-choice questions, 3 short-answer
+- Arrive 10 minutes early to get seated
+- See the [exam page](${href}/exams/midterm) for the practice format`,
+	},
+	{
+		weekday: "Mon",
+		day: "17",
+		month: "Mar",
+		kind: "class" as const,
+		title: "Arrays and strings",
+		description:
+			"Working with sequences: indexing, slicing, and a few common patterns.",
+		details: `- Read [Chapter 5: Sequences](https://example.com/reading/ch5)
+- No prep needed beyond the reading — we'll build everything from scratch in class`,
+	},
+	{
+		weekday: "Wed",
+		day: "19",
+		month: "Mar",
+		kind: "class" as const,
+		title: "Searching and sorting",
+		description:
+			"Linear vs. binary search, and a first look at how sorting algorithms compare.",
+		details: `- Read [Chapter 6: Search & Sort](https://example.com/reading/ch6)
+- Try implementing binary search yourself before class — we'll compare notes`,
+	},
+] as const;
+---
+
+<AppLayout title={course.discipline.name}>
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <div class="flex items-center justify-between gap-3">
+      <a href="/courses" class="text-sm text-base-content/60 hover:text-primary">← My courses</a>
+      {isInstructor && (
+        <a href={`${href}/manage`} class="text-sm text-primary hover:underline">Instructor view →</a>
+      )}
+    </div>
+
+    <div class="mt-3">
+      <span class="badge badge-outline badge-sm font-mono">{course.disciplineSlug}</span>
+      <h1 class="mt-2 text-3xl font-bold">{course.discipline.name}</h1>
+      <p class="mt-1 text-base-content/60">{course.instructor.name} · {course.edition}</p>
+    </div>
+
+    {course.description && <p class="mt-6 max-w-2xl text-base-content/70">{course.description}</p>}
+
+    <div class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100">
+      <div class="stat">
+        <div class="stat-title">Exams</div>
+        <div class="stat-value text-2xl">3</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Students</div>
+        <div class="stat-value text-2xl">{course._count.enrollments}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Resources</div>
+        <div class="stat-value text-2xl">7</div>
+      </div>
+    </div>
+
+    <section class="mt-10">
+      <SectionHeader title="Schedule" href="/calendar" linkText="Full calendar →" />
+      <Alert variant="info" class="mt-3">
+        <span>Preview data — the schedule below isn't read from the database yet.</span>
+      </Alert>
+      <p class="mt-3 text-sm text-base-content/60">Upcoming classes and events for this course.</p>
+
+      <div class="mt-4 flex flex-col gap-3">
+        {
+          schedule.map((item) => (
+            <div class="card card-border bg-base-100">
+              <div class="card-body flex-row gap-4 py-4">
+                <div class="flex w-14 shrink-0 flex-col items-center rounded-field border border-base-300 py-1.5 text-center">
+                  <span class="text-[11px] font-medium text-base-content/50">{item.weekday}</span>
+                  <span class="font-display text-lg leading-none font-semibold">{item.day}</span>
+                  <span class="text-[11px] text-base-content/50">{item.month}</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="font-medium">{item.title}</p>
+                    <span class:list={["badge badge-sm", item.kind === "event" ? "badge-success" : "badge-outline"]}>
+                      {item.kind === "event" ? "Event" : "Class"}
+                    </span>
+                    {"href" in item && item.href && (
+                      <a href={item.href} class="ml-auto text-sm text-primary hover:underline">
+                        Open →
+                      </a>
+                    )}
+                  </div>
+                  <p class="mt-1 text-sm text-base-content/60">{item.description}</p>
+
+                  <details class="group mt-2">
+                    <summary class="cursor-pointer text-sm font-medium text-primary select-none hover:underline">
+                      <span class="group-open:hidden">Show details</span>
+                      <span class="hidden group-open:inline">Hide details</span>
+                    </summary>
+                    <div
+                      class="prose prose-sm mt-2 max-w-none border-t border-base-200 pt-3 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
+                      set:html={md.render(item.details)}
+                    />
+                  </details>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <SectionHeader title="Upcoming exams" href={`${href}/exams`} />
+
+      <div class="mt-4 flex flex-col gap-3">
+        <ListRow href={`${href}/exams/midterm`}>
+          <p class="font-medium">Midterm Exam</p>
+          <p class="text-sm text-base-content/60">Due Mar 15 · 10 questions</p>
+          <span slot="trailing" class="badge badge-success">Open</span>
+        </ListRow>
+        <ListRow muted>
+          <p class="font-medium">Final Project</p>
+          <p class="text-sm text-base-content/60">Opens Apr 10</p>
+          <span slot="trailing" class="badge badge-outline">Upcoming</span>
+        </ListRow>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <SectionHeader title="Resources" href={`${href}/resources`} />
+
+      <div class="mt-4 flex flex-col gap-3">
+        <ListRow href={`${href}/resources`}>
+          <p class="font-medium">Syllabus</p>
+          <p class="text-sm text-base-content/60">PDF · updated Jan 8</p>
+        </ListRow>
+        <ListRow href={`${href}/resources`}>
+          <p class="font-medium">Course repository</p>
+          <p class="text-sm text-base-content/60">github.com/codehood-cs101/coursework</p>
+        </ListRow>
+      </div>
+    </section>
+  </main>
+</AppLayout>

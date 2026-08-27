@@ -1,9 +1,16 @@
+import { canInvite } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
-import type { Create, FindOne, ServiceMethodOpts } from "./base-service";
+import {
+	type ActingOpts,
+	type CreateAs,
+	type FindOneAs,
+	ForbiddenError,
+} from "./base-service";
 import {
 	type Invite,
 	type InviteKind,
 	type PrismaClient,
+	type PrismaTx,
 	prisma,
 	type Role,
 } from "./client";
@@ -54,8 +61,9 @@ type RedeemableInvite = {
 
 class InviteService
 	implements
-	Create<CreateInviteInput, CreateInviteResult>,
-	FindOne<FindInviteBy, InviteWithCount> {
+		CreateAs<CreateInviteInput, CreateInviteResult>,
+		FindOneAs<FindInviteBy, InviteWithCount>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -67,16 +75,20 @@ class InviteService
 	 */
 	async create(
 		input: CreateInviteInput,
-		opts?: ServiceMethodOpts,
+		opts: ActingOpts,
 	): Promise<CreateInviteResult> {
-		const client = opts?.tx ?? this.prisma;
+		const role = input.role ?? "STUDENT";
+		if (!canInvite(opts.actor, role)) {
+			throw new ForbiddenError();
+		}
+		const client = opts.tx ?? this.prisma;
 		const token = generateToken();
 		const invite = await client.invite.create({
 			data: {
 				tokenHash: hashToken(token),
 				kind: input.kind,
 				email: input.email,
-				role: input.role ?? "STUDENT",
+				role,
 				courseId: input.courseId,
 				maxUses: input.maxUses ?? null,
 				expiresAt: new Date(
@@ -89,43 +101,16 @@ class InviteService
 	}
 
 	/**
-	 * Single-email, single-use invite (instructor→student, admin→instructor).
+	 * Not actor-filtered: the raw token is the credential (see the invite's
+	 * `tokenHash`), and looking one up is how the invite-acceptance flow
+	 * establishes what the redeemer is allowed to become — there is nothing
+	 * else to check `actor` against yet.
 	 */
-	// TODO: refactor only create() exists. This should be a parameterized call.
-	createPersonalCode(
-		input: {
-			email: string;
-			role: Role;
-			courseId?: number;
-			createdById: number;
-			expiresInMs?: number;
-		},
-		opts?: ServiceMethodOpts,
-	) {
-		return this.create({ ...input, kind: "PERSONAL", maxUses: 1 }, opts);
-	}
-
-	/**
-	 * Reusable join code for a course; any STUDENT can redeem it until expiry/capacity.
-	 */
-	// TODO: refactor only create() exists. This should be a parameterized call.
-	createClassroomCode(
-		input: {
-			courseId: number;
-			createdById: number;
-			maxUses?: number;
-			expiresInMs?: number;
-		},
-		opts?: ServiceMethodOpts,
-	) {
-		return this.create({ ...input, kind: "CLASSROOM", role: "STUDENT" }, opts);
-	}
-
 	findOne(
 		filter: FindInviteBy,
-		opts?: ServiceMethodOpts,
+		opts: ActingOpts,
 	): Promise<InviteWithCount | null> {
-		const client = opts?.tx ?? this.prisma;
+		const client = opts.tx ?? this.prisma;
 		return client.invite.findUnique({
 			where: { tokenHash: hashToken(filter.token) },
 			include: { _count: { select: { redemptions: true } } },
@@ -136,11 +121,20 @@ class InviteService
 	 * Redeems an invite for `userId`, atomically re-checking expiry/capacity/email match.
 	 * Callers should run {@link checkRedeemable} first to avoid doing invite-rejected work
 	 * (e.g. creating the User row) — this transaction is the authoritative, race-safe check.
+	 *
+	 * Pass `tx` when the caller already has one open (e.g. `acceptInvite`, which creates the
+	 * `User`, redeems the invite, and enrolls the student in one transaction so a redemption
+	 * failure can't leave a User row with no invite behind it). Without one, this opens its own.
 	 */
-	redeem(token: string, userId: number, email: string) {
+	redeem(
+		token: string,
+		userId: number,
+		email: string,
+		opts?: { tx?: PrismaTx },
+	) {
 		const tokenHash = hashToken(token);
 
-		return this.prisma.$transaction(async (tx) => {
+		const run = async (tx: PrismaTx) => {
 			const invite = await tx.invite.findUnique({
 				where: { tokenHash },
 				include: { _count: { select: { redemptions: true } } },
@@ -162,7 +156,9 @@ class InviteService
 			}
 
 			return invite;
-		});
+		};
+
+		return opts?.tx ? run(opts.tx) : this.prisma.$transaction(run);
 	}
 }
 

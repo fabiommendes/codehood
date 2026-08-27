@@ -1,0 +1,133 @@
+---
+import Alert from "@/components/ui/Alert";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const buttonVariants = [
+	"primary",
+	"secondary",
+	"accent",
+	"neutral",
+	"ghost",
+	"outline",
+] as const;
+const badgeVariants = [
+	"neutral",
+	"primary",
+	"secondary",
+	"accent",
+	"info",
+	"success",
+	"warning",
+	"error",
+] as const;
+const alertVariants = ["info", "success", "warning", "error"] as const;
+---
+
+<DesignLayout title="Elements" active="elements">
+  <section class="mb-14">
+    <h1 class="text-3xl font-bold">Elements</h1>
+    <p class="mt-3 max-w-2xl text-base-content/70">
+      Reusable pieces from <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/components/ui/</code
+      >. These aren't recreations for the showcase &mdash; every example below is the same component the rest of
+      the app imports.
+    </p>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Button</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<Button variant="primary">`}</code> &mdash; renders an
+      <code class="font-mono">&lt;a&gt;</code> instead of a <code class="font-mono">&lt;button&gt;</code> when given
+      an <code class="font-mono">href</code>.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body flex-row flex-wrap gap-3">
+        {buttonVariants.map((variant) => <Button variant={variant}>{variant}</Button>)}
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Badge</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<Badge variant="success">`}</code> &mdash; used for role labels and API key kinds
+      elsewhere in the app.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body flex-row flex-wrap items-center gap-3">
+        {badgeVariants.map((variant) => <Badge variant={variant}>{variant}</Badge>)}
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Alert</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<Alert variant="error">`}</code> &mdash; the same pattern used for action-result
+      messages on the login, invite, and profile pages.
+    </p>
+    <div class="flex flex-col gap-3">
+      {
+        alertVariants.map((variant) => (
+          <Alert variant={variant}>
+            <span class="capitalize">{variant}</span> &mdash; this is what a {variant} message looks like.
+          </Alert>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Card</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<Card title="...">`}</code> &mdash; a bordered container with an optional title;
+      every section on this page (including this one) is one.
+    </p>
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <Card title="With a title">
+        <p class="text-sm text-base-content/70">Pass a <code class="font-mono text-xs">title</code> prop and it renders as a card-title heading.</p>
+      </Card>
+      <Card>
+        <p class="text-sm text-base-content/70">Omit it and the card is just a bordered container for whatever you put inside.</p>
+      </Card>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-2 text-xl font-semibold">Divider &amp; list</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      Not (yet) wrapped in components &mdash; plain daisyUI classes, used as-is on the profile page's API key
+      list.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <ul class="list">
+          <li class="list-row">
+            <div>
+              <div class="font-medium">my laptop</div>
+              <div class="text-xs text-base-content/60">created Jan 3 &middot; last used yesterday</div>
+            </div>
+            <Badge variant="neutral" style="outline">cli</Badge>
+          </li>
+          <li class="list-row">
+            <div>
+              <div class="font-medium">grading bot</div>
+              <div class="text-xs text-base-content/60">created Feb 12 &middot; last used never</div>
+            </div>
+            <Badge variant="neutral" style="outline">bot</Badge>
+          </li>
+        </ul>
+        <div class="divider"></div>
+        <p class="text-xs text-base-content/50">
+          <code class="font-mono">divider</code> separates the list from whatever follows it &mdash; on the
+          profile page, the create-key form.
+        </p>
+      </div>
+    </div>
+  </section>
+</DesignLayout>

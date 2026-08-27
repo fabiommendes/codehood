@@ -1,0 +1,17 @@
+---
+import Layout from "@/layouts/Layout.astro";
+
+export const prerender = false;
+---
+
+<Layout title="Layout demo — Codehood">
+  <a href="/design/layouts" class="btn btn-sm btn-ghost fixed bottom-4 right-4 shadow">← Layouts</a>
+  <main class="mx-auto max-w-2xl p-8">
+    <h1 class="text-3xl font-bold">Just the shell</h1>
+    <p class="mt-3 text-base-content/70">
+      This page renders <code class="font-mono">&lt;Layout&gt;</code> directly, with nothing else. No navbar, no
+      chrome &mdash; just the HTML document, global styles, and fonts. Every other layout builds on top of this
+      one; pages don't normally use it by itself.
+    </p>
+  </main>
+</Layout>

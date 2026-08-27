@@ -1,0 +1,128 @@
+---
+import Alert from "@/components/ui/Alert";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/utils/course-url";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course } = result;
+
+const href = courseHref({
+	disciplineSlug: course.disciplineSlug,
+	username: course.instructor.username,
+	edition: course.edition,
+});
+
+const submissions = [
+	{
+		name: "Grace Hopper",
+		status: "graded" as const,
+		score: "9 / 10",
+		submitted: "Mar 14",
+	},
+	{
+		name: "Alan Turing",
+		status: "graded" as const,
+		score: "10 / 10",
+		submitted: "Mar 13",
+	},
+	{
+		name: "Katherine Johnson",
+		status: "graded" as const,
+		score: "8 / 10",
+		submitted: "Mar 14",
+	},
+	{
+		name: "Margaret Hamilton",
+		status: "pending" as const,
+		score: null,
+		submitted: "Mar 15",
+	},
+	{
+		name: "Radia Perlman",
+		status: "pending" as const,
+		score: null,
+		submitted: "Mar 15",
+	},
+	{
+		name: "Barbara Liskov",
+		status: "not submitted" as const,
+		score: null,
+		submitted: null,
+	},
+];
+
+const graded = submissions.filter((s) => s.status === "graded");
+const average =
+	Math.round(
+		(graded.reduce((sum, s) => sum + Number(s.score?.split(" / ")[0]), 0) /
+			graded.length) *
+			10,
+	) / 10;
+---
+
+<AppLayout title={`Gradebook · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <a href={`${href}/manage`} class="text-sm text-base-content/60 hover:text-primary">← {course.discipline.name} · Manage</a>
+
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-3xl font-bold">Gradebook</h1>
+      <span class="badge badge-primary badge-sm">Instructor view</span>
+    </div>
+    <p class="mt-2 text-base-content/60">{course.discipline.name} · Midterm Exam</p>
+
+    <Alert variant="info" class="mt-6">
+      <span>Preview data — nothing here reads real submission data yet.</span>
+    </Alert>
+
+    <div class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100">
+      <div class="stat">
+        <div class="stat-title">Submitted</div>
+        <div class="stat-value text-2xl">5 / 6</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Graded</div>
+        <div class="stat-value text-2xl">{graded.length} / 6</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Average</div>
+        <div class="stat-value text-2xl">{average} / 10</div>
+      </div>
+    </div>
+
+    <div class="mt-8 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Status</th>
+            <th>Submitted</th>
+            <th class="text-right">Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            submissions.map((s) => (
+              <tr>
+                <td class="font-medium">{s.name}</td>
+                <td>
+                  {s.status === "graded" && <span class="badge badge-success badge-sm">Graded</span>}
+                  {s.status === "pending" && <span class="badge badge-warning badge-sm">Pending review</span>}
+                  {s.status === "not submitted" && <span class="badge badge-outline badge-sm">Not submitted</span>}
+                </td>
+                <td class="text-base-content/60">{s.submitted ?? "—"}</td>
+                <td class="text-right font-mono">{s.score ?? "—"}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</AppLayout>

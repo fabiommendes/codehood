@@ -1,12 +1,20 @@
 import { nanoid } from "nanoid";
 import { hashPassword } from "@/auth/password";
+import {
+	canCreateUser,
+	canEditUser,
+	canViewUser,
+	userVisibility,
+} from "@/auth/permissions";
 import type { FillUndefineds } from "@/utils/types";
-import type {
-	Create,
-	FindMany,
-	FindOne,
-	ServiceMethodOpts,
-	Update,
+import {
+	type ActingOpts,
+	type CreateAs,
+	type FindManyAs,
+	type FindOneAs,
+	ForbiddenError,
+	type ServiceMethodOpts,
+	type UpdateAs,
 } from "./base-service";
 import {
 	type User as DbUser,
@@ -25,9 +33,8 @@ export interface CreateUser {
 	schoolId?: string;
 }
 
-
 type FindOneBy = FillUndefineds<
-	{ publicId: string }
+	| { publicId: string }
 	| { privateId: number }
 	| { email: string }
 	| { username: string }
@@ -36,19 +43,22 @@ type FindOneBy = FillUndefineds<
 	| { login: string } // either email or username
 >;
 
-
 export interface FindManyBy {
-	usernames: string[];
+	usernames?: string[];
 }
 
 export interface UpdateUserFilter {
 	id: number;
 }
 
+/**
+ * The editable profile fields. `username` is deliberately absent: it is a
+ * stable identifier baked into course URLs (`Course.instructorId` targets
+ * `User.username`), so it is set once at signup and never changes.
+ */
 export interface UpdateProfile {
 	name: string;
 	email: string;
-	username: string;
 	githubId: string;
 	schoolId: string;
 }
@@ -60,10 +70,11 @@ export type User = Omit<DbUser, "createdAt">;
 
 class UserService
 	implements
-	Create<CreateUser, User>,
-	FindOne<FindOneBy, User>,
-	FindMany<FindManyBy, User>,
-	Update<UpdateUserFilter, UpdateProfile, User> {
+		CreateAs<CreateUser, User>,
+		FindOneAs<FindOneBy, User>,
+		FindManyAs<FindManyBy, User>,
+		UpdateAs<UpdateUserFilter, UpdateProfile, User>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -71,9 +82,14 @@ class UserService
 	}
 
 	/**
-	 * Create new user.
+	 * Create new user. Real accounts always go through invite redemption or
+	 * the `manage create-user` CLI — see {@link canCreateUser}.
 	 */
-	async create(input: CreateUser, opts?: ServiceMethodOpts): Promise<User> {
+	async create(input: CreateUser, opts: ActingOpts): Promise<User> {
+		if (!canCreateUser(opts.actor)) {
+			throw new ForbiddenError();
+		}
+
 		const isAdmin = input.role === "ADMIN";
 		if (!input.githubId && !isAdmin) {
 			throw new Error("githubId is required for non-admin users");
@@ -84,7 +100,7 @@ class UserService
 
 		const githubId = input.githubId ?? defaultHandle(input.username);
 		const schoolId = input.schoolId ?? defaultHandle(input.username);
-		const client = opts?.tx ?? this.prisma;
+		const client = opts.tx ?? this.prisma;
 
 		return await client.user.create({
 			data: {
@@ -101,10 +117,12 @@ class UserService
 	}
 
 	/**
-	 * Finds a single user by one of the unique search fields.
+	 * Finds a single user by one of the unique search fields. Throws
+	 * `FORBIDDEN` if the user exists but `actor` may not see it (see
+	 * {@link canViewUser}); returns `null` if it does not exist.
 	 */
-	async findOne(by: FindOneBy, opts?: ServiceMethodOpts): Promise<User | null> {
-		const client = opts?.tx ?? this.prisma;
+	async findOne(by: FindOneBy, opts: ActingOpts): Promise<User | null> {
+		const client = opts.tx ?? this.prisma;
 		let user: DbUser | null = null;
 
 		if (by.publicId) {
@@ -137,16 +155,27 @@ class UserService
 			});
 		}
 
+		if (!user) return null;
+		if (!canViewUser(opts.actor, user)) {
+			throw new ForbiddenError();
+		}
 		return user;
 	}
 
 	/**
-	 * Find many users by some search criteria.
+	 * Find many users by some search criteria, narrowed to what `actor` may
+	 * see (see {@link userVisibility}). Newest first.
 	 */
-	async findMany(by: FindManyBy, opts?: ServiceMethodOpts): Promise<User[]> {
-		const client = opts?.tx ?? this.prisma;
+	async findMany(by: FindManyBy, opts: ActingOpts): Promise<User[]> {
+		const client = opts.tx ?? this.prisma;
 		const users = await client.user.findMany({
-			where: { username: { in: by.usernames } },
+			where: {
+				AND: [
+					by.usernames ? { username: { in: by.usernames } } : {},
+					userVisibility(opts.actor),
+				],
+			},
+			orderBy: { createdAt: "desc" },
 		});
 		return users;
 	}
@@ -155,25 +184,40 @@ class UserService
 	 * Fetches a user by their raw numeric id (e.g. `context.locals.user.id`).
 	 * Distinct from `findOne({ id })`, which looks up by the public-facing id.
 	 */
-	getById(id: number, opts?: ServiceMethodOpts): Promise<User | null> {
-		const client = opts?.tx ?? this.prisma;
-		return client.user.findUnique({ where: { id } });
+	async getById(id: number, opts: ActingOpts): Promise<User | null> {
+		const client = opts.tx ?? this.prisma;
+		const user = await client.user.findUnique({ where: { id } });
+		if (!user) return null;
+		if (!canViewUser(opts.actor, user)) {
+			throw new ForbiddenError();
+		}
+		return user;
 	}
 
 	/**
-	 * Updates the editable profile fields for a user.
+	 * Updates the editable profile fields for a user. Rejects any attempt to
+	 * smuggle a `username` change through `fields` — see {@link UpdateProfile}.
 	 */
-	update(
+	async update(
 		filter: UpdateUserFilter,
 		fields: UpdateProfile,
-		opts?: ServiceMethodOpts,
+		opts: ActingOpts,
 	): Promise<User> {
-		const client = opts?.tx ?? this.prisma;
+		if (!canEditUser(opts.actor, filter.id)) {
+			throw new ForbiddenError();
+		}
+		if ("username" in fields) {
+			throw new Error(
+				"username cannot be changed: it is used as a stable identifier in course URLs",
+			);
+		}
+		const client = opts.tx ?? this.prisma;
 		return client.user.update({ where: { id: filter.id }, data: fields });
 	}
 
 	/**
-	 * Number of users in the database.
+	 * Number of users in the database. System-only bootstrap utility — not
+	 * exposed to any actor-facing feature.
 	 */
 	async count(opts?: ServiceMethodOpts): Promise<number> {
 		const client = opts?.tx ?? this.prisma;
@@ -181,22 +225,17 @@ class UserService
 	}
 
 	/**
-	 * All users, newest first. Callers are responsible for checking the actor
-	 * is allowed to see this (see canManageUsers in auth/permissions.ts).
-	 */
-	// TODO: remove this and use the FindMany interface.
-	listAll(
-		opts?: ServiceMethodOpts,
-	): Promise<Array<User & { createdAt: Date }>> {
-		const client = opts?.tx ?? this.prisma;
-		return client.user.findMany({ orderBy: { createdAt: "desc" } });
-	}
-
-	/**
 	 * Update password for a user. Returns the password hash.
 	 */
-	async updatePassword(user: User, password: string, opts?: ServiceMethodOpts) {
-		const client = opts?.tx ?? this.prisma;
+	async updatePassword(
+		user: User,
+		password: string,
+		opts: ActingOpts,
+	): Promise<{ hash: string }> {
+		if (!canEditUser(opts.actor, user.id)) {
+			throw new ForbiddenError();
+		}
+		const client = opts.tx ?? this.prisma;
 		const updated = await client.user.update({
 			where: { id: user.id },
 			data: { passwordHash: await hashPassword(password) },

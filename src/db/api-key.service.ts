@@ -1,9 +1,12 @@
+import { canManageApiKeys } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
-import type {
-	Create,
-	FindMany,
-	FindOne,
-	ServiceMethodOpts,
+import {
+	type ActingOpts,
+	type CreateAs,
+	type FindManyAs,
+	type FindOneAs,
+	ForbiddenError,
+	type ServiceMethodOpts,
 } from "./base-service";
 import type { ApiKey, ApiKeyKind, PrismaClient } from "./client";
 import { prisma } from "./client";
@@ -29,9 +32,9 @@ export interface FindApiKeysBy {
 
 class ApiKeyService
 	implements
-		Create<CreateApiKey, CreateApiKeyResult>,
-		FindOne<FindApiKeyBy, ApiKey>,
-		FindMany<FindApiKeysBy, ApiKey>
+		CreateAs<CreateApiKey, CreateApiKeyResult>,
+		FindOneAs<FindApiKeyBy, ApiKey>,
+		FindManyAs<FindApiKeysBy, ApiKey>
 {
 	prisma: PrismaClient;
 
@@ -41,9 +44,12 @@ class ApiKeyService
 
 	async create(
 		input: CreateApiKey,
-		opts?: ServiceMethodOpts,
+		opts: ActingOpts,
 	): Promise<CreateApiKeyResult> {
-		const client = opts?.tx ?? this.prisma;
+		if (!canManageApiKeys(opts.actor, input.userId)) {
+			throw new ForbiddenError();
+		}
+		const client = opts.tx ?? this.prisma;
 		const token = generateToken();
 		const apiKey = await client.apiKey.create({
 			data: {
@@ -56,16 +62,27 @@ class ApiKeyService
 		return { token, apiKey };
 	}
 
-	findOne(
+	async findOne(
 		filter: FindApiKeyBy,
-		opts?: ServiceMethodOpts,
+		opts: ActingOpts,
 	): Promise<ApiKey | null> {
-		const client = opts?.tx ?? this.prisma;
-		return client.apiKey.findUnique({ where: { id: filter.id } });
+		const client = opts.tx ?? this.prisma;
+		const apiKey = await client.apiKey.findUnique({
+			where: { id: filter.id },
+		});
+		if (!apiKey) return null;
+		if (!canManageApiKeys(opts.actor, apiKey.userId)) {
+			throw new ForbiddenError();
+		}
+		return apiKey;
 	}
 
-	findMany(filter: FindApiKeysBy, opts?: ServiceMethodOpts): Promise<ApiKey[]> {
-		const client = opts?.tx ?? this.prisma;
+	/** Filtered, not thrown: a userId whose keys `actor` may not see just gets no rows back. */
+	findMany(filter: FindApiKeysBy, opts: ActingOpts): Promise<ApiKey[]> {
+		if (!canManageApiKeys(opts.actor, filter.userId)) {
+			return Promise.resolve([]);
+		}
+		const client = opts.tx ?? this.prisma;
 		return client.apiKey.findMany({
 			where: { userId: filter.userId },
 			orderBy: { createdAt: "desc" },
@@ -73,7 +90,9 @@ class ApiKeyService
 	}
 
 	/**
-	 * Looks up the key for `token` and stamps `lastUsedAt`.
+	 * Looks up the key for `token` and stamps `lastUsedAt`. Not actor-gated:
+	 * the raw token is the credential, and validating one is how the caller's
+	 * identity gets established in the first place.
 	 */
 	async validate(token: string, opts?: ServiceMethodOpts) {
 		const client = opts?.tx ?? this.prisma;
@@ -90,9 +109,18 @@ class ApiKeyService
 		return apiKey;
 	}
 
-	revoke(id: number, opts?: ServiceMethodOpts) {
-		const client = opts?.tx ?? this.prisma;
-		return client.apiKey.delete({ where: { id } });
+	/**
+	 * Revokes an API key. There is no silent no-op: a missing key and a key
+	 * `actor` may not manage both throw `FORBIDDEN`, so a caller can't probe
+	 * for another user's key ids by comparing error codes.
+	 */
+	async revoke(id: number, opts: ActingOpts): Promise<void> {
+		const client = opts.tx ?? this.prisma;
+		const apiKey = await client.apiKey.findUnique({ where: { id } });
+		if (!apiKey || !canManageApiKeys(opts.actor, apiKey.userId)) {
+			throw new ForbiddenError();
+		}
+		await client.apiKey.delete({ where: { id } });
 	}
 }
 
