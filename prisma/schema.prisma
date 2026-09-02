@@ -122,20 +122,29 @@ model InviteRedemption {
 // System data
 //==============================================================================
 model File {
-  id       String @id @default(cuid())
-  filename String
-  slugHash  String @unique
-  path     String @unique
+  id Int @id @default(autoincrement())
+
+  /// A hash of the file contents used as a slug part when creating urls for the
+  /// file. This is used to derive URLs and also to store the file in the
+  /// filesystem.
+  slugHash String @unique
+
   mimeType String
   size     Int
 
-  createdAt DateTime @default(now())
+  /// Set when the bytes are removed from disk; the row survives as a
+  /// tombstone so the URL can explain itself instead of 404ing (FR-SYNC-013,
+  /// FR-SYNC-015).
+  deletedAt DateTime?
+
+  createdAt DateTime   @default(now())
+  resources Resource[]
 }
 
 // =============================================================================
 // Course related Models
 // =============================================================================
-enum WEEKDAY {
+enum Weekday {
   SUNDAY
   MONDAY
   TUESDAY
@@ -145,13 +154,28 @@ enum WEEKDAY {
   SATURDAY
 }
 
+enum EventKind {
+  LECTURE
+  LAB
+  EXAM
+  REVIEW
+  SEMINAR
+  PROJECT
+  SELF_STUDY
+  HOLIDAY
+  RECESS
+  CANCELLED
+}
+
 model Course {
   id          Int     @id @default(autoincrement())
   description String?
-  edition     String
 
   discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
   disciplineSlug String
+
+  edition     Edition @relation(fields: [editionSlug], references: [slug])
+  editionSlug String  @map("edition")
 
   instructorSlug String @map("instructorRef")
   instructor     User   @relation(fields: [instructorSlug], references: [username])
@@ -163,12 +187,14 @@ model Course {
   endAt   DateTime
 
   schedule           TimeSlot[]
+  events             CalendarEvent[]
   passphrases        Passphrase[]
   exams              Exam[]
   questionForCourses QuestionForCourse[]
   enrollments        Enrollment[]
+  resources          Resource[]
 
-  @@unique([disciplineSlug, instructorSlug, edition])
+  @@unique([disciplineSlug, instructorSlug, editionSlug])
 }
 
 model Discipline {
@@ -178,6 +204,20 @@ model Discipline {
 
   courses   Course[]
   questions QuestionRef[]
+}
+
+/// An academic term, managed by admins. `slug` is the token that appears in
+/// every course URL (`/cs101/ada_2026-1`), so it is immutable once courses
+/// reference it. The window (`startAt`..`endAt`) says when new courses may be
+/// created for this edition; it never affects courses that already exist.
+model Edition {
+  slug      String   @id
+  name      String
+  startAt   DateTime
+  endAt     DateTime
+  createdAt DateTime @default(now())
+
+  courses Course[]
 }
 
 enum EnrollmentStatus {
@@ -213,36 +253,116 @@ model Passphrase {
 }
 
 model TimeSlot {
-  id Int @id @default(autoincrement())
-
+  id       Int    @id @default(autoincrement())
   courseId Int
-  course   Course @relation(fields: [courseId], references: [id])
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  day WEEKDAY
+  /// Authored: `mon`, `wed-lab`. Stable when the hour changes.
+  slug String
+  /// Optional label for the syllabus line: "Lecture", "Lab".
+  title String?
 
-  /// Minutes since 00:00, e.g. 14:30 -> 870
-  startMin Int
-  endMin   Int
+  day         Weekday
+  startMin    Int
+  durationMin Int
 
-  events Event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events CalendarEvent[]
+
+  @@unique([courseId, slug])
+  @@unique([id, courseId])
 }
 
-model Event {
-  id Int @id @default(autoincrement())
+model CalendarEvent {
+  id       Int    @id @default(autoincrement())
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   timeSlotId Int
-  timeSlot   TimeSlot @relation(fields: [timeSlotId], references: [id])
+  timeSlot   TimeSlot @relation(fields: [timeSlotId, courseId], references: [id, courseId])
 
   slug String
 
+  startAt     DateTime
+  durationMin Int
   week        Int
+
+  kind        EventKind @default(LECTURE)
   title       String
   description String?
 
-  start DateTime
-  end   DateTime
+  /// Derived, never authored: the exam whose window overlaps this one.
+  examId Int?
+  exam   Exam? @relation(fields: [examId], references: [id], onDelete: SetNull)
 
-  isHoliday Boolean @default(false)
+  /// Supplied by the writer, opaque to the server. See the manifest decision.
+  contentHash String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, slug])
+  @@index([courseId, startAt])
+}
+
+enum ResourceType {
+  /// External links
+  LINK
+
+  /// Files uploaded to the system. If the file is a supported media type 
+  /// (image, audio, video, pdf), it will be displayed inline in the browser.
+  FILE
+
+  /// Source code snippets, with syntax highlighting.
+  CODE
+
+  /// Markdown content, rendered as HTML in the browser.
+  MD
+}
+
+/// Resource is modelled after the folowing enum:
+///
+///   type Resource 
+///       = { type: "link", url: string, title: string, description?: string }
+///       | { type: "file", fileId: string, title: string, description?: string }
+///       | { type: "md", title: string, description?: string, content: string }
+///       | { type: "code", title: string, description?: string, content: string, language: string }
+///
+/// This cannot be represeted cleanly in the DB, hence we denormalize some
+/// fields in a table.
+model Resource {
+  id   Int          @id @default(autoincrement())
+  type ResourceType
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  /// Natural key from the repository path — FR-SYNC-010. Renaming a file in
+  /// the repository is a delete plus a create (FR-SYNC-011).
+  slug String
+
+  title       String
+  description String?
+
+  /// Url, for LINK resources, content for MD and CODE resources. Null for FILE resources.
+  data String?
+
+  /// Language, for CODE resources. Null for LINK, FILE and MD resources.
+  extra String?
+
+  fileId Int?
+  file   File? @relation(fields: [fileId], references: [id])
+
+  /// Supplied by the writer, opaque to the server.
+  contentHash String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, slug])
+  @@index([courseId, type])
 }
 
 // =============================================================================
@@ -455,6 +575,9 @@ model Exam {
 
   scheduledAt DateTime?
   durationMs  Int?
+  /// Extra time granted on top of durationMs (FR-EXAM-020/022), part of the
+  /// exam's window for the calendar-link match in src/db/exam-link.ts.
+  extraTimeMs Int @default(0)
 
   authorId Int
   author   User @relation(fields: [authorId], references: [id])
@@ -465,6 +588,7 @@ model Exam {
   examTags          ExamTags[]
   questionsForExams QuestionsForExam[]
   responses         Response[]
+  events            CalendarEvent[]
 }
 
 /// A M2M relation table linking Exams to their Questions (QuestionRefs).

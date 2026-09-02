@@ -64,8 +64,7 @@ user, regardless of enrollment.
 page: discipline, course name, instructor, description. Nothing else.
 
 **FR-CRS-032** — Course *contents* — exams, questions, calendar, resources,
-roster — MUST be visible only to enrolled students, the instructor, and
-`SYSTEM`.
+roster — MUST be visible only to enrolled user and the course instructor.
 
 **FR-CRS-033** — Instructor-only sub-routes (`/manage`, `/roster`,
 `/gradebook`) MUST render 403 for anyone else.
@@ -84,16 +83,15 @@ and MUST offer a separate section for finding a new course.
 
 ### Who sees what
 
-| Actor | Listing | Teaser | Contents | Manage |
-| :--- | :--- | :--- | :--- | :--- |
-| `SYSTEM` | all | yes | yes | yes |
-| `ADMIN` | all | yes | yes | records only (FR-ACC-011) |
-| Instructor, owner | all | yes | yes | yes |
-| Instructor, other | all | yes | only if enrolled | no |
-| Student, enrolled | all | yes | yes | no |
-| Student, other | all | yes | no | no |
-| Dropped student | all | yes | no | no |
-| Anonymous | none | no | no | no |
+| Actor                      | Listing | Teaser | See Contents     | Interact | Manage |
+| :------------------------- | :------ | :----- | :--------------- | -------- | :----- |
+| Instructor or admin, owner | all     | yes    | yes              | mocked   | yes    |
+| Admin, other               | all     | yes    | yes              | no       | no     |
+| Instructor, other          | all     | yes    | only if enrolled | no       | no     |
+| Any user, enrolled         | all     | yes    | yes              | yes      | no     |
+| Student, other             | all     | yes    | no               | no       | no     |
+| Dropped student            | all     | yes    | no               | no       | no     |
+| Anonymous                  | none    | no     | no               | no       | no     |
 
 ## Enrollment
 

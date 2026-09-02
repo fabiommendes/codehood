@@ -12,7 +12,7 @@ import {
 	inviteService,
 } from "@/db/invite.service";
 import { sessionService } from "@/db/session.service";
-import { type user as ServiceUser, userService } from "@/db/user.service";
+import { type User, userService } from "@/db/user.service";
 import { SESSION_COOKIE } from "@/middleware";
 import { USERNAME_RE } from "@/utils/course-url";
 import { withActionErrors } from "./helpers";
@@ -24,7 +24,7 @@ const SESSION_COOKIE_OPTS = {
 	path: "/",
 };
 
-export type User = Omit<ServiceUser, "passwordHash" | "id" | "publicId"> & {
+export type PublicUser = Omit<User, "passwordHash" | "id" | "publicId"> & {
 	id: string;
 };
 
@@ -98,7 +98,7 @@ export const auth = {
 
 			// One transaction: a redemption failure (race on maxUses, etc.) must not
 			// leave behind a User row with no invite and no course to show for it.
-			let user: ServiceUser;
+			let user: User;
 			try {
 				user = await prisma.$transaction(async (tx) => {
 					const createdUser = await userService.create(
@@ -229,7 +229,7 @@ function inviteErrorMessage(code: InviteError["code"]): string {
 	}
 }
 
-function publicUser(user: ServiceUser): User {
+function publicUser(user: User): PublicUser {
 	return {
 		id: user.publicId,
 		email: user.email,

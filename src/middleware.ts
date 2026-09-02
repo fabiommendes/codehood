@@ -17,7 +17,8 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 		return next();
 	}
 
-	context.locals.user = { id: session.user.id, role: session.user.role };
+	context.locals.user = session.user;
+
 	// Re-stamp the cookie so its lifetime tracks the (possibly just-refreshed) sliding expiry.
 	context.cookies.set(SESSION_COOKIE, token, {
 		httpOnly: true,

@@ -45,11 +45,22 @@ is whatever language the instructor wrote.
 
 ## Resource files and their threat model
 
-**FR-NFR-030** — A resource file MUST be addressed by an unguessable slug hash
-and served directly by the reverse proxy, without an authentication check.
+**FR-NFR-030** — A resource file MUST be addressed by its content hash
+(`slugHash`, a sha-256 of the bytes) and served directly by the reverse proxy,
+without an authentication check.
 
-**FR-NFR-031** — Access to a resource MUST be understood as **unrevocable**.
-Anyone who learns the URL has the file permanently.
+Amended by `dev/specs/to-review/resources.md`: the original wording said
+"unguessable slug hash", and a content hash is not unguessable — a public PDF,
+last year's handout, or a file a student already holds has a computable hash
+and therefore a computable URL. This is accepted, not overlooked: FR-NFR-032
+already forbids putting anything whose disclosure matters into a resource, and
+FR-NFR-031 already treats every resource URL as permanently public.
+Guessability only changes *who* can reach a non-secret file, from "anyone
+given the link" to "anyone with the same file" — a threat model already
+accepted by the other two requirements.
+
+**FR-NFR-031** — Access to a resource MAY be **unrevocable**. Anyone who learns
+the URL would have the file permanently.
 
 This is a deliberate exception to FR-ACC-030, and the consequences belong in the
 open:

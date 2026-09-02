@@ -35,20 +35,29 @@ first path segment. See the reserved names section below.
 Everything belonging to a course hangs off its address:
 
 ```
-/cs101/ada_2026-1                    course home (student view)
-/cs101/ada_2026-1/manage             instructor dashboard
-/cs101/ada_2026-1/roster             enrolled students
-/cs101/ada_2026-1/invite             generate a classroom join code
-/cs101/ada_2026-1/gradebook          submissions and scores
-/cs101/ada_2026-1/resources          syllabus, repository links
+/cs101/ada_2026-1                    course home
 /cs101/ada_2026-1/exams              exam index
 /cs101/ada_2026-1/exams/<slug>       one exam
+/cs101/ada_2026-1/resources          files, links, notes, and snippets, grouped by type
+/cs101/ada_2026-1/resources/<slug>   one note or snippet's own page (MD, CODE)
+/cs101/ada_2026-1/schedule           the course's own term calendar
+/cs101/ada_2026-1/roster             enrolled students ("Students" tab)
+/cs101/ada_2026-1/manage             course record, enrollment, sync status
 ```
+
+Every one of these renders the same tab strip (`CourseHeader.astro`,
+`courseTabs()` in `src/utils/course-tabs.ts`); which tabs show up is a
+function of the course and the viewer, not of which URL they typed. The last
+two are instructor-only — a student never sees their tabs and gets a 403 if
+they follow the link anyway (FR-CRS-033). The gradebook is reached from an
+exam on the Exams tab rather than through its own tab; it keeps its URL
+(`/gradebook`) but carries no separate entry in the strip.
 
 Instructor-only pages live under the course rather than in a separate
 `/teaching/` tree. Two reasons. Every course link works the same way regardless
 of who is following it, and an instructor can open the plain course URL to see
-what their students see.
+what their students see. There is no `/invite` route — generating a classroom
+join code lives on the Manage tab.
 
 `/<discipline-slug>` on its own is not routed yet. It is reserved for a future
 page listing every edition of a discipline. Do not use it for anything else.
@@ -111,7 +120,7 @@ A discipline slug must not equal any of these:
 
 ```
 403  404  500  _actions  _astro  _image  admin  api  calendar  courses
-design  favicon  getting-started  img  invite  login  logo  manifest
+design  favicon  files  getting-started  img  invite  login  logo  manifest
 profile  sw
 ```
 
@@ -150,6 +159,7 @@ the same commit, and checking that no existing discipline already claims it.
 | `/admin`               | admin  | administration                       |
 | `/design`, `/design/*` | public | design system showcase               |
 | `/api/docs`            | public | REST API reference (Swagger UI)      |
+| `/files/<hash>[/<name>]` | none | resource blobs — no auth check by design (FR-NFR-030) |
 | `/403`, `/404`, `/500` | public | error pages                          |
 
 `/courses` keeps its name even though no course URL contains it. It is a
@@ -175,5 +185,6 @@ at `/api/docs`. See `docs/design/openapi.md`.
 
 Astro Actions post to `/_actions/<namespace>.<name>` and are called through
 `Astro.callAction` or the `actions` client import rather than by URL. Current
-namespaces are `auth` and `profile`. The path is Astro's, not ours, but
-`_actions` is on the reserved list because it occupies a first segment.
+namespaces are `auth`, `profile`, `admin`, and `course`. The path is Astro's,
+not ours, but `_actions` is on the reserved list because it occupies a first
+segment.

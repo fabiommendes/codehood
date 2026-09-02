@@ -5,10 +5,13 @@
 		"moduleResolution": "bundler",
 		"target": "es2024",
 		"strict": true,
+		"strictNullChecks": true,
 		"esModuleInterop": true,
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
 		"incremental": true,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
 		"forceConsistentCasingInFileNames": true,
 		"paths": {
 			"@/*": ["./src/*"],

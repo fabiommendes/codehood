@@ -16,14 +16,14 @@ DRAFT ──push──▶ SCHEDULED ──clock/start now──▶ ONGOING ─�
                                                                                     ARCHIVED
 ```
 
-| Status | Submissions | Students see | Set by |
-| :--- | :--- | :--- | :--- |
-| `DRAFT` | no | nothing | push |
-| `SCHEDULED` | no | that it exists, and when | push |
-| `ONGOING` | yes | the paper | clock, or "start now" |
-| `CLOSED` | no | their own submissions | clock |
-| `COMPLETED` | no | answers, feedback, scores | instructor |
-| `ARCHIVED` | no | nothing new | push |
+| Status      | Submissions | Students see              | Set by                |
+| :---------- | :---------- | :------------------------ | :-------------------- |
+| `DRAFT`     | no          | nothing                   | push                  |
+| `SCHEDULED` | no          | that it exists, and when  | push                  |
+| `ONGOING`   | yes         | the paper                 | clock, or "start now" |
+| `CLOSED`    | no          | their own submissions     | clock                 |
+| `COMPLETED` | no          | answers, feedback, scores | instructor            |
+| `ARCHIVED`  | no          | nothing new               | push                  |
 
 **FR-EXAM-010** — `SCHEDULED → ONGOING` and `ONGOING → CLOSED` MUST be driven by
 the clock and evaluated **lazily**: the first request that touches the exam
@@ -46,9 +46,8 @@ response (`Response.acceptingSubmissions`) is the only per-person exception.
 
 ## The window
 
-**FR-EXAM-020** — The exam window MUST be global: it opens at `scheduledAt` and
-closes at `scheduledAt + durationMs + extraTimeMs`, at the same instant for
-every student.
+**FR-EXAM-020** — The exam window MUST be global: it opens at the scheduled timestamp and
+closes at timestamp + duration + extra time for all students, regardless of when they start.
 
 **FR-EXAM-021** — A student who starts late MUST get less time. There is no
 per-student timer.

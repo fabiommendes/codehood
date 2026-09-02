@@ -28,30 +28,30 @@ The server MUST NOT filter, redact, or strip a merged object on the way out.
 **FR-QST-005** — Validation and grading MUST merge the two payloads and hand the
 result to the `mdq-js` constructor, which builds a question from a plain object.
 
-**FR-QST-006** — A question MUST have exactly one owner (`ownerId`), the
-instructor of the course it belongs to.
+**FR-QST-006** — A question MUST belong to exactly one course. Its identity is
+`(course, slug)`; the course's instructor owns it, and no separate owner column
+exists because none can disagree with the course.
 
-**FR-QST-007** — `QuestionType` MUST remain a server-side enum. `mdq-js` is the
-upstream authority on which types exist; the server MAY implement a subset and
-MUST refuse the rest (FR-SYNC-041).
+**FR-QST-007** — Copying a question into another edition MUST produce a distinct
+question. Editing next year's copy cannot reach last year's rows, and last
+year's responses keep the question they were answered against, intact.
 
 ## Versions
 
-**FR-QST-010** — Editing a question's content MUST create a new `QuestionData`
-row and repoint `QuestionRef.latest`. Existing rows MUST NOT be mutated.
+**FR-QST-010** — Editing a question's content MUST create a new version of a
+Question and keep old versions that might be used by other resources in the
+database.
 
-**FR-QST-011** — `versionHash` MUST be treated as an opaque label supplied by
-the CLI. The server MUST NOT infer that content changed from a changed hash, nor
-that it is unchanged from an equal one.
+**FR-QST-011** — each question as an opaque label supplied by the CLI. The
+server MUST not infer the hash and MUST keep the version history as provided by
+the CLI.
 
 **FR-QST-012** — `(refId, versionHash)` MUST remain unique, so a buggy client
 cannot map one hash to two contents.
 
-**FR-QST-013** — A question MAY be pinned to a specific version by an exam
-(`QuestionsForExam.version`) or a course (`QuestionForCourse.version`).
-
-**FR-QST-014** — An unset pin MUST mean "use `QuestionRef.latest`", and MUST NOT
-be settable by a user. The server sets it at `SCHEDULED` (FR-EXAM-013).
+**FR-QST-013** — A question in a exam MUST be pinned to a specific version when
+a exam starts. If not pinned, force the latest version at the time of the exam's
+start.
 
 ## Status
 
@@ -78,12 +78,12 @@ questions that count. Weights are absolute, not normalized to a total.
 The server depends on `mdq-js` for four things. Its API is not yet designed;
 these are the requirements the server places on it.
 
-| The server needs | Why |
-| :--- | :--- |
-| Construct a question from a plain object | Validation at write time, rendering, grading |
-| Grade a submission payload against the merged question | FR-GRD-001 |
-| Decide whether two versions are grade-neutral | FR-SYNC-031 |
-| SolidJS components for rendering and input validation | Questions render client-side from `publicPayload` |
+| The server needs                                       | Why                                               |
+| :----------------------------------------------------- | :------------------------------------------------ |
+| Construct a question from a plain object               | Validation at write time, rendering, grading      |
+| Grade a submission payload against the merged question | FR-GRD-001                                        |
+| Decide whether two versions are grade-neutral          | FR-SYNC-031                                       |
+| SolidJS components for rendering and input validation  | Questions render client-side from `publicPayload` |
 
 **FR-QST-040** — Question rendering and input validation MUST happen
 client-side, from `publicPayload` only.
@@ -97,31 +97,19 @@ position, since choice order is shuffled per student (FR-EXAM-031).
 ## Schema impact
 
 - `QuestionData.payload` splits into `publicPayload` and `privatePayload`.
-- `QuestionRef.authorId` → `ownerId`.
+- `QuestionRef.disciplineSlug` → `courseId`; the unique key becomes
+  `[slug, courseId]`. `authorId` is dropped: the course names the owner.
+- `QuestionForCourse` is dropped. A question is already in exactly one course.
 - `QuestionsForExam` gains `weight Float?` (default 1) and `voidedAt DateTime?`.
-- `QuestionRef.publicId` is not unique today; if it stays, it needs a
-  constraint — or it should be dropped, since identity is the natural key.
+- `QuestionRef.publicId` is not unique today and needs the constraint, since it
+  is the token that addresses a question outside the CLI's natural key.
 
 ## Open questions
 
-**Is the question bank scoped to a discipline or to a course?** This is
-unresolved and load-bearing:
-
-- `QuestionRef` hangs off `Discipline`, with `QuestionForCourse` as a join —
-  a discipline-wide bank shared across editions and instructors.
-- The natural key used by the CLI is
-  `discipline/instructor_edition/question-slug`, which addresses a question
-  *under a course*.
-
-If the bank is discipline-wide, two instructors teaching the same discipline
-share question identities and the last push wins — which contradicts "one
-repository owns the content" unless they share a repository. If it is
-per-course, reusing a question next year means a distinct row, and
-`QuestionForCourse` is redundant.
-
-The two readings differ in what happens when an instructor edits a question in
-2027 that 2026's students already answered: shared identity rewrites their
-question's lineage, per-course identity leaves it untouched.
-
-Secondary: does `QuestionForCourse` survive at all, and if so, does it mean
-"available for practice in this course" as distinct from "used in this exam"?
+- **Cross-edition statistics have nothing to correlate on.** `Group` exists so
+  co-teaching instructors can compare how a question performs, but per-course
+  identity means this year's copy and last year's are unrelated rows. Solving it
+  later means a lineage token the CLI carries when it copies a file — deliberately
+  not V1, and noted here so the feature is not designed as if the link exists.
+- Does a question need an `authors` field at all, or does authorship live in the
+  content the CLI pushes and never become a server-side concept?

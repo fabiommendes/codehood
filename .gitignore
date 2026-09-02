@@ -27,6 +27,9 @@ pnpm-debug.log*
 *.db
 *.db-journal
 
+# resource blobs (RESOURCE_ROOT, see src/constants.ts)
+/storage/
+
 # macOS-specific files
 .DS_Store
 

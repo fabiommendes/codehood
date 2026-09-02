@@ -5,14 +5,14 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 import type { APIContext } from "astro";
 import { type ZodType, z } from "zod";
-import type { user } from "@/db/user.service";
+import type { User } from "@/db/user.service";
 
 // Must run before any schema calls .openapi(...) — every route file imports
 // this module first, so this is the one place that needs to call it.
 extendZodWithOpenApi(z);
 
 /// Actor = User? or User depending if API is public or not.
-type Actor<IsPublic> = IsPublic extends false ? user : user | undefined;
+type Actor<IsPublic> = IsPublic extends false ? User : User | undefined;
 
 /**
  * Options for the route/get/post functions and friends.
@@ -36,7 +36,7 @@ export type RouteOptions<In, Out, IsPublic extends boolean = false> = {
 };
 
 /// Arguments for the handler function
-type HandlerArgs<In, Actor> = Actor extends user
+type HandlerArgs<In, Actor> = Actor extends User
 	? { actor: Actor; body: In }
 	: { actor?: Actor; body: In };
 
@@ -127,7 +127,7 @@ function route<In, Out, IsPublic extends boolean = false>(
 	};
 
 	result.view = async ({ locals, request }: APIContext) => {
-		const user = locals.user as user | undefined;
+		const user = locals.user as User | undefined;
 
 		if (!request.headers.get("accept")?.includes("application/json")) {
 			// TODO: declare proper error schemas and error codes.

@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import { TEST_DATABASE_URL } from "./test/db-path";
+import { TEST_RESOURCE_ROOT } from "./test/resource-root";
 
 export default defineConfig({
 	testDir: "./test",
@@ -21,6 +22,7 @@ export default defineConfig({
 		timeout: 60_000,
 		env: {
 			DATABASE_URL: TEST_DATABASE_URL,
+			RESOURCE_ROOT: TEST_RESOURCE_ROOT,
 			NODE_ENV: "test",
 			HOST: "localhost",
 			PORT: "4322",

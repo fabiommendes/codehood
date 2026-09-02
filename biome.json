@@ -16,9 +16,6 @@
 		"enabled": true,
 		"domains": {
 			"solid": "recommended"
-		},
-		"rules": {
-			"recommended": true
 		}
 	},
 	"css": {
@@ -29,6 +26,9 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
+		},
+		"parser": {
+			"unsafeParameterDecoratorsEnabled": true
 		}
 	},
 	"assist": {
@@ -41,7 +41,9 @@
 	},
 	"overrides": [
 		{
-			"includes": ["**/*.astro"],
+			"includes": [
+				"**/*.astro"
+			],
 			"linter": {
 				"rules": {
 					"style": {

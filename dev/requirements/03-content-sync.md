@@ -66,12 +66,12 @@ rejected by default.
 
 **FR-SYNC-013** — Deleting content MUST behave per type:
 
-| Type | On delete |
-| :--- | :--- |
-| Question | `ARCHIVED`; never removed, because responses reference it |
-| Exam | `ARCHIVED` |
-| Calendar event | Deleted outright |
-| Resource file | Blob deleted; URL retained as a tombstone |
+| Type           | On delete                                                 |
+| :------------- | :-------------------------------------------------------- |
+| Question       | `ARCHIVED`; never removed, because responses reference it |
+| Exam           | `ARCHIVED`                                                |
+| Calendar event | Deleted outright                                          |
+| Resource file  | Blob deleted; URL retained as a tombstone                 |
 
 **FR-SYNC-014** — Archived content MUST continue to resolve everywhere it is
 already referenced. A completed exam MUST still render its archived questions,

@@ -22,6 +22,14 @@ for the specific model.
 
 The precise types are documented in the interface definitions at `src/db/base-service.ts`.
 
+Implement the whole set, even when the feature being built only needs part of
+it. These classes are what the REST API exposes as resources, so a method left
+out here becomes a missing endpoint later, and adding it during the original
+work costs far less than a second pass over the same class. Where a method has
+no obvious meaning for a model, say what it does mean — `update` on an invite
+extends its expiry and adjusts `maxUses`, and nothing else — rather than
+omitting it or letting it accept everything.
+
 All methods take an `opts` parameter with two properties:
 
 * tx (optional): a Prisma transaction object, used to run the query in a transaction or mock db.

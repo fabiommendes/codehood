@@ -6,7 +6,7 @@ import { editionService } from "@/db/edition.service";
 import { fileService } from "@/db/file.service";
 import { resourceService } from "@/db/resource.service";
 import { timeSlotService } from "@/db/time-slot.service";
-import { type user, userService } from "@/db/user.service";
+import { type User, userService } from "@/db/user.service";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -501,7 +501,7 @@ async function demoUser(input: {
 	name: string;
 	role: "INSTRUCTOR" | "STUDENT" | "ADMIN";
 	password?: string;
-}): Promise<user> {
+}): Promise<User> {
 	const existing = await userService.findOne(
 		{ username: input.username },
 		FULL_ACCESS,

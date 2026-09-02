@@ -6,12 +6,15 @@
 		"node": ">=22.12.0"
 	},
 	"scripts": {
-		"dev": "astro dev",
+		"dev": "pnpm run openapi && astro dev",
 		"build": "pnpm run openapi && astro build",
 		"preview": "astro preview",
 		"manage": "tsx src/commands/index.ts",
 		"openapi": "tsx scripts/generate-openapi.ts",
-		"seed": "prisma db seed",
+		"sidebar-art": "tsx scripts/generate-sidebar-art.ts",
+		"route-patterns": "tsx scripts/generate-route-patterns.ts",
+		"seed": "prisma db push && prisma db seed",
+		"db-reset": "rm -f dev.db && prisma db push && prisma db seed",
 		"test": "tsx test/run.ts",
 		"test-e2e": "tsx test/run.ts",
 		"test-ui": "tsx test/run.ts --ui",
@@ -33,14 +36,19 @@
 		"dotenv": "^17.4.2",
 		"markdown-it": "^15.0.0",
 		"nanoid": "^6.0.1",
+		"reflect-metadata": "^0.2.2",
+		"shiki": "^4.4.3",
 		"solid-js": "^1.9.15",
 		"swagger-ui-dist": "^5.32.14",
+		"wildleek": "^2.0.0",
+		"yaml": "^2.9.0",
 		"zod": "^4.4.3"
 	},
 	"allowScripts": {
 		"esbuild": true
 	},
 	"devDependencies": {
+		"@astrojs/check": "^0.9.10",
 		"@biomejs/biome": "^2.5.10",
 		"@playwright/test": "^1.62.1",
 		"@tailwindcss/typography": "^0.5.20",

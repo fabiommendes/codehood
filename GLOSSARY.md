@@ -96,7 +96,10 @@ Code: `src/utils/course-url.ts`
 The address `/<discipline-slug>/<username>_<edition>`, e.g. `/cs101/ada_2026-1`.
 It is built from the columns of `Course`'s unique key, so no extra id is stored
 and the [CLI](#cli) can construct it offline. There is no `/courses/` prefix,
-which is why [Reserved slug](#reserved-slug) exists.
+which is why [Reserved slug](#reserved-slug) exists. Everything about the
+course hangs off it: `/exams`, `/resources`, `/schedule`, and, for its
+instructor only, `/roster` and `/manage` — one tab strip, on every page,
+built by `courseTabs()`.
 
 ## Discipline
 
@@ -111,11 +114,13 @@ discipline outlives the [Courses](#course) that instantiate it and owns the
 ## Edition
 
 Type: domain
+Code: `Edition`, `EditionService`
 
-The term label separating repeated runs of the same discipline by the same
-instructor: a four-digit year, optionally plus a term number (`2026`, `2026-1`).
-No leading zero on the term, so `2026-1` and `2026-01` cannot both exist and
-mean different things.
+An academic term, created by an admin, that separates repeated runs of the same
+discipline by the same instructor. Its slug is a four-digit year with an
+optional term number (`2026`, `2026-1`) and appears in every course URL, so it
+never changes; its window says when new courses may be created for it, and
+closing that window leaves existing courses alone.
 
 ## Enrollment
 
@@ -130,11 +135,14 @@ table with no identity of its own.
 ## Event
 
 Type: domain 
-Code: `Event`
+Code: `CalendarEvent`
 
 One dated occurrence of a [Time slot](#time-slot) — a single class meeting in a
-given week, with its own title and description, or flagged as a holiday. This is
-what the calendar renders.
+given week, with its own title, description, and kind (`LECTURE`, `LAB`, `EXAM`,
+`REVIEW`, `SEMINAR`, `PROJECT`, `SELF_STUDY`, `HOLIDAY`, `RECESS`, `CANCELLED`).
+May carry a derived link to an [Exam](#exam) whose window overlaps it. This is
+what the calendar renders. The model is `CalendarEvent`, not `Event`, since the
+latter is a DOM global.
 
 ## Exam
 
@@ -273,6 +281,44 @@ routes over dynamic ones silently, so a discipline named `login` would not
 error — its courses would just become unreachable. Adding a top-level route
 means adding its name to this list in the same commit.
 
+## Resource
+
+Type: domain
+Code: `Resource`, `ResourceType`, `ResourceService`
+
+One of the four things a [Course](#course) hands its students — a `FILE` to
+download, a `LINK` to follow, an `MD` note, or a `CODE` snippet — grouped by
+type on `/resources` in a fixed, unauthored order. Pushed by the [CLI](#cli)
+only, never authored in the web app; visible to everyone who may see the
+course's contents, with no separate "unpublished" state. A `FILE` resource
+points at a [File](#resource-file) it does not own — the same bytes may back
+resources in more than one course.
+
+## Resource file
+
+Also: File, blob
+Type: domain
+Code: `File`, `FileService`
+
+The bytes behind a `FILE` [Resource](#resource), addressed by `slugHash` — a
+sha-256 of its own content, which doubles as the URL token
+(`/files/<slugHash>/<name>`) and the on-disk storage path. Content-addressed,
+so two courses pushing the same bytes share one row; removing a resource
+removes the file only once nothing else points at it, at which point it
+becomes a [Resource tombstone](#resource-tombstone). Served with no
+authentication check, on the understanding that nothing whose disclosure
+matters ever becomes a resource (FR-NFR-032).
+
+## Resource tombstone
+
+Type: domain
+Code: `File.deletedAt`
+
+What a [Resource file](#resource-file)'s row becomes once its bytes are
+removed from disk and nothing else points at it: the row and its `slugHash`
+survive with `deletedAt` stamped, so the blob route can answer `410 Gone` and
+explain what happened instead of a bare `404`.
+
 ## Response
 
 Type: domain 
@@ -361,8 +407,10 @@ keeps its full history.
 Type: domain 
 Code: `TimeSlot`
 
-A course's recurring weekly meeting — a weekday and a start and end time.
-Concrete dated meetings are its [Events](#event).
+A course's recurring weekly meeting — a weekday and a start and end time. Carries
+an authored slug (its sync identity, stable when the hour moves) and an optional
+title for the syllabus line ("Lecture", "Lab"). Concrete dated meetings are its
+[Events](#event).
 
 ## User
 

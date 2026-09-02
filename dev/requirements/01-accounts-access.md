@@ -54,13 +54,12 @@ refreshed once past halfway.
 `Authorization: Bearer <key>`, shown once at creation, stored hashed, and
 revocable individually.
 
-**FR-ACC-022** — An API key MUST have a kind, `CLI` or `BOT`, and the kind MUST
-narrow what the request may do:
+**FR-ACC-022** — An API key MUST distinguish CLI/REST interaction from BOTs.
 
-| Key kind | May read | May write |
-| :--- | :--- | :--- |
-| `CLI` | everything its owner may read | course content owned by its owner |
-| `BOT` | responses and submissions in its owner's courses | grades, feedback, grading status |
+| Key kind | May read                                         | May write                         |
+| :------- | :----------------------------------------------- | :-------------------------------- |
+| `REST`   | everything its owner may read                    | course content owned by its owner |
+| `BOT`    | responses and submissions in its owner's courses | grades, feedback, grading status  |
 
 **FR-ACC-023** — A `BOT` key MUST NOT create or modify questions, exams,
 calendar events, resources, courses, or enrollments.
@@ -73,17 +72,17 @@ than its owner sees.
 **FR-ACC-030** — Every page and endpoint MUST require authentication except the
 following, which MUST remain public:
 
-| Route | Why |
-| :--- | :--- |
-| `/` | Landing page |
-| `/login` | Sign in |
-| `/invite/[token]` | Redeemed by someone who has no account yet |
-| `/getting-started` | Onboarding notes |
-| `/design/*` | Design showcase; statically cacheable |
-| `/403`, `/404`, `/500` | Error pages |
-| `/api/health` | Liveness probe |
-| API login endpoints | Exchange credentials for an API key |
-| Static assets | Favicon, manifest, fonts, images |
+| Route                  | Why                                        |
+| :--------------------- | :----------------------------------------- |
+| `/`                    | Landing page                               |
+| `/login`               | Sign in                                    |
+| `/invite/[token]`      | Redeemed by someone who has no account yet |
+| `/getting-started`     | Onboarding notes                           |
+| `/design/*`            | Design showcase; statically cacheable      |
+| `/403`, `/404`, `/500` | Error pages                                |
+| `/api/health`          | Liveness probe                             |
+| API login endpoints    | Exchange credentials for an API key        |
+| Static assets          | Favicon, manifest, fonts, images           |
 
 **FR-ACC-031** — Resource file URLs are served by the reverse proxy and are NOT
 covered by FR-ACC-030. They are unauthenticated capability URLs; see
@@ -95,7 +94,8 @@ covered by FR-ACC-030. They are unauthenticated capability URLs; see
 associated with it, and MUST NOT grant any write authority.
 
 **FR-ACC-041** — Group membership MUST NOT affect question ownership. A question
-has exactly one owner (`ownerId`) and may credit many authors.
+has exactly one owner and may credit many authors. Owner is derived from the
+course instructor for that question.
 
 > Groups exist so co-teaching instructors can inspect a shared bank and, in a
 > later milestone, compare a question's performance across courses.

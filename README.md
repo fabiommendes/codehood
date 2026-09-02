@@ -61,17 +61,17 @@ Then use one of the following, depending on what you want to do:
 The Codehood server is built with [Astro](https://astro.build/). It uses the
 following tech stack:
 
-| Layer             | Technology                                                      |
-| :---------------- | :-------------------------------------------------------------- |
-| Frontend          | [Astro](https://astro.build/)                                   |
-| Rest API          | Astro endpoints (`src/pages/api/`)                               |
-| Database          | [Prisma](https://www.prisma.io/) ORM with SQLite                |
-| Validation        | [Zod](https://zod.dev/)                                         |
-| Auth              | Roll-your-own: Argon2id, session cookies, API keys (see `docs/implemented/auth.md`) |
-| CSS               | [DaisyUI](https://daisyui.com/) and TailwindCSS                 |
-| Components        | [SolidJS](https://www.solidjs.com/)                             |
-| Integration Tests | [Playwright](https://playwright.dev/)                           |
-| Linter and QA     | [Biome](https://biomejs.dev/) and [ESLint](https://eslint.org/) |
+| Layer             | Technology                                                                       |
+| :---------------- | :------------------------------------------------------------------------------- |
+| Frontend          | [Astro](https://astro.build/)                                                    |
+| Rest API          | In-house Astro dynamic endpoints                                                 |
+| Database          | [Prisma](https://www.prisma.io/) ORM with SQLite                                 |
+| Validation        | [Zod](https://zod.dev/)                                                          |
+| Auth              | In-house: Argon2id + session cookies + API keys (see `docs/implemented/auth.md`) |
+| CSS               | [DaisyUI](https://daisyui.com/) and TailwindCSS                                  |
+| Components        | [SolidJS](https://www.solidjs.com/)                                              |
+| Integration Tests | [Playwright](https://playwright.dev/)                                            |
+| Linter and QA     | [Biome](https://biomejs.dev/)                                                    |
 
 
 ## Project Structure
