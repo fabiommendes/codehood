@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 276 250"
+   aria-hidden="true"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="sidebar-art.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs8" />
+  <sodipodi:namedview
+     id="namedview8"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showguides="true"
+     inkscape:zoom="2.334"
+     inkscape:cx="73.907455"
+     inkscape:cy="192.15938"
+     inkscape:window-width="3440"
+     inkscape:window-height="1366"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg8">
+    <sodipodi:guide
+       position="-118.04237,227.17803"
+       orientation="1,0"
+       id="guide8"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="-41.089523,227.17803"
+       orientation="1,0"
+       id="guide9"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="-41.089523,227.17803"
+       orientation="0,-1"
+       id="guide10"
+       inkscape:locked="false" />
+  </sodipodi:namedview>
+  <!-- staircase (green), 4 steps, touching with no gap -->
+  <!-- half-circle (yellow) "sun", flat bottom edge, overlapping the top step -->
+  <!-- rest of the cluster, carried across the remaining width -->
+  <path
+     style="mix-blend-mode:multiply;fill:#d3d7cf;fill-opacity:1;stroke:none;stroke-width:0.653423"
+     d="m 86.273818,132.09883 v 118.24523 h 29.562852 v -59.12562 h 29.55676 v 59.12562 h 29.56281 V 132.09883 h -29.56281 v 29.56282 h -29.55676 v -29.56282 z"
+     id="path10" />
+  <g
+     id="g13"
+     transform="matrix(-2.1537485,0,0,2.1537485,437.02001,28.474148)">
+    <path
+       style="mix-blend-mode:multiply;fill:#2980b9;fill-opacity:1;stroke:none;stroke-width:0.161653"
+       d="m 94.963492,48.113641 a 16.453639,16.453639 0 0 0 -14.248748,8.227199 16.453639,16.453639 0 0 0 0,16.454296 16.453639,16.453639 0 0 0 14.248748,8.225462 h 8.227168 V 48.113641 Z"
+       id="path148" />
+    <path
+       style="mix-blend-mode:multiply;fill:#c0392b;stroke-width:0.107775"
+       d="M 103.19141,53.597656 A 10.969744,10.969744 0 0 0 92.220703,64.566406 10.969744,10.969744 0 0 0 103.19141,75.537109 10.969744,10.969744 0 0 0 114.16016,64.566406 10.969744,10.969744 0 0 0 103.19141,53.597656 Z"
+       id="path11" />
+  </g>
+  <path
+     style="mix-blend-mode:multiply;fill:#f1c40f;fill-opacity:1;stroke:none;stroke-width:0.385699"
+     d="m 37.321287,230.71422 a 39.258046,39.258046 0 0 1 19.62988,-33.99722 39.258046,39.258046 0 0 1 39.259683,0 39.258046,39.258046 0 0 1 19.62582,33.99722 v 19.62984 H 37.321287 Z"
+     id="path12" />
+  <path
+     style="mix-blend-mode:multiply;fill:#f1c40f;fill-opacity:1;stroke:none;stroke-width:0.385701"
+     d="m 189.34693,189.33738 a 39.258078,39.258078 0 0 0 19.62986,33.99725 39.258078,39.258078 0 0 0 39.25971,0 39.258078,39.258078 0 0 0 19.62581,-33.99725 v -19.62989 h -78.51538 z"
+     id="path150" />
+  <path
+     style="mix-blend-mode:multiply;fill:#c0392b;stroke-width:0.259666"
+     d="M 37.319239,105.66768 A 26.429736,26.429736 0 0 0 10.891898,132.09974 26.429736,26.429736 0 0 0 37.319239,158.52706 26.429736,26.429736 0 0 0 63.751303,132.09974 26.429736,26.429736 0 0 0 37.319239,105.66768 Z"
+     id="path149" />
+  <path
+     style="mix-blend-mode:multiply;fill:#27ae60;fill-opacity:1;stroke:none;stroke-width:0.752138"
+     d="M 0,183.50181 V 205.66556 227.83277 250 h 22.168355 22.164932 22.1649 v -22.16723 h -22.1649 V 205.66556 H 22.168355 v -22.16375 z"
+     id="path151" />
+  <path
+     style="mix-blend-mode:multiply;fill:#27ae60;fill-opacity:1;stroke:none;stroke-width:0.597875"
+     d="M 63.752146,132.09883 A 26.429736,26.429736 0 0 0 37.321287,158.52966 26.429736,26.429736 0 0 0 63.752146,184.95778 26.429736,26.429736 0 0 0 90.180285,158.52966 26.429736,26.429736 0 0 0 63.752146,132.09883 Z"
+     id="path13" />
+</svg>

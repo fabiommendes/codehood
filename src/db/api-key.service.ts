@@ -1,12 +1,11 @@
 import { canManageApiKeys } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import {
-	type ActingOpts,
-	type CreateAs,
-	type FindManyAs,
-	type FindOneAs,
+	type Create,
+	type FindMany,
+	type FindOne,
 	ForbiddenError,
-	type ServiceMethodOpts,
+	type ServiceOpts,
 } from "./base-service";
 import type { ApiKey, ApiKeyKind, PrismaClient } from "./client";
 import { prisma } from "./client";
@@ -32,10 +31,9 @@ export interface FindApiKeysBy {
 
 class ApiKeyService
 	implements
-		CreateAs<CreateApiKey, CreateApiKeyResult>,
-		FindOneAs<FindApiKeyBy, ApiKey>,
-		FindManyAs<FindApiKeysBy, ApiKey>
-{
+	Create<CreateApiKey, CreateApiKeyResult>,
+	FindOne<FindApiKeyBy, ApiKey>,
+	FindMany<FindApiKeysBy, ApiKey> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -44,7 +42,7 @@ class ApiKeyService
 
 	async create(
 		input: CreateApiKey,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CreateApiKeyResult> {
 		if (!canManageApiKeys(opts.actor, input.userId)) {
 			throw new ForbiddenError();
@@ -64,7 +62,7 @@ class ApiKeyService
 
 	async findOne(
 		filter: FindApiKeyBy,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<ApiKey | null> {
 		const client = opts.tx ?? this.prisma;
 		const apiKey = await client.apiKey.findUnique({
@@ -78,7 +76,7 @@ class ApiKeyService
 	}
 
 	/** Filtered, not thrown: a userId whose keys `actor` may not see just gets no rows back. */
-	findMany(filter: FindApiKeysBy, opts: ActingOpts): Promise<ApiKey[]> {
+	findMany(filter: FindApiKeysBy, opts: ServiceOpts): Promise<ApiKey[]> {
 		if (!canManageApiKeys(opts.actor, filter.userId)) {
 			return Promise.resolve([]);
 		}
@@ -94,7 +92,7 @@ class ApiKeyService
 	 * the raw token is the credential, and validating one is how the caller's
 	 * identity gets established in the first place.
 	 */
-	async validate(token: string, opts?: ServiceMethodOpts) {
+	async validate(token: string, opts?: ServiceOpts) {
 		const client = opts?.tx ?? this.prisma;
 		const keyHash = hashToken(token);
 		const apiKey = await client.apiKey.findUnique({
@@ -114,7 +112,7 @@ class ApiKeyService
 	 * `actor` may not manage both throw `FORBIDDEN`, so a caller can't probe
 	 * for another user's key ids by comparing error codes.
 	 */
-	async revoke(id: number, opts: ActingOpts): Promise<void> {
+	async revoke(id: number, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const apiKey = await client.apiKey.findUnique({ where: { id } });
 		if (!apiKey || !canManageApiKeys(opts.actor, apiKey.userId)) {

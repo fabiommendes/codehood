@@ -1,0 +1,205 @@
+---
+export const prerender = false;
+
+import { actions } from "astro:actions";
+import AdminTabs from "@/components/AdminTabs.astro";
+import UsersTable, { type UserRow } from "@/components/admin/UsersTable";
+import PageKicker from "@/components/PageKicker.astro";
+import { type user, userService } from "@/db/user.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+
+// adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
+// non-admin visitors before this runs; the check below is here only so
+// TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
+if (!Astro.locals.user) return Astro.redirect("/login");
+
+const forceLogoutResult = Astro.getActionResult(actions.admin.forceLogout);
+const createUserResult = Astro.getActionResult(actions.admin.createUser);
+
+const users = (await userService.findMany(
+  {},
+  { actor: Astro.locals.user },
+)) as Array<user & { createdAt: Date }>;
+
+const userRows: UserRow[] = users.map((u) => ({
+  id: u.id,
+  name: u.name,
+  username: u.username,
+  email: u.email,
+  role: u.role,
+  createdAt: u.createdAt,
+}));
+
+const counts = {
+  ADMIN: users.filter((u) => u.role === "ADMIN").length,
+  INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
+  STUDENT: users.filter((u) => u.role === "STUDENT").length,
+};
+---
+
+<AppLayout title="Admin · Users">
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <AdminTabs active="users" />
+
+    <PageKicker text="Admin" />
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-3xl font-bold">Users</h1>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        data-open-dialog="add-user-dialog"
+      >
+        Add new user
+      </button>
+    </div>
+    <p class="mt-2 text-base-content/60">
+      Every account on this Codehood instance — {users.length} total.
+    </p>
+
+    {
+      createUserResult?.error && (
+        <div role="alert" class="alert alert-error mt-6">
+          <span>{createUserResult.error.message}</span>
+        </div>
+      )
+    }
+    {
+      createUserResult && !createUserResult.error && (
+        <div role="alert" class="alert alert-success mt-6">
+          <span>
+            Account created for{" "}
+            <span class="font-mono">@{createUserResult.data.username}</span>.
+          </span>
+        </div>
+      )
+    }
+
+    <dialog id="add-user-dialog" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+            >✕</button
+          >
+        </form>
+        <h3 class="text-lg font-bold">Add new user</h3>
+        <form
+          method="POST"
+          action={actions.admin.createUser}
+          class="mt-4 flex flex-col gap-4"
+        >
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Name</legend>
+            <input
+              type="text"
+              name="name"
+              required
+              placeholder="Ada Lovelace"
+              class="input w-full"
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Email</legend>
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="ada@example.edu"
+              class="input w-full"
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Username</legend>
+            <input
+              type="text"
+              name="username"
+              required
+              placeholder="ada"
+              class="input w-full font-mono"
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Role</legend>
+            <select name="role" class="select w-full">
+              <option value="STUDENT">Student</option>
+              <option value="INSTRUCTOR">Instructor</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">GitHub id</legend>
+            <input
+              type="text"
+              name="githubId"
+              placeholder="required unless Admin"
+              class="input w-full"
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">School id</legend>
+            <input
+              type="text"
+              name="schoolId"
+              placeholder="required unless Admin"
+              class="input w-full"
+            />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Password</legend>
+            <input
+              type="password"
+              name="password"
+              required
+              minlength="8"
+              class="input w-full"
+            />
+          </fieldset>
+
+          <div class="modal-action">
+            <button type="submit" class="btn btn-primary"> Add user </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <div class="stats mt-8 max-w-md border border-base-300 bg-base-100">
+      <div class="stat">
+        <div class="stat-title">Admins</div>
+        <div class="stat-value text-2xl">{counts.ADMIN}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Instructors</div>
+        <div class="stat-value text-2xl">{counts.INSTRUCTOR}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Students</div>
+        <div class="stat-value text-2xl">{counts.STUDENT}</div>
+      </div>
+    </div>
+
+    {
+      forceLogoutResult?.error && (
+        <div role="alert" class="alert alert-error mt-6">
+          <span>{forceLogoutResult.error.message}</span>
+        </div>
+      )
+    }
+    {
+      forceLogoutResult && !forceLogoutResult.error && (
+        <div role="alert" class="alert alert-success mt-6">
+          <span>Every session for that account has been logged out.</span>
+        </div>
+      )
+    }
+
+    <UsersTable users={userRows} />
+  </main>
+</AppLayout>

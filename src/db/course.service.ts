@@ -1,19 +1,21 @@
 import {
 	canCreateCourseFor,
+	canCreateCourseOutsideWindow,
+	canDropEnrollment,
 	canManageCourse,
+	canManageEnrollment,
 	canViewCourse,
 	courseVisibility,
 } from "@/auth/permissions";
-import { EDITION_RE } from "@/utils/course-url";
 import type { FillUndefineds } from "@/utils/types";
 import {
-	type ActingOpts,
-	type CreateAs,
-	type DeleteAs,
-	type FindManyAs,
-	type FindOneAs,
+	type Create,
+	type Delete,
+	type FindMany,
+	type FindOne,
 	ForbiddenError,
-	type UpdateAs,
+	type ServiceOpts,
+	type Update,
 } from "./base-service";
 import {
 	type Course,
@@ -22,6 +24,7 @@ import {
 	prisma,
 	type User,
 } from "./client";
+import { isEditionOpen } from "./edition.service";
 
 /** Identifies a course the way its URL does — see `src/utils/course-url.ts`. */
 export interface CourseRef {
@@ -34,7 +37,7 @@ export interface CreateCourseInput {
 	disciplineSlug: string;
 	/** The instructor's `username`, not a numeric id — `Course.instructor` targets `User.username`. */
 	instructorUsername: string;
-	edition: string;
+	editionSlug: string;
 	description?: string;
 	startAt: Date;
 	endAt: Date;
@@ -59,6 +62,7 @@ export type FindOneBy = FillUndefineds<{ id: number } | { ref: CourseRef }>;
 export interface FindManyBy {
 	instructorUsername?: string;
 	disciplineSlug?: string;
+	editionSlug?: string;
 }
 
 export interface EnrollInput {
@@ -76,12 +80,13 @@ export type UnenrollInput = EnrollInput;
  */
 const courseInclude = {
 	discipline: true,
+	edition: true,
 	instructor: {
 		select: { id: true, publicId: true, username: true, name: true },
 	},
 	enrollments: {
 		where: { status: "ACTIVE" as const },
-		select: { userId: true },
+		select: { userId: true, createdAt: true },
 	},
 	_count: {
 		select: { enrollments: { where: { status: "ACTIVE" as const } } },
@@ -94,12 +99,11 @@ export type CourseWithDetails = Prisma.CourseGetPayload<{
 
 class CourseService
 	implements
-		CreateAs<CreateCourseInput, CourseWithDetails>,
-		FindOneAs<FindOneBy, CourseWithDetails>,
-		FindManyAs<FindManyBy, CourseWithDetails>,
-		UpdateAs<UpdateCourseFilter, UpdateCourseInput, CourseWithDetails>,
-		DeleteAs<DeleteCourseFilter>
-{
+	Create<CreateCourseInput, CourseWithDetails>,
+	FindOne<FindOneBy, CourseWithDetails>,
+	FindMany<FindManyBy, CourseWithDetails>,
+	Update<UpdateCourseFilter, UpdateCourseInput, CourseWithDetails>,
+	Delete<DeleteCourseFilter> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -107,21 +111,30 @@ class CourseService
 	}
 
 	/**
-	 * Creates a course. Rejects a malformed `edition`, and rejects an
+	 * Creates a course. Rejects an unknown edition, rejects an instructor
+	 * creating one outside that edition's active window, and rejects an
 	 * instructor naming somebody else as the course's instructor — an admin
-	 * (or `SYSTEM`, e.g. `manage create-course`) may do that on any
-	 * instructor's behalf.
+	 * (or `SYSTEM`, e.g. `manage create-course`) may do both of the latter on
+	 * any instructor's behalf.
 	 */
 	async create(
 		input: CreateCourseInput,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CourseWithDetails> {
-		if (!EDITION_RE.test(input.edition)) {
+		const client = opts.tx ?? this.prisma;
+		const edition = await client.edition.findUnique({
+			where: { slug: input.editionSlug },
+		});
+		if (!edition) {
 			throw new Error(
-				`"${input.edition}" is not a valid edition: it must match ${EDITION_RE}.`,
+				`No edition "${input.editionSlug}". Editions are created by an admin.`,
 			);
 		}
-		const client = opts.tx ?? this.prisma;
+		if (!isEditionOpen(edition) && !canCreateCourseOutsideWindow(opts.actor)) {
+			throw new Error(
+				`Edition "${edition.slug}" is not accepting new courses: its window ran from ${edition.startAt.toISOString().slice(0, 10)} to ${edition.endAt.toISOString().slice(0, 10)}.`,
+			);
+		}
 		const instructorUser = await client.user.findUnique({
 			where: { username: input.instructorUsername },
 		});
@@ -135,7 +148,7 @@ class CourseService
 			data: {
 				disciplineSlug: input.disciplineSlug,
 				instructorSlug: input.instructorUsername,
-				edition: input.edition,
+				editionSlug: input.editionSlug,
 				description: input.description,
 				startAt: input.startAt,
 				endAt: input.endAt,
@@ -151,7 +164,7 @@ class CourseService
 	 */
 	async findOne(
 		filter: FindOneBy,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CourseWithDetails | null> {
 		const client = opts.tx ?? this.prisma;
 		let course: CourseWithDetails | null = null;
@@ -164,10 +177,10 @@ class CourseService
 		} else if (filter.ref) {
 			course = await client.course.findUnique({
 				where: {
-					disciplineSlug_instructorSlug_edition: {
+					disciplineSlug_instructorSlug_editionSlug: {
 						disciplineSlug: filter.ref.disciplineSlug,
 						instructorSlug: filter.ref.username,
-						edition: filter.ref.edition,
+						editionSlug: filter.ref.edition,
 					},
 				},
 				include: courseInclude,
@@ -190,7 +203,7 @@ class CourseService
 	 */
 	async findMany(
 		filter: FindManyBy,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CourseWithDetails[]> {
 		const client = opts.tx ?? this.prisma;
 		return client.course.findMany({
@@ -202,6 +215,7 @@ class CourseService
 					filter.disciplineSlug
 						? { disciplineSlug: filter.disciplineSlug }
 						: {},
+					filter.editionSlug ? { editionSlug: filter.editionSlug } : {},
 					courseVisibility(opts.actor),
 				],
 			},
@@ -213,7 +227,7 @@ class CourseService
 	async update(
 		filter: UpdateCourseFilter,
 		fields: UpdateCourseInput,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CourseWithDetails> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
@@ -230,7 +244,7 @@ class CourseService
 		});
 	}
 
-	async delete(filter: DeleteCourseFilter, opts: ActingOpts): Promise<void> {
+	async delete(filter: DeleteCourseFilter, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: filter.id },
@@ -244,17 +258,17 @@ class CourseService
 
 	/**
 	 * Enrolls `input.userId` in `input.courseId`, or reactivates a `DROPPED`
-	 * enrollment. Instructor/admin/system only — there is no self-enroll UI
-	 * yet; a student joins through a classroom invite, which enrolls them as
-	 * `SYSTEM` inside the invite-redemption transaction.
+	 * enrollment. The course's owner (or system) only — there is no
+	 * self-enroll UI yet; a student joins through a classroom invite, which
+	 * enrolls them as `SYSTEM` inside the invite-redemption transaction.
 	 */
-	async enroll(input: EnrollInput, opts: ActingOpts): Promise<void> {
+	async enroll(input: EnrollInput, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
 			include: courseInclude,
 		});
-		if (!course || !canManageCourse(opts.actor, course)) {
+		if (!course || !canManageEnrollment(opts.actor, course)) {
 			throw new ForbiddenError();
 		}
 		await client.enrollment.upsert({
@@ -266,14 +280,19 @@ class CourseService
 		});
 	}
 
-	/** Marks the enrollment `DROPPED` rather than deleting it, so re-enrolling keeps history. */
-	async unenroll(input: UnenrollInput, opts: ActingOpts): Promise<void> {
+	/**
+	 * Marks the enrollment `DROPPED` rather than deleting it, so re-enrolling
+	 * keeps history. Gated by {@link canDropEnrollment}: the course's owner
+	 * dropping any student, or a student dropping themselves (FR-CRS-042) —
+	 * idempotent, so dropping an already-`DROPPED` enrollment is a no-op.
+	 */
+	async unenroll(input: UnenrollInput, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
 			include: courseInclude,
 		});
-		if (!course || !canManageCourse(opts.actor, course)) {
+		if (!course || !canDropEnrollment(opts.actor, course, input.userId)) {
 			throw new ForbiddenError();
 		}
 		await client.enrollment.updateMany({
@@ -283,17 +302,22 @@ class CourseService
 	}
 
 	/**
-	 * Lists the actively-enrolled students in `courseId`. Instructor/admin/
-	 * system only — students cannot list their classmates, a privacy
-	 * default rather than a technical limit.
+	 * Lists the actively-enrolled students in `courseId`, each carrying
+	 * `enrolledAt`. The course's owner (or system) only — students cannot
+	 * list their classmates, a privacy default rather than a technical
+	 * limit, and a non-owning admin gets no branch either (see
+	 * {@link canManageEnrollment}).
 	 */
-	async listStudents(courseId: number, opts: ActingOpts): Promise<User[]> {
+	async listStudents(
+		courseId: number,
+		opts: ServiceOpts,
+	): Promise<(User & { enrolledAt: Date })[]> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: courseId },
 			include: courseInclude,
 		});
-		if (!course || !canManageCourse(opts.actor, course)) {
+		if (!course || !canManageEnrollment(opts.actor, course)) {
 			throw new ForbiddenError();
 		}
 		const enrollments = await client.enrollment.findMany({
@@ -301,7 +325,7 @@ class CourseService
 			include: { user: true },
 			orderBy: { createdAt: "asc" },
 		});
-		return enrollments.map((e) => e.user);
+		return enrollments.map((e) => ({ ...e.user, enrolledAt: e.createdAt }));
 	}
 }
 

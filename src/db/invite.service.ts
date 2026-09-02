@@ -1,10 +1,13 @@
-import { canInvite } from "@/auth/permissions";
+import { canInvite, canViewInvite, inviteVisibility } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import {
-	type ActingOpts,
-	type CreateAs,
-	type FindOneAs,
+	type Create,
+	type Delete,
+	type FindMany,
+	type FindOne,
 	ForbiddenError,
+	type ServiceOpts,
+	type Update,
 } from "./base-service";
 import {
 	type Invite,
@@ -49,7 +52,39 @@ export interface FindInviteBy {
 	token: string;
 }
 
+export interface FindInvitesBy {
+	createdById?: number;
+	kind?: InviteKind;
+	courseId?: number;
+	/** Only invites that have not expired yet. */
+	active?: boolean;
+}
+
+export interface InviteFilter {
+	id: number;
+}
+
+/**
+ * The fields an invite may change without rewriting what it grants. `kind`,
+ * `role`, and `email` are the contract the holder of the link already accepted;
+ * editing them under an outstanding invite would silently change what redeeming
+ * it does.
+ */
+export interface UpdateInvite {
+	expiresAt?: Date;
+	maxUses?: number | null;
+}
+
 export type InviteWithCount = Invite & { _count: { redemptions: number } };
+
+/**
+ * What a listing shows. Carries the creator, because "who issued this" is the
+ * first thing an admin looking at somebody else's invite needs to know; the
+ * single-invite `findOne` stays lean, since the redemption flow does not care.
+ */
+export type InviteListItem = InviteWithCount & {
+	createdBy: { username: string; name: string };
+};
 
 type RedeemableInvite = {
 	kind: InviteKind;
@@ -61,9 +96,11 @@ type RedeemableInvite = {
 
 class InviteService
 	implements
-		CreateAs<CreateInviteInput, CreateInviteResult>,
-		FindOneAs<FindInviteBy, InviteWithCount>
-{
+	Create<CreateInviteInput, CreateInviteResult>,
+	FindOne<FindInviteBy, InviteWithCount>,
+	FindMany<FindInvitesBy, InviteListItem>,
+	Update<InviteFilter, UpdateInvite, InviteWithCount>,
+	Delete<InviteFilter> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -75,7 +112,7 @@ class InviteService
 	 */
 	async create(
 		input: CreateInviteInput,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CreateInviteResult> {
 		const role = input.role ?? "STUDENT";
 		if (!canInvite(opts.actor, role)) {
@@ -108,13 +145,85 @@ class InviteService
 	 */
 	findOne(
 		filter: FindInviteBy,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<InviteWithCount | null> {
 		const client = opts.tx ?? this.prisma;
 		return client.invite.findUnique({
 			where: { tokenHash: hashToken(filter.token) },
 			include: { _count: { select: { redemptions: true } } },
 		});
+	}
+
+	/**
+	 * Lists invites narrowed to what `actor` may see (see
+	 * {@link inviteVisibility}): every invite for an admin, self-issued ones
+	 * for an instructor, none for a student. Never returns a token — only
+	 * `tokenHash` is stored, so a lost link is reissued, not recovered.
+	 */
+	findMany(
+		filter: FindInvitesBy,
+		opts: ServiceOpts,
+	): Promise<InviteListItem[]> {
+		const client = opts.tx ?? this.prisma;
+		return client.invite.findMany({
+			where: {
+				AND: [
+					filter.createdById ? { createdById: filter.createdById } : {},
+					filter.kind ? { kind: filter.kind } : {},
+					filter.courseId ? { courseId: filter.courseId } : {},
+					filter.active ? { expiresAt: { gt: new Date() } } : {},
+					inviteVisibility(opts.actor),
+				],
+			},
+			include: {
+				_count: { select: { redemptions: true } },
+				createdBy: { select: { username: true, name: true } },
+			},
+			orderBy: { createdAt: "desc" },
+		});
+	}
+
+	/**
+	 * Extends an expiry or adjusts `maxUses`. Lowering `maxUses` below the
+	 * redemptions already made is allowed and simply exhausts the invite; it
+	 * never revokes an account that was already created.
+	 */
+	async update(
+		filter: InviteFilter,
+		fields: UpdateInvite,
+		opts: ServiceOpts,
+	): Promise<InviteWithCount> {
+		const client = opts.tx ?? this.prisma;
+		const invite = await client.invite.findUnique({
+			where: { id: filter.id },
+			include: { _count: { select: { redemptions: true } } },
+		});
+		if (!invite || !canViewInvite(opts.actor, invite)) {
+			throw new ForbiddenError();
+		}
+		return client.invite.update({
+			where: { id: filter.id },
+			data: {
+				expiresAt: fields.expiresAt,
+				maxUses: fields.maxUses,
+			},
+			include: { _count: { select: { redemptions: true } } },
+		});
+	}
+
+	/**
+	 * Revokes an invite. Redemptions cascade with it, which removes the record
+	 * that an account came from this invite but never the account itself.
+	 */
+	async delete(filter: InviteFilter, opts: ServiceOpts): Promise<void> {
+		const client = opts.tx ?? this.prisma;
+		const invite = await client.invite.findUnique({
+			where: { id: filter.id },
+		});
+		if (!invite || !canViewInvite(opts.actor, invite)) {
+			throw new ForbiddenError();
+		}
+		await client.invite.delete({ where: { id: filter.id } });
 	}
 
 	/**

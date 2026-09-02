@@ -1,87 +1,197 @@
 ---
+// The viewer's own schedule, aggregated across every course they take or
+// teach (FR-CAL-021) — see dev/specs/to-review/calendar.md. A real month
+// grid, navigated with ?month=YYYY-MM, defaulting to the current month in
+// the server zone.
 import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
+import { calendarEventService } from "@/db/calendar-event.service";
+import { courseService } from "@/db/course.service";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/utils/course-url";
+import { formatDateTime, localDateOf, toInstant } from "@/utils/schedule-time";
 
 export const prerender = false;
 
-// Same mock term used across /courses — dot colors match the sidebar's course markers.
-const events = [
-	{ day: 15, code: "CS 101", title: "Midterm Exam", dot: "bg-primary" },
-	{ day: 20, code: "CS 201", title: "Quiz 2", dot: "bg-error" },
-	{ day: 22, code: "CS 301", title: "Problem Set 4", dot: "bg-warning" },
-];
-const eventsByDay = new Map(events.map((event) => [event.day, event]));
+const actor = Astro.locals.user;
+if (!actor) return Astro.redirect("/login");
 
-const daysInMonth = 31;
-const startWeekday = 6; // March 1 falls on a Sunday in this mock term.
+const courses = await courseService.findMany({}, { actor });
+const courseIds = courses.map((c) => c.id);
+
+// A per-course color dot, cycling through a fixed palette so the same course
+// always reads the same color within one page load.
+const DOT_PALETTE = [
+	"bg-primary",
+	"bg-error",
+	"bg-warning",
+	"bg-success",
+	"bg-info",
+	"bg-secondary",
+	"bg-accent",
+	"bg-neutral",
+];
+const courseColor = new Map(
+	courses.map((c, i) => [c.id, DOT_PALETTE[i % DOT_PALETTE.length]]),
+);
+const courseHrefs = new Map(
+	courses.map((c) => [
+		c.id,
+		courseHref({
+			disciplineSlug: c.disciplineSlug,
+			username: c.instructor.username,
+			edition: c.editionSlug,
+		}),
+	]),
+);
+const courseNames = new Map(courses.map((c) => [c.id, c.discipline.name]));
+
+const now = new Date();
+const monthParam = Astro.url.searchParams.get("month");
+const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
+const [year, month] = monthMatch
+	? [Number(monthMatch[1]), Number(monthMatch[2])]
+	: localDateOf(now).slice(0, 7).split("-").map(Number);
+
+const monthStart = toInstant(`${year}-${String(month).padStart(2, "0")}-01`, 0);
+const nextMonthYear = month === 12 ? year + 1 : year;
+const nextMonth = month === 12 ? 1 : month + 1;
+const monthEnd = toInstant(
+	`${nextMonthYear}-${String(nextMonth).padStart(2, "0")}-01`,
+	0,
+);
+
+const prevMonth = month === 1 ? 12 : month - 1;
+const prevMonthYear = month === 1 ? year - 1 : year;
+const nextHref = `/calendar?month=${nextMonthYear}-${String(nextMonth).padStart(2, "0")}`;
+const prevHref = `/calendar?month=${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`;
+
+const monthEvents =
+	courseIds.length > 0
+		? await calendarEventService.findMany(
+				{ courseIds, from: monthStart, to: monthEnd },
+				{ actor },
+			)
+		: [];
+
+const eventsByDay = new Map<string, typeof monthEvents>();
+for (const event of monthEvents) {
+	const day = localDateOf(event.startAt);
+	eventsByDay.set(day, [...(eventsByDay.get(day) ?? []), event]);
+}
+
+const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+const startWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
 const cells: (number | null)[] = [
 	...Array(startWeekday).fill(null),
 	...Array.from({ length: daysInMonth }, (_, i) => i + 1),
 ];
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// timeZone: "UTC" is deliberate and correct here, not a violation of "always
+// render in SERVER_TZ": the Date above is a pure calendar-math placeholder
+// built with Date.UTC from already-resolved year/month integers, not an
+// authored instant, so formatting it in any other zone could shift the
+// calendar date it represents (the exact "Jan 31 for Feb 1st" bug the
+// SERVER_TZ rule exists to prevent — see src/utils/schedule-time.ts).
+const monthLabel = new Intl.DateTimeFormat("en-US", {
+	month: "long",
+	year: "numeric",
+	timeZone: "UTC",
+}).format(new Date(Date.UTC(year, month - 1, 1)));
+
+const upcoming =
+	courseIds.length > 0
+		? await calendarEventService.findMany(
+				{ courseIds, from: now, limit: 5 },
+				{ actor },
+			)
+		: [];
 ---
 
 <AppLayout title="Calendar">
-  <main class="mx-auto max-w-3xl px-4 py-10">
+  <main class="mx-auto max-w-4xl px-4 py-10">
     <PageKicker text="Term overview" squares />
     <h1 class="text-3xl font-bold">Calendar</h1>
-    <p class="mt-2 text-base-content/70">Exams and assignments due across all your courses.</p>
+    <p class="mt-2 text-base-content/70">Your schedule across every course you take or teach.</p>
 
-    <Alert variant="info" class="mt-6">
-      <span>This is a static preview of the calendar — dates shown aren't tied to the real term yet.</span>
-    </Alert>
+    {
+      courses.length === 0 && (
+        <Alert variant="info" class="mt-6">
+          <span>You're not enrolled in or teaching any courses yet.</span>
+        </Alert>
+      )
+    }
 
     <div class="mt-8 rounded-box border border-base-300 bg-base-100 p-5">
-      <p class="font-display text-lg font-semibold">March</p>
+      <div class="flex items-center justify-between">
+        <a href={prevHref} class="btn btn-ghost btn-sm" aria-label="Previous month">←</a>
+        <p class="font-display text-lg font-semibold">{monthLabel}</p>
+        <a href={nextHref} class="btn btn-ghost btn-sm" aria-label="Next month">→</a>
+      </div>
 
       <div class="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-base-content/50">
-        {weekdays.map((day) => <div class="py-1">{day}</div>)}
+        {weekdayLabels.map((day) => <div class="py-1">{day}</div>)}
       </div>
       <div class="grid grid-cols-7 gap-1">
         {
           cells.map((day) => {
-            const event = day ? eventsByDay.get(day) : undefined;
+            const dayKey = day
+              ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+              : null;
+            const dayEvents = dayKey ? (eventsByDay.get(dayKey) ?? []) : [];
             return (
               <div
                 class:list={[
                   "flex h-16 flex-col items-center gap-1 rounded-field p-1 text-sm",
                   day && "border border-base-300",
-                  event && "border-primary/40 bg-primary/5",
+                  dayEvents.length > 0 && "border-primary/40 bg-primary/5",
                 ]}
               >
-                {day && <span class={event ? "font-semibold" : "text-base-content/70"}>{day}</span>}
-                {event && (
+                {day && <span class={dayEvents.length > 0 ? "font-semibold" : "text-base-content/70"}>{day}</span>}
+                {dayEvents.slice(0, 2).map((event) => (
                   <span class="flex items-center gap-1 text-[10px] text-base-content/60">
-                    <span class:list={["inline-block h-1.5 w-1.5 rounded-full", event.dot]} />
-                    {event.code}
+                    <span class:list={["inline-block h-1.5 w-1.5 shrink-0 rounded-full", courseColor.get(event.courseId)]} />
+                    {event.title.length > 10 ? `${event.title.slice(0, 9)}…` : event.title}
                   </span>
+                ))}
+                {dayEvents.length > 2 && (
+                  <span class="text-[10px] text-base-content/40">+{dayEvents.length - 2} more</span>
                 )}
               </div>
             );
           })
         }
       </div>
+
+      {
+        monthEvents.length === 0 && courses.length > 0 && (
+          <p class="mt-4 text-center text-sm text-base-content/50">No events this month.</p>
+        )
+      }
     </div>
 
     <section class="mt-10">
       <SectionHeader title="Upcoming" />
-      <div class="mt-4 flex flex-col gap-3">
-        {
-          events.map((event) => (
-            <ListRow>
-              <span slot="leading" class:list={["inline-block h-2.5 w-2.5 shrink-0 rounded-full", event.dot]} />
-              <p class="font-medium">{event.title}</p>
-              <p class="text-sm text-base-content/60">{event.code}</p>
-              <p slot="trailing" class="text-sm text-base-content/60">
-                March {event.day}
-              </p>
-            </ListRow>
-          ))
-        }
-      </div>
+      {
+        upcoming.length === 0 ? (
+          <p class="mt-4 text-sm text-base-content/60">Nothing coming up.</p>
+        ) : (
+          <div class="mt-4 flex flex-col gap-3">
+            {upcoming.map((event) => (
+              <ListRow href={courseHrefs.get(event.courseId) ? `${courseHrefs.get(event.courseId)}/schedule` : undefined}>
+                <span slot="leading" class:list={["inline-block h-2.5 w-2.5 shrink-0 rounded-full", courseColor.get(event.courseId)]} />
+                <p class="font-medium">{event.title}</p>
+                <p class="text-sm text-base-content/60">{courseNames.get(event.courseId)}</p>
+                <span slot="trailing" class="text-sm text-base-content/60">
+                  {formatDateTime(event.startAt)}
+                </span>
+              </ListRow>
+            ))}
+          </div>
+        )
+      }
     </section>
   </main>
 </AppLayout>

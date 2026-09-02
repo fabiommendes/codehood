@@ -2,6 +2,7 @@ import { execSync, spawnSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { TEST_DATABASE_URL, TEST_DB_PATH } from "./db-path";
+import { TEST_RESOURCE_ROOT } from "./resource-root";
 
 // Resets the test SQLite database and pushes the current Prisma schema to it,
 // then runs Playwright with the same DATABASE_URL so both the unit-test worker
@@ -11,7 +12,13 @@ for (const suffix of ["", "-journal", "-wal", "-shm"]) {
 	rmSync(`${TEST_DB_PATH}${suffix}`, { force: true });
 }
 
+// Same idea for resource blobs: a throwaway directory, wiped before every run
+// so file-service tests never see bytes left over from a previous one.
+rmSync(TEST_RESOURCE_ROOT, { recursive: true, force: true });
+mkdirSync(TEST_RESOURCE_ROOT, { recursive: true });
+
 process.env.DATABASE_URL = TEST_DATABASE_URL;
+process.env.RESOURCE_ROOT = TEST_RESOURCE_ROOT;
 process.env.NODE_ENV = "test";
 
 // prisma.config.ts hardcodes its datasource url, so the CLI needs --url to target the

@@ -1,90 +1,55 @@
-import type { APIContext } from "astro";
+import "reflect-metadata";
 import { z } from "zod";
 import { verifyPassword } from "@/auth/password";
 import { apiKeyService } from "@/db/api-key.service";
 import { FULL_ACCESS } from "@/db/base-service";
+import { sessionService } from "@/db/session.service";
 import { userService } from "@/db/user.service";
-import { registry } from "./openapi/registry";
+import { POST } from "./registry";
 
-export const CliLoginRequest = z
-	.object({
-		email: z.email(),
-		password: z.string().min(1),
-	})
-	.openapi("CliLoginRequest");
 
-export const CliLoginResponse = z
-	.object({
-		token: z.string().openapi({
-			description:
-				"The raw API key. Shown once — store it; it can't be recovered later.",
-		}),
-	})
-	.openapi("CliLoginResponse");
-
-export const ApiError = z
-	.object({
-		error: z.string(),
-	})
-	.openapi("ApiError");
-
-registry.registerPath({
-	method: "post",
-	path: "/api/auth/cli-login",
-	operationId: "cliLogin",
-	summary: "Exchange email/password for a CLI API key",
-	description:
-		"Verifies the given credentials and issues a new CLI-kind API key for that user, the same as one created on /profile.",
-	tags: ["Auth"],
-	security: [],
-	request: {
-		body: {
-			content: { "application/json": { schema: CliLoginRequest } },
-		},
-	},
-	responses: {
-		200: {
-			description: "A new API key.",
-			content: { "application/json": { schema: CliLoginResponse } },
-		},
-		400: {
-			description: "Missing or malformed email/password.",
-			content: { "application/json": { schema: ApiError } },
-		},
-		401: {
-			description: "The email/password pair does not match any user.",
-			content: { "application/json": { schema: ApiError } },
-		},
+/**
+ * POST /api/auth/logout — logs out the current user by invalidating their session.
+ */
+export const logout = POST("/api/auth/logout", {
+	out: z.object({ success: z.boolean() }).openapi("LogoutResponse"),
+	summary: "Logs out the current user.",
+	description: "Logs out the current user by invalidating their session.",
+	handler: async ({ actor }) => {
+		sessionService.delete({ userId: actor.id }, { actor });
+		return { success: true };
 	},
 });
 
 /**
- * POST /api/auth/cli-login — exchanges email/password for a CLI API key.
+ * POST /api/auth/login — exchanges email/password for a CLI API key.
  */
-export async function cliLogin(context: APIContext): Promise<Response> {
-	const body = await context.request.json().catch(() => null);
-	const parsed = CliLoginRequest.safeParse(body);
-	if (!parsed.success) {
-		return Response.json(
-			{ error: "email and password are required" } satisfies z.infer<
-				typeof ApiError
-			>,
-			{ status: 400 },
-		);
-	}
-	const { email, password } = parsed.data;
+export const token = POST("/api/auth/token", {
+	isPublic: true,
+	in: z.object({
+		login: z
+			.string()
+			.min(1)
+			.openapi({ description: "The user's email or username." }),
+		password: z.string().min(1),
+	}).openapi("LoginRequest"),
+	out: z.object({
+		token: z.string().openapi({
+			description:
+				"The raw API key. Shown once; it can't be recovered later.",
+		}),
+	}).openapi("LoginResponse"),
+	handler: async ({ body }) => {
+		// TODO: move it to a service method
+		const { login, password } = body;
 
-	const user = await userService.findOne({ email }, FULL_ACCESS);
-	if (!user || !(await verifyPassword(user.passwordHash, password))) {
-		return Response.json(
-			{ error: "invalid credentials" } satisfies z.infer<typeof ApiError>,
-			{ status: 401 },
-		);
-	}
+		const user = await userService.findOne({ login }, FULL_ACCESS);
+		if (!user || !(await verifyPassword(user.passwordHash, password))) {
+			// TODO: define the correct error type
+			throw new Error("invalid credentials");
+		}
 
-	const { token } = await apiKeyService.create(
-		{ userId: user.id, name: "CLI login", kind: "CLI" },
-		{ actor: { id: user.id, role: user.role } },
-	);
-	return Response.json({ token } satisfies z.infer<typeof CliLoginResponse>);
-}
+		const { token } = await apiKeyService.create({ userId: user.id, name: "Login token", kind: "CLI" }, { actor: user });
+		return { token };
+	},
+});

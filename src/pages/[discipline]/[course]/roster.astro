@@ -1,7 +1,12 @@
 ---
+import { actions } from "astro:actions";
+import CourseHeader from "@/components/CourseHeader.astro";
+import StudentsTable from "@/components/StudentsTable";
+import Alert from "@/components/ui/Alert";
 import { courseService } from "@/db/course.service";
+import { inviteService } from "@/db/invite.service";
+import { passphraseService } from "@/db/passphrase.service";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -11,61 +16,484 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course } = result;
+const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.user!;
-const students = await courseService.listStudents(course.id, { actor });
 
-const href = courseHref({
-	disciplineSlug: course.disciplineSlug,
-	username: course.instructor.username,
-	edition: course.edition,
-});
+const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
+const passphraseResult = Astro.getActionResult(
+	actions.course.generatePassphrase,
+);
+
+// createClassroomInvite has no `accept: "form"` (see src/actions/auth.ts) — a plain
+// <form action={actions.auth.createClassroomInvite}> would send a body Astro can't
+// parse against that shape. Handling the POST manually (formData in, Astro.callAction
+// out) is the same workaround invite.astro used before it folded into manage.astro,
+// then here. The `_action` guard matters here: other forms on this page post to
+// actions referenced directly as their `action`, which Astro resolves back to this
+// same page URL with `?_action=<name>` rather than to a separate endpoint. Without
+// the guard, submitting one of those would also run this block.
+let inviteUrl: string | null = null;
+let inviteError: string | null = null;
+if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
+	const formData = await Astro.request.formData();
+	const maxUsesRaw = formData.get("maxUses");
+	const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
+
+	const { data, error } = await Astro.callAction(
+		actions.auth.createClassroomInvite,
+		{ courseId: course.id, maxUses },
+	);
+
+	if (error) {
+		inviteError =
+			error.message ||
+			"You need to be logged in as an instructor to create an invite.";
+	} else {
+		inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
+	}
+}
+
+const students = await courseService.listStudents(course.id, { actor });
+const invites = await inviteService.findMany(
+	{ courseId: course.id, kind: "CLASSROOM" },
+	{ actor },
+);
+const activePassphrases = await passphraseService.findMany(
+	{ courseId: course.id, active: true },
+	{ actor },
+);
+const currentPassphrase = activePassphrases[0] ?? null;
+
+function formatDate(date: Date): string {
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+}
+
+function formatTime(date: Date | string): string {
+	return new Date(date).toLocaleTimeString("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
+}
+
+const RENEW_ICON =
+	"M4 12a8 8 0 0 1 14.93-4M20 4v5h-5 M20 12a8 8 0 0 1-14.93 4M4 20v-5h5";
+const COPY_ICON =
+	"M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
+const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
+
+const csvFilename = `roster-${course.disciplineSlug}-${course.editionSlug}.csv`;
+const csvRows = [
+	["Name", "Username", "Email", "GitHub", "School ID", "Enrolled"],
+	...students.map((s) => [
+		s.name,
+		s.username,
+		s.email,
+		s.githubId,
+		s.schoolId,
+		s.enrolledAt.toISOString().slice(0, 10),
+	]),
+];
 ---
 
-<AppLayout title={`Roster · ${course.discipline.name}`}>
-  <main class="mx-auto max-w-3xl px-4 py-10">
-    <a href={`${href}/manage`} class="text-sm text-base-content/60 hover:text-primary">← {course.discipline.name} · Manage</a>
+<AppLayout title={`Students · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="students" />
 
-    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-3xl font-bold">Roster</h1>
-      <span class="badge badge-primary badge-sm">Instructor view</span>
-    </div>
-    <p class="mt-2 text-base-content/60">{course.discipline.name} · {students.length} enrolled</p>
-    <a href={`${href}/invite`} class="mt-1 inline-block text-sm text-primary hover:underline">
-      Invite students →
-    </a>
+    <section class="mt-4">
+      <h2 class="text-xl font-semibold">Enrollment</h2>
+      <p class="mt-1 text-sm text-base-content/60">
+        Two ways for a student to join: a shareable link, or a passphrase read out in class.
+      </p>
 
-    <div class="mt-8 overflow-x-auto rounded-box border border-base-300 bg-base-100">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Username</th>
-            <th>Email</th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            students.length === 0 ? (
-              <tr>
-                <td colspan="3" class="py-6 text-center text-base-content/50">
-                  No students enrolled yet.
-                </td>
-              </tr>
-            ) : (
-              students.map((student) => (
-                <tr>
-                  <td class="font-medium">{student.name}</td>
-                  <td class="font-mono text-sm text-base-content/60">@{student.username}</td>
-                  <td class="text-base-content/60">{student.email}</td>
-                </tr>
-              ))
-            )
-          }
-        </tbody>
-      </table>
+      {
+        inviteError && (
+          <Alert variant="error" class="mt-4">
+            <span>{inviteError}</span>
+          </Alert>
+        )
+      }
+      {
+        revokeResult?.error && (
+          <Alert variant="error" class="mt-4">
+            <span>{revokeResult.error.message}</span>
+          </Alert>
+        )
+      }
+      {
+        revokeResult && !revokeResult.error && (
+          <Alert variant="success" class="mt-4">
+            <span>Invite revoked.</span>
+          </Alert>
+        )
+      }
+      {
+        passphraseResult?.error && (
+          <Alert variant="error" class="mt-4">
+            <span>{passphraseResult.error.message}</span>
+          </Alert>
+        )
+      }
+
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline btn-sm" data-open-dialog="passphrase-dialog">
+          Passphrase
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" data-open-dialog="invite-link-dialog">
+          Invite link
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" data-open-dialog="revoke-invites-dialog">
+          Revoke invites
+        </button>
+      </div>
+    </section>
+
+    <div class="divider mt-8"></div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-xl font-semibold">Students</h2>
+      <button type="button" id="download-roster-csv" class="btn btn-outline btn-sm" disabled={students.length === 0}>
+        Download CSV
+      </button>
     </div>
+    <p class="mt-1 text-base-content/60">{course.discipline.name} · {students.length} enrolled</p>
+
+    {
+      students.length === 0 ? (
+        <p class="mt-8 text-center text-base-content/50">No students enrolled yet.</p>
+      ) : (
+        <StudentsTable students={students} courseId={course.id} client:load />
+      )
+    }
   </main>
 </AppLayout>
+
+<dialog id="passphrase-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
+        ✕
+      </button>
+    </form>
+    <h3 class="text-lg font-bold">Passphrase</h3>
+    <p class="mt-1 text-sm text-base-content/60">Read this out in class. Live for 5 minutes, then it's gone.</p>
+
+    <div id="passphrase-error" class="alert alert-error mt-4" hidden>
+      <span></span>
+    </div>
+
+    <div class="mt-6 flex flex-col items-center gap-2 rounded-box bg-base-200 py-10">
+      <span
+        id="passphrase-value"
+        class:list={[
+          "font-mono text-6xl font-bold tracking-[0.3em]",
+          currentPassphrase ? "text-primary" : "text-base-content/25",
+        ]}
+      >
+        {currentPassphrase?.value ?? "——————"}
+      </span>
+      <p id="passphrase-meta" class="text-xs text-base-content/50">
+        {
+          currentPassphrase
+            ? `live until ${formatTime(currentPassphrase.expiresAt)}`
+            : "No active passphrase — generate one below."
+        }
+      </p>
+    </div>
+
+    <form method="post" action={actions.course.generatePassphrase} id="passphrase-form" class="mt-4">
+      <input type="hidden" name="courseId" value={course.id} />
+      <details class="collapse collapse-arrow">
+        <summary class="collapse-title min-h-0 px-0 py-2 text-sm font-medium">Advanced options</summary>
+        <div class="collapse-content px-0">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Custom passphrase</legend>
+            <input type="text" name="value" placeholder="Auto-generated" class="input w-full font-mono uppercase" />
+            <p class="label">Leave blank for a random 6-character code.</p>
+          </fieldset>
+        </div>
+      </details>
+    </form>
+
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn btn-ghost">Cancel</button>
+      </form>
+      <button
+        type="submit"
+        form="passphrase-form"
+        class="btn btn-primary btn-square"
+        aria-label="Renew passphrase"
+        title="Renew"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d={RENEW_ICON} stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<dialog id="invite-link-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
+        ✕
+      </button>
+    </form>
+    <h3 class="text-lg font-bold">Classroom invite link</h3>
+    <p class="mt-1 text-sm text-base-content/60">
+      Anyone who opens it can create a student account and enroll — no per-student email required.
+    </p>
+
+    <div id="invite-error" class="alert alert-error mt-4" hidden>
+      <span></span>
+    </div>
+
+    <div id="invite-url-row" class="join mt-4 w-full" hidden={!inviteUrl}>
+      <input
+        type="text"
+        readonly
+        value={inviteUrl ?? ""}
+        class="input join-item w-full font-mono text-sm"
+        id="invite-url"
+      />
+      <button
+        type="button"
+        class="btn btn-primary join-item"
+        id="copy-invite-url"
+        aria-label="Copy invite link"
+        title="Copy"
+      >
+        <svg id="copy-invite-url-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d={COPY_ICON} stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <form method="POST" action={Astro.url.pathname} id="invite-form" class="mt-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Limit to N uses (optional)</legend>
+        <input type="number" name="maxUses" min="1" placeholder="Unlimited" class="input w-full" />
+      </fieldset>
+    </form>
+
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn btn-ghost">Cancel</button>
+      </form>
+      <button type="submit" form="invite-form" class="btn btn-primary">
+        Generate link
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<dialog id="revoke-invites-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
+        ✕
+      </button>
+    </form>
+    <h3 class="text-lg font-bold">Classroom invites</h3>
+    <p class="mt-1 text-sm text-base-content/60">
+      Revoking stops a link working immediately. Students who already joined through it stay enrolled.
+    </p>
+
+    <div id="revoke-error" class="alert alert-error mt-4" hidden>
+      <span></span>
+    </div>
+
+    <div id="revoke-invites-list" class="mt-4 flex flex-col gap-3">
+      {
+        invites.length === 0 ? (
+          <p class="text-sm text-base-content/50">No classroom invites yet.</p>
+        ) : (
+          invites.map((invite) => {
+            const expired = invite.expiresAt < new Date();
+            return (
+              <div class="card card-border bg-base-100" data-invite-id={invite.id}>
+                <div class="card-body flex-row items-center gap-4 py-3">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium">{formatDate(invite.createdAt)}</p>
+                    <p class="text-xs text-base-content/60">
+                      {invite._count.redemptions} / {invite.maxUses ?? "∞"} used ·{" "}
+                      <span class={expired ? "text-error" : ""}>
+                        {expired ? "expired" : `expires ${formatDate(invite.expiresAt)}`}
+                      </span>
+                    </p>
+                  </div>
+                  <form method="post" action={actions.admin.revokeInvite} data-role="revoke-invite">
+                    <input type="hidden" name="id" value={invite.id} />
+                    <button type="submit" class="btn btn-outline btn-error btn-sm">
+                      Revoke
+                    </button>
+                  </form>
+                </div>
+              </div>
+            );
+          })
+        )
+      }
+    </div>
+
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn btn-ghost">Close</button>
+      </form>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<input type="hidden" id="course-id" value={course.id} />
+
+<script type="application/json" id="roster-csv-data" set:html={JSON.stringify(csvRows)} />
+<script define:vars={{ csvFilename }}>
+	// Built client-side from the same rows the table renders, rather than a
+	// dedicated endpoint — the roster is already small (see admin-view.md's
+	// "unpaginated, with an expiry date" note on user tables) and this avoids
+	// standing up an authenticated download route for one button.
+	function csvCell(value) {
+		const text = String(value);
+		return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+	}
+
+	const button = document.getElementById("download-roster-csv");
+	button?.addEventListener("click", () => {
+		const rows = JSON.parse(document.getElementById("roster-csv-data")?.textContent ?? "[]");
+		const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+		const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = csvFilename;
+		link.click();
+		URL.revokeObjectURL(url);
+	});
+</script>
+
+<script>
+	import { actions } from "astro:actions";
+
+	const courseId = Number((document.getElementById("course-id") as HTMLInputElement).value);
+
+	// Mirrors COPY_ICON/CHECK_ICON in the frontmatter — duplicated here since a
+	// processed <script> (needed for the astro:actions import) can't read
+	// server-side consts the way a define:vars script can.
+	const COPY_ICON =
+		"M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
+	const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
+
+	function formatTime(iso: string | Date): string {
+		return new Date(iso).toLocaleTimeString("en-US", {
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+		});
+	}
+
+	function showError(box: HTMLElement, message: string) {
+		const span = box.querySelector("span");
+		if (span) span.textContent = message;
+		box.hidden = false;
+	}
+
+	// Passphrase: renew without leaving the dialog open, so the instructor can
+	// keep it on screen for students to read.
+	const passphraseForm = document.getElementById("passphrase-form") as HTMLFormElement | null;
+	const passphraseValue = document.getElementById("passphrase-value");
+	const passphraseMeta = document.getElementById("passphrase-meta");
+	const passphraseError = document.getElementById("passphrase-error");
+
+	passphraseForm?.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		if (passphraseError) passphraseError.hidden = true;
+		const { data, error } = await actions.course.generatePassphrase(new FormData(passphraseForm));
+		if (error) {
+			if (passphraseError) showError(passphraseError, error.message);
+			return;
+		}
+		if (passphraseValue) {
+			passphraseValue.textContent = data.value;
+			passphraseValue.classList.remove("text-base-content/25");
+			passphraseValue.classList.add("text-primary");
+		}
+		if (passphraseMeta) passphraseMeta.textContent = `live until ${formatTime(data.expiresAt)}`;
+		passphraseForm.reset();
+	});
+
+	// Invite link: same deal — generating a link keeps the dialog open so it's
+	// right there to copy.
+	const inviteForm = document.getElementById("invite-form") as HTMLFormElement | null;
+	const inviteUrlRow = document.getElementById("invite-url-row");
+	const inviteUrlInput = document.getElementById("invite-url") as HTMLInputElement | null;
+	const inviteError = document.getElementById("invite-error");
+
+	inviteForm?.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		if (inviteError) inviteError.hidden = true;
+		const maxUsesRaw = new FormData(inviteForm).get("maxUses");
+		const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
+		const { data, error } = await actions.auth.createClassroomInvite({ courseId, maxUses });
+		if (error) {
+			if (inviteError) showError(inviteError, error.message || "Something went wrong.");
+			return;
+		}
+		if (inviteUrlInput) inviteUrlInput.value = new URL(`/invite/${data.token}`, window.location.origin).toString();
+		if (inviteUrlRow) inviteUrlRow.hidden = false;
+	});
+
+	const copyButton = document.getElementById("copy-invite-url");
+	const copyIconPath = document.querySelector("#copy-invite-url-icon path");
+
+	copyButton?.addEventListener("click", async () => {
+		if (!inviteUrlInput || !copyIconPath) return;
+		await navigator.clipboard.writeText(inviteUrlInput.value);
+		copyIconPath.setAttribute("d", CHECK_ICON);
+		copyButton.setAttribute("aria-label", "Copied");
+		copyButton.setAttribute("title", "Copied!");
+		setTimeout(() => {
+			copyIconPath.setAttribute("d", COPY_ICON);
+			copyButton.setAttribute("aria-label", "Copy invite link");
+			copyButton.setAttribute("title", "Copy");
+		}, 1500);
+	});
+
+	// Revoke invites: revoking one keeps the dialog open with the rest of the
+	// list still there — it only closes itself once the last invite is gone.
+	const revokeList = document.getElementById("revoke-invites-list");
+	const revokeDialog = document.getElementById("revoke-invites-dialog") as HTMLDialogElement | null;
+	const revokeError = document.getElementById("revoke-error");
+
+	revokeList?.addEventListener("submit", async (event) => {
+		const form = event.target;
+		if (!(form instanceof HTMLFormElement) || form.dataset.role !== "revoke-invite") return;
+		event.preventDefault();
+		if (revokeError) revokeError.hidden = true;
+		const { error } = await actions.admin.revokeInvite(new FormData(form));
+		if (error) {
+			if (revokeError) showError(revokeError, error.message);
+			return;
+		}
+		form.closest("[data-invite-id]")?.remove();
+		if (!revokeList.querySelector("[data-invite-id]")) {
+			revokeDialog?.close();
+		}
+	});
+</script>

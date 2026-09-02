@@ -14,7 +14,7 @@ const { course } = result;
 const href = courseHref({
 	disciplineSlug: course.disciplineSlug,
 	username: course.instructor.username,
-	edition: course.edition,
+	edition: course.editionSlug,
 });
 
 // Same three questions modeled on the exam-taking pages — now shown with the

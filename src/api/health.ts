@@ -1,42 +1,7 @@
-import type { APIContext } from "astro";
 import { z } from "zod";
 import { prisma } from "@/db/client";
-import { registry } from "./openapi/registry";
+import { GET } from "./registry";
 
-export const HealthOk = z
-	.object({
-		status: z.literal("ok"),
-		database: z.literal("ok"),
-	})
-	.openapi("HealthOk");
-
-export const HealthError = z
-	.object({
-		status: z.literal("error"),
-		database: z.literal("unreachable"),
-	})
-	.openapi("HealthError");
-
-registry.registerPath({
-	method: "get",
-	path: "/api/health",
-	operationId: "getHealth",
-	summary: "Liveness/readiness probe",
-	description:
-		"Confirms the server can reach the database, not just that the process answers HTTP. Unauthenticated — uptime monitors and orchestration probes hitting this usually don't hold an API key.",
-	tags: ["Health"],
-	security: [],
-	responses: {
-		200: {
-			description: "The server is up and can reach the database.",
-			content: { "application/json": { schema: HealthOk } },
-		},
-		503: {
-			description: "The server is up but cannot reach the database.",
-			content: { "application/json": { schema: HealthError } },
-		},
-	},
-});
 
 /**
  * GET /api/health — liveness/readiness probe for the CLI, uptime monitors,
@@ -45,19 +10,44 @@ registry.registerPath({
  * Confirms the server can actually reach the database, not just that the
  * process is up — a server that answers HTTP but can't query is not healthy.
  */
-export async function health(_context: APIContext): Promise<Response> {
-	try {
-		await prisma.$queryRaw`SELECT 1`;
-	} catch {
-		return Response.json(
-			{ status: "error", database: "unreachable" } satisfies z.infer<
-				typeof HealthError
-			>,
-			{ status: 503 },
-		);
+export const health = GET("/api/health", {
+	isPublic: true,
+	out: z.object({
+		status: z.literal("ok"),
+		database: z.literal("ok"),
+	}).openapi("HealthResponse"),
+	summary: "Liveness/readiness probe",
+	description:
+		"Confirms the server can reach the database, not just that the process answers HTTP. Unauthenticated — uptime monitors and orchestration probes hitting this usually don't hold an API key.",
+	errors: {
+		503: {
+			description: "The server is up but cannot reach the database.",
+			schema: z.object({
+				status: z.literal("error"),
+				database: z.literal("unreachable"),
+			}).openapi("HealthError"),
+		},
+	},
+	handler: async (_) => {
+		try {
+			await prisma.$queryRaw`SELECT 1`;
+		} catch {
+			throw new HttpError({ status: "error", database: "unreachable" }, 503);
+		}
+		return { status: "ok", database: "ok" }
 	}
+});
 
-	return Response.json({ status: "ok", database: "ok" } satisfies z.infer<
-		typeof HealthOk
-	>);
+
+// TODO: move this to a shared file, since it's used in multiple places
+// Define the representation from Error to JSON mapping
+class HttpError extends Error {
+	body: { [key: string]: unknown };
+	status: number;
+
+	constructor(body: { [key: string]: unknown }, status: number = 500) {
+		super(`HTTP ${status}: ${JSON.stringify(body)}`);
+		this.body = body;
+		this.status = status;
+	}
 }

@@ -12,8 +12,8 @@ import {
 	inviteService,
 } from "@/db/invite.service";
 import { sessionService } from "@/db/session.service";
-import { type User as ServiceUser, userService } from "@/db/user.service";
-import { SESSION_COOKIE } from "@/middleware/session";
+import { type user as ServiceUser, userService } from "@/db/user.service";
+import { SESSION_COOKIE } from "@/middleware";
 import { USERNAME_RE } from "@/utils/course-url";
 import { withActionErrors } from "./helpers";
 
@@ -236,7 +236,6 @@ function publicUser(user: ServiceUser): User {
 		name: user.name,
 		username: user.username,
 		role: user.role,
-		image: user.image,
 		githubId: user.githubId ?? undefined,
 		schoolId: user.schoolId ?? undefined,
 	};

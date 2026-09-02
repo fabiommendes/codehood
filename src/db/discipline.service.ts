@@ -1,11 +1,14 @@
-import { canCreateDiscipline } from "@/auth/permissions";
+import { canManageDisciplines } from "@/auth/permissions";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/utils/course-url";
+import type { FillUndefineds } from "@/utils/types";
 import {
-	type ActingOpts,
-	type CreateAs,
+	type Create,
+	type Delete,
 	type FindMany,
+	type FindOne,
 	ForbiddenError,
-	type ServiceMethodOpts,
+	type ServiceOpts,
+	type Update,
 } from "./base-service";
 import { type Discipline, type PrismaClient, prisma } from "./client";
 
@@ -14,8 +17,24 @@ export interface CreateDiscipline {
 	name: string;
 }
 
+export type FindDisciplineBy = FillUndefineds<{ slug: string }>;
+
 export interface FindDisciplinesBy {
 	slugs?: string[];
+}
+
+export interface DisciplineFilter {
+	slug: string;
+}
+
+/**
+ * The editable fields. `slug` is deliberately absent: it is the first segment
+ * of every course URL under this discipline (see
+ * `docs/design/url-structure.md`), so changing it would move every one of those
+ * courses without touching a row.
+ */
+export interface UpdateDiscipline {
+	name: string;
 }
 
 /**
@@ -26,18 +45,28 @@ export interface FindDisciplinesBy {
  */
 class DisciplineService
 	implements
-		FindMany<FindDisciplinesBy, Discipline>,
-		CreateAs<CreateDiscipline, Discipline>
-{
+	FindOne<FindDisciplineBy, Discipline>,
+	FindMany<FindDisciplinesBy, Discipline>,
+	Create<CreateDiscipline, Discipline>,
+	Update<DisciplineFilter, UpdateDiscipline, Discipline>,
+	Delete<DisciplineFilter> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
 		this.prisma = client;
 	}
 
+	findOne(
+		filter: FindDisciplineBy,
+		opts?: ServiceOpts,
+	): Promise<Discipline | null> {
+		const client = opts?.tx ?? this.prisma;
+		return client.discipline.findUnique({ where: { slug: filter.slug } });
+	}
+
 	findMany(
 		filter: FindDisciplinesBy,
-		opts?: ServiceMethodOpts,
+		opts?: ServiceOpts,
 	): Promise<Discipline[]> {
 		const client = opts?.tx ?? this.prisma;
 		return client.discipline.findMany({
@@ -46,8 +75,11 @@ class DisciplineService
 		});
 	}
 
-	async create(input: CreateDiscipline, opts: ActingOpts): Promise<Discipline> {
-		if (!canCreateDiscipline(opts.actor)) {
+	async create(
+		input: CreateDiscipline,
+		opts: ServiceOpts,
+	): Promise<Discipline> {
+		if (!canManageDisciplines(opts.actor)) {
 			throw new ForbiddenError();
 		}
 		if (
@@ -62,6 +94,49 @@ class DisciplineService
 		return client.discipline.create({
 			data: { slug: input.slug, name: input.name },
 		});
+	}
+
+	async update(
+		filter: DisciplineFilter,
+		fields: UpdateDiscipline,
+		opts: ServiceOpts,
+	): Promise<Discipline> {
+		if (!canManageDisciplines(opts.actor)) {
+			throw new ForbiddenError();
+		}
+		const client = opts.tx ?? this.prisma;
+		const current = await client.discipline.findUnique({
+			where: { slug: filter.slug },
+		});
+		if (!current) {
+			throw new Error(`No discipline with slug "${filter.slug}".`);
+		}
+		return client.discipline.update({
+			where: { slug: filter.slug },
+			data: { name: fields.name },
+		});
+	}
+
+	/**
+	 * Refuses a discipline that still has courses or questions. The foreign
+	 * keys would raise anyway; checking first is what turns a constraint error
+	 * into a message naming what is in the way.
+	 */
+	async delete(filter: DisciplineFilter, opts: ServiceOpts): Promise<void> {
+		if (!canManageDisciplines(opts.actor)) {
+			throw new ForbiddenError();
+		}
+		const client = opts.tx ?? this.prisma;
+		const [courses, questions] = await Promise.all([
+			client.course.count({ where: { disciplineSlug: filter.slug } }),
+			client.questionRef.count({ where: { disciplineSlug: filter.slug } }),
+		]);
+		if (courses > 0 || questions > 0) {
+			throw new Error(
+				`Discipline "${filter.slug}" still has ${courses} course(s) and ${questions} question(s) and cannot be deleted.`,
+			);
+		}
+		await client.discipline.deleteMany({ where: { slug: filter.slug } });
 	}
 }
 

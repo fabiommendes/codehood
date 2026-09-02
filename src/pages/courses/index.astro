@@ -1,5 +1,6 @@
 ---
 import PageKicker from "@/components/PageKicker.astro";
+import Alert from "@/components/ui/Alert";
 import { courseService } from "@/db/course.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHref } from "@/utils/course-url";
@@ -8,6 +9,8 @@ export const prerender = false;
 
 const actor = Astro.locals.user;
 if (!actor) return Astro.redirect("/login");
+
+const justLeft = Astro.url.searchParams.has("left");
 
 // No "my courses" filter needed: the actor already is one. This returns
 // exactly what that user may see — courses they teach plus courses they're
@@ -22,6 +25,14 @@ const courses = await courseService.findMany({}, { actor });
     <p class="mt-2 text-base-content/70">Courses you take or teach.</p>
 
     {
+      justLeft && (
+        <Alert variant="success" class="mt-6">
+          <span>You've left the course. Nothing was deleted — your submissions stay on record.</span>
+        </Alert>
+      )
+    }
+
+    {
       courses.length === 0 ? (
         <p class="mt-8 text-base-content/60">
           You're not enrolled in or teaching any courses yet.
@@ -32,7 +43,7 @@ const courses = await courseService.findMany({}, { actor });
             const href = courseHref({
               disciplineSlug: course.disciplineSlug,
               username: course.instructor.username,
-              edition: course.edition,
+              edition: course.editionSlug,
             });
             const isInstructor = course.instructor.id === actor.id;
             return (
@@ -46,7 +57,7 @@ const courses = await courseService.findMany({}, { actor });
                     {isInstructor ? "You're teaching" : course.instructor.name}
                   </p>
                   <p class="mt-3 text-xs text-base-content/50">
-                    {course.edition} · {course._count.enrollments} enrolled
+                    {course.editionSlug} · {course._count.enrollments} enrolled
                   </p>
                 </div>
               </a>

@@ -4,7 +4,7 @@ import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
 import { sessionService } from "@/db/session.service";
 import { userService } from "@/db/user.service";
-import { SESSION_COOKIE } from "@/middleware/session";
+import { SESSION_COOKIE } from "@/middleware";
 
 const FIELD_LABELS: Record<string, string> = {
 	email: "email",
@@ -12,7 +12,9 @@ const FIELD_LABELS: Record<string, string> = {
 	schoolId: "school id",
 };
 
-/** Turns a Prisma unique-constraint violation into a message naming the conflicting field. */
+/** 
+ * Turns a Prisma unique-constraint violation into a message naming the conflicting field. 
+ */
 function uniqueConstraintMessage(error: unknown): string | null {
 	if (
 		typeof error !== "object" ||
@@ -26,8 +28,8 @@ function uniqueConstraintMessage(error: unknown): string | null {
 	const meta = (error as { meta?: Record<string, unknown> }).meta ?? {};
 	const adapterFields = (
 		meta.driverAdapterError as
-			| { cause?: { constraint?: { fields?: unknown } } }
-			| undefined
+		| { cause?: { constraint?: { fields?: unknown } } }
+		| undefined
 	)?.cause?.constraint?.fields;
 	const target = meta.target ?? adapterFields;
 	const fields = Array.isArray(target)
@@ -70,7 +72,7 @@ export const profile = {
 		}),
 		handler: async (input, context) => {
 			const actor = requireUser(context);
-			const user = await userService.getById(actor.id, { actor });
+			const user = await userService.findOne({ id: actor.id }, { actor });
 			if (
 				!user ||
 				!(await verifyPassword(user.passwordHash, input.currentPassword))

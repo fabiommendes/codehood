@@ -1,23 +1,37 @@
 ---
 // A single-row card: optional leading icon/chip/dot, main content, optional
-// trailing badge/link/date. Renders as an <a> when href is given, a <div>
-// otherwise. Used for exam, resource, and "upcoming" list rows across the app.
+// trailing badge/link/date. Renders as an <a> when href is given, a <button>
+// that opens a <dialog> when openDialog is given (see AppLayout's generic
+// data-open-dialog wiring), or a plain <div> otherwise. Used for exam,
+// resource, and "upcoming" list rows across the app.
 interface Props {
 	href?: string;
+	openDialog?: string;
 	muted?: boolean;
 	class?: string;
 }
 
-const { href, muted = false, class: className } = Astro.props;
+const { href, openDialog, muted = false, class: className } = Astro.props;
 
-const cardClass = ["card card-border bg-base-100", href && "transition-colors hover:border-primary", muted && "opacity-70", className]
+const cardClass = [
+	"card card-border bg-base-100",
+	(href || openDialog) && "transition-colors hover:border-primary",
+	openDialog && "w-full text-left",
+	muted && "opacity-70",
+	className,
+]
 	.filter(Boolean)
 	.join(" ");
 
-const Tag = href ? "a" : "div";
+const Tag = href ? "a" : openDialog ? "button" : "div";
 ---
 
-<Tag href={href} class={cardClass}>
+<Tag
+  href={href}
+  type={openDialog ? "button" : undefined}
+  data-open-dialog={openDialog}
+  class={cardClass}
+>
   <div class="card-body flex-row items-center gap-4 py-4">
     <slot name="leading" />
     <div class="min-w-0 flex-1">

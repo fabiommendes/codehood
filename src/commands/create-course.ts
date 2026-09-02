@@ -62,7 +62,7 @@ export const createCourseCommand = new Command("create-course")
 					{
 						disciplineSlug,
 						instructorUsername: instructor,
-						edition,
+						editionSlug: edition,
 						description: description || undefined,
 						startAt,
 						endAt,

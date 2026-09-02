@@ -1,8 +1,9 @@
 ---
+import { canManageEnrollment } from "@/auth/permissions";
+import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Badge from "@/components/ui/Badge";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -10,55 +11,96 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course } = result;
+const { course, href } = result;
 
-const href = courseHref({
-	disciplineSlug: course.disciplineSlug,
-	username: course.instructor.username,
-	edition: course.edition,
-});
+// biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
+const canManage = canManageEnrollment(Astro.locals.user!, course);
 
+// Still mocked — exams and submissions need question rendering (out of scope
+// for dev/specs/to-do/course-navigation.md). A draft exam is only ever in
+// this list, carrying a Draft badge, for the instructor (see the "no modes"
+// design decision: same page, same URL, more rows — never a parallel screen).
 const exams = [
 	{
 		name: "Quiz 1: Variables & Loops",
-		detail: "Completed · Score 8/10",
-		badge: { variant: "neutral" as const, label: "Completed" },
+		status: "closed" as const,
+		studentDetail: "Completed · Score 8/10",
+		instructorDetail: "38 / 42 submitted",
+		badge: {
+			variant: "neutral" as const,
+			label: "Closed",
+			style: undefined,
+		},
 		href: null,
 	},
 	{
 		name: "Midterm Exam",
-		detail: "Due Mar 15 · 10 questions",
-		badge: { variant: "success" as const, label: "Open" },
+		status: "open" as const,
+		studentDetail: "Due Mar 15 · 10 questions",
+		instructorDetail: "12 / 42 submitted",
+		badge: { variant: "success" as const, label: "Open", style: undefined },
 		href: `${href}/exams/midterm`,
 	},
 	{
 		name: "Final Project",
-		detail: "Opens Apr 10",
-		badge: { style: "outline" as const, label: "Upcoming" },
+		status: "draft" as const,
+		studentDetail: "Opens Apr 10",
+		instructorDetail: "Not visible to students yet",
+		badge: {
+			style: "outline" as const,
+			label: "Draft",
+			variant: undefined,
+		},
 		href: null,
 	},
-];
+] as const;
+
+const visibleExams = canManage
+	? exams
+	: exams.filter((exam) => exam.status !== "draft");
 ---
 
 <AppLayout title={`${course.discipline.name} · Exams`}>
-  <main class="mx-auto max-w-3xl px-4 py-10">
-    <a href={href} class="text-sm text-base-content/60 hover:text-primary">← {course.discipline.name}</a>
+	<main class="mx-auto max-w-4xl px-4 py-10">
+		<CourseHeader course={course} active="exams" />
 
-    <h1 class="mt-3 text-3xl font-bold">Exams</h1>
-    <p class="mt-2 text-base-content/70">{course.discipline.name} · {course.edition}</p>
+		<h2 class="text-xl font-semibold">Exams</h2>
+		<p class="mt-1 text-sm text-base-content/60">
+			{course.discipline.name} · {course.editionSlug}
+		</p>
 
-    <div class="mt-8 flex flex-col gap-3">
-      {
-        exams.map((exam) => (
-          <ListRow href={exam.href ?? undefined} muted={!exam.href}>
-            <p class="font-medium">{exam.name}</p>
-            <p class="text-sm text-base-content/60">{exam.detail}</p>
-            <Badge slot="trailing" variant={exam.badge.variant} style={exam.badge.style}>
-              {exam.badge.label}
-            </Badge>
-          </ListRow>
-        ))
-      }
-    </div>
-  </main>
+		<div class="mt-6 flex flex-col gap-3">
+			{
+				visibleExams.map((exam) => (
+					<ListRow href={exam.href ?? undefined} muted={!exam.href}>
+						<p class="font-medium">{exam.name}</p>
+						<p class="text-sm text-base-content/60">
+							{canManage
+								? exam.instructorDetail
+								: exam.studentDetail}
+						</p>
+						<div
+							slot="trailing"
+							class="flex flex-col items-end gap-1"
+						>
+							<Badge
+								variant={exam.badge.variant}
+								style={exam.badge.style}
+							>
+								{exam.badge.label}
+							</Badge>
+							{canManage && exam.status !== "draft" && (
+								<a
+									href={`${href}/gradebook`}
+									class="text-xs text-primary hover:underline"
+								>
+									Gradebook →
+								</a>
+							)}
+						</div>
+					</ListRow>
+				))
+			}
+		</div>
+	</main>
 </AppLayout>

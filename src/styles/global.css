@@ -3,7 +3,9 @@
 @plugin "@tailwindcss/typography";
 
 @plugin "daisyui" {
-	themes: codehood --default, codehood-dark --prefersdark;
+	themes:
+		codehood --default,
+		codehood-dark --prefersdark;
 }
 
 /*
@@ -151,6 +153,11 @@ h6 {
 .brand-mark-glyph {
 	fill: #ecf0f1;
 }
+/* SidebarArt.astro's block letter — a flatter gray than the logo's glyph so it
+   reads as backdrop rather than as a second mark. */
+.brand-mark-gray {
+	fill: #d3d7cf;
+}
 [data-theme="codehood-dark"] .brand-mark :is(path, g) {
 	mix-blend-mode: normal;
 }
@@ -163,13 +170,16 @@ h6 {
 	fill: #ffffff;
 }
 [data-theme="codehood-dark"] .brand-mark-yellow {
-	fill: #95a5a6;
+	fill: #7f8c8d;
 }
 [data-theme="codehood-dark"] .brand-mark-green {
-	fill: #bdc3c7;
+	fill: #95a5a6;
 }
 [data-theme="codehood-dark"] .brand-mark-red {
 	fill: #c0392b;
+}
+[data-theme="codehood-dark"] .brand-mark-gray {
+	fill: #6c7a7b;
 }
 
 /* Small blue uppercase eyebrow label above a heading — matches the landing page's
@@ -181,4 +191,19 @@ h6 {
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--color-primary);
+}
+
+/* Shiki (src/utils/highlight-code.ts) renders both themes' colors into CSS
+   variables per token (defaultColor: false) instead of picking one at
+   render time, so a snippet page doesn't need to re-highlight on toggle —
+   these two rules just switch which variable each token's color reads from. */
+.shiki,
+.shiki span {
+	color: var(--shiki-light);
+	background-color: var(--shiki-light-bg) !important;
+}
+[data-theme="codehood-dark"] .shiki,
+[data-theme="codehood-dark"] .shiki span {
+	color: var(--shiki-dark);
+	background-color: var(--shiki-dark-bg) !important;
 }

@@ -14,7 +14,7 @@ async function loginAs(
 test("a student sees exactly their courses on /courses, and opens one to the real heading", async ({
 	request,
 }) => {
-	await loginAs(request, "hopper", "student");
+	await loginAs(request, "hopper", "hopper");
 
 	const listing = await request.get("/courses");
 	const listingHtml = await listing.text();
@@ -30,11 +30,11 @@ test("a student sees exactly their courses on /courses, and opens one to the rea
 test("a student gets a 403 naming the course on one they're not enrolled in, and a 404 on a course that doesn't exist", async ({
 	request,
 }) => {
-	await loginAs(request, "hopper", "student");
+	await loginAs(request, "hopper", "hopper");
 
-	const forbidden = await request.get("/cs201/turing_2026-1");
+	const forbidden = await request.get("/cs201/alan_2026-1");
 	expect(forbidden.status()).toBe(403);
-	expect(await forbidden.text()).toContain("turing_2026-1");
+	expect(await forbidden.text()).toContain("alan_2026-1");
 
 	const notFound = await request.get("/cs101/nobody_2026-1");
 	expect(notFound.status()).toBe(404);
@@ -43,7 +43,7 @@ test("a student gets a 403 naming the course on one they're not enrolled in, and
 test("an instructor sees /manage and /roster, and the roster lists every enrolled student", async ({
 	request,
 }) => {
-	await loginAs(request, "ada", "instructor");
+	await loginAs(request, "ada", "ada");
 
 	const manage = await request.get("/cs101/ada_2026-1/manage");
 	expect(manage.status()).toBe(200);
@@ -59,7 +59,7 @@ test("an instructor sees /manage and /roster, and the roster lists every enrolle
 test("a student following the instructor's /manage URL gets a 403", async ({
 	request,
 }) => {
-	await loginAs(request, "hopper", "student");
+	await loginAs(request, "hopper", "hopper");
 	const manage = await request.get("/cs101/ada_2026-1/manage");
 	expect(manage.status()).toBe(403);
 });
@@ -67,14 +67,14 @@ test("a student following the instructor's /manage URL gets a 403", async ({
 test("redeeming a classroom invite enrolls the student; a personal invite does not", async ({
 	request,
 }) => {
-	await loginAs(request, "ada", "instructor");
+	await loginAs(request, "ada", "ada");
 
-	const invitePage = await request.post("/cs101/ada_2026-1/invite", {
+	const managePage = await request.post("/cs101/ada_2026-1/manage", {
 		form: {},
 	});
-	expect(invitePage.status()).toBe(200);
-	const invitePageHtml = await invitePage.text();
-	const classroomTokenMatch = invitePageHtml.match(
+	expect(managePage.status()).toBe(200);
+	const managePageHtml = await managePage.text();
+	const classroomTokenMatch = managePageHtml.match(
 		/value="[^"]*\/invite\/([^"]+)"/,
 	);
 	expect(classroomTokenMatch).not.toBeNull();
@@ -98,7 +98,7 @@ test("redeeming a classroom invite enrolls the student; a personal invite does n
 	expect(await listing.text()).toContain("cs101");
 
 	// Back to an instructor to issue a personal invite (no courseId).
-	await loginAs(request, "ada", "instructor");
+	await loginAs(request, "ada", "ada");
 	const personalInvite = await request.post(
 		"/_actions/auth.createPersonalInvite",
 		{

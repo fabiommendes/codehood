@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { buildOpenApiDocument } from "@/api/openapi/document";
+import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 
 const publicPath = path.resolve(import.meta.dirname, "../public/openapi.json");
 

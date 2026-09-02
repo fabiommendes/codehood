@@ -1,0 +1,48 @@
+---
+export const prerender = false;
+
+import AdminTabs from "@/components/AdminTabs.astro";
+import CoursesTable, { type CourseRow } from "@/components/admin/CoursesTable";
+import PageKicker from "@/components/PageKicker.astro";
+import { courseService } from "@/db/course.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/utils/course-url";
+
+// adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
+// non-admin visitors before this runs; the check below is here only so
+// TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
+if (!Astro.locals.user) return Astro.redirect("/login");
+const actor = Astro.locals.user;
+const courses = await courseService.findMany({}, { actor });
+
+const courseRows: CourseRow[] = courses.map((course) => ({
+	id: course.id,
+	disciplineSlug: course.disciplineSlug,
+	disciplineName: course.discipline.name,
+	editionSlug: course.editionSlug,
+	instructorName: course.instructor.name,
+	activeCount: course._count.enrollments,
+	startAt: course.startAt,
+	endAt: course.endAt,
+	href: courseHref({
+		disciplineSlug: course.disciplineSlug,
+		username: course.instructor.username,
+		edition: course.editionSlug,
+	}),
+}));
+---
+
+<AppLayout title="Admin · Courses">
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <AdminTabs active="courses" />
+
+    <PageKicker text="Admin" />
+    <h1 class="text-3xl font-bold">Courses</h1>
+    <p class="mt-2 max-w-xl text-base-content/60">
+      Every course across every discipline — read-only. Instructors own the record; admins see it and, once
+      courses can be archived, retire it.
+    </p>
+
+    <CoursesTable courses={courseRows} />
+  </main>
+</AppLayout>

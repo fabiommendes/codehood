@@ -4,16 +4,27 @@ import { PrismaClient } from "../generated/prisma/client";
 export type {
 	ApiKey,
 	ApiKeyKind,
+	CalendarEvent,
 	Course,
 	Discipline,
+	Edition,
 	Enrollment,
 	EnrollmentStatus,
+	EventKind,
+	Exam,
+	ExamStatus,
+	File,
 	Invite,
 	InviteKind,
+	Passphrase,
 	Prisma,
+	Resource,
+	ResourceType,
 	Role,
 	Session,
+	TimeSlot,
 	User,
+	Weekday,
 } from "../generated/prisma/client";
 export { PrismaClient } from "../generated/prisma/client";
 

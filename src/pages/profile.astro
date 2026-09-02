@@ -3,26 +3,27 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import PageKicker from "@/components/PageKicker.astro";
+import Tabs from "@/components/ui/Tabs.astro";
 import { apiKeyService } from "@/db/api-key.service";
 import type { ApiKey } from "@/db/client";
 import { userService } from "@/db/user.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 const logoutEverywhereResult = Astro.getActionResult(
-	actions.profile.logoutEverywhere,
+  actions.profile.logoutEverywhere,
 );
 if (logoutEverywhereResult && !logoutEverywhereResult.error) {
-	return Astro.redirect("/login");
+  return Astro.redirect("/login");
 }
 
 if (!Astro.locals.user) {
-	return Astro.redirect("/login");
+  return Astro.redirect("/login");
 }
 
 const actor = Astro.locals.user;
-const user = await userService.getById(actor.id, { actor });
+const user = await userService.findOne({ id: actor.id }, { actor });
 if (!user) {
-	return Astro.redirect("/login");
+  return Astro.redirect("/login");
 }
 
 const apiKeys = await apiKeyService.findMany({ userId: user.id }, { actor });
@@ -33,224 +34,345 @@ const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
 const revokeApiKeyResult = Astro.getActionResult(actions.auth.revokeApiKey);
 
 function formatDate(date: Date | null): string {
-	if (!date) return "never";
-	return date.toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
+  if (!date) return "never";
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
+
+// Land on whichever tab the just-submitted form lives on, so a validation
+// error (or a fresh success message) doesn't get hidden behind "Details".
+const activeTab: "details" | "account" | "apikeys" =
+  createApiKeyResult || revokeApiKeyResult
+    ? "apikeys"
+    : passwordResult || logoutEverywhereResult
+      ? "account"
+      : "details";
+
+const profileTabs = [
+  { key: "details", label: "Details" },
+  { key: "account", label: "Account" },
+  { key: "apikeys", label: "API keys" },
+];
 ---
 
 <AppLayout title="Profile">
-  <main class="mx-auto flex max-w-2xl flex-col gap-8 p-6">
+  <main class="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10">
     <div>
       <PageKicker text="Account" />
       <h1 class="text-2xl font-bold">Profile</h1>
     </div>
 
-    <div class="card card-border">
-      <div class="card-body">
-        <div class="flex items-center justify-between">
-          <h2 class="card-title">Your details</h2>
-          <span class="badge badge-neutral">{user.role.toLowerCase()}</span>
-        </div>
+    <Tabs items={profileTabs} active={activeTab} name="profile-tabs">
+      <Fragment slot="details">
+        <div class="flex flex-col gap-8 pt-6">
+          <div class="card card-border">
+            <div class="card-body">
+              <div class="flex items-center justify-between">
+                <h2 class="card-title">Your details</h2>
+                <span class="badge badge-neutral"
+                  >{user.role.toLowerCase()}</span
+                >
+              </div>
 
-        {
-          updateResult?.error && (
-            <div role="alert" class="alert alert-error">
-              <span>{updateResult.error.message}</span>
-            </div>
-          )
-        }
-        {
-          updateResult && !updateResult.error && (
-            <div role="alert" class="alert alert-success">
-              <span>Profile updated.</span>
-            </div>
-          )
-        }
-
-        <form method="POST" action={actions.profile.update} class="flex flex-col gap-4">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input type="text" name="name" required value={user.name} class="input w-full" />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Email</legend>
-            <input type="email" name="email" required value={user.email} class="input w-full" />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Username</legend>
-            <input type="text" value={user.username} class="input w-full" disabled />
-            <p class="label">Usernames can't be changed — they're part of your course URLs.</p>
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">GitHub username</legend>
-            <input type="text" name="githubId" required value={user.githubId} class="input w-full" />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">School id</legend>
-            <input type="text" name="schoolId" required value={user.schoolId} class="input w-full" />
-          </fieldset>
-
-          <div class="card-actions">
-            <button type="submit" class="btn btn-primary">Save changes</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div class="card card-border">
-      <div class="card-body">
-        <h2 class="card-title">Change password</h2>
-
-        {
-          passwordResult?.error && (
-            <div role="alert" class="alert alert-error">
-              <span>{passwordResult.error.message}</span>
-            </div>
-          )
-        }
-        {
-          passwordResult && !passwordResult.error && (
-            <div role="alert" class="alert alert-success">
-              <span>Password changed.</span>
-            </div>
-          )
-        }
-
-        <form method="POST" action={actions.profile.changePassword} class="flex flex-col gap-4">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Current password</legend>
-            <input type="password" name="currentPassword" required class="input w-full" />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">New password</legend>
-            <input
-              type="password"
-              name="newPassword"
-              id="newPassword"
-              required
-              minlength="8"
-              class="input w-full"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Confirm new password</legend>
-            <input type="password" id="newPasswordConfirm" required minlength="8" class="input w-full" />
-            <p class="label" id="passwordMismatch" hidden>Passwords do not match.</p>
-          </fieldset>
-
-          <div class="card-actions">
-            <button type="submit" class="btn btn-primary">Change password</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div class="card card-border">
-      <div class="card-body">
-        <h2 class="card-title">Security</h2>
-        <p class="text-sm text-base-content/60">Sign out of every device and browser where you're logged in.</p>
-        <form method="POST" action={actions.profile.logoutEverywhere} class="card-actions">
-          <button type="submit" class="btn btn-outline btn-error">Log out everywhere</button>
-        </form>
-      </div>
-    </div>
-
-    <div class="card card-border">
-      <div class="card-body">
-        <h2 class="card-title">API keys</h2>
-        <p class="text-sm text-base-content/60">Used by the CLI and grading bots to authenticate as you.</p>
-        <a href="/getting-started" class="text-sm text-primary hover:underline">New to the CLI? See the getting started guide →</a>
-
-        {
-          createApiKeyResult?.error && (
-            <div role="alert" class="alert alert-error">
-              <span>{createApiKeyResult.error.message}</span>
-            </div>
-          )
-        }
-        {
-          createApiKeyResult && !createApiKeyResult.error && (
-            <div role="alert" class="alert alert-success flex-col items-start">
-              <span>
-                New key created. Copy it now &mdash; it won't be shown again.
-              </span>
-              <code class="w-full break-all rounded bg-base-300 px-2 py-1 text-xs">
-                {createApiKeyResult.data.token}
-              </code>
-            </div>
-          )
-        }
-        {
-          revokeApiKeyResult?.error && (
-            <div role="alert" class="alert alert-error">
-              <span>{revokeApiKeyResult.error.message}</span>
-            </div>
-          )
-        }
-
-        {
-          apiKeys.length > 0 && (
-            <ul class="list">
-              {apiKeys.map((key: ApiKey) => (
-                <li class="list-row items-center">
-                  <div>
-                    <div class="font-medium">{key.name}</div>
-                    <div class="text-xs text-base-content/60">
-                      created {formatDate(key.createdAt)} &middot; last used {formatDate(key.lastUsedAt)}
-                    </div>
+              {
+                updateResult?.error && (
+                  <div role="alert" class="alert alert-error">
+                    <span>{updateResult.error.message}</span>
                   </div>
-                  <span class="badge badge-outline">{key.kind.toLowerCase()}</span>
-                  <form method="POST" action={actions.auth.revokeApiKey}>
-                    <input type="hidden" name="id" value={key.id} />
-                    <button type="submit" class="btn btn-sm btn-ghost">Revoke</button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          )
-        }
+                )
+              }
+              {
+                updateResult && !updateResult.error && (
+                  <div role="alert" class="alert alert-success">
+                    <span>Profile updated.</span>
+                  </div>
+                )
+              }
 
-        <div class="divider"></div>
+              <form
+                method="POST"
+                action={actions.profile.update}
+                class="flex flex-col gap-4"
+              >
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Name</legend>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    value={user.name}
+                    class="input w-full"
+                  />
+                </fieldset>
 
-        <form
-          method="POST"
-          action={actions.auth.createApiKey}
-          class="flex flex-wrap items-end gap-4"
-        >
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Key name</legend>
-            <input type="text" name="name" required placeholder="e.g. my laptop" class="input" />
-          </fieldset>
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Email</legend>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    value={user.email}
+                    class="input w-full"
+                  />
+                </fieldset>
 
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Kind</legend>
-            <select name="kind" class="select">
-              <option value="CLI">CLI</option>
-              <option value="BOT">Bot</option>
-            </select>
-          </fieldset>
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Username</legend>
+                  <input
+                    type="text"
+                    value={user.username}
+                    class="input w-full"
+                    disabled
+                  />
+                  <p class="label">
+                    Usernames can't be changed — they're part of your course
+                    URLs.
+                  </p>
+                </fieldset>
 
-          <button type="submit" class="btn">Create key</button>
-        </form>
-      </div>
-    </div>
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">GitHub username</legend>
+                  <input
+                    type="text"
+                    name="githubId"
+                    required
+                    value={user.githubId}
+                    class="input w-full"
+                  />
+                </fieldset>
+
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">School id</legend>
+                  <input
+                    type="text"
+                    name="schoolId"
+                    required
+                    value={user.schoolId}
+                    class="input w-full"
+                  />
+                </fieldset>
+
+                <div class="card-actions">
+                  <button type="submit" class="btn btn-primary"
+                    >Save changes</button
+                  >
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </Fragment>
+
+      <Fragment slot="account">
+        <div class="flex flex-col gap-8 pt-6">
+          <div class="card card-border">
+            <div class="card-body">
+              <h2 class="card-title">Change password</h2>
+
+              {
+                passwordResult?.error && (
+                  <div role="alert" class="alert alert-error">
+                    <span>{passwordResult.error.message}</span>
+                  </div>
+                )
+              }
+              {
+                passwordResult && !passwordResult.error && (
+                  <div role="alert" class="alert alert-success">
+                    <span>Password changed.</span>
+                  </div>
+                )
+              }
+
+              <form
+                method="POST"
+                action={actions.profile.changePassword}
+                class="flex flex-col gap-4"
+              >
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Current password</legend>
+                  <input
+                    type="password"
+                    name="currentPassword"
+                    required
+                    class="input w-full"
+                  />
+                </fieldset>
+
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">New password</legend>
+                  <input
+                    type="password"
+                    name="newPassword"
+                    id="newPassword"
+                    required
+                    minlength="8"
+                    class="input w-full"
+                  />
+                </fieldset>
+
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Confirm new password</legend>
+                  <input
+                    type="password"
+                    id="newPasswordConfirm"
+                    required
+                    minlength="8"
+                    class="input w-full"
+                  />
+                  <p class="label" id="passwordMismatch" hidden>
+                    Passwords do not match.
+                  </p>
+                </fieldset>
+
+                <div class="card-actions">
+                  <button type="submit" class="btn btn-primary"
+                    >Change password</button
+                  >
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card card-border">
+            <div class="card-body">
+              <h2 class="card-title">Security</h2>
+              <p class="text-sm text-base-content/60">
+                Sign out of every device and browser where you're logged in.
+              </p>
+              <form
+                method="POST"
+                action={actions.profile.logoutEverywhere}
+                class="card-actions"
+              >
+                <button type="submit" class="btn btn-outline btn-error"
+                  >Log out everywhere</button
+                >
+              </form>
+            </div>
+          </div>
+        </div>
+      </Fragment>
+
+      <Fragment slot="apikeys">
+        <div class="pt-6">
+          <div class="card card-border">
+            <div class="card-body">
+              <h2 class="card-title">API keys</h2>
+              <p class="text-sm text-base-content/60">
+                Used by the CLI and grading bots to authenticate as you.
+              </p>
+              <a
+                href="/getting-started"
+                class="text-sm text-primary hover:underline"
+                >New to the CLI? See the getting started guide →</a
+              >
+
+              {
+                createApiKeyResult?.error && (
+                  <div role="alert" class="alert alert-error">
+                    <span>{createApiKeyResult.error.message}</span>
+                  </div>
+                )
+              }
+              {
+                createApiKeyResult && !createApiKeyResult.error && (
+                  <div
+                    role="alert"
+                    class="alert alert-success flex-col items-start"
+                  >
+                    <span>
+                      New key created. Copy it now &mdash; it won't be shown
+                      again.
+                    </span>
+                    <code class="w-full break-all rounded bg-base-300 px-2 py-1 text-xs">
+                      {createApiKeyResult.data.token}
+                    </code>
+                  </div>
+                )
+              }
+              {
+                revokeApiKeyResult?.error && (
+                  <div role="alert" class="alert alert-error">
+                    <span>{revokeApiKeyResult.error.message}</span>
+                  </div>
+                )
+              }
+
+              {
+                apiKeys.length > 0 && (
+                  <ul class="list">
+                    {apiKeys.map((key: ApiKey) => (
+                      <li class="list-row items-center">
+                        <div>
+                          <div class="font-medium">{key.name}</div>
+                          <div class="text-xs text-base-content/60">
+                            created {formatDate(key.createdAt)} &middot; last
+                            used {formatDate(key.lastUsedAt)}
+                          </div>
+                        </div>
+                        <span class="badge badge-outline">
+                          {key.kind.toLowerCase()}
+                        </span>
+                        <form method="POST" action={actions.auth.revokeApiKey}>
+                          <input type="hidden" name="id" value={key.id} />
+                          <button type="submit" class="btn btn-sm btn-ghost">
+                            Revoke
+                          </button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+
+              <div class="divider"></div>
+
+              <form
+                method="POST"
+                action={actions.auth.createApiKey}
+                class="flex flex-wrap items-end gap-4"
+              >
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Key name</legend>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    placeholder="e.g. my laptop"
+                    class="input"
+                  />
+                </fieldset>
+
+                <fieldset class="fieldset">
+                  <legend class="fieldset-legend">Kind</legend>
+                  <select name="kind" class="select">
+                    <option value="CLI">CLI</option>
+                    <option value="BOT">Bot</option>
+                  </select>
+                </fieldset>
+
+                <button type="submit" class="btn">Create key</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </Fragment>
+    </Tabs>
   </main>
 </AppLayout>
 
 <script>
   const passwordForm = document.getElementById("newPassword")?.closest("form");
-  const password = document.getElementById("newPassword") as HTMLInputElement | null;
-  const confirm = document.getElementById("newPasswordConfirm") as HTMLInputElement | null;
+  const password = document.getElementById(
+    "newPassword",
+  ) as HTMLInputElement | null;
+  const confirm = document.getElementById(
+    "newPasswordConfirm",
+  ) as HTMLInputElement | null;
   const mismatch = document.getElementById("passwordMismatch");
 
   passwordForm?.addEventListener("submit", (event) => {

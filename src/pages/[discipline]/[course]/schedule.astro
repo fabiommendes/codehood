@@ -1,0 +1,151 @@
+---
+// The course's own term calendar (FR-CAL-020), grouped by authored week — see
+// dev/specs/to-review/calendar.md. Read-only: the only way schedule data gets
+// in is `manage import-calendar` and the demo seed.
+import MarkdownIt from "markdown-it";
+import CourseHeader from "@/components/CourseHeader.astro";
+import Alert from "@/components/ui/Alert";
+import {
+	type CalendarEventWithDetails,
+	calendarEventService,
+	isMeeting,
+} from "@/db/calendar-event.service";
+import { timeSlotService } from "@/db/time-slot.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { loadCourse } from "@/utils/load-course";
+import { endOf, formatTime, SERVER_TZ } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.user!;
+
+const md = new MarkdownIt();
+
+const WEEKDAY_LABEL: Record<string, string> = {
+	SUNDAY: "Sun",
+	MONDAY: "Mon",
+	TUESDAY: "Tue",
+	WEDNESDAY: "Wed",
+	THURSDAY: "Thu",
+	FRIDAY: "Fri",
+	SATURDAY: "Sat",
+};
+
+const slots = await timeSlotService.findMany(
+	{ courseId: course.id },
+	{ actor },
+);
+const slotDayById = new Map(slots.map((s) => [s.id, s.day]));
+
+const events = await calendarEventService.findMany(
+	{ courseIds: [course.id] },
+	{ actor },
+);
+
+const weeks = new Map<number, CalendarEventWithDetails[]>();
+for (const event of events) {
+	weeks.set(event.week, [...(weeks.get(event.week) ?? []), event]);
+}
+const orderedWeeks = [...weeks.entries()].sort(([a], [b]) => a - b);
+
+const timeFmt = new Intl.DateTimeFormat("en-US", {
+	timeZone: SERVER_TZ,
+	hour: "2-digit",
+	minute: "2-digit",
+	hourCycle: "h23",
+});
+function timeRange(event: CalendarEventWithDetails): string {
+	const start = timeFmt.format(event.startAt);
+	const end = timeFmt.format(endOf(event.startAt, event.durationMin));
+	return `${start}–${end}`;
+}
+
+const meetingsHeld = events.filter(
+	(e) => isMeeting(e.kind) && e.kind !== "CANCELLED",
+).length;
+---
+
+<AppLayout title={`Schedule · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="schedule" />
+
+    <h2 class="text-xl font-semibold">Schedule</h2>
+    <p class="mt-1 text-sm text-base-content/60">
+      {course.discipline.name} · {course.editionSlug} — the term, grouped by authored week.
+    </p>
+
+    {
+      slots.length === 0 ? (
+        <Alert variant="info" class="mt-6">
+          <span>No schedule published yet — the instructor pushes it with the CLI.</span>
+        </Alert>
+      ) : (
+        <>
+          <div class="mt-6 flex flex-wrap gap-2">
+            {slots.map((slot) => (
+              <span class="badge badge-outline gap-1.5">
+                {slot.title ?? "Meeting"} · {WEEKDAY_LABEL[slot.day]} {formatTime(slot.startMin)}–
+                {formatTime(slot.startMin + slot.durationMin)}
+              </span>
+            ))}
+          </div>
+          <p class="mt-3 text-xs text-base-content/50">{meetingsHeld} meeting(s) held so far.</p>
+
+          {events.length === 0 ? (
+            <p class="mt-8 text-sm text-base-content/60">No events on the calendar yet.</p>
+          ) : (
+            <div class="mt-6 flex flex-col gap-8">
+              {orderedWeeks.map(([week, weekEvents]) => (
+                <div>
+                  <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">Week {week}</h3>
+                  <div class="mt-3 flex flex-col gap-3">
+                    {weekEvents.map((event) => {
+                      const meeting = isMeeting(event.kind);
+                      const cancelled = event.kind === "CANCELLED";
+                      const dayLabel = WEEKDAY_LABEL[slotDayById.get(event.timeSlotId) ?? ""] ?? "";
+                      return (
+                        <div class:list={["card card-border bg-base-100", !meeting && "opacity-60"]}>
+                          <div class="card-body flex-row gap-4 py-4">
+                            <div class="flex w-16 shrink-0 flex-col items-center rounded-field border border-base-300 py-1.5 text-center">
+                              <span class="text-[11px] font-medium text-base-content/50">{dayLabel}</span>
+                              <span class="font-display text-sm leading-none font-semibold">{timeRange(event)}</span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class:list={["font-medium", cancelled && "line-through"]}>{event.title}</p>
+                                <span class:list={["badge badge-sm", meeting ? "badge-outline" : "badge-ghost"]}>
+                                  {event.kind}
+                                </span>
+                                {event.exam && (
+                                  <a href={`${href}/exams`} class="ml-auto text-sm text-primary hover:underline">
+                                    {event.exam.title} →
+                                  </a>
+                                )}
+                              </div>
+                              {event.description && (
+                                <div
+                                  class="prose prose-sm mt-1 max-w-none text-base-content/70 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
+                                  set:html={md.render(event.description)}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )
+    }
+  </main>
+</AppLayout>

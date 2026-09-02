@@ -1,0 +1,121 @@
+---
+export const prerender = false;
+
+import { actions } from "astro:actions";
+import AdminTabs from "@/components/AdminTabs.astro";
+import DisciplinesTable, {
+	type DisciplineRow,
+} from "@/components/admin/DisciplinesTable";
+import PageKicker from "@/components/PageKicker.astro";
+import { courseService } from "@/db/course.service";
+import { disciplineService } from "@/db/discipline.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+
+// adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
+// non-admin visitors before this runs; the check below is here only so
+// TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
+if (!Astro.locals.user) return Astro.redirect("/login");
+const actor = Astro.locals.user;
+
+const createResult = Astro.getActionResult(actions.admin.createDiscipline);
+const updateResult = Astro.getActionResult(actions.admin.updateDiscipline);
+const deleteResult = Astro.getActionResult(actions.admin.deleteDiscipline);
+
+const disciplines = await disciplineService.findMany({});
+const courses = await courseService.findMany({}, { actor });
+const courseCounts = new Map<string, number>();
+for (const course of courses) {
+	courseCounts.set(
+		course.disciplineSlug,
+		(courseCounts.get(course.disciplineSlug) ?? 0) + 1,
+	);
+}
+
+const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
+	slug: discipline.slug,
+	name: discipline.name,
+	courseCount: courseCounts.get(discipline.slug) ?? 0,
+}));
+---
+
+<AppLayout title="Admin · Disciplines">
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <AdminTabs active="disciplines" />
+
+    <PageKicker text="Admin" />
+    <h1 class="text-3xl font-bold">Disciplines</h1>
+    <p class="mt-2 max-w-xl text-base-content/60">
+      One of two catalogs admins own outright. The slug is permanent once created — it's the first segment of
+      every course URL underneath it.
+    </p>
+
+    {
+      createResult?.error && (
+        <div role="alert" class="alert alert-error mt-6">
+          <span>{createResult.error.message}</span>
+        </div>
+      )
+    }
+    {
+      createResult && !createResult.error && (
+        <div role="alert" class="alert alert-success mt-6">
+          <span>Discipline "{createResult.data.slug}" created.</span>
+        </div>
+      )
+    }
+
+    <div class="card card-border mt-6 bg-base-100">
+      <div class="card-body">
+        <h2 class="card-title">New discipline</h2>
+        <form method="POST" action={actions.admin.createDiscipline} class="mt-2 flex flex-wrap items-end gap-4">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Slug</legend>
+            <input type="text" name="slug" required placeholder="cs102" class="input font-mono" />
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Name</legend>
+            <input type="text" name="name" required placeholder="Computer Science" class="input" />
+          </fieldset>
+
+          <button type="submit" class="btn btn-square btn-primary" aria-label="New discipline" title="New discipline">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {
+      updateResult?.error && (
+        <div role="alert" class="alert alert-error mt-6">
+          <span>{updateResult.error.message}</span>
+        </div>
+      )
+    }
+    {
+      updateResult && !updateResult.error && (
+        <div role="alert" class="alert alert-success mt-6">
+          <span>Discipline updated.</span>
+        </div>
+      )
+    }
+    {
+      deleteResult?.error && (
+        <div role="alert" class="alert alert-error mt-6">
+          <span>{deleteResult.error.message}</span>
+        </div>
+      )
+    }
+    {
+      deleteResult && !deleteResult.error && (
+        <div role="alert" class="alert alert-success mt-6">
+          <span>Discipline deleted.</span>
+        </div>
+      )
+    }
+
+    <DisciplinesTable disciplines={disciplineRows} />
+  </main>
+</AppLayout>

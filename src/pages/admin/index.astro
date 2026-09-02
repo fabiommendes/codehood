@@ -1,101 +1,451 @@
 ---
-// Real page: gated by the actual role system (isAtLeast/canManageUsers in
-// auth/permissions.ts), reading real users from the database — the first page
-// in the app that actually redirects to /403 on a real permission failure.
 export const prerender = false;
 
-import { canManageUsers } from "@/auth/permissions";
+import { actions } from "astro:actions";
+import AdminTabs from "@/components/AdminTabs.astro";
+import InvitesTable, { type InviteRow } from "@/components/admin/InvitesTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { type User, userService } from "@/db/user.service";
+import { courseService } from "@/db/course.service";
+import { disciplineService } from "@/db/discipline.service";
+import { editionService, isEditionOpen } from "@/db/edition.service";
+import { inviteService } from "@/db/invite.service";
+import { userService } from "@/db/user.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 
+// adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
+// non-admin visitors before this runs; the check below is here only so
+// TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
 if (!Astro.locals.user) return Astro.redirect("/login");
-if (!canManageUsers(Astro.locals.user)) return Astro.redirect("/403");
+const actor = Astro.locals.user;
 
-const users = (await userService.findMany(
-	{},
-	{ actor: Astro.locals.user },
-)) as Array<User & { createdAt: Date }>;
+const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
+const disciplineResult = Astro.getActionResult(actions.admin.createDiscipline);
+const editionResult = Astro.getActionResult(actions.admin.createEdition);
 
-const counts = {
+// createPersonalInvite has no `accept: "form"` — it's called as a JSON action
+// elsewhere (see test/auth-flow.spec.ts), so a plain <form action={...}> here
+// would send a body Astro can't parse against that shape. Handling this one
+// POST manually (formData in, Astro.callAction out) is the same workaround
+// invite.astro already uses for createClassroomInvite.
+let inviteUrl: string | null = null;
+let inviteError: string | null = null;
+if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
+	const formData = await Astro.request.formData();
+	const email = formData.get("email");
+	if (typeof email === "string") {
+		const { data, error } = await Astro.callAction(
+			actions.auth.createPersonalInvite,
+			{
+				email,
+				role: "INSTRUCTOR",
+			},
+		);
+		if (error) {
+			inviteError = error.message || "Could not create the invite.";
+		} else {
+			inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
+		}
+	}
+}
+
+const [users, courses, disciplines, editions, invites] = await Promise.all([
+	userService.findMany({}, { actor }),
+	courseService.findMany({}, { actor }),
+	disciplineService.findMany({}),
+	editionService.findMany({}),
+	inviteService.findMany({ kind: "PERSONAL" }, { actor }),
+]);
+
+const userCounts = {
 	ADMIN: users.filter((u) => u.role === "ADMIN").length,
 	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
 	STUDENT: users.filter((u) => u.role === "STUDENT").length,
 };
 
-const roleBadge = {
-	ADMIN: "badge-warning",
-	INSTRUCTOR: "badge-primary",
-	STUDENT: "badge-outline",
-} as const;
+const liveEditions = editions.filter((e) => isEditionOpen(e)).length;
 
-function formatDate(date: Date): string {
-	return date.toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
-}
+const disciplineSample =
+	disciplines
+		.slice(0, 3)
+		.map((d) => d.slug)
+		.join(", ") +
+	(disciplines.length > 3 ? ` & ${disciplines.length - 3} more` : "");
+
+const pendingInvites: InviteRow[] = invites
+	.filter((invite) => invite.role === "INSTRUCTOR")
+	.map((invite) => ({
+		id: invite.id,
+		email: invite.email ?? "—",
+		createdByName: invite.createdBy.name,
+		createdAt: invite.createdAt,
+		expiresAt: invite.expiresAt,
+		maxUses: invite.maxUses,
+		redemptions: invite._count.redemptions,
+	}));
 ---
 
-<AppLayout title="Admin · Users">
-  <main class="mx-auto max-w-3xl px-4 py-10">
+<AppLayout title="Admin · Overview">
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <AdminTabs active="overview" />
+
     <PageKicker text="Admin" />
-    <h1 class="text-3xl font-bold">Users</h1>
-    <p class="mt-2 text-base-content/60">
-      Every account on this Codehood instance — {users.length} total.
+    <h1 class="text-3xl font-bold">Overview</h1>
+    <p class="mt-2 max-w-xl text-base-content/60">
+      Everything an admin can do from one place — invite instructors, manage the catalogs you own, and reach the
+      levers that live nowhere else.
     </p>
 
-    <div
-      class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100"
-    >
+    <div class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100">
       <div class="stat">
-        <div class="stat-title">Admins</div>
-        <div class="stat-value text-2xl">{counts.ADMIN}</div>
+        <div class="stat-title">Users</div>
+        <div class="stat-value text-2xl">{users.length}</div>
+        <div class="stat-desc">
+          {userCounts.ADMIN} admins · {userCounts.INSTRUCTOR} instructors · {userCounts.STUDENT} students
+        </div>
       </div>
       <div class="stat">
-        <div class="stat-title">Instructors</div>
-        <div class="stat-value text-2xl">{counts.INSTRUCTOR}</div>
+        <div class="stat-title">Courses</div>
+        <div class="stat-value text-2xl">{courses.length}</div>
+        <div class="stat-desc">across {disciplines.length} disciplines</div>
       </div>
       <div class="stat">
-        <div class="stat-title">Students</div>
-        <div class="stat-value text-2xl">{counts.STUDENT}</div>
+        <div class="stat-title">Disciplines</div>
+        <div class="stat-value text-2xl">{disciplines.length}</div>
+        <div class="stat-desc">{disciplineSample || "none yet"}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Editions</div>
+        <div class="stat-value text-2xl">{editions.length}</div>
+        <div class="stat-desc">{liveEditions} live now</div>
       </div>
     </div>
 
-    <div
-      class="mt-8 overflow-x-auto rounded-box border border-base-300 bg-base-100"
-    >
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Username</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Joined</th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            users.map((u) => (
-              <tr>
-                <td class="font-medium">{u.name}</td>
-                <td class="font-mono text-sm text-base-content/60">
-                  @{u.username}
-                </td>
-                <td class="text-base-content/60">{u.email}</td>
-                <td>
-                  <span class:list={["badge badge-sm", roleBadge[u.role]]}>
-                    {u.role.toLowerCase()}
-                  </span>
-                </td>
-                <td class="text-base-content/60">{formatDate(u.createdAt)}</td>
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
+    <div class="mt-10">
+      <h2 class="text-lg font-semibold">Actions</h2>
+      <p class="mt-1 text-sm text-base-content/60">
+        Available system-wide. Destructive ones ask you to confirm before anything happens.
+      </p>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="card card-border flex flex-col bg-base-100">
+          <div class="card-body flex-1">
+            <div class="flex items-start gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-field bg-primary/10 text-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-11Z"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  />
+                  <path
+                    d="m4.5 6 7.5 6 7.5-6"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-sm font-semibold">Invite an instructor</h3>
+                <p class="mt-1 text-sm text-base-content/60">
+                  Generate a one-time signup link — they set their own password and details.
+                </p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-1 items-end justify-end">
+              <button type="button" class="btn btn-primary btn-sm" data-open-dialog="invite-instructor-dialog">
+                Invite instructor
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-border flex flex-col bg-base-100">
+          <div class="card-body flex-1">
+            <div class="flex items-start gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-field bg-accent/10 text-accent">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M6 4.5h9.5L19 8v11.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linejoin="round"
+                  />
+                  <path d="M14.5 4.5V8H19" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                  <path d="M8.5 12.5h7M8.5 15.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-sm font-semibold">New discipline</h3>
+                <p class="mt-1 text-sm text-base-content/60">
+                  Add a new subject catalog, e.g. <span class="font-mono">cs102</span>.
+                </p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-1 items-end justify-end">
+              <button type="button" class="btn btn-outline btn-sm" data-open-dialog="new-discipline-dialog">
+                New discipline
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-border flex flex-col bg-base-100">
+          <div class="card-body flex-1">
+            <div class="flex items-start gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-field bg-secondary/10 text-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-sm font-semibold">New edition</h3>
+                <p class="mt-1 text-sm text-base-content/60">
+                  Add a term with its active window, e.g. <span class="font-mono">2026-1</span>.
+                </p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-1 items-end justify-end">
+              <button type="button" class="btn btn-outline btn-sm" data-open-dialog="new-edition-dialog">
+                New edition
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <div class="mt-10">
+      <h2 class="text-lg font-semibold">Pending invites</h2>
+      <p class="mt-1 text-sm text-base-content/60">
+        Revoke one to invalidate its link. Force-logout lives on each row in the Users tab.
+      </p>
+
+      {
+        inviteError && (
+          <div role="alert" class="alert alert-error mt-4">
+            <span>{inviteError}</span>
+          </div>
+        )
+      }
+      {
+        inviteUrl && (
+          <>
+            <div role="alert" class="alert alert-success mt-4">
+              <span>Invite created — it expires in 7 days.</span>
+            </div>
+            <div class="join mt-3 w-full">
+              <input
+                type="text"
+                readonly
+                value={inviteUrl}
+                class="input join-item w-full font-mono text-sm"
+                id="invite-url"
+              />
+              <button
+                type="button"
+                class="btn btn-square btn-primary join-item"
+                id="copy-invite-url"
+                aria-label="Copy invite link"
+                title="Copy"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.6" />
+                  <path
+                    d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </>
+        )
+      }
+      {
+        revokeResult?.error && (
+          <div role="alert" class="alert alert-error mt-4">
+            <span>{revokeResult.error.message}</span>
+          </div>
+        )
+      }
+      {
+        revokeResult && !revokeResult.error && (
+          <div role="alert" class="alert alert-success mt-4">
+            <span>Invite revoked.</span>
+          </div>
+        )
+      }
+      {
+        disciplineResult?.error && (
+          <div role="alert" class="alert alert-error mt-4">
+            <span>{disciplineResult.error.message}</span>
+          </div>
+        )
+      }
+      {
+        disciplineResult && !disciplineResult.error && (
+          <div role="alert" class="alert alert-success mt-4">
+            <span>
+              Discipline "{disciplineResult.data.slug}" created —{" "}
+              <a href="/admin/disciplines" class="underline">
+                see it on the Disciplines tab
+              </a>
+              .
+            </span>
+          </div>
+        )
+      }
+      {
+        editionResult?.error && (
+          <div role="alert" class="alert alert-error mt-4">
+            <span>{editionResult.error.message}</span>
+          </div>
+        )
+      }
+      {
+        editionResult && !editionResult.error && (
+          <div role="alert" class="alert alert-success mt-4">
+            <span>
+              Edition "{editionResult.data.slug}" created —{" "}
+              <a href="/admin/editions" class="underline">
+                see it on the Editions tab
+              </a>
+              .
+            </span>
+          </div>
+        )
+      }
+
+      {
+        pendingInvites.length > 0 ? (
+          <InvitesTable invites={pendingInvites} />
+        ) : (
+          <p class="mt-4 text-sm text-base-content/50">No pending instructor invites.</p>
+        )
+      }
+
+      <div role="alert" class="alert alert-info mt-4">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+          <path d="M12 11v5.5M12 8v.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+        <span>A link is only ever shown once. If someone loses it, revoke the invite here and issue a new one.</span>
+      </div>
+    </div>
+
+    <dialog id="invite-instructor-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">✕</button>
+    </form>
+    <h3 class="text-lg font-bold">Invite an instructor</h3>
+    <p class="mt-2 text-sm text-base-content/70">
+      They redeem this link to create their own account — password, GitHub handle, and school id are theirs to
+      supply.
+    </p>
+    <form method="POST" class="mt-4 flex flex-col gap-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Email</legend>
+        <input type="email" name="email" required class="input w-full" placeholder="instructor@example.edu" />
+      </fieldset>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">
+          Generate invite link
+        </button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<dialog id="new-discipline-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">✕</button>
+    </form>
+    <h3 class="text-lg font-bold">New discipline</h3>
+    <form method="POST" action={actions.admin.createDiscipline} class="mt-4 flex flex-col gap-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Slug</legend>
+        <input type="text" name="slug" required placeholder="cs102" class="input w-full font-mono" />
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Name</legend>
+        <input type="text" name="name" required placeholder="Computer Science" class="input w-full" />
+      </fieldset>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">
+          Create discipline
+        </button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<dialog id="new-edition-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">✕</button>
+    </form>
+    <h3 class="text-lg font-bold">New edition</h3>
+    <form method="POST" action={actions.admin.createEdition} class="mt-4 flex flex-col gap-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Slug</legend>
+        <input type="text" name="slug" required placeholder="2026-2" class="input w-full font-mono" />
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Name</legend>
+        <input type="text" name="name" required placeholder="Second term" class="input w-full" />
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Starts</legend>
+        <input type="date" name="startAt" required class="input w-full" />
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Ends</legend>
+        <input type="date" name="endAt" required class="input w-full" />
+      </fieldset>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">
+          Create edition
+        </button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
   </main>
 </AppLayout>
+
+<script>
+	const button = document.getElementById("copy-invite-url");
+	const input = document.getElementById("invite-url") as HTMLInputElement | null;
+	const copyIcon = button?.innerHTML ?? "";
+	const checkIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m5 13 4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+	button?.addEventListener("click", async () => {
+		if (!input) return;
+		await navigator.clipboard.writeText(input.value);
+		button.innerHTML = checkIcon;
+		button.setAttribute("aria-label", "Copied");
+		setTimeout(() => {
+			button.innerHTML = copyIcon;
+			button.setAttribute("aria-label", "Copy invite link");
+		}, 1500);
+	});
+</script>

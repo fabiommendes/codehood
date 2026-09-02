@@ -1,0 +1,20 @@
+[
+	{
+		"name": "logout",
+		"method": "post",
+		"pattern": "/api/auth/logout",
+		"file": "auth.ts"
+	},
+	{
+		"name": "token",
+		"method": "post",
+		"pattern": "/api/auth/token",
+		"file": "auth.ts"
+	},
+	{
+		"name": "health",
+		"method": "get",
+		"pattern": "/api/health",
+		"file": "health.ts"
+	}
+]

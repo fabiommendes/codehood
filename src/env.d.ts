@@ -1,9 +1,6 @@
 declare namespace App {
 	interface Locals {
-		user?: {
-			id: number;
-			role: import("@/db/client").Role;
-		};
+		user?: import("@/db/user.service").user;
 		apiKey?: {
 			id: number;
 			kind: import("@/db/client").ApiKeyKind;

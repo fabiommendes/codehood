@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildOpenApiDocument } from "@/api/openapi/document";
+import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 
 const rootDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),

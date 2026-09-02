@@ -2,11 +2,10 @@ import { canManageSessions } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import type { FillUndefineds } from "@/utils/types";
 import {
-	type ActingOpts,
-	type CreateAs,
-	type DeleteAs,
+	type Create,
+	type Delete,
 	ForbiddenError,
-	type ServiceMethodOpts,
+	type ServiceOpts,
 } from "./base-service";
 import { type PrismaClient, prisma, type Session } from "./client";
 
@@ -28,9 +27,8 @@ export type DeleteSessionFilter = FillUndefineds<
 
 class SessionService
 	implements
-		CreateAs<CreateSession, CreateSessionResult>,
-		DeleteAs<DeleteSessionFilter>
-{
+	Create<CreateSession, CreateSessionResult>,
+	Delete<DeleteSessionFilter> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -44,7 +42,7 @@ class SessionService
 	 */
 	async create(
 		input: CreateSession,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<CreateSessionResult> {
 		if (!canManageSessions(opts.actor, input.userId)) {
 			throw new ForbiddenError();
@@ -67,7 +65,7 @@ class SessionService
 	 * credential, and validating one is how an actor's identity gets
 	 * established in the first place.
 	 * */
-	async validate(token: string, opts?: ServiceMethodOpts) {
+	async validate(token: string, opts?: ServiceOpts) {
 		const client = opts?.tx ?? this.prisma;
 		const tokenHash = hashToken(token);
 		const session = await client.session.findUnique({
@@ -98,7 +96,7 @@ class SessionService
 	 * itself the proof of ownership (logout). A `userId` deletion ("log out
 	 * everywhere") is gated by {@link canManageSessions}.
 	 */
-	async delete(filter: DeleteSessionFilter, opts: ActingOpts): Promise<void> {
+	async delete(filter: DeleteSessionFilter, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		if (filter.token) {
 			await client.session.deleteMany({

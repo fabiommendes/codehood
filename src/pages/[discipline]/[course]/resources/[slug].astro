@@ -1,0 +1,76 @@
+---
+import MarkdownIt from "markdown-it";
+import CourseHeader from "@/components/CourseHeader.astro";
+import Badge from "@/components/ui/Badge";
+import { resourceService } from "@/db/resource.service";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { highlightCode } from "@/utils/highlight-code";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.user!;
+
+if (!slug) {
+	return Astro.rewrite("/404");
+}
+
+const resource = await resourceService.findOne(
+	{ ref: { courseId: course.id, slug } },
+	{ actor },
+);
+// LINK and FILE resources act from their row on the list page — they have no
+// page of their own here.
+if (!resource || (resource.type !== "MD" && resource.type !== "CODE")) {
+	return Astro.rewrite("/404");
+}
+
+// Content is rendered with no user-supplied HTML: markdown-it runs with
+// `html: false` (raw HTML in a note would execute on the app's own origin —
+// see "Markdown is rendered with HTML off" in dev/specs/to-do/resources.md),
+// and the CODE branch never interprets its text, only highlights it.
+const bodyHtml =
+	resource.type === "MD"
+		? new MarkdownIt({ html: false }).render(resource.data ?? "")
+		: await highlightCode(resource.data ?? "", resource.extra);
+---
+
+<AppLayout title={`${resource.title} · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="resources" />
+
+    <a href={`${href}/resources`} class="text-sm text-base-content/60 hover:text-primary">← Resources</a>
+
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <h2 class="text-xl font-semibold">{resource.title}</h2>
+      {resource.type === "CODE" && resource.extra && (
+        <Badge size="sm" style="outline">
+          {resource.extra}
+        </Badge>
+      )}
+    </div>
+    {resource.description && <p class="mt-1 text-sm text-base-content/60">{resource.description}</p>}
+
+    {
+      resource.type === "MD" ? (
+        <div class="card card-border mt-6 bg-base-200">
+          <div
+            class="card-body prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
+            set:html={bodyHtml}
+          />
+        </div>
+      ) : (
+        <div
+          class="mockup-code mt-6 overflow-x-auto text-sm [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+          set:html={bodyHtml}
+        />
+      )
+    }
+  </main>
+</AppLayout>

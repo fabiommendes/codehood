@@ -1,0 +1,98 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import ListRow from "@/components/ListRow.astro";
+import Alert from "@/components/ui/Alert";
+import Badge from "@/components/ui/Badge";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { loadCourse } from "@/utils/load-course";
+import {
+	mockQuestions,
+	questionTypeLabels,
+	statusBadgeClass,
+} from "@/utils/mock-questions";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+const own = mockQuestions.filter((q) => !q.sharedBy);
+const shared = mockQuestions.filter((q) => q.sharedBy);
+---
+
+<AppLayout title={`Questions · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="manage" />
+
+    <a href={`${href}/manage`} class="text-sm text-base-content/60 hover:text-primary">← Manage</a>
+    <h2 class="mt-2 text-xl font-semibold">Questions</h2>
+    <p class="mt-1 text-sm text-base-content/60">{course.discipline.name} · {mockQuestions.length} question{mockQuestions.length === 1 ? "" : "s"}</p>
+
+    <Alert variant="info" class="mt-4">
+      <span>
+        Preview data — the question bank doesn't sync from the CLI yet
+        (<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code> has no server side to
+        push to). This is a mock of what your bank and your team's shared bank will look like.
+      </span>
+    </Alert>
+
+    <section class="mt-10">
+      <h2 class="text-xl font-semibold">Your questions</h2>
+      <div class="mt-4 flex flex-col gap-3">
+        {
+          own.map((q) => (
+            <ListRow href={`${href}/questions/${q.slug}`}>
+              <p class="font-medium">{q.title}</p>
+              <div class="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-base-content/60">
+                <span>{questionTypeLabels[q.type]}</span>
+                {q.tags.map((tag) => (
+                  <Badge size="xs" style="outline">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+              <div slot="trailing" class="flex flex-col items-end gap-1">
+                <span class:list={["badge badge-sm", statusBadgeClass(q.status)]}>{q.status}</span>
+                <span class="text-xs text-base-content/50">Updated {q.updatedAt}</span>
+              </div>
+            </ListRow>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h2 class="text-xl font-semibold">Shared with you</h2>
+      <p class="mt-1 text-sm text-base-content/60">
+        Questions another member of your <span class="font-medium">Group</span> owns, visible to you for read access.
+      </p>
+      <div class="mt-4 flex flex-col gap-3">
+        {
+          shared.map((q) => (
+            <ListRow href={`${href}/questions/${q.slug}`}>
+              <p class="font-medium">{q.title}</p>
+              <div class="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-base-content/60">
+                <span>{questionTypeLabels[q.type]}</span>
+                {q.tags.map((tag) => (
+                  <Badge size="xs" style="outline">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+              <div slot="trailing" class="flex flex-col items-end gap-1">
+                <Badge size="sm" variant="info" style="soft">
+                  @{q.sharedBy?.author} · {q.sharedBy?.group}
+                </Badge>
+                <span class="text-xs text-base-content/50">Updated {q.updatedAt}</span>
+              </div>
+            </ListRow>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+</AppLayout>

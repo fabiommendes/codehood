@@ -1,9 +1,7 @@
 ---
-import ListRow from "@/components/ListRow.astro";
-import SectionHeader from "@/components/SectionHeader.astro";
+import CourseHeader from "@/components/CourseHeader.astro";
 import Alert from "@/components/ui/Alert";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -13,92 +11,26 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course } = result;
-
-const href = courseHref({
-	disciplineSlug: course.disciplineSlug,
-	username: course.instructor.username,
-	edition: course.edition,
-});
-
-// Still mocked — exams and submission data need question rendering, out of scope here.
-const exams = [
-	{
-		name: "Quiz 1: Variables & Loops",
-		status: "Closed",
-		submissions: "38 / 42",
-		badge: "badge-neutral",
-	},
-	{
-		name: "Midterm Exam",
-		status: "Open · due Mar 15",
-		submissions: "12 / 42",
-		badge: "badge-success",
-	},
-	{
-		name: "Final Project",
-		status: "Draft",
-		submissions: "0 / 42",
-		badge: "badge-outline",
-	},
-];
+const { course, href } = result;
 ---
 
 <AppLayout title={`Manage · ${course.discipline.name}`}>
-  <main class="mx-auto max-w-3xl px-4 py-10">
-    <a href={href} class="text-sm text-base-content/60 hover:text-primary">← {course.discipline.name}</a>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="manage" />
 
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-      <span class="badge badge-outline badge-sm font-mono">{course.disciplineSlug}</span>
-      <span class="badge badge-primary badge-sm">Instructor view</span>
-    </div>
-    <h1 class="mt-2 text-3xl font-bold">{course.discipline.name}</h1>
-    <p class="mt-1 text-base-content/60">
-      You're teaching this course · {course._count.enrollments} student{course._count.enrollments === 1 ? "" : "s"} enrolled
+    <p class="mt-4 text-sm text-base-content/60">
+      Enrollment — invite links, revocation, and the passphrase — lives on the{" "}
+      <a href={`${href}/roster`} class="text-primary hover:underline">Students tab</a>.
     </p>
 
-    <section class="mt-10">
-      <h2 class="text-xl font-semibold">Content sync</h2>
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold">Sync status</h2>
       <Alert variant="info" class="mt-4">
         <span>Preview data — content sync doesn't run yet. Nothing here reflects a real <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code>.</span>
       </Alert>
-    </section>
-
-    <section class="mt-10">
-      <SectionHeader title="Exams" href={`${href}/gradebook`} linkText="Open gradebook →" />
-      <Alert variant="info" class="mt-3">
-        <span>Preview data — exams and submissions aren't read from the database yet.</span>
-      </Alert>
-
-      <div class="mt-4 flex flex-col gap-3">
-        {
-          exams.map((exam) => (
-            <ListRow>
-              <p class="font-medium">{exam.name}</p>
-              <p class="text-sm text-base-content/60">{exam.status}</p>
-              <div slot="trailing" class="flex flex-col items-end gap-1">
-                <span class:list={["badge badge-sm", exam.badge]}>{exam.submissions}</span>
-              </div>
-            </ListRow>
-          ))
-        }
-      </div>
-    </section>
-
-    <section class="mt-10">
-      <h2 class="text-xl font-semibold">Course management</h2>
-      <div class="mt-4 flex flex-col gap-3">
-        <ListRow href={`${href}/roster`}>
-          <p class="font-medium">Roster</p>
-          <p class="text-sm text-base-content/60">
-            View and manage the {course._count.enrollments} student{course._count.enrollments === 1 ? "" : "s"} enrolled in this course.
-          </p>
-        </ListRow>
-        <ListRow href={`${href}/gradebook`}>
-          <p class="font-medium">Gradebook</p>
-          <p class="text-sm text-base-content/60">Submission status and scores across every exam.</p>
-        </ListRow>
-      </div>
+      <a href={`${href}/questions`} class="mt-3 inline-block text-sm text-primary hover:underline">
+        View the question bank (preview) →
+      </a>
     </section>
   </main>
 </AppLayout>

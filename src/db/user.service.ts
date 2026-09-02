@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
-import { hashPassword } from "@/auth/password";
+import type { z } from "zod";
+import { hashPassword, passwordStrengthIssues } from "@/auth/password";
 import {
 	canCreateUser,
 	canEditUser,
@@ -7,74 +8,47 @@ import {
 	userVisibility,
 } from "@/auth/permissions";
 import type { FillUndefineds } from "@/utils/types";
+import { Arg, Validate } from "@/utils/validate";
 import {
-	type ActingOpts,
-	type CreateAs,
-	type FindManyAs,
-	type FindOneAs,
+	type Create,
+	type FindMany,
+	type FindOne,
 	ForbiddenError,
-	type ServiceMethodOpts,
-	type UpdateAs,
+	type ServiceOpts,
+	SYSTEM,
+	type Update,
 } from "./base-service";
+import { type User as DbUser, type PrismaClient, prisma } from "./client";
 import {
-	type User as DbUser,
-	type PrismaClient,
-	prisma,
-	type Role,
-} from "./client";
+	type UserId,
+	userCreate,
+	userFilter,
+	userPK,
+	userSchema,
+	userUpdate,
+} from "./schemas";
 
-export interface CreateUser {
-	email: string;
-	name: string;
-	username: string;
-	role: Role;
-	password: string;
-	githubId?: string;
-	schoolId?: string;
+export type { UserId } from "./schemas";
+
+function brand<T extends { id: number }>(user: T): T & { id: UserId } {
+	return user as T & { id: UserId }; // branding is a runtime no-op
 }
 
-type FindOneBy = FillUndefineds<
-	| { publicId: string }
-	| { privateId: number }
-	| { email: string }
-	| { username: string }
-	| { githubId: string }
-	| { schoolId: string }
-	| { login: string } // either email or username
->;
-
-export interface FindManyBy {
-	usernames?: string[];
-}
-
-export interface UpdateUserFilter {
-	id: number;
-}
-
-/**
- * The editable profile fields. `username` is deliberately absent: it is a
- * stable identifier baked into course URLs (`Course.instructorId` targets
- * `User.username`), so it is set once at signup and never changes.
- */
-export interface UpdateProfile {
-	name: string;
-	email: string;
-	githubId: string;
-	schoolId: string;
-}
-
-/**
- * Thats the main User type returned from the service functions.
- */
-export type User = Omit<DbUser, "createdAt">;
+//
+// Type definitions
+//
+export type UserCreate = z.infer<typeof userCreate>;
+export type User = z.infer<typeof userSchema>;
+export type UserFilter = z.infer<typeof userFilter>;
+export type UserPK = z.infer<typeof userPK>;
+export type UserUpdate = z.infer<typeof userUpdate>;
 
 class UserService
 	implements
-		CreateAs<CreateUser, User>,
-		FindOneAs<FindOneBy, User>,
-		FindManyAs<FindManyBy, User>,
-		UpdateAs<UpdateUserFilter, UpdateProfile, User>
-{
+	Create<UserCreate, User>,
+	FindOne<UserPK, User>,
+	FindMany<UserFilter, User>,
+	Update<UserPK, UserUpdate, User> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -82,56 +56,63 @@ class UserService
 	}
 
 	/**
-	 * Create new user. Real accounts always go through invite redemption or
-	 * the `manage create-user` CLI — see {@link canCreateUser}.
+	 * Create a new user.
 	 */
-	async create(input: CreateUser, opts: ActingOpts): Promise<User> {
-		if (!canCreateUser(opts.actor)) {
-			throw new ForbiddenError();
-		}
+	@Validate({ service: true, returns: userSchema })
+	async create(
+		@Arg(userCreate) input: UserCreate,
+		opts: ServiceOpts,
+	): Promise<User> {
+		if (!canCreateUser(opts.actor)) throw new ForbiddenError();
 
 		const isAdmin = input.role === "ADMIN";
-		if (!input.githubId && !isAdmin) {
+		if (!input.githubId && !isAdmin)
 			throw new Error("githubId is required for non-admin users");
-		}
-		if (!input.schoolId && !isAdmin) {
+		if (!input.schoolId && !isAdmin)
 			throw new Error("schoolId is required for non-admin users");
-		}
 
 		const githubId = input.githubId ?? defaultHandle(input.username);
 		const schoolId = input.schoolId ?? defaultHandle(input.username);
 		const client = opts.tx ?? this.prisma;
 
-		return await client.user.create({
-			data: {
-				publicId: nanoid(10),
-				email: input.email,
-				name: input.name,
-				username: input.username,
-				role: input.role,
-				passwordHash: await hashPassword(input.password),
-				githubId,
-				schoolId,
-			},
-		});
+		return toUser(
+			await client.user.create({
+				data: {
+					publicId: nanoid(10),
+					email: input.email,
+					name: input.name,
+					username: input.username,
+					role: input.role,
+					passwordHash: await hashPassword(input.password),
+					githubId,
+					schoolId,
+				},
+			}),
+		);
 	}
 
 	/**
-	 * Finds a single user by one of the unique search fields. Throws
-	 * `FORBIDDEN` if the user exists but `actor` may not see it (see
-	 * {@link canViewUser}); returns `null` if it does not exist.
+	 * Finds a single user by one of the unique search fields.
+	 *
+	 * It accepts a single filter at a time, can search by id, publicId, email,
+	 * username, githubId, schoolId or login (email or username).
 	 */
-	async findOne(by: FindOneBy, opts: ActingOpts): Promise<User | null> {
+	@Validate({ service: true, returns: userSchema.nullable() })
+	async findOne(
+		@Arg(userFilter) filter: UserPK,
+		opts: ServiceOpts,
+	): Promise<User | null> {
 		const client = opts.tx ?? this.prisma;
 		let user: DbUser | null = null;
+		const by = filter as FillUndefineds<UserPK>; // zod doesn't narrow to a single field, so we do it here
 
-		if (by.publicId) {
+		if (by.id) {
+			user = await client.user.findUnique({
+				where: { id: by.id as UserId },
+			});
+		} else if (by.publicId) {
 			user = await client.user.findUnique({
 				where: { publicId: by.publicId },
-			});
-		} else if (by.privateId) {
-			user = await client.user.findUnique({
-				where: { id: by.privateId },
 			});
 		} else if (by.email) {
 			user = await client.user.findUnique({
@@ -156,17 +137,18 @@ class UserService
 		}
 
 		if (!user) return null;
-		if (!canViewUser(opts.actor, user)) {
+		if (!canViewUser(opts.actor, brand(user))) {
 			throw new ForbiddenError();
 		}
-		return user;
+		return toUser(user);
 	}
 
 	/**
 	 * Find many users by some search criteria, narrowed to what `actor` may
-	 * see (see {@link userVisibility}). Newest first.
+	 * see. Newest first.
 	 */
-	async findMany(by: FindManyBy, opts: ActingOpts): Promise<User[]> {
+	@Validate({ service: true, returns: userSchema.array() })
+	async findMany(by: UserFilter, opts: ServiceOpts): Promise<User[]> {
 		const client = opts.tx ?? this.prisma;
 		const users = await client.user.findMany({
 			where: {
@@ -176,65 +158,61 @@ class UserService
 				],
 			},
 			orderBy: { createdAt: "desc" },
+			take: by.take,
 		});
-		return users;
+		return users.map(toUser);
 	}
 
 	/**
-	 * Fetches a user by their raw numeric id (e.g. `context.locals.user.id`).
-	 * Distinct from `findOne({ id })`, which looks up by the public-facing id.
+	 * Updates the editable profile fields for a user.
 	 */
-	async getById(id: number, opts: ActingOpts): Promise<User | null> {
-		const client = opts.tx ?? this.prisma;
-		const user = await client.user.findUnique({ where: { id } });
-		if (!user) return null;
-		if (!canViewUser(opts.actor, user)) {
-			throw new ForbiddenError();
-		}
-		return user;
-	}
-
-	/**
-	 * Updates the editable profile fields for a user. Rejects any attempt to
-	 * smuggle a `username` change through `fields` — see {@link UpdateProfile}.
-	 */
+	@Validate({ service: true, returns: userSchema })
 	async update(
-		filter: UpdateUserFilter,
-		fields: UpdateProfile,
-		opts: ActingOpts,
+		@Arg(userPK) filter: UserPK,
+		@Arg(userUpdate) payload: UserUpdate,
+		opts: ServiceOpts,
 	): Promise<User> {
-		if (!canEditUser(opts.actor, filter.id)) {
-			throw new ForbiddenError();
-		}
-		if ("username" in fields) {
-			throw new Error(
-				"username cannot be changed: it is used as a stable identifier in course URLs",
-			);
-		}
+		const target = await this.findOne(filter, opts);
+
+		if (!target) throw new Error("user not found");
+		if (!canEditUser(opts.actor, target)) throw new ForbiddenError();
+
 		const client = opts.tx ?? this.prisma;
-		return client.user.update({ where: { id: filter.id }, data: fields });
+		return toUser(
+			await client.user.update({ where: { id: target.id }, data: payload }),
+		);
 	}
 
-	/**
-	 * Number of users in the database. System-only bootstrap utility — not
-	 * exposed to any actor-facing feature.
-	 */
-	async count(opts?: ServiceMethodOpts): Promise<number> {
-		const client = opts?.tx ?? this.prisma;
-		return await client.user.count();
-	}
-
+	// TODO: this method should be moved to the auth service.
 	/**
 	 * Update password for a user. Returns the password hash.
 	 */
+	@Validate({ service: true })
 	async updatePassword(
-		user: User,
+		@Arg(userSchema) user: User,
 		password: string,
-		opts: ActingOpts,
+		opts: ServiceOpts,
 	): Promise<{ hash: string }> {
-		if (!canEditUser(opts.actor, user.id)) {
-			throw new ForbiddenError();
+		if (!canEditUser(opts.actor, user)) throw new ForbiddenError();
+
+		// Validate password strength
+		const issues = await passwordStrengthIssues(password);
+		if (issues && opts.actor === SYSTEM) {
+			// System can define any password it wants, but we issue a warning
+			// anyway so that the system admin can see it in the logs.	
+			for (const issue of issues) {
+				console.warn(`[password-${issue.code}] for ${user.username}: ${issue.message}`);
+			}
+		} else if (issues) {
+			// If the actor is not SYSTEM, we throw an error if the password is weak.
+			// TODO: pick a better error class
+			throw new Error(
+				`Password does not meet strength requirements: ${issues
+					.map((issue) => issue.message)
+					.join(", ")}`,
+			);
 		}
+
 		const client = opts.tx ?? this.prisma;
 		const updated = await client.user.update({
 			where: { id: user.id },
@@ -246,9 +224,26 @@ class UserService
 
 export const userService = new UserService();
 
-/**
- * Synthetic handle for ADMIN accounts that don't need a real GitHub/school id.
- */
+//
+// Auxiliary functions
+//
+
+// Synthetic handle for ADMIN accounts that don't need a real GitHub/school id.
 function defaultHandle(username: string): string {
 	return `@${username}`;
+}
+
+// Convert a database user record to the public-facing user type.
+function toUser(dbUser: DbUser): User {
+	return {
+		publicId: dbUser.publicId,
+		id: dbUser.id as UserId, // branding is safe because it comes from the DB.
+		email: dbUser.email,
+		name: dbUser.name,
+		username: dbUser.username,
+		role: dbUser.role,
+		passwordHash: dbUser.passwordHash,
+		githubId: dbUser.githubId ?? "",
+		schoolId: dbUser.schoolId ?? "",
+	};
 }

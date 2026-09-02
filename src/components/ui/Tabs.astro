@@ -1,0 +1,88 @@
+---
+// Reusable tab strip: a flat underline style (a subtle full-width rule, the
+// active tab picked out in bold primary) used both by AdminTabs (page-linked
+// tabs across /admin/*) and by same-page tabs like /profile.
+//
+// Two modes, chosen by whether `name` is set:
+//   - Link mode (no `name`): each item needs an `href` — plain <a> tabs that
+//     navigate, exactly what AdminTabs needs.
+//   - Same-page mode (`name` set): each item's content goes in a slot named
+//     after its `key`. Renders one <input type="radio"> per tab (daisyUI's
+//     own `content: attr(aria-label)` trick supplies the visible label) and
+//     styles the active one with Tailwind's `checked:` variant — driven live
+//     by the browser's native radio state, not a server-computed class, so
+//     the highlight actually follows a click instead of freezing at whichever
+//     tab was active on load. Panels live *outside* the input row (shown via
+//     a generated `:has()` rule) rather than as the input's next sibling, so
+//     the strip keeps one clean row with the underline sitting right below
+//     it — the same shape as link-mode's border, instead of trailing off
+//     after all the (mostly hidden) panel content.
+export interface TabItem {
+	key: string;
+	label: string;
+	href?: string;
+}
+
+interface Props {
+	items: readonly TabItem[];
+	active: string;
+	name?: string;
+}
+
+const { items, active, name } = Astro.props;
+
+const activeClasses = "border-primary font-bold text-primary";
+const inactiveClasses = "border-transparent font-medium text-base-content/60";
+
+const panelCss = name
+	? items
+			.map(
+				(item) =>
+					`.tabs-scope-${name}:has(#${name}-${item.key}:checked) [data-tab-panel="${item.key}"] { display: block; }`,
+			)
+			.join("\n")
+	: "";
+---
+
+{
+	name ? (
+		<div class={`tabs-scope-${name}`}>
+			<div
+				role="tablist"
+				class="tabs mb-8 flex gap-6 border-b border-base-300"
+			>
+				{items.map((item) => (
+					<input
+						type="radio"
+						id={`${name}-${item.key}`}
+						name={name}
+						aria-label={item.label}
+						class="tab h-auto border-b-2 px-0 pb-3 text-sm border-transparent font-medium text-base-content/60 checked:border-primary checked:font-bold checked:text-primary"
+						checked={item.key === active}
+					/>
+					<div data-tab-panel={item.key} class="tab-content">
+						<slot name={item.key} />
+					</div>
+				))}
+			</div>
+			<style set:html={panelCss} />
+		</div>
+	) : (
+		<div role="tablist" class="mb-8 flex gap-6 overflow-x-auto border-b border-base-300">
+			{items.map((item) => (
+				<a
+					role="tab"
+					href={item.href}
+					class:list={[
+						"-mb-px shrink-0 border-b-2 pb-3 text-sm",
+						item.key === active
+							? activeClasses
+							: [inactiveClasses, "hover:text-base-content"],
+					]}
+				>
+					{item.label}
+				</a>
+			))}
+		</div>
+	)
+}

@@ -25,35 +25,36 @@
       }
     },
     "schemas": {
-      "CliLoginResponse": {
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "LoginResponse": {
         "type": "object",
         "properties": {
           "token": {
             "type": "string",
-            "description": "The raw API key. Shown once — store it; it can't be recovered later."
+            "description": "The raw API key. Shown once; it can't be recovered later."
           }
         },
         "required": [
           "token"
         ]
       },
-      "ApiError": {
+      "LoginRequest": {
         "type": "object",
         "properties": {
-          "error": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "error"
-        ]
-      },
-      "CliLoginRequest": {
-        "type": "object",
-        "properties": {
-          "email": {
+          "login": {
             "type": "string",
-            "format": "email"
+            "minLength": 1,
+            "description": "The user's email or username."
           },
           "password": {
             "type": "string",
@@ -61,11 +62,11 @@
           }
         },
         "required": [
-          "email",
+          "login",
           "password"
         ]
       },
-      "HealthOk": {
+      "HealthResponse": {
         "type": "object",
         "properties": {
           "status": {
@@ -111,51 +112,44 @@
     "parameters": {}
   },
   "paths": {
-    "/api/auth/cli-login": {
+    "/api/auth/logout": {
       "post": {
-        "operationId": "cliLogin",
-        "summary": "Exchange email/password for a CLI API key",
-        "description": "Verifies the given credentials and issues a new CLI-kind API key for that user, the same as one created on /profile.",
-        "tags": [
-          "Auth"
-        ],
-        "security": [],
+        "operationId": "handler",
+        "summary": "Logs out the current user.",
+        "description": "Logs out the current user by invalidating their session.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/token": {
+      "post": {
+        "operationId": "handler",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CliLoginRequest"
+                "$ref": "#/components/schemas/LoginRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "A new API key.",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CliLoginResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing or malformed email/password.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "The email/password pair does not match any user.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
+                  "$ref": "#/components/schemas/LoginResponse"
                 }
               }
             }
@@ -165,20 +159,16 @@
     },
     "/api/health": {
       "get": {
-        "operationId": "getHealth",
+        "operationId": "handler",
         "summary": "Liveness/readiness probe",
         "description": "Confirms the server can reach the database, not just that the process answers HTTP. Unauthenticated — uptime monitors and orchestration probes hitting this usually don't hold an API key.",
-        "tags": [
-          "Health"
-        ],
-        "security": [],
         "responses": {
           "200": {
-            "description": "The server is up and can reach the database.",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthOk"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }

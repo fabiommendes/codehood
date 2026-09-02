@@ -21,3 +21,28 @@ export function withActionErrors<Args extends unknown[], R>(
 		}
 	};
 }
+
+/**
+ * Like {@link withActionErrors}, but also surfaces a plain `Error`'s message
+ * as `BAD_REQUEST` instead of letting Astro mask it. Use this where the
+ * service's thrown messages ("2026-01" is not a valid slug", "Passphrase
+ * "AB12CD" is already in use") are written for the form they surface in, not
+ * for a log.
+ */
+export function withServiceErrors<Args extends unknown[], R>(
+	handler: (...args: Args) => Promise<R>,
+): (...args: Args) => Promise<R> {
+	return async (...args) => {
+		try {
+			return await handler(...args);
+		} catch (error) {
+			if (error instanceof ForbiddenError) {
+				throw new ActionError({ code: "FORBIDDEN", message: error.message });
+			}
+			if (error instanceof Error) {
+				throw new ActionError({ code: "BAD_REQUEST", message: error.message });
+			}
+			throw error;
+		}
+	};
+}

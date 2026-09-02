@@ -62,7 +62,7 @@ test("update() rejects any attempt to smuggle in a username change", async () =>
 		),
 	).rejects.toThrow(/username/i);
 
-	const reloaded = await userService.getById(user.id, FULL_ACCESS);
+	const reloaded = await userService.findOne({ id: user.id }, FULL_ACCESS);
 	expect(reloaded?.username).toBe("immutable-username");
 });
 
@@ -91,21 +91,35 @@ test("publicId is generated and unique per user", async () => {
 	expect(a.publicId).not.toBe(b.publicId);
 });
 
-test("create() rejects a non-system actor", async () => {
+test("create() rejects an instructor or student actor, accepts an admin", async () => {
 	await expect(
 		userService.create(
 			{
-				email: "not-system@codehood.test",
-				username: "not-system",
-				name: "Not System",
+				email: "not-admin@codehood.test",
+				username: "not-admin",
+				name: "Not Admin",
 				role: "STUDENT",
 				password: "x",
-				githubId: "not-system",
-				schoolId: "not-system",
+				githubId: "not-admin",
+				schoolId: "not-admin",
 			},
-			{ actor: { id: 1, role: "ADMIN" } },
+			{ actor: { id: 1, role: "INSTRUCTOR" } },
 		),
 	).rejects.toThrow();
+
+	const created = await userService.create(
+		{
+			email: "admin-registered@codehood.test",
+			username: "admin-registered",
+			name: "Admin Registered",
+			role: "STUDENT",
+			password: "x",
+			githubId: "admin-registered",
+			schoolId: "admin-registered",
+		},
+		{ actor: { id: 2, role: "ADMIN" } },
+	);
+	expect(created.username).toBe("admin-registered");
 });
 
 test("findMany visibility agrees with canViewUser: self sees only self, admin sees everyone", async () => {

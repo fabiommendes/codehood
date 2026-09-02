@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
-import { registry } from "./registry";
+import { registry } from ".";
 
 // Importing these registers their paths on `registry` as a side effect —
 // see ./registry.ts. Add a new handler module's import here whenever it
