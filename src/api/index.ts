@@ -46,6 +46,7 @@ export const courseApi = CRUD("/api/course", {
     service: db.course,
 });
 export const disciplinesApi = CRUD("/api/discipline", {
+    pk: "slug",
     name: "Discipline",
     entity: schema.disciplineSchema,
     create: schema.disciplineCreate,
@@ -56,6 +57,7 @@ export const disciplinesApi = CRUD("/api/discipline", {
     service: db.discipline,
 });
 export const editionApi = CRUD("/api/edition", {
+    pk: "slug",
     name: "Edition",
     entity: schema.editionSchema,
     create: schema.editionCreate,

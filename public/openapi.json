@@ -236,28 +236,21 @@
         }
       },
       "get": {
-        "operationId": "findManyApi-key",
+        "operationId": "listApi-key",
         "summary": "Find multiple ApiKeys.",
         "tags": [
           "Api Key"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "userId": {
-                    "type": "number"
-                  }
-                },
-                "required": [
-                  "userId"
-                ]
-              }
-            }
+        "parameters": [
+          {
+            "schema": {
+              "type": "number"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -320,28 +313,11 @@
     },
     "/api/api-key/[id]": {
       "get": {
-        "operationId": "findApi-key",
+        "operationId": "readApi-key",
         "summary": "Find a single ApiKey by id.",
         "tags": [
           "Api Key"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "number"
-                  }
-                },
-                "required": [
-                  "id"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -475,23 +451,6 @@
         "tags": [
           "Api Key"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "number"
-                  }
-                },
-                "required": [
-                  "id"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -753,65 +712,86 @@
         }
       },
       "get": {
-        "operationId": "findManyCalendar",
+        "operationId": "listCalendar",
         "summary": "Find multiple CalendarEvents.",
         "tags": [
           "Calendar Events"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "courseIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "number"
-                    }
-                  },
-                  "from": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "to": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "kinds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "LECTURE",
-                        "LAB",
-                        "EXAM",
-                        "REVIEW",
-                        "SEMINAR",
-                        "PROJECT",
-                        "SELF_STUDY",
-                        "HOLIDAY",
-                        "RECESS",
-                        "CANCELLED"
-                      ]
-                    }
-                  },
-                  "weeks": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    }
-                  },
-                  "limit": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
-                  }
-                }
+        "parameters": [
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
               }
-            }
+            },
+            "required": false,
+            "name": "courseIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "LECTURE",
+                  "LAB",
+                  "EXAM",
+                  "REVIEW",
+                  "SEMINAR",
+                  "PROJECT",
+                  "SELF_STUDY",
+                  "HOLIDAY",
+                  "RECESS",
+                  "CANCELLED"
+                ]
+              }
+            },
+            "required": false,
+            "name": "kinds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "required": false,
+            "name": "weeks",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -988,55 +968,11 @@
     },
     "/api/calendar/[id]": {
       "get": {
-        "operationId": "findCalendar",
+        "operationId": "readCalendar",
         "summary": "Find a single CalendarEvent by id.",
         "tags": [
           "Calendar Events"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "courseId": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "courseId",
-                          "slug"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -1436,50 +1372,6 @@
         "tags": [
           "Calendar Events"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "courseId": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "courseId",
-                          "slug"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -1524,10 +1416,12 @@
                   },
                   "startAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   },
                   "endAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   }
                 },
@@ -1617,14 +1511,17 @@
                         },
                         "startAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         },
                         "endAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         },
                         "createdAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         }
                       },
@@ -1716,31 +1613,37 @@
         }
       },
       "get": {
-        "operationId": "findManyCourse",
+        "operationId": "listCourse",
         "summary": "Find multiple Courses.",
         "tags": [
           "Courses"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "instructorUsername": {
-                    "type": "string"
-                  },
-                  "disciplineSlug": {
-                    "type": "string"
-                  },
-                  "editionSlug": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "instructorUsername",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "disciplineSlug",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "editionSlug",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -1818,14 +1721,17 @@
                           },
                           "startAt": {
                             "type": "string",
+                            "nullable": true,
                             "format": "date-time"
                           },
                           "endAt": {
                             "type": "string",
+                            "nullable": true,
                             "format": "date-time"
                           },
                           "createdAt": {
                             "type": "string",
+                            "nullable": true,
                             "format": "date-time"
                           }
                         },
@@ -1920,59 +1826,11 @@
     },
     "/api/course/[id]": {
       "get": {
-        "operationId": "findCourse",
+        "operationId": "readCourse",
         "summary": "Find a single Course by id.",
         "tags": [
           "Courses"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "disciplineSlug": {
-                            "type": "string"
-                          },
-                          "username": {
-                            "type": "string"
-                          },
-                          "edition": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "disciplineSlug",
-                          "username",
-                          "edition"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -2048,14 +1906,17 @@
                         },
                         "startAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         },
                         "endAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         },
                         "createdAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         }
                       },
@@ -2163,10 +2024,12 @@
                   },
                   "startAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   },
                   "endAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   }
                 }
@@ -2249,14 +2112,17 @@
                         },
                         "startAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         },
                         "endAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         },
                         "createdAt": {
                           "type": "string",
+                          "nullable": true,
                           "format": "date-time"
                         }
                       },
@@ -2353,54 +2219,6 @@
         "tags": [
           "Courses"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "disciplineSlug": {
-                            "type": "string"
-                          },
-                          "username": {
-                            "type": "string"
-                          },
-                          "edition": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "disciplineSlug",
-                          "username",
-                          "edition"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -2478,28 +2296,24 @@
         }
       },
       "get": {
-        "operationId": "findManyDiscipline",
+        "operationId": "listDiscipline",
         "summary": "Find multiple Disciplines.",
         "tags": [
           "Disciplines"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slugs": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
+        "parameters": [
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
-            }
+            },
+            "required": false,
+            "name": "slugs",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -2538,29 +2352,11 @@
     },
     "/api/discipline/[id]": {
       "get": {
-        "operationId": "findDiscipline",
-        "summary": "Find a single Discipline by id.",
+        "operationId": "readDiscipline",
+        "summary": "Find a single Discipline by slug.",
         "tags": [
           "Disciplines"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slug": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "slug"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -2595,7 +2391,7 @@
       },
       "patch": {
         "operationId": "updateDiscipline",
-        "summary": "Update a single Discipline by id.",
+        "summary": "Update a single Discipline by slug.",
         "tags": [
           "Disciplines"
         ],
@@ -2655,24 +2451,6 @@
         "tags": [
           "Disciplines"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slug": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "slug"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -2710,10 +2488,12 @@
                   },
                   "startAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   },
                   "endAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   }
                 },
@@ -2745,14 +2525,17 @@
                     },
                     "startAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     },
                     "endAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     },
                     "createdAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     }
                   },
@@ -2770,31 +2553,32 @@
         }
       },
       "get": {
-        "operationId": "findManyEdition",
+        "operationId": "listEdition",
         "summary": "Find multiple Editions.",
         "tags": [
           "Editions"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slugs": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "active": {
-                    "type": "boolean"
-                  }
-                }
+        "parameters": [
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
-            }
+            },
+            "required": false,
+            "name": "slugs",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean"
+            },
+            "required": false,
+            "name": "active",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -2815,14 +2599,17 @@
                       },
                       "startAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time"
                       },
                       "endAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time"
                       },
                       "createdAt": {
                         "type": "string",
+                        "nullable": true,
                         "format": "date-time"
                       }
                     },
@@ -2843,29 +2630,11 @@
     },
     "/api/edition/[id]": {
       "get": {
-        "operationId": "findEdition",
-        "summary": "Find a single Edition by id.",
+        "operationId": "readEdition",
+        "summary": "Find a single Edition by slug.",
         "tags": [
           "Editions"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slug": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "slug"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -2884,14 +2653,17 @@
                     },
                     "startAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     },
                     "endAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     },
                     "createdAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     }
                   },
@@ -2910,7 +2682,7 @@
       },
       "patch": {
         "operationId": "updateEdition",
-        "summary": "Update a single Edition by id.",
+        "summary": "Update a single Edition by slug.",
         "tags": [
           "Editions"
         ],
@@ -2926,10 +2698,12 @@
                   },
                   "startAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   },
                   "endAt": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date-time"
                   }
                 }
@@ -2955,14 +2729,17 @@
                     },
                     "startAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     },
                     "endAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     },
                     "createdAt": {
                       "type": "string",
+                      "nullable": true,
                       "format": "date-time"
                     }
                   },
@@ -2985,24 +2762,6 @@
         "tags": [
           "Editions"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "slug": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "slug"
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -3095,34 +2854,35 @@
         }
       },
       "get": {
-        "operationId": "findManyFile",
+        "operationId": "listFile",
         "summary": "Find multiple Files.",
         "tags": [
           "Files"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "number"
-                    }
-                  },
-                  "slugHashes": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
+        "parameters": [
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
               }
-            }
+            },
+            "required": false,
+            "name": "ids",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "required": false,
+            "name": "slugHashes",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -3174,43 +2934,11 @@
     },
     "/api/file/[id]": {
       "get": {
-        "operationId": "findFile",
+        "operationId": "readFile",
         "summary": "Find a single File by id.",
         "tags": [
           "Files"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "slugHash": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "slugHash"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -3331,38 +3059,6 @@
         "tags": [
           "Files"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "slugHash": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "slugHash"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -3555,43 +3251,49 @@
         }
       },
       "get": {
-        "operationId": "findManyResource",
+        "operationId": "listResource",
         "summary": "Find multiple Resources.",
         "tags": [
           "Resources"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "courseId": {
-                    "type": "number"
-                  },
-                  "types": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "LINK",
-                        "FILE",
-                        "CODE",
-                        "MD"
-                      ]
-                    }
-                  },
-                  "slugs": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
+        "parameters": [
+          {
+            "schema": {
+              "type": "number"
+            },
+            "required": false,
+            "name": "courseId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "LINK",
+                  "FILE",
+                  "CODE",
+                  "MD"
+                ]
               }
-            }
+            },
+            "required": false,
+            "name": "types",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "required": false,
+            "name": "slugs",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -3714,55 +3416,11 @@
     },
     "/api/resource/[id]": {
       "get": {
-        "operationId": "findResource",
+        "operationId": "readResource",
         "summary": "Find a single Resource by id.",
         "tags": [
           "Resources"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "courseId": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "courseId",
-                          "slug"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -4045,50 +3703,6 @@
         "tags": [
           "Resources"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "courseId": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "courseId",
-                          "slug"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -4223,25 +3837,21 @@
         }
       },
       "get": {
-        "operationId": "findManyTime-slot",
+        "operationId": "listTime-slot",
         "summary": "Find multiple TimeSlots.",
         "tags": [
           "Time Slots"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "courseId": {
-                    "type": "number"
-                  }
-                }
-              }
-            }
+        "parameters": [
+          {
+            "schema": {
+              "type": "number"
+            },
+            "required": false,
+            "name": "courseId",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4314,55 +3924,11 @@
     },
     "/api/time-slot/[id]": {
       "get": {
-        "operationId": "findTime-slot",
+        "operationId": "readTime-slot",
         "summary": "Find a single TimeSlot by id.",
         "tags": [
           "Time Slots"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "courseId": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "courseId",
-                          "slug"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -4540,50 +4106,6 @@
         "tags": [
           "Time Slots"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "ref": {
-                        "type": "object",
-                        "properties": {
-                          "courseId": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "courseId",
-                          "slug"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "ref"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -4714,33 +4236,34 @@
         }
       },
       "get": {
-        "operationId": "findManyUser",
+        "operationId": "listUser",
         "summary": "Find multiple Users.",
         "tags": [
           "Users"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "usernames": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "take": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 100
-                  }
-                }
+        "parameters": [
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
-            }
+            },
+            "required": false,
+            "name": "usernames",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "required": false,
+            "name": "take",
+            "in": "query"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4807,99 +4330,11 @@
     },
     "/api/user/[id]": {
       "get": {
-        "operationId": "findUser",
+        "operationId": "readUser",
         "summary": "Find a single User by id.",
         "tags": [
           "Users"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "publicId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "publicId"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "email": {
-                        "type": "string",
-                        "format": "email"
-                      }
-                    },
-                    "required": [
-                      "email"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "username": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "username"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "githubId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "githubId"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "schoolId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "schoolId"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "login": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "login"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -5058,94 +4493,6 @@
         "tags": [
           "Users"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "publicId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "publicId"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "email": {
-                        "type": "string",
-                        "format": "email"
-                      }
-                    },
-                    "required": [
-                      "email"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "username": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "username"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "githubId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "githubId"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "schoolId": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "schoolId"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "login": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "login"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -5162,7 +4509,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "operationId": "handler",
+        "operationId": "logout",
         "summary": "Logs out the current user.",
         "description": "Logs out the current user by invalidating their session.",
         "tags": [
@@ -5184,7 +4531,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "operationId": "handler",
+        "operationId": "login",
         "tags": [
           "Authentication"
         ],
@@ -5214,7 +4561,7 @@
     },
     "/api/health": {
       "get": {
-        "operationId": "handler",
+        "operationId": "health",
         "summary": "Liveness/readiness probe",
         "description": "Confirms the server can reach the database, not just that the process answers HTTP. Unauthenticated — uptime monitors and orchestration probes hitting this usually don't hold an API key.",
         "tags": [

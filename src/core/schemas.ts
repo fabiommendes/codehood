@@ -164,9 +164,9 @@ export const disciplineFilter = z.object({
 export const editionSchema = z.object({
     slug: z.string().min(1),
     name: z.string().min(1),
-    startAt: z.date(),
-    endAt: z.date(),
-    createdAt: z.date(),
+    startAt: z.coerce.date(),
+    endAt: z.coerce.date(),
+    createdAt: z.coerce.date(),
 });
 export const editionCreate = editionSchema.pick({
     slug: true,
@@ -226,13 +226,13 @@ export const courseCreate = z.object({
     instructorUsername: z.string().min(1),
     editionSlug: z.string().min(1),
     description: z.string().optional(),
-    startAt: z.date(),
-    endAt: z.date(),
+    startAt: z.coerce.date(),
+    endAt: z.coerce.date(),
 });
 export const courseUpdate = z.object({
     description: z.string().optional(),
-    startAt: z.date().optional(),
-    endAt: z.date().optional(),
+    startAt: z.coerce.date().optional(),
+    endAt: z.coerce.date().optional(),
 });
 
 // Identifies a course the way its URL does — see `src/utils/course-url.ts`.

@@ -29,6 +29,7 @@ export const health = GET("/api/health", {
 		},
 	},
 	tags: ["System"],
+	operationId: "health",
 	handler: async (_) => {
 		try {
 			await prisma.$queryRaw`SELECT 1`;

@@ -1,10 +1,11 @@
 import type { ActionAPIContext } from "astro:actions";
 import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import type { APIContext } from "astro";
-import { type ZodType, z } from "zod";
+import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor as User } from "@/core/actor";
 import { InvalidData } from "@/core/error";
 import type { Crud } from "@/db/base-service";
+import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
 
 /// Actor = User? or User depending if API is public or not.
 type MaybeActor<IsPublic> = IsPublic extends false ? User : User | undefined;
@@ -65,12 +66,18 @@ function route<In, Out, IsPublic extends boolean = false>(
 ): Route<In, Out, MaybeActor<IsPublic>> {
 	const action = options.handler;
 
+	// GET and DELETE never carry a body, so their input travels as a query
+	// string instead; POST/PUT/PATCH keep documenting a JSON request body.
+	const readsQueryString = method === "get" || method === "delete";
+
 	const requestOpts = options.in
-		? {
-			request: {
-				body: { content: { "application/json": { schema: options.in } } },
-			},
-		}
+		? readsQueryString
+			? { request: { query: options.in as unknown as ZodObject } }
+			: {
+				request: {
+					body: { content: { "application/json": { schema: options.in } } },
+				},
+			}
 		: {};
 
 	registry.registerPath({
@@ -128,8 +135,15 @@ function route<In, Out, IsPublic extends boolean = false>(
 		const user = locals.actor as User | undefined;
 
 		const result = await safeAction(async () => {
-			const body = options.in ? await request.json() : undefined;
-			const validated = options.in?.safeParse(body);
+			const raw = options.in
+				? readsQueryString
+					? coerceForSchema(
+						options.in,
+						collectSearchParams(new URL(request.url).searchParams),
+					)
+					: await request.json()
+				: undefined;
+			const validated = options.in?.safeParse(raw);
 			if (validated?.error)
 				throw InvalidData.fromZodError(validated.error, validated.data);
 
@@ -250,7 +264,12 @@ export function CRUD<
 	path: `/api/${string}`,
 	options: CrudRouteOptions<Entity, Create, Filter, PkFilter, Update>,
 ) {
-	const pathWithId = `${path}/[${options.pk ?? "id"}]`;
+	// The dynamic segment is always literally `[id]`, because `hook.ts` injects
+	// exactly `/api/<resource>/[id]` into Astro and `ROUTES` is keyed by the
+	// pattern Astro hands back. `options.pk` names the FIELD that segment
+	// carries (e.g. a discipline is addressed by `slug`), not the segment.
+	const pathWithId = `${path}/[id]`;
+	const pkField = options.pk ?? "id";
 	const slug =
 		path.split("/").findLast((segment) => segment.length > 0) ?? path;
 	const slugTitle = slug?.charAt(0).toUpperCase() + slug?.slice(1);
@@ -259,6 +278,28 @@ export function CRUD<
 	const service = options.service;
 	const operationId = (action: string) => `${action}${slugTitle}`;
 	const hasUpdate = !isZodNeverScheme(options.update) || undefined;
+
+	// `findOne`/`update`/`delete` all key off the dynamic route segment
+	// (`pathWithId`), never off a body or query string — but that segment is
+	// still just as untrusted as either, so it goes through `filterPk` here
+	// exactly like a parsed body would, before any service ever sees it.
+	const parsePk = (params: Record<string, string>): PkFilter => {
+		// Rename the `[id]` segment to whatever field `filterPk` actually wants.
+		// The stale `id` is dropped, not just shadowed: a union PK like
+		// `coursePK` would otherwise match its `{ id }` branch off a value that
+		// was never an id.
+		const raw: Record<string, string> = { ...params };
+		if (pkField !== "id" && raw.id !== undefined) {
+			raw[pkField] = raw.id;
+			delete raw.id;
+		}
+		const validated = options.filterPk.safeParse(
+			coerceForSchema(options.filterPk, raw),
+		);
+		if (validated.error)
+			throw InvalidData.fromZodError(validated.error, validated.data);
+		return validated.data;
+	};
 
 	return {
 		create: POST(path, {
@@ -273,18 +314,17 @@ export function CRUD<
 			},
 		}),
 		findOne: GET(pathWithId, {
-			operationId: operationId("find"),
-			in: options.filterPk,
+			operationId: operationId("read"),
 			out: options.entity,
 			summary: `Find a single ${name} by ${options.pk ?? "id"}.`,
 			tags: options.tags,
 			errors: options.errors,
-			handler: async ({ actor, body }) => {
-				return service.findOne(body as PkFilter, { actor });
+			handler: async ({ actor, params }) => {
+				return service.findOne(parsePk(params), { actor });
 			},
 		}),
 		findMany: GET(path, {
-			operationId: operationId("findMany"),
+			operationId: operationId("list"),
 			in: options.filter,
 			out: options.entity.array(),
 			summary: `Find multiple ${namePlural}.`,
@@ -304,12 +344,11 @@ export function CRUD<
 				tags: options.tags,
 				errors: options.errors,
 				handler: async ({ actor, body, params }) => {
-					return service.update(params as PkFilter, body as Update, { actor });
+					return service.update(parsePk(params), body as Update, { actor });
 				},
 			}),
 		delete: DELETE(pathWithId, {
 			operationId: operationId("delete"),
-			in: options.filterPk,
 			// TOOD: maybe return the deleted entity.
 			out: z
 				.object({ success: z.boolean(), message: z.string() })
@@ -318,7 +357,7 @@ export function CRUD<
 			tags: options.tags,
 			errors: options.errors,
 			handler: async ({ actor, params }) => {
-				await service.delete(params as PkFilter, { actor });
+				await service.delete(parsePk(params), { actor });
 				return { success: true, message: `${name} deleted successfully` };
 			},
 		}),

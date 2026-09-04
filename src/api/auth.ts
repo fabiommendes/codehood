@@ -16,6 +16,7 @@ export const logout = POST("/api/auth/logout", {
 	summary: "Logs out the current user.",
 	description: "Logs out the current user by invalidating their session.",
 	tags: ["Authentication"],
+	operationId: "logout",
 	handler: async ({ actor }) => {
 		sessionService.delete({ userId: actor.id }, { actor });
 		return { success: true };
@@ -42,6 +43,7 @@ export const login = POST("/api/auth/login", {
 		})
 		.openapi("LoginResponse"),
 	tags: ["Authentication"],
+	operationId: "login",
 	handler: async ({ body }) => {
 		// TODO: move it to a service method
 		const { login, password } = body;
