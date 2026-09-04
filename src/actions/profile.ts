@@ -12,8 +12,8 @@ const FIELD_LABELS: Record<string, string> = {
 	schoolId: "school id",
 };
 
-/** 
- * Turns a Prisma unique-constraint violation into a message naming the conflicting field. 
+/**
+ * Turns a Prisma unique-constraint violation into a message naming the conflicting field.
  */
 function uniqueConstraintMessage(error: unknown): string | null {
 	if (
@@ -28,8 +28,8 @@ function uniqueConstraintMessage(error: unknown): string | null {
 	const meta = (error as { meta?: Record<string, unknown> }).meta ?? {};
 	const adapterFields = (
 		meta.driverAdapterError as
-		| { cause?: { constraint?: { fields?: unknown } } }
-		| undefined
+			| { cause?: { constraint?: { fields?: unknown } } }
+			| undefined
 	)?.cause?.constraint?.fields;
 	const target = meta.target ?? adapterFields;
 	const fields = Array.isArray(target)

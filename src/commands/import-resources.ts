@@ -134,7 +134,7 @@ export const importResourcesCommand = new Command("import-resources")
 			}
 			console.log(
 				"\nReminder: every /files/ URL is public forever, with no authentication check " +
-				"(FR-NFR-030/031/032). Never point a resource at content whose disclosure matters.",
+					"(FR-NFR-030/031/032). Never point a resource at content whose disclosure matters.",
 			);
 		},
 	);

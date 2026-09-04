@@ -2,7 +2,6 @@ import { z } from "zod";
 import { prisma } from "@/db/client";
 import { GET } from "./registry";
 
-
 /**
  * GET /api/health — liveness/readiness probe for the CLI, uptime monitors,
  * and orchestration systems. Unauthenticated on purpose: whatever is
@@ -12,20 +11,24 @@ import { GET } from "./registry";
  */
 export const health = GET("/api/health", {
 	isPublic: true,
-	out: z.object({
-		status: z.literal("ok"),
-		database: z.literal("ok"),
-	}).openapi("HealthResponse"),
+	out: z
+		.object({
+			status: z.literal("ok"),
+			database: z.literal("ok"),
+		})
+		.openapi("HealthResponse"),
 	summary: "Liveness/readiness probe",
 	description:
 		"Confirms the server can reach the database, not just that the process answers HTTP. Unauthenticated — uptime monitors and orchestration probes hitting this usually don't hold an API key.",
 	errors: {
 		503: {
 			description: "The server is up but cannot reach the database.",
-			schema: z.object({
-				status: z.literal("error"),
-				database: z.literal("unreachable"),
-			}).openapi("HealthError"),
+			schema: z
+				.object({
+					status: z.literal("error"),
+					database: z.literal("unreachable"),
+				})
+				.openapi("HealthError"),
 		},
 	},
 	tags: ["System"],
@@ -36,10 +39,9 @@ export const health = GET("/api/health", {
 		} catch {
 			throw new HttpError({ status: "error", database: "unreachable" }, 503);
 		}
-		return { status: "ok", database: "ok" }
-	}
+		return { status: "ok", database: "ok" };
+	},
 });
-
 
 // TODO: move this to a shared file, since it's used in multiple places
 // Define the representation from Error to JSON mapping

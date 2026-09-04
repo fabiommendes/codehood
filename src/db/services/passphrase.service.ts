@@ -52,13 +52,14 @@ export type PassphraseUpdate = z.infer<typeof passphraseUpdate>;
  */
 class PassphraseService
 	implements
-	Crud<{
-		entity: Passphrase;
-		pkFilter: PassphrasePK;
-		create: PassphraseCreate;
-		filter: PassphraseFilter;
-		update: PassphraseUpdate;
-	}> {
+		Crud<{
+			entity: Passphrase;
+			pkFilter: PassphrasePK;
+			create: PassphraseCreate;
+			filter: PassphraseFilter;
+			update: PassphraseUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

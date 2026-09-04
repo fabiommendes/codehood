@@ -9,7 +9,7 @@ import { courseHref } from "@/utils/course-url";
 import Layout from "./Layout.astro";
 
 interface Props {
-  title?: string;
+	title?: string;
 }
 
 const { title } = Astro.props;
@@ -18,75 +18,75 @@ const user = Astro.locals.actor;
 // Static for now — not tied to real enrollment data yet. Each item carries its own
 // accent color so the icon chip and active-state border stay in sync.
 const nav = [
-  {
-    label: "Home",
-    href: "/",
-    icon: "M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9",
-    chip: "bg-primary/10 text-primary",
-    active: "border-primary",
-    glow: "from-primary/10",
-  },
-  {
-    label: "My courses",
-    href: "/courses",
-    icon: "M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 17.5A2.5 2.5 0 0 1 6.5 15H20",
-    chip: "bg-secondary/10 text-secondary",
-    active: "border-secondary",
-    glow: "from-secondary/10",
-  },
-  {
-    label: "Calendar",
-    href: "/calendar",
-    icon: "M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z",
-    chip: "bg-info/10 text-info",
-    active: "border-info",
-    glow: "from-info/10",
-  },
-  {
-    label: "Profile",
-    href: "/profile",
-    icon: "M12 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM4.5 20c1.2-3.5 4.2-5.5 7.5-5.5s6.3 2 7.5 5.5",
-    chip: "bg-accent/10 text-accent",
-    active: "border-accent",
-    glow: "from-accent/10",
-  },
-  ...(user?.role === "ADMIN"
-    ? [
-        {
-          label: "Admin",
-          href: "/admin",
-          icon: "M12 3.5 4.5 6.5v5c0 5 3.2 8.5 7.5 9.5 4.3-1 7.5-4.5 7.5-9.5v-5L12 3.5Z",
-          chip: "bg-warning/10 text-warning",
-          active: "border-warning",
-          glow: "from-warning/10",
-        },
-      ]
-    : []),
+	{
+		label: "Home",
+		href: "/",
+		icon: "M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9",
+		chip: "bg-primary/10 text-primary",
+		active: "border-primary",
+		glow: "from-primary/10",
+	},
+	{
+		label: "My courses",
+		href: "/courses",
+		icon: "M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 17.5A2.5 2.5 0 0 1 6.5 15H20",
+		chip: "bg-secondary/10 text-secondary",
+		active: "border-secondary",
+		glow: "from-secondary/10",
+	},
+	{
+		label: "Calendar",
+		href: "/calendar",
+		icon: "M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z",
+		chip: "bg-info/10 text-info",
+		active: "border-info",
+		glow: "from-info/10",
+	},
+	{
+		label: "Profile",
+		href: "/profile",
+		icon: "M12 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM4.5 20c1.2-3.5 4.2-5.5 7.5-5.5s6.3 2 7.5 5.5",
+		chip: "bg-accent/10 text-accent",
+		active: "border-accent",
+		glow: "from-accent/10",
+	},
+	...(user?.role === "ADMIN"
+		? [
+				{
+					label: "Admin",
+					href: "/admin",
+					icon: "M12 3.5 4.5 6.5v5c0 5 3.2 8.5 7.5 9.5 4.3-1 7.5-4.5 7.5-9.5v-5L12 3.5Z",
+					chip: "bg-warning/10 text-warning",
+					active: "border-warning",
+					glow: "from-warning/10",
+				},
+			]
+		: []),
 ];
 
 // Cycle the logo's colors for course markers.
 const DOT_COLORS = [
-  "bg-primary",
-  "bg-error",
-  "bg-warning",
-  "bg-secondary",
-  "bg-info",
+	"bg-primary",
+	"bg-error",
+	"bg-warning",
+	"bg-secondary",
+	"bg-info",
 ];
 const courses = user
-  ? (await courseService.findMany({}, { actor: user })).map((course, i) => ({
-      code: course.disciplineSlug,
-      href: courseHref({
-        disciplineSlug: course.disciplineSlug,
-        username: course.instructor.username,
-        edition: course.editionSlug,
-      }),
-      dot: DOT_COLORS[i % DOT_COLORS.length],
-    }))
-  : [];
+	? (await courseService.findMany({}, { actor: user })).map((course, i) => ({
+			code: course.disciplineSlug,
+			href: courseHref({
+				disciplineSlug: course.disciplineSlug,
+				username: course.instructor.username,
+				edition: course.editionSlug,
+			}),
+			dot: DOT_COLORS[i % DOT_COLORS.length],
+		}))
+	: [];
 
 const currentPath = Astro.url.pathname;
 function isActive(href: string): boolean {
-  return href === "/" ? currentPath === "/" : currentPath.startsWith(href);
+	return href === "/" ? currentPath === "/" : currentPath.startsWith(href);
 }
 ---
 

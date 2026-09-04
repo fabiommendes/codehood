@@ -67,11 +67,12 @@ type RedeemableInvite = {
 
 class InviteService
 	implements
-	Create<InviteCreate, InviteCreateResult>,
-	FindOne<InviteTokenFilter, InviteWithCount>,
-	FindMany<InviteFilter, InviteListItem>,
-	Update<InvitePK, InviteUpdate, InviteWithCount>,
-	Delete<InvitePK> {
+		Create<InviteCreate, InviteCreateResult>,
+		FindOne<InviteTokenFilter, InviteWithCount>,
+		FindMany<InviteFilter, InviteListItem>,
+		Update<InvitePK, InviteUpdate, InviteWithCount>,
+		Delete<InvitePK>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

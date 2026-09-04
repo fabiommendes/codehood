@@ -4,7 +4,7 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import AdminTabs from "@/components/AdminTabs.astro";
 import DisciplinesTable, {
-  type DisciplineRow,
+	type DisciplineRow,
 } from "@/components/admin/DisciplinesTable";
 import PageKicker from "@/components/PageKicker.astro";
 import { courseService } from "@/db/services/course.service";
@@ -25,16 +25,16 @@ const disciplines = await disciplineService.findMany({});
 const courses = await courseService.findMany({}, { actor });
 const courseCounts = new Map<string, number>();
 for (const course of courses) {
-  courseCounts.set(
-    course.disciplineSlug,
-    (courseCounts.get(course.disciplineSlug) ?? 0) + 1,
-  );
+	courseCounts.set(
+		course.disciplineSlug,
+		(courseCounts.get(course.disciplineSlug) ?? 0) + 1,
+	);
 }
 
 const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
-  slug: discipline.slug,
-  name: discipline.name,
-  courseCount: courseCounts.get(discipline.slug) ?? 0,
+	slug: discipline.slug,
+	name: discipline.name,
+	courseCount: courseCounts.get(discipline.slug) ?? 0,
 }));
 ---
 

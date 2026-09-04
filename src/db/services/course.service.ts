@@ -66,13 +66,14 @@ type DbCourse = Prisma.CourseGetPayload<{ include: typeof courseInclude }>;
 
 class CourseService
 	implements
-	Crud<{
-		entity: Course;
-		pkFilter: CoursePK;
-		create: CourseCreate;
-		filter: CourseFilter;
-		update: CourseUpdate;
-	}> {
+		Crud<{
+			entity: Course;
+			pkFilter: CoursePK;
+			create: CourseCreate;
+			filter: CourseFilter;
+			update: CourseUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

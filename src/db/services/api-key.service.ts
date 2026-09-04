@@ -25,19 +25,20 @@ export type ApiKeyPK = z.infer<typeof apiKeyPK>;
 export type ApiKeyFilter = z.infer<typeof apiKeyFilter>;
 
 class ApiKeyService
-	implements Crud<{
-		entity: ApiKey;
-		pkFilter: ApiKeyPK;
-		create: ApiKeyCreate;
-		filter: ApiKeyFilter;
-		update: never;
-	}> {
+	implements
+		Crud<{
+			entity: ApiKey;
+			pkFilter: ApiKeyPK;
+			create: ApiKeyCreate;
+			filter: ApiKeyFilter;
+			update: never;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
 		this.prisma = client;
 	}
-
 
 	/**
 	 * Creates a new API key for `input.userId` and returns its raw token.
@@ -49,10 +50,7 @@ class ApiKeyService
 		returns: apiKeySchema,
 		args: [apiKeyCreate],
 	})
-	async create(
-		input: ApiKeyCreate,
-		opts: ServiceOpts,
-	): Promise<ApiKey> {
+	async create(input: ApiKeyCreate, opts: ServiceOpts): Promise<ApiKey> {
 		if (!canManageApiKeys(opts.actor, input.userId)) {
 			throw new NotAllowed({ action: "create-api-key" });
 		}
@@ -146,12 +144,26 @@ class ApiKeyService
 	}
 
 	/**
-	 * API keys are immutable after creation. 
+	 * API keys are immutable after creation.
 	 */
-	update(_filter: ApiKeyPK, _data: never, _opts: ServiceOpts): Promise<{ id: number & z.core.$brand<"ApiKeyId">; keyHash: string; name: string; kind: "CLI" | "BOT"; userId: number & z.core.$brand<"UserId">; lastUsedAt: Date | null; createdAt: Date; token?: string | undefined; }> {
-		throw new RuleViolation({ message: "Update method not implemented for API keys" });
+	update(
+		_filter: ApiKeyPK,
+		_data: never,
+		_opts: ServiceOpts,
+	): Promise<{
+		id: number & z.core.$brand<"ApiKeyId">;
+		keyHash: string;
+		name: string;
+		kind: "CLI" | "BOT";
+		userId: number & z.core.$brand<"UserId">;
+		lastUsedAt: Date | null;
+		createdAt: Date;
+		token?: string | undefined;
+	}> {
+		throw new RuleViolation({
+			message: "Update method not implemented for API keys",
+		});
 	}
-
 }
 
 export const apiKeyService = new ApiKeyService();

@@ -9,15 +9,15 @@ import CenteredLayout from "@/layouts/CenteredLayout.astro";
 const { token } = Astro.params;
 const result = Astro.getActionResult(actions.auth.acceptInvite);
 if (result && !result.error) {
-  return Astro.redirect("/");
+	return Astro.redirect("/");
 }
 
 const invite = token
-  ? await inviteService.findOne({ token }, FULL_ACCESS)
-  : null;
+	? await inviteService.findOne({ token }, FULL_ACCESS)
+	: null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
-  invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;
+	invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
 ---
 

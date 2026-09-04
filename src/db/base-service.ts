@@ -1,7 +1,6 @@
 import type { Actor } from "@/core/actor";
 import type { PrismaTx } from "./client";
 
-
 /**
  * Common set of options for service methods. `tx` is optional, but `actor` is required.
  */
@@ -78,8 +77,7 @@ type CrudT<
  */
 export interface Crud<T extends CrudT<unknown, unknown>>
 	extends Create<T["create"], T["entity"]>,
-	FindMany<T["filter"], T["entity"]>,
-	FindOne<T["pkFilter"], T["entity"]>,
-	Update<T["pkFilter"], T["update"], T["entity"]>,
-	Delete<T["pkFilter"]> { }
-
+		FindMany<T["filter"], T["entity"]>,
+		FindOne<T["pkFilter"], T["entity"]>,
+		Update<T["pkFilter"], T["update"], T["entity"]>,
+		Delete<T["pkFilter"]> {}

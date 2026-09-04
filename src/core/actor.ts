@@ -1,13 +1,14 @@
 import type { User } from "@/db/services/user.service";
 
 /**
- * A stripped down version of the User type with only the essential fields 
- * needed for authorization checks. 
- * 
- * This is used to avoid passing around the full User object when only a few 
+ * A stripped down version of the User type with only the essential fields
+ * needed for authorization checks.
+ *
+ * This is used to avoid passing around the full User object when only a few
  * fields are needed.
  */
-export interface UserActor extends Pick<User, "id" | "role" | "username" | "name"> { }
+export interface UserActor
+	extends Pick<User, "id" | "role" | "username" | "name"> {}
 
 /**
  * Sentinel actor for callers with no user behind them.
@@ -21,10 +22,10 @@ export interface UserActor extends Pick<User, "id" | "role" | "username" | "name
 export const SYSTEM = Symbol("system");
 
 /**
- * The actor abstracts the entity performing an action, which may be a user or 
+ * The actor abstracts the entity performing an action, which may be a user or
  * the system itself.
- * 
- * This allows for consistent permission checks and auditing across the 
+ *
+ * This allows for consistent permission checks and auditing across the
  * application.
  */
 export type Actor = UserActor | typeof SYSTEM;

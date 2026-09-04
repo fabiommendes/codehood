@@ -39,13 +39,14 @@ export type UserUpdate = z.infer<typeof userUpdate>;
 
 class UserService
 	implements
-	Crud<{
-		entity: User;
-		pkFilter: UserPK;
-		create: UserCreate;
-		filter: UserFilter;
-		update: UserUpdate;
-	}> {
+		Crud<{
+			entity: User;
+			pkFilter: UserPK;
+			create: UserCreate;
+			filter: UserFilter;
+			update: UserUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -57,7 +58,8 @@ class UserService
 	 */
 	@Validate({ service: true, returns: userSchema, args: [userCreate] })
 	async create(input: UserCreate, opts: ServiceOpts): Promise<User> {
-		if (!canCreateUser(opts.actor)) throw new NotAllowed({ action: "create-user" });
+		if (!canCreateUser(opts.actor))
+			throw new NotAllowed({ action: "create-user" });
 
 		const isAdmin = input.role === "ADMIN";
 		if (!input.githubId && !isAdmin)
@@ -202,7 +204,8 @@ class UserService
 		password: string,
 		opts: ServiceOpts,
 	): Promise<{ hash: string }> {
-		if (!canEditUser(opts.actor, user)) throw new NotAllowed({ action: "update-user.password" });
+		if (!canEditUser(opts.actor, user))
+			throw new NotAllowed({ action: "update-user.password" });
 
 		// Validate password strength
 		const issues = await passwordStrengthIssues(password);

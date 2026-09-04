@@ -4,7 +4,10 @@ import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
 import { fileService } from "@/db/services/file.service";
-import { groupResourcesByType, resourceService } from "@/db/services/resource.service";
+import {
+	groupResourcesByType,
+	resourceService,
+} from "@/db/services/resource.service";
 import { userService } from "@/db/services/user.service";
 
 // A random suffix, not an incrementing counter: this file's own `tag()`

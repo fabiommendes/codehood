@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { canViewCourse } from "@/auth/permissions";
-import { FULL_ACCESS } from "@/core/actor";
-import { SYSTEM } from "@/core/actor";
+import { FULL_ACCESS, SYSTEM } from "@/core/actor";
 import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";

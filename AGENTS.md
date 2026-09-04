@@ -61,6 +61,22 @@ changelog. If you find any bugs, create a new issue in `dev/issues/`. If the
 bug is simple, create a regression test and fix it. If it is complex, ask the
 human for help.
 
+## Linting
+
+Never hand-fix what Biome can fix itself. Auto-fix first, then run the linter as
+a final check, and only investigate what survives:
+
+```
+pnpm exec biome check --write .   # auto-fix
+pnpm run lint                     # final check — must exit 0
+```
+
+Both steps are required before calling a task done. `pnpm run lint` is what CI
+runs (`.github/workflows/ci.yml`), so a task is not finished while it fails.
+
+Checking only the files you touched is not enough — CI lints the whole project,
+so run it project-wide.
+
 ## Astro Development
 
 When starting the dev server, use background mode:

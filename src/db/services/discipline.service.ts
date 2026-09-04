@@ -32,13 +32,14 @@ export type DisciplineUpdate = z.infer<typeof disciplineUpdate>;
  */
 class DisciplineService
 	implements
-	Crud<{
-		entity: Discipline;
-		pkFilter: DisciplinePK;
-		create: DisciplineCreate;
-		filter: DisciplineFilter;
-		update: DisciplineUpdate;
-	}> {
+		Crud<{
+			entity: Discipline;
+			pkFilter: DisciplinePK;
+			create: DisciplineCreate;
+			filter: DisciplineFilter;
+			update: DisciplineUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

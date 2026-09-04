@@ -86,13 +86,14 @@ type DbEvent = Prisma.CalendarEventGetPayload<{
 
 class CalendarEventService
 	implements
-	Crud<{
-		entity: CalendarEvent;
-		pkFilter: CalendarEventPK;
-		create: CalendarEventCreate;
-		filter: CalendarEventFilter;
-		update: CalendarEventUpdate;
-	}> {
+		Crud<{
+			entity: CalendarEvent;
+			pkFilter: CalendarEventPK;
+			create: CalendarEventCreate;
+			filter: CalendarEventFilter;
+			update: CalendarEventUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

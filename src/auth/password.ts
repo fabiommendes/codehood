@@ -102,7 +102,9 @@ let WILDLEEK: WildLeek | undefined;
 
 async function passwordInTheWild(password: string): Promise<boolean> {
 	if (!WILDLEEK) {
-		const module = (await import("wildleek" as unknown as "wildleek")) as { default: WildLeek };
+		const module = (await import("wildleek" as unknown as "wildleek")) as {
+			default: WildLeek;
+		};
 		WILDLEEK = module.default;
 	}
 	return WILDLEEK(password);

@@ -24,27 +24,27 @@ const courseIds = courses.map((c) => c.id);
 // A per-course color dot, cycling through a fixed palette so the same course
 // always reads the same color within one page load.
 const DOT_PALETTE = [
-  "bg-primary",
-  "bg-error",
-  "bg-warning",
-  "bg-success",
-  "bg-info",
-  "bg-secondary",
-  "bg-accent",
-  "bg-neutral",
+	"bg-primary",
+	"bg-error",
+	"bg-warning",
+	"bg-success",
+	"bg-info",
+	"bg-secondary",
+	"bg-accent",
+	"bg-neutral",
 ];
 const courseColor = new Map(
-  courses.map((c, i) => [c.id, DOT_PALETTE[i % DOT_PALETTE.length]]),
+	courses.map((c, i) => [c.id, DOT_PALETTE[i % DOT_PALETTE.length]]),
 );
 const courseHrefs = new Map(
-  courses.map((c) => [
-    c.id,
-    courseHref({
-      disciplineSlug: c.disciplineSlug,
-      username: c.instructor.username,
-      edition: c.editionSlug,
-    }),
-  ]),
+	courses.map((c) => [
+		c.id,
+		courseHref({
+			disciplineSlug: c.disciplineSlug,
+			username: c.instructor.username,
+			edition: c.editionSlug,
+		}),
+	]),
 );
 const courseNames = new Map(courses.map((c) => [c.id, c.discipline.name]));
 
@@ -52,15 +52,15 @@ const now = new Date();
 const monthParam = Astro.url.searchParams.get("month");
 const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
 const [year, month] = monthMatch
-  ? [Number(monthMatch[1]), Number(monthMatch[2])]
-  : localDateOf(now).slice(0, 7).split("-").map(Number);
+	? [Number(monthMatch[1]), Number(monthMatch[2])]
+	: localDateOf(now).slice(0, 7).split("-").map(Number);
 
 const monthStart = toInstant(`${year}-${String(month).padStart(2, "0")}-01`, 0);
 const nextMonthYear = month === 12 ? year + 1 : year;
 const nextMonth = month === 12 ? 1 : month + 1;
 const monthEnd = toInstant(
-  `${nextMonthYear}-${String(nextMonth).padStart(2, "0")}-01`,
-  0,
+	`${nextMonthYear}-${String(nextMonth).padStart(2, "0")}-01`,
+	0,
 );
 
 const prevMonth = month === 1 ? 12 : month - 1;
@@ -69,24 +69,24 @@ const nextHref = `/calendar?month=${nextMonthYear}-${String(nextMonth).padStart(
 const prevHref = `/calendar?month=${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`;
 
 const monthEvents =
-  courseIds.length > 0
-    ? await calendarEventService.findMany(
-        { courseIds, from: monthStart, to: monthEnd },
-        { actor },
-      )
-    : [];
+	courseIds.length > 0
+		? await calendarEventService.findMany(
+				{ courseIds, from: monthStart, to: monthEnd },
+				{ actor },
+			)
+		: [];
 
 const eventsByDay = new Map<string, typeof monthEvents>();
 for (const event of monthEvents) {
-  const day = localDateOf(event.startAt);
-  eventsByDay.set(day, [...(eventsByDay.get(day) ?? []), event]);
+	const day = localDateOf(event.startAt);
+	eventsByDay.set(day, [...(eventsByDay.get(day) ?? []), event]);
 }
 
 const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
 const startWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
 const cells: (number | null)[] = [
-  ...Array(startWeekday).fill(null),
-  ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+	...Array(startWeekday).fill(null),
+	...Array.from({ length: daysInMonth }, (_, i) => i + 1),
 ];
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // timeZone: "UTC" is deliberate and correct here, not a violation of "always
@@ -96,18 +96,18 @@ const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // calendar date it represents (the exact "Jan 31 for Feb 1st" bug the
 // SERVER_TZ rule exists to prevent — see src/utils/schedule-time.ts).
 const monthLabel = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
+	month: "long",
+	year: "numeric",
+	timeZone: "UTC",
 }).format(new Date(Date.UTC(year, month - 1, 1)));
 
 const upcoming =
-  courseIds.length > 0
-    ? await calendarEventService.findMany(
-        { courseIds, from: now, limit: 5 },
-        { actor },
-      )
-    : [];
+	courseIds.length > 0
+		? await calendarEventService.findMany(
+				{ courseIds, from: now, limit: 5 },
+				{ actor },
+			)
+		: [];
 ---
 
 <AppLayout title="Calendar">

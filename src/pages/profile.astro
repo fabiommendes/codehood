@@ -10,20 +10,20 @@ import { userService } from "@/db/services/user.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 const logoutEverywhereResult = Astro.getActionResult(
-  actions.profile.logoutEverywhere,
+	actions.profile.logoutEverywhere,
 );
 if (logoutEverywhereResult && !logoutEverywhereResult.error) {
-  return Astro.redirect("/login");
+	return Astro.redirect("/login");
 }
 
 if (!Astro.locals.actor) {
-  return Astro.redirect("/login");
+	return Astro.redirect("/login");
 }
 
 const actor = Astro.locals.actor;
 const user = await userService.findOne({ id: actor.id }, { actor });
 if (!user) {
-  return Astro.redirect("/login");
+	return Astro.redirect("/login");
 }
 
 const apiKeys = await apiKeyService.findMany({ userId: user.id }, { actor });
@@ -34,27 +34,27 @@ const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
 const revokeApiKeyResult = Astro.getActionResult(actions.auth.revokeApiKey);
 
 function formatDate(date: Date | null): string {
-  if (!date) return "never";
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+	if (!date) return "never";
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
 }
 
 // Land on whichever tab the just-submitted form lives on, so a validation
 // error (or a fresh success message) doesn't get hidden behind "Details".
 const activeTab: "details" | "account" | "apikeys" =
-  createApiKeyResult || revokeApiKeyResult
-    ? "apikeys"
-    : passwordResult || logoutEverywhereResult
-      ? "account"
-      : "details";
+	createApiKeyResult || revokeApiKeyResult
+		? "apikeys"
+		: passwordResult || logoutEverywhereResult
+			? "account"
+			: "details";
 
 const profileTabs = [
-  { key: "details", label: "Details" },
-  { key: "account", label: "Account" },
-  { key: "apikeys", label: "API keys" },
+	{ key: "details", label: "Details" },
+	{ key: "account", label: "Account" },
+	{ key: "apikeys", label: "API keys" },
 ];
 ---
 

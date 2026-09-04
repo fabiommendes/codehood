@@ -18,17 +18,17 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 
 if (!slug) {
-  return Astro.rewrite("/404");
+	return Astro.rewrite("/404");
 }
 
 const resource = await resourceService.findOne(
-  { ref: { courseId: course.id, slug } },
-  { actor },
+	{ ref: { courseId: course.id, slug } },
+	{ actor },
 );
 // LINK and FILE resources act from their row on the list page — they have no
 // page of their own here.
 if (!resource || (resource.type !== "MD" && resource.type !== "CODE")) {
-  return Astro.rewrite("/404");
+	return Astro.rewrite("/404");
 }
 
 // Content is rendered with no user-supplied HTML: markdown-it runs with
@@ -36,9 +36,9 @@ if (!resource || (resource.type !== "MD" && resource.type !== "CODE")) {
 // see "Markdown is rendered with HTML off" in dev/specs/to-do/resources.md),
 // and the CODE branch never interprets its text, only highlights it.
 const bodyHtml =
-  resource.type === "MD"
-    ? new MarkdownIt({ html: false }).render(resource.data ?? "")
-    : await highlightCode(resource.data ?? "", resource.extra);
+	resource.type === "MD"
+		? new MarkdownIt({ html: false }).render(resource.data ?? "")
+		: await highlightCode(resource.data ?? "", resource.extra);
 ---
 
 <AppLayout title={`${resource.title} · ${course.discipline.name}`}>

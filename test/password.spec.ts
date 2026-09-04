@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { hashPassword, passwordStrengthIssues, verifyPassword } from "@/auth/password";
+import {
+	hashPassword,
+	passwordStrengthIssues,
+	verifyPassword,
+} from "@/auth/password";
 
 // Regression: `common-passwords.json` is a plain JSON array. A namespace import
 // (`import * as X from "./x.json"`) gives an object with numeric-string keys, not

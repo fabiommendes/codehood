@@ -17,23 +17,23 @@ const forceLogoutResult = Astro.getActionResult(actions.admin.forceLogout);
 const createUserResult = Astro.getActionResult(actions.admin.createUser);
 
 const users = (await db.user.findMany(
-  {},
-  { actor: Astro.locals.actor },
+	{},
+	{ actor: Astro.locals.actor },
 )) as Array<User & { createdAt: Date }>;
 
 const userRows: UserRow[] = users.map((u) => ({
-  id: u.id,
-  name: u.name,
-  username: u.username,
-  email: u.email,
-  role: u.role,
-  createdAt: u.createdAt,
+	id: u.id,
+	name: u.name,
+	username: u.username,
+	email: u.email,
+	role: u.role,
+	createdAt: u.createdAt,
 }));
 
 const counts = {
-  ADMIN: users.filter((u) => u.role === "ADMIN").length,
-  INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
-  STUDENT: users.filter((u) => u.role === "STUDENT").length,
+	ADMIN: users.filter((u) => u.role === "ADMIN").length,
+	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
+	STUDENT: users.filter((u) => u.role === "STUDENT").length,
 };
 ---
 

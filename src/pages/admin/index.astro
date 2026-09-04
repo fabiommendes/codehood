@@ -30,58 +30,58 @@ const editionResult = Astro.getActionResult(actions.admin.createEdition);
 let inviteUrl: string | null = null;
 let inviteError: string | null = null;
 if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
-  const formData = await Astro.request.formData();
-  const email = formData.get("email");
-  if (typeof email === "string") {
-    const { data, error } = await Astro.callAction(
-      actions.auth.createPersonalInvite,
-      {
-        email,
-        role: "INSTRUCTOR",
-      },
-    );
-    if (error) {
-      inviteError = error.message || "Could not create the invite.";
-    } else {
-      inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
-    }
-  }
+	const formData = await Astro.request.formData();
+	const email = formData.get("email");
+	if (typeof email === "string") {
+		const { data, error } = await Astro.callAction(
+			actions.auth.createPersonalInvite,
+			{
+				email,
+				role: "INSTRUCTOR",
+			},
+		);
+		if (error) {
+			inviteError = error.message || "Could not create the invite.";
+		} else {
+			inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
+		}
+	}
 }
 
 const [users, courses, disciplines, editions, invites] = await Promise.all([
-  userService.findMany({}, { actor }),
-  courseService.findMany({}, { actor }),
-  disciplineService.findMany({}),
-  editionService.findMany({}),
-  inviteService.findMany({ kind: "PERSONAL" }, { actor }),
+	userService.findMany({}, { actor }),
+	courseService.findMany({}, { actor }),
+	disciplineService.findMany({}),
+	editionService.findMany({}),
+	inviteService.findMany({ kind: "PERSONAL" }, { actor }),
 ]);
 
 const userCounts = {
-  ADMIN: users.filter((u) => u.role === "ADMIN").length,
-  INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
-  STUDENT: users.filter((u) => u.role === "STUDENT").length,
+	ADMIN: users.filter((u) => u.role === "ADMIN").length,
+	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
+	STUDENT: users.filter((u) => u.role === "STUDENT").length,
 };
 
 const liveEditions = editions.filter((e) => isEditionOpen(e)).length;
 
 const disciplineSample =
-  disciplines
-    .slice(0, 3)
-    .map((d) => d.slug)
-    .join(", ") +
-  (disciplines.length > 3 ? ` & ${disciplines.length - 3} more` : "");
+	disciplines
+		.slice(0, 3)
+		.map((d) => d.slug)
+		.join(", ") +
+	(disciplines.length > 3 ? ` & ${disciplines.length - 3} more` : "");
 
 const pendingInvites: InviteRow[] = invites
-  .filter((invite) => invite.role === "INSTRUCTOR")
-  .map((invite) => ({
-    id: invite.id,
-    email: invite.email ?? "—",
-    createdByName: invite.createdBy.name,
-    createdAt: invite.createdAt,
-    expiresAt: invite.expiresAt,
-    maxUses: invite.maxUses,
-    redemptions: invite._count.redemptions,
-  }));
+	.filter((invite) => invite.role === "INSTRUCTOR")
+	.map((invite) => ({
+		id: invite.id,
+		email: invite.email ?? "—",
+		createdByName: invite.createdBy.name,
+		createdAt: invite.createdAt,
+		expiresAt: invite.expiresAt,
+		maxUses: invite.maxUses,
+		redemptions: invite._count.redemptions,
+	}));
 ---
 
 <AppLayout title="Admin · Overview">

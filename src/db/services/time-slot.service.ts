@@ -82,13 +82,14 @@ function minutesOverlap(
 
 class TimeSlotService
 	implements
-	Crud<{
-		entity: TimeSlot;
-		pkFilter: TimeSlotPK;
-		create: TimeSlotCreate;
-		filter: TimeSlotFilter;
-		update: TimeSlotUpdate;
-	}> {
+		Crud<{
+			entity: TimeSlot;
+			pkFilter: TimeSlotPK;
+			create: TimeSlotCreate;
+			filter: TimeSlotFilter;
+			update: TimeSlotUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

@@ -35,17 +35,19 @@ export type Undefineds<T> = { [K in KeysOfUnion<T>]: undefined };
 export type FillUndefineds<T> = Pretty<FillUndefinedsAux<T, KeysOfUnion<T>>>;
 type FillUndefinedsAux<T, Ks extends Key> = T extends { [key: Key]: unknown }
 	? Partial<{
-		[K in Exclude<Ks, keyof T>]: K extends keyof T ? T[K] : undefined;
-	}> & { [K in keyof T]: T[K] }
+			[K in Exclude<Ks, keyof T>]: K extends keyof T ? T[K] : undefined;
+		}> & { [K in keyof T]: T[K] }
 	: never;
 
 type ValueOfKeyAcrossUnion<T, K extends Key> = T extends { [key: Key]: unknown }
 	? K extends keyof T
-	? T[K]
-	: never
+		? T[K]
+		: never
 	: never;
 
-type IsKeyInEveryMember<T, K extends Key> = [T] extends [{ [P in K]: unknown }] ? true : false;
+type IsKeyInEveryMember<T, K extends Key> = [T] extends [{ [P in K]: unknown }]
+	? true
+	: false;
 
 /**
  * Intersection of all types in a union: a single object type with every key seen across
@@ -64,9 +66,13 @@ type IsKeyInEveryMember<T, K extends Key> = [T] extends [{ [P in K]: unknown }] 
  */
 export type IntersectUnion<T> = Pretty<
 	{
-		[K in KeysOfUnion<T> as IsKeyInEveryMember<T, K> extends true ? K : never]: ValueOfKeyAcrossUnion<T, K>;
+		[K in KeysOfUnion<T> as IsKeyInEveryMember<T, K> extends true
+			? K
+			: never]: ValueOfKeyAcrossUnion<T, K>;
 	} & {
-		[K in KeysOfUnion<T> as IsKeyInEveryMember<T, K> extends true ? never : K]?: ValueOfKeyAcrossUnion<T, K> | undefined;
+		[K in KeysOfUnion<T> as IsKeyInEveryMember<T, K> extends true ? never : K]?:
+			| ValueOfKeyAcrossUnion<T, K>
+			| undefined;
 	}
 >;
 
@@ -75,28 +81,31 @@ export type IntersectUnion<T> = Pretty<
  */
 export type ArrayToUnion<T extends readonly string[]> = T[number];
 
-
 /**
  * Make all properties that accept `undefined` optional.
  */
 export type ToOptional<T> = {
-	[K in keyof T as undefined extends T[K] ? never : K]-?: T[K]
+	[K in keyof T as undefined extends T[K] ? never : K]-?: T[K];
 } & {
-	[K in keyof T as undefined extends T[K] ? K : never]+?: Exclude<T[K], undefined>
+	[K in keyof T as undefined extends T[K] ? K : never]+?: Exclude<
+		T[K],
+		undefined
+	>;
 };
-
 
 /**
  * Like Pick<T, K>, but keys in T not selected became optional.
  */
-export type Require<T, K extends keyof T> = Pretty<{ [K2 in K]: T[K2] } & { [K2 in Exclude<keyof T, K>]?: T[K2] }>;
-
+export type Require<T, K extends keyof T> = Pretty<
+	{ [K2 in K]: T[K2] } & { [K2 in Exclude<keyof T, K>]?: T[K2] }
+>;
 
 /**
  * Like Pick<T, K>, but accept any extra optional keys.
  */
-export type Impl<T, K extends keyof T> = { [K2 in K]: T[K2] } & { [key: string]: unknown };
-
+export type Impl<T, K extends keyof T> = { [K2 in K]: T[K2] } & {
+	[key: string]: unknown;
+};
 
 /* -----------------------------------------------------------------------------------------------
  * Strings
@@ -113,8 +122,8 @@ export type Impl<T, K extends keyof T> = { [K2 in K]: T[K2] } & { [key: string]:
 export type Split<S extends string, Delim extends string> = Delim extends ""
 	? [S]
 	: S extends `${infer Head}${Delim}${infer Tail}`
-	? [Head, ...Split<Tail, Delim>]
-	: [S];
+		? [Head, ...Split<Tail, Delim>]
+		: [S];
 
 /**
  * Join a tuple of strings into a single string literal, using `Delim` as separator.
@@ -124,59 +133,112 @@ export type Split<S extends string, Delim extends string> = Delim extends ""
  * type Joined = Join<["a", "b", "c"], ".">; // "a.b.c"
  * ```
  */
-export type Join<Parts extends readonly string[], Delim extends string> = Parts extends readonly [
+export type Join<
+	Parts extends readonly string[],
+	Delim extends string,
+> = Parts extends readonly [
 	infer Head extends string,
 	...infer Tail extends string[],
 ]
 	? Tail extends []
-	? Head
-	: `${Head}${Delim}${Join<Tail, Delim>}`
+		? Head
+		: `${Head}${Delim}${Join<Tail, Delim>}`
 	: "";
 
 /**
  * True if `S` starts with `Prefix`.
  */
-export type StartsWith<S extends string, Prefix extends string> = S extends `${Prefix}${string}` ? true : false;
+export type StartsWith<
+	S extends string,
+	Prefix extends string,
+> = S extends `${Prefix}${string}` ? true : false;
 
 /**
  * True if `S` ends with `Suffix`.
  */
-export type EndsWith<S extends string, Suffix extends string> = S extends `${string}${Suffix}` ? true : false;
+export type EndsWith<
+	S extends string,
+	Suffix extends string,
+> = S extends `${string}${Suffix}` ? true : false;
 
 /**
  * True if `S` contains `Sub` anywhere.
  */
-export type Includes<S extends string, Sub extends string> = S extends `${string}${Sub}${string}` ? true : false;
+export type Includes<
+	S extends string,
+	Sub extends string,
+> = S extends `${string}${Sub}${string}` ? true : false;
 
 /**
  * Replace the first occurrence of `From` in `S` with `To`.
  */
-export type Replace<S extends string, From extends string, To extends string> = From extends ""
+export type Replace<
+	S extends string,
+	From extends string,
+	To extends string,
+> = From extends ""
 	? S
 	: S extends `${infer Head}${From}${infer Tail}`
-	? `${Head}${To}${Tail}`
-	: S;
+		? `${Head}${To}${Tail}`
+		: S;
 
 /**
  * Replace all occurrences of `From` in `S` with `To`.
  */
-export type ReplaceAll<S extends string, From extends string, To extends string> = From extends ""
+export type ReplaceAll<
+	S extends string,
+	From extends string,
+	To extends string,
+> = From extends ""
 	? S
 	: S extends `${infer Head}${From}${infer Tail}`
-	? `${Head}${To}${ReplaceAll<Tail, From, To>}`
-	: S;
+		? `${Head}${To}${ReplaceAll<Tail, From, To>}`
+		: S;
 
 type LowerAlphaNumChar =
-	| "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-	| "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
-	| "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
+	| "0"
+	| "1"
+	| "2"
+	| "3"
+	| "4"
+	| "5"
+	| "6"
+	| "7"
+	| "8"
+	| "9"
+	| "a"
+	| "b"
+	| "c"
+	| "d"
+	| "e"
+	| "f"
+	| "g"
+	| "h"
+	| "i"
+	| "j"
+	| "k"
+	| "l"
+	| "m"
+	| "n"
+	| "o"
+	| "p"
+	| "q"
+	| "r"
+	| "s"
+	| "t"
+	| "u"
+	| "v"
+	| "w"
+	| "x"
+	| "y"
+	| "z";
 
 type IsAlphaNum<S extends string> = S extends `${infer Head}${infer Tail}`
 	? Head extends LowerAlphaNumChar
-	? Tail extends ""
-	? true
-	: IsAlphaNum<Tail>
-	: false
+		? Tail extends ""
+			? true
+			: IsAlphaNum<Tail>
+		: false
 	: false;
 
 type IsSlugSegments<Parts extends readonly string[]> = Parts extends readonly [
@@ -184,8 +246,8 @@ type IsSlugSegments<Parts extends readonly string[]> = Parts extends readonly [
 	...infer Tail extends string[],
 ]
 	? IsAlphaNum<Head> extends true
-	? IsSlugSegments<Tail>
-	: false
+		? IsSlugSegments<Tail>
+		: false
 	: true;
 
 /**
@@ -200,8 +262,9 @@ type IsSlugSegments<Parts extends readonly string[]> = Parts extends readonly [
  * type D = IsSlug<"hello--world">; // false (double hyphen)
  * ```
  */
-export type IsSlug<S extends string> = S extends "" ? false : IsSlugSegments<Split<S, "-">>;
-
+export type IsSlug<S extends string> = S extends ""
+	? false
+	: IsSlugSegments<Split<S, "-">>;
 
 /**
  * True if `S` is an Astro dynamic route param: a slug wrapped in square brackets.
@@ -213,7 +276,9 @@ export type IsSlug<S extends string> = S extends "" ? false : IsSlugSegments<Spl
  * type C = IsParam<"[Discipline]">; // false (bracket contents must be a slug)
  * ```
  */
-export type IsParam<S extends string> = S extends `[${infer Name}]` ? IsSlug<Name> : false;
+export type IsParam<S extends string> = S extends `[${infer Name}]`
+	? IsSlug<Name>
+	: false;
 
 /**
  * Extract the slug name out of an Astro dynamic route param. Resolves to `never`
@@ -227,8 +292,8 @@ export type IsParam<S extends string> = S extends `[${infer Name}]` ? IsSlug<Nam
  */
 export type ParamToSlug<S extends string> = S extends `[${infer Name}]`
 	? IsSlug<Name> extends true
-	? Name
-	: never
+		? Name
+		: never
 	: never;
 
 /**
@@ -241,5 +306,6 @@ export type ParamToSlug<S extends string> = S extends `[${infer Name}]`
  * type B = ExtractParams<"/foo/bar">;               // never
  * ```
  */
-export type ExtractParams<S extends string> = ParamToSlug<Split<S, "/">[number]>;
-
+export type ExtractParams<S extends string> = ParamToSlug<
+	Split<S, "/">[number]
+>;

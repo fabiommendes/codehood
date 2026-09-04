@@ -48,13 +48,14 @@ export function blobPath(slugHash: string): string {
  */
 class FileService
 	implements
-	Crud<{
-		entity: File;
-		pkFilter: FilePK;
-		create: FileCreate;
-		filter: FileFilter;
-		update: FileUpdate;
-	}> {
+		Crud<{
+			entity: File;
+			pkFilter: FilePK;
+			create: FileCreate;
+			filter: FileFilter;
+			update: FileUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

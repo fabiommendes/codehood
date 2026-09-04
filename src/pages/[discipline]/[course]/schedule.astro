@@ -6,9 +6,9 @@ import MarkdownIt from "markdown-it";
 import CourseHeader from "@/components/CourseHeader.astro";
 import Alert from "@/components/ui/Alert";
 import {
-  type CalendarEvent,
-  calendarEventService,
-  isMeeting,
+	type CalendarEvent,
+	calendarEventService,
+	isMeeting,
 } from "@/db/services/calendar-event.service";
 import { timeSlotService } from "@/db/services/time-slot.service";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -28,46 +28,46 @@ const actor = Astro.locals.actor!;
 const md = new MarkdownIt();
 
 const WEEKDAY_LABEL: Record<string, string> = {
-  SUNDAY: "Sun",
-  MONDAY: "Mon",
-  TUESDAY: "Tue",
-  WEDNESDAY: "Wed",
-  THURSDAY: "Thu",
-  FRIDAY: "Fri",
-  SATURDAY: "Sat",
+	SUNDAY: "Sun",
+	MONDAY: "Mon",
+	TUESDAY: "Tue",
+	WEDNESDAY: "Wed",
+	THURSDAY: "Thu",
+	FRIDAY: "Fri",
+	SATURDAY: "Sat",
 };
 
 const slots = await timeSlotService.findMany(
-  { courseId: course.id },
-  { actor },
+	{ courseId: course.id },
+	{ actor },
 );
 const slotDayById = new Map(slots.map((s) => [s.id, s.day]));
 
 const events = await calendarEventService.findMany(
-  { courseIds: [course.id] },
-  { actor },
+	{ courseIds: [course.id] },
+	{ actor },
 );
 
 const weeks = new Map<number, CalendarEvent[]>();
 for (const event of events) {
-  weeks.set(event.week, [...(weeks.get(event.week) ?? []), event]);
+	weeks.set(event.week, [...(weeks.get(event.week) ?? []), event]);
 }
 const orderedWeeks = [...weeks.entries()].sort(([a], [b]) => a - b);
 
 const timeFmt = new Intl.DateTimeFormat("en-US", {
-  timeZone: SERVER_TZ,
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
+	timeZone: SERVER_TZ,
+	hour: "2-digit",
+	minute: "2-digit",
+	hourCycle: "h23",
 });
 function timeRange(event: CalendarEvent): string {
-  const start = timeFmt.format(event.startAt);
-  const end = timeFmt.format(endOf(event.startAt, event.durationMin));
-  return `${start}–${end}`;
+	const start = timeFmt.format(event.startAt);
+	const end = timeFmt.format(endOf(event.startAt, event.durationMin));
+	return `${start}–${end}`;
 }
 
 const meetingsHeld = events.filter(
-  (e) => isMeeting(e.kind) && e.kind !== "CANCELLED",
+	(e) => isMeeting(e.kind) && e.kind !== "CANCELLED",
 ).length;
 ---
 

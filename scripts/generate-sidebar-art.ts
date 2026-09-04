@@ -6,115 +6,115 @@ import { fileURLToPath } from "node:url";
 // src/styles/global.css, so the generated markup carries theme-aware classes
 // instead of hardcoded colors.
 const FILL_TO_CLASS: Record<string, string> = {
-    "#d3d7cf": "brand-mark-gray",
-    "#2980b9": "brand-mark-blue",
-    "#c0392b": "brand-mark-red",
-    "#f1c40f": "brand-mark-yellow",
-    "#27ae60": "brand-mark-green",
+	"#d3d7cf": "brand-mark-gray",
+	"#2980b9": "brand-mark-blue",
+	"#c0392b": "brand-mark-red",
+	"#f1c40f": "brand-mark-yellow",
+	"#27ae60": "brand-mark-green",
 };
 
 const rootDir = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "..",
+	path.dirname(fileURLToPath(import.meta.url)),
+	"..",
 );
 const publicDir = path.join(rootDir, "public");
 const componentsDir = path.join(rootDir, "src", "components");
 
 function toComponentName(svgFileName: string): string {
-    return svgFileName
-        .replace(/\.svg$/, "")
-        .split("-")
-        .map((part) => part[0].toUpperCase() + part.slice(1))
-        .join("");
+	return svgFileName
+		.replace(/\.svg$/, "")
+		.split("-")
+		.map((part) => part[0].toUpperCase() + part.slice(1))
+		.join("");
 }
 
 // Splits a `style="fill:#xxx;stroke:none;..."` attribute into the brand-mark
 // class for its fill color and the remaining declarations (fill-opacity is
 // dropped as redundant with the class, mix-blend-mode lives on .brand-mark).
 function convertStyle(
-    style: string,
-    svgFileName: string,
+	style: string,
+	svgFileName: string,
 ): { fillClass: string; rest: string } {
-    let fillClass = "";
-    const kept: string[] = [];
-    for (const decl of style
-        .split(";")
-        .map((s) => s.trim())
-        .filter(Boolean)) {
-        const [prop, value] = decl.split(":").map((s) => s.trim());
-        if (prop === "fill") {
-            const mapped = FILL_TO_CLASS[value.toLowerCase()];
-            if (!mapped)
-                throw new Error(`${svgFileName}: unknown fill color ${value}`);
-            fillClass = mapped;
-        } else if (prop === "mix-blend-mode" || prop === "fill-opacity") {
-        } else {
-            kept.push(`${prop}:${value}`);
-        }
-    }
-    if (!fillClass)
-        throw new Error(`${svgFileName}: path is missing a fill color`);
-    return { fillClass, rest: kept.join(";") };
+	let fillClass = "";
+	const kept: string[] = [];
+	for (const decl of style
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		const [prop, value] = decl.split(":").map((s) => s.trim());
+		if (prop === "fill") {
+			const mapped = FILL_TO_CLASS[value.toLowerCase()];
+			if (!mapped)
+				throw new Error(`${svgFileName}: unknown fill color ${value}`);
+			fillClass = mapped;
+		} else if (prop === "mix-blend-mode" || prop === "fill-opacity") {
+		} else {
+			kept.push(`${prop}:${value}`);
+		}
+	}
+	if (!fillClass)
+		throw new Error(`${svgFileName}: path is missing a fill color`);
+	return { fillClass, rest: kept.join(";") };
 }
 
 function convertPath(
-    pathTag: string,
-    indent: string,
-    svgFileName: string,
+	pathTag: string,
+	indent: string,
+	svgFileName: string,
 ): string {
-    const styleMatch = pathTag.match(/style="([^"]*)"/);
-    const dMatch = pathTag.match(/\sd="([^"]*)"/);
-    if (!dMatch)
-        throw new Error(`${svgFileName}: <path> is missing a d attribute`);
-    const { fillClass, rest } = convertStyle(styleMatch?.[1] ?? "", svgFileName);
-    const lines = [`${indent}<path`, `${indent}  class="${fillClass}"`];
-    lines.push(
-        rest ? `${indent}  style="${rest}"` : `${indent}  style="stroke:none"`,
-    );
-    lines.push(`${indent}  d="${dMatch[1]}"`);
-    lines.push(`${indent}></path>`);
-    return lines.join("\n");
+	const styleMatch = pathTag.match(/style="([^"]*)"/);
+	const dMatch = pathTag.match(/\sd="([^"]*)"/);
+	if (!dMatch)
+		throw new Error(`${svgFileName}: <path> is missing a d attribute`);
+	const { fillClass, rest } = convertStyle(styleMatch?.[1] ?? "", svgFileName);
+	const lines = [`${indent}<path`, `${indent}  class="${fillClass}"`];
+	lines.push(
+		rest ? `${indent}  style="${rest}"` : `${indent}  style="stroke:none"`,
+	);
+	lines.push(`${indent}  d="${dMatch[1]}"`);
+	lines.push(`${indent}></path>`);
+	return lines.join("\n");
 }
 
 function convertShapes(svgBody: string, svgFileName: string): string {
-    const elements: string[] = [];
-    const elementRe = /<g([^>]*)>([\s\S]*?)<\/g>|<path([^>]*?)\/>/g;
-    let match: RegExpExecArray | null;
-    // biome-ignore lint/suspicious/noAssignInExpressions: standard regex-loop idiom
-    while ((match = elementRe.exec(svgBody))) {
-        const [, gAttrs, gBody, pathAttrs] = match;
-        if (gAttrs !== undefined) {
-            const transform = gAttrs.match(/transform="([^"]*)"/)?.[1];
-            if (!transform)
-                throw new Error(`${svgFileName}: <g> is missing a transform attribute`);
-            const innerPaths = [...gBody.matchAll(/<path[^>]*?\/>/g)].map((m) =>
-                convertPath(m[0], "    ", svgFileName),
-            );
-            elements.push(
-                [`  <g transform="${transform}">`, ...innerPaths, "  </g>"].join("\n"),
-            );
-        } else {
-            elements.push(convertPath(`<path${pathAttrs}/>`, "  ", svgFileName));
-        }
-    }
-    return elements.join("\n");
+	const elements: string[] = [];
+	const elementRe = /<g([^>]*)>([\s\S]*?)<\/g>|<path([^>]*?)\/>/g;
+	let match: RegExpExecArray | null;
+	// biome-ignore lint/suspicious/noAssignInExpressions: standard regex-loop idiom
+	while ((match = elementRe.exec(svgBody))) {
+		const [, gAttrs, gBody, pathAttrs] = match;
+		if (gAttrs !== undefined) {
+			const transform = gAttrs.match(/transform="([^"]*)"/)?.[1];
+			if (!transform)
+				throw new Error(`${svgFileName}: <g> is missing a transform attribute`);
+			const innerPaths = [...gBody.matchAll(/<path[^>]*?\/>/g)].map((m) =>
+				convertPath(m[0], "    ", svgFileName),
+			);
+			elements.push(
+				[`  <g transform="${transform}">`, ...innerPaths, "  </g>"].join("\n"),
+			);
+		} else {
+			elements.push(convertPath(`<path${pathAttrs}/>`, "  ", svgFileName));
+		}
+	}
+	return elements.join("\n");
 }
 
 function generateComponent(svgFileName: string): string {
-    const svgSource = readFileSync(path.join(publicDir, svgFileName), "utf8");
-    const viewBox = svgSource.match(/viewBox="([^"]*)"/)?.[1];
-    if (!viewBox)
-        throw new Error(`${svgFileName}: <svg> is missing a viewBox attribute`);
+	const svgSource = readFileSync(path.join(publicDir, svgFileName), "utf8");
+	const viewBox = svgSource.match(/viewBox="([^"]*)"/)?.[1];
+	if (!viewBox)
+		throw new Error(`${svgFileName}: <svg> is missing a viewBox attribute`);
 
-    // Strip defs, Inkscape's namedview/guides, and XML comments to leave only
-    // the drawable <path>/<g> elements.
-    const body = svgSource
-        .replace(/<defs[^>]*\/>/, "")
-        .replace(/<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/, "")
-        .replace(/<!--[\s\S]*?-->/g, "");
-    const shapes = convertShapes(body, svgFileName);
+	// Strip defs, Inkscape's namedview/guides, and XML comments to leave only
+	// the drawable <path>/<g> elements.
+	const body = svgSource
+		.replace(/<defs[^>]*\/>/, "")
+		.replace(/<sodipodi:namedview[\s\S]*?<\/sodipodi:namedview>/, "")
+		.replace(/<!--[\s\S]*?-->/g, "");
+	const shapes = convertShapes(body, svgFileName);
 
-    return `---
+	return `---
 interface Props {
 	class?: string;
 }
@@ -143,16 +143,16 @@ ${shapes}
 }
 
 const svgFiles = readdirSync(publicDir).filter((name) =>
-    /^sidebar-art.*\.svg$/.test(name),
+	/^sidebar-art.*\.svg$/.test(name),
 );
 if (svgFiles.length === 0)
-    throw new Error(`No sidebar-art*.svg files found in ${publicDir}`);
+	throw new Error(`No sidebar-art*.svg files found in ${publicDir}`);
 
 for (const svgFileName of svgFiles) {
-    const componentName = toComponentName(svgFileName);
-    const outPath = path.join(componentsDir, `${componentName}.astro`);
-    writeFileSync(outPath, generateComponent(svgFileName));
-    console.log(
-        `Wrote ${path.relative(rootDir, outPath)} from ${path.relative(rootDir, path.join(publicDir, svgFileName))}`,
-    );
+	const componentName = toComponentName(svgFileName);
+	const outPath = path.join(componentsDir, `${componentName}.astro`);
+	writeFileSync(outPath, generateComponent(svgFileName));
+	console.log(
+		`Wrote ${path.relative(rootDir, outPath)} from ${path.relative(rootDir, path.join(publicDir, svgFileName))}`,
+	);
 }

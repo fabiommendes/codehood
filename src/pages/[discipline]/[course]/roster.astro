@@ -13,7 +13,7 @@ export const prerender = false;
 
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment, {
-  manage: true,
+	manage: true,
 });
 if ("redirect" in result) return result.redirect;
 const { course, href } = result;
@@ -23,7 +23,7 @@ const actor = Astro.locals.actor!;
 
 const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
 const passphraseResult = Astro.getActionResult(
-  actions.course.generatePassphrase,
+	actions.course.generatePassphrase,
 );
 
 // createClassroomInvite has no `accept: "form"` (see src/actions/auth.ts) — a plain
@@ -37,68 +37,68 @@ const passphraseResult = Astro.getActionResult(
 let inviteUrl: string | null = null;
 let inviteError: string | null = null;
 if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
-  const formData = await Astro.request.formData();
-  const maxUsesRaw = formData.get("maxUses");
-  const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
+	const formData = await Astro.request.formData();
+	const maxUsesRaw = formData.get("maxUses");
+	const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
 
-  const { data, error } = await Astro.callAction(
-    actions.auth.createClassroomInvite,
-    { courseId: course.id, maxUses },
-  );
+	const { data, error } = await Astro.callAction(
+		actions.auth.createClassroomInvite,
+		{ courseId: course.id, maxUses },
+	);
 
-  if (error) {
-    inviteError =
-      error.message ||
-      "You need to be logged in as an instructor to create an invite.";
-  } else {
-    inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
-  }
+	if (error) {
+		inviteError =
+			error.message ||
+			"You need to be logged in as an instructor to create an invite.";
+	} else {
+		inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
+	}
 }
 
 const students = await courseService.listStudents(course.id, { actor });
 const invites = await inviteService.findMany(
-  { courseId: course.id, kind: "CLASSROOM" },
-  { actor },
+	{ courseId: course.id, kind: "CLASSROOM" },
+	{ actor },
 );
 const activePassphrases = await passphraseService.findMany(
-  { courseId: course.id, active: true },
-  { actor },
+	{ courseId: course.id, active: true },
+	{ actor },
 );
 const currentPassphrase = activePassphrases[0] ?? null;
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
 }
 
 function formatTime(date: Date | string): string {
-  return new Date(date).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+	return new Date(date).toLocaleTimeString("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
 }
 
 const RENEW_ICON =
-  "M4 12a8 8 0 0 1 14.93-4M20 4v5h-5 M20 12a8 8 0 0 1-14.93 4M4 20v-5h5";
+	"M4 12a8 8 0 0 1 14.93-4M20 4v5h-5 M20 12a8 8 0 0 1-14.93 4M4 20v-5h5";
 const COPY_ICON =
-  "M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
+	"M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
 const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
 
 const csvFilename = `roster-${course.disciplineSlug}-${course.editionSlug}.csv`;
 const csvRows = [
-  ["Name", "Username", "Email", "GitHub", "School ID", "Enrolled"],
-  ...students.map((s) => [
-    s.name,
-    s.username,
-    s.email,
-    s.githubId,
-    s.schoolId,
-    s.enrolledAt.toISOString().slice(0, 10),
-  ]),
+	["Name", "Username", "Email", "GitHub", "School ID", "Enrolled"],
+	...students.map((s) => [
+		s.name,
+		s.username,
+		s.email,
+		s.githubId,
+		s.schoolId,
+		s.enrolledAt.toISOString().slice(0, 10),
+	]),
 ];
 ---
 

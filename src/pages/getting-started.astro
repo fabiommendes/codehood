@@ -12,8 +12,8 @@ if (!Astro.locals.actor) return Astro.redirect("/login");
 
 const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
 const apiKeys = await apiKeyService.findMany(
-  { userId: Astro.locals.actor.id },
-  { actor: Astro.locals.actor },
+	{ userId: Astro.locals.actor.id },
+	{ actor: Astro.locals.actor },
 );
 const hasKey = apiKeys.length > 0;
 ---

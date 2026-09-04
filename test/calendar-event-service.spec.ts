@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { canViewCourseContents } from "@/auth/permissions";
-import type { ServiceOpts } from "@/db/base-service";
 import { FULL_ACCESS, SYSTEM } from "@/core/actor";
+import type { ServiceOpts } from "@/db/base-service";
 import { prisma } from "@/db/client";
 import { calendarEventService } from "@/db/services/calendar-event.service";
 import { courseService } from "@/db/services/course.service";

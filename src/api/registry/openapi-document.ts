@@ -4,11 +4,10 @@ import { fileURLToPath } from "node:url";
 import { OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
 import { registry } from ".";
 
-// Importing this module triggers the import of all other api modules, 
+// Importing this module triggers the import of all other api modules,
 // registering their routes and schemas with the global `registry` object. This is
 // necessary for generating the OpenAPI document, which is built from the registry.
 import "@/api/registry/dynamicHandler";
-
 
 const rootDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),

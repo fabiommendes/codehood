@@ -22,34 +22,34 @@ const actor = Astro.locals.actor!;
 const myEnrollment = course.enrollments.find((e) => e.userId === actor.id);
 
 function formatDate(date: Date): string {
-  return formatDateTime(date, {
-    weekday: undefined,
-    hour: undefined,
-    minute: undefined,
-    year: "numeric",
-  });
+	return formatDateTime(date, {
+		weekday: undefined,
+		hour: undefined,
+		minute: undefined,
+		year: "numeric",
+	});
 }
 
 const WEEKDAY_LABEL: Record<string, string> = {
-  SUNDAY: "Sun",
-  MONDAY: "Mon",
-  TUESDAY: "Tue",
-  WEDNESDAY: "Wed",
-  THURSDAY: "Thu",
-  FRIDAY: "Fri",
-  SATURDAY: "Sat",
+	SUNDAY: "Sun",
+	MONDAY: "Mon",
+	TUESDAY: "Tue",
+	WEDNESDAY: "Wed",
+	THURSDAY: "Thu",
+	FRIDAY: "Fri",
+	SATURDAY: "Sat",
 };
 
 // The syllabus line and the next few meetings — see "Course home page" in
 // dev/specs/to-review/calendar.md. Both come from the same source the
 // Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await timeSlotService.findMany(
-  { courseId: course.id },
-  { actor },
+	{ courseId: course.id },
+	{ actor },
 );
 const nextEvents = await calendarEventService.findMany(
-  { courseIds: [course.id], from: new Date(), limit: 3 },
-  { actor },
+	{ courseIds: [course.id], from: new Date(), limit: 3 },
+	{ actor },
 );
 ---
 

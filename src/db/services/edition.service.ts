@@ -31,13 +31,14 @@ export type EditionUpdate = z.infer<typeof editionUpdate>;
  */
 class EditionService
 	implements
-	Crud<{
-		entity: Edition;
-		pkFilter: EditionPK;
-		create: EditionCreate;
-		filter: EditionFilter;
-		update: EditionUpdate;
-	}> {
+		Crud<{
+			entity: Edition;
+			pkFilter: EditionPK;
+			create: EditionCreate;
+			filter: EditionFilter;
+			update: EditionUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

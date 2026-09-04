@@ -142,7 +142,8 @@ function validateArgs<T extends unknown[]>(schemas: SchemaItem[], args: T): T {
 		const arg = args[i];
 		if (schema) {
 			const validationResult = schema.safeParse(arg);
-			if (!validationResult.success) throw InvalidData.fromZodError(validationResult.error, arg);
+			if (!validationResult.success)
+				throw InvalidData.fromZodError(validationResult.error, arg);
 			args[i] = validationResult.data;
 		}
 	}

@@ -74,10 +74,10 @@ function route<In, Out, IsPublic extends boolean = false>(
 		? readsQueryString
 			? { request: { query: options.in as unknown as ZodObject } }
 			: {
-				request: {
-					body: { content: { "application/json": { schema: options.in } } },
-				},
-			}
+					request: {
+						body: { content: { "application/json": { schema: options.in } } },
+					},
+				}
 		: {};
 
 	registry.registerPath({
@@ -138,9 +138,9 @@ function route<In, Out, IsPublic extends boolean = false>(
 			const raw = options.in
 				? readsQueryString
 					? coerceForSchema(
-						options.in,
-						collectSearchParams(new URL(request.url).searchParams),
-					)
+							options.in,
+							collectSearchParams(new URL(request.url).searchParams),
+						)
 					: await request.json()
 				: undefined;
 			const validated = options.in?.safeParse(raw);

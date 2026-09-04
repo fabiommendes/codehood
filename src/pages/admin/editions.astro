@@ -4,7 +4,7 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import AdminTabs from "@/components/AdminTabs.astro";
 import EditionsTable, {
-  type EditionRow,
+	type EditionRow,
 } from "@/components/admin/EditionsTable";
 import PageKicker from "@/components/PageKicker.astro";
 import { courseService } from "@/db/services/course.service";
@@ -25,19 +25,19 @@ const editions = await editionService.findMany({});
 const courses = await courseService.findMany({}, { actor });
 const courseCounts = new Map<string, number>();
 for (const course of courses) {
-  courseCounts.set(
-    course.editionSlug,
-    (courseCounts.get(course.editionSlug) ?? 0) + 1,
-  );
+	courseCounts.set(
+		course.editionSlug,
+		(courseCounts.get(course.editionSlug) ?? 0) + 1,
+	);
 }
 
 const editionRows: EditionRow[] = editions.map((edition) => ({
-  slug: edition.slug,
-  name: edition.name,
-  startAt: edition.startAt,
-  endAt: edition.endAt,
-  courseCount: courseCounts.get(edition.slug) ?? 0,
-  isLive: isEditionOpen(edition),
+	slug: edition.slug,
+	name: edition.name,
+	startAt: edition.startAt,
+	endAt: edition.endAt,
+	courseCount: courseCounts.get(edition.slug) ?? 0,
+	isLive: isEditionOpen(edition),
 }));
 ---
 

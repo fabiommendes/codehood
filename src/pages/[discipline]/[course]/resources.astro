@@ -4,8 +4,8 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
 import {
-  groupResourcesByType,
-  resourceService,
+	groupResourcesByType,
+	resourceService,
 } from "@/db/services/resource.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { formatBytes } from "@/utils/format-bytes";
@@ -24,52 +24,52 @@ const actor = Astro.locals.actor!;
 const canWrite = canWriteCourseContent(actor, course);
 
 const resources = await resourceService.findMany(
-  { courseId: course.id },
-  { actor },
+	{ courseId: course.id },
+	{ actor },
 );
 const groups = groupResourcesByType(resources);
 
 const totalFileBytes = resources
-  .filter((r) => r.type === "FILE" && r.file && !r.file.deletedAt)
-  .reduce((sum, r) => sum + (r.file?.size ?? 0), 0);
+	.filter((r) => r.type === "FILE" && r.file && !r.file.deletedAt)
+	.reduce((sum, r) => sum + (r.file?.size ?? 0), 0);
 
 // Blob URLs carry no auth check of their own (FR-NFR-030); this page's referrer
 // still shouldn't leak into every link it hands out.
 Astro.response.headers.set("Referrer-Policy", "no-referrer");
 
 const ICONS = {
-  FILE: "M6 3.5h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z M14 3.5V8h4",
-  LINK: "M9.5 14.5 14.5 9.5 M11 8h1.5A3.5 3.5 0 0 1 16 11.5v0A3.5 3.5 0 0 1 12.5 15H11 M13 16h-1.5A3.5 3.5 0 0 1 8 12.5v0A3.5 3.5 0 0 1 11.5 9H13",
-  MD: "M6 3.5h9l3 3V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z M8 12h8M8 15.5h8M8 8.5h4",
-  CODE: "m9 8-4 4 4 4M15 8l4 4-4 4M13.5 6.5l-3 11",
+	FILE: "M6 3.5h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z M14 3.5V8h4",
+	LINK: "M9.5 14.5 14.5 9.5 M11 8h1.5A3.5 3.5 0 0 1 16 11.5v0A3.5 3.5 0 0 1 12.5 15H11 M13 16h-1.5A3.5 3.5 0 0 1 8 12.5v0A3.5 3.5 0 0 1 11.5 9H13",
+	MD: "M6 3.5h9l3 3V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z M8 12h8M8 15.5h8M8 8.5h4",
+	CODE: "m9 8-4 4 4 4M15 8l4 4-4 4M13.5 6.5l-3 11",
 } as const;
 
 const DOWNLOAD_ICON = "M12 4v11m0 0 4-4m-4 4-4-4M5 19h14";
 
 function detail(resource: (typeof resources)[number]): string {
-  switch (resource.type) {
-    case "FILE":
-      if (resource.file?.deletedAt) return "no longer available";
-      return `${resource.file?.mimeType ?? "file"}${resource.file ? ` · ${formatBytes(resource.file.size)}` : ""}`;
-    case "LINK":
-      return "external";
-    case "MD":
-      return "markdown";
-    case "CODE":
-      return resource.extra ? resource.extra : "snippet";
-  }
+	switch (resource.type) {
+		case "FILE":
+			if (resource.file?.deletedAt) return "no longer available";
+			return `${resource.file?.mimeType ?? "file"}${resource.file ? ` · ${formatBytes(resource.file.size)}` : ""}`;
+		case "LINK":
+			return "external";
+		case "MD":
+			return "markdown";
+		case "CODE":
+			return resource.extra ? resource.extra : "snippet";
+	}
 }
 
 function rowHref(resource: (typeof resources)[number]): string {
-  switch (resource.type) {
-    case "FILE":
-      return "#";
-    case "LINK":
-      return resource.data ?? "#";
-    case "MD":
-    case "CODE":
-      return `${href}/resources/${resource.slug}`;
-  }
+	switch (resource.type) {
+		case "FILE":
+			return "#";
+		case "LINK":
+			return resource.data ?? "#";
+		case "MD":
+		case "CODE":
+			return `${href}/resources/${resource.slug}`;
+	}
 }
 ---
 

@@ -146,13 +146,14 @@ export function groupResourcesByType(resources: Resource[]): ResourceGroup[] {
 
 class ResourceService
 	implements
-	Crud<{
-		entity: Resource;
-		pkFilter: ResourcePK;
-		create: ResourceCreate;
-		filter: ResourceFilter;
-		update: ResourceUpdate;
-	}> {
+		Crud<{
+			entity: Resource;
+			pkFilter: ResourcePK;
+			create: ResourceCreate;
+			filter: ResourceFilter;
+			update: ResourceUpdate;
+		}>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {

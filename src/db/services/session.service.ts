@@ -29,7 +29,8 @@ export type SessionCreateResult = z.infer<typeof sessionCreateResult>;
 export type SessionDeletePK = z.infer<typeof sessionDeletePK>;
 
 class SessionService
-	implements Create<SessionCreate, SessionCreateResult>, Delete<SessionDeletePK> {
+	implements Create<SessionCreate, SessionCreateResult>, Delete<SessionDeletePK>
+{
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
