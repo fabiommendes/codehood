@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { APIS } from "@/api/registry/hook";
+import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { collectSearchParams } from "@/utils/query-coerce";
 
 /**
@@ -44,7 +46,9 @@ const OPTIONAL_FILTER_RESOURCES = [
 	"user",
 ] as const;
 
-async function adminToken(request: import("@playwright/test").APIRequestContext) {
+async function adminToken(
+	request: import("@playwright/test").APIRequestContext,
+) {
 	const login = await request.post("/api/auth/login", {
 		data: { login: "admin", password: "admin" },
 	});
@@ -173,17 +177,31 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 	expect(new Date(body.endAt).toISOString()).toBe(endAt);
 });
 
-test.fail(
-	"GET /api/calendar returns 200 with a JSON array (bug b: registered as /api/calendar-event, 404s)",
-	async ({ request }) => {
-		const token = await adminToken(request);
-		const res = await request.get("/api/calendar", {
-			headers: authHeader(token),
-		});
-		expect(res.status()).toBe(200);
-		expect(Array.isArray(await res.json())).toBe(true);
-	},
-);
+test("GET /api/calendar-event returns 200 with a JSON array", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	const res = await request.get("/api/calendar-event", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(200);
+	expect(Array.isArray(await res.json())).toBe(true);
+});
+
+// The guard that would have caught bug (b) — and the `[slug]` segment mismatch
+// — the moment either was introduced. `hook.ts` hardcodes the patterns it
+// injects into Astro, because it cannot import the route modules to discover
+// them; `CRUD()`/`route()` register their own paths independently. When the two
+// drift, Astro serves a pattern `ROUTES` has no entry for and the endpoint 404s
+// with an HTML page, which no other test would notice.
+test("every registered API path is a pattern hook.ts actually injects into Astro", () => {
+	const registered = Object.keys(buildOpenApiDocument().paths ?? {});
+	expect(registered.length).toBeGreaterThan(0);
+
+	const injected = new Set(APIS);
+	const orphaned = registered.filter((path) => !injected.has(path));
+	expect(orphaned).toEqual([]);
+});
 
 test("a query filter that matches narrows the list to only the matching row", async ({
 	request,
@@ -212,9 +230,12 @@ test("a query filter that matches nothing returns an empty array, not everything
 	request,
 }) => {
 	const token = await adminToken(request);
-	const res = await request.get("/api/discipline?slugs=qa-crud-does-not-exist", {
-		headers: authHeader(token),
-	});
+	const res = await request.get(
+		"/api/discipline?slugs=qa-crud-does-not-exist",
+		{
+			headers: authHeader(token),
+		},
+	);
 	expect(res.status()).toBe(200);
 	expect(await res.json()).toEqual([]);
 });

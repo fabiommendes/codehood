@@ -15,23 +15,26 @@ export * as health from "../health";
  * success or with the error message and status code.
  */
 function handler(method: keyof HttpMethods) {
-    const route: APIRoute = async (context) => {
-        const methods = readPattern(context.routePattern);
-
-        try {
-            const result = methods?.[method]?.view(context);
-            if (!result)
-                throw new NotFound({
-                    resource: "url-pattern",
-                    context: `${method.toUpperCase()} ${context.routePattern}`,
-                });
-            return result;
-        } catch (err) {
-            const response = responseFromException(err);
-            return Response.json(response, { status: response.status });
-        }
-    };
-    return route;
+	const route: APIRoute = async (context) => {
+		try {
+			const methods = readPattern(context.routePattern);
+			const route = methods?.[method];
+			if (!route)
+				throw new NotFound({
+					resource: "url-pattern",
+					context: `${method.toUpperCase()} ${context.routePattern}`,
+				});
+			// `await` inside the `try` on purpose: returning the promise
+			// unawaited would let a rejected `view()` sail straight past this
+			// catch, and Astro would render a 500 HTML page instead of the
+			// JSON error `responseFromException` builds.
+			return await route.view(context);
+		} catch (err) {
+			const response = responseFromException(err);
+			return Response.json(response, { status: response.status });
+		}
+	};
+	return route;
 }
 
 //

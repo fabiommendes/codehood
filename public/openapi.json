@@ -465,9 +465,9 @@
         }
       }
     },
-    "/api/calendar": {
+    "/api/calendar-event": {
       "post": {
-        "operationId": "createCalendar",
+        "operationId": "createCalendar-event",
         "summary": "Creates a new CalendarEvent.",
         "tags": [
           "Calendar Events"
@@ -712,7 +712,7 @@
         }
       },
       "get": {
-        "operationId": "listCalendar",
+        "operationId": "listCalendar-event",
         "summary": "Find multiple CalendarEvents.",
         "tags": [
           "Calendar Events"
@@ -966,9 +966,9 @@
         }
       }
     },
-    "/api/calendar/[id]": {
+    "/api/calendar-event/[id]": {
       "get": {
-        "operationId": "readCalendar",
+        "operationId": "readCalendar-event",
         "summary": "Find a single CalendarEvent by id.",
         "tags": [
           "Calendar Events"
@@ -1144,7 +1144,7 @@
         }
       },
       "patch": {
-        "operationId": "updateCalendar",
+        "operationId": "updateCalendar-event",
         "summary": "Update a single CalendarEvent by id.",
         "tags": [
           "Calendar Events"
@@ -1367,7 +1367,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteCalendar",
+        "operationId": "deleteCalendar-event",
         "summary": "Delete a single CalendarEvent by primary key.",
         "tags": [
           "Calendar Events"
