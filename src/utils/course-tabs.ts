@@ -8,7 +8,7 @@ import {
 	type CourseWithEnrollment,
 	canManageEnrollment,
 } from "@/auth/permissions";
-import type { Actor } from "@/db/base-service";
+import type { Actor } from "@/core/actor";
 import { type CourseRef, courseHref } from "./course-url";
 
 export type CourseTabKey =

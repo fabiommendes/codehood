@@ -2,22 +2,22 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import { FULL_ACCESS } from "@/db/base-service";
-import { inviteService } from "@/db/invite.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { inviteService } from "@/db/services/invite.service";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 const { token } = Astro.params;
 const result = Astro.getActionResult(actions.auth.acceptInvite);
 if (result && !result.error) {
-	return Astro.redirect("/");
+  return Astro.redirect("/");
 }
 
 const invite = token
-	? await inviteService.findOne({ token }, FULL_ACCESS)
-	: null;
+  ? await inviteService.findOne({ token }, FULL_ACCESS)
+  : null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
-	invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;
+  invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
 ---
 
@@ -44,10 +44,15 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
         )}
 
         <p class="text-sm text-base-content/60">
-          You're accepting an invite to join as <strong>{invite.role.toLowerCase()}</strong>.
+          You're accepting an invite to join as{" "}
+          <strong>{invite.role.toLowerCase()}</strong>.
         </p>
 
-        <form method="POST" action={actions.auth.acceptInvite} class="flex flex-col gap-4">
+        <form
+          method="POST"
+          action={actions.auth.acceptInvite}
+          class="flex flex-col gap-4"
+        >
           <input type="hidden" name="token" value={token} />
 
           <fieldset class="fieldset">
@@ -84,19 +89,35 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">Password</legend>
-            <input type="password" name="password" id="password" required minlength="8" class="input w-full" />
+            <input
+              type="password"
+              name="password"
+              id="password"
+              required
+              minlength="8"
+              class="input w-full"
+            />
           </fieldset>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">Confirm password</legend>
-            <input type="password" id="passwordConfirm" required minlength="8" class="input w-full" />
+            <input
+              type="password"
+              id="passwordConfirm"
+              required
+              minlength="8"
+              class="input w-full"
+            />
             <p class="label" id="passwordMismatch" hidden>
               Passwords do not match.
             </p>
           </fieldset>
 
           <div class="card-actions">
-            <button type="submit" class="btn btn-primary btn-block rounded-full">
+            <button
+              type="submit"
+              class="btn btn-primary btn-block rounded-full"
+            >
               Create account
             </button>
           </div>
@@ -108,8 +129,12 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
 
 <script>
   const form = document.querySelector("form");
-  const password = document.getElementById("password") as HTMLInputElement | null;
-  const confirm = document.getElementById("passwordConfirm") as HTMLInputElement | null;
+  const password = document.getElementById(
+    "password",
+  ) as HTMLInputElement | null;
+  const confirm = document.getElementById(
+    "passwordConfirm",
+  ) as HTMLInputElement | null;
   const mismatch = document.getElementById("passwordMismatch");
 
   form?.addEventListener("submit", (event) => {

@@ -1,9 +1,9 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { userService } from "@/db/services/user.service";
 
 export const createCourseCommand = new Command("create-course")
 	.description(

@@ -3,16 +3,16 @@ import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { FULL_ACCESS } from "@/core/actor";
 import {
-	type CreateEvent,
+	type CalendarEventCreate,
 	calendarEventService,
-} from "@/db/calendar-event.service";
-import { FULL_ACCESS } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
+} from "@/db/services/calendar-event.service";
+import { courseService } from "@/db/services/course.service";
 import {
-	type TimeSlotWithDetails,
+	type TimeSlot,
 	timeSlotService,
-} from "@/db/time-slot.service";
+} from "@/db/services/time-slot.service";
 
 const WEEKDAYS = [
 	"SUNDAY",
@@ -120,14 +120,14 @@ export const importCalendarCommand = new Command("import-calendar")
 				return;
 			}
 
-			const slotsBySlug = new Map<string, TimeSlotWithDetails>();
+			const slotsBySlug = new Map<string, TimeSlot>();
 			for (const entry of manifest.slots) {
 				try {
 					const existing = await timeSlotService.findOne(
 						{ ref: { courseId: course.id, slug: entry.slug } },
 						FULL_ACCESS,
 					);
-					let slot: TimeSlotWithDetails;
+					let slot: TimeSlot;
 					if (existing) {
 						slot = await timeSlotService.update(
 							{ id: existing.id },
@@ -175,7 +175,10 @@ export const importCalendarCommand = new Command("import-calendar")
 					continue;
 				}
 				try {
-					const built: Omit<CreateEvent, "courseId" | "timeSlotId" | "slug"> = {
+					const built: Omit<
+						CalendarEventCreate,
+						"courseId" | "timeSlotId" | "slug"
+					> = {
 						date: entry.date,
 						startMin: entry.start ? parseClock(entry.start) : undefined,
 						durationMin: entry.duration,

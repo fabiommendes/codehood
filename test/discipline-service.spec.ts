@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { userService } from "@/db/services/user.service";
 
 test("create() rejects a reserved slug", async () => {
 	await expect(

@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { hashPassword, verifyPassword } from "@/auth/password";
+import { hashPassword, passwordStrengthIssues, verifyPassword } from "@/auth/password";
+
+// Regression: `common-passwords.json` is a plain JSON array. A namespace import
+// (`import * as X from "./x.json"`) gives an object with numeric-string keys, not
+// an actual array, so `buildCommonWordsSet`'s `for...of` threw "words is not
+// iterable" — at module load time, breaking every import of this module.
+test("flags a word from the common-passwords list", async () => {
+	const issues = await passwordStrengthIssues("12345678");
+	expect(issues?.map((issue) => issue.code)).toContain("too-common");
+});
 
 test("hashes and verifies a password", async () => {
 	const hash = await hashPassword("correct horse battery staple");

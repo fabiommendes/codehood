@@ -2,8 +2,8 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
-import { calendarEventService } from "@/db/calendar-event.service";
-import { timeSlotService } from "@/db/time-slot.service";
+import { calendarEventService } from "@/db/services/calendar-event.service";
+import { timeSlotService } from "@/db/services/time-slot.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 import { formatDateTime, formatTime } from "@/utils/schedule-time";
@@ -16,40 +16,40 @@ if ("redirect" in result) return result.redirect;
 const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
-const actor = Astro.locals.user!;
+const actor = Astro.locals.actor!;
 // Course.instructor is not an enrollment, so an instructor viewing their own
 // course never matches here — there is nothing for them to leave.
 const myEnrollment = course.enrollments.find((e) => e.userId === actor.id);
 
 function formatDate(date: Date): string {
-	return formatDateTime(date, {
-		weekday: undefined,
-		hour: undefined,
-		minute: undefined,
-		year: "numeric",
-	});
+  return formatDateTime(date, {
+    weekday: undefined,
+    hour: undefined,
+    minute: undefined,
+    year: "numeric",
+  });
 }
 
 const WEEKDAY_LABEL: Record<string, string> = {
-	SUNDAY: "Sun",
-	MONDAY: "Mon",
-	TUESDAY: "Tue",
-	WEDNESDAY: "Wed",
-	THURSDAY: "Thu",
-	FRIDAY: "Fri",
-	SATURDAY: "Sat",
+  SUNDAY: "Sun",
+  MONDAY: "Mon",
+  TUESDAY: "Tue",
+  WEDNESDAY: "Wed",
+  THURSDAY: "Thu",
+  FRIDAY: "Fri",
+  SATURDAY: "Sat",
 };
 
 // The syllabus line and the next few meetings — see "Course home page" in
 // dev/specs/to-review/calendar.md. Both come from the same source the
 // Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await timeSlotService.findMany(
-	{ courseId: course.id },
-	{ actor },
+  { courseId: course.id },
+  { actor },
 );
 const nextEvents = await calendarEventService.findMany(
-	{ courseIds: [course.id], from: new Date(), limit: 3 },
-	{ actor },
+  { courseIds: [course.id], from: new Date(), limit: 3 },
+  { actor },
 );
 ---
 
@@ -57,9 +57,15 @@ const nextEvents = await calendarEventService.findMany(
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="home" />
 
-    {course.description && <p class="mt-6 max-w-2xl text-base-content/70">{course.description}</p>}
+    {
+      course.description && (
+        <p class="mt-6 max-w-2xl text-base-content/70">{course.description}</p>
+      )
+    }
 
-    <div class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100">
+    <div
+      class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100"
+    >
       <div class="stat">
         <div class="stat-title">Exams</div>
         <div class="stat-value text-2xl">3</div>
@@ -101,7 +107,9 @@ const nextEvents = await calendarEventService.findMany(
         </ListRow>
         <ListRow href={`${href}/resources`}>
           <p class="font-medium">Course repository</p>
-          <p class="text-sm text-base-content/60">github.com/codehood-cs101/coursework</p>
+          <p class="text-sm text-base-content/60">
+            github.com/codehood-cs101/coursework
+          </p>
         </ListRow>
       </div>
     </section>
@@ -126,7 +134,9 @@ const nextEvents = await calendarEventService.findMany(
             </p>
             <div class="mt-4 flex flex-col gap-3">
               {nextEvents.length === 0 ? (
-                <p class="text-sm text-base-content/60">Nothing left on the calendar.</p>
+                <p class="text-sm text-base-content/60">
+                  Nothing left on the calendar.
+                </p>
               ) : (
                 nextEvents.map((event) => (
                   <ListRow href={`${href}/schedule`}>
@@ -150,9 +160,15 @@ const nextEvents = await calendarEventService.findMany(
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p class="font-medium">You're enrolled in this course</p>
-              <p class="mt-1 text-sm text-base-content/60">Joined {formatDate(myEnrollment.createdAt)}</p>
+              <p class="mt-1 text-sm text-base-content/60">
+                Joined {formatDate(myEnrollment.createdAt)}
+              </p>
             </div>
-            <button type="button" class="btn btn-outline btn-error btn-sm" data-open-dialog="leave-course-dialog">
+            <button
+              type="button"
+              class="btn btn-outline btn-error btn-sm"
+              data-open-dialog="leave-course-dialog"
+            >
               Leave course
             </button>
           </div>
@@ -167,15 +183,27 @@ const nextEvents = await calendarEventService.findMany(
     <dialog id="leave-course-dialog" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2" type="button">
+          <button
+            class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+            type="button"
+          >
             ✕
           </button>
         </form>
         <h3 class="text-lg font-bold">Leave {course.discipline.name}?</h3>
         <ul class="mt-3 flex flex-col gap-2 pl-5 text-sm text-base-content/70 list-disc">
-          <li>Your access to everything in this course ends immediately — including your own past submissions.</li>
-          <li>Nothing is deleted. Your submissions stay on record, and your instructor still sees them in the gradebook.</li>
-          <li>Rejoining needs a new classroom invite or a live passphrase — you can't undo this yourself.</li>
+          <li>
+            Your access to everything in this course ends immediately —
+            including your own past submissions.
+          </li>
+          <li>
+            Nothing is deleted. Your submissions stay on record, and your
+            instructor still sees them in the gradebook.
+          </li>
+          <li>
+            Rejoining needs a new classroom invite or a live passphrase — you
+            can't undo this yourself.
+          </li>
         </ul>
         <div id="leave-course-error" class="alert alert-error mt-4" hidden>
           <span>Something went wrong. Try again.</span>
@@ -195,19 +223,20 @@ const nextEvents = await calendarEventService.findMany(
 }
 
 <script>
-	import { actions } from "astro:actions";
+  import { actions } from "astro:actions";
 
-	const form = document.getElementById("leave-course-form") as HTMLFormElement | null;
-	const errorBox = document.getElementById("leave-course-error");
+  const form = document.getElementById(
+    "leave-course-form",
+  ) as HTMLFormElement | null;
+  const errorBox = document.getElementById("leave-course-error");
 
-	form?.addEventListener("submit", async (event) => {
-		event.preventDefault();
-		const courseId = Number(new FormData(form).get("courseId"));
-		const { error } = await actions.course.dropEnrollment({ courseId });
-		if (error) {
-			errorBox?.removeAttribute("hidden");
-			return;
-		}
-		window.location.href = "/courses?left=1";
-	});
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const { error } = await actions.course.dropEnrollment(new FormData(form));
+    if (error) {
+      errorBox?.removeAttribute("hidden");
+      return;
+    }
+    window.location.href = "/courses?left=1";
+  });
 </script>

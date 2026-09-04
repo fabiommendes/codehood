@@ -5,21 +5,21 @@ import { actions } from "astro:actions";
 import AdminTabs from "@/components/AdminTabs.astro";
 import UsersTable, { type UserRow } from "@/components/admin/UsersTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { type user, userService } from "@/db/user.service";
+import { db, type User } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
 // TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
-if (!Astro.locals.user) return Astro.redirect("/login");
+if (!Astro.locals.actor) return Astro.redirect("/login");
 
 const forceLogoutResult = Astro.getActionResult(actions.admin.forceLogout);
 const createUserResult = Astro.getActionResult(actions.admin.createUser);
 
-const users = (await userService.findMany(
+const users = (await db.user.findMany(
   {},
-  { actor: Astro.locals.user },
-)) as Array<user & { createdAt: Date }>;
+  { actor: Astro.locals.actor },
+)) as Array<User & { createdAt: Date }>;
 
 const userRows: UserRow[] = users.map((u) => ({
   id: u.id,

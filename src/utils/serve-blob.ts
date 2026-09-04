@@ -3,7 +3,7 @@
 // authentication check by design (FR-NFR-030, amended): the URL is the
 // content's own hash, and nothing whose disclosure matters is meant to live
 // in a resource (FR-NFR-032).
-import { fileService } from "@/db/file.service";
+import { fileService } from "@/db/services/file.service";
 import { blobSecurityHeaders, contentDisposition } from "./blob-response";
 import { slugify } from "./slugify";
 

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { canViewUser } from "@/auth/permissions";
-import { FULL_ACCESS } from "@/db/base-service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { userService } from "@/db/services/user.service";
 
 test("admin without githubId/schoolId gets the @<username> default", async () => {
 	const user = await userService.create(

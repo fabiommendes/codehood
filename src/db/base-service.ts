@@ -1,35 +1,8 @@
+import type { Actor } from "@/core/actor";
 import type { PrismaTx } from "./client";
-import type { User } from "./user.service";
 
-//
-// Types and interfaces
-//
 
 /**
- * The type of authenticated users making a request.
- */
-export interface AuthUser extends User { }
-export interface BasicAuthUser extends Pick<User, "id" | "role"> { }
-
-/**
- * Sentinel actor for callers with no user behind them.
- * 
- * Used on seeds, manage commands, etc.
- * 
- * A symbol so it can never arrive by accident from parsed JSON or a
- * forgotten variable — writing `SYSTEM` is a decision you can see in a diff.
- */
-export const SYSTEM = Symbol("system");
-
-export type Actor = AuthUser | typeof SYSTEM;
-
-/**
- * Shorthand for `{ actor: SYSTEM }`, for trusted call sites with no transaction. 
- */
-export const FULL_ACCESS = Object.freeze({ actor: SYSTEM } as const);
-
-
-/** 
  * Common set of options for service methods. `tx` is optional, but `actor` is required.
  */
 export type ServiceOpts = {
@@ -37,6 +10,10 @@ export type ServiceOpts = {
 	actor: Actor;
 	skipValidation?: { input?: boolean; output?: boolean } | boolean;
 };
+
+//
+// Interface for common CRUD operations
+//
 
 export interface Create<In, Out> {
 	/**
@@ -49,7 +26,10 @@ export interface FindOne<FilterIn, Out> {
 	/**
 	 * Find the first entity that matches the input criteria, or null if none is found.
 	 */
-	findOne<Opt extends ServiceOpts>(filter: FilterIn, opts: Opt): Promise<Out | null>;
+	findOne<Opt extends ServiceOpts>(
+		filter: FilterIn,
+		opts: Opt,
+	): Promise<Out | null>;
 }
 
 export interface FindMany<Filter, Out> {
@@ -63,31 +43,43 @@ export interface Update<Id, In, Out> {
 	/**
 	 * Update the first entity that matches the input criteria.
 	 */
-	update<Opt extends ServiceOpts>(filter: Id, update: In, opts: Opt): Promise<Out>;
+	update<Opt extends ServiceOpts>(
+		filter: Id,
+		update: In,
+		opts: Opt,
+	): Promise<Out>;
 }
 
 export interface Delete<FilterIn> {
+	// TODO: should delete return a response? return the deleted object?
 	/**
 	 * Delete the first entity that matches the input criteria.
 	 */
 	delete<Opt extends ServiceOpts>(filter: FilterIn, opts: Opt): Promise<void>;
 }
 
-// TODO: move it to the errors package, once it is defined.
+type CrudT<
+	Entity,
+	Filter,
+	PkFilter = Entity extends { id: unknown } ? { id: Entity["id"] } : unknown,
+	Create = Omit<Entity, "id">,
+	Update = Partial<Entity>,
+> = {
+	entity: Entity;
+	filter: Filter;
+	create?: Create;
+	pkFilter?: PkFilter;
+	update?: Update;
+};
+
 /**
- * Thrown by a service when `opts.actor` may not perform the requested
- * operation. 
- * 
- * Framework-agnostic on purpose: services are imported directly by
- * unit tests (outside Astro's Vite pipeline), so this file cannot depend on
- * `astro:actions`, which only resolves inside it. The Astro Actions/API
- * layer is what turns this into an `ActionError({ code: "FORBIDDEN" })` —
- * see `src/actions/helpers.ts`.
+ * Expected composition of interfaces for a CRUD based service. Declare `never`
+ * as the type of some operation to omit it from the service.
  */
-// TODO: errors. centralize and define the exception interface 
-export class ForbiddenError extends Error {
-	constructor(message = "Forbidden") {
-		super(message);
-		this.name = "ForbiddenError";
-	}
-}
+export interface Crud<T extends CrudT<unknown, unknown>>
+	extends Create<T["create"], T["entity"]>,
+	FindMany<T["filter"], T["entity"]>,
+	FindOne<T["pkFilter"], T["entity"]>,
+	Update<T["pkFilter"], T["update"], T["entity"]>,
+	Delete<T["pkFilter"]> { }
+

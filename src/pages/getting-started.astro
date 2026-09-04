@@ -5,15 +5,15 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import PageKicker from "@/components/PageKicker.astro";
-import { apiKeyService } from "@/db/api-key.service";
+import { apiKeyService } from "@/db/services/api-key.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 
-if (!Astro.locals.user) return Astro.redirect("/login");
+if (!Astro.locals.actor) return Astro.redirect("/login");
 
 const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
 const apiKeys = await apiKeyService.findMany(
-	{ userId: Astro.locals.user.id },
-	{ actor: Astro.locals.user },
+  { userId: Astro.locals.actor.id },
+  { actor: Astro.locals.actor },
 );
 const hasKey = apiKeys.length > 0;
 ---
@@ -23,17 +23,22 @@ const hasKey = apiKeys.length > 0;
     <PageKicker text="CLI" squares />
     <h1 class="text-3xl font-bold">Getting started</h1>
     <p class="mt-2 max-w-xl text-base-content/70">
-      Codehood courses are written locally and synced with a CLI tool. Four steps to your first push.
+      Codehood courses are written locally and synced with a CLI tool. Four
+      steps to your first push.
     </p>
 
     <ol class="mt-8 flex flex-col gap-6">
       <li class="card card-border bg-base-100">
         <div class="card-body gap-3 p-5">
           <div class="flex items-center gap-3">
-            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content">1</span>
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
+              >1</span
+            >
             <p class="font-medium">Scaffold a course</p>
           </div>
-          <pre class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood init
+          <pre
+            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood init
   created course/ (codehood.toml, content/)</code></pre>
         </div>
       </li>
@@ -41,11 +46,17 @@ const hasKey = apiKeys.length > 0;
       <li class="card card-border bg-base-100">
         <div class="card-body gap-3 p-5">
           <div class="flex items-center gap-3">
-            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content">2</span>
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
+              >2</span
+            >
             <p class="font-medium">Write your content</p>
           </div>
           <p class="text-sm text-base-content/60">
-            Questions, exams, and resources live as plain text files under <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">content/</code> — edit them in whatever editor you already use.
+            Questions, exams, and resources live as plain text files under <code
+              class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs"
+              >content/</code
+            > — edit them in whatever editor you already use.
           </p>
         </div>
       </li>
@@ -53,10 +64,16 @@ const hasKey = apiKeys.length > 0;
       <li class="card card-border bg-base-100">
         <div class="card-body gap-3 p-5">
           <div class="flex items-center gap-3">
-            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content">3</span>
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
+              >3</span
+            >
             <p class="font-medium">Create a CLI API key</p>
           </div>
-          <p class="text-sm text-base-content/60">The CLI authenticates as you with a key — generate one below, or manage keys any time from your profile.</p>
+          <p class="text-sm text-base-content/60">
+            The CLI authenticates as you with a key — generate one below, or
+            manage keys any time from your profile.
+          </p>
 
           {
             createApiKeyResult?.error && (
@@ -67,9 +84,14 @@ const hasKey = apiKeys.length > 0;
           }
           {
             createApiKeyResult && !createApiKeyResult.error && (
-              <div role="alert" class="alert alert-success flex-col items-start">
+              <div
+                role="alert"
+                class="alert alert-success flex-col items-start"
+              >
                 <span>Key created — copy it now, it won't be shown again.</span>
-                <code class="w-full break-all rounded bg-base-300 px-2 py-1 text-xs">{createApiKeyResult.data.token}</code>
+                <code class="w-full break-all rounded bg-base-300 px-2 py-1 text-xs">
+                  {createApiKeyResult.data.token}
+                </code>
               </div>
             )
           }
@@ -78,11 +100,19 @@ const hasKey = apiKeys.length > 0;
             hasKey && !createApiKeyResult ? (
               <div role="alert" class="alert alert-info">
                 <span>
-                  You already have a CLI key. Manage it from your <a href="/profile" class="link">profile</a>.
+                  You already have a CLI key. Manage it from your{" "}
+                  <a href="/profile" class="link">
+                    profile
+                  </a>
+                  .
                 </span>
               </div>
             ) : (
-              <form method="POST" action={actions.auth.createApiKey} class="flex items-center gap-3">
+              <form
+                method="POST"
+                action={actions.auth.createApiKey}
+                class="flex items-center gap-3"
+              >
                 <input type="hidden" name="name" value="cli" />
                 <input type="hidden" name="kind" value="CLI" />
                 <button type="submit" class="btn btn-primary btn-sm">
@@ -97,10 +127,14 @@ const hasKey = apiKeys.length > 0;
       <li class="card card-border bg-base-100">
         <div class="card-body gap-3 p-5">
           <div class="flex items-center gap-3">
-            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content">4</span>
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
+              >4</span
+            >
             <p class="font-medium">Push, and it's live</p>
           </div>
-          <pre class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
+          <pre
+            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
   syncing content/questions/*.q.md
   syncing content/exams/midterm.md
   live for your students</code></pre>

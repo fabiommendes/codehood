@@ -1,8 +1,8 @@
 import { input, password as passwordPrompt } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/db/base-service";
+import { FULL_ACCESS } from "@/core/actor";
 import type { Role } from "@/db/client";
-import { userService } from "@/db/user.service";
+import { userService } from "@/db/services/user.service";
 
 const ROLES: Role[] = ["ADMIN", "INSTRUCTOR", "STUDENT"];
 

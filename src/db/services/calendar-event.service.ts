@@ -5,11 +5,14 @@
  * ({@link canViewCourseContents}). `examId` is never authored: both `create`
  * and `update` resolve it fresh from {@link examForEvent} on every write.
  */
+import type { z } from "zod";
 import {
 	canViewCourseContents,
 	canWriteCourseContent,
 	courseContentsVisibility,
 } from "@/auth/permissions";
+import type { Actor } from "@/core/actor";
+import { NotAllowed } from "@/core/error";
 import {
 	endOf,
 	localDateOf,
@@ -17,25 +20,39 @@ import {
 	weekdayOf,
 } from "@/utils/schedule-time";
 import type { FillUndefineds } from "@/utils/types";
+import { Validate } from "@/utils/validate";
 import {
-	type Actor,
-	type Create,
-	type Delete,
-	type FindMany,
-	type FindOne,
-	ForbiddenError,
-	type ServiceOpts,
-	type Update,
-} from "./base-service";
+	type CalendarEventId,
+	type CourseId,
+	calendarEventCreate,
+	calendarEventFilter,
+	calendarEventPK,
+	calendarEventSchema,
+	calendarEventUpdate,
+	type TimeSlotId,
+} from "../../core/schemas";
+import type { Crud, ServiceOpts } from "../base-service";
 import {
-	type EventKind,
 	type Prisma,
 	type PrismaClient,
 	type PrismaTx,
 	prisma,
 	type Weekday,
-} from "./client";
-import { examForEvent } from "./exam-link";
+} from "../client";
+import { examForEvent } from "../util.exam-link";
+
+export type { CalendarEventId } from "../../core/schemas";
+
+//
+// Type definitions
+//
+export type CalendarEventCreate = z.infer<typeof calendarEventCreate>;
+export type CalendarEvent = z.infer<typeof calendarEventSchema>;
+export type CalendarEventFilter = z.infer<typeof calendarEventFilter>;
+export type CalendarEventPK = z.infer<typeof calendarEventPK>;
+export type CalendarEventUpdate = z.infer<typeof calendarEventUpdate>;
+export type EventKind = CalendarEvent["kind"];
+export type LinkedExam = NonNullable<CalendarEvent["exam"]>;
 
 /** True for the seven kinds that represent an actual meeting (FR-CAL-011). */
 const MEETING_KINDS: ReadonlySet<EventKind> = new Set([
@@ -48,74 +65,8 @@ const MEETING_KINDS: ReadonlySet<EventKind> = new Set([
 	"SELF_STUDY",
 ]);
 
-/** Whether `kind` represents a meeting that was actually held. */
-export function isMeeting(kind: EventKind): boolean {
-	return MEETING_KINDS.has(kind);
-}
-
-export interface CreateEvent {
-	courseId: number;
-	timeSlotId: number;
-	/** Natural key from the repository path — FR-SYNC-010. */
-	slug: string;
-	/** The calendar day this event happens, `YYYY-MM-DD`, in the server zone. */
-	date: string;
-	/** Minutes since 00:00; defaults to the slot's `startMin` when omitted. */
-	startMin?: number;
-	/** Defaults to the slot's `durationMin` when omitted. */
-	durationMin?: number;
-	/** Authored, never derived (FR-CAL-015). */
-	week: number;
-	kind?: EventKind;
-	title: string;
-	description?: string;
-	/** Supplied by the writer, stored verbatim. */
-	contentHash: string;
-}
-
-export type EventRef = { courseId: number; slug: string };
-
-export type FindEventBy = FillUndefineds<{ id: number } | { ref: EventRef }>;
-
-export interface FindEventsBy {
-	courseIds?: number[];
-	/** Inclusive: events whose window ends at or after it. */
-	from?: Date;
-	/** Exclusive: events starting before it. */
-	to?: Date;
-	kinds?: EventKind[];
-	weeks?: number[];
-	/** For "the next three meetings" on the course page. */
-	limit?: number;
-}
-
-export interface UpdateEventFilter {
-	id: number;
-}
-
-/**
- * The editable fields. `slug`, `courseId`, and `timeSlotId` are absent —
- * moving an event to a different slot is a delete plus a create. Provide
- * `date` to move the event's day; `startMin`/`durationMin` without `date` is
- * rejected, since a wall-clock move always names the day it lands on.
- */
-export interface UpdateEvent {
-	date?: string;
-	startMin?: number;
-	durationMin?: number;
-	week?: number;
-	kind?: EventKind;
-	title?: string;
-	description?: string;
-	contentHash?: string;
-}
-
-export interface DeleteEventFilter {
-	id: number;
-}
-
 /** The minimal shape every read loads: the owning course, the slot, and the linked exam. */
-const eventInclude = {
+const EVENT_INCLUDE = {
 	course: {
 		select: {
 			instructor: { select: { id: true } },
@@ -129,45 +80,19 @@ const eventInclude = {
 	exam: { select: { id: true, slug: true, title: true, status: true } },
 } satisfies Prisma.CalendarEventInclude;
 
-type EventRow = Prisma.CalendarEventGetPayload<{
-	include: typeof eventInclude;
+type DbEvent = Prisma.CalendarEventGetPayload<{
+	include: typeof EVENT_INCLUDE;
 }>;
-
-/** The linked exam's public summary, or `null` — see {@link maskExam}. */
-export type LinkedExam = { id: number; slug: string; title: string };
-
-export type CalendarEventWithDetails = Omit<EventRow, "course" | "exam"> & {
-	exam: LinkedExam | null;
-};
-
-/**
- * The link is computed for everybody — it is a fact about the schedule — but
- * a row must not leak the existence and title of an unpublished exam to
- * anyone but the course's own instructor (or `SYSTEM`): `DRAFT` and
- * `ARCHIVED` exams are nulled out of what non-owners see.
- */
-function maskExam(row: EventRow, actor: Actor): CalendarEventWithDetails {
-	const { course: _course, exam, ...rest } = row;
-	const privileged = canWriteCourseContent(actor, row.course);
-	const visible =
-		exam !== null &&
-		(privileged || (exam.status !== "DRAFT" && exam.status !== "ARCHIVED"));
-	return {
-		...rest,
-		exam:
-			visible && exam
-				? { id: exam.id, slug: exam.slug, title: exam.title }
-				: null,
-	};
-}
 
 class CalendarEventService
 	implements
-	Create<CreateEvent, CalendarEventWithDetails>,
-	FindOne<FindEventBy, CalendarEventWithDetails>,
-	FindMany<FindEventsBy, CalendarEventWithDetails>,
-	Update<UpdateEventFilter, UpdateEvent, CalendarEventWithDetails>,
-	Delete<DeleteEventFilter> {
+	Crud<{
+		entity: CalendarEvent;
+		pkFilter: CalendarEventPK;
+		create: CalendarEventCreate;
+		filter: CalendarEventFilter;
+		update: CalendarEventUpdate;
+	}> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -176,25 +101,28 @@ class CalendarEventService
 
 	/**
 	 * Given only a day, fills `startAt` and `durationMin` from the slot;
-	 * explicit `startMin`/`durationMin` are kept as given. Rejects a slot
-	 * belonging to another course, an event whose resolved `startAt` falls on
-	 * a different weekday than its slot, a second event on the same slot on
-	 * the same local day, and a missing `contentHash`.
+	 * explicit `startMin`/`durationMin` are kept as given.
+	 *
+	 * Rejects a slot belonging to another course, an event whose resolved
+	 * `startAt` falls on a different weekday than its slot, and a second
+	 * event on the same slot on the same local day.
 	 */
+	@Validate({
+		service: true,
+		returns: calendarEventSchema,
+		args: [calendarEventCreate],
+	})
 	async create(
-		input: CreateEvent,
+		input: CalendarEventCreate,
 		opts: ServiceOpts,
-	): Promise<CalendarEventWithDetails> {
+	): Promise<CalendarEvent> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
 			select: { instructor: { select: { id: true } } },
 		});
 		if (!course || !canWriteCourseContent(opts.actor, course)) {
-			throw new ForbiddenError();
-		}
-		if (!input.contentHash) {
-			throw new Error("contentHash is required.");
+			throw new NotAllowed({ action: "create-calendar-event" });
 		}
 
 		const slot = await client.timeSlot.findUnique({
@@ -232,59 +160,70 @@ class CalendarEventService
 				examId,
 				contentHash: input.contentHash,
 			},
-			include: eventInclude,
+			include: EVENT_INCLUDE,
 		});
 		return maskExam(row, opts.actor);
 	}
 
 	/**
-	 * Finds an event by id or by its `(courseId, slug)` natural key. Throws
-	 * `FORBIDDEN` if it exists but `actor` may not see its course's contents;
-	 * returns `null` if it does not exist.
+	 * Finds an event by id or by its `(courseId, slug)` natural key.
+	 *
+	 * Throws `FORBIDDEN` if it exists but `actor` may not see its course's
+	 * contents; returns `null` if it does not exist.
 	 */
+	@Validate({
+		service: true,
+		returns: calendarEventSchema.nullable(),
+		args: [calendarEventPK],
+	})
 	async findOne(
-		filter: FindEventBy,
+		filter: CalendarEventPK,
 		opts: ServiceOpts,
-	): Promise<CalendarEventWithDetails | null> {
+	): Promise<CalendarEvent | null> {
 		const client = opts.tx ?? this.prisma;
-		let row: EventRow | null = null;
+		const by = filter as FillUndefineds<CalendarEventPK>; // zod doesn't narrow to a single field, so we do it here
+		let row: DbEvent | null = null;
 
-		if (filter.id !== undefined) {
+		if (by.id !== undefined) {
 			row = await client.calendarEvent.findUnique({
-				where: { id: filter.id },
-				include: eventInclude,
+				where: { id: by.id },
+				include: EVENT_INCLUDE,
 			});
-		} else if (filter.ref) {
+		} else if (by.ref) {
 			row = await client.calendarEvent.findUnique({
 				where: {
-					courseId_slug: {
-						courseId: filter.ref.courseId,
-						slug: filter.ref.slug,
-					},
+					courseId_slug: { courseId: by.ref.courseId, slug: by.ref.slug },
 				},
-				include: eventInclude,
+				include: EVENT_INCLUDE,
 			});
 		}
 
 		if (!row) return null;
 		if (!canViewCourseContents(opts.actor, row.course)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "read-calendar-event" });
 		}
 		return maskExam(row, opts.actor);
 	}
 
 	/**
 	 * Lists events narrowed to what `actor` may see (see
-	 * {@link courseContentsVisibility}). With no `courseIds`, returns
-	 * everything the actor may see — what `/calendar` wants. `from` is
-	 * inclusive of an event still running at that instant, applied after the
-	 * database query since it depends on `durationMin`; every other filter is
-	 * a plain `where`. Ordered by `startAt`.
+	 * {@link courseContentsVisibility}).
+	 *
+	 * With no `courseIds`, returns everything the actor may see — what
+	 * `/calendar` wants. `from` is inclusive of an event still running at
+	 * that instant, applied after the database query since it depends on
+	 * `durationMin`; every other filter is a plain `where`. Ordered by
+	 * `startAt`.
 	 */
+	@Validate({
+		service: true,
+		returns: calendarEventSchema.array(),
+		args: [calendarEventFilter],
+	})
 	async findMany(
-		filter: FindEventsBy,
+		filter: CalendarEventFilter,
 		opts: ServiceOpts,
-	): Promise<CalendarEventWithDetails[]> {
+	): Promise<CalendarEvent[]> {
 		const client = opts.tx ?? this.prisma;
 		const rows = await client.calendarEvent.findMany({
 			where: {
@@ -296,7 +235,7 @@ class CalendarEventService
 					{ course: courseContentsVisibility(opts.actor) },
 				],
 			},
-			include: eventInclude,
+			include: EVENT_INCLUDE,
 			orderBy: { startAt: "asc" },
 		});
 
@@ -311,25 +250,35 @@ class CalendarEventService
 	}
 
 	/**
-	 * Changes `week`/`kind`/`title`/`description`/`contentHash` freely, and the
-	 * event's time when `date` is given (`startMin`/`durationMin` combine with
-	 * it, each defaulting to the slot's own when omitted from a `date` move,
-	 * or to the current value when only `durationMin` changes alone). Re-runs
-	 * the weekday and same-day-collision checks whenever the date moves, and
-	 * always re-resolves `examId` from the (possibly unchanged) window.
+	 * Changes `week`/`kind`/`title`/`description`/`contentHash` freely, and
+	 * the event's time when `date` is given.
+	 *
+	 * `startMin`/`durationMin` combine with `date`, each defaulting to the
+	 * slot's own when omitted from a `date` move, or to the current value
+	 * when only `durationMin` changes alone. Re-runs the weekday and
+	 * same-day-collision checks whenever the date moves, and always
+	 * re-resolves `examId` from the (possibly unchanged) window.
 	 */
+	@Validate({
+		service: true,
+		returns: calendarEventSchema,
+		args: [calendarEventPK, calendarEventUpdate],
+	})
 	async update(
-		filter: UpdateEventFilter,
-		fields: UpdateEvent,
+		filter: CalendarEventPK,
+		fields: CalendarEventUpdate,
 		opts: ServiceOpts,
-	): Promise<CalendarEventWithDetails> {
+	): Promise<CalendarEvent> {
+		const target = await this.findOne(filter, opts);
+		if (!target) throw new Error("event not found");
+
 		const client = opts.tx ?? this.prisma;
 		const current = await client.calendarEvent.findUnique({
-			where: { id: filter.id },
-			include: eventInclude,
+			where: { id: target.id },
+			include: EVENT_INCLUDE,
 		});
 		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "update-calendar-event" });
 		}
 
 		let startAt = current.startAt;
@@ -360,7 +309,7 @@ class CalendarEventService
 		});
 
 		const row = await client.calendarEvent.update({
-			where: { id: filter.id },
+			where: { id: target.id },
 			data: {
 				startAt,
 				durationMin,
@@ -371,27 +320,38 @@ class CalendarEventService
 				contentHash: fields.contentHash,
 				examId,
 			},
-			include: eventInclude,
+			include: EVENT_INCLUDE,
 		});
 		return maskExam(row, opts.actor);
 	}
 
 	/**
-	 * Removes the row outright — events are never archived (FR-CAL-014). A
-	 * subsequent `findOne` returns `null`.
+	 * Removes the row outright — events are never archived (FR-CAL-014).
+	 *
+	 * A subsequent `findOne` returns `null`.
 	 */
-	async delete(filter: DeleteEventFilter, opts: ServiceOpts): Promise<void> {
+	@Validate({ service: true, args: [calendarEventPK] })
+	async delete(filter: CalendarEventPK, opts: ServiceOpts): Promise<void> {
+		const target = await this.findOne(filter, opts);
+		if (!target) throw new Error("event not found");
+
 		const client = opts.tx ?? this.prisma;
 		const current = await client.calendarEvent.findUnique({
-			where: { id: filter.id },
-			include: eventInclude,
+			where: { id: target.id },
+			include: EVENT_INCLUDE,
 		});
 		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "delete-calendar-event" });
 		}
-		await client.calendarEvent.delete({ where: { id: filter.id } });
+		await client.calendarEvent.delete({ where: { id: target.id } });
 	}
 }
+
+export const calendarEventService = new CalendarEventService();
+
+//
+// Auxiliary functions
+//
 
 /** Rejects an event whose resolved `startAt` lands on a day other than its slot's. */
 function assertWeekdayMatches(
@@ -435,4 +395,36 @@ async function assertNoSlotDayCollision(
 	}
 }
 
-export const calendarEventService = new CalendarEventService();
+/**
+ * The link is computed for everybody — it is a fact about the schedule —
+ * but a row must not leak the existence and title of an unpublished exam to
+ * anyone but the course's own instructor (or `SYSTEM`): `DRAFT` and
+ * `ARCHIVED` exams are nulled out of what non-owners see.
+ */
+function maskExam(row: DbEvent, actor: Actor): CalendarEvent {
+	const { course, exam, ...rest } = row;
+	const privileged = canWriteCourseContent(actor, course);
+	const visible =
+		exam !== null &&
+		(privileged || (exam.status !== "DRAFT" && exam.status !== "ARCHIVED"));
+	return {
+		...rest,
+		id: rest.id as CalendarEventId,
+		courseId: rest.courseId as CourseId,
+		timeSlotId: rest.timeSlotId as TimeSlotId,
+		timeSlot: {
+			...rest.timeSlot,
+			id: rest.timeSlot.id as TimeSlotId,
+			courseId: rest.timeSlot.courseId as CourseId,
+		},
+		exam:
+			visible && exam
+				? { id: exam.id, slug: exam.slug, title: exam.title }
+				: null,
+	};
+}
+
+/** Whether `kind` represents a meeting that was actually held. */
+export function isMeeting(kind: EventKind): boolean {
+	return MEETING_KINDS.has(kind);
+}

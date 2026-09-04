@@ -1,8 +1,7 @@
-import { type Actor, type AuthUser, SYSTEM } from "@/db/base-service";
+import { type Actor, SYSTEM } from "@/core/actor";
 import type { Prisma, Role } from "@/db/client";
-import type { User } from "@/db/user.service";
-import type { Impl, Require } from "@/utils/types";
-
+import type { User } from "@/db/services/user.service";
+import type { Impl } from "@/utils/types";
 
 const ROLE_RANK: Record<Role, number> = {
 	STUDENT: 0,
@@ -18,10 +17,10 @@ export function isAtLeast(actor: Actor, role: Role): boolean {
 	return ROLE_RANK[actor.role] >= ROLE_RANK[role];
 }
 
-/** 
+/**
  * Actor can invite users with the given `targetRole`.
- * 
- * - SYSTEM can invite any role, 
+ *
+ * - SYSTEM can invite any role,
  * - ADMIN can invite INSTRUCTOR or STUDENT
  * - INSTRUCTOR can only invite STUDENT
  * - STUDENT cannot invite anyone.
@@ -59,9 +58,9 @@ export function canCreateUser(actor: Actor): boolean {
 	return actor === SYSTEM || actor.role === "ADMIN";
 }
 
-/** 
+/**
  * Can edit an user:
- * 
+ *
  * 	- SYSTEM
  *  - Admins
  *  - The user themselves
@@ -72,7 +71,7 @@ export function canEditUser(actor: Actor, user: Impl<User, "id">): boolean {
 
 /**
  * Can view details of an user:
- * 
+ *
  * 	- SYSTEM
  * 	- Admins
  *  - The user themselves

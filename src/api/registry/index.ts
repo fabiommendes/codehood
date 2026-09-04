@@ -1,18 +1,13 @@
 import type { ActionAPIContext } from "astro:actions";
-import {
-	extendZodWithOpenApi,
-	OpenAPIRegistry,
-} from "@asteasolutions/zod-to-openapi";
+import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import type { APIContext } from "astro";
 import { type ZodType, z } from "zod";
-import type { User } from "@/db/user.service";
-
-// Must run before any schema calls .openapi(...) — every route file imports
-// this module first, so this is the one place that needs to call it.
-extendZodWithOpenApi(z);
+import type { UserActor as User } from "@/core/actor";
+import { InvalidData } from "@/core/error";
+import type { Crud } from "@/db/base-service";
 
 /// Actor = User? or User depending if API is public or not.
-type Actor<IsPublic> = IsPublic extends false ? User : User | undefined;
+type MaybeActor<IsPublic> = IsPublic extends false ? User : User | undefined;
 
 /**
  * Options for the route/get/post functions and friends.
@@ -24,21 +19,21 @@ export type RouteOptions<In, Out, IsPublic extends boolean = false> = {
 	out: ZodType<Out>;
 	summary?: string;
 	description?: string;
-	tags?: string[];
+	tags: string[];
 	errors?: {
 		[status: number]: { description: string; schema: ZodType<unknown> };
 	};
 	handler: HandlerFunction<
 		In extends { [key: string]: unknown } ? In : undefined,
 		Out,
-		Actor<IsPublic>
+		MaybeActor<IsPublic>
 	>;
 };
 
 /// Arguments for the handler function
-type HandlerArgs<In, Actor> = Actor extends User
-	? { actor: Actor; body: In }
-	: { actor?: Actor; body: In };
+type HandlerArgs<In, Actor> = Actor extends Actor
+	? { actor: Actor; body: In; params: Record<string, string> }
+	: { actor?: Actor; body: In; params: Record<string, string> };
 
 /// The Handler function itself
 type HandlerFunction<In, Out, Actor> = (
@@ -67,7 +62,7 @@ function route<In, Out, IsPublic extends boolean = false>(
 	method: keyof HttpMethods,
 	path: string,
 	options: RouteOptions<In, Out, IsPublic>,
-): Route<In, Out, Actor<IsPublic>> {
+): Route<In, Out, MaybeActor<IsPublic>> {
 	const action = options.handler;
 
 	const requestOpts = options.in
@@ -109,7 +104,7 @@ function route<In, Out, IsPublic extends boolean = false>(
 	// We make a unknown cast because typescript insists that In must be a
 	// object, but route declares it as an arbitrary type parameter
 	const wrapper = (args: Parameters<typeof action>[0]) => action(args);
-	const result = wrapper as unknown as Route<In, Out, Actor<IsPublic>>;
+	const result = wrapper as unknown as Route<In, Out, MaybeActor<IsPublic>>;
 
 	// Catches some errors and return an object { value, error } instead of
 	// throwing an exception.
@@ -126,35 +121,22 @@ function route<In, Out, IsPublic extends boolean = false>(
 		throw new Error("not implemented");
 	};
 
-	result.view = async ({ locals, request }: APIContext) => {
-		const user = locals.user as User | undefined;
-
-		if (!request.headers.get("accept")?.includes("application/json")) {
-			// TODO: declare proper error schemas and error codes.
-			return Response.json(
-				{
-					error:
-						"Not Accepting JSON, this request requires the 'Accept: application/json' header",
-					isError: true,
-				},
-				{ status: 406 },
-			);
-		}
+	// This is the exported view function used by astro when routing
+	// API requests
+	result.view = async ({ locals, request, params }: APIContext) => {
+		const user = locals.actor as User | undefined;
 
 		const validated = options.in?.safeParse(await request.json());
-		if (validated?.error) {
-			return Response.json(
-				// TODO: model the error responses. Is treeify good enough?
-				{ error: z.treeifyError(validated.error), isError: true },
-				{ status: 400 },
-			);
-		}
+		if (validated?.error)
+			throw InvalidData.fromZodError(validated.error, validated.data);
 
-		// biome-ignore lint/suspicious/noExplicitAny: Typescript cannot narrow the type to be correct in all possiblities (Body, Actor) in terms of being nullable or not.
+		// biome-ignore-start lint/suspicious/noExplicitAny: Typescript cannot narrow the type to be correct in all possiblities (Body, Actor) in terms of being nullable or not.
 		const result = await safeAction({
 			actor: user,
 			body: validated?.data,
+			params: params as Record<string, string>,
 		} as any);
+		// biome-ignore-end lint/suspicious/noExplicitAny: ...
 
 		if (result.isError) {
 			const status = (result.error as { status?: number })?.status ?? 400;
@@ -222,6 +204,123 @@ export function PATCH<In, Out, IsPublic extends boolean = false>(
 	return route("patch", path, options);
 }
 
+export type CrudRouteOptions<
+	Entity,
+	Create extends object,
+	Filter,
+	PkFilter,
+	Update extends object,
+> = {
+	pk?: string;
+	name: string;
+	plural?: string;
+	entity: ZodType<Entity>;
+	create: ZodType<Create>;
+	update: ZodType<Update>;
+	filter: ZodType<Filter>;
+	filterPk: ZodType<PkFilter>;
+	tags: string[];
+	errors?: {
+		[status: number]: { description: string; schema: ZodType<unknown> };
+	};
+	service: Crud<{
+		entity: Entity;
+		create: Create;
+		filter: Filter;
+		pkFilter: PkFilter;
+		update: Update;
+	}>;
+	extra?: Record<string, Route<unknown, unknown, User>>;
+};
+
+/**
+ * RESTful CRUD interface
+ */
+export function CRUD<
+	Entity,
+	Create extends object,
+	Filter,
+	PkFilter,
+	Update extends object,
+>(
+	path: `/api/${string}`,
+	options: CrudRouteOptions<Entity, Create, Filter, PkFilter, Update>,
+) {
+	const pathWithId = `${path}/[${options.pk ?? "id"}]`;
+	const slug =
+		path.split("/").findLast((segment) => segment.length > 0) ?? path;
+	const slugTitle = slug?.charAt(0).toUpperCase() + slug?.slice(1);
+	const name = options.name;
+	const namePlural = options.plural ?? `${name}s`;
+	const service = options.service;
+	const operationId = (action: string) => `${action}${slugTitle}`;
+	const hasUpdate = !isZodNeverScheme(options.update) || undefined;
+
+	return {
+		create: POST(path, {
+			operationId: operationId("create"),
+			in: options.create,
+			out: options.entity,
+			summary: `Creates a new ${name}.`,
+			tags: options.tags,
+			errors: options.errors,
+			handler: async ({ actor, body }) => {
+				return service.create(body as Create, { actor });
+			},
+		}),
+		findOne: GET(pathWithId, {
+			operationId: operationId("find"),
+			in: options.filterPk,
+			out: options.entity,
+			summary: `Find a single ${name} by ${options.pk ?? "id"}.`,
+			tags: options.tags,
+			errors: options.errors,
+			handler: async ({ actor, body }) => {
+				return service.findOne(body as PkFilter, { actor });
+			},
+		}),
+		findMany: GET(path, {
+			operationId: operationId("findMany"),
+			in: options.filter,
+			out: options.entity.array(),
+			summary: `Find multiple ${namePlural}.`,
+			tags: options.tags,
+			errors: options.errors,
+			handler: async ({ actor, body }) => {
+				return service.findMany(body as Filter, { actor });
+			},
+		}),
+		update:
+			hasUpdate &&
+			PATCH(pathWithId, {
+				operationId: operationId("update"),
+				in: options.update,
+				out: options.entity,
+				summary: `Update a single ${name} by ${options.pk ?? "id"}.`,
+				tags: options.tags,
+				errors: options.errors,
+				handler: async ({ actor, body, params }) => {
+					return service.update(params as PkFilter, body as Update, { actor });
+				},
+			}),
+		delete: DELETE(pathWithId, {
+			operationId: operationId("delete"),
+			in: options.filterPk,
+			// TOOD: maybe return the deleted entity.
+			out: z
+				.object({ success: z.boolean(), message: z.string() })
+				.openapi("Deleted"),
+			summary: `Delete a single ${name} by primary key.`,
+			tags: options.tags,
+			errors: options.errors,
+			handler: async ({ actor, params }) => {
+				await service.delete(params as PkFilter, { actor });
+				return { success: true, message: `${name} deleted successfully` };
+			},
+		}),
+	};
+}
+
 //
 // Prepare the global registry
 //
@@ -244,7 +343,7 @@ registry.registerComponent("securitySchemes", "BearerAuth", {
 	type: "http",
 	scheme: "bearer",
 	description:
-		"An API key for the CLI or a grading bot. Issued by POST /api/auth/cli-login, or created on /profile.",
+		"An API key for the CLI or a grading bot. Issued by POST /api/auth/login, or created on /profile.",
 });
 
 /**
@@ -280,4 +379,9 @@ function errorToJSON(error: unknown) {
 		name: error.name,
 		stack: error.stack,
 	};
+}
+
+function isZodNeverScheme(schema: ZodType<unknown>): boolean {
+	// biome-ignore lint/suspicious/noExplicitAny: ZodType has no way to narrow the type to be correct in all possiblilities.
+	return (schema as any)._def.typeName === "ZodNever";
 }

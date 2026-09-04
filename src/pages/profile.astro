@@ -4,9 +4,9 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import PageKicker from "@/components/PageKicker.astro";
 import Tabs from "@/components/ui/Tabs.astro";
-import { apiKeyService } from "@/db/api-key.service";
 import type { ApiKey } from "@/db/client";
-import { userService } from "@/db/user.service";
+import { apiKeyService } from "@/db/services/api-key.service";
+import { userService } from "@/db/services/user.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 const logoutEverywhereResult = Astro.getActionResult(
@@ -16,11 +16,11 @@ if (logoutEverywhereResult && !logoutEverywhereResult.error) {
   return Astro.redirect("/login");
 }
 
-if (!Astro.locals.user) {
+if (!Astro.locals.actor) {
   return Astro.redirect("/login");
 }
 
-const actor = Astro.locals.user;
+const actor = Astro.locals.actor;
 const user = await userService.findOne({ id: actor.id }, { actor });
 if (!user) {
   return Astro.redirect("/login");

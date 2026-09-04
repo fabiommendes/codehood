@@ -2,7 +2,7 @@
  * Environment variables and configuration constants for the application.
  */
 
-import type { ArrayToUnion } from "./utils/types";
+import type { ArrayToUnion } from "../utils/types";
 
 /**
  * Read environment variable as string with a default value.
@@ -53,6 +53,8 @@ export const ENVIRONMENT = assertIn(readEnv("ENVIRONMENT", "dev"), [
 	"dev",
 	"prod",
 ]);
+export const DEVELOPMENT = ENVIRONMENT === "dev";
+export const PRODUCTION = ENVIRONMENT === "prod";
 
 /**
  * Where resource blobs are stored on disk, as `<RESOURCE_ROOT>/<hash[0:2]>/<hash>`

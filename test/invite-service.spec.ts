@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { canViewInvite } from "@/auth/permissions";
-import { FULL_ACCESS } from "@/db/base-service";
-import { checkRedeemable, inviteService } from "@/db/invite.service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { checkRedeemable, inviteService } from "@/db/services/invite.service";
+import { userService } from "@/db/services/user.service";
 
 function makeAdmin(email: string) {
 	return userService.create(

@@ -1,7 +1,7 @@
 import { password as passwordPrompt } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/db/base-service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { userService } from "@/db/services/user.service";
 
 export const resetPasswordCommand = new Command("reset-password")
 	.description("Reset the password for a given user")

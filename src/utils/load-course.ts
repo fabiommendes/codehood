@@ -1,11 +1,11 @@
 import type { AstroGlobal } from "astro";
 import { canManageEnrollment } from "@/auth/permissions";
-import { ForbiddenError } from "@/db/base-service";
-import { type CourseWithDetails, courseService } from "@/db/course.service";
+import { NotAllowed } from "@/core/error";
+import { type Course, courseService } from "@/db/services/course.service";
 import { courseHref, parseCourseSegment } from "./course-url";
 
 export type LoadCourseResult =
-	| { course: CourseWithDetails; href: string }
+	| { course: Course; href: string }
 	| { redirect: Response };
 
 /**
@@ -27,7 +27,7 @@ export async function loadCourse(
 	courseSegment: string | undefined,
 	opts?: { manage?: boolean },
 ): Promise<LoadCourseResult> {
-	const actor = Astro.locals.user;
+	const actor = Astro.locals.actor;
 	if (!actor) {
 		return { redirect: Astro.redirect("/login") };
 	}
@@ -38,7 +38,7 @@ export async function loadCourse(
 	}
 	const segment = courseSegment;
 
-	let course: CourseWithDetails | null;
+	let course: Course | null;
 	try {
 		course = await courseService.findOne(
 			{
@@ -51,7 +51,7 @@ export async function loadCourse(
 			{ actor },
 		);
 	} catch (error) {
-		if (error instanceof ForbiddenError) {
+		if (error instanceof NotAllowed) {
 			return { redirect: await forbidden(Astro, segment) };
 		}
 		throw error;

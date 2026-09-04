@@ -4,18 +4,18 @@
 // dev/specs/to-do/course-navigation.md. There is no back-link and no
 // "Instructor view" badge; the strip is the whole of the page's navigation,
 // and an instructor's extra tabs are the only thing that marks them as one.
-import { type CourseWithDetails } from "@/db/course.service";
+import { type Course } from "@/db/services/course.service";
 import { type CourseTabKey, courseTabs } from "@/utils/course-tabs";
 import Tabs from "./ui/Tabs.astro";
 
 interface Props {
-	course: CourseWithDetails;
+	course: Course;
 	active: CourseTabKey;
 }
 
 const { course, active } = Astro.props;
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
-const actor = Astro.locals.user!;
+const actor = Astro.locals.actor!;
 
 const tabs = courseTabs(
 	{
@@ -30,11 +30,15 @@ const tabs = courseTabs(
 ---
 
 <div>
-  <span class="badge badge-outline badge-sm font-mono">{course.disciplineSlug}</span>
-  <h1 class="mt-2 text-3xl font-bold">{course.discipline.name}</h1>
-  <p class="mt-1 text-base-content/60">{course.instructor.name} · {course.editionSlug}</p>
+	<span class="badge badge-outline badge-sm font-mono"
+		>{course.disciplineSlug}</span
+	>
+	<h1 class="mt-2 text-3xl font-bold">{course.discipline.name}</h1>
+	<p class="mt-1 text-base-content/60">
+		{course.instructor.name} · {course.editionSlug}
+	</p>
 </div>
 
 <div class="mt-6">
-  <Tabs items={tabs} active={active} />
+	<Tabs items={tabs} active={active} />
 </div>

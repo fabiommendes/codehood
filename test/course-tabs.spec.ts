@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { canManageEnrollment } from "@/auth/permissions";
-import { SYSTEM } from "@/db/base-service";
+import { SYSTEM } from "@/core/actor";
 import { type CourseTab, courseTabs } from "@/utils/course-tabs";
 
 const admin = { id: 1, role: "ADMIN" as const };

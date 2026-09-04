@@ -28,6 +28,7 @@ export const health = GET("/api/health", {
 			}).openapi("HealthError"),
 		},
 	},
+	tags: ["System"],
 	handler: async (_) => {
 		try {
 			await prisma.$queryRaw`SELECT 1`;

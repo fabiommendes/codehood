@@ -2,17 +2,18 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
-import { apiKeyService } from "@/db/api-key.service";
-import { FULL_ACCESS } from "@/db/base-service";
+import { FULL_ACCESS } from "@/core/actor";
+import * as schema from "@/core/schemas";
 import { prisma } from "@/db/client";
-import { courseService } from "@/db/course.service";
+import { apiKeyService } from "@/db/services/api-key.service";
+import { courseService } from "@/db/services/course.service";
 import {
 	checkRedeemable,
 	InviteError,
 	inviteService,
-} from "@/db/invite.service";
-import { sessionService } from "@/db/session.service";
-import { type User, userService } from "@/db/user.service";
+} from "@/db/services/invite.service";
+import { sessionService } from "@/db/services/session.service";
+import { type User, userService } from "@/db/services/user.service";
 import { SESSION_COOKIE } from "@/middleware";
 import { USERNAME_RE } from "@/utils/course-url";
 import { withActionErrors } from "./helpers";
@@ -206,10 +207,10 @@ export const auth = {
 
 	revokeApiKey: defineAction({
 		accept: "form",
-		input: z.object({ id: z.coerce.number().int() }),
+		input: schema.apiKeyPK,
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await apiKeyService.revoke(input.id, { actor });
+			await apiKeyService.delete({ id: input.id }, { actor });
 		}),
 	}),
 };

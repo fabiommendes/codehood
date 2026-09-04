@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { canViewCourseContents } from "@/auth/permissions";
-import { FULL_ACCESS, type ServiceOpts, SYSTEM } from "@/db/base-service";
-import { calendarEventService } from "@/db/calendar-event.service";
+import type { ServiceOpts } from "@/db/base-service";
+import { FULL_ACCESS, SYSTEM } from "@/core/actor";
 import { prisma } from "@/db/client";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { relinkExam } from "@/db/exam-link";
-import { timeSlotService } from "@/db/time-slot.service";
-import { userService } from "@/db/user.service";
+import { calendarEventService } from "@/db/services/calendar-event.service";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { timeSlotService } from "@/db/services/time-slot.service";
+import { userService } from "@/db/services/user.service";
+import { relinkExam } from "@/db/util.exam-link";
 
 // Random suffix, not an incrementing counter: shared test database across
 // spec files. Prefixed "cal-" so it never collides with another file's tag().
@@ -364,7 +365,7 @@ test("a student enrolled in one of two courses sees only that course's events; a
 		{ courseId: courseA.id, userId: dropped.id },
 		FULL_ACCESS,
 	);
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: courseA.id, userId: dropped.id },
 		FULL_ACCESS,
 	);
@@ -421,7 +422,7 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 		{ courseId: course.id, userId: dropped.id },
 		FULL_ACCESS,
 	);
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: course.id, userId: dropped.id },
 		FULL_ACCESS,
 	);

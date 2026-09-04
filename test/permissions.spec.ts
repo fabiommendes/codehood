@@ -18,7 +18,8 @@ import {
 	isAtLeast,
 	userVisibility,
 } from "@/auth/permissions";
-import { type Actor, SYSTEM } from "@/db/base-service";
+import type { Actor } from "@/core/actor";
+import { SYSTEM } from "@/core/actor";
 
 const admin = { id: 1, role: "ADMIN" as const };
 const instructor = { id: 2, role: "INSTRUCTOR" as const };

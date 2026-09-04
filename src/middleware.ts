@@ -1,12 +1,19 @@
 import { defineMiddleware, sequence } from "astro:middleware";
 import { canManageUsers } from "@/auth/permissions";
-import { apiKeyService } from "@/db/api-key.service";
-import { sessionService } from "@/db/session.service";
-import { ensureDemoCourses, ensureDevAdmin } from "./auth/bootstrap";
-import * as env from "./constants";
+import { apiKeyService } from "@/db/services/api-key.service";
+import { sessionService } from "@/db/services/session.service";
+import * as env from "./core/constants";
+import { ensureDemoCourses, ensureDevAdmin } from "./db/bootstrap";
 
 export const SESSION_COOKIE = "session";
 
+/**
+ * The session middleware is responsible for validating the session cookie and populating
+ * `context.locals.actor`.
+ *
+ * `context.locals.actor` is populated with a stripped down version of the
+ * authenticated user when the session is valid, or undefined.
+ */
 export const sessionMiddleware = defineMiddleware(async (context, next) => {
 	const token = context.cookies.get(SESSION_COOKIE)?.value;
 	if (!token) return next();
@@ -17,7 +24,7 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 		return next();
 	}
 
-	context.locals.user = session.user;
+	context.locals.actor = session.user;
 
 	// Re-stamp the cookie so its lifetime tracks the (possibly just-refreshed) sliding expiry.
 	context.cookies.set(SESSION_COOKIE, token, {
@@ -40,14 +47,14 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 export const adminMiddleware = defineMiddleware((context, next) => {
 	if (!context.url.pathname.startsWith("/admin")) return next();
 
-	if (!context.locals.user) return context.redirect("/login");
-	if (!canManageUsers(context.locals.user)) return context.redirect("/403");
+	if (!context.locals.actor) return context.redirect("/login");
+	if (!canManageUsers(context.locals.actor)) return context.redirect("/403");
 
 	return next();
 });
 
 export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
-	if (context.locals.user) return next(); // already authenticated via session cookie
+	if (context.locals.actor) return next(); // already authenticated via session cookie
 
 	const header = context.request.headers.get("authorization");
 	const token = header?.startsWith("Bearer ")
@@ -57,7 +64,7 @@ export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 
 	const apiKey = await apiKeyService.validate(token);
 	if (apiKey) {
-		context.locals.user = { id: apiKey.user.id, role: apiKey.user.role };
+		context.locals.actor = { id: apiKey.user.id, role: apiKey.user.role };
 		context.locals.apiKey = { id: apiKey.id, kind: apiKey.kind };
 	}
 

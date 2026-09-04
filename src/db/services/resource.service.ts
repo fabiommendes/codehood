@@ -1,77 +1,39 @@
+import type { z } from "zod";
 import {
 	canViewCourseContents,
 	canWriteCourseContent,
 	courseContentsVisibility,
 } from "@/auth/permissions";
+import { SYSTEM } from "@/core/actor";
+import { NotAllowed } from "@/core/error";
 import type { FillUndefineds } from "@/utils/types";
+import { Validate } from "@/utils/validate";
 import {
-	type Create,
-	type Delete,
-	type FindMany,
-	type FindOne,
-	ForbiddenError,
-	type ServiceOpts,
-	SYSTEM,
-	type Update,
-} from "./base-service";
-import {
-	type File,
-	type Prisma,
-	type PrismaClient,
-	prisma,
-	type ResourceType,
-} from "./client";
+	type CourseId,
+	type FileId,
+	type ResourceId,
+	resourceCreate,
+	resourceFilter,
+	resourcePK,
+	type resourceRef,
+	resourceSchema,
+	resourceUpdate,
+} from "../../core/schemas";
+import type { Crud, ServiceOpts } from "../base-service";
+import { type Prisma, type PrismaClient, prisma } from "../client";
 import { fileService } from "./file.service";
 
-export interface CreateResource {
-	courseId: number;
-	/** Natural key from the repository path — FR-SYNC-010. */
-	slug: string;
-	type: ResourceType;
-	title: string;
-	description?: string;
-	/** Url, for LINK. Markdown, for MD. Source, for CODE. Absent for FILE. */
-	data?: string;
-	/** Language, for CODE. Absent otherwise. */
-	extra?: string;
-	fileId?: number;
-	/** Supplied by the writer, stored verbatim. */
-	contentHash: string;
-}
+export type { ResourceId } from "../../core/schemas";
 
-export type ResourceRef = { courseId: number; slug: string };
-
-export type FindResourceBy = FillUndefineds<
-	{ id: number } | { ref: ResourceRef }
->;
-
-export interface FindResourcesBy {
-	courseId?: number;
-	types?: ResourceType[];
-	slugs?: string[];
-}
-
-export interface UpdateResourceFilter {
-	id: number;
-}
-
-/**
- * The editable fields. `slug` is deliberately absent: it is the sync natural
- * key, and renaming is a delete plus a create (FR-SYNC-011).
- */
-export interface UpdateResource {
-	type?: ResourceType;
-	title?: string;
-	description?: string;
-	data?: string;
-	extra?: string;
-	fileId?: number;
-	contentHash?: string;
-}
-
-export interface DeleteResourceFilter {
-	id: number;
-}
+//
+// Type definitions
+//
+export type ResourceCreate = z.infer<typeof resourceCreate>;
+export type Resource = z.infer<typeof resourceSchema>;
+export type ResourceFilter = z.infer<typeof resourceFilter>;
+export type ResourcePK = z.infer<typeof resourcePK>;
+export type ResourceUpdate = z.infer<typeof resourceUpdate>;
+export type ResourceRef = z.infer<typeof resourceRef>;
 
 /** The minimal course shape the write/read predicates need, loaded alongside every row. */
 const resourceInclude = {
@@ -87,17 +49,9 @@ const resourceInclude = {
 	file: true,
 } satisfies Prisma.ResourceInclude;
 
-type ResourceRow = Prisma.ResourceGetPayload<{
+type DbResource = Prisma.ResourceGetPayload<{
 	include: typeof resourceInclude;
 }>;
-
-/** What every read returns: the resource's own fields plus the `File` it links, if any. */
-export type ResourceWithFile = Omit<ResourceRow, "course">;
-
-function omitCourse(row: ResourceRow): ResourceWithFile {
-	const { course: _course, ...rest } = row;
-	return rest;
-}
 
 /** Whole-string URL check — the heuristic the create/update validation uses. */
 const BARE_URL_RE = /^https?:\/\/\S+$/i;
@@ -111,7 +65,7 @@ const BARE_URL_RE = /^https?:\/\/\S+$/i;
  * to be a `LINK`.
  */
 function validateResourceShape(
-	type: ResourceType,
+	type: Resource["type"],
 	fields: {
 		data?: string | null;
 		extra?: string | null;
@@ -156,13 +110,13 @@ function validateResourceShape(
 
 /** One of the four fixed groups the resources page renders, title-sorted, empty groups omitted. */
 export interface ResourceGroup {
-	type: ResourceType;
+	type: Resource["type"];
 	label: string;
-	resources: ResourceWithFile[];
+	resources: Resource[];
 }
 
 /** Display order and label for each `ResourceType` — never authored, see the spec. */
-const GROUP_ORDER: { type: ResourceType; label: string }[] = [
+const GROUP_ORDER: { type: Resource["type"]; label: string }[] = [
 	{ type: "FILE", label: "Files" },
 	{ type: "LINK", label: "Links" },
 	{ type: "MD", label: "Notes" },
@@ -170,15 +124,14 @@ const GROUP_ORDER: { type: ResourceType; label: string }[] = [
 ];
 
 /**
- * Groups resources into the four fixed sections the page renders — type
- * order fixed (`FILE` → Files, `LINK` → Links, `MD` → Notes, `CODE` →
- * Snippets), title order within each, empty groups absent. Exported as a pure
- * function so the grouping/ordering is unit-testable independent of the
- * database.
+ * Groups resources into the four fixed sections the page renders.
+ *
+ * Type order fixed (`FILE` → Files, `LINK` → Links, `MD` → Notes, `CODE` →
+ * Snippets), title order within each, empty groups absent. Exported as a
+ * pure function so the grouping/ordering is unit-testable independent of
+ * the database.
  */
-export function groupResourcesByType(
-	resources: ResourceWithFile[],
-): ResourceGroup[] {
+export function groupResourcesByType(resources: Resource[]): ResourceGroup[] {
 	const groups: ResourceGroup[] = [];
 	for (const { type, label } of GROUP_ORDER) {
 		const inGroup = resources
@@ -193,31 +146,32 @@ export function groupResourcesByType(
 
 class ResourceService
 	implements
-	Create<CreateResource, ResourceWithFile>,
-	FindOne<FindResourceBy, ResourceWithFile>,
-	FindMany<FindResourcesBy, ResourceWithFile>,
-	Update<UpdateResourceFilter, UpdateResource, ResourceWithFile>,
-	Delete<DeleteResourceFilter> {
+	Crud<{
+		entity: Resource;
+		pkFilter: ResourcePK;
+		create: ResourceCreate;
+		filter: ResourceFilter;
+		update: ResourceUpdate;
+	}> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
 		this.prisma = client;
 	}
 
-	async create(
-		input: CreateResource,
-		opts: ServiceOpts,
-	): Promise<ResourceWithFile> {
+	/**
+	 * Creates a resource, rejecting a shape that doesn't match its
+	 * `type` (see {@link validateResourceShape}).
+	 */
+	@Validate({ service: true, returns: resourceSchema, args: [resourceCreate] })
+	async create(input: ResourceCreate, opts: ServiceOpts): Promise<Resource> {
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
 			select: { instructor: { select: { id: true } } },
 		});
 		if (!course || !canWriteCourseContent(opts.actor, course)) {
-			throw new ForbiddenError();
-		}
-		if (!input.contentHash) {
-			throw new Error("contentHash is required.");
+			throw new NotAllowed({ action: "create-resource" });
 		}
 		validateResourceShape(input.type, input);
 
@@ -235,34 +189,38 @@ class ResourceService
 			},
 			include: resourceInclude,
 		});
-		return omitCourse(row);
+		return toResource(row);
 	}
 
 	/**
-	 * Finds a resource by id or by its `(courseId, slug)` natural key. Throws
-	 * `FORBIDDEN` if it exists but `actor` may not see its course's contents
-	 * (see {@link canViewCourseContents}); returns `null` if it does not
-	 * exist.
+	 * Finds a resource by id or by its `(courseId, slug)` natural key.
+	 *
+	 * Throws `FORBIDDEN` if it exists but `actor` may not see its course's
+	 * contents (see {@link canViewCourseContents}); returns `null` if it
+	 * does not exist.
 	 */
+	@Validate({
+		service: true,
+		returns: resourceSchema.nullable(),
+		args: [resourcePK],
+	})
 	async findOne(
-		filter: FindResourceBy,
+		filter: ResourcePK,
 		opts: ServiceOpts,
-	): Promise<ResourceWithFile | null> {
+	): Promise<Resource | null> {
 		const client = opts.tx ?? this.prisma;
-		let row: ResourceRow | null = null;
+		const by = filter as FillUndefineds<ResourcePK>; // zod doesn't narrow to a single field, so we do it here
+		let row: DbResource | null = null;
 
-		if (filter.id !== undefined) {
+		if (by.id !== undefined) {
 			row = await client.resource.findUnique({
-				where: { id: filter.id },
+				where: { id: by.id },
 				include: resourceInclude,
 			});
-		} else if (filter.ref) {
+		} else if (by.ref) {
 			row = await client.resource.findUnique({
 				where: {
-					courseId_slug: {
-						courseId: filter.ref.courseId,
-						slug: filter.ref.slug,
-					},
+					courseId_slug: { courseId: by.ref.courseId, slug: by.ref.slug },
 				},
 				include: resourceInclude,
 			});
@@ -270,23 +228,29 @@ class ResourceService
 
 		if (!row) return null;
 		if (!canViewCourseContents(opts.actor, row.course)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "read-resource" });
 		}
-		return omitCourse(row);
+		return toResource(row);
 	}
 
 	/**
 	 * Lists resources narrowed to what `actor` may see (see
 	 * {@link courseContentsVisibility}): an admin or the course's own
 	 * instructor sees everything, an actively enrolled student sees the
-	 * course's resources, everyone else sees none. Use
-	 * {@link groupResourcesByType} on the result to build the page's four
-	 * sections.
+	 * course's resources, everyone else sees none.
+	 *
+	 * Use {@link groupResourcesByType} on the result to build the page's
+	 * four sections.
 	 */
+	@Validate({
+		service: true,
+		returns: resourceSchema.array(),
+		args: [resourceFilter],
+	})
 	async findMany(
-		filter: FindResourcesBy,
+		filter: ResourceFilter,
 		opts: ServiceOpts,
-	): Promise<ResourceWithFile[]> {
+	): Promise<Resource[]> {
 		const client = opts.tx ?? this.prisma;
 		const rows = await client.resource.findMany({
 			where: {
@@ -300,27 +264,37 @@ class ResourceService
 			include: resourceInclude,
 			orderBy: { title: "asc" },
 		});
-		return rows.map(omitCourse);
+		return rows.map(toResource);
 	}
 
 	/**
-	 * Updates everything but `slug` and `courseId` — `manage import-resources`
-	 * uses this to update an existing row in place when re-pushing an
-	 * unchanged slug. Re-validates the merged shape, so switching a resource's
-	 * `type` (unusual, but not refused) cannot leave it in an invalid one.
+	 * Updates everything but `slug` and `courseId`.
+	 *
+	 * `manage import-resources` uses this to update an existing row in
+	 * place when re-pushing an unchanged slug. Re-validates the merged
+	 * shape, so switching a resource's `type` (unusual, but not refused)
+	 * cannot leave it in an invalid one.
 	 */
+	@Validate({
+		service: true,
+		returns: resourceSchema,
+		args: [resourcePK, resourceUpdate],
+	})
 	async update(
-		filter: UpdateResourceFilter,
-		fields: UpdateResource,
+		filter: ResourcePK,
+		fields: ResourceUpdate,
 		opts: ServiceOpts,
-	): Promise<ResourceWithFile> {
+	): Promise<Resource> {
+		const target = await this.findOne(filter, opts);
+		if (!target) throw new Error("resource not found");
+
 		const client = opts.tx ?? this.prisma;
 		const current = await client.resource.findUnique({
-			where: { id: filter.id },
+			where: { id: target.id },
 			include: resourceInclude,
 		});
 		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "update-resource" });
 		}
 
 		const merged = {
@@ -332,7 +306,7 @@ class ResourceService
 		validateResourceShape(merged.type, merged);
 
 		const row = await client.resource.update({
-			where: { id: filter.id },
+			where: { id: target.id },
 			data: {
 				type: fields.type,
 				title: fields.title,
@@ -344,26 +318,32 @@ class ResourceService
 			},
 			include: resourceInclude,
 		});
-		return omitCourse(row);
+		return toResource(row);
 	}
 
 	/**
-	 * Removes the resource row outright (matching FR-SYNC-013's "deleted" row
-	 * for calendar events — there is no soft delete at this layer). If it
-	 * pointed at a `File`, releases that reference: `FileService.delete` only
-	 * reaches the disk once the last resource pointing at the blob is gone,
-	 * since content addressing means another course may still share it.
+	 * Removes the resource row outright (matching FR-SYNC-013's "deleted"
+	 * row for calendar events — there is no soft delete at this layer).
+	 *
+	 * If it pointed at a `File`, releases that reference: `FileService.delete`
+	 * only reaches the disk once the last resource pointing at the blob is
+	 * gone, since content addressing means another course may still share
+	 * it.
 	 */
-	async delete(filter: DeleteResourceFilter, opts: ServiceOpts): Promise<void> {
+	@Validate({ service: true, args: [resourcePK] })
+	async delete(filter: ResourcePK, opts: ServiceOpts): Promise<void> {
+		const target = await this.findOne(filter, opts);
+		if (!target) throw new Error("resource not found");
+
 		const client = opts.tx ?? this.prisma;
 		const current = await client.resource.findUnique({
-			where: { id: filter.id },
+			where: { id: target.id },
 			include: resourceInclude,
 		});
 		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "delete-resource" });
 		}
-		await client.resource.delete({ where: { id: filter.id } });
+		await client.resource.delete({ where: { id: target.id } });
 		if (current.fileId && current.file) {
 			await fileService.delete(
 				{ slugHash: current.file.slugHash },
@@ -374,4 +354,18 @@ class ResourceService
 }
 
 export const resourceService = new ResourceService();
-export type { File };
+
+//
+// Auxiliary functions
+//
+
+// Convert a database resource record to the public-facing resource type.
+function toResource(row: DbResource): Resource {
+	return {
+		...row,
+		id: row.id as ResourceId,
+		courseId: row.courseId as CourseId,
+		fileId: row.fileId as FileId | null,
+		file: row.file && { ...row.file, id: row.file.id as FileId },
+	};
+}

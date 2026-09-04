@@ -1,11 +1,11 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { inviteService } from "@/db/invite.service";
-import { sessionService } from "@/db/session.service";
-import { userService } from "@/db/user.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { inviteService } from "@/db/services/invite.service";
+import { sessionService } from "@/db/services/session.service";
+import { userService } from "@/db/services/user.service";
 import { USERNAME_RE } from "@/utils/course-url";
 import { withServiceErrors } from "./helpers";
 

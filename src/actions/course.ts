@@ -1,8 +1,8 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
-import { courseService } from "@/db/course.service";
-import { passphraseService } from "@/db/passphrase.service";
+import { courseService } from "@/db/services/course.service";
+import { passphraseService } from "@/db/services/passphrase.service";
 import { withActionErrors, withServiceErrors } from "./helpers";
 
 export const course = {
@@ -20,7 +20,7 @@ export const course = {
 		}),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await courseService.unenroll(
+			await courseService.drop(
 				{ courseId: input.courseId, userId: input.userId ?? actor.id },
 				{ actor },
 			);

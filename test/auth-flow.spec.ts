@@ -41,8 +41,8 @@ test("login as dev admin, invite a student, accept the invite, and lose admin pe
 test("cli-login issues a bearer token that authenticates API-key middleware", async ({
 	request,
 }) => {
-	const login = await request.post("/api/auth/cli-login", {
-		data: { email: "admin@codehood.local", password: "admin" },
+	const login = await request.post("/api/auth/login", {
+		data: { login: "admin@codehood.local", password: "admin" },
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
@@ -58,18 +58,29 @@ test("cli-login issues a bearer token that authenticates API-key middleware", as
 	expect(await authed.text()).toContain("My courses");
 });
 
-test("cli-login rejects a malformed email with 400, and a missing password with 400", async ({
+test("cli-login rejects a login that is neither a valid email nor a valid username with 400, and a missing password with 400", async ({
 	request,
 }) => {
-	const badEmail = await request.post("/api/auth/cli-login", {
-		data: { email: "not-an-email", password: "admin" },
+	const badLogin = await request.post("/api/auth/login", {
+		data: { login: "not a valid login!", password: "admin" },
 	});
-	expect(badEmail.status()).toBe(400);
+	expect(badLogin.status()).toBe(400);
 
-	const noPassword = await request.post("/api/auth/cli-login", {
-		data: { email: "admin@codehood.local" },
+	const noPassword = await request.post("/api/auth/login", {
+		data: { login: "admin@codehood.local" },
 	});
 	expect(noPassword.status()).toBe(400);
+});
+
+test("cli-login accepts a username as well as an email", async ({
+	request,
+}) => {
+	const login = await request.post("/api/auth/login", {
+		data: { login: "admin", password: "admin" },
+	});
+	expect(login.ok()).toBe(true);
+	const { token } = await login.json();
+	expect(typeof token).toBe("string");
 });
 
 test("rejects invalid credentials", async ({ request }) => {

@@ -1,13 +1,13 @@
 ---
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
-import { courseService } from "@/db/course.service";
+import { courseService } from "@/db/services/course.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHref } from "@/utils/course-url";
 
 export const prerender = false;
 
-const actor = Astro.locals.user;
+const actor = Astro.locals.actor;
 if (!actor) return Astro.redirect("/login");
 
 const justLeft = Astro.url.searchParams.has("left");
@@ -27,7 +27,10 @@ const courses = await courseService.findMany({}, { actor });
     {
       justLeft && (
         <Alert variant="success" class="mt-6">
-          <span>You've left the course. Nothing was deleted — your submissions stay on record.</span>
+          <span>
+            You've left the course. Nothing was deleted — your submissions stay
+            on record.
+          </span>
         </Alert>
       )
     }
@@ -47,9 +50,17 @@ const courses = await courseService.findMany({}, { actor });
             });
             const isInstructor = course.instructor.id === actor.id;
             return (
-              <a href={href} class="card card-border bg-base-100 shadow-sm transition-shadow hover:shadow-md">
+              <a
+                href={href}
+                class="card card-border bg-base-100 shadow-sm transition-shadow hover:shadow-md"
+              >
                 <div class="card-body">
-                  <span class:list={["badge badge-sm font-mono", isInstructor ? "badge-primary" : "badge-outline"]}>
+                  <span
+                    class:list={[
+                      "badge badge-sm font-mono",
+                      isInstructor ? "badge-primary" : "badge-outline",
+                    ]}
+                  >
                     {course.disciplineSlug}
                   </span>
                   <h2 class="card-title mt-1">{course.discipline.name}</h2>

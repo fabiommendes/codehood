@@ -168,6 +168,179 @@
 
 ### Changed
 
+- `src/db/api-key.service.ts` now follows `user.service.ts`'s pattern: its Zod
+  schemas (`apiKeySchema`, `apiKeyCreate`, `apiKeyCreateResult`, `apiKeyPK`,
+  `apiKeyFilter`, plus a branded `ApiKeyId`) live in `src/db/schemas.ts`, and
+  `create`/`findOne`/`findMany` are decorated with `@Validate({ service: true,
+  returns: ... })` / `@Arg(...)` against those schemas instead of validating
+  (or not validating) fields by hand. `validate(token, opts?)` and `revoke(id,
+  opts)` are left as plain, undecorated methods — their only inputs are bare
+  primitives (a token string, a numeric id), not one of the models above, and
+  `@Arg`/Zod is for validating meaningful domain shapes, not primitives; a
+  `service: true` decorator on `validate` would also be wrong regardless,
+  since `opts` is optional there and it isn't actor-gated (validating a token
+  is how the caller's identity gets established in the first place). No
+  call-site changes were needed. Verified with a standalone `tsx` script
+  against a real SQLite test DB (Playwright still can't load this file — see
+  `dev/issues/arg-decorator-breaks-playwright-test-transform.md`), covering
+  create/findOne/findMany/validate/revoke, `@Arg` input validation, and
+  `ForbiddenError` enforcement.
+- `src/db/course.service.ts` now follows the same `user.service.ts` pattern,
+  and implements the new `Crud<T>` interface from `src/db/base-service.ts`
+  instead of composing `Create`/`FindOne`/`FindMany`/`Update` by hand. Its Zod
+  schemas (`courseSchema`, `courseCreate`, `courseUpdate`, `coursePK`,
+  `courseFilter`, `courseEnrollInput`, `courseRef`, plus a branded
+  `CourseId`) live in `src/db/schemas.ts`; `courseSchema` mirrors the
+  `courseInclude` shape (discipline, edition, instructor, active enrollments,
+  `_count`). `create`/`findOne`/`findMany`/`update`/`delete`/`enroll`/
+  `unenroll` are decorated with `@Validate`/`@Arg`; `listStudents(courseId,
+  opts)` keeps its bare-`number` parameter undecorated (same reasoning as
+  `apiKeyService.revoke`) but still validates its return shape. `update` and
+  `delete` now go through `this.findOne()` first, so they accept the same
+  `id`-or-`ref` `CoursePK` the read side does, rather than `id` only.
+  `coursePK.id` and `courseEnrollInput`'s ids are plain numbers, not the
+  branded `CourseId`/`UserId`: they're sourced from places that never carry
+  the brand (a coerced action input, `Invite.courseId`), so branding them
+  would have broken those call sites. The exported type is now `Course` (was
+  `CourseWithDetails`) to match `user.service.ts`'s naming, which renamed two
+  external references (`src/utils/load-course.ts`,
+  `src/components/CourseHeader.astro`). Verified with a standalone `tsx`
+  script against a real SQLite test DB, covering create/findOne (by id and by
+  ref)/findMany/update/delete/enroll/unenroll/listStudents, `@Arg` input
+  validation, and `ForbiddenError` enforcement for every write and read path.
+- `src/db/discipline.service.ts` and `src/db/edition.service.ts` now follow
+  the same pattern too, implementing `Crud<T>`. Both entities key on `slug`
+  (there's no numeric surrogate id on either model), so neither introduces a
+  branded id — `disciplinePK`/`editionPK` are plain `{ slug }`, and the DB
+  row already matches its Zod schema exactly, so neither service needs a
+  `toX()` converter. `findOne`/`findMany` on both stay permission-free (an
+  optional `opts`, as before) and use `@Validate({ async: true, returns })`
+  instead of `service: true` — `service: true` assumes `opts` is always
+  present, which would break the moment it's called without one (see
+  `dev/issues/validate-ts-error-type-and-footguns.md`); `create`/`update`/
+  `delete` are actor-gated and keep `service: true`. The slug-format and
+  reserved-name checks (`DISCIPLINE_SLUG_RE`/`RESERVED_SLUGS`/`EDITION_RE`)
+  and the `startAt < endAt` window check stay hand-written in the method
+  body rather than moving into the Zod schema, so their existing, specific
+  error messages are unchanged — only the request shape is Zod-validated.
+  Verified with a standalone `tsx` script against a real SQLite test DB,
+  covering create/findOne/findMany/update/delete on both services, `@Arg`
+  input validation, and each business-rule rejection (bad slug, reserved
+  slug, bad window).
+- `src/db/schemas.ts` reordered (Discipline and Edition now precede Course,
+  since Course embeds both) and de-duplicated: `courseSchema`'s nested
+  `discipline`/`edition`/`instructor` shapes are no longer redefined inline —
+  they now reuse `disciplineSchema`, `editionSchema`, and
+  `userSchema.pick(...)` directly.
+- `src/db/passphrase.service.ts` now follows the same pattern, implementing
+  `Crud<T>`. Its Zod schemas (`passphraseSchema`, `passphraseCreate`,
+  `passphraseUpdate`, `passphrasePK`, `passphraseFilter`, plus a branded
+  `PassphraseId`) live in `src/db/schemas.ts`; every method is decorated with
+  `@Validate`/`@Arg`. `update`/`delete` now go through `this.findOne()`
+  first (needed to accept the same `id`-or-`value` `PassphrasePK` union
+  `findOne` does — the `Crud<T>` interface requires one shared `pkFilter`
+  type across all four), same as `course.service.ts`. `passphraseSchema`'s
+  `courseId` is the branded `CourseId` (it's always DB-sourced on output),
+  but `passphraseCreate`/`passphraseFilter`'s `courseId` stays a plain
+  number (sourced from a coerced action input), the same asymmetry as
+  `coursePK`/`courseEnrollInput`. Verified with a standalone `tsx` script
+  against a real SQLite test DB, covering create (generated and
+  explicit-value paths, plus the collision case)/findOne (by id and by
+  value)/findMany (course-scoped and system-wide)/update/delete, `@Arg`
+  input validation, and `ForbiddenError` enforcement for every gated path.
+- `src/db/invite.service.ts` and `src/db/file.service.ts` now follow the same
+  pattern.
+  - `invite.service.ts` keeps composing `Create`/`FindOne`/`FindMany`/
+    `Update`/`Delete` by hand rather than `Crud<T>` — like `api-key.service.ts`,
+    its methods don't share one entity shape: `create` returns
+    `{ token, invite }`, `findOne`/`update` return the row plus its
+    redemption `_count` (`InviteWithCount`), and `findMany` adds `createdBy`
+    on top of that (`InviteListItem`) — expressed as a `inviteSchema` →
+    `inviteWithCount` → `inviteListItem` chain of `.extend()`s mirroring the
+    original type hierarchy. `findOne` keys on `token` (the credential
+    itself); `update`/`delete` key on a separate, plain-number `invitePK`
+    (`{ id }`, sourced from a coerced action input). `redeem(token, userId,
+    email, opts?)` is untouched and undecorated — bare primitives, and its
+    `opts` isn't a `ServiceOpts` (no `actor`) so it can't use `@Validate`'s
+    `service` mode anyway.
+  - `file.service.ts` implements `Crud<T>` (`create`/`findOne`/`findMany`/
+    `update`/`delete` all return the same `File`), reusing the
+    `course.service.ts`-style `this.findOne()`-first shape for `update`/
+    `delete` now that `filePK` is the `{ id } | { slugHash }` union
+    `findOne` already supported. `fileCreate` validates `bytes` with
+    `z.instanceof(Buffer)` alongside `mimeType`/`contentHash` — a multi-field
+    object, not a bare primitive, so it gets the same `@Arg` treatment as
+    every other create schema. `findWithReferencingTitles`/`readBlob`/
+    `blobPath`/`writeBlob` (bare-primitive or filesystem-only helpers) are
+    unchanged.
+  - Both add a branded id (`InviteId`, `FileId`); `Invite.courseId`/
+    `createdById` are branded (`CourseId`/`UserId`) on output but plain on
+    `inviteCreate`/`inviteFilter`, the same input/output asymmetry as
+    `coursePK`/`courseEnrollInput`.
+  - Verified both with standalone `tsx` scripts against a real SQLite test
+    DB (plus a throwaway `RESOURCE_ROOT` for the file blobs): invite's
+    create/findOne/findMany/update/delete/redeem/checkRedeemable across
+    admin/instructor/student visibility, and file's create (including the
+    dedup and corrupt-upload paths)/findOne/findMany/update/delete/
+    findWithReferencingTitles/readBlob, with `@Arg` input validation and
+    `ForbiddenError` enforcement throughout.
+- `src/db/session.service.ts`, `src/db/time-slot.service.ts`, and
+  `src/db/resource.service.ts` now follow the same pattern.
+  - `session.service.ts` composes `Create`/`Delete` by hand (like
+    `invite.service.ts`) rather than `Crud<T>` — it has no `findOne`/
+    `findMany`/`update`, and `create` returns `{ token, session }`, not the
+    entity alone. `validate(token, opts?)` is unchanged and undecorated: a
+    bare-primitive param, no `ServiceOpts`/actor gating, and its return
+    value (the session with `user` joined) feeds `Astro.locals.user`
+    directly rather than the branded `Session` shape.
+  - `time-slot.service.ts` and `resource.service.ts` both implement
+    `Crud<T>`, reusing the `course.service.ts`-style `this.findOne()`-first
+    shape for `update`/`delete` now that their `pkFilter`s are `{ id } |
+    { ref }` unions. `resourceSchema.file` reuses `fileSchema` directly
+    (the same relation-reuse as `courseSchema`'s `discipline`/`edition`) —
+    `Resource`'s `fileId`/`file` are branded/typed as `FileId`/`File | null`
+    on output, but `resourceCreate`/`resourceUpdate`'s `fileId` stays a
+    plain number. Dropped `create()`'s manual `if (!input.contentHash)`
+    check — `resourceCreate`'s `contentHash: z.string().min(1)` already
+    covers it, so the runtime check was fully redundant, unlike the
+    business-rule checks (resource-shape-by-type, slot-window/overlap) that
+    stay hand-written since Zod can't express them declaratively.
+  - Both `TimeSlotWithDetails`/`ResourceWithFile` are renamed to
+    `TimeSlot`/`Resource` (matching `user.service.ts`'s naming), updating
+    their external references (`src/commands/import-calendar.ts`,
+    `src/commands/import-resources.ts`).
+  - Verified all three with standalone `tsx` scripts against a real SQLite
+    test DB: session's create/validate/delete (by token and by userId);
+    time-slot's create (including the window and overlap-collision
+    rejections)/findOne/findMany/update/delete (including the
+    still-has-events refusal); and resource's create (including each
+    resource-shape rejection)/findOne/findMany/`groupResourcesByType`/
+    update/delete (including releasing a shared file reference) — with
+    `@Arg` input validation and `ForbiddenError` enforcement throughout.
+- `src/db/calendar-event.service.ts` now follows the same pattern too —
+  the last of `src/db/*.service.ts` to convert. It implements `Crud<T>`,
+  reusing the `course.service.ts`-style `this.findOne()`-first shape for
+  `update`/`delete` now that `calendarEventPK` is the `{ id } | { ref }`
+  union `findOne` already supported. `calendarEventSchema.timeSlot` reuses
+  `timeSlotSchema` directly (the include always loads the full slot); `exam`
+  is its own small `linkedExamSchema` (`{ id, slug, title }`), since
+  {@link maskExam} — unchanged — only ever exposes that summary, never the
+  full `Exam` row, and nulls it out for a non-owner when the linked exam is
+  `DRAFT`/`ARCHIVED`. Dropped `create()`'s manual `if (!input.contentHash)`
+  check (redundant once `calendarEventCreate` requires it); the weekday-match
+  and same-slot-same-day collision checks stay hand-written, same reasoning
+  as the resource-shape and time-slot-window checks elsewhere. `isMeeting()`
+  is unchanged. `CalendarEventWithDetails`/`CreateEvent` are renamed to
+  `CalendarEvent`/`CalendarEventCreate` (matching `user.service.ts`'s
+  naming), updating their external references
+  (`src/commands/import-calendar.ts`,
+  `src/pages/[discipline]/[course]/schedule.astro`). Verified with a
+  standalone `tsx` script against a real SQLite test DB, covering create
+  (including the weekday-mismatch and slot/day-collision rejections)/findOne
+  (by id and by ref)/findMany/update (including the exam-relink and the
+  startMin-without-date rejection)/delete, the exam-masking behavior for a
+  `DRAFT` exam (visible to the instructor, hidden from an enrolled student),
+  and `@Arg`/`ForbiddenError` enforcement throughout.
 - The admin tab strip's flat underline style (`AdminTabs`) is now a generic
   `Tabs` component (`src/components/ui/Tabs.astro`) with two modes: page-linked
   tabs (what `AdminTabs` needs — each item is an `<a href>`) or same-page tabs
@@ -225,6 +398,46 @@
 
 ### Fixed
 
+- `@Arg`-declared parameter decorators crashed Playwright Test's own TypeScript
+  transform (a hardcoded, Stage-3-only Babel decorators plugin that has no
+  parameter-decorator support at all — not a `tsconfig.json`/esbuild config
+  gap), blocking `pnpm test` for nearly the whole suite. Fixed by removing
+  parameter decorators entirely: `@Validate` now takes an `args: SchemaItem[]`
+  option (positional Zod schemas for the method's parameters) instead of one
+  `@Arg` decorator per parameter, and its implementation is a hybrid legacy /
+  Stage-3 method decorator so it still runs correctly under both esbuild
+  (Astro/Vite, `tsx`) and Playwright's Babel transform. All 11 service classes
+  and `test/validate.spec.ts` were updated to the new `args:` form; no
+  call-site validation behavior changed. See
+  `dev/issues/arg-decorator-breaks-playwright-test-transform.md` (now
+  resolved) and `src/utils/validate.ts`.
+- `UserService.findOne`'s `@Arg`/`args` schema was `userFilter` (a
+  `{usernames?, take?}` shape meant for `findMany`) instead of `userPK`;
+  since Zod strips unknown keys by default, `findOne({ id })` silently lost
+  the `id` and always returned `null`. Only surfaced once the fix above let
+  `test/user-service.spec.ts` actually run.
+- `userUpdate` was a plain (non-`strict`) Zod object, so `userService.update`
+  silently dropped unexpected keys (like a smuggled `username`) instead of
+  rejecting them, despite the "Username is now read-only on `/profile`"
+  entry above claiming otherwise. It was also missing `email`, which
+  `/profile`'s own update form always submits — undetected because the same
+  non-strict stripping silently no-op'd email changes rather than erroring.
+  `userUpdate` now picks `email` too and is `.strict()`.
+- `src/auth/password.ts`'s `common-passwords.json` import needed an explicit
+  `with { type: "json" }` import attribute for Playwright's ESM loader (a
+  loader-specific requirement; Astro/Vite/`tsx` didn't need it).
+- `@Arg`-declared parameter validation never actually ran on any
+  `@Validate`-decorated method (`UserService.create/findOne/update/updatePassword`
+  and any future consumer): TypeScript's `__decorate` helper snapshots the
+  property descriptor before parameter decorators run and unconditionally
+  restores that stale snapshot afterward, discarding the mutation `@Arg` relied
+  on to hand its schema to `@Validate`. Input validation silently no-op'd —
+  malformed input reached business logic and Prisma directly, with no error or
+  warning. `src/utils/validate.ts` now records `@Arg` schemas in a side
+  registry keyed by the stable class-prototype object instead of by mutating
+  the method, which `__decorate` doesn't clobber; `@Arg` used without a
+  matching `@Validate` now also warns instead of silently doing nothing. No
+  call-site changes needed. See `test/validate.spec.ts`.
 - `test/course-flow.spec.ts` logged in as `ada`/`hopper` with the wrong
   passwords (`"instructor"`/`"student"` instead of the seeded `"ada"`/
   `"hopper"`) and named the cs201 instructor's course URL by their display

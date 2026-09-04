@@ -1,7 +1,7 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/db/base-service";
-import { editionService } from "@/db/edition.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { editionService } from "@/db/services/edition.service";
 
 export const createEditionCommand = new Command("create-edition")
 	.description("Create an academic edition (term)")

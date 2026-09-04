@@ -13,7 +13,7 @@ test("public/openapi.json matches what the Zod schemas/route registrations curre
 test("documents both REST endpoints, unauthenticated", () => {
 	const document = buildOpenApiDocument();
 	expect(document.paths?.["/api/health"]?.get?.security).toEqual([]);
-	expect(document.paths?.["/api/auth/cli-login"]?.post?.security).toEqual([]);
+	expect(document.paths?.["/api/auth/login"]?.post?.security).toEqual([]);
 });
 
 test("GET /openapi.json is served statically and matches the generated document", async ({

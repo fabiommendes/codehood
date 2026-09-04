@@ -4,7 +4,7 @@ import Logo from "@/components/Logo.astro";
 import SidebarArt from "@/components/SidebarArt.astro";
 import SidebarArtAlt from "@/components/SidebarArtAlt.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
-import { courseService } from "@/db/course.service";
+import { courseService } from "@/db/services/course.service";
 import { courseHref } from "@/utils/course-url";
 import Layout from "./Layout.astro";
 
@@ -13,7 +13,7 @@ interface Props {
 }
 
 const { title } = Astro.props;
-const user = Astro.locals.user;
+const user = Astro.locals.actor;
 
 // Static for now — not tied to real enrollment data yet. Each item carries its own
 // accent color so the icon chip and active-state border stay in sync.

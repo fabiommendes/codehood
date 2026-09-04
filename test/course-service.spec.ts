@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { canViewCourse } from "@/auth/permissions";
-import { FULL_ACCESS, SYSTEM } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { SYSTEM } from "@/core/actor";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { userService } from "@/db/services/user.service";
 
 let uniq = 0;
 function tag(prefix: string): string {
@@ -215,7 +216,7 @@ test("unenroll marks the enrollment DROPPED rather than deleting it, and re-enro
 	});
 	expect(students).toHaveLength(1);
 
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: course.id, userId: student.id },
 		FULL_ACCESS,
 	);
@@ -251,7 +252,7 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 		{ courseId: courseA.id, userId: studentDropped.id },
 		FULL_ACCESS,
 	);
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: courseA.id, userId: studentDropped.id },
 		FULL_ACCESS,
 	);
@@ -328,7 +329,7 @@ test("a student drops themselves — the half of FR-CRS-042 that used to be miss
 		FULL_ACCESS,
 	);
 
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: course.id, userId: student.id },
 		{ actor: student },
 	);
@@ -350,7 +351,7 @@ test("a student naming another student's userId is refused, and the other enroll
 	);
 
 	await expect(
-		courseService.unenroll(
+		courseService.drop(
 			{ courseId: course.id, userId: studentB.id },
 			{ actor: studentA },
 		),
@@ -373,7 +374,7 @@ test("a non-owning admin cannot drop an enrollment, list students, or enroll one
 	);
 
 	await expect(
-		courseService.unenroll(
+		courseService.drop(
 			{ courseId: course.id, userId: student.id },
 			{ actor: admin },
 		),
@@ -397,13 +398,13 @@ test("dropping an already-DROPPED enrollment is a no-op, not an error", async ()
 		{ courseId: course.id, userId: student.id },
 		FULL_ACCESS,
 	);
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: course.id, userId: student.id },
 		{ actor: instructor },
 	);
 
 	await expect(
-		courseService.unenroll(
+		courseService.drop(
 			{ courseId: course.id, userId: student.id },
 			{ actor: instructor },
 		),
@@ -423,7 +424,7 @@ test("re-enrolling a dropped student restores access to submissions made before 
 		{ courseId: course.id, userId: student.id },
 		FULL_ACCESS,
 	);
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: course.id, userId: student.id },
 		{ actor: student },
 	);

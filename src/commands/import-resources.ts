@@ -4,14 +4,14 @@ import path from "node:path";
 import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { FULL_ACCESS } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
-import { fileService } from "@/db/file.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { courseService } from "@/db/services/course.service";
+import { fileService } from "@/db/services/file.service";
 import {
-	type CreateResource,
-	type ResourceWithFile,
+	type Resource,
+	type ResourceCreate,
 	resourceService,
-} from "@/db/resource.service";
+} from "@/db/services/resource.service";
 import { guessMimeType } from "@/utils/mime";
 import { blobHref, fileDownloadName } from "@/utils/resource-url";
 
@@ -83,7 +83,7 @@ export const importResourcesCommand = new Command("import-resources")
 						{ ref: { courseId: course.id, slug: entry.slug } },
 						FULL_ACCESS,
 					);
-					let resource: ResourceWithFile;
+					let resource: Resource;
 					if (existing) {
 						resource = await resourceService.update(
 							{ id: existing.id },
@@ -134,7 +134,7 @@ export const importResourcesCommand = new Command("import-resources")
 			}
 			console.log(
 				"\nReminder: every /files/ URL is public forever, with no authentication check " +
-					"(FR-NFR-030/031/032). Never point a resource at content whose disclosure matters.",
+				"(FR-NFR-030/031/032). Never point a resource at content whose disclosure matters.",
 			);
 		},
 	);
@@ -149,7 +149,7 @@ async function buildCreateInput(
 	entry: ResourceEntry,
 	manifestDir: string,
 	_courseId: number,
-): Promise<Omit<CreateResource, "courseId" | "slug">> {
+): Promise<Omit<ResourceCreate, "courseId" | "slug">> {
 	if (entry.type === "FILE") {
 		if (!entry.file) {
 			throw new Error("a FILE resource needs a `file` path.");

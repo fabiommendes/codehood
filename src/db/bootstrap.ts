@@ -1,12 +1,12 @@
-import { FULL_ACCESS } from "@/db/base-service";
-import { calendarEventService } from "@/db/calendar-event.service";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { fileService } from "@/db/file.service";
-import { resourceService } from "@/db/resource.service";
-import { timeSlotService } from "@/db/time-slot.service";
-import { type User, userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { calendarEventService } from "@/db/services/calendar-event.service";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { fileService } from "@/db/services/file.service";
+import { resourceService } from "@/db/services/resource.service";
+import { timeSlotService } from "@/db/services/time-slot.service";
+import { type User, userService } from "@/db/services/user.service";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";

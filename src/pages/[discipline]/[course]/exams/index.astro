@@ -14,7 +14,7 @@ if ("redirect" in result) return result.redirect;
 const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
-const canManage = canManageEnrollment(Astro.locals.user!, course);
+const canManage = canManageEnrollment(Astro.locals.actor!, course);
 
 // Still mocked — exams and submissions need question rendering (out of scope
 // for dev/specs/to-do/course-navigation.md). A draft exam is only ever in

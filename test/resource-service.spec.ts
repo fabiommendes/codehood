@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { fileService } from "@/db/file.service";
-import { groupResourcesByType, resourceService } from "@/db/resource.service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { fileService } from "@/db/services/file.service";
+import { groupResourcesByType, resourceService } from "@/db/services/resource.service";
+import { userService } from "@/db/services/user.service";
 
 // A random suffix, not an incrementing counter: this file's own `tag()`
 // numbering would otherwise collide with the identically-named counters in
@@ -286,7 +286,7 @@ test("an enrolled student sees a course's resources; a dropped student sees none
 		{ courseId: course.id, userId: dropped.id },
 		FULL_ACCESS,
 	);
-	await courseService.unenroll(
+	await courseService.drop(
 		{ courseId: course.id, userId: dropped.id },
 		FULL_ACCESS,
 	);

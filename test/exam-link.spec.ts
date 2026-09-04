@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { calendarEventService } from "@/db/calendar-event.service";
-import { FULL_ACCESS } from "@/db/base-service";
+import { FULL_ACCESS } from "@/core/actor";
 import { prisma } from "@/db/client";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { examForEvent, relinkExam } from "@/db/exam-link";
-import { timeSlotService } from "@/db/time-slot.service";
-import { userService } from "@/db/user.service";
+import { calendarEventService } from "@/db/services/calendar-event.service";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { timeSlotService } from "@/db/services/time-slot.service";
+import { userService } from "@/db/services/user.service";
+import { examForEvent, relinkExam } from "@/db/util.exam-link";
 import { endOf } from "@/utils/schedule-time";
 
 const MIN = 60_000;

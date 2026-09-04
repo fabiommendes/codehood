@@ -2,8 +2,8 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
-import { sessionService } from "@/db/session.service";
-import { userService } from "@/db/user.service";
+import { sessionService } from "@/db/services/session.service";
+import { userService } from "@/db/services/user.service";
 import { SESSION_COOKIE } from "@/middleware";
 
 const FIELD_LABELS: Record<string, string> = {

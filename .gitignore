@@ -5,6 +5,7 @@ dist/
 test/.tmp/
 test-results/
 playwright-report/
+coverage/
 
 # generated types
 .astro/

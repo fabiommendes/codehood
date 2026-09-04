@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { calendarEventService } from "@/db/calendar-event.service";
-import { FULL_ACCESS } from "@/db/base-service";
-import { courseService } from "@/db/course.service";
-import { disciplineService } from "@/db/discipline.service";
-import { editionService } from "@/db/edition.service";
-import { timeSlotService } from "@/db/time-slot.service";
-import { userService } from "@/db/user.service";
+import { FULL_ACCESS } from "@/core/actor";
+import { calendarEventService } from "@/db/services/calendar-event.service";
+import { courseService } from "@/db/services/course.service";
+import { disciplineService } from "@/db/services/discipline.service";
+import { editionService } from "@/db/services/edition.service";
+import { timeSlotService } from "@/db/services/time-slot.service";
+import { userService } from "@/db/services/user.service";
 
 // A random suffix, not an incrementing counter: this file's `tag()` numbering
 // would otherwise collide with identically-named counters in sibling spec

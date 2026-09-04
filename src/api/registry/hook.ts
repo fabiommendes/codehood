@@ -2,11 +2,27 @@
 // We must update the resource names to match the API routes.
 // We cannot import the modules to get the real paths since they use internal
 // astro APIs that break during configuration.
-const RESOURCES = ["auth", "health", "courses", "users", "sessions"] as const;
+const RESOURCES = ["auth",
+    "api-key",
+    "calendar-event",
+    "course",
+    "discipline",
+    "edition",
+    "file",
+    "invite",
+    "resource",
+    "session",
+    "time-slot",
+    "user",
+    "health",
+    "courses",
+    "users",
+    "sessions"
+] as const;
 export const APIS: string[] = [];
 
 // We extend with some special cases and actions that break the RESTful CRUD pattern.
-APIS.push("/api/auth/token", "/api/auth/logout");
+APIS.push("/api/auth/login", "/api/auth/logout");
 APIS.push(...RESOURCES.flatMap((resource) => [`/api/${resource}`, `/api/${resource}/[id]`]));
 
 export type InjectRoute = (route: { pattern: string; entrypoint: string }) => void;

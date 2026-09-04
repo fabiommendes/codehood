@@ -1,7 +1,5 @@
 import { hash, verify } from "@node-rs/argon2";
-import * as COMMON_PASSWORDS from "./common-passwords.json";
-
-const passwordInTheWild = require("wildleek");
+import COMMON_PASSWORDS from "./common-passwords.json" with { type: "json" };
 
 export type PasswordErrorCode = "too-short" | "too-common" | "compromised";
 export type PasswordError = {
@@ -96,4 +94,16 @@ function buildCommonWordsSet(words: string[]): Set<string> {
 		}
 	}
 	return set;
+}
+
+// Import an old CommonJS module.
+type WildLeek = (password: string) => Promise<boolean>;
+let WILDLEEK: WildLeek | undefined;
+
+async function passwordInTheWild(password: string): Promise<boolean> {
+	if (!WILDLEEK) {
+		const module = (await import("wildleek" as unknown as "wildleek")) as { default: WildLeek };
+		WILDLEEK = module.default;
+	}
+	return WILDLEEK(password);
 }

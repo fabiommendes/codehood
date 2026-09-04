@@ -1,22 +1,33 @@
+import type { z } from "zod";
 import { canInvite, canViewInvite, inviteVisibility } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
+import { NotAllowed } from "@/core/error";
+import { Validate } from "@/utils/validate";
 import {
-	type Create,
-	type Delete,
-	type FindMany,
-	type FindOne,
-	ForbiddenError,
-	type ServiceOpts,
-	type Update,
-} from "./base-service";
-import {
-	type Invite,
-	type InviteKind,
-	type PrismaClient,
-	type PrismaTx,
-	prisma,
-	type Role,
-} from "./client";
+	type CourseId,
+	type InviteId,
+	inviteCreate,
+	inviteCreateResult,
+	inviteFilter,
+	inviteListItem,
+	invitePK,
+	type inviteSchema,
+	inviteTokenFilter,
+	inviteUpdate,
+	inviteWithCount,
+	type UserId,
+} from "../../core/schemas";
+import type {
+	Create,
+	Delete,
+	FindMany,
+	FindOne,
+	ServiceOpts,
+	Update,
+} from "../base-service";
+import { type PrismaClient, type PrismaTx, prisma } from "../client";
+
+export type { InviteId } from "../../core/schemas";
 
 const DEFAULT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -33,61 +44,21 @@ export class InviteError extends Error {
 	}
 }
 
-export interface CreateInviteInput {
-	kind: InviteKind;
-	email?: string;
-	role?: Role;
-	courseId?: number;
-	maxUses?: number | null;
-	createdById: number;
-	expiresInMs?: number;
-}
-
-export interface CreateInviteResult {
-	token: string;
-	invite: Invite;
-}
-
-export interface FindInviteBy {
-	token: string;
-}
-
-export interface FindInvitesBy {
-	createdById?: number;
-	kind?: InviteKind;
-	courseId?: number;
-	/** Only invites that have not expired yet. */
-	active?: boolean;
-}
-
-export interface InviteFilter {
-	id: number;
-}
-
-/**
- * The fields an invite may change without rewriting what it grants. `kind`,
- * `role`, and `email` are the contract the holder of the link already accepted;
- * editing them under an outstanding invite would silently change what redeeming
- * it does.
- */
-export interface UpdateInvite {
-	expiresAt?: Date;
-	maxUses?: number | null;
-}
-
-export type InviteWithCount = Invite & { _count: { redemptions: number } };
-
-/**
- * What a listing shows. Carries the creator, because "who issued this" is the
- * first thing an admin looking at somebody else's invite needs to know; the
- * single-invite `findOne` stays lean, since the redemption flow does not care.
- */
-export type InviteListItem = InviteWithCount & {
-	createdBy: { username: string; name: string };
-};
+//
+// Type definitions
+//
+export type InviteCreate = z.infer<typeof inviteCreate>;
+export type Invite = z.infer<typeof inviteSchema>;
+export type InviteWithCount = z.infer<typeof inviteWithCount>;
+export type InviteListItem = z.infer<typeof inviteListItem>;
+export type InviteCreateResult = z.infer<typeof inviteCreateResult>;
+export type InviteTokenFilter = z.infer<typeof inviteTokenFilter>;
+export type InvitePK = z.infer<typeof invitePK>;
+export type InviteFilter = z.infer<typeof inviteFilter>;
+export type InviteUpdate = z.infer<typeof inviteUpdate>;
 
 type RedeemableInvite = {
-	kind: InviteKind;
+	kind: Invite["kind"];
 	email: string | null;
 	expiresAt: Date;
 	maxUses: number | null;
@@ -96,11 +67,11 @@ type RedeemableInvite = {
 
 class InviteService
 	implements
-	Create<CreateInviteInput, CreateInviteResult>,
-	FindOne<FindInviteBy, InviteWithCount>,
-	FindMany<FindInvitesBy, InviteListItem>,
-	Update<InviteFilter, UpdateInvite, InviteWithCount>,
-	Delete<InviteFilter> {
+	Create<InviteCreate, InviteCreateResult>,
+	FindOne<InviteTokenFilter, InviteWithCount>,
+	FindMany<InviteFilter, InviteListItem>,
+	Update<InvitePK, InviteUpdate, InviteWithCount>,
+	Delete<InvitePK> {
 	prisma: PrismaClient;
 
 	constructor(client: PrismaClient = prisma) {
@@ -108,15 +79,20 @@ class InviteService
 	}
 
 	/**
-	 * Create a new invite, returning the plaintext token and the invite row.
+	 * Creates an invite, returning the plaintext token and the invite row.
 	 */
+	@Validate({
+		service: true,
+		returns: inviteCreateResult,
+		args: [inviteCreate],
+	})
 	async create(
-		input: CreateInviteInput,
+		input: InviteCreate,
 		opts: ServiceOpts,
-	): Promise<CreateInviteResult> {
+	): Promise<InviteCreateResult> {
 		const role = input.role ?? "STUDENT";
 		if (!canInvite(opts.actor, role)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "create-invite" });
 		}
 		const client = opts.tx ?? this.prisma;
 		const token = generateToken();
@@ -134,38 +110,53 @@ class InviteService
 				createdById: input.createdById,
 			},
 		});
-		return { token, invite };
+		return { token, invite: brand(invite) };
 	}
 
 	/**
+	 * Finds a single invite by its token.
+	 *
 	 * Not actor-filtered: the raw token is the credential (see the invite's
 	 * `tokenHash`), and looking one up is how the invite-acceptance flow
 	 * establishes what the redeemer is allowed to become — there is nothing
 	 * else to check `actor` against yet.
 	 */
-	findOne(
-		filter: FindInviteBy,
+	@Validate({
+		service: true,
+		returns: inviteWithCount.nullable(),
+		args: [inviteTokenFilter],
+	})
+	async findOne(
+		filter: InviteTokenFilter,
 		opts: ServiceOpts,
 	): Promise<InviteWithCount | null> {
 		const client = opts.tx ?? this.prisma;
-		return client.invite.findUnique({
+		const invite = await client.invite.findUnique({
 			where: { tokenHash: hashToken(filter.token) },
 			include: { _count: { select: { redemptions: true } } },
 		});
+		return invite && brand(invite);
 	}
 
 	/**
 	 * Lists invites narrowed to what `actor` may see (see
 	 * {@link inviteVisibility}): every invite for an admin, self-issued ones
-	 * for an instructor, none for a student. Never returns a token — only
-	 * `tokenHash` is stored, so a lost link is reissued, not recovered.
+	 * for an instructor, none for a student.
+	 *
+	 * Never returns a token — only `tokenHash` is stored, so a lost link is
+	 * reissued, not recovered.
 	 */
-	findMany(
-		filter: FindInvitesBy,
+	@Validate({
+		service: true,
+		returns: inviteListItem.array(),
+		args: [inviteFilter],
+	})
+	async findMany(
+		filter: InviteFilter,
 		opts: ServiceOpts,
 	): Promise<InviteListItem[]> {
 		const client = opts.tx ?? this.prisma;
-		return client.invite.findMany({
+		const invites = await client.invite.findMany({
 			where: {
 				AND: [
 					filter.createdById ? { createdById: filter.createdById } : {},
@@ -181,16 +172,24 @@ class InviteService
 			},
 			orderBy: { createdAt: "desc" },
 		});
+		return invites.map(brand);
 	}
 
 	/**
-	 * Extends an expiry or adjusts `maxUses`. Lowering `maxUses` below the
-	 * redemptions already made is allowed and simply exhausts the invite; it
-	 * never revokes an account that was already created.
+	 * Extends an expiry or adjusts `maxUses`.
+	 *
+	 * Lowering `maxUses` below the redemptions already made is allowed and
+	 * simply exhausts the invite; it never revokes an account that was
+	 * already created.
 	 */
+	@Validate({
+		service: true,
+		returns: inviteWithCount,
+		args: [invitePK, inviteUpdate],
+	})
 	async update(
-		filter: InviteFilter,
-		fields: UpdateInvite,
+		filter: InvitePK,
+		fields: InviteUpdate,
 		opts: ServiceOpts,
 	): Promise<InviteWithCount> {
 		const client = opts.tx ?? this.prisma;
@@ -199,9 +198,9 @@ class InviteService
 			include: { _count: { select: { redemptions: true } } },
 		});
 		if (!invite || !canViewInvite(opts.actor, invite)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "update-invite" });
 		}
-		return client.invite.update({
+		const updated = await client.invite.update({
 			where: { id: filter.id },
 			data: {
 				expiresAt: fields.expiresAt,
@@ -209,31 +208,37 @@ class InviteService
 			},
 			include: { _count: { select: { redemptions: true } } },
 		});
+		return brand(updated);
 	}
 
 	/**
-	 * Revokes an invite. Redemptions cascade with it, which removes the record
-	 * that an account came from this invite but never the account itself.
+	 * Revokes an invite.
+	 *
+	 * Redemptions cascade with it, which removes the record that an account
+	 * came from this invite but never the account itself.
 	 */
-	async delete(filter: InviteFilter, opts: ServiceOpts): Promise<void> {
+	@Validate({ service: true, args: [invitePK] })
+	async delete(filter: InvitePK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const invite = await client.invite.findUnique({
 			where: { id: filter.id },
 		});
 		if (!invite || !canViewInvite(opts.actor, invite)) {
-			throw new ForbiddenError();
+			throw new NotAllowed({ action: "delete-invite" });
 		}
 		await client.invite.delete({ where: { id: filter.id } });
 	}
 
 	/**
 	 * Redeems an invite for `userId`, atomically re-checking expiry/capacity/email match.
-	 * Callers should run {@link checkRedeemable} first to avoid doing invite-rejected work
-	 * (e.g. creating the User row) — this transaction is the authoritative, race-safe check.
 	 *
-	 * Pass `tx` when the caller already has one open (e.g. `acceptInvite`, which creates the
-	 * `User`, redeems the invite, and enrolls the student in one transaction so a redemption
-	 * failure can't leave a User row with no invite behind it). Without one, this opens its own.
+	 * Callers should run {@link checkRedeemable} first to avoid doing
+	 * invite-rejected work (e.g. creating the User row) — this transaction
+	 * is the authoritative, race-safe check. Pass `tx` when the caller
+	 * already has one open (e.g. `acceptInvite`, which creates the `User`,
+	 * redeems the invite, and enrolls the student in one transaction so a
+	 * redemption failure can't leave a User row with no invite behind it).
+	 * Without one, this opens its own.
 	 */
 	redeem(
 		token: string,
@@ -287,4 +292,22 @@ export function checkRedeemable(
 	if (invite.maxUses !== null && invite._count.redemptions >= invite.maxUses)
 		return "exhausted";
 	return undefined;
+}
+
+//
+// Auxiliary functions
+//
+
+// Re-brand a raw invite row's numeric ids — a runtime no-op, since they
+// already carry the right values, just not the branded type.
+function brand<
+	T extends { id: number; courseId: number | null; createdById: number },
+>(
+	invite: T,
+): T & { id: InviteId; courseId: CourseId | null; createdById: UserId } {
+	return invite as T & {
+		id: InviteId;
+		courseId: CourseId | null;
+		createdById: UserId;
+	};
 }
