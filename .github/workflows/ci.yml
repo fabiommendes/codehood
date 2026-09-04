@@ -24,9 +24,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - run: pnpm run lint
+      - name: Run default linter
+        run: pnpm run lint
 
   test:
     runs-on: ubuntu-latest
@@ -42,12 +44,20 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - run: pnpm run coverage
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Reset database
+        run: pnpm run db-reset
+
+      - name: Run tests with coverage
+        run: pnpm run coverage
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
