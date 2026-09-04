@@ -80,6 +80,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 					title="Open course"
 				>
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+						<title>Open course</title>
 						<path
 							d="M9 6h9v9M18 6 6 18"
 							stroke="currentColor"

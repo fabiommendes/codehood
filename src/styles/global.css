@@ -138,29 +138,37 @@ h6 {
 .brand-mark :is(path, g) {
 	mix-blend-mode: multiply;
 }
+
 .brand-mark-blue {
 	fill: #2980b9;
 }
+
 .brand-mark-red {
 	fill: #c0392b;
 }
+
 .brand-mark-yellow {
 	fill: #f1c40f;
 }
+
 .brand-mark-green {
 	fill: #27ae60;
 }
+
 .brand-mark-glyph {
 	fill: #ecf0f1;
 }
+
 /* SidebarArt.astro's block letter — a flatter gray than the logo's glyph so it
    reads as backdrop rather than as a second mark. */
 .brand-mark-gray {
 	fill: #d3d7cf;
 }
+
 [data-theme="codehood-dark"] .brand-mark :is(path, g) {
 	mix-blend-mode: normal;
 }
+
 /* Dark mode goes monochrome — only the red circles keep their color. The rest use
    a few off-white "flat UI colors" grays (Silver, Concrete) rather than flat white
    for all three, since normal-blend paints one solid color over another where
@@ -169,15 +177,19 @@ h6 {
 [data-theme="codehood-dark"] .brand-mark-glyph {
 	fill: #ffffff;
 }
+
 [data-theme="codehood-dark"] .brand-mark-yellow {
 	fill: #7f8c8d;
 }
+
 [data-theme="codehood-dark"] .brand-mark-green {
 	fill: #95a5a6;
 }
+
 [data-theme="codehood-dark"] .brand-mark-red {
 	fill: #c0392b;
 }
+
 [data-theme="codehood-dark"] .brand-mark-gray {
 	fill: #6c7a7b;
 }
@@ -200,10 +212,11 @@ h6 {
 .shiki,
 .shiki span {
 	color: var(--shiki-light);
-	background-color: var(--shiki-light-bg) !important;
+	background-color: var(--shiki-light-bg);
 }
+
 [data-theme="codehood-dark"] .shiki,
 [data-theme="codehood-dark"] .shiki span {
 	color: var(--shiki-dark);
-	background-color: var(--shiki-dark-bg) !important;
+	background-color: var(--shiki-dark-bg);
 }

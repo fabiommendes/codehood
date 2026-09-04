@@ -80,6 +80,7 @@ function route<In, Out, IsPublic extends boolean = false>(
 		summary: options.summary,
 		description: options.description,
 		tags: options.tags,
+		...(options.isPublic ? { security: [] } : {}),
 		...requestOpts,
 		responses: {
 			200: {
@@ -108,16 +109,16 @@ function route<In, Out, IsPublic extends boolean = false>(
 
 	// Catches some errors and return an object { value, error } instead of
 	// throwing an exception.
-	const safeAction = async (args: Parameters<typeof action>[0]) => {
+	const safeAction = async (thunk: () => Promise<Out>) => {
 		try {
-			const value = await action(args);
+			const value = await thunk();
 			return { value, isError: false };
 		} catch (error) {
 			return { error: errorToJSON(error), isError: true };
 		}
 	};
 
-	result.action = async (input: In, context: ActionAPIContext) => {
+	result.action = async (_input: In, _context: ActionAPIContext) => {
 		throw new Error("not implemented");
 	};
 
@@ -126,17 +127,20 @@ function route<In, Out, IsPublic extends boolean = false>(
 	result.view = async ({ locals, request, params }: APIContext) => {
 		const user = locals.actor as User | undefined;
 
-		const validated = options.in?.safeParse(await request.json());
-		if (validated?.error)
-			throw InvalidData.fromZodError(validated.error, validated.data);
+		const result = await safeAction(async () => {
+			const body = options.in ? await request.json() : undefined;
+			const validated = options.in?.safeParse(body);
+			if (validated?.error)
+				throw InvalidData.fromZodError(validated.error, validated.data);
 
-		// biome-ignore-start lint/suspicious/noExplicitAny: Typescript cannot narrow the type to be correct in all possiblities (Body, Actor) in terms of being nullable or not.
-		const result = await safeAction({
-			actor: user,
-			body: validated?.data,
-			params: params as Record<string, string>,
-		} as any);
-		// biome-ignore-end lint/suspicious/noExplicitAny: ...
+			// biome-ignore-start lint/suspicious/noExplicitAny: Typescript cannot narrow the type to be correct in all possiblities (Body, Actor) in terms of being nullable or not.
+			return action({
+				actor: user,
+				body: validated?.data,
+				params: params as Record<string, string>,
+			} as any);
+			// biome-ignore-end lint/suspicious/noExplicitAny: ...
+		});
 
 		if (result.isError) {
 			const status = (result.error as { status?: number })?.status ?? 400;

@@ -63,9 +63,9 @@ test("the system and admins create user accounts directly", () => {
 });
 
 test("users edit only their own profile", () => {
-	expect(canEditUser(student, student.id)).toBe(true);
-	expect(canEditUser(student, 999)).toBe(false);
-	expect(canEditUser(SYSTEM, 999)).toBe(true);
+	expect(canEditUser(student, student)).toBe(true);
+	expect(canEditUser(student, { id: 999 })).toBe(false);
+	expect(canEditUser(SYSTEM, { id: 999 })).toBe(true);
 });
 
 test("canViewUser and userVisibility agree: self and admins see everyone, others see only themselves", () => {

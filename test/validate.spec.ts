@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
-import type { ServiceOpts } from "@/db/base-service";
 import { SYSTEM } from "@/core/actor";
+import type { ServiceOpts } from "@/db/base-service";
 import { Validate } from "@/utils/validate";
 
 const opts: ServiceOpts = { actor: SYSTEM };
@@ -121,12 +121,12 @@ class UserLikeService {
 		returns: z.object({ name: z.string().min(3) }),
 		args: [z.object({ name: z.string().min(1) })],
 	})
-	async create(input: { name: string }, o: ServiceOpts) {
+	async create(input: { name: string }, _: ServiceOpts) {
 		return { name: input.name };
 	}
 
 	@Validate({ service: true, args: [z.string().min(1)] })
-	async noReturnSchema(name: string, o: ServiceOpts) {
+	async noReturnSchema(name: string, _: ServiceOpts) {
 		return { name };
 	}
 }

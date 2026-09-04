@@ -5188,6 +5188,7 @@
         "tags": [
           "Authentication"
         ],
+        "security": [],
         "requestBody": {
           "content": {
             "application/json": {
@@ -5219,6 +5220,7 @@
         "tags": [
           "System"
         ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Success",

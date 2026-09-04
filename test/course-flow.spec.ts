@@ -69,7 +69,7 @@ test("redeeming a classroom invite enrolls the student; a personal invite does n
 }) => {
 	await loginAs(request, "ada", "ada");
 
-	const managePage = await request.post("/cs101/ada_2026-1/manage", {
+	const managePage = await request.post("/cs101/ada_2026-1/roster", {
 		form: {},
 	});
 	expect(managePage.status()).toBe(200);

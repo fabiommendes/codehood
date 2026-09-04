@@ -30,7 +30,7 @@ class ApiKeyService
 		pkFilter: ApiKeyPK;
 		create: ApiKeyCreate;
 		filter: ApiKeyFilter;
-		update: any;
+		update: never;
 	}> {
 	prisma: PrismaClient;
 
@@ -148,7 +148,7 @@ class ApiKeyService
 	/**
 	 * API keys are immutable after creation. 
 	 */
-	update(_filter: ApiKeyPK, _opts: ServiceOpts): Promise<{ id: number & z.core.$brand<"ApiKeyId">; keyHash: string; name: string; kind: "CLI" | "BOT"; userId: number & z.core.$brand<"UserId">; lastUsedAt: Date | null; createdAt: Date; token?: string | undefined; }> {
+	update(_filter: ApiKeyPK, _data: never, _opts: ServiceOpts): Promise<{ id: number & z.core.$brand<"ApiKeyId">; keyHash: string; name: string; kind: "CLI" | "BOT"; userId: number & z.core.$brand<"UserId">; lastUsedAt: Date | null; createdAt: Date; token?: string | undefined; }> {
 		throw new RuleViolation({ message: "Update method not implemented for API keys" });
 	}
 
