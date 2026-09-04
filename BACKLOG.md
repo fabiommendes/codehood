@@ -7,9 +7,39 @@ and a rough schedule is agreed upon for a set of backlog items.
 
 Backlog items are categorized in sections, not on priority.
 
+## Small issues
+
+None now!
+
+## Maintainability
+
+* **Permanent:** go through all `any` types and replace them with more specific
+  types where possible. We can use advanced TypeScript features and the module
+  `utils/types.ts` have great helpers. If `any` can't be avoided, create a type
+  alias with a descriptive name for that use and add a comment explaining why
+  that `any` is necessary.
+* **Permanent:** go through the FIXME/TODO items. If it is an easy fix, fix it.
+  Otherwise, remove the comment and save it in the corresponding section in the
+  backlog.
+* **Permanent:** review all code comments and ensure they are up-to-date and
+  relevant. Refactors can make comment drift, so we need to keep them in sync
+  with the code. If a comment is no longer relevant, remove it. If a comment is
+  unclear or incomplete, update it to provide accurate information. If the
+  comment is too long or complex, consider making a summary or breaking it into
+  smaller comments. Documentation facing comments (TSDoc) should be kept
+  especially accurate and up-to-date. TSDocs never refer to planning
+  discussions, temporary notes or documents under /dev/. If the reference is
+  relevant to understanding the implementation, break the comment in two: the
+  main TSDoc comment for the public API, and a separate `//` comment for the
+  implementation details and decisions.
+* **Permanent:** fix any typos and grammatical errors throughout the codebase,
+  including comments, documentation, and variable and function names. Make
+  sure not breaking any call site when editing the later two.
+
+
 ## Infrastructure
 
-* Abstract e-mail provider interface. The provider is implemented via plugins.
+* Implement email providers with plugins. 
 
 ## Auth
 

@@ -124,10 +124,12 @@ class ApiKeyService
 			include: { user: true },
 		});
 		if (!apiKey) return null;
+
 		await client.apiKey.update({
 			where: { id: apiKey.id },
 			data: { lastUsedAt: new Date() },
 		});
+
 		return apiKey;
 	}
 

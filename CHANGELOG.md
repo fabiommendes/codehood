@@ -4,6 +4,50 @@
 
 ### Added
 
+- `pnpm run clear` (`scripts/clean.mjs`) resets the checkout to the state of a
+  fresh `git clone`, deleting `node_modules/`, `src/generated/`, `.astro/`,
+  `dist/`, `coverage/`, test output, the local `*.db` files and the `storage/`
+  resource blobs. Nothing git tracks is touched. `.env` survives unless you pass
+  `--all`, and `--dry-run` lists the targets without deleting them.
+- `pnpm run init` (`scripts/init.mjs`) takes a fresh clone to a runnable state
+  in one command: `pnpm install`, `.env` from the new tracked `.env.example`,
+  `prisma generate`/`migrate deploy`/`db seed`, then the `route-patterns`,
+  `sidebar-art` and `openapi` generators, followed by a Biome pass over their
+  output so the tree lints clean. Every step is idempotent.
+- `pnpm run generate` runs the generators whose output the app actually depends
+  on (`route-patterns`, `openapi`, then `question-models`). `dev` and `build`
+  now call it instead of `openapi` alone.
+- `pnpm run question-models` (`scripts/generate-question-models.ts`) generates
+  `src/mdq/schemas-generated.ts` — Zod schemas and inferred types for the exam
+  and all seven question types — from the MDQ spec's bundled JSON Schema at
+  `public/mdq.schema.json`. The generated module is structs only: schemas and
+  types, no logic. Since the spec is still evolving, the generator is a
+  purpose-built converter for the subset of JSON Schema that file uses and
+  throws on any construct it does not recognize, so a spec revision fails the
+  build instead of silently dropping fields. Constraints Zod cannot express
+  (`uniqueItems`, short-answer's `if`/`then`) are listed on stdout at
+  generation time rather than dropped. `test/mdq-schemas.spec.ts` guards
+  against the committed output drifting from the schema.
+
+### Changed
+
+- `prisma/migrations/` was squashed to a single `init` migration generated from
+  the current `schema.prisma`. The previous two migrations were far behind it —
+  `migrate deploy` produced a database without `User.username`, among many
+  other missing columns and indexes — which is why every other script reached
+  for `db push`. Applying migrations is now a working path again.
+
+### Fixed
+
+- `scripts/generate-route-patterns.ts` scraped `export const x = GET(...)` out
+  of `src/api/*.ts` with a regex, so it saw only the three hand-written routes
+  and none of the 18 that `CRUD()` registers. It now reads the live
+  `getRouteMapping()` registry instead — the same import-and-inspect trick
+  `openapi-document.ts` uses — and emits `{ pattern, methods }` for all 21.
+- `src/api/registry/hook.ts` no longer hardcodes the resource list it injects
+  into Astro; it reads the generated `route-patterns.json`. The hardcoded list
+  had drifted, injecting routes for `invite`, `session`, `courses`, `users` and
+  `sessions`, none of which are registered.
 - Every course page (`/`, `/exams`, `/resources`, `/schedule`, `/roster`,
   `/manage`) now shares one tab strip (`CourseHeader.astro`, built on the pure
   `courseTabs()` in `src/utils/course-tabs.ts`) instead of a back-link. Everyone

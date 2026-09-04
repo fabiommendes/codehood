@@ -1,0 +1,842 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/mdq.schema.json",
+  "title": "MDQ document (bundled)",
+  "description": "Every MDQ document type -- an exam, or any one of the seven question types -- bundled from schema/*.yaml into a single self-contained file. Validate against the whole thing to accept any MDQ document, or against `#/$defs/<type>` (e.g. `#/$defs/multiple-choice`) to check one type specifically.",
+  "oneOf": [
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/multiple-choice.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/multiple-selection.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/true-false.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/essay.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/numeric.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/short-answer.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/fill-in.yaml"
+    },
+    {
+      "$ref": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/exam.yaml"
+    }
+  ],
+  "$defs": {
+    "essay": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/essay.yaml",
+      "title": "Essay question",
+      "description": "An open-ended question where the student writes a free-form answer, rather than choosing among predefined options. Extends the common question-base schema with an `input` field describing how the answer should be edited, and an optional answer key.",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "essay"
+            },
+            "input": {
+              "type": "string",
+              "description": "The kind of editor shown to the student. `text` is a formatted (rich text) editor, `plain` a plain text box, and `code` a code editor, which is normally paired with `highlight`.",
+              "enum": [
+                "code",
+                "text",
+                "plain"
+              ],
+              "default": "text"
+            },
+            "highlight": {
+              "type": "string",
+              "description": "Programming language used for syntax highlighting and, where supported, validation. Only applicable when `input` is `code`; it is ignored (and the linter warns) for any other input.",
+              "minLength": 1,
+              "examples": [
+                "python",
+                "javascript",
+                "sql"
+              ]
+            },
+            "answerKey": {
+              "type": "string",
+              "description": "A model answer. It guides the instructor while grading and MAY be shown to students as feedback afterwards.",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "exam": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/exam.yaml",
+      "title": "Exam",
+      "description": "A set of questions gathered for assessment. An exam is recognized by its H1 title, which a question document can never carry. Each entry in `questions` is either a complete question document or an `include` referring to one that lives elsewhere.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "exam",
+          "description": "Redundant in practice -- an exam is recognized by its H1 title -- but accepted so a document can state its kind explicitly."
+        },
+        "id": {
+          "type": "string",
+          "description": "Url-friendly slug identifying the exam, written either in the H1 (`# [slug] Title`) or in the frontmatter. A number written in the frontmatter is read as its decimal string form.",
+          "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+          "examples": [
+            "midterm",
+            "cs101-final"
+          ]
+        },
+        "uuid": {
+          "type": "string",
+          "description": "Universally unique identifier for the exam.",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human readable title, normally taken from the H1 heading. When the frontmatter also sets it, the frontmatter wins.",
+          "minLength": 1
+        },
+        "course": {
+          "type": "string",
+          "description": "The course code the exam belongs to.",
+          "minLength": 1
+        },
+        "author": {
+          "type": "string",
+          "description": "The exam author. Inherited by any question that does not name one.",
+          "minLength": 1
+        },
+        "locale": {
+          "type": "string",
+          "description": "The language the exam is written in, as an IETF BCP 47 language tag. Inherited by any question that does not set one. Well-formedness is left to the implementation -- see mdq.linter.",
+          "examples": [
+            "pt-BR",
+            "en"
+          ]
+        },
+        "instructions": {
+          "type": "string",
+          "description": "The paragraphs between the title and the first question, shown to the student before the assessment begins. May contain Markdown."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Arbitrary set of strings associated with the exam. Unlike `locale` and `author`, tags are NOT inherited by the questions.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "meta": {
+          "type": "object",
+          "description": "Arbitrary mapping of strings to JSON values, for extension data not covered by the standard fields.",
+          "additionalProperties": true
+        },
+        "penalty": {
+          "enum": [
+            "none",
+            "capped",
+            "full"
+          ],
+          "default": "none",
+          "description": "The exam's policy for whether a negative question score survives. Questions never clamp their own score -- this is the only place clamping happens. `none` floors each question score at 0 before weighting it into the total. `capped` keeps the full, possibly negative, question values but floors the exam total at 0. `full` floors nothing, at either level."
+        },
+        "questions": {
+          "type": "array",
+          "description": "The questions, in the order their blocks appear in the document. An entry is either a full question document or an `include`.",
+          "items": {
+            "$ref": "#/$defs/Entry"
+          }
+        }
+      },
+      "required": [
+        "questions"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "Entry": {
+          "title": "Exam entry",
+          "description": "One question block: either a question written inline, or a reference to one stored elsewhere.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Include"
+            },
+            {
+              "$ref": "./multiple-choice.yaml"
+            },
+            {
+              "$ref": "./multiple-selection.yaml"
+            },
+            {
+              "$ref": "./true-false.yaml"
+            },
+            {
+              "$ref": "./essay.yaml"
+            },
+            {
+              "$ref": "./numeric.yaml"
+            },
+            {
+              "$ref": "./short-answer.yaml"
+            },
+            {
+              "$ref": "./fill-in.yaml"
+            }
+          ]
+        },
+        "Include": {
+          "type": "object",
+          "title": "Include",
+          "description": "A reference to a question defined outside this exam, by its id. Resolving the reference is the host system's job; a document that merely fails to resolve is still well-formed.",
+          "additionalProperties": false,
+          "properties": {
+            "include": {
+              "type": "string",
+              "description": "The id of the question to pull in.",
+              "pattern": "^.*(/?([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*))+$",
+              "examples": [
+                "recursion-01"
+              ]
+            }
+          },
+          "required": [
+            "include"
+          ]
+        }
+      }
+    },
+    "fill-in": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/fill-in.yaml",
+      "title": "Fill in the blanks question",
+      "description": "A question whose stem contains one or more named blanks, each answered in place by the student. Extends the common question-base schema with a `blanks` field. Every blank is itself a small graded question -- a set of choices, a short answer, or a numeric value -- referenced from the stem by its id, as in `The capital of Brazil is [^capital].`",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "fill-in"
+            },
+            "blanks": {
+              "type": "array",
+              "description": "The blanks referenced by the stem, in the order their definitions appear in the document.",
+              "items": {
+                "$ref": "#/$defs/Blank"
+              },
+              "minItems": 1
+            },
+            "shuffle": {
+              "type": "boolean",
+              "description": "If true, the choices of every choice-based blank are safe to shuffle. If false, they should never be shuffled, and if omitted the system is free to choose."
+            }
+          },
+          "required": [
+            "type",
+            "blanks"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false,
+      "$defs": {
+        "Blank": {
+          "title": "Blank",
+          "description": "A single blank. `type` discriminates the three kinds; it is required here even though the surface syntax may leave it implicit (`[^capital]:` infers its kind from the definition that follows, while `[^size/numeric]:` states it).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ChoiceBlank"
+            },
+            {
+              "$ref": "#/$defs/ShortAnswerBlank"
+            },
+            {
+              "$ref": "#/$defs/NumericBlank"
+            }
+          ]
+        },
+        "BlankId": {
+          "type": "string",
+          "description": "Url-friendly identifier for the blank, matching the `[^id]` marker used in the stem. MUST be unique within the question.",
+          "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+          "examples": [
+            "capital",
+            "size"
+          ]
+        },
+        "ChoiceBlank": {
+          "type": "object",
+          "title": "Choice blank",
+          "description": "A blank the student answers by picking one of a list of choices, graded exactly like a multiple-choice question.",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/BlankId"
+            },
+            "type": {
+              "const": "multiple-choice"
+            },
+            "choices": {
+              "type": "array",
+              "description": "The list of choices presented for this blank.",
+              "items": {
+                "$ref": "./multiple-choice.yaml#/$defs/Choice"
+              },
+              "minItems": 2
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "choices"
+          ]
+        },
+        "ShortAnswerBlank": {
+          "type": "object",
+          "title": "Short answer blank",
+          "description": "A blank the student answers by typing a short piece of text, graded exactly like a short-answer question.",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/BlankId"
+            },
+            "type": {
+              "const": "short-answer"
+            },
+            "oneOf": {
+              "type": "array",
+              "description": "The list of accepted responses; a response is correct if it matches any entry, after the normalization implied by `exact`.",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "regex": {
+              "type": "string",
+              "description": "A regular expression matching every correct response, applied as a full match. Takes precedence over `oneOf`.",
+              "minLength": 1
+            },
+            "exact": {
+              "type": "boolean",
+              "description": "If true, compare responses verbatim; if false (the default), normalize case, unicode letters, and whitespace first.",
+              "default": false
+            }
+          },
+          "required": [
+            "id",
+            "type"
+          ]
+        },
+        "NumericBlank": {
+          "type": "object",
+          "title": "Numeric blank",
+          "description": "A blank the student answers with a number, graded exactly like a numeric question.",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/BlankId"
+            },
+            "type": {
+              "const": "numeric"
+            },
+            "answer": {
+              "type": "number",
+              "description": "The expected correct numeric value."
+            },
+            "unit": {
+              "type": "string",
+              "description": "The unit (e.g., kg, m, lm, etc) of the expected answer.",
+              "pattern": "^[\\w.\\-]+$"
+            },
+            "domain": {
+              "enum": [
+                "integer",
+                "decimal",
+                "fraction"
+              ],
+              "description": "The domain/kind of number for the response."
+            },
+            "decimalPlaces": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The number of decimal places used in the decimal value representation. Ignored if domain is 'integer' or 'fraction'."
+            },
+            "tolerance": {
+              "$ref": "./numeric.yaml#/$defs/Tolerance"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "answer"
+          ]
+        }
+      }
+    },
+    "multiple-choice": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/multiple-choice.yaml",
+      "title": "Multiple choice question",
+      "description": "A question where the student must select exactly one choice out of a list of options. Extends the common question-base schema with a `choices` field.",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "multiple-choice"
+            },
+            "choices": {
+              "type": "array",
+              "description": "The list of choices presented to the student.",
+              "items": {
+                "$ref": "#/$defs/Choice"
+              },
+              "minItems": 2
+            },
+            "shuffle": {
+              "type": "boolean",
+              "description": "If true, the choices are safe to shuffle. If false, they should never be shuffled and if ommited, use the system is free to choose."
+            }
+          },
+          "required": [
+            "type",
+            "choices"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false,
+      "$defs": {
+        "Choice": {
+          "type": "object",
+          "title": "Choice",
+          "description": "A single option in a multiple-choice question.",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique url-friendly identifier for the choice.",
+              "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+              "examples": [
+                "berlin",
+                "red-green-and-blue"
+              ]
+            },
+            "text": {
+              "type": "string",
+              "description": "A textual display for the choice.",
+              "minLength": 1
+            },
+            "score": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1,
+              "description": "Numeric grade associated with the choice, on a scale from -1 to 1. 1 is considered correct and 0 incorrect. The instructor may omit this for incorrect choices, or set negative values as penalties for selecting a wrong choice. A question never clamps its own score -- whether a negative value survives into the exam total is decided entirely by the exam's `penalty` policy (see schema/exam.yaml), never here. A value outside [-1, 1] is a malformed question, not a clamped grade."
+            },
+            "feedback": {
+              "type": "string",
+              "description": "Feedback text shown to students that selected this choice. Usually explains why the choice is wrong (or right)."
+            },
+            "comment": {
+              "type": "string",
+              "description": "Optional comment for the instructor. Do not shown to students."
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    },
+    "multiple-selection": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/multiple-selection.yaml",
+      "title": "Multiple selection question",
+      "description": "A question where the student must select all choices they believe are correct, out of a list of options (zero, one, or many may be correct). Extends the common question-base schema with a `choices` field.",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "multiple-selection"
+            },
+            "choices": {
+              "type": "array",
+              "description": "The list of choices presented to the student.",
+              "items": {
+                "$ref": "#/$defs/Choice"
+              },
+              "minItems": 2
+            },
+            "shuffle": {
+              "type": "boolean",
+              "description": "If true, the choices are safe to shuffle. If false, they should never be shuffled and if ommited, use the system is free to choose."
+            }
+          },
+          "required": [
+            "type",
+            "choices"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false,
+      "$defs": {
+        "Choice": {
+          "type": "object",
+          "title": "Choice",
+          "description": "A single option in a multiple-selection question.",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique url-friendly identifier for the choice.",
+              "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+              "examples": [
+                "berlin",
+                "red-green-and-blue"
+              ]
+            },
+            "text": {
+              "type": "string",
+              "description": "A textual display for the choice.",
+              "minLength": 1
+            },
+            "correct": {
+              "type": "boolean",
+              "description": "Whether this choice should be selected in a correct answer. If omitted, it is interpreted as false (i.e. the choice should not be selected).",
+              "default": false
+            },
+            "feedback": {
+              "type": "string",
+              "description": "Feedback text shown to students that judged this choice wrongly -- either by ticking one that should not be ticked, or by leaving unticked one that should be. Usually explains why the choice belongs in the answer or does not. Unlike multiple-choice, a correctly judged choice never shows it."
+            },
+            "comment": {
+              "type": "string",
+              "description": "Optional comment for the instructor. Do not show to students."
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    },
+    "numeric": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/numeric.yaml",
+      "title": "Numeric question",
+      "description": "A question where the student must enter a numeric value, graded against an expected answer within an optional tolerance. Extends the common question-base schema with `answer` and `tolerance` fields.",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "numeric"
+            },
+            "answer": {
+              "type": "number",
+              "description": "The expected correct numeric value."
+            },
+            "unit": {
+              "type": "string",
+              "description": "The unit (e.g., kg, m, lm, etc) of the expected answer.",
+              "pattern": "^[\\w.-_]+$"
+            },
+            "domain": {
+              "enum": [
+                "integer",
+                "decimal",
+                "fraction"
+              ],
+              "description": "The domain/kind of number for the response."
+            },
+            "decimalPlaces": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The number of decimal places used in the decimal value representation. This value is ignored if domain is 'integer' or 'fraction'."
+            },
+            "tolerance": {
+              "$ref": "#/$defs/Tolerance"
+            }
+          },
+          "required": [
+            "type",
+            "answer"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false,
+      "$defs": {
+        "Tolerance": {
+          "type": "object",
+          "title": "Tolerance",
+          "description": "Acceptable margin of error around the expected answer. Both fields are optional; when both are given, a submitted value is accepted if it satisfies either one.",
+          "additionalProperties": false,
+          "properties": {
+            "absolute": {
+              "type": "number",
+              "description": "Maximum allowed absolute difference between the submitted value and the answer, i.e. |submitted - answer| <= absolute.",
+              "minimum": 0
+            },
+            "relative": {
+              "type": "number",
+              "description": "Maximum allowed relative difference between the submitted value and the answer, expressed as a fraction (e.g. 0.05 for 5%), i.e. |submitted - answer| / |answer| <= relative.",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "question-base": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/question-base.yaml",
+      "title": "Question (base)",
+      "description": "Common properties shared by every MDQ question type. Question-type schemas (multiple-choice, multiple-selection, true-false, numeric, short-answer, fill-in, essay) extend this schema, typically via `allOf` + `$ref`, and add their own `type`-specific fields (e.g. `choices`).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Url-friendly identifier for the question. Used to reference the question from exams, results, and cross-links. When omitted, an id may be derived from the question's position or title.",
+          "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+          "examples": [
+            "q1",
+            "rgb-question",
+            "composite-id-42"
+          ]
+        },
+        "uuid": {
+          "type": "string",
+          "description": "A universally unique identifier (UUID) for the question. Used to reference the question from exams, results, and cross-links. When omitted, a UUID may be generated automatically. Must be a valid UUID, `xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx`  where `M` is the version and `N` is the variant.",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "examples": [
+            "123e4567-e89b-12d3-a456-426614174000",
+            "550e8400-e29b-41d4-a716-446655440000",
+            "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "Human readable title, e.g. shown in question listings, tables of contents, or instructor-facing question banks.",
+          "minLength": 1
+        },
+        "author": {
+          "type": "string",
+          "description": "The name of the author or authors. Just for reference.",
+          "minLength": 1
+        },
+        "stem": {
+          "type": "string",
+          "description": "The main command shown to the students (e.g. \"Select all correct answers\", \"Write a program that...\"). This is the sentence that tells the student what to do and is always shown to them.",
+          "minLength": 1
+        },
+        "preamble": {
+          "type": "string",
+          "description": "One or more paragraphs of context shown before the stem. May contain Markdown markup."
+        },
+        "epilogue": {
+          "type": "string",
+          "description": "One or more paragraphs of text shown after the question body (e.g. after the list of choices). May contain Markdown markup."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Free-form text shown only to instructors, never to students. Used to explain the intent of the question, grading rationale, formatting decisions, etc."
+        },
+        "locale": {
+          "type": "string",
+          "description": "The language the question is written in, as an IETF BCP 47 language tag. BCP 47 is too involved to express as a JSON Schema `pattern`, so well-formedness is left to the implementation -- see the `malformed-locale` check in mdq.linter.",
+          "examples": [
+            "pt-BR",
+            "en",
+            "zh-Hans-CN"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "description": "Arbitrary set of strings associated with the question.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "meta": {
+          "type": "object",
+          "description": "Arbitrary mapping of strings to JSON values, for extension data not covered by the standard fields.",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "stem"
+      ]
+    },
+    "short-answer": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/short-answer.yaml",
+      "title": "Short answer question",
+      "description": "A question answered with a short piece of free text, graded by comparing the response against a list of accepted answers or against a regular expression. Extends the common question-base schema.",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "short-answer"
+            },
+            "oneOf": {
+              "type": "array",
+              "description": "The list of accepted responses; a response is correct if it matches any entry, after the normalization implied by `exact`. This is where the body's answer text is stored -- either the single string written after `[short-answer]:`, or the unordered list written below it.",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "regex": {
+              "type": "string",
+              "description": "A regular expression matching every correct response. Matching is a *full match*, so leading `^` and trailing `$` are redundant. Set from the frontmatter, or from a body whose answer text is delimited by `/`; the frontmatter wins.",
+              "minLength": 1
+            },
+            "exact": {
+              "type": "boolean",
+              "description": "If true, compare responses verbatim. If false (the default), comparison ignores case, normalizes unicode letters, collapses runs of whitespace into a single space, and strips leading and trailing whitespace.",
+              "default": false
+            },
+            "openEnded": {
+              "type": "boolean",
+              "description": "If true, the question has no answer key and requires manual grading. Inferred when the body declares no answer text.",
+              "default": false
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "if": {
+            "properties": {
+              "openEnded": {
+                "const": true
+              }
+            },
+            "required": [
+              "openEnded"
+            ]
+          },
+          "then": {
+            "properties": {
+              "oneOf": false,
+              "regex": false
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "true-false": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://raw.githubusercontent.com/codehood-lms/mdq.spec/master/schema/true-false.yaml",
+      "title": "True/False question",
+      "description": "A question where the student must judge each statement in a list as true or false. Extends the common question-base schema with a `choices` field, where each choice represents one statement to be judged.",
+      "allOf": [
+        {
+          "$ref": "./question-base.yaml"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "true-false"
+            },
+            "choices": {
+              "type": "array",
+              "description": "The list of statements presented to the student, each to be judged as true or false.",
+              "items": {
+                "$ref": "#/$defs/Choice"
+              },
+              "minItems": 2
+            },
+            "shuffle": {
+              "type": "boolean",
+              "description": "If true, the statements are safe to shuffle. If false, they should never be shuffled, and if omitted the system is free to choose."
+            }
+          },
+          "required": [
+            "type",
+            "choices"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false,
+      "$defs": {
+        "Choice": {
+          "type": "object",
+          "title": "Choice",
+          "description": "A single statement in a true/false question.",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique url-friendly identifier for the choice.",
+              "pattern": "^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$",
+              "examples": [
+                "berlin",
+                "red-green-and-blue"
+              ]
+            },
+            "text": {
+              "type": "string",
+              "description": "A textual display for the statement.",
+              "minLength": 1
+            },
+            "correct": {
+              "type": "boolean",
+              "description": "Whether the statement is true. If omitted, it is interpreted as false (i.e. the statement is false).",
+              "default": false
+            },
+            "marker": {
+              "type": "string",
+              "description": "The single letter written between the brackets in the source document (`T`, `F`, `V`, ...). Preserved verbatim: `answer` carries the meaning, but the letter itself is needed to warn about PROVISIONAL letters and locale mismatches, and to round-trip the document unchanged.",
+              "minLength": 1,
+              "maxLength": 1
+            },
+            "feedback": {
+              "type": "string",
+              "description": "Feedback text shown to students that judged this statement incorrectly or left it unjudged. Usually explains why the statement is true or false."
+            },
+            "comment": {
+              "type": "string",
+              "description": "Optional comment for the instructor. Do not show to students."
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,54 +1,42 @@
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+/**
+ * Writes src/api/registry/route-patterns.json, the list of URL patterns
+ * `hook.ts` injects into Astro.
+ *
+ * The patterns are read from the live `ROUTES` registry rather than scraped out
+ * of the source, so anything that registers a route — a bare `GET`/`POST` call
+ * or a whole `CRUD()` block — is picked up the same way. `hook.ts` itself
+ * cannot do this: it runs during `astro:config:setup`, where importing the API
+ * modules pulls in Astro internals that are not ready yet. Hence this file.
+ */
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getRouteMapping } from "@/api/registry";
 
-// Matches `export const name = GET("/api/foo", { ... }` (and POST/PUT/DELETE/PATCH).
-// Regex-based on purpose: this only has to handle the shape every route in
-// src/api/*.ts is written in, not arbitrary JS.
-const ROUTE_RE =
-	/export\s+const\s+(\w+)\s*=\s*(GET|POST|PUT|DELETE|PATCH)\(\s*["'`]([^"'`]+)["'`]\s*,\s*\{/g;
+// Importing this module imports every API module in turn, which is what
+// populates the registry. Same trick as openapi-document.ts.
+import "@/api/registry/dynamicHandler";
 
 const rootDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
 	"..",
 );
-const apiDir = path.join(rootDir, "src", "api");
-const outPath = path.join(apiDir, "registry", "route-patterns.json");
+const outPath = path.join(
+	rootDir,
+	"src",
+	"api",
+	"registry",
+	"route-patterns.json",
+);
 
-type RoutePattern = {
-	name: string;
-	method: string;
-	pattern: string;
-	file: string;
-};
-
-function findRoutes(fileName: string): RoutePattern[] {
-	const source = readFileSync(path.join(apiDir, fileName), "utf8");
-	const routes: RoutePattern[] = [];
-	for (const match of source.matchAll(ROUTE_RE)) {
-		const [, name, method, pattern] = match;
-		routes.push({
-			name,
-			method: method.toLowerCase(),
-			pattern,
-			file: fileName,
-		});
-	}
-	return routes;
-}
-
-const apiFiles = readdirSync(apiDir, { withFileTypes: true })
-	.filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
-	.map((entry) => entry.name);
-
-const routes = apiFiles
-	.flatMap(findRoutes)
-	.sort(
-		(a, b) =>
-			a.pattern.localeCompare(b.pattern) || a.method.localeCompare(b.method),
-	);
+const routes = Object.entries(getRouteMapping())
+	.map(([pattern, methods]) => ({
+		pattern,
+		methods: Object.keys(methods).sort(),
+	}))
+	.sort((a, b) => a.pattern.localeCompare(b.pattern));
 
 writeFileSync(outPath, `${JSON.stringify(routes, null, 2)}\n`);
 console.log(
-	`Wrote ${path.relative(rootDir, outPath)} (${routes.length} routes)`,
+	`Wrote ${path.relative(rootDir, outPath)} (${routes.length} patterns)`,
 );

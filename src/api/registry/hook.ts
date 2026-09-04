@@ -1,34 +1,11 @@
-// We must update the resource names to match the API routes.
-// We cannot import the modules to get the real paths since they use internal
-// astro APIs that break during configuration.
-const RESOURCES = [
-	"auth",
-	"api-key",
-	"calendar-event",
-	"course",
-	"discipline",
-	"edition",
-	"file",
-	"invite",
-	"resource",
-	"session",
-	"time-slot",
-	"user",
-	"health",
-	"courses",
-	"users",
-	"sessions",
-] as const;
-export const APIS: string[] = [];
+import routePatterns from "./route-patterns.json" with { type: "json" };
 
-// We extend with some special cases and actions that break the RESTful CRUD pattern.
-APIS.push("/api/auth/login", "/api/auth/logout");
-APIS.push(
-	...RESOURCES.flatMap((resource) => [
-		`/api/${resource}`,
-		`/api/${resource}/[id]`,
-	]),
-);
+// The patterns come from a generated file rather than from the route modules
+// themselves, because this runs during `astro:config:setup`, where importing
+// them pulls in internal Astro APIs that are not ready yet. Run
+// `pnpm run route-patterns` to regenerate it from the live registry — `dev` and
+// `build` already do.
+export const APIS: string[] = routePatterns.map((route) => route.pattern);
 
 export type InjectRoute = (route: {
 	pattern: string;

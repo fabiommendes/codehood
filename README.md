@@ -41,19 +41,31 @@ Once you update a resource, your students will see the changes immediately in th
 
 ## Preparing the dev environment
 
-You need pnpm and playwright pre-installed. Then follow the usual ways: 
+You need pnpm and playwright pre-installed. Then, from a fresh clone:
 
 ```sh
-pnpm install
+pnpm run init
 ```
+
+That installs the dependencies, writes a `.env`, creates and seeds the local
+SQLite database and runs the code generators. It is idempotent, so you can
+re-run it any time.
 
 Then use one of the following, depending on what you want to do:
 
 | Command              | Action                                      |
 | :------------------- | :------------------------------------------ |
+| `pnpm run init`      | Set the project up from scratch             |
 | `pnpm run configure` | Configure the local environment.            |
 | `pnpm run dev`       | Starts local dev server at `localhost:4321` |
 | `pnpm run build`     | Build your production site to `./dist/`     |
+| `pnpm run clear`     | Reset the project to a freshly-cloned state |
+
+`pnpm run clear` deletes every generated artifact — `node_modules/`, the Prisma
+client, the Astro cache, builds, test output, `dev.db` and the `storage/`
+resource blobs — leaving only what git tracks. It keeps `.env` unless you pass
+`--all`, and `--dry-run` lists what it would delete. `pnpm run init` brings the
+project back afterwards.
 
 
 ## Architecture and Tech Stack

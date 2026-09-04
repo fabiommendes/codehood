@@ -1,20 +1,86 @@
 [
 	{
-		"name": "logout",
-		"method": "post",
+		"pattern": "/api/api-key",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/api-key/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/auth/login",
+		"methods": ["post"]
+	},
+	{
 		"pattern": "/api/auth/logout",
-		"file": "auth.ts"
+		"methods": ["post"]
 	},
 	{
-		"name": "token",
-		"method": "post",
-		"pattern": "/api/auth/token",
-		"file": "auth.ts"
+		"pattern": "/api/calendar-event",
+		"methods": ["get", "post"]
 	},
 	{
-		"name": "health",
-		"method": "get",
+		"pattern": "/api/calendar-event/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/course",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/course/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/discipline",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/discipline/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/edition",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/edition/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/file",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/file/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
 		"pattern": "/api/health",
-		"file": "health.ts"
+		"methods": ["get"]
+	},
+	{
+		"pattern": "/api/resource",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/resource/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/time-slot",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/time-slot/[id]",
+		"methods": ["delete", "get", "patch"]
+	},
+	{
+		"pattern": "/api/user",
+		"methods": ["get", "post"]
+	},
+	{
+		"pattern": "/api/user/[id]",
+		"methods": ["delete", "get", "patch"]
 	}
 ]

@@ -1,3 +1,30 @@
 {
-	"prisma.pinToPrisma6": false
+	"[javascript]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"[javascriptreact]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"[typescriptreact]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"[css]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	}
+	// "prisma.pinToPrisma6":·false,
+	// "editor.formatOnSave": true,
+	// "editor.formatOnSaveMode": "file",
+	// "editor.codeActionsOnSave": {
+	// 	"source.fixAll.biome": "explicit",
+	// 	"source.organizeImports.biome": "explicit"
+	// }
 }
