@@ -1,8 +1,13 @@
 ---
+import BrandSquares from "@/components/BrandSquares.astro";
+import ListRow from "@/components/ListRow.astro";
+import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import Table from "@/components/ui/Table";
+import Tabs from "@/components/ui/Tabs.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
@@ -26,6 +31,30 @@ const badgeVariants = [
 	"error",
 ] as const;
 const alertVariants = ["info", "success", "warning", "error"] as const;
+
+const tableRows = [
+	{ name: "my laptop", kind: "cli", lastUsed: "yesterday" },
+	{ name: "grading bot", kind: "bot", lastUsed: "never" },
+];
+const tableColumns = [
+	{
+		title: "Name",
+		class: "font-medium",
+		render: (row: (typeof tableRows)[number]) => row.name,
+	},
+	{ title: "Kind", render: (row: (typeof tableRows)[number]) => row.kind },
+	{
+		title: "Last used",
+		class: "text-right",
+		headerClass: "text-right",
+		render: (row: (typeof tableRows)[number]) => row.lastUsed,
+	},
+];
+
+const tabItems = [
+	{ key: "overview", label: "Overview" },
+	{ key: "history", label: "History" },
+] as const;
 ---
 
 <DesignLayout title="Elements" active="elements">
@@ -98,7 +127,7 @@ const alertVariants = ["info", "success", "warning", "error"] as const;
     </div>
   </section>
 
-  <section>
+  <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Divider &amp; list</h2>
     <p class="mb-5 text-sm text-base-content/60">
       Not (yet) wrapped in components &mdash; plain daisyUI classes, used as-is on the profile page's API key
@@ -127,6 +156,78 @@ const alertVariants = ["info", "success", "warning", "error"] as const;
           <code class="font-mono">divider</code> separates the list from whatever follows it &mdash; on the
           profile page, the create-key form.
         </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Table</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<Table columns={...} data={...} />`}</code> &mdash; a data-driven
+      <code class="font-mono">&lt;table&gt;</code>; each column declares its header and how to render a row's
+      cell, so the markup never repeats per row.
+    </p>
+    <Table columns={tableColumns} data={tableRows} />
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Tabs</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<Tabs items={...} active="..." />`}</code> &mdash; the tab strip on this very
+      page. Link mode (shown above, no <code class="font-mono">name</code> prop) renders <code class="font-mono">&lt;a&gt;</code>
+      tabs that navigate; pass a <code class="font-mono">name</code> instead for same-page tabs driven by radio
+      inputs, as on the profile page.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <Tabs items={tabItems} active="overview" />
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">ListRow</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<ListRow href="..." muted>`}</code> &mdash; a single-row card with optional
+      leading/trailing slots. Renders an <code class="font-mono">&lt;a&gt;</code> when given
+      <code class="font-mono">href</code>, a <code class="font-mono">&lt;button&gt;</code> when given
+      <code class="font-mono">openDialog</code>, or a plain <code class="font-mono">&lt;div&gt;</code> otherwise.
+      Used for exam, resource, and upcoming-item rows across the app.
+    </p>
+    <div class="flex flex-col gap-3">
+      <ListRow href="#">
+        <div class="font-medium">Midterm exam</div>
+        <div class="text-xs text-base-content/60">opens Mar 3 &middot; 90 minutes</div>
+        <Fragment slot="trailing">
+          <Badge variant="primary">open</Badge>
+        </Fragment>
+      </ListRow>
+      <ListRow muted>
+        <div class="font-medium">Final exam</div>
+        <div class="text-xs text-base-content/60">opens Jun 12</div>
+        <Fragment slot="trailing">
+          <Badge variant="neutral" style="outline">locked</Badge>
+        </Fragment>
+      </ListRow>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-2 text-xl font-semibold">PageKicker &amp; BrandSquares</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">{`<PageKicker text="..." squares />`}</code> &mdash; the small uppercase label
+      above a page's heading, seen at the top of this design section index. The
+      <code class="font-mono">squares</code> prop pairs it with <code class="font-mono">&lt;BrandSquares /&gt;</code>,
+      the four-square logo flourish; only the landing page's hero kicker uses it, every other kicker is text-only.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body gap-4">
+        <PageKicker text="Reference" squares />
+        <PageKicker text="Section" />
+        <div class="flex items-center gap-2">
+          <BrandSquares />
+          <span class="text-xs text-base-content/60">BrandSquares on its own</span>
+        </div>
       </div>
     </div>
   </section>

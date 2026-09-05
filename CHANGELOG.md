@@ -4,6 +4,104 @@
 
 ### Added
 
+- The first question type is implemented end to end: `src/mdq/` turns a
+  validated `MultipleChoice` into a graded score and a student-safe payload.
+  `Question#score()` applies mdq.spec's grading strategies (`symmetric` by
+  default: an unmarked choice is worth whatever makes picking at random average
+  to zero, clamped to `[-1, 0]`), `Question#toPublic()` strips every score,
+  feedback and comment, and `Question#answerKey()` names the winning choices so
+  a review screen does not re-derive correctness. `src/mdq/choices.ts` gives
+  every choice a stable id — a slug of its text, per mdq.spec, falling back to
+  position when the text slugifies to nothing — and scoring and the public
+  representation share it, so an answer always addresses the choice it named.
+  All seven rows of mdq.spec's grading table are pinned in
+  `test/mdq-question.spec.ts`.
+- Multiple-choice questions render, in SolidJS. `MultipleChoiceView` takes only
+  the public half of a question and draws it in three modes — `answer` (a
+  keyboard-accessible radio group), `readonly`, and `review`, which marks the
+  right and the picked choice and shows the choice's own feedback. Correctness
+  arrives separately, in a `QuestionResult<T>` the caller fills from
+  `Question#answerKey()`, so a component that was never handed an answer key
+  cannot leak one. `QuestionView` dispatches on `question.type` and names the
+  types it cannot draw yet instead of rendering nothing. Stem, preamble,
+  epilogue and choice text go through `markdown-it` with raw HTML off.
+- Multiple-selection questions render too, sharing the model layer and the view
+  pattern. Their grading is nothing like multiple choice's: there are no
+  per-choice scores, every choice is judged — an unticked one asserts it is
+  false — and `partial`, `all-or-nothing` and `symmetric` turn "`r` of `n`
+  judged correctly" into a score three different ways. All six rows of
+  mdq.spec's worked example are pinned. `Scored` grew `choices`, a list of
+  per-choice feedback in document order, because a multiple-selection question
+  gives feedback only on the choices judged wrongly — including a correct one
+  the student left unticked, which is the mistake most worth explaining.
+  `MultipleSelectionView` marks rows by judgement rather than by what was
+  ticked, so a missed correct answer reads as wrong, and `QuestionView`
+  dispatches to it.
+- True/false questions render, with a three-position control per statement —
+  False, unmarked, True — because abstaining is a real answer here rather than
+  a synonym for "false". `TrueFalseAnswer` is a partial `Map<string, boolean>`:
+  a statement with no entry was skipped, and mdq.spec's grading leaves those
+  alone. `all-or-nothing` accordingly means "no mistakes" rather than
+  "everything answered", so a partly-answered flawless paper keeps proportional
+  credit — the same strategy name behaving differently than it does for
+  multiple selection. Feedback covers the statements judged wrongly *and* the
+  ones abstained, since a student who skipped one is who the explanation is
+  for. `marker` — the letter the author wrote between the brackets — is
+  stripped from the public half along with the answers: it is `T` exactly when
+  the statement is true.
+- Essay questions render, and are the first type the machine does not grade:
+  mdq.spec grades them manually, so `score()` returns a placeholder flagged
+  `pending` rather than inventing a number. The flag earns its place because
+  `score: 0` is already a verdict — an essay a human read and marked worthless
+  scores 0 too — so `EssayView` badges an ungraded answer "Awaiting grading"
+  instead of "Score 0.00". The answer key is the model answer, prose next to
+  the student's prose, and both sit in their own labelled block so neither can
+  be read as the other. `input` decides the editor: Markdown, plain text, or a
+  monospace box badged with `highlight`. Outside `answer` mode the textarea is
+  dropped and the text is rendered instead of frozen — a disabled textarea
+  strands a long answer behind a scrollbar nobody can drag any more, which is
+  the opposite of what review is for.
+- Numeric questions render, and grade binarily: a response the tolerance admits
+  scores 1 and everything else scores 0, with no strategy to select between —
+  mdq.spec gives numeric questions no `grading` field, because being close is
+  worth nothing and widening the tolerance is how an author expresses leniency.
+  The two tolerances are alternatives rather than conditions, and the relative
+  one is stored as a fraction (`0.05`, not `5`). `toPublic()` resolves an
+  omitted `domain` through mdq.spec's coercion table so `NumericView` never
+  reimplements it, keeps `unit` and `decimalPlaces` because they describe the
+  input box, and strips `answer` and `tolerance`. A `fraction` question gets a
+  text input rather than a number one, since a number input rejects `1/3`
+  outright; `parseNumericInput` reads both spellings and turns anything
+  uninterpretable into no answer rather than a wrong one. Review marks
+  correctness from the score rather than from the key, because the tolerance
+  that decides it is deliberately not public.
+- Short-answer questions render, and they brought the schema with them:
+  `public/mdq.schema.json` was a stale bundle whose entire difference from
+  mdq.spec was this type. Refreshing it added `accept`, `reject`, `preAccept`
+  and `preReject` as pattern lists and removed the question-wide `exact`
+  boolean, since exactness is now spelled per pattern. `src/mdq/short-answer.ts`
+  reads the mini-language those lists are written in — `/re/flags` for a regex,
+  backticks for an exact literal, `*` for a wildcard, anything else compared
+  inexactly — with mdq.spec's own flags rather than JavaScript's: regexes are
+  anchored at both ends unless `f` or `b` says otherwise, `n` folds to NFC, and
+  a stale `g` is ignored. Inexact matching folds case, whitespace and unicode
+  form but deliberately not diacritics, so `Brasília` still rejects `Brasilia`.
+  Grading is binary; what varies is how much of it is automatic. A response
+  matching neither list is wrong when the question lists no rejections — the
+  absent list carries an implicit trailing wildcard — and the instructor's when
+  it lists some and none of them cover it, which lands on the `pending` flag
+  essay introduced. `preAccept` and `preReject` are public and warn the student
+  as they type, with the precedence inverted from grading's, and never touch a
+  score.
+- `/design/questions`, a new tab in the design showcase, renders every view
+  state from real `Question` objects, grouped by question type: answer,
+  readonly and review for each of the six. A sticky side nav lists the types
+  and marks the one you are looking at, since the page is now long enough that
+  scrolling to a type was the slow part. It is in the page's own column rather
+  than floating over it, so it cannot land on the cards at some width nobody
+  tested, and it is not rendered at all below `lg`. Grading itself is not shown there
+  — the numbers are pinned in `test/mdq-question.spec.ts` instead, which is
+  where a formula belongs.
 - `pnpm run clear` (`scripts/clean.mjs`) resets the checkout to the state of a
   fresh `git clone`, deleting `node_modules/`, `src/generated/`, `.astro/`,
   `dist/`, `coverage/`, test output, the local `*.db` files and the `storage/`
@@ -38,6 +136,26 @@
   for `db push`. Applying migrations is now a working path again.
 
 ### Fixed
+
+- `biome check --write .` no longer rewrites `src/mdq/schemas-generated.ts` out
+  from under its own generator. `generate-question-models.ts` runs `biome
+  format` on its output and deliberately not `check --write`, so that the file
+  does not depend on which lint rules a given Biome version autofixes — but
+  nothing stopped the project-wide command CLAUDE.md tells everyone to run from
+  applying one anyway (`noUselessEscapeInRegex`, rewriting `[\w.\-]`). The
+  linter is now off for that one generated file, and the drift guard in
+  `test/mdq-schemas.spec.ts` — parked as a `test.fail` because the file was out
+  of sync with the bundle — is a real test again.
+- The question-model generator could not compile a `oneOf` with an inline
+  branch; it assumed every branch was a `$ref` to a named schema, which
+  mdq.spec's `pattern` definition is not. Inline branches now compile in place,
+  and only an all-named union still becomes a `z.discriminatedUnion`.
+- The tab strip no longer offers a vertical scrollbar it has nothing to scroll.
+  `overflow-x-auto` promotes the other axis from `visible` to `auto`, and the
+  active tab's `-mb-px` leaves its border one pixel below the box — one stray
+  pixel, enough for the browser to draw a scrollbar on a single row of links.
+  Pinned shut with `overflow-y-hidden`; the horizontal scrolling and the active
+  underline both survive.
 
 - `scripts/generate-route-patterns.ts` scraped `export const x = GET(...)` out
   of `src/api/*.ts` with a regex, so it saw only the three hand-written routes

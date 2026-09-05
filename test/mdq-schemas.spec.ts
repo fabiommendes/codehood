@@ -79,7 +79,8 @@ const shortAnswerDoc = {
 	type: "short-answer",
 	stem: "Name the author of 'Hamlet'.",
 	oneOf: ["Shakespeare", "William Shakespeare"],
-	exact: false,
+	accept: ["/[Ww]illiam Shakespeare/"],
+	reject: [{ pattern: "Marlowe", feedback: "A contemporary, not the author." }],
 } as const;
 
 const fillInDoc = {
@@ -397,19 +398,16 @@ test("inferred types are usable as plain object literals", () => {
 // 11. Generated file is up to date (drift guard)
 //
 
-test.fail(
-	"src/mdq/schemas-generated.ts matches what the generator currently produces from public/mdq.schema.json",
-	() => {
-		const schemaPath = path.resolve(
-			import.meta.dirname,
-			"../public/mdq.schema.json",
-		);
-		const generatedPath = path.resolve(
-			import.meta.dirname,
-			"../src/mdq/schemas-generated.ts",
-		);
-		const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
-		const onDisk = readFileSync(generatedPath, "utf8");
-		expect(onDisk).toEqual(renderModule(schema));
-	},
-);
+test("src/mdq/schemas-generated.ts matches what the generator currently produces from public/mdq.schema.json", () => {
+	const schemaPath = path.resolve(
+		import.meta.dirname,
+		"../public/mdq.schema.json",
+	);
+	const generatedPath = path.resolve(
+		import.meta.dirname,
+		"../src/mdq/schemas-generated.ts",
+	);
+	const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+	const onDisk = readFileSync(generatedPath, "utf8");
+	expect(onDisk).toEqual(renderModule(schema));
+});

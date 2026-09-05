@@ -17,6 +17,6 @@ export default defineConfig({
 		seed: "tsx prisma/seed.ts",
 	},
 	datasource: {
-		url: envOr("DATABASE_URL", "sqlite:./dev.db"),
+		url: envOr("DATABASE_URL", "file:./dev.db"),
 	},
 });

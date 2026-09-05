@@ -11,6 +11,18 @@ Backlog items are categorized in sections, not on priority.
 
 None now!
 
+## Features
+
+* [ ] The Essay question should use a rich text editor component for better
+  content formatting. Investigate suitable rich text editor libraries and
+  integrate it in the component. It should provide a user-friendly interface
+  and a raw markdown mode for advanced users.
+* [ ] The Essay question should support a code editor textarea for code
+  questions. I lean towards using Monaco, but we should evaluate pros and cons
+  before making a final decision.
+
+
+
 ## Maintainability
 
 * **Permanent:** go through all `any` types and replace them with more specific

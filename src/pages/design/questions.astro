@@ -1,0 +1,994 @@
+---
+import EssayView from "@/components/question/EssayView";
+import MultipleChoiceView from "@/components/question/MultipleChoiceView";
+import MultipleSelectionView from "@/components/question/MultipleSelectionView";
+import NumericView from "@/components/question/NumericView";
+import QuestionView, {
+	type QuestionViewProps,
+} from "@/components/question/QuestionView";
+import ShortAnswerView from "@/components/question/ShortAnswerView";
+import TrueFalseView from "@/components/question/TrueFalseView";
+import Card from "@/components/ui/Card";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+import type { PublicQuestion } from "@/mdq/public";
+import { Question } from "@/mdq/question";
+import type {
+	Essay,
+	MultipleChoice,
+	MultipleSelection,
+	Numeric,
+	ShortAnswer,
+	TrueFalse,
+} from "@/mdq/schemas-generated";
+import type { QuestionResult } from "@/mdq/scoring";
+
+export const prerender = false;
+
+// Every fixture below is a real `Question`, built the same way an mdq file
+// would produce one after validation — the showcase drives `toPublic()`,
+// `score()`, and `answerKey()` on it rather than hand-writing the public
+// payload the components expect.
+function mc(data: Omit<MultipleChoice, "type">): Question<MultipleChoice> {
+	return new Question({ type: "multiple-choice", ...data } as MultipleChoice);
+}
+
+function ms(
+	data: Omit<MultipleSelection, "type">,
+	extra: Partial<MultipleSelection> = {},
+): Question<MultipleSelection> {
+	return new Question({
+		type: "multiple-selection",
+		...data,
+		...extra,
+	} as MultipleSelection);
+}
+
+const capitals = mc({
+	stem: "Which city is the capital of Brazil?",
+	choices: [
+		{ id: "brasilia", text: "Brasília", score: 1, feedback: "Correct." },
+		{ id: "rio", text: "Rio de Janeiro", score: 0 },
+		{
+			id: "sao-paulo",
+			text: "São Paulo",
+			score: -0.5,
+			feedback: "The largest city, not the capital.",
+		},
+	],
+});
+
+const markdownFixture = mc({
+	title: "Big-O of binary search",
+	stem: "What is the time complexity of binary search on a sorted array of `n` elements?",
+	preamble:
+		"A function repeatedly halves the search range until it finds the target or the range is empty.",
+	epilogue: "See *Introduction to Algorithms*, ch. 2, for the derivation.",
+	tags: ["algorithms", "complexity"],
+	choices: [
+		{
+			id: "log-n",
+			text: "`O(log n)`",
+			score: 1,
+			feedback: "Correct — the range halves each step.",
+		},
+		{
+			id: "linear",
+			text: "`O(n)`",
+			score: 0,
+			feedback: "That is linear search.",
+		},
+		{ id: "n-log-n", text: "`O(n log n)`", score: 0 },
+		{ id: "constant", text: "`O(1)`", score: 0 },
+	],
+});
+
+// `Public<FillIn>` is `never` — fill-in has no public representation yet — so
+// the fallback can only be demonstrated by casting past the union it is the
+// point of not being in.
+const fillInStub = {
+	type: "fill-in",
+	stem: "The capital of Brazil is [^capital].",
+} as unknown as PublicQuestion;
+
+const wrongPickResult: QuestionResult<"multiple-choice"> = {
+	score: capitals.score({ choice: "sao-paulo" }).score,
+	feedback: capitals.score({ choice: "sao-paulo" }).feedback,
+	correct: capitals.answerKey(),
+};
+
+const correctPickResult: QuestionResult<"multiple-choice"> = {
+	score: capitals.score({ choice: "brasilia" }).score,
+	feedback: capitals.score({ choice: "brasilia" }).feedback,
+	correct: capitals.answerKey(),
+};
+
+const withheldResult: QuestionResult<"multiple-choice"> = {
+	score: capitals.score({ choice: "brasilia" }).score,
+};
+
+//
+// Multiple selection
+//
+
+const primes = ms({
+	stem: "Which of the following numbers are prime?",
+	choices: [
+		{ id: "two", text: "2", correct: true, feedback: "Prime." },
+		{ id: "three", text: "3", correct: true, feedback: "Prime." },
+		{ id: "four", text: "4", feedback: "Not prime — 2 × 2." },
+		{ id: "nine", text: "9", feedback: "Not prime — 3 × 3." },
+	],
+});
+
+// Ticked every correct choice and nothing else: every row is judged
+// correctly, so the feedback list comes back empty.
+const perfectAnswer = { choices: new Set(["two", "three"]) };
+const perfectResult: QuestionResult<"multiple-selection"> = {
+	...primes.score(perfectAnswer),
+	correct: primes.answerKey(),
+};
+
+// Ticked "four" (wrong) and missed "two" (also wrong, since leaving a correct
+// choice unticked asserts it is false) — the card that shows feedback landing
+// on a choice the student never touched.
+const partialAnswer = { choices: new Set(["three", "four"]) };
+const partialResult: QuestionResult<"multiple-selection"> = {
+	...primes.score(partialAnswer),
+	correct: primes.answerKey(),
+};
+
+// Same answer, graded, but with the key withheld — an exam still open for
+// review, showing no right/wrong markers at all.
+const withheldSelectionResult: QuestionResult<"multiple-selection"> = {
+	score: primes.score(partialAnswer).score,
+};
+
+//
+// True/false
+//
+
+function tf(
+	data: Omit<TrueFalse, "type">,
+	extra: Partial<TrueFalse> = {},
+): Question<TrueFalse> {
+	return new Question({
+		type: "true-false",
+		...data,
+		...extra,
+	} as TrueFalse);
+}
+
+const protocols = tf({
+	stem: "Judge each statement about network protocols.",
+	choices: [
+		{
+			id: "tcp-order",
+			text: "TCP guarantees ordered delivery.",
+			correct: true,
+			feedback: "True — TCP reassembles segments in order.",
+		},
+		{
+			id: "udp-guarantee",
+			text: "UDP guarantees delivery.",
+			correct: false,
+			feedback: "False — UDP makes no delivery guarantee at all.",
+		},
+		{
+			id: "http2-multiplex",
+			text: "HTTP/2 multiplexes multiple streams over one connection.",
+			correct: true,
+			feedback: "True — that is the point of HTTP/2 framing.",
+		},
+		{
+			id: "dns-tcp",
+			text: "DNS resolution requires TCP.",
+			correct: false,
+			feedback:
+				"False — DNS mostly uses UDP, falling back to TCP only for large responses.",
+		},
+	],
+});
+
+// Some true, some false, and "http2-multiplex" left unmarked, so all three
+// toggle positions are visible on the same card.
+const partlyMarkedAnswer = new Map([
+	["tcp-order", true],
+	["udp-guarantee", false],
+]);
+
+const flawlessAnswer = {
+	answers: new Map([
+		["tcp-order", true],
+		["udp-guarantee", false],
+		["http2-multiplex", true],
+		["dns-tcp", false],
+	]),
+};
+const flawlessResult: QuestionResult<"true-false"> = {
+	...protocols.score(flawlessAnswer),
+	correct: protocols.answerKey(),
+};
+
+// Got "tcp-order" right, "udp-guarantee" wrong, and abstained on
+// "http2-multiplex" — the card that shows the third outcome next to the
+// other two, with feedback landing on both the wrong statement and the
+// abstained one.
+const mixedAnswer = {
+	answers: new Map([
+		["tcp-order", true],
+		["udp-guarantee", true],
+		["dns-tcp", false],
+	]),
+};
+const mixedResult: QuestionResult<"true-false"> = {
+	...protocols.score(mixedAnswer),
+	correct: protocols.answerKey(),
+};
+
+// Same answer, graded, but with the key withheld.
+const withheldTrueFalseResult: QuestionResult<"true-false"> = {
+	score: protocols.score(mixedAnswer).score,
+};
+
+//
+// Essay
+//
+
+function es(data: Omit<Essay, "type">): Question<Essay> {
+	return new Question({ type: "essay", ...data } as Essay);
+}
+
+const greenhouse = es({
+	stem: "Describe how the greenhouse effect works and how it affects the climate.",
+	preamble:
+		"The atmosphere is transparent to most incoming sunlight but not to the heat the surface radiates back.",
+	input: "text",
+	answerKey:
+		"Sunlight passes through the atmosphere and warms the surface, which re-radiates the energy as *infrared*. Greenhouse gases absorb part of that infrared and re-emit it downwards, keeping the lower atmosphere warmer than it would otherwise be. Raising their concentration raises the equilibrium temperature.",
+	comment: "Accept any answer that names absorption and re-emission.",
+});
+
+const areaFunction = es({
+	stem: "Write a function `area(r)` that returns the area of a circle of radius `r`.",
+	input: "code",
+	highlight: "python",
+	answerKey: "import math\n\n\ndef area(r):\n    return math.pi * r**2",
+});
+
+const definition = es({
+	stem: "In one sentence, define idempotence.",
+	input: "plain",
+	answerKey:
+		"An operation is idempotent when applying it more than once has the same effect as applying it once.",
+});
+
+const greenhouseAnswer =
+	"The sun heats the ground, and the ground gives off *infrared*. Gases like CO2 and methane absorb it and send some of it back down, so the lower atmosphere stays warmer. More of those gases means more of the heat stays.";
+
+const codeAnswer = "def area(r):\n    return 3.14159 * r * r";
+
+// Straight out of `score()`: the model layer cannot grade an essay, so it
+// returns a placeholder flagged `pending` and the badge says so.
+const ungradedResult: QuestionResult<"essay"> = {
+	...greenhouse.score({ essay: greenhouseAnswer }),
+	correct: greenhouse.answerKey(),
+};
+
+// What an instructor's grade looks like: a real score, no `pending`.
+const gradedResult: QuestionResult<"essay"> = {
+	score: 0.75,
+	feedback: "Correct mechanism, but the answer never mentions equilibrium.",
+	correct: greenhouse.answerKey(),
+};
+
+// Graded with the model answer withheld, which is the normal state while an
+// exam is still open.
+const withheldEssayResult: QuestionResult<"essay"> = {
+	score: 1,
+	feedback: "Exactly right.",
+};
+
+//
+// Numeric
+//
+
+function nm(data: Omit<Numeric, "type">): Question<Numeric> {
+	return new Question({ type: "numeric", ...data } as Numeric);
+}
+
+const water = nm({
+	stem: "How many grams of water are there in a liter?",
+	preamble: "Assume pure water at 4 °C, where its density is exactly 1 g/mL.",
+	answer: 1000,
+	unit: "g",
+	tolerance: { absolute: 5 },
+});
+
+const pi = nm({
+	stem: "Give the value of `π` to two decimal places.",
+	answer: 3.14,
+	decimalPlaces: 2,
+	tolerance: { absolute: 0.005 },
+});
+
+const slope = nm({
+	stem: "What is the slope of the line through `(0, 1)` and `(3, 0)`?",
+	answer: -1 / 3,
+	domain: "fraction",
+	tolerance: { relative: 0.01 },
+});
+
+// Inside the 5 g tolerance, and outside it: the two review cards, both graded
+// by `score()` rather than by hand.
+const closeEnough = { value: 998 };
+const wayOff = { value: 100 };
+
+const acceptedResult: QuestionResult<"numeric"> = {
+	...water.score(closeEnough),
+	feedback:
+		"A liter of water massing a kilogram is the definition of the gram.",
+	correct: water.answerKey(),
+};
+
+const rejectedResult: QuestionResult<"numeric"> = {
+	...water.score(wayOff),
+	feedback: "Off by a factor of ten — check the milliliter-to-liter step.",
+	correct: water.answerKey(),
+};
+
+// Graded with the expected value withheld. The check still shows: there is
+// one box here, and the score badge beside it already says it was right.
+const withheldNumericResult: QuestionResult<"numeric"> =
+	water.score(closeEnough);
+
+//
+// Short answer
+//
+
+function sa(data: Omit<ShortAnswer, "type">): Question<ShortAnswer> {
+	return new Question({ type: "short-answer", ...data } as ShortAnswer);
+}
+
+const capital = sa({
+	stem: "What is the capital of Brazil?",
+	accept: [
+		{ pattern: "Brasília", feedback: "Good call!" },
+		{ pattern: "`BSB`", comment: "The airport code, for the aviation-minded." },
+	],
+	reject: [
+		{
+			pattern: "Rio de Janeiro",
+			feedback: "It used to be, but it is not anymore.",
+		},
+		{ pattern: "Brasilia", feedback: 'You forgot the accent on the "i".' },
+		{ pattern: "*", feedback: "Sorry, that is not the correct answer." },
+	],
+});
+
+// No trailing wildcard, so a response matching neither list is the
+// instructor's rather than the grader's.
+const isnan = sa({
+	stem: "Which **Python** function checks whether a number is `NaN`?",
+	oneOf: ["`math.isnan`"],
+	reject: [
+		{ pattern: "`isnan`", feedback: "Close — it lives in the `math` module." },
+	],
+});
+
+const headcount = sa({
+	stem: "How many people were in the room? Write the number in digits.",
+	oneOf: ["12"],
+	preAccept: ["/\\d+/"],
+	preReject: [{ pattern: "/0+/", feedback: "Zero is not a count." }],
+});
+
+const openEnded = sa({
+	stem: "In a few words, why does binary search need a sorted array?",
+	openEnded: true,
+});
+
+const rightResult: QuestionResult<"short-answer"> = {
+	...capital.score({ text: "brasília" }),
+	correct: capital.answerKey(),
+};
+
+const wrongResult: QuestionResult<"short-answer"> = {
+	...capital.score({ text: "Brasilia" }),
+	correct: capital.answerKey(),
+};
+
+// Matched neither list, because `isnan` writes its reject block out and does
+// not end it with a wildcard. The badge says so instead of saying "Score 0".
+const unsettledResult: QuestionResult<"short-answer"> = {
+	...isnan.score({ text: "numpy.isnan" }),
+	correct: isnan.answerKey(),
+};
+
+const pendingTypes = ["fill-in"] as const;
+
+// The side nav. Its ids are the `id` of the matching <section> below; the
+// order is the order they appear on the page, which is the order the types
+// were built in.
+const sectionLinks = [
+	{ id: "multiple-choice", label: "Multiple choice" },
+	{ id: "multiple-selection", label: "Multiple selection" },
+	{ id: "true-false", label: "True / false" },
+	{ id: "essay", label: "Essay" },
+	{ id: "numeric", label: "Numeric" },
+	{ id: "short-answer", label: "Short answer" },
+	{ id: "pending", label: "Not implemented" },
+] as const;
+---
+
+<DesignLayout title="Questions" active="questions">
+  <div class="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10">
+    {/*
+      Sticky rather than fixed: it stays in the page's own column, so it can
+      never land on top of the content at a width nobody tested. Below `lg`
+      there is no room beside the cards, and the nav is simply not rendered —
+      the page is short enough to scroll on a phone.
+    */}
+    <nav aria-label="Question types" class="sticky top-6 self-start max-lg:hidden">
+      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-base-content/40">
+        Question types
+      </p>
+      <ul class="flex flex-col gap-1 border-l border-base-300">
+        {
+          sectionLinks.map((link) => (
+            <li>
+              <a
+                href={`#${link.id}`}
+                data-section-link={link.id}
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-base-content/60 transition-colors hover:border-base-300 hover:text-base-content aria-current:border-primary aria-current:font-semibold aria-current:text-primary"
+              >
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div>
+  <section class="mb-14">
+    <h1 class="text-3xl font-bold">Questions</h1>
+    <p class="mt-3 max-w-2xl text-base-content/70">
+      Views from <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/components/question/</code> and the
+      <code class="font-mono">QuestionView</code> dispatcher, rendering fixtures built from real
+      <code class="font-mono">Question</code> objects in <code class="font-mono">src/mdq/</code>{" "}
+      &mdash; nothing on this page hand-writes the public payload the components expect.
+    </p>
+  </section>
+
+  <section id="multiple-choice" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Multiple choice</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        The interactive form a student fills in. One is empty; the other is seeded with a choice already picked,
+        to show the controlled path. Markdown in the stem and inline code in the choices come from{" "}
+        <code class="font-mono">markdownFixture</code>, a fixture with a <code class="font-mono">preamble</code>,
+        an <code class="font-mono">epilogue</code>, and <code class="font-mono">tags</code>.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Unanswered">
+          <MultipleChoiceView client:load question={capitals.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Pre-answered, with markdown">
+          <MultipleChoiceView client:load question={markdownFixture.toPublic()} mode="answer" value="log-n" />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Same visuals as answer mode, but the inputs are disabled and nothing is clickable &mdash; for showing a
+        question back to a student without letting them change it, before grading exists.
+      </p>
+      <Card>
+        <MultipleChoiceView question={capitals.toPublic()} mode="readonly" value="rio" />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Three graded states, all driven by <code class="font-mono">capitals.score()</code> and{" "}
+        <code class="font-mono">capitals.answerKey()</code>: a correct pick, a wrong pick with the choice's own
+        feedback and a score below zero, and a graded answer whose key is withheld
+        (<code class="font-mono">result</code> with no <code class="font-mono">correct</code>) &mdash; that last
+        one is what an exam still open for review looks like, and it deliberately shows no right/wrong markers.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Card title="Correct pick">
+          <MultipleChoiceView
+            question={capitals.toPublic()}
+            mode="review"
+            value="brasilia"
+            result={correctPickResult}
+          />
+        </Card>
+        <Card title="Wrong pick, with feedback">
+          <MultipleChoiceView
+            question={capitals.toPublic()}
+            mode="review"
+            value="sao-paulo"
+            result={wrongPickResult}
+          />
+        </Card>
+        <Card title="Key withheld">
+          <MultipleChoiceView
+            question={capitals.toPublic()}
+            mode="review"
+            value="brasilia"
+            result={withheldResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="multiple-selection" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Multiple selection</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Checkboxes rather than radios &mdash; toggling a row adds or removes its id from the answer set. One card
+        is empty; the other is seeded with a couple of choices already ticked, to show the controlled path.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Unanswered">
+          <MultipleSelectionView client:load question={primes.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Pre-answered">
+          <MultipleSelectionView
+            client:load
+            question={primes.toPublic()}
+            mode="answer"
+            value={new Set(["two", "three"])}
+          />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Same visuals as answer mode, but the checkboxes are disabled and nothing is clickable.
+      </p>
+      <Card>
+        <MultipleSelectionView question={primes.toPublic()} mode="readonly" value={new Set(["three"])} />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Marking is by judgement, not by ticked-ness: a row reads correct when whether it was ticked matches
+        whether <code class="font-mono">result.correct</code> says it should have been, per{" "}
+        <code class="font-mono">dev/specs/to-review/question-rendering.md</code>. The middle card ticked "4"
+        (wrong) and left "2" alone (also wrong &mdash; a correct choice left unticked asserts it is false), so it
+        shows feedback attached to a choice the student never touched. The last card grades the same answer with
+        the key withheld, and shows no markers at all.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Card title="Perfect answer">
+          <MultipleSelectionView
+            question={primes.toPublic()}
+            mode="review"
+            value={perfectAnswer.choices}
+            result={perfectResult}
+          />
+        </Card>
+        <Card title="Ticked wrong, missed right">
+          <MultipleSelectionView
+            question={primes.toPublic()}
+            mode="review"
+            value={partialAnswer.choices}
+            result={partialResult}
+          />
+        </Card>
+        <Card title="Key withheld">
+          <MultipleSelectionView
+            question={primes.toPublic()}
+            mode="review"
+            value={partialAnswer.choices}
+            result={withheldSelectionResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="true-false" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">True / false</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Each statement gets one toggle with three states, not a checkbox: unchecked is False, checked is True, and
+        the knob centered (the native <code class="font-mono">indeterminate</code> property) is unmarked, because a
+        student can judge a statement or abstain on it; see{" "}
+        <code class="font-mono">dev/specs/to-do/question-true-false.md</code>, "Abstaining is a third state".
+        Clicking (or pressing space) cycles unmarked &rarr; True &rarr; False &rarr; unmarked, so the middle state
+        stays reachable instead of only being where an untouched toggle starts. One card is fully unmarked; the
+        other has "tcp-order" marked True, "udp-guarantee" marked False, and "http2-multiplex" and "dns-tcp" left
+        unmarked, so all three positions show at once.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Unanswered">
+          <TrueFalseView client:load question={protocols.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Partly marked">
+          <TrueFalseView client:load question={protocols.toPublic()} mode="answer" value={partlyMarkedAnswer} />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Same visuals as answer mode, but every toggle is disabled and nothing is clickable.
+      </p>
+      {/*
+        `client:load` here is load-bearing, not decorative: the centered knob
+        for an abstained statement comes from the `indeterminate` DOM property,
+        which cannot be expressed in server-rendered markup. Without
+        hydration, an abstained statement would render looking like a
+        confident "False" — do not remove this directive as an "optimization."
+      */}
+      <Card>
+        <TrueFalseView client:load question={protocols.toPublic()} mode="readonly" value={partlyMarkedAnswer} />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Three outcomes per statement, not two: judged correctly, judged wrongly, and abstained. The middle card
+        marked "tcp-order" right, "udp-guarantee" wrong, and left "http2-multiplex" unmarked, so it shows feedback
+        landing on the wrong statement <em>and</em> on the abstained one — mdq.spec includes abstentions in the
+        feedback deliberately, since a student who skipped a statement is who the explanation is for. The
+        abstained row renders muted, with neither a check nor an x, because the grading does not penalize it. The
+        last card grades the same answer with the key withheld, and shows no markers at all.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Flawless paper">
+          <TrueFalseView
+            client:load
+            question={protocols.toPublic()}
+            mode="review"
+            value={flawlessAnswer.answers}
+            result={flawlessResult}
+          />
+        </Card>
+        <Card title="Right, wrong, and abstained">
+          <TrueFalseView
+            client:load
+            question={protocols.toPublic()}
+            mode="review"
+            value={mixedAnswer.answers}
+            result={mixedResult}
+          />
+        </Card>
+        <Card title="Key withheld">
+          <TrueFalseView
+            client:load
+            question={protocols.toPublic()}
+            mode="review"
+            value={mixedAnswer.answers}
+            result={withheldTrueFalseResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="essay" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Essay</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        One textarea, shaped by the question's <code class="font-mono">input</code> field:{" "}
+        <code class="font-mono">text</code> accepts Markdown, <code class="font-mono">plain</code> does not, and{" "}
+        <code class="font-mono">code</code> gets a monospace box with spell-checking off and the{" "}
+        <code class="font-mono">highlight</code> language on a badge. There is no rich-text widget and no syntax
+        colouring inside the box; see <code class="font-mono">dev/specs/to-do/question-essay.md</code>, "Three
+        input kinds, two editors, and no rich-text widget".
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Rich text (empty)">
+          <EssayView client:load question={greenhouse.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Code">
+          <EssayView client:load question={areaFunction.toPublic()} mode="answer" value={codeAnswer} />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Unlike the other three views, this one does not freeze its control — it drops the textarea and renders the
+        submitted text instead. A disabled textarea would leave a long answer stranded behind a scrollbar the
+        student can no longer drag, which is the opposite of what a frozen view is for. Each <code
+          class="font-mono">input</code
+        > kind is displayed the way it was meant to be read: Markdown rendered, code in a code mockup, plain text
+        with its whitespace intact. An answer nobody wrote says so, rather than showing an empty box.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Rich text">
+          <EssayView client:load question={greenhouse.toPublic()} mode="readonly" value={greenhouseAnswer} />
+        </Card>
+        <Card title="Code">
+          <EssayView client:load question={areaFunction.toPublic()} mode="readonly" value={codeAnswer} />
+        </Card>
+        <Card title="Plain text, nothing submitted">
+          <EssayView client:load question={definition.toPublic()} mode="readonly" value="" />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Nothing here is marked right or wrong, because nothing in an essay can be: mdq.spec grades them manually.
+        The first card is what <code class="font-mono">score()</code> actually returns — a placeholder flagged{" "}
+        <code class="font-mono">pending</code>, badged "Awaiting grading" rather than "Score 0.00", since a human
+        who reads the essay and marks it worthless also scores 0. The second is an instructor's grade. The last
+        one is graded with the model answer withheld, which is the normal state while an exam is still open.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Awaiting grading">
+          <EssayView
+            client:load
+            question={greenhouse.toPublic()}
+            mode="review"
+            value={greenhouseAnswer}
+            result={ungradedResult}
+          />
+        </Card>
+        <Card title="Graded, with the model answer">
+          <EssayView
+            client:load
+            question={greenhouse.toPublic()}
+            mode="review"
+            value={greenhouseAnswer}
+            result={gradedResult}
+          />
+        </Card>
+        <Card title="Model answer withheld">
+          <EssayView
+            client:load
+            question={definition.toPublic()}
+            mode="review"
+            value="Doing it twice is the same as doing it once."
+            result={withheldEssayResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="numeric" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Numeric</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        One box, shaped by the question's <code class="font-mono">domain</code> — resolved by{" "}
+        <code class="font-mono">toPublic()</code>, so the view never reimplements mdq.spec's coercion table. An{" "}
+        <code class="font-mono">integer</code> or <code class="font-mono">decimal</code> question gets a number
+        input stepped by <code class="font-mono">decimalPlaces</code>; a <code class="font-mono">fraction</code>
+        {" "}question gets a text input, because a number input rejects <code class="font-mono">1/3</code> outright
+        and a domain nobody can type in is not a domain. <code class="font-mono">unit</code> is a label on the box
+        and nothing more — no unit conversion is performed.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Integer, with a unit">
+          <NumericView client:load question={water.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Decimal, two places">
+          <NumericView client:load question={pi.toPublic()} mode="answer" value={3.14} />
+        </Card>
+        <Card title="Fraction">
+          <NumericView client:load question={slope.toPublic()} mode="answer" />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        The input is kept and disabled, unlike the essay view which drops its textarea entirely. A disabled number
+        box shows its one value completely; a disabled textarea strands a long answer behind a scrollbar. The
+        value keeps its normal text color rather than being dimmed away.
+      </p>
+      <Card>
+        <NumericView client:load question={water.toPublic()} mode="readonly" value={998} />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Grading is binary: 998 g is inside the question's 5 g tolerance and scores 1, and 100 g scores 0. There is
+        no partial credit for being close — the tolerance is the only notion of closeness mdq.spec has. The check
+        and the x are read off <code class="font-mono">result.score</code>, not derived from the key, because the
+        tolerance that decides them is not public. They show even on the last card, where the expected value is
+        withheld: with one box and a score badge beside it, hiding the check would conceal nothing.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Inside the tolerance">
+          <NumericView client:load question={water.toPublic()} mode="review" value={998} result={acceptedResult} />
+        </Card>
+        <Card title="Outside it">
+          <NumericView client:load question={water.toPublic()} mode="review" value={100} result={rejectedResult} />
+        </Card>
+        <Card title="Expected value withheld">
+          <NumericView
+            client:load
+            question={water.toPublic()}
+            mode="review"
+            value={998}
+            result={withheldNumericResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="short-answer" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Short answer</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        One line of text. The patterns that decide the grade never reach the browser, but{" "}
+        <code class="font-mono">preAccept</code> and <code class="font-mono">preReject</code> do &mdash; mdq.spec
+        asks that a student be warned about an invalid submission <em>before</em> committing to it, and they
+        describe the shape of an answer rather than its content. Type <code class="font-mono">many</code> or{" "}
+        <code class="font-mono">0</code> into the second card to see it; the warning never blocks anything, and
+        plays no part in grading.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Plain">
+          <ShortAnswerView client:load question={capital.toPublic()} mode="answer" />
+        </Card>
+        <Card title="With pre-validation">
+          <ShortAnswerView client:load question={headcount.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Open ended">
+          <ShortAnswerView client:load question={openEnded.toPublic()} mode="answer" />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        The input is kept and disabled, as numeric does &mdash; a single line shows completely when frozen, and
+        only essay's textarea had a reason to be dropped.
+      </p>
+      <Card>
+        <ShortAnswerView client:load question={capital.toPublic()} mode="readonly" value="Brasília" />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Grading is binary, but how much of it is automatic is not. The first two cards are settled by the
+        question's own patterns, with the feedback of the first matching pattern that carries a message. The third
+        is the case that makes this type different: <code class="font-mono">isnan</code> writes its reject block
+        out and does not end it with a <code class="font-mono">*</code>, so a response matching neither list is
+        not something the question claims to know about &mdash; it badges "Awaiting grading" rather than "Score
+        0.00", and shows neither a check nor an x. Adding the wildcard back is how an author closes that off.
+        Regexes never appear under "Accepted answers": a grading rule is not an answer anyone can read.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Accepted">
+          <ShortAnswerView
+            client:load
+            question={capital.toPublic()}
+            mode="review"
+            value="brasília"
+            result={rightResult}
+          />
+        </Card>
+        <Card title="Rejected, with feedback">
+          <ShortAnswerView
+            client:load
+            question={capital.toPublic()}
+            mode="review"
+            value="Brasilia"
+            result={wrongResult}
+          />
+        </Card>
+        <Card title="Matched neither list">
+          <ShortAnswerView
+            client:load
+            question={isnan.toPublic()}
+            mode="review"
+            value="numpy.isnan"
+            result={unsettledResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="pending" class="scroll-mt-6">
+    <h2 class="mb-2 text-xl font-semibold">Not yet implemented</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">QuestionView</code> dispatches on <code class="font-mono">question.type</code>;
+      every type but one now has a renderer, and the last falls back to a named warning instead of a blank
+      space: {pendingTypes.join(", ")}.
+    </p>
+    {/*
+     * `QuestionViewProps` is a discriminated union, and TypeScript will not
+     * accept the `PublicQuestion` union against it — the stub is a type that
+     * has no arm at all, which is the point of the demo.
+     */}
+    <QuestionView {...({ question: fillInStub } as QuestionViewProps)} />
+  </section>
+  </div>
+  </div>
+</DesignLayout>
+
+<script>
+  // Marks the link for whichever section is currently on screen. `aria-current`
+  // rather than a class, because that is what the state actually is, and the
+  // stylesheet keys off it directly.
+  const links = new Map(
+    Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-section-link]")).map(
+      (link) => [link.dataset.sectionLink ?? "", link],
+    ),
+  );
+
+  const visible = new Set<string>();
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) visible.add(entry.target.id);
+        else visible.delete(entry.target.id);
+      }
+
+      highlight();
+    },
+    { rootMargin: "-10% 0px -70% 0px" },
+  );
+
+  function highlight() {
+    // The topmost section still on screen wins, so scrolling through a long
+    // section does not hand the highlight to the next one the moment its
+    // heading peeks in.
+    //
+    // At the very bottom of the document the last section wins outright: the
+    // page has stopped scrolling, so a short final section never reaches the
+    // observer's band and the highlight would otherwise stay stuck on the one
+    // above it — including right after someone clicked the last link.
+    const ids = Array.from(links.keys());
+    const atBottom =
+      window.scrollY + window.innerHeight >=
+      document.documentElement.scrollHeight - 2;
+    const current = atBottom ? ids[ids.length - 1] : ids.find((id) => visible.has(id));
+
+    for (const [id, link] of links) {
+      if (id === current) link.setAttribute("aria-current", "true");
+      else link.removeAttribute("aria-current");
+    }
+  }
+
+  for (const id of links.keys()) {
+    const section = document.getElementById(id);
+    if (section) observer.observe(section);
+  }
+
+  window.addEventListener("scroll", highlight, { passive: true });
+</script>

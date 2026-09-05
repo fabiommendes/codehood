@@ -29,6 +29,13 @@ const thisFile = fileURLToPath(import.meta.url);
  * rules -- which we do need, since `renderObjectLiteral` emits a flat
  * one-tab indent regardless of nesting depth and relies on Biome to reflow
  * long lines.
+ *
+ * `biome.json` disables the linter for the emitted file for the same reason,
+ * from the other side: a project-wide `biome check --write .` -- the command
+ * CLAUDE.md tells everyone to run -- would otherwise autofix the file into
+ * something this generator does not emit (`noUselessEscapeInRegex` rewriting
+ * `[\w.\-]` to `[\w.-]`, for one) and break the drift guard in
+ * `test/mdq-schemas.spec.ts`.
  */
 function formatWithBiome(source: string): string {
 	const biomeBin = path.join(rootDir, "node_modules", ".bin", "biome");
@@ -435,30 +442,47 @@ function compileObject(node: JsonObject, ctx: CompileCtx): string {
 	return renderObjectLiteral(properties, required, strict, ctx);
 }
 
-function compileOneOfEntries(branches: Json[], ctx: CompileCtx): DefEntry[] {
+/**
+ * One branch of a `oneOf`: either a `$ref` to a named schema, or a schema
+ * written inline.
+ *
+ * The distinction survives the compile because only an all-named union can
+ * become a `z.discriminatedUnion` — the discriminant is read off the entries.
+ */
+type OneOfBranch = { expr: string; entry?: DefEntry };
+
+function compileOneOfEntries(branches: Json[], ctx: CompileCtx): OneOfBranch[] {
 	return branches.map((branch, index) => {
-		const branchNode = requireObject(branch, `${ctx.label}[${index}]`);
-		assertKnownKeys(branchNode, ["$ref"], `${ctx.label}[${index}]`);
-		const ref = getString(branchNode, "$ref", `${ctx.label}[${index}]`);
+		const label = `${ctx.label}[${index}]`;
+		const branchNode = requireObject(branch, label);
+
+		// An inline branch is compiled where it stands. It has no name to
+		// reference, which is why it can never carry a discriminant.
+		if (!("$ref" in branchNode)) {
+			return { expr: compileNode(branchNode, { ...ctx, label }) };
+		}
+
+		assertKnownKeys(branchNode, ["$ref"], label);
+		const ref = getString(branchNode, "$ref", label);
 		const target = resolveRef(ref, ctx);
 		const entry = nodeToEntry.get(target);
 		if (!entry) {
 			throw new Error(
-				`$ref "${ref}" in ${ctx.label}[${index}] does not resolve to a registered named schema`,
+				`$ref "${ref}" in ${label} does not resolve to a registered named schema`,
 			);
 		}
 		ensureGenerated(entry);
 		ctx.currentEntry.deps.add(entry.name);
-		return entry;
+		return { expr: entry.schemaConstName, entry };
 	});
 }
 
-function buildUnionExpr(entries: DefEntry[]): string {
-	const names = entries.map((entry) => entry.schemaConstName);
-	if (entries.every((entry) => entry.hasTypeConst)) {
-		return `z.discriminatedUnion("type", [${names.join(", ")}])`;
+function buildUnionExpr(branches: OneOfBranch[]): string {
+	const exprs = branches.map((branch) => branch.expr);
+	if (branches.every((branch) => branch.entry?.hasTypeConst)) {
+		return `z.discriminatedUnion("type", [${exprs.join(", ")}])`;
 	}
-	return `z.union([${names.join(", ")}])`;
+	return `z.union([${exprs.join(", ")}])`;
 }
 
 function compileOneOf(node: JsonObject, ctx: CompileCtx): string {
@@ -694,7 +718,9 @@ function buildRootUnionEntry(
 		deps: new Set(entries.map((e) => e.name)),
 		hasTypeConst: false,
 	};
-	entry.bodyExpr = buildUnionExpr(entries);
+	entry.bodyExpr = buildUnionExpr(
+		entries.map((e) => ({ expr: e.schemaConstName, entry: e })),
+	);
 	entry.generated = true;
 	nameToEntry.set(name, entry);
 	emissionOrder.push(entry);
@@ -737,7 +763,18 @@ export function renderModule(schema: unknown): string {
 			hasTypeConst: false,
 		},
 	};
-	const rootEntries = compileOneOfEntries(root.oneOf, rootCtx);
+	// Every root branch has to be a named document type: the module exports one
+	// schema per branch, and an inline one would have no name to export under.
+	const rootEntries = compileOneOfEntries(root.oneOf, rootCtx).map(
+		(branch, index) => {
+			if (!branch.entry) {
+				throw new Error(
+					`Expected root.oneOf[${index}] to be a $ref to a named schema`,
+				);
+			}
+			return branch.entry;
+		},
+	);
 	const examEntry = rootEntries.find((entry) => entry.name === "Exam");
 	const questionEntries = rootEntries.filter((entry) => entry.name !== "Exam");
 	if (!examEntry) {

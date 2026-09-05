@@ -5,7 +5,12 @@
 //
 // Two modes, chosen by whether `name` is set:
 //   - Link mode (no `name`): each item needs an `href` — plain <a> tabs that
-//     navigate, exactly what AdminTabs needs.
+//     navigate, exactly what AdminTabs needs. The strip scrolls horizontally
+//     when the tabs outgrow it, and `overflow-y-hidden` is load-bearing: CSS
+//     promotes an `overflow-y` of `visible` to `auto` the moment the other
+//     axis is not `visible`, and the active tab's `-mb-px` puts its border one
+//     pixel below the box — enough for the browser to offer a vertical
+//     scrollbar for a strip with nothing to scroll.
 //   - Same-page mode (`name` set): each item's content goes in a slot named
 //     after its `key`. Renders one <input type="radio"> per tab (daisyUI's
 //     own `content: attr(aria-label)` trick supplies the visible label) and
@@ -68,7 +73,10 @@ const panelCss = name
 			<style set:html={panelCss} />
 		</div>
 	) : (
-		<div role="tablist" class="mb-8 flex gap-6 overflow-x-auto border-b border-base-300">
+		<div
+			role="tablist"
+			class="mb-8 flex gap-6 overflow-x-auto overflow-y-hidden border-b border-base-300"
+		>
 			{items.map((item) => (
 				<a
 					role="tab"

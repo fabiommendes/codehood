@@ -573,6 +573,42 @@ export const NumericSchema = z
 export type Numeric = z.infer<typeof NumericSchema>;
 
 /**
+ * A regular expression when delimited by `/`, an exact literal when enclosed in
+ * backticks, and a plain literal compared inexactly otherwise; a lone `*` is a
+ * wildcard matching every response.
+ */
+export const ShortAnswerPatternStringSchema = z.string().min(1).regex(/\S/);
+export type ShortAnswerPatternString = z.infer<
+	typeof ShortAnswerPatternStringSchema
+>;
+
+/**
+ * One answer pattern, written either as a bare string or as an object carrying
+ * feedback and comments alongside it.
+ */
+export const ShortAnswerPatternSchema = z.union([
+	ShortAnswerPatternStringSchema,
+	z
+		.object({
+			pattern: ShortAnswerPatternStringSchema,
+			/** Shown to the student whose response this pattern decided. */
+			feedback: z.string().optional(),
+			/** An author-facing note. Never shown to students. */
+			comment: z.string().optional(),
+		})
+		.strict(),
+]);
+export type ShortAnswerPattern = z.infer<typeof ShortAnswerPatternSchema>;
+
+/** A list of answer patterns, tried in the order written. */
+export const ShortAnswerPatternListSchema = z
+	.array(ShortAnswerPatternSchema)
+	.min(1);
+export type ShortAnswerPatternList = z.infer<
+	typeof ShortAnswerPatternListSchema
+>;
+
+/**
  * A question answered with a short piece of free text, graded by comparing the
  * response against a list of accepted answers or against a regular expression.
  * Extends the common question-base schema.
@@ -646,9 +682,9 @@ export const ShortAnswerSchema = z
 		type: z.literal("short-answer"),
 		/**
 		 * The list of accepted responses; a response is correct if it matches any
-		 * entry, after the normalization implied by `exact`. This is where the body's
-		 * answer text is stored -- either the single string written after
-		 * `[short-answer]:`, or the unordered list written below it.
+		 * entry. This is where the body's answer text is stored -- either the single
+		 * string written after `[short-answer]:`, or the unordered list written below
+		 * it.
 		 */
 		oneOf: z.array(z.string().min(1)).min(1).optional(),
 		/**
@@ -659,12 +695,31 @@ export const ShortAnswerSchema = z
 		 */
 		regex: z.string().min(1).optional(),
 		/**
-		 * If true, compare responses verbatim. If false (the default), comparison
-		 * ignores case, normalizes unicode letters, collapses runs of whitespace into
-		 * a single space, and strips leading and trailing whitespace. Defaults to
-		 * `false` when omitted.
+		 * Patterns matching a correct response. The canonical form of the
+		 * `[short-answer/accept]` block; a response is correct if it matches any
+		 * entry.
 		 */
-		exact: z.boolean().optional(),
+		accept: ShortAnswerPatternListSchema.optional(),
+		/**
+		 * Patterns matching a known incorrect response. The canonical form of the
+		 * `[short-answer/reject]` block. Rejecting never changes a score -- `accept`
+		 * decides that, and wins when both match -- so this list exists to attach
+		 * feedback to answers known to be wrong.
+		 */
+		reject: ShortAnswerPatternListSchema.optional(),
+		/**
+		 * Patterns a submission must match to be considered valid. A pre-submission
+		 * validator: systems should warn the student before accepting the answer.
+		 * Plays no part in grading.
+		 */
+		preAccept: ShortAnswerPatternListSchema.optional(),
+		/**
+		 * Patterns a submission must not match to be considered valid. Like
+		 * `preAccept`, a pre-submission validator that never affects a score. When a
+		 * response matches both, it is treated as rejected -- the opposite of the
+		 * `accept`/`reject` precedence used when grading.
+		 */
+		preReject: ShortAnswerPatternListSchema.optional(),
 		/**
 		 * If true, the question has no answer key and requires manual grading.
 		 * Inferred when the body declares no answer text. Defaults to `false` when
@@ -708,7 +763,7 @@ export const FillInShortAnswerBlankSchema = z
 		type: z.literal("short-answer"),
 		/**
 		 * The list of accepted responses; a response is correct if it matches any
-		 * entry, after the normalization implied by `exact`.
+		 * entry.
 		 */
 		oneOf: z.array(z.string().min(1)).min(1).optional(),
 		/**
@@ -716,11 +771,6 @@ export const FillInShortAnswerBlankSchema = z
 		 * match. Takes precedence over `oneOf`.
 		 */
 		regex: z.string().min(1).optional(),
-		/**
-		 * If true, compare responses verbatim; if false (the default), normalize case,
-		 * unicode letters, and whitespace first. Defaults to `false` when omitted.
-		 */
-		exact: z.boolean().optional(),
 	})
 	.strict();
 export type FillInShortAnswerBlank = z.infer<
@@ -740,7 +790,7 @@ export const FillInNumericBlankSchema = z
 		/** The unit (e.g., kg, m, lm, etc) of the expected answer. */
 		unit: z
 			.string()
-			.regex(/^[\w.-]+$/)
+			.regex(/^[\w.\-]+$/)
 			.optional(),
 		/** The domain/kind of number for the response. */
 		domain: z.enum(["integer", "decimal", "fraction"]).optional(),

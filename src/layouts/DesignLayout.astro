@@ -1,6 +1,7 @@
 ---
 import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
+import Tabs from "@/components/ui/Tabs.astro";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 		| "colors"
 		| "layouts"
 		| "elements"
+		| "questions"
 		| "forms";
 }
 
@@ -22,6 +24,7 @@ const tabs = [
 	{ key: "colors", label: "Colors", href: "/design/colors" },
 	{ key: "layouts", label: "Layouts", href: "/design/layouts" },
 	{ key: "elements", label: "Elements", href: "/design/elements" },
+	{ key: "questions", label: "Questions", href: "/design/questions" },
 	{ key: "forms", label: "Forms", href: "/design/forms" },
 ] as const;
 ---
@@ -39,16 +42,8 @@ const tabs = [
         <ThemeToggle />
       </div>
     </div>
-    <div class="mx-auto max-w-5xl px-4">
-      <div role="tablist" class="tabs tabs-lift">
-        {
-          tabs.map((tab) => (
-            <a role="tab" class:list={["tab", { "tab-active": tab.key === active }]} href={tab.href}>
-              {tab.label}
-            </a>
-          ))
-        }
-      </div>
+    <div class="mx-auto max-w-5xl px-4 [&_[role=tablist]]:mb-0">
+      <Tabs items={tabs} active={active} />
     </div>
   </div>
   <main class="mx-auto max-w-5xl px-4 py-10">
