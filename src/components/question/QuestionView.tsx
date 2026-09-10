@@ -3,6 +3,7 @@ import { Match, Switch } from "solid-js";
 import Alert from "@/components/ui/Alert";
 import type {
 	PublicEssay,
+	PublicFillIn,
 	PublicMultipleChoice,
 	PublicMultipleSelection,
 	PublicNumeric,
@@ -10,6 +11,7 @@ import type {
 	PublicTrueFalse,
 } from "@/mdq/public";
 import EssayView, { type EssayViewProps } from "./EssayView";
+import FillInView, { type FillInViewProps } from "./FillInView";
 import MultipleChoiceView, {
 	type MultipleChoiceViewProps,
 } from "./MultipleChoiceView";
@@ -36,7 +38,8 @@ export type QuestionViewProps =
 			MultipleSelectionViewProps,
 			"question"
 	  >)
-	| ({ question: PublicTrueFalse } & Omit<TrueFalseViewProps, "question">);
+	| ({ question: PublicTrueFalse } & Omit<TrueFalseViewProps, "question">)
+	| ({ question: PublicFillIn } & Omit<FillInViewProps, "question">);
 
 type EssayProps = Extract<QuestionViewProps, { question: PublicEssay }>;
 type NumericProps = Extract<QuestionViewProps, { question: PublicNumeric }>;
@@ -53,14 +56,17 @@ type SelectionProps = Extract<
 	{ question: PublicMultipleSelection }
 >;
 type TrueFalseProps = Extract<QuestionViewProps, { question: PublicTrueFalse }>;
+type FillInProps = Extract<QuestionViewProps, { question: PublicFillIn }>;
 
 /**
  * Dispatches on `question.type` to the component that renders it, so a page
  * showing a mix of question types does not need its own switch statement.
  *
- * Only `fill-in` has no renderer today. It falls back to a named "not yet
- * implemented" alert rather than a blank space, which keeps the dispatcher
- * honest about what it can grow into.
+ * Every type has a renderer now, so no well-typed caller can reach the
+ * fallback. It stays anyway: the union is a compile-time claim and the payload
+ * is a runtime fact, and a question stored before a type existed — or a client
+ * one version behind — is better served by a named warning than by a blank
+ * space.
  */
 export default function QuestionView(props: QuestionViewProps): JSX.Element {
 	return (
@@ -94,6 +100,9 @@ export default function QuestionView(props: QuestionViewProps): JSX.Element {
 			</Match>
 			<Match when={props.question.type === "true-false"}>
 				<TrueFalseView {...(props as TrueFalseProps)} />
+			</Match>
+			<Match when={props.question.type === "fill-in"}>
+				<FillInView {...(props as FillInProps)} />
 			</Match>
 		</Switch>
 	);

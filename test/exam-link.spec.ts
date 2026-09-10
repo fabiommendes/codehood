@@ -59,8 +59,8 @@ async function makeCourse(instructorUsername: string) {
 	return courseService.create(
 		{
 			disciplineSlug,
-			instructorUsername,
-			editionSlug,
+			instructor: instructorUsername,
+			edition: editionSlug,
 			startAt: new Date("2026-01-01"),
 			endAt: new Date("2026-05-01"),
 		},

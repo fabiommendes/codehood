@@ -31,11 +31,10 @@ export type {
 export type {
 	Course,
 	CourseCreate,
-	CourseEnrollInput,
+	CourseEnrollment as CourseEnrollInput,
 	CourseFilter,
 	CoursePK,
 	CourseRef,
-	CourseUnenrollInput,
 	CourseUpdate,
 } from "./services/course.service";
 export type {
@@ -62,13 +61,10 @@ export type {
 export type {
 	Invite,
 	InviteCreate,
-	InviteCreateResult,
 	InviteFilter,
-	InviteListItem,
 	InvitePK,
 	InviteTokenFilter,
 	InviteUpdate,
-	InviteWithCount,
 } from "./services/invite.service";
 export type {
 	Passphrase,

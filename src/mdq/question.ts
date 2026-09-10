@@ -7,6 +7,7 @@ import {
 	type Scored,
 	score,
 } from "./scoring";
+import { type QuestionProblem, validateQuestion } from "./validation";
 
 export type {
 	Answer,
@@ -14,6 +15,7 @@ export type {
 	QuestionResult,
 	QuestionType,
 } from "./scoring";
+export type { QuestionProblem } from "./validation";
 
 /**
  * The Question type.
@@ -27,6 +29,19 @@ export class Question<Q extends schema.Question> {
 	}
 
 	constructor(public readonly data: Q) {}
+
+	/**
+	 * Everything wrong with this question that its schema cannot express, or an
+	 * empty list when it is well formed.
+	 *
+	 * Call this before storing a question. The Zod schemas check one field at a
+	 * time, which is all JSON Schema can express; mdq.spec's rules *between*
+	 * fields — a fill-in stem and its blanks agreeing, for one — are checked
+	 * here, and a document that breaks one is a question nobody can answer.
+	 */
+	validate(): QuestionProblem[] {
+		return validateQuestion(this.data);
+	}
 
 	/**
 	 * Score the schema Question against the given answer.

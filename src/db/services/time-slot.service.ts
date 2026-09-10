@@ -12,7 +12,8 @@ import {
 	courseContentsVisibility,
 } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
+import type { FillUndefineds, Pretty } from "@/typing";
+import type { Brand } from "@/typing/branding";
 import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
@@ -40,11 +41,15 @@ export type TimeSlotPK = z.infer<typeof timeSlotPK>;
 export type TimeSlotUpdate = z.infer<typeof timeSlotUpdate>;
 export type TimeSlotRef = z.infer<typeof timeSlotRef>;
 
+type DbTimeSlot = Prisma.TimeSlotGetPayload<{
+	include: typeof timeSlotInclude;
+}>;
+
 /** The minimal course shape the write/read predicates need, loaded alongside every row. */
 const timeSlotInclude = {
 	course: {
 		select: {
-			instructor: { select: { id: true } },
+			instructor: { select: { id: true, username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
 				select: { userId: true },
@@ -52,33 +57,6 @@ const timeSlotInclude = {
 		},
 	},
 } satisfies Prisma.TimeSlotInclude;
-
-type DbTimeSlot = Prisma.TimeSlotGetPayload<{
-	include: typeof timeSlotInclude;
-}>;
-
-/** `durationMin > 0`, `startMin` in range, and the slot does not run past midnight. */
-function validateWindow(startMin: number, durationMin: number): void {
-	if (durationMin <= 0) {
-		throw new Error("A time slot's durationMin must be greater than zero.");
-	}
-	if (startMin < 0 || startMin > 1439) {
-		throw new Error("A time slot's startMin must be within 0..1439.");
-	}
-	if (startMin + durationMin > 1440) {
-		throw new Error("A time slot cannot run past midnight.");
-	}
-}
-
-/** Whether `[aStart, aStart+aDuration)` and `[bStart, bStart+bDuration)` intersect. */
-function minutesOverlap(
-	aStart: number,
-	aDuration: number,
-	bStart: number,
-	bDuration: number,
-): boolean {
-	return aStart < bStart + bDuration && bStart < aStart + aDuration;
-}
 
 class TimeSlotService
 	implements
@@ -181,9 +159,10 @@ class TimeSlotService
 		}
 
 		if (!row) return null;
-		if (!canViewCourseContents(opts.actor, row.course)) {
-			throw new NotAllowed({ action: "read-time-slot" });
-		}
+
+		const canViewCourse = !canViewCourseContents(opts.actor, row.course);
+		if (canViewCourse) throw new NotAllowed({ action: "read-time-slot" });
+
 		return toTimeSlot(row);
 	}
 
@@ -318,4 +297,27 @@ function toTimeSlot(row: DbTimeSlot): TimeSlot {
 		id: rest.id as TimeSlotId,
 		courseId: rest.courseId as CourseId,
 	};
+}
+
+/** `durationMin > 0`, `startMin` in range, and the slot does not run past midnight. */
+function validateWindow(startMin: number, durationMin: number): void {
+	if (durationMin <= 0) {
+		throw new Error("A time slot's durationMin must be greater than zero.");
+	}
+	if (startMin < 0 || startMin > 1439) {
+		throw new Error("A time slot's startMin must be within 0..1439.");
+	}
+	if (startMin + durationMin > 1440) {
+		throw new Error("A time slot cannot run past midnight.");
+	}
+}
+
+/** Whether `[aStart, aStart+aDuration)` and `[bStart, bStart+bDuration)` intersect. */
+function minutesOverlap(
+	aStart: number,
+	aDuration: number,
+	bStart: number,
+	bDuration: number,
+): boolean {
+	return aStart < bStart + bDuration && bStart < aStart + aDuration;
 }

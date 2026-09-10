@@ -43,8 +43,8 @@ export async function loadCourse(
 		course = await courseService.findOne(
 			{
 				ref: {
-					disciplineSlug,
-					username: parsed.username,
+					discipline: disciplineSlug,
+					instructor: parsed.instructor,
 					edition: parsed.edition,
 				},
 			},
@@ -67,8 +67,8 @@ export async function loadCourse(
 	return {
 		course,
 		href: courseHref({
-			disciplineSlug: course.disciplineSlug,
-			username: course.instructor.username,
+			discipline: course.disciplineSlug,
+			instructor: course.instructor.username,
 			edition: course.editionSlug,
 		}),
 	};

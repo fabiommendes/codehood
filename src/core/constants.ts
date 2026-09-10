@@ -2,7 +2,7 @@
  * Environment variables and configuration constants for the application.
  */
 
-import type { ArrayToUnion } from "../utils/types";
+import type { ArrayToUnion } from "@/typing";
 
 /**
  * Read environment variable as string with a default value.

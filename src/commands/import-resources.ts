@@ -52,7 +52,9 @@ export const importResourcesCommand = new Command("import-resources")
 			options: { prune?: boolean },
 		) => {
 			const course = await courseService.findOne(
-				{ ref: { disciplineSlug, username: instructor, edition } },
+				{
+					ref: { discipline: disciplineSlug, instructor: instructor, edition },
+				},
 				FULL_ACCESS,
 			);
 			if (!course) {

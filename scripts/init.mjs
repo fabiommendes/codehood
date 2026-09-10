@@ -53,6 +53,11 @@ if (existsSync(envPath)) {
 
 // 3. Database: client, schema, data.
 run("Generating Prisma client", "pnpm", ["exec", "prisma", "generate"]);
+run("Branding generated types", "pnpm", [
+	"exec",
+	"tsx",
+	"scripts/brand-generated-types.ts",
+]);
 run("Applying migrations", "pnpm", ["exec", "prisma", "migrate", "deploy"]);
 run("Seeding the database", "pnpm", ["exec", "prisma", "db", "seed"]);
 

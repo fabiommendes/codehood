@@ -9,17 +9,18 @@ import {
 	courseVisibility,
 } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
+import type { FillUndefineds } from "@/typing";
+import type { Brand } from "@/typing/branding";
 import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
 	courseCreate,
-	courseEnrollInput,
 	courseFilter,
 	coursePK,
 	type courseRef,
 	courseSchema,
 	courseUpdate,
+	createCourseEnrollment,
 	type UserId,
 	userSchema,
 } from "../../core/schemas";
@@ -37,9 +38,13 @@ export type Course = z.infer<typeof courseSchema>;
 export type CourseFilter = z.infer<typeof courseFilter>;
 export type CoursePK = z.infer<typeof coursePK>;
 export type CourseUpdate = z.infer<typeof courseUpdate>;
-export type CourseEnrollInput = z.infer<typeof courseEnrollInput>;
-export type CourseUnenrollInput = CourseEnrollInput;
+export type CourseEnrollment = z.infer<typeof createCourseEnrollment>;
 export type CourseRef = z.infer<typeof courseRef>;
+
+type DbCourse = Brand<
+	CourseId,
+	Prisma.CourseGetPayload<{ include: typeof courseInclude }>
+>;
 
 /**
  * What every returned course carries: its discipline and instructor (every
@@ -57,12 +62,7 @@ const courseInclude = {
 		where: { status: "ACTIVE" as const },
 		select: { userId: true, createdAt: true },
 	},
-	_count: {
-		select: { enrollments: { where: { status: "ACTIVE" as const } } },
-	},
 } satisfies Prisma.CourseInclude;
-
-type DbCourse = Prisma.CourseGetPayload<{ include: typeof courseInclude }>;
 
 class CourseService
 	implements
@@ -93,11 +93,11 @@ class CourseService
 	async create(input: CourseCreate, opts: ServiceOpts): Promise<Course> {
 		const client = opts.tx ?? this.prisma;
 		const edition = await client.edition.findUnique({
-			where: { slug: input.editionSlug },
+			where: { slug: input.edition },
 		});
 		if (!edition) {
 			throw new Error(
-				`No edition "${input.editionSlug}". Editions are created by an admin.`,
+				`No edition "${input.edition}". Editions are created by an admin.`,
 			);
 		}
 		if (!isEditionOpen(edition) && !canCreateCourseOutsideWindow(opts.actor)) {
@@ -106,10 +106,10 @@ class CourseService
 			);
 		}
 		const instructorUser = await client.user.findUnique({
-			where: { username: input.instructorUsername },
+			where: { username: input.instructor },
 		});
 		if (!instructorUser) {
-			throw new Error(`No user with username "${input.instructorUsername}".`);
+			throw new Error(`No user with username "${input.instructor}".`);
 		}
 		if (!canCreateCourseFor(opts.actor, instructorUser.id)) {
 			throw new NotAllowed({ action: "create-course" });
@@ -117,15 +117,15 @@ class CourseService
 		const row = await client.course.create({
 			data: {
 				disciplineSlug: input.disciplineSlug,
-				instructorSlug: input.instructorUsername,
-				editionSlug: input.editionSlug,
+				instructorSlug: input.instructor,
+				editionSlug: input.edition,
 				description: input.description,
 				startAt: input.startAt,
 				endAt: input.endAt,
 			},
 			include: courseInclude,
 		});
-		return toCourse(row);
+		return fromDb(row);
 	}
 
 	/**
@@ -141,6 +141,7 @@ class CourseService
 	})
 	async findOne(filter: CoursePK, opts: ServiceOpts): Promise<Course | null> {
 		const client = opts.tx ?? this.prisma;
+
 		let row: DbCourse | null = null;
 		const by = filter as FillUndefineds<CoursePK>; // zod doesn't narrow to a single field, so we do it here
 
@@ -153,8 +154,8 @@ class CourseService
 			row = await client.course.findUnique({
 				where: {
 					disciplineSlug_instructorSlug_editionSlug: {
-						disciplineSlug: by.ref.disciplineSlug,
-						instructorSlug: by.ref.username,
+						disciplineSlug: by.ref.discipline,
+						instructorSlug: by.ref.instructor,
 						editionSlug: by.ref.edition,
 					},
 				},
@@ -163,10 +164,11 @@ class CourseService
 		}
 
 		if (!row) return null;
-		if (!canViewCourse(opts.actor, row)) {
-			throw new NotAllowed({ action: "read-course" });
-		}
-		return toCourse(row);
+
+		const viewAllowed = canViewCourse(opts.actor, row);
+		if (!viewAllowed) throw new NotAllowed({ action: "read-course" });
+
+		return fromDb(row);
 	}
 
 	/**
@@ -200,7 +202,7 @@ class CourseService
 			include: courseInclude,
 			orderBy: { createdAt: "desc" },
 		});
-		return rows.map(toCourse);
+		return rows.map(fromDb);
 	}
 
 	/**
@@ -227,7 +229,7 @@ class CourseService
 			data: fields,
 			include: courseInclude,
 		});
-		return toCourse(row);
+		return fromDb(row);
 	}
 
 	/**
@@ -252,16 +254,18 @@ class CourseService
 	 * a student joins through a classroom invite, which enrolls them as
 	 * `SYSTEM` inside the invite-redemption transaction.
 	 */
-	@Validate({ service: true, args: [courseEnrollInput] })
-	async enroll(input: CourseEnrollInput, opts: ServiceOpts): Promise<void> {
+	@Validate({ service: true, args: [createCourseEnrollment] })
+	async enroll(input: CourseEnrollment, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
+
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
 			include: courseInclude,
 		});
-		if (!course || !canManageEnrollment(opts.actor, course)) {
-			throw new NotAllowed({ action: "do-course:enroll" });
-		}
+
+		const canEnroll = course && canManageEnrollment(opts.actor, course);
+		if (!canEnroll) throw new NotAllowed({ action: "do-course:enroll" });
+
 		await client.enrollment.upsert({
 			where: {
 				userId_courseId: { userId: input.userId, courseId: input.courseId },
@@ -279,16 +283,19 @@ class CourseService
 	 * student, or a student dropping themselves (FR-CRS-042) — idempotent,
 	 * so dropping an already-`DROPPED` enrollment is a no-op.
 	 */
-	@Validate({ service: true, args: [courseEnrollInput] })
-	async drop(input: CourseUnenrollInput, opts: ServiceOpts): Promise<void> {
+	@Validate({ service: true, args: [createCourseEnrollment] })
+	async drop(input: CourseEnrollment, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
+
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
 			include: courseInclude,
 		});
-		if (!course || !canDropEnrollment(opts.actor, course, input.userId)) {
-			throw new NotAllowed({ action: "do-course:drop" });
-		}
+
+		const canDrop =
+			course && canDropEnrollment(opts.actor, course, input.userId);
+		if (!canDrop) throw new NotAllowed({ action: "do-course:drop" });
+
 		await client.enrollment.updateMany({
 			where: { userId: input.userId, courseId: input.courseId },
 			data: { status: "DROPPED" },
@@ -308,23 +315,30 @@ class CourseService
 		returns: userSchema.extend({ enrolledAt: z.date() }).array(),
 	})
 	async listStudents(
-		courseId: number,
+		courseId: CourseId,
 		opts: ServiceOpts,
 	): Promise<(User & { enrolledAt: Date })[]> {
 		const client = opts.tx ?? this.prisma;
+
 		const course = await client.course.findUnique({
 			where: { id: courseId },
 			include: courseInclude,
 		});
-		if (!course || !canManageEnrollment(opts.actor, course)) {
-			throw new NotAllowed({ action: "read-course.students" });
-		}
-		const enrollments = await client.enrollment.findMany({
-			where: { courseId, status: "ACTIVE" },
-			include: { user: true },
-			orderBy: { createdAt: "asc" },
+
+		const canView = course && canManageEnrollment(opts.actor, course);
+		if (!canView) throw new NotAllowed({ action: "read-course.students" });
+
+		const studentIds = course.enrollments.map((e) => e.userId);
+		const studentToDate = new Map(
+			course.enrollments.map((e) => [e.userId, e.createdAt]),
+		);
+		const students = await client.user.findMany({
+			where: { id: { in: studentIds } },
 		});
-		return enrollments.map((e) => ({ ...e.user, enrolledAt: e.createdAt }));
+
+		return students.map((e) => {
+			return { ...e, enrolledAt: studentToDate.get(e.id) as Date };
+		});
 	}
 }
 
@@ -335,7 +349,7 @@ export const courseService = new CourseService();
 //
 
 // Convert a database course record (with its `courseInclude` relations) to the public-facing course type.
-function toCourse(row: DbCourse): Course {
+function fromDb(row: DbCourse): Course {
 	return {
 		...row,
 		id: row.id as CourseId,

@@ -9,35 +9,39 @@ extendZodWithOpenApi(z);
 // =============================================================================
 //                              Branding
 // =============================================================================
-const userId = z.number().brand("UserId");
-export type UserId = z.infer<typeof userId>;
 
-const apiKeyId = z.number().brand("ApiKeyId");
+const apiKeyId = z.number().int().brand("ApiKeyId");
 export type ApiKeyId = z.infer<typeof apiKeyId>;
 
-const courseId = z.number().brand("CourseId");
+const calendarEventId = z.number().int().brand("CalendarEventId");
+export type CalendarEventId = z.infer<typeof calendarEventId>;
+
+const courseId = z.number().int().brand("CourseId");
 export type CourseId = z.infer<typeof courseId>;
 
-const passphraseId = z.number().brand("PassphraseId");
-export type PassphraseId = z.infer<typeof passphraseId>;
+const examId = z.number().int().brand("ExamId");
+export type ExamId = z.infer<typeof examId>;
 
-const inviteId = z.number().brand("InviteId");
-export type InviteId = z.infer<typeof inviteId>;
-
-const fileId = z.number().brand("FileId");
+const fileId = z.number().int().brand("FileId");
 export type FileId = z.infer<typeof fileId>;
 
-const sessionId = z.number().brand("SessionId");
-export type SessionId = z.infer<typeof sessionId>;
+const inviteId = z.number().int().brand("InviteId");
+export type InviteId = z.infer<typeof inviteId>;
 
-const timeSlotId = z.number().brand("TimeSlotId");
-export type TimeSlotId = z.infer<typeof timeSlotId>;
+const passphraseId = z.number().int().brand("PassphraseId");
+export type PassphraseId = z.infer<typeof passphraseId>;
 
-const resourceId = z.number().brand("ResourceId");
+const resourceId = z.number().int().brand("ResourceId");
 export type ResourceId = z.infer<typeof resourceId>;
 
-const calendarEventId = z.number().brand("CalendarEventId");
-export type CalendarEventId = z.infer<typeof calendarEventId>;
+const sessionId = z.number().int().brand("SessionId");
+export type SessionId = z.infer<typeof sessionId>;
+
+const timeSlotId = z.number().int().brand("TimeSlotId");
+export type TimeSlotId = z.infer<typeof timeSlotId>;
+
+const userId = z.number().int().brand("UserId");
+export type UserId = z.infer<typeof userId>;
 
 // =============================================================================
 //                               Schemas
@@ -77,6 +81,7 @@ export const userSchema = z.object({
 	schoolId: z.string().optional(),
 	passwordHash: z.string(),
 });
+
 export const userCreate = userSchema
 	.omit({
 		id: true,
@@ -90,6 +95,7 @@ export const userCreate = userSchema
 		githubId: z.string().optional(),
 		schoolId: z.string().optional(),
 	});
+
 export const userUpdate = userSchema
 	.pick({
 		name: true,
@@ -99,15 +105,17 @@ export const userUpdate = userSchema
 	})
 	.partial()
 	.strict();
+
 export const userPK = z.union([
-	z.object({ publicId: z.string() }),
 	z.object({ id: userId }),
+	z.object({ publicId: z.string() }),
 	z.object({ email: z.email() }),
 	z.object({ username: z.string() }),
 	z.object({ githubId: z.string() }),
 	z.object({ schoolId: z.string() }),
 	z.object({ login: z.string() }), // email or username
 ]);
+
 export const userFilter = z.object({
 	usernames: z.array(z.string()).optional(),
 	take: z.number().int().min(1).max(100).optional(),
@@ -119,12 +127,14 @@ export const userFilter = z.object({
 export const apiKeySchema = z.object({
 	id: apiKeyId,
 	keyHash: z.string(),
-	token: z.string().optional(),
 	name: z.string().min(1),
 	kind: z.enum(["CLI", "BOT"]),
 	userId: userId,
 	lastUsedAt: z.date().nullable(),
 	createdAt: z.date(),
+
+	/** Token is only shown in the `create` response. Undefined in all other cases. */
+	token: z.string().optional(),
 });
 export const apiKeyCreate = apiKeySchema.pick({
 	name: true,
@@ -198,10 +208,17 @@ const courseInstructor = userSchema.pick({
 	username: true,
 	name: true,
 });
+
 const courseEnrollment = z.object({
 	userId: userId,
 	createdAt: z.date(),
 });
+
+export const createCourseEnrollment = z.object({
+	courseId: courseId,
+	userId: userId,
+});
+
 export const courseSchema = z.object({
 	id: courseId,
 	description: z.string().nullable(),
@@ -216,17 +233,18 @@ export const courseSchema = z.object({
 	edition: editionSchema,
 	instructor: courseInstructor,
 	enrollments: z.array(courseEnrollment),
-	_count: z.object({ enrollments: z.number() }),
 });
+
 export const courseCreate = z.object({
 	disciplineSlug: z.string().min(1),
-	// The instructor's `username`, not a numeric id — `Course.instructor` targets `User.username`.
-	instructorUsername: z.string().min(1),
-	editionSlug: z.string().min(1),
+	// The instructor's `username`
+	instructor: z.string().min(1),
+	edition: z.string().min(1),
 	description: z.string().optional(),
 	startAt: z.coerce.date(),
 	endAt: z.coerce.date(),
 });
+
 export const courseUpdate = z.object({
 	description: z.string().optional(),
 	startAt: z.coerce.date().optional(),
@@ -235,8 +253,8 @@ export const courseUpdate = z.object({
 
 // Identifies a course the way its URL does — see `src/utils/course-url.ts`.
 export const courseRef = z.object({
-	disciplineSlug: z.string(),
-	username: z.string(),
+	discipline: z.string(),
+	instructor: z.string(),
 	edition: z.string(),
 });
 
@@ -244,17 +262,14 @@ export const courseRef = z.object({
 // places that never carry the brand (coerced action input, another entity's
 // foreign key), the same reasoning as `apiKeyService.revoke`'s `id`.
 export const coursePK = z.union([
-	z.object({ id: z.number() }),
+	z.object({ id: courseId }),
 	z.object({ ref: courseRef }),
 ]);
+
 export const courseFilter = z.object({
 	instructorUsername: z.string().optional(),
 	disciplineSlug: z.string().optional(),
 	editionSlug: z.string().optional(),
-});
-export const courseEnrollInput = z.object({
-	courseId: z.number(),
-	userId: z.number(),
 });
 
 //
@@ -282,7 +297,7 @@ export const passphraseUpdate = z.object({
 });
 
 export const passphrasePK = z.union([
-	z.object({ id: z.number() }),
+	z.object({ id: passphraseId }),
 	z.object({ value: z.string() }),
 ]);
 
@@ -306,43 +321,26 @@ export const inviteSchema = z.object({
 	courseId: courseId.nullable(),
 	maxUses: z.number().nullable(),
 	expiresAt: z.date(),
+	redemptions: z.number().int(),
 	createdById: userId,
 	createdAt: z.date(),
+
+	// Only show once, when the invite is created
+	token: z.string().optional(),
 });
 
-// What `findOne`/`update` return: the row plus its redemption count.
-export const inviteWithCount = inviteSchema.extend({
-	_count: z.object({ redemptions: z.number() }),
-});
+export const inviteCreate = inviteSchema
+	.omit({
+		id: true,
+		tokenHash: true,
+		expiresAt: true,
+		createdAt: true,
+		redemptions: true,
+	})
+	.extend({ expiresInMs: z.number().int().optional() });
 
-// What `findMany` returns: the above, plus who created it.
-export const inviteListItem = inviteWithCount.extend({
-	createdBy: z.object({ username: z.string(), name: z.string() }),
-});
-
-export const inviteCreate = z.object({
-	kind: inviteSchema.shape.kind,
-	email: z.string().optional(),
-	role: userSchema.shape.role.optional(),
-	// Plain number, not the branded `courseId`/`userId` above: sourced from
-	// a coerced action input, the same reasoning as `coursePK`.
-	courseId: z.number().optional(),
-	maxUses: z.number().nullable().optional(),
-	createdById: z.number(),
-	expiresInMs: z.number().optional(),
-});
-
-export const inviteCreateResult = z.object({
-	token: z.string(),
-	invite: inviteSchema,
-});
-
-// `findOne` looks up by token — the credential itself, not a database id.
 export const inviteTokenFilter = z.object({ token: z.string().min(1) });
-
-// `update`/`delete` key on the numeric id, sourced from a coerced action
-// input — plain, not the branded `inviteId`.
-export const invitePK = z.object({ id: z.number() });
+export const invitePK = z.object({ id: inviteId });
 
 export const inviteFilter = z.object({
 	createdById: z.number().optional(),
@@ -451,7 +449,7 @@ export const timeSlotSchema = z.object({
 });
 
 export const timeSlotCreate = z.object({
-	courseId: z.number(),
+	courseId: courseId,
 	slug: z.string().min(1),
 	title: z.string().optional(),
 	day: weekdaySchema,
@@ -474,7 +472,7 @@ export const timeSlotRef = z.object({
 });
 
 export const timeSlotPK = z.union([
-	z.object({ id: z.number() }),
+	z.object({ id: timeSlotId }),
 	z.object({ ref: timeSlotRef }),
 ]);
 
@@ -508,7 +506,7 @@ export const resourceSchema = z.object({
 });
 
 export const resourceCreate = z.object({
-	courseId: z.number(),
+	courseId: courseId,
 	slug: z.string().min(1),
 	type: resourceTypeSchema,
 	title: z.string().min(1),
@@ -537,7 +535,7 @@ export const resourceRef = z.object({
 });
 
 export const resourcePK = z.union([
-	z.object({ id: z.number() }),
+	z.object({ id: resourceId }),
 	z.object({ ref: resourceRef }),
 ]);
 
@@ -566,7 +564,7 @@ export const eventKindSchema = z.enum([
 // The linked exam's public summary — never the full `Exam` row, and never
 // present at all unless {@link maskExam} decides `actor` may see it.
 export const linkedExamSchema = z.object({
-	id: z.number(),
+	id: examId,
 	slug: z.string(),
 	title: z.string(),
 });
@@ -579,12 +577,10 @@ export const calendarEventSchema = z.object({
 	slug: z.string().min(1),
 	startAt: z.date(),
 	durationMin: z.number().int(),
-	// Authored, never derived (FR-CAL-015).
 	week: z.number().int(),
 	kind: eventKindSchema,
 	title: z.string().min(1),
 	description: z.string().nullable(),
-	// Derived, never authored: the exam whose window overlaps this one.
 	examId: z.number().nullable(),
 	// Supplied by the writer, opaque to the server. See the manifest decision.
 	contentHash: z.string(),
@@ -594,21 +590,17 @@ export const calendarEventSchema = z.object({
 	exam: linkedExamSchema.nullable(),
 });
 
-export const calendarEventCreate = z.object({
+export const calendarEventCreate = calendarEventSchema
+	.omit({ id: true, createdAt: true, updatedAt: true, exam: true })
+	.extend({
+		// The calendar day this event happens, `YYYY-MM-DD`, in the server zone.
+		date: z.date(),
+		// Minutes since 00:00; defaults to the slot's `startMin` when omitted.
+		startMin: z.number().int(),
+	});
+
+z.object({
 	courseId: z.number(),
-	timeSlotId: z.number(),
-	slug: z.string().min(1),
-	// The calendar day this event happens, `YYYY-MM-DD`, in the server zone.
-	date: z.string().min(1),
-	// Minutes since 00:00; defaults to the slot's `startMin` when omitted.
-	startMin: z.number().int().optional(),
-	// Defaults to the slot's `durationMin` when omitted.
-	durationMin: z.number().int().optional(),
-	week: z.number().int(),
-	kind: eventKindSchema.optional(),
-	title: z.string().min(1),
-	description: z.string().optional(),
-	contentHash: z.string().min(1),
 });
 
 // `slug`, `courseId`, and `timeSlotId` are deliberately absent: moving an
@@ -627,12 +619,12 @@ export const calendarEventUpdate = z.object({
 });
 
 export const calendarEventRef = z.object({
-	courseId: z.number(),
+	courseId: courseId,
 	slug: z.string(),
 });
 
 export const calendarEventPK = z.union([
-	z.object({ id: z.number() }),
+	z.object({ id: calendarEventId }),
 	z.object({ ref: calendarEventRef }),
 ]);
 

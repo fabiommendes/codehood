@@ -22,7 +22,7 @@ const REFERENCE = /\[\^([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*)\]/g;
  * switched on a stem parsed from rendered HTML would come apart. The cost is
  * that Markdown cannot span a blank — `**bold [^x] bold**` is two fragments
  * with unbalanced delimiters — which
- * `dev/specs/to-do/question-fill-in.md` declares unsupported, as mdq.spec's own
+ * `dev/specs/to-review/question-fill-in.md` declares unsupported, as mdq.spec's own
  * grammar reads it.
  */
 export function parseFillInStem(stem: string): FillInSegment[] {

@@ -1,7 +1,7 @@
 import { type Actor, SYSTEM } from "@/core/actor";
 import type { Prisma, Role } from "@/db/client";
-import type { User } from "@/db/services/user.service";
-import type { Impl } from "@/utils/types";
+import type { User, UserId } from "@/db/services/user.service";
+import type { Impl } from "@/typing";
 
 const ROLE_RANK: Record<Role, number> = {
 	STUDENT: 0,
@@ -135,8 +135,8 @@ export function canCreateCourseFor(
  * import these predicates without a cycle.
  */
 export interface CourseWithEnrollment {
-	instructor: { id: number };
-	enrollments: { userId: number }[];
+	instructor: { id: UserId; username: string };
+	enrollments: { userId: UserId }[];
 }
 
 /**
@@ -256,7 +256,7 @@ export function canDropEnrollment(
  * this predicate without a cycle.
  */
 export interface InviteWithCreator {
-	createdById: number;
+	createdById: UserId;
 }
 
 /**

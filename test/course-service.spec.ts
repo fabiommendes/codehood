@@ -55,8 +55,8 @@ async function makeCourse(instructorUsername: string, disciplineSlug?: string) {
 	return courseService.create(
 		{
 			disciplineSlug: disciplineSlug ?? (await makeDiscipline()),
-			instructorUsername,
-			editionSlug: "2026-1",
+			instructor: instructorUsername,
+			edition: "2026-1",
 			startAt: new Date("2026-01-01"),
 			endAt: new Date("2026-05-01"),
 		},
@@ -71,8 +71,8 @@ test("create() rejects an edition that does not exist", async () => {
 		courseService.create(
 			{
 				disciplineSlug,
-				instructorUsername: instructor.username,
-				editionSlug: "2099-1",
+				instructor: instructor.username,
+				edition: "2099-1",
 				startAt: new Date(),
 				endAt: new Date(),
 			},
@@ -88,8 +88,8 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 	await courseService.create(
 		{
 			disciplineSlug,
-			instructorUsername: instructor.username,
-			editionSlug: "2026-1",
+			instructor: instructor.username,
+			edition: "2026-1",
 			startAt: new Date(),
 			endAt: new Date(),
 		},
@@ -99,8 +99,8 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 		courseService.create(
 			{
 				disciplineSlug,
-				instructorUsername: instructor.username,
-				editionSlug: "2026-1",
+				instructor: instructor.username,
+				edition: "2026-1",
 				startAt: new Date(),
 				endAt: new Date(),
 			},
@@ -120,8 +120,8 @@ test("create() rejects an instructor naming a different instructor, and allows a
 		courseService.create(
 			{
 				disciplineSlug,
-				instructorUsername: instructorB.username,
-				editionSlug: "2026-1",
+				instructor: instructorB.username,
+				edition: "2026-1",
 				startAt: new Date(),
 				endAt: new Date(),
 			},
@@ -132,8 +132,8 @@ test("create() rejects an instructor naming a different instructor, and allows a
 	const course = await courseService.create(
 		{
 			disciplineSlug,
-			instructorUsername: instructorB.username,
-			editionSlug: "2026-1",
+			instructor: instructorB.username,
+			edition: "2026-1",
 			startAt: new Date(),
 			endAt: new Date(),
 		},

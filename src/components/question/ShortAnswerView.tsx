@@ -18,6 +18,7 @@ import {
 	scoreBadge,
 	scoreLabel,
 } from "./scoreDisplay";
+import TextInput from "./TextInput";
 import type { QuestionMode } from "./types";
 
 export interface ShortAnswerViewProps {
@@ -98,16 +99,14 @@ export default function ShortAnswerView(
 
 			<div class="flex flex-col gap-2">
 				<div class="flex flex-wrap items-center gap-3">
-					<input
+					<TextInput
 						id={inputId}
-						type="text"
-						class="input w-full max-w-sm disabled:text-base-content"
-						placeholder="Your answer"
-						disabled={mode() !== "answer"}
+						class="w-full max-w-sm"
 						value={text()}
-						onInput={(event) => edit(event.currentTarget.value)}
-						aria-label="Your answer"
-						aria-describedby={
+						onChange={edit}
+						disabled={mode() !== "answer"}
+						ariaLabel="Your answer"
+						ariaDescribedBy={
 							warning()
 								? warningId
 								: props.result?.feedback

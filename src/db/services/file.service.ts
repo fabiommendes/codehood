@@ -5,8 +5,6 @@ import type { z } from "zod";
 import { SYSTEM } from "@/core/actor";
 import { RESOURCE_ROOT } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
-import { Validate } from "@/utils/validate";
 import {
 	type FileId,
 	fileCreate,
@@ -14,11 +12,13 @@ import {
 	filePK,
 	fileSchema,
 	fileUpdate,
-} from "../../core/schemas";
+} from "@/core/schemas";
+import type { FillUndefineds } from "@/typing";
+import { Validate } from "@/utils/validate";
 import type { Crud, ServiceOpts } from "../base-service";
 import { type File as DbFile, type PrismaClient, prisma } from "../client";
 
-export type { FileId } from "../../core/schemas";
+export type { FileId } from "@/core/schemas";
 
 //
 // Type definitions
@@ -29,22 +29,9 @@ export type FileFilter = z.infer<typeof fileFilter>;
 export type FilePK = z.infer<typeof filePK>;
 export type FileUpdate = z.infer<typeof fileUpdate>;
 
-/** Filesystem path a blob is stored at: `<RESOURCE_ROOT>/<hash[0:2]>/<hash>`. */
-export function blobPath(slugHash: string): string {
-	return path.join(RESOURCE_ROOT, slugHash.slice(0, 2), slugHash);
-}
-
 /**
  * Blob storage, content-addressed by a sha-256 of the bytes (`slugHash`),
- * which doubles as both the URL token and the on-disk path — see "Files are
- * content-addressed" in `dev/specs/to-do/resources.md`.
- *
- * Nothing here is reachable from the web app: content is only ever written
- * by `manage import-resources`, so every write requires `SYSTEM` — there is
- * no rule to apply on behalf of a signed-in user, because there is no path
- * by which one calls this directly. Reads carry no rule either, matching
- * the blob route, which serves bytes with no authentication check by
- * design.
+ * which doubles as both the URL token and the on-disk path.
  */
 class FileService
 	implements
@@ -177,9 +164,9 @@ class FileService
 
 	/**
 	 * Reference-counted: unlinks the bytes and stamps `deletedAt` only when
-	 * no `Resource` still points at this file (content addressing means
-	 * more than one course may share it — see "Files are content-addressed"
-	 * in `dev/specs/to-do/resources.md`).
+	 * no `Resource` still points at this file.
+	 *
+	 * Content addressing means more than one course may share it.
 	 *
 	 * The row and its `slugHash` always survive, so the blob route can
 	 * answer `410` instead of `404`. A file still referenced is left
@@ -188,6 +175,8 @@ class FileService
 	 */
 	@Validate({ service: true, args: [filePK] })
 	async delete(filter: FilePK, opts: ServiceOpts): Promise<void> {
+		const client = opts.tx ?? this.prisma;
+
 		if (opts.actor !== SYSTEM) {
 			throw new NotAllowed({ action: "delete-file" });
 		}
@@ -195,7 +184,6 @@ class FileService
 		if (!target || target.deletedAt) {
 			return;
 		}
-		const client = opts.tx ?? this.prisma;
 		const current = await client.file.findUnique({
 			where: { slugHash: target.slugHash },
 			include: { _count: { select: { resources: true } } },
@@ -260,4 +248,9 @@ export const fileService = new FileService();
 // the right value, just not the branded type.
 function brand<T extends { id: number }>(file: T): T & { id: FileId } {
 	return file as T & { id: FileId };
+}
+
+/** Filesystem path a blob is stored at: `<RESOURCE_ROOT>/<hash[0:2]>/<hash>`. */
+export function blobPath(slugHash: string): string {
+	return path.join(RESOURCE_ROOT, slugHash.slice(0, 2), slugHash);
 }

@@ -217,26 +217,29 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 
 /**
  * Thrown when a resource is not found.
+ *
+ * ```typescript
+ *
+ * throw new NotFound("user", { id: userId })
+ * ```
  */
 export class NotFound extends BaseSerializableError<NotFoundResponse> {
 	readonly code = "not-found";
 	readonly status: 404 = 404;
 	readonly id: string | number;
 	readonly context?: string;
+	// TODO: define ResourceType enum
 	readonly resource: string;
 
-	constructor(args: {
-		resource: string;
-		message?: string;
-		id?: string | number;
-		context?: string;
-	}) {
-		const {
-			resource,
-			message = "Resource not found",
-			id = "unknown",
-			context,
-		} = args;
+	constructor(
+		resource: string,
+		args: {
+			message?: string;
+			id?: string | number;
+			context?: string;
+		},
+	) {
+		const { message = "Resource not found", id = "unknown", context } = args;
 		super(message, "not-found", 404);
 		this.resource = resource;
 		this.id = id;

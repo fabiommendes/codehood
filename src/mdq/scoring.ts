@@ -447,7 +447,7 @@ export function gradeBlank(
  *
  * mdq.spec writes fill-in's grading in multiple-selection's vocabulary ("each
  * correct blank *ticked*"), which no numeric or short-answer blank has. Read
- * here, and argued in `dev/specs/to-do/question-fill-in.md`, as: an empty blank
+ * here, and argued in `dev/specs/to-review/question-fill-in.md`, as: an empty blank
  * is the unticked one, and a filled blank is right or wrong. `all-or-nothing`
  * counts an empty blank as a mistake, which is what fill-in's prose says and
  * where it differs from true/false's.
@@ -462,8 +462,7 @@ function fillInScore(
 	if (grades.length === 0) return 0;
 
 	const total = (contribution: (grade: BlankGrade) => number): number =>
-		grades.reduce((sum, grade) => sum + contribution(grade), 0) /
-		grades.length;
+		grades.reduce((sum, grade) => sum + contribution(grade), 0) / grades.length;
 
 	switch (strategy) {
 		case "partial":

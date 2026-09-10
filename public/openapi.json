@@ -167,7 +167,7 @@
                     ]
                   },
                   "userId": {
-                    "type": "number"
+                    "type": "integer"
                   }
                 },
                 "required": [
@@ -188,12 +188,9 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "keyHash": {
-                      "type": "string"
-                    },
-                    "token": {
                       "type": "string"
                     },
                     "name": {
@@ -208,7 +205,7 @@
                       ]
                     },
                     "userId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "lastUsedAt": {
                       "type": "string",
@@ -218,6 +215,9 @@
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "token": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -244,7 +244,7 @@
         "parameters": [
           {
             "schema": {
-              "type": "number"
+              "type": "integer"
             },
             "required": true,
             "name": "userId",
@@ -262,12 +262,9 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "keyHash": {
-                        "type": "string"
-                      },
-                      "token": {
                         "type": "string"
                       },
                       "name": {
@@ -282,7 +279,7 @@
                         ]
                       },
                       "userId": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "lastUsedAt": {
                         "type": "string",
@@ -292,6 +289,9 @@
                       "createdAt": {
                         "type": "string",
                         "format": "date-time"
+                      },
+                      "token": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -327,12 +327,9 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "keyHash": {
-                      "type": "string"
-                    },
-                    "token": {
                       "type": "string"
                     },
                     "name": {
@@ -347,7 +344,7 @@
                       ]
                     },
                     "userId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "lastUsedAt": {
                       "type": "string",
@@ -357,6 +354,9 @@
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "token": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -398,12 +398,9 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "keyHash": {
-                      "type": "string"
-                    },
-                    "token": {
                       "type": "string"
                     },
                     "name": {
@@ -418,7 +415,7 @@
                       ]
                     },
                     "userId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "lastUsedAt": {
                       "type": "string",
@@ -428,6 +425,9 @@
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "token": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -550,13 +550,13 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "timeSlotId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -614,10 +614,10 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "courseId": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "slug": {
                           "type": "string",
@@ -803,13 +803,13 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "courseId": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "timeSlotId": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "slug": {
                         "type": "string",
@@ -867,10 +867,10 @@
                         "type": "object",
                         "properties": {
                           "id": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "courseId": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "slug": {
                             "type": "string",
@@ -982,13 +982,13 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "timeSlotId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -1046,10 +1046,10 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "courseId": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "slug": {
                           "type": "string",
@@ -1205,13 +1205,13 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "timeSlotId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -1269,10 +1269,10 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "courseId": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "slug": {
                           "type": "string",
@@ -1403,11 +1403,11 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "instructorUsername": {
+                  "instructor": {
                     "type": "string",
                     "minLength": 1
                   },
-                  "editionSlug": {
+                  "edition": {
                     "type": "string",
                     "minLength": 1
                   },
@@ -1427,8 +1427,8 @@
                 },
                 "required": [
                   "disciplineSlug",
-                  "instructorUsername",
-                  "editionSlug",
+                  "instructor",
+                  "edition",
                   "startAt",
                   "endAt"
                 ]
@@ -1445,7 +1445,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "description": {
                       "type": "string",
@@ -1537,7 +1537,7 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "publicId": {
                           "type": "string",
@@ -1565,7 +1565,7 @@
                         "type": "object",
                         "properties": {
                           "userId": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "createdAt": {
                             "type": "string",
@@ -1655,7 +1655,7 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "description": {
                         "type": "string",
@@ -1747,7 +1747,7 @@
                         "type": "object",
                         "properties": {
                           "id": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "publicId": {
                             "type": "string",
@@ -1775,7 +1775,7 @@
                           "type": "object",
                           "properties": {
                             "userId": {
-                              "type": "number"
+                              "type": "integer"
                             },
                             "createdAt": {
                               "type": "string",
@@ -1840,7 +1840,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "description": {
                       "type": "string",
@@ -1932,7 +1932,7 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "publicId": {
                           "type": "string",
@@ -1960,7 +1960,7 @@
                         "type": "object",
                         "properties": {
                           "userId": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "createdAt": {
                             "type": "string",
@@ -2046,7 +2046,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "description": {
                       "type": "string",
@@ -2138,7 +2138,7 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "publicId": {
                           "type": "string",
@@ -2166,7 +2166,7 @@
                         "type": "object",
                         "properties": {
                           "userId": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "createdAt": {
                             "type": "string",
@@ -2817,7 +2817,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slugHash": {
                       "type": "string"
@@ -2864,7 +2864,7 @@
             "schema": {
               "type": "array",
               "items": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": false,
@@ -2894,7 +2894,7 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "slugHash": {
                         "type": "string"
@@ -2948,7 +2948,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slugHash": {
                       "type": "string"
@@ -3017,7 +3017,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slugHash": {
                       "type": "string"
@@ -3143,7 +3143,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "type": {
                       "type": "string",
@@ -3155,7 +3155,7 @@
                       ]
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -3178,7 +3178,7 @@
                       "nullable": true
                     },
                     "fileId": {
-                      "type": "number",
+                      "type": "integer",
                       "nullable": true
                     },
                     "file": {
@@ -3186,7 +3186,7 @@
                       "nullable": true,
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "slugHash": {
                           "type": "string"
@@ -3305,7 +3305,7 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "type": {
                         "type": "string",
@@ -3317,7 +3317,7 @@
                         ]
                       },
                       "courseId": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "slug": {
                         "type": "string",
@@ -3340,7 +3340,7 @@
                         "nullable": true
                       },
                       "fileId": {
-                        "type": "number",
+                        "type": "integer",
                         "nullable": true
                       },
                       "file": {
@@ -3348,7 +3348,7 @@
                         "nullable": true,
                         "properties": {
                           "id": {
-                            "type": "number"
+                            "type": "integer"
                           },
                           "slugHash": {
                             "type": "string"
@@ -3430,7 +3430,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "type": {
                       "type": "string",
@@ -3442,7 +3442,7 @@
                       ]
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -3465,7 +3465,7 @@
                       "nullable": true
                     },
                     "fileId": {
-                      "type": "number",
+                      "type": "integer",
                       "nullable": true
                     },
                     "file": {
@@ -3473,7 +3473,7 @@
                       "nullable": true,
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "slugHash": {
                           "type": "string"
@@ -3590,7 +3590,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "type": {
                       "type": "string",
@@ -3602,7 +3602,7 @@
                       ]
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -3625,7 +3625,7 @@
                       "nullable": true
                     },
                     "fileId": {
-                      "type": "number",
+                      "type": "integer",
                       "nullable": true
                     },
                     "file": {
@@ -3633,7 +3633,7 @@
                       "nullable": true,
                       "properties": {
                         "id": {
-                          "type": "number"
+                          "type": "integer"
                         },
                         "slugHash": {
                           "type": "string"
@@ -3779,10 +3779,10 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -3863,10 +3863,10 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "courseId": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "slug": {
                         "type": "string",
@@ -3938,10 +3938,10 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -4043,10 +4043,10 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "courseId": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "slug": {
                       "type": "string",
@@ -4184,7 +4184,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "publicId": {
                       "type": "string",
@@ -4275,7 +4275,7 @@
                     "type": "object",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "type": "integer"
                       },
                       "publicId": {
                         "type": "string",
@@ -4344,7 +4344,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "publicId": {
                       "type": "string",
@@ -4436,7 +4436,7 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "number"
+                      "type": "integer"
                     },
                     "publicId": {
                       "type": "string",

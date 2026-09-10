@@ -5,8 +5,8 @@
  */
 
 export interface CourseRef {
-	disciplineSlug: string;
-	username: string;
+	discipline: string;
+	instructor: string;
 	edition: string;
 }
 
@@ -61,22 +61,22 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
 
 /** Builds `/<discipline-slug>/<username>_<edition>` for a course. */
 export function courseHref(ref: CourseRef): string {
-	return `/${ref.disciplineSlug}/${ref.username}_${ref.edition}`;
+	return `/${ref.discipline}/${ref.instructor}_${ref.edition}`;
 }
 
 /**
  * Splits a course URL segment (`<username>_<edition>`) at its last
- * underscore — editions never contain one, so this stays correct even if
- * usernames ever do. Returns `null` for a malformed segment, which callers
- * should treat as a 404, not a 400.
+ * underscore.
+ *
+ * Returns `null` for a malformed segment.
  */
 export function parseCourseSegment(
 	segment: string,
-): { username: string; edition: string } | null {
+): { instructor: string; edition: string } | null {
 	const i = segment.lastIndexOf("_");
 	if (i < 0) return null;
 	const username = segment.slice(0, i);
 	const edition = segment.slice(i + 1);
 	if (!username || !EDITION_RE.test(edition)) return null;
-	return { username, edition };
+	return { instructor: username, edition };
 }

@@ -61,8 +61,8 @@ export const createCourseCommand = new Command("create-course")
 				const course = await courseService.create(
 					{
 						disciplineSlug,
-						instructorUsername: instructor,
-						editionSlug: edition,
+						instructor: instructor,
+						edition: edition,
 						description: description || undefined,
 						startAt,
 						endAt,

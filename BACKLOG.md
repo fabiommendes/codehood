@@ -11,6 +11,29 @@ Backlog items are categorized in sections, not on priority.
 
 None now!
 
+## UI issues
+
+* [ ] In the /design/questions page, the floating navbar should float to the left
+  of the main container. It should not share the same horizontal space as the content.
+* [ ] /courses and /getting-started use a different container than the other
+  pages and have more horizontal space than it should. Make it consistent and
+  make all pages share the same source of truth.
+* [ ] There are some title patterns that re-appear somewhat inconsistently
+  across different pages. Standardize the title patterns to a single component.
+  It has a subtitle above the main title. The main title and an optional subtitle below it.
+  The upper subtitle have two modes:
+  - Mode 1: blue subtitle with the BrandSquares.
+  - Mode 2: it is a badge.
+* [ ] Profile page should add the option to upload a profile picture.
+
+
+## Architecture
+
+* [ ] Make a mechanism to declare astro actions similar to the CRUD function that register routes for RESTful APIs.
+* [ ] Add support for RPC since rest cant handle everything.
+* [ ] Check options for RPC UI. Use openapi? Is there a better alternative? Is gRPC too much trouble?
+
+
 ## Features
 
 * [ ] The Essay question should use a rich text editor component for better
@@ -20,7 +43,6 @@ None now!
 * [ ] The Essay question should support a code editor textarea for code
   questions. I lean towards using Monaco, but we should evaluate pros and cons
   before making a final decision.
-
 
 
 ## Maintainability
@@ -53,11 +75,13 @@ None now!
 
 * Implement email providers with plugins. 
 
+
 ## Auth
 
 * E-mail password reset flow.
 * OAuth2 login.
 * 2FA (TOTP) for instructors and admins.
+
 
 ## Localization
 
@@ -68,6 +92,7 @@ None now!
   and the locale is a server-wide setting, not per user. Deferred deliberately:
   doing it late costs a sweep over the strings, doing it now costs it on every
   screen before the screens are settled.
+
 
 ## Questions and exams
 

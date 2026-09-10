@@ -2,7 +2,7 @@ import type { z } from "zod";
 import { canManageSessions } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
+import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
 	type SessionId,

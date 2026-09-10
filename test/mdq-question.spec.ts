@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { parseFillInStem } from "@/mdq/fill-in";
 import { parseNumericInput } from "@/mdq/numeric";
 import { Question } from "@/mdq/question";
-import { parseFillInStem } from "@/mdq/fill-in";
 import type {
 	Essay,
 	FillIn,
@@ -93,15 +93,6 @@ test.describe("score", () => {
 
 	test("an unknown choice id is worth nothing, and does not throw", () => {
 		expect(capital.score({ choice: "atlantis" })).toEqual({ score: 0 });
-	});
-
-	test("an unimplemented question type names the missing function", () => {
-		const fillIn = new Question({
-			type: "fill-in",
-			stem: "The capital of Brazil is [^capital].",
-		} as never);
-
-		expect(() => fillIn.score({ blanks: {} } as never)).toThrow(/fill-in/);
 	});
 });
 
@@ -1162,14 +1153,85 @@ test.describe("fill-in stem parsing", () => {
 	});
 });
 
+test.describe("question validation", () => {
+	/** The problem codes a question reports, which is what a caller branches on. */
+	function codes(question: Question<FillIn>): string[] {
+		return question.validate().map((problem) => problem.code);
+	}
+
+	test("a well-formed question reports nothing", () => {
+		expect(brasilia().validate()).toEqual([]);
+	});
+
+	test("the types with no cross-field rules always pass", () => {
+		expect(capital.validate()).toEqual([]);
+		expect(sa({ oneOf: ["Brasília"] }).validate()).toEqual([]);
+	});
+
+	test("a reference the question defines no blank for is refused", () => {
+		expect(
+			codes(fi({ stem: "The capital is [^capitl].", blanks: [capitalBlank] })),
+		).toEqual(["fill-in-undefined-blank", "fill-in-unreferenced-blank"]);
+	});
+
+	test("a blank the stem never references is refused", () => {
+		// mdq.spec: a blank definition's slug "MUST be present in the stem".
+		expect(
+			codes(
+				fi({
+					stem: "The capital of Brazil is [^capital].",
+					blanks: [capitalBlank, riverBlank],
+				}),
+			),
+		).toEqual(["fill-in-unreferenced-blank"]);
+	});
+
+	test("two blanks with the same id are refused", () => {
+		expect(
+			codes(
+				fi({
+					stem: "[^capital] and [^capital].",
+					blanks: [capitalBlank, { ...capitalBlank }],
+				}),
+			),
+		).toEqual(["fill-in-duplicate-blank"]);
+	});
+
+	test("a fill-in stem with no reference at all is refused", () => {
+		// The grammar is `item : inline_md? (ref inline_md?)+` — at least one.
+		expect(
+			codes(fi({ stem: "Nothing to fill in.", blanks: [capitalBlank] })),
+		).toEqual(["fill-in-stem-has-no-blank", "fill-in-unreferenced-blank"]);
+	});
+
+	test("every problem is reported at once, not just the first", () => {
+		// An author fixing a document wants the whole list.
+		const problems = fi({
+			stem: "Only [^typo] here.",
+			blanks: [capitalBlank, riverBlank],
+		}).validate();
+
+		expect(problems.map((p) => p.code)).toEqual([
+			"fill-in-undefined-blank",
+			"fill-in-unreferenced-blank",
+			"fill-in-unreferenced-blank",
+		]);
+		// The message names the thing the author has to go and fix.
+		expect(problems[0].message).toContain("[^typo]");
+	});
+});
+
 test.describe("fill-in cross references", () => {
-	test("a reference with no blank stays in the stem as text", () => {
+	// These documents are refused by `validate()` and never reach storage. The
+	// model layer still has to survive them: validation guards the door, and a
+	// question stored before a rule existed would otherwise crash a whole exam
+	// rather than one blank.
+	test("a reference with no blank contributes nothing", () => {
 		const question = fi({
 			stem: "The capital is [^capitl].",
 			blanks: [capitalBlank],
 		});
 
-		// Nothing to draw, nothing to grade, and the typo is left visible.
 		expect(question.toPublic().blanks).toEqual([]);
 		expect(question.answerKey()).toEqual({});
 		expect(question.score({ blanks: {} }).score).toBe(0);
@@ -1258,9 +1320,9 @@ test.describe("fill-in blank grading", () => {
 		expect(brasilia().score(allRight).choices).toEqual([
 			{ id: "capital", feedback: "Correct." },
 		]);
-		expect(
-			brasilia().score({ blanks: { capital: "lisbon" } }).choices,
-		).toEqual([{ id: "capital", feedback: "Wrong country." }]);
+		expect(brasilia().score({ blanks: { capital: "lisbon" } }).choices).toEqual(
+			[{ id: "capital", feedback: "Wrong country." }],
+		);
 	});
 });
 
@@ -1308,8 +1370,9 @@ test.describe("fill-in grading strategies", () => {
 	test("a price the author put on a wrong choice overrides the flat point", () => {
 		// Lisbon declares -0.25, so it costs that rather than the -1 an
 		// unpriced wrong answer costs.
-		expect(brasilia("symmetric").score({ blanks: { capital: "lisbon" } }).score)
-			.toBeCloseTo(-0.25 / 3, 12);
+		expect(
+			brasilia("symmetric").score({ blanks: { capital: "lisbon" } }).score,
+		).toBeCloseTo(-0.25 / 3, 12);
 
 		// Rio declares nothing, so it is priced by `symmetric`'s own rule at
 		// -0.75 — the value that makes guessing among these three average zero.

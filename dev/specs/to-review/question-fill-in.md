@@ -8,6 +8,10 @@ The seventh and last question type: a stem parser in `src/mdq/fill-in.ts`,
 extracted out of the views that own them today (`NumericInput`, `TextInput`)
 so that `FillInView` composes them rather than growing a third copy.
 
+It also brings the first cross-field validation the project has needed:
+`src/mdq/validation.ts` and `Question#validate()`, because fill-in is the first
+type whose fields have to agree with each other.
+
 Shared decisions from the earlier specs are not re-argued: the public half as
 the only thing a view receives, three view modes, `QuestionResult` carrying the
 key separately, `Scored.pending` for a response only a human can settle.
@@ -39,16 +43,36 @@ way. Three widenings, no duplication.
 `acceptPatterns` is deliberately *not* widened — see "regex takes precedence"
 below. The blank does not share short-answer's semantics, only its engine.
 
-### A choice's text is Markdown, and `<option>` renders none
+### A choice's text is Markdown, which costs us the native `<select>`
 
 Everywhere else a choice's `text` goes through `md.renderInline`. An `<option>`
-element renders no markup at all, so `` `O(n)` `` would show its backticks.
+cannot do that, and not for want of trying: its content model is text, so a
+`<code>` written into one lands in the DOM, computes a monospace font, and
+generates **zero layout boxes**, while the identical markup in a `<span>`
+generates one. There is no property to set. `` `O(n)` `` shows its backticks or
+the control is not a `<select>`.
 
-Decision: **a choice blank's text is rendered as plain text, with the Markdown
-delimiters left as the author wrote them.** Stripping them would be a lie about
-what the document says, and rendering them is impossible. An author who wants
-code voice inside a blank has picked the wrong control; this belongs in the
-`comment`-level guidance upstream rather than in a silent transformation here.
+Three ways out, and why the third won:
+
+- **Strip the delimiters.** Misquotes the document — it renders `O(n)` as prose
+  where the author wrote code.
+- **Leave them showing.** Honest, and ugly enough that an author would work
+  around it by avoiding Markdown in blanks, which is the format losing.
+- **Give up the native control.** `ChoiceSelect` is the ARIA APG's select-only
+  combobox: a `role="combobox"` button that keeps focus, a
+  `<div role="listbox">` of `<div role="option">`, and the highlight carried by
+  `aria-activedescendant`.
+
+The third is the only one where a choice reads the same inside a sentence as it
+does in `MultipleChoiceView`, which is the property worth paying for. What it
+costs is what the component rebuilds: arrows, Home/End, Enter, Escape, focus
+returning to the button on close, and closing on an outside click. Options are
+deliberately not focusable and deliberately carry no key handler — that is the
+pattern, and the two Biome suppressions in the file say so.
+
+The options are `<div>`s rather than `<li><button>`s because an option is a
+leaf in the accessibility tree and must not contain an interactive element of
+its own.
 
 ## Parsing the stem
 
@@ -72,17 +96,22 @@ would break the day that changes.
 
 Four decisions the grammar does not state:
 
-**A ref with no matching blank renders as literal text.** The schema cannot
-express the cross-reference — `blanks` is a list and the stem is a string — so
-a document with a typo in one of the two is representable and must not throw in
-the middle of rendering an exam. The literal `[^capitl]` in the sentence is the
-most legible way to show an author their mistake.
+**A stem and its blanks that disagree are refused at the door.** The Zod
+schemas check one field at a time, which is all JSON Schema can express, so the
+cross-reference — `blanks` is a list, the stem is a string — is unrepresentable
+there. `src/mdq/validation.ts` checks it instead, and `Question#validate()`
+must pass before a question is stored. See "Validation" below.
 
-**A blank with no ref is dropped, and is not graded.** It is not rendered, so
-the student cannot answer it; counting it would subtract a point for an
-authoring error the student cannot see. `fillInBlanks(question)` returns the
-blanks the stem actually references, in document order, and grading, the answer
-key and the public representation all go through it.
+**The model layer still survives a document that broke those rules.**
+Validation guards the door; it is not a licence for the renderer to explode on
+whatever got in another way — a question stored before a rule existed, or one
+that arrived down some path that forgot to call it. So a reference naming no
+blank stays in the sentence as written (an author's typo should be visible, not
+swallowed), and a blank no reference names is dropped from the payload, the key
+and the score. `fillInBlanks(question)` returns the blanks the stem actually
+references, in document order, and grading, the answer key and the public
+representation all go through it. One malformed blank costs one blank, not the
+whole exam.
 
 **Markdown cannot span a blank.** Each markdown segment is rendered on its own
 with `md.renderInline`, so `**bold [^x] bold**` produces two fragments with
@@ -94,6 +123,30 @@ with placeholder tokens and HTML splicing. mdq.spec's own grammar puts
 `Markdown`'s `inline` prop, which emits a `<span>`; the inputs are
 `inline-flex` and `align-baseline` so a blank sits on the line rather than
 starting one.
+
+## Validation
+
+`validateQuestion(data)` in `src/mdq/validation.ts` returns every problem with
+a question that its schema cannot express, and `Question#validate()` exposes
+it. Only `fill-in` has rules today; the other six return an empty list.
+
+Four rules, all of them mdq.spec's:
+
+| Code                        | Rule                                                        |
+| :-------------------------- | :---------------------------------------------------------- |
+| `fill-in-stem-has-no-blank` | The stem grammar is `(ref inline_md?)+` — at least one ref   |
+| `fill-in-duplicate-blank`   | A blank id "MUST be unique within the question"              |
+| `fill-in-undefined-blank`   | A ref in the stem names a blank the question does not define |
+| `fill-in-unreferenced-blank`| A blank's slug "MUST be present in the stem"                 |
+
+It returns a list rather than throwing on the first problem, because an author
+fixing a document wants to see all of them at once, and each `message` names
+the thing they have to go and change.
+
+**Nothing calls it yet**, because nothing stores questions yet: there is no
+question service, and `QuestionType` in `prisma/schema.prisma` still lists four
+types. Wiring it in is the storage slice's first job — a question that fails
+`validate()` must not reach `QuestionData`.
 
 ## The answer, the key, and why both are plain strings
 
@@ -322,8 +375,11 @@ becomes a demonstration of an *unknown* type instead of a pending one, and
 - **stem parsing** — refs and text interleaved, a ref at either end, adjacent
   refs, a bracket expression that is not a slug, an empty stem's degenerate
   case, and the CommonMark-footnote collision.
-- **cross-references** — an unmatched ref survives as text; an unreferenced
-  blank is absent from `toPublic()`, from the key and from the score.
+- **validation** — each of the four rules, one at a time, plus a document that
+  breaks two and reports both.
+- **cross-references** — the model layer's behaviour on a document validation
+  would have refused: an unmatched ref survives as text; an unreferenced blank
+  is absent from `toPublic()`, from the key and from the score.
 - **per-blank grading** — each kind right, wrong and empty; a stale choice id;
   a numeric blank inside and outside each tolerance; `regex` beating `oneOf`.
 - **strategies** — the three formulas over the same set of answers, with a

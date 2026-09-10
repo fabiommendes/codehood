@@ -25,8 +25,8 @@ const courseRows: CourseRow[] = courses.map((course) => ({
 	startAt: course.startAt,
 	endAt: course.endAt,
 	href: courseHref({
-		disciplineSlug: course.disciplineSlug,
-		username: course.instructor.username,
+		discipline: course.disciplineSlug,
+		instructor: course.instructor.username,
 		edition: course.editionSlug,
 	}),
 }));

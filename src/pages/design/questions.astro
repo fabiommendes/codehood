@@ -1,5 +1,6 @@
 ---
 import EssayView from "@/components/question/EssayView";
+import FillInView from "@/components/question/FillInView";
 import MultipleChoiceView from "@/components/question/MultipleChoiceView";
 import MultipleSelectionView from "@/components/question/MultipleSelectionView";
 import NumericView from "@/components/question/NumericView";
@@ -14,6 +15,7 @@ import type { PublicQuestion } from "@/mdq/public";
 import { Question } from "@/mdq/question";
 import type {
 	Essay,
+	FillIn,
 	MultipleChoice,
 	MultipleSelection,
 	Numeric,
@@ -82,12 +84,12 @@ const markdownFixture = mc({
 	],
 });
 
-// `Public<FillIn>` is `never` — fill-in has no public representation yet — so
-// the fallback can only be demonstrated by casting past the union it is the
-// point of not being in.
-const fillInStub = {
-	type: "fill-in",
-	stem: "The capital of Brazil is [^capital].",
+// Every type in the union now has an arm, so the fallback is only reachable
+// with a payload the types say cannot exist — which is exactly the payload a
+// question stored before a type was added would be.
+const unknownStub = {
+	type: "ordering",
+	stem: "Put the following steps in order.",
 } as unknown as PublicQuestion;
 
 const wrongPickResult: QuestionResult<"multiple-choice"> = {
@@ -404,7 +406,88 @@ const unsettledResult: QuestionResult<"short-answer"> = {
 	correct: isnan.answerKey(),
 };
 
-const pendingTypes = ["fill-in"] as const;
+//
+// Fill in the blanks
+//
+
+function fi(data: Omit<FillIn, "type">): Question<FillIn> {
+	return new Question({ type: "fill-in", ...data } as FillIn);
+}
+
+const brasilia = fi({
+	stem: "The capital of Brazil is [^capital], a city of roughly [^size] on the [^river] plateau.",
+	preamble: "Fill each blank with the answer its control asks for.",
+	blanks: [
+		{
+			id: "capital",
+			type: "multiple-choice",
+			choices: [
+				{ id: "brasilia", text: "Brasília", score: 1, feedback: "Correct." },
+				{ id: "rio", text: "Rio de Janeiro" },
+				{
+					id: "lisbon",
+					text: "Lisbon",
+					score: -0.25,
+					feedback: "Right language, wrong continent.",
+				},
+			],
+		},
+		{
+			id: "size",
+			type: "numeric",
+			answer: 2800000,
+			unit: "people",
+			tolerance: { relative: 0.1 },
+		},
+		{ id: "river", type: "short-answer", oneOf: ["Central", "Planalto"] },
+	],
+});
+
+// Choices carrying Markdown, which is why the blank is not a native `<select>`.
+const complexity = fi({
+	title: "Binary search",
+	stem: "Binary search runs in [^time] time and uses [^space] extra space.",
+	blanks: [
+		{
+			id: "time",
+			type: "multiple-choice",
+			choices: [
+				{ id: "log", text: "`O(log n)`", score: 1 },
+				{ id: "linear", text: "`O(n)`" },
+			],
+		},
+		{
+			id: "space",
+			type: "multiple-choice",
+			choices: [
+				{ id: "constant", text: "`O(1)`", score: 1 },
+				{ id: "linear", text: "`O(n)`" },
+			],
+		},
+	],
+});
+
+const filledIn = {
+	blanks: { capital: "brasilia", size: "2750000", river: "Planalto" },
+};
+
+const mixedUp = {
+	blanks: { capital: "lisbon", size: "12", river: "" },
+};
+
+const filledInResult: QuestionResult<"fill-in"> = {
+	...brasilia.score(filledIn),
+	correct: brasilia.answerKey(),
+};
+
+const mixedUpResult: QuestionResult<"fill-in"> = {
+	...brasilia.score(mixedUp),
+	correct: brasilia.answerKey(),
+};
+
+// Graded with the key withheld — an exam still open, where the per-blank marks
+// show which blank went wrong without saying what would have been right.
+const withheldFillInResult: QuestionResult<"fill-in"> = brasilia.score(mixedUp);
 
 // The side nav. Its ids are the `id` of the matching <section> below; the
 // order is the order they appear on the page, which is the order the types
@@ -416,7 +499,8 @@ const sectionLinks = [
 	{ id: "essay", label: "Essay" },
 	{ id: "numeric", label: "Numeric" },
 	{ id: "short-answer", label: "Short answer" },
-	{ id: "pending", label: "Not implemented" },
+	{ id: "fill-in", label: "Fill in the blanks" },
+	{ id: "unknown", label: "Unknown type" },
 ] as const;
 ---
 
@@ -922,19 +1006,97 @@ const sectionLinks = [
     </section>
   </section>
 
-  <section id="pending" class="scroll-mt-6">
-    <h2 class="mb-2 text-xl font-semibold">Not yet implemented</h2>
+  <section id="fill-in" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Fill in the blanks</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        The only type whose stem has a grammar. It is split on its <code class="font-mono">[^id]</code>{" "}
+        references and the controls are dropped in place, so each blank flows with the sentence rather than
+        stacking under it. A choice blank is a native <code class="font-mono">select</code> &mdash; a stack of
+        radio cards cannot sit inside a clause &mdash; while the grading is multiple choice's, per-choice scores
+        and all. It is <em>not</em> a native <code class="font-mono">select</code>, though: an{" "}
+        <code class="font-mono">option</code>'s content model is text, so markup written into one generates no
+        layout boxes and <code class="font-mono">`O(n)`</code> would show its backticks. The second card is that
+        case &mdash; <code class="font-mono">ChoiceSelect</code> is a listbox that renders a choice the same way
+        every other view does, and pays for it by rebuilding the keyboard contract the browser gave away.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Three kinds of blank">
+          <FillInView client:load question={brasilia.toPublic()} mode="answer" />
+        </Card>
+        <Card title="Markdown in a choice">
+          <FillInView client:load question={complexity.toPublic()} mode="answer" />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        Every control is kept and disabled, as numeric and short answer do. What the student picked stays legible
+        &mdash; a frozen sentence that hid its own answers would be showing nothing at all.
+      </p>
+      <Card>
+        <FillInView client:load question={brasilia.toPublic()} mode="readonly" value={filledIn.blanks} />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-base-content/60">
+        A single badge for a sentence full of separate answers would say nothing useful, so{" "}
+        <code class="font-mono">Scored</code> carries a score per blank and each one draws its own mark. A blank
+        left empty draws none: under <code class="font-mono">symmetric</code> it neither adds nor subtracts, and
+        a cross would claim otherwise. The second card is graded with the key withheld &mdash; the marks still
+        show which blank went wrong without saying what would have been right.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Every blank right">
+          <FillInView
+            client:load
+            question={brasilia.toPublic()}
+            mode="review"
+            value={filledIn.blanks}
+            result={filledInResult}
+          />
+        </Card>
+        <Card title="One wrong, one priced, one empty">
+          <FillInView
+            client:load
+            question={brasilia.toPublic()}
+            mode="review"
+            value={mixedUp.blanks}
+            result={mixedUpResult}
+          />
+        </Card>
+        <Card title="Key withheld">
+          <FillInView
+            client:load
+            question={brasilia.toPublic()}
+            mode="review"
+            value={mixedUp.blanks}
+            result={withheldFillInResult}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="unknown" class="scroll-mt-6">
+    <h2 class="mb-2 text-xl font-semibold">Unknown type</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">QuestionView</code> dispatches on <code class="font-mono">question.type</code>;
-      every type but one now has a renderer, and the last falls back to a named warning instead of a blank
-      space: {pendingTypes.join(", ")}.
+      Every type mdq.spec defines now has a renderer, so <code class="font-mono">QuestionView</code>'s fallback is
+      unreachable from the union. It stays: the union is a compile-time claim and a stored question is a runtime
+      fact, and a client one version behind is better served by a named warning than by a blank space.
     </p>
     {/*
-     * `QuestionViewProps` is a discriminated union, and TypeScript will not
-     * accept the `PublicQuestion` union against it — the stub is a type that
-     * has no arm at all, which is the point of the demo.
+     * `QuestionViewProps` is a discriminated union, and the stub is a type
+     * with no arm in it at all — which is the point of the demo, and why the
+     * cast is here rather than a bug.
      */}
-    <QuestionView {...({ question: fillInStub } as QuestionViewProps)} />
+    <QuestionView {...({ question: unknownStub } as QuestionViewProps)} />
   </section>
   </div>
   </div>

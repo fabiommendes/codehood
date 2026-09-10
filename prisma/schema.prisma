@@ -95,27 +95,36 @@ model ApiKey {
 }
 
 model Invite {
-  id          Int                @id @default(autoincrement())
-  tokenHash   String             @unique
-  kind        InviteKind
-  email       String?
-  role        Role
-  courseId    Int?
-  maxUses     Int?
-  expiresAt   DateTime
+  id        Int    @id @default(autoincrement())
+  tokenHash String @unique
+
+  kind    InviteKind
+  role    Role
+  maxUses Int?
+  email   String?
+
+  courseId Int?
+  course   Course? @relation(fields: [courseId], references: [id])
+
   createdById Int
-  createdAt   DateTime           @default(now())
-  createdBy   User               @relation("InviteCreatedBy", fields: [createdById], references: [id])
+  createdBy   User @relation("InviteCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
   redemptions InviteRedemption[]
 }
 
 model InviteRedemption {
-  id         Int      @id @default(autoincrement())
-  inviteId   Int
-  userId     Int      @unique
+  id Int @id @default(autoincrement())
+
+  inviteId Int
+  invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id])
+
   redeemedAt DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
-  invite     Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
 }
 
 //==============================================================================
@@ -193,6 +202,7 @@ model Course {
   questionForCourses QuestionForCourse[]
   enrollments        Enrollment[]
   resources          Resource[]
+  invites            Invite[]
 
   @@unique([disciplineSlug, instructorSlug, editionSlug])
 }
@@ -258,7 +268,7 @@ model TimeSlot {
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   /// Authored: `mon`, `wed-lab`. Stable when the hour changes.
-  slug String
+  slug  String
   /// Optional label for the syllabus line: "Lecture", "Lab".
   title String?
 
@@ -577,7 +587,7 @@ model Exam {
   durationMs  Int?
   /// Extra time granted on top of durationMs (FR-EXAM-020/022), part of the
   /// exam's window for the calendar-link match in src/db/exam-link.ts.
-  extraTimeMs Int @default(0)
+  extraTimeMs Int       @default(0)
 
   authorId Int
   author   User @relation(fields: [authorId], references: [id])

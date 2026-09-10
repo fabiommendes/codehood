@@ -2,8 +2,8 @@ import { customAlphabet } from "nanoid";
 import type { z } from "zod";
 import { canManageEnrollment } from "@/auth/permissions";
 import { SYSTEM } from "@/core/actor";
-import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
+import { NotAllowed, NotFound } from "@/core/error";
+import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
@@ -40,8 +40,9 @@ export type PassphrasePK = z.infer<typeof passphrasePK>;
 export type PassphraseUpdate = z.infer<typeof passphraseUpdate>;
 
 /**
- * A short-lived, course-scoped join code (FR-CRS-040/041) — the in-class
- * counterpart to a classroom invite link.
+ * A short-lived, course-scoped join code.
+ *
+ * The in-class counterpart to a classroom invite link.
  *
  * There is no management UI for these: an instructor generates one from
  * `/manage`, reads it out, and it expires on its own five minutes later.
@@ -64,29 +65,6 @@ class PassphraseService
 
 	constructor(client: PrismaClient = prisma) {
 		this.prisma = client;
-	}
-
-	private async requireManageableCourse(
-		courseId: number,
-		opts: ServiceOpts,
-		action: "read" | "create" | "update" | "delete",
-	): Promise<void> {
-		const client = opts.tx ?? this.prisma;
-		const course = await client.course.findUnique({
-			where: { id: courseId },
-			select: { instructor: { select: { id: true } } },
-		});
-		if (!course) {
-			throw new Error(`No course with id ${courseId}.`);
-		}
-		if (
-			!canManageEnrollment(opts.actor, {
-				instructor: course.instructor,
-				enrollments: [],
-			})
-		) {
-			throw new NotAllowed({ action: `${action}-passphrase` });
-		}
 	}
 
 	/**
@@ -160,7 +138,9 @@ class PassphraseService
 
 		let row: DbPassphrase | null = null;
 		if (by.id !== undefined) {
-			row = await client.passphrase.findUnique({ where: { id: by.id } });
+			row = await client.passphrase.findUnique({
+				where: { id: by.id as PassphraseId },
+			});
 		} else if (by.value !== undefined) {
 			row = await client.passphrase.findUnique({
 				where: { value: by.value },
@@ -240,6 +220,30 @@ class PassphraseService
 		await this.requireManageableCourse(target.courseId, opts, "delete");
 		const client = opts.tx ?? this.prisma;
 		await client.passphrase.delete({ where: { id: target.id } });
+	}
+
+	//
+	// Utility methods
+	//
+	private async requireManageableCourse(
+		courseId: number,
+		opts: ServiceOpts,
+		action: "read" | "create" | "update" | "delete",
+	): Promise<void> {
+		const client = opts.tx ?? this.prisma;
+
+		const course = await client.course.findUnique({
+			where: { id: courseId as CourseId },
+			select: { instructor: { select: { id: true, username: true } } },
+		});
+		if (!course) throw new NotFound("course", { id: courseId });
+
+		const canManage = canManageEnrollment(opts.actor, {
+			instructor: course.instructor,
+			enrollments: [],
+		});
+
+		if (!canManage) throw new NotAllowed({ action: `${action}-passphrase` });
 	}
 }
 

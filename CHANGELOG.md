@@ -93,15 +93,68 @@
   essay introduced. `preAccept` and `preReject` are public and warn the student
   as they type, with the precedence inverted from grading's, and never touch a
   score.
+- Fill-in-the-blank questions render, completing mdq.spec's seven types. It is
+  the first type that composes others: `src/mdq/fill-in.ts` splits the stem on
+  its `[^id]` references — before anything reaches `markdown-it`, since `[^x]`
+  is CommonMark's footnote syntax — and each blank is graded by the rules of the
+  type it stands for, choice blanks through multiple choice's `choiceScores` and
+  per-choice scores included. The question's strategy then combines the blanks:
+  `partial` counts the right ones, `all-or-nothing` counts an empty blank as a
+  mistake (where true/false lets a student abstain), and `symmetric` charges a
+  wrong blank the flat point unless its author priced that particular answer.
+  Answers travel as one string per blank id, which is what the controls produce
+  and, unlike the `Set` and `Map` the other keys use, survives
+  `JSON.stringify`. `Scored` grew a per-blank `blanks` map, because one badge
+  for a sentence full of separate answers tells a student nothing about which
+  blank cost them. The two cross-references the schema cannot check are handled
+  rather than left to crash a render: a reference naming no blank stays
+  in the sentence as written, and a blank no reference names is dropped from
+  the payload, the key and the score.
+- `Question#validate()` and `src/mdq/validation.ts`, the first cross-field
+  checks the project has needed. The Zod schemas check one field at a time,
+  which is all JSON Schema can express, but mdq.spec also states rules
+  *between* fields — a fill-in's stem must reference at least one blank, every
+  blank id must be unique, every reference must name a defined blank, and every
+  blank's slug must appear in the stem. A question failing any of these is one
+  nobody can answer and must be refused before it is stored. Every problem is
+  reported at once rather than the first one thrown, since an author fixing a
+  document wants the whole list. Nothing calls it yet: there is no question
+  service, and `QuestionType` in the Prisma schema still lists four types.
+  Wiring it in is the storage slice's first job.
+- `FillInView` renders that sentence with its controls in place, so fill-in
+  shares multiple choice's model and none of its markup — a stack of radio
+  cards cannot sit inside a clause.
+- `ChoiceSelect`, a listbox that renders each choice as inline Markdown. A
+  native `select` cannot: an `option`'s content model is text, so a `code`
+  element written into one lands in the DOM, computes a monospace font, and
+  generates zero layout boxes, while the same markup in a `span` generates one.
+  There is no property to set — either `` `O(n)` `` shows its backticks or the
+  control stops being a `select`. This is the ARIA APG's select-only combobox:
+  a `role="combobox"` button that keeps focus throughout, a `role="listbox"` of
+  `role="option"` divs, and the highlight carried by `aria-activedescendant`.
+  The keyboard contract the browser used to supply is rebuilt — arrows,
+  Home/End, Enter, Escape, focus returning to the button, and closing on an
+  outside click. `NumericInput`
+  and `TextInput` were extracted out of `NumericView` and `ShortAnswerView`
+  first, so the three blank kinds are three siblings rather than two components
+  and a loose `input`; `NumericInput` gained a raw-text controlled mode, since a
+  fill-in blank distinguishes an empty box from one holding "about ten" and a
+  parsed `null` cannot. A frozen blank keeps a visible border, which the
+  standalone views can do without and a sentence cannot: an empty blank has no
+  text to carry it, and the gap would read as a missing question.
 - `/design/questions`, a new tab in the design showcase, renders every view
   state from real `Question` objects, grouped by question type: answer,
-  readonly and review for each of the six. A sticky side nav lists the types
+  readonly and review for each of the seven. A sticky side nav lists the types
   and marks the one you are looking at, since the page is now long enough that
   scrolling to a type was the slow part. It is in the page's own column rather
   than floating over it, so it cannot land on the cards at some width nobody
   tested, and it is not rendered at all below `lg`. Grading itself is not shown there
   — the numbers are pinned in `test/mdq-question.spec.ts` instead, which is
-  where a formula belongs.
+  where a formula belongs. With every type rendering, the dispatcher's
+  "not yet implemented" fallback is unreachable from the union; it stays, and
+  the showcase now demonstrates it with an unknown type rather than a pending
+  one, since the union is a compile-time claim and a stored question is a
+  runtime fact.
 - `pnpm run clear` (`scripts/clean.mjs`) resets the checkout to the state of a
   fresh `git clone`, deleting `node_modules/`, `src/generated/`, `.astro/`,
   `dist/`, `coverage/`, test output, the local `*.db` files and the `storage/`

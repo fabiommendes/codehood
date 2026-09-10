@@ -101,7 +101,9 @@ export const importCalendarCommand = new Command("import-calendar")
 			options: { prune?: boolean },
 		) => {
 			const course = await courseService.findOne(
-				{ ref: { disciplineSlug, username: instructor, edition } },
+				{
+					ref: { discipline: disciplineSlug, instructor: instructor, edition },
+				},
 				FULL_ACCESS,
 			);
 			if (!course) {
@@ -179,13 +181,13 @@ export const importCalendarCommand = new Command("import-calendar")
 						CalendarEventCreate,
 						"courseId" | "timeSlotId" | "slug"
 					> = {
-						date: entry.date,
-						startMin: entry.start ? parseClock(entry.start) : undefined,
-						durationMin: entry.duration,
+						date: new Date(entry.date),
+						startMin: entry.start ? parseClock(entry.start) : 0,
+						durationMin: entry.duration ?? 120,
 						week: entry.week,
-						kind: entry.kind,
+						kind: entry.kind ?? "LECTURE",
 						title: entry.title,
-						description: entry.description,
+						description: entry.description ?? null,
 						contentHash: canonicalHash(entry),
 					};
 					const existing = await calendarEventService.findOne(

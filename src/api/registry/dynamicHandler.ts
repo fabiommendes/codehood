@@ -20,8 +20,7 @@ function handler(method: keyof HttpMethods) {
 			const methods = readPattern(context.routePattern);
 			const route = methods?.[method];
 			if (!route)
-				throw new NotFound({
-					resource: "url-pattern",
+				throw new NotFound("url-pattern", {
 					context: `${method.toUpperCase()} ${context.routePattern}`,
 				});
 			// `await` inside the `try` on purpose: returning the promise

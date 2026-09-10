@@ -135,8 +135,8 @@ test("delete() refuses while a course uses the edition, and succeeds once it is 
 	const course = await courseService.create(
 		{
 			disciplineSlug: await makeDiscipline(),
-			instructorUsername: instructor.username,
-			editionSlug: slug,
+			instructor: instructor.username,
+			edition: slug,
 			startAt: new Date(),
 			endAt: new Date(),
 		},
@@ -181,8 +181,8 @@ test("courseService.create() enforces the window for instructors but not for adm
 		courseService.create(
 			{
 				disciplineSlug,
-				instructorUsername: instructor.username,
-				editionSlug: slug,
+				instructor: instructor.username,
+				edition: slug,
 				startAt: new Date(),
 				endAt: new Date(),
 			},
@@ -193,8 +193,8 @@ test("courseService.create() enforces the window for instructors but not for adm
 	const course = await courseService.create(
 		{
 			disciplineSlug,
-			instructorUsername: instructor.username,
-			editionSlug: slug,
+			instructor: instructor.username,
+			edition: slug,
 			startAt: new Date(),
 			endAt: new Date(),
 		},

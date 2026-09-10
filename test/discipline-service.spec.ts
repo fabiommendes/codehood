@@ -97,8 +97,8 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 	const course = await courseService.create(
 		{
 			disciplineSlug: slug,
-			instructorUsername: instructor.username,
-			editionSlug: "2201",
+			instructor: instructor.username,
+			edition: "2201",
 			startAt: new Date(),
 			endAt: new Date(),
 		},

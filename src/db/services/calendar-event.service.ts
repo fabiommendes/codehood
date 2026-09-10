@@ -13,13 +13,13 @@ import {
 } from "@/auth/permissions";
 import type { Actor } from "@/core/actor";
 import { NotAllowed } from "@/core/error";
+import type { FillUndefineds } from "@/typing";
 import {
 	endOf,
 	localDateOf,
 	toInstant,
 	weekdayOf,
 } from "@/utils/schedule-time";
-import type { FillUndefineds } from "@/utils/types";
 import { Validate } from "@/utils/validate";
 import {
 	type CalendarEventId,
@@ -69,7 +69,7 @@ const MEETING_KINDS: ReadonlySet<EventKind> = new Set([
 const EVENT_INCLUDE = {
 	course: {
 		select: {
-			instructor: { select: { id: true } },
+			instructor: { select: { id: true, username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
 				select: { userId: true },
@@ -137,7 +137,8 @@ class CalendarEventService
 
 		const startMin = input.startMin ?? slot.startMin;
 		const durationMin = input.durationMin ?? slot.durationMin;
-		const startAt = toInstant(input.date, startMin);
+		const startAt = toInstant(input.date.toString(), startMin);
+
 		assertWeekdayMatches(startAt, slot.day, slot.slug);
 		await assertNoSlotDayCollision(client, slot.id, startAt, null);
 

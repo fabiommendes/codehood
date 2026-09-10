@@ -7,6 +7,8 @@
  * A standalone module rather than a method on either service, because
  * `exam.service.ts` and `event.service.ts` would otherwise import each other.
  */
+
+import type { ExamId } from "@/core/schemas";
 import { endOf } from "@/utils/schedule-time";
 import type { PrismaTx } from "./client";
 
@@ -93,7 +95,7 @@ export async function examForEvent(
  * blanking it. A no-op if the exam does not exist (e.g. it was deleted in the
  * same transaction).
  */
-export async function relinkExam(tx: PrismaTx, examId: number): Promise<void> {
+export async function relinkExam(tx: PrismaTx, examId: ExamId): Promise<void> {
 	const exam = await tx.exam.findUnique({
 		where: { id: examId },
 		select: {

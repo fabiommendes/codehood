@@ -7,6 +7,7 @@ import { fileService } from "@/db/services/file.service";
 import { resourceService } from "@/db/services/resource.service";
 import { timeSlotService } from "@/db/services/time-slot.service";
 import { type User, userService } from "@/db/services/user.service";
+import type { CalendarEvent } from "./client";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -167,8 +168,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	const cs101 = await courseService.create(
 		{
 			disciplineSlug: "cs101",
-			instructorUsername: ada.username,
-			editionSlug: "2026-1",
+			instructor: ada.username,
+			edition: "2026-1",
 			description:
 				"A first course in programming: variables, control flow, functions, and enough data structures to get dangerous.",
 			startAt: new Date("2026-01-05"),
@@ -179,8 +180,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	const cs201 = await courseService.create(
 		{
 			disciplineSlug: "cs201",
-			instructorUsername: alan.username,
-			editionSlug: "2026-1",
+			instructor: alan.username,
+			edition: "2026-1",
 			description:
 				"Arrays, linked lists, trees, and graphs, with an eye toward complexity.",
 			startAt: new Date("2026-01-05"),
@@ -358,6 +359,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			week: 1,
 			kind: "LECTURE" as const,
 			title: "Course overview and tooling",
+			durationMin: 120,
 			description: "Setting up the toolchain; how the term is graded.",
 		},
 		{
@@ -416,6 +418,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			date: "2026-01-28",
 			week: 4,
 			kind: "CANCELLED" as const,
+			durationMin: 0,
 			title: "Lab: recursion practice",
 			description: "Instructor traveling; make-up session posted online.",
 		},
@@ -425,11 +428,12 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				courseId: cs101.id,
 				timeSlotId: event.slot.id,
 				slug: event.slug,
-				date: event.date,
+				date: new Date(event.date),
 				week: event.week,
 				kind: event.kind,
 				title: event.title,
-				description: event.description,
+				durationMin: event.durationMin ?? 120,
+				description: event.description ?? null,
 				contentHash: `demo-${event.slug}-v1`,
 			},
 			FULL_ACCESS,
@@ -476,11 +480,12 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				courseId: cs201.id,
 				timeSlotId: cs201Mon.id,
 				slug: event.slug,
-				date: event.date,
+				date: new Date(event.date),
 				week: event.week,
 				kind: event.kind,
 				title: event.title,
-				description: event.description,
+				description: event.description ?? "",
+				durationMin: 120,
 				contentHash: `demo-cs201-${event.slug}-v1`,
 			},
 			FULL_ACCESS,

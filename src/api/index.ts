@@ -25,9 +25,6 @@ export const apiKeyApi = CRUD("/api/api-key", {
 	tags: ["Api Key"],
 	service: db.apiKey,
 });
-// `/api/calendar-event`, not `/api/calendar`: the path mirrors the entity, the
-// same way `/api/api-key` and `/api/time-slot` do, and it is the name
-// `hook.ts` injects into Astro. They disagreed before, so nothing served it.
 export const calendarEventApi = CRUD("/api/calendar-event", {
 	name: "CalendarEvent",
 	entity: schema.calendarEventSchema,

@@ -9,7 +9,8 @@ import {
 } from "@/auth/permissions";
 import { SYSTEM } from "@/core/actor";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
+import type { FillUndefineds } from "@/typing";
+import { unsafeBrand } from "@/typing/branding";
 import { Validate } from "@/utils/validate";
 import {
 	type UserId,
@@ -251,7 +252,7 @@ function defaultHandle(username: string): string {
 function toUser(dbUser: DbUser): User {
 	return {
 		publicId: dbUser.publicId,
-		id: dbUser.id as UserId, // branding is safe because it comes from the DB.
+		id: unsafeBrand<UserId>(dbUser.id),
 		email: dbUser.email,
 		name: dbUser.name,
 		username: dbUser.username,

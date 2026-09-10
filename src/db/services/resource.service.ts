@@ -6,8 +6,6 @@ import {
 } from "@/auth/permissions";
 import { SYSTEM } from "@/core/actor";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/utils/types";
-import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
 	type FileId,
@@ -18,7 +16,9 @@ import {
 	type resourceRef,
 	resourceSchema,
 	resourceUpdate,
-} from "../../core/schemas";
+} from "@/core/schemas";
+import type { FillUndefineds, Pretty } from "@/typing";
+import { Validate } from "@/utils/validate";
 import type { Crud, ServiceOpts } from "../base-service";
 import { type Prisma, type PrismaClient, prisma } from "../client";
 import { fileService } from "./file.service";
@@ -35,11 +35,15 @@ export type ResourcePK = z.infer<typeof resourcePK>;
 export type ResourceUpdate = z.infer<typeof resourceUpdate>;
 export type ResourceRef = z.infer<typeof resourceRef>;
 
+type DbResource = Prisma.ResourceGetPayload<{
+	include: Pretty<typeof resourceInclude>;
+}>;
+
 /** The minimal course shape the write/read predicates need, loaded alongside every row. */
 const resourceInclude = {
 	course: {
 		select: {
-			instructor: { select: { id: true } },
+			instructor: { select: { id: true, username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
 				select: { userId: true },
@@ -48,10 +52,6 @@ const resourceInclude = {
 	},
 	file: true,
 } satisfies Prisma.ResourceInclude;
-
-type DbResource = Prisma.ResourceGetPayload<{
-	include: typeof resourceInclude;
-}>;
 
 /** Whole-string URL check — the heuristic the create/update validation uses. */
 const BARE_URL_RE = /^https?:\/\/\S+$/i;

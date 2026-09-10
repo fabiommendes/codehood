@@ -1,20 +1,12 @@
-import {
-	createEffect,
-	createSignal,
-	createUniqueId,
-	type JSX,
-	Show,
-} from "solid-js";
+import { createUniqueId, type JSX, Show } from "solid-js";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
-import {
-	formatNumericInput as format,
-	parseNumericInput as parse,
-} from "@/mdq/numeric";
+import { formatNumericInput as format } from "@/mdq/numeric";
 import type { PublicNumeric } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
 import { CheckIcon, XIcon } from "./icons";
 import Markdown from "./Markdown";
+import NumericInput from "./NumericInput";
 import { scoreBadge, scoreLabel } from "./scoreDisplay";
 import type { QuestionMode } from "./types";
 
@@ -43,41 +35,8 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 	const feedbackId = `${name}-feedback`;
 	const inputId = `${name}-value`;
 
-	// The raw text, not the parsed number: a half-typed "3." or "-" is not a
-	// number yet, and reformatting the box from the parsed value while someone
-	// is still typing takes the caret with it.
-	const [text, setText] = createSignal(format(props.value ?? null));
-
-	// Follows the controlled value, and only that: an absent `value` means the
-	// caller passed none, so the box owns its own text and must not be rewritten
-	// from a `null` that was never an answer. Even when controlled the rewrite
-	// waits until the two disagree as *numbers*, so a half-typed "3.50" is not
-	// snapped back to "3.5" with the caret in it.
-	createEffect(() => {
-		const incoming = props.value;
-		if (incoming === undefined) return;
-		if (parse(text()) !== incoming) setText(format(incoming));
-	});
-
 	const graded = () => mode() === "review" && props.result !== undefined;
 	const correct = () => (props.result?.score ?? 0) > 0;
-
-	function edit(next: string): void {
-		setText(next);
-		props.onChange?.(parse(next));
-	}
-
-	// A number input rejects "1/3" outright, so a question that asks for a
-	// fraction has to accept text or the domain means nothing.
-	const isFraction = () => props.question.domain === "fraction";
-
-	// `1` for whole numbers, `10⁻ᵈ` when the author fixed the decimals, and
-	// otherwise no constraint at all.
-	const step = (): string => {
-		if (props.question.domain === "integer") return "1";
-		const places = props.question.decimalPlaces;
-		return places === undefined ? "any" : String(10 ** -places);
-	};
 
 	return (
 		<div class="flex flex-col gap-4">
@@ -102,27 +61,18 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 			</div>
 
 			<div class="flex flex-wrap items-center gap-3">
-				<label
-					class="input w-48 disabled:text-base-content"
-					for={inputId}
-					aria-label="Your answer"
-				>
-					<input
-						id={inputId}
-						type={isFraction() ? "text" : "number"}
-						step={isFraction() ? undefined : step()}
-						inputmode={isFraction() ? "text" : "decimal"}
-						class="grow disabled:text-base-content"
-						placeholder={isFraction() ? "a/b" : "Your answer"}
-						disabled={mode() !== "answer"}
-						value={text()}
-						onInput={(event) => edit(event.currentTarget.value)}
-						aria-describedby={props.result?.feedback ? feedbackId : undefined}
-					/>
-					<Show when={props.question.unit}>
-						{(unit) => <span class="label">{unit()}</span>}
-					</Show>
-				</label>
+				<NumericInput
+					id={inputId}
+					class="w-48"
+					domain={props.question.domain}
+					unit={props.question.unit}
+					decimalPlaces={props.question.decimalPlaces}
+					value={props.value}
+					onChange={(next) => props.onChange?.(next)}
+					disabled={mode() !== "answer"}
+					ariaLabel="Your answer"
+					ariaDescribedBy={props.result?.feedback ? feedbackId : undefined}
+				/>
 
 				<Show when={graded()}>
 					<Show when={correct()} fallback={<XIcon />}>
