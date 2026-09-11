@@ -1,9 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { canViewUser } from "@/auth/permissions";
+import type { Actor } from "@/core/actor";
 import { FULL_ACCESS } from "@/core/actor";
+import type { UserId } from "@/core/schemas";
 import { userService } from "@/db/services/user.service";
 
-test("admin without githubId/schoolId gets the @<username> default", async () => {
+function actorOf(
+	username: UserId,
+	role: "ADMIN" | "INSTRUCTOR" | "STUDENT",
+): Actor {
+	return { username, role } as unknown as Actor;
+}
+
+test("admin without githubId/schoolId has them unset, not the sentinel", async () => {
 	const user = await userService.create(
 		{
 			email: "root@codehood.test",
@@ -14,8 +23,8 @@ test("admin without githubId/schoolId gets the @<username> default", async () =>
 		},
 		FULL_ACCESS,
 	);
-	expect(user.githubId).toBe("@root");
-	expect(user.schoolId).toBe("@root");
+	expect(user.githubId).toBeUndefined();
+	expect(user.schoolId).toBeUndefined();
 });
 
 test("student requires githubId and schoolId", async () => {
@@ -56,39 +65,17 @@ test("update() rejects any attempt to smuggle in a username change", async () =>
 
 	await expect(
 		userService.update(
-			{ id: user.id },
+			{ username: user.username },
 			fieldsWithSmuggledUsername,
 			FULL_ACCESS,
 		),
 	).rejects.toThrow(/username/i);
 
-	const reloaded = await userService.findOne({ id: user.id }, FULL_ACCESS);
+	const reloaded = await userService.findOne(
+		{ username: user.username },
+		FULL_ACCESS,
+	);
 	expect(reloaded?.username).toBe("immutable-username");
-});
-
-test("publicId is generated and unique per user", async () => {
-	const a = await userService.create(
-		{
-			email: "a1@codehood.test",
-			username: "a1",
-			name: "A",
-			role: "ADMIN",
-			password: "x",
-		},
-		FULL_ACCESS,
-	);
-	const b = await userService.create(
-		{
-			email: "a2@codehood.test",
-			username: "a2",
-			name: "B",
-			role: "ADMIN",
-			password: "x",
-		},
-		FULL_ACCESS,
-	);
-	expect(a.publicId).toHaveLength(10);
-	expect(a.publicId).not.toBe(b.publicId);
 });
 
 test("create() rejects an instructor or student actor, accepts an admin", async () => {
@@ -103,7 +90,7 @@ test("create() rejects an instructor or student actor, accepts an admin", async 
 				githubId: "not-admin",
 				schoolId: "not-admin",
 			},
-			{ actor: { id: 1, role: "INSTRUCTOR" } },
+			{ actor: actorOf("actor-instructor" as UserId, "INSTRUCTOR") },
 		),
 	).rejects.toThrow();
 
@@ -117,7 +104,7 @@ test("create() rejects an instructor or student actor, accepts an admin", async 
 			githubId: "admin-registered",
 			schoolId: "admin-registered",
 		},
-		{ actor: { id: 2, role: "ADMIN" } },
+		{ actor: actorOf("actor-admin" as UserId, "ADMIN") },
 	);
 	expect(created.username).toBe("admin-registered");
 });
@@ -148,26 +135,22 @@ test("findMany visibility agrees with canViewUser: self sees only self, admin se
 
 	const everyone = await userService.findMany({}, FULL_ACCESS);
 
-	const asStudent = await userService.findMany(
-		{},
-		{ actor: { id: student.id, role: "STUDENT" } },
-	);
-	expect(asStudent.map((u) => u.id).sort()).toEqual(
+	const studentActor = actorOf(student.username as UserId, "STUDENT");
+	const asStudent = await userService.findMany({}, { actor: studentActor });
+	expect(asStudent.map((u) => u.username).sort()).toEqual(
 		everyone
-			.filter((u) => canViewUser({ id: student.id, role: "STUDENT" }, u))
-			.map((u) => u.id)
+			.filter((u) => canViewUser(studentActor, u))
+			.map((u) => u.username)
 			.sort(),
 	);
-	expect(asStudent.map((u) => u.id)).toEqual([student.id]);
+	expect(asStudent.map((u) => u.username)).toEqual([student.username]);
 
-	const asAdmin = await userService.findMany(
-		{},
-		{ actor: { id: admin.id, role: "ADMIN" } },
-	);
-	expect(asAdmin.map((u) => u.id).sort()).toEqual(
+	const adminActor = actorOf(admin.username as UserId, "ADMIN");
+	const asAdmin = await userService.findMany({}, { actor: adminActor });
+	expect(asAdmin.map((u) => u.username).sort()).toEqual(
 		everyone
-			.filter((u) => canViewUser({ id: admin.id, role: "ADMIN" }, u))
-			.map((u) => u.id)
+			.filter((u) => canViewUser(adminActor, u))
+			.map((u) => u.username)
 			.sort(),
 	);
 	expect(asAdmin.length).toBe(everyone.length);

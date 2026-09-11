@@ -44,11 +44,11 @@ const courses = await courseService.findMany({}, { actor });
         <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => {
             const href = courseHref({
-              discipline: course.disciplineSlug,
+              discipline: course.discipline.slug,
               instructor: course.instructor.username,
-              edition: course.editionSlug,
+              edition: course.edition.slug,
             });
-            const isInstructor = course.instructor.id === actor.id;
+            const isInstructor = course.instructor.username === actor.username;
             return (
               <a
                 href={href}
@@ -61,14 +61,14 @@ const courses = await courseService.findMany({}, { actor });
                       isInstructor ? "badge-primary" : "badge-outline",
                     ]}
                   >
-                    {course.disciplineSlug}
+                    {course.discipline.slug}
                   </span>
                   <h2 class="card-title mt-1">{course.discipline.name}</h2>
                   <p class="text-sm text-base-content/60">
                     {isInstructor ? "You're teaching" : course.instructor.name}
                   </p>
                   <p class="mt-3 text-xs text-base-content/50">
-                    {course.editionSlug} · {course._count.enrollments} enrolled
+                    {course.edition.slug} · {course.enrollments.length} enrolled
                   </p>
                 </div>
               </a>

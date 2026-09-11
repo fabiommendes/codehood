@@ -2,7 +2,6 @@ import type { z } from "zod";
 import { canInvite, canViewInvite, inviteVisibility } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed, NotFound } from "@/core/error";
-import type { Optional } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
 	inviteCreate,
@@ -54,16 +53,12 @@ export type InvitePK = z.infer<typeof invitePK>;
 export type InviteFilter = z.infer<typeof inviteFilter>;
 export type InviteUpdate = z.infer<typeof inviteUpdate>;
 
-type DbInvite = Optional<
-	Prisma.InviteGetPayload<{
-		include: typeof inviteInclude;
-	}>,
-	"_count"
->;
+type DbInvite = Prisma.InviteGetPayload<{ include: typeof inviteInclude }>;
 
-/** The minimal course shape the write/read predicates need, loaded alongside every row. */
+/** The creator and redemption count every returned invite carries. */
 const inviteInclude = {
 	_count: { select: { redemptions: true } },
+	createdBy: { select: { username: true, name: true } },
 } satisfies Prisma.InviteInclude;
 
 class InviteService
@@ -89,9 +84,7 @@ class InviteService
 		args: [inviteCreate],
 	})
 	async create(input: InviteCreate, opts: ServiceOpts): Promise<Invite> {
-		const role = input.role ?? "STUDENT";
-
-		if (!canInvite(opts.actor, role)) {
+		if (!canInvite(opts.actor, input.invitedRole)) {
 			throw new NotAllowed({ action: "create-invite" });
 		}
 		const client = opts.tx ?? this.prisma;
@@ -101,16 +94,19 @@ class InviteService
 				tokenHash: hashToken(token),
 				kind: input.kind,
 				email: input.email,
-				role,
+				invitedRole: input.invitedRole,
 				courseId: input.courseId,
 				maxUses: input.maxUses ?? null,
 				expiresAt: new Date(
 					Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
 				),
-				createdById: input.createdById,
+				createdById: input.createdBy.username,
 			},
+			include: inviteInclude,
 		});
-		return fromDb(invite);
+		const result = fromDb(invite);
+		result.token = token; // only here, never in the database
+		return result;
 	}
 
 	/**
@@ -155,7 +151,7 @@ class InviteService
 	})
 	async findMany(filter: InviteFilter, opts: ServiceOpts): Promise<Invite[]> {
 		const client = opts.tx ?? this.prisma;
-		const invites = (await client.invite.findMany({
+		const invites = await client.invite.findMany({
 			where: {
 				AND: [
 					filter.createdById ? { createdById: filter.createdById } : {},
@@ -165,12 +161,9 @@ class InviteService
 					inviteVisibility(opts.actor),
 				],
 			},
-			include: {
-				_count: { select: { redemptions: true } },
-				createdBy: { select: { username: true, name: true } },
-			},
+			include: inviteInclude,
 			orderBy: { createdAt: "desc" },
-		})) satisfies DbInvite[];
+		});
 		return invites.map(fromDb);
 	}
 
@@ -198,8 +191,9 @@ class InviteService
 			include: inviteInclude,
 		});
 
-		const isVisibleInvite = !invite || !canViewInvite(opts.actor, invite);
-		if (isVisibleInvite) throw new NotAllowed({ action: "update-invite" });
+		if (!invite || !canViewInvite(opts.actor, invite)) {
+			throw new NotAllowed({ action: "update-invite" });
+		}
 
 		const updated = await client.invite.update({
 			where: { id: filter.id },
@@ -227,6 +221,7 @@ class InviteService
 		if (!invite || !canViewInvite(opts.actor, invite)) {
 			throw new NotAllowed({ action: "delete-invite" });
 		}
+		await client.invite.delete({ where: { id: filter.id } });
 	}
 
 	// TODO: validate this schema. Should not impose tasks on the caller.
@@ -241,7 +236,7 @@ class InviteService
 	 * redemption failure can't leave a User row with no invite behind it).
 	 * Without one, this opens its own.
 	 */
-	redeem(token: string, userId: number, email: string, opts: ServiceOpts) {
+	redeem(token: string, username: string, email: string, opts: ServiceOpts) {
 		const run = async (tx: PrismaTx) => {
 			const invite = await this.findOne(
 				{ token },
@@ -254,7 +249,7 @@ class InviteService
 
 			try {
 				await tx.inviteRedemption.create({
-					data: { inviteId: invite.id, userId },
+					data: { inviteId: invite.id, userId: username },
 				});
 			} catch {
 				// InviteRedemption.userId is unique: this user already redeemed
@@ -288,6 +283,6 @@ export const inviteService = new InviteService();
 //
 
 function fromDb(db: DbInvite): Invite {
-	const { _count, ...rest } = db;
-	return { ...rest, redemptions: _count?.redemptions ?? 0 };
+	const { _count, createdById: _createdById, ...rest } = db;
+	return { ...rest, redemptions: _count.redemptions };
 }

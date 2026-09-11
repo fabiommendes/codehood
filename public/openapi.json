@@ -166,14 +166,28 @@
                       "BOT"
                     ]
                   },
-                  "userId": {
-                    "type": "integer"
+                  "createdBy": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "username": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "username"
+                    ]
                   }
                 },
                 "required": [
                   "name",
                   "kind",
-                  "userId"
+                  "createdBy"
                 ]
               }
             }
@@ -204,8 +218,22 @@
                         "BOT"
                       ]
                     },
-                    "userId": {
-                      "type": "integer"
+                    "createdBy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "username": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "username"
+                      ]
                     },
                     "lastUsedAt": {
                       "type": "string",
@@ -225,7 +253,7 @@
                     "keyHash",
                     "name",
                     "kind",
-                    "userId",
+                    "createdBy",
                     "lastUsedAt",
                     "createdAt"
                   ]
@@ -244,10 +272,10 @@
         "parameters": [
           {
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
             "required": true,
-            "name": "userId",
+            "name": "createdById",
             "in": "query"
           }
         ],
@@ -278,8 +306,22 @@
                           "BOT"
                         ]
                       },
-                      "userId": {
-                        "type": "integer"
+                      "createdBy": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "username"
+                        ]
                       },
                       "lastUsedAt": {
                         "type": "string",
@@ -299,7 +341,7 @@
                       "keyHash",
                       "name",
                       "kind",
-                      "userId",
+                      "createdBy",
                       "lastUsedAt",
                       "createdAt"
                     ]
@@ -343,8 +385,22 @@
                         "BOT"
                       ]
                     },
-                    "userId": {
-                      "type": "integer"
+                    "createdBy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "username": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "username"
+                      ]
                     },
                     "lastUsedAt": {
                       "type": "string",
@@ -364,7 +420,7 @@
                     "keyHash",
                     "name",
                     "kind",
-                    "userId",
+                    "createdBy",
                     "lastUsedAt",
                     "createdAt"
                   ]
@@ -414,8 +470,22 @@
                         "BOT"
                       ]
                     },
-                    "userId": {
-                      "type": "integer"
+                    "createdBy": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "username": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "username"
+                      ]
                     },
                     "lastUsedAt": {
                       "type": "string",
@@ -435,7 +505,7 @@
                     "keyHash",
                     "name",
                     "kind",
-                    "userId",
+                    "createdBy",
                     "lastUsedAt",
                     "createdAt"
                   ]
@@ -479,21 +549,14 @@
                 "type": "object",
                 "properties": {
                   "courseId": {
-                    "type": "number"
+                    "type": "integer"
                   },
                   "timeSlotId": {
-                    "type": "number"
+                    "type": "integer"
                   },
                   "slug": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "date": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "startMin": {
-                    "type": "integer"
                   },
                   "durationMin": {
                     "type": "integer"
@@ -521,21 +584,27 @@
                     "minLength": 1
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "contentHash": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "startMin": {
+                    "type": "integer"
                   }
                 },
                 "required": [
                   "courseId",
                   "timeSlotId",
                   "slug",
-                  "date",
                   "week",
                   "title",
-                  "contentHash"
+                  "contentHash",
+                  "date"
                 ]
               }
             }
@@ -557,6 +626,29 @@
                     },
                     "timeSlotId": {
                       "type": "integer"
+                    },
+                    "examId": {
+                      "type": "integer"
+                    },
+                    "exam": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "title"
+                      ]
                     },
                     "slug": {
                       "type": "string",
@@ -593,10 +685,6 @@
                     },
                     "description": {
                       "type": "string",
-                      "nullable": true
-                    },
-                    "examId": {
-                      "type": "number",
                       "nullable": true
                     },
                     "contentHash": {
@@ -665,32 +753,13 @@
                         "createdAt",
                         "updatedAt"
                       ]
-                    },
-                    "exam": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "number"
-                        },
-                        "slug": {
-                          "type": "string"
-                        },
-                        "title": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "slug",
-                        "title"
-                      ]
                     }
                   },
                   "required": [
                     "id",
                     "courseId",
                     "timeSlotId",
+                    "exam",
                     "slug",
                     "startAt",
                     "durationMin",
@@ -698,12 +767,10 @@
                     "kind",
                     "title",
                     "description",
-                    "examId",
                     "contentHash",
                     "createdAt",
                     "updatedAt",
-                    "timeSlot",
-                    "exam"
+                    "timeSlot"
                   ]
                 }
               }
@@ -811,6 +878,29 @@
                       "timeSlotId": {
                         "type": "integer"
                       },
+                      "examId": {
+                        "type": "integer"
+                      },
+                      "exam": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "title"
+                        ]
+                      },
                       "slug": {
                         "type": "string",
                         "minLength": 1
@@ -846,10 +936,6 @@
                       },
                       "description": {
                         "type": "string",
-                        "nullable": true
-                      },
-                      "examId": {
-                        "type": "number",
                         "nullable": true
                       },
                       "contentHash": {
@@ -918,32 +1004,13 @@
                           "createdAt",
                           "updatedAt"
                         ]
-                      },
-                      "exam": {
-                        "type": "object",
-                        "nullable": true,
-                        "properties": {
-                          "id": {
-                            "type": "number"
-                          },
-                          "slug": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "slug",
-                          "title"
-                        ]
                       }
                     },
                     "required": [
                       "id",
                       "courseId",
                       "timeSlotId",
+                      "exam",
                       "slug",
                       "startAt",
                       "durationMin",
@@ -951,12 +1018,10 @@
                       "kind",
                       "title",
                       "description",
-                      "examId",
                       "contentHash",
                       "createdAt",
                       "updatedAt",
-                      "timeSlot",
-                      "exam"
+                      "timeSlot"
                     ]
                   }
                 }
@@ -989,6 +1054,29 @@
                     },
                     "timeSlotId": {
                       "type": "integer"
+                    },
+                    "examId": {
+                      "type": "integer"
+                    },
+                    "exam": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "title"
+                      ]
                     },
                     "slug": {
                       "type": "string",
@@ -1025,10 +1113,6 @@
                     },
                     "description": {
                       "type": "string",
-                      "nullable": true
-                    },
-                    "examId": {
-                      "type": "number",
                       "nullable": true
                     },
                     "contentHash": {
@@ -1097,32 +1181,13 @@
                         "createdAt",
                         "updatedAt"
                       ]
-                    },
-                    "exam": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "number"
-                        },
-                        "slug": {
-                          "type": "string"
-                        },
-                        "title": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "slug",
-                        "title"
-                      ]
                     }
                   },
                   "required": [
                     "id",
                     "courseId",
                     "timeSlotId",
+                    "exam",
                     "slug",
                     "startAt",
                     "durationMin",
@@ -1130,12 +1195,10 @@
                     "kind",
                     "title",
                     "description",
-                    "examId",
                     "contentHash",
                     "createdAt",
                     "updatedAt",
-                    "timeSlot",
-                    "exam"
+                    "timeSlot"
                   ]
                 }
               }
@@ -1213,6 +1276,29 @@
                     "timeSlotId": {
                       "type": "integer"
                     },
+                    "examId": {
+                      "type": "integer"
+                    },
+                    "exam": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "title"
+                      ]
+                    },
                     "slug": {
                       "type": "string",
                       "minLength": 1
@@ -1248,10 +1334,6 @@
                     },
                     "description": {
                       "type": "string",
-                      "nullable": true
-                    },
-                    "examId": {
-                      "type": "number",
                       "nullable": true
                     },
                     "contentHash": {
@@ -1320,32 +1402,13 @@
                         "createdAt",
                         "updatedAt"
                       ]
-                    },
-                    "exam": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "number"
-                        },
-                        "slug": {
-                          "type": "string"
-                        },
-                        "title": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "slug",
-                        "title"
-                      ]
                     }
                   },
                   "required": [
                     "id",
                     "courseId",
                     "timeSlotId",
+                    "exam",
                     "slug",
                     "startAt",
                     "durationMin",
@@ -1353,12 +1416,10 @@
                     "kind",
                     "title",
                     "description",
-                    "examId",
                     "contentHash",
                     "createdAt",
                     "updatedAt",
-                    "timeSlot",
-                    "exam"
+                    "timeSlot"
                   ]
                 }
               }
@@ -1399,17 +1460,20 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "disciplineSlug": {
+                  "discipline": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "Discipline slug"
                   },
                   "instructor": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "Instructor username"
                   },
                   "edition": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "Edition slug"
                   },
                   "description": {
                     "type": "string"
@@ -1426,7 +1490,7 @@
                   }
                 },
                 "required": [
-                  "disciplineSlug",
+                  "discipline",
                   "instructor",
                   "edition",
                   "startAt",
@@ -1451,14 +1515,76 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "disciplineSlug": {
-                      "type": "string"
+                    "discipline": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ]
                     },
-                    "editionSlug": {
-                      "type": "string"
+                    "edition": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ]
                     },
-                    "instructorSlug": {
-                      "type": "string"
+                    "instructor": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "username": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "username"
+                      ]
+                    },
+                    "enrollments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "username"
+                        ]
+                      }
                     },
                     "startAt": {
                       "type": "string",
@@ -1476,135 +1602,23 @@
                       "type": "string",
                       "format": "date-time"
                     },
-                    "discipline": {
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "slug",
-                        "name",
-                        "createdAt"
-                      ]
-                    },
-                    "edition": {
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "startAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        },
-                        "endAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "slug",
-                        "name",
-                        "startAt",
-                        "endAt",
-                        "createdAt"
-                      ]
-                    },
-                    "instructor": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        },
-                        "publicId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "username": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "publicId",
-                        "username",
-                        "name"
-                      ]
-                    },
-                    "enrollments": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "userId": {
-                            "type": "integer"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "userId",
-                          "createdAt"
-                        ]
-                      }
-                    },
-                    "_count": {
-                      "type": "object",
-                      "properties": {
-                        "enrollments": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "enrollments"
-                      ]
+                    "joinedAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
                   "required": [
                     "id",
                     "description",
-                    "disciplineSlug",
-                    "editionSlug",
-                    "instructorSlug",
-                    "startAt",
-                    "endAt",
-                    "createdAt",
-                    "updatedAt",
                     "discipline",
                     "edition",
                     "instructor",
                     "enrollments",
-                    "_count"
+                    "startAt",
+                    "endAt",
+                    "createdAt",
+                    "updatedAt",
+                    "joinedAt"
                   ]
                 }
               }
@@ -1661,14 +1675,76 @@
                         "type": "string",
                         "nullable": true
                       },
-                      "disciplineSlug": {
-                        "type": "string"
+                      "discipline": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name"
+                        ]
                       },
-                      "editionSlug": {
-                        "type": "string"
+                      "edition": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name"
+                        ]
                       },
-                      "instructorSlug": {
-                        "type": "string"
+                      "instructor": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "username"
+                        ]
+                      },
+                      "enrollments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "username": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "username"
+                          ]
+                        }
                       },
                       "startAt": {
                         "type": "string",
@@ -1686,135 +1762,23 @@
                         "type": "string",
                         "format": "date-time"
                       },
-                      "discipline": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "name": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "createdAt"
-                        ]
-                      },
-                      "edition": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "name": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "startAt": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "date-time"
-                          },
-                          "endAt": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "date-time"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "startAt",
-                          "endAt",
-                          "createdAt"
-                        ]
-                      },
-                      "instructor": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer"
-                          },
-                          "publicId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "username": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "name": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "publicId",
-                          "username",
-                          "name"
-                        ]
-                      },
-                      "enrollments": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "userId": {
-                              "type": "integer"
-                            },
-                            "createdAt": {
-                              "type": "string",
-                              "format": "date-time"
-                            }
-                          },
-                          "required": [
-                            "userId",
-                            "createdAt"
-                          ]
-                        }
-                      },
-                      "_count": {
-                        "type": "object",
-                        "properties": {
-                          "enrollments": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "enrollments"
-                        ]
+                      "joinedAt": {
+                        "type": "string",
+                        "format": "date-time"
                       }
                     },
                     "required": [
                       "id",
                       "description",
-                      "disciplineSlug",
-                      "editionSlug",
-                      "instructorSlug",
-                      "startAt",
-                      "endAt",
-                      "createdAt",
-                      "updatedAt",
                       "discipline",
                       "edition",
                       "instructor",
                       "enrollments",
-                      "_count"
+                      "startAt",
+                      "endAt",
+                      "createdAt",
+                      "updatedAt",
+                      "joinedAt"
                     ]
                   }
                 }
@@ -1846,14 +1810,76 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "disciplineSlug": {
-                      "type": "string"
+                    "discipline": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ]
                     },
-                    "editionSlug": {
-                      "type": "string"
+                    "edition": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ]
                     },
-                    "instructorSlug": {
-                      "type": "string"
+                    "instructor": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "username": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "username"
+                      ]
+                    },
+                    "enrollments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "username"
+                        ]
+                      }
                     },
                     "startAt": {
                       "type": "string",
@@ -1871,135 +1897,23 @@
                       "type": "string",
                       "format": "date-time"
                     },
-                    "discipline": {
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "slug",
-                        "name",
-                        "createdAt"
-                      ]
-                    },
-                    "edition": {
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "startAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        },
-                        "endAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "slug",
-                        "name",
-                        "startAt",
-                        "endAt",
-                        "createdAt"
-                      ]
-                    },
-                    "instructor": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        },
-                        "publicId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "username": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "publicId",
-                        "username",
-                        "name"
-                      ]
-                    },
-                    "enrollments": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "userId": {
-                            "type": "integer"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "userId",
-                          "createdAt"
-                        ]
-                      }
-                    },
-                    "_count": {
-                      "type": "object",
-                      "properties": {
-                        "enrollments": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "enrollments"
-                      ]
+                    "joinedAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
                   "required": [
                     "id",
                     "description",
-                    "disciplineSlug",
-                    "editionSlug",
-                    "instructorSlug",
-                    "startAt",
-                    "endAt",
-                    "createdAt",
-                    "updatedAt",
                     "discipline",
                     "edition",
                     "instructor",
                     "enrollments",
-                    "_count"
+                    "startAt",
+                    "endAt",
+                    "createdAt",
+                    "updatedAt",
+                    "joinedAt"
                   ]
                 }
               }
@@ -2020,19 +1934,23 @@
                 "type": "object",
                 "properties": {
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "startAt": {
                     "type": "string",
-                    "nullable": true,
                     "format": "date-time"
                   },
                   "endAt": {
                     "type": "string",
-                    "nullable": true,
                     "format": "date-time"
                   }
-                }
+                },
+                "required": [
+                  "description",
+                  "startAt",
+                  "endAt"
+                ]
               }
             }
           }
@@ -2052,14 +1970,76 @@
                       "type": "string",
                       "nullable": true
                     },
-                    "disciplineSlug": {
-                      "type": "string"
+                    "discipline": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ]
                     },
-                    "editionSlug": {
-                      "type": "string"
+                    "edition": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ]
                     },
-                    "instructorSlug": {
-                      "type": "string"
+                    "instructor": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "username": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "username"
+                      ]
+                    },
+                    "enrollments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "username"
+                        ]
+                      }
                     },
                     "startAt": {
                       "type": "string",
@@ -2077,135 +2057,23 @@
                       "type": "string",
                       "format": "date-time"
                     },
-                    "discipline": {
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "slug",
-                        "name",
-                        "createdAt"
-                      ]
-                    },
-                    "edition": {
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "startAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        },
-                        "endAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "nullable": true,
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "slug",
-                        "name",
-                        "startAt",
-                        "endAt",
-                        "createdAt"
-                      ]
-                    },
-                    "instructor": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        },
-                        "publicId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "username": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "publicId",
-                        "username",
-                        "name"
-                      ]
-                    },
-                    "enrollments": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "userId": {
-                            "type": "integer"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "userId",
-                          "createdAt"
-                        ]
-                      }
-                    },
-                    "_count": {
-                      "type": "object",
-                      "properties": {
-                        "enrollments": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "enrollments"
-                      ]
+                    "joinedAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
                   "required": [
                     "id",
                     "description",
-                    "disciplineSlug",
-                    "editionSlug",
-                    "instructorSlug",
-                    "startAt",
-                    "endAt",
-                    "createdAt",
-                    "updatedAt",
                     "discipline",
                     "edition",
                     "instructor",
                     "enrollments",
-                    "_count"
+                    "startAt",
+                    "endAt",
+                    "createdAt",
+                    "updatedAt",
+                    "joinedAt"
                   ]
                 }
               }
@@ -3087,7 +2955,7 @@
                 "type": "object",
                 "properties": {
                   "courseId": {
-                    "type": "number"
+                    "type": "integer"
                   },
                   "slug": {
                     "type": "string",
@@ -3731,7 +3599,7 @@
                 "type": "object",
                 "properties": {
                   "courseId": {
-                    "type": "number"
+                    "type": "integer"
                   },
                   "slug": {
                     "type": "string",
@@ -4153,15 +4021,15 @@
                       "ADMIN"
                     ]
                   },
-                  "password": {
-                    "type": "string",
-                    "minLength": 1
-                  },
                   "githubId": {
                     "type": "string"
                   },
                   "schoolId": {
                     "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -4183,13 +4051,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "integer"
-                    },
-                    "publicId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
                     "email": {
                       "type": "string",
                       "format": "email"
@@ -4221,8 +4082,6 @@
                     }
                   },
                   "required": [
-                    "id",
-                    "publicId",
                     "email",
                     "name",
                     "username",
@@ -4274,13 +4133,6 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": {
-                        "type": "integer"
-                      },
-                      "publicId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
                       "email": {
                         "type": "string",
                         "format": "email"
@@ -4312,8 +4164,6 @@
                       }
                     },
                     "required": [
-                      "id",
-                      "publicId",
                       "email",
                       "name",
                       "username",
@@ -4343,13 +4193,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "integer"
-                    },
-                    "publicId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
                     "email": {
                       "type": "string",
                       "format": "email"
@@ -4381,8 +4224,6 @@
                     }
                   },
                   "required": [
-                    "id",
-                    "publicId",
                     "email",
                     "name",
                     "username",
@@ -4435,13 +4276,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "integer"
-                    },
-                    "publicId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
                     "email": {
                       "type": "string",
                       "format": "email"
@@ -4473,8 +4307,6 @@
                     }
                   },
                   "required": [
-                    "id",
-                    "publicId",
                     "email",
                     "name",
                     "username",

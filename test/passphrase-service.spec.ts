@@ -54,7 +54,7 @@ async function makeCourse(instructorUsername: string) {
 	await disciplineService.create({ slug, name: slug }, FULL_ACCESS);
 	return courseService.create(
 		{
-			disciplineSlug: slug,
+			discipline: slug,
 			instructor: instructorUsername,
 			edition: "2026-1",
 			startAt: new Date("2026-01-01"),

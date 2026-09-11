@@ -1,19 +1,14 @@
 import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
+import type { User } from "@/db";
 
-export interface StudentRow {
-	id: number;
-	name: string;
-	username: string;
-	email: string;
-	githubId: string;
-	schoolId: string;
+type EnrolledUser = User & {
 	enrolledAt: Date;
-}
+};
 
 interface Props {
-	students: StudentRow[];
+	students: EnrolledUser[];
 	courseId: number;
 }
 
@@ -32,48 +27,48 @@ function formatDate(date: Date): string {
  * "Leave course" button uses, gated per-actor by `canDropEnrollment`.
  */
 export default function StudentsTable(props: Props): JSX.Element {
-	const columns: ColumnConfig<StudentRow>[] = [
-		{ title: "Name", class: "font-medium", render: (row) => row.name },
+	const columns: ColumnConfig<EnrolledUser>[] = [
+		{ title: "Name", class: "font-medium", render: (user) => user.name },
 		{
 			title: "Username",
 			class: "font-mono text-sm text-base-content/60",
-			render: (row) => `@${row.username}`,
+			render: (user) => `@${user.username}`,
 		},
 		{
 			title: "Email",
 			class: "text-base-content/60",
-			render: (row) => row.email,
+			render: (user) => user.email,
 		},
 		{
 			title: "GitHub",
 			class: "font-mono text-sm text-base-content/60",
-			render: (row) => row.githubId,
+			render: (user) => user.githubId,
 		},
 		{
 			title: "School ID",
 			class: "font-mono text-sm text-base-content/60",
-			render: (row) => row.schoolId,
+			render: (user) => user.schoolId,
 		},
 		{
 			title: "Enrolled",
 			class: "text-base-content/60",
-			render: (row) => formatDate(row.enrolledAt),
+			render: (user) => formatDate(user.enrolledAt),
 		},
 		{
 			title: "Actions",
 			class: "text-right",
 			headerClass: "text-right",
-			render: (row) => (
+			render: (user) => (
 				<>
 					<button
 						type="button"
 						class="btn btn-outline btn-error btn-sm"
-						data-open-dialog={`drop-student-${row.id}`}
+						data-open-dialog={`drop-student-${user.username}`}
 					>
 						Drop
 					</button>
 
-					<dialog id={`drop-student-${row.id}`} class="modal">
+					<dialog id={`drop-student-${user.username}`} class="modal">
 						<div class="modal-box">
 							<form method="dialog">
 								<button
@@ -84,7 +79,7 @@ export default function StudentsTable(props: Props): JSX.Element {
 								</button>
 							</form>
 							<h3 class="text-lg font-bold">
-								Drop {row.name} from this course?
+								Drop {user.name} from this course?
 							</h3>
 							<p class="mt-2 text-sm text-base-content/70">
 								Their access ends immediately. Nothing is deleted — their
@@ -97,7 +92,7 @@ export default function StudentsTable(props: Props): JSX.Element {
 								class="modal-action"
 							>
 								<input type="hidden" name="courseId" value={props.courseId} />
-								<input type="hidden" name="userId" value={row.id} />
+								<input type="hidden" name="userId" value={user.username} />
 								{/* formmethod="dialog" overrides the form's post just for this button, so
 								    Cancel closes the dialog without submitting the drop. */}
 								<button type="submit" formmethod="dialog" class="btn btn-ghost">

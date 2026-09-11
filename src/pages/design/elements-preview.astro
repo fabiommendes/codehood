@@ -1,0 +1,611 @@
+---
+import BrandSquares from "../../components/BrandSquares.astro";
+import ListRow from "../../components/ListRow.astro";
+import PageKicker from "../../components/PageKicker.astro";
+import Alert from "../../components/ui/Alert";
+import Badge from "../../components/ui/Badge";
+import Button from "../../components/ui/Button";
+import Card from "../../components/ui/Card";
+import Table from "../../components/ui/Table";
+import Tabs from "../../components/ui/Tabs.astro";
+import DesignLayout from "../../layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const buttonVariants = [
+	"primary",
+	"secondary",
+	"accent",
+	"neutral",
+	"ghost",
+	"outline",
+] as const;
+const badgeVariants = [
+	"neutral",
+	"primary",
+	"secondary",
+	"accent",
+	"info",
+	"success",
+	"warning",
+	"error",
+] as const;
+const alertVariants = ["info", "success", "warning", "error"] as const;
+
+const tableRows = [
+	{ name: "my laptop", kind: "cli", lastUsed: "yesterday" },
+	{ name: "grading bot", kind: "bot", lastUsed: "never" },
+];
+const tableColumns = [
+	{
+		title: "Name",
+		class: "font-medium py-3.5 pl-6",
+		headerClass: "pl-6 py-3.5 font-bold text-base-content/85",
+		render: (row: (typeof tableRows)[number]) => row.name,
+	},
+	{
+		title: "Kind",
+		class: "py-3.5 font-mono text-xs",
+		headerClass: "py-3.5 font-bold text-base-content/85",
+		render: (row: (typeof tableRows)[number]) => row.kind,
+	},
+	{
+		title: "Last used",
+		class: "text-right pr-6 py-3.5 text-base-content/75",
+		headerClass: "text-right pr-6 py-3.5 font-bold text-base-content/85",
+		render: (row: (typeof tableRows)[number]) => row.lastUsed,
+	},
+];
+
+const tabItems = [
+	{ key: "overview", label: "Overview" },
+	{ key: "history", label: "History" },
+] as const;
+---
+
+<DesignLayout title="Improved Elements Preview" active="elements">
+  <div class="custom-design-elements">
+    <section class="mb-14">
+      <div class="flex items-center gap-3">
+        <PageKicker text="Refined Design System" />
+        <span class="badge badge-success badge-sm font-semibold text-white">INTERACTIVE PREVIEW</span>
+      </div>
+      <h1 class="text-4xl font-bold mt-1 tracking-tight text-base-content font-display">Aesthetic Elements Preview</h1>
+      <p class="mt-4 max-w-2xl text-base-content/70 leading-relaxed font-sans">
+        This is a polished showcase containing proposed visual refinements of our core UI elements. We've enhanced shadows, 
+        paddings, hover transitions, and status cues to establish an exceptionally premium dev-tool aesthetic, while strictly keeping 
+        all existing components, logo, colors, and data.
+      </p>
+    </section>
+
+    <!-- BUTTON SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Button <span class="text-xs font-normal text-success font-mono">Added: click states + hover lifting</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">btn-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        Buttons now feel physical. They feature transition effects that translate upwards by <code class="text-xs font-mono bg-base-200 px-1 py-0.5 rounded">1px</code> on mouseover, 
+        acquire a soft drop-shadow, and return to flat ground on click.
+      </p>
+      <div class="card card-border bg-base-100 hover:shadow-sm transition-all duration-200">
+        <div class="card-body flex-row flex-wrap gap-3.5 p-8">
+          {
+            buttonVariants.map((variant) => (
+              <Button variant={variant} class="btn-aesthetic capitalize">{variant}</Button>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- BADGE SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Badge <span class="text-xs font-normal text-success font-mono">Added: micro status dots</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">badge-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        Badges have been evolved with micro status indicators. Standard flat background chips can feel anonymous; introducing active color dots creates meaningful status-at-a-glance.
+      </p>
+      <div class="card card-border bg-base-100 hover:shadow-sm transition-all duration-200">
+        <div class="card-body flex-row flex-wrap items-center gap-4 p-8">
+          {
+            badgeVariants.map((variant) => (
+              <div class={`badge-aesthetic badge-aesthetic-${variant}`}>
+                <span class="status-dot"></span>
+                <span class="capitalize text-xs font-semibold">{variant}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ALERT SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Alert <span class="text-xs font-normal text-success font-mono">Added: soft tinted background + left accent strip</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">alert-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        The original alerts are full-tint blocks that can be visually overwhelming. This refined design pairs a very gentle background tint with a sharp left accent bar and beautiful crisp icons.
+      </p>
+      <div class="flex flex-col gap-4">
+        <div class="refined-alert alert-info">
+          <span class="alert-strip"></span>
+          <svg class="alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <div class="alert-message">
+            <strong>Info</strong> &mdash; This is what an info message looks like, styled beautifully with a balanced accent.
+          </div>
+        </div>
+
+        <div class="refined-alert alert-success">
+          <span class="alert-strip"></span>
+          <svg class="alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <div class="alert-message">
+            <strong>Success</strong> &mdash; This is what a success message looks like, styled beautifully with a balanced accent.
+          </div>
+        </div>
+
+        <div class="refined-alert alert-warning">
+          <span class="alert-strip"></span>
+          <svg class="alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <div class="alert-message">
+            <strong>Warning</strong> &mdash; This is what a warning message looks like, styled beautifully with a balanced accent.
+          </div>
+        </div>
+
+        <div class="refined-alert alert-error">
+          <span class="alert-strip"></span>
+          <svg class="alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+          <div class="alert-message">
+            <strong>Error</strong> &mdash; This is what an error message looks like, styled beautifully with a balanced accent.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARD SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Card <span class="text-xs font-normal text-success font-mono">Added: micro top-accent strip + shadow elevation</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">card-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed font-sans">
+        Cards now incorporate our four-color system stripe at the top edge to tie the containers into the brand, plus a modern corner radius and subtle shadow elevation.
+      </p>
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div class="refined-card">
+          <span class="card-brand-top"></span>
+          <h2 class="text-lg font-bold font-display text-base-content mb-2">With a title</h2>
+          <p class="text-sm text-base-content/70 leading-relaxed">
+            Pass a <code class="font-mono text-xs bg-primary-soft text-primary-strong px-1.5 py-0.5 rounded">title</code> prop and it renders
+            as a card-title heading with a neat, responsive padding layout.
+          </p>
+        </div>
+        <div class="refined-card">
+          <span class="card-brand-top"></span>
+          <p class="text-sm text-base-content/70 leading-relaxed mt-1">
+            Omit it and the card is just a wonderfully clean, rounded container for showcasing whatever educational dashboard content you put inside.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DIVIDER & LIST SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Divider &amp; List <span class="text-xs font-normal text-success font-mono">Added: row separators + hover contrast</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">list-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        Row details inside lists have more structural integrity. They support rounded, hoverable highlights and subtle separation lines without visual clutter.
+      </p>
+      <div class="card card-border bg-base-100 overflow-hidden hover:shadow-sm transition-all duration-200">
+        <div class="card-body p-6">
+          <ul class="refined-list flex flex-col gap-1.5">
+            <li class="refined-list-row">
+              <div>
+                <div class="font-bold text-sm text-base-content">my laptop</div>
+                <div class="text-xs text-base-content/55 mt-0.5">
+                  created Jan 3 &middot; last used yesterday
+                </div>
+              </div>
+              <span class="refined-inline-badge">cli</span>
+            </li>
+            <li class="refined-list-row">
+              <div>
+                <div class="font-bold text-sm text-base-content">grading bot</div>
+                <div class="text-xs text-base-content/55 mt-0.5">
+                  created Feb 12 &middot; last used never
+                </div>
+              </div>
+              <span class="refined-inline-badge">bot</span>
+            </li>
+          </ul>
+          <div class="divider before:bg-base-200 after:bg-base-200 my-4"></div>
+          <p class="text-xs text-base-content/50 italic">
+            <code class="font-mono text-[11px]">divider</code> separates the list from whatever
+            follows it &mdash; on the profile page, the create-key form.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLE SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Table <span class="text-xs font-normal text-success font-mono">Added: micro rounded border + subtle striping</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">table-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        The refined table component integrates custom padding, soft backgrounds, and is fully responsive while keeping simple clean zebra-striping.
+      </p>
+      <div class="refined-table-container">
+        <Table columns={tableColumns} data={tableRows} />
+      </div>
+    </section>
+
+    <!-- TABS SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          Tabs <span class="text-xs font-normal text-success font-mono">Added: micro pills and transitions</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">tabs-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        Tabs are polished into rounded tabs with soft active-indicator curves below the active state.
+      </p>
+      <div class="card card-border bg-base-100 hover:shadow-sm transition-all duration-200">
+        <div class="card-body p-6">
+          <Tabs items={tabItems} active="overview" />
+        </div>
+      </div>
+    </section>
+
+    <!-- LISTROW SECTION -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          ListRow <span class="text-xs font-normal text-success font-mono">Added: hover hover:translate-x-1 + status icons</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">listrow-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        ListRows represent individual items like assignments or exams. We have added a subtle horizontal movement transition (`hover:translate-x-1`) and a clean icon outline structure.
+      </p>
+      <div class="flex flex-col gap-3">
+        <ListRow href="#" class="refined-listrow-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div>
+              <div class="font-bold text-sm text-base-content transition-colors group-hover:text-primary">Midterm exam</div>
+              <div class="text-xs text-base-content/60 mt-0.5">
+                opens Mar 3 &middot; 90 minutes
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#229b62]/10 text-[#229b62] text-xs font-bold font-display">
+              <span class="block w-1.5 h-1.5 rounded-full bg-[#229b62]"></span>
+              open
+            </span>
+          </div>
+        </ListRow>
+
+        <ListRow muted class="refined-listrow-card muted">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div>
+              <div class="font-bold text-sm text-base-content">Final exam</div>
+              <div class="text-xs text-base-content/60 mt-0.5">opens Jun 12</div>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-base-200 text-base-content/50 text-xs font-bold font-display border border-base-300">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              locked
+            </span>
+          </div>
+        </ListRow>
+      </div>
+    </section>
+
+    <!-- PAGEKICKER & BRANDSQUARES -->
+    <section class="mb-14">
+      <div class="flex items-center justify-between mb-4 border-b border-base-200 pb-2">
+        <h2 class="text-xl font-bold font-display text-base-content flex items-center gap-2">
+          PageKicker &amp; BrandSquares <span class="text-xs font-normal text-success font-mono">Added: micro color dots & crisp boundaries</span>
+        </h2>
+        <span class="badge badge-xs badge-neutral font-mono">brand-refined</span>
+      </div>
+      <p class="mb-5 text-sm text-base-content/60 leading-relaxed">
+        Page kickers are small uppercase labels. Coupled with `BrandSquares`, we present a crisp geometric continuous line.
+      </p>
+      <div class="card card-border bg-base-100 hover:shadow-sm transition-all duration-200">
+        <div class="card-body gap-5 p-8">
+          <PageKicker text="Reference" squares />
+          <PageKicker text="Section" />
+          <div class="flex items-center gap-3 bg-base-200 p-3 rounded-lg border border-base-300 w-fit">
+            <BrandSquares />
+            <span class="text-xs text-base-content/60 font-semibold"
+              >BrandSquares on its own</span
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</DesignLayout>
+
+<style is:global>
+  /* Custom refinements layout */
+  .custom-design-elements {
+    --br: 12px;
+  }
+
+  /* Refined Button */
+  .btn-aesthetic {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    border-radius: var(--br) !important;
+    border: 1.5px solid transparent !important;
+  }
+  
+  .btn-aesthetic:not(.btn-ghost):not(.btn-outline):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -10px currentColor !important;
+  }
+
+  .btn-aesthetic.btn-outline {
+    border-color: var(--line) !important;
+    color: var(--ink) !important;
+  }
+
+  .btn-aesthetic.btn-outline:hover {
+    border-color: var(--primary) !important;
+    color: #fff !important;
+    background: var(--primary) !important;
+    transform: translateY(-2px);
+  }
+
+  .btn-aesthetic.btn-ghost:hover {
+    background: var(--primary-soft) !important;
+    color: var(--primary-strong) !important;
+  }
+
+  /* Refined Badges with status dots */
+  .badge-aesthetic {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 99px;
+    font-family: "IBM Plex Sans", sans-serif;
+    border: 1px solid transparent;
+  }
+
+  .badge-aesthetic .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: block;
+    background: currentColor;
+  }
+
+  /* Variant Colors Mixes for status badges */
+  .badge-aesthetic-neutral {
+    background: color-mix(in srgb, var(--ink) 8%, var(--surface));
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--ink) 12%, transparent);
+  }
+  .badge-aesthetic-primary {
+    background: var(--primary-soft);
+    color: var(--primary-strong);
+    border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  }
+  .badge-aesthetic-secondary {
+    background: color-mix(in srgb, var(--green) 8%, var(--surface));
+    color: var(--green);
+    border-color: color-mix(in srgb, var(--green) 20%, transparent);
+  }
+  .badge-aesthetic-accent {
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  }
+  .badge-aesthetic-info {
+    background: var(--primary-soft);
+    color: var(--primary-strong);
+    border-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  }
+  .badge-aesthetic-success {
+    background: rgba(34, 155, 98, 0.08);
+    color: #229b62;
+    border-color: rgba(34, 155, 98, 0.2);
+  }
+  .badge-aesthetic-warning {
+    background: rgba(228, 173, 25, 0.08);
+    color: #c48b06;
+    border-color: rgba(228, 173, 25, 0.2);
+  }
+  .badge-aesthetic-error {
+    background: rgba(217, 77, 63, 0.08);
+    color: #d94d3f;
+    border-color: rgba(217, 77, 63, 0.2);
+  }
+
+  /* Refined Alert styled like premium Github notifications */
+  .refined-alert {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-radius: var(--br);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    overflow: hidden;
+    box-shadow: 0 4px 20px -8px rgba(18, 45, 53, 0.08);
+  }
+
+  .alert-strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--ink);
+  }
+
+  .alert-icon {
+    flex-shrink: 0;
+  }
+
+  .alert-message {
+    font-size: 14.5px;
+    line-height: 1.5;
+    text-align: left;
+  }
+
+  /* Alert specific colors styling */
+  .alert-info {
+    background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+    border-color: color-mix(in srgb, var(--primary) 12%, var(--line));
+  }
+  .alert-info .alert-strip { background: var(--primary); }
+  .alert-info .alert-icon { color: var(--primary); }
+
+  .alert-success {
+    background: color-mix(in srgb, var(--green) 4%, var(--surface));
+    border-color: color-mix(in srgb, var(--green) 12%, var(--line));
+  }
+  .alert-success .alert-strip { background: var(--green); }
+  .alert-success .alert-icon { color: var(--green); }
+
+  .alert-warning {
+    background: color-mix(in srgb, var(--yellow) 4%, var(--surface));
+    border-color: color-mix(in srgb, var(--yellow) 12%, var(--line));
+  }
+  .alert-warning .alert-strip { background: var(--yellow); }
+  .alert-warning .alert-icon { color: var(--yellow); }
+
+  .alert-error {
+    background: color-mix(in srgb, var(--red) 4%, var(--surface));
+    border-color: color-mix(in srgb, var(--red) 12%, var(--line));
+  }
+  .alert-error .alert-strip { background: var(--red); }
+  .alert-error .alert-icon { color: var(--red); }
+
+  /* Refined Card layout with stripe accent */
+  .refined-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px 24px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px -8px rgba(18, 45, 53, 0.05);
+    text-align: left;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .refined-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -10px rgba(18, 45, 53, 0.09);
+  }
+
+  .card-brand-top {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--green), var(--yellow), var(--red));
+  }
+
+  /* Refined List styles */
+  .refined-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: transparent;
+    transition: background 0.2s ease;
+    text-align: left;
+  }
+
+  .refined-list-row:hover {
+    background: color-mix(in srgb, var(--page) 50%, var(--surface));
+  }
+
+  .refined-inline-badge {
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    border: 1.5px solid var(--line);
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--surface);
+  }
+
+  /* Refined Table container */
+  .refined-table-container {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 4px 16px -6px rgba(18, 45, 53, 0.04);
+  }
+
+  .refined-table-container table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .refined-table-container th {
+    background: color-mix(in srgb, var(--page) 40%, var(--surface)) !important;
+    border-bottom: 2px solid var(--line) !important;
+  }
+
+  .refined-table-container tr {
+    transition: background 0.15s ease;
+  }
+
+  .refined-table-container tr:not(:last-child) td {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .refined-table-container tr:hover {
+    background: color-mix(in srgb, var(--page) 25%, var(--surface)) !important;
+  }
+
+  /* Refined ListRow style */
+  .refined-listrow-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+    border-radius: var(--br) !important;
+    padding: 18px 22px !important;
+    margin-bottom: 2px;
+  }
+
+  .refined-listrow-card:hover {
+    transform: translateX(4px) !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 6px 18px -8px rgba(18, 45, 53, 0.08) !important;
+  }
+
+  .refined-listrow-card.muted {
+    opacity: 0.65;
+  }
+</style>

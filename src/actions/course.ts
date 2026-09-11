@@ -1,8 +1,10 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
+import type { CourseId } from "@/db/services/course.service";
 import { courseService } from "@/db/services/course.service";
 import { passphraseService } from "@/db/services/passphrase.service";
+import type { UserId } from "@/db/services/user.service";
 import { withActionErrors, withServiceErrors } from "./helpers";
 
 export const course = {
@@ -16,12 +18,15 @@ export const course = {
 		accept: "form",
 		input: z.object({
 			courseId: z.coerce.number().int(),
-			userId: z.coerce.number().int().optional(),
+			userId: z.string().optional(),
 		}),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await courseService.drop(
-				{ courseId: input.courseId, userId: input.userId ?? actor.id },
+				{
+					courseId: input.courseId as CourseId,
+					userId: (input.userId as UserId | undefined) ?? actor.username,
+				},
 				{ actor },
 			);
 		}),

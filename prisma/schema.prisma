@@ -27,17 +27,25 @@ enum InviteKind {
 }
 
 model User {
-  id               Int               @id @default(autoincrement())
-  publicId         String            @unique
-  username         String            @unique
-  email            String            @unique
-  schoolId         String            @unique
-  githubId         String            @unique
-  name             String
-  passwordHash     String
-  role             Role
-  image            String?
-  createdAt        DateTime          @default(now())
+  // Basic indentification and credentials
+  username     String @id @unique
+  name         String
+  passwordHash String
+  role         Role
+
+  // Additional required fields for the system
+  email String @unique
+
+  // Soft-nullable. @unique fields cannot be null, but those have unique sentinel
+  // values that effectively make them nullable. The database value is not nullable,
+  // but service code should convert them back to null's. 
+  // Both for schoolId and githubId, the null sentinel is `!<username>`.
+  schoolId String @unique
+  githubId String @unique
+
+  image     String?
+  createdAt DateTime @default(now())
+
   apiKeys          ApiKey[]
   invitesSent      Invite[]          @relation("InviteCreatedBy")
   redemption       InviteRedemption?
@@ -60,14 +68,15 @@ model Group {
   questionRefs QuestionRef[]
 }
 
+/// M2M relation table linking users to groups.
 model GroupMembership {
   id Int @id @default(autoincrement())
 
   groupId Int
   group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [username], onDelete: Cascade)
+  userId String
 
   isAdmin Boolean @default(false)
 
@@ -77,37 +86,44 @@ model GroupMembership {
 model Session {
   id        Int      @id @default(autoincrement())
   tokenHash String   @unique
-  userId    Int
   expiresAt DateTime
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [username], onDelete: Cascade)
 }
 
 model ApiKey {
-  id         Int        @id @default(autoincrement())
-  keyHash    String     @unique
-  name       String
-  kind       ApiKeyKind
-  userId     Int
+  // AUDIT: is it vulnerable to enumeration attacks?
+  id      Int        @id @default(autoincrement())
+  keyHash String     @unique
+  name    String
+  kind    ApiKeyKind
+
+  // User who owns this key.
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [username], onDelete: Cascade)
+
   lastUsedAt DateTime?
-  createdAt  DateTime   @default(now())
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
 }
 
 model Invite {
-  id        Int    @id @default(autoincrement())
-  tokenHash String @unique
+  // AUDIT: is it vulnerable to enumeration attacks?
+  id        Int        @id @default(autoincrement())
+  tokenHash String     @unique
+  kind      InviteKind
 
-  kind    InviteKind
-  role    Role
-  maxUses Int?
-  email   String?
+  /// Role assigned to users who redeem this invite.
+  invitedRole Role
+  maxUses     Int?
+  email       String?
 
   courseId Int?
   course   Course? @relation(fields: [courseId], references: [id])
 
-  createdById Int
-  createdBy   User @relation("InviteCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("InviteCreatedBy", fields: [createdById], references: [username])
 
   createdAt DateTime @default(now())
   expiresAt DateTime
@@ -116,13 +132,15 @@ model Invite {
 }
 
 model InviteRedemption {
+  // AUDIT: is it vulnerable to enumeration attacks?
   id Int @id @default(autoincrement())
 
   inviteId Int
   invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
 
-  userId Int  @unique
-  user   User @relation(fields: [userId], references: [id])
+  /// User who redeemed the invite.
+  user   User   @relation(fields: [userId], references: [username])
+  userId String @unique
 
   redeemedAt DateTime @default(now())
 }
@@ -131,6 +149,7 @@ model InviteRedemption {
 // System data
 //==============================================================================
 model File {
+  // AUDIT: is it vulnerable to enumeration attacks?
   id Int @id @default(autoincrement())
 
   /// A hash of the file contents used as a slug part when creating urls for the
@@ -180,14 +199,14 @@ model Course {
   id          Int     @id @default(autoincrement())
   description String?
 
-  discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
   disciplineSlug String
+  discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
 
-  edition     Edition @relation(fields: [editionSlug], references: [slug])
   editionSlug String  @map("edition")
+  edition     Edition @relation(fields: [editionSlug], references: [slug])
 
-  instructorSlug String @map("instructorRef")
-  instructor     User   @relation(fields: [instructorSlug], references: [username])
+  instructorId String
+  instructor   User   @relation(fields: [instructorId], references: [username])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -204,7 +223,7 @@ model Course {
   resources          Resource[]
   invites            Invite[]
 
-  @@unique([disciplineSlug, instructorSlug, editionSlug])
+  @@unique([disciplineSlug, instructorId, editionSlug])
 }
 
 model Discipline {
@@ -239,8 +258,8 @@ model Enrollment {
   id     Int              @id @default(autoincrement())
   status EnrollmentStatus @default(ACTIVE)
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [username], onDelete: Cascade)
 
   courseId Int
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -263,7 +282,8 @@ model Passphrase {
 }
 
 model TimeSlot {
-  id       Int    @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
   courseId Int
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
@@ -286,24 +306,23 @@ model TimeSlot {
 }
 
 model CalendarEvent {
-  id       Int    @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
+  slug        String
+  kind        EventKind @default(LECTURE)
+  title       String
+  description String?
+
   courseId Int
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   timeSlotId Int
   timeSlot   TimeSlot @relation(fields: [timeSlotId, courseId], references: [id, courseId])
 
-  slug String
-
   startAt     DateTime
   durationMin Int
   week        Int
 
-  kind        EventKind @default(LECTURE)
-  title       String
-  description String?
-
-  /// Derived, never authored: the exam whose window overlaps this one.
+  /// The exam whose window overlaps this one.
   examId Int?
   exam   Exam? @relation(fields: [examId], references: [id], onDelete: SetNull)
 
@@ -415,8 +434,8 @@ model QuestionRef {
   disciplineSlug String
   discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
 
-  authorId Int
-  author   User @relation(fields: [authorId], references: [id])
+  authorId String
+  author   User   @relation(fields: [authorId], references: [username])
 
   groupId Int?
   group   Group? @relation(fields: [groupId], references: [id])
@@ -494,8 +513,8 @@ model Response {
   questionId Int
   question   QuestionRef @relation(fields: [questionId], references: [id])
 
-  authorId Int
-  author   User @relation(fields: [authorId], references: [id])
+  authorId String
+  author   User   @relation(fields: [authorId], references: [username])
 
   examId Int?
   exam   Exam? @relation(fields: [examId], references: [id])
@@ -513,9 +532,10 @@ model Response {
 model Submission {
   id Int @id @default(autoincrement())
 
-  status     SubmissionStatus @default(PENDING_GRADE)
+  status SubmissionStatus @default(PENDING_GRADE)
+
   responseId Int
-  response   Response         @relation(fields: [responseId], references: [id])
+  response   Response @relation(fields: [responseId], references: [id])
 
   payload Json
 
@@ -523,8 +543,8 @@ model Submission {
   feedback     String?
   scorePercent Float?
 
-  graderId Int?
-  grader   User? @relation(fields: [graderId], references: [id])
+  graderId String?
+  grader   User?   @relation(fields: [graderId], references: [username])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -589,8 +609,8 @@ model Exam {
   /// exam's window for the calendar-link match in src/db/exam-link.ts.
   extraTimeMs Int       @default(0)
 
-  authorId Int
-  author   User @relation(fields: [authorId], references: [id])
+  authorId String
+  author   User   @relation(fields: [authorId], references: [username])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

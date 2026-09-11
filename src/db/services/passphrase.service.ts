@@ -234,7 +234,7 @@ class PassphraseService
 
 		const course = await client.course.findUnique({
 			where: { id: courseId as CourseId },
-			select: { instructor: { select: { id: true, username: true } } },
+			select: { instructor: { select: { username: true } } },
 		});
 		if (!course) throw new NotFound("course", { id: courseId });
 

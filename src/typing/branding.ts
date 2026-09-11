@@ -64,10 +64,3 @@ export function unsafeBrandIdAtField<
 >(obj: T): BrandIdAtField<Brand, Path, T> {
 	return obj as unknown as BrandIdAtField<Brand, Path, T>;
 }
-
-type AId = number & { __brand: "Aid" };
-type A = { id: number; foo: number };
-type B = Brand<AId, A>;
-
-type AA = { foo: A; bar: string };
-type BB = BrandIdAtField<AId, "foo", AA>;

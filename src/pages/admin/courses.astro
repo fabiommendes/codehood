@@ -2,11 +2,10 @@
 export const prerender = false;
 
 import AdminTabs from "@/components/AdminTabs.astro";
-import CoursesTable, { type CourseRow } from "@/components/admin/CoursesTable";
+import CoursesTable from "@/components/admin/CoursesTable";
 import PageKicker from "@/components/PageKicker.astro";
 import { courseService } from "@/db/services/course.service";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
@@ -14,22 +13,6 @@ import { courseHref } from "@/utils/course-url";
 if (!Astro.locals.actor) return Astro.redirect("/login");
 const actor = Astro.locals.actor;
 const courses = await courseService.findMany({}, { actor });
-
-const courseRows: CourseRow[] = courses.map((course) => ({
-	id: course.id,
-	disciplineSlug: course.disciplineSlug,
-	disciplineName: course.discipline.name,
-	editionSlug: course.editionSlug,
-	instructorName: course.instructor.name,
-	activeCount: course._count.enrollments,
-	startAt: course.startAt,
-	endAt: course.endAt,
-	href: courseHref({
-		discipline: course.disciplineSlug,
-		instructor: course.instructor.username,
-		edition: course.editionSlug,
-	}),
-}));
 ---
 
 <AppLayout title="Admin · Courses">
@@ -44,6 +27,6 @@ const courseRows: CourseRow[] = courses.map((course) => ({
 			it.
 		</p>
 
-		<CoursesTable courses={courseRows} />
+		<CoursesTable courses={courses} />
 	</main>
 </AppLayout>

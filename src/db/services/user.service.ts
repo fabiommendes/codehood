@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import type { z } from "zod";
 import { hashPassword, passwordStrengthIssues } from "@/auth/password";
 import {
@@ -9,25 +8,19 @@ import {
 } from "@/auth/permissions";
 import { SYSTEM } from "@/core/actor";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/typing";
-import { unsafeBrand } from "@/typing/branding";
-import { Validate } from "@/utils/validate";
 import {
-	type UserId,
 	userCreate,
 	type userFilter,
 	userPK,
 	userSchema,
 	userUpdate,
-} from "../../core/schemas";
+} from "@/core/schemas";
+import type { FillUndefineds } from "@/typing";
+import { Validate } from "@/utils/validate";
 import type { Crud, ServiceOpts } from "../base-service";
 import { type User as DbUser, type PrismaClient, prisma } from "../client";
 
-export type { UserId } from "../../core/schemas";
-
-function brand<T extends { id: number }>(user: T): T & { id: UserId } {
-	return user as T & { id: UserId }; // branding is a runtime no-op
-}
+export type { UserId } from "@/core/schemas";
 
 //
 // Type definitions
@@ -68,14 +61,13 @@ class UserService
 		if (!input.schoolId && !isAdmin)
 			throw new Error("schoolId is required for non-admin users");
 
-		const githubId = input.githubId ?? defaultHandle(input.username);
-		const schoolId = input.schoolId ?? defaultHandle(input.username);
+		const githubId = input.githubId ?? nullSentinel(input.username);
+		const schoolId = input.schoolId ?? nullSentinel(input.username);
 		const client = opts.tx ?? this.prisma;
 
 		return toUser(
 			await client.user.create({
 				data: {
-					publicId: nanoid(10),
 					email: input.email,
 					name: input.name,
 					username: input.username,
@@ -91,8 +83,8 @@ class UserService
 	/**
 	 * Finds a single user by one of the unique search fields.
 	 *
-	 * It accepts a single filter at a time, can search by id, publicId, email,
-	 * username, githubId, schoolId or login (email or username).
+	 * It accepts a single filter at a time, can search by email, username,
+	 * githubId, schoolId or login (email or username).
 	 */
 	@Validate({ service: true, returns: userSchema.nullable(), args: [userPK] })
 	async findOne(filter: UserPK, opts: ServiceOpts): Promise<User | null> {
@@ -100,15 +92,7 @@ class UserService
 		let user: DbUser | null = null;
 		const by = filter as FillUndefineds<UserPK>; // zod doesn't narrow to a single field, so we do it here
 
-		if (by.id) {
-			user = await client.user.findUnique({
-				where: { id: by.id as UserId },
-			});
-		} else if (by.publicId) {
-			user = await client.user.findUnique({
-				where: { publicId: by.publicId },
-			});
-		} else if (by.email) {
+		if (by.email) {
 			user = await client.user.findUnique({
 				where: { email: by.email },
 			});
@@ -131,7 +115,7 @@ class UserService
 		}
 
 		if (!user) return null;
-		if (!canViewUser(opts.actor, brand(user))) {
+		if (!canViewUser(opts.actor, user)) {
 			throw new NotAllowed({ action: "read-user" });
 		}
 		return toUser(user);
@@ -174,7 +158,10 @@ class UserService
 
 		const client = opts.tx ?? this.prisma;
 		return toUser(
-			await client.user.update({ where: { id: target.id }, data: payload }),
+			await client.user.update({
+				where: { username: target.username },
+				data: payload,
+			}),
 		);
 	}
 
@@ -192,7 +179,7 @@ class UserService
 		if (!user) throw new Error("user not found");
 
 		// TODO: delete or soft delete? design decision
-		await client.user.delete({ where: { id: user.id } });
+		await client.user.delete({ where: { username: user.username } });
 	}
 
 	// TODO: this method should be moved to the auth service.
@@ -230,7 +217,7 @@ class UserService
 
 		const client = opts.tx ?? this.prisma;
 		const updated = await client.user.update({
-			where: { id: user.id },
+			where: { username: user.username },
 			data: { passwordHash: await hashPassword(password) },
 		});
 		return { hash: updated.passwordHash };
@@ -243,22 +230,27 @@ export const userService = new UserService();
 // Auxiliary functions
 //
 
-// Synthetic handle for ADMIN accounts that don't need a real GitHub/school id.
-function defaultHandle(username: string): string {
-	return `@${username}`;
+// The `schoolId`/`githubId` columns are NOT NULL @unique, so an account with
+// no real value stores this sentinel instead — see the comment on `User` in
+// schema.prisma. `unmask` reverses it back to `undefined` on the way out.
+function nullSentinel(username: string): string {
+	return `!${username}`;
+}
+
+function unmask(value: string, username: string): string | undefined {
+	return value === nullSentinel(username) ? undefined : value;
 }
 
 // Convert a database user record to the public-facing user type.
-function toUser(dbUser: DbUser): User {
+export function toUser(dbUser: DbUser): User {
 	return {
-		publicId: dbUser.publicId,
-		id: unsafeBrand<UserId>(dbUser.id),
 		email: dbUser.email,
 		name: dbUser.name,
 		username: dbUser.username,
+		createdAt: dbUser.createdAt,
 		role: dbUser.role,
 		passwordHash: dbUser.passwordHash,
-		githubId: dbUser.githubId ?? "",
-		schoolId: dbUser.schoolId ?? "",
+		githubId: unmask(dbUser.githubId, dbUser.username),
+		schoolId: unmask(dbUser.schoolId, dbUser.username),
 	};
 }

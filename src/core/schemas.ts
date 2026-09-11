@@ -40,7 +40,10 @@ export type SessionId = z.infer<typeof sessionId>;
 const timeSlotId = z.number().int().brand("TimeSlotId");
 export type TimeSlotId = z.infer<typeof timeSlotId>;
 
-const userId = z.number().int().brand("UserId");
+// UserId is now the username.
+// We do not brand since it is not likely to be confused with other numeric IDs.
+// due to both its type (not an int) and name (not id).
+const userId = z.string();
 export type UserId = z.infer<typeof userId>;
 
 // =============================================================================
@@ -51,49 +54,36 @@ export type UserId = z.infer<typeof userId>;
 // User
 //
 
-/** A valid username, per {@link USERNAME_RE}. */
-export const usernameSchema = z
-	.string()
-	.regex(USERNAME_RE, "Invalid username.");
-
 /**
  * A login identifier: either an email or a username.
- *
- * Uses `.describe()` (plain Zod) rather than `.openapi()` here: this module's
- * `zod` import ends up in a different SSR chunk than `@/api/registry`, whose
- * `extendZodWithOpenApi(z)` only patches the `ZodType` prototype of *its own*
- * chunk's `zod` instance. Calling `.openapi()` on a schema built here throws
- * at runtime ("... .openapi is not a function"); `.describe()` is native Zod
- * and zod-to-openapi reads it as the field description regardless.
  */
-export const loginSchema = z
-	.union([z.email(), usernameSchema])
+/** A valid username, per {@link USERNAME_RE}. */
+export const username = z.string().regex(USERNAME_RE, "Invalid username.");
+
+export const usernameOrEmail = z
+	.union([z.email(), username])
 	.describe("The user's email or username.");
 
+const userRole = z.enum(["STUDENT", "INSTRUCTOR", "ADMIN"]);
+
 export const userSchema = z.object({
-	id: userId,
-	publicId: z.string().min(1),
 	email: z.email(),
 	name: z.string().min(1),
 	username: z.string().min(1),
-	role: z.enum(["STUDENT", "INSTRUCTOR", "ADMIN"]),
+	role: userRole,
+
+	// TODO: add validations for githubId and schoolId (e.g. regex, length)
+	// schoolId should read the optional regex from a env variable.
 	githubId: z.string().optional(),
 	schoolId: z.string().optional(),
 	passwordHash: z.string(),
+	createdAt: z.date(),
 });
 
 export const userCreate = userSchema
-	.omit({
-		id: true,
-		githubId: true,
-		schoolId: true,
-		publicId: true,
-		passwordHash: true,
-	})
+	.omit({ passwordHash: true, createdAt: true })
 	.extend({
 		password: z.string().min(1),
-		githubId: z.string().optional(),
-		schoolId: z.string().optional(),
 	});
 
 export const userUpdate = userSchema
@@ -107,8 +97,6 @@ export const userUpdate = userSchema
 	.strict();
 
 export const userPK = z.union([
-	z.object({ id: userId }),
-	z.object({ publicId: z.string() }),
 	z.object({ email: z.email() }),
 	z.object({ username: z.string() }),
 	z.object({ githubId: z.string() }),
@@ -121,6 +109,16 @@ export const userFilter = z.object({
 	take: z.number().int().min(1).max(100).optional(),
 });
 
+/**
+ * Simplified representation of a user in the system.
+ *
+ * Usually used embedded in other entities, e.g. `Course.instructor` or `ApiKey.createdBy`.
+ */
+const userInfo = userSchema.pick({
+	name: true,
+	username: true,
+});
+
 //
 // ApiKey
 //
@@ -129,7 +127,7 @@ export const apiKeySchema = z.object({
 	keyHash: z.string(),
 	name: z.string().min(1),
 	kind: z.enum(["CLI", "BOT"]),
-	userId: userId,
+	createdBy: userInfo,
 	lastUsedAt: z.date().nullable(),
 	createdAt: z.date(),
 
@@ -139,10 +137,10 @@ export const apiKeySchema = z.object({
 export const apiKeyCreate = apiKeySchema.pick({
 	name: true,
 	kind: true,
-	userId: true,
+	createdBy: true,
 });
 export const apiKeyPK = z.object({ id: apiKeyId });
-export const apiKeyFilter = z.object({ userId: userId });
+export const apiKeyFilter = z.object({ createdById: userId });
 
 //
 // Discipline
@@ -152,19 +150,29 @@ export const disciplineSchema = z.object({
 	name: z.string().min(1),
 	createdAt: z.date(),
 });
+
 export const disciplineCreate = disciplineSchema.pick({
 	slug: true,
 	name: true,
 });
+
 export const disciplineUpdate = disciplineSchema.pick({
 	name: true,
 });
+
 export const disciplinePK = disciplineSchema.pick({
 	slug: true,
 });
+
 export const disciplineFilter = z.object({
 	slugs: z.array(z.string()).optional(),
 });
+
+/**
+ * Simplified representation of a discipline to be embedded in other entities,
+ * e.g. `Course.discipline`.
+ */
+export const disciplineInfo = disciplineSchema.pick({ slug: true, name: true });
 
 //
 // Edition
@@ -176,12 +184,14 @@ export const editionSchema = z.object({
 	endAt: z.coerce.date(),
 	createdAt: z.coerce.date(),
 });
+
 export const editionCreate = editionSchema.pick({
 	slug: true,
 	name: true,
 	startAt: true,
 	endAt: true,
 });
+
 export const editionUpdate = editionSchema
 	.pick({
 		name: true,
@@ -189,31 +199,27 @@ export const editionUpdate = editionSchema
 		endAt: true,
 	})
 	.partial();
+
 export const editionPK = editionSchema.pick({
 	slug: true,
 });
+
 export const editionFilter = z.object({
 	slugs: z.array(z.string()).optional(),
 	active: z.boolean().optional(),
 });
+
+/**
+ * Simplified representation of an edition to be embedded in other entities,
+ * e.g. `Course.edition`.
+ */
+export const editionInfo = editionSchema.pick({ slug: true, name: true });
 
 //
 // Course
 //
 
 // The nested shapes `courseSchema` embeds — one per relation in `courseInclude`.
-const courseInstructor = userSchema.pick({
-	id: true,
-	publicId: true,
-	username: true,
-	name: true,
-});
-
-const courseEnrollment = z.object({
-	userId: userId,
-	createdAt: z.date(),
-});
-
 export const createCourseEnrollment = z.object({
 	courseId: courseId,
 	userId: userId,
@@ -222,33 +228,35 @@ export const createCourseEnrollment = z.object({
 export const courseSchema = z.object({
 	id: courseId,
 	description: z.string().nullable(),
-	disciplineSlug: z.string(),
-	editionSlug: z.string(),
-	instructorSlug: z.string(),
+	discipline: disciplineInfo,
+	edition: editionInfo,
+	instructor: userInfo,
+	enrollments: userInfo.array(),
+
+	// Dates
 	startAt: z.date(),
 	endAt: z.date(),
 	createdAt: z.date(),
 	updatedAt: z.date(),
-	discipline: disciplineSchema,
-	edition: editionSchema,
-	instructor: courseInstructor,
-	enrollments: z.array(courseEnrollment),
+
+	// The date the current user joined the course.
+	// SYSTEM joins at course creation.
+	joinedAt: z.date(),
 });
 
 export const courseCreate = z.object({
-	disciplineSlug: z.string().min(1),
-	// The instructor's `username`
-	instructor: z.string().min(1),
-	edition: z.string().min(1),
+	discipline: z.string().min(1).describe("Discipline slug"),
+	instructor: z.string().min(1).describe("Instructor username"),
+	edition: z.string().min(1).describe("Edition slug"),
 	description: z.string().optional(),
 	startAt: z.coerce.date(),
 	endAt: z.coerce.date(),
 });
 
-export const courseUpdate = z.object({
-	description: z.string().optional(),
-	startAt: z.coerce.date().optional(),
-	endAt: z.coerce.date().optional(),
+export const courseUpdate = courseSchema.pick({
+	description: true,
+	startAt: true,
+	endAt: true,
 });
 
 // Identifies a course the way its URL does — see `src/utils/course-url.ts`.
@@ -317,12 +325,12 @@ export const inviteSchema = z.object({
 	tokenHash: z.string(),
 	kind: z.enum(["PERSONAL", "CLASSROOM"]),
 	email: z.string().nullable(),
-	role: userSchema.shape.role,
+	invitedRole: userRole,
 	courseId: courseId.nullable(),
-	maxUses: z.number().nullable(),
+	maxUses: z.number().int().nullable(),
 	expiresAt: z.date(),
 	redemptions: z.number().int(),
-	createdById: userId,
+	createdBy: userInfo,
 	createdAt: z.date(),
 
 	// Only show once, when the invite is created
@@ -343,7 +351,7 @@ export const inviteTokenFilter = z.object({ token: z.string().min(1) });
 export const invitePK = z.object({ id: inviteId });
 
 export const inviteFilter = z.object({
-	createdById: z.number().optional(),
+	createdById: userId.optional(),
 	kind: inviteSchema.shape.kind.optional(),
 	courseId: z.number().optional(),
 	// Only invites that have not expired yet.
@@ -403,9 +411,7 @@ export const sessionSchema = z.object({
 });
 
 export const sessionCreate = z.object({
-	// Plain number, not the branded `userId`: sourced from `actor.id`, which
-	// is already assignable, or a coerced action input elsewhere.
-	userId: z.number(),
+	userId: userId,
 });
 
 export const sessionCreateResult = z.object({
@@ -415,10 +421,10 @@ export const sessionCreateResult = z.object({
 
 // A `token` deletion needs no further check (holding it is proof of
 // ownership); a `userId` deletion ("log out everywhere") is actor-gated in
-// the service. Plain number, same reasoning as `sessionCreate.userId`.
+// the service.
 export const sessionDeletePK = z.union([
 	z.object({ token: z.string().min(1) }),
-	z.object({ userId: z.number() }),
+	z.object({ userId: userId }),
 ]);
 
 //
@@ -573,30 +579,50 @@ export const calendarEventSchema = z.object({
 	id: calendarEventId,
 	courseId: courseId,
 	timeSlotId: timeSlotId,
+	examId: examId.optional(),
+	exam: linkedExamSchema.nullable(),
+
 	// Natural key from the repository path — FR-SYNC-010.
 	slug: z.string().min(1),
 	startAt: z.date(),
 	durationMin: z.number().int(),
 	week: z.number().int(),
+
 	kind: eventKindSchema,
 	title: z.string().min(1),
 	description: z.string().nullable(),
-	examId: z.number().nullable(),
-	// Supplied by the writer, opaque to the server. See the manifest decision.
+
+	// Supplied by the writer, opaque to the server.
 	contentHash: z.string(),
 	createdAt: z.date(),
 	updatedAt: z.date(),
+
 	timeSlot: timeSlotSchema,
-	exam: linkedExamSchema.nullable(),
 });
 
 export const calendarEventCreate = calendarEventSchema
-	.omit({ id: true, createdAt: true, updatedAt: true, exam: true })
+	.omit({
+		id: true,
+		createdAt: true,
+		updatedAt: true,
+		exam: true,
+		// Computed by the service, not authored: `startAt` from `date` +
+		// `startMin`, `examId` freshly from `examForEvent` on every write, and
+		// `timeSlot` is never read from `create`'s input at all.
+		startAt: true,
+		examId: true,
+		timeSlot: true,
+	})
 	.extend({
 		// The calendar day this event happens, `YYYY-MM-DD`, in the server zone.
-		date: z.date(),
+		date: z.string(),
 		// Minutes since 00:00; defaults to the slot's `startMin` when omitted.
-		startMin: z.number().int(),
+		startMin: z.number().int().optional(),
+		// Defaults to the slot's `durationMin` when omitted.
+		durationMin: z.number().int().optional(),
+		// Defaults to the Prisma column default (`LECTURE`) when omitted.
+		kind: eventKindSchema.optional(),
+		description: z.string().nullable().optional(),
 	});
 
 z.object({

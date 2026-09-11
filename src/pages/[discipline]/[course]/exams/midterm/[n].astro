@@ -12,36 +12,36 @@ if ("redirect" in result) return result.redirect;
 const { course } = result;
 
 const href = courseHref({
-  discipline: course.disciplineSlug,
-  instructor: course.instructor.username,
-  edition: course.editionSlug,
+	discipline: course.discipline.slug,
+	instructor: course.instructor.username,
+	edition: course.edition.slug,
 });
 
 // Same three questions shown on the all-at-once exam page — this route previews the
 // alternative one-question-at-a-time flow instead.
 const questions = [
-  {
-    kind: "Multiple choice",
-    prompt: "What does the following expression evaluate to?",
-    code: "3 + 4 * 2",
-    options: ["11", "14", "10", "Syntax error"],
-  },
-  {
-    kind: "Multiple choice",
-    prompt: "Which of these is not a primitive type in most languages?",
-    options: ["Integer", "Boolean", "Array", "Character"],
-  },
-  {
-    kind: "Short answer",
-    prompt:
-      "In one or two sentences, explain the difference between a stack and a queue.",
-  },
+	{
+		kind: "Multiple choice",
+		prompt: "What does the following expression evaluate to?",
+		code: "3 + 4 * 2",
+		options: ["11", "14", "10", "Syntax error"],
+	},
+	{
+		kind: "Multiple choice",
+		prompt: "Which of these is not a primitive type in most languages?",
+		options: ["Integer", "Boolean", "Array", "Character"],
+	},
+	{
+		kind: "Short answer",
+		prompt:
+			"In one or two sentences, explain the difference between a stack and a queue.",
+	},
 ] as const;
 const totalOnExam = 10; // Midterm Exam is listed as 10 questions; only the first 3 are modeled here.
 
 const n = Number(nParam);
 if (!Number.isInteger(n) || n < 1 || n > questions.length) {
-  return Astro.redirect(`${href}/exams/midterm/1`);
+	return Astro.redirect(`${href}/exams/midterm/1`);
 }
 const question = questions[n - 1];
 const isLast = n === questions.length;

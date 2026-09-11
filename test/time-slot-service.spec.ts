@@ -55,7 +55,7 @@ async function makeCourse(instructorUsername: string) {
 	const editionSlug = await ensureEdition();
 	return courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructorUsername,
 			edition: editionSlug,
 			startAt: new Date("2026-01-01"),

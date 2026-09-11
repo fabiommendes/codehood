@@ -6,6 +6,7 @@ import { editionService } from "@/db/services/edition.service";
 import { fileService } from "@/db/services/file.service";
 import {
 	groupResourcesByType,
+	type Resource,
 	resourceService,
 } from "@/db/services/resource.service";
 import { userService } from "@/db/services/user.service";
@@ -58,7 +59,7 @@ async function makeCourse(instructorUsername: string) {
 	await ensureEdition();
 	return courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructorUsername,
 			edition: "2026-1",
 			startAt: new Date("2026-01-01"),
@@ -264,14 +265,16 @@ test("groupResourcesByType: fixed type order (Files, Links, Notes, Snippets), ti
 		},
 	];
 
-	const groups = groupResourcesByType(resources);
+	const groups = groupResourcesByType(resources as unknown as Resource[]);
 	expect(groups.map((g) => g.type)).toEqual(["LINK", "MD", "CODE"]); // FILE group absent: empty
 	expect(
 		groups.find((g) => g.type === "LINK")?.resources.map((r) => r.title),
 	).toEqual(["Alpha link", "Beta link"]);
 
 	// Reproducible: same input, same output, every time.
-	expect(groupResourcesByType(resources)).toEqual(groups);
+	expect(groupResourcesByType(resources as unknown as Resource[])).toEqual(
+		groups,
+	);
 });
 
 test("an enrolled student sees a course's resources; a dropped student sees none; a non-owning admin reads but cannot write", async () => {
@@ -282,15 +285,15 @@ test("an enrolled student sees a course's resources; a dropped student sees none
 	const course = await makeCourse(instructor.username);
 
 	await courseService.enroll(
-		{ courseId: course.id, userId: active.id },
+		{ courseId: course.id, userId: active.username },
 		FULL_ACCESS,
 	);
 	await courseService.enroll(
-		{ courseId: course.id, userId: dropped.id },
+		{ courseId: course.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 	await courseService.drop(
-		{ courseId: course.id, userId: dropped.id },
+		{ courseId: course.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 

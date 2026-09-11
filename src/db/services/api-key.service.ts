@@ -8,11 +8,16 @@ import {
 	apiKeyFilter,
 	apiKeyPK,
 	apiKeySchema,
-	type UserId,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
 import { Validate } from "@/utils/validate";
-import { type ApiKey as DbApiKey, type PrismaClient, prisma } from "../client";
+import { type Prisma, type PrismaClient, prisma } from "../client";
+
+const apiKeyInclude = {
+	createdBy: { select: { username: true, name: true } },
+} satisfies Prisma.ApiKeyInclude;
+
+type DbApiKey = Prisma.ApiKeyGetPayload<{ include: typeof apiKeyInclude }>;
 
 export type { ApiKeyId } from "@/core/schemas";
 
@@ -41,7 +46,7 @@ class ApiKeyService
 	}
 
 	/**
-	 * Creates a new API key for `input.userId` and returns its raw token.
+	 * Creates a new API key owned by `input.createdBy` and returns its raw token.
 	 *
 	 * The token is shown only once here; only its hash is persisted.
 	 */
@@ -51,7 +56,7 @@ class ApiKeyService
 		args: [apiKeyCreate],
 	})
 	async create(input: ApiKeyCreate, opts: ServiceOpts): Promise<ApiKey> {
-		if (!canManageApiKeys(opts.actor, input.userId)) {
+		if (!canManageApiKeys(opts.actor, input.createdBy.username)) {
 			throw new NotAllowed({ action: "create-api-key" });
 		}
 		const client = opts.tx ?? this.prisma;
@@ -61,8 +66,9 @@ class ApiKeyService
 				keyHash: hashToken(token),
 				name: input.name,
 				kind: input.kind,
-				userId: input.userId,
+				createdById: input.createdBy.username,
 			},
+			include: apiKeyInclude,
 		});
 		const result = toApiKey(apiKey);
 		result.token = token; // only here, never in the database
@@ -81,18 +87,19 @@ class ApiKeyService
 		const client = opts.tx ?? this.prisma;
 		const apiKey = await client.apiKey.findUnique({
 			where: { id: filter.id },
+			include: apiKeyInclude,
 		});
 		if (!apiKey) return null;
-		if (!canManageApiKeys(opts.actor, apiKey.userId)) {
+		if (!canManageApiKeys(opts.actor, apiKey.createdById)) {
 			throw new NotAllowed({ action: "read-api-key" });
 		}
 		return toApiKey(apiKey);
 	}
 
 	/**
-	 * Finds all API keys belonging to `filter.userId`.
+	 * Finds all API keys belonging to `filter.createdById`.
 	 *
-	 * Filtered, not thrown: a userId whose keys `actor` may not see just gets
+	 * Filtered, not thrown: an owner whose keys `actor` may not see just gets
 	 * no rows back.
 	 */
 	@Validate({
@@ -101,10 +108,11 @@ class ApiKeyService
 		args: [apiKeyFilter],
 	})
 	async findMany(filter: ApiKeyFilter, opts: ServiceOpts): Promise<ApiKey[]> {
-		if (!canManageApiKeys(opts.actor, filter.userId)) return [];
+		if (!canManageApiKeys(opts.actor, filter.createdById)) return [];
 		const client = opts.tx ?? this.prisma;
 		const apiKeys = await client.apiKey.findMany({
-			where: { userId: filter.userId },
+			where: { createdById: filter.createdById },
+			include: apiKeyInclude,
 			orderBy: { createdAt: "desc" },
 		});
 		return apiKeys.map(toApiKey);
@@ -121,7 +129,7 @@ class ApiKeyService
 		const keyHash = hashToken(token);
 		const apiKey = await client.apiKey.findUnique({
 			where: { keyHash },
-			include: { user: true },
+			include: { createdBy: true },
 		});
 		if (!apiKey) return null;
 
@@ -139,7 +147,7 @@ class ApiKeyService
 	async delete(filter: ApiKeyPK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const apiKey = await client.apiKey.findUnique({ where: { id: filter.id } });
-		if (!apiKey || !canManageApiKeys(opts.actor, apiKey.userId)) {
+		if (!apiKey || !canManageApiKeys(opts.actor, apiKey.createdById)) {
 			throw new NotAllowed({ action: "delete-api-key" });
 		}
 		await client.apiKey.delete({ where: { id: filter.id } });
@@ -148,20 +156,7 @@ class ApiKeyService
 	/**
 	 * API keys are immutable after creation.
 	 */
-	update(
-		_filter: ApiKeyPK,
-		_data: never,
-		_opts: ServiceOpts,
-	): Promise<{
-		id: number & z.core.$brand<"ApiKeyId">;
-		keyHash: string;
-		name: string;
-		kind: "CLI" | "BOT";
-		userId: number & z.core.$brand<"UserId">;
-		lastUsedAt: Date | null;
-		createdAt: Date;
-		token?: string | undefined;
-	}> {
+	update(_filter: ApiKeyPK, _data: never, _opts: ServiceOpts): Promise<ApiKey> {
 		throw new RuleViolation({
 			message: "Update method not implemented for API keys",
 		});
@@ -181,7 +176,7 @@ function toApiKey(dbApiKey: DbApiKey): ApiKey {
 		keyHash: dbApiKey.keyHash,
 		name: dbApiKey.name,
 		kind: dbApiKey.kind,
-		userId: dbApiKey.userId as UserId,
+		createdBy: dbApiKey.createdBy,
 		lastUsedAt: dbApiKey.lastUsedAt,
 		createdAt: dbApiKey.createdAt,
 	};

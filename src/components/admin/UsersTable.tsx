@@ -2,18 +2,10 @@ import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import Badge from "@/components/ui/Badge";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
-
-export interface UserRow {
-	id: number;
-	name: string;
-	username: string;
-	email: string;
-	role: "ADMIN" | "INSTRUCTOR" | "STUDENT";
-	createdAt: Date;
-}
+import type { User } from "@/db";
 
 interface Props {
-	users: UserRow[];
+	users: User[];
 }
 
 const ROLE_BADGE = {
@@ -31,29 +23,29 @@ function formatDate(date: Date): string {
 }
 
 export default function UsersTable(props: Props): JSX.Element {
-	const columns: ColumnConfig<UserRow>[] = [
-		{ title: "Name", class: "font-medium", render: (row) => row.name },
+	const columns: ColumnConfig<User>[] = [
+		{ title: "Name", class: "font-medium", render: (user) => user.name },
 		{
 			title: "Username",
 			class: "font-mono text-sm text-base-content/60",
-			render: (row) => `@${row.username}`,
+			render: (user) => `@${user.username}`,
 		},
 		{
 			title: "Email",
 			class: "text-base-content/60",
-			render: (row) => row.email,
+			render: (user) => user.email,
 		},
 		{
 			title: "Role",
-			render: (row) => {
-				const variant = ROLE_BADGE[row.role];
+			render: (user) => {
+				const variant = ROLE_BADGE[user.role];
 				return variant ? (
 					<Badge variant={variant} size="sm">
-						{row.role.toLowerCase()}
+						{user.role.toLowerCase()}
 					</Badge>
 				) : (
 					<Badge style="outline" size="sm">
-						{row.role.toLowerCase()}
+						{user.role.toLowerCase()}
 					</Badge>
 				);
 			},
@@ -61,20 +53,20 @@ export default function UsersTable(props: Props): JSX.Element {
 		{
 			title: "Joined",
 			class: "text-base-content/60",
-			render: (row) => formatDate(row.createdAt),
+			render: (user) => formatDate(user.createdAt),
 		},
 		{
 			title: "Actions",
 			class: "text-right",
 			headerClass: "text-right",
-			render: (row) => (
+			render: (user) => (
 				<>
 					<button
 						type="button"
 						class="btn btn-square btn-error btn-sm text-white"
-						aria-label={`Force logout ${row.name}`}
+						aria-label={`Force logout ${user.name}`}
 						title="Force logout"
-						data-open-dialog={`force-logout-${row.id}`}
+						data-open-dialog={`force-logout-${user.username}`}
 					>
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
 							<title>Force logout</title>
@@ -88,7 +80,7 @@ export default function UsersTable(props: Props): JSX.Element {
 						</svg>
 					</button>
 
-					<dialog id={`force-logout-${row.id}`} class="modal">
+					<dialog id={`force-logout-${user.username}`} class="modal">
 						<div class="modal-box">
 							<form method="dialog">
 								<button
@@ -98,7 +90,7 @@ export default function UsersTable(props: Props): JSX.Element {
 									✕
 								</button>
 							</form>
-							<h3 class="text-lg font-bold">Force logout {row.name}?</h3>
+							<h3 class="text-lg font-bold">Force logout {user.name}?</h3>
 							<p class="mt-2 text-sm text-base-content/70">
 								Every active session ends immediately; the account itself is not
 								disabled.
@@ -108,7 +100,7 @@ export default function UsersTable(props: Props): JSX.Element {
 								action={actions.admin.forceLogout}
 								class="modal-action"
 							>
-								<input type="hidden" name="userId" value={row.id} />
+								<input type="hidden" name="userId" value={user.username} />
 								<button type="submit" class="btn btn-error">
 									Log out
 								</button>

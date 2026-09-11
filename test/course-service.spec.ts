@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { canViewCourse } from "@/auth/permissions";
 import { FULL_ACCESS, SYSTEM } from "@/core/actor";
+import type { CourseId } from "@/db/services/course.service";
 import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
@@ -54,7 +55,7 @@ async function makeCourse(instructorUsername: string, disciplineSlug?: string) {
 	await ensureEdition();
 	return courseService.create(
 		{
-			disciplineSlug: disciplineSlug ?? (await makeDiscipline()),
+			discipline: disciplineSlug ?? (await makeDiscipline()),
 			instructor: instructorUsername,
 			edition: "2026-1",
 			startAt: new Date("2026-01-01"),
@@ -70,7 +71,7 @@ test("create() rejects an edition that does not exist", async () => {
 	await expect(
 		courseService.create(
 			{
-				disciplineSlug,
+				discipline: disciplineSlug,
 				instructor: instructor.username,
 				edition: "2099-1",
 				startAt: new Date(),
@@ -87,7 +88,7 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 	await ensureEdition();
 	await courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructor.username,
 			edition: "2026-1",
 			startAt: new Date(),
@@ -98,7 +99,7 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 	await expect(
 		courseService.create(
 			{
-				disciplineSlug,
+				discipline: disciplineSlug,
 				instructor: instructor.username,
 				edition: "2026-1",
 				startAt: new Date(),
@@ -119,7 +120,7 @@ test("create() rejects an instructor naming a different instructor, and allows a
 	await expect(
 		courseService.create(
 			{
-				disciplineSlug,
+				discipline: disciplineSlug,
 				instructor: instructorB.username,
 				edition: "2026-1",
 				startAt: new Date(),
@@ -131,7 +132,7 @@ test("create() rejects an instructor naming a different instructor, and allows a
 
 	const course = await courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructorB.username,
 			edition: "2026-1",
 			startAt: new Date(),
@@ -148,7 +149,7 @@ test("findOne returns null for a course that does not exist, and throws FORBIDDE
 	const course = await makeCourse(instructor.username);
 
 	await expect(
-		courseService.findOne({ id: 999_999_999 }, { actor: outsider }),
+		courseService.findOne({ id: 999_999_999 as CourseId }, { actor: outsider }),
 	).resolves.toBeNull();
 
 	await expect(
@@ -168,14 +169,18 @@ test("update, delete, and enroll throw FORBIDDEN for a student and for an instru
 
 	for (const actor of [student, otherInstructor]) {
 		await expect(
-			courseService.update({ id: course.id }, { description: "x" }, { actor }),
+			courseService.update(
+				{ id: course.id },
+				{ description: "x", startAt: new Date(), endAt: new Date() },
+				{ actor },
+			),
 		).rejects.toThrow();
 		await expect(
 			courseService.delete({ id: course.id }, { actor }),
 		).rejects.toThrow();
 		await expect(
 			courseService.enroll(
-				{ courseId: course.id, userId: student.id },
+				{ courseId: course.id, userId: student.username },
 				{ actor },
 			),
 		).rejects.toThrow();
@@ -187,7 +192,7 @@ test("listStudents throws for an enrolled student", async () => {
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 
@@ -198,7 +203,7 @@ test("listStudents throws for an enrolled student", async () => {
 	const students = await courseService.listStudents(course.id, {
 		actor: instructor,
 	});
-	expect(students.map((s) => s.id)).toEqual([student.id]);
+	expect(students.map((s) => s.username)).toEqual([student.username]);
 });
 
 test("unenroll marks the enrollment DROPPED rather than deleting it, and re-enroll reactivates it", async () => {
@@ -207,7 +212,7 @@ test("unenroll marks the enrollment DROPPED rather than deleting it, and re-enro
 	const course = await makeCourse(instructor.username);
 
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 	let students = await courseService.listStudents(course.id, {
@@ -216,14 +221,14 @@ test("unenroll marks the enrollment DROPPED rather than deleting it, and re-enro
 	expect(students).toHaveLength(1);
 
 	await courseService.drop(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 	students = await courseService.listStudents(course.id, { actor: instructor });
 	expect(students).toHaveLength(0);
 
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 	students = await courseService.listStudents(course.id, { actor: instructor });
@@ -244,19 +249,19 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 	// courseA: studentActive is ACTIVE, studentDropped is DROPPED, instructorB
 	// (who teaches courseB) is also enrolled here as a student.
 	await courseService.enroll(
-		{ courseId: courseA.id, userId: studentActive.id },
+		{ courseId: courseA.id, userId: studentActive.username },
 		FULL_ACCESS,
 	);
 	await courseService.enroll(
-		{ courseId: courseA.id, userId: studentDropped.id },
+		{ courseId: courseA.id, userId: studentDropped.username },
 		FULL_ACCESS,
 	);
 	await courseService.drop(
-		{ courseId: courseA.id, userId: studentDropped.id },
+		{ courseId: courseA.id, userId: studentDropped.username },
 		FULL_ACCESS,
 	);
 	await courseService.enroll(
-		{ courseId: courseA.id, userId: instructorB.id },
+		{ courseId: courseA.id, userId: instructorB.username },
 		FULL_ACCESS,
 	);
 
@@ -324,12 +329,12 @@ test("a student drops themselves — the half of FR-CRS-042 that used to be miss
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 
 	await courseService.drop(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		{ actor: student },
 	);
 
@@ -345,13 +350,13 @@ test("a student naming another student's userId is refused, and the other enroll
 	const studentB = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: studentB.id },
+		{ courseId: course.id, userId: studentB.username },
 		FULL_ACCESS,
 	);
 
 	await expect(
 		courseService.drop(
-			{ courseId: course.id, userId: studentB.id },
+			{ courseId: course.id, userId: studentB.username },
 			{ actor: studentA },
 		),
 	).rejects.toThrow();
@@ -359,7 +364,7 @@ test("a student naming another student's userId is refused, and the other enroll
 	const students = await courseService.listStudents(course.id, {
 		actor: instructor,
 	});
-	expect(students.map((s) => s.id)).toEqual([studentB.id]);
+	expect(students.map((s) => s.username)).toEqual([studentB.username]);
 });
 
 test("a non-owning admin cannot drop an enrollment, list students, or enroll one", async () => {
@@ -368,13 +373,13 @@ test("a non-owning admin cannot drop an enrollment, list students, or enroll one
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 
 	await expect(
 		courseService.drop(
-			{ courseId: course.id, userId: student.id },
+			{ courseId: course.id, userId: student.username },
 			{ actor: admin },
 		),
 	).rejects.toThrow();
@@ -383,7 +388,7 @@ test("a non-owning admin cannot drop an enrollment, list students, or enroll one
 	).rejects.toThrow();
 	await expect(
 		courseService.enroll(
-			{ courseId: course.id, userId: student.id },
+			{ courseId: course.id, userId: student.username },
 			{ actor: admin },
 		),
 	).rejects.toThrow();
@@ -394,17 +399,17 @@ test("dropping an already-DROPPED enrollment is a no-op, not an error", async ()
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 	await courseService.drop(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		{ actor: instructor },
 	);
 
 	await expect(
 		courseService.drop(
-			{ courseId: course.id, userId: student.id },
+			{ courseId: course.id, userId: student.username },
 			{ actor: instructor },
 		),
 	).resolves.toBeUndefined();
@@ -420,11 +425,11 @@ test("re-enrolling a dropped student restores access to submissions made before 
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 	await courseService.drop(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		{ actor: student },
 	);
 	await expect(
@@ -432,7 +437,7 @@ test("re-enrolling a dropped student restores access to submissions made before 
 	).rejects.toThrow();
 
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		{ actor: instructor },
 	);
 	await expect(
@@ -445,7 +450,7 @@ test("listStudents carries enrolledAt for the Students tab", async () => {
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 

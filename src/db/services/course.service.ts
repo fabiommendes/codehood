@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	type CourseWithEnrollment,
 	canCreateCourseFor,
 	canCreateCourseOutsideWindow,
 	canDropEnrollment,
@@ -8,9 +9,9 @@ import {
 	canViewCourse,
 	courseVisibility,
 } from "@/auth/permissions";
+import { type Actor, SYSTEM } from "@/core/actor";
 import { NotAllowed } from "@/core/error";
 import type { FillUndefineds } from "@/typing";
-import type { Brand } from "@/typing/branding";
 import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
@@ -21,12 +22,12 @@ import {
 	courseSchema,
 	courseUpdate,
 	createCourseEnrollment,
-	type UserId,
 	userSchema,
 } from "../../core/schemas";
 import type { Crud, ServiceOpts } from "../base-service";
-import { type Prisma, type PrismaClient, prisma, type User } from "../client";
+import { type Prisma, type PrismaClient, prisma } from "../client";
 import { isEditionOpen } from "./edition.service";
+import { toUser, type User } from "./user.service";
 
 export type { CourseId } from "../../core/schemas";
 
@@ -41,10 +42,7 @@ export type CourseUpdate = z.infer<typeof courseUpdate>;
 export type CourseEnrollment = z.infer<typeof createCourseEnrollment>;
 export type CourseRef = z.infer<typeof courseRef>;
 
-type DbCourse = Brand<
-	CourseId,
-	Prisma.CourseGetPayload<{ include: typeof courseInclude }>
->;
+type DbCourse = Prisma.CourseGetPayload<{ include: typeof courseInclude }>;
 
 /**
  * What every returned course carries: its discipline and instructor (every
@@ -56,11 +54,15 @@ const courseInclude = {
 	discipline: true,
 	edition: true,
 	instructor: {
-		select: { id: true, publicId: true, username: true, name: true },
+		select: { username: true, name: true },
 	},
 	enrollments: {
 		where: { status: "ACTIVE" as const },
-		select: { userId: true, createdAt: true },
+		select: {
+			userId: true,
+			createdAt: true,
+			user: { select: { name: true } },
+		},
 	},
 } satisfies Prisma.CourseInclude;
 
@@ -111,13 +113,13 @@ class CourseService
 		if (!instructorUser) {
 			throw new Error(`No user with username "${input.instructor}".`);
 		}
-		if (!canCreateCourseFor(opts.actor, instructorUser.id)) {
+		if (!canCreateCourseFor(opts.actor, instructorUser.username)) {
 			throw new NotAllowed({ action: "create-course" });
 		}
 		const row = await client.course.create({
 			data: {
-				disciplineSlug: input.disciplineSlug,
-				instructorSlug: input.instructor,
+				disciplineSlug: input.discipline,
+				instructorId: input.instructor,
 				editionSlug: input.edition,
 				description: input.description,
 				startAt: input.startAt,
@@ -125,7 +127,7 @@ class CourseService
 			},
 			include: courseInclude,
 		});
-		return fromDb(row);
+		return fromDb(row, opts.actor);
 	}
 
 	/**
@@ -153,9 +155,9 @@ class CourseService
 		} else if (by.ref) {
 			row = await client.course.findUnique({
 				where: {
-					disciplineSlug_instructorSlug_editionSlug: {
+					disciplineSlug_instructorId_editionSlug: {
 						disciplineSlug: by.ref.discipline,
-						instructorSlug: by.ref.instructor,
+						instructorId: by.ref.instructor,
 						editionSlug: by.ref.edition,
 					},
 				},
@@ -168,7 +170,7 @@ class CourseService
 		const viewAllowed = canViewCourse(opts.actor, row);
 		if (!viewAllowed) throw new NotAllowed({ action: "read-course" });
 
-		return fromDb(row);
+		return fromDb(row, opts.actor);
 	}
 
 	/**
@@ -190,7 +192,7 @@ class CourseService
 			where: {
 				AND: [
 					filter.instructorUsername
-						? { instructorSlug: filter.instructorUsername }
+						? { instructorId: filter.instructorUsername }
 						: {},
 					filter.disciplineSlug
 						? { disciplineSlug: filter.disciplineSlug }
@@ -202,7 +204,7 @@ class CourseService
 			include: courseInclude,
 			orderBy: { createdAt: "desc" },
 		});
-		return rows.map(fromDb);
+		return rows.map((row) => fromDb(row, opts.actor));
 	}
 
 	/**
@@ -220,7 +222,7 @@ class CourseService
 	): Promise<Course> {
 		const target = await this.findOne(filter, opts);
 		if (!target) throw new Error("course not found");
-		if (!canManageCourse(opts.actor, target))
+		if (!canManageCourse(opts.actor, toEnrollmentView(target)))
 			throw new NotAllowed({ action: "update-course" });
 
 		const client = opts.tx ?? this.prisma;
@@ -229,7 +231,7 @@ class CourseService
 			data: fields,
 			include: courseInclude,
 		});
-		return fromDb(row);
+		return fromDb(row, opts.actor);
 	}
 
 	/**
@@ -239,13 +241,16 @@ class CourseService
 	async delete(filter: CoursePK, opts: ServiceOpts): Promise<void> {
 		const target = await this.findOne(filter, opts);
 		if (!target) throw new Error("course not found");
-		if (!canManageCourse(opts.actor, target))
+		if (!canManageCourse(opts.actor, toEnrollmentView(target)))
 			throw new NotAllowed({ action: "delete-course" });
 
 		const client = opts.tx ?? this.prisma;
 		await client.course.delete({ where: { id: target.id } });
 	}
 
+	// FIXME: the enroll/unenroll methods should not be part of a course service;
+	// we should follow REST semantics and have a separate enrollment service,
+	// and it be mapped to create/delete methods
 	/**
 	 * Enrolls `input.userId` in `input.courseId`, or reactivates a `DROPPED`
 	 * enrollment.
@@ -268,7 +273,10 @@ class CourseService
 
 		await client.enrollment.upsert({
 			where: {
-				userId_courseId: { userId: input.userId, courseId: input.courseId },
+				userId_courseId: {
+					userId: input.userId,
+					courseId: input.courseId,
+				},
 			},
 			update: { status: "ACTIVE" },
 			create: { userId: input.userId, courseId: input.courseId },
@@ -328,35 +336,61 @@ class CourseService
 		const canView = course && canManageEnrollment(opts.actor, course);
 		if (!canView) throw new NotAllowed({ action: "read-course.students" });
 
-		const studentIds = course.enrollments.map((e) => e.userId);
+		const studentUsernames = course.enrollments.map((e) => e.userId);
 		const studentToDate = new Map(
 			course.enrollments.map((e) => [e.userId, e.createdAt]),
 		);
 		const students = await client.user.findMany({
-			where: { id: { in: studentIds } },
+			where: { username: { in: studentUsernames } },
 		});
 
-		return students.map((e) => {
-			return { ...e, enrolledAt: studentToDate.get(e.id) as Date };
+		return students.map((dbUser) => {
+			return {
+				...toUser(dbUser),
+				enrolledAt: studentToDate.get(dbUser.username) as Date,
+			};
 		});
 	}
 }
 
 export const courseService = new CourseService();
 
+/**
+ * Adapts a public {@link Course} to the raw-row shape the permission
+ * predicates in `@/auth/permissions` expect ({@link CourseWithEnrollment}) —
+ * needed anywhere a page already has the public entity (from {@link
+ * courseService.findOne}) rather than a freshly-loaded Prisma row.
+ */
+export function toEnrollmentView(course: Course): CourseWithEnrollment {
+	return {
+		instructor: course.instructor,
+		enrollments: course.enrollments.map((e) => ({ userId: e.username })),
+	};
+}
+
 //
 // Auxiliary functions
 //
 
+// The date `actor` joined the course: SYSTEM and anyone without an
+// enrollment row (the instructor, or an admin just looking) join at course
+// creation; anyone else joins when their own enrollment was created.
+function joinedAtFor(row: DbCourse, actor: Actor): Date {
+	if (actor === SYSTEM) return row.createdAt;
+	const enrollment = row.enrollments.find((e) => e.userId === actor.username);
+	return enrollment?.createdAt ?? row.createdAt;
+}
+
 // Convert a database course record (with its `courseInclude` relations) to the public-facing course type.
-function fromDb(row: DbCourse): Course {
+function fromDb(row: DbCourse, actor: Actor): Course {
 	return {
 		...row,
 		id: row.id as CourseId,
-		instructor: { ...row.instructor, id: row.instructor.id as UserId },
+		instructor: row.instructor,
 		enrollments: row.enrollments.map((e) => ({
-			...e,
-			userId: e.userId as UserId,
+			username: e.userId,
+			name: e.user.name,
 		})),
+		joinedAt: joinedAtFor(row, actor),
 	};
 }

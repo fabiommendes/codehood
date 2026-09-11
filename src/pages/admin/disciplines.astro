@@ -26,8 +26,8 @@ const courses = await courseService.findMany({}, { actor });
 const courseCounts = new Map<string, number>();
 for (const course of courses) {
 	courseCounts.set(
-		course.disciplineSlug,
-		(courseCounts.get(course.disciplineSlug) ?? 0) + 1,
+		course.discipline.slug,
+		(courseCounts.get(course.discipline.slug) ?? 0) + 1,
 	);
 }
 

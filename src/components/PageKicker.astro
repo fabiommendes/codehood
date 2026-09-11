@@ -3,8 +3,8 @@ import BrandSquares from "./BrandSquares.astro";
 
 interface Props {
 	text: string;
-	// The landing page only pairs the brand-squares flourish with its very first
-	// hero kicker — every other section kicker (here and there) is text-only.
+	// Landing page section headings use the brand-stripe flourish when squares is set;
+	// other page kickers can remain text-only.
 	squares?: boolean;
 	class?: string;
 }

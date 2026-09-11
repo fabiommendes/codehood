@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
+import type { Actor } from "@/core/actor";
 import { FULL_ACCESS } from "@/core/actor";
+import type { UserId } from "@/core/schemas";
 import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
 import { userService } from "@/db/services/user.service";
+
+function actorOf(id: UserId, role: "ADMIN" | "INSTRUCTOR" | "STUDENT"): Actor {
+	return { id, role } as unknown as Actor;
+}
 
 let uniq = 0;
 function tag(prefix: string): string {
@@ -74,14 +80,14 @@ test("create() rejects an instructor and accepts an admin", async () => {
 		editionService.create(
 			{ slug: "2102", name: "2102", ...WINDOW },
 			{
-				actor: { id: 1, role: "INSTRUCTOR" },
+				actor: actorOf("instructor" as UserId, "INSTRUCTOR"),
 			},
 		),
 	).rejects.toThrow();
 
 	const edition = await editionService.create(
 		{ slug: "2102", name: "2102", ...WINDOW },
-		{ actor: { id: 1, role: "ADMIN" } },
+		{ actor: actorOf("admin" as UserId, "ADMIN") },
 	);
 	expect(edition.slug).toBe("2102");
 });
@@ -111,7 +117,7 @@ test("update() changes name and window, and needs an admin", async () => {
 			{ slug: "2104" },
 			{ name: "nope" },
 			{
-				actor: { id: 1, role: "INSTRUCTOR" },
+				actor: actorOf("instructor" as UserId, "INSTRUCTOR"),
 			},
 		),
 	).rejects.toThrow();
@@ -134,7 +140,7 @@ test("delete() refuses while a course uses the edition, and succeeds once it is 
 	const instructor = await makeInstructor();
 	const course = await courseService.create(
 		{
-			disciplineSlug: await makeDiscipline(),
+			discipline: await makeDiscipline(),
 			instructor: instructor.username,
 			edition: slug,
 			startAt: new Date(),
@@ -180,25 +186,25 @@ test("courseService.create() enforces the window for instructors but not for adm
 	await expect(
 		courseService.create(
 			{
-				disciplineSlug,
+				discipline: disciplineSlug,
 				instructor: instructor.username,
 				edition: slug,
 				startAt: new Date(),
 				endAt: new Date(),
 			},
-			{ actor: { id: instructor.id, role: "INSTRUCTOR" } },
+			{ actor: actorOf(instructor.username, "INSTRUCTOR") },
 		),
 	).rejects.toThrow(/not accepting new courses/);
 
 	const course = await courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructor.username,
 			edition: slug,
 			startAt: new Date(),
 			endAt: new Date(),
 		},
-		{ actor: { id: 1, role: "ADMIN" } },
+		{ actor: actorOf("admin" as UserId, "ADMIN") },
 	);
-	expect(course.editionSlug).toBe(slug);
+	expect(course.edition.slug).toBe(slug);
 });

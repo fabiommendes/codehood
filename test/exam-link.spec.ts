@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/core/actor";
+import type {
+	CalendarEventId,
+	CourseId,
+	TimeSlotId,
+	UserId,
+} from "@/core/schemas";
 import { prisma } from "@/db/client";
 import { calendarEventService } from "@/db/services/calendar-event.service";
 import { courseService } from "@/db/services/course.service";
@@ -58,7 +64,7 @@ async function makeCourse(instructorUsername: string) {
 	const editionSlug = await ensureEdition();
 	return courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructorUsername,
 			edition: editionSlug,
 			startAt: new Date("2026-01-01"),
@@ -74,7 +80,11 @@ interface SlotSpec {
 	durationMin: number;
 }
 
-async function makeSlot(courseId: number, spec: SlotSpec, slug = tag("slot")) {
+async function makeSlot(
+	courseId: CourseId,
+	spec: SlotSpec,
+	slug = tag("slot"),
+) {
 	return timeSlotService.create(
 		{
 			courseId,
@@ -88,8 +98,8 @@ async function makeSlot(courseId: number, spec: SlotSpec, slug = tag("slot")) {
 }
 
 async function makeEvent(
-	courseId: number,
-	timeSlotId: number,
+	courseId: CourseId,
+	timeSlotId: TimeSlotId,
 	date: string,
 	opts: { startMin?: number; durationMin?: number; week?: number } = {},
 ) {
@@ -111,7 +121,7 @@ async function makeEvent(
 
 async function makeExam(
 	courseId: number,
-	authorId: number,
+	authorId: UserId,
 	fields: {
 		scheduledAt: Date | null;
 		durationMs?: number | null;
@@ -124,7 +134,7 @@ async function makeExam(
 			status: "SCHEDULED",
 			courseId,
 			title: "Exam",
-			authorId,
+			authorId: authorId,
 			scheduledAt: fields.scheduledAt,
 			durationMs: fields.durationMs ?? null,
 			extraTimeMs: fields.extraTimeMs ?? 0,
@@ -132,7 +142,7 @@ async function makeExam(
 	});
 }
 
-async function reload(eventId: number) {
+async function reload(eventId: CalendarEventId) {
 	return calendarEventService.findOne({ id: eventId }, FULL_ACCESS);
 }
 
@@ -146,7 +156,7 @@ test("an exam starting inside, one starting before and ending inside, and one sp
 	});
 
 	const evtInside = await makeEvent(course.id, slot.id, "2026-01-05");
-	const examInside = await makeExam(course.id, instructor.id, {
+	const examInside = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evtInside.startAt.getTime() + 60 * MIN),
 		durationMs: 30 * MIN,
 	});
@@ -155,7 +165,7 @@ test("an exam starting inside, one starting before and ending inside, and one sp
 	const evtStartsBefore = await makeEvent(course.id, slot.id, "2026-01-12", {
 		week: 2,
 	});
-	const examStartsBefore = await makeExam(course.id, instructor.id, {
+	const examStartsBefore = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evtStartsBefore.startAt.getTime() - 60 * MIN),
 		durationMs: 90 * MIN, // ends 30 min into the event
 	});
@@ -164,7 +174,7 @@ test("an exam starting inside, one starting before and ending inside, and one sp
 	const evtSpanned = await makeEvent(course.id, slot.id, "2026-01-19", {
 		week: 3,
 	});
-	const examSpanning = await makeExam(course.id, instructor.id, {
+	const examSpanning = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evtSpanned.startAt.getTime() - 60 * MIN),
 		durationMs: 240 * MIN, // spans well past the event's end
 	});
@@ -181,7 +191,7 @@ test("adjacency is not overlap, at either edge", async () => {
 	});
 
 	const evtA = await makeEvent(course.id, slot.id, "2026-01-05");
-	const examStartsAtEnd = await makeExam(course.id, instructor.id, {
+	const examStartsAtEnd = await makeExam(course.id, instructor.username, {
 		scheduledAt: endOf(evtA.startAt, evtA.durationMin),
 		durationMs: 30 * MIN,
 	});
@@ -189,7 +199,7 @@ test("adjacency is not overlap, at either edge", async () => {
 	expect(await examForEvent(prisma, evtA)).toBeNull();
 
 	const evtB = await makeEvent(course.id, slot.id, "2026-01-12", { week: 2 });
-	await makeExam(course.id, instructor.id, {
+	await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evtB.startAt.getTime() - 30 * MIN),
 		durationMs: 30 * MIN, // ends exactly at evtB.startAt
 	});
@@ -213,7 +223,7 @@ test("extraTimeMs extends the match: one event initially, two once extra time cr
 	const evtA = await makeEvent(course.id, slotA.id, "2026-01-05");
 	const evtB = await makeEvent(course.id, slotB.id, "2026-01-05", { week: 1 });
 
-	const exam = await makeExam(course.id, instructor.id, {
+	const exam = await makeExam(course.id, instructor.username, {
 		scheduledAt: evtA.startAt,
 		durationMs: 60 * MIN, // 09:00-10:00: matches evtA only, adjacent to evtB
 	});
@@ -240,7 +250,7 @@ test("a null durationMs matches the containing instant; a null scheduledAt match
 	});
 	const evt = await makeEvent(course.id, slot.id, "2026-01-05");
 
-	const exam = await makeExam(course.id, instructor.id, {
+	const exam = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 30 * MIN),
 		durationMs: null,
 	});
@@ -272,7 +282,7 @@ test("a three-hour exam over two consecutive meetings links from both events", a
 	const evtA = await makeEvent(course.id, slotA.id, "2026-01-05");
 	const evtB = await makeEvent(course.id, slotB.id, "2026-01-05", { week: 1 });
 
-	const exam = await makeExam(course.id, instructor.id, {
+	const exam = await makeExam(course.id, instructor.username, {
 		scheduledAt: evtA.startAt,
 		durationMs: 180 * MIN, // 09:00-12:00, covering both meetings exactly
 	});
@@ -292,11 +302,11 @@ test("two exams inside one event: the earlier scheduledAt wins, and a tie at equ
 	});
 	const evt = await makeEvent(course.id, slot.id, "2026-01-05");
 
-	const earlier = await makeExam(course.id, instructor.id, {
+	const earlier = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 10 * MIN),
 		durationMs: 10 * MIN,
 	});
-	await makeExam(course.id, instructor.id, {
+	await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 30 * MIN),
 		durationMs: 10 * MIN,
 	});
@@ -304,7 +314,7 @@ test("two exams inside one event: the earlier scheduledAt wins, and a tie at equ
 
 	// A tie at the same instant as `earlier`, created afterwards (higher id):
 	// the lower id still wins.
-	const tie = await makeExam(course.id, instructor.id, {
+	const tie = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 10 * MIN),
 		durationMs: 10 * MIN,
 	});
@@ -322,7 +332,7 @@ test("update moving an event out of its exam's window clears the link; moving it
 	});
 	const evt = await makeEvent(course.id, slot.id, "2026-01-05");
 
-	const exam = await makeExam(course.id, instructor.id, {
+	const exam = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 30 * MIN),
 		durationMs: 30 * MIN,
 	});
@@ -355,11 +365,11 @@ test("relinkExam hands a vacated event to a second overlapping exam rather than 
 	const evt = await makeEvent(course.id, slot.id, "2026-01-05");
 	const originalHash = evt.contentHash;
 
-	const winner = await makeExam(course.id, instructor.id, {
+	const winner = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 10 * MIN),
 		durationMs: 10 * MIN,
 	});
-	const runnerUp = await makeExam(course.id, instructor.id, {
+	const runnerUp = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evt.startAt.getTime() + 30 * MIN),
 		durationMs: 10 * MIN,
 	});
@@ -403,7 +413,7 @@ test("an exam window crossing midnight matches the meetings on both days", async
 		week: 1,
 	});
 
-	const exam = await makeExam(course.id, instructor.id, {
+	const exam = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evtMonday.startAt.getTime() + 30 * MIN), // 23:30 Monday
 		durationMs: 120 * MIN, // ends 01:30 Tuesday
 	});
@@ -424,7 +434,7 @@ test("the two push orders converge: exam-then-event and event-then-exam leave th
 
 	// Order A: the exam lands first. Its relink finds no events yet; the
 	// event's own create finds the exam when it arrives.
-	const examFirst = await makeExam(course.id, instructor.id, {
+	const examFirst = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date("2026-01-05T00:00:00Z"),
 		durationMs: 240 * MIN,
 	});
@@ -446,7 +456,7 @@ test("the two push orders converge: exam-then-event and event-then-exam leave th
 	// arrives with the same relative window and pulls the link in via relink.
 	const evtB = await makeEvent(course.id, slot.id, "2026-01-12", { week: 2 });
 	expect((await reload(evtB.id))?.exam).toBeNull();
-	const examSecond = await makeExam(course.id, instructor.id, {
+	const examSecond = await makeExam(course.id, instructor.username, {
 		scheduledAt: new Date(evtB.startAt.getTime() + 10 * MIN),
 		durationMs: 10 * MIN,
 	});
@@ -467,7 +477,7 @@ test("an exam in another course is never matched, even at the same instant", asy
 	});
 
 	const evt = await makeEvent(courseA.id, slotA.id, "2026-01-05");
-	await makeExam(courseB.id, instructor.id, {
+	await makeExam(courseB.id, instructor.username, {
 		scheduledAt: evt.startAt,
 		durationMs: evt.durationMin * MIN,
 	});

@@ -4,7 +4,7 @@
 // dev/specs/to-do/course-navigation.md. There is no back-link and no
 // "Instructor view" badge; the strip is the whole of the page's navigation,
 // and an instructor's extra tabs are the only thing that marks them as one.
-import { type Course } from "@/db/services/course.service";
+import { type Course, toEnrollmentView } from "@/db/services/course.service";
 import { type CourseTabKey, courseTabs } from "@/utils/course-tabs";
 import Tabs from "./ui/Tabs.astro";
 
@@ -18,11 +18,11 @@ const { course, active } = Astro.props;
 const actor = Astro.locals.actor!;
 
 const tabs = courseTabs(
+	toEnrollmentView(course),
 	{
-		instructor: course.instructor,
-		enrollments: course.enrollments,
-		discipline: course.disciplineSlug,
-		edition: course.editionSlug,
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
 	},
 	actor,
 );
@@ -30,11 +30,11 @@ const tabs = courseTabs(
 
 <div>
 	<span class="badge badge-outline badge-sm font-mono"
-		>{course.disciplineSlug}</span
+		>{course.discipline.slug}</span
 	>
 	<h1 class="mt-2 text-3xl font-bold">{course.discipline.name}</h1>
 	<p class="mt-1 text-base-content/60">
-		{course.instructor.name} · {course.editionSlug}
+		{course.instructor.name} · {course.edition.slug}
 	</p>
 </div>
 

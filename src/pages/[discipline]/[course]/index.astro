@@ -19,7 +19,9 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 // Course.instructor is not an enrollment, so an instructor viewing their own
 // course never matches here — there is nothing for them to leave.
-const myEnrollment = course.enrollments.find((e) => e.userId === actor.id);
+const isEnrolled = course.enrollments.some(
+	(e) => e.username === actor.username,
+);
 
 function formatDate(date: Date): string {
 	return formatDateTime(date, {
@@ -72,7 +74,7 @@ const nextEvents = await calendarEventService.findMany(
       </div>
       <div class="stat">
         <div class="stat-title">Students</div>
-        <div class="stat-value text-2xl">{course._count.enrollments}</div>
+        <div class="stat-value text-2xl">{course.enrollments.length}</div>
       </div>
       <div class="stat">
         <div class="stat-title">Resources</div>
@@ -155,13 +157,13 @@ const nextEvents = await calendarEventService.findMany(
     </section>
 
     {
-      myEnrollment && (
+      isEnrolled && (
         <section class="mt-10 rounded-box border border-base-300 bg-base-100 p-5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p class="font-medium">You're enrolled in this course</p>
               <p class="mt-1 text-sm text-base-content/60">
-                Joined {formatDate(myEnrollment.createdAt)}
+                Joined {formatDate(course.joinedAt)}
               </p>
             </div>
             <button
@@ -179,7 +181,7 @@ const nextEvents = await calendarEventService.findMany(
 </AppLayout>
 
 {
-  myEnrollment && (
+  isEnrolled && (
     <dialog id="leave-course-dialog" class="modal">
       <div class="modal-box">
         <form method="dialog">

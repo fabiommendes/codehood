@@ -33,16 +33,16 @@ export function canInvite(actor: Actor, targetRole: Role): boolean {
 	return false;
 }
 
-/** Whether `actor` may issue/revoke API keys belonging to `ownerId`. */
-export function canManageApiKeys(actor: Actor, ownerId: number): boolean {
+/** Whether `actor` may issue/revoke API keys belonging to `owner`. */
+export function canManageApiKeys(actor: Actor, owner: UserId): boolean {
 	if (actor === SYSTEM) return true;
-	return actor.id === ownerId || actor.role === "ADMIN";
+	return actor.username === owner || actor.role === "ADMIN";
 }
 
-/** Whether `actor` may revoke sessions belonging to `ownerId` ("log out everywhere"). */
-export function canManageSessions(actor: Actor, ownerId: number): boolean {
+/** Whether `actor` may revoke sessions belonging to `owner` ("log out everywhere"). */
+export function canManageSessions(actor: Actor, owner: UserId): boolean {
 	if (actor === SYSTEM) return true;
-	return actor.id === ownerId || actor.role === "ADMIN";
+	return actor.username === owner || actor.role === "ADMIN";
 }
 
 export function canManageUsers(actor: Actor): boolean {
@@ -65,8 +65,15 @@ export function canCreateUser(actor: Actor): boolean {
  *  - Admins
  *  - The user themselves
  */
-export function canEditUser(actor: Actor, user: Impl<User, "id">): boolean {
-	return actor === SYSTEM || actor.role === "ADMIN" || actor.id === user.id;
+export function canEditUser(
+	actor: Actor,
+	user: Impl<User, "username">,
+): boolean {
+	return (
+		actor === SYSTEM ||
+		actor.role === "ADMIN" ||
+		actor.username === user.username
+	);
 }
 
 /**
@@ -76,14 +83,21 @@ export function canEditUser(actor: Actor, user: Impl<User, "id">): boolean {
  * 	- Admins
  *  - The user themselves
  */
-export function canViewUser(actor: Actor, user: Impl<User, "id">): boolean {
-	return actor === SYSTEM || actor.role === "ADMIN" || actor.id === user.id;
+export function canViewUser(
+	actor: Actor,
+	user: Impl<User, "username">,
+): boolean {
+	return (
+		actor === SYSTEM ||
+		actor.role === "ADMIN" ||
+		actor.username === user.username
+	);
 }
 
 /** Prisma `where` fragment implementing the same rule as {@link canViewUser}. */
 export function userVisibility(actor: Actor): Prisma.UserWhereInput {
 	if (actor === SYSTEM || actor.role === "ADMIN") return {};
-	return { id: actor.id };
+	return { username: actor.username };
 }
 
 /**
@@ -115,16 +129,13 @@ export function canCreateCourseOutsideWindow(actor: Actor): boolean {
 }
 
 /**
- * Whether `actor` may create a course taught by `instructorId`. An admin (or
+ * Whether `actor` may create a course taught by `instructor`. An admin (or
  * `SYSTEM`, e.g. `manage create-course`) may name any instructor; anyone
  * else may only name themselves.
  */
-export function canCreateCourseFor(
-	actor: Actor,
-	instructorId: number,
-): boolean {
+export function canCreateCourseFor(actor: Actor, instructor: UserId): boolean {
 	return (
-		actor === SYSTEM || actor.role === "ADMIN" || actor.id === instructorId
+		actor === SYSTEM || actor.role === "ADMIN" || actor.username === instructor
 	);
 }
 
@@ -135,8 +146,8 @@ export function canCreateCourseFor(
  * import these predicates without a cycle.
  */
 export interface CourseWithEnrollment {
-	instructor: { id: UserId; username: string };
-	enrollments: { userId: UserId }[];
+	instructor: { username: string };
+	enrollments: { username: UserId; name: string }[];
 }
 
 /**
@@ -149,8 +160,8 @@ export function canViewCourse(
 	course: CourseWithEnrollment,
 ): boolean {
 	if (actor === SYSTEM || actor.role === "ADMIN") return true;
-	if (course.instructor.id === actor.id) return true;
-	return course.enrollments.some((e) => e.userId === actor.id);
+	if (course.instructor.username === actor.username) return true;
+	return course.enrollments.some((e) => e.username === actor.username);
 }
 
 /** Prisma `where` fragment implementing the same rule as {@link canViewCourse}. */
@@ -158,8 +169,8 @@ export function courseVisibility(actor: Actor): Prisma.CourseWhereInput {
 	if (actor === SYSTEM || actor.role === "ADMIN") return {};
 	return {
 		OR: [
-			{ instructor: { id: actor.id } },
-			{ enrollments: { some: { userId: actor.id, status: "ACTIVE" } } },
+			{ instructor: { username: actor.username } },
+			{ enrollments: { some: { userId: actor.username, status: "ACTIVE" } } },
 		],
 	};
 }
@@ -197,9 +208,9 @@ export function courseContentsVisibility(
  */
 export function canWriteCourseContent(
 	actor: Actor,
-	course: { instructor: { id: number } },
+	course: { instructor: { username: UserId } },
 ): boolean {
-	return actor === SYSTEM || course.instructor.id === actor.id;
+	return actor === SYSTEM || course.instructor.username === actor.username;
 }
 
 /**
@@ -216,7 +227,7 @@ export function canManageCourse(
 	return (
 		actor === SYSTEM ||
 		actor.role === "ADMIN" ||
-		course.instructor.id === actor.id
+		course.instructor.username === actor.username
 	);
 }
 
@@ -231,7 +242,7 @@ export function canManageEnrollment(
 	actor: Actor,
 	course: CourseWithEnrollment,
 ): boolean {
-	return actor === SYSTEM || course.instructor.id === actor.id;
+	return actor === SYSTEM || course.instructor.username === actor.username;
 }
 
 /**
@@ -244,10 +255,10 @@ export function canManageEnrollment(
 export function canDropEnrollment(
 	actor: Actor,
 	course: CourseWithEnrollment,
-	userId: number,
+	username: UserId,
 ): boolean {
 	if (actor === SYSTEM) return true;
-	return canManageEnrollment(actor, course) || actor.id === userId;
+	return canManageEnrollment(actor, course) || actor.username === username;
 }
 
 /**
@@ -274,12 +285,12 @@ export function canViewInvite(
 ): boolean {
 	if (actor === SYSTEM || actor.role === "ADMIN") return true;
 	if (actor.role === "STUDENT") return false;
-	return invite.createdById === actor.id;
+	return invite.createdById === actor.username;
 }
 
 /** Prisma `where` fragment implementing the same rule as {@link canViewInvite}. */
 export function inviteVisibility(actor: Actor): Prisma.InviteWhereInput {
 	if (actor === SYSTEM || actor.role === "ADMIN") return {};
 	if (actor.role === "STUDENT") return { id: { in: [] } };
-	return { createdById: actor.id };
+	return { createdById: actor.username };
 }

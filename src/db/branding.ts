@@ -17,6 +17,7 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "id", from: "number", to: "CalendarEventId" },
 		{ field: "courseId", from: "number", to: "CourseId" },
 		{ field: "timeSlotId", from: "number", to: "TimeSlotId" },
+		{ field: "examId", from: "number", to: "ExamId" },
 	],
 	Course: [{ field: "id", from: "number", to: "CourseId" }],
 	// Discipline: [{ field: "id", from: "number" , to: "DisciplineId"}],

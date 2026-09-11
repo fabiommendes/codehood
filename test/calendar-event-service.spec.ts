@@ -4,6 +4,7 @@ import { FULL_ACCESS, SYSTEM } from "@/core/actor";
 import type { ServiceOpts } from "@/db/base-service";
 import { prisma } from "@/db/client";
 import { calendarEventService } from "@/db/services/calendar-event.service";
+import type { CourseId } from "@/db/services/course.service";
 import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
@@ -57,7 +58,7 @@ async function makeCourse(instructorUsername: string) {
 	const editionSlug = await ensureEdition();
 	return courseService.create(
 		{
-			disciplineSlug,
+			discipline: disciplineSlug,
 			instructor: instructorUsername,
 			edition: editionSlug,
 			startAt: new Date("2026-01-01"),
@@ -68,7 +69,7 @@ async function makeCourse(instructorUsername: string) {
 }
 
 async function makeSlot(
-	courseId: number,
+	courseId: CourseId,
 	opts: ServiceOpts = { actor: SYSTEM },
 ) {
 	return timeSlotService.create(
@@ -358,15 +359,15 @@ test("a student enrolled in one of two courses sees only that course's events; a
 	const slotA = await makeSlot(courseA.id, opts);
 
 	await courseService.enroll(
-		{ courseId: courseA.id, userId: active.id },
+		{ courseId: courseA.id, userId: active.username },
 		FULL_ACCESS,
 	);
 	await courseService.enroll(
-		{ courseId: courseA.id, userId: dropped.id },
+		{ courseId: courseA.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 	await courseService.drop(
-		{ courseId: courseA.id, userId: dropped.id },
+		{ courseId: courseA.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 
@@ -415,15 +416,15 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 	const slot = await makeSlot(course.id, opts);
 
 	await courseService.enroll(
-		{ courseId: course.id, userId: active.id },
+		{ courseId: course.id, userId: active.username },
 		FULL_ACCESS,
 	);
 	await courseService.enroll(
-		{ courseId: course.id, userId: dropped.id },
+		{ courseId: course.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 	await courseService.drop(
-		{ courseId: course.id, userId: dropped.id },
+		{ courseId: course.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 
@@ -441,8 +442,8 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 	);
 
 	const courseShape = {
-		instructor: { id: instructor.id },
-		enrollments: [{ userId: active.id }],
+		instructor: { username: instructor.username },
+		enrollments: [{ username: active.username, name: "" }],
 	};
 	const actors = [
 		{ label: "SYSTEM", actor: SYSTEM },
@@ -471,7 +472,7 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 	await courseService.enroll(
-		{ courseId: course.id, userId: student.id },
+		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 
@@ -495,7 +496,7 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 			status: "DRAFT",
 			courseId: course.id,
 			title: "Midterm",
-			authorId: instructor.id,
+			authorId: instructor.username,
 			scheduledAt: event.startAt,
 			durationMs: 60 * 60_000,
 		},

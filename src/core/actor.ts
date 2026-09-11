@@ -7,8 +7,7 @@ import type { User } from "@/db/services/user.service";
  * This is used to avoid passing around the full User object when only a few
  * fields are needed.
  */
-export interface UserActor
-	extends Pick<User, "id" | "role" | "username" | "name"> {}
+export interface UserActor extends Pick<User, "role" | "username" | "name"> {}
 
 /**
  * Sentinel actor for callers with no user behind them.

@@ -17,7 +17,7 @@ const invite = token
 	: null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
-	invite?.maxUses != null ? invite._count.redemptions >= invite.maxUses : false;
+	invite?.maxUses != null ? invite.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
 ---
 
@@ -45,7 +45,7 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
 
         <p class="text-sm text-base-content/60">
           You're accepting an invite to join as{" "}
-          <strong>{invite.role.toLowerCase()}</strong>.
+          <strong>{invite.invitedRole.toLowerCase()}</strong>.
         </p>
 
         <form

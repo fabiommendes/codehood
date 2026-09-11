@@ -20,10 +20,23 @@ import {
 } from "@/auth/permissions";
 import type { Actor } from "@/core/actor";
 import { SYSTEM } from "@/core/actor";
+import type { UserId } from "@/core/schemas";
 
-const admin = { id: 1, role: "ADMIN" as const };
-const instructor = { id: 2, role: "INSTRUCTOR" as const };
-const student = { id: 3, role: "STUDENT" as const };
+const admin = {
+	role: "ADMIN" as const,
+	username: "admin",
+	name: "Admin",
+};
+const instructor = {
+	role: "INSTRUCTOR" as const,
+	username: "instructor",
+	name: "Instructor",
+};
+const student = {
+	role: "STUDENT" as const,
+	username: "student",
+	name: "Student",
+};
 
 test("role hierarchy", () => {
 	expect(isAtLeast(admin, "INSTRUCTOR")).toBe(true);
@@ -39,15 +52,15 @@ test("invite permissions follow admin -> instructor -> student", () => {
 });
 
 test("api key ownership: owner or admin", () => {
-	expect(canManageApiKeys(instructor, instructor.id)).toBe(true);
-	expect(canManageApiKeys(instructor, 999)).toBe(false);
-	expect(canManageApiKeys(admin, 999)).toBe(true);
+	expect(canManageApiKeys(instructor, instructor.username)).toBe(true);
+	expect(canManageApiKeys(instructor, "other")).toBe(false);
+	expect(canManageApiKeys(admin, "other")).toBe(true);
 });
 
 test("session ownership: owner or admin", () => {
-	expect(canManageSessions(instructor, instructor.id)).toBe(true);
-	expect(canManageSessions(instructor, 999)).toBe(false);
-	expect(canManageSessions(admin, 999)).toBe(true);
+	expect(canManageSessions(instructor, instructor.username)).toBe(true);
+	expect(canManageSessions(instructor, "other")).toBe(false);
+	expect(canManageSessions(admin, "other")).toBe(true);
 });
 
 test("only admins manage users", () => {
@@ -64,8 +77,8 @@ test("the system and admins create user accounts directly", () => {
 
 test("users edit only their own profile", () => {
 	expect(canEditUser(student, student)).toBe(true);
-	expect(canEditUser(student, { id: 999 })).toBe(false);
-	expect(canEditUser(SYSTEM, { id: 999 })).toBe(true);
+	expect(canEditUser(student, { username: "other" as UserId })).toBe(false);
+	expect(canEditUser(SYSTEM, { username: "other" as UserId })).toBe(true);
 });
 
 test("canViewUser and userVisibility agree: self and admins see everyone, others see only themselves", () => {
@@ -77,7 +90,7 @@ test("canViewUser and userVisibility agree: self and admins see everyone, others
 		const expected =
 			actor === SYSTEM || actor.role === "ADMIN"
 				? fixtures
-				: fixtures.filter((u) => u.id === actor.id);
+				: fixtures.filter((u) => u.username === actor.username);
 		expect(visible).toEqual(expected);
 
 		// The Prisma fragment must accept exactly the same rows the predicate does.
@@ -85,13 +98,16 @@ test("canViewUser and userVisibility agree: self and admins see everyone, others
 		if (actor === SYSTEM || actor.role === "ADMIN") {
 			expect(fragment).toEqual({});
 		} else {
-			expect(fragment).toEqual({ id: actor.id });
+			expect(fragment).toEqual({ username: actor.username });
 		}
 	}
 });
 
 test("canManageEnrollment is owner-only, unlike canManageCourse", () => {
-	const course = { instructor: { id: instructor.id }, enrollments: [] };
+	const course = {
+		instructor: { id: instructor.username, username: instructor.username },
+		enrollments: [],
+	};
 	expect(canManageEnrollment(instructor, course)).toBe(true);
 	expect(canManageEnrollment(SYSTEM, course)).toBe(true);
 	// The row that separates it from canManageCourse: an admin who does not
@@ -102,19 +118,30 @@ test("canManageEnrollment is owner-only, unlike canManageCourse", () => {
 });
 
 test("canDropEnrollment: the owning instructor, a student dropping themselves, never another student's userId", () => {
-	const course = { instructor: { id: instructor.id }, enrollments: [] };
-	expect(canDropEnrollment(instructor, course, student.id)).toBe(true);
-	expect(canDropEnrollment(student, course, student.id)).toBe(true);
-	expect(canDropEnrollment(student, course, 999)).toBe(false);
-	expect(canDropEnrollment(SYSTEM, course, student.id)).toBe(true);
+	const course = {
+		instructor: { id: instructor.username, username: instructor.username },
+		enrollments: [],
+	};
+	expect(canDropEnrollment(instructor, course, student.username)).toBe(true);
+	expect(canDropEnrollment(student, course, student.username)).toBe(true);
+	expect(canDropEnrollment(student, course, "other")).toBe(false);
+	expect(canDropEnrollment(SYSTEM, course, student.username)).toBe(true);
 });
 
 test("canViewCourseContents is exactly canViewCourse, and courseContentsVisibility exactly courseVisibility", () => {
-	const outsider = { id: 999, role: "STUDENT" as const };
-	const enrolled = { id: 4, role: "STUDENT" as const };
+	const outsider = {
+		role: "STUDENT" as const,
+		username: "outsider",
+		name: "Outsider",
+	};
+	const enrolled = {
+		role: "STUDENT" as const,
+		username: "enrolled",
+		name: "Enrolled",
+	};
 	const course = {
-		instructor: { id: instructor.id },
-		enrollments: [{ userId: enrolled.id }],
+		instructor: { id: instructor.username, username: instructor.username },
+		enrollments: [{ username: enrolled.username, name: "" }],
 	};
 	const viewActors: Actor[] = [SYSTEM, admin, instructor, enrolled, outsider];
 	for (const actor of viewActors) {
@@ -129,26 +156,30 @@ test("canViewCourseContents is exactly canViewCourse, and courseContentsVisibili
 });
 
 test("canWriteCourseContent is SYSTEM or the course's own instructor, with no admin branch", () => {
-	const course = { instructor: { id: instructor.id } };
+	const course = { instructor: { username: instructor.username } };
 	expect(canWriteCourseContent(SYSTEM, course)).toBe(true);
 	expect(canWriteCourseContent(instructor, course)).toBe(true);
 	// The row that separates it from canManageCourse: an admin who does not
 	// teach the course gets no branch here.
 	expect(canWriteCourseContent(admin, course)).toBe(false);
 	expect(canWriteCourseContent(student, course)).toBe(false);
-	const otherInstructor = { id: 5, role: "INSTRUCTOR" as const };
+	const otherInstructor = {
+		role: "INSTRUCTOR" as const,
+		username: "other-instructor",
+		name: "Other Instructor",
+	};
 	expect(canWriteCourseContent(otherInstructor, course)).toBe(false);
 	// The point of the predicate: an admin who *is* the course's instructor
 	// passes, because the check reads ownership and never the role.
-	const teachingAdminCourse = { instructor: { id: admin.id } };
+	const teachingAdminCourse = { instructor: { username: admin.username } };
 	expect(canWriteCourseContent(admin, teachingAdminCourse)).toBe(true);
 });
 
 test("SYSTEM bypasses every rule", () => {
 	expect(isAtLeast(SYSTEM, "ADMIN")).toBe(true);
 	expect(canInvite(SYSTEM, "INSTRUCTOR")).toBe(true);
-	expect(canManageApiKeys(SYSTEM, 999)).toBe(true);
-	expect(canManageSessions(SYSTEM, 999)).toBe(true);
+	expect(canManageApiKeys(SYSTEM, "other")).toBe(true);
+	expect(canManageSessions(SYSTEM, "other")).toBe(true);
 	expect(canManageUsers(SYSTEM)).toBe(true);
-	expect(canViewUser(SYSTEM, { id: 999 })).toBe(true);
+	expect(canViewUser(SYSTEM, { username: "other" as UserId })).toBe(true);
 });

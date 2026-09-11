@@ -6,12 +6,9 @@ import { FULL_ACCESS } from "@/core/actor";
 import * as schema from "@/core/schemas";
 import { prisma } from "@/db/client";
 import { apiKeyService } from "@/db/services/api-key.service";
+import type { CourseId } from "@/db/services/course.service";
 import { courseService } from "@/db/services/course.service";
-import {
-	checkRedeemable,
-	InviteError,
-	inviteService,
-} from "@/db/services/invite.service";
+import { InviteError, inviteService } from "@/db/services/invite.service";
 import { sessionService } from "@/db/services/session.service";
 import { type User, userService } from "@/db/services/user.service";
 import { SESSION_COOKIE } from "@/middleware";
@@ -25,9 +22,7 @@ const SESSION_COOKIE_OPTS = {
 	path: "/",
 };
 
-export type PublicUser = Omit<User, "passwordHash" | "id" | "publicId"> & {
-	id: string;
-};
+export type PublicUser = Omit<User, "passwordHash" | "createdAt">;
 
 export const auth = {
 	login: defineAction({
@@ -48,7 +43,7 @@ export const auth = {
 				});
 			}
 			const { token, session } = await sessionService.create(
-				{ userId: user.id },
+				{ userId: user.username },
 				FULL_ACCESS,
 			);
 			context.cookies.set(SESSION_COOKIE, token, {
@@ -89,7 +84,7 @@ export const auth = {
 					code: "NOT_FOUND",
 					message: "Invite not found or expired.",
 				});
-			const precheckError = checkRedeemable(invite, input.email);
+			const precheckError = inviteService.checkRedeemable(invite, input.email);
 			if (precheckError) {
 				throw new ActionError({
 					code: "BAD_REQUEST",
@@ -107,19 +102,22 @@ export const auth = {
 							email: input.email,
 							username: input.username,
 							name: input.name,
-							role: invite.role,
+							role: invite.invitedRole,
 							password: input.password,
 							githubId: input.githubId,
 							schoolId: input.schoolId,
 						},
 						{ ...FULL_ACCESS, tx },
 					);
-					await inviteService.redeem(input.token, createdUser.id, input.email, {
-						tx,
-					});
+					await inviteService.redeem(
+						input.token,
+						createdUser.username,
+						input.email,
+						{ ...FULL_ACCESS, tx },
+					);
 					if (invite.courseId) {
 						await courseService.enroll(
-							{ courseId: invite.courseId, userId: createdUser.id },
+							{ courseId: invite.courseId, userId: createdUser.username },
 							{ ...FULL_ACCESS, tx },
 						);
 					}
@@ -136,7 +134,7 @@ export const auth = {
 			}
 
 			const { token: sessionToken, session } = await sessionService.create(
-				{ userId: user.id },
+				{ userId: user.username },
 				FULL_ACCESS,
 			);
 			context.cookies.set(SESSION_COOKIE, sessionToken, {
@@ -157,10 +155,13 @@ export const auth = {
 			const actor = requireUser(context);
 			const { token } = await inviteService.create(
 				{
-					...input,
+					email: input.email,
+					invitedRole: input.role,
+					courseId:
+						input.courseId != null ? (input.courseId as CourseId) : null,
 					kind: "PERSONAL",
 					maxUses: 1,
-					createdById: actor.id,
+					createdBy: { username: actor.username, name: actor.name },
 				},
 				{ actor },
 			);
@@ -177,10 +178,12 @@ export const auth = {
 			const actor = requireUser(context);
 			const { token } = await inviteService.create(
 				{
-					...input,
+					email: null,
+					courseId: input.courseId as CourseId,
+					maxUses: input.maxUses ?? null,
 					kind: "CLASSROOM",
-					role: "STUDENT",
-					createdById: actor.id,
+					invitedRole: "STUDENT",
+					createdBy: { username: actor.username, name: actor.name },
 				},
 				{ actor },
 			);
@@ -195,7 +198,7 @@ export const auth = {
 			const actor = requireUser(context);
 			const { token } = await apiKeyService.create(
 				{
-					userId: actor.id,
+					createdBy: { username: actor.username, name: actor.name },
 					name: input.name,
 					kind: input.kind,
 				},
@@ -232,7 +235,6 @@ function inviteErrorMessage(code: InviteError["code"]): string {
 
 function publicUser(user: User): PublicUser {
 	return {
-		id: user.publicId,
 		email: user.email,
 		name: user.name,
 		username: user.username,

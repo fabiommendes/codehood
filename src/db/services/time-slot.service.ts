@@ -12,9 +12,6 @@ import {
 	courseContentsVisibility,
 } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds, Pretty } from "@/typing";
-import type { Brand } from "@/typing/branding";
-import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
 	type TimeSlotId,
@@ -24,12 +21,14 @@ import {
 	type timeSlotRef,
 	timeSlotSchema,
 	timeSlotUpdate,
-} from "../../core/schemas";
+} from "@/core/schemas";
+import type { FillUndefineds } from "@/typing";
+import { Validate } from "@/utils/validate";
 import type { Crud, ServiceOpts } from "../base-service";
 import { type Prisma, type PrismaClient, prisma } from "../client";
 
-export type { TimeSlotId } from "../../core/schemas";
-export { weekdaySchema } from "../../core/schemas";
+export type { TimeSlotId } from "@/core/schemas";
+export { weekdaySchema } from "@/core/schemas";
 
 //
 // Type definitions
@@ -49,7 +48,7 @@ type DbTimeSlot = Prisma.TimeSlotGetPayload<{
 const timeSlotInclude = {
 	course: {
 		select: {
-			instructor: { select: { id: true, username: true } },
+			instructor: { select: { username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
 				select: { userId: true },
@@ -86,7 +85,7 @@ class TimeSlotService
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
-			select: { instructor: { select: { id: true } } },
+			select: { instructor: { select: { username: true } } },
 		});
 		if (!course || !canWriteCourseContent(opts.actor, course)) {
 			throw new NotAllowed({ action: "create-time-slot" });

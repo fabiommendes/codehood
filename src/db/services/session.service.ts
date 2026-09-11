@@ -10,7 +10,6 @@ import {
 	sessionCreateResult,
 	sessionDeletePK,
 	type sessionSchema,
-	type UserId,
 } from "../../core/schemas";
 import type { Create, Delete, ServiceOpts } from "../base-service";
 import { type PrismaClient, prisma } from "../client";
@@ -63,7 +62,7 @@ class SessionService
 				expiresAt: new Date(Date.now() + SESSION_TTL_MS),
 			},
 		});
-		return { token, session: brand(session) };
+		return { token, session: toSession(session) };
 	}
 
 	/**
@@ -126,10 +125,19 @@ class SessionService
 
 export const sessionService = new SessionService();
 
-// Re-brand a raw session row's numeric ids — a runtime no-op, since they
-// already carry the right values, just not the branded type.
-function brand<T extends { id: number; userId: number }>(
-	session: T,
-): T & { id: SessionId; userId: UserId } {
-	return session as T & { id: SessionId; userId: UserId };
+// Convert a raw session row to the public-facing session type.
+function toSession(session: {
+	id: number;
+	userId: string;
+	tokenHash: string;
+	expiresAt: Date;
+	createdAt: Date;
+}): Session {
+	return {
+		id: session.id as SessionId,
+		userId: session.userId,
+		tokenHash: session.tokenHash,
+		expiresAt: session.expiresAt,
+		createdAt: session.createdAt,
+	};
 }

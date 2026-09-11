@@ -181,7 +181,7 @@ export const importCalendarCommand = new Command("import-calendar")
 						CalendarEventCreate,
 						"courseId" | "timeSlotId" | "slug"
 					> = {
-						date: new Date(entry.date),
+						date: entry.date,
 						startMin: entry.start ? parseClock(entry.start) : 0,
 						durationMin: entry.duration ?? 120,
 						week: entry.week,
@@ -204,7 +204,7 @@ export const importCalendarCommand = new Command("import-calendar")
 								week: built.week,
 								kind: built.kind,
 								title: built.title,
-								description: built.description,
+								description: built.description ?? undefined,
 								contentHash: built.contentHash,
 							},
 							FULL_ACCESS,

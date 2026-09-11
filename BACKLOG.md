@@ -9,7 +9,8 @@ Backlog items are categorized in sections, not on priority.
 
 ## Small issues
 
-None now!
+* [ ] Remove the generated openapi.json. Instead, we should generate once during 
+  startup, cache it and serve this file
 
 ## UI issues
 
@@ -29,10 +30,11 @@ None now!
 
 ## Architecture
 
-* [ ] Make a mechanism to declare astro actions similar to the CRUD function that register routes for RESTful APIs.
+* [ ] Make a mechanism to declare astro actions similar to the CRUD function 
+  that register routes for RESTful APIs.
 * [ ] Add support for RPC since rest cant handle everything.
-* [ ] Check options for RPC UI. Use openapi? Is there a better alternative? Is gRPC too much trouble?
-
+* [ ] Check options for RPC UI. Use openapi? Is there a better alternative? 
+  Is gRPC too much trouble?
 
 ## Features
 

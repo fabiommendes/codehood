@@ -43,7 +43,7 @@ type DbResource = Prisma.ResourceGetPayload<{
 const resourceInclude = {
 	course: {
 		select: {
-			instructor: { select: { id: true, username: true } },
+			instructor: { select: { username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
 				select: { userId: true },
@@ -169,7 +169,7 @@ class ResourceService
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
-			select: { instructor: { select: { id: true } } },
+			select: { instructor: { select: { username: true } } },
 		});
 		if (!course || !canWriteCourseContent(opts.actor, course)) {
 			throw new NotAllowed({ action: "create-resource" });

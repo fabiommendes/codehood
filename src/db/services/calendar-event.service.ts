@@ -69,7 +69,7 @@ const MEETING_KINDS: ReadonlySet<EventKind> = new Set([
 const EVENT_INCLUDE = {
 	course: {
 		select: {
-			instructor: { select: { id: true, username: true } },
+			instructor: { select: { username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
 				select: { userId: true },
@@ -120,7 +120,7 @@ class CalendarEventService
 		const client = opts.tx ?? this.prisma;
 		const course = await client.course.findUnique({
 			where: { id: input.courseId },
-			select: { instructor: { select: { id: true } } },
+			select: { instructor: { select: { username: true } } },
 		});
 		if (!course || !canWriteCourseContent(opts.actor, course)) {
 			throw new NotAllowed({ action: "create-calendar-event" });
@@ -137,7 +137,7 @@ class CalendarEventService
 
 		const startMin = input.startMin ?? slot.startMin;
 		const durationMin = input.durationMin ?? slot.durationMin;
-		const startAt = toInstant(input.date.toString(), startMin);
+		const startAt = toInstant(input.date, startMin);
 
 		assertWeekdayMatches(startAt, slot.day, slot.slug);
 		await assertNoSlotDayCollision(client, slot.id, startAt, null);
@@ -414,6 +414,9 @@ function maskExam(row: DbEvent, actor: Actor): CalendarEvent {
 		id: rest.id as CalendarEventId,
 		courseId: rest.courseId as CourseId,
 		timeSlotId: rest.timeSlotId as TimeSlotId,
+		// The column is nullable, the public type optional: an unlinked event
+		// carries no `examId` at all rather than an explicit null.
+		examId: rest.examId ?? undefined,
 		timeSlot: {
 			...rest.timeSlot,
 			id: rest.timeSlot.id as TimeSlotId,

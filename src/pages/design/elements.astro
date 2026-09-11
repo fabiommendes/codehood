@@ -61,22 +61,30 @@ const tabItems = [
   <section class="mb-14">
     <h1 class="text-3xl font-bold">Elements</h1>
     <p class="mt-3 max-w-2xl text-base-content/70">
-      Reusable pieces from <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/components/ui/</code
-      >. These aren't recreations for the showcase &mdash; every example below is the same component the rest of
-      the app imports.
+      Reusable pieces from <code
+        class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm"
+        >src/components/ui/</code
+      >. These aren't recreations for the showcase &mdash; every example below
+      is the same component the rest of the app imports.
     </p>
   </section>
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Button</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Button variant="primary">`}</code> &mdash; renders an
-      <code class="font-mono">&lt;a&gt;</code> instead of a <code class="font-mono">&lt;button&gt;</code> when given
-      an <code class="font-mono">href</code>.
+      <code class="font-mono">{`<Button variant="primary">`}</code> &mdash; renders
+      an
+      <code class="font-mono">&lt;a&gt;</code> instead of a <code
+        class="font-mono">&lt;button&gt;</code
+      > when given an <code class="font-mono">href</code>.
     </p>
     <div class="card card-border bg-base-100">
       <div class="card-body flex-row flex-wrap gap-3">
-        {buttonVariants.map((variant) => <Button variant={variant}>{variant}</Button>)}
+        {
+          buttonVariants.map((variant) => (
+            <Button variant={variant}>{variant}</Button>
+          ))
+        }
       </div>
     </div>
   </section>
@@ -84,12 +92,16 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Badge</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Badge variant="success">`}</code> &mdash; used for role labels and API key kinds
-      elsewhere in the app.
+      <code class="font-mono">{`<Badge variant="success">`}</code> &mdash; used for
+      role labels and API key kinds elsewhere in the app.
     </p>
     <div class="card card-border bg-base-100">
       <div class="card-body flex-row flex-wrap items-center gap-3">
-        {badgeVariants.map((variant) => <Badge variant={variant}>{variant}</Badge>)}
+        {
+          badgeVariants.map((variant) => (
+            <Badge variant={variant}>{variant}</Badge>
+          ))
+        }
       </div>
     </div>
   </section>
@@ -97,14 +109,15 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Alert</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Alert variant="error">`}</code> &mdash; the same pattern used for action-result
-      messages on the login, invite, and profile pages.
+      <code class="font-mono">{`<Alert variant="error">`}</code> &mdash; the same
+      pattern used for action-result messages on the login, invite, and profile pages.
     </p>
     <div class="flex flex-col gap-3">
       {
         alertVariants.map((variant) => (
           <Alert variant={variant}>
-            <span class="capitalize">{variant}</span> &mdash; this is what a {variant} message looks like.
+            <span class="capitalize">{variant}</span> &mdash; this is what a{" "}
+            {variant} message looks like.
           </Alert>
         ))
       }
@@ -114,15 +127,21 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Card</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Card title="...">`}</code> &mdash; a bordered container with an optional title;
-      every section on this page (including this one) is one.
+      <code class="font-mono">{`<Card title="...">`}</code> &mdash; a bordered container
+      with an optional title; every section on this page (including this one) is one.
     </p>
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
       <Card title="With a title">
-        <p class="text-sm text-base-content/70">Pass a <code class="font-mono text-xs">title</code> prop and it renders as a card-title heading.</p>
+        <p class="text-sm text-base-content/70">
+          Pass a <code class="font-mono text-xs">title</code> prop and it renders
+          as a card-title heading.
+        </p>
       </Card>
       <Card>
-        <p class="text-sm text-base-content/70">Omit it and the card is just a bordered container for whatever you put inside.</p>
+        <p class="text-sm text-base-content/70">
+          Omit it and the card is just a bordered container for whatever you put
+          inside.
+        </p>
       </Card>
     </div>
   </section>
@@ -130,8 +149,8 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Divider &amp; list</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      Not (yet) wrapped in components &mdash; plain daisyUI classes, used as-is on the profile page's API key
-      list.
+      Not (yet) wrapped in components &mdash; plain daisyUI classes, used as-is
+      on the profile page's API key list.
     </p>
     <div class="card card-border bg-base-100">
       <div class="card-body">
@@ -139,22 +158,26 @@ const tabItems = [
           <li class="list-row">
             <div>
               <div class="font-medium">my laptop</div>
-              <div class="text-xs text-base-content/60">created Jan 3 &middot; last used yesterday</div>
+              <div class="text-xs text-base-content/60">
+                created Jan 3 &middot; last used yesterday
+              </div>
             </div>
             <Badge variant="neutral" style="outline">cli</Badge>
           </li>
           <li class="list-row">
             <div>
               <div class="font-medium">grading bot</div>
-              <div class="text-xs text-base-content/60">created Feb 12 &middot; last used never</div>
+              <div class="text-xs text-base-content/60">
+                created Feb 12 &middot; last used never
+              </div>
             </div>
             <Badge variant="neutral" style="outline">bot</Badge>
           </li>
         </ul>
         <div class="divider"></div>
         <p class="text-xs text-base-content/50">
-          <code class="font-mono">divider</code> separates the list from whatever follows it &mdash; on the
-          profile page, the create-key form.
+          <code class="font-mono">divider</code> separates the list from whatever
+          follows it &mdash; on the profile page, the create-key form.
         </p>
       </div>
     </div>
@@ -163,9 +186,11 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Table</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Table columns={...} data={...} />`}</code> &mdash; a data-driven
-      <code class="font-mono">&lt;table&gt;</code>; each column declares its header and how to render a row's
-      cell, so the markup never repeats per row.
+      <code class="font-mono">{`<Table columns={...} data={...} />`}</code> &mdash;
+      a data-driven
+      <code class="font-mono">&lt;table&gt;</code>; each column declares its
+      header and how to render a row's cell, so the markup never repeats per
+      row.
     </p>
     <Table columns={tableColumns} data={tableRows} />
   </section>
@@ -173,10 +198,12 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Tabs</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Tabs items={...} active="..." />`}</code> &mdash; the tab strip on this very
-      page. Link mode (shown above, no <code class="font-mono">name</code> prop) renders <code class="font-mono">&lt;a&gt;</code>
-      tabs that navigate; pass a <code class="font-mono">name</code> instead for same-page tabs driven by radio
-      inputs, as on the profile page.
+      <code class="font-mono">{`<Tabs items={...} active="..." />`}</code> &mdash;
+      the tab strip on this very page. Link mode (shown above, no <code
+        class="font-mono">name</code
+      > prop) renders <code class="font-mono">&lt;a&gt;</code>
+      tabs that navigate; pass a <code class="font-mono">name</code> instead for same-page
+      tabs driven by radio inputs, as on the profile page.
     </p>
     <div class="card card-border bg-base-100">
       <div class="card-body">
@@ -188,16 +215,23 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">ListRow</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<ListRow href="..." muted>`}</code> &mdash; a single-row card with optional
-      leading/trailing slots. Renders an <code class="font-mono">&lt;a&gt;</code> when given
-      <code class="font-mono">href</code>, a <code class="font-mono">&lt;button&gt;</code> when given
-      <code class="font-mono">openDialog</code>, or a plain <code class="font-mono">&lt;div&gt;</code> otherwise.
-      Used for exam, resource, and upcoming-item rows across the app.
+      <code class="font-mono">{`<ListRow href="..." muted>`}</code> &mdash; a single-row
+      card with optional leading/trailing slots. Renders an <code
+        class="font-mono">&lt;a&gt;</code
+      > when given
+      <code class="font-mono">href</code>, a <code class="font-mono"
+        >&lt;button&gt;</code
+      > when given
+      <code class="font-mono">openDialog</code>, or a plain <code
+        class="font-mono">&lt;div&gt;</code
+      > otherwise. Used for exam, resource, and upcoming-item rows across the app.
     </p>
     <div class="flex flex-col gap-3">
       <ListRow href="#">
         <div class="font-medium">Midterm exam</div>
-        <div class="text-xs text-base-content/60">opens Mar 3 &middot; 90 minutes</div>
+        <div class="text-xs text-base-content/60">
+          opens Mar 3 &middot; 90 minutes
+        </div>
         <Fragment slot="trailing">
           <Badge variant="primary">open</Badge>
         </Fragment>
@@ -215,10 +249,13 @@ const tabItems = [
   <section>
     <h2 class="mb-2 text-xl font-semibold">PageKicker &amp; BrandSquares</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<PageKicker text="..." squares />`}</code> &mdash; the small uppercase label
-      above a page's heading, seen at the top of this design section index. The
-      <code class="font-mono">squares</code> prop pairs it with <code class="font-mono">&lt;BrandSquares /&gt;</code>,
-      the four-square logo flourish; only the landing page's hero kicker uses it, every other kicker is text-only.
+      <code class="font-mono">{`<PageKicker text="..." squares />`}</code> &mdash;
+      the small uppercase label above a page's heading, seen at the top of this design
+      section index. The
+      <code class="font-mono">squares</code> prop pairs it with <code
+        class="font-mono">&lt;BrandSquares /&gt;</code
+      >, the continuous multicolor logo stripe; only the landing page's hero
+      kicker uses it, every other kicker is text-only.
     </p>
     <div class="card card-border bg-base-100">
       <div class="card-body gap-4">
@@ -226,7 +263,9 @@ const tabItems = [
         <PageKicker text="Section" />
         <div class="flex items-center gap-2">
           <BrandSquares />
-          <span class="text-xs text-base-content/60">BrandSquares on its own</span>
+          <span class="text-xs text-base-content/60"
+            >BrandSquares on its own</span
+          >
         </div>
       </div>
     </div>

@@ -55,7 +55,9 @@ export const profile = {
 		handler: async (input, context) => {
 			const actor = requireUser(context);
 			try {
-				await userService.update({ id: actor.id }, input, { actor });
+				await userService.update({ username: actor.username }, input, {
+					actor,
+				});
 			} catch (error) {
 				const message = uniqueConstraintMessage(error);
 				if (message) throw new ActionError({ code: "BAD_REQUEST", message });
@@ -72,7 +74,10 @@ export const profile = {
 		}),
 		handler: async (input, context) => {
 			const actor = requireUser(context);
-			const user = await userService.findOne({ id: actor.id }, { actor });
+			const user = await userService.findOne(
+				{ username: actor.username },
+				{ actor },
+			);
 			if (
 				!user ||
 				!(await verifyPassword(user.passwordHash, input.currentPassword))
@@ -90,7 +95,7 @@ export const profile = {
 		accept: "form",
 		handler: async (_input, context) => {
 			const actor = requireUser(context);
-			await sessionService.delete({ userId: actor.id }, { actor });
+			await sessionService.delete({ userId: actor.username }, { actor });
 			context.cookies.delete(SESSION_COOKIE, { path: "/" });
 		},
 	}),

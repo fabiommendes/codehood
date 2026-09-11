@@ -1,8 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { canViewInvite } from "@/auth/permissions";
+import type { Actor } from "@/core/actor";
 import { FULL_ACCESS } from "@/core/actor";
-import { checkRedeemable, inviteService } from "@/db/services/invite.service";
+import type { CourseId, UserId } from "@/core/schemas";
+import { inviteService } from "@/db/services/invite.service";
 import { userService } from "@/db/services/user.service";
+
+function actorOf(
+	username: UserId,
+	role: "ADMIN" | "INSTRUCTOR" | "STUDENT",
+): Actor {
+	return { username, name: username, role };
+}
 
 function makeAdmin(email: string) {
 	return userService.create(
@@ -39,27 +48,45 @@ test("personal invite: redeems for the invited email, rejects others, then is ex
 			kind: "PERSONAL",
 			maxUses: 1,
 			email: "invitee1@codehood.test",
-			role: "STUDENT",
-			createdById: admin.id,
+			invitedRole: "STUDENT",
+			courseId: null,
+			createdBy: { username: admin.username, name: admin.name },
 		},
 		{ actor: admin },
 	);
+	// biome-ignore lint/style/noNonNullAssertion: create() always sets a token
+	const inviteToken = token!;
 
-	const invite = await inviteService.findOne({ token }, FULL_ACCESS);
+	const invite = await inviteService.findOne(
+		{ token: inviteToken },
+		FULL_ACCESS,
+	);
 	expect(invite).not.toBeNull();
 	// biome-ignore lint/style/noNonNullAssertion: asserted above
-	expect(checkRedeemable(invite!, "wrong@codehood.test")).toBe(
+	expect(inviteService.checkRedeemable(invite!, "wrong@codehood.test")).toBe(
 		"email_mismatch",
 	);
-	// biome-ignore lint/style/noNonNullAssertion: asserted above
-	expect(checkRedeemable(invite!, "invitee1@codehood.test")).toBeUndefined();
+	expect(
+		// biome-ignore lint/style/noNonNullAssertion: asserted above
+		inviteService.checkRedeemable(invite!, "invitee1@codehood.test"),
+	).toBeUndefined();
 
 	const invitee = await makeStudent("invitee1@codehood.test", "invitee1");
-	await inviteService.redeem(token, invitee.id, "invitee1@codehood.test");
+	await inviteService.redeem(
+		inviteToken,
+		invitee.username,
+		"invitee1@codehood.test",
+		FULL_ACCESS,
+	);
 
 	const second = await makeStudent("invitee1b@codehood.test", "invitee1b");
 	await expect(
-		inviteService.redeem(token, second.id, "invitee1@codehood.test"),
+		inviteService.redeem(
+			inviteToken,
+			second.username,
+			"invitee1@codehood.test",
+			FULL_ACCESS,
+		),
 	).rejects.toMatchObject({
 		code: "exhausted",
 	});
@@ -70,22 +97,35 @@ test("classroom invite: redeemable up to maxUses, then exhausted", async () => {
 	const { token } = await inviteService.create(
 		{
 			kind: "CLASSROOM",
-			role: "STUDENT",
-			courseId: 1,
-			createdById: admin.id,
+			invitedRole: "STUDENT",
+			email: null,
+			courseId: 1 as CourseId,
+			createdBy: { username: admin.username, name: admin.name },
 			maxUses: 2,
 		},
 		{ actor: admin },
 	);
+	// biome-ignore lint/style/noNonNullAssertion: create() always sets a token
+	const inviteToken = token!;
 
 	for (const i of [1, 2]) {
 		const user = await makeStudent(`class${i}@codehood.test`, `class${i}`);
-		await inviteService.redeem(token, user.id, `class${i}@codehood.test`);
+		await inviteService.redeem(
+			inviteToken,
+			user.username,
+			`class${i}@codehood.test`,
+			FULL_ACCESS,
+		);
 	}
 
 	const overflow = await makeStudent("class3@codehood.test", "class3");
 	await expect(
-		inviteService.redeem(token, overflow.id, "class3@codehood.test"),
+		inviteService.redeem(
+			inviteToken,
+			overflow.username,
+			"class3@codehood.test",
+			FULL_ACCESS,
+		),
 	).rejects.toMatchObject({
 		code: "exhausted",
 	});
@@ -98,20 +138,33 @@ test("expired invite is rejected before redemption", async () => {
 			kind: "PERSONAL",
 			maxUses: 1,
 			email: "late@codehood.test",
-			role: "STUDENT",
-			createdById: admin.id,
+			invitedRole: "STUDENT",
+			courseId: null,
+			createdBy: { username: admin.username, name: admin.name },
 			expiresInMs: -1,
 		},
 		{ actor: admin },
 	);
+	// biome-ignore lint/style/noNonNullAssertion: create() always sets a token
+	const inviteToken = token!;
 
-	const invite = await inviteService.findOne({ token }, FULL_ACCESS);
+	const invite = await inviteService.findOne(
+		{ token: inviteToken },
+		FULL_ACCESS,
+	);
 	// biome-ignore lint/style/noNonNullAssertion: asserted below
-	expect(checkRedeemable(invite!, "late@codehood.test")).toBe("expired");
+	expect(inviteService.checkRedeemable(invite!, "late@codehood.test")).toBe(
+		"expired",
+	);
 
 	const user = await makeStudent("late@codehood.test", "late");
 	await expect(
-		inviteService.redeem(token, user.id, "late@codehood.test"),
+		inviteService.redeem(
+			inviteToken,
+			user.username,
+			"late@codehood.test",
+			FULL_ACCESS,
+		),
 	).rejects.toMatchObject({
 		code: "expired",
 	});
@@ -143,9 +196,10 @@ test("findMany visibility agrees with canViewInvite: admins see all, instructors
 			{
 				kind: "PERSONAL",
 				email: `invitee-of-${creator.username}@codehood.test`,
-				role: "STUDENT",
+				invitedRole: "STUDENT",
+				courseId: null,
 				maxUses: 1,
-				createdById: creator.id,
+				createdBy: { username: creator.username, name: creator.name },
 			},
 			FULL_ACCESS,
 		);
@@ -154,13 +208,16 @@ test("findMany visibility agrees with canViewInvite: admins see all, instructors
 	const all = await inviteService.findMany({}, FULL_ACCESS);
 	expect(all.length).toBeGreaterThanOrEqual(3);
 
-	for (const actor of [
-		{ id: admin.id, role: "ADMIN" as const },
-		{ id: instructorA.id, role: "INSTRUCTOR" as const },
-		{ id: student.id, role: "STUDENT" as const },
-	]) {
+	const actors: Actor[] = [
+		actorOf(admin.username, "ADMIN"),
+		actorOf(instructorA.username, "INSTRUCTOR"),
+		actorOf(student.username, "STUDENT"),
+	];
+	for (const actor of actors) {
 		const visible = await inviteService.findMany({}, { actor });
-		const expected = all.filter((invite) => canViewInvite(actor, invite));
+		const expected = all.filter((invite) =>
+			canViewInvite(actor, { createdById: invite.createdBy.username }),
+		);
 		expect(visible.map((i) => i.id).sort()).toEqual(
 			expected.map((i) => i.id).sort(),
 		);
@@ -172,31 +229,35 @@ test("findMany carries the creator and the redemption count, never a token", asy
 	await inviteService.create(
 		{
 			kind: "CLASSROOM",
-			role: "STUDENT",
+			invitedRole: "STUDENT",
+			email: null,
+			courseId: null,
 			maxUses: 5,
-			createdById: instructor.id,
+			createdBy: { username: instructor.username, name: instructor.name },
 		},
 		FULL_ACCESS,
 	);
 
 	const [invite] = await inviteService.findMany(
-		{ createdById: instructor.id },
+		{ createdById: instructor.username },
 		FULL_ACCESS,
 	);
 	expect(invite.createdBy.username).toBe("list-instructor");
-	expect(invite._count.redemptions).toBe(0);
+	expect(invite.redemptions).toBe(0);
 	expect(invite).not.toHaveProperty("token");
 });
 
 test("update() extends an expiry and adjusts maxUses, and refuses another instructor", async () => {
 	const owner = await makeInstructor("update-owner");
 	const other = await makeInstructor("update-other");
-	const { invite } = await inviteService.create(
+	const invite = await inviteService.create(
 		{
 			kind: "CLASSROOM",
-			role: "STUDENT",
+			invitedRole: "STUDENT",
+			email: null,
+			courseId: null,
 			maxUses: 2,
-			createdById: owner.id,
+			createdBy: { username: owner.username, name: owner.name },
 		},
 		FULL_ACCESS,
 	);
@@ -205,7 +266,7 @@ test("update() extends an expiry and adjusts maxUses, and refuses another instru
 		inviteService.update(
 			{ id: invite.id },
 			{ maxUses: 99 },
-			{ actor: { id: other.id, role: "INSTRUCTOR" } },
+			{ actor: actorOf(other.username, "INSTRUCTOR") },
 		),
 	).rejects.toThrow();
 
@@ -213,7 +274,7 @@ test("update() extends an expiry and adjusts maxUses, and refuses another instru
 	const updated = await inviteService.update(
 		{ id: invite.id },
 		{ expiresAt: later, maxUses: null },
-		{ actor: { id: owner.id, role: "INSTRUCTOR" } },
+		{ actor: actorOf(owner.username, "INSTRUCTOR") },
 	);
 	expect(updated.expiresAt).toEqual(later);
 	expect(updated.maxUses).toBeNull();
@@ -225,32 +286,48 @@ test("delete() refuses a stranger, and succeeds for the creator and for an admin
 	const admin = await makeAdmin("delete-admin@codehood.test");
 
 	const first = await inviteService.create(
-		{ kind: "CLASSROOM", role: "STUDENT", createdById: owner.id },
+		{
+			kind: "CLASSROOM",
+			invitedRole: "STUDENT",
+			email: null,
+			courseId: null,
+			maxUses: null,
+			createdBy: { username: owner.username, name: owner.name },
+		},
 		FULL_ACCESS,
 	);
 	await expect(
 		inviteService.delete(
-			{ id: first.invite.id },
-			{ actor: { id: other.id, role: "INSTRUCTOR" } },
+			{ id: first.id },
+			{ actor: actorOf(other.username, "INSTRUCTOR") },
 		),
 	).rejects.toThrow();
 	await inviteService.delete(
-		{ id: first.invite.id },
-		{ actor: { id: owner.id, role: "INSTRUCTOR" } },
+		{ id: first.id },
+		{ actor: actorOf(owner.username, "INSTRUCTOR") },
 	);
 	expect(
-		await inviteService.findOne({ token: first.token }, FULL_ACCESS),
+		// biome-ignore lint/style/noNonNullAssertion: create() always sets a token
+		await inviteService.findOne({ token: first.token! }, FULL_ACCESS),
 	).toBeNull();
 
 	const second = await inviteService.create(
-		{ kind: "CLASSROOM", role: "STUDENT", createdById: owner.id },
+		{
+			kind: "CLASSROOM",
+			invitedRole: "STUDENT",
+			email: null,
+			courseId: null,
+			maxUses: null,
+			createdBy: { username: owner.username, name: owner.name },
+		},
 		FULL_ACCESS,
 	);
 	await inviteService.delete(
-		{ id: second.invite.id },
-		{ actor: { id: admin.id, role: "ADMIN" } },
+		{ id: second.id },
+		{ actor: actorOf(admin.username, "ADMIN") },
 	);
 	expect(
-		await inviteService.findOne({ token: second.token }, FULL_ACCESS),
+		// biome-ignore lint/style/noNonNullAssertion: create() always sets a token
+		await inviteService.findOne({ token: second.token! }, FULL_ACCESS),
 	).toBeNull();
 });

@@ -53,7 +53,7 @@ function overlaps(exam: ExamWindow, event: EventWindow): boolean {
 export async function examForEvent(
 	tx: PrismaTx,
 	event: EventWindow,
-): Promise<number | null> {
+): Promise<ExamId | null> {
 	const eventEnd = endOf(event.startAt, event.durationMin);
 	const candidates = await tx.exam.findMany({
 		where: {
@@ -83,7 +83,7 @@ export async function examForEvent(
 			best = candidate;
 		}
 	}
-	return best?.id ?? null;
+	return (best?.id as ExamId) ?? null;
 }
 
 /**

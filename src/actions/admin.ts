@@ -3,7 +3,7 @@ import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
-import { inviteService } from "@/db/services/invite.service";
+import { type InviteId, inviteService } from "@/db/services/invite.service";
 import { sessionService } from "@/db/services/session.service";
 import { userService } from "@/db/services/user.service";
 import { USERNAME_RE } from "@/utils/course-url";
@@ -54,7 +54,7 @@ export const admin = {
 
 	forceLogout: defineAction({
 		accept: "form",
-		input: z.object({ userId: z.coerce.number().int() }),
+		input: z.object({ userId: z.string() }),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await sessionService.delete({ userId: input.userId }, { actor });
@@ -103,7 +103,7 @@ export const admin = {
 		input: z.object({ id: z.coerce.number().int() }),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await inviteService.delete({ id: input.id }, { actor });
+			await inviteService.delete({ id: input.id as InviteId }, { actor });
 		}),
 	}),
 

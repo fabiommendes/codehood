@@ -123,7 +123,11 @@ export function formatDateTime(
 	}).format(instant);
 }
 
-/** `870 -> "14:30"`. Pure: minutes-since-midnight carry no time zone. */
+/**
+ * Format minutes from midnight to human readable hour.
+ *
+ * Example: `formatTime(870) -> "14:30"`.
+ */
 export function formatTime(minutes: number): string {
 	const hour = Math.floor(minutes / 60);
 	const minute = minutes % 60;

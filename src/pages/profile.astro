@@ -4,9 +4,7 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import PageKicker from "@/components/PageKicker.astro";
 import Tabs from "@/components/ui/Tabs.astro";
-import type { ApiKey } from "@/db/client";
-import { apiKeyService } from "@/db/services/api-key.service";
-import { userService } from "@/db/services/user.service";
+import { type ApiKey, db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 const logoutEverywhereResult = Astro.getActionResult(
@@ -21,12 +19,15 @@ if (!Astro.locals.actor) {
 }
 
 const actor = Astro.locals.actor;
-const user = await userService.findOne({ id: actor.id }, { actor });
+const user = await db.user.findOne({ username: actor.username }, { actor });
 if (!user) {
 	return Astro.redirect("/login");
 }
 
-const apiKeys = await apiKeyService.findMany({ userId: user.id }, { actor });
+const apiKeys = await db.apiKey.findMany(
+	{ createdById: user.username },
+	{ actor },
+);
 
 const updateResult = Astro.getActionResult(actions.profile.update);
 const passwordResult = Astro.getActionResult(actions.profile.changePassword);

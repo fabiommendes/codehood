@@ -3,7 +3,6 @@ import { canManageUsers } from "@/auth/permissions";
 import { apiKeyService } from "@/db/services/api-key.service";
 import { sessionService } from "@/db/services/session.service";
 import * as env from "./core/constants";
-import type { UserId } from "./core/schemas";
 import { ensureDemoCourses, ensureDevAdmin } from "./db/bootstrap";
 
 export const SESSION_COOKIE = "session";
@@ -24,9 +23,8 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 		context.cookies.delete(SESSION_COOKIE, { path: "/" });
 		return next();
 	}
-	const { id, role, name, username } = session.user;
-	// FIXME: make the session type the user object correctly so that this cast is not necessary
-	context.locals.actor = { id: id as UserId, role, name, username };
+	const { role, name, username } = session.user;
+	context.locals.actor = { role, name, username };
 
 	// Re-stamp the cookie so its lifetime tracks the (possibly just-refreshed) sliding expiry.
 	context.cookies.set(SESSION_COOKIE, token, {
@@ -67,10 +65,9 @@ export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 	const apiKey = await apiKeyService.validate(token);
 	if (apiKey) {
 		context.locals.actor = {
-			id: apiKey.user.id as UserId, // FIXME: this cast should not be necessary if the service typed the user correctly
-			role: apiKey.user.role,
-			username: apiKey.user.username,
-			name: apiKey.user.name,
+			role: apiKey.createdBy.role,
+			username: apiKey.createdBy.username,
+			name: apiKey.createdBy.name,
 		};
 		context.locals.apiKey = { id: apiKey.id, kind: apiKey.kind };
 	}

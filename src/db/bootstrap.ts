@@ -7,7 +7,6 @@ import { fileService } from "@/db/services/file.service";
 import { resourceService } from "@/db/services/resource.service";
 import { timeSlotService } from "@/db/services/time-slot.service";
 import { type User, userService } from "@/db/services/user.service";
-import type { CalendarEvent } from "./client";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -167,7 +166,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	const cs101 = await courseService.create(
 		{
-			disciplineSlug: "cs101",
+			discipline: "cs101",
 			instructor: ada.username,
 			edition: "2026-1",
 			description:
@@ -179,7 +178,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	const cs201 = await courseService.create(
 		{
-			disciplineSlug: "cs201",
+			discipline: "cs201",
 			instructor: alan.username,
 			edition: "2026-1",
 			description:
@@ -192,14 +191,14 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	for (const student of [hopper, hamilton, liskov, bob]) {
 		await courseService.enroll(
-			{ courseId: cs101.id, userId: student.id },
+			{ courseId: cs101.id, userId: student.username },
 			FULL_ACCESS,
 		);
 	}
 
 	for (const student of [liskov, bob]) {
 		await courseService.enroll(
-			{ courseId: cs201.id, userId: student.id },
+			{ courseId: cs201.id, userId: student.username },
 			FULL_ACCESS,
 		);
 	}
@@ -428,7 +427,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				courseId: cs101.id,
 				timeSlotId: event.slot.id,
 				slug: event.slug,
-				date: new Date(event.date),
+				date: event.date,
+				startMin: event.slot.startMin,
 				week: event.week,
 				kind: event.kind,
 				title: event.title,
@@ -480,7 +480,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				courseId: cs201.id,
 				timeSlotId: cs201Mon.id,
 				slug: event.slug,
-				date: new Date(event.date),
+				date: event.date,
+				startMin: cs201Mon.startMin,
 				week: event.week,
 				kind: event.kind,
 				title: event.title,

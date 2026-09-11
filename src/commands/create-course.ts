@@ -60,7 +60,7 @@ export const createCourseCommand = new Command("create-course")
 			try {
 				const course = await courseService.create(
 					{
-						disciplineSlug,
+						discipline: disciplineSlug,
 						instructor: instructor,
 						edition: edition,
 						description: description || undefined,

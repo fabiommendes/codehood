@@ -6,6 +6,9 @@ export default defineConfig({
 	testDir: "./test",
 	fullyParallel: false,
 	workers: 1,
+	// Refuses to run against the wrong database — see the file for why that is
+	// otherwise invisible.
+	globalSetup: "./test/global-setup.ts",
 	use: {
 		baseURL: "http://localhost:4322",
 		// Astro's CSRF protection for form-accepting actions checks the Origin header,

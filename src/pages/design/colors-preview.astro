@@ -1,0 +1,213 @@
+---
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+const light = [
+	{
+		name: "primary",
+		hex: "#2980b9",
+		content: "#ffffff",
+		role: "Logo blue and primary actions",
+	},
+	{
+		name: "secondary",
+		hex: "#27ae60",
+		content: "#ffffff",
+		role: "Logo green and positive actions",
+	},
+	{
+		name: "accent",
+		hex: "#f1c40f",
+		content: "#1c2b36",
+		role: "Logo yellow and highlights",
+	},
+	{
+		name: "neutral",
+		hex: "#2c3e50",
+		content: "#ffffff",
+		role: "Navigation and quiet emphasis",
+	},
+	{
+		name: "info",
+		hex: "#3498db",
+		content: "#ffffff",
+		role: "Informational feedback",
+	},
+	{
+		name: "success",
+		hex: "#27ae60",
+		content: "#ffffff",
+		role: "Confirmed or completed state",
+	},
+	{
+		name: "warning",
+		hex: "#f1c40f",
+		content: "#2c3e50",
+		role: "Attention state",
+	},
+	{
+		name: "error",
+		hex: "#c0392b",
+		content: "#ffffff",
+		role: "Logo red and destructive state",
+	},
+];
+
+const dark = [
+	{
+		name: "primary",
+		hex: "#5dade2",
+		content: "#0d1620",
+		role: "Brighter blue for dark surfaces",
+	},
+	{
+		name: "secondary",
+		hex: "#48c9a0",
+		content: "#0d1620",
+		role: "Brighter green complement",
+	},
+	{
+		name: "accent",
+		hex: "#f4cf55",
+		content: "#172733",
+		role: "Warm yellow highlight",
+	},
+	{
+		name: "neutral",
+		hex: "#0d1620",
+		content: "#ecf0f1",
+		role: "Deep application chrome",
+	},
+	{
+		name: "info",
+		hex: "#5dade2",
+		content: "#0b1620",
+		role: "Informational feedback",
+	},
+	{
+		name: "success",
+		hex: "#2ecc71",
+		content: "#0b1620",
+		role: "Confirmed or completed state",
+	},
+	{
+		name: "warning",
+		hex: "#f1c40f",
+		content: "#2c3e50",
+		role: "Attention state",
+	},
+	{
+		name: "error",
+		hex: "#e74c3c",
+		content: "#0b1620",
+		role: "Brighter red on dark surfaces",
+	},
+];
+
+const surfaces = [
+	{ name: "base-100", light: "#ffffff", dark: "#1c2b36" },
+	{ name: "base-200", light: "#ecf0f1", dark: "#16232d" },
+	{ name: "base-300", light: "#d7dde0", dark: "#263644" },
+];
+---
+
+<DesignLayout title="Palette preview" active="colors">
+  <section class="mb-10">
+    <div class="preview-stripe" aria-hidden="true"></div>
+    <p class="mt-5 font-mono text-xs uppercase tracking-[0.08em] text-primary">Temporary palette preview</p>
+    <h1 class="mt-3 text-4xl font-bold">A palette closer to the mark.</h1>
+    <p class="mt-4 max-w-2xl text-base-content/70">
+      This is an isolated proposal. It does not change the active Codehood themes. The logo colors stay recognizable while each token keeps a clear UI job.
+    </p>
+  </section>
+
+  <section class="mb-12">
+    <h2 class="mb-4 text-2xl font-bold">Surfaces</h2>
+    <div class="grid gap-4 md:grid-cols-3">
+      {surfaces.map((surface) => (
+        <div class="surface-pair rounded-box border border-base-300">
+          <div style={`background:${surface.light};color:#1c2b36`}>
+            <span>{surface.name}</span><code>{surface.light}</code>
+          </div>
+          <div style={`background:${surface.dark};color:#ecf0f1`}>
+            <span>dark</span><code>{surface.dark}</code>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="mb-12">
+    <h2 class="mb-4 text-2xl font-bold">Semantic roles</h2>
+    <div class="grid gap-8 lg:grid-cols-2">
+      {[{ label: "Light theme", colors: light }, { label: "Dark theme", colors: dark }].map((theme) => (
+        <div>
+          <h3 class="mb-3 text-lg font-semibold">{theme.label}</h3>
+          <div class="grid gap-3 sm:grid-cols-2">
+            {theme.colors.map((color) => (
+              <div class="swatch rounded-box" style={`background:${color.hex};color:${color.content}`}>
+                <div class="flex items-center justify-between gap-3">
+                  <strong>{color.name}</strong>
+                  <code style={`color:${color.content}`}>{color.hex}</code>
+                </div>
+                <span>{color.role}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="rounded-box border border-base-300 bg-base-200 p-6">
+    <h2 class="text-xl font-bold">The main change</h2>
+    <p class="mt-2 max-w-2xl text-base-content/70">
+      Purple and unrelated teal leave the identity. Blue remains primary, green becomes the secondary brand color, yellow becomes the accent, and red continues to carry error meaning.
+    </p>
+  </section>
+</DesignLayout>
+
+<style>
+  .preview-stripe {
+    width: 4rem;
+    height: 0.25rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2980b9, #c0392b, #f1c40f, #27ae60);
+  }
+
+  .surface-pair {
+    overflow: hidden;
+  }
+
+  .surface-pair > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem;
+    font-weight: 600;
+  }
+
+  .surface-pair code,
+  .swatch code {
+    background: transparent;
+    color: inherit;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    opacity: 0.8;
+  }
+
+  .swatch {
+    min-height: 6.4rem;
+    padding: 1rem;
+  }
+
+  .swatch > span {
+    display: block;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    opacity: 0.82;
+  }
+</style>

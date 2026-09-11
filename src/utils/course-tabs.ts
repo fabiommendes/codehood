@@ -34,10 +34,11 @@ export interface CourseTab {
  * so a visible tab never 403s.
  */
 export function courseTabs(
-	course: CourseWithEnrollment & CourseRef,
+	course: CourseWithEnrollment,
+	ref: CourseRef,
 	actor: Actor,
 ): readonly CourseTab[] {
-	const href = courseHref(course);
+	const href = courseHref(ref);
 	const tabs: CourseTab[] = [
 		{ key: "home", label: "Home", href },
 		{ key: "exams", label: "Exams", href: `${href}/exams` },

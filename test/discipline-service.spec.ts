@@ -1,9 +1,18 @@
 import { expect, test } from "@playwright/test";
+import type { Actor } from "@/core/actor";
 import { FULL_ACCESS } from "@/core/actor";
+import type { UserId } from "@/core/schemas";
 import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
 import { userService } from "@/db/services/user.service";
+
+function actorOf(
+	username: UserId,
+	role: "ADMIN" | "INSTRUCTOR" | "STUDENT",
+): Actor {
+	return { id: username, role } as unknown as Actor;
+}
 
 test("create() rejects a reserved slug", async () => {
 	await expect(
@@ -29,7 +38,7 @@ test("create() rejects a non-admin, non-system actor", async () => {
 	await expect(
 		disciplineService.create(
 			{ slug: "some-discipline", name: "Some Discipline" },
-			{ actor: { id: 1, role: "INSTRUCTOR" } },
+			{ actor: actorOf("instructor" as UserId, "INSTRUCTOR") },
 		),
 	).rejects.toThrow();
 });
@@ -56,7 +65,7 @@ test("update() renames a discipline and refuses a non-admin", async () => {
 			{ slug: "disc-rename" },
 			{ name: "Nope" },
 			{
-				actor: { id: 1, role: "INSTRUCTOR" },
+				actor: actorOf("instructor" as UserId, "INSTRUCTOR"),
 			},
 		),
 	).rejects.toThrow();
@@ -96,7 +105,7 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 	);
 	const course = await courseService.create(
 		{
-			disciplineSlug: slug,
+			discipline: slug,
 			instructor: instructor.username,
 			edition: "2201",
 			startAt: new Date(),

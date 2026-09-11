@@ -1,7 +1,11 @@
 import type { AstroGlobal } from "astro";
 import { canManageEnrollment } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import { type Course, courseService } from "@/db/services/course.service";
+import {
+	type Course,
+	courseService,
+	toEnrollmentView,
+} from "@/db/services/course.service";
 import { courseHref, parseCourseSegment } from "./course-url";
 
 export type LoadCourseResult =
@@ -60,16 +64,16 @@ export async function loadCourse(
 	if (!course) {
 		return { redirect: await Astro.rewrite("/404") };
 	}
-	if (opts?.manage && !canManageEnrollment(actor, course)) {
+	if (opts?.manage && !canManageEnrollment(actor, toEnrollmentView(course))) {
 		return { redirect: await forbidden(Astro, segment) };
 	}
 
 	return {
 		course,
 		href: courseHref({
-			discipline: course.disciplineSlug,
+			discipline: course.discipline.slug,
 			instructor: course.instructor.username,
-			edition: course.editionSlug,
+			edition: course.edition.slug,
 		}),
 	};
 }

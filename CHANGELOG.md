@@ -179,9 +179,48 @@
   (`uniqueItems`, short-answer's `if`/`then`) are listed on stdout at
   generation time rather than dropped. `test/mdq-schemas.spec.ts` guards
   against the committed output drifting from the schema.
+- The three `*-flow.spec.ts` files are replaced by user-story tests under
+  `test/stories/`, one module per role and category, each test named after the
+  story it covers in `docs/user-stories/`. Where the old specs drove Astro
+  actions over HTTP, these drive the page: 16 stories across joining, finding
+  course material, account management, enrollment and admin. `test/stories/`
+  documents the conventions and the traps — the forms name inputs with a
+  `<legend>` rather than a `<label>`, so `getByLabel` finds nothing today.
+  Background state is seeded through the `src/fixtures/*.factory.ts` suite, and
+  `logInAs` mints a real session rather than retyping the login form; only the
+  stories actually about signing in drive it. The CLI-level login coverage that
+  no page exercises stayed API-level, in `test/api-auth.spec.ts`.
+- `test/global-setup.ts` refuses to run when `DATABASE_URL` is not the test
+  database. Bypassing `test/run.ts` used to leave the test process on
+  `dev.db` while the server read the test database, which failed every seeded
+  test as though login were broken — and wrote to the real dev database on the
+  way past.
 
 ### Changed
 
+- `ApiKey`'s owner columns were renamed `username`/`user` → `createdById`/
+  `createdBy`, and its entity schema now carries a `createdBy` `userInfo` object
+  in place of `user`. `Invite.createdByUsername` → `createdById` followed, which
+  lets `invite.service.ts`'s `fromDb` drop the rename step it needed while the
+  column and the entity field disagreed. **Breaking:** the REST filter
+  `GET /api/api-key?userId=<username>` is now `?createdById=<username>`.
+- Every foreign key pointing at `User` now follows the same `<relation>Id`
+  convention: `Course.instructorSlug` → `instructorId` (and its
+  `@map("instructorRef")` is
+  dropped, so the column name matches the field), `Enrollment.username`,
+  `Session.username`, `GroupMembership.username` and `InviteRedemption.username`
+  → `userId`, and `Exam.authorUsername`, `QuestionRef.authorUsername`,
+  `Response.authorUsername` → `authorId`, `Submission.graderUsername` →
+  `graderId`. Public entity shapes are unchanged — `userInfo` (`{ name,
+  username }`) still calls the field `username`; only the database layer and
+  the `fromDb`/`toX` mapping step in between were touched. `Course`'s compound
+  `@@unique` accessors renamed accordingly
+  (`disciplineSlug_instructorId_editionSlug`, `userId_courseId`), and
+  `auth/permissions.ts`'s `CourseWithEnrollment.enrollments` is now `{ userId:
+  UserId }[]` — `db/services/course.service.ts` exports `toEnrollmentView()` to
+  adapt the public `Course` entity (`enrollments: {username, name}[]`) to that
+  shape for the three call sites (`load-course.ts`, `CourseHeader.astro`,
+  `exams/index.astro`) that only have the public entity on hand.
 - `prisma/migrations/` was squashed to a single `init` migration generated from
   the current `schema.prisma`. The previous two migrations were far behind it —
   `migrate deploy` produced a database without `User.username`, among many
@@ -190,6 +229,11 @@
 
 ### Fixed
 
+- `pnpm run lint:fix` now runs `biome check --write .`, the same scope
+  `pnpm run lint` checks. It used to run `format` and `lint` over
+  `src test scripts` only, never the assist — so `organizeImports` violations
+  had no fixer and root-level files were skipped entirely, leaving errors that
+  CI reported and no local command would repair.
 - `biome check --write .` no longer rewrites `src/mdq/schemas-generated.ts` out
   from under its own generator. `generate-question-models.ts` runs `biome
   format` on its output and deliberately not `check --write`, so that the file

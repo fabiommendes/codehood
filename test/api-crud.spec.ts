@@ -15,7 +15,7 @@ import { collectSearchParams } from "@/utils/query-coerce";
  * validation runs — the exact same `options.in.safeParse(...)` a JSON body
  * goes through. The 9 tests below that used to document this bug via
  * `test.fail` are now plain, passing tests; the coercion/filtering behavior
- * itself is proven by the tests further down.
+ * itself is proven by the tests further d/own.
  *
  * `CRUD()`'s `findOne`/`update`/`delete` also used to read their primary
  * key from the wrong place (`findOne` from the body — which the query-string
@@ -74,11 +74,11 @@ for (const resource of OPTIONAL_FILTER_RESOURCES) {
 	});
 }
 
-// Unlike the resources above, `apiKeyFilter` requires `userId` — there is no
-// "list every API key" endpoint by design — so a bare `GET /api/api-key`
+// Unlike the resources above, `apiKeyFilter` requires `createdById` — there is
+// no "list every API key" endpoint by design — so a bare `GET /api/api-key`
 // legitimately 400s even after the fix. This is not bug (a): it's the
 // filter schema doing its job. Supply the required filter instead.
-test("GET /api/api-key?userId=<id> returns 200 with a JSON array", async ({
+test("GET /api/api-key?createdById=<username> returns 200 with a JSON array", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -88,9 +88,12 @@ test("GET /api/api-key?userId=<id> returns 200 with a JSON array", async ({
 	expect(admin.status()).toBe(200);
 	const [adminUser] = await admin.json();
 
-	const res = await request.get(`/api/api-key?userId=${adminUser.id}`, {
-		headers: authHeader(token),
-	});
+	const res = await request.get(
+		`/api/api-key?createdById=${adminUser.username}`,
+		{
+			headers: authHeader(token),
+		},
+	);
 	expect(res.status()).toBe(200);
 	expect(Array.isArray(await res.json())).toBe(true);
 });
@@ -163,7 +166,7 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 	const res = await request.post("/api/course", {
 		headers: authHeader(token),
 		data: {
-			disciplineSlug: discipline.slug,
+			discipline: discipline.slug,
 			instructorUsername: "ada",
 			editionSlug: edition.slug,
 			description: "created by api-crud.spec",

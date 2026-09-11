@@ -79,7 +79,7 @@ function rowHref(resource: (typeof resources)[number]): string {
 
     <h2 class="text-xl font-semibold">Resources</h2>
     <p class="mt-1 text-sm text-base-content/60">
-      {course.discipline.name} · {course.editionSlug}
+      {course.discipline.name} · {course.edition.slug}
       {
         canWrite &&
           totalFileBytes > 0 &&
@@ -93,8 +93,8 @@ function rowHref(resource: (typeof resources)[number]): string {
           <span>
             Nothing pushed yet. Run{" "}
             <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">
-              manage import-resources {course.disciplineSlug}{" "}
-              {course.instructor.username} {course.editionSlug} ./resources.yaml
+              manage import-resources {course.discipline.slug}{" "}
+              {course.instructor.username} {course.edition.slug} ./resources.yaml
             </code>{" "}
             from the CLI. Every file it uploads gets a permanent,
             unauthenticated URL — nothing whose disclosure matters belongs here.

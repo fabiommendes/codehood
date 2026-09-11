@@ -3,13 +3,10 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import AdminTabs from "@/components/AdminTabs.astro";
-import InvitesTable, { type InviteRow } from "@/components/admin/InvitesTable";
+import InvitesTable from "@/components/admin/InvitesTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService, isEditionOpen } from "@/db/services/edition.service";
-import { inviteService } from "@/db/services/invite.service";
-import { userService } from "@/db/services/user.service";
+import { db, type Invite } from "@/db";
+import { isEditionOpen } from "@/db/services/edition.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -23,7 +20,7 @@ const disciplineResult = Astro.getActionResult(actions.admin.createDiscipline);
 const editionResult = Astro.getActionResult(actions.admin.createEdition);
 
 // createPersonalInvite has no `accept: "form"` — it's called as a JSON action
-// elsewhere (see test/auth-flow.spec.ts), so a plain <form action={...}> here
+// elsewhere, so a plain <form action={...}> here
 // would send a body Astro can't parse against that shape. Handling this one
 // POST manually (formData in, Astro.callAction out) is the same workaround
 // invite.astro already uses for createClassroomInvite.
@@ -49,11 +46,11 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 }
 
 const [users, courses, disciplines, editions, invites] = await Promise.all([
-	userService.findMany({}, { actor }),
-	courseService.findMany({}, { actor }),
-	disciplineService.findMany({}),
-	editionService.findMany({}),
-	inviteService.findMany({ kind: "PERSONAL" }, { actor }),
+	db.user.findMany({}, { actor }),
+	db.course.findMany({}, { actor }),
+	db.discipline.findMany({}),
+	db.edition.findMany({}),
+	db.invite.findMany({ kind: "PERSONAL" }, { actor }),
 ]);
 
 const userCounts = {
@@ -71,17 +68,9 @@ const disciplineSample =
 		.join(", ") +
 	(disciplines.length > 3 ? ` & ${disciplines.length - 3} more` : "");
 
-const pendingInvites: InviteRow[] = invites
-	.filter((invite) => invite.role === "INSTRUCTOR")
-	.map((invite) => ({
-		id: invite.id,
-		email: invite.email ?? "—",
-		createdByName: invite.createdBy.name,
-		createdAt: invite.createdAt,
-		expiresAt: invite.expiresAt,
-		maxUses: invite.maxUses,
-		redemptions: invite._count.redemptions,
-	}));
+const pendingInvites: Invite[] = invites.filter(
+	(invite) => invite.invitedRole === "INSTRUCTOR",
+);
 ---
 
 <AppLayout title="Admin · Overview">

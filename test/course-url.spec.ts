@@ -8,7 +8,7 @@ import {
 } from "@/utils/course-url";
 
 test("parseCourseSegment round-trips with courseHref", () => {
-	const ref = { disciplineSlug: "cs101", username: "ada", edition: "2026-1" };
+	const ref = { discipline: "cs101", instructor: "ada", edition: "2026-1" };
 	const href = courseHref(ref);
 	expect(href).toBe("/cs101/ada_2026-1");
 

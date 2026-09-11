@@ -74,6 +74,6 @@ export const createUserCommand = new Command("create-user")
 		);
 
 		console.log(
-			`Created ${user.role.toLowerCase()} ${user.email} (id=${user.id}).`,
+			`Created ${user.role.toLowerCase()} ${user.email} (username=${user.username}).`,
 		);
 	});

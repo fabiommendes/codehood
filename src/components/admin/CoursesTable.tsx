@@ -1,32 +1,16 @@
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
-
-/**
- * One row's worth of pre-computed display data — free of `CourseWithDetails`
- * and `courseService` on purpose, same split as `EditionsTable`/`UsersTable`:
- * this component only renders rows, the `.astro` page owns fetching them and
- * building each course's URL.
- */
-export interface CourseRow {
-	id: number;
-	disciplineSlug: string;
-	disciplineName: string;
-	editionSlug: string;
-	instructorName: string;
-	activeCount: number;
-	startAt: Date;
-	endAt: Date;
-	href: string;
-}
+import type { Course } from "@/db";
+import { courseHref } from "@/utils/course-url";
 
 interface Props {
-	courses: CourseRow[];
+	courses: Course[];
 }
 
 // startAt/endAt are calendar dates with no meaningful time-of-day but stored
 // as UTC midnight — format in UTC too, or a negative-offset server timezone
 // renders "2026-01-05" as "Jan 4".
-function formatTerm(row: Pick<CourseRow, "startAt" | "endAt">): string {
+function formatTerm(row: Pick<Course, "startAt" | "endAt">): string {
 	const short: Intl.DateTimeFormatOptions = {
 		month: "short",
 		day: "numeric",
@@ -41,27 +25,31 @@ function formatTerm(row: Pick<CourseRow, "startAt" | "endAt">): string {
 }
 
 export default function CoursesTable(props: Props): JSX.Element {
-	const columns: ColumnConfig<CourseRow>[] = [
+	const columns: ColumnConfig<Course>[] = [
 		{
 			title: "Discipline",
-			render: (row) => (
+			render: (course) => (
 				<>
-					<div class="font-mono font-medium">{row.disciplineSlug}</div>
-					<div class="text-xs text-base-content/60">{row.disciplineName}</div>
+					<div class="font-mono font-medium">{course.discipline.slug}</div>
+					<div class="text-xs text-base-content/60">
+						{course.discipline.name}
+					</div>
 				</>
 			),
 		},
 		{
 			title: "Edition",
 			class: "font-mono text-base-content/60",
-			render: (row) => row.editionSlug,
+			render: (row) => row.edition.slug,
 		},
-		{ title: "Instructor", render: (row) => row.instructorName },
+		{ title: "Instructor", render: (row) => row.instructor.name },
 		{
 			title: "Students",
 			class: "text-base-content/60",
-			render: (row) =>
-				`${row.activeCount} student${row.activeCount === 1 ? "" : "s"}`,
+			render: (row) => {
+				const count = row.enrollments.length;
+				return `${count} student${count === 1 ? "" : "s"}`;
+			},
 		},
 		{
 			title: "Term",
@@ -74,7 +62,11 @@ export default function CoursesTable(props: Props): JSX.Element {
 			headerClass: "text-right",
 			render: (row) => (
 				<a
-					href={row.href}
+					href={courseHref({
+						discipline: row.discipline.slug,
+						instructor: row.instructor.username,
+						edition: row.edition.slug,
+					})}
 					class="btn btn-square btn-ghost btn-sm"
 					aria-label="Open course"
 					title="Open course"

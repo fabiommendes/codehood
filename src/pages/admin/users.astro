@@ -3,7 +3,7 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import AdminTabs from "@/components/AdminTabs.astro";
-import UsersTable, { type UserRow } from "@/components/admin/UsersTable";
+import UsersTable from "@/components/admin/UsersTable";
 import PageKicker from "@/components/PageKicker.astro";
 import { db, type User } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -20,15 +20,6 @@ const users = (await db.user.findMany(
 	{},
 	{ actor: Astro.locals.actor },
 )) as Array<User & { createdAt: Date }>;
-
-const userRows: UserRow[] = users.map((u) => ({
-	id: u.id,
-	name: u.name,
-	username: u.username,
-	email: u.email,
-	role: u.role,
-	createdAt: u.createdAt,
-}));
 
 const counts = {
 	ADMIN: users.filter((u) => u.role === "ADMIN").length,
@@ -200,6 +191,6 @@ const counts = {
       )
     }
 
-    <UsersTable users={userRows} />
+    <UsersTable users={users} />
   </main>
 </AppLayout>

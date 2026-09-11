@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { z } from "zod";
 import { verifyPassword } from "@/auth/password";
 import { FULL_ACCESS } from "@/core/actor";
-import { loginSchema } from "@/core/schemas";
+import { usernameOrEmail } from "@/core/schemas";
 import { apiKeyService } from "@/db/services/api-key.service";
 import { sessionService } from "@/db/services/session.service";
 import { userService } from "@/db/services/user.service";
@@ -18,7 +18,7 @@ export const logout = POST("/api/auth/logout", {
 	tags: ["Authentication"],
 	operationId: "logout",
 	handler: async ({ actor }) => {
-		sessionService.delete({ userId: actor.id }, { actor });
+		sessionService.delete({ userId: actor.username }, { actor });
 		return { success: true };
 	},
 });
@@ -30,7 +30,7 @@ export const login = POST("/api/auth/login", {
 	isPublic: true,
 	in: z
 		.object({
-			login: loginSchema,
+			login: usernameOrEmail,
 			password: z.string().min(1),
 		})
 		.openapi("LoginRequest"),
@@ -55,7 +55,11 @@ export const login = POST("/api/auth/login", {
 		}
 
 		const { token } = await apiKeyService.create(
-			{ userId: user.id, name: "Login token", kind: "CLI" },
+			{
+				createdBy: { username: user.username, name: user.name },
+				name: "Login token",
+				kind: "CLI",
+			},
 			{ actor: user },
 		);
 		return { token };

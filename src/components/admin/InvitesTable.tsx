@@ -1,19 +1,10 @@
 import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
-
-export interface InviteRow {
-	id: number;
-	email: string;
-	createdByName: string;
-	createdAt: Date;
-	expiresAt: Date;
-	maxUses: number | null;
-	redemptions: number;
-}
+import type { Invite } from "@/db";
 
 interface Props {
-	invites: InviteRow[];
+	invites: Invite[];
 }
 
 function formatDate(date: Date): string {
@@ -25,12 +16,12 @@ function formatDate(date: Date): string {
 }
 
 export default function InvitesTable(props: Props): JSX.Element {
-	const columns: ColumnConfig<InviteRow>[] = [
+	const columns: ColumnConfig<Invite>[] = [
 		{ title: "Email", render: (row) => row.email },
 		{
 			title: "Created by",
 			class: "text-base-content/60",
-			render: (row) => row.createdByName,
+			render: (row) => row.createdBy.name,
 		},
 		{
 			title: "Created",
