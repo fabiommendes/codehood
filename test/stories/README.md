@@ -35,12 +35,23 @@ are *about* signing in, and for the moment a story has to prove a credential
 still works — after a password change, say.
 
 **Name the test after the story.** Prefix it with the role and use the story
-title, so a failure names the story that broke and the database in
-`docs/user-stories` can be mapped back to its coverage:
+title verbatim, so a failure names the story that broke:
 
 ```ts
-test("student: log in with either a username or an email", async ({ page }) => {
+test("student: log in", async ({ page }) => {
 ```
+
+`pnpm run stories` slugifies both sides and writes `docs/user-stories/coverage.md`
+from the result. `pnpm run lint` runs it with `--check`, which fails when a test
+names a story that no longer exists, so renaming a story breaks the build until
+its test is renamed too, and `--stale` names the tests that have drifted.
+`--missing` lists the stories still waiting for a test, and
+`pnpm run stories --missing | grep -v '\[status: todo\]'` narrows that to the
+ones whose feature is already built.
+
+One story can carry several tests, but a story split across two tests is usually
+a story that should not have been split. A failure path belongs in a
+`test.step` inside the story it interrupts, the same way the catalogue writes it.
 
 **Keep fixture data unique.** The database is created once per run, not once per
 test: `test/run.ts` wipes the file and pushes the schema before Playwright

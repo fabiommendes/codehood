@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/core/actor";
 import { inviteService } from "@/db/services/invite.service";
-import { fillField, logInAs, resetDatabase, seedUser } from "./helpers";
+import { persistedInviteFactory } from "@/fixtures/invite.factory";
+import { fillField, logIn, logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);
 
-test("admin: create personalized invites", async ({ page }) => {
+test("admin: invite an instructor", async ({ page }) => {
 	const admin = await seedUser({ role: "ADMIN", name: "Grace Admin" });
 	const invited = "new-instructor@codehood.test";
 
@@ -51,4 +52,78 @@ test("admin: create personalized invites", async ({ page }) => {
 	);
 	const stored = invites.find((invite) => invite.email === invited);
 	expect(stored?.invitedRole).toBe("INSTRUCTOR");
+});
+
+test("admin: see every invite that is outstanding", async ({ page }) => {
+	const admin = await seedUser({ role: "ADMIN", name: "Grace Admin" });
+	const recruiter = await seedUser({ role: "ADMIN", name: "Ada Recruiter" });
+	const invited = "waiting-instructor@codehood.test";
+
+	// Background: someone already issued an invite before the admin looks —
+	// the admin didn't create this one, so the view has to say who did.
+	await persistedInviteFactory.create({
+		email: invited,
+		invitedRole: "INSTRUCTOR",
+		maxUses: 1,
+		createdBy: { username: recruiter.username, name: recruiter.name },
+	});
+
+	await logInAs(page, admin);
+	await page.goto("/admin");
+
+	const row = page.getByRole("row").filter({ hasText: invited });
+	await test.step("the invite names its recipient and who sent it", async () => {
+		await expect(row).toBeVisible();
+		await expect(row).toContainText("Ada Recruiter");
+	});
+
+	await test.step("and how many times it has been used so far", async () => {
+		await expect(row).toContainText("0 / 1");
+	});
+});
+
+test("admin: find a user and end their sessions", async ({ page, browser }) => {
+	const admin = await seedUser({ role: "ADMIN", name: "Grace Admin" });
+	const suspect = await seedUser({
+		role: "STUDENT",
+		name: "Compromised Carol",
+		email: "carol-compromised@codehood.test",
+	});
+
+	// Background: the account already holds a live session somewhere else —
+	// the point of the story is that this session dies without the account
+	// itself being touched.
+	const elsewhere = await browser.newContext();
+	const elsewherePage = await elsewhere.newPage();
+	await logInAs(elsewherePage, suspect);
+	await elsewherePage.goto("/profile");
+	await expect(elsewherePage).not.toHaveURL(/\/login/);
+
+	await logInAs(page, admin);
+	await page.goto("/admin/users");
+
+	await test.step("admin finds the account by its email and ends its sessions", async () => {
+		const row = page.getByRole("row").filter({ hasText: suspect.email });
+		await row
+			.getByRole("button", { name: `Force logout ${suspect.name}` })
+			.click();
+		await page
+			.locator(`#force-logout-${suspect.username}`)
+			.getByRole("button", { name: "Log out" })
+			.click();
+		await expect(
+			page.getByText("Every session for that account has been logged out."),
+		).toBeVisible();
+	});
+
+	await test.step("the account still exists but its old session is dead", async () => {
+		await elsewherePage.goto("/profile");
+		await expect(elsewherePage).toHaveURL(/\/login/);
+	});
+
+	// The account itself is untouched — it just needs someone to log in
+	// again, the same way the story says.
+	await test.step("and it can still log back in", async () => {
+		await logIn(elsewherePage, suspect);
+	});
 });

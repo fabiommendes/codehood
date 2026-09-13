@@ -1,9 +1,11 @@
 import { expect, type Page } from "@playwright/test";
 import { FULL_ACCESS } from "@/core/actor";
+import type { Weekday } from "@/db/client";
 import { prisma } from "@/db/client";
 import { sessionService } from "@/db/services/session.service";
 import type { UserCreate } from "@/db/services/user.service";
 import { persistedUserFactory, userFactory } from "@/fixtures/user.factory";
+import { SERVER_TZ } from "@/utils/schedule-time";
 
 /**
  * Mirrors `SESSION_COOKIE` in `src/middleware.ts`.
@@ -148,4 +150,47 @@ export async function fillField(
 		.locator("input, textarea")
 		.first()
 		.fill(value);
+}
+
+const WEEKDAY_ORDER: readonly Weekday[] = [
+	"SUNDAY",
+	"MONDAY",
+	"TUESDAY",
+	"WEDNESDAY",
+	"THURSDAY",
+	"FRIDAY",
+	"SATURDAY",
+];
+
+/**
+ * A calendar date `daysAhead` days from today and the {@link Weekday} it
+ * falls on, both read in `SERVER_TZ` — the same zone
+ * `calendarEventService.create` interprets an authored `date` in.
+ *
+ * A calendar-event fixture needs a `date`/slot-`day` pair that actually
+ * matches (the service rejects a mismatch) and, for a story about "what's
+ * coming up", one that is genuinely in the future. Building the pair from
+ * `new Date()` in the local Node timezone would drift from `SERVER_TZ` and
+ * occasionally hand back yesterday or the wrong weekday; this reads today's
+ * date the same way the server does, then adds whole days as calendar math
+ * rather than a duration, so it can never straddle a DST change.
+ */
+export function futureDate(daysAhead: number): { date: string; day: Weekday } {
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZone: SERVER_TZ,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).formatToParts(new Date());
+	const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+	const today = Date.UTC(
+		Number(map.year),
+		Number(map.month) - 1,
+		Number(map.day),
+	);
+	const target = new Date(today + daysAhead * 86_400_000);
+	return {
+		date: target.toISOString().slice(0, 10),
+		day: WEEKDAY_ORDER[target.getUTCDay()],
+	};
 }

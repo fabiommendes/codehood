@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/core/actor";
+import { courseService } from "@/db/services/course.service";
 import { userService } from "@/db/services/user.service";
+import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { courseHref } from "@/utils/course-url";
 import {
 	fillField,
 	logIn,
@@ -47,7 +50,7 @@ test("student: update my profile", async ({ page }) => {
 	expect(stored?.email).toBe(student.email);
 });
 
-test("student: change my password", async ({ page }) => {
+test("student: change my password and log out everywhere", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
 
 	await logInAs(page, student);
@@ -64,15 +67,22 @@ test("student: change my password", async ({ page }) => {
 		).toBeVisible();
 	});
 
-	await test.step("the right one is accepted, and the new password works", async () => {
+	await test.step("the right one is accepted", async () => {
 		await openTab(page, "Account");
 		await fillField(page, "Current password", student.password);
 		await fillField(page, "New password", "brandnewpassword");
 		await fillField(page, "Confirm new password", "brandnewpassword");
 		await page.getByRole("button", { name: "Change password" }).click();
+	});
 
+	await test.step("logging out everywhere ends the session in hand", async () => {
 		await openTab(page, "Account");
 		await page.getByRole("button", { name: "Log out everywhere" }).click();
+		await page.goto("/profile");
+		await expect(page).toHaveURL(/\/login/);
+	});
+
+	await test.step("and the new password is what gets back in", async () => {
 		await logIn(page, {
 			username: student.username,
 			password: "brandnewpassword",
@@ -80,15 +90,44 @@ test("student: change my password", async ({ page }) => {
 	});
 });
 
-test("student: log out everywhere", async ({ page }) => {
+test("student: leave a course", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create();
+	await courseService.enroll(
+		{ courseId: course.id, userId: student.username },
+		FULL_ACCESS,
+	);
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
 
 	await logInAs(page, student);
-	await page.goto("/profile");
-	await openTab(page, "Account");
-	await page.getByRole("button", { name: "Log out everywhere" }).click();
+	await page.goto(href);
 
-	// The session is gone, so an authenticated page sends them back to login.
-	await page.goto("/profile");
-	await expect(page).toHaveURL(/\/login/);
+	await test.step("the student leaves the course themselves", async () => {
+		await page.getByRole("button", { name: "Leave course" }).click();
+		await page
+			.locator("#leave-course-dialog")
+			.getByRole("button", { name: "Leave course" })
+			.click();
+		await expect(page).toHaveURL(/\/courses/);
+	});
+
+	await test.step("it disappears from their course list", async () => {
+		await expect(
+			page.getByRole("heading", { name: course.discipline.name }),
+		).toHaveCount(0);
+	});
+
+	// Nothing was destroyed — an instructor re-enrolling them would restore
+	// access to whatever they already submitted.
+	const stillEnrolled = await courseService.findOne(
+		{ id: course.id },
+		FULL_ACCESS,
+	);
+	expect(
+		stillEnrolled?.enrollments.some((e) => e.username === student.username),
+	).toBe(false);
 });

@@ -25,6 +25,18 @@ test("student: redeem a personal invite", async ({ page }) => {
 		await expect(page.getByText("You're accepting an invite")).toBeVisible();
 	});
 
+	// A personal invite renders its address into a `readonly` input, so the
+	// redeemer cannot submit a different one. That is also why the service's
+	// `email_mismatch` code is unreachable from this page. See
+	// dev/issues/invite-address-cannot-be-changed.md.
+	await test.step("the address it was issued to is pinned", async () => {
+		const email = page
+			.getByRole("group", { name: "Email", exact: true })
+			.locator("input");
+		await expect(email).toHaveValue("invitee@codehood.test");
+		await expect(email).toHaveAttribute("readonly", "");
+	});
+
 	await test.step("student fills in their details and gets an account", async () => {
 		await acceptInvite(page, {
 			username: "invitee",
@@ -46,6 +58,28 @@ test("student: redeem a personal invite", async ({ page }) => {
 		FULL_ACCESS,
 	);
 	expect(created?.role).toBe("STUDENT");
+
+	await test.step("coming back to a spent link says it is used up", async () => {
+		await page.context().clearCookies();
+		await page.goto(`/invite/${invite.token}`);
+		await expect(
+			page.getByText("This invite has already been fully used."),
+		).toBeVisible();
+	});
+
+	await test.step("a link left for weeks says it expired instead", async () => {
+		const stale = await persistedInviteFactory.create({
+			kind: "PERSONAL",
+			invitedRole: "STUDENT",
+			email: "late@codehood.test",
+			courseId: course.id,
+			createdBy: course.instructor,
+		});
+		await expire(stale.token);
+
+		await page.goto(`/invite/${stale.token}`);
+		await expect(page.getByText("This invite has expired.")).toBeVisible();
+	});
 });
 
 test("student: redeem a classroom invite link", async ({ page }) => {
@@ -74,71 +108,7 @@ test("student: redeem a classroom invite link", async ({ page }) => {
 	).toBeVisible();
 });
 
-test("student: fail to redeem a stale invite", async ({ page }) => {
-	const course = await persistedCourseFactory.create();
-
-	await test.step("an invite past its expiry says so", async () => {
-		const invite = await persistedInviteFactory.create({
-			kind: "PERSONAL",
-			invitedRole: "STUDENT",
-			email: "late@codehood.test",
-			courseId: course.id,
-			createdBy: course.instructor,
-		});
-		await expire(invite.token);
-
-		await page.goto(`/invite/${invite.token}`);
-		await expect(page.getByText("This invite has expired.")).toBeVisible();
-	});
-
-	await test.step("one that has been used up says that instead", async () => {
-		const invite = await persistedInviteFactory.create({
-			kind: "CLASSROOM",
-			invitedRole: "STUDENT",
-			email: null,
-			courseId: course.id,
-			maxUses: 1,
-			createdBy: course.instructor,
-		});
-		await page.goto(`/invite/${invite.token}`);
-		await acceptInvite(page, {
-			email: "first@codehood.test",
-			username: "first-comer",
-			name: "First Comer",
-			password: "correcthorse",
-		});
-		await page.context().clearCookies();
-
-		await page.goto(`/invite/${invite.token}`);
-		await expect(
-			page.getByText("This invite has already been fully used."),
-		).toBeVisible();
-	});
-
-	// The story's third branch — a link forwarded to someone it was not
-	// addressed to — has no UI path. A personal invite renders its address into
-	// a `readonly` input, so the redeemer cannot submit a different one and
-	// `email_mismatch` is unreachable from this page. See
-	// dev/issues/stale-invite-story-claims-unreachable-branch.md.
-	await test.step("a personal invite pins the address it was issued to", async () => {
-		const invite = await persistedInviteFactory.create({
-			kind: "PERSONAL",
-			invitedRole: "STUDENT",
-			email: "addressee@codehood.test",
-			courseId: course.id,
-			createdBy: course.instructor,
-		});
-
-		await page.goto(`/invite/${invite.token}`);
-		const email = page
-			.getByRole("group", { name: "Email", exact: true })
-			.locator("input");
-		await expect(email).toHaveValue("addressee@codehood.test");
-		await expect(email).toHaveAttribute("readonly", "");
-	});
-});
-
-test("student: log in with either a username or an email", async ({ page }) => {
+test("student: log in", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
 
 	await test.step("the username works", async () => {
@@ -175,7 +145,11 @@ test("student: log in with either a username or an email", async ({ page }) => {
  * `InviteCreate` has no `expiresAt` — the service sets it — so the only way to
  * age one is to write the column.
  */
-async function expire(token: string): Promise<void> {
+async function expire(token: string | undefined): Promise<void> {
+	// `Invite.token` is optional on the entity: the service returns it only from
+	// `create`, which is where these fixtures get theirs.
+	if (!token) throw new Error("the invite fixture carries no token");
+
 	await prisma.invite.update({
 		where: { tokenHash: hashToken(token) },
 		data: { expiresAt: new Date(Date.now() - 1000) },

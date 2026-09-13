@@ -25,7 +25,8 @@
 		"test-ui": "tsx test/run.ts --ui",
 		"ui-report": "playwright show-report",
 		"lint:fix": "biome check --write .",
-		"lint": "biome ci .",
+		"lint": "biome ci . && pnpm run stories --check",
+		"stories": "tsx scripts/story-coverage.ts",
 		"coverage": "COVERAGE=1 c8 --reporter=lcov --reporter=text-summary --exclude 'src/generated/**' --exclude 'test/**' --exclude 'prisma/**' --exclude 'scripts/**' --exclude '**/*.config.*' -- tsx test/run.ts",
 		"studio": "pnpm prisma studio --url file://./dev.db",
 		"astro": "astro"
