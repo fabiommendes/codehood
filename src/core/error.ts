@@ -367,6 +367,25 @@ export class RuleViolation extends BaseSerializableError<RuleViolationResponse> 
 	}
 }
 
+/**
+ * Thrown when the server is up but a dependency it needs is not.
+ *
+ * The caller did nothing wrong and the request may well succeed later, which
+ * is what separates this from every other 500: retrying is the right move.
+ */
+export class Unavailable extends BaseSerializableError<InternalErrorResponse> {
+	readonly code = "internal-error";
+	readonly status: 503 = 503;
+
+	constructor(message: string = "Service unavailable") {
+		super(message, "internal-error", 503);
+	}
+
+	protected _toJsonExtra(): Record<string, never> {
+		return {};
+	}
+}
+
 //
 // Utility functions
 //

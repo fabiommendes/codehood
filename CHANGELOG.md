@@ -4,6 +4,23 @@
 
 ### Added
 
+- A JSON-RPC 2.0 endpoint at `POST /rpc`, beside the REST API rather than
+  replacing it: REST keeps the CRUD surface, RPC takes the verb-shaped
+  operations where the resource being POSTed to would be a fiction. Methods are
+  registered with `METHOD("namespace.verb", ...)` in `src/rpc/`, taking the same
+  options as a REST route and validating against the same Zod schemas.
+  Authentication is unchanged — the existing session and API-key middleware
+  populate the actor, so a cookie and a `Bearer` key both work — and
+  `isPublic` is per method with authenticated as the default. Batches and
+  notifications are supported; errors carry the body the REST API would have
+  returned in `error.data`. Ships with `health.check` (public) and
+  `debug.whoami`.
+- `Unavailable`, a `core/error` class for "the server is up but something it
+  depends on is not", reported as status 503.
+- `/openrpc.json` describes the RPC surface, and `/rpc/docs` renders it as a
+  Swagger UI page. gRPC and tRPC were both rejected — see
+  `dev/specs/to-review/rpc-interface.md` for why, including why the docs page
+  is not the OpenRPC inspector.
 - Every service with a stable natural key now implements `upsert`, the PUT to
   `update`'s PATCH and the primitive the CLI syncs with: `user` (on
   `username`), `discipline` and `edition` (on `slug`), and `course`,
@@ -22,6 +39,11 @@
 
 ### Changed
 
+- `/openapi.json` is generated on first request and cached for the life of the
+  process instead of being committed to `public/` by `pnpm openapi`. The
+  document is a pure function of route registrations that are fixed at import
+  time, so the generator bought nothing but a way to go stale; the script, the
+  npm script, the committed file and the drift test guarding it are all gone.
 - A create/update field over a nullable column is `.nullish()` rather than
   `.optional()`: absent means keep the stored value, `null` means clear it.
   `.optional()` alone could not express a deletion, so a description removed
