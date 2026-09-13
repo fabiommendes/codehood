@@ -37,4 +37,7 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
+# Rtk
+.rtk
+
 TODO.md
