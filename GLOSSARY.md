@@ -193,6 +193,15 @@ A Commander.js script for operator tasks that have no UI, such as
 `manage create-user` and `manage reset-password`. Commands go through the
 [Service](#service) layer like everything else, never straight to Prisma.
 
+## OpenRPC
+
+Type: platform 
+Code: `src/rpc/registry/openrpc-document.ts`
+
+What [OpenAPI](#rest-api) is to REST, for JSON-RPC. Generated from the same Zod
+schemas the [RPC API](#rpc-api) validates against and served at
+`/openrpc.json`; `/rpc/docs` renders the same registry through Swagger UI.
+
 ## Passphrase
 
 Type: domain 
@@ -337,6 +346,18 @@ The account-wide permission level — [Admin](#admin), [Instructor](#instructor)
 or [Student](#student) — fixed by the [Invite](#invite) that created the
 account. Per-course authority is decided by ownership and
 [Enrollment](#enrollment), not by role alone.
+
+## RPC API
+
+Also: JSON-RPC 
+Type: platform 
+Code: `src/rpc/` (methods), `src/pages/rpc.ts` (endpoint)
+
+The [JSON-RPC 2.0](https://www.jsonrpc.org/specification) surface at
+`POST /rpc`, for verb-shaped operations the [REST API](#rest-api) would have to
+invent a resource for. Methods are named `namespace.verb`, authenticated the
+same way as everything else, and — like [Actions](#action) — thin wrappers over
+[Services](#service). Described by [OpenRPC](#openrpc).
 
 ## Service
 
