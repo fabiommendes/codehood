@@ -13,7 +13,7 @@ export type Key = string | number | symbol;
 /**
  * Expand a type to make it more readable in IDEs and error messages.
  */
-export type Pretty<T> = T extends object ? { [K in keyof T]: T[K] } : T;
+export type Pretty<T> = T extends object ? { [K in keyof T]: T[K] } & {} : T;
 
 /**
  * Collect all keys seen in a union.
@@ -26,7 +26,7 @@ export type KeysOfUnion<T> = T extends { [key: Key]: unknown }
  * Collect all keys that can be seen in a union, and create an object type with
  * those keys and `undefined` values.
  */
-export type Undefineds<T> = { [K in KeysOfUnion<T>]: undefined };
+export type Undefine<T> = { [K in KeysOfUnion<T>]: undefined };
 
 /**
  * Make the selected keys optional
@@ -106,6 +106,22 @@ export type ToOptional<T> = {
 };
 
 /**
+ * Make all nullable properties optional.
+ *
+ * ```ts
+ * type A = ToNullableOptional<{ x: string | null; y: number }>;
+ * // A is { x?: string | undefined; y: number }
+ * ```
+ */
+export type ToNullableOptional<T> = Pretty<
+	{
+		[K in keyof T as null extends T[K] ? never : K]-?: T[K];
+	} & {
+		[K in keyof T as null extends T[K] ? K : never]+?: Exclude<T[K], null>;
+	}
+>;
+
+/**
  * Like Pick<T, K>, but keys in T not selected became optional.
  */
 export type Require<T, K extends keyof T> = Pretty<
@@ -118,3 +134,12 @@ export type Require<T, K extends keyof T> = Pretty<
 export type Impl<T, K extends keyof T> = { [K2 in K]: T[K2] } & {
 	[key: string]: unknown;
 };
+
+/**
+ * Constructor type.
+ *
+ * Used to declare class mixins functions.
+ */
+export type Constructor<T = Record<Key, unknown>> = new (
+	...args: unknown[]
+) => T;
