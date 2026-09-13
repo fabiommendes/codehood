@@ -14,7 +14,7 @@ test("parseCourseSegment round-trips with courseHref", () => {
 
 	const segment = href.split("/")[2];
 	expect(parseCourseSegment(segment)).toEqual({
-		username: "ada",
+		instructor: "ada",
 		edition: "2026-1",
 	});
 });
@@ -37,7 +37,7 @@ test("parseCourseSegment rejects a leading-zero term number", () => {
 
 test("parseCourseSegment splits at the last underscore", () => {
 	expect(parseCourseSegment("some_user_2026-1")).toEqual({
-		username: "some_user",
+		instructor: "some_user",
 		edition: "2026-1",
 	});
 });

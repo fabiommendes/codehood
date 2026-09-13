@@ -6,9 +6,47 @@
  */
 
 import { z } from "zod";
+import { InvalidData } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
+import { parseCourseSegment } from "@/utils/course-url";
 import { CRUD } from "./registry";
+
+/**
+ * Turns a course's two path segments into a `coursePkRef`.
+ *
+ * Throws `InvalidData` (400) for a segment that does not match the grammar.
+ * That is a deliberate divergence from the web app, which rounds a malformed
+ * course URL down to a 404: a person typing a URL cannot act on a 400, but the
+ * CLI can, and reporting bad local configuration as "no such course" sends
+ * them hunting for the wrong problem.
+ */
+export function parseCourseParams(params: Record<string, string>) {
+	const segment = parseCourseSegment(params.course ?? "");
+	if (!segment)
+		throw new InvalidData({
+			errors: {
+				course: [
+					{
+						code: "pattern-mismatch",
+						message: "Expected <instructor>_<edition>.",
+					},
+				],
+			},
+			message: `"${params.course}" is not a course segment.`,
+		});
+
+	const validated = schema.coursePkRef.safeParse({
+		ref: {
+			discipline: params.discipline,
+			instructor: segment.instructor,
+			edition: segment.edition,
+		},
+	});
+	if (validated.error)
+		throw InvalidData.fromZodError(validated.error, validated.data);
+	return validated.data;
+}
 
 //
 // Pure RESTful interfaces. They expose only the classic CRUD operations.
@@ -41,7 +79,12 @@ export const courseApi = CRUD("/api/course", {
 	create: schema.courseCreate,
 	update: schema.courseUpdate,
 	filter: schema.courseFilter,
-	filterPk: schema.coursePK,
+	filterPk: schema.coursePkRef,
+	// A course is addressed the same way in the API as on the web:
+	// `<discipline>/<instructor>_<edition>`, the columns of its unique key. See
+	// docs/design/url-structure.md.
+	pkPath: "/[discipline]/[course]",
+	parsePk: parseCourseParams,
 	tags: ["Courses"],
 	service: db.course,
 });

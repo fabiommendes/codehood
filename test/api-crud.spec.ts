@@ -98,7 +98,14 @@ test("GET /api/api-key?createdById=<username> returns 200 with a JSON array", as
 	expect(Array.isArray(await res.json())).toBe(true);
 });
 
-test("GET /api/course/[id] returns 200 with the course object", async ({
+// A course is addressed by its natural key, the same `<discipline>/<username>_<edition>`
+// the web app uses, and no longer by its autoincrement id. The three status
+// codes below are the substance of that change: a segment that doesn't match
+// the grammar is a client bug (400), one that does but names nothing is a miss
+// (404), and a course you may not see is a refusal (403). The web app rounds
+// the first down to 404 on purpose; the API does not. See
+// docs/design/url-structure.md.
+test("GET /api/course/[discipline]/[course] resolves a course by its natural key", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -107,20 +114,51 @@ test("GET /api/course/[id] returns 200 with the course object", async ({
 	const [course] = await list.json();
 	expect(course).toBeTruthy();
 
-	const res = await request.get(`/api/course/${course.id}`, {
-		headers: authHeader(token),
-	});
+	const res = await request.get(
+		`/api/course/${course.discipline.slug}/${course.instructor.username}_${course.edition.slug}`,
+		{ headers: authHeader(token) },
+	);
 	expect(res.status()).toBe(200);
 	const body = await res.json();
 	expect(Array.isArray(body)).toBe(false);
 	expect(body.id).toBe(course.id);
 });
 
-// A resource whose primary key is not `id` is addressed by that field's value
-// in the URL, while the Astro route segment stays literally `[id]` — that is
-// the only pattern `hook.ts` injects. Getting this wrong 404s (segment renamed
-// to `[slug]`, so nothing serves it) or 400s (`slug: expected string, received
-// undefined`), which is exactly what these two used to do.
+test("GET /api/course/[id] is gone", async ({ request }) => {
+	const token = await adminToken(request);
+	const res = await request.get("/api/course/1", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(404);
+});
+
+test("a malformed course segment is a 400, not a 404", async ({ request }) => {
+	const token = await adminToken(request);
+	const res = await request.get("/api/course/cs101/no-underscore-here", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(400);
+	expect((await res.json()).code).toBe("invalid-data");
+});
+
+test("a well-formed course segment naming no course is a 404", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	const res = await request.get("/api/course/cs101/nobody_2099-1", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(404);
+	expect((await res.json()).code).toBe("not-found");
+});
+
+// A resource addressed by a single segment carrying something other than `id`
+// still routes through the literal `[id]` segment `CRUD` injects by default;
+// `options.pk` renames the field, not the segment. (A natural key spanning
+// several segments sets `pkPath` instead — see the course tests above.)
+// Getting this wrong 404s (segment renamed to `[slug]`, so nothing serves it)
+// or 400s (`slug: expected string, received undefined`), which is exactly what
+// these two used to do.
 for (const [resource, pkField] of [
 	["discipline", "slug"],
 	["edition", "slug"],
@@ -167,8 +205,8 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 		headers: authHeader(token),
 		data: {
 			discipline: discipline.slug,
-			instructorUsername: "ada",
-			editionSlug: edition.slug,
+			instructor: "ada",
+			edition: edition.slug,
 			description: "created by api-crud.spec",
 			startAt,
 			endAt,
@@ -201,8 +239,13 @@ test("every registered API path is a pattern hook.ts actually injects into Astro
 	const registered = Object.keys(buildOpenApiDocument().paths ?? {});
 	expect(registered.length).toBeGreaterThan(0);
 
+	// The document spells a dynamic segment `{id}` and `hook.ts` spells it
+	// `[id]`, so compare in Astro's spelling — the one Astro is actually
+	// handed.
 	const injected = new Set(APIS);
-	const orphaned = registered.filter((path) => !injected.has(path));
+	const orphaned = registered
+		.map((path) => path.replace(/\{([^}]+)\}/g, "[$1]"))
+		.filter((path) => !injected.has(path));
 	expect(orphaned).toEqual([]);
 });
 

@@ -28,7 +28,7 @@
 		"methods": ["get", "post"]
 	},
 	{
-		"pattern": "/api/course/[id]",
+		"pattern": "/api/course/[discipline]/[course]",
 		"methods": ["delete", "get", "patch"]
 	},
 	{

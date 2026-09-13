@@ -82,11 +82,14 @@ It must also survive the reserved-name check described below.
 ^[a-z0-9][a-z0-9-]{1,30}$
 ```
 
-Usernames carry no format rules today. `acceptInvite` and `profile.update`
-both validate them as `z.string().min(1)`, which permits slashes, spaces, and
-anything else. That was harmless while usernames only appeared in the database.
-It is not harmless now that a username is a path segment, so this rule has to be
-enforced in both places.
+This rule is enforced wherever a username enters the system, because a username
+is a path segment. `admin.createUser` and `acceptInvite` both check it, and
+`userUpdate` does not include `username` at all, so a username cannot be
+changed after the account exists. `userSchema.username` stays a plain
+`z.string()`: it is also the `returns:` schema on four service methods, and an
+output validator's job is the shape, not re-checking a constraint already
+enforced on write. `userCreate` carries the format rule instead. See
+`docs/design/db-service-classes.md`.
 
 Underscore is deliberately excluded. It is the separator inside the course
 segment, and keeping it out of usernames means the segment splits at its only
@@ -173,7 +176,26 @@ with `Authorization: Bearer <key>`.
 ```
 /api/auth/cli-login
 /api/health
+/api/course/<discipline>/<username>_<edition>
 ```
+
+A course is addressed in the API by the same natural key it uses on the web, so
+the CLI builds one string and uses it for both. There is no `/api/course/<id>`.
+Everything else under `/api/` is addressed by a single segment carrying its
+primary key.
+
+The status codes deliberately differ from the web app, which rounds a malformed
+course URL down to a 404:
+
+| Case                                | Web | API |
+| :---------------------------------- | :-- | :-- |
+| Segment does not match the grammar  | 404 | 400 |
+| Grammar matches, no such course     | 404 | 404 |
+| Course exists, actor may not see it | 403 | 403 |
+
+A person typing a URL cannot act on a 400. The CLI can: `ada_not-a-year` is
+malformed local configuration, and reporting it as "no such course" sends the
+user hunting for the wrong problem.
 
 `/api/health` is the one unauthenticated exception — uptime monitors and
 orchestration probes hitting it don't have a key, and checking auth first

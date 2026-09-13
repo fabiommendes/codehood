@@ -353,12 +353,22 @@
         }
       }
     },
-    "/api/api-key/[id]": {
+    "/api/api-key/{id}": {
       "get": {
         "operationId": "readApi-key",
         "summary": "Find a single ApiKey by id.",
         "tags": [
           "Api Key"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -435,6 +445,16 @@
         "summary": "Update a single ApiKey by id.",
         "tags": [
           "Api Key"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "requestBody": {
           "content": {
@@ -520,6 +540,16 @@
         "summary": "Delete a single ApiKey by primary key.",
         "tags": [
           "Api Key"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -628,7 +658,8 @@
                       "type": "integer"
                     },
                     "examId": {
-                      "type": "integer"
+                      "type": "integer",
+                      "nullable": true
                     },
                     "exam": {
                       "type": "object",
@@ -759,6 +790,7 @@
                     "id",
                     "courseId",
                     "timeSlotId",
+                    "examId",
                     "exam",
                     "slug",
                     "startAt",
@@ -879,7 +911,8 @@
                         "type": "integer"
                       },
                       "examId": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                       },
                       "exam": {
                         "type": "object",
@@ -1010,6 +1043,7 @@
                       "id",
                       "courseId",
                       "timeSlotId",
+                      "examId",
                       "exam",
                       "slug",
                       "startAt",
@@ -1031,12 +1065,22 @@
         }
       }
     },
-    "/api/calendar-event/[id]": {
+    "/api/calendar-event/{id}": {
       "get": {
         "operationId": "readCalendar-event",
         "summary": "Find a single CalendarEvent by id.",
         "tags": [
           "Calendar Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -1056,7 +1100,8 @@
                       "type": "integer"
                     },
                     "examId": {
-                      "type": "integer"
+                      "type": "integer",
+                      "nullable": true
                     },
                     "exam": {
                       "type": "object",
@@ -1187,6 +1232,7 @@
                     "id",
                     "courseId",
                     "timeSlotId",
+                    "examId",
                     "exam",
                     "slug",
                     "startAt",
@@ -1211,6 +1257,16 @@
         "summary": "Update a single CalendarEvent by id.",
         "tags": [
           "Calendar Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "requestBody": {
           "content": {
@@ -1249,7 +1305,8 @@
                     "type": "string"
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "contentHash": {
                     "type": "string"
@@ -1277,7 +1334,8 @@
                       "type": "integer"
                     },
                     "examId": {
-                      "type": "integer"
+                      "type": "integer",
+                      "nullable": true
                     },
                     "exam": {
                       "type": "object",
@@ -1408,6 +1466,7 @@
                     "id",
                     "courseId",
                     "timeSlotId",
+                    "examId",
                     "exam",
                     "slug",
                     "startAt",
@@ -1432,6 +1491,16 @@
         "summary": "Delete a single CalendarEvent by primary key.",
         "tags": [
           "Calendar Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -1476,7 +1545,8 @@
                     "description": "Edition slug"
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "startAt": {
                     "type": "string",
@@ -1537,7 +1607,7 @@
                       "properties": {
                         "slug": {
                           "type": "string",
-                          "minLength": 1
+                          "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                         },
                         "name": {
                           "type": "string",
@@ -1697,7 +1767,7 @@
                         "properties": {
                           "slug": {
                             "type": "string",
-                            "minLength": 1
+                            "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                           },
                           "name": {
                             "type": "string",
@@ -1788,12 +1858,30 @@
         }
       }
     },
-    "/api/course/[id]": {
+    "/api/course/{discipline}/{course}": {
       "get": {
         "operationId": "readCourse",
-        "summary": "Find a single Course by id.",
+        "summary": "Find a single Course by discipline/course.",
         "tags": [
           "Courses"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -1832,7 +1920,7 @@
                       "properties": {
                         "slug": {
                           "type": "string",
-                          "minLength": 1
+                          "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                         },
                         "name": {
                           "type": "string",
@@ -1923,9 +2011,27 @@
       },
       "patch": {
         "operationId": "updateCourse",
-        "summary": "Update a single Course by id.",
+        "summary": "Update a single Course by discipline/course.",
         "tags": [
           "Courses"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          }
         ],
         "requestBody": {
           "content": {
@@ -1945,12 +2051,7 @@
                     "type": "string",
                     "format": "date-time"
                   }
-                },
-                "required": [
-                  "description",
-                  "startAt",
-                  "endAt"
-                ]
+                }
               }
             }
           }
@@ -1992,7 +2093,7 @@
                       "properties": {
                         "slug": {
                           "type": "string",
-                          "minLength": 1
+                          "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                         },
                         "name": {
                           "type": "string",
@@ -2086,6 +2187,24 @@
         "summary": "Delete a single Course by primary key.",
         "tags": [
           "Courses"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "discipline",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "course",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -2218,12 +2337,22 @@
         }
       }
     },
-    "/api/discipline/[id]": {
+    "/api/discipline/{id}": {
       "get": {
         "operationId": "readDiscipline",
         "summary": "Find a single Discipline by slug.",
         "tags": [
           "Disciplines"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -2263,6 +2392,16 @@
         "tags": [
           "Disciplines"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2273,10 +2412,7 @@
                     "type": "string",
                     "minLength": 1
                   }
-                },
-                "required": [
-                  "name"
-                ]
+                }
               }
             }
           }
@@ -2319,6 +2455,16 @@
         "tags": [
           "Disciplines"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -2348,7 +2494,7 @@
                 "properties": {
                   "slug": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                   },
                   "name": {
                     "type": "string",
@@ -2385,7 +2531,7 @@
                   "properties": {
                     "slug": {
                       "type": "string",
-                      "minLength": 1
+                      "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                     },
                     "name": {
                       "type": "string",
@@ -2459,7 +2605,7 @@
                     "properties": {
                       "slug": {
                         "type": "string",
-                        "minLength": 1
+                        "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                       },
                       "name": {
                         "type": "string",
@@ -2496,12 +2642,22 @@
         }
       }
     },
-    "/api/edition/[id]": {
+    "/api/edition/{id}": {
       "get": {
         "operationId": "readEdition",
         "summary": "Find a single Edition by slug.",
         "tags": [
           "Editions"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -2513,7 +2669,7 @@
                   "properties": {
                     "slug": {
                       "type": "string",
-                      "minLength": 1
+                      "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                     },
                     "name": {
                       "type": "string",
@@ -2554,6 +2710,16 @@
         "tags": [
           "Editions"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2589,7 +2755,7 @@
                   "properties": {
                     "slug": {
                       "type": "string",
-                      "minLength": 1
+                      "pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
                     },
                     "name": {
                       "type": "string",
@@ -2629,6 +2795,16 @@
         "summary": "Delete a single Edition by primary key.",
         "tags": [
           "Editions"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -2800,12 +2976,22 @@
         }
       }
     },
-    "/api/file/[id]": {
+    "/api/file/{id}": {
       "get": {
         "operationId": "readFile",
         "summary": "Find a single File by id.",
         "tags": [
           "Files"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -2857,6 +3043,16 @@
         "summary": "Update a single File by id.",
         "tags": [
           "Files"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "requestBody": {
           "content": {
@@ -2927,6 +3123,16 @@
         "tags": [
           "Files"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -2975,16 +3181,20 @@
                     "minLength": 1
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "data": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "extra": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "fileId": {
-                    "type": "number"
+                    "type": "number",
+                    "nullable": true
                   },
                   "contentHash": {
                     "type": "string",
@@ -3282,12 +3492,22 @@
         }
       }
     },
-    "/api/resource/[id]": {
+    "/api/resource/{id}": {
       "get": {
         "operationId": "readResource",
         "summary": "Find a single Resource by id.",
         "tags": [
           "Resources"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -3411,6 +3631,16 @@
         "tags": [
           "Resources"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3430,16 +3660,20 @@
                     "type": "string"
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "data": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "extra": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "fileId": {
-                    "type": "number"
+                    "type": "number",
+                    "nullable": true
                   },
                   "contentHash": {
                     "type": "string"
@@ -3571,6 +3805,16 @@
         "tags": [
           "Resources"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -3606,7 +3850,8 @@
                     "minLength": 1
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "day": {
                     "type": "string",
@@ -3790,12 +4035,22 @@
         }
       }
     },
-    "/api/time-slot/[id]": {
+    "/api/time-slot/{id}": {
       "get": {
         "operationId": "readTime-slot",
         "summary": "Find a single TimeSlot by id.",
         "tags": [
           "Time Slots"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -3868,6 +4123,16 @@
         "summary": "Update a single TimeSlot by id.",
         "tags": [
           "Time Slots"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "requestBody": {
           "content": {
@@ -3974,6 +4239,16 @@
         "tags": [
           "Time Slots"
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4011,7 +4286,7 @@
                   },
                   "username": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^[a-z0-9][a-z0-9-]{1,30}$"
                   },
                   "role": {
                     "type": "string",
@@ -4022,10 +4297,12 @@
                     ]
                   },
                   "githubId": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "schoolId": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "password": {
                     "type": "string",
@@ -4072,13 +4349,19 @@
                       ]
                     },
                     "githubId": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "schoolId": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "passwordHash": {
                       "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
                   "required": [
@@ -4086,7 +4369,10 @@
                     "name",
                     "username",
                     "role",
-                    "passwordHash"
+                    "githubId",
+                    "schoolId",
+                    "passwordHash",
+                    "createdAt"
                   ]
                 }
               }
@@ -4154,13 +4440,19 @@
                         ]
                       },
                       "githubId": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true
                       },
                       "schoolId": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true
                       },
                       "passwordHash": {
                         "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
                       }
                     },
                     "required": [
@@ -4168,7 +4460,10 @@
                       "name",
                       "username",
                       "role",
-                      "passwordHash"
+                      "githubId",
+                      "schoolId",
+                      "passwordHash",
+                      "createdAt"
                     ]
                   }
                 }
@@ -4178,12 +4473,22 @@
         }
       }
     },
-    "/api/user/[id]": {
+    "/api/user/{id}": {
       "get": {
         "operationId": "readUser",
         "summary": "Find a single User by id.",
         "tags": [
           "Users"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {
@@ -4214,13 +4519,19 @@
                       ]
                     },
                     "githubId": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "schoolId": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "passwordHash": {
                       "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
                   "required": [
@@ -4228,7 +4539,10 @@
                     "name",
                     "username",
                     "role",
-                    "passwordHash"
+                    "githubId",
+                    "schoolId",
+                    "passwordHash",
+                    "createdAt"
                   ]
                 }
               }
@@ -4241,6 +4555,16 @@
         "summary": "Update a single User by id.",
         "tags": [
           "Users"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "requestBody": {
           "content": {
@@ -4257,10 +4581,12 @@
                     "format": "email"
                   },
                   "githubId": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "schoolId": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   }
                 },
                 "additionalProperties": false
@@ -4297,13 +4623,19 @@
                       ]
                     },
                     "githubId": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "schoolId": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "passwordHash": {
                       "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   },
                   "required": [
@@ -4311,7 +4643,10 @@
                     "name",
                     "username",
                     "role",
-                    "passwordHash"
+                    "githubId",
+                    "schoolId",
+                    "passwordHash",
+                    "createdAt"
                   ]
                 }
               }
@@ -4324,6 +4659,16 @@
         "summary": "Delete a single User by primary key.",
         "tags": [
           "Users"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
         ],
         "responses": {
           "200": {

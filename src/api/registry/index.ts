@@ -3,7 +3,7 @@ import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import type { APIContext } from "astro";
 import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor as User } from "@/core/actor";
-import { InvalidData } from "@/core/error";
+import { InvalidData, NotFound, responseFromException } from "@/core/error";
 import type { Crud } from "@/db/base-service";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
 
@@ -70,19 +70,37 @@ function route<In, Out, IsPublic extends boolean = false>(
 	// string instead; POST/PUT/PATCH keep documenting a JSON request body.
 	const readsQueryString = method === "get" || method === "delete";
 
-	const requestOpts = options.in
+	const inputOpts = options.in
 		? readsQueryString
-			? { request: { query: options.in as unknown as ZodObject } }
+			? { query: options.in as unknown as ZodObject }
 			: {
-					request: {
-						body: { content: { "application/json": { schema: options.in } } },
-					},
+					body: { content: { "application/json": { schema: options.in } } },
 				}
 		: {};
 
+	// Astro spells a dynamic segment `[id]`; OpenAPI spells it `{id}`. The
+	// registry is keyed by Astro's spelling because that is what
+	// `context.routePattern` hands back, so the translation happens here, at
+	// the one point where a pattern crosses into the document. Each segment
+	// also has to be declared as a path parameter or the document describes an
+	// endpoint nobody can call.
+	const pathParams = segmentNames(path);
+	const paramsOpts = pathParams.length
+		? {
+				params: z.object(
+					Object.fromEntries(pathParams.map((name) => [name, z.string()])),
+				),
+			}
+		: {};
+
+	const requestOpts =
+		options.in || pathParams.length
+			? { request: { ...inputOpts, ...paramsOpts } }
+			: {};
+
 	registry.registerPath({
 		method,
-		path,
+		path: toOpenApiPath(path),
 		operationId: options.operationId ?? action.name,
 		summary: options.summary,
 		description: options.description,
@@ -116,12 +134,17 @@ function route<In, Out, IsPublic extends boolean = false>(
 
 	// Catches some errors and return an object { value, error } instead of
 	// throwing an exception.
+	//
+	// The error is serialized with `responseFromException`, the same function
+	// `dynamicHandler.ts` uses for anything thrown outside the handler, so a
+	// `NotFound` raised by a route reaches the client as a 404 with
+	// `code: "not-found"` rather than as a stack trace under a blanket 400.
 	const safeAction = async (thunk: () => Promise<Out>) => {
 		try {
 			const value = await thunk();
 			return { value, isError: false };
 		} catch (error) {
-			return { error: errorToJSON(error), isError: true };
+			return { error: responseFromException(error), isError: true };
 		}
 	};
 
@@ -156,9 +179,13 @@ function route<In, Out, IsPublic extends boolean = false>(
 			// biome-ignore-end lint/suspicious/noExplicitAny: ...
 		});
 
+		// The error response is returned flat, not wrapped in the internal
+		// `{ error, isError }` envelope, so that an error raised inside a
+		// handler is shaped exactly like one `dynamicHandler.ts` catches
+		// outside it. Nothing reads `isError` past this line.
 		if (result.isError) {
-			const status = (result.error as { status?: number })?.status ?? 400;
-			return Response.json(result, { status });
+			const error = result.error as { status?: number };
+			return Response.json(error, { status: error?.status ?? 400 });
 		}
 		return Response.json(result.value, { status: 200 });
 	};
@@ -230,6 +257,25 @@ export type CrudRouteOptions<
 	Update extends object,
 > = {
 	pk?: string;
+
+	/**
+	 * The dynamic part of the path that addresses one entity, appended to
+	 * `path` for `findOne`/`update`/`delete`.
+	 *
+	 * Defaults to `/[id]`. A resource whose natural key spans several segments
+	 * (a course is `/[discipline]/[course]`) sets this and `parsePk` together.
+	 */
+	pkPath?: string;
+
+	/**
+	 * Turns the dynamic segments into the primary-key filter the service wants.
+	 *
+	 * Defaults to renaming the `[id]` segment to `pk` and validating against
+	 * `filterPk`. A multi-segment `pkPath` needs its own, and is responsible
+	 * for its own validation.
+	 */
+	parsePk?: (params: Record<string, string>) => PkFilter;
+
 	name: string;
 	plural?: string;
 	entity: ZodType<Entity>;
@@ -264,12 +310,19 @@ export function CRUD<
 	path: `/api/${string}`,
 	options: CrudRouteOptions<Entity, Create, Filter, PkFilter, Update>,
 ) {
-	// The dynamic segment is always literally `[id]`, because `hook.ts` injects
-	// exactly `/api/<resource>/[id]` into Astro and `ROUTES` is keyed by the
-	// pattern Astro hands back. `options.pk` names the FIELD that segment
-	// carries (e.g. a discipline is addressed by `slug`), not the segment.
-	const pathWithId = `${path}/[id]`;
+	// `ROUTES` is keyed by the pattern Astro hands back, so the segments here
+	// are written in Astro's `[name]` spelling. By default a resource is
+	// addressed by a single `[id]` segment, and `options.pk` names the FIELD
+	// that segment carries (e.g. a discipline is addressed by `slug`), not the
+	// segment. `options.pkPath` overrides the shape for a natural key that
+	// needs more than one segment.
+	const pathWithId = `${path}${options.pkPath ?? "/[id]"}`;
 	const pkField = options.pk ?? "id";
+	// What the summary line calls the key: the field name for a single segment,
+	// the segment names themselves for a multi-segment natural key.
+	const pkLabel = options.pkPath
+		? segmentNames(options.pkPath).join("/")
+		: pkField;
 	const slug =
 		path.split("/").findLast((segment) => segment.length > 0) ?? path;
 	const slugTitle = slug?.charAt(0).toUpperCase() + slug?.slice(1);
@@ -283,23 +336,25 @@ export function CRUD<
 	// (`pathWithId`), never off a body or query string — but that segment is
 	// still just as untrusted as either, so it goes through `filterPk` here
 	// exactly like a parsed body would, before any service ever sees it.
-	const parsePk = (params: Record<string, string>): PkFilter => {
-		// Rename the `[id]` segment to whatever field `filterPk` actually wants.
-		// The stale `id` is dropped, not just shadowed: a union PK like
-		// `coursePK` would otherwise match its `{ id }` branch off a value that
-		// was never an id.
-		const raw: Record<string, string> = { ...params };
-		if (pkField !== "id" && raw.id !== undefined) {
-			raw[pkField] = raw.id;
-			delete raw.id;
-		}
-		const validated = options.filterPk.safeParse(
-			coerceForSchema(options.filterPk, raw),
-		);
-		if (validated.error)
-			throw InvalidData.fromZodError(validated.error, validated.data);
-		return validated.data;
-	};
+	const parsePk =
+		options.parsePk ??
+		((params: Record<string, string>): PkFilter => {
+			// Rename the `[id]` segment to whatever field `filterPk` actually wants.
+			// The stale `id` is dropped, not just shadowed: a union PK like
+			// `coursePK` would otherwise match its `{ id }` branch off a value that
+			// was never an id.
+			const raw: Record<string, string> = { ...params };
+			if (pkField !== "id" && raw.id !== undefined) {
+				raw[pkField] = raw.id;
+				delete raw.id;
+			}
+			const validated = options.filterPk.safeParse(
+				coerceForSchema(options.filterPk, raw),
+			);
+			if (validated.error)
+				throw InvalidData.fromZodError(validated.error, validated.data);
+			return validated.data;
+		});
 
 	return {
 		create: POST(path, {
@@ -316,11 +371,17 @@ export function CRUD<
 		findOne: GET(pathWithId, {
 			operationId: operationId("read"),
 			out: options.entity,
-			summary: `Find a single ${name} by ${options.pk ?? "id"}.`,
+			summary: `Find a single ${name} by ${pkLabel}.`,
 			tags: options.tags,
 			errors: options.errors,
+			// A primary key that names no row is a 404. The service reports it as
+			// `null`, which would otherwise be serialized as a 200 carrying
+			// `null` — a body that satisfies no entity schema and that a client
+			// has to special-case.
 			handler: async ({ actor, params }) => {
-				return service.findOne(parsePk(params), { actor });
+				const found = await service.findOne(parsePk(params), { actor });
+				if (!found) throw new NotFound(slug, { context: `GET ${pathWithId}` });
+				return found;
 			},
 		}),
 		findMany: GET(path, {
@@ -340,7 +401,7 @@ export function CRUD<
 				operationId: operationId("update"),
 				in: options.update,
 				out: options.entity,
-				summary: `Update a single ${name} by ${options.pk ?? "id"}.`,
+				summary: `Update a single ${name} by ${pkLabel}.`,
 				tags: options.tags,
 				errors: options.errors,
 				handler: async ({ actor, body, params }) => {
@@ -404,24 +465,14 @@ export function readPattern(pattern: string) {
 //
 // Auxiliary functions
 //
-/**
- * Convert exceptions to JSON and show in the API.
- *
- * Codehood defines a few different types of user-facing errors. All other
- * errors should be treated as generic 500 internal server errors, and the
- * details of the exception should not be exposed to the user.
- *
- * The error API expects a .debug field that is only present in development
- * mode, and a .message field that is always present.
- */
-function errorToJSON(error: unknown) {
-	if (!(error instanceof Error)) return { message: String(error) };
+/** The names of every `[segment]` in an Astro route pattern, in order. */
+function segmentNames(pattern: string): string[] {
+	return [...pattern.matchAll(/\[([^\]]+)\]/g)].map((match) => match[1]);
+}
 
-	return {
-		message: error.message,
-		name: error.name,
-		stack: error.stack,
-	};
+/** Rewrites an Astro route pattern (`/api/x/[id]`) as an OpenAPI one. */
+function toOpenApiPath(pattern: string): string {
+	return pattern.replace(/\[([^\]]+)\]/g, "{$1}");
 }
 
 function isZodNeverScheme(schema: ZodType<unknown>): boolean {
