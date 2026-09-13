@@ -36,6 +36,32 @@ All methods take an `opts` parameter with two properties:
 * actor (optional): a user object, used to enforce access control.
 
 
+## Input and output validation
+
+Every service method is wrapped in `@Validate`, which checks its arguments
+against a schema on the way in and its return value against `returns:` on the
+way out. The two are not the same job, and the schemas should not be the same
+schema.
+
+Input schemas constrain **values**. This is the only place a format rule can be
+enforced, so it belongs here and it should be as tight as the domain allows.
+`userCreate` requires a username to match `USERNAME_RE`, because a username is
+a path segment and an unaddressable account is a bug that surfaces far from
+where it was created.
+
+Output schemas constrain **shape**. Their job is to whitelist the fields that
+leave the service, because a Prisma row carries whatever columns the table has
+and the typechecker will happily pass a newly added one straight through to a
+client. That is where information leaks, so `returns:` stays on every method.
+
+What an output schema does *not* need to do is re-check a value constraint the
+input schema already enforced. `userSchema.username` is a plain `z.string()`
+even though `userCreate.username` carries the regex: the format was proven when
+the row was written, and repeating it on every read only means an old row that
+predates the rule becomes unreadable rather than merely invalid. A loose field
+on an output schema paired with a tight one on the input schema is deliberate,
+not an oversight.
+
 ## Access control and permissions
 
 For all methods, if the `actor` is omitted, treat as system access to the

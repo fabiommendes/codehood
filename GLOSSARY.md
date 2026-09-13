@@ -1,20 +1,8 @@
 # Glossary
 
-Terms used in Codehood, both in the application domain and in the development
-process. Entries are always alphabetical.
-
-An entry may carry one metadata line directly under its heading, with fields
-separated by newlines.
-
-- Also: other names for the same thing, including the ones used in code.
-- Type: one of `domain` (the LMS itself), `platform` (how the server is
-  built), `process` (how the project is worked on).
-- Code: the identifiers this term maps to — Prisma model, service class,
-  module.
-
-A definition opens with a noun phrase and its first sentence stands alone, since
-that is all a tooltip will show. Cross-references are ordinary links to another
-entry's anchor.
+Be extremely succint when adding entries to the glossary. If a new term is
+defined in a conversation, ask human if it should be added to the glossary.
+Add in alphabetical order.
 
 ---
 
@@ -99,7 +87,8 @@ and the [CLI](#cli) can construct it offline. There is no `/courses/` prefix,
 which is why [Reserved slug](#reserved-slug) exists. Everything about the
 course hangs off it: `/exams`, `/resources`, `/schedule`, and, for its
 instructor only, `/roster` and `/manage` — one tab strip, on every page,
-built by `courseTabs()`.
+built by `courseTabs()`. The [REST API](#rest-api) takes the same address under
+`/api/course/`, so the CLI builds one string for both.
 
 ## Discipline
 
