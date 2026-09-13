@@ -144,10 +144,16 @@ export function canCreateCourseFor(actor: Actor, instructor: UserId): boolean {
  * who teaches it, and who currently holds an `ACTIVE` enrollment in it.
  * Structural, not imported from `course.service.ts`, so that module can
  * import these predicates without a cycle.
+ *
+ * `enrollments` is keyed by `userId`, matching the `Enrollment` model column
+ * (see `courseVisibility` below, and `courseInclude` in `course.service.ts`)
+ * — not `username`, which is what the *public* `Course.enrollments` shape
+ * uses after `fromDb` renames it. Passing that public shape back in (e.g.
+ * `toEnrollmentView`) means mapping it to `userId` first.
  */
 export interface CourseWithEnrollment {
 	instructor: { username: string };
-	enrollments: { username: UserId; name: string }[];
+	enrollments: { userId: UserId }[];
 }
 
 /**
@@ -161,7 +167,7 @@ export function canViewCourse(
 ): boolean {
 	if (actor === SYSTEM || actor.role === "ADMIN") return true;
 	if (course.instructor.username === actor.username) return true;
-	return course.enrollments.some((e) => e.username === actor.username);
+	return course.enrollments.some((e) => e.userId === actor.username);
 }
 
 /** Prisma `where` fragment implementing the same rule as {@link canViewCourse}. */

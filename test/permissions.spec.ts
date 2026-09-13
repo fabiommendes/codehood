@@ -141,7 +141,7 @@ test("canViewCourseContents is exactly canViewCourse, and courseContentsVisibili
 	};
 	const course = {
 		instructor: { id: instructor.username, username: instructor.username },
-		enrollments: [{ username: enrolled.username, name: "" }],
+		enrollments: [{ userId: enrolled.username }],
 	};
 	const viewActors: Actor[] = [SYSTEM, admin, instructor, enrolled, outsider];
 	for (const actor of viewActors) {

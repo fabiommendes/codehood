@@ -15,7 +15,7 @@ const student = { username: "student", role: "STUDENT" as const };
 
 const course = {
 	instructor: { username: "ada" },
-	enrollments: [{ username: student.username, name: "" }],
+	enrollments: [{ userId: student.username }],
 };
 const ref: CourseRef = {
 	discipline: "cs101",
