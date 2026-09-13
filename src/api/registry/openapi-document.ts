@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
+import pkg from "../../../package.json" with { type: "json" };
 import { registry } from ".";
 
 // Importing this module triggers the import of all other api modules,
@@ -9,22 +7,13 @@ import { registry } from ".";
 // necessary for generating the OpenAPI document, which is built from the registry.
 import "@/api/registry/dynamicHandler";
 
-const rootDir = path.resolve(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"../../..",
-);
-
 /**
  * Builds the OpenAPI document from every path registered on `registry`.
- * Shared by `scripts/generate-openapi.ts` (writes it to `public/openapi.json`)
- * and `test/openapi.spec.ts` (checks that file hasn't drifted from the Zod
- * schemas/route registrations it's generated from).
+ *
+ * Called by `src/pages/openapi.json.ts`, which caches the result for the life
+ * of the process, and by the tests that assert what the document says.
  */
 export function buildOpenApiDocument() {
-	const pkg = JSON.parse(
-		readFileSync(path.join(rootDir, "package.json"), "utf8"),
-	);
-
 	const generator = new OpenApiGeneratorV3(registry.definitions);
 	return generator.generateDocument({
 		openapi: "3.0.0",

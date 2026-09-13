@@ -80,7 +80,6 @@ run("Formatting generated files", "pnpm", [
 	"src/api/registry/route-patterns.json",
 	"src/components/SidebarArt.astro",
 	"src/components/SidebarArtAlt.astro",
-	"public/openapi.json",
 ]);
 
 console.log("\n✔ Project ready. Run `pnpm run dev` to start the server.");

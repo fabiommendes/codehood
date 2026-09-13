@@ -1,14 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
-
-const publicPath = path.resolve(import.meta.dirname, "../public/openapi.json");
-
-test("public/openapi.json matches what the Zod schemas/route registrations currently generate", () => {
-	const onDisk = JSON.parse(readFileSync(publicPath, "utf8"));
-	expect(onDisk).toEqual(buildOpenApiDocument());
-});
 
 test("documents both REST endpoints, unauthenticated", () => {
 	const document = buildOpenApiDocument();
@@ -16,7 +7,7 @@ test("documents both REST endpoints, unauthenticated", () => {
 	expect(document.paths?.["/api/auth/login"]?.post?.security).toEqual([]);
 });
 
-test("GET /openapi.json is served statically and matches the generated document", async ({
+test("GET /openapi.json is generated on demand and matches the registrations", async ({
 	request,
 }) => {
 	const res = await request.get("/openapi.json");

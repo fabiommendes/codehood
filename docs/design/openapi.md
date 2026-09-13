@@ -21,8 +21,10 @@ definition, not a hand-written spec that drifts from the code.
   every handler module (for the registration side effects) and turns
   `registry.definitions` into the full document. New REST endpoint modules
   need adding to its import list, or they won't appear in the spec.
-- `public/openapi.json` — the generated file, served as-is at `/openapi.json`
-  by Astro's static asset handling.
+- `src/pages/openapi.json.ts` — serves the document at `/openapi.json`,
+  building it on the first request and caching the serialized JSON for the
+  life of the process. The registrations are fixed at import time, so there is
+  nothing to invalidate.
 - `src/pages/api/docs/index.astro` — a Swagger UI page pointed at
   `/openapi.json`. Deliberately not built on `src/layouts/Layout.astro`:
   that pulls in Tailwind, and Preflight's reset strips the default element
@@ -34,16 +36,13 @@ definition, not a hand-written spec that drifts from the code.
   Gated by a fixed filename allowlist, not a path join of the request —
   the incoming segment can only ever match one of five known-safe names.
 
-## Regenerating
+## No generation step
 
-```
-pnpm openapi
-```
-
-`pnpm build` runs this first automatically, so a deploy can't ship a stale
-spec. `test/openapi.spec.ts` also asserts the committed file matches what
-`buildOpenApiDocument()` produces right now, so running the test suite
-without regenerating first is a build failure, not a silent drift.
+There isn't one. The document is built from the live registry on demand, so it
+cannot drift from the code: there is no committed artifact to forget to
+regenerate. `test/openapi.spec.ts` asserts the served response equals
+`buildOpenApiDocument()` and that the two unauthenticated routes stay that
+way.
 
 ## Unauthenticated routes are the exception, not the default
 
