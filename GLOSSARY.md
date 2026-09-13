@@ -46,6 +46,31 @@ once at creation and stored only as a SHA-256 hash, revocable individually, and
 sent as `Authorization: Bearer <key>`. A request authenticated by one acts as
 the key's owner.
 
+## Attachment
+
+Type: domain
+Code: `Attachment`, `AttachmentService`
+
+One use of a [Blob](#blob) by one owner — a [Resource](#resource), a
+[Question](#question) — carrying the `filename` and `mimeType` that use is
+served under, and the [User](#user) charged for the bytes. The owner is
+polymorphic (`ownerType`/`ownerId`), so a new kind of owner needs no change to
+blob storage. The last attachment leaving a blob is what makes it collectable.
+
+## Blob
+
+Also: file, bytes
+Type: domain
+Code: `Blob`, `BlobService`
+
+Anonymous file content, addressed by `hash` — a lowercase-hex sha-256 of its
+own bytes, which doubles as the URL token (`/files/<hash>/<filename>`) and the
+on-disk directory. Content-addressed and deduped, so identical uploads share
+one row; it carries no name and no mime type, since those belong to each
+[Attachment](#attachment). Served with no authentication check, on the
+understanding that knowing the hash is what grants access and that nothing
+whose disclosure matters ever becomes a blob (FR-NFR-032).
+
 ## Classroom invite
 
 Type: domain 
@@ -289,33 +314,20 @@ download, a `LINK` to follow, an `MD` note, or a `CODE` snippet — grouped by
 type on `/resources` in a fixed, unauthored order. Pushed by the [CLI](#cli)
 only, never authored in the web app; visible to everyone who may see the
 course's contents, with no separate "unpublished" state. A `FILE` resource
-points at a [File](#resource-file) it does not own — the same bytes may back
-resources in more than one course.
-
-## Resource file
-
-Also: File, blob
-Type: domain
-Code: `File`, `FileService`
-
-The bytes behind a `FILE` [Resource](#resource), addressed by `slugHash` — a
-sha-256 of its own content, which doubles as the URL token
-(`/files/<slugHash>/<name>`) and the on-disk storage path. Content-addressed,
-so two courses pushing the same bytes share one row; removing a resource
-removes the file only once nothing else points at it, at which point it
-becomes a [Resource tombstone](#resource-tombstone). Served with no
-authentication check, on the understanding that nothing whose disclosure
-matters ever becomes a resource (FR-NFR-032).
+points at a [Blob](#blob) it does not own, through an
+[Attachment](#attachment) it does — the same bytes may back resources in more
+than one course.
 
 ## Resource tombstone
 
+Also: blob tombstone
 Type: domain
-Code: `File.deletedAt`
+Code: `Blob.deletedAt`
 
-What a [Resource file](#resource-file)'s row becomes once its bytes are
-removed from disk and nothing else points at it: the row and its `slugHash`
-survive with `deletedAt` stamped, so the blob route can answer `410 Gone` and
-explain what happened instead of a bare `404`.
+What a [Blob](#blob)'s row becomes once its bytes are removed from disk and no
+[Attachment](#attachment) points at it: the row and its `hash` survive with
+`deletedAt` stamped, so the blob route can answer `410 Gone` and explain what
+happened instead of a bare `404`.
 
 ## Response
 

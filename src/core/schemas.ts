@@ -429,6 +429,82 @@ export const fileFilter = z.object({
 });
 
 //
+// Blob and Attachment
+//
+export const blobHash = z
+	.string()
+	.regex(
+		/^[0-9a-f]{64}$/,
+		"Not a blob hash: expected 64 lowercase hex digits.",
+	);
+
+export const blobSchema = z.object({
+	hash: blobHash,
+	size: z.number(),
+	deletedAt: z.date().nullable(),
+	createdAt: z.date(),
+});
+
+export const blobCreate = z.object({
+	bytes: z
+		.instanceof(Buffer)
+		.openapi("Buffer", { type: "string", format: "binary" }),
+	// A hash the writer computed locally, checked against the hash the server
+	// computes from `bytes`. A mismatch means the upload is corrupt.
+	contentHash: blobHash.optional(),
+});
+
+export const blobPK = z.object({ hash: blobHash });
+
+export const blobFilter = z.object({
+	hashes: z.array(blobHash).optional(),
+	unattached: z.boolean().optional(),
+});
+
+const attachmentId = z.number().int().brand("AttachmentId");
+export type AttachmentId = z.infer<typeof attachmentId>;
+
+export const attachmentOwnerSchema = z.enum(["RESOURCE", "QUESTION"]);
+
+export const attachmentSchema = z.object({
+	id: attachmentId,
+	hash: blobHash,
+	filename: z.string().min(1),
+	mimeType: z.string().min(1),
+	uploaderUsername: z.string().nullable(),
+	ownerType: attachmentOwnerSchema,
+	ownerId: z.number().int(),
+	createdAt: z.date(),
+});
+
+export const attachmentCreate = z.object({
+	bytes: z
+		.instanceof(Buffer)
+		.openapi("Buffer", { type: "string", format: "binary" }),
+	filename: z.string().min(1),
+	// Ignored when the filename carries a known extension, which wins.
+	mimeType: z.string().min(1).nullish(),
+	contentHash: blobHash.optional(),
+	uploaderUsername: z.string().nullish(),
+	ownerType: attachmentOwnerSchema,
+	ownerId: z.number().int(),
+});
+
+export const attachmentUpdate = z.object({
+	filename: z.string().min(1),
+});
+
+export const attachmentPK = z.object({ id: attachmentId });
+
+export const attachmentFilter = z.object({
+	ids: z.array(attachmentId).optional(),
+	hashes: z.array(blobHash).optional(),
+	ownerType: attachmentOwnerSchema.optional(),
+	ownerIds: z.array(z.number().int()).optional(),
+	uploaderUsername: z.string().optional(),
+});
+
+//
 // Session
 //
 export const sessionSchema = z.object({

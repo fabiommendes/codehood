@@ -108,6 +108,9 @@ importers:
       daisyui:
         specifier: ^5.7.22
         version: 5.7.22
+      fast-check:
+        specifier: ^4.10.0
+        version: 4.10.0
       fishery:
         specifier: ^2.4.0
         version: 2.4.0
@@ -2357,6 +2360,10 @@ packages:
     resolution: {integrity: sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A==}
     engines: {node: '>=8.0.0'}
 
+  fast-check@4.10.0:
+    resolution: {integrity: sha512-hhqQL+IJllZi3aM4TKvmCj3bywLEcycNTTLZeLhA9ttMxBrCqM07q7Di4kl+j9EWSTXvJH1+EpIgsDbF/+8H5Q==}
+    engines: {node: '>=12.17.0'}
+
   fast-decode-uri-component@1.0.1:
     resolution: {integrity: sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==}
 
@@ -3123,6 +3130,9 @@ packages:
 
   pure-rand@6.1.0:
     resolution: {integrity: sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA==}
+
+  pure-rand@8.4.2:
+    resolution: {integrity: sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng==}
 
   radix3@1.1.2:
     resolution: {integrity: sha512-b484I/7b8rDEdSDKckSSBA8knMpcdsXudlE/LNL639wFoHKwLbEkQFZHWEYwDC0wa0FKUcCY+GAF73Z7wxNVFA==}
@@ -5965,6 +5975,10 @@ snapshots:
     dependencies:
       pure-rand: 6.1.0
 
+  fast-check@4.10.0:
+    dependencies:
+      pure-rand: 8.4.2
+
   fast-decode-uri-component@1.0.1: {}
 
   fast-deep-equal@3.1.3: {}
@@ -6650,6 +6664,8 @@ snapshots:
   punycode.js@2.3.1: {}
 
   pure-rand@6.1.0: {}
+
+  pure-rand@8.4.2: {}
 
   radix3@1.1.2: {}
 

@@ -1,0 +1,65 @@
+# Codehood behind Caddy.
+#
+# Blobs are content-addressed and served straight off disk; everything else is
+# proxied to the Astro server. Copy this next to your site config and adjust
+# the domain, the upstream address and the blob root.
+#
+# URL shape:   /files/<hash>/<filename>        (or /files/<hash> for the raw blob)
+# Disk layout: <RESOURCE_ROOT>/<hash[0:2]>/<hash>/<hash>      the bytes
+#              <RESOURCE_ROOT>/<hash[0:2]>/<hash>/<filename>  link per attachment
+#
+# The per-attachment links carry the real filename and therefore a real
+# extension, so Caddy derives Content-Type from its own table and Codehood
+# ships no mime map of its own. Content-Disposition is deliberately absent:
+# the browser picks inline-vs-download from the type and takes the download
+# name from the URL's last segment, which is already the filename.
+
+{
+	# Replace with your own email for ACME.
+	email admin@example.com
+}
+
+codehood.example.com {
+	encode zstd gzip
+
+	handle_path /files/* {
+		root * /srv/codehood/storage/resources
+
+		# /files/ab/abcdef.../handout.pdf -> /ab/abcdef.../handout.pdf
+		#   1 = first two hex chars, 2 = remaining 62, 3 = filename
+		@named path_regexp named ^/([0-9a-f]{2})([0-9a-f]{62})/(.+)$
+		rewrite @named /{re.named.1}/{re.named.1}{re.named.2}/{re.named.3}
+
+		# /files/ab/abcdef... -> the canonical, unnamed blob
+		@bare path_regexp bare ^/([0-9a-f]{2})([0-9a-f]{62})$
+		rewrite @bare /{re.bare.1}/{re.bare.1}{re.bare.2}/{re.bare.1}{re.bare.2}
+
+		# No system mime table knows the question format, so say it here.
+		@mdq path *.mdq
+		header @mdq Content-Type "text/markdown; charset=utf-8"
+
+		header {
+			# The URL is the content's own hash, so the bytes can never change.
+			Cache-Control           "public, max-age=31536000, immutable"
+			X-Content-Type-Options  "nosniff"
+			# SVG can carry script; this is what makes serving it inline safe.
+			Content-Security-Policy "default-src 'none'; sandbox"
+			-Server
+		}
+
+		# A miss falls through to the app, which answers 410 with an
+		# explanation for a tombstoned blob and 404 for an unknown hash.
+		file_server {
+			pass_thru
+		}
+		reverse_proxy localhost:4321
+	}
+
+	reverse_proxy localhost:4321 {
+		# Uploads arrive as multipart/form-data on the resource endpoints.
+		# Keep this at or above the largest per-role quota.
+		request_body {
+			max_size 1GB
+		}
+	}
+}

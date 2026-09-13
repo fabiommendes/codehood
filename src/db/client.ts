@@ -4,6 +4,9 @@ import { PrismaClient } from "../generated/prisma/client";
 export type {
 	ApiKey,
 	ApiKeyKind,
+	Attachment,
+	AttachmentOwner,
+	Blob,
 	CalendarEvent,
 	Course,
 	Discipline,

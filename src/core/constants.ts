@@ -2,7 +2,9 @@
  * Environment variables and configuration constants for the application.
  */
 
+import type { Role } from "@/db/client";
 import type { ArrayToUnion } from "@/typing";
+import { parseByteSize } from "@/utils/format-bytes";
 
 /**
  * Read environment variable as string with a default value.
@@ -66,6 +68,35 @@ export const PRODUCTION = ENVIRONMENT === "prod";
 export const RESOURCE_ROOT = readEnv("RESOURCE_ROOT", "./storage/resources");
 
 /**
+ * How a blob's per-attachment names are materialised next to its bytes.
+ *
+ * `symlink` is self-documenting (`ls -l` resolves to the hash) but needs
+ * symlink following, which hardened nginx turns off; `hardlink` works where
+ * symlinks do not; `copy` exists for filesystems supporting neither, at the
+ * cost of storing the bytes once per distinct filename.
+ */
+export const ATTACHMENT_LINK_MODE = assertIn(
+	readEnv("ATTACHMENT_LINK_MODE", "symlink"),
+	["symlink", "hardlink", "copy"],
+);
+export type AttachmentLinkMode = typeof ATTACHMENT_LINK_MODE;
+
+/**
+ * Total bytes each role may have attached, `null` for unlimited.
+ *
+ * Global for now; the schema supports per-account and per-course limits later
+ * with no migration.
+ */
+export const BLOB_QUOTA_BY_ROLE: Record<Role, number | null> = {
+	ADMIN: null,
+	INSTRUCTOR: parseByteSize(readEnv("BLOB_QUOTA_INSTRUCTOR", "1gb")),
+	STUDENT: parseByteSize(readEnv("BLOB_QUOTA_STUDENT", "200mb")),
+};
+
+/** How long an unattached blob survives before garbage collection may take it. */
+export const BLOB_GC_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Log environment variables to the console for debugging purposes.
  */
 function logEnvVariables(vars: [string, unknown][]): void {
@@ -78,4 +109,7 @@ logEnvVariables([
 	["DEBUG", DEBUG],
 	["ENVIRONMENT", ENVIRONMENT],
 	["RESOURCE_ROOT", RESOURCE_ROOT],
+	["ATTACHMENT_LINK_MODE", ATTACHMENT_LINK_MODE],
+	["BLOB_QUOTA_INSTRUCTOR", BLOB_QUOTA_BY_ROLE.INSTRUCTOR],
+	["BLOB_QUOTA_STUDENT", BLOB_QUOTA_BY_ROLE.STUDENT],
 ]);

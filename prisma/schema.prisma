@@ -53,6 +53,7 @@ model User {
   groupMemberships GroupMembership[]
   courses          Course[]
   enrollments      Enrollment[]
+  attachments      Attachment[]
   questionRefs     QuestionRef[]
   responses        Response[]
   submissions      Submission[]
@@ -167,6 +168,67 @@ model File {
 
   createdAt DateTime   @default(now())
   resources Resource[]
+}
+
+// =============================================================================
+// Blob storage
+// =============================================================================
+
+/// Anonymous file content, deduped by the sha-256 of its own bytes. Carries no
+/// name and no mime type: those belong to each Attachment, because the same
+/// bytes may be used under different names by different owners.
+/// See dev/specs/to-do/blob-attachments.md.
+model Blob {
+  /// Lowercase-hex sha-256 of the bytes. Identity, URL token and on-disk
+  /// directory, all one value.
+  hash String @id
+
+  size Int
+
+  /// Set when the bytes are removed from disk; the row survives as a
+  /// tombstone so the URL can explain itself instead of 404ing (FR-SYNC-013,
+  /// FR-SYNC-015).
+  deletedAt DateTime?
+
+  createdAt   DateTime     @default(now())
+  attachments Attachment[]
+}
+
+enum AttachmentOwner {
+  RESOURCE
+  QUESTION
+}
+
+/// One use of a Blob by one owner, carrying the filename and mime type that
+/// use is served under, plus the user charged for the bytes.
+model Attachment {
+  id   Int    @id @default(autoincrement())
+  hash String
+  blob Blob   @relation(fields: [hash], references: [hash], onDelete: Cascade)
+
+  /// Sanitised: a bare basename, also used as the on-disk link name and as
+  /// the last segment of the blob URL.
+  filename String
+
+  /// Per use-site, never per bytes.
+  mimeType String
+
+  /// Charged for these bytes. Nullable so deleting a user does not delete the
+  /// material they uploaded; the quota charge leaves with them.
+  uploaderUsername String?
+  uploader         User?   @relation(fields: [uploaderUsername], references: [username], onDelete: SetNull)
+
+  /// Polymorphic owner. SQLite cannot cascade this, so every owner service
+  /// detaches in its own delete.
+  ownerType AttachmentOwner
+  ownerId   Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([hash, filename, ownerType, ownerId])
+  @@index([ownerType, ownerId])
+  @@index([hash])
+  @@index([uploaderUsername])
 }
 
 // =============================================================================
