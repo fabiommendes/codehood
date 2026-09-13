@@ -21,10 +21,11 @@ import {
 	type timeSlotRef,
 	timeSlotSchema,
 	timeSlotUpdate,
+	timeSlotUpsert,
 } from "@/core/schemas";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
-import type { Crud, ServiceOpts } from "../base-service";
+import { type Crud, type ServiceOpts, upsert } from "../base-service";
 import { type Prisma, type PrismaClient, prisma } from "../client";
 
 export type { TimeSlotId } from "@/core/schemas";
@@ -38,6 +39,7 @@ export type TimeSlot = z.infer<typeof timeSlotSchema>;
 export type TimeSlotFilter = z.infer<typeof timeSlotFilter>;
 export type TimeSlotPK = z.infer<typeof timeSlotPK>;
 export type TimeSlotUpdate = z.infer<typeof timeSlotUpdate>;
+export type TimeSlotUpsert = z.infer<typeof timeSlotUpsert>;
 export type TimeSlotRef = z.infer<typeof timeSlotRef>;
 
 type DbTimeSlot = Prisma.TimeSlotGetPayload<{
@@ -65,6 +67,7 @@ class TimeSlotService
 			create: TimeSlotCreate;
 			filter: TimeSlotFilter;
 			update: TimeSlotUpdate;
+			upsert: TimeSlotUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -249,6 +252,37 @@ class TimeSlotService
 			include: timeSlotInclude,
 		});
 		return toTimeSlot(row);
+	}
+
+	/**
+	 * Upserts a time slot keyed on `{courseId, slug}`.
+	 *
+	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
+	 * or updating, same as `create`/`update`; the overlap check re-runs on
+	 * whichever branch fires.
+	 */
+	@Validate({ service: true, returns: timeSlotSchema, args: [timeSlotUpsert] })
+	async upsert(input: TimeSlotUpsert, opts: ServiceOpts): Promise<TimeSlot> {
+		return upsert(
+			this.prisma,
+			this,
+			input,
+			opts,
+			{
+				pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
+				assertCreatable: async (i, o) => {
+					const client = o.tx ?? this.prisma;
+					const course = await client.course.findUnique({
+						where: { id: i.courseId },
+						select: { instructor: { select: { username: true } } },
+					});
+					if (!course || !canWriteCourseContent(o.actor, course)) {
+						throw new NotAllowed({ action: "upsert-time-slot" });
+					}
+				},
+			},
+			"upsert-time-slot",
+		);
 	}
 
 	/**

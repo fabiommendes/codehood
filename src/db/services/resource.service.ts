@@ -16,10 +16,11 @@ import {
 	type resourceRef,
 	resourceSchema,
 	resourceUpdate,
+	resourceUpsert,
 } from "@/core/schemas";
 import type { FillUndefineds, Pretty } from "@/typing";
 import { Validate } from "@/utils/validate";
-import type { Crud, ServiceOpts } from "../base-service";
+import { type Crud, type ServiceOpts, upsert } from "../base-service";
 import { type Prisma, type PrismaClient, prisma } from "../client";
 import { fileService } from "./file.service";
 
@@ -33,6 +34,7 @@ export type Resource = z.infer<typeof resourceSchema>;
 export type ResourceFilter = z.infer<typeof resourceFilter>;
 export type ResourcePK = z.infer<typeof resourcePK>;
 export type ResourceUpdate = z.infer<typeof resourceUpdate>;
+export type ResourceUpsert = z.infer<typeof resourceUpsert>;
 export type ResourceRef = z.infer<typeof resourceRef>;
 
 type DbResource = Prisma.ResourceGetPayload<{
@@ -56,94 +58,6 @@ const resourceInclude = {
 /** Whole-string URL check — the heuristic the create/update validation uses. */
 const BARE_URL_RE = /^https?:\/\/\S+$/i;
 
-/**
- * Enforces the shape each `ResourceType` implies (see the table in
- * `dev/specs/to-do/resources.md`): `LINK` needs `data` and no `fileId`,
- * `FILE` needs `fileId` and no `data`, `MD` needs `data` and no `fileId`,
- * `CODE` needs `data` and `extra` and no `fileId`. A `data` that is nothing
- * but a bare URL is refused for `MD`/`CODE`, on the theory that it was meant
- * to be a `LINK`.
- */
-function validateResourceShape(
-	type: Resource["type"],
-	fields: {
-		data?: string | null;
-		extra?: string | null;
-		fileId?: number | null;
-	},
-): void {
-	const { data, extra, fileId } = fields;
-	switch (type) {
-		case "LINK":
-			if (!data) throw new Error("A LINK resource requires data (the URL).");
-			if (fileId != null)
-				throw new Error("A LINK resource must not have a fileId.");
-			break;
-		case "FILE":
-			if (fileId == null) throw new Error("A FILE resource requires fileId.");
-			if (data != null) throw new Error("A FILE resource must not have data.");
-			break;
-		case "MD":
-			if (!data)
-				throw new Error("An MD resource requires data (the markdown content).");
-			if (fileId != null)
-				throw new Error("An MD resource must not have a fileId.");
-			break;
-		case "CODE":
-			if (!data) throw new Error("A CODE resource requires data (the source).");
-			if (!extra)
-				throw new Error("A CODE resource requires extra (the language).");
-			if (fileId != null)
-				throw new Error("A CODE resource must not have a fileId.");
-			break;
-	}
-	if (
-		(type === "MD" || type === "CODE") &&
-		data &&
-		BARE_URL_RE.test(data.trim())
-	) {
-		throw new Error(
-			`A ${type} resource's data looks like a bare URL; use type: LINK for links.`,
-		);
-	}
-}
-
-/** One of the four fixed groups the resources page renders, title-sorted, empty groups omitted. */
-export interface ResourceGroup {
-	type: Resource["type"];
-	label: string;
-	resources: Resource[];
-}
-
-/** Display order and label for each `ResourceType` — never authored, see the spec. */
-const GROUP_ORDER: { type: Resource["type"]; label: string }[] = [
-	{ type: "FILE", label: "Files" },
-	{ type: "LINK", label: "Links" },
-	{ type: "MD", label: "Notes" },
-	{ type: "CODE", label: "Snippets" },
-];
-
-/**
- * Groups resources into the four fixed sections the page renders.
- *
- * Type order fixed (`FILE` → Files, `LINK` → Links, `MD` → Notes, `CODE` →
- * Snippets), title order within each, empty groups absent. Exported as a
- * pure function so the grouping/ordering is unit-testable independent of
- * the database.
- */
-export function groupResourcesByType(resources: Resource[]): ResourceGroup[] {
-	const groups: ResourceGroup[] = [];
-	for (const { type, label } of GROUP_ORDER) {
-		const inGroup = resources
-			.filter((r) => r.type === type)
-			.sort((a, b) => a.title.localeCompare(b.title));
-		if (inGroup.length > 0) {
-			groups.push({ type, label, resources: inGroup });
-		}
-	}
-	return groups;
-}
-
 class ResourceService
 	implements
 		Crud<{
@@ -152,6 +66,7 @@ class ResourceService
 			create: ResourceCreate;
 			filter: ResourceFilter;
 			update: ResourceUpdate;
+			upsert: ResourceUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -323,6 +238,37 @@ class ResourceService
 	}
 
 	/**
+	 * Upserts a resource keyed on `{courseId, slug}`.
+	 *
+	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
+	 * or updating, same as `create`/`update`; the shape-by-type check
+	 * ({@link validateResourceShape}) re-runs on whichever branch fires.
+	 */
+	@Validate({ service: true, returns: resourceSchema, args: [resourceUpsert] })
+	async upsert(input: ResourceUpsert, opts: ServiceOpts): Promise<Resource> {
+		return upsert(
+			this.prisma,
+			this,
+			input,
+			opts,
+			{
+				pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
+				assertCreatable: async (i, o) => {
+					const client = o.tx ?? this.prisma;
+					const course = await client.course.findUnique({
+						where: { id: i.courseId },
+						select: { instructor: { select: { username: true } } },
+					});
+					if (!course || !canWriteCourseContent(o.actor, course)) {
+						throw new NotAllowed({ action: "upsert-resource" });
+					}
+				},
+			},
+			"upsert-resource",
+		);
+	}
+
+	/**
 	 * Removes the resource row outright (matching FR-SYNC-013's "deleted"
 	 * row for calendar events — there is no soft delete at this layer).
 	 *
@@ -369,4 +315,93 @@ function toResource(row: DbResource): Resource {
 		fileId: row.fileId as FileId | null,
 		file: row.file && { ...row.file, id: row.file.id as FileId },
 	};
+}
+
+/**
+ * Enforces the shape each `ResourceType` implies (see the table in
+ * `dev/specs/to-do/resources.md`): `LINK` needs `data` and no `fileId`,
+ * `FILE` needs `fileId` and no `data`, `MD` needs `data` and no `fileId`,
+ * `CODE` needs `data` and `extra` and no `fileId`. A `data` that is nothing
+ * but a bare URL is refused for `MD`/`CODE`, on the theory that it was meant
+ * to be a `LINK`.
+ */
+function validateResourceShape(
+	type: Resource["type"],
+	fields: {
+		data?: string | null;
+		extra?: string | null;
+		fileId?: number | null;
+	},
+): void {
+	const { data, extra, fileId } = fields;
+	// TODO: exception audit: we should use our custom errors classes here!
+	switch (type) {
+		case "LINK":
+			if (!data) throw new Error("A LINK resource requires data (the URL).");
+			if (fileId != null)
+				throw new Error("A LINK resource must not have a fileId.");
+			break;
+		case "FILE":
+			if (fileId == null) throw new Error("A FILE resource requires fileId.");
+			if (data != null) throw new Error("A FILE resource must not have data.");
+			break;
+		case "MD":
+			if (!data)
+				throw new Error("An MD resource requires data (the markdown content).");
+			if (fileId != null)
+				throw new Error("An MD resource must not have a fileId.");
+			break;
+		case "CODE":
+			if (!data) throw new Error("A CODE resource requires data (the source).");
+			if (!extra)
+				throw new Error("A CODE resource requires extra (the language).");
+			if (fileId != null)
+				throw new Error("A CODE resource must not have a fileId.");
+			break;
+	}
+	if (
+		(type === "MD" || type === "CODE") &&
+		data &&
+		BARE_URL_RE.test(data.trim())
+	) {
+		throw new Error(
+			`A ${type} resource's data looks like a bare URL; use type: LINK for links.`,
+		);
+	}
+}
+
+/** One of the four fixed groups the resources page renders, title-sorted, empty groups omitted. */
+export interface ResourceGroup {
+	type: Resource["type"];
+	label: string;
+	resources: Resource[];
+}
+
+/** Display order and label for each `ResourceType` — never authored, see the spec. */
+const GROUP_ORDER: { type: Resource["type"]; label: string }[] = [
+	{ type: "FILE", label: "Files" },
+	{ type: "LINK", label: "Links" },
+	{ type: "MD", label: "Notes" },
+	{ type: "CODE", label: "Snippets" },
+];
+
+/**
+ * Groups resources into the four fixed sections the page renders.
+ *
+ * Type order fixed (`FILE` → Files, `LINK` → Links, `MD` → Notes, `CODE` →
+ * Snippets), title order within each, empty groups absent. Exported as a
+ * pure function so the grouping/ordering is unit-testable independent of
+ * the database.
+ */
+export function groupResourcesByType(resources: Resource[]): ResourceGroup[] {
+	const groups: ResourceGroup[] = [];
+	for (const { type, label } of GROUP_ORDER) {
+		const inGroup = resources
+			.filter((r) => r.type === type)
+			.sort((a, b) => a.title.localeCompare(b.title));
+		if (inGroup.length > 0) {
+			groups.push({ type, label, resources: inGroup });
+		}
+	}
+	return groups;
 }

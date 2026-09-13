@@ -239,7 +239,7 @@ function publicUser(user: User): PublicUser {
 		name: user.name,
 		username: user.username,
 		role: user.role,
-		githubId: user.githubId ?? undefined,
-		schoolId: user.schoolId ?? undefined,
+		githubId: user.githubId,
+		schoolId: user.schoolId,
 	};
 }

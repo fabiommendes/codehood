@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { canViewCourse } from "@/auth/permissions";
 import { FULL_ACCESS, SYSTEM } from "@/core/actor";
 import type { CourseId } from "@/db/services/course.service";
-import { courseService } from "@/db/services/course.service";
+import { courseService, toEnrollmentView } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
 import { userService } from "@/db/services/user.service";
@@ -288,7 +288,9 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 				.map((c) => c.id),
 		);
 		const expectedIds = new Set(
-			fixtureCourses.filter((c) => canViewCourse(actor, c)).map((c) => c.id),
+			fixtureCourses
+				.filter((c) => canViewCourse(actor, toEnrollmentView(c)))
+				.map((c) => c.id),
 		);
 		expect(visibleIds, label).toEqual(expectedIds);
 	}
@@ -458,4 +460,135 @@ test("listStudents carries enrolledAt for the Students tab", async () => {
 		actor: instructor,
 	});
 	expect(students[0].enrolledAt).toBeInstanceOf(Date);
+});
+
+test("upsert creates on first call, updates the same course on the second, and a different key creates a separate course", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const disciplineSlug = await makeDiscipline();
+	const editionSlug = await ensureEdition();
+
+	const created = await courseService.upsert(
+		{
+			discipline: disciplineSlug,
+			instructor: instructor.username,
+			edition: editionSlug,
+			description: "Before",
+			startAt: new Date("2026-01-01"),
+			endAt: new Date("2026-05-01"),
+		},
+		FULL_ACCESS,
+	);
+	expect(created.description).toBe("Before");
+
+	const updated = await courseService.upsert(
+		{
+			discipline: disciplineSlug,
+			instructor: instructor.username,
+			edition: editionSlug,
+			description: null,
+			startAt: new Date("2026-01-01"),
+			endAt: new Date("2026-06-01"),
+		},
+		FULL_ACCESS,
+	);
+	expect(updated.id).toBe(created.id); // same key, same row
+	expect(updated.description).toBeNull(); // cleared
+	expect(updated.endAt).toEqual(new Date("2026-06-01")); // changed
+	expect(updated.startAt).toEqual(new Date("2026-01-01")); // untouched
+
+	const matching = await courseService.findMany(
+		{
+			disciplineSlug,
+			instructorUsername: instructor.username,
+			editionSlug,
+		},
+		FULL_ACCESS,
+	);
+	expect(matching).toHaveLength(1);
+
+	const otherInstructor = await makeUser("INSTRUCTOR");
+	const other = await courseService.upsert(
+		{
+			discipline: disciplineSlug,
+			instructor: otherInstructor.username,
+			edition: editionSlug,
+			startAt: new Date("2026-01-01"),
+			endAt: new Date("2026-05-01"),
+		},
+		FULL_ACCESS,
+	);
+	expect(other.id).not.toBe(created.id);
+});
+
+test("upsert in a closed edition succeeds for an existing course, fails for a new one, and an actor with the outside-window permission bypasses both", async () => {
+	const closedSlug = "9911";
+	const closedWindow = {
+		startAt: new Date("2020-01-01"),
+		endAt: new Date("2020-06-01"),
+	};
+	await editionService.create(
+		{ slug: closedSlug, name: closedSlug, ...closedWindow },
+		FULL_ACCESS,
+	);
+	const admin = await makeUser("ADMIN");
+	const instructor = await makeUser("INSTRUCTOR");
+	const disciplineSlug = await makeDiscipline();
+
+	// Only an admin (canCreateCourseOutsideWindow) may create the first course
+	// in a closed edition.
+	const existing = await courseService.upsert(
+		{
+			discipline: disciplineSlug,
+			instructor: instructor.username,
+			edition: closedSlug,
+			startAt: new Date("2020-01-01"),
+			endAt: new Date("2020-05-01"),
+		},
+		{ actor: admin },
+	);
+
+	// The course already exists: an ordinary instructor may now upsert (sync)
+	// it even though the edition window is closed.
+	const resynced = await courseService.upsert(
+		{
+			discipline: disciplineSlug,
+			instructor: instructor.username,
+			edition: closedSlug,
+			description: "resynced",
+			startAt: new Date("2020-01-01"),
+			endAt: new Date("2020-05-01"),
+		},
+		{ actor: instructor },
+	);
+	expect(resynced.id).toBe(existing.id);
+	expect(resynced.description).toBe("resynced");
+
+	// A genuinely new course in the same closed edition is refused for the
+	// instructor...
+	const disciplineSlug2 = await makeDiscipline();
+	await expect(
+		courseService.upsert(
+			{
+				discipline: disciplineSlug2,
+				instructor: instructor.username,
+				edition: closedSlug,
+				startAt: new Date("2020-01-01"),
+				endAt: new Date("2020-05-01"),
+			},
+			{ actor: instructor },
+		),
+	).rejects.toThrow(/not accepting new courses/);
+
+	// ...but succeeds for the admin.
+	const createdByAdmin = await courseService.upsert(
+		{
+			discipline: disciplineSlug2,
+			instructor: instructor.username,
+			edition: closedSlug,
+			startAt: new Date("2020-01-01"),
+			endAt: new Date("2020-05-01"),
+		},
+		{ actor: admin },
+	);
+	expect(createdByAdmin.edition.slug).toBe(closedSlug);
 });

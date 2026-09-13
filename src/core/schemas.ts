@@ -1,6 +1,6 @@
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
-import { USERNAME_RE } from "@/utils/course-url";
+import { EDITION_RE, USERNAME_RE } from "@/utils/course-url";
 
 // Must run before any schema calls .openapi(...) — every route file imports
 // this module first, so this is the one place that needs to call it.
@@ -74,17 +74,30 @@ export const userSchema = z.object({
 
 	// TODO: add validations for githubId and schoolId (e.g. regex, length)
 	// schoolId should read the optional regex from a env variable.
-	githubId: z.string().optional(),
-	schoolId: z.string().optional(),
+	githubId: z.string().nullable(),
+	schoolId: z.string().nullable(),
 	passwordHash: z.string(),
 	createdAt: z.date(),
 });
 
+// `username` is tightened here rather than on `userSchema`: a username is a
+// path segment, so the format has to hold for anything the API creates, but
+// `userSchema` is also the `returns:` schema on four service methods, and an
+// output validator's job is the shape, not re-checking a value constraint
+// already enforced on write. See docs/design/db-service-classes.md.
 export const userCreate = userSchema
 	.omit({ passwordHash: true, createdAt: true })
+	.partial({ githubId: true, schoolId: true })
 	.extend({
 		password: z.string().min(1),
+		username,
 	});
+
+/**
+ * PUT-shaped input: `password` is optional and, when present on an existing
+ * user, resets the stored one.
+ */
+export const userUpsert = userCreate.partial({ password: true });
 
 export const userUpdate = userSchema
 	.pick({
@@ -156,9 +169,13 @@ export const disciplineCreate = disciplineSchema.pick({
 	name: true,
 });
 
-export const disciplineUpdate = disciplineSchema.pick({
-	name: true,
-});
+export const disciplineUpdate = disciplineSchema
+	.pick({
+		name: true,
+	})
+	.partial();
+
+export const disciplineUpsert = disciplineCreate;
 
 export const disciplinePK = disciplineSchema.pick({
 	slug: true,
@@ -178,7 +195,7 @@ export const disciplineInfo = disciplineSchema.pick({ slug: true, name: true });
 // Edition
 //
 export const editionSchema = z.object({
-	slug: z.string().min(1),
+	slug: z.string().regex(EDITION_RE),
 	name: z.string().min(1),
 	startAt: z.coerce.date(),
 	endAt: z.coerce.date(),
@@ -199,6 +216,8 @@ export const editionUpdate = editionSchema
 		endAt: true,
 	})
 	.partial();
+
+export const editionUpsert = editionCreate;
 
 export const editionPK = editionSchema.pick({
 	slug: true,
@@ -248,16 +267,20 @@ export const courseCreate = z.object({
 	discipline: z.string().min(1).describe("Discipline slug"),
 	instructor: z.string().min(1).describe("Instructor username"),
 	edition: z.string().min(1).describe("Edition slug"),
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	startAt: z.coerce.date(),
 	endAt: z.coerce.date(),
 });
 
-export const courseUpdate = courseSchema.pick({
-	description: true,
-	startAt: true,
-	endAt: true,
-});
+export const courseUpsert = courseCreate;
+
+export const courseUpdate = courseSchema
+	.pick({
+		description: true,
+		startAt: true,
+		endAt: true,
+	})
+	.partial();
 
 // Identifies a course the way its URL does — see `src/utils/course-url.ts`.
 export const courseRef = z.object({
@@ -273,6 +296,12 @@ export const coursePK = z.union([
 	z.object({ id: courseId }),
 	z.object({ ref: courseRef }),
 ]);
+
+// What the REST layer accepts, as opposed to what the service resolves. A
+// course's address is `/api/course/<discipline>/<instructor>_<edition>`, so a
+// route can only ever build the `ref` branch; keeping the union out of
+// `filterPk` says that in the schema instead of in a comment.
+export const coursePkRef = z.object({ ref: courseRef });
 
 export const courseFilter = z.object({
 	instructorUsername: z.string().optional(),
@@ -457,7 +486,7 @@ export const timeSlotSchema = z.object({
 export const timeSlotCreate = z.object({
 	courseId: courseId,
 	slug: z.string().min(1),
-	title: z.string().optional(),
+	title: z.string().nullish(),
 	day: weekdaySchema,
 	startMin: z.number().int(),
 	durationMin: z.number().int(),
@@ -471,6 +500,8 @@ export const timeSlotUpdate = z.object({
 	startMin: z.number().int().optional(),
 	durationMin: z.number().int().optional(),
 });
+
+export const timeSlotUpsert = timeSlotCreate;
 
 export const timeSlotRef = z.object({
 	courseId: z.number(),
@@ -516,22 +547,24 @@ export const resourceCreate = z.object({
 	slug: z.string().min(1),
 	type: resourceTypeSchema,
 	title: z.string().min(1),
-	description: z.string().optional(),
-	data: z.string().optional(),
-	extra: z.string().optional(),
-	fileId: z.number().optional(),
+	description: z.string().nullish(),
+	data: z.string().nullish(),
+	extra: z.string().nullish(),
+	fileId: z.number().nullish(),
 	contentHash: z.string().min(1),
 });
+
+export const resourceUpsert = resourceCreate;
 
 // `slug` is deliberately absent: it is the sync natural key, and renaming is
 // a delete plus a create (FR-SYNC-011).
 export const resourceUpdate = z.object({
 	type: resourceTypeSchema.optional(),
 	title: z.string().optional(),
-	description: z.string().optional(),
-	data: z.string().optional(),
-	extra: z.string().optional(),
-	fileId: z.number().optional(),
+	description: z.string().nullish(),
+	data: z.string().nullish(),
+	extra: z.string().nullish(),
+	fileId: z.number().nullish(),
 	contentHash: z.string().optional(),
 });
 
@@ -579,7 +612,7 @@ export const calendarEventSchema = z.object({
 	id: calendarEventId,
 	courseId: courseId,
 	timeSlotId: timeSlotId,
-	examId: examId.optional(),
+	examId: examId.nullable(),
 	exam: linkedExamSchema.nullable(),
 
 	// Natural key from the repository path — FR-SYNC-010.
@@ -625,10 +658,6 @@ export const calendarEventCreate = calendarEventSchema
 		description: z.string().nullable().optional(),
 	});
 
-z.object({
-	courseId: z.number(),
-});
-
 // `slug`, `courseId`, and `timeSlotId` are deliberately absent: moving an
 // event to a different slot is a delete plus a create. Provide `date` to
 // move the event's day; `startMin`/`durationMin` without `date` is rejected,
@@ -640,9 +669,11 @@ export const calendarEventUpdate = z.object({
 	week: z.number().int().optional(),
 	kind: eventKindSchema.optional(),
 	title: z.string().optional(),
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	contentHash: z.string().optional(),
 });
+
+export const calendarEventUpsert = calendarEventCreate;
 
 export const calendarEventRef = z.object({
 	courseId: courseId,

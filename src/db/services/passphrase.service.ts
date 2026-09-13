@@ -59,6 +59,7 @@ class PassphraseService
 			create: PassphraseCreate;
 			filter: PassphraseFilter;
 			update: PassphraseUpdate;
+			upsert: never;
 		}>
 {
 	prisma: PrismaClient;
@@ -207,6 +208,12 @@ class PassphraseService
 				data: { expiresAt: fields.expiresAt },
 			}),
 		);
+	}
+
+	// No upsert: `value` is server-generated unless pinned, and the only
+	// updatable field is `expiresAt`.
+	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
+		throw new Error("Method not implemented.");
 	}
 
 	/**

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/core/actor";
+import { prisma } from "@/db/client";
 import { calendarEventService } from "@/db/services/calendar-event.service";
 import { courseService } from "@/db/services/course.service";
 import { disciplineService } from "@/db/services/discipline.service";
@@ -363,4 +364,123 @@ test("an instructor writes their own course's slots; another instructor and a no
 			{ actor: admin },
 		),
 	).resolves.toMatchObject({ slug: "mon" });
+});
+
+test("upsert creates on first call, updates the same slot on the second, and a different slug creates a separate slot", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+
+	const created = await timeSlotService.upsert(
+		{
+			courseId: course.id,
+			slug: "upsert-slot",
+			title: "Before",
+			day: "MONDAY",
+			startMin: 840,
+			durationMin: 120,
+		},
+		opts,
+	);
+	expect(created.title).toBe("Before");
+
+	const updated = await timeSlotService.upsert(
+		{
+			courseId: course.id,
+			slug: "upsert-slot",
+			title: null,
+			day: "MONDAY",
+			startMin: 840,
+			durationMin: 90,
+		},
+		opts,
+	);
+	expect(updated.id).toBe(created.id); // same key, same row
+	expect(updated.durationMin).toBe(90); // changed
+	expect(updated.title).toBeNull(); // cleared
+	expect(updated.day).toBe("MONDAY"); // untouched
+
+	const other = await timeSlotService.upsert(
+		{
+			courseId: course.id,
+			slug: "upsert-slot-2",
+			day: "TUESDAY",
+			startMin: 840,
+			durationMin: 60,
+		},
+		opts,
+	);
+	expect(other.id).not.toBe(created.id);
+});
+
+test("upsert enforces the overlap rule against other slots, but not against the slot's own current row", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+
+	await timeSlotService.upsert(
+		{
+			courseId: course.id,
+			slug: "existing",
+			day: "MONDAY",
+			startMin: 840,
+			durationMin: 120,
+		},
+		opts,
+	);
+
+	await expect(
+		timeSlotService.upsert(
+			{
+				courseId: course.id,
+				slug: "overlapping",
+				day: "MONDAY",
+				startMin: 900,
+				durationMin: 60,
+			},
+			opts,
+		),
+	).rejects.toThrow();
+
+	// Re-upserting "existing" with a shifted window must not collide with itself.
+	await expect(
+		timeSlotService.upsert(
+			{
+				courseId: course.id,
+				slug: "existing",
+				day: "MONDAY",
+				startMin: 850,
+				durationMin: 120,
+			},
+			opts,
+		),
+	).resolves.toMatchObject({ startMin: 850 });
+});
+
+test("an upsert nested in the caller's tx rolls back with it, proving it reuses that transaction rather than opening its own", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+
+	await expect(
+		prisma.$transaction(async (tx) => {
+			await timeSlotService.upsert(
+				{
+					courseId: course.id,
+					slug: "tx-slot",
+					day: "MONDAY",
+					startMin: 840,
+					durationMin: 120,
+				},
+				{ ...opts, tx },
+			);
+			throw new Error("rollback");
+		}),
+	).rejects.toThrow("rollback");
+
+	const found = await timeSlotService.findOne(
+		{ ref: { courseId: course.id, slug: "tx-slot" } },
+		opts,
+	);
+	expect(found).toBeNull();
 });

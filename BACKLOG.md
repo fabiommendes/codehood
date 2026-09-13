@@ -9,6 +9,19 @@ Backlog items are categorized in sections, not on priority.
 
 ## Small issues
 
+* [ ] **Schema hygiene in `src/core/schemas.ts`** — create/update schemas
+  retyped instead of derived from `xSchema`, and `.optional()` used where the
+  column is nullable (so the field can never be cleared). See
+  `dev/issues/schemas-verbose-and-optional-vs-nullable.md`.
+* [ ] **Relative expiry breaks idempotency** — `inviteCreate.expiresInMs` and
+  `passphrase.create`'s implicit deadline make the same request produce a
+  different row every time, which is why both services have no `upsert`. See
+  `dev/issues/relative-expiry-breaks-idempotency.md`.
+* [ ] Decide whether `tsc --noEmit` joins `pnpm run lint`. `lint` is `biome ci .`,
+  which does not typecheck, so the enrolled-student 403 fixed in this release sat
+  in `main` through a whole refactor while `tsc` reported it at nine call sites
+  and CI stayed green.
+
 * [ ] Remove the generated openapi.json. Instead, we should generate once during 
   startup, cache it and serve this file
 
@@ -35,6 +48,15 @@ Backlog items are categorized in sections, not on priority.
 * [ ] Add support for RPC since rest cant handle everything.
 * [ ] Check options for RPC UI. Use openapi? Is there a better alternative? 
   Is gRPC too much trouble?
+* [ ] Extend the natural-key REST addressing to the course-scoped subtree:
+  `resource`, `time-slot`, `calendar-event`, `passphrase` and `exam`. Their
+  `*Ref` schemas are `{ courseId: number, slug }`, so the CLI still has to
+  resolve a numeric course id before it can touch anything inside a course.
+  Nest them under the course path
+  (`/api/course/<discipline>/<instructor>_<edition>/resource/<slug>`) reusing
+  the multi-segment PK mechanism added for `/api/course`. Once every endpoint
+  is addressable naturally, drop `id` from the REST responses (but never from
+  `courseSchema`, which the frontend and services keep using).
 
 ## Features
 

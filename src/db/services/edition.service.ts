@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { canManageEditions } from "@/auth/permissions";
-import { NotAllowed } from "@/core/error";
-import { EDITION_RE } from "@/utils/course-url";
+import type { Actor } from "@/core/actor";
+import { type ActionCode, NotAllowed } from "@/core/error";
 import { Validate } from "@/utils/validate";
 import {
 	editionCreate,
@@ -9,6 +9,7 @@ import {
 	editionPK,
 	editionSchema,
 	editionUpdate,
+	editionUpsert,
 } from "../../core/schemas";
 import type { Crud, ServiceOpts } from "../base-service";
 import { type PrismaClient, prisma } from "../client";
@@ -21,6 +22,7 @@ export type Edition = z.infer<typeof editionSchema>;
 export type EditionFilter = z.infer<typeof editionFilter>;
 export type EditionPK = z.infer<typeof editionPK>;
 export type EditionUpdate = z.infer<typeof editionUpdate>;
+export type EditionUpsert = z.infer<typeof editionUpsert>;
 
 /**
  * Every user sees every edition — they are labels on courses, not secrets —
@@ -37,6 +39,7 @@ class EditionService
 			create: EditionCreate;
 			filter: EditionFilter;
 			update: EditionUpdate;
+			upsert: EditionUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -53,16 +56,11 @@ class EditionService
 	 */
 	@Validate({ service: true, returns: editionSchema, args: [editionCreate] })
 	async create(input: EditionCreate, opts: ServiceOpts): Promise<Edition> {
-		if (!canManageEditions(opts.actor)) {
-			throw new NotAllowed({ action: "create-edition" });
-		}
-		if (!EDITION_RE.test(input.slug)) {
-			throw new Error(
-				`"${input.slug}" is not a valid edition slug: it should be a URL-safe name with no spaces, e.g. 2026 or 2026-1.`,
-			);
-		}
-		assertWindow(input.startAt, input.endAt);
 		const client = opts.tx ?? this.prisma;
+
+		assertCanWriteEdition(opts.actor, "create-edition");
+		assertWindow(input.startAt, input.endAt);
+
 		return client.edition.create({
 			data: {
 				slug: input.slug,
@@ -126,9 +124,7 @@ class EditionService
 		fields: EditionUpdate,
 		opts: ServiceOpts,
 	): Promise<Edition> {
-		if (!canManageEditions(opts.actor)) {
-			throw new NotAllowed({ action: "update-edition" });
-		}
+		assertCanWriteEdition(opts.actor, "update-edition");
 		const client = opts.tx ?? this.prisma;
 		const current = await client.edition.findUnique({
 			where: { slug: filter.slug },
@@ -143,6 +139,40 @@ class EditionService
 		return client.edition.update({
 			where: { slug: filter.slug },
 			data: fields,
+		});
+	}
+
+	/**
+	 * Upserts an edition keyed on `slug`: creates it if absent, else updates
+	 * its editable fields.
+	 *
+	 * Same permission and window checks as `create`/`update`, run once via
+	 * {@link assertCanWriteEdition}/{@link assertWindow} regardless of which
+	 * branch Prisma takes.
+	 */
+	@Validate({
+		service: true,
+		args: [editionUpsert],
+		returns: editionSchema,
+	})
+	upsert(input: EditionUpsert, opts: ServiceOpts): Promise<Edition> {
+		assertCanWriteEdition(opts.actor, "upsert-edition");
+		assertWindow(input.startAt, input.endAt);
+		const client = opts.tx ?? this.prisma;
+
+		return client.edition.upsert({
+			where: { slug: input.slug },
+			update: {
+				name: input.name,
+				startAt: input.startAt,
+				endAt: input.endAt,
+			},
+			create: {
+				slug: input.slug,
+				name: input.name,
+				startAt: input.startAt,
+				endAt: input.endAt,
+			},
 		});
 	}
 
@@ -175,6 +205,17 @@ function assertWindow(startAt: Date, endAt: Date): void {
 	if (startAt >= endAt) {
 		throw new Error("An edition's startAt must be before its endAt.");
 	}
+}
+
+/**
+ * Enforces {@link canManageEditions}, tagged with `action`.
+ *
+ * Shared by `create`/`update`/`upsert`: editions are shared infrastructure —
+ * their slugs appear in every course URL — so every write path carries the
+ * same admin-only rule.
+ */
+function assertCanWriteEdition(actor: Actor, action: ActionCode): void {
+	if (!canManageEditions(actor)) throw new NotAllowed({ action });
 }
 
 /** Whether `edition`'s active window contains `at` (default: now). */

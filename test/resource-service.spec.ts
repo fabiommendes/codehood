@@ -371,3 +371,101 @@ test("delete removes the resource row; the File it pointed at survives, because 
 	const survivor = await fileService.findOne({ id: file.id }, FULL_ACCESS);
 	expect(survivor?.deletedAt).toBeNull();
 });
+
+test("upsert creates on first call, updates the same resource on the second, and a different slug creates a separate resource", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+
+	const created = await resourceService.upsert(
+		{
+			courseId: course.id,
+			slug: "upsert-resource",
+			type: "LINK",
+			title: "Before",
+			description: "d1",
+			data: "https://example.com/before",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+	expect(created.title).toBe("Before");
+	expect(created.description).toBe("d1");
+
+	const updated = await resourceService.upsert(
+		{
+			courseId: course.id,
+			slug: "upsert-resource",
+			type: "LINK",
+			title: "After",
+			description: null,
+			data: "https://example.com/before",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+	expect(updated.id).toBe(created.id); // same key, same row
+	expect(updated.title).toBe("After"); // changed
+	expect(updated.description).toBeNull(); // cleared
+	expect(updated.data).toBe("https://example.com/before"); // untouched
+
+	const other = await resourceService.upsert(
+		{
+			courseId: course.id,
+			slug: "upsert-resource-2",
+			type: "LINK",
+			title: "Other",
+			data: "https://example.com/other",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+	expect(other.id).not.toBe(created.id);
+});
+
+test("upsert enforces shape-by-type on both the create branch and the update branch", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+
+	await expect(
+		resourceService.upsert(
+			{
+				courseId: course.id,
+				slug: "shape-new",
+				type: "LINK",
+				title: "t",
+				contentHash: tag("h"),
+			},
+			opts,
+		),
+	).rejects.toThrow();
+
+	const existing = await resourceService.upsert(
+		{
+			courseId: course.id,
+			slug: "shape-existing",
+			type: "LINK",
+			title: "t",
+			data: "https://example.com",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+
+	await expect(
+		resourceService.upsert(
+			{
+				courseId: course.id,
+				slug: "shape-existing",
+				type: "CODE",
+				title: "t",
+				contentHash: tag("h"),
+			},
+			opts,
+		),
+	).rejects.toThrow();
+
+	const untouched = await resourceService.findOne({ id: existing.id }, opts);
+	expect(untouched?.type).toBe("LINK");
+});

@@ -122,3 +122,32 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 	await disciplineService.delete({ slug }, FULL_ACCESS);
 	expect(await disciplineService.findOne({ slug })).toBeNull();
 });
+
+test("upsert creates on first call, updates the same row in place on the second, and a different slug creates a separate row", async () => {
+	const created = await disciplineService.upsert(
+		{ slug: "disc-upsert", name: "Before" },
+		FULL_ACCESS,
+	);
+	expect(created.slug).toBe("disc-upsert");
+	expect(created.name).toBe("Before");
+
+	const updated = await disciplineService.upsert(
+		{ slug: "disc-upsert", name: "After" },
+		FULL_ACCESS,
+	);
+	expect(updated.slug).toBe("disc-upsert"); // same key, same row
+	expect(updated.name).toBe("After"); // changed
+
+	const sameSlug = await disciplineService.findMany({ slugs: ["disc-upsert"] });
+	expect(sameSlug).toHaveLength(1);
+
+	const other = await disciplineService.upsert(
+		{ slug: "disc-upsert-2", name: "Other" },
+		FULL_ACCESS,
+	);
+	expect(other.slug).toBe("disc-upsert-2");
+	const both = await disciplineService.findMany({
+		slugs: ["disc-upsert", "disc-upsert-2"],
+	});
+	expect(both).toHaveLength(2);
+});

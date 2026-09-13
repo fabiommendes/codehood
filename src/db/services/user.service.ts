@@ -6,19 +6,26 @@ import {
 	canViewUser,
 	userVisibility,
 } from "@/auth/permissions";
+import type { Actor } from "@/core/actor";
 import { SYSTEM } from "@/core/actor";
-import { NotAllowed } from "@/core/error";
+import { type ActionCode, NotAllowed } from "@/core/error";
 import {
 	userCreate,
 	type userFilter,
 	userPK,
 	userSchema,
 	userUpdate,
+	userUpsert,
 } from "@/core/schemas";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
-import type { Crud, ServiceOpts } from "../base-service";
-import { type User as DbUser, type PrismaClient, prisma } from "../client";
+import { type Crud, type ServiceOpts, upsert } from "../base-service";
+import {
+	type User as DbUser,
+	type PrismaClient,
+	type PrismaTx,
+	prisma,
+} from "../client";
 
 export type { UserId } from "@/core/schemas";
 
@@ -30,6 +37,7 @@ export type User = z.infer<typeof userSchema>;
 export type UserFilter = z.infer<typeof userFilter>;
 export type UserPK = z.infer<typeof userPK>;
 export type UserUpdate = z.infer<typeof userUpdate>;
+export type UserUpsert = z.infer<typeof userUpsert>;
 
 class UserService
 	implements
@@ -39,6 +47,7 @@ class UserService
 			create: UserCreate;
 			filter: UserFilter;
 			update: UserUpdate;
+			upsert: UserUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -52,8 +61,7 @@ class UserService
 	 */
 	@Validate({ service: true, returns: userSchema, args: [userCreate] })
 	async create(input: UserCreate, opts: ServiceOpts): Promise<User> {
-		if (!canCreateUser(opts.actor))
-			throw new NotAllowed({ action: "create-user" });
+		assertCanCreateUser(opts.actor);
 
 		const isAdmin = input.role === "ADMIN";
 		if (!input.githubId && !isAdmin)
@@ -157,12 +165,67 @@ class UserService
 			throw new NotAllowed({ action: "update-user" });
 
 		const client = opts.tx ?? this.prisma;
+		const { githubId, schoolId, ...rest } = payload;
 		return toUser(
 			await client.user.update({
 				where: { username: target.username },
-				data: payload,
+				data: {
+					...rest,
+					githubId: mask(githubId, target.username),
+					schoolId: mask(schoolId, target.username),
+				},
 			}),
 		);
+	}
+
+	/**
+	 * Upserts a user keyed on `username`: creates one if absent, else updates
+	 * `name`/`email`/`githubId`/`schoolId`.
+	 *
+	 * PUT semantics: admin-only whether creating or updating — the create
+	 * permission ({@link assertCanCreateUser}) is enforced on the update
+	 * branch too, so a student cannot reach a wider write through `upsert`
+	 * than `update` already grants for their own profile. `password`, absent
+	 * from `UserUpdate`, is applied as a second write when given; omitted, the
+	 * stored hash is left alone.
+	 */
+	@Validate({ service: true, returns: userSchema, args: [userUpsert] })
+	async upsert(input: UserUpsert, opts: ServiceOpts): Promise<User> {
+		const run = async (tx: PrismaTx): Promise<User> => {
+			const scoped: ServiceOpts = { ...opts, tx };
+
+			// `assertCreatable` runs on the update branch only, so it doubles as
+			// the signal for which branch `upsert` took. `create` already stores
+			// the password; re-running `updatePassword` after it would hash twice
+			// and apply strength rules `create` does not.
+			let existed = false;
+
+			const user = await upsert(
+				this.prisma,
+				this,
+				input,
+				scoped,
+				{
+					pk: (i) => ({ username: i.username }),
+					update: (i) => ({
+						name: i.name,
+						email: i.email,
+						githubId: i.githubId,
+						schoolId: i.schoolId,
+					}),
+					assertCreatable: (_i, o) => {
+						existed = true;
+						assertCanCreateUser(o.actor, "upsert-user");
+					},
+				},
+				"upsert-user",
+			);
+
+			if (!existed || input.password === undefined) return user;
+			const { hash } = await this.updatePassword(user, input.password, scoped);
+			return { ...user, passwordHash: hash };
+		};
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction((tx) => run(tx));
 	}
 
 	/**
@@ -230,6 +293,18 @@ export const userService = new UserService();
 // Auxiliary functions
 //
 
+/**
+ * Enforces {@link canCreateUser}, tagged with `action` — `create()`'s own
+ * check, and reused by `upsert()`'s update branch so a request that would
+ * fail as a fresh `create` fails the same way when the row already exists.
+ */
+function assertCanCreateUser(
+	actor: Actor,
+	action: ActionCode = "create-user",
+): void {
+	if (!canCreateUser(actor)) throw new NotAllowed({ action });
+}
+
 // The `schoolId`/`githubId` columns are NOT NULL @unique, so an account with
 // no real value stores this sentinel instead — see the comment on `User` in
 // schema.prisma. `unmask` reverses it back to `undefined` on the way out.
@@ -237,8 +312,22 @@ function nullSentinel(username: string): string {
 	return `!${username}`;
 }
 
-function unmask(value: string, username: string): string | undefined {
-	return value === nullSentinel(username) ? undefined : value;
+function unmask(value: string, username: string): string | null {
+	return value === nullSentinel(username) ? null : value;
+}
+
+/**
+ * Maps a cleared external id back onto the sentinel the NOT NULL column holds.
+ *
+ * `undefined` means "not saying" and is left for Prisma to skip; `null` means
+ * "clear it" and becomes the sentinel.
+ */
+function mask(
+	value: string | null | undefined,
+	username: string,
+): string | undefined {
+	if (value === undefined) return undefined;
+	return value ?? nullSentinel(username);
 }
 
 // Convert a database user record to the public-facing user type.

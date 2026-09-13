@@ -29,9 +29,10 @@ import {
 	calendarEventPK,
 	calendarEventSchema,
 	calendarEventUpdate,
+	calendarEventUpsert,
 	type TimeSlotId,
 } from "../../core/schemas";
-import type { Crud, ServiceOpts } from "../base-service";
+import { type Crud, type ServiceOpts, upsert } from "../base-service";
 import {
 	type Prisma,
 	type PrismaClient,
@@ -51,6 +52,7 @@ export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 export type CalendarEventFilter = z.infer<typeof calendarEventFilter>;
 export type CalendarEventPK = z.infer<typeof calendarEventPK>;
 export type CalendarEventUpdate = z.infer<typeof calendarEventUpdate>;
+export type CalendarEventUpsert = z.infer<typeof calendarEventUpsert>;
 export type EventKind = CalendarEvent["kind"];
 export type LinkedExam = NonNullable<CalendarEvent["exam"]>;
 
@@ -92,6 +94,7 @@ class CalendarEventService
 			create: CalendarEventCreate;
 			filter: CalendarEventFilter;
 			update: CalendarEventUpdate;
+			upsert: CalendarEventUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -328,6 +331,45 @@ class CalendarEventService
 	}
 
 	/**
+	 * Upserts an event keyed on `{courseId, slug}`.
+	 *
+	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
+	 * or updating, same as `create`/`update`; the weekday-match and
+	 * slot-day-collision checks re-run on whichever branch fires, since
+	 * `date` is always present in `CalendarEventUpsert`.
+	 */
+	@Validate({
+		service: true,
+		returns: calendarEventSchema,
+		args: [calendarEventUpsert],
+	})
+	async upsert(
+		input: CalendarEventUpsert,
+		opts: ServiceOpts,
+	): Promise<CalendarEvent> {
+		return upsert(
+			this.prisma,
+			this,
+			input,
+			opts,
+			{
+				pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
+				assertCreatable: async (i, o) => {
+					const client = o.tx ?? this.prisma;
+					const course = await client.course.findUnique({
+						where: { id: i.courseId },
+						select: { instructor: { select: { username: true } } },
+					});
+					if (!course || !canWriteCourseContent(o.actor, course)) {
+						throw new NotAllowed({ action: "upsert-calendar-event" });
+					}
+				},
+			},
+			"upsert-calendar-event",
+		);
+	}
+
+	/**
 	 * Removes the row outright — events are never archived (FR-CAL-014).
 	 *
 	 * A subsequent `findOne` returns `null`.
@@ -414,9 +456,7 @@ function maskExam(row: DbEvent, actor: Actor): CalendarEvent {
 		id: rest.id as CalendarEventId,
 		courseId: rest.courseId as CourseId,
 		timeSlotId: rest.timeSlotId as TimeSlotId,
-		// The column is nullable, the public type optional: an unlinked event
-		// carries no `examId` at all rather than an explicit null.
-		examId: rest.examId ?? undefined,
+		examId: rest.examId,
 		timeSlot: {
 			...rest.timeSlot,
 			id: rest.timeSlot.id as TimeSlotId,

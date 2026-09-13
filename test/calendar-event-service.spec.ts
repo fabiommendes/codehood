@@ -443,7 +443,7 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 
 	const courseShape = {
 		instructor: { username: instructor.username },
-		enrollments: [{ username: active.username, name: "" }],
+		enrollments: [{ userId: active.username }],
 	};
 	const actors = [
 		{ label: "SYSTEM", actor: SYSTEM },
@@ -524,4 +524,128 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 		{ actor: student },
 	);
 	expect(asStudentAfterPublish?.exam?.id).toBe(exam.id);
+});
+
+test("upsert creates on first call, updates the same event on the second, and a different slug creates a separate event", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts);
+
+	const created = await calendarEventService.upsert(
+		{
+			courseId: course.id,
+			timeSlotId: slot.id,
+			slug: "upsert-event",
+			date: "2026-01-05", // Monday, matches the slot
+			week: 1,
+			title: "Before",
+			description: "d1",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+	expect(created.title).toBe("Before");
+	expect(created.description).toBe("d1");
+
+	const updated = await calendarEventService.upsert(
+		{
+			courseId: course.id,
+			timeSlotId: slot.id,
+			slug: "upsert-event",
+			date: "2026-01-05",
+			week: 1,
+			title: "After",
+			description: null,
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+	expect(updated.id).toBe(created.id); // same key, same row
+	expect(updated.title).toBe("After"); // changed
+	expect(updated.description).toBeNull(); // cleared
+	expect(updated.startAt.getTime()).toBe(created.startAt.getTime()); // untouched
+
+	const other = await calendarEventService.upsert(
+		{
+			courseId: course.id,
+			timeSlotId: slot.id,
+			slug: "upsert-event-2",
+			date: "2026-01-12",
+			week: 2,
+			title: "Other",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+	expect(other.id).not.toBe(created.id);
+});
+
+test("upsert enforces the weekday-match and slot-day-collision rules, but not against the event's own current row", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts); // MONDAY
+
+	// 2026-01-06 is a Tuesday; the slot is MONDAY.
+	await expect(
+		calendarEventService.upsert(
+			{
+				courseId: course.id,
+				timeSlotId: slot.id,
+				slug: "weekday-mismatch",
+				date: "2026-01-06",
+				week: 1,
+				title: "t",
+				contentHash: tag("h"),
+			},
+			opts,
+		),
+	).rejects.toThrow();
+
+	const existing = await calendarEventService.upsert(
+		{
+			courseId: course.id,
+			timeSlotId: slot.id,
+			slug: "day-collision-existing",
+			date: "2026-01-05",
+			week: 1,
+			title: "Existing",
+			contentHash: tag("h"),
+		},
+		opts,
+	);
+
+	// A different event on the same slot, same local day, is refused.
+	await expect(
+		calendarEventService.upsert(
+			{
+				courseId: course.id,
+				timeSlotId: slot.id,
+				slug: "day-collision-new",
+				date: "2026-01-05",
+				startMin: 900,
+				week: 1,
+				title: "New",
+				contentHash: tag("h"),
+			},
+			opts,
+		),
+	).rejects.toThrow();
+
+	// Re-upserting the existing event on the same day must not collide with itself.
+	await expect(
+		calendarEventService.upsert(
+			{
+				courseId: course.id,
+				timeSlotId: slot.id,
+				slug: "day-collision-existing",
+				date: "2026-01-05",
+				week: 1,
+				title: "Existing, resynced",
+				contentHash: tag("h"),
+			},
+			opts,
+		),
+	).resolves.toMatchObject({ id: existing.id, title: "Existing, resynced" });
 });

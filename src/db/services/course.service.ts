@@ -10,7 +10,7 @@ import {
 	courseVisibility,
 } from "@/auth/permissions";
 import { type Actor, SYSTEM } from "@/core/actor";
-import { NotAllowed } from "@/core/error";
+import { type ActionCode, NotAllowed } from "@/core/error";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
@@ -21,11 +21,17 @@ import {
 	type courseRef,
 	courseSchema,
 	courseUpdate,
+	courseUpsert,
 	createCourseEnrollment,
 	userSchema,
 } from "../../core/schemas";
-import type { Crud, ServiceOpts } from "../base-service";
-import { type Prisma, type PrismaClient, prisma } from "../client";
+import { type Crud, type ServiceOpts, upsert } from "../base-service";
+import {
+	type Prisma,
+	type PrismaClient,
+	type PrismaTx,
+	prisma,
+} from "../client";
 import { isEditionOpen } from "./edition.service";
 import { toUser, type User } from "./user.service";
 
@@ -39,6 +45,7 @@ export type Course = z.infer<typeof courseSchema>;
 export type CourseFilter = z.infer<typeof courseFilter>;
 export type CoursePK = z.infer<typeof coursePK>;
 export type CourseUpdate = z.infer<typeof courseUpdate>;
+export type CourseUpsert = z.infer<typeof courseUpsert>;
 export type CourseEnrollment = z.infer<typeof createCourseEnrollment>;
 export type CourseRef = z.infer<typeof courseRef>;
 
@@ -74,6 +81,7 @@ class CourseService
 			create: CourseCreate;
 			filter: CourseFilter;
 			update: CourseUpdate;
+			upsert: CourseUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -94,28 +102,7 @@ class CourseService
 	@Validate({ service: true, returns: courseSchema, args: [courseCreate] })
 	async create(input: CourseCreate, opts: ServiceOpts): Promise<Course> {
 		const client = opts.tx ?? this.prisma;
-		const edition = await client.edition.findUnique({
-			where: { slug: input.edition },
-		});
-		if (!edition) {
-			throw new Error(
-				`No edition "${input.edition}". Editions are created by an admin.`,
-			);
-		}
-		if (!isEditionOpen(edition) && !canCreateCourseOutsideWindow(opts.actor)) {
-			throw new Error(
-				`Edition "${edition.slug}" is not accepting new courses: its window ran from ${edition.startAt.toISOString().slice(0, 10)} to ${edition.endAt.toISOString().slice(0, 10)}.`,
-			);
-		}
-		const instructorUser = await client.user.findUnique({
-			where: { username: input.instructor },
-		});
-		if (!instructorUser) {
-			throw new Error(`No user with username "${input.instructor}".`);
-		}
-		if (!canCreateCourseFor(opts.actor, instructorUser.username)) {
-			throw new NotAllowed({ action: "create-course" });
-		}
+		await assertCanCreateCourse(client, input, opts, { enforceWindow: true });
 		const row = await client.course.create({
 			data: {
 				disciplineSlug: input.discipline,
@@ -232,6 +219,42 @@ class CourseService
 			include: courseInclude,
 		});
 		return fromDb(row, opts.actor);
+	}
+
+	/**
+	 * Upserts a course keyed on `{discipline, instructor, edition}`.
+	 *
+	 * PUT semantics: {@link assertCanCreateCourse}'s permission (unknown
+	 * edition, unknown instructor, or an instructor naming someone else) is
+	 * enforced on the update branch too — but not the edition-window rule,
+	 * which is state-dependent rather than permission-dependent and stays
+	 * `create`-branch-only, or last term's material would become permanently
+	 * un-syncable.
+	 */
+	@Validate({ service: true, returns: courseSchema, args: [courseUpsert] })
+	async upsert(input: CourseUpsert, opts: ServiceOpts): Promise<Course> {
+		return upsert(
+			this.prisma,
+			this,
+			input,
+			opts,
+			{
+				pk: (i) => ({
+					ref: {
+						discipline: i.discipline,
+						instructor: i.instructor,
+						edition: i.edition,
+					},
+				}),
+				assertCreatable: async (i, o) => {
+					const client = o.tx ?? this.prisma;
+					await assertCanCreateCourse(client, i, o, {
+						action: "upsert-course",
+					});
+				},
+			},
+			"upsert-course",
+		);
 	}
 
 	/**
@@ -371,6 +394,51 @@ export function toEnrollmentView(course: Course): CourseWithEnrollment {
 //
 // Auxiliary functions
 //
+
+/**
+ * Looks up the edition and instructor `create`/`upsert` both need, and
+ * enforces {@link canCreateCourseFor}, tagged with `action`.
+ *
+ * `enforceWindow` gates the edition-window rule (see `create`'s doc): it is
+ * state-dependent, not permission-dependent, so `upsert`'s update branch
+ * leaves it off — the same request must not flip outcome depending on
+ * whether the row already exists.
+ */
+async function assertCanCreateCourse(
+	client: PrismaClient | PrismaTx,
+	input: Pick<CourseCreate, "edition" | "instructor">,
+	opts: ServiceOpts,
+	options: { action?: ActionCode; enforceWindow?: boolean } = {},
+) {
+	const { action = "create-course", enforceWindow = false } = options;
+	const edition = await client.edition.findUnique({
+		where: { slug: input.edition },
+	});
+	if (!edition) {
+		throw new Error(
+			`No edition "${input.edition}". Editions are created by an admin.`,
+		);
+	}
+	if (
+		enforceWindow &&
+		!isEditionOpen(edition) &&
+		!canCreateCourseOutsideWindow(opts.actor)
+	) {
+		throw new Error(
+			`Edition "${edition.slug}" is not accepting new courses: its window ran from ${edition.startAt.toISOString().slice(0, 10)} to ${edition.endAt.toISOString().slice(0, 10)}.`,
+		);
+	}
+	const instructorUser = await client.user.findUnique({
+		where: { username: input.instructor },
+	});
+	if (!instructorUser) {
+		throw new Error(`No user with username "${input.instructor}".`);
+	}
+	if (!canCreateCourseFor(opts.actor, instructorUser.username)) {
+		throw new NotAllowed({ action });
+	}
+	return { edition, instructor: instructorUser };
+}
 
 // The date `actor` joined the course: SYSTEM and anyone without an
 // enrollment row (the instructor, or an admin just looking) join at course

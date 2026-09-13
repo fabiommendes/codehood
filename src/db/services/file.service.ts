@@ -41,6 +41,7 @@ class FileService
 			create: FileCreate;
 			filter: FileFilter;
 			update: FileUpdate;
+			upsert: never;
 		}>
 {
 	prisma: PrismaClient;
@@ -160,6 +161,13 @@ class FileService
 				data: { mimeType: fields.mimeType },
 			}),
 		);
+	}
+
+	// No upsert: content-addressed — `slugHash` is derived from `bytes`, so
+	// "the row already exists" means the bytes are identical and there is
+	// nothing to update but `mimeType`.
+	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
+		throw new Error("Method not implemented.");
 	}
 
 	/**

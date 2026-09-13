@@ -4,6 +4,54 @@
 
 ### Added
 
+- Every service with a stable natural key now implements `upsert`, the PUT to
+  `update`'s PATCH and the primitive the CLI syncs with: `user` (on
+  `username`), `discipline` and `edition` (on `slug`), and `course`,
+  `time-slot`, `resource` and `calendar-event` (on their `ref`). It is keyed on
+  the natural key and never on `id`, so an upsert whose key does not match an
+  existing row creates one rather than renaming another. Permission follows PUT
+  semantics rather than the branch taken: create permission is required always,
+  update permission in addition when the row exists, so the same request is
+  allowed or refused regardless of what the server already holds. `api-key`,
+  `invite`, `session`, `file` and `passphrase` keep an explicit stub — the
+  first three mint a secret on create, `file` is content-addressed, and a
+  passphrase's value is generated rather than supplied.
+- `NotAllowed#as(action)` re-tags a refusal with the operation the actor asked
+  for, so an `upsert` refused by its own existence probe reports `upsert-user`
+  rather than the internal `read-user` step.
+
+### Changed
+
+- A create/update field over a nullable column is `.nullish()` rather than
+  `.optional()`: absent means keep the stored value, `null` means clear it.
+  `.optional()` alone could not express a deletion, so a description removed
+  locally could never be removed on the server. Affects `courseCreate`,
+  `timeSlotCreate`, `resourceCreate`/`resourceUpdate` and
+  `calendarEventUpdate`.
+- `User.githubId`/`schoolId` and `CalendarEvent.examId` are `null` when unset
+  rather than `undefined`; the sentinel `User` columns still hold `!<username>`
+  underneath, now masked in both directions.
+- `courseUpdate` and `disciplineUpdate` were missing `.partial()`, so PATCH-ing
+  a course demanded `description`, `startAt` and `endAt` on every call.
+
+### Fixed
+
+- `test/edition-service.spec.ts`'s `actorOf` built `{id, role}` where `Actor`
+  is `{username, role}`, so every actor in that file carried an undefined
+  username and any username-comparing permission check silently saw nothing.
+
+- `pnpm run stories` links the user-story catalogue to the tests that cover it.
+  It slugifies every story title in `docs/user-stories` and every test name in
+  `test/stories`, writes `docs/user-stories/coverage.md` from the match, and
+  with `--check` fails when a test names a story that no longer exists, when a
+  document has two titles that slugify the same, or when the report is stale.
+  `pnpm run lint` runs it, so renaming a story breaks the build until its test
+  is renamed too. `--missing` and `--covered` list the two halves of the split,
+  each story with its `status`, so `--missing | grep -v '[status: todo]'` names the
+  stories whose feature is built and whose test is not, and `--stale` lists the
+  tests a renamed story left behind. This replaces the
+  hand-edited `tested:` flag, which was set by a one-off script and would have
+  been wrong by the next rename.
 - The first question type is implemented end to end: `src/mdq/` turns a
   validated `MultipleChoice` into a graded score and a student-safe payload.
   `Question#score()` applies mdq.spec's grading strategies (`symmetric` by
@@ -196,8 +244,69 @@
   test as though login were broken — and wrote to the real dev database on the
   way past.
 
+### Fixed
+
+- Enrolled students could not open their own course. `canViewCourse` decided
+  enrollment with `e.username`, but the rows `courseInclude` loads have carried
+  `userId` since the branded-id refactor in `f1125e7`, so the comparison was
+  always `undefined === actor.username` and every actor who was neither admin
+  nor the course's instructor got a 403 on the course home, resources and
+  schedule. Its partner `courseVisibility` had been updated and filtered on
+  `userId` correctly, so the Permission pair had drifted apart, which is the
+  failure mode the pair exists to prevent. `CourseWithEnrollment.enrollments` is
+  now `{ userId }[]`, matching the schema. Nine pre-existing test failures went
+  green with it, the agreement test between the pair among them. `tsc` had been
+  reporting this at nine call sites the whole time; `pnpm run lint` is biome
+  only and does not typecheck, so the build stayed green.
+
+- `public/openapi.json` published Astro's `[id]` where OpenAPI wants `{id}`, and
+  declared no `parameters` at all, so every path parameter in the document was
+  undocumented and no generated client could fill one in.
+- Two test bugs that had been failing in place: `POST /api/course` in
+  `api-crud.spec.ts` sent `instructorUsername`/`editionSlug`, which
+  `courseCreate` does not have, and `course-url.spec.ts` still expected
+  `parseCourseSegment` to return `username` rather than `instructor`.
+
 ### Changed
 
+- The course REST endpoints are addressed by their natural key:
+  `/api/course/<discipline>/<instructor>_<edition>`, the same string
+  `courseHref()` builds for the web app, so the CLI constructs a course address
+  from local configuration instead of resolving an id first.
+  `/api/course/<id>` is gone. A malformed segment is a 400 rather than the
+  404 the web app returns — a person typing a URL cannot act on a 400 but the
+  CLI can. `CRUD()` grew `pkPath` and `parsePk` so a primary key can span
+  several path segments, which the course-scoped resources will reuse.
+- An error thrown inside a route handler is now serialized with
+  `responseFromException`, the same function `dynamicHandler.ts` uses for
+  anything thrown outside one, and returned flat instead of wrapped in an
+  internal `{ error, isError }` envelope. `NotFound` used to reach the client as
+  a stack trace under a blanket 400, because the old serializer dropped both
+  `code` and `status`.
+- `GET` on a primary key that names no row is a 404. It used to be a 200
+  carrying `null`, a body that satisfies no entity schema.
+- `userCreate` requires a username to match `USERNAME_RE`. The actions already
+  checked it, so `POST /api/user` was the one way left to create an account the
+  router cannot address. `userSchema` stays loose on purpose — see the new
+  input/output validation section in `docs/design/db-service-classes.md`.
+
+- The user-story catalogue is rewritten and cut from 81 stories to 53. Stories
+  that existed only to describe a failure are gone, folded into the story of the
+  thing the user was actually trying to do: redeeming a stale invite now lives
+  inside "Redeem a personal invite", the two 403 stories inside "See my courses",
+  the dead-file link inside "Browse course resources". Near-duplicates are merged
+  the same way, so drafting, scheduling and hiding an exam are one story rather
+  than three. `docs/user-stories/README.md` now says why, since the split was a
+  rule nobody had written down.
+- Story metadata collapses to `status` and `url`. `status` is `todo`,
+  `implemented`, or `web`/`cli` when only that half works, replacing the old
+  `implemented` and `tested` flags.
+  `priority` is dropped: it was `critical` or `high` on 61 of 81 stories and
+  therefore sorted nothing, and ROADMAP.md and BACKLOG.md already say what comes
+  next.
+- The story tests are merged to match, from 15 tests to 11, with no assertion
+  lost. Failure paths that were their own test are now a `test.step` inside the
+  story they interrupt.
 - `ApiKey`'s owner columns were renamed `username`/`user` → `createdById`/
   `createdBy`, and its entity schema now carries a `createdBy` `userInfo` object
   in place of `user`. `Invite.createdByUsername` → `createdById` followed, which

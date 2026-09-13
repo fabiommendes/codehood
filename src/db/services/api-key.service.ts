@@ -37,6 +37,7 @@ class ApiKeyService
 			create: ApiKeyCreate;
 			filter: ApiKeyFilter;
 			update: never;
+			upsert: never;
 		}>
 {
 	prisma: PrismaClient;
@@ -160,6 +161,12 @@ class ApiKeyService
 		throw new RuleViolation({
 			message: "Update method not implemented for API keys",
 		});
+	}
+
+	// No upsert: `create` mints a secret and returns a token-plus-entity
+	// wrapper, not the entity — re-minting a fresh key on every sync is wrong.
+	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
+		throw new Error("Method not implemented.");
 	}
 }
 

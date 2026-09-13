@@ -18,6 +18,7 @@ import type {
 	FindOne,
 	ServiceOpts,
 	Update,
+	Upsert,
 } from "../base-service";
 import {
 	type Prisma,
@@ -67,7 +68,8 @@ class InviteService
 		FindOne<InviteTokenFilter, Invite>,
 		FindMany<InviteFilter, Invite>,
 		Update<InvitePK, InviteUpdate, Invite>,
-		Delete<InvitePK>
+		Delete<InvitePK>,
+		Upsert<never, Invite>
 {
 	prisma: PrismaClient;
 
@@ -204,6 +206,13 @@ class InviteService
 			include: inviteInclude,
 		});
 		return fromDb(updated);
+	}
+
+	// No upsert: `create` mints a token and returns a token-plus-entity
+	// wrapper, not the entity — re-minting a fresh invite token on every sync
+	// is wrong.
+	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
+		throw new Error("Method not implemented.");
 	}
 
 	/**

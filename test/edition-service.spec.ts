@@ -7,8 +7,11 @@ import { disciplineService } from "@/db/services/discipline.service";
 import { editionService } from "@/db/services/edition.service";
 import { userService } from "@/db/services/user.service";
 
-function actorOf(id: UserId, role: "ADMIN" | "INSTRUCTOR" | "STUDENT"): Actor {
-	return { id, role } as unknown as Actor;
+function actorOf(
+	username: UserId,
+	role: "ADMIN" | "INSTRUCTOR" | "STUDENT",
+): Actor {
+	return { username, role } as unknown as Actor;
 }
 
 let uniq = 0;
@@ -207,4 +210,33 @@ test("courseService.create() enforces the window for instructors but not for adm
 		{ actor: actorOf("admin" as UserId, "ADMIN") },
 	);
 	expect(course.edition.slug).toBe(slug);
+});
+
+test("upsert creates on first call, updates the same row in place on the second, and a different slug creates a separate row", async () => {
+	const created = await editionService.upsert(
+		{ slug: "2201-1", name: "Before", ...WINDOW },
+		FULL_ACCESS,
+	);
+	expect(created.slug).toBe("2201-1");
+	expect(created.name).toBe("Before");
+
+	const newEndAt = new Date("2026-06-30");
+	const updated = await editionService.upsert(
+		{ slug: "2201-1", name: "After", startAt: WINDOW.startAt, endAt: newEndAt },
+		FULL_ACCESS,
+	);
+	expect(updated.name).toBe("After"); // changed
+	expect(updated.endAt).toEqual(newEndAt); // changed
+	expect(updated.startAt).toEqual(WINDOW.startAt); // untouched
+
+	const sameSlug = await editionService.findMany({ slugs: ["2201-1"] });
+	expect(sameSlug).toHaveLength(1);
+
+	const other = await editionService.upsert(
+		{ slug: "2201-2", name: "Other", ...WINDOW },
+		FULL_ACCESS,
+	);
+	expect(other.slug).toBe("2201-2");
+	const both = await editionService.findMany({ slugs: ["2201-1", "2201-2"] });
+	expect(both).toHaveLength(2);
 });

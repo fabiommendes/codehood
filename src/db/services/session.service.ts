@@ -11,7 +11,7 @@ import {
 	sessionDeletePK,
 	type sessionSchema,
 } from "../../core/schemas";
-import type { Create, Delete, ServiceOpts } from "../base-service";
+import type { Create, Delete, ServiceOpts, Upsert } from "../base-service";
 import { type PrismaClient, prisma } from "../client";
 
 export type { SessionId } from "../../core/schemas";
@@ -28,7 +28,10 @@ export type SessionCreateResult = z.infer<typeof sessionCreateResult>;
 export type SessionDeletePK = z.infer<typeof sessionDeletePK>;
 
 class SessionService
-	implements Create<SessionCreate, SessionCreateResult>, Delete<SessionDeletePK>
+	implements
+		Create<SessionCreate, SessionCreateResult>,
+		Delete<SessionDeletePK>,
+		Upsert<never, Session>
 {
 	prisma: PrismaClient;
 
@@ -63,6 +66,13 @@ class SessionService
 			},
 		});
 		return { token, session: toSession(session) };
+	}
+
+	// No upsert: `create` mints a token and returns a token-plus-entity
+	// wrapper, not the entity — re-minting a fresh session token on every sync
+	// is wrong. (No `update` either, hence placed here rather than below one.)
+	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
+		throw new Error("Method not implemented.");
 	}
 
 	/**

@@ -66,8 +66,14 @@ export interface NotAllowedResponse extends BaseErrorResponse {
 	actor?: string;
 }
 
-type ActionCodeAction = "create" | "read" | "update" | "delete" | "do";
-type ActionCode = `${ActionCodeAction}-${string}`;
+type ActionCodeAction =
+	| "create"
+	| "read"
+	| "update"
+	| "upsert"
+	| "delete"
+	| "do";
+export type ActionCode = `${ActionCodeAction}-${string}`;
 
 /**
  * The user request is invalid
@@ -285,6 +291,22 @@ export class NotAllowed extends BaseSerializableError<NotAllowedResponse> {
 		this.action = action;
 		this.target = target;
 		this.status = status;
+	}
+
+	/**
+	 * Returns a copy of this error re-tagged with a different action.
+	 *
+	 * Lets a caller report the operation the actor asked for rather than the
+	 * internal step that refused it — an `upsert` whose existence probe hits
+	 * `read-user` reports `upsert-user`.
+	 */
+	as(action: ActionCode): NotAllowed {
+		return new NotAllowed({
+			action,
+			message: this.message,
+			status: this.status,
+			target: this.target,
+		});
 	}
 
 	protected _toJsonExtra(): {

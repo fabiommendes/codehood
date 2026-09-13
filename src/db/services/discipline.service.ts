@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { canManageDisciplines } from "@/auth/permissions";
-import { NotAllowed } from "@/core/error";
+import type { Actor } from "@/core/actor";
+import { type ActionCode, NotAllowed } from "@/core/error";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/utils/course-url";
 import { Validate } from "@/utils/validate";
 import {
@@ -9,6 +10,7 @@ import {
 	disciplinePK,
 	disciplineSchema,
 	disciplineUpdate,
+	disciplineUpsert,
 } from "../../core/schemas";
 import type { Crud, ServiceOpts } from "../base-service";
 import { type PrismaClient, prisma } from "../client";
@@ -21,6 +23,7 @@ export type Discipline = z.infer<typeof disciplineSchema>;
 export type DisciplineFilter = z.infer<typeof disciplineFilter>;
 export type DisciplinePK = z.infer<typeof disciplinePK>;
 export type DisciplineUpdate = z.infer<typeof disciplineUpdate>;
+export type DisciplineUpsert = z.infer<typeof disciplineUpsert>;
 
 /**
  * Every discipline is public — there is no catalog-visibility rule — so
@@ -38,6 +41,7 @@ class DisciplineService
 			create: DisciplineCreate;
 			filter: DisciplineFilter;
 			update: DisciplineUpdate;
+			upsert: DisciplineUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -97,17 +101,7 @@ class DisciplineService
 		input: DisciplineCreate,
 		opts: ServiceOpts,
 	): Promise<Discipline> {
-		if (!canManageDisciplines(opts.actor)) {
-			throw new NotAllowed({ action: "create-discipline" });
-		}
-		if (
-			!DISCIPLINE_SLUG_RE.test(input.slug) ||
-			RESERVED_SLUGS.has(input.slug)
-		) {
-			throw new Error(
-				`"${input.slug}" is not a valid discipline slug: it must match ${DISCIPLINE_SLUG_RE} and not be a reserved name.`,
-			);
-		}
+		assertCanWriteDiscipline(opts.actor, input.slug, "create-discipline");
 		const client = opts.tx ?? this.prisma;
 		return client.discipline.create({
 			data: { slug: input.slug, name: input.name },
@@ -132,9 +126,7 @@ class DisciplineService
 		fields: DisciplineUpdate,
 		opts: ServiceOpts,
 	): Promise<Discipline> {
-		if (!canManageDisciplines(opts.actor)) {
-			throw new NotAllowed({ action: "update-discipline" });
-		}
+		assertCanWriteDiscipline(opts.actor, filter.slug, "update-discipline");
 		const client = opts.tx ?? this.prisma;
 		const current = await client.discipline.findUnique({
 			where: { slug: filter.slug },
@@ -145,6 +137,29 @@ class DisciplineService
 		return client.discipline.update({
 			where: { slug: filter.slug },
 			data: { name: fields.name },
+		});
+	}
+
+	/**
+	 * Upserts a discipline keyed on `slug`: creates it if absent, else updates
+	 * its `name`.
+	 *
+	 * Same permission and slug-validation rule as `create`/`update`, run once
+	 * via {@link assertCanWriteDiscipline} regardless of which branch Prisma
+	 * takes.
+	 */
+	@Validate({
+		service: true,
+		returns: disciplineSchema,
+		args: [disciplineUpsert],
+	})
+	upsert(input: DisciplineUpsert, opts: ServiceOpts): Promise<Discipline> {
+		assertCanWriteDiscipline(opts.actor, input.slug, "upsert-discipline");
+		const client = opts.tx ?? this.prisma;
+		return client.discipline.upsert({
+			where: { slug: input.slug },
+			update: { name: input.name },
+			create: { slug: input.slug, name: input.name },
 		});
 	}
 
@@ -175,3 +190,28 @@ class DisciplineService
 }
 
 export const disciplineService = new DisciplineService();
+
+//
+// Auxiliary functions
+//
+
+/**
+ * Enforces {@link canManageDisciplines} and rejects a slug that doesn't
+ * match {@link DISCIPLINE_SLUG_RE} or that names a reserved route.
+ *
+ * Shared by `create`/`update`/`upsert`: a discipline slug occupies the root
+ * URL namespace shared with every system route, so every write path carries
+ * the same rule.
+ */
+function assertCanWriteDiscipline(
+	actor: Actor,
+	slug: string,
+	action: ActionCode,
+): void {
+	if (!canManageDisciplines(actor)) throw new NotAllowed({ action });
+	if (!DISCIPLINE_SLUG_RE.test(slug) || RESERVED_SLUGS.has(slug)) {
+		throw new Error(
+			`"${slug}" is not a valid discipline slug: it must match ${DISCIPLINE_SLUG_RE} and not be a reserved name.`,
+		);
+	}
+}
