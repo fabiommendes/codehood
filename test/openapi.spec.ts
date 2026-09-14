@@ -43,3 +43,44 @@ test("GET /api/docs/vendor/<anything not allowlisted> is a 404, not a path trave
 	);
 	expect(traversal.status()).toBe(404);
 });
+
+test("resources are documented only under their course, and never offer the course as a field", () => {
+	const paths = buildOpenApiDocument().paths ?? {};
+	const collection = paths["/api/course/{discipline}/{course}/resource"];
+	const item = paths["/api/course/{discipline}/{course}/resource/{slug}"];
+
+	expect(
+		Object.keys(paths).filter((p) => p.startsWith("/api/resource")),
+	).toEqual([]);
+	expect(Object.keys(collection ?? {}).sort()).toEqual(["get", "post"]);
+	expect(Object.keys(item ?? {}).sort()).toEqual([
+		"delete",
+		"get",
+		"patch",
+		"put",
+	]);
+
+	const queryNames = (collection?.get?.parameters ?? [])
+		.map((p) => ("name" in p ? p.name : ""))
+		.filter((name) => !["discipline", "course"].includes(name));
+	expect(queryNames).not.toContain("courseId");
+	expect(queryNames.some((name) => name.startsWith("courseRef"))).toBe(false);
+
+	const bodyFields = (operation: typeof item.put) => {
+		const body = operation?.requestBody;
+		const schema =
+			body && "content" in body
+				? body.content["application/json"]?.schema
+				: undefined;
+		return Object.keys(
+			(schema && "properties" in schema ? schema.properties : undefined) ?? {},
+		);
+	};
+	expect(bodyFields(collection?.post)).not.toContain("courseId");
+	expect(bodyFields(collection?.post)).not.toContain("courseRef");
+	expect(bodyFields(collection?.post)).toContain("slug");
+	expect(bodyFields(item?.put)).toEqual(
+		expect.not.arrayContaining(["courseId", "courseRef", "slug"]),
+	);
+	expect(bodyFields(item?.put)).toContain("title");
+});

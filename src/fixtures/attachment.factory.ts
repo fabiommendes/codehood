@@ -1,5 +1,5 @@
 import { faker } from "@faker-js/faker";
-import { Factory } from "fishery";
+import { type DeepPartial, Factory } from "fishery";
 import {
 	type Attachment,
 	type AttachmentCreate,
@@ -9,7 +9,7 @@ import { type PersistParams, serviceOpts } from "./support";
 
 function buildAttachment(
 	sequence: number,
-	params: Partial<AttachmentCreate>,
+	params: DeepPartial<AttachmentCreate>,
 ): AttachmentCreate {
 	return {
 		bytes: Buffer.from(`${faker.lorem.paragraphs(2)} ${sequence}`, "utf-8"),

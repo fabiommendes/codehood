@@ -115,6 +115,16 @@ instructor only, `/roster` and `/manage` — one tab strip, on every page,
 built by `courseTabs()`. The [REST API](#rest-api) takes the same address under
 `/api/course/`, so the CLI builds one string for both.
 
+## Course-scoped endpoint
+
+Type: platform 
+Code: `parseScope` in `src/api/registry/index.ts`
+
+A [REST API](#rest-api) endpoint nested under a course's
+[Course URL](#course-url), e.g. `/api/course/cs101/ada_2026-1/resource/syllabus`.
+The path names the course, so the body and query never carry it. A course the
+actor may not see is a 403, lists included.
+
 ## Discipline
 
 Also: subject 

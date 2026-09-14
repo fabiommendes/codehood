@@ -29,7 +29,7 @@ identity and the only one the URL, the disk path and the CLI use.
   use-site, carrying `filename`, `mimeType`, uploader and polymorphic owner).
 - `BlobService` and `AttachmentService` in `src/db/services/`, full CRUD per
   `docs/design/db-service-classes.md`. Neither is routed.
-- `POST /api/resource` accepts `application/json` and `multipart/form-data`
+- `POST /api/course/<discipline>/<instructor>_<edition>/resource` accepts `application/json` and `multipart/form-data`
   from the same operation; the multipart branch carries the bytes.
 - Per-role quotas from env vars, plus `AttachmentService.usageBytes(username)`.
 - `BlobService.collectGarbage()` and a `manage gc-blobs` command.
@@ -143,17 +143,17 @@ API only exposes the higher-level resource, which calls both services inside one
 
 `requestBody.content` in OpenAPI 3.x is a map of media type to schema, so a
 single operation legitimately documents both. Swagger UI renders a media-type
-dropdown. `POST /api/resource` therefore keeps one `operationId` and branches on
+dropdown. `POST /api/course/<discipline>/<instructor>_<edition>/resource` therefore keeps one `operationId` and branches on
 `Content-Type`:
 
 ```
-POST /api/resource
+POST /api/course/cs101/ada_2026-1/resource
 Content-Type: multipart/form-data; boundary=----abc
 
 ------abc
 Content-Disposition: form-data; name="slug"
 
-week1/handout
+week1-handout
 ------abc
 Content-Disposition: form-data; name="title"
 

@@ -469,3 +469,204 @@ test("upsert enforces shape-by-type on both the create branch and the update bra
 	const untouched = await resourceService.findOne({ id: existing.id }, opts);
 	expect(untouched?.type).toBe("LINK");
 });
+
+function courseRefOf(course: Awaited<ReturnType<typeof makeCourse>>) {
+	return {
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	};
+}
+
+test("findOne addresses a resource by its course's natural key and slug", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const created = await resourceService.create(
+		{
+			courseId: course.id,
+			slug: "syllabus",
+			type: "LINK",
+			title: "Syllabus",
+			data: "https://example.com",
+			contentHash: tag("h"),
+		},
+		{ actor: instructor },
+	);
+
+	const found = await resourceService.findOne(
+		{ ref: { courseRef: courseRefOf(course), slug: "syllabus" } },
+		{ actor: instructor },
+	);
+	expect(found?.id).toBe(created.id);
+});
+
+async function statusOf(promise: Promise<unknown>) {
+	try {
+		await promise;
+	} catch (error) {
+		return (error as { status?: number }).status;
+	}
+	return "resolved";
+}
+
+test("findOne by course ref: 404 for no such course, 403 for a course the actor cannot see even if the slug is missing, null for a missing slug", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const outsider = await makeUser("STUDENT");
+	const course = await makeCourse(instructor.username);
+	const courseRef = courseRefOf(course);
+
+	expect(
+		await statusOf(
+			resourceService.findOne(
+				{
+					ref: {
+						courseRef: { ...courseRef, discipline: tag("nope") },
+						slug: "x",
+					},
+				},
+				{ actor: instructor },
+			),
+		),
+	).toBe(404);
+	expect(
+		await statusOf(
+			resourceService.findOne(
+				{ ref: { courseRef, slug: "missing" } },
+				{ actor: outsider },
+			),
+		),
+	).toBe(403);
+	await expect(
+		resourceService.findOne(
+			{ ref: { courseRef, slug: "missing" } },
+			{ actor: instructor },
+		),
+	).resolves.toBeNull();
+});
+
+test("findMany by course ref: 404 for no such course, 403 for a course the actor cannot see, while by courseId it stays an empty list", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const outsider = await makeUser("STUDENT");
+	const course = await makeCourse(instructor.username);
+	const courseRef = courseRefOf(course);
+	await resourceService.create(
+		{
+			courseId: course.id,
+			slug: "syllabus",
+			type: "LINK",
+			title: "Syllabus",
+			data: "https://example.com",
+			contentHash: tag("h"),
+		},
+		{ actor: instructor },
+	);
+
+	expect(
+		await statusOf(
+			resourceService.findMany(
+				{ courseRef: { ...courseRef, discipline: tag("nope") } },
+				{ actor: instructor },
+			),
+		),
+	).toBe(404);
+	expect(
+		await statusOf(
+			resourceService.findMany({ courseRef }, { actor: outsider }),
+		),
+	).toBe(403);
+	await expect(
+		resourceService.findMany({ courseId: course.id }, { actor: outsider }),
+	).resolves.toEqual([]);
+	await expect(
+		resourceService.findMany({ courseRef }, { actor: instructor }),
+	).resolves.toHaveLength(1);
+});
+
+test("create and upsert accept a course ref in place of courseId", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const courseRef = courseRefOf(course);
+	const opts = { actor: instructor };
+	const link = {
+		type: "LINK" as const,
+		title: "t",
+		data: "https://example.com",
+		contentHash: tag("h"),
+	};
+
+	const created = await resourceService.create(
+		{ courseRef, slug: "by-ref", ...link },
+		opts,
+	);
+	expect(created.courseId).toBe(course.id);
+
+	const first = await resourceService.upsert(
+		{ courseRef, slug: "upsert-by-ref", ...link, title: "Before" },
+		opts,
+	);
+	const second = await resourceService.upsert(
+		{ courseRef, slug: "upsert-by-ref", ...link, title: "After" },
+		opts,
+	);
+	expect(second.id).toBe(first.id);
+	expect(second.title).toBe("After");
+});
+
+test("create: 400 without a course or with both courseId and courseRef, 404 for a course ref naming no course", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const courseRef = courseRefOf(course);
+	const opts = { actor: instructor };
+	const link = {
+		type: "LINK" as const,
+		title: "t",
+		data: "https://example.com",
+		contentHash: tag("h"),
+	};
+
+	expect(
+		await statusOf(resourceService.create({ slug: "none", ...link }, opts)),
+	).toBe(400);
+	expect(
+		await statusOf(
+			resourceService.create(
+				{ courseId: course.id, courseRef, slug: "both", ...link },
+				opts,
+			),
+		),
+	).toBe(400);
+	expect(
+		await statusOf(
+			resourceService.create(
+				{
+					courseRef: { ...courseRef, discipline: tag("nope") },
+					slug: "ghost",
+					...link,
+				},
+				opts,
+			),
+		),
+	).toBe(404);
+});
+
+for (const slug of ["week-01/notes", "Syllabus", "-lead", "has space", ""]) {
+	test(`create rejects the slug ${JSON.stringify(slug)} with a 400`, async () => {
+		const instructor = await makeUser("INSTRUCTOR");
+		const course = await makeCourse(instructor.username);
+		expect(
+			await statusOf(
+				resourceService.create(
+					{
+						courseId: course.id,
+						slug,
+						type: "LINK",
+						title: "t",
+						data: "https://example.com",
+						contentHash: tag("h"),
+					},
+					{ actor: instructor },
+				),
+			),
+		).toBe(400);
+	});
+}

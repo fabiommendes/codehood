@@ -108,6 +108,19 @@ runs (`.github/workflows/ci.yml`), so a task is not finished while it fails.
 Checking only the files you touched is not enough — CI lints the whole project,
 so run it project-wide.
 
+`pnpm run lint` is three checks, and Biome is only the first:
+
+```
+biome ci .                # style and lint rules
+pnpm run typecheck        # tsc --noEmit
+pnpm run stories --check  # story catalogue against test names
+```
+
+Biome does not typecheck. A type error passes `biome ci .` happily, which is how
+a broken `canViewCourse` and a broken question fixture both reached `main` while
+CI stayed green. If you changed a type, a service signature or a Prisma model,
+run `pnpm run typecheck` yourself rather than trusting a green Biome run.
+
 ## Astro Development
 
 When starting the dev server, use background mode:
@@ -164,14 +177,13 @@ repeat a format rule there that the create/update schema already enforces. See
 Some installed skills assume a file layout this project does not use. Map them
 onto what exists here instead of creating parallel structure:
 
-| Skill expects     | Use instead                                        |
-| :---------------- | :------------------------------------------------- |
-| `CONTEXT.md`      | `GLOSSARY.md` (terms only, alphabetical, succint)  |
-| `docs/adr/*.md`   | `dev/specs/` (design decisions and rationale)      |
+| Skill expects   | Use instead                                       |
+| :-------------- | :------------------------------------------------ |
+| `CONTEXT.md`    | `GLOSSARY.md` (terms only, alphabetical, succint) |
+| `docs/adr/*.md` | `dev/specs/` (design decisions and rationale)     |
 
 Never create `CONTEXT.md`, `CONTEXT-MAP.md` or `docs/adr/`.
 
-<!-- rtk-instructions v2 -->
 # RTK
 
 ## Golden Rule
@@ -254,4 +266,3 @@ rtk diff                # Ultra-compact diffs
 rtk curl <url>          # Compact HTTP responses
 rtk wget <url>          # Compact download output
 ```
-<!-- /rtk-instructions -->

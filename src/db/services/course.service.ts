@@ -374,6 +374,13 @@ class CourseService
 			};
 		});
 	}
+
+	//
+	// Public utilities
+	//
+	naturalKey(courseRef: CourseRef): string {
+		return `${courseRef.discipline}/${courseRef.instructor}_${courseRef.edition}`;
+	}
 }
 
 export const courseService = new CourseService();

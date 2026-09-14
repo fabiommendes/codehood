@@ -27,6 +27,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # `pnpm run lint` typechecks, and `src/generated/` and the Prisma client
+      # are both gitignored, so a fresh checkout has neither.
+      - name: Generate Prisma client
+        run: pnpm run db:generate
+
+      - name: Generate sources
+        run: pnpm run generate
+
       - name: Run default linter
         run: pnpm run lint
 
@@ -54,7 +62,7 @@ jobs:
         run: pnpm exec prisma generate
 
       - name: Reset database
-        run: pnpm run db-reset
+        run: pnpm run db:reset
 
       - name: Run tests with coverage
         run: pnpm run coverage

@@ -177,10 +177,20 @@ with `Authorization: Bearer <key>`.
 /api/auth/cli-login
 /api/health
 /api/course/<discipline>/<username>_<edition>
+/api/course/<discipline>/<username>_<edition>/resource
+/api/course/<discipline>/<username>_<edition>/resource/<slug>
 ```
 
 A course is addressed in the API by the same natural key it uses on the web, so
 the CLI builds one string and uses it for both. There is no `/api/course/<id>`.
+
+Course-scoped endpoints hang off that address the way the web pages do, and
+never take the course in a body or query string. A resource's slug is flat
+(`^[a-z0-9][a-z0-9._-]*$`), so it is always exactly one segment; the CLI
+normalizes repository paths into that form. There is no `/api/resource`. The
+other course-scoped resources (`time-slot`, `calendar-event`, `passphrase`,
+`exam`) still use flat addresses until they are converted.
+
 Everything else under `/api/` is addressed by a single segment carrying its
 primary key.
 
@@ -192,6 +202,10 @@ course URL down to a 404:
 | Segment does not match the grammar  | 404 | 400 |
 | Grammar matches, no such course     | 404 | 404 |
 | Course exists, actor may not see it | 403 | 403 |
+
+Course-scoped endpoints use the same table for the course part of the address,
+lists included: a client that names a course it may not see gets 403, not an
+empty array. A malformed slug is a 400 and a missing one a 404.
 
 A person typing a URL cannot act on a 400. The CLI can: `ada_not-a-year` is
 malformed local configuration, and reporting it as "no such course" sends the

@@ -618,9 +618,21 @@ export const resourceSchema = z.object({
 	updatedAt: z.date(),
 });
 
+// Flat, so a slug is always exactly one URL segment. The CLI normalizes
+// repository paths into this form; the server still refuses anything else.
+const resourceSlug = z
+	.string()
+	.regex(
+		/^[a-z0-9][a-z0-9._-]*$/,
+		"Lowercase letters, digits, '.', '_' and '-', starting with a letter or digit.",
+	);
+
+// Exactly one of `courseId`/`courseRef` is required. The service checks it,
+// not a refinement, because the REST API derives its body with `.omit()`.
 export const resourceCreate = z.object({
-	courseId: courseId,
-	slug: z.string().min(1),
+	courseId: courseId.optional(),
+	courseRef: courseRef.optional(),
+	slug: resourceSlug,
 	type: resourceTypeSchema,
 	title: z.string().min(1),
 	description: z.string().nullish(),
@@ -644,18 +656,27 @@ export const resourceUpdate = z.object({
 	contentHash: z.string().optional(),
 });
 
-export const resourceRef = z.object({
-	courseId: z.number(),
-	slug: z.string(),
-});
+// Addressed under a course by id or by the course's own natural key. The REST
+// API only ever builds the `courseRef` branch (FR-SYNC-010).
+export const resourceRef = z.union([
+	z.object({ courseId: z.number(), slug: resourceSlug }),
+	z.object({ courseRef: courseRef, slug: resourceSlug }),
+]);
 
 export const resourcePK = z.union([
 	z.object({ id: resourceId }),
 	z.object({ ref: resourceRef }),
 ]);
 
+// What the REST layer accepts, as opposed to what the service resolves: a
+// resource's address is `/api/course/<discipline>/<instructor>_<edition>/resource/<slug>`.
+export const resourcePkRef = z.object({
+	ref: z.object({ courseRef: courseRef, slug: resourceSlug }),
+});
+
 export const resourceFilter = z.object({
 	courseId: z.number().optional(),
+	courseRef: courseRef.optional(),
 	types: z.array(resourceTypeSchema).optional(),
 	slugs: z.array(z.string()).optional(),
 });
@@ -702,7 +723,7 @@ export const calendarEventSchema = z.object({
 	description: z.string().nullable(),
 
 	// Supplied by the writer, opaque to the server.
-	contentHash: z.string(),
+	contentHash: z.string().min(1),
 	createdAt: z.date(),
 	updatedAt: z.date(),
 

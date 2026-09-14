@@ -1,7 +1,7 @@
 {
 	"name": "codehood-server",
 	"type": "module",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"engines": {
 		"node": ">=22.12.0"
 	},
@@ -24,7 +24,8 @@
 		"test-ui": "tsx test/run.ts --ui",
 		"ui-report": "playwright show-report",
 		"lint:fix": "biome check --write .",
-		"lint": "biome ci . && pnpm run stories --check",
+		"lint": "biome ci . && pnpm run typecheck && pnpm run stories --check",
+		"typecheck": "tsc --noEmit",
 		"stories": "tsx scripts/story-coverage.ts",
 		"coverage": "COVERAGE=1 c8 --reporter=lcov --reporter=text-summary --exclude 'src/generated/**' --exclude 'test/**' --exclude 'prisma/**' --exclude 'scripts/**' --exclude '**/*.config.*' -- tsx test/run.ts",
 		"studio": "pnpm prisma studio --url file://./dev.db",

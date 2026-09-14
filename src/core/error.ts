@@ -239,12 +239,21 @@ export class NotFound extends BaseSerializableError<NotFoundResponse> {
 
 	constructor(
 		resource: string,
-		args: {
-			message?: string;
-			id?: string | number;
-			context?: string;
-		},
+		args?:
+			| {
+					message?: string;
+					id?: string | number;
+					context?: string;
+			  }
+			| string
+			| number,
 	) {
+		if (typeof args === "string" || typeof args === "number") {
+			args = { id: args };
+		} else if (args === undefined) {
+			args = {};
+		}
+
 		const { message = "Resource not found", id = "unknown", context } = args;
 		super(message, "not-found", 404);
 		this.resource = resource;

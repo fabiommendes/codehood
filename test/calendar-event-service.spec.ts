@@ -1,15 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { canViewCourseContents } from "@/auth/permissions";
 import { FULL_ACCESS, SYSTEM } from "@/core/actor";
-import type { ServiceOpts } from "@/db/base-service";
+import type { CourseId } from "@/core/schemas";
+import { db, type ServiceOpts } from "@/db";
 import { prisma } from "@/db/client";
-import { calendarEventService } from "@/db/services/calendar-event.service";
-import type { CourseId } from "@/db/services/course.service";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { timeSlotService } from "@/db/services/time-slot.service";
-import { userService } from "@/db/services/user.service";
 import { relinkExam } from "@/db/util.exam-link";
 
 // Random suffix, not an incrementing counter: shared test database across
@@ -20,7 +14,7 @@ function tag(prefix: string): string {
 
 async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 	const username = tag(role.toLowerCase());
-	return userService.create(
+	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
@@ -35,8 +29,8 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 }
 
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await editionService.findOne({ slug }))) {
-		await editionService.create(
+	if (!(await db.edition.findOne({ slug }))) {
+		await db.edition.create(
 			{
 				slug,
 				name: slug,
@@ -51,12 +45,12 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 
 async function makeCourse(instructorUsername: string) {
 	const disciplineSlug = tag("disc");
-	await disciplineService.create(
+	await db.discipline.create(
 		{ slug: disciplineSlug, name: disciplineSlug },
 		FULL_ACCESS,
 	);
 	const editionSlug = await ensureEdition();
-	return courseService.create(
+	return db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
@@ -72,7 +66,7 @@ async function makeSlot(
 	courseId: CourseId,
 	opts: ServiceOpts = { actor: SYSTEM },
 ) {
-	return timeSlotService.create(
+	return db.timeSlot.create(
 		{ courseId, slug: "mon", day: "MONDAY", startMin: 840, durationMin: 120 },
 		opts,
 	);
@@ -84,7 +78,7 @@ test("create given only a day fills startAt and durationMin from the slot, and k
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	const defaulted = await calendarEventService.create(
+	const defaulted = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -102,7 +96,7 @@ test("create given only a day fills startAt and durationMin from the slot, and k
 		new Date("2026-01-05T00:00:00Z").getTime(),
 	);
 
-	const explicit = await calendarEventService.create(
+	const explicit = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -129,7 +123,7 @@ test("create rejects a slot belonging to another course, and an event whose star
 	const slotA = await makeSlot(courseA.id, opts);
 
 	await expect(
-		calendarEventService.create(
+		db.calendarEvent.create(
 			{
 				courseId: courseB.id,
 				timeSlotId: slotA.id,
@@ -145,7 +139,7 @@ test("create rejects a slot belonging to another course, and an event whose star
 
 	// 2026-01-06 is a Tuesday; slotA is MONDAY.
 	await expect(
-		calendarEventService.create(
+		db.calendarEvent.create(
 			{
 				courseId: courseA.id,
 				timeSlotId: slotA.id,
@@ -166,7 +160,7 @@ test("create rejects a second event on the same slot on the same local day", asy
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	await calendarEventService.create(
+	await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -180,7 +174,7 @@ test("create rejects a second event on the same slot on the same local day", asy
 	);
 
 	await expect(
-		calendarEventService.create(
+		db.calendarEvent.create(
 			{
 				courseId: course.id,
 				timeSlotId: slot.id,
@@ -203,7 +197,7 @@ test("create rejects a missing contentHash; update stores the supplied one verba
 	const slot = await makeSlot(course.id, opts);
 
 	await expect(
-		calendarEventService.create(
+		db.calendarEvent.create(
 			{
 				courseId: course.id,
 				timeSlotId: slot.id,
@@ -217,7 +211,7 @@ test("create rejects a missing contentHash; update stores the supplied one verba
 		),
 	).rejects.toThrow();
 
-	const event = await calendarEventService.create(
+	const event = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -231,7 +225,7 @@ test("create rejects a missing contentHash; update stores the supplied one verba
 	);
 
 	const newHash = tag("verbatim");
-	const updated = await calendarEventService.update(
+	const updated = await db.calendarEvent.update(
 		{ id: event.id },
 		{ contentHash: newHash },
 		opts,
@@ -245,7 +239,7 @@ test("delete removes the row; a subsequent findOne returns null (no archive)", a
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	const event = await calendarEventService.create(
+	const event = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -257,9 +251,9 @@ test("delete removes the row; a subsequent findOne returns null (no archive)", a
 		},
 		opts,
 	);
-	await calendarEventService.delete({ id: event.id }, opts);
+	await db.calendarEvent.delete({ id: event.id }, opts);
 	await expect(
-		calendarEventService.findOne({ id: event.id }, opts),
+		db.calendarEvent.findOne({ id: event.id }, opts),
 	).resolves.toBeNull();
 });
 
@@ -269,7 +263,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 	const courseB = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 	const slotA = await makeSlot(courseA.id, opts);
-	const slotB = await timeSlotService.create(
+	const slotB = await db.timeSlot.create(
 		{
 			courseId: courseB.id,
 			slug: "mon",
@@ -281,7 +275,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 	);
 
 	// Runs 14:00-16:00 on 2026-01-05: still running at a `from` of 15:00.
-	const stillRunning = await calendarEventService.create(
+	const stillRunning = await db.calendarEvent.create(
 		{
 			courseId: courseA.id,
 			timeSlotId: slotA.id,
@@ -295,7 +289,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 		opts,
 	);
 	// Strictly inside [from, to): the ordering/kind-filter fixture.
-	const inBetween = await calendarEventService.create(
+	const inBetween = await db.calendarEvent.create(
 		{
 			courseId: courseA.id,
 			timeSlotId: slotA.id,
@@ -309,7 +303,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 		opts,
 	);
 	// Starts exactly at `to`: excluded.
-	const startsAtTo = await calendarEventService.create(
+	const startsAtTo = await db.calendarEvent.create(
 		{
 			courseId: courseB.id,
 			timeSlotId: slotB.id,
@@ -327,13 +321,13 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 	const from = new Date("2026-01-05T18:00:00Z"); // 15:00 America/Sao_Paulo, inside stillRunning's window
 	const to = startsAtTo.startAt;
 
-	const results = await calendarEventService.findMany(
+	const results = await db.calendarEvent.findMany(
 		{ courseIds: [courseA.id, courseB.id], from, to },
 		opts,
 	);
 	expect(results.map((r) => r.id)).toEqual([stillRunning.id, inBetween.id]);
 
-	const kindFiltered = await calendarEventService.findMany(
+	const kindFiltered = await db.calendarEvent.findMany(
 		{ courseIds: [courseA.id, courseB.id], kinds: ["LECTURE"] },
 		opts,
 	);
@@ -342,7 +336,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 		[stillRunning.id, inBetween.id].sort(),
 	);
 
-	const weekFiltered = await calendarEventService.findMany(
+	const weekFiltered = await db.calendarEvent.findMany(
 		{ courseIds: [courseA.id, courseB.id], weeks: [3] },
 		opts,
 	);
@@ -358,20 +352,20 @@ test("a student enrolled in one of two courses sees only that course's events; a
 	const opts = { actor: instructor };
 	const slotA = await makeSlot(courseA.id, opts);
 
-	await courseService.enroll(
+	await db.course.enroll(
 		{ courseId: courseA.id, userId: active.username },
 		FULL_ACCESS,
 	);
-	await courseService.enroll(
+	await db.course.enroll(
 		{ courseId: courseA.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
-	await courseService.drop(
+	await db.course.drop(
 		{ courseId: courseA.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 
-	await calendarEventService.create(
+	await db.calendarEvent.create(
 		{
 			courseId: courseA.id,
 			timeSlotId: slotA.id,
@@ -385,19 +379,19 @@ test("a student enrolled in one of two courses sees only that course's events; a
 	);
 
 	await expect(
-		calendarEventService.findMany(
+		db.calendarEvent.findMany(
 			{ courseIds: [courseA.id, courseB.id] },
 			{ actor: active },
 		),
 	).resolves.toHaveLength(1);
 	await expect(
-		calendarEventService.findMany(
+		db.calendarEvent.findMany(
 			{ courseIds: [courseA.id, courseB.id] },
 			{ actor: dropped },
 		),
 	).resolves.toHaveLength(0);
 	await expect(
-		calendarEventService.findMany(
+		db.calendarEvent.findMany(
 			{ courseIds: [courseA.id] },
 			{ actor: instructor },
 		),
@@ -415,20 +409,20 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	await courseService.enroll(
+	await db.course.enroll(
 		{ courseId: course.id, userId: active.username },
 		FULL_ACCESS,
 	);
-	await courseService.enroll(
+	await db.course.enroll(
 		{ courseId: course.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
-	await courseService.drop(
+	await db.course.drop(
 		{ courseId: course.id, userId: dropped.username },
 		FULL_ACCESS,
 	);
 
-	await calendarEventService.create(
+	await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -456,7 +450,7 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 	] as const;
 
 	for (const { label, actor } of actors) {
-		const visible = await calendarEventService.findMany(
+		const visible = await db.calendarEvent.findMany(
 			{ courseIds: [course.id] },
 			{ actor },
 		);
@@ -471,12 +465,12 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
-	await courseService.enroll(
+	await db.course.enroll(
 		{ courseId: course.id, userId: student.username },
 		FULL_ACCESS,
 	);
 
-	const event = await calendarEventService.create(
+	const event = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -503,13 +497,13 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 	});
 	await relinkExam(prisma, exam.id);
 
-	const asStudent = await calendarEventService.findOne(
+	const asStudent = await db.calendarEvent.findOne(
 		{ id: event.id },
 		{ actor: student },
 	);
 	expect(asStudent?.exam).toBeNull();
 
-	const asInstructor = await calendarEventService.findOne(
+	const asInstructor = await db.calendarEvent.findOne(
 		{ id: event.id },
 		{ actor: instructor },
 	);
@@ -519,7 +513,7 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 		where: { id: exam.id },
 		data: { status: "SCHEDULED" },
 	});
-	const asStudentAfterPublish = await calendarEventService.findOne(
+	const asStudentAfterPublish = await db.calendarEvent.findOne(
 		{ id: event.id },
 		{ actor: student },
 	);
@@ -532,7 +526,7 @@ test("upsert creates on first call, updates the same event on the second, and a 
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	const created = await calendarEventService.upsert(
+	const created = await db.calendarEvent.upsert(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -548,7 +542,7 @@ test("upsert creates on first call, updates the same event on the second, and a 
 	expect(created.title).toBe("Before");
 	expect(created.description).toBe("d1");
 
-	const updated = await calendarEventService.upsert(
+	const updated = await db.calendarEvent.upsert(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -566,7 +560,7 @@ test("upsert creates on first call, updates the same event on the second, and a 
 	expect(updated.description).toBeNull(); // cleared
 	expect(updated.startAt.getTime()).toBe(created.startAt.getTime()); // untouched
 
-	const other = await calendarEventService.upsert(
+	const other = await db.calendarEvent.upsert(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -589,7 +583,7 @@ test("upsert enforces the weekday-match and slot-day-collision rules, but not ag
 
 	// 2026-01-06 is a Tuesday; the slot is MONDAY.
 	await expect(
-		calendarEventService.upsert(
+		db.calendarEvent.upsert(
 			{
 				courseId: course.id,
 				timeSlotId: slot.id,
@@ -603,7 +597,7 @@ test("upsert enforces the weekday-match and slot-day-collision rules, but not ag
 		),
 	).rejects.toThrow();
 
-	const existing = await calendarEventService.upsert(
+	const existing = await db.calendarEvent.upsert(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -618,7 +612,7 @@ test("upsert enforces the weekday-match and slot-day-collision rules, but not ag
 
 	// A different event on the same slot, same local day, is refused.
 	await expect(
-		calendarEventService.upsert(
+		db.calendarEvent.upsert(
 			{
 				courseId: course.id,
 				timeSlotId: slot.id,
@@ -635,7 +629,7 @@ test("upsert enforces the weekday-match and slot-day-collision rules, but not ag
 
 	// Re-upserting the existing event on the same day must not collide with itself.
 	await expect(
-		calendarEventService.upsert(
+		db.calendarEvent.upsert(
 			{
 				courseId: course.id,
 				timeSlotId: slot.id,

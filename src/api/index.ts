@@ -48,6 +48,17 @@ export function parseCourseParams(params: Record<string, string>) {
 	return validated.data;
 }
 
+/** Turns a course's two path segments plus `[slug]` into a `resourcePkRef`. */
+export function parseResourceParams(params: Record<string, string>) {
+	const { ref: courseRef } = parseCourseParams(params);
+	const validated = schema.resourcePkRef.safeParse({
+		ref: { courseRef, slug: params.slug },
+	});
+	if (validated.error)
+		throw InvalidData.fromZodError(validated.error, validated.data);
+	return validated.data;
+}
+
 //
 // Pure RESTful interfaces. They expose only the classic CRUD operations.
 //
@@ -110,16 +121,6 @@ export const editionApi = CRUD("/api/edition", {
 	tags: ["Editions"],
 	service: db.edition,
 });
-export const fileApi = CRUD("/api/file", {
-	name: "File",
-	entity: schema.fileSchema,
-	create: schema.fileCreate,
-	update: schema.fileUpdate,
-	filter: schema.fileFilter,
-	filterPk: schema.filePK,
-	tags: ["Files"],
-	service: db.file,
-});
 // export const inviteApi = CRUD("/api/invite", {
 //     name: "Invite",
 //     entity: schema.inviteSchema,
@@ -130,13 +131,22 @@ export const fileApi = CRUD("/api/file", {
 //     tags: ["Invites"],
 //     service: db.invite,
 // });
-export const resourceApi = CRUD("/api/resource", {
+export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	name: "Resource",
 	entity: schema.resourceSchema,
-	create: schema.resourceCreate,
+	// The course is named by the path, so the body and query never carry it.
+	create: schema.resourceCreate.omit({ courseId: true, courseRef: true }),
+	upsert: schema.resourceUpsert.omit({
+		courseId: true,
+		courseRef: true,
+		slug: true,
+	}),
 	update: schema.resourceUpdate,
-	filter: schema.resourceFilter,
-	filterPk: schema.resourcePK,
+	filter: schema.resourceFilter.omit({ courseId: true, courseRef: true }),
+	filterPk: schema.resourcePkRef,
+	pkPath: "/[slug]",
+	parsePk: parseResourceParams,
+	parseScope: (params) => ({ courseRef: parseCourseParams(params).ref }),
 	tags: ["Resources"],
 	service: db.resource,
 });

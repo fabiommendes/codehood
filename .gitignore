@@ -41,3 +41,6 @@ pnpm-debug.log*
 .rtk
 
 TODO.md
+# Incremental typecheck caches, rewritten by every `pnpm run typecheck`.
+tsconfig.tsbuildinfo
+tsconfig.build.tsbuildinfo

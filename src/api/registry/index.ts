@@ -276,10 +276,30 @@ export type CrudRouteOptions<
 	 */
 	parsePk?: (params: Record<string, string>) => PkFilter;
 
+	/**
+	 * Turns the dynamic segments of a scoped collection path into the fields
+	 * that path owns.
+	 *
+	 * A resource nested under its course
+	 * (`/api/course/[discipline]/[course]/resource`) names the course in the
+	 * path, so the result is merged over the query filter and the request body.
+	 * The path wins, and `filter`/`create` omit those fields so the OpenAPI
+	 * document never offers them, which is also why the result is not typed
+	 * against either.
+	 */
+	parseScope?: (params: Record<string, string>) => Record<string, unknown>;
+
 	name: string;
 	plural?: string;
 	entity: ZodType<Entity>;
 	create: ZodType<Create>;
+	/**
+	 * The `PUT` body, when the address carries part of the upsert input.
+	 *
+	 * Defaults to `create`. When set, `parseScope`'s fields and every `pkPath`
+	 * segment (by name) are merged over the body, so this schema omits them.
+	 */
+	upsert?: ZodType<object>;
 	update: ZodType<Update>;
 	filter: ZodType<Filter>;
 	filterPk: ZodType<PkFilter>;
@@ -316,7 +336,8 @@ export function CRUD<
 	// that segment carries (e.g. a discipline is addressed by `slug`), not the
 	// segment. `options.pkPath` overrides the shape for a natural key that
 	// needs more than one segment.
-	const pathWithId = `${path}${options.pkPath ?? "/[id]"}`;
+	const itemPath = options.pkPath ?? "/[id]";
+	const pathWithId = `${path}${itemPath}`;
 	const pkField = options.pk ?? "id";
 	// What the summary line calls the key: the field name for a single segment,
 	// the segment names themselves for a multi-segment natural key.
@@ -355,6 +376,7 @@ export function CRUD<
 				throw InvalidData.fromZodError(validated.error, validated.data);
 			return validated.data;
 		});
+	const parseScope = options.parseScope ?? (() => ({}));
 
 	return {
 		create: POST(path, {
@@ -364,8 +386,9 @@ export function CRUD<
 			summary: `Creates a new ${name}.`,
 			tags: options.tags,
 			errors: options.errors,
-			handler: async ({ actor, body }) => {
-				return service.create(body as Create, { actor });
+			handler: async ({ actor, body, params }) => {
+				const input = { ...body, ...parseScope(params) } as Create;
+				return service.create(input, { actor });
 			},
 		}),
 		findOne: GET(pathWithId, {
@@ -391,8 +414,9 @@ export function CRUD<
 			summary: `Find multiple ${namePlural}.`,
 			tags: options.tags,
 			errors: options.errors,
-			handler: async ({ actor, body }) => {
-				return service.findMany(body as Filter, { actor });
+			handler: async ({ actor, body, params }) => {
+				const filter = { ...body, ...parseScope(params) } as Filter;
+				return service.findMany(filter, { actor });
 			},
 		}),
 		update:
@@ -420,6 +444,31 @@ export function CRUD<
 			handler: async ({ actor, params }) => {
 				await service.delete(parsePk(params), { actor });
 				return { success: true, message: `${name} deleted successfully` };
+			},
+		}),
+		upsert: PUT(pathWithId, {
+			operationId: operationId("upsert"),
+			in: options.upsert ?? options.create,
+			out: options.entity,
+			summary: `Upsert a single ${name}. Creates if it does not exist, update otherwise.`,
+			tags: options.tags,
+			errors: options.errors,
+			handler: async ({ actor, body, params }) => {
+				// With an explicit `upsert` body, the address supplies the rest: the
+				// scope's fields and each `pkPath` segment under its own name.
+				const addressed = options.upsert
+					? {
+							...parseScope(params),
+							...Object.fromEntries(
+								segmentNames(itemPath).map((name) => [name, params[name]]),
+							),
+						}
+					: {};
+				const input = {
+					...(body as unknown as object),
+					...addressed,
+				} as Create;
+				return service.upsert(input, { actor });
 			},
 		}),
 	};

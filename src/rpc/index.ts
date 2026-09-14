@@ -6,5 +6,7 @@
  * effect alone. A method module missing from this list exists in the source
  * and nowhere else.
  */
+
+export * as cli from "./cli";
 export * as debug from "./debug";
 export * as health from "./health";

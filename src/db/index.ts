@@ -1,4 +1,4 @@
-export * as schema from "../core/schemas";
+export * as schema from "@/core/schemas";
 
 import { apiKeyService } from "./services/api-key.service";
 import { calendarEventService } from "./services/calendar-event.service";
@@ -12,6 +12,8 @@ import { resourceService } from "./services/resource.service";
 import { sessionService } from "./services/session.service";
 import { timeSlotService } from "./services/time-slot.service";
 import { userService } from "./services/user.service";
+
+export type { ServiceOpts } from "@/db/base-service";
 
 export type {
 	ApiKey,

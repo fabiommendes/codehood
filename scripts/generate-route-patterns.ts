@@ -36,7 +36,7 @@ const routes = Object.entries(getRouteMapping())
 	}))
 	.sort((a, b) => a.pattern.localeCompare(b.pattern));
 
-writeFileSync(outPath, `${JSON.stringify(routes, null, 2)}\n`);
+writeFileSync(outPath, `${JSON.stringify(routes, null, "\t")}\n`);
 console.log(
 	`Wrote ${path.relative(rootDir, outPath)} (${routes.length} patterns)`,
 );

@@ -55,8 +55,39 @@
   underneath, now masked in both directions.
 - `courseUpdate` and `disciplineUpdate` were missing `.partial()`, so PATCH-ing
   a course demanded `description`, `startAt` and `endAt` on every call.
+- Resources moved from `/api/resource[/<id>]` to
+  `/api/course/<discipline>/<instructor>_<edition>/resource[/<slug>]`, with
+  `PUT <slug>` as upsert. The flat routes are removed. The path names the
+  course, so bodies and queries no longer carry `courseId`/`courseRef`. A course
+  the actor may not see is a 403 on lists too, not an empty array.
+  `ResourceService` accepts a `courseRef` wherever it took a `courseId`, and
+  resource slugs must match `^[a-z0-9][a-z0-9._-]*$`. `CRUD` gained
+  `parseScope` and an `upsert` body option for course-scoped endpoints. See
+  `dev/specs/to-review/course-scoped-resource-api.md`.
 
 ### Fixed
+
+- `pnpm run lint` now typechecks. It was `biome ci .`, which does not look at
+  types, so `tsc` errors reached `main` and sat there: the `canViewCourse`
+  enrollment bug through a whole refactor, and a `DeepPartialObject` mismatch in
+  `attachment.factory.ts`. `lint` is now `biome ci . && pnpm run typecheck &&
+  pnpm run stories --check`, and the CI lint job generates the Prisma client and
+  `src/generated/` first, since both are gitignored and `tsc` cannot run without
+  them.
+- `public/sw.js` declared `const sw` twice, a `SyntaxError` that stopped the
+  service worker registering at all. Found by the new typecheck step, which is
+  the only thing that looks at `public/` — Biome is configured to skip it.
+- The CI test job ran `pnpm run db-reset`; the script is `db:reset`.
+- `scripts/generate-route-patterns.ts` wrote 2-space JSON while Biome formats
+  with tabs, so every `pnpm run generate` left the tree failing lint until
+  someone reformatted by hand. It writes tabs now, and the generated file is in
+  Biome's ignore list beside `src/generated`, since Biome collapses short arrays
+  and `JSON.stringify` cannot.
+- Biome no longer checks `.claude/`. `settings.local.json` is ignored through
+  the user's global gitignore, which Biome's `useIgnoreFile` does not read, so
+  it failed formatting on every local run.
+- The `tsbuildinfo` caches are untracked and gitignored. They were committed,
+  and the new typecheck step rewrites them on every run.
 
 - `test/edition-service.spec.ts`'s `actorOf` built `{id, role}` where `Actor`
   is `{username, role}`, so every actor in that file carried an undefined

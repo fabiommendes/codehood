@@ -5,9 +5,15 @@ import {
 	courseContentsVisibility,
 } from "@/auth/permissions";
 import { SYSTEM } from "@/core/actor";
-import { NotAllowed } from "@/core/error";
+import {
+	type ActionCode,
+	InvalidData,
+	NotAllowed,
+	NotFound,
+} from "@/core/error";
 import {
 	type CourseId,
+	type courseRef,
 	type FileId,
 	type ResourceId,
 	resourceCreate,
@@ -21,7 +27,13 @@ import {
 import type { FillUndefineds, Pretty } from "@/typing";
 import { Validate } from "@/utils/validate";
 import { type Crud, type ServiceOpts, upsert } from "../base-service";
-import { type Prisma, type PrismaClient, prisma } from "../client";
+import {
+	type Prisma,
+	type PrismaClient,
+	type PrismaTx,
+	prisma,
+} from "../client";
+import { ensureExist } from "../utils";
 import { fileService } from "./file.service";
 
 export type { ResourceId } from "../../core/schemas";
@@ -36,6 +48,7 @@ export type ResourcePK = z.infer<typeof resourcePK>;
 export type ResourceUpdate = z.infer<typeof resourceUpdate>;
 export type ResourceUpsert = z.infer<typeof resourceUpsert>;
 export type ResourceRef = z.infer<typeof resourceRef>;
+type CourseRef = z.infer<typeof courseRef>;
 
 type DbResource = Prisma.ResourceGetPayload<{
 	include: Pretty<typeof resourceInclude>;
@@ -82,18 +95,17 @@ class ResourceService
 	@Validate({ service: true, returns: resourceSchema, args: [resourceCreate] })
 	async create(input: ResourceCreate, opts: ServiceOpts): Promise<Resource> {
 		const client = opts.tx ?? this.prisma;
-		const course = await client.course.findUnique({
-			where: { id: input.courseId },
-			select: { instructor: { select: { username: true } } },
-		});
-		if (!course || !canWriteCourseContent(opts.actor, course)) {
-			throw new NotAllowed({ action: "create-resource" });
-		}
+		const courseId = await findWritableCourseId(
+			client,
+			input,
+			opts,
+			"create-resource",
+		);
 		validateResourceShape(input.type, input);
 
 		const row = await client.resource.create({
 			data: {
-				courseId: input.courseId,
+				courseId,
 				slug: input.slug,
 				type: input.type,
 				title: input.title,
@@ -134,10 +146,13 @@ class ResourceService
 				include: resourceInclude,
 			});
 		} else if (by.ref) {
+			const ref = by.ref as FillUndefineds<ResourceRef>;
+			const courseId =
+				ref.courseId ??
+				(await findVisibleCourse(client, ref.courseRef, opts, "read-resource"))
+					.id;
 			row = await client.resource.findUnique({
-				where: {
-					courseId_slug: { courseId: by.ref.courseId, slug: by.ref.slug },
-				},
+				where: { courseId_slug: { courseId, slug: ref.slug } },
 				include: resourceInclude,
 			});
 		}
@@ -167,20 +182,38 @@ class ResourceService
 		filter: ResourceFilter,
 		opts: ServiceOpts,
 	): Promise<Resource[]> {
-		const client = opts.tx ?? this.prisma;
-		const rows = await client.resource.findMany({
-			where: {
-				AND: [
-					filter.courseId !== undefined ? { courseId: filter.courseId } : {},
-					filter.types ? { type: { in: filter.types } } : {},
-					filter.slugs ? { slug: { in: filter.slugs } } : {},
-					{ course: courseContentsVisibility(opts.actor) },
-				],
-			},
-			include: resourceInclude,
-			orderBy: { title: "asc" },
-		});
-		return rows.map(toResource);
+		async function run(client: PrismaTx) {
+			// A course named by ref must exist and be visible; by id it is only a
+			// SQL filter, as it always was.
+			if (filter.courseRef && !filter.courseId) {
+				const course = await findVisibleCourse(
+					client,
+					filter.courseRef,
+					opts,
+					"read-resource",
+				);
+
+				filter = { ...filter };
+				filter.courseId = course.id;
+				delete filter.courseRef;
+			}
+
+			const rows = await client.resource.findMany({
+				where: {
+					AND: [
+						filter.courseId !== undefined ? { courseId: filter.courseId } : {},
+						filter.types ? { type: { in: filter.types } } : {},
+						filter.slugs ? { slug: { in: filter.slugs } } : {},
+						{ course: courseContentsVisibility(opts.actor) },
+					],
+				},
+				include: resourceInclude,
+				orderBy: { title: "asc" },
+			});
+			return rows.map(toResource);
+		}
+
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
 	}
 
 	/**
@@ -202,7 +235,7 @@ class ResourceService
 		opts: ServiceOpts,
 	): Promise<Resource> {
 		const target = await this.findOne(filter, opts);
-		if (!target) throw new Error("resource not found");
+		if (!target) throw new NotFound("resource");
 
 		const client = opts.tx ?? this.prisma;
 		const current = await client.resource.findUnique({
@@ -238,7 +271,7 @@ class ResourceService
 	}
 
 	/**
-	 * Upserts a resource keyed on `{courseId, slug}`.
+	 * Upserts a resource keyed on `{courseId | courseRef, slug}`.
 	 *
 	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
 	 * or updating, same as `create`/`update`; the shape-by-type check
@@ -252,16 +285,14 @@ class ResourceService
 			input,
 			opts,
 			{
-				pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
+				pk: (i) => ({ ref: { ...courseKey(i), slug: i.slug } }),
 				assertCreatable: async (i, o) => {
-					const client = o.tx ?? this.prisma;
-					const course = await client.course.findUnique({
-						where: { id: i.courseId },
-						select: { instructor: { select: { username: true } } },
-					});
-					if (!course || !canWriteCourseContent(o.actor, course)) {
-						throw new NotAllowed({ action: "upsert-resource" });
-					}
+					await findWritableCourseId(
+						o.tx ?? this.prisma,
+						i,
+						o,
+						"upsert-resource",
+					);
 				},
 			},
 			"upsert-resource",
@@ -280,7 +311,7 @@ class ResourceService
 	@Validate({ service: true, args: [resourcePK] })
 	async delete(filter: ResourcePK, opts: ServiceOpts): Promise<void> {
 		const target = await this.findOne(filter, opts);
-		if (!target) throw new Error("resource not found");
+		if (!target) throw new NotFound("resource");
 
 		const client = opts.tx ?? this.prisma;
 		const current = await client.resource.findUnique({
@@ -305,6 +336,95 @@ export const resourceService = new ResourceService();
 //
 // Auxiliary functions
 //
+
+/**
+ * Resolves a course's natural key to a course `actor` may see the contents of.
+ *
+ * Throws `NotFound` if there is no such course and `NotAllowed` if the actor
+ * may not see it, so a caller that named one course never gets a silent miss.
+ */
+async function findVisibleCourse(
+	client: PrismaTx | PrismaClient,
+	ref: CourseRef,
+	opts: ServiceOpts,
+	action: ActionCode,
+) {
+	const course = ensureExist(
+		await client.course.findUnique({
+			where: courseRefWhere(ref),
+			select: { id: true, ...resourceInclude.course.select },
+		}),
+		"course",
+	);
+	if (!canViewCourseContents(opts.actor, course))
+		throw new NotAllowed({ action });
+	return course;
+}
+
+/**
+ * Picks the one course field a write names.
+ *
+ * Throws `InvalidData` unless exactly one of `courseId`/`courseRef` is set.
+ */
+function courseKey(input: {
+	courseId?: CourseId;
+	courseRef?: CourseRef;
+}): { courseId: CourseId } | { courseRef: CourseRef } {
+	if (input.courseId !== undefined && input.courseRef === undefined)
+		return { courseId: input.courseId };
+	if (input.courseRef !== undefined && input.courseId === undefined)
+		return { courseRef: input.courseRef };
+	throw new InvalidData({
+		errors: {
+			courseId: [
+				{
+					code: "invalid",
+					message: "Expected exactly one of courseId or courseRef.",
+				},
+			],
+		},
+		message: "A resource needs exactly one of courseId or courseRef.",
+	});
+}
+
+/**
+ * Resolves the course a write names to its id, if `actor` may write its content.
+ *
+ * A `courseRef` naming no course is `NotFound`; a `courseId` naming none stays
+ * `NotAllowed`, as it always was.
+ */
+async function findWritableCourseId(
+	client: PrismaTx | PrismaClient,
+	input: { courseId?: CourseId; courseRef?: CourseRef },
+	opts: ServiceOpts,
+	action: ActionCode,
+): Promise<CourseId> {
+	const key = courseKey(input) as FillUndefineds<ReturnType<typeof courseKey>>;
+	const select = { id: true, instructor: { select: { username: true } } };
+	const course = key.courseRef
+		? ensureExist(
+				await client.course.findUnique({
+					where: courseRefWhere(key.courseRef),
+					select,
+				}),
+				"course",
+			)
+		: await client.course.findUnique({ where: { id: key.courseId }, select });
+	if (!course || !canWriteCourseContent(opts.actor, course))
+		throw new NotAllowed({ action });
+	return course.id as CourseId;
+}
+
+/** The unique-key `where` for a course's natural key. */
+function courseRefWhere(ref: CourseRef) {
+	return {
+		disciplineSlug_instructorId_editionSlug: {
+			disciplineSlug: ref.discipline,
+			instructorId: ref.instructor,
+			editionSlug: ref.edition,
+		},
+	};
+}
 
 // Convert a database resource record to the public-facing resource type.
 function toResource(row: DbResource): Resource {

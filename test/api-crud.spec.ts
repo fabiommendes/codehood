@@ -40,8 +40,6 @@ const OPTIONAL_FILTER_RESOURCES = [
 	"course",
 	"discipline",
 	"edition",
-	"file",
-	"resource",
 	"time-slot",
 	"user",
 ] as const;

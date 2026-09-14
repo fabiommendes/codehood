@@ -1,86 +1,148 @@
 [
 	{
 		"pattern": "/api/api-key",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/api-key/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	},
 	{
 		"pattern": "/api/auth/login",
-		"methods": ["post"]
+		"methods": [
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/auth/logout",
-		"methods": ["post"]
+		"methods": [
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/calendar-event",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/calendar-event/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	},
 	{
 		"pattern": "/api/course",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/course/[discipline]/[course]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/resource",
+		"methods": [
+			"get",
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/resource/[slug]",
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	},
 	{
 		"pattern": "/api/discipline",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/discipline/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	},
 	{
 		"pattern": "/api/edition",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/edition/[id]",
-		"methods": ["delete", "get", "patch"]
-	},
-	{
-		"pattern": "/api/file",
-		"methods": ["get", "post"]
-	},
-	{
-		"pattern": "/api/file/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	},
 	{
 		"pattern": "/api/health",
-		"methods": ["get"]
-	},
-	{
-		"pattern": "/api/resource",
-		"methods": ["get", "post"]
-	},
-	{
-		"pattern": "/api/resource/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"get"
+		]
 	},
 	{
 		"pattern": "/api/time-slot",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/time-slot/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	},
 	{
 		"pattern": "/api/user",
-		"methods": ["get", "post"]
+		"methods": [
+			"get",
+			"post"
+		]
 	},
 	{
 		"pattern": "/api/user/[id]",
-		"methods": ["delete", "get", "patch"]
+		"methods": [
+			"delete",
+			"get",
+			"patch",
+			"put"
+		]
 	}
 ]

@@ -7,7 +7,15 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!public", "!src/generated", "!dist", "!test-results"]
+		"includes": [
+			"**",
+			"!public",
+			"!src/generated",
+			"!dist",
+			"!test-results",
+			"!.claude",
+			"!src/api/registry/route-patterns.json"
+		]
 	},
 	"formatter": {
 		"enabled": true,
