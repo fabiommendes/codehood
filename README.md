@@ -1,4 +1,5 @@
-# Codehood
+# Codehood [![codecov](https://codecov.io/gh/fabiommendes/codehood/graph/badge.svg?token=glsmeycRAV)](https://codecov.io/gh/fabiommendes/codehood)
+
 
 Codehood is a simple Learning Management System (LMS) optimized for programmers
 and geeky types. As an instructor, you should consider it if you like the idea
