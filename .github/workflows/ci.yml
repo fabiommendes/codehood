@@ -35,6 +35,11 @@ jobs:
       - name: Generate sources
         run: pnpm run generate
 
+      # Also we need to create the astro files like astro:actions and so
+      # on for the first run.
+      - name: Generate Astro files
+        run: pnpm run astro sync
+
       - name: Run default linter
         run: pnpm run lint
 

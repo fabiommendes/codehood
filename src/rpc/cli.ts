@@ -36,10 +36,10 @@ export const getState = METHOD("cli.course.preSync", {
 		const course = await db.course.findOne({ ref: body }, { actor });
 		if (!course) throw new NotFound("course", db.course.naturalKey(body));
 
-		const resources = await db.resource.findMany(
-			{ courseId: course.id },
-			{ actor },
-		);
+		// const resources = await db.resource.findMany(
+		// 	{ courseId: course.id },
+		// 	{ actor },
+		// );
 
 		return {
 			resources: [],
