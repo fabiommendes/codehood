@@ -272,7 +272,8 @@ function publicChoices(
 ): PublicChoice[] {
 	const ids = resolveChoiceIds(choices);
 	return choices.map((choice, index) => ({
-		id: ids[index],
+		// biome-ignore lint/style/noNonNullAssertion: resolveChoiceIds returns exactly one id per input choice, in order.
+		id: ids[index]!,
 		text: choice.text,
 	}));
 }

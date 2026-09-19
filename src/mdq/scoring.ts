@@ -267,9 +267,11 @@ export const score = {
 		// exception thrown in the middle of grading a whole exam.
 		if (index === -1) return { score: 0 };
 
-		const choice = question.choices[index];
+		// biome-ignore lint/style/noNonNullAssertion: index came from indexOf and was just checked against -1, so it is a valid index into question.choices.
+		const choice = question.choices[index]!;
 		return {
-			score: choiceScores(question)[index],
+			// biome-ignore lint/style/noNonNullAssertion: same valid index as above, into the same-length array choiceScores returns.
+			score: choiceScores(question)[index]!,
 			feedback: choice.feedback,
 		};
 	},
@@ -294,7 +296,8 @@ export const score = {
 		// score would grade a choice that does not exist.
 		const judged = question.choices.map(
 			(choice, index) =>
-				response.choices.has(ids[index]) === (choice.correct ?? false),
+				// biome-ignore lint/style/noNonNullAssertion: ids has exactly one entry per choice, in the same order (resolveChoiceIds(question.choices)).
+				response.choices.has(ids[index]!) === (choice.correct ?? false),
 		);
 
 		const right = judged.filter(Boolean).length;
@@ -304,7 +307,8 @@ export const score = {
 			score: selectionScore(grading(question), right, total),
 			choices: question.choices.flatMap((choice, index) =>
 				!judged[index] && choice.feedback !== undefined
-					? [{ id: ids[index], feedback: choice.feedback }]
+					? // biome-ignore lint/style/noNonNullAssertion: ids has exactly one entry per choice, in the same order.
+						[{ id: ids[index]!, feedback: choice.feedback }]
 					: [],
 			),
 		};
@@ -325,7 +329,8 @@ export const score = {
 		// Three buckets, not two: an id absent from the map was abstained, which
 		// is not the same as marking it false.
 		const verdicts = question.choices.map((choice, index) => {
-			const marked = response.answers.get(ids[index]);
+			// biome-ignore lint/style/noNonNullAssertion: ids has exactly one entry per choice, in the same order.
+			const marked = response.answers.get(ids[index]!);
 			if (marked === undefined) return "abstained" as const;
 			return marked === (choice.correct ?? false) ? "right" : "wrong";
 		});
@@ -337,7 +342,8 @@ export const score = {
 			score: trueFalseScore(grading(question), right, wrong, verdicts.length),
 			choices: question.choices.flatMap((choice, index) =>
 				verdicts[index] !== "right" && choice.feedback !== undefined
-					? [{ id: ids[index], feedback: choice.feedback }]
+					? // biome-ignore lint/style/noNonNullAssertion: ids has exactly one entry per choice, in the same order.
+						[{ id: ids[index]!, feedback: choice.feedback }]
 					: [],
 			),
 		};
@@ -367,17 +373,21 @@ export const score = {
 			score: fillInScore(grading(question), grades),
 			blanks: Object.fromEntries(
 				blanks.flatMap((blank, index) =>
-					grades[index].verdict === "unanswered"
+					// biome-ignore lint/style/noNonNullAssertion: grades has exactly one entry per blank, in the same order (blanks.map(...) above).
+					grades[index]!.verdict === "unanswered"
 						? []
-						: [[blank.id, grades[index].score] as const],
+						: // biome-ignore lint/style/noNonNullAssertion: same index, same array.
+							[[blank.id, grades[index]!.score] as const],
 				),
 			),
 			// Keyed by blank rather than by choice: a blank is what identifies a
 			// spot in the stem, and two blanks may well both offer a choice
 			// called "yes".
 			choices: blanks.flatMap((blank, index) =>
-				grades[index].feedback !== undefined
-					? [{ id: blank.id, feedback: grades[index].feedback }]
+				// biome-ignore lint/style/noNonNullAssertion: grades has exactly one entry per blank, in the same order.
+				grades[index]!.feedback !== undefined
+					? // biome-ignore lint/style/noNonNullAssertion: same index, same array.
+						[{ id: blank.id, feedback: grades[index]!.feedback }]
 					: [],
 			),
 		};
@@ -411,11 +421,13 @@ export function gradeBlank(
 			// is treated as nothing picked rather than as a wrong pick.
 			if (index === -1) return { score: 0, verdict: "unanswered" };
 
-			const score = choiceScores(blank)[index];
+			// biome-ignore lint/style/noNonNullAssertion: index came from indexOf and was just checked against -1, so it is a valid index into blank.choices.
+			const score = choiceScores(blank)[index]!;
 			return {
 				score,
 				verdict: score > 0 ? "right" : "wrong",
-				feedback: blank.choices[index].feedback,
+				// biome-ignore lint/style/noNonNullAssertion: same valid index as above.
+				feedback: blank.choices[index]!.feedback,
 			};
 		}
 
@@ -605,7 +617,10 @@ export const answerKey = {
 		question: schema.MultipleSelection,
 	): AnswerKey<"multiple-selection"> {
 		const ids = resolveChoiceIds(question.choices);
-		return new Set(ids.filter((_, index) => question.choices[index].correct));
+		return new Set(
+			// biome-ignore lint/style/noNonNullAssertion: ids has exactly one entry per choice, in the same order — index is valid into both arrays.
+			ids.filter((_, index) => question.choices[index]!.correct),
+		);
 	},
 
 	/** How each statement should be judged, keyed by its id. */
@@ -613,7 +628,8 @@ export const answerKey = {
 		const ids = resolveChoiceIds(question.choices);
 		return new Map(
 			question.choices.map((choice, index) => [
-				ids[index],
+				// biome-ignore lint/style/noNonNullAssertion: ids has exactly one entry per choice, in the same order.
+				ids[index]!,
 				choice.correct ?? false,
 			]),
 		);

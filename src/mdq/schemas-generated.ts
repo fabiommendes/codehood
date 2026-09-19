@@ -12,7 +12,7 @@ import { z } from "zod";
  * schema with an `input` field describing how the answer should be edited, and
  * an optional answer key.
  */
-export const EssaySchema = z
+export const essaySchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -98,23 +98,23 @@ export const EssaySchema = z
 		answerKey: z.string().min(1).regex(/\S/).optional(),
 	})
 	.strict();
-export type Essay = z.infer<typeof EssaySchema>;
+export type Essay = z.infer<typeof essaySchema>;
 
 /**
  * A reference to a question defined outside this exam, by its id. Resolving the
  * reference is the host system's job; a document that merely fails to resolve
  * is still well-formed.
  */
-export const ExamIncludeSchema = z
+export const examIncludeSchema = z
 	.object({
 		/** The id of the question to pull in. */
 		include: z.string().regex(/^.*(\/?([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*))+$/),
 	})
 	.strict();
-export type ExamInclude = z.infer<typeof ExamIncludeSchema>;
+export type ExamInclude = z.infer<typeof examIncludeSchema>;
 
 /** A single option in a multiple-choice question. */
-export const MultipleChoiceChoiceSchema = z
+export const multipleChoiceChoiceSchema = z
 	.object({
 		/** Unique url-friendly identifier for the choice. */
 		id: z
@@ -142,13 +142,13 @@ export const MultipleChoiceChoiceSchema = z
 		comment: z.string().optional(),
 	})
 	.strict();
-export type MultipleChoiceChoice = z.infer<typeof MultipleChoiceChoiceSchema>;
+export type MultipleChoiceChoice = z.infer<typeof multipleChoiceChoiceSchema>;
 
 /**
  * A question where the student must select exactly one choice out of a list of
  * options. Extends the common question-base schema with a `choices` field.
  */
-export const MultipleChoiceSchema = z
+export const multipleChoiceSchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -216,7 +216,7 @@ export const MultipleChoiceSchema = z
 		meta: z.record(z.string(), z.unknown()).optional(),
 		type: z.literal("multiple-choice"),
 		/** The list of choices presented to the student. */
-		choices: z.array(MultipleChoiceChoiceSchema).min(2),
+		choices: z.array(multipleChoiceChoiceSchema).min(2),
 		/**
 		 * If true, the choices are safe to shuffle. If false, they should never be
 		 * shuffled and if ommited, use the system is free to choose.
@@ -224,10 +224,10 @@ export const MultipleChoiceSchema = z
 		shuffle: z.boolean().optional(),
 	})
 	.strict();
-export type MultipleChoice = z.infer<typeof MultipleChoiceSchema>;
+export type MultipleChoice = z.infer<typeof multipleChoiceSchema>;
 
 /** A single option in a multiple-selection question. */
-export const MultipleSelectionChoiceSchema = z
+export const multipleSelectionChoiceSchema = z
 	.object({
 		/** Unique url-friendly identifier for the choice. */
 		id: z
@@ -254,7 +254,7 @@ export const MultipleSelectionChoiceSchema = z
 	})
 	.strict();
 export type MultipleSelectionChoice = z.infer<
-	typeof MultipleSelectionChoiceSchema
+	typeof multipleSelectionChoiceSchema
 >;
 
 /**
@@ -262,7 +262,7 @@ export type MultipleSelectionChoice = z.infer<
  * correct, out of a list of options (zero, one, or many may be correct).
  * Extends the common question-base schema with a `choices` field.
  */
-export const MultipleSelectionSchema = z
+export const multipleSelectionSchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -330,7 +330,7 @@ export const MultipleSelectionSchema = z
 		meta: z.record(z.string(), z.unknown()).optional(),
 		type: z.literal("multiple-selection"),
 		/** The list of choices presented to the student. */
-		choices: z.array(MultipleSelectionChoiceSchema).min(2),
+		choices: z.array(multipleSelectionChoiceSchema).min(2),
 		/**
 		 * If true, the choices are safe to shuffle. If false, they should never be
 		 * shuffled and if ommited, use the system is free to choose.
@@ -338,10 +338,10 @@ export const MultipleSelectionSchema = z
 		shuffle: z.boolean().optional(),
 	})
 	.strict();
-export type MultipleSelection = z.infer<typeof MultipleSelectionSchema>;
+export type MultipleSelection = z.infer<typeof multipleSelectionSchema>;
 
 /** A single statement in a true/false question. */
-export const TrueFalseChoiceSchema = z
+export const trueFalseChoiceSchema = z
 	.object({
 		/** Unique url-friendly identifier for the choice. */
 		id: z
@@ -371,14 +371,14 @@ export const TrueFalseChoiceSchema = z
 		comment: z.string().optional(),
 	})
 	.strict();
-export type TrueFalseChoice = z.infer<typeof TrueFalseChoiceSchema>;
+export type TrueFalseChoice = z.infer<typeof trueFalseChoiceSchema>;
 
 /**
  * A question where the student must judge each statement in a list as true or
  * false. Extends the common question-base schema with a `choices` field, where
  * each choice represents one statement to be judged.
  */
-export const TrueFalseSchema = z
+export const trueFalseSchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -449,7 +449,7 @@ export const TrueFalseSchema = z
 		 * The list of statements presented to the student, each to be judged as true
 		 * or false.
 		 */
-		choices: z.array(TrueFalseChoiceSchema).min(2),
+		choices: z.array(trueFalseChoiceSchema).min(2),
 		/**
 		 * If true, the statements are safe to shuffle. If false, they should never be
 		 * shuffled, and if omitted the system is free to choose.
@@ -457,14 +457,14 @@ export const TrueFalseSchema = z
 		shuffle: z.boolean().optional(),
 	})
 	.strict();
-export type TrueFalse = z.infer<typeof TrueFalseSchema>;
+export type TrueFalse = z.infer<typeof trueFalseSchema>;
 
 /**
  * Acceptable margin of error around the expected answer. Both fields are
  * optional; when both are given, a submitted value is accepted if it satisfies
  * either one.
  */
-export const NumericToleranceSchema = z
+export const numericToleranceSchema = z
 	.object({
 		/**
 		 * Maximum allowed absolute difference between the submitted value and the
@@ -479,14 +479,14 @@ export const NumericToleranceSchema = z
 		relative: z.number().min(0).optional(),
 	})
 	.strict();
-export type NumericTolerance = z.infer<typeof NumericToleranceSchema>;
+export type NumericTolerance = z.infer<typeof numericToleranceSchema>;
 
 /**
  * A question where the student must enter a numeric value, graded against an
  * expected answer within an optional tolerance. Extends the common
  * question-base schema with `answer` and `tolerance` fields.
  */
-export const NumericSchema = z
+export const numericSchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -567,30 +567,30 @@ export const NumericSchema = z
 		 * value is ignored if domain is 'integer' or 'fraction'.
 		 */
 		decimalPlaces: z.int().min(0).optional(),
-		tolerance: NumericToleranceSchema.optional(),
+		tolerance: numericToleranceSchema.optional(),
 	})
 	.strict();
-export type Numeric = z.infer<typeof NumericSchema>;
+export type Numeric = z.infer<typeof numericSchema>;
 
 /**
  * A regular expression when delimited by `/`, an exact literal when enclosed in
  * backticks, and a plain literal compared inexactly otherwise; a lone `*` is a
  * wildcard matching every response.
  */
-export const ShortAnswerPatternStringSchema = z.string().min(1).regex(/\S/);
+export const shortAnswerPatternStringSchema = z.string().min(1).regex(/\S/);
 export type ShortAnswerPatternString = z.infer<
-	typeof ShortAnswerPatternStringSchema
+	typeof shortAnswerPatternStringSchema
 >;
 
 /**
  * One answer pattern, written either as a bare string or as an object carrying
  * feedback and comments alongside it.
  */
-export const ShortAnswerPatternSchema = z.union([
-	ShortAnswerPatternStringSchema,
+export const shortAnswerPatternSchema = z.union([
+	shortAnswerPatternStringSchema,
 	z
 		.object({
-			pattern: ShortAnswerPatternStringSchema,
+			pattern: shortAnswerPatternStringSchema,
 			/** Shown to the student whose response this pattern decided. */
 			feedback: z.string().optional(),
 			/** An author-facing note. Never shown to students. */
@@ -598,14 +598,14 @@ export const ShortAnswerPatternSchema = z.union([
 		})
 		.strict(),
 ]);
-export type ShortAnswerPattern = z.infer<typeof ShortAnswerPatternSchema>;
+export type ShortAnswerPattern = z.infer<typeof shortAnswerPatternSchema>;
 
 /** A list of answer patterns, tried in the order written. */
-export const ShortAnswerPatternListSchema = z
-	.array(ShortAnswerPatternSchema)
+export const shortAnswerPatternListSchema = z
+	.array(shortAnswerPatternSchema)
 	.min(1);
 export type ShortAnswerPatternList = z.infer<
-	typeof ShortAnswerPatternListSchema
+	typeof shortAnswerPatternListSchema
 >;
 
 /**
@@ -613,7 +613,7 @@ export type ShortAnswerPatternList = z.infer<
  * response against a list of accepted answers or against a regular expression.
  * Extends the common question-base schema.
  */
-export const ShortAnswerSchema = z
+export const shortAnswerSchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -699,27 +699,27 @@ export const ShortAnswerSchema = z
 		 * `[short-answer/accept]` block; a response is correct if it matches any
 		 * entry.
 		 */
-		accept: ShortAnswerPatternListSchema.optional(),
+		accept: shortAnswerPatternListSchema.optional(),
 		/**
 		 * Patterns matching a known incorrect response. The canonical form of the
 		 * `[short-answer/reject]` block. Rejecting never changes a score -- `accept`
 		 * decides that, and wins when both match -- so this list exists to attach
 		 * feedback to answers known to be wrong.
 		 */
-		reject: ShortAnswerPatternListSchema.optional(),
+		reject: shortAnswerPatternListSchema.optional(),
 		/**
 		 * Patterns a submission must match to be considered valid. A pre-submission
 		 * validator: systems should warn the student before accepting the answer.
 		 * Plays no part in grading.
 		 */
-		preAccept: ShortAnswerPatternListSchema.optional(),
+		preAccept: shortAnswerPatternListSchema.optional(),
 		/**
 		 * Patterns a submission must not match to be considered valid. Like
 		 * `preAccept`, a pre-submission validator that never affects a score. When a
 		 * response matches both, it is treated as rejected -- the opposite of the
 		 * `accept`/`reject` precedence used when grading.
 		 */
-		preReject: ShortAnswerPatternListSchema.optional(),
+		preReject: shortAnswerPatternListSchema.optional(),
 		/**
 		 * If true, the question has no answer key and requires manual grading.
 		 * Inferred when the body declares no answer text. Defaults to `false` when
@@ -728,38 +728,38 @@ export const ShortAnswerSchema = z
 		openEnded: z.boolean().optional(),
 	})
 	.strict();
-export type ShortAnswer = z.infer<typeof ShortAnswerSchema>;
+export type ShortAnswer = z.infer<typeof shortAnswerSchema>;
 
 /**
  * Url-friendly identifier for the blank, matching the `[^id]` marker used in
  * the stem. MUST be unique within the question.
  */
-export const FillInBlankIdSchema = z
+export const fillInBlankIdSchema = z
 	.string()
 	.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/);
-export type FillInBlankId = z.infer<typeof FillInBlankIdSchema>;
+export type FillInBlankId = z.infer<typeof fillInBlankIdSchema>;
 
 /**
  * A blank the student answers by picking one of a list of choices, graded
  * exactly like a multiple-choice question.
  */
-export const FillInChoiceBlankSchema = z
+export const fillInChoiceBlankSchema = z
 	.object({
-		id: FillInBlankIdSchema,
+		id: fillInBlankIdSchema,
 		type: z.literal("multiple-choice"),
 		/** The list of choices presented for this blank. */
-		choices: z.array(MultipleChoiceChoiceSchema).min(2),
+		choices: z.array(multipleChoiceChoiceSchema).min(2),
 	})
 	.strict();
-export type FillInChoiceBlank = z.infer<typeof FillInChoiceBlankSchema>;
+export type FillInChoiceBlank = z.infer<typeof fillInChoiceBlankSchema>;
 
 /**
  * A blank the student answers by typing a short piece of text, graded exactly
  * like a short-answer question.
  */
-export const FillInShortAnswerBlankSchema = z
+export const fillInShortAnswerBlankSchema = z
 	.object({
-		id: FillInBlankIdSchema,
+		id: fillInBlankIdSchema,
 		type: z.literal("short-answer"),
 		/**
 		 * The list of accepted responses; a response is correct if it matches any
@@ -774,16 +774,16 @@ export const FillInShortAnswerBlankSchema = z
 	})
 	.strict();
 export type FillInShortAnswerBlank = z.infer<
-	typeof FillInShortAnswerBlankSchema
+	typeof fillInShortAnswerBlankSchema
 >;
 
 /**
  * A blank the student answers with a number, graded exactly like a numeric
  * question.
  */
-export const FillInNumericBlankSchema = z
+export const fillInNumericBlankSchema = z
 	.object({
-		id: FillInBlankIdSchema,
+		id: fillInBlankIdSchema,
 		type: z.literal("numeric"),
 		/** The expected correct numeric value. */
 		answer: z.number(),
@@ -799,10 +799,10 @@ export const FillInNumericBlankSchema = z
 		 * Ignored if domain is 'integer' or 'fraction'.
 		 */
 		decimalPlaces: z.int().min(0).optional(),
-		tolerance: NumericToleranceSchema.optional(),
+		tolerance: numericToleranceSchema.optional(),
 	})
 	.strict();
-export type FillInNumericBlank = z.infer<typeof FillInNumericBlankSchema>;
+export type FillInNumericBlank = z.infer<typeof fillInNumericBlankSchema>;
 
 /**
  * A single blank. `type` discriminates the three kinds; it is required here
@@ -810,12 +810,12 @@ export type FillInNumericBlank = z.infer<typeof FillInNumericBlankSchema>;
  * its kind from the definition that follows, while `[^size/numeric]:` states
  * it).
  */
-export const FillInBlankSchema = z.discriminatedUnion("type", [
-	FillInChoiceBlankSchema,
-	FillInShortAnswerBlankSchema,
-	FillInNumericBlankSchema,
+export const fillInBlankSchema = z.discriminatedUnion("type", [
+	fillInChoiceBlankSchema,
+	fillInShortAnswerBlankSchema,
+	fillInNumericBlankSchema,
 ]);
-export type FillInBlank = z.infer<typeof FillInBlankSchema>;
+export type FillInBlank = z.infer<typeof fillInBlankSchema>;
 
 /**
  * A question whose stem contains one or more named blanks, each answered in
@@ -824,7 +824,7 @@ export type FillInBlank = z.infer<typeof FillInBlankSchema>;
  * short answer, or a numeric value -- referenced from the stem by its id, as in
  * `The capital of Brazil is [^capital].`
  */
-export const FillInSchema = z
+export const fillInSchema = z
 	.object({
 		/**
 		 * Url-friendly identifier for the question. Used to reference the question
@@ -895,7 +895,7 @@ export const FillInSchema = z
 		 * The blanks referenced by the stem, in the order their definitions appear in
 		 * the document.
 		 */
-		blanks: z.array(FillInBlankSchema).min(1),
+		blanks: z.array(fillInBlankSchema).min(1),
 		/**
 		 * If true, the choices of every choice-based blank are safe to shuffle. If
 		 * false, they should never be shuffled, and if omitted the system is free to
@@ -904,23 +904,23 @@ export const FillInSchema = z
 		shuffle: z.boolean().optional(),
 	})
 	.strict();
-export type FillIn = z.infer<typeof FillInSchema>;
+export type FillIn = z.infer<typeof fillInSchema>;
 
 /**
  * One question block: either a question written inline, or a reference to one
  * stored elsewhere.
  */
-export const ExamEntrySchema = z.union([
-	ExamIncludeSchema,
-	MultipleChoiceSchema,
-	MultipleSelectionSchema,
-	TrueFalseSchema,
-	EssaySchema,
-	NumericSchema,
-	ShortAnswerSchema,
-	FillInSchema,
+export const examEntrySchema = z.union([
+	examIncludeSchema,
+	multipleChoiceSchema,
+	multipleSelectionSchema,
+	trueFalseSchema,
+	essaySchema,
+	numericSchema,
+	shortAnswerSchema,
+	fillInSchema,
 ]);
-export type ExamEntry = z.infer<typeof ExamEntrySchema>;
+export type ExamEntry = z.infer<typeof examEntrySchema>;
 
 /**
  * A set of questions gathered for assessment. An exam is recognized by its H1
@@ -928,7 +928,7 @@ export type ExamEntry = z.infer<typeof ExamEntrySchema>;
  * is either a complete question document or an `include` referring to one that
  * lives elsewhere.
  */
-export const ExamSchema = z
+export const examSchema = z
 	.object({
 		/**
 		 * Redundant in practice -- an exam is recognized by its H1 title -- but
@@ -994,10 +994,10 @@ export const ExamSchema = z
 		 * The questions, in the order their blocks appear in the document. An entry is
 		 * either a full question document or an `include`.
 		 */
-		questions: z.array(ExamEntrySchema),
+		questions: z.array(examEntrySchema),
 	})
 	.strict();
-export type Exam = z.infer<typeof ExamSchema>;
+export type Exam = z.infer<typeof examSchema>;
 
 /**
  * Common properties shared by every MDQ question type. Question-type schemas
@@ -1005,7 +1005,7 @@ export type Exam = z.infer<typeof ExamSchema>;
  * fill-in, essay) extend this schema, typically via `allOf` + `$ref`, and add
  * their own `type`-specific fields (e.g. `choices`).
  */
-export const QuestionBaseSchema = z.object({
+export const questionBaseSchema = z.object({
 	/**
 	 * Url-friendly identifier for the question. Used to reference the question
 	 * from exams, results, and cross-links. When omitted, an id may be derived
@@ -1071,23 +1071,23 @@ export const QuestionBaseSchema = z.object({
 	 */
 	meta: z.record(z.string(), z.unknown()).optional(),
 });
-export type QuestionBase = z.infer<typeof QuestionBaseSchema>;
+export type QuestionBase = z.infer<typeof questionBaseSchema>;
 
 /**
  * Any single MDQ question document: one of the seven question types,
  * discriminated by `type`.
  */
-export const QuestionSchema = z.discriminatedUnion("type", [
-	MultipleChoiceSchema,
-	MultipleSelectionSchema,
-	TrueFalseSchema,
-	EssaySchema,
-	NumericSchema,
-	ShortAnswerSchema,
-	FillInSchema,
+export const questionSchema = z.discriminatedUnion("type", [
+	multipleChoiceSchema,
+	multipleSelectionSchema,
+	trueFalseSchema,
+	essaySchema,
+	numericSchema,
+	shortAnswerSchema,
+	fillInSchema,
 ]);
-export type Question = z.infer<typeof QuestionSchema>;
+export type Question = z.infer<typeof questionSchema>;
 
 /** Any MDQ document: an exam, or one of the seven question types. */
-export const MdqDocumentSchema = z.union([QuestionSchema, ExamSchema]);
-export type MdqDocument = z.infer<typeof MdqDocumentSchema>;
+export const mdqDocumentSchema = z.union([questionSchema, examSchema]);
+export type MdqDocument = z.infer<typeof mdqDocumentSchema>;

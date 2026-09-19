@@ -3,24 +3,24 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import {
 	type Essay,
-	EssaySchema,
 	type Exam,
-	ExamEntrySchema,
-	ExamIncludeSchema,
-	ExamSchema,
+	essaySchema,
+	examEntrySchema,
+	examIncludeSchema,
+	examSchema,
 	type FillIn,
-	FillInBlankSchema,
-	FillInSchema,
-	MdqDocumentSchema,
+	fillInBlankSchema,
+	fillInSchema,
 	type MultipleChoice,
-	MultipleChoiceChoiceSchema,
-	MultipleChoiceSchema,
-	MultipleSelectionSchema,
+	mdqDocumentSchema,
+	multipleChoiceChoiceSchema,
+	multipleChoiceSchema,
+	multipleSelectionSchema,
 	type Numeric,
-	NumericSchema,
-	QuestionSchema,
-	ShortAnswerSchema,
-	TrueFalseSchema,
+	numericSchema,
+	questionSchema,
+	shortAnswerSchema,
+	trueFalseSchema,
 } from "@/mdq/schemas-generated";
 import { renderModule } from "../scripts/generate-question-models";
 
@@ -102,19 +102,19 @@ const fillInDoc = {
 const QUESTION_DOCS = [
 	{
 		name: "multiple-choice",
-		schema: MultipleChoiceSchema,
+		schema: multipleChoiceSchema,
 		doc: multipleChoiceDoc,
 	},
 	{
 		name: "multiple-selection",
-		schema: MultipleSelectionSchema,
+		schema: multipleSelectionSchema,
 		doc: multipleSelectionDoc,
 	},
-	{ name: "true-false", schema: TrueFalseSchema, doc: trueFalseDoc },
-	{ name: "essay", schema: EssaySchema, doc: essayDoc },
-	{ name: "numeric", schema: NumericSchema, doc: numericDoc },
-	{ name: "short-answer", schema: ShortAnswerSchema, doc: shortAnswerDoc },
-	{ name: "fill-in", schema: FillInSchema, doc: fillInDoc },
+	{ name: "true-false", schema: trueFalseSchema, doc: trueFalseDoc },
+	{ name: "essay", schema: essaySchema, doc: essayDoc },
+	{ name: "numeric", schema: numericSchema, doc: numericDoc },
+	{ name: "short-answer", schema: shortAnswerSchema, doc: shortAnswerDoc },
+	{ name: "fill-in", schema: fillInSchema, doc: fillInDoc },
 ] as const;
 
 const examDoc = {
@@ -137,7 +137,7 @@ test("each representative question document round-trips through its own schema",
 //
 
 test("an exam with a mix of inline questions and an include entry round-trips, preserving order", () => {
-	const parsed = ExamSchema.parse(examDoc);
+	const parsed = examSchema.parse(examDoc);
 	expect(parsed).toEqual(examDoc);
 	expect(parsed.questions).toEqual([
 		{ include: "recursion-01" },
@@ -150,26 +150,26 @@ test("an exam with a mix of inline questions and an include entry round-trips, p
 // 3. Discrimination
 //
 
-test("every question document parses through both QuestionSchema and MdqDocumentSchema", () => {
+test("every question document parses through both questionSchema and mdqDocumentSchema", () => {
 	for (const { doc } of QUESTION_DOCS) {
-		expect(QuestionSchema.parse(doc)).toEqual(doc);
-		expect(MdqDocumentSchema.parse(doc)).toEqual(doc);
+		expect(questionSchema.parse(doc)).toEqual(doc);
+		expect(mdqDocumentSchema.parse(doc)).toEqual(doc);
 	}
 });
 
-test("an exam parses through MdqDocumentSchema but not through QuestionSchema", () => {
-	expect(MdqDocumentSchema.parse(examDoc)).toEqual(examDoc);
-	expect(() => QuestionSchema.parse(examDoc)).toThrow();
+test("an exam parses through mdqDocumentSchema but not through questionSchema", () => {
+	expect(mdqDocumentSchema.parse(examDoc)).toEqual(examDoc);
+	expect(() => questionSchema.parse(examDoc)).toThrow();
 });
 
-test("a document with an unrecognized `type` is rejected by QuestionSchema and MdqDocumentSchema", () => {
+test("a document with an unrecognized `type` is rejected by questionSchema and mdqDocumentSchema", () => {
 	const notAQuestion = { type: "matching", stem: "Match the pairs." };
-	expect(() => QuestionSchema.parse(notAQuestion)).toThrow();
-	expect(() => MdqDocumentSchema.parse(notAQuestion)).toThrow();
+	expect(() => questionSchema.parse(notAQuestion)).toThrow();
+	expect(() => mdqDocumentSchema.parse(notAQuestion)).toThrow();
 });
 
-test("a bare {} is rejected by MdqDocumentSchema", () => {
-	expect(() => MdqDocumentSchema.parse({})).toThrow();
+test("a bare {} is rejected by mdqDocumentSchema", () => {
+	expect(() => mdqDocumentSchema.parse({})).toThrow();
 });
 
 //
@@ -178,8 +178,8 @@ test("a bare {} is rejected by MdqDocumentSchema", () => {
 
 test("an unknown top-level property is rejected", () => {
 	for (const { schema, doc } of [
-		{ schema: MultipleChoiceSchema, doc: multipleChoiceDoc },
-		{ schema: EssaySchema, doc: essayDoc },
+		{ schema: multipleChoiceSchema, doc: multipleChoiceDoc },
+		{ schema: essaySchema, doc: essayDoc },
 	]) {
 		expect(() => schema.parse({ ...doc, bogus: true })).toThrow();
 	}
@@ -187,10 +187,10 @@ test("an unknown top-level property is rejected", () => {
 
 test("an unknown property on a nested choice object is rejected", () => {
 	expect(() =>
-		MultipleChoiceChoiceSchema.parse({ text: "a", bogus: true }),
+		multipleChoiceChoiceSchema.parse({ text: "a", bogus: true }),
 	).toThrow();
 	expect(() =>
-		MultipleChoiceSchema.parse({
+		multipleChoiceSchema.parse({
 			...multipleChoiceDoc,
 			choices: [{ text: "a", bogus: true }, { text: "b" }],
 		}),
@@ -199,7 +199,7 @@ test("an unknown property on a nested choice object is rejected", () => {
 
 test("an unknown property on an exam's include entry is rejected", () => {
 	expect(() =>
-		ExamIncludeSchema.parse({ include: "recursion-01", bogus: true }),
+		examIncludeSchema.parse({ include: "recursion-01", bogus: true }),
 	).toThrow();
 });
 
@@ -215,15 +215,15 @@ test("dropping `stem` (required by question-base) is rejected for every question
 });
 
 const REQUIRED_KEY_CASES = [
-	{ schema: MultipleChoiceSchema, doc: multipleChoiceDoc, key: "choices" },
+	{ schema: multipleChoiceSchema, doc: multipleChoiceDoc, key: "choices" },
 	{
-		schema: MultipleSelectionSchema,
+		schema: multipleSelectionSchema,
 		doc: multipleSelectionDoc,
 		key: "choices",
 	},
-	{ schema: TrueFalseSchema, doc: trueFalseDoc, key: "choices" },
-	{ schema: NumericSchema, doc: numericDoc, key: "answer" },
-	{ schema: FillInSchema, doc: fillInDoc, key: "blanks" },
+	{ schema: trueFalseSchema, doc: trueFalseDoc, key: "choices" },
+	{ schema: numericSchema, doc: numericDoc, key: "answer" },
+	{ schema: fillInSchema, doc: fillInDoc, key: "blanks" },
 ] as const;
 
 test("dropping the type-specific required field is rejected", () => {
@@ -261,7 +261,7 @@ test("question-base fields (id, title, tags) are accepted by every question type
 
 test("a choice list below the minimum size is rejected", () => {
 	expect(() =>
-		MultipleChoiceSchema.parse({
+		multipleChoiceSchema.parse({
 			...multipleChoiceDoc,
 			choices: [{ text: "only one" }],
 		}),
@@ -270,32 +270,32 @@ test("a choice list below the minimum size is rejected", () => {
 
 test("a choice score far outside the allowed range is rejected", () => {
 	expect(() =>
-		MultipleChoiceChoiceSchema.parse({ text: "a", score: 5 }),
+		multipleChoiceChoiceSchema.parse({ text: "a", score: 5 }),
 	).toThrow();
 });
 
 test("a malformed uuid is rejected", () => {
 	expect(() =>
-		MultipleChoiceSchema.parse({ ...multipleChoiceDoc, uuid: "not-a-uuid" }),
+		multipleChoiceSchema.parse({ ...multipleChoiceDoc, uuid: "not-a-uuid" }),
 	).toThrow();
 });
 
 test("a malformed slug id is rejected", () => {
 	expect(() =>
-		MultipleChoiceSchema.parse({ ...multipleChoiceDoc, id: "has spaces!" }),
+		multipleChoiceSchema.parse({ ...multipleChoiceDoc, id: "has spaces!" }),
 	).toThrow();
 	expect(() =>
-		MultipleChoiceChoiceSchema.parse({ text: "a", id: "has spaces!" }),
+		multipleChoiceChoiceSchema.parse({ text: "a", id: "has spaces!" }),
 	).toThrow();
 });
 
 //
-// 8. Non-discriminated unions (FillInBlankSchema, ExamEntrySchema) -- plain
+// 8. Non-discriminated unions (fillInBlankSchema, examEntrySchema) -- plain
 // z.union()s, so the likeliest place for a future generator change to
 // accidentally accept a mismatched shape.
 //
 
-test("FillInBlankSchema accepts one valid instance of each blank kind", () => {
+test("fillInBlankSchema accepts one valid instance of each blank kind", () => {
 	const choiceBlank = {
 		id: "capital",
 		type: "multiple-choice",
@@ -312,13 +312,13 @@ test("FillInBlankSchema accepts one valid instance of each blank kind", () => {
 	const numericBlank = { id: "boiling", type: "numeric", answer: 100 };
 
 	for (const blank of [choiceBlank, shortAnswerBlank, numericBlank]) {
-		expect(FillInBlankSchema.parse(blank)).toEqual(blank);
+		expect(fillInBlankSchema.parse(blank)).toEqual(blank);
 	}
 });
 
-test("FillInBlankSchema rejects a blank whose `type` does not match its payload", () => {
+test("fillInBlankSchema rejects a blank whose `type` does not match its payload", () => {
 	expect(() =>
-		FillInBlankSchema.parse({
+		fillInBlankSchema.parse({
 			id: "x",
 			type: "numeric",
 			choices: [{ text: "a" }, { text: "b" }],
@@ -326,16 +326,16 @@ test("FillInBlankSchema rejects a blank whose `type` does not match its payload"
 	).toThrow();
 });
 
-test("ExamEntrySchema accepts an include entry and an inline question", () => {
-	expect(ExamEntrySchema.parse({ include: "recursion-01" })).toEqual({
+test("examEntrySchema accepts an include entry and an inline question", () => {
+	expect(examEntrySchema.parse({ include: "recursion-01" })).toEqual({
 		include: "recursion-01",
 	});
-	expect(ExamEntrySchema.parse(multipleChoiceDoc)).toEqual(multipleChoiceDoc);
+	expect(examEntrySchema.parse(multipleChoiceDoc)).toEqual(multipleChoiceDoc);
 });
 
-test("ExamEntrySchema rejects an entry that is both an include and a question", () => {
+test("examEntrySchema rejects an entry that is both an include and a question", () => {
 	expect(() =>
-		ExamEntrySchema.parse({ include: "q1", stem: "Also a question?" }),
+		examEntrySchema.parse({ include: "q1", stem: "Also a question?" }),
 	).toThrow();
 });
 
@@ -344,12 +344,12 @@ test("ExamEntrySchema rejects an entry that is both an include and a question", 
 //
 
 test("an omitted `shuffle` stays absent, rather than being defaulted", () => {
-	const parsed = MultipleChoiceSchema.parse(multipleChoiceDoc);
+	const parsed = multipleChoiceSchema.parse(multipleChoiceDoc);
 	expect("shuffle" in parsed && parsed.shuffle !== undefined).toBe(false);
 });
 
 test("an omitted exam `penalty` stays absent, rather than being defaulted", () => {
-	const parsed = ExamSchema.parse(examDoc);
+	const parsed = examSchema.parse(examDoc);
 	expect("penalty" in parsed && parsed.penalty !== undefined).toBe(false);
 });
 
@@ -366,32 +366,32 @@ test("inferred types are usable as plain object literals", () => {
 			{ text: "4", score: 1 },
 		],
 	};
-	expect(MultipleChoiceSchema.parse(q)).toEqual(q);
+	expect(multipleChoiceSchema.parse(q)).toEqual(q);
 
 	const e = {
 		type: "essay",
 		stem: "Explain recursion.",
 	} satisfies Essay;
-	expect(EssaySchema.parse(e)).toEqual(e);
+	expect(essaySchema.parse(e)).toEqual(e);
 
 	const n = {
 		type: "numeric",
 		stem: "What is pi rounded to 2 decimal places?",
 		answer: 3.14,
 	} satisfies Numeric;
-	expect(NumericSchema.parse(n)).toEqual(n);
+	expect(numericSchema.parse(n)).toEqual(n);
 
 	const exam: Exam = {
 		questions: [{ include: "some-question" }],
 	};
-	expect(ExamSchema.parse(exam)).toEqual(exam);
+	expect(examSchema.parse(exam)).toEqual(exam);
 
 	const doc = {
 		type: "fill-in",
 		stem: "The capital of Brazil is [^capital].",
 		blanks: [{ id: "capital", type: "numeric", answer: 1 }],
 	} satisfies FillIn;
-	expect(FillInSchema.parse(doc)).toEqual(doc);
+	expect(fillInSchema.parse(doc)).toEqual(doc);
 });
 
 //

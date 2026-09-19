@@ -100,5 +100,5 @@ export class Question<Q extends schema.Question> {
 }
 
 function camelCase(str: string): string {
-	return str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+	return str.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }

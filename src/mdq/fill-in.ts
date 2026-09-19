@@ -8,7 +8,7 @@ export type FillInSegment =
 	| { kind: "markdown"; text: string }
 	| { kind: "blank"; id: string };
 
-// The slug of `FillInBlankIdSchema`, wrapped in the `[^…]` marker. Anything
+// The slug of `fillInBlankIdSchema`, wrapped in the `[^…]` marker. Anything
 // between brackets that does not match is not a reference and stays in the
 // Markdown, which is what makes `[^1]` and `[not a slug]` harmless.
 const REFERENCE = /\[\^([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*)\]/g;
@@ -34,7 +34,8 @@ export function parseFillInStem(stem: string): FillInSegment[] {
 		if (start > cursor) {
 			segments.push({ kind: "markdown", text: stem.slice(cursor, start) });
 		}
-		segments.push({ kind: "blank", id: match[1] });
+		// biome-ignore lint/style/noNonNullAssertion: REFERENCE's capture group is mandatory in any match matchAll produces.
+		segments.push({ kind: "blank", id: match[1]! });
 		cursor = start + match[0].length;
 	}
 

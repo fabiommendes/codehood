@@ -1217,7 +1217,7 @@ test.describe("question validation", () => {
 			"fill-in-unreferenced-blank",
 		]);
 		// The message names the thing the author has to go and fix.
-		expect(problems[0].message).toContain("[^typo]");
+		expect(problems[0]?.message).toContain("[^typo]");
 	});
 });
 
