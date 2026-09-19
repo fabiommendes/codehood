@@ -1,9 +1,8 @@
 ---
-import { canManageEnrollment } from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Badge from "@/components/ui/Badge";
-import { toEnrollmentView } from "@/db/services/course.service";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 
@@ -16,7 +15,7 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
 const actor = Astro.locals.actor!;
-const canManage = canManageEnrollment(actor, toEnrollmentView(course));
+const canManage = hasPerm(actor, "enrollment.manage", course);
 
 // Still mocked — exams and submissions need question rendering (out of scope
 // for dev/specs/to-do/course-navigation.md). A draft exam is only ever in

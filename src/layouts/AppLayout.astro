@@ -4,8 +4,8 @@ import Logo from "@/components/Logo.astro";
 import SidebarArt from "@/components/SidebarArt.astro";
 import SidebarArtAlt from "@/components/SidebarArtAlt.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
-import { courseService } from "@/db/services/course.service";
-import { courseHref } from "@/utils/course-url";
+import { db } from "@/db";
+import { courseHref } from "@/urls";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -73,7 +73,7 @@ const DOT_COLORS = [
 	"bg-info",
 ];
 const courses = user
-	? (await courseService.findMany({}, { actor: user })).map((course, i) => ({
+	? (await db.course.findMany({}, { actor: user })).map((course, i) => ({
 			code: course.discipline.slug,
 			href: courseHref({
 				discipline: course.discipline.slug,

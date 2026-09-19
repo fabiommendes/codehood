@@ -4,16 +4,8 @@ import path from "node:path";
 import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { FULL_ACCESS } from "@/core/actor";
-import { courseService } from "@/db/services/course.service";
-import { fileService } from "@/db/services/file.service";
-import {
-	type Resource,
-	type ResourceCreate,
-	resourceService,
-} from "@/db/services/resource.service";
-import { guessMimeType } from "@/utils/mime";
-import { blobHref, fileDownloadName } from "@/utils/resource-url";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db, type Resource, type ResourceCreate } from "@/db";
 
 const resourceEntrySchema = z.object({
 	slug: z.string().min(1),
@@ -51,9 +43,11 @@ export const importResourcesCommand = new Command("import-resources")
 			manifestPath: string,
 			options: { prune?: boolean },
 		) => {
-			const course = await courseService.findOne(
+			const course = await db.course.findOne(
 				{
-					ref: { discipline: disciplineSlug, instructor: instructor, edition },
+					discipline: disciplineSlug,
+					instructor: instructor,
+					edition,
 				},
 				FULL_ACCESS,
 			);
@@ -80,31 +74,28 @@ export const importResourcesCommand = new Command("import-resources")
 			for (const entry of entries) {
 				seenSlugs.add(entry.slug);
 				try {
-					const built = await buildCreateInput(entry, manifestDir, course.id);
-					const existing = await resourceService.findOne(
-						{ ref: { courseId: course.id, slug: entry.slug } },
+					const built = await buildCreateInput(entry, manifestDir);
+					const existing = await db.resource.findOne(
+						{ courseId: course.id, slug: entry.slug },
 						FULL_ACCESS,
 					);
 					let resource: Resource;
 					if (existing) {
-						resource = await resourceService.update(
+						resource = await db.resource.update(
 							{ id: existing.id },
 							built,
 							FULL_ACCESS,
 						);
 						console.log(`Updated  ${entry.slug} (${entry.type}).`);
 					} else {
-						resource = await resourceService.create(
+						resource = await db.resource.create(
 							{ ...built, courseId: course.id, slug: entry.slug },
 							FULL_ACCESS,
 						);
 						console.log(`Created  ${entry.slug} (${entry.type}).`);
 					}
-					if (resource.type === "FILE" && resource.file) {
-						const url = blobHref(
-							resource.file,
-							fileDownloadName(resource, resource.file),
-						);
+					if (resource.data.type === "FILE" && resource.data.link) {
+						const url = resource.data.link;
 						createdBlobUrls.push(url);
 					}
 				} catch (error) {
@@ -116,14 +107,14 @@ export const importResourcesCommand = new Command("import-resources")
 			}
 
 			if (options.prune) {
-				const current = await resourceService.findMany(
+				const current = await db.resource.findMany(
 					{ courseId: course.id },
 					FULL_ACCESS,
 				);
 				for (const resource of current) {
 					if (!seenSlugs.has(resource.slug)) {
-						await resourceService.delete({ id: resource.id }, FULL_ACCESS);
-						console.log(`Pruned   ${resource.slug} (${resource.type}).`);
+						await db.resource.delete({ id: resource.id }, FULL_ACCESS);
+						console.log(`Pruned   ${resource.slug} (${resource.data.type}).`);
 					}
 				}
 			}
@@ -142,43 +133,66 @@ export const importResourcesCommand = new Command("import-resources")
 	);
 
 /**
- * Builds the fields shared by `create` and `update`, computing `contentHash`
- * locally the way the CLI will: for `FILE`, the underlying blob's sha-256; for
+ * Builds the fields shared by `create` and `update`, computing `ref`
+ * locally the way the CLI will: for `FILE`, the raw bytes' sha-256; for
  * everything else, a hash of the resource's own fields, since `data`/`extra`
  * carry the content the file hash would otherwise cover.
  */
 async function buildCreateInput(
 	entry: ResourceEntry,
 	manifestDir: string,
-	_courseId: number,
 ): Promise<Omit<ResourceCreate, "courseId" | "slug">> {
 	if (entry.type === "FILE") {
 		if (!entry.file) {
 			throw new Error("a FILE resource needs a `file` path.");
 		}
 		const filePath = path.resolve(manifestDir, entry.file);
-		const bytes = await readFile(filePath);
-		const contentHash = createHash("sha256").update(bytes).digest("hex");
-		const file = await fileService.create(
-			{ bytes, mimeType: guessMimeType(filePath), contentHash },
-			FULL_ACCESS,
-		);
+		const buffer = await readFile(filePath);
+		const fileHash = createHash("sha256").update(buffer).digest("hex");
 		return {
-			type: entry.type,
 			title: entry.title,
 			description: entry.description,
-			fileId: file.id,
-			contentHash: resourceContentHash(entry, file.slugHash),
+			ref: resourceContentHash(entry, fileHash),
+			data: {
+				type: "FILE",
+				filename: path.basename(entry.file),
+				buffer,
+			},
 		};
 	}
 	return {
-		type: entry.type,
 		title: entry.title,
 		description: entry.description,
-		data: entry.data,
-		extra: entry.extra,
-		contentHash: resourceContentHash(entry),
+		ref: resourceContentHash(entry),
+		data: buildResourceData(entry),
 	};
+}
+
+function buildResourceData(
+	entry: ResourceEntry,
+): Exclude<ResourceCreate["data"], { type: "FILE" }> {
+	switch (entry.type) {
+		case "LINK":
+			if (!entry.data) {
+				throw new Error("a LINK resource needs `data` set to its URL.");
+			}
+			return { type: "LINK", url: entry.data };
+		case "CODE":
+			if (!entry.data) {
+				throw new Error("a CODE resource needs `data` set to its content.");
+			}
+			if (!entry.extra) {
+				throw new Error("a CODE resource needs `extra` set to its language.");
+			}
+			return { type: "CODE", content: entry.data, language: entry.extra };
+		case "MD":
+			if (!entry.data) {
+				throw new Error("an MD resource needs `data` set to its content.");
+			}
+			return { type: "MD", content: entry.data };
+		default:
+			throw new Error(`Unsupported type: ${entry.type}`);
+	}
 }
 
 function resourceContentHash(entry: ResourceEntry, fileHash?: string): string {

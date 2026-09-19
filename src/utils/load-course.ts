@@ -1,17 +1,14 @@
 import type { AstroGlobal } from "astro";
-import { canManageEnrollment } from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import {
-	type Course,
-	courseService,
-	toEnrollmentView,
-} from "@/db/services/course.service";
-import { courseHref, parseCourseSegment } from "./course-url";
+import { type Course, db } from "@/db";
+import { courseHref, parseCourseSegment } from "../urls";
 
 export type LoadCourseResult =
 	| { course: Course; href: string }
 	| { redirect: Response };
 
+// TODO: IMPORTANT! database access must be done through service classes.
 /**
  * The four steps every course page needs: parse the URL segment, load the
  * course, check the actor may see it, and 403/404 on failure. `Astro.rewrite`
@@ -21,7 +18,7 @@ export type LoadCourseResult =
  * repeated on every page.
  *
  * Pass `manage: true` on instructor-only pages (`/manage`, `/roster`) to
- * also require {@link canManageEnrollment}, not just visibility — the same
+ * also require `enrollment.manage`, not just visibility — the same
  * predicate `courseTabs` uses to decide whether those tabs even show up (see
  * `dev/specs/to-do/course-navigation.md`).
  */
@@ -44,13 +41,11 @@ export async function loadCourse(
 
 	let course: Course | null;
 	try {
-		course = await courseService.findOne(
+		course = await db.course.findOne(
 			{
-				ref: {
-					discipline: disciplineSlug,
-					instructor: parsed.instructor,
-					edition: parsed.edition,
-				},
+				discipline: disciplineSlug,
+				instructor: parsed.instructor,
+				edition: parsed.edition,
 			},
 			{ actor },
 		);
@@ -64,7 +59,7 @@ export async function loadCourse(
 	if (!course) {
 		return { redirect: await Astro.rewrite("/404") };
 	}
-	if (opts?.manage && !canManageEnrollment(actor, toEnrollmentView(course))) {
+	if (opts?.manage && !hasPerm(actor, "enrollment.manage", course)) {
 		return { redirect: await forbidden(Astro, segment) };
 	}
 

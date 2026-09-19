@@ -1,8 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
+import { FULL_ACCESS } from "@/auth/actor";
 import { hashToken } from "@/auth/token";
-import { FULL_ACCESS } from "@/core/actor";
+import { db } from "@/db";
 import { prisma } from "@/db/client";
-import { userService } from "@/db/services/user.service";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedInviteFactory } from "@/fixtures/invite.factory";
 import { fillField, logIn, openTab, resetDatabase, seedUser } from "./helpers";
@@ -53,10 +53,7 @@ test("student: redeem a personal invite", async ({ page }) => {
 		page.getByRole("heading", { name: course.discipline.name }),
 	).toBeVisible();
 
-	const created = await userService.findOne(
-		{ username: "invitee" },
-		FULL_ACCESS,
-	);
+	const created = await db.user.findOne({ username: "invitee" }, FULL_ACCESS);
 	expect(created?.role).toBe("STUDENT");
 
 	await test.step("coming back to a spent link says it is used up", async () => {

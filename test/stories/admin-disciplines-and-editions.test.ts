@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
+import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import {
 	disciplineFactory,
@@ -49,7 +48,7 @@ test("admin: create a discipline", async ({ page }) => {
 
 	// The story says the discipline outlives the courses under it, so the slug
 	// has to have actually landed — not just been echoed back into the page.
-	const stored = await disciplineService.findOne({ slug });
+	const stored = await db.discipline.findOne({ slug });
 	expect(stored?.name).toBe("Quantum Mechanics");
 });
 
@@ -86,7 +85,7 @@ test("admin: create an edition", async ({ page }) => {
 
 	// Instructors can only create courses inside the window the admin just
 	// opened — that window is the part the page can't show back visually.
-	const stored = await editionService.findOne({ slug });
+	const stored = await db.edition.findOne({ slug });
 	expect(stored?.startAt.toISOString().slice(0, 10)).toBe("2026-08-01");
 	expect(stored?.endAt.toISOString().slice(0, 10)).toBe("2026-12-15");
 });
@@ -142,9 +141,9 @@ test("admin: delete an edition or discipline created by mistake", async ({
 	});
 
 	// The courses running under the surviving ones are untouched.
-	expect(await editionService.findOne({ slug: inUse.slug })).not.toBeNull();
+	expect(await db.edition.findOne({ slug: inUse.slug })).not.toBeNull();
 	expect(
-		await disciplineService.findOne({ slug: disciplineInUse.slug }),
+		await db.discipline.findOne({ slug: disciplineInUse.slug }),
 	).not.toBeNull();
-	expect(await editionService.findOne({ slug: empty.slug })).toBeNull();
+	expect(await db.edition.findOne({ slug: empty.slug })).toBeNull();
 });

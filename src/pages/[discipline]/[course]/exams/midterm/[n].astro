@@ -1,7 +1,7 @@
 ---
 import Alert from "@/components/ui/Alert";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -43,7 +43,8 @@ const n = Number(nParam);
 if (!Number.isInteger(n) || n < 1 || n > questions.length) {
 	return Astro.redirect(`${href}/exams/midterm/1`);
 }
-const question = questions[n - 1];
+// biome-ignore lint/style/noNonNullAssertion: the guard above redirects unless 1 <= n <= questions.length, so n - 1 is a valid index.
+const question = questions[n - 1]!;
 const isLast = n === questions.length;
 ---
 

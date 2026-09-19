@@ -2,7 +2,7 @@
 import MarkdownIt from "markdown-it";
 import CourseHeader from "@/components/CourseHeader.astro";
 import Badge from "@/components/ui/Badge";
-import { resourceService } from "@/db/services/resource.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
@@ -21,24 +21,28 @@ if (!slug) {
 	return Astro.rewrite("/404");
 }
 
-const resource = await resourceService.findOne(
-	{ ref: { courseId: course.id, slug } },
+const resource = await db.resource.findOne(
+	{ courseId: course.id, slug },
 	{ actor },
 );
 // LINK and FILE resources act from their row on the list page — they have no
 // page of their own here.
-if (!resource || (resource.type !== "MD" && resource.type !== "CODE")) {
+if (
+	!resource ||
+	(resource.data.type !== "MD" && resource.data.type !== "CODE")
+) {
 	return Astro.rewrite("/404");
 }
+const data = resource.data;
 
 // Content is rendered with no user-supplied HTML: markdown-it runs with
 // `html: false` (raw HTML in a note would execute on the app's own origin —
 // see "Markdown is rendered with HTML off" in dev/specs/to-do/resources.md),
 // and the CODE branch never interprets its text, only highlights it.
 const bodyHtml =
-	resource.type === "MD"
-		? new MarkdownIt({ html: false }).render(resource.data ?? "")
-		: await highlightCode(resource.data ?? "", resource.extra);
+	data.type === "MD"
+		? new MarkdownIt({ html: false }).render(data.content)
+		: await highlightCode(data.content, data.language);
 ---
 
 <AppLayout title={`${resource.title} · ${course.discipline.name}`}>
@@ -53,9 +57,9 @@ const bodyHtml =
     <div class="mt-2 flex flex-wrap items-center gap-2">
       <h2 class="text-xl font-semibold">{resource.title}</h2>
       {
-        resource.type === "CODE" && resource.extra && (
+        data.type === "CODE" && (
           <Badge size="sm" style="outline">
-            {resource.extra}
+            {data.language}
           </Badge>
         )
       }
@@ -67,7 +71,7 @@ const bodyHtml =
     }
 
     {
-      resource.type === "MD" ? (
+      data.type === "MD" ? (
         <div class="card card-border mt-6 bg-base-200">
           <div
             class="card-body prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline"

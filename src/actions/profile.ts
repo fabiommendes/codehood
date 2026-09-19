@@ -2,9 +2,8 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
-import { sessionService } from "@/db/services/session.service";
-import { userService } from "@/db/services/user.service";
-import { SESSION_COOKIE } from "@/middleware";
+import { SESSION_COOKIE } from "@/core/constants";
+import { db } from "@/db";
 
 const FIELD_LABELS: Record<string, string> = {
 	email: "email",
@@ -55,7 +54,7 @@ export const profile = {
 		handler: async (input, context) => {
 			const actor = requireUser(context);
 			try {
-				await userService.update({ username: actor.username }, input, {
+				await db.user.update({ username: actor.username }, input, {
 					actor,
 				});
 			} catch (error) {
@@ -74,7 +73,7 @@ export const profile = {
 		}),
 		handler: async (input, context) => {
 			const actor = requireUser(context);
-			const user = await userService.findOne(
+			const user = await db.user.findOne(
 				{ username: actor.username },
 				{ actor },
 			);
@@ -87,7 +86,7 @@ export const profile = {
 					message: "Current password is incorrect.",
 				});
 			}
-			await userService.updatePassword(user, input.newPassword, { actor });
+			await db.user.updatePassword(user, input.newPassword, { actor });
 		},
 	}),
 
@@ -95,7 +94,7 @@ export const profile = {
 		accept: "form",
 		handler: async (_input, context) => {
 			const actor = requireUser(context);
-			await sessionService.delete({ userId: actor.username }, { actor });
+			await db.session.delete({ username: actor.username }, { actor });
 			context.cookies.delete(SESSION_COOKIE, { path: "/" });
 		},
 	}),

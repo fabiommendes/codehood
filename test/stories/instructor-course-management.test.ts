@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { apiKeyService } from "@/db/services/api-key.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import {
 	fillField,
 	logInAs,
@@ -58,10 +58,10 @@ test("instructor: get started with the CLI", async ({ page }) => {
 	});
 
 	// The key that came back is a real CLI key the instructor now owns.
-	const keys = await apiKeyService.findMany(
+	const keys = await db.apiKey.findMany(
 		{ createdById: instructor.username },
 		FULL_ACCESS,
 	);
 	expect(keys).toHaveLength(1);
-	expect(keys[0].kind).toBe("CLI");
+	expect(keys[0]?.kind).toBe("CLI");
 });

@@ -1,18 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
+import { FULL_ACCESS } from "@/auth/actor";
 import type {
 	CalendarEventId,
 	CourseId,
 	TimeSlotId,
 	UserId,
 } from "@/core/schemas";
+import { db } from "@/db";
 import { prisma } from "@/db/client";
-import { calendarEventService } from "@/db/services/calendar-event.service";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { timeSlotService } from "@/db/services/time-slot.service";
-import { userService } from "@/db/services/user.service";
 import { examForEvent, relinkExam } from "@/db/util.exam-link";
 import { endOf } from "@/utils/schedule-time";
 
@@ -26,7 +21,7 @@ function tag(prefix: string): string {
 
 async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 	const username = tag(role.toLowerCase());
-	return userService.create(
+	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
@@ -41,8 +36,8 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 }
 
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await editionService.findOne({ slug }))) {
-		await editionService.create(
+	if (!(await db.edition.findOne({ slug }))) {
+		await db.edition.create(
 			{
 				slug,
 				name: slug,
@@ -57,12 +52,12 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 
 async function makeCourse(instructorUsername: string) {
 	const disciplineSlug = tag("disc");
-	await disciplineService.create(
+	await db.discipline.create(
 		{ slug: disciplineSlug, name: disciplineSlug },
 		FULL_ACCESS,
 	);
 	const editionSlug = await ensureEdition();
-	return courseService.create(
+	return db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
@@ -85,7 +80,7 @@ async function makeSlot(
 	spec: SlotSpec,
 	slug = tag("slot"),
 ) {
-	return timeSlotService.create(
+	return db.timeSlot.create(
 		{
 			courseId,
 			slug,
@@ -103,7 +98,7 @@ async function makeEvent(
 	date: string,
 	opts: { startMin?: number; durationMin?: number; week?: number } = {},
 ) {
-	return calendarEventService.create(
+	return db.calendarEvent.create(
 		{
 			courseId,
 			timeSlotId,
@@ -143,7 +138,7 @@ async function makeExam(
 }
 
 async function reload(eventId: CalendarEventId) {
-	return calendarEventService.findOne({ id: eventId }, FULL_ACCESS);
+	return db.calendarEvent.findOne({ id: eventId }, FULL_ACCESS);
 }
 
 test("an exam starting inside, one starting before and ending inside, and one spanning entirely all match", async () => {
@@ -339,14 +334,14 @@ test("update moving an event out of its exam's window clears the link; moving it
 	await relinkExam(prisma, exam.id);
 	expect((await reload(evt.id))?.exam?.id).toBe(exam.id);
 
-	const movedAway = await calendarEventService.update(
+	const movedAway = await db.calendarEvent.update(
 		{ id: evt.id },
 		{ date: "2026-01-12" },
 		{ actor: instructor },
 	);
 	expect(movedAway.exam).toBeNull();
 
-	const movedBack = await calendarEventService.update(
+	const movedBack = await db.calendarEvent.update(
 		{ id: evt.id },
 		{ date: "2026-01-05" },
 		{ actor: instructor },

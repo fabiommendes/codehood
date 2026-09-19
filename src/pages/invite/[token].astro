@@ -2,22 +2,20 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import { FULL_ACCESS } from "@/core/actor";
-import { inviteService } from "@/db/services/invite.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 const { token } = Astro.params;
 const result = Astro.getActionResult(actions.auth.acceptInvite);
 if (result && !result.error) {
-	return Astro.redirect("/");
+  return Astro.redirect("/");
 }
 
-const invite = token
-	? await inviteService.findOne({ token }, FULL_ACCESS)
-	: null;
+const invite = token ? await db.invite.findOne({ token }, FULL_ACCESS) : null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
-	invite?.maxUses != null ? invite.redemptions >= invite.maxUses : false;
+  invite?.maxUses != null ? invite.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
 ---
 

@@ -1,18 +1,12 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
+import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
-import { FULL_ACCESS } from "@/core/actor";
-import * as schema from "@/core/schemas";
+import { SESSION_COOKIE } from "@/core/constants";
+import { db, InviteError, schema, type User } from "@/db";
 import { prisma } from "@/db/client";
-import { apiKeyService } from "@/db/services/api-key.service";
-import type { CourseId } from "@/db/services/course.service";
-import { courseService } from "@/db/services/course.service";
-import { InviteError, inviteService } from "@/db/services/invite.service";
-import { sessionService } from "@/db/services/session.service";
-import { type User, userService } from "@/db/services/user.service";
-import { SESSION_COOKIE } from "@/middleware";
-import { USERNAME_RE } from "@/utils/course-url";
+import { USERNAME_RE } from "@/urls";
 import { withActionErrors } from "./helpers";
 
 const SESSION_COOKIE_OPTS = {
@@ -32,18 +26,15 @@ export const auth = {
 			password: z.string().min(1),
 		}),
 		handler: async (input, context) => {
-			const user = await userService.findOne(
-				{ login: input.login },
-				FULL_ACCESS,
-			);
+			const user = await db.user.findOne({ login: input.login }, FULL_ACCESS);
 			if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
 				throw new ActionError({
 					code: "UNAUTHORIZED",
 					message: "Invalid email/username or password.",
 				});
 			}
-			const { token, session } = await sessionService.create(
-				{ userId: user.username },
+			const { token, session } = await db.session.create(
+				{ username: user.username },
 				FULL_ACCESS,
 			);
 			context.cookies.set(SESSION_COOKIE, token, {
@@ -58,7 +49,7 @@ export const auth = {
 		accept: "form",
 		handler: async (_input, context) => {
 			const token = context.cookies.get(SESSION_COOKIE)?.value;
-			if (token) await sessionService.delete({ token }, FULL_ACCESS);
+			if (token) await db.session.delete({ token }, FULL_ACCESS);
 			context.cookies.delete(SESSION_COOKIE, { path: "/" });
 		},
 	}),
@@ -75,7 +66,7 @@ export const auth = {
 			schoolId: z.string().min(1),
 		}),
 		handler: async (input, context) => {
-			const invite = await inviteService.findOne(
+			const invite = await db.invite.findOne(
 				{ token: input.token },
 				FULL_ACCESS,
 			);
@@ -84,7 +75,7 @@ export const auth = {
 					code: "NOT_FOUND",
 					message: "Invite not found or expired.",
 				});
-			const precheckError = inviteService.checkRedeemable(invite, input.email);
+			const precheckError = db.invite.checkRedeemable(invite, input.email);
 			if (precheckError) {
 				throw new ActionError({
 					code: "BAD_REQUEST",
@@ -97,7 +88,7 @@ export const auth = {
 			let user: User;
 			try {
 				user = await prisma.$transaction(async (tx) => {
-					const createdUser = await userService.create(
+					const createdUser = await db.user.create(
 						{
 							email: input.email,
 							username: input.username,
@@ -109,15 +100,15 @@ export const auth = {
 						},
 						{ ...FULL_ACCESS, tx },
 					);
-					await inviteService.redeem(
+					await db.invite.redeem(
 						input.token,
 						createdUser.username,
 						input.email,
 						{ ...FULL_ACCESS, tx },
 					);
 					if (invite.courseId) {
-						await courseService.enroll(
-							{ courseId: invite.courseId, userId: createdUser.username },
+						await db.enrollment.create(
+							{ courseId: invite.courseId, username: createdUser.username },
 							{ ...FULL_ACCESS, tx },
 						);
 					}
@@ -133,8 +124,8 @@ export const auth = {
 				throw error;
 			}
 
-			const { token: sessionToken, session } = await sessionService.create(
-				{ userId: user.username },
+			const { token: sessionToken, session } = await db.session.create(
+				{ username: user.username },
 				FULL_ACCESS,
 			);
 			context.cookies.set(SESSION_COOKIE, sessionToken, {
@@ -153,12 +144,12 @@ export const auth = {
 		}),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { token } = await inviteService.create(
+			const { token } = await db.invite.create(
 				{
 					email: input.email,
 					invitedRole: input.role,
 					courseId:
-						input.courseId != null ? (input.courseId as CourseId) : null,
+						input.courseId != null ? (input.courseId as schema.CourseId) : null,
 					kind: "PERSONAL",
 					maxUses: 1,
 					createdBy: { username: actor.username, name: actor.name },
@@ -176,10 +167,10 @@ export const auth = {
 		}),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { token } = await inviteService.create(
+			const { token } = await db.invite.create(
 				{
 					email: null,
-					courseId: input.courseId as CourseId,
+					courseId: input.courseId as schema.CourseId,
 					maxUses: input.maxUses ?? null,
 					kind: "CLASSROOM",
 					invitedRole: "STUDENT",
@@ -196,7 +187,7 @@ export const auth = {
 		input: z.object({ name: z.string().min(1), kind: z.enum(["CLI", "BOT"]) }),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { token } = await apiKeyService.create(
+			const { token } = await db.apiKey.create(
 				{
 					createdBy: { username: actor.username, name: actor.name },
 					name: input.name,
@@ -213,7 +204,7 @@ export const auth = {
 		input: schema.apiKeyPK,
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await apiKeyService.delete({ id: input.id }, { actor });
+			await db.apiKey.delete({ id: input.id }, { actor });
 		}),
 	}),
 };

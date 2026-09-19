@@ -7,8 +7,7 @@ import EditionsTable, {
 	type EditionRow,
 } from "@/components/admin/EditionsTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { courseService } from "@/db/services/course.service";
-import { editionService, isEditionOpen } from "@/db/services/edition.service";
+import { db, isEditionOpen } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -21,8 +20,8 @@ const createResult = Astro.getActionResult(actions.admin.createEdition);
 const updateResult = Astro.getActionResult(actions.admin.updateEdition);
 const deleteResult = Astro.getActionResult(actions.admin.deleteEdition);
 
-const editions = await editionService.findMany({});
-const courses = await courseService.findMany({}, { actor });
+const editions = await db.edition.findMany({});
+const courses = await db.course.findMany({}, { actor });
 const courseCounts = new Map<string, number>();
 for (const course of courses) {
 	courseCounts.set(

@@ -3,16 +3,8 @@ import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { FULL_ACCESS } from "@/core/actor";
-import {
-	type CalendarEventCreate,
-	calendarEventService,
-} from "@/db/services/calendar-event.service";
-import { courseService } from "@/db/services/course.service";
-import {
-	type TimeSlot,
-	timeSlotService,
-} from "@/db/services/time-slot.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { type CalendarEventCreate, db, type TimeSlot } from "@/db";
 
 const WEEKDAYS = [
 	"SUNDAY",
@@ -100,9 +92,11 @@ export const importCalendarCommand = new Command("import-calendar")
 			manifestPath: string,
 			options: { prune?: boolean },
 		) => {
-			const course = await courseService.findOne(
+			const course = await db.course.findOne(
 				{
-					ref: { discipline: disciplineSlug, instructor: instructor, edition },
+					discipline: disciplineSlug,
+					instructor: instructor,
+					edition,
 				},
 				FULL_ACCESS,
 			);
@@ -125,13 +119,13 @@ export const importCalendarCommand = new Command("import-calendar")
 			const slotsBySlug = new Map<string, TimeSlot>();
 			for (const entry of manifest.slots) {
 				try {
-					const existing = await timeSlotService.findOne(
+					const existing = await db.timeSlot.findOne(
 						{ ref: { courseId: course.id, slug: entry.slug } },
 						FULL_ACCESS,
 					);
 					let slot: TimeSlot;
 					if (existing) {
-						slot = await timeSlotService.update(
+						slot = await db.timeSlot.update(
 							{ id: existing.id },
 							{
 								title: entry.title,
@@ -143,7 +137,7 @@ export const importCalendarCommand = new Command("import-calendar")
 						);
 						console.log(`Updated  slot ${entry.slug} (${entry.day}).`);
 					} else {
-						slot = await timeSlotService.create(
+						slot = await db.timeSlot.create(
 							{
 								courseId: course.id,
 								slug: entry.slug,
@@ -190,12 +184,12 @@ export const importCalendarCommand = new Command("import-calendar")
 						description: entry.description ?? null,
 						contentHash: canonicalHash(entry),
 					};
-					const existing = await calendarEventService.findOne(
+					const existing = await db.calendarEvent.findOne(
 						{ ref: { courseId: course.id, slug: entry.slug } },
 						FULL_ACCESS,
 					);
 					if (existing) {
-						await calendarEventService.update(
+						await db.calendarEvent.update(
 							{ id: existing.id },
 							{
 								date: built.date,
@@ -213,7 +207,7 @@ export const importCalendarCommand = new Command("import-calendar")
 							`Updated  event ${entry.slug} (${entry.kind ?? "LECTURE"}).`,
 						);
 					} else {
-						await calendarEventService.create(
+						await db.calendarEvent.create(
 							{
 								...built,
 								courseId: course.id,
@@ -235,13 +229,13 @@ export const importCalendarCommand = new Command("import-calendar")
 			}
 
 			if (options.prune) {
-				const current = await calendarEventService.findMany(
+				const current = await db.calendarEvent.findMany(
 					{ courseIds: [course.id] },
 					FULL_ACCESS,
 				);
 				for (const event of current) {
 					if (!seenEventSlugs.has(event.slug)) {
-						await calendarEventService.delete({ id: event.id }, FULL_ACCESS);
+						await db.calendarEvent.delete({ id: event.id }, FULL_ACCESS);
 						console.log(`Pruned   event ${event.slug} (${event.kind}).`);
 					}
 				}

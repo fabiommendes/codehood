@@ -1,13 +1,13 @@
 import { password as passwordPrompt } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/core/actor";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 
 export const resetPasswordCommand = new Command("reset-password")
 	.description("Reset the password for a given user")
 	.argument("<email>", "email address of the user")
 	.action(async (email: string) => {
-		const user = await userService.findOne({ email }, FULL_ACCESS);
+		const user = await db.user.findOne({ email }, FULL_ACCESS);
 		if (!user) {
 			console.error(`No user with email ${email}.`);
 			process.exitCode = 1;
@@ -28,6 +28,6 @@ export const resetPasswordCommand = new Command("reset-password")
 			return;
 		}
 
-		await userService.updatePassword(user, password, FULL_ACCESS);
+		await db.user.updatePassword(user, password, FULL_ACCESS);
 		console.log(`Password updated for ${user.email}.`);
 	});

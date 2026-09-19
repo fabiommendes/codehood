@@ -1,16 +1,12 @@
 ---
-import { canWriteCourseContent } from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
-import {
-	groupResourcesByType,
-	resourceService,
-} from "@/db/services/resource.service";
+import { db, groupResourcesByType } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { formatBytes } from "@/utils/format-bytes";
 import { loadCourse } from "@/utils/load-course";
-import { blobHref, fileDownloadName } from "@/utils/resource-url";
+import { fileDownloadName } from "@/utils/resource-url";
 
 export const prerender = false;
 
@@ -21,17 +17,13 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
-const canWrite = canWriteCourseContent(actor, course);
+const canWrite = hasPerm(actor, "course.update-contents", course);
 
-const resources = await resourceService.findMany(
+const resources = await db.resource.findMany(
 	{ courseId: course.id },
 	{ actor },
 );
 const groups = groupResourcesByType(resources);
-
-const totalFileBytes = resources
-	.filter((r) => r.type === "FILE" && r.file && !r.file.deletedAt)
-	.reduce((sum, r) => sum + (r.file?.size ?? 0), 0);
 
 // Blob URLs carry no auth check of their own (FR-NFR-030); this page's referrer
 // still shouldn't leak into every link it hands out.
@@ -47,25 +39,24 @@ const ICONS = {
 const DOWNLOAD_ICON = "M12 4v11m0 0 4-4m-4 4-4-4M5 19h14";
 
 function detail(resource: (typeof resources)[number]): string {
-	switch (resource.type) {
+	switch (resource.data.type) {
 		case "FILE":
-			if (resource.file?.deletedAt) return "no longer available";
-			return `${resource.file?.mimeType ?? "file"}${resource.file ? ` · ${formatBytes(resource.file.size)}` : ""}`;
+			return resource.data.mimeType;
 		case "LINK":
 			return "external";
 		case "MD":
 			return "markdown";
 		case "CODE":
-			return resource.extra ? resource.extra : "snippet";
+			return resource.data.language;
 	}
 }
 
 function rowHref(resource: (typeof resources)[number]): string {
-	switch (resource.type) {
+	switch (resource.data.type) {
 		case "FILE":
 			return "#";
 		case "LINK":
-			return resource.data ?? "#";
+			return resource.data.url;
 		case "MD":
 		case "CODE":
 			return `${href}/resources/${resource.slug}`;
@@ -80,11 +71,6 @@ function rowHref(resource: (typeof resources)[number]): string {
     <h2 class="text-xl font-semibold">Resources</h2>
     <p class="mt-1 text-sm text-base-content/60">
       {course.discipline.name} · {course.edition.slug}
-      {
-        canWrite &&
-          totalFileBytes > 0 &&
-          ` · ${formatBytes(totalFileBytes)} total`
-      }
     </p>
 
     {
@@ -94,7 +80,8 @@ function rowHref(resource: (typeof resources)[number]): string {
             Nothing pushed yet. Run{" "}
             <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">
               manage import-resources {course.discipline.slug}{" "}
-              {course.instructor.username} {course.edition.slug} ./resources.yaml
+              {course.instructor.username} {course.edition.slug}{" "}
+              ./resources.yaml
             </code>{" "}
             from the CLI. Every file it uploads gets a permanent,
             unauthenticated URL — nothing whose disclosure matters belongs here.
@@ -119,20 +106,14 @@ function rowHref(resource: (typeof resources)[number]): string {
             </h3>
             <div class="mt-2 flex flex-col gap-3">
               {group.resources.map((resource) => {
-                const removed =
-                  resource.type === "FILE" && resource.file?.deletedAt;
                 const downloadFile =
-                  resource.type === "FILE" && !removed
-                    ? resource.file
-                    : undefined;
+                  resource.data.type === "FILE" ? resource.data : undefined;
                 const downloadName = downloadFile
                   ? fileDownloadName(resource, downloadFile)
                   : undefined;
-                const downloadHref = downloadFile
-                  ? blobHref(downloadFile, downloadName)
-                  : undefined;
+                const downloadHref = downloadFile?.link;
                 const linkUrl =
-                  resource.type === "LINK" ? rowHref(resource) : undefined;
+                  resource.data.type === "LINK" ? rowHref(resource) : undefined;
                 const linkDialogId = linkUrl
                   ? `link-resource-${resource.slug}`
                   : undefined;
@@ -140,12 +121,11 @@ function rowHref(resource: (typeof resources)[number]): string {
                   <>
                     <ListRow
                       href={
-                        removed || downloadHref || linkDialogId
+                        downloadHref || linkDialogId
                           ? undefined
                           : rowHref(resource)
                       }
                       openDialog={linkDialogId}
-                      muted={!!removed}
                     >
                       <span
                         slot="leading"
@@ -158,7 +138,7 @@ function rowHref(resource: (typeof resources)[number]): string {
                           fill="none"
                         >
                           <path
-                            d={ICONS[resource.type]}
+                            d={ICONS[resource.data.type]}
                             stroke="currentColor"
                             stroke-width="1.6"
                             stroke-linecap="round"
@@ -166,11 +146,7 @@ function rowHref(resource: (typeof resources)[number]): string {
                           />
                         </svg>
                       </span>
-                      <p
-                        class:list={["font-medium", removed && "line-through"]}
-                      >
-                        {resource.title}
-                      </p>
+                      <p class="font-medium">{resource.title}</p>
                       <p class="text-sm text-base-content/60">
                         {detail(resource)}
                       </p>

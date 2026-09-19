@@ -1,7 +1,7 @@
 ---
 import Alert from "@/components/ui/Alert";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -12,51 +12,51 @@ if ("redirect" in result) return result.redirect;
 const { course } = result;
 
 const href = courseHref({
-	discipline: course.discipline.slug,
-	instructor: course.instructor.username,
-	edition: course.edition.slug,
+  discipline: course.discipline.slug,
+  instructor: course.instructor.username,
+  edition: course.edition.slug,
 });
 
 // Same three questions modeled on the exam-taking pages — now shown with the
 // student's own submitted answer and how it was graded.
 const questions = [
-	{
-		kind: "Multiple choice",
-		prompt: "What does the following expression evaluate to?",
-		code: "3 + 4 * 2",
-		studentAnswer: "14",
-		correctAnswer: "14",
-		isCorrect: true,
-		points: "2 / 2",
-	},
-	{
-		kind: "Multiple choice",
-		prompt: "Which of these is not a primitive type in most languages?",
-		studentAnswer: "Boolean",
-		correctAnswer: "Array",
-		isCorrect: false,
-		points: "0 / 2",
-	},
-	{
-		kind: "Short answer",
-		prompt:
-			"In one or two sentences, explain the difference between a stack and a queue.",
-		studentAnswer:
-			"A stack is last-in-first-out, like a pile of plates. A queue is first-in-first-out, like a line at a store.",
-		feedback:
-			"Good — you could also name them LIFO and FIFO explicitly next time.",
-		points: "3 / 3",
-		isCorrect: false,
-	},
+  {
+    kind: "Multiple choice",
+    prompt: "What does the following expression evaluate to?",
+    code: "3 + 4 * 2",
+    studentAnswer: "14",
+    correctAnswer: "14",
+    isCorrect: true,
+    points: "2 / 2",
+  },
+  {
+    kind: "Multiple choice",
+    prompt: "Which of these is not a primitive type in most languages?",
+    studentAnswer: "Boolean",
+    correctAnswer: "Array",
+    isCorrect: false,
+    points: "0 / 2",
+  },
+  {
+    kind: "Short answer",
+    prompt:
+      "In one or two sentences, explain the difference between a stack and a queue.",
+    studentAnswer:
+      "A stack is last-in-first-out, like a pile of plates. A queue is first-in-first-out, like a line at a store.",
+    feedback:
+      "Good — you could also name them LIFO and FIFO explicitly next time.",
+    points: "3 / 3",
+    isCorrect: false,
+  },
 ] as const;
 
 const earnedShown = questions.reduce(
-	(sum, q) => sum + Number(q.points.split(" / ")[0]),
-	0,
+  (sum, q) => sum + Number(q.points.split(" / ")[0]),
+  0,
 );
 const totalShown = questions.reduce(
-	(sum, q) => sum + Number(q.points.split(" / ")[1]),
-	0,
+  (sum, q) => sum + Number(q.points.split(" / ")[1]),
+  0,
 );
 ---
 

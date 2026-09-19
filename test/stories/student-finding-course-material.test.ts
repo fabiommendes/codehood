@@ -1,13 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { type Course, courseService } from "@/db/services/course.service";
-import { resourceService } from "@/db/services/resource.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { type Course, db } from "@/db";
 import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
-import { persistedFileFactory } from "@/fixtures/file.factory";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);
@@ -89,30 +87,25 @@ test("student: browse course resources", async ({ page }) => {
 	const course = await persistedCourseFactory.create();
 	await enroll(course.id, student.username);
 
-	const file = await persistedFileFactory.create({
-		mimeType: "application/pdf",
-	});
-	// Not `persistedResourceFactory`: its default build always sets `data` to
-	// a fake URL, and fishery's params merge only *overrides* keys it is
-	// given — it cannot unset one back to absent, which a FILE resource
-	// requires (`data` and `fileId` are mutually exclusive). Calling the
-	// service directly is exactly what the factory does under the hood.
-	const fileResource = await resourceService.create(
+	const buffer = Buffer.from("%PDF-1.4 fake lecture notes bytes");
+
+	// Not `persistedResourceFactory` for this one: it always sets `data` to a
+	// `LINK`, and building a `FILE` payload is just `db.resource.create`
+	// directly, exactly what the factory does under the hood.
+	const fileResource = await db.resource.create(
 		{
 			courseId: course.id,
 			slug: "lecture-notes",
-			type: "FILE",
 			title: "Lecture notes",
-			fileId: file.id,
-			contentHash: "lecture-notes-hash",
+			data: { type: "FILE", buffer, filename: "lecture-notes.pdf" },
+			ref: "lecture-notes-hash",
 		},
 		FULL_ACCESS,
 	);
 	await persistedResourceFactory.create({
 		courseId: course.id,
-		type: "LINK",
 		title: "Syllabus overview",
-		data: "https://example.com/syllabus",
+		data: { type: "LINK", url: "https://example.com/syllabus" },
 	});
 
 	await logInAs(page, student);
@@ -146,7 +139,7 @@ test("student: browse course resources", async ({ page }) => {
 	await test.step("an old link to a since-removed file explains itself", async () => {
 		// The instructor pushed again without this file — background, since
 		// pushing is CLI-only and not this story's promise.
-		await resourceService.delete({ id: fileResource.id }, FULL_ACCESS);
+		await db.resource.delete({ id: fileResource.id }, FULL_ACCESS);
 
 		const response = await page.request.get(downloadHref);
 		expect(response.status()).toBe(410);
@@ -244,7 +237,7 @@ test("student: see all my courses in one calendar", async ({ page }) => {
 
 /** Enrolls an already-seeded student, which the course factory's `students` cannot do. */
 async function enroll(courseId: Course["id"], username: string) {
-	await courseService.enroll({ courseId, userId: username }, FULL_ACCESS);
+	await db.enrollment.create({ courseId, username: username }, FULL_ACCESS);
 }
 
 /** The course's public URL, from the three columns of its unique key. */

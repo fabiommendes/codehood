@@ -1,31 +1,29 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
-import type { CourseId } from "@/db/services/course.service";
-import { courseService } from "@/db/services/course.service";
-import { passphraseService } from "@/db/services/passphrase.service";
-import type { UserId } from "@/db/services/user.service";
+import { db, type schema } from "@/db";
 import { withActionErrors, withServiceErrors } from "./helpers";
 
 export const course = {
 	/**
-	 * Drops `userId`'s enrollment, defaulting to the caller — the one action
+	 * Drops `username`'s enrollment, defaulting to the caller — the one action
 	 * behind both the instructor's "Drop" control on the Students tab and a
-	 * student's own "Leave course" button, gated by `canDropEnrollment` inside
-	 * `courseService.unenroll` (see dev/specs/to-do/course-navigation.md).
+	 * student's own "Leave course" button, gated by `enrollment.delete` inside
+	 * `db.enrollment.delete` (see dev/specs/to-do/course-navigation.md).
 	 */
 	dropEnrollment: defineAction({
 		accept: "form",
 		input: z.object({
 			courseId: z.coerce.number().int(),
-			userId: z.string().optional(),
+			username: z.string().optional(),
 		}),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await courseService.drop(
+			await db.enrollment.delete(
 				{
-					courseId: input.courseId as CourseId,
-					userId: (input.userId as UserId | undefined) ?? actor.username,
+					courseId: input.courseId as schema.CourseId,
+					username:
+						(input.username as schema.UserId | undefined) ?? actor.username,
 				},
 				{ actor },
 			);
@@ -47,7 +45,7 @@ export const course = {
 		}),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			return passphraseService.create(
+			return db.passphrase.create(
 				{ courseId: input.courseId, value: input.value },
 				{ actor },
 			);

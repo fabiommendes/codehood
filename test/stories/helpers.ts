@@ -1,9 +1,8 @@
 import { expect, type Page } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db, type UserCreate } from "@/db";
 import type { Weekday } from "@/db/client";
 import { prisma } from "@/db/client";
-import { sessionService } from "@/db/services/session.service";
-import type { UserCreate } from "@/db/services/user.service";
 import { persistedUserFactory, userFactory } from "@/fixtures/user.factory";
 import { SERVER_TZ } from "@/utils/schedule-time";
 
@@ -104,8 +103,8 @@ export async function logInAs(
 	page: Page,
 	user: Pick<UserCreate, "username">,
 ): Promise<void> {
-	const { token, session } = await sessionService.create(
-		{ userId: user.username },
+	const { token, session } = await db.session.create(
+		{ username: user.username },
 		FULL_ACCESS,
 	);
 	await page.context().addCookies([
@@ -191,6 +190,6 @@ export function futureDate(daysAhead: number): { date: string; day: Weekday } {
 	const target = new Date(today + daysAhead * 86_400_000);
 	return {
 		date: target.toISOString().slice(0, 10),
-		day: WEEKDAY_ORDER[target.getUTCDay()],
+		day: WEEKDAY_ORDER[target.getUTCDay()] as Weekday,
 	};
 }

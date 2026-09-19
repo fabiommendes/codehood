@@ -1,7 +1,7 @@
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { Course } from "@/db";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 
 interface Props {
 	courses: Course[];

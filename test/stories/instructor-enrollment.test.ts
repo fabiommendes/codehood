@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { inviteService } from "@/db/services/invite.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { fillField, logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);
@@ -71,10 +71,10 @@ test("instructor: hand out one join link for the whole class", async ({
 
 	// The cap is the part the UI cannot show back, and the part an instructor
 	// is relying on when they post the link publicly.
-	const invites = await inviteService.findMany(
+	const invites = await db.invite.findMany(
 		{ courseId: course.id, kind: "CLASSROOM" },
 		FULL_ACCESS,
 	);
 	expect(invites).toHaveLength(1);
-	expect(invites[0].maxUses).toBe(5);
+	expect(invites[0]?.maxUses).toBe(5);
 });

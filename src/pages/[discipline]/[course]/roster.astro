@@ -3,9 +3,7 @@ import { actions } from "astro:actions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import StudentsTable from "@/components/StudentsTable";
 import Alert from "@/components/ui/Alert";
-import { courseService } from "@/db/services/course.service";
-import { inviteService } from "@/db/services/invite.service";
-import { passphraseService } from "@/db/services/passphrase.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 
@@ -55,12 +53,15 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 	}
 }
 
-const students = await courseService.listStudents(course.id, { actor });
-const invites = await inviteService.findMany(
+const students = await db.enrollment.findMany(
+	{ courseId: course.id },
+	{ actor },
+);
+const invites = await db.invite.findMany(
 	{ courseId: course.id, kind: "CLASSROOM" },
 	{ actor },
 );
-const activePassphrases = await passphraseService.findMany(
+const activePassphrases = await db.passphrase.findMany(
 	{ courseId: course.id, active: true },
 	{ actor },
 );

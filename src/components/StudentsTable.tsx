@@ -24,7 +24,7 @@ function formatDate(date: Date): string {
  * The Students tab's table — the fifth caller of `ui/Table.tsx`, alongside
  * the four admin tables (see dev/specs/to-do/course-navigation.md). The drop
  * control posts to the same `course.dropEnrollment` action a student's own
- * "Leave course" button uses, gated per-actor by `canDropEnrollment`.
+ * "Leave course" button uses, gated per-actor by `enrollment.delete`.
  */
 export default function StudentsTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<EnrolledUser>[] = [

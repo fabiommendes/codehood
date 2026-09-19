@@ -7,10 +7,9 @@ import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
-import { calendarEventService } from "@/db/services/calendar-event.service";
-import { courseService } from "@/db/services/course.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { formatDateTime, localDateOf, toInstant } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -18,7 +17,7 @@ export const prerender = false;
 const actor = Astro.locals.actor;
 if (!actor) return Astro.redirect("/login");
 
-const courses = await courseService.findMany({}, { actor });
+const courses = await db.course.findMany({}, { actor });
 const courseIds = courses.map((c) => c.id);
 
 // A per-course color dot, cycling through a fixed palette so the same course
@@ -51,9 +50,11 @@ const courseNames = new Map(courses.map((c) => [c.id, c.discipline.name]));
 const now = new Date();
 const monthParam = Astro.url.searchParams.get("month");
 const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
-const [year, month] = monthMatch
-	? [Number(monthMatch[1]), Number(monthMatch[2])]
-	: localDateOf(now).slice(0, 7).split("-").map(Number);
+const [year, month] = (
+	monthMatch
+		? [Number(monthMatch[1]), Number(monthMatch[2])]
+		: localDateOf(now).slice(0, 7).split("-").map(Number)
+) as [number, number];
 
 const monthStart = toInstant(`${year}-${String(month).padStart(2, "0")}-01`, 0);
 const nextMonthYear = month === 12 ? year + 1 : year;
@@ -70,7 +71,7 @@ const prevHref = `/calendar?month=${prevMonthYear}-${String(prevMonth).padStart(
 
 const monthEvents =
 	courseIds.length > 0
-		? await calendarEventService.findMany(
+		? await db.calendarEvent.findMany(
 				{ courseIds, from: monthStart, to: monthEnd },
 				{ actor },
 			)
@@ -103,7 +104,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
 
 const upcoming =
 	courseIds.length > 0
-		? await calendarEventService.findMany(
+		? await db.calendarEvent.findMany(
 				{ courseIds, from: now, limit: 5 },
 				{ actor },
 			)

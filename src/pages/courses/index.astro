@@ -1,9 +1,9 @@
 ---
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
-import { courseService } from "@/db/services/course.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 
 export const prerender = false;
 
@@ -15,7 +15,7 @@ const justLeft = Astro.url.searchParams.has("left");
 // No "my courses" filter needed: the actor already is one. This returns
 // exactly what that user may see — courses they teach plus courses they're
 // enrolled in — which is precisely the definition of their course list.
-const courses = await courseService.findMany({}, { actor });
+const courses = await db.course.findMany({}, { actor });
 ---
 
 <AppLayout title="My courses">

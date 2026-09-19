@@ -1,7 +1,7 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/core/actor";
-import { editionService } from "@/db/services/edition.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 
 export const createEditionCommand = new Command("create-edition")
 	.description("Create an academic edition (term)")
@@ -24,7 +24,7 @@ export const createEditionCommand = new Command("create-edition")
 		}
 
 		try {
-			const edition = await editionService.create(
+			const edition = await db.edition.create(
 				{ slug, name, startAt, endAt },
 				FULL_ACCESS,
 			);

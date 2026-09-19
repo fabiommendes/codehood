@@ -1,7 +1,7 @@
 ---
 import Alert from "@/components/ui/Alert";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -12,9 +12,9 @@ if ("redirect" in result) return result.redirect;
 const { course } = result;
 
 const href = courseHref({
-	discipline: course.discipline.slug,
-	instructor: course.instructor.username,
-	edition: course.edition.slug,
+  discipline: course.discipline.slug,
+  instructor: course.instructor.username,
+  edition: course.edition.slug,
 });
 ---
 

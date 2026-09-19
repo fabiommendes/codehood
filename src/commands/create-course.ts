@@ -1,9 +1,7 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
-import { FULL_ACCESS } from "@/core/actor";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 
 export const createCourseCommand = new Command("create-course")
 	.description(
@@ -14,7 +12,7 @@ export const createCourseCommand = new Command("create-course")
 	.argument("<edition>", "e.g. 2026 or 2026-1")
 	.action(
 		async (disciplineSlug: string, instructor: string, edition: string) => {
-			const instructorUser = await userService.findOne(
+			const instructorUser = await db.user.findOne(
 				{ username: instructor },
 				FULL_ACCESS,
 			);
@@ -25,14 +23,14 @@ export const createCourseCommand = new Command("create-course")
 			}
 
 			const discipline = (
-				await disciplineService.findMany({ slugs: [disciplineSlug] })
+				await db.discipline.findMany({ slugs: [disciplineSlug] })
 			)[0];
 			if (!discipline) {
 				const name = await input({
 					message: `Discipline "${disciplineSlug}" does not exist yet. Name:`,
 				});
 				try {
-					await disciplineService.create(
+					await db.discipline.create(
 						{ slug: disciplineSlug, name },
 						FULL_ACCESS,
 					);
@@ -58,7 +56,7 @@ export const createCourseCommand = new Command("create-course")
 			}
 
 			try {
-				const course = await courseService.create(
+				const course = await db.course.create(
 					{
 						discipline: disciplineSlug,
 						instructor: instructor,

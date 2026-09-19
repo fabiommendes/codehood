@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { inviteService } from "@/db/services/invite.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { persistedInviteFactory } from "@/fixtures/invite.factory";
 import { fillField, logIn, logInAs, resetDatabase, seedUser } from "./helpers";
 
@@ -46,10 +46,7 @@ test("admin: invite an instructor", async ({ page }) => {
 
 	// Issued for the address the admin typed, and for an instructor — the role
 	// is fixed by the page rather than chosen, so it is worth pinning.
-	const invites = await inviteService.findMany(
-		{ kind: "PERSONAL" },
-		FULL_ACCESS,
-	);
+	const invites = await db.invite.findMany({ kind: "PERSONAL" }, FULL_ACCESS);
 	const stored = invites.find((invite) => invite.email === invited);
 	expect(stored?.invitedRole).toBe("INSTRUCTOR");
 });

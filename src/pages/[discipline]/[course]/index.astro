@@ -2,8 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
-import { calendarEventService } from "@/db/services/calendar-event.service";
-import { timeSlotService } from "@/db/services/time-slot.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 import { formatDateTime, formatTime } from "@/utils/schedule-time";
@@ -45,11 +44,8 @@ const WEEKDAY_LABEL: Record<string, string> = {
 // The syllabus line and the next few meetings — see "Course home page" in
 // dev/specs/to-review/calendar.md. Both come from the same source the
 // Schedule tab reads; this section is a preview of it, not a copy.
-const slots = await timeSlotService.findMany(
-	{ courseId: course.id },
-	{ actor },
-);
-const nextEvents = await calendarEventService.findMany(
+const slots = await db.timeSlot.findMany({ courseId: course.id }, { actor });
+const nextEvents = await db.calendarEvent.findMany(
 	{ courseIds: [course.id], from: new Date(), limit: 3 },
 	{ actor },
 );

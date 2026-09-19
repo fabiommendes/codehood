@@ -5,8 +5,7 @@ import { actions } from "astro:actions";
 import AdminTabs from "@/components/AdminTabs.astro";
 import InvitesTable from "@/components/admin/InvitesTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { db, type Invite } from "@/db";
-import { isEditionOpen } from "@/db/services/edition.service";
+import { db, type Invite, isEditionOpen } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/

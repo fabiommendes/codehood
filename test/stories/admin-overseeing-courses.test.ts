@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);

@@ -7,8 +7,7 @@ import DisciplinesTable, {
 	type DisciplineRow,
 } from "@/components/admin/DisciplinesTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -21,8 +20,8 @@ const createResult = Astro.getActionResult(actions.admin.createDiscipline);
 const updateResult = Astro.getActionResult(actions.admin.updateDiscipline);
 const deleteResult = Astro.getActionResult(actions.admin.deleteDiscipline);
 
-const disciplines = await disciplineService.findMany({});
-const courses = await courseService.findMany({}, { actor });
+const disciplines = await db.discipline.findMany({});
+const courses = await db.course.findMany({}, { actor });
 const courseCounts = new Map<string, number>();
 for (const course of courses) {
 	courseCounts.set(

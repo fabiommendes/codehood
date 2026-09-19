@@ -4,7 +4,7 @@ export const prerender = false;
 import AdminTabs from "@/components/AdminTabs.astro";
 import CoursesTable from "@/components/admin/CoursesTable";
 import PageKicker from "@/components/PageKicker.astro";
-import { courseService } from "@/db/services/course.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -12,7 +12,7 @@ import AppLayout from "@/layouts/AppLayout.astro";
 // TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
 if (!Astro.locals.actor) return Astro.redirect("/login");
 const actor = Astro.locals.actor;
-const courses = await courseService.findMany({}, { actor });
+const courses = await db.course.findMany({}, { actor });
 ---
 
 <AppLayout title="Admin · Courses">

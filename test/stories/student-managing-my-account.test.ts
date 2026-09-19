@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { courseService } from "@/db/services/course.service";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
-import { courseHref } from "@/utils/course-url";
+import { courseHref } from "@/urls";
 import {
 	fillField,
 	logIn,
@@ -42,7 +41,7 @@ test("student: update my profile", async ({ page }) => {
 		await expect(page.getByText(/email is already in use/i)).toBeVisible();
 	});
 
-	const stored = await userService.findOne(
+	const stored = await db.user.findOne(
 		{ username: student.username },
 		FULL_ACCESS,
 	);
@@ -93,8 +92,8 @@ test("student: change my password and log out everywhere", async ({ page }) => {
 test("student: leave a course", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create();
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
+	await db.enrollment.create(
+		{ courseId: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	const href = courseHref({
@@ -123,10 +122,7 @@ test("student: leave a course", async ({ page }) => {
 
 	// Nothing was destroyed — an instructor re-enrolling them would restore
 	// access to whatever they already submitted.
-	const stillEnrolled = await courseService.findOne(
-		{ id: course.id },
-		FULL_ACCESS,
-	);
+	const stillEnrolled = await db.course.findOne({ id: course.id }, FULL_ACCESS);
 	expect(
 		stillEnrolled?.enrollments.some((e) => e.username === student.username),
 	).toBe(false);

@@ -5,13 +5,13 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import PageKicker from "@/components/PageKicker.astro";
-import { apiKeyService } from "@/db/services/api-key.service";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 if (!Astro.locals.actor) return Astro.redirect("/login");
 
 const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
-const apiKeys = await apiKeyService.findMany(
+const apiKeys = await db.apiKey.findMany(
 	{ createdById: Astro.locals.actor.username },
 	{ actor: Astro.locals.actor },
 );
