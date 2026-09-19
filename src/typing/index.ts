@@ -159,7 +159,7 @@ export type NotNever<T> = [T] extends [never] ? false : true;
  * ```
  *
  */
-export type Assert<_T extends true> = void;
+export type Assert<_T extends true> = undefined;
 
 /**
  * Assert type `T` is `never`, reporting the offending members on failure.
@@ -170,4 +170,4 @@ export type Assert<_T extends true> = void;
  * type B = AssertNever<Exclude<"a" | "b", "a">>; // Error: '"b"' does not satisfy 'never'
  * ```
  */
-export type AssertNever<_T extends never> = void;
+export type AssertNever<_T extends never> = undefined;

@@ -172,7 +172,7 @@ function convertPrismaError(error: PrismaClientKnownRequestError): InvalidData {
 	}
 
 	if (DEVELOPMENT) {
-		errors["debug"] = [
+		errors.debug = [
 			{
 				code: "debug",
 				message: {

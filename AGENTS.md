@@ -43,10 +43,13 @@ like "synergy", "disruptive", "paradigm shift", "pivotal moment", etc. Avoid
 buzzwords in general and marketing lingo. We are not an startup trying to
 impress investors.
 
-Avoid those specificlanguage vices:
+Avoid those specific language vices (specially Opus):
 
 - "name" as a verb. Usually there is a better more precise word: "refers to a
   variable", "declare a type", "reference an entity", etc.
+
+Avoid these expressions and reword with more specific alternatives:
+- "load bearing", "gate" (as a a verb), "pivotal". 
 
 
 ## Project layout

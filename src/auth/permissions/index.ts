@@ -133,6 +133,15 @@ export interface QuestionWithCourse {
 	course: CourseTarget | CourseWithEnrollment;
 }
 
+/// Permissions are declared in a single object so hasPerm can statically verify
+/// the target types at compile time.
+///
+/// Some guidelines:
+///
+/// * Keep the natural language description of business rules clear and concise.
+/// * Unless explicitly mentioned, SYSTEM and admin have full permissions. No
+///   need to declare them in each rule.
+/// * The audit helpers are defined in the end of this file or inline, if not reused.
 const PERMISSIONS = {
 	// SYSTEM ------------------------------------------------------------------
 	// Rule: only admins can manage the system globally
@@ -142,7 +151,7 @@ const PERMISSIONS = {
 	// Rule: only admins can create and remove new users
 	"user.create | user.delete": { admin: true },
 
-	// Rule: users can only read or edit their own information, except admins.
+	// Rule: users can only read or edit their own information.
 	"user.read | user.update": {
 		admin: true,
 		other: (actor, target) => actor.username === target.username,
@@ -153,8 +162,9 @@ const PERMISSIONS = {
 	// A course target covers all its enrollments; `{ course, user }` covers one.
 
 	// Rule: only the course's owner enrolls students or runs the course's
-	// operations (invites, roster, manage pages). A non-owning admin cannot.
+	// operations (invites, roster, manage pages).
 	"enrollment.create | enrollment.update | enrollment.manage": {
+		admin: true,
 		other: (actor, target) => isCourseOwner(actor, courseOf(target)),
 		audit: auditEnrollment,
 	} satisfies PermDef<CourseTarget | EnrollmentTarget>,
@@ -178,13 +188,12 @@ const PERMISSIONS = {
 		audit: (target) => ({ invitedRole: target.invitedRole }),
 	} satisfies PermDef<InviteCreateTarget>,
 
-	// Rule: seeing an invite and controlling it are the same right. Admins hold
-	// it over every invite, instructors over the ones they issued. Paired with
-	// `inviteWhere` for lists.
+	// Rule: seeing an invite and controlling it are the same right.
+	// Instructors controls invites they issued.
 	"invite.read | invite.update | invite.delete": {
 		admin: true,
-		instructor: (actor, target) => target.createdBy.username === actor.username,
 		student: false,
+		instructor: (actor, target) => target.createdBy.username === actor.username,
 		audit: (target) => ({
 			...(target.id !== undefined && { id: target.id }),
 			createdBy: target.createdBy.username,
@@ -192,8 +201,8 @@ const PERMISSIONS = {
 	} satisfies PermDef<InviteTarget>,
 
 	// DISCIPLINE --------------------------------------------------------------
-	// Rule: only admins. A discipline slug occupies the root URL namespace
-	// shared with every system route, and there is no catalog-editor role yet.
+	// Rule: only admins manage disciplines. A discipline slug occupies the
+	// root URL namespace shared with every system route.
 	"discipline.create | discipline.update | discipline.delete": { admin: true },
 
 	// EDITION -----------------------------------------------------------------
@@ -373,6 +382,7 @@ type _AssertPermissionsUnique = AssertNever<DuplicateKeys<typeof PERMISSIONS>>;
 type _AssertPermissionsAudited = AssertNever<MissingAudit<PermDefsByKey>>;
 type _AssertPermissionsValues = Assert<
 	NotNever<
+		// biome-ignore lint/suspicious/noExplicitAny: `PermDef<any>` matches a definition of any target type.
 		(typeof PERMISSIONS)[keyof typeof PERMISSIONS] extends PermDef<any>
 			? (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
 			: never
