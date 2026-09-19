@@ -5,7 +5,7 @@ import {
 	EDITION_RE,
 	parseCourseSegment,
 	RESERVED_SLUGS,
-} from "@/utils/course-url";
+} from "@/urls";
 
 test("parseCourseSegment round-trips with courseHref", () => {
 	const ref = { discipline: "cs101", instructor: "ada", edition: "2026-1" };
@@ -13,6 +13,7 @@ test("parseCourseSegment round-trips with courseHref", () => {
 	expect(href).toBe("/cs101/ada_2026-1");
 
 	const segment = href.split("/")[2];
+	if (!segment) throw new Error("expected a course segment");
 	expect(parseCourseSegment(segment)).toEqual({
 		instructor: "ada",
 		edition: "2026-1",
