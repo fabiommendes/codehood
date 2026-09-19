@@ -12,6 +12,8 @@
 		"incremental": true,
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
+		"noUncheckedIndexedAccess": true,
+		// "noImplicitReturns": true,
 		"forceConsistentCasingInFileNames": true,
 		"paths": {
 			"@/*": ["./src/*"],

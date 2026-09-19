@@ -24,7 +24,7 @@ function toComponentName(svgFileName: string): string {
 	return svgFileName
 		.replace(/\.svg$/, "")
 		.split("-")
-		.map((part) => part[0].toUpperCase() + part.slice(1))
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
 		.join("");
 }
 
@@ -42,6 +42,9 @@ function convertStyle(
 		.map((s) => s.trim())
 		.filter(Boolean)) {
 		const [prop, value] = decl.split(":").map((s) => s.trim());
+		if (prop === undefined || value === undefined) {
+			throw new Error(`${svgFileName}: malformed style declaration "${decl}"`);
+		}
 		if (prop === "fill") {
 			const mapped = FILL_TO_CLASS[value.toLowerCase()];
 			if (!mapped)
@@ -87,7 +90,8 @@ function convertShapes(svgBody: string, svgFileName: string): string {
 			const transform = gAttrs.match(/transform="([^"]*)"/)?.[1];
 			if (!transform)
 				throw new Error(`${svgFileName}: <g> is missing a transform attribute`);
-			const innerPaths = [...gBody.matchAll(/<path[^>]*?\/>/g)].map((m) =>
+			// biome-ignore lint/style/noNonNullAssertion: gAttrs !== undefined means the <g> alternative matched, so its mandatory capture group gBody is defined too.
+			const innerPaths = [...gBody!.matchAll(/<path[^>]*?\/>/g)].map((m) =>
 				convertPath(m[0], "    ", svgFileName),
 			);
 			elements.push(

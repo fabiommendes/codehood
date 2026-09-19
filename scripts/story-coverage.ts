@@ -80,11 +80,13 @@ function parseStories(role: string, source: string): Story[] {
 		if (!heading) continue;
 
 		if (heading[1] === "##") {
-			section = heading[2].trim();
+			// biome-ignore lint/style/noNonNullAssertion: `(.+)` is a mandatory capture group in a match that already succeeded (the `if (!heading) continue` above).
+			section = heading[2]!.trim();
 			continue;
 		}
 
-		const title = heading[2].trim();
+		// biome-ignore lint/style/noNonNullAssertion: same mandatory capture group as above.
+		const title = heading[2]!.trim();
 		const status = block.match(/^\s{4}status:\s*"?(\w+)"?\s*$/m)?.[1] ?? "todo";
 		stories.push({
 			role,
@@ -101,9 +103,11 @@ function parseStories(role: string, source: string): Story[] {
 function parseTests(file: string, source: string): TestRef[] {
 	const refs: TestRef[] = [];
 
-	for (const [, name] of source.matchAll(/\btest\(\s*"([^"]+)"/g)) {
+	for (const match of source.matchAll(/\btest\(\s*"([^"]+)"/g)) {
+		// biome-ignore lint/style/noNonNullAssertion: `([^"]+)` is a mandatory capture group in a match matchAll already produced.
+		const name = match[1]!;
 		const [, role, title] = name.match(/^(\w+):\s*(.+)$/) ?? [];
-		if (!role) continue;
+		if (!role || !title) continue;
 		refs.push({ role, title, slug: slugify(title), file });
 	}
 

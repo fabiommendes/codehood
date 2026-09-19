@@ -21,6 +21,6 @@ sw.offlinePage = "/offline";
 // @return boolean
 // @param {url} requested url
 // @default false
-sw.exclude = (url) => {
+sw.exclude = (_url) => {
 	return false;
 };

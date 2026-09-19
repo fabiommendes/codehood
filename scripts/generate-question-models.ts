@@ -52,6 +52,11 @@ function formatWithBiome(source: string): string {
 type Json = string | number | boolean | null | Json[] | JsonObject;
 type JsonObject = { [key: string]: Json };
 
+/** The const a schema is exported as: the type name, camelCased. */
+function schemaConstName(name: string): string {
+	return `${name.charAt(0).toLowerCase()}${name.slice(1)}Schema`;
+}
+
 function isObject(value: unknown): value is JsonObject {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -121,7 +126,7 @@ function buildIdMaps(root: JsonObject) {
 	}
 }
 
-function requireObject(value: Json, label: string): JsonObject {
+function requireObject(value: Json | undefined, label: string): JsonObject {
 	if (!isObject(value)) {
 		throw new Error(
 			`Expected an object in ${label}, got ${JSON.stringify(value)}`,
@@ -154,7 +159,8 @@ function navigateFragment(
 				`Cannot resolve fragment segment "${segment}" of $ref "${ref}" in ${label}`,
 			);
 		}
-		current = current[segment];
+		// biome-ignore lint/style/noNonNullAssertion: `segment in current` was just checked above, so this key is present (JSON never stores an actual `undefined`).
+		current = current[segment]!;
 	}
 	return current;
 }
@@ -239,7 +245,7 @@ function registerEntry(
 		node,
 		enclosingNode,
 		kind,
-		schemaConstName: `${name}Schema`,
+		schemaConstName: schemaConstName(name),
 		generated: false,
 		generating: false,
 		deps: new Set(),
@@ -571,7 +577,8 @@ function compileFlattenedDef(node: JsonObject, ctx: CompileCtx): string {
 
 	const orderedProperties: JsonObject = {};
 	for (const key of propertyOrder) {
-		orderedProperties[key] = mergedProperties[key];
+		// biome-ignore lint/style/noNonNullAssertion: every key in propertyOrder was pushed in the same loop iteration that set mergedProperties[key], above.
+		orderedProperties[key] = mergedProperties[key]!;
 	}
 	return renderObjectLiteral(orderedProperties, required, true, ctx);
 }
@@ -712,7 +719,7 @@ function buildRootUnionEntry(
 		node: syntheticNode,
 		enclosingNode: syntheticNode,
 		kind: "node",
-		schemaConstName: `${name}Schema`,
+		schemaConstName: schemaConstName(name),
 		generated: false,
 		generating: false,
 		deps: new Set(entries.map((e) => e.name)),
