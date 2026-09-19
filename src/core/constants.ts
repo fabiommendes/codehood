@@ -50,6 +50,9 @@ function assertIn<T extends E[], E extends string>(
 	return value as T[number];
 }
 
+// =============================================================================
+//  						  ENVIRONMENT
+// =============================================================================
 export const DEBUG = readBoolean("DEBUG", false);
 export const ENVIRONMENT = assertIn(readEnv("ENVIRONMENT", "dev"), [
 	"dev",
@@ -58,12 +61,28 @@ export const ENVIRONMENT = assertIn(readEnv("ENVIRONMENT", "dev"), [
 export const DEVELOPMENT = ENVIRONMENT === "dev";
 export const PRODUCTION = ENVIRONMENT === "prod";
 
+// =============================================================================
+//  						    SESSION
+// =============================================================================
+export const SESSION_COOKIE = "session";
+export const SESSION_COOKIE_OPTIONS = {
+	httpOnly: true,
+	secure: PRODUCTION,
+	sameSite: "lax" as const,
+	path: "/",
+};
+
+// =============================================================================
+//  							RESOURCES
+// =============================================================================
+
 /**
- * Where resource blobs are stored on disk, as `<RESOURCE_ROOT>/<hash[0:2]>/<hash>`
- * (see `dev/specs/to-do/resources.md`). Defaults to a folder next to the
- * SQLite database so a fresh dev checkout works with no extra setup; a real
- * deployment should point this at a persistent volume and have its reverse
- * proxy `try_files` that path before falling back to the app (FR-SYNC-013).
+ * Where resource blobs are stored on disk.
+ *
+ * Defaults to a folder next to the SQLite database so a fresh dev checkout
+ * works with no extra setup; a real deployment should point this at a persistent
+ * volume and have its reverse proxy `try_files` that path before falling back
+ * to the app (FR-SYNC-013).
  */
 export const RESOURCE_ROOT = readEnv("RESOURCE_ROOT", "./storage/resources");
 

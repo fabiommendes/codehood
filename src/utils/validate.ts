@@ -92,14 +92,9 @@ export function Validate(options: ValidateOptions) {
 			return async function <T extends unknown[]>(this: This, ...args: T) {
 				const opts = args[args.length - 1] as ServiceOpts;
 				const skipInputValidation =
-					typeof opts.skipValidation === "object"
-						? opts.skipValidation.input
-						: opts.skipValidation;
+					opts.validate === "none" || opts.validate === "output";
 				const skipOutputValidation =
-					options.returns === undefined ||
-					(typeof opts.skipValidation === "object"
-						? opts.skipValidation.output
-						: opts.skipValidation);
+					opts.validate === "none" || opts.validate === "input";
 
 				if (hasArgSchemas && !skipInputValidation)
 					args = validateArgs(argSchemas, args);

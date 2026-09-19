@@ -76,7 +76,8 @@ function coerceField(schema: ZodType, raw: RawValue): unknown {
 	// A field that isn't declared as an array but received a repeated key: the
 	// last value wins, the same way a repeated `application/x-www-form-urlencoded`
 	// field would.
-	const value = Array.isArray(raw) ? raw[raw.length - 1] : raw;
+	// biome-ignore lint/style/noNonNullAssertion: every RawValue array reaching this function comes from collectSearchParams, which never produces an empty one.
+	const value = Array.isArray(raw) ? raw[raw.length - 1]! : raw;
 	return coerceScalar(s, value);
 }
 // biome-ignore-end lint/suspicious/noExplicitAny: see above.
@@ -97,14 +98,17 @@ export function coerceForSchema(
 	raw: Record<string, RawValue>,
 ): Record<string, unknown> {
 	const shape = fieldShapeMap(schema);
+
 	// Null-prototype for the same reason as `collectSearchParams`, plus one of
 	// its own: `out.__proto__ = <a Date>` on a plain object would set the
 	// prototype instead of adding a key.
 	const out: Record<string, unknown> = Object.create(null);
+
 	for (const [key, value] of Object.entries(raw)) {
 		const fieldSchema = shape[key];
 		out[key] = fieldSchema ? coerceField(fieldSchema, value) : value;
 	}
+
 	return out;
 }
 
@@ -125,7 +129,8 @@ export function collectSearchParams(
 	for (const key of searchParams.keys()) {
 		if (Object.hasOwn(out, key)) continue;
 		const values = searchParams.getAll(key);
-		out[key] = values.length > 1 ? values : values[0];
+		// biome-ignore lint/style/noNonNullAssertion: key came from searchParams.keys(), so getAll(key) always returns at least one value (possibly "").
+		out[key] = values.length > 1 ? values : values[0]!;
 	}
 	return out;
 }

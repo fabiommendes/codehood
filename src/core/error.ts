@@ -1,137 +1,66 @@
+/**
+ * Core Codehood exceptions
+ */
 import type { z } from "zod";
 import * as env from "@/core/constants";
+import {
+	type BaseErrorResponse,
+	type ErrorResponse,
+	type InternalErrorResponse,
+	type InvalidDataCode,
+	type InvalidDataResponse,
+	type JSONable,
+	type JSONValue,
+	type NotAllowedAction,
+	type NotAllowedResponse,
+	type NotFoundResponse,
+	type RuleViolationResponse,
+	toJsonValueOrNothing,
+} from "./error-response";
 
-interface ToJSON {
-	toJSON(): JSON;
-}
-type JSONable = JSON | ToJSON;
+export type {
+	JSONValue,
+	NotAllowedAction as ActionCode,
+} from "./error-response";
 
 /**
- * Error responses describe the user-facing JSON that represents an error/exception.
+ * Thrown when hitting non-implemented methods and functions.
  */
-export type ErrorResponse =
-	| InvalidDataResponse
-	| NotAllowedResponse
-	| NotFoundResponse
-	| RuleViolationResponse
-	| InternalErrorResponse
-	| BadRequestResponse;
-
-interface BaseErrorResponse {
-	type: "error";
-	code: string;
-	status: number;
-	message: string;
-	timestamp: Date;
-}
+export class NotImplemented extends Error {}
 
 /**
- * Error responses produced by validation errors.
+ * Thrown when the code reaches some supposedly unreacheable state.
  *
- * Usually they are captured from a zod validation error. It may contain a
- * partial view of the data and an object mapping error fields to the
- * corresponding errors.
+ * This flags bugs in the code that should never occur.
+ */
+export class ImproperBehavior extends Error {
+	static assert<B extends true>(
+		cond: B | false,
+		msg?: string | (() => string),
+	): asserts cond is B {
+		if (!cond)
+			throw new ImproperBehavior(typeof msg === "function" ? msg() : msg);
+	}
+}
+
+/**
+ * Thrown when the global configuration is inconsistent.
  *
- * The special `$` fields designates the root object. I.e., it store global
- * error messages for the invalid object.
+ * Throw this instead of ImproperBehavior when the source of error is a
+ * misconfiguration in the global settings rathen than a bug in the code.
  */
-export interface InvalidDataResponse extends BaseErrorResponse {
-	code: "invalid-data";
-	status: 400 | 422;
-	data?: JSONable;
-	errors: { [key: string]: { code: ValidationErrorCode; message?: string }[] };
-}
-
-type ValidationErrorCode =
-	| "missing"
-	| "not-allowed"
-	| "invalid"
-	| "too-long"
-	| "too-short"
-	| "pattern-mismatch"
-	| "type-mismatch"
-	| "custom";
-
-/**
- * Reports a user that is not allowed to perform an action on a resource.
- *
- * Can optionally store the username of the user/actor that attempted the
- * action.
- */
-export interface NotAllowedResponse extends BaseErrorResponse {
-	code: "not-allowed";
-	status: 401 | 403 | 409;
-	action: ActionCode;
-	target?: JSON;
-	actor?: string;
-}
-
-type ActionCodeAction =
-	| "create"
-	| "read"
-	| "update"
-	| "upsert"
-	| "delete"
-	| "do";
-export type ActionCode = `${ActionCodeAction}-${string}`;
-
-/**
- * The user request is invalid
- */
-export interface BadRequestResponse extends BaseErrorResponse {
-	code: "bad-request";
-	status: 400 | 405 | 406 | 408;
+export class ImproperConfiguration extends Error {
+	static assert<B extends true>(
+		cond: B | false,
+		msg?: string | (() => string),
+	): asserts cond is B {
+		if (!cond)
+			throw new ImproperConfiguration(typeof msg === "function" ? msg() : msg);
+	}
 }
 
 /**
- * Reports a resource that was not found.
- *
- * It may contain the id/pk used to locate the resource. The resource type is
- * included in the `resource` field and should be a dash-case string identifying
- * the resource type (e.g. "user", "course", "enrollment", "api-key").
- */
-export interface NotFoundResponse extends BaseErrorResponse {
-	code: "not-found";
-	status: 404;
-	id: string | number;
-	resource: string;
-	context?: string;
-}
-
-/**
- * Flags an operation that was interrupted because it would violate some
- * internal business rule.
- *
- * This is generally should not be user-facing, but rather it exists to assert
- * some invariants in the code. Only shown in dev mode. Production convert them
- * to generic internal errors (status code 500).
- */
-export interface RuleViolationResponse extends BaseErrorResponse {
-	code: "rule-violation";
-	status: 500;
-	actor?: string;
-	target?: JSON;
-	info?: JSON;
-}
-
-/**
- * Generic internal error response. This is used when an unexpected error due
- * to exceptions that were never caught.
- *
- * Ideally we should never produce those errors in normal circumstances, but we
- * never know :)
- */
-export interface InternalErrorResponse extends BaseErrorResponse {
-	code: "internal-error";
-	status: 500 | 501 | 503;
-}
-
-//
-// Error classes
-//
-
-/**
- * Base Codehood error.
+ * Base Codehood user-facing error.
  *
  * Abstract class, never create instances.
  */
@@ -178,7 +107,7 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 		item?: unknown,
 		status: number = 400,
 	): InvalidData {
-		const grouped: InvalidDataResponse["errors"] = {};
+		const grouped: InvalidDataErrors = {};
 		const summaries: string[] = [];
 		for (const issue of error.issues) {
 			const key = issue.path.length > 0 ? issue.path.join(".") : "$";
@@ -190,24 +119,36 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 			summaries.push(key === "$" ? issue.message : `${key}: ${issue.message}`);
 		}
 		const message = summaries.length > 0 ? summaries.join("; ") : undefined;
-		return new InvalidData({
-			errors: grouped,
+		return new InvalidData(grouped, {
 			data: item as JSONable,
 			status,
 			message,
 		});
 	}
 
-	constructor(args: {
-		errors: InvalidDataResponse["errors"];
-		data?: InvalidDataResponse["data"];
-		message?: string;
-		status?: number;
-	}) {
-		const { errors, data, message = "Validation Error", status = 400 } = args;
-		super(message, "invalid-data", status);
-		this.errors = errors;
-		this.data = data;
+	constructor(
+		errors: {
+			[key: string]: InvalidDataResponse["errors"][string] | undefined | null;
+		},
+		args?: {
+			data?: InvalidDataResponse["data"];
+			message?: string;
+			status?: number;
+		},
+	) {
+		const message = args?.message ?? "Validation Error";
+		super(message, "invalid-data", args?.status ?? 400);
+
+		errors = { ...errors };
+		delete errors.$;
+
+		this.errors = {};
+		for (const [k, v] of Object.entries(errors)) {
+			if (v && v.length > 0) {
+				this.errors[k] = v;
+			}
+		}
+		this.data = args?.data;
 	}
 
 	protected _toJsonExtra(): {
@@ -219,21 +160,53 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 			data: this.data,
 		};
 	}
+
+	/**
+	 * Throws an InvalidData error if any of the provided errors are non-empty.
+	 */
+	static ensureNoError(
+		errors: {
+			[key: string]: InvalidDataResponse["errors"][string] | undefined | null;
+		},
+		args?: {
+			data?: InvalidDataResponse["data"];
+			message?: string;
+			status?: number;
+		},
+	) {
+		for (const v of Object.values(errors)) {
+			if (v && v.length > 0) {
+				throw new InvalidData(errors, args);
+			}
+		}
+	}
+
+	/**
+	 * Ensure object is a valid Zod parsed result.
+	 *
+	 * Throws an InvalidData error if the parsed result is invalid.
+	 */
+	static zodValidate<T>(parsed: z.ZodSafeParseResult<T>) {
+		if (parsed.success) return parsed.data;
+		throw InvalidData.fromZodError(parsed.error);
+	}
 }
+
+export type InvalidDataErrors = InvalidDataResponse["errors"];
 
 /**
  * Thrown when a resource is not found.
  *
  * ```typescript
  *
- * throw new NotFound("user", { id: userId })
+ * throw new NotFound("user", { id: username })
  * ```
  */
 export class NotFound extends BaseSerializableError<NotFoundResponse> {
 	readonly code = "not-found";
 	readonly status: 404 = 404;
 	readonly id: string | number;
-	readonly context?: string;
+	readonly context?: JSONValue;
 	// TODO: define ResourceType enum
 	readonly resource: string;
 
@@ -243,7 +216,7 @@ export class NotFound extends BaseSerializableError<NotFoundResponse> {
 			| {
 					message?: string;
 					id?: string | number;
-					context?: string;
+					context?: JSONValue;
 			  }
 			| string
 			| number,
@@ -264,7 +237,7 @@ export class NotFound extends BaseSerializableError<NotFoundResponse> {
 	protected _toJsonExtra(): {
 		id: string | number;
 		resource: string;
-		context?: string;
+		context?: JSONValue;
 	} {
 		return {
 			id: this.id,
@@ -280,25 +253,22 @@ export class NotFound extends BaseSerializableError<NotFoundResponse> {
 export class NotAllowed extends BaseSerializableError<NotAllowedResponse> {
 	readonly code = "not-allowed";
 	readonly status: 403 | 401 | 409;
-	readonly action: ActionCode;
-	readonly target?: JSON;
+	readonly action: NotAllowedAction;
+	readonly target?: JSONValue;
 	readonly actor?: string;
 
-	constructor(args: {
-		action: ActionCode;
-		message?: string;
-		status?: 403 | 401 | 409;
-		target?: JSON;
-	}) {
-		const {
-			action,
-			message = "Permission denied",
-			status = 403,
-			target,
-		} = args;
+	constructor(
+		action: NotAllowedAction,
+		args?: {
+			message?: string;
+			status?: 403 | 401 | 409;
+			target?: unknown;
+		},
+	) {
+		const { message = "Permission denied", status = 403, target } = args ?? {};
 		super(message, "not-allowed", status);
 		this.action = action;
-		this.target = target;
+		this.target = toJsonValueOrNothing(target);
 		this.status = status;
 	}
 
@@ -306,12 +276,10 @@ export class NotAllowed extends BaseSerializableError<NotAllowedResponse> {
 	 * Returns a copy of this error re-tagged with a different action.
 	 *
 	 * Lets a caller report the operation the actor asked for rather than the
-	 * internal step that refused it — an `upsert` whose existence probe hits
-	 * `read-user` reports `upsert-user`.
+	 * internal step that refused it.
 	 */
-	as(action: ActionCode): NotAllowed {
-		return new NotAllowed({
-			action,
+	as(action: NotAllowedAction): NotAllowed {
+		return new NotAllowed(action, {
 			message: this.message,
 			status: this.status,
 			target: this.target,
@@ -319,8 +287,8 @@ export class NotAllowed extends BaseSerializableError<NotAllowedResponse> {
 	}
 
 	protected _toJsonExtra(): {
-		action: ActionCode;
-		target?: JSON;
+		action: NotAllowedAction;
+		target?: JSONValue;
 	} {
 		return {
 			action: this.action,
@@ -336,14 +304,14 @@ export class RuleViolation extends BaseSerializableError<RuleViolationResponse> 
 	readonly code = "rule-violation";
 	readonly status: 500 = 500;
 	readonly actor?: string;
-	readonly target?: JSON;
-	readonly info?: JSON;
+	readonly target?: JSONValue;
+	readonly info?: JSONValue;
 
 	constructor(args: {
 		message?: string;
 		actor?: string;
-		target?: JSON;
-		info?: JSON;
+		target?: JSONValue;
+		info?: JSONValue;
 	}) {
 		const { message = "Rule violation", actor, target, info } = args;
 		super(message, "rule-violation", 500);
@@ -354,8 +322,8 @@ export class RuleViolation extends BaseSerializableError<RuleViolationResponse> 
 
 	protected _toJsonExtra(): {
 		actor?: string;
-		target?: JSON;
-		info?: JSON;
+		target?: JSONValue;
+		info?: JSONValue;
 	} {
 		return {
 			actor: this.actor,
@@ -400,27 +368,13 @@ export class Unavailable extends BaseSerializableError<InternalErrorResponse> {
 //
 
 /**
- * Maps a Zod issue to the coarser {@link ValidationErrorCode} the API exposes.
+ * Raise an error type constructed with the given parameters.
+ *
+ * This is useful to throw exceptions in places that expect expressions instead
+ * of statements.
  */
-function validationErrorCodeFromZodIssue(
-	issue: z.core.$ZodIssue,
-): ValidationErrorCode {
-	switch (issue.code) {
-		case "invalid_type":
-			return issue.input === undefined ? "missing" : "type-mismatch";
-		case "too_big":
-			return "too-long";
-		case "too_small":
-			return "too-short";
-		case "invalid_format":
-			return "pattern-mismatch";
-		case "unrecognized_keys":
-			return "not-allowed";
-		case "custom":
-			return "custom";
-		default:
-			return "invalid";
-	}
+export function raise(err: Error) {
+	throw err;
 }
 
 /**
@@ -454,4 +408,28 @@ export function responseFromException(error: unknown): ErrorResponse {
 		message: String(error),
 		timestamp: new Date(),
 	};
+}
+
+/**
+ * Maps a Zod issue to the coarser {@link InvalidDataCode} the API exposes.
+ */
+function validationErrorCodeFromZodIssue(
+	issue: z.core.$ZodIssue,
+): InvalidDataCode {
+	switch (issue.code) {
+		case "invalid_type":
+			return issue.input === undefined ? "missing" : "type-mismatch";
+		case "too_big":
+			return "too-long";
+		case "too_small":
+			return "too-short";
+		case "invalid_format":
+			return "pattern-mismatch";
+		case "unrecognized_keys":
+			return "not-allowed";
+		case "custom":
+			return "custom";
+		default:
+			return "invalid";
+	}
 }

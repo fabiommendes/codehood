@@ -143,3 +143,31 @@ export type Impl<T, K extends keyof T> = { [K2 in K]: T[K2] } & {
 export type Constructor<T = Record<Key, unknown>> = new (
 	...args: unknown[]
 ) => T;
+
+/**
+ * Checks if a type is not `never`.
+ */
+export type NotNever<T> = [T] extends [never] ? false : true;
+
+/**
+ * Assert type `T` is `true`. Usually used for compile-time checks.
+ *
+ * @example
+ * ```ts
+ * type A = Assert<NotNever<string>>; // OK
+ * type B = Assert<NotNever<never>>;  // Error
+ * ```
+ *
+ */
+export type Assert<_T extends true> = void;
+
+/**
+ * Assert type `T` is `never`, reporting the offending members on failure.
+ *
+ * @example
+ * ```ts
+ * type A = AssertNever<Exclude<"a", "a">>; // OK
+ * type B = AssertNever<Exclude<"a" | "b", "a">>; // Error: '"b"' does not satisfy 'never'
+ * ```
+ */
+export type AssertNever<_T extends never> = void;

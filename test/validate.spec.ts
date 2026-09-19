@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
-import { SYSTEM } from "@/core/actor";
+import { SYSTEM } from "@/auth/actor";
 import type { ServiceOpts } from "@/db/base-service";
 import { Validate } from "@/utils/validate";
 
@@ -148,7 +148,7 @@ test("service mode: validates output and rejects invalid output by default", asy
 test("service mode: skipValidation === true skips both input and output validation", async () => {
 	const service = new UserLikeService();
 	await expect(
-		service.create({ name: "" }, { ...opts, skipValidation: true }),
+		service.create({ name: "" }, { ...opts, validate: "none" }),
 	).resolves.toEqual({ name: "" });
 });
 
@@ -156,7 +156,7 @@ test("service mode: skipValidation.input skips only input validation", async () 
 	const service = new UserLikeService();
 	// name "abc" clears the output schema too, so only input skipping is exercised.
 	await expect(
-		service.create({ name: "" }, { ...opts, skipValidation: { input: true } }),
+		service.create({ name: "" }, { ...opts, validate: "output" }),
 	).rejects.toBeTruthy(); // still rejects: output schema (min 3) fails on ""
 });
 
@@ -164,10 +164,7 @@ test("service mode: skipValidation.output skips only output validation", async (
 	const service = new UserLikeService();
 	await expect(service.create({ name: "a" }, opts)).rejects.toBeTruthy();
 	await expect(
-		service.create(
-			{ name: "a" },
-			{ ...opts, skipValidation: { output: true } },
-		),
+		service.create({ name: "a" }, { ...opts, validate: "input" }),
 	).resolves.toEqual({ name: "a" });
 });
 
