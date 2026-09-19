@@ -39,6 +39,20 @@
 
 ### Changed
 
+- Authorization has a single mechanism. The `canViewCourse`,
+  `canViewCourseContents`, `canUpdateCourse`, `canUpdateCourseContents`,
+  `canCreateCourseFor`, `canReadQuestion`, `canManageApiKeys` and
+  `canManageSessions` predicates are gone, folded into the `PERMISSIONS` table
+  as `course.create`, `course.read`, `course.read-contents`, `course.update`,
+  `course.delete`, `course.update-contents`, `question.read`,
+  `question.read-public`, `api-key.manage` and `session.manage`. Every
+  authorization question now goes through `hasPerm`/`ensurePerm`, so each rule
+  is declared in one table with an `audit` reducer that keeps whole rows out of
+  errors. `canReadQuestion`'s `isPublic` flag became the choice between
+  `question.read` and `question.read-public`. `Perm` is derived from the table,
+  making a permission with no definition a compile error rather than a runtime
+  crash, and the currying helpers the old predicates needed were removed.
+
 - `/openapi.json` is generated on first request and cached for the life of the
   process instead of being committed to `public/` by `pnpm openapi`. The
   document is a pure function of route registrations that are fixed at import

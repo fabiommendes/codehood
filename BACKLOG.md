@@ -9,7 +9,7 @@ Backlog items are categorized in sections, not on priority.
 
 ## Small issues
 
-* [ ] **Schema hygiene in `src/core/schemas.ts`** — create/update schemas
+* [ ] **Schema hygiene in `src/core/schemas/`** — create/update schemas
   retyped instead of derived from `xSchema`, and `.optional()` used where the
   column is nullable (so the field can never be cleared). See
   `dev/issues/schemas-verbose-and-optional-vs-nullable.md`.

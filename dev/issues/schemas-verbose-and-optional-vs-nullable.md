@@ -1,4 +1,4 @@
-# `src/core/schemas.ts` is verbose and confuses optional with nullable
+# `src/core/schemas/` is verbose and confuses optional with nullable
 
 Two problems, same file.
 

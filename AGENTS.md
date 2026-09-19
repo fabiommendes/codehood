@@ -20,10 +20,6 @@ language. Do not adulate or be sycophantic to the human. The human is another
 senior software engineer, so do not explain or re-state common knowledge or
 implied information. The human can ask for clarification, when needed.
 
-Be very concise and direct in your all your communication. When talking
-to the human, sacrifice grammar for conciseness. Use good grammar when writing
-user-facing documentation and strings. 
-
 When replying to the human, prefer bullet points over long paragraphs. Prefix
 the bullet points with a identifier to make it easy to reference back to it.
 
@@ -36,8 +32,21 @@ easily reverted or things that have the pros clearly outweigh the cons. In the
 later case, briefly state your decision and move on. The human can revert it, if
 needed.
 
+### Writing Style
+
+Be very concise and direct in your all your communication. When talking to the
+human, sacrifice grammar for conciseness. Use good grammar only when writing
+user-facing text like documentation, code comments and strings.
+
 Avoid AI writting tells like em-dashes, excessive use of emojis and buzzwords
-like "synergy", "disruptive", "paradigm shift", "pivotal moment", etc.
+like "synergy", "disruptive", "paradigm shift", "pivotal moment", etc. Avoid
+buzzwords in general and marketing lingo. We are not an startup trying to
+impress investors.
+
+Avoid those specificlanguage vices:
+
+- "name" as a verb. Usually there is a better more precise word: "refers to a
+  variable", "declare a type", "reference an entity", etc.
 
 
 ## Project layout
@@ -184,9 +193,35 @@ onto what exists here instead of creating parallel structure:
 
 Never create `CONTEXT.md`, `CONTEXT-MAP.md` or `docs/adr/`.
 
-# RTK
 
-## Golden Rule
+## Coding style
+
+Adopt best practices and some specific rules for this project:
+
+- Never reference the functional requirements or context that can only be 
+  understood via the current conversation in comments (documentation comments 
+  or otherwise).
+- When doc commenting variables, and constants, use `///`. For public functions,
+  methods and classes use `/** */`. Private members or internal details use
+  `///`. Some functions are marked public only because they belong to a
+  sub-module that be re-exported by inner modules and are not actually exposed
+  in the public API. Treat those functions as if they were private. Never import
+  them directly outside the sibling sub-modules. This hierarchy follows the
+  filesystem hierarchy.
+- The doc comments for methods, functions and classes follow the structure:
+  - A SINGLE sentence describing the purpose and behavior.
+  - Any additional details or context, if necessary (it is more often than not, uncessary)
+  - A `@example` section demonstrating usage, if the description alone is not 
+    sufficient and if the example is self-contained, executable and reasonably 
+    simple.
+  - A `@params` section ONLY if the usage of each parameter is not already clear
+    from the description and type signature.
+  - Add a `@throws` section if the function can throw exceptions. 
+
+
+## RTK
+
+### Golden Rule
 
 **Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. RTK is always safe to use.
 
@@ -199,20 +234,20 @@ git add . && git commit -m "msg" && git push
 rtk git add . && rtk git commit -m "msg" && rtk git push
 ```
 
-## RTK Commands by Workflow
+### RTK Commands by Workflow
 
-### Build & Compile
+#### Build & Compile
 ```bash
 rtk tsc                 # TypeScript errors grouped by file/code
 rtk lint                # ESLint/Biome violations grouped
 ```
 
-### Test
+#### Test
 ```bash
 rtk playwright test     # Playwright failures only
 ```
 
-### Git
+#### Git
 ```bash
 rtk git status          # Compact status
 rtk git log             # Compact log (works with all git flags)
@@ -231,7 +266,7 @@ rtk git worktree        # Compact worktree
 Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
 
 
-### JavaScript/TypeScript Tooling
+#### JavaScript/TypeScript Tooling
 ```bash
 rtk pnpm list           # Compact dependency tree
 rtk pnpm outdated       # Compact outdated packages
@@ -242,7 +277,7 @@ rtk prisma              # Prisma without ASCII art
 rtk uv run <cmd>        # Compact uv project command output
 ```
 
-### Files & Search
+#### Files & Search
 ```bash
 rtk ls <path>           # Tree format, compact
 rtk read <file>         # Code reading with filtering
@@ -250,7 +285,7 @@ rtk grep <pattern>      # Search grouped by file. Format flags (-c, -l, -L, -o, 
 rtk find <pattern>      # Find grouped by directory
 ```
 
-### Analysis & Debug
+#### Analysis & Debug
 ```bash
 rtk err <cmd>           # Filter errors only from any command
 rtk log <file>          # Deduplicated logs with counts
@@ -261,8 +296,19 @@ rtk summary <cmd>       # Smart summary of command output
 rtk diff                # Ultra-compact diffs
 ```
 
-### Network
+#### Network
 ```bash
 rtk curl <url>          # Compact HTTP responses
 rtk wget <url>          # Compact download output
+```
+
+#### Other commands
+
+We have the usual pnpm run commands: dev, test, lint, build. We also have:
+
+```bash
+rtk pnpm run db:seed      # Seed the database for dev work
+rtk pnpm run db:reset     # Reset the dev database. This is safe: the dev db is a throwaway database
+rtk pnpm run db:generate  # Generate the prisma client. IMPORTANT: use this rather than `prisma generate`
+rtk pnpm run stories      # Check user stories coverage
 ```

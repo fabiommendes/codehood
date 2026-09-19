@@ -81,7 +81,7 @@ client from mapping one hash to two contents.
 `DRAFT` / `PUBLISHED` / `ARCHIVED` arrive in the push. There is no publish
 button, and there never will be while `FR-ACC-010` holds.
 
-Students see `PUBLISHED` questions. The instructor sees all three. `ARCHIVED`
+Everyone but the author sees `PUBLISHED` questions only. The author sees all three. `ARCHIVED`
 means "offered in nothing new" and never retroactively hides a question from an
 exam that already references it, or from a student reading their own answer.
 
@@ -93,8 +93,8 @@ course record and wrong for its content. This spec adds the pair:
 ```ts
 // src/auth/permissions.ts, adjacent
 export function canWriteCourseContent(actor: Actor, course: CourseWithEnrollment): boolean;
-export function canViewQuestion(actor: Actor, question: QuestionWithCourse): boolean;
-export function questionVisibility(actor: Actor): Prisma.QuestionRefWhereInput;
+export function canViewQuestion(actor: Actor, question: QuestionWithCourse, isPublic?: boolean): boolean;
+export function questionWhere(actor: Actor, isPublic?: boolean): Prisma.QuestionRefWhereInput;
 export function canShareQuestion(actor: Actor, question: QuestionWithCourse): boolean;
 ```
 
@@ -111,7 +111,7 @@ agreement test.
 | :---------------- | :----------- | :---------- | :----- |
 | `SYSTEM`          | everything   | both halves | yes    |
 | Instructor, owner | all statuses | both halves | yes    |
-| Admin             | all statuses | public only | **no** |
+| Admin             | `PUBLISHED`  | public only | **no** |
 | Student, enrolled | `PUBLISHED`  | public only | no     |
 | Anyone else       | nothing      | —           | no     |
 
@@ -241,6 +241,39 @@ actor is required and forgetting it is a compile error.
 A separate `findOneForStudent` is *not* added. The same `findOne` returns the
 public half unless the actor may see more, because two methods that differ only
 in what they omit is exactly the shape where one call site picks the wrong one.
+
+### Writing versions, as implemented
+
+- `update` takes `question` and `version` together or not at all; `status`
+  alone writes no version.
+- A new `version` label appends a row. A label already used for this question
+  resolves to that row when the content is identical (a repeated push, or a
+  rollback), and is refused with `409` when it is not. Content is compared only
+  in that case, never inferred from the label.
+- `update` on an `ARCHIVED` question is refused with `409` (`FR-SYNC-012`).
+  `create` and `upsert` on its slug revive it in place: same row, same
+  `publicId`, history kept, the new content appended as a version.
+- `delete` archives, and is a no-op on a question already archived.
+
+### Visibility lives in `canViewQuestion` / `questionWhere`
+
+`canViewQuestion(actor, question, isPublic)` and its Prisma fragment
+`questionWhere(actor, isPublic)` are the one place that decides who sees which
+question, because exams will make it depend on more than role and status (a
+question disclosed only while an exam is open, say). `isPublic: false` asks for
+the whole document, and only its author (or `SYSTEM`) gets that; `isPublic:
+true` adds whoever may see the course's contents, for `PUBLISHED` questions
+only. The flag defaults to `false`, the narrower rule. An agreement test pins
+the pair to each other.
+
+A `DRAFT` or `ARCHIVED` question does not exist for anyone but its author:
+`findOne` returns `null`, `update`/`delete` throw `NotFound`, and listings
+leave it out.
+
+Reads take a three-way `public` flag, and `findOne`/`findMany` are overloaded
+on it: `true` returns `QuestionPublic`, `false` returns `Question` and throws
+`NotAllowed` for an actor who may only see the public half, and leaving it out
+returns `QuestionView`, whatever the actor may see.
 
 ### Validation happens on write, through `mdq-js`
 
