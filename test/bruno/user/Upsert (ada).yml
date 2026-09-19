@@ -1,0 +1,23 @@
+info:
+  name: Upsert (ada)
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/user/
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Ada Lovelace",
+        "username": "ada@local"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

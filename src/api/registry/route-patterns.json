@@ -1,21 +1,5 @@
 [
 	{
-		"pattern": "/api/api-key",
-		"methods": [
-			"get",
-			"post"
-		]
-	},
-	{
-		"pattern": "/api/api-key/[id]",
-		"methods": [
-			"delete",
-			"get",
-			"patch",
-			"put"
-		]
-	},
-	{
 		"pattern": "/api/auth/login",
 		"methods": [
 			"post"
@@ -31,7 +15,8 @@
 		"pattern": "/api/calendar-event",
 		"methods": [
 			"get",
-			"post"
+			"post",
+			"put"
 		]
 	},
 	{
@@ -39,15 +24,15 @@
 		"methods": [
 			"delete",
 			"get",
-			"patch",
-			"put"
+			"patch"
 		]
 	},
 	{
 		"pattern": "/api/course",
 		"methods": [
 			"get",
-			"post"
+			"post",
+			"put"
 		]
 	},
 	{
@@ -55,15 +40,31 @@
 		"methods": [
 			"delete",
 			"get",
-			"patch",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/question",
+		"methods": [
+			"get",
+			"post",
 			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/question/[slug]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
 		]
 	},
 	{
 		"pattern": "/api/course/[discipline]/[course]/resource",
 		"methods": [
 			"get",
-			"post"
+			"post",
+			"put"
 		]
 	},
 	{
@@ -71,40 +72,39 @@
 		"methods": [
 			"delete",
 			"get",
-			"patch",
-			"put"
+			"patch"
 		]
 	},
 	{
 		"pattern": "/api/discipline",
 		"methods": [
 			"get",
-			"post"
+			"post",
+			"put"
 		]
 	},
 	{
-		"pattern": "/api/discipline/[id]",
+		"pattern": "/api/discipline/[slug]",
 		"methods": [
 			"delete",
 			"get",
-			"patch",
-			"put"
+			"patch"
 		]
 	},
 	{
 		"pattern": "/api/edition",
 		"methods": [
 			"get",
-			"post"
+			"post",
+			"put"
 		]
 	},
 	{
-		"pattern": "/api/edition/[id]",
+		"pattern": "/api/edition/[slug]",
 		"methods": [
 			"delete",
 			"get",
-			"patch",
-			"put"
+			"patch"
 		]
 	},
 	{
@@ -114,10 +114,25 @@
 		]
 	},
 	{
-		"pattern": "/api/time-slot",
+		"pattern": "/api/invite",
 		"methods": [
 			"get",
 			"post"
+		]
+	},
+	{
+		"pattern": "/api/invite/[id]",
+		"methods": [
+			"delete",
+			"get"
+		]
+	},
+	{
+		"pattern": "/api/time-slot",
+		"methods": [
+			"get",
+			"post",
+			"put"
 		]
 	},
 	{
@@ -125,24 +140,30 @@
 		"methods": [
 			"delete",
 			"get",
-			"patch",
-			"put"
+			"patch"
 		]
 	},
 	{
 		"pattern": "/api/user",
 		"methods": [
 			"get",
-			"post"
+			"post",
+			"put"
 		]
 	},
 	{
-		"pattern": "/api/user/[id]",
+		"pattern": "/api/user/[username]",
 		"methods": [
 			"delete",
 			"get",
-			"patch",
-			"put"
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/user/me",
+		"methods": [
+			"get",
+			"patch"
 		]
 	}
 ]

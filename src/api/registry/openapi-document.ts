@@ -1,6 +1,6 @@
 import { OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
 import pkg from "../../../package.json" with { type: "json" };
-import { registry } from ".";
+import { registry } from "./route";
 
 // Importing this module triggers the import of all other api modules,
 // registering their routes and schemas with the global `registry` object. This is

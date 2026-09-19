@@ -1,0 +1,23 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/discipline/
+  body:
+    type: json
+    data: |-
+      {
+        "slug": "cs101",
+        "name": "Intro to programming"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

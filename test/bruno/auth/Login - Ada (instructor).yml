@@ -1,0 +1,32 @@
+info:
+  name: Login / Ada (instructor)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/auth/login
+  body:
+    type: json
+    data: |-
+      {
+        "login": "ada",
+        "password": "ada"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const body = res.getBody();
+        if (body && body.token) {
+          bru.setEnvVar("token", body.token);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

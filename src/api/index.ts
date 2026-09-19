@@ -5,151 +5,131 @@
  * should fit nicely in this module.
  */
 
-import { z } from "zod";
-import { InvalidData } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
-import { parseCourseSegment } from "@/utils/course-url";
-import { CRUD } from "./registry";
+import { CRUD, GET, PATCH } from "./registry";
+import { parseCourseParams } from "./utils";
 
-/**
- * Turns a course's two path segments into a `coursePkRef`.
- *
- * Throws `InvalidData` (400) for a segment that does not match the grammar.
- * That is a deliberate divergence from the web app, which rounds a malformed
- * course URL down to a 404: a person typing a URL cannot act on a 400, but the
- * CLI can, and reporting bad local configuration as "no such course" sends
- * them hunting for the wrong problem.
- */
-export function parseCourseParams(params: Record<string, string>) {
-	const segment = parseCourseSegment(params.course ?? "");
-	if (!segment)
-		throw new InvalidData({
-			errors: {
-				course: [
-					{
-						code: "pattern-mismatch",
-						message: "Expected <instructor>_<edition>.",
-					},
-				],
-			},
-			message: `"${params.course}" is not a course segment.`,
-		});
-
-	const validated = schema.coursePkRef.safeParse({
-		ref: {
-			discipline: params.discipline,
-			instructor: segment.instructor,
-			edition: segment.edition,
-		},
-	});
-	if (validated.error)
-		throw InvalidData.fromZodError(validated.error, validated.data);
-	return validated.data;
-}
-
-/** Turns a course's two path segments plus `[slug]` into a `resourcePkRef`. */
-export function parseResourceParams(params: Record<string, string>) {
-	const { ref: courseRef } = parseCourseParams(params);
-	const validated = schema.resourcePkRef.safeParse({
-		ref: { courseRef, slug: params.slug },
-	});
-	if (validated.error)
-		throw InvalidData.fromZodError(validated.error, validated.data);
-	return validated.data;
-}
-
-//
-// Pure RESTful interfaces. They expose only the classic CRUD operations.
-//
-// Some services have a few operations disabled at the type level.
-//
-export const apiKeyApi = CRUD("/api/api-key", {
-	name: "ApiKey",
-	entity: schema.apiKeySchema,
-	create: schema.apiKeyCreate,
-	update: z.any().openapi("ApiKeyUpdate"), // FIXME: it should be never, not any
-	filter: schema.apiKeyFilter,
-	filterPk: schema.apiKeyPK,
-	tags: ["Api Key"],
-	service: db.apiKey,
-});
 export const calendarEventApi = CRUD("/api/calendar-event", {
-	name: "CalendarEvent",
+	name: "Calendar Event",
+	plural: "Calendar Events",
 	entity: schema.calendarEventSchema,
 	create: schema.calendarEventCreate,
 	update: schema.calendarEventUpdate,
 	filter: schema.calendarEventFilter,
-	filterPk: schema.calendarEventPK,
+	key: schema.calendarEventPK,
 	tags: ["Calendar Events"],
 	service: db.calendarEvent,
 });
+
 export const courseApi = CRUD("/api/course", {
 	name: "Course",
-	entity: schema.courseSchema,
+	plural: "Courses",
+	keySegment: "/[discipline]/[course]",
+	parseKeyParams: parseCourseParams,
+	entity: schema.courseSchema.omit({ id: true }),
 	create: schema.courseCreate,
 	update: schema.courseUpdate,
+	upsert: schema.courseUpsert,
 	filter: schema.courseFilter,
-	filterPk: schema.coursePkRef,
-	// A course is addressed the same way in the API as on the web:
-	// `<discipline>/<instructor>_<edition>`, the columns of its unique key. See
-	// docs/design/url-structure.md.
-	pkPath: "/[discipline]/[course]",
-	parsePk: parseCourseParams,
+	key: schema.courseNaturalKey,
 	tags: ["Courses"],
 	service: db.course,
 });
+
 export const disciplinesApi = CRUD("/api/discipline", {
-	pk: "slug",
 	name: "Discipline",
+	plural: "Disciplines",
+	keySegment: "/[slug]",
 	entity: schema.disciplineSchema,
 	create: schema.disciplineCreate,
 	update: schema.disciplineUpdate,
 	filter: schema.disciplineFilter,
-	filterPk: schema.disciplinePK,
+	key: schema.disciplinePK,
 	tags: ["Disciplines"],
 	service: db.discipline,
 });
+
 export const editionApi = CRUD("/api/edition", {
-	pk: "slug",
 	name: "Edition",
+	plural: "Editions",
+	keySegment: "/[slug]",
 	entity: schema.editionSchema,
 	create: schema.editionCreate,
 	update: schema.editionUpdate,
 	filter: schema.editionFilter,
-	filterPk: schema.editionPK,
+	key: schema.editionPK,
 	tags: ["Editions"],
 	service: db.edition,
 });
-// export const inviteApi = CRUD("/api/invite", {
-//     name: "Invite",
-//     entity: schema.inviteSchema,
-//     create: schema.inviteCreate,
-//     update: schema.inviteUpdate,
-//     filter: schema.inviteFilter,
-//     filterPk: schema.invitePK,
-//     tags: ["Invites"],
-//     service: db.invite,
-// });
+
+export const inviteApi = CRUD("/api/invite", {
+	name: "Invite",
+	plural: "Invites",
+	entity: schema.inviteSchema,
+	create: schema.inviteCreate,
+	update: null,
+	filter: schema.inviteFilter,
+	key: schema.invitePK,
+	tags: ["Invites"],
+	service: db.invite,
+});
+
 export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	name: "Resource",
-	entity: schema.resourceSchema,
-	// The course is named by the path, so the body and query never carry it.
-	create: schema.resourceCreate.omit({ courseId: true, courseRef: true }),
-	upsert: schema.resourceUpsert.omit({
-		courseId: true,
-		courseRef: true,
-		slug: true,
-	}),
+	plural: "Resources",
+	keySegment: "/[slug]",
+
+	entity: schema.resourceSchema.omit({ id: true }),
+	create: schema.resourceCreate.omit({ courseId: true }),
+	upsert: schema.resourceUpsert.omit({ courseId: true }),
 	update: schema.resourceUpdate,
-	filter: schema.resourceFilter.omit({ courseId: true, courseRef: true }),
-	filterPk: schema.resourcePkRef,
-	pkPath: "/[slug]",
-	parsePk: parseResourceParams,
-	parseScope: (params) => ({ courseRef: parseCourseParams(params).ref }),
+	filter: schema.resourceFilterBase,
+	scope: schema.courseNaturalKey,
+	key: schema.resourceNaturalKey,
+
 	tags: ["Resources"],
 	service: db.resource,
+
+	parseKeyParams(params) {
+		return { ...parseCourseParams(params), slug: params.slug as string };
+	},
+	parseCreateParams(params) {
+		return { courseId: parseCourseParams(params) };
+	},
+	parseListParams(params) {
+		return parseCourseParams(params);
+	},
 });
+
+export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
+	name: "Question",
+	plural: "Questions",
+	keySegment: "/[slug]",
+
+	entity: schema.questionSchema,
+	create: schema.questionCreate.omit({ courseId: true }),
+	upsert: schema.questionUpsert.omit({ courseId: true }),
+	update: schema.questionUpdate,
+	filter: schema.questionFilterBase,
+	scope: schema.courseNaturalKey,
+	key: schema.questionNaturalKey,
+	findOneQuery: schema.questionFindOneQuery,
+
+	tags: ["Questions"],
+	service: db.question,
+
+	parseKeyParams(params) {
+		return { ...parseCourseParams(params), slug: params.slug as string };
+	},
+	parseCreateParams(params) {
+		return { courseId: parseCourseParams(params) };
+	},
+	parseListParams(params) {
+		return parseCourseParams(params);
+	},
+});
+
 // export const sessionApi = CRUD("/api/session", {
 //     name: "Session",
 //     entity: schema.sessionSchema,
@@ -160,23 +140,58 @@ export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 //     tags: ["Sessions"],
 //     service: db.session,
 // });
+
 export const timeSlotApi = CRUD("/api/time-slot", {
 	name: "TimeSlot",
 	entity: schema.timeSlotSchema,
 	create: schema.timeSlotCreate,
 	update: schema.timeSlotUpdate,
 	filter: schema.timeSlotFilter,
-	filterPk: schema.timeSlotPK,
+	key: schema.timeSlotPK,
 	tags: ["Time Slots"],
 	service: db.timeSlot,
 });
-export const userApi = CRUD("/api/user", {
-	name: "User",
-	entity: schema.userSchema,
-	create: schema.userCreate,
-	update: schema.userUpdate,
-	filter: schema.userFilter,
-	filterPk: schema.userPK,
-	tags: ["Users"],
-	service: db.user,
-});
+
+// TODO: document Errors
+const userTags = ["Users"];
+const userErrors = {
+	// TODO: Define user-related errors here
+};
+
+export const userApi = {
+	viewMe: GET("/api/user/me", {
+		out: schema.userSchema.omit({ passwordHash: true }),
+		summary: "View current user information",
+		tags: userTags,
+		errors: userErrors,
+		handler: async (args) => {
+			return db.user.findOne(
+				{ username: args.actor.username },
+				{ actor: args.actor },
+			);
+		},
+	}),
+	updateMe: PATCH("/api/user/me", {
+		in: schema.userUpdate,
+		out: schema.userSchema.omit({ passwordHash: true }),
+		summary: "Update current user information",
+		tags: userTags,
+		errors: userErrors,
+		handler: async (args) => {
+			return db.user.update({ username: args.actor.username }, args.body, {
+				actor: args.actor,
+			});
+		},
+	}),
+	...CRUD("/api/user", {
+		name: "User",
+		keySegment: "/[username]",
+		entity: schema.userSchema.pick({ username: true, name: true }),
+		create: schema.userCreate,
+		update: schema.userUpdate,
+		filter: schema.userFilter,
+		key: schema.userPK,
+		tags: userTags,
+		service: db.user,
+	}),
+};

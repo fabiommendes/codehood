@@ -1,0 +1,33 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/question
+  body:
+    type: json
+    data: |-
+      {
+          "slug": "foo",
+          "status": "PUBLISHED",
+          "version": "abc",
+          "question": {
+            "type": "multiple-choice",
+            "title": "Recursion basics",
+            "stem": "Which of the following is required for a recursive function to terminate?",
+            "choices": [
+              { "id": "base-case", "text": "A base case", "score": 1 },
+              { "id": "tail-call", "text": "A tail call" }
+            ]
+          }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

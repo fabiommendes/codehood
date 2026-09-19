@@ -1,0 +1,23 @@
+info:
+  name: Create (cs103)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/discipline/
+  body:
+    type: json
+    data: |-
+      {
+        "slug": "cs103",
+        "name": "Web Programming"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

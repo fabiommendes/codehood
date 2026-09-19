@@ -1,0 +1,25 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/edition/
+  body:
+    type: json
+    data: |-
+      {
+        "slug": "2026-3",
+        "name": "2026 · third term",
+        "startAt": "2026-08-15T20:09:44.092Z",
+        "endAt": "2027-01-15T20:09:44.092Z"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

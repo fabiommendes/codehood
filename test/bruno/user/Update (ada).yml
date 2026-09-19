@@ -1,0 +1,22 @@
+info:
+  name: Update (ada)
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/user/ada
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Augusta Ada Byron King"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

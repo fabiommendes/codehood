@@ -1,0 +1,29 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/resource
+  body:
+    type: json
+    data: |-
+      {
+          "slug": "foo",
+          "title": "Title",
+          "description": "Hello world!",
+          "ref": "abc",
+          "data": {
+            "type": "MD",
+            "content": "# Foo\n\nFoo Bar"
+          }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

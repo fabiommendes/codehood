@@ -1,0 +1,23 @@
+info:
+  name: Update (cs101)
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/discipline/cs101
+  body:
+    type: json
+    data: |-
+      {
+        "foo": "sdfds",
+        "name": "Intro to programming"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

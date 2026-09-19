@@ -66,7 +66,7 @@ test("resources are documented only under their course, and never offer the cour
 	expect(queryNames).not.toContain("courseId");
 	expect(queryNames.some((name) => name.startsWith("courseRef"))).toBe(false);
 
-	const bodyFields = (operation: typeof item.put) => {
+	const bodyFields = (operation: NonNullable<typeof item>["put"]) => {
 		const body = operation?.requestBody;
 		const schema =
 			body && "content" in body

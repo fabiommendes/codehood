@@ -1,0 +1,26 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/course/
+  body:
+    type: json
+    data: |-
+      {
+          "description": "A first course in programming: variables, control flow, functions, and enough data structures to get dangerous.",
+          "discipline": "cs101",
+          "edition": "2026-2",
+          "startAt": "2026-01-05T00:00:00.000Z",
+          "endAt": "2026-05-15T00:00:00.000Z"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,5434 @@
+{
+	"openapi": "3.0.0",
+	"info": {
+		"title": "Codehood API",
+		"version": "0.0.2",
+		"description": "REST API for the Codehood CLI and grading bots. Authenticated with `Authorization: Bearer <key>`, except where noted — see docs/design/url-structure.md."
+	},
+	"servers": [
+		{
+			"url": "/",
+			"description": "Same origin as the web app"
+		}
+	],
+	"security": [
+		{
+			"BearerAuth": []
+		}
+	],
+	"components": {
+		"securitySchemes": {
+			"BearerAuth": {
+				"type": "http",
+				"scheme": "bearer",
+				"description": "An API key for the CLI or a grading bot. Issued by POST /api/auth/login, or created on /profile."
+			}
+		},
+		"schemas": {
+			"CalendarEvent": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"courseId": {
+						"type": "integer"
+					},
+					"timeSlotId": {
+						"type": "integer"
+					},
+					"examId": {
+						"type": "integer",
+						"nullable": true
+					},
+					"exam": {
+						"type": "object",
+						"nullable": true,
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"slug": {
+								"type": "string"
+							},
+							"title": {
+								"type": "string"
+							}
+						},
+						"required": ["id", "slug", "title"]
+					},
+					"slug": {
+						"type": "string",
+						"minLength": 1
+					},
+					"startAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"durationMin": {
+						"type": "integer"
+					},
+					"week": {
+						"type": "integer"
+					},
+					"kind": {
+						"type": "string",
+						"enum": [
+							"LECTURE",
+							"LAB",
+							"EXAM",
+							"REVIEW",
+							"SEMINAR",
+							"PROJECT",
+							"SELF_STUDY",
+							"HOLIDAY",
+							"RECESS",
+							"CANCELLED"
+						]
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1
+					},
+					"description": {
+						"type": "string",
+						"nullable": true
+					},
+					"contentHash": {
+						"type": "string",
+						"minLength": 1
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"timeSlot": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"courseId": {
+								"type": "integer"
+							},
+							"slug": {
+								"type": "string",
+								"minLength": 1
+							},
+							"title": {
+								"type": "string",
+								"nullable": true
+							},
+							"day": {
+								"type": "string",
+								"enum": [
+									"SUNDAY",
+									"MONDAY",
+									"TUESDAY",
+									"WEDNESDAY",
+									"THURSDAY",
+									"FRIDAY",
+									"SATURDAY"
+								]
+							},
+							"startMin": {
+								"type": "integer"
+							},
+							"durationMin": {
+								"type": "integer"
+							},
+							"createdAt": {
+								"type": "string",
+								"format": "date-time"
+							},
+							"updatedAt": {
+								"type": "string",
+								"format": "date-time"
+							}
+						},
+						"required": [
+							"id",
+							"courseId",
+							"slug",
+							"title",
+							"day",
+							"startMin",
+							"durationMin",
+							"createdAt",
+							"updatedAt"
+						]
+					}
+				},
+				"required": [
+					"id",
+					"courseId",
+					"timeSlotId",
+					"examId",
+					"exam",
+					"slug",
+					"startAt",
+					"durationMin",
+					"week",
+					"kind",
+					"title",
+					"description",
+					"contentHash",
+					"createdAt",
+					"updatedAt",
+					"timeSlot"
+				]
+			},
+			"Deleted": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					},
+					"message": {
+						"type": "string"
+					}
+				},
+				"required": ["success", "message"]
+			},
+			"Course": {
+				"type": "object",
+				"properties": {
+					"description": {
+						"type": "string",
+						"nullable": true
+					},
+					"discipline": {
+						"type": "object",
+						"properties": {
+							"slug": {
+								"type": "string",
+								"minLength": 1
+							},
+							"name": {
+								"type": "string",
+								"minLength": 1
+							}
+						},
+						"required": ["slug", "name"]
+					},
+					"edition": {
+						"type": "object",
+						"properties": {
+							"slug": {
+								"type": "string",
+								"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+							},
+							"name": {
+								"type": "string",
+								"minLength": 1
+							}
+						},
+						"required": ["slug", "name"]
+					},
+					"instructor": {
+						"type": "object",
+						"properties": {
+							"name": {
+								"type": "string",
+								"minLength": 1
+							},
+							"username": {
+								"type": "string",
+								"minLength": 1
+							}
+						},
+						"required": ["name", "username"]
+					},
+					"enrollments": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"name": {
+									"type": "string",
+									"minLength": 1
+								},
+								"username": {
+									"type": "string",
+									"minLength": 1
+								}
+							},
+							"required": ["name", "username"]
+						}
+					},
+					"startAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"endAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"joinedAt": {
+						"type": "string",
+						"format": "date-time"
+					}
+				},
+				"required": [
+					"description",
+					"discipline",
+					"edition",
+					"instructor",
+					"enrollments",
+					"startAt",
+					"endAt",
+					"createdAt",
+					"updatedAt",
+					"joinedAt"
+				]
+			},
+			"Discipline": {
+				"type": "object",
+				"properties": {
+					"slug": {
+						"type": "string",
+						"minLength": 1
+					},
+					"name": {
+						"type": "string",
+						"minLength": 1
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					}
+				},
+				"required": ["slug", "name", "createdAt"]
+			},
+			"Edition": {
+				"type": "object",
+				"properties": {
+					"slug": {
+						"type": "string",
+						"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+					},
+					"name": {
+						"type": "string",
+						"minLength": 1
+					},
+					"startAt": {
+						"type": "string",
+						"nullable": true,
+						"format": "date-time"
+					},
+					"endAt": {
+						"type": "string",
+						"nullable": true,
+						"format": "date-time"
+					},
+					"createdAt": {
+						"type": "string",
+						"nullable": true,
+						"format": "date-time"
+					}
+				},
+				"required": ["slug", "name", "startAt", "endAt", "createdAt"]
+			},
+			"Invite": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"tokenHash": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string",
+						"enum": ["PERSONAL", "CLASSROOM"]
+					},
+					"email": {
+						"type": "string",
+						"nullable": true
+					},
+					"invitedRole": {
+						"type": "string",
+						"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+					},
+					"courseId": {
+						"type": "integer",
+						"nullable": true
+					},
+					"maxUses": {
+						"type": "integer",
+						"nullable": true
+					},
+					"expiresAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"redemptions": {
+						"type": "integer"
+					},
+					"createdBy": {
+						"type": "object",
+						"properties": {
+							"name": {
+								"type": "string",
+								"minLength": 1
+							},
+							"username": {
+								"type": "string",
+								"minLength": 1
+							}
+						},
+						"required": ["name", "username"]
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"token": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"tokenHash",
+					"kind",
+					"email",
+					"invitedRole",
+					"courseId",
+					"maxUses",
+					"expiresAt",
+					"redemptions",
+					"createdBy",
+					"createdAt"
+				]
+			},
+			"Resource": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"slug": {
+						"type": "string",
+						"minLength": 1
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1
+					},
+					"description": {
+						"type": "string",
+						"nullable": true
+					},
+					"data": {
+						"anyOf": [
+							{
+								"type": "object",
+								"properties": {
+									"type": {
+										"type": "string",
+										"enum": ["LINK"]
+									},
+									"url": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["type", "url"]
+							},
+							{
+								"type": "object",
+								"properties": {
+									"link": {
+										"type": "string",
+										"minLength": 1
+									},
+									"mimeType": {
+										"type": "string",
+										"minLength": 1
+									},
+									"filename": {
+										"type": "string",
+										"minLength": 1
+									},
+									"type": {
+										"type": "string",
+										"enum": ["FILE"]
+									}
+								},
+								"required": ["link", "mimeType", "filename", "type"]
+							},
+							{
+								"type": "object",
+								"properties": {
+									"type": {
+										"type": "string",
+										"enum": ["CODE"]
+									},
+									"content": {
+										"type": "string",
+										"minLength": 1
+									},
+									"language": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["type", "content", "language"]
+							},
+							{
+								"type": "object",
+								"properties": {
+									"type": {
+										"type": "string",
+										"enum": ["MD"]
+									},
+									"content": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["type", "content"]
+							}
+						]
+					},
+					"ref": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					}
+				},
+				"required": [
+					"id",
+					"slug",
+					"title",
+					"description",
+					"data",
+					"ref",
+					"createdAt",
+					"updatedAt"
+				]
+			},
+			"TimeSlot": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer"
+					},
+					"courseId": {
+						"type": "integer"
+					},
+					"slug": {
+						"type": "string",
+						"minLength": 1
+					},
+					"title": {
+						"type": "string",
+						"nullable": true
+					},
+					"day": {
+						"type": "string",
+						"enum": [
+							"SUNDAY",
+							"MONDAY",
+							"TUESDAY",
+							"WEDNESDAY",
+							"THURSDAY",
+							"FRIDAY",
+							"SATURDAY"
+						]
+					},
+					"startMin": {
+						"type": "integer"
+					},
+					"durationMin": {
+						"type": "integer"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					}
+				},
+				"required": [
+					"id",
+					"courseId",
+					"slug",
+					"title",
+					"day",
+					"startMin",
+					"durationMin",
+					"createdAt",
+					"updatedAt"
+				]
+			},
+			"User": {
+				"type": "object",
+				"properties": {
+					"username": {
+						"type": "string",
+						"minLength": 1
+					},
+					"name": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": ["username", "name"]
+			},
+			"LogoutResponse": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean"
+					}
+				},
+				"required": ["success"]
+			},
+			"LoginResponse": {
+				"type": "object",
+				"properties": {
+					"token": {
+						"type": "string",
+						"description": "The raw API key. Shown once; it can't be recovered later."
+					}
+				},
+				"required": ["token"]
+			},
+			"InvalidCredentials": {
+				"type": "object",
+				"properties": {
+					"type": {
+						"type": "string",
+						"enum": ["error"]
+					},
+					"code": {
+						"type": "string",
+						"enum": ["not-allowed"]
+					},
+					"status": {
+						"type": "number",
+						"enum": [401]
+					},
+					"message": {
+						"type": "string"
+					},
+					"action": {
+						"type": "string"
+					},
+					"timestamp": {
+						"type": "string",
+						"nullable": true,
+						"format": "date-time"
+					}
+				},
+				"required": ["type", "code", "status", "message", "action", "timestamp"]
+			},
+			"LoginRequest": {
+				"type": "object",
+				"properties": {
+					"login": {
+						"anyOf": [
+							{
+								"type": "string",
+								"format": "email"
+							},
+							{
+								"type": "string",
+								"pattern": "^[a-z0-9][a-z0-9-]{1,30}$"
+							}
+						],
+						"description": "The user's email or username."
+					},
+					"password": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": ["login", "password"]
+			},
+			"HealthResponse": {
+				"type": "object",
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": ["ok"]
+					},
+					"database": {
+						"type": "string",
+						"enum": ["ok"]
+					}
+				},
+				"required": ["status", "database"]
+			},
+			"HealthError": {
+				"type": "object",
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": ["error"]
+					},
+					"database": {
+						"type": "string",
+						"enum": ["unreachable"]
+					}
+				},
+				"required": ["status", "database"]
+			}
+		},
+		"parameters": {}
+	},
+	"paths": {
+		"/api/calendar-event": {
+			"post": {
+				"operationId": "createCalendarevent",
+				"summary": "Creates a new CalendarEvent.",
+				"tags": ["Calendar Events"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"courseId": {
+										"type": "integer"
+									},
+									"timeSlotId": {
+										"type": "integer"
+									},
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"durationMin": {
+										"type": "integer"
+									},
+									"week": {
+										"type": "integer"
+									},
+									"kind": {
+										"type": "string",
+										"enum": [
+											"LECTURE",
+											"LAB",
+											"EXAM",
+											"REVIEW",
+											"SEMINAR",
+											"PROJECT",
+											"SELF_STUDY",
+											"HOLIDAY",
+											"RECESS",
+											"CANCELLED"
+										]
+									},
+									"title": {
+										"type": "string",
+										"minLength": 1
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"contentHash": {
+										"type": "string",
+										"minLength": 1
+									},
+									"date": {
+										"type": "string"
+									},
+									"startMin": {
+										"type": "integer"
+									}
+								},
+								"required": [
+									"courseId",
+									"timeSlotId",
+									"slug",
+									"week",
+									"title",
+									"contentHash",
+									"date"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CalendarEvent"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listCalendarevent",
+				"summary": "Find multiple CalendarEvents.",
+				"tags": ["Calendar Events"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "number"
+							}
+						},
+						"required": false,
+						"name": "courseIds",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"required": false,
+						"name": "from",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "string",
+							"format": "date-time"
+						},
+						"required": false,
+						"name": "to",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"enum": [
+									"LECTURE",
+									"LAB",
+									"EXAM",
+									"REVIEW",
+									"SEMINAR",
+									"PROJECT",
+									"SELF_STUDY",
+									"HOLIDAY",
+									"RECESS",
+									"CANCELLED"
+								]
+							}
+						},
+						"required": false,
+						"name": "kinds",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "integer"
+							}
+						},
+						"required": false,
+						"name": "weeks",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "integer",
+							"minimum": 0,
+							"exclusiveMinimum": true
+						},
+						"required": false,
+						"name": "limit",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"courseId": {
+												"type": "integer"
+											},
+											"timeSlotId": {
+												"type": "integer"
+											},
+											"examId": {
+												"type": "integer",
+												"nullable": true
+											},
+											"exam": {
+												"type": "object",
+												"nullable": true,
+												"properties": {
+													"id": {
+														"type": "integer"
+													},
+													"slug": {
+														"type": "string"
+													},
+													"title": {
+														"type": "string"
+													}
+												},
+												"required": ["id", "slug", "title"]
+											},
+											"slug": {
+												"type": "string",
+												"minLength": 1
+											},
+											"startAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"durationMin": {
+												"type": "integer"
+											},
+											"week": {
+												"type": "integer"
+											},
+											"kind": {
+												"type": "string",
+												"enum": [
+													"LECTURE",
+													"LAB",
+													"EXAM",
+													"REVIEW",
+													"SEMINAR",
+													"PROJECT",
+													"SELF_STUDY",
+													"HOLIDAY",
+													"RECESS",
+													"CANCELLED"
+												]
+											},
+											"title": {
+												"type": "string",
+												"minLength": 1
+											},
+											"description": {
+												"type": "string",
+												"nullable": true
+											},
+											"contentHash": {
+												"type": "string",
+												"minLength": 1
+											},
+											"createdAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"updatedAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"timeSlot": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "integer"
+													},
+													"courseId": {
+														"type": "integer"
+													},
+													"slug": {
+														"type": "string",
+														"minLength": 1
+													},
+													"title": {
+														"type": "string",
+														"nullable": true
+													},
+													"day": {
+														"type": "string",
+														"enum": [
+															"SUNDAY",
+															"MONDAY",
+															"TUESDAY",
+															"WEDNESDAY",
+															"THURSDAY",
+															"FRIDAY",
+															"SATURDAY"
+														]
+													},
+													"startMin": {
+														"type": "integer"
+													},
+													"durationMin": {
+														"type": "integer"
+													},
+													"createdAt": {
+														"type": "string",
+														"format": "date-time"
+													},
+													"updatedAt": {
+														"type": "string",
+														"format": "date-time"
+													}
+												},
+												"required": [
+													"id",
+													"courseId",
+													"slug",
+													"title",
+													"day",
+													"startMin",
+													"durationMin",
+													"createdAt",
+													"updatedAt"
+												]
+											}
+										},
+										"required": [
+											"id",
+											"courseId",
+											"timeSlotId",
+											"examId",
+											"exam",
+											"slug",
+											"startAt",
+											"durationMin",
+											"week",
+											"kind",
+											"title",
+											"description",
+											"contentHash",
+											"createdAt",
+											"updatedAt",
+											"timeSlot"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/calendar-event/{id}": {
+			"get": {
+				"operationId": "readCalendarevent",
+				"summary": "Find a single CalendarEvent.",
+				"tags": ["Calendar Events"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"courseId": {
+											"type": "integer"
+										},
+										"timeSlotId": {
+											"type": "integer"
+										},
+										"examId": {
+											"type": "integer",
+											"nullable": true
+										},
+										"exam": {
+											"type": "object",
+											"nullable": true,
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"slug": {
+													"type": "string"
+												},
+												"title": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "slug", "title"]
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"startAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"durationMin": {
+											"type": "integer"
+										},
+										"week": {
+											"type": "integer"
+										},
+										"kind": {
+											"type": "string",
+											"enum": [
+												"LECTURE",
+												"LAB",
+												"EXAM",
+												"REVIEW",
+												"SEMINAR",
+												"PROJECT",
+												"SELF_STUDY",
+												"HOLIDAY",
+												"RECESS",
+												"CANCELLED"
+											]
+										},
+										"title": {
+											"type": "string",
+											"minLength": 1
+										},
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"contentHash": {
+											"type": "string",
+											"minLength": 1
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"timeSlot": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"courseId": {
+													"type": "integer"
+												},
+												"slug": {
+													"type": "string",
+													"minLength": 1
+												},
+												"title": {
+													"type": "string",
+													"nullable": true
+												},
+												"day": {
+													"type": "string",
+													"enum": [
+														"SUNDAY",
+														"MONDAY",
+														"TUESDAY",
+														"WEDNESDAY",
+														"THURSDAY",
+														"FRIDAY",
+														"SATURDAY"
+													]
+												},
+												"startMin": {
+													"type": "integer"
+												},
+												"durationMin": {
+													"type": "integer"
+												},
+												"createdAt": {
+													"type": "string",
+													"format": "date-time"
+												},
+												"updatedAt": {
+													"type": "string",
+													"format": "date-time"
+												}
+											},
+											"required": [
+												"id",
+												"courseId",
+												"slug",
+												"title",
+												"day",
+												"startMin",
+												"durationMin",
+												"createdAt",
+												"updatedAt"
+											]
+										}
+									},
+									"required": [
+										"id",
+										"courseId",
+										"timeSlotId",
+										"examId",
+										"exam",
+										"slug",
+										"startAt",
+										"durationMin",
+										"week",
+										"kind",
+										"title",
+										"description",
+										"contentHash",
+										"createdAt",
+										"updatedAt",
+										"timeSlot"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateCalendarevent",
+				"summary": "Update a single CalendarEvent.",
+				"tags": ["Calendar Events"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"date": {
+										"type": "string"
+									},
+									"startMin": {
+										"type": "integer"
+									},
+									"durationMin": {
+										"type": "integer"
+									},
+									"week": {
+										"type": "integer"
+									},
+									"kind": {
+										"type": "string",
+										"enum": [
+											"LECTURE",
+											"LAB",
+											"EXAM",
+											"REVIEW",
+											"SEMINAR",
+											"PROJECT",
+											"SELF_STUDY",
+											"HOLIDAY",
+											"RECESS",
+											"CANCELLED"
+										]
+									},
+									"title": {
+										"type": "string"
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"contentHash": {
+										"type": "string"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"courseId": {
+											"type": "integer"
+										},
+										"timeSlotId": {
+											"type": "integer"
+										},
+										"examId": {
+											"type": "integer",
+											"nullable": true
+										},
+										"exam": {
+											"type": "object",
+											"nullable": true,
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"slug": {
+													"type": "string"
+												},
+												"title": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "slug", "title"]
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"startAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"durationMin": {
+											"type": "integer"
+										},
+										"week": {
+											"type": "integer"
+										},
+										"kind": {
+											"type": "string",
+											"enum": [
+												"LECTURE",
+												"LAB",
+												"EXAM",
+												"REVIEW",
+												"SEMINAR",
+												"PROJECT",
+												"SELF_STUDY",
+												"HOLIDAY",
+												"RECESS",
+												"CANCELLED"
+											]
+										},
+										"title": {
+											"type": "string",
+											"minLength": 1
+										},
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"contentHash": {
+											"type": "string",
+											"minLength": 1
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"timeSlot": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"courseId": {
+													"type": "integer"
+												},
+												"slug": {
+													"type": "string",
+													"minLength": 1
+												},
+												"title": {
+													"type": "string",
+													"nullable": true
+												},
+												"day": {
+													"type": "string",
+													"enum": [
+														"SUNDAY",
+														"MONDAY",
+														"TUESDAY",
+														"WEDNESDAY",
+														"THURSDAY",
+														"FRIDAY",
+														"SATURDAY"
+													]
+												},
+												"startMin": {
+													"type": "integer"
+												},
+												"durationMin": {
+													"type": "integer"
+												},
+												"createdAt": {
+													"type": "string",
+													"format": "date-time"
+												},
+												"updatedAt": {
+													"type": "string",
+													"format": "date-time"
+												}
+											},
+											"required": [
+												"id",
+												"courseId",
+												"slug",
+												"title",
+												"day",
+												"startMin",
+												"durationMin",
+												"createdAt",
+												"updatedAt"
+											]
+										}
+									},
+									"required": [
+										"id",
+										"courseId",
+										"timeSlotId",
+										"examId",
+										"exam",
+										"slug",
+										"startAt",
+										"durationMin",
+										"week",
+										"kind",
+										"title",
+										"description",
+										"contentHash",
+										"createdAt",
+										"updatedAt",
+										"timeSlot"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertCalendarevent",
+				"summary": "Upsert a single CalendarEvent. Creates if it does not exist, update otherwise.",
+				"tags": ["Calendar Events"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"courseId": {
+										"type": "integer"
+									},
+									"timeSlotId": {
+										"type": "integer"
+									},
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"durationMin": {
+										"type": "integer"
+									},
+									"week": {
+										"type": "integer"
+									},
+									"kind": {
+										"type": "string",
+										"enum": [
+											"LECTURE",
+											"LAB",
+											"EXAM",
+											"REVIEW",
+											"SEMINAR",
+											"PROJECT",
+											"SELF_STUDY",
+											"HOLIDAY",
+											"RECESS",
+											"CANCELLED"
+										]
+									},
+									"title": {
+										"type": "string",
+										"minLength": 1
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"contentHash": {
+										"type": "string",
+										"minLength": 1
+									},
+									"date": {
+										"type": "string"
+									},
+									"startMin": {
+										"type": "integer"
+									}
+								},
+								"required": [
+									"courseId",
+									"timeSlotId",
+									"slug",
+									"week",
+									"title",
+									"contentHash",
+									"date"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"courseId": {
+											"type": "integer"
+										},
+										"timeSlotId": {
+											"type": "integer"
+										},
+										"examId": {
+											"type": "integer",
+											"nullable": true
+										},
+										"exam": {
+											"type": "object",
+											"nullable": true,
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"slug": {
+													"type": "string"
+												},
+												"title": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "slug", "title"]
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"startAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"durationMin": {
+											"type": "integer"
+										},
+										"week": {
+											"type": "integer"
+										},
+										"kind": {
+											"type": "string",
+											"enum": [
+												"LECTURE",
+												"LAB",
+												"EXAM",
+												"REVIEW",
+												"SEMINAR",
+												"PROJECT",
+												"SELF_STUDY",
+												"HOLIDAY",
+												"RECESS",
+												"CANCELLED"
+											]
+										},
+										"title": {
+											"type": "string",
+											"minLength": 1
+										},
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"contentHash": {
+											"type": "string",
+											"minLength": 1
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"timeSlot": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "integer"
+												},
+												"courseId": {
+													"type": "integer"
+												},
+												"slug": {
+													"type": "string",
+													"minLength": 1
+												},
+												"title": {
+													"type": "string",
+													"nullable": true
+												},
+												"day": {
+													"type": "string",
+													"enum": [
+														"SUNDAY",
+														"MONDAY",
+														"TUESDAY",
+														"WEDNESDAY",
+														"THURSDAY",
+														"FRIDAY",
+														"SATURDAY"
+													]
+												},
+												"startMin": {
+													"type": "integer"
+												},
+												"durationMin": {
+													"type": "integer"
+												},
+												"createdAt": {
+													"type": "string",
+													"format": "date-time"
+												},
+												"updatedAt": {
+													"type": "string",
+													"format": "date-time"
+												}
+											},
+											"required": [
+												"id",
+												"courseId",
+												"slug",
+												"title",
+												"day",
+												"startMin",
+												"durationMin",
+												"createdAt",
+												"updatedAt"
+											]
+										}
+									},
+									"required": [
+										"id",
+										"courseId",
+										"timeSlotId",
+										"examId",
+										"exam",
+										"slug",
+										"startAt",
+										"durationMin",
+										"week",
+										"kind",
+										"title",
+										"description",
+										"contentHash",
+										"createdAt",
+										"updatedAt",
+										"timeSlot"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteCalendarevent",
+				"summary": "Delete a single CalendarEvent by primary key.",
+				"tags": ["Calendar Events"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/course": {
+			"post": {
+				"operationId": "createCourse",
+				"summary": "Creates a new Course.",
+				"tags": ["Courses"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"discipline": {
+										"type": "string",
+										"minLength": 1,
+										"description": "Discipline slug"
+									},
+									"instructor": {
+										"type": "string",
+										"minLength": 1,
+										"description": "Instructor username"
+									},
+									"edition": {
+										"type": "string",
+										"minLength": 1,
+										"description": "Edition slug"
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"startAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									},
+									"endAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									}
+								},
+								"required": [
+									"discipline",
+									"instructor",
+									"edition",
+									"startAt",
+									"endAt"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Course"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listCourse",
+				"summary": "Find multiple Courses.",
+				"tags": ["Courses"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"pattern": "^[a-z0-9][a-z0-9-]{1,30}$"
+						},
+						"required": false,
+						"name": "instructor",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "string",
+							"pattern": "^[a-z0-9][a-z0-9._-]*$"
+						},
+						"required": false,
+						"name": "discipline",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "string",
+							"pattern": "^[a-z0-9][a-z0-9._-]*$"
+						},
+						"required": false,
+						"name": "edition",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"description": {
+												"type": "string",
+												"nullable": true
+											},
+											"discipline": {
+												"type": "object",
+												"properties": {
+													"slug": {
+														"type": "string",
+														"minLength": 1
+													},
+													"name": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["slug", "name"]
+											},
+											"edition": {
+												"type": "object",
+												"properties": {
+													"slug": {
+														"type": "string",
+														"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+													},
+													"name": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["slug", "name"]
+											},
+											"instructor": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string",
+														"minLength": 1
+													},
+													"username": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["name", "username"]
+											},
+											"enrollments": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"name": {
+															"type": "string",
+															"minLength": 1
+														},
+														"username": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["name", "username"]
+												}
+											},
+											"startAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"endAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"createdAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"updatedAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"joinedAt": {
+												"type": "string",
+												"format": "date-time"
+											}
+										},
+										"required": [
+											"description",
+											"discipline",
+											"edition",
+											"instructor",
+											"enrollments",
+											"startAt",
+											"endAt",
+											"createdAt",
+											"updatedAt",
+											"joinedAt"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/course/{id}": {
+			"get": {
+				"operationId": "readCourse",
+				"summary": "Find a single Course.",
+				"tags": ["Courses"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"discipline": {
+											"type": "object",
+											"properties": {
+												"slug": {
+													"type": "string",
+													"minLength": 1
+												},
+												"name": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["slug", "name"]
+										},
+										"edition": {
+											"type": "object",
+											"properties": {
+												"slug": {
+													"type": "string",
+													"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+												},
+												"name": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["slug", "name"]
+										},
+										"instructor": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"type": "string",
+													"minLength": 1
+												},
+												"username": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["name", "username"]
+										},
+										"enrollments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string",
+														"minLength": 1
+													},
+													"username": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["name", "username"]
+											}
+										},
+										"startAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"endAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"joinedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"description",
+										"discipline",
+										"edition",
+										"instructor",
+										"enrollments",
+										"startAt",
+										"endAt",
+										"createdAt",
+										"updatedAt",
+										"joinedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateCourse",
+				"summary": "Update a single Course.",
+				"tags": ["Courses"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"startAt": {
+										"type": "string",
+										"format": "date-time"
+									},
+									"endAt": {
+										"type": "string",
+										"format": "date-time"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"discipline": {
+											"type": "object",
+											"properties": {
+												"slug": {
+													"type": "string",
+													"minLength": 1
+												},
+												"name": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["slug", "name"]
+										},
+										"edition": {
+											"type": "object",
+											"properties": {
+												"slug": {
+													"type": "string",
+													"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+												},
+												"name": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["slug", "name"]
+										},
+										"instructor": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"type": "string",
+													"minLength": 1
+												},
+												"username": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["name", "username"]
+										},
+										"enrollments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string",
+														"minLength": 1
+													},
+													"username": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["name", "username"]
+											}
+										},
+										"startAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"endAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"joinedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"description",
+										"discipline",
+										"edition",
+										"instructor",
+										"enrollments",
+										"startAt",
+										"endAt",
+										"createdAt",
+										"updatedAt",
+										"joinedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertCourse",
+				"summary": "Upsert a single Course. Creates if it does not exist, update otherwise.",
+				"tags": ["Courses"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"discipline": {
+										"type": "string",
+										"minLength": 1,
+										"description": "Discipline slug"
+									},
+									"instructor": {
+										"type": "string",
+										"minLength": 1,
+										"description": "Instructor username"
+									},
+									"edition": {
+										"type": "string",
+										"minLength": 1,
+										"description": "Edition slug"
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"startAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									},
+									"endAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									}
+								},
+								"required": [
+									"discipline",
+									"instructor",
+									"edition",
+									"startAt",
+									"endAt"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"discipline": {
+											"type": "object",
+											"properties": {
+												"slug": {
+													"type": "string",
+													"minLength": 1
+												},
+												"name": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["slug", "name"]
+										},
+										"edition": {
+											"type": "object",
+											"properties": {
+												"slug": {
+													"type": "string",
+													"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+												},
+												"name": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["slug", "name"]
+										},
+										"instructor": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"type": "string",
+													"minLength": 1
+												},
+												"username": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["name", "username"]
+										},
+										"enrollments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string",
+														"minLength": 1
+													},
+													"username": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["name", "username"]
+											}
+										},
+										"startAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"endAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"joinedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"description",
+										"discipline",
+										"edition",
+										"instructor",
+										"enrollments",
+										"startAt",
+										"endAt",
+										"createdAt",
+										"updatedAt",
+										"joinedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteCourse",
+				"summary": "Delete a single Course by primary key.",
+				"tags": ["Courses"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/discipline": {
+			"post": {
+				"operationId": "createDiscipline",
+				"summary": "Creates a new Discipline.",
+				"tags": ["Disciplines"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"name": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["slug", "name"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Discipline"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listDiscipline",
+				"summary": "Find multiple Disciplines.",
+				"tags": ["Disciplines"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"required": false,
+						"name": "slugs",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"slug": {
+												"type": "string",
+												"minLength": 1
+											},
+											"name": {
+												"type": "string",
+												"minLength": 1
+											},
+											"createdAt": {
+												"type": "string",
+												"format": "date-time"
+											}
+										},
+										"required": ["slug", "name", "createdAt"]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/discipline/{slug}": {
+			"get": {
+				"operationId": "readDiscipline",
+				"summary": "Find a single Discipline.",
+				"tags": ["Disciplines"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": ["slug", "name", "createdAt"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateDiscipline",
+				"summary": "Update a single Discipline.",
+				"tags": ["Disciplines"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": ["slug", "name", "createdAt"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertDiscipline",
+				"summary": "Upsert a single Discipline. Creates if it does not exist, update otherwise.",
+				"tags": ["Disciplines"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"name": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["slug", "name"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": ["slug", "name", "createdAt"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteDiscipline",
+				"summary": "Delete a single Discipline by primary key.",
+				"tags": ["Disciplines"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/edition": {
+			"post": {
+				"operationId": "createEdition",
+				"summary": "Creates a new Edition.",
+				"tags": ["Editions"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"slug": {
+										"type": "string",
+										"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+									},
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"startAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									},
+									"endAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									}
+								},
+								"required": ["slug", "name", "startAt", "endAt"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Edition"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listEdition",
+				"summary": "Find multiple Editions.",
+				"tags": ["Editions"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"required": false,
+						"name": "slugs",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "boolean"
+						},
+						"required": false,
+						"name": "active",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"slug": {
+												"type": "string",
+												"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+											},
+											"name": {
+												"type": "string",
+												"minLength": 1
+											},
+											"startAt": {
+												"type": "string",
+												"nullable": true,
+												"format": "date-time"
+											},
+											"endAt": {
+												"type": "string",
+												"nullable": true,
+												"format": "date-time"
+											},
+											"createdAt": {
+												"type": "string",
+												"nullable": true,
+												"format": "date-time"
+											}
+										},
+										"required": [
+											"slug",
+											"name",
+											"startAt",
+											"endAt",
+											"createdAt"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/edition/{slug}": {
+			"get": {
+				"operationId": "readEdition",
+				"summary": "Find a single Edition.",
+				"tags": ["Editions"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"slug": {
+											"type": "string",
+											"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"startAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										},
+										"endAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										},
+										"createdAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										}
+									},
+									"required": ["slug", "name", "startAt", "endAt", "createdAt"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateEdition",
+				"summary": "Update a single Edition.",
+				"tags": ["Editions"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"startAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									},
+									"endAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"slug": {
+											"type": "string",
+											"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"startAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										},
+										"endAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										},
+										"createdAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										}
+									},
+									"required": ["slug", "name", "startAt", "endAt", "createdAt"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertEdition",
+				"summary": "Upsert a single Edition. Creates if it does not exist, update otherwise.",
+				"tags": ["Editions"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"slug": {
+										"type": "string",
+										"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+									},
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"startAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									},
+									"endAt": {
+										"type": "string",
+										"nullable": true,
+										"format": "date-time"
+									}
+								},
+								"required": ["slug", "name", "startAt", "endAt"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"slug": {
+											"type": "string",
+											"pattern": "^[0-9]{4}(-([1-9][0-9]*|0))?$"
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"startAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										},
+										"endAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										},
+										"createdAt": {
+											"type": "string",
+											"nullable": true,
+											"format": "date-time"
+										}
+									},
+									"required": ["slug", "name", "startAt", "endAt", "createdAt"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteEdition",
+				"summary": "Delete a single Edition by primary key.",
+				"tags": ["Editions"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/invite": {
+			"post": {
+				"operationId": "createInvite",
+				"summary": "Creates a new Invite.",
+				"tags": ["Invites"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"kind": {
+										"type": "string",
+										"enum": ["PERSONAL", "CLASSROOM"]
+									},
+									"email": {
+										"type": "string",
+										"nullable": true
+									},
+									"invitedRole": {
+										"type": "string",
+										"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+									},
+									"courseId": {
+										"type": "integer",
+										"nullable": true
+									},
+									"maxUses": {
+										"type": "integer",
+										"nullable": true
+									},
+									"createdBy": {
+										"type": "object",
+										"properties": {
+											"name": {
+												"type": "string",
+												"minLength": 1
+											},
+											"username": {
+												"type": "string",
+												"minLength": 1
+											}
+										},
+										"required": ["name", "username"]
+									},
+									"token": {
+										"type": "string"
+									},
+									"expiresInMs": {
+										"type": "integer"
+									}
+								},
+								"required": [
+									"kind",
+									"email",
+									"invitedRole",
+									"courseId",
+									"maxUses",
+									"createdBy"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Invite"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listInvite",
+				"summary": "Find multiple Invites.",
+				"tags": ["Invites"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": false,
+						"name": "createdById",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "string",
+							"enum": ["PERSONAL", "CLASSROOM"]
+						},
+						"required": false,
+						"name": "kind",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "number"
+						},
+						"required": false,
+						"name": "courseId",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "boolean"
+						},
+						"required": false,
+						"name": "active",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"tokenHash": {
+												"type": "string"
+											},
+											"kind": {
+												"type": "string",
+												"enum": ["PERSONAL", "CLASSROOM"]
+											},
+											"email": {
+												"type": "string",
+												"nullable": true
+											},
+											"invitedRole": {
+												"type": "string",
+												"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+											},
+											"courseId": {
+												"type": "integer",
+												"nullable": true
+											},
+											"maxUses": {
+												"type": "integer",
+												"nullable": true
+											},
+											"expiresAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"redemptions": {
+												"type": "integer"
+											},
+											"createdBy": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string",
+														"minLength": 1
+													},
+													"username": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["name", "username"]
+											},
+											"createdAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"token": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"tokenHash",
+											"kind",
+											"email",
+											"invitedRole",
+											"courseId",
+											"maxUses",
+											"expiresAt",
+											"redemptions",
+											"createdBy",
+											"createdAt"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/invite/{id}": {
+			"get": {
+				"operationId": "readInvite",
+				"summary": "Find a single Invite.",
+				"tags": ["Invites"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"tokenHash": {
+											"type": "string"
+										},
+										"kind": {
+											"type": "string",
+											"enum": ["PERSONAL", "CLASSROOM"]
+										},
+										"email": {
+											"type": "string",
+											"nullable": true
+										},
+										"invitedRole": {
+											"type": "string",
+											"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+										},
+										"courseId": {
+											"type": "integer",
+											"nullable": true
+										},
+										"maxUses": {
+											"type": "integer",
+											"nullable": true
+										},
+										"expiresAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"redemptions": {
+											"type": "integer"
+										},
+										"createdBy": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"type": "string",
+													"minLength": 1
+												},
+												"username": {
+													"type": "string",
+													"minLength": 1
+												}
+											},
+											"required": ["name", "username"]
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"token": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"tokenHash",
+										"kind",
+										"email",
+										"invitedRole",
+										"courseId",
+										"maxUses",
+										"expiresAt",
+										"redemptions",
+										"createdBy",
+										"createdAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteInvite",
+				"summary": "Delete a single Invite by primary key.",
+				"tags": ["Invites"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/course/{discipline}/{course}/resource": {
+			"post": {
+				"operationId": "createResource",
+				"summary": "Creates a new Resource.",
+				"tags": ["Resources"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "discipline",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "course",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"title": {
+										"type": "string",
+										"minLength": 1
+									},
+									"ref": {
+										"type": "string"
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"data": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["LINK"]
+													},
+													"url": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "url"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"filename": {
+														"type": "string",
+														"minLength": 1
+													},
+													"type": {
+														"type": "string",
+														"enum": ["FILE"]
+													},
+													"buffer": {
+														"type": "string",
+														"format": "binary"
+													}
+												},
+												"required": ["filename", "type", "buffer"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["CODE"]
+													},
+													"content": {
+														"type": "string",
+														"minLength": 1
+													},
+													"language": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "content", "language"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["MD"]
+													},
+													"content": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "content"]
+											}
+										]
+									}
+								},
+								"required": ["slug", "title", "ref", "data"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Resource"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listResource",
+				"summary": "Find multiple Resources.",
+				"tags": ["Resources"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "discipline",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "course",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"enum": ["LINK", "FILE", "CODE", "MD"]
+							}
+						},
+						"required": false,
+						"name": "types",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"required": false,
+						"name": "slugs",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"slug": {
+												"type": "string",
+												"minLength": 1
+											},
+											"title": {
+												"type": "string",
+												"minLength": 1
+											},
+											"description": {
+												"type": "string",
+												"nullable": true
+											},
+											"data": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"type": {
+																"type": "string",
+																"enum": ["LINK"]
+															},
+															"url": {
+																"type": "string",
+																"minLength": 1
+															}
+														},
+														"required": ["type", "url"]
+													},
+													{
+														"type": "object",
+														"properties": {
+															"link": {
+																"type": "string",
+																"minLength": 1
+															},
+															"mimeType": {
+																"type": "string",
+																"minLength": 1
+															},
+															"filename": {
+																"type": "string",
+																"minLength": 1
+															},
+															"type": {
+																"type": "string",
+																"enum": ["FILE"]
+															}
+														},
+														"required": ["link", "mimeType", "filename", "type"]
+													},
+													{
+														"type": "object",
+														"properties": {
+															"type": {
+																"type": "string",
+																"enum": ["CODE"]
+															},
+															"content": {
+																"type": "string",
+																"minLength": 1
+															},
+															"language": {
+																"type": "string",
+																"minLength": 1
+															}
+														},
+														"required": ["type", "content", "language"]
+													},
+													{
+														"type": "object",
+														"properties": {
+															"type": {
+																"type": "string",
+																"enum": ["MD"]
+															},
+															"content": {
+																"type": "string",
+																"minLength": 1
+															}
+														},
+														"required": ["type", "content"]
+													}
+												]
+											},
+											"ref": {
+												"type": "string"
+											},
+											"createdAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"updatedAt": {
+												"type": "string",
+												"format": "date-time"
+											}
+										},
+										"required": [
+											"id",
+											"slug",
+											"title",
+											"description",
+											"data",
+											"ref",
+											"createdAt",
+											"updatedAt"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/course/{discipline}/{course}/resource/{slug}": {
+			"get": {
+				"operationId": "readResource",
+				"summary": "Find a single Resource.",
+				"tags": ["Resources"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "discipline",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "course",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"title": {
+											"type": "string",
+											"minLength": 1
+										},
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"data": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["LINK"]
+														},
+														"url": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "url"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"link": {
+															"type": "string",
+															"minLength": 1
+														},
+														"mimeType": {
+															"type": "string",
+															"minLength": 1
+														},
+														"filename": {
+															"type": "string",
+															"minLength": 1
+														},
+														"type": {
+															"type": "string",
+															"enum": ["FILE"]
+														}
+													},
+													"required": ["link", "mimeType", "filename", "type"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["CODE"]
+														},
+														"content": {
+															"type": "string",
+															"minLength": 1
+														},
+														"language": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "content", "language"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["MD"]
+														},
+														"content": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "content"]
+												}
+											]
+										},
+										"ref": {
+											"type": "string"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"id",
+										"slug",
+										"title",
+										"description",
+										"data",
+										"ref",
+										"createdAt",
+										"updatedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateResource",
+				"summary": "Update a single Resource.",
+				"tags": ["Resources"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "discipline",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "course",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"title": {
+										"type": "string",
+										"minLength": 1
+									},
+									"ref": {
+										"type": "string"
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"data": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["LINK"]
+													},
+													"url": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "url"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"filename": {
+														"type": "string",
+														"minLength": 1
+													},
+													"type": {
+														"type": "string",
+														"enum": ["FILE"]
+													},
+													"buffer": {
+														"type": "string",
+														"format": "binary"
+													}
+												},
+												"required": ["filename", "type", "buffer"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["CODE"]
+													},
+													"content": {
+														"type": "string",
+														"minLength": 1
+													},
+													"language": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "content", "language"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["MD"]
+													},
+													"content": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "content"]
+											}
+										]
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"title": {
+											"type": "string",
+											"minLength": 1
+										},
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"data": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["LINK"]
+														},
+														"url": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "url"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"link": {
+															"type": "string",
+															"minLength": 1
+														},
+														"mimeType": {
+															"type": "string",
+															"minLength": 1
+														},
+														"filename": {
+															"type": "string",
+															"minLength": 1
+														},
+														"type": {
+															"type": "string",
+															"enum": ["FILE"]
+														}
+													},
+													"required": ["link", "mimeType", "filename", "type"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["CODE"]
+														},
+														"content": {
+															"type": "string",
+															"minLength": 1
+														},
+														"language": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "content", "language"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["MD"]
+														},
+														"content": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "content"]
+												}
+											]
+										},
+										"ref": {
+											"type": "string"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"id",
+										"slug",
+										"title",
+										"description",
+										"data",
+										"ref",
+										"createdAt",
+										"updatedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertResource",
+				"summary": "Upsert a single Resource. Creates if it does not exist, update otherwise.",
+				"tags": ["Resources"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "discipline",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "course",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"title": {
+										"type": "string",
+										"minLength": 1
+									},
+									"ref": {
+										"type": "string"
+									},
+									"description": {
+										"type": "string",
+										"nullable": true
+									},
+									"data": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["LINK"]
+													},
+													"url": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "url"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"filename": {
+														"type": "string",
+														"minLength": 1
+													},
+													"type": {
+														"type": "string",
+														"enum": ["FILE"]
+													},
+													"buffer": {
+														"type": "string",
+														"format": "binary"
+													}
+												},
+												"required": ["filename", "type", "buffer"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["CODE"]
+													},
+													"content": {
+														"type": "string",
+														"minLength": 1
+													},
+													"language": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "content", "language"]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"type": "string",
+														"enum": ["MD"]
+													},
+													"content": {
+														"type": "string",
+														"minLength": 1
+													}
+												},
+												"required": ["type", "content"]
+											}
+										]
+									}
+								},
+								"required": ["slug", "title", "ref", "data"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"title": {
+											"type": "string",
+											"minLength": 1
+										},
+										"description": {
+											"type": "string",
+											"nullable": true
+										},
+										"data": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["LINK"]
+														},
+														"url": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "url"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"link": {
+															"type": "string",
+															"minLength": 1
+														},
+														"mimeType": {
+															"type": "string",
+															"minLength": 1
+														},
+														"filename": {
+															"type": "string",
+															"minLength": 1
+														},
+														"type": {
+															"type": "string",
+															"enum": ["FILE"]
+														}
+													},
+													"required": ["link", "mimeType", "filename", "type"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["CODE"]
+														},
+														"content": {
+															"type": "string",
+															"minLength": 1
+														},
+														"language": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "content", "language"]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": ["MD"]
+														},
+														"content": {
+															"type": "string",
+															"minLength": 1
+														}
+													},
+													"required": ["type", "content"]
+												}
+											]
+										},
+										"ref": {
+											"type": "string"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"id",
+										"slug",
+										"title",
+										"description",
+										"data",
+										"ref",
+										"createdAt",
+										"updatedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteResource",
+				"summary": "Delete a single Resource by primary key.",
+				"tags": ["Resources"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "discipline",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "course",
+						"in": "path"
+					},
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "slug",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/time-slot": {
+			"post": {
+				"operationId": "createTimeslot",
+				"summary": "Creates a new TimeSlot.",
+				"tags": ["Time Slots"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"courseId": {
+										"type": "integer"
+									},
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"title": {
+										"type": "string",
+										"nullable": true
+									},
+									"day": {
+										"type": "string",
+										"enum": [
+											"SUNDAY",
+											"MONDAY",
+											"TUESDAY",
+											"WEDNESDAY",
+											"THURSDAY",
+											"FRIDAY",
+											"SATURDAY"
+										]
+									},
+									"startMin": {
+										"type": "integer"
+									},
+									"durationMin": {
+										"type": "integer"
+									}
+								},
+								"required": [
+									"courseId",
+									"slug",
+									"day",
+									"startMin",
+									"durationMin"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TimeSlot"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listTimeslot",
+				"summary": "Find multiple TimeSlots.",
+				"tags": ["Time Slots"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "number"
+						},
+						"required": false,
+						"name": "courseId",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "integer"
+											},
+											"courseId": {
+												"type": "integer"
+											},
+											"slug": {
+												"type": "string",
+												"minLength": 1
+											},
+											"title": {
+												"type": "string",
+												"nullable": true
+											},
+											"day": {
+												"type": "string",
+												"enum": [
+													"SUNDAY",
+													"MONDAY",
+													"TUESDAY",
+													"WEDNESDAY",
+													"THURSDAY",
+													"FRIDAY",
+													"SATURDAY"
+												]
+											},
+											"startMin": {
+												"type": "integer"
+											},
+											"durationMin": {
+												"type": "integer"
+											},
+											"createdAt": {
+												"type": "string",
+												"format": "date-time"
+											},
+											"updatedAt": {
+												"type": "string",
+												"format": "date-time"
+											}
+										},
+										"required": [
+											"id",
+											"courseId",
+											"slug",
+											"title",
+											"day",
+											"startMin",
+											"durationMin",
+											"createdAt",
+											"updatedAt"
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/time-slot/{id}": {
+			"get": {
+				"operationId": "readTimeslot",
+				"summary": "Find a single TimeSlot.",
+				"tags": ["Time Slots"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"courseId": {
+											"type": "integer"
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"title": {
+											"type": "string",
+											"nullable": true
+										},
+										"day": {
+											"type": "string",
+											"enum": [
+												"SUNDAY",
+												"MONDAY",
+												"TUESDAY",
+												"WEDNESDAY",
+												"THURSDAY",
+												"FRIDAY",
+												"SATURDAY"
+											]
+										},
+										"startMin": {
+											"type": "integer"
+										},
+										"durationMin": {
+											"type": "integer"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"id",
+										"courseId",
+										"slug",
+										"title",
+										"day",
+										"startMin",
+										"durationMin",
+										"createdAt",
+										"updatedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateTimeslot",
+				"summary": "Update a single TimeSlot.",
+				"tags": ["Time Slots"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"title": {
+										"type": "string",
+										"nullable": true
+									},
+									"day": {
+										"type": "string",
+										"enum": [
+											"SUNDAY",
+											"MONDAY",
+											"TUESDAY",
+											"WEDNESDAY",
+											"THURSDAY",
+											"FRIDAY",
+											"SATURDAY"
+										]
+									},
+									"startMin": {
+										"type": "integer"
+									},
+									"durationMin": {
+										"type": "integer"
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"courseId": {
+											"type": "integer"
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"title": {
+											"type": "string",
+											"nullable": true
+										},
+										"day": {
+											"type": "string",
+											"enum": [
+												"SUNDAY",
+												"MONDAY",
+												"TUESDAY",
+												"WEDNESDAY",
+												"THURSDAY",
+												"FRIDAY",
+												"SATURDAY"
+											]
+										},
+										"startMin": {
+											"type": "integer"
+										},
+										"durationMin": {
+											"type": "integer"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"id",
+										"courseId",
+										"slug",
+										"title",
+										"day",
+										"startMin",
+										"durationMin",
+										"createdAt",
+										"updatedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertTimeslot",
+				"summary": "Upsert a single TimeSlot. Creates if it does not exist, update otherwise.",
+				"tags": ["Time Slots"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"courseId": {
+										"type": "integer"
+									},
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"title": {
+										"type": "string",
+										"nullable": true
+									},
+									"day": {
+										"type": "string",
+										"enum": [
+											"SUNDAY",
+											"MONDAY",
+											"TUESDAY",
+											"WEDNESDAY",
+											"THURSDAY",
+											"FRIDAY",
+											"SATURDAY"
+										]
+									},
+									"startMin": {
+										"type": "integer"
+									},
+									"durationMin": {
+										"type": "integer"
+									}
+								},
+								"required": [
+									"courseId",
+									"slug",
+									"day",
+									"startMin",
+									"durationMin"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "integer"
+										},
+										"courseId": {
+											"type": "integer"
+										},
+										"slug": {
+											"type": "string",
+											"minLength": 1
+										},
+										"title": {
+											"type": "string",
+											"nullable": true
+										},
+										"day": {
+											"type": "string",
+											"enum": [
+												"SUNDAY",
+												"MONDAY",
+												"TUESDAY",
+												"WEDNESDAY",
+												"THURSDAY",
+												"FRIDAY",
+												"SATURDAY"
+											]
+										},
+										"startMin": {
+											"type": "integer"
+										},
+										"durationMin": {
+											"type": "integer"
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										},
+										"updatedAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"id",
+										"courseId",
+										"slug",
+										"title",
+										"day",
+										"startMin",
+										"durationMin",
+										"createdAt",
+										"updatedAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteTimeslot",
+				"summary": "Delete a single TimeSlot by primary key.",
+				"tags": ["Time Slots"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "id",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/user/me": {
+			"get": {
+				"operationId": "handler",
+				"summary": "View current user information",
+				"tags": ["Users"],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"email": {
+											"type": "string",
+											"format": "email"
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"username": {
+											"type": "string",
+											"minLength": 1
+										},
+										"role": {
+											"type": "string",
+											"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+										},
+										"githubId": {
+											"type": "string",
+											"nullable": true
+										},
+										"schoolId": {
+											"type": "string",
+											"nullable": true
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"email",
+										"name",
+										"username",
+										"role",
+										"githubId",
+										"schoolId",
+										"createdAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "handler",
+				"summary": "Update current user information",
+				"tags": ["Users"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"email": {
+										"type": "string",
+										"format": "email"
+									},
+									"githubId": {
+										"type": "string",
+										"nullable": true
+									},
+									"schoolId": {
+										"type": "string",
+										"nullable": true
+									},
+									"password": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"additionalProperties": false
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"email": {
+											"type": "string",
+											"format": "email"
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										},
+										"username": {
+											"type": "string",
+											"minLength": 1
+										},
+										"role": {
+											"type": "string",
+											"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+										},
+										"githubId": {
+											"type": "string",
+											"nullable": true
+										},
+										"schoolId": {
+											"type": "string",
+											"nullable": true
+										},
+										"createdAt": {
+											"type": "string",
+											"format": "date-time"
+										}
+									},
+									"required": [
+										"email",
+										"name",
+										"username",
+										"role",
+										"githubId",
+										"schoolId",
+										"createdAt"
+									]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/user": {
+			"post": {
+				"operationId": "createUser",
+				"summary": "Creates a new User.",
+				"tags": ["Users"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"email": {
+										"type": "string",
+										"format": "email"
+									},
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"username": {
+										"type": "string",
+										"pattern": "^[a-z0-9][a-z0-9-]{1,30}$"
+									},
+									"role": {
+										"type": "string",
+										"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+									},
+									"githubId": {
+										"type": "string",
+										"nullable": true
+									},
+									"schoolId": {
+										"type": "string",
+										"nullable": true
+									},
+									"password": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["email", "name", "username", "role", "password"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/User"
+								}
+							}
+						}
+					}
+				}
+			},
+			"get": {
+				"operationId": "listUser",
+				"summary": "Find multiple Users.",
+				"tags": ["Users"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"required": false,
+						"name": "usernames",
+						"in": "query"
+					},
+					{
+						"schema": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100
+						},
+						"required": false,
+						"name": "take",
+						"in": "query"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"username": {
+												"type": "string",
+												"minLength": 1
+											},
+											"name": {
+												"type": "string",
+												"minLength": 1
+											}
+										},
+										"required": ["username", "name"]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/user/{username}": {
+			"get": {
+				"operationId": "readUser",
+				"summary": "Find a single User.",
+				"tags": ["Users"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "username",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"username": {
+											"type": "string",
+											"minLength": 1
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										}
+									},
+									"required": ["username", "name"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "updateUser",
+				"summary": "Update a single User.",
+				"tags": ["Users"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "username",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"email": {
+										"type": "string",
+										"format": "email"
+									},
+									"githubId": {
+										"type": "string",
+										"nullable": true
+									},
+									"schoolId": {
+										"type": "string",
+										"nullable": true
+									},
+									"password": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"additionalProperties": false
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"username": {
+											"type": "string",
+											"minLength": 1
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										}
+									},
+									"required": ["username", "name"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"put": {
+				"operationId": "upsertUser",
+				"summary": "Upsert a single User. Creates if it does not exist, update otherwise.",
+				"tags": ["Users"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "username",
+						"in": "path"
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"email": {
+										"type": "string",
+										"format": "email"
+									},
+									"name": {
+										"type": "string",
+										"minLength": 1
+									},
+									"username": {
+										"type": "string",
+										"pattern": "^[a-z0-9][a-z0-9-]{1,30}$"
+									},
+									"role": {
+										"type": "string",
+										"enum": ["STUDENT", "INSTRUCTOR", "ADMIN"]
+									},
+									"githubId": {
+										"type": "string",
+										"nullable": true
+									},
+									"schoolId": {
+										"type": "string",
+										"nullable": true
+									},
+									"password": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": ["email", "name", "username", "role", "password"]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"username": {
+											"type": "string",
+											"minLength": 1
+										},
+										"name": {
+											"type": "string",
+											"minLength": 1
+										}
+									},
+									"required": ["username", "name"]
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteUser",
+				"summary": "Delete a single User by primary key.",
+				"tags": ["Users"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"name": "username",
+						"in": "path"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Deleted"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/auth/logout": {
+			"post": {
+				"operationId": "logout",
+				"summary": "Logs out the current user.",
+				"description": "Logs out the current user by invalidating their session.",
+				"tags": ["Authentication"],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LogoutResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/auth/login": {
+			"post": {
+				"operationId": "login",
+				"tags": ["Authentication"],
+				"security": [],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LoginRequest"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LoginResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "The login or password is incorrect.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/InvalidCredentials"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/health": {
+			"get": {
+				"operationId": "health",
+				"summary": "Liveness/readiness probe",
+				"description": "Confirms the server can reach the database, not just that the process answers HTTP. Unauthenticated — uptime monitors and orchestration probes hitting this usually don't hold an API key.",
+				"tags": ["System"],
+				"security": [],
+				"responses": {
+					"200": {
+						"description": "Success",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/HealthResponse"
+								}
+							}
+						}
+					},
+					"503": {
+						"description": "The server is up but cannot reach the database.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/HealthError"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

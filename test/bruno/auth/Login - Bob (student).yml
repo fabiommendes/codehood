@@ -1,0 +1,32 @@
+info:
+  name: Login / Bob (student)
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:4321/api/auth/login
+  body:
+    type: json
+    data: |-
+      {
+        "login": "bob",
+        "password": "bob"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const body = res.getBody();
+        if (body && body.token) {
+          bru.setEnvVar("token", body.token);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

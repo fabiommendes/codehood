@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { NotFound, responseFromException } from "@/core/error";
-import { type HttpMethods, readPattern } from ".";
+import { type HttpMethods, readPattern } from "./route";
 
 // We must force the imports here to ensure that all routes are registered
 // before the dynamic handler is invoked.
@@ -21,7 +21,10 @@ function handler(method: keyof HttpMethods) {
 			const route = methods?.[method];
 			if (!route)
 				throw new NotFound("url-pattern", {
-					context: `${method.toUpperCase()} ${context.routePattern}`,
+					context: {
+						method: method.toUpperCase(),
+						routePattern: context.routePattern,
+					},
 				});
 			// `await` inside the `try` on purpose: returning the promise
 			// unawaited would let a rejected `view()` sail straight past this

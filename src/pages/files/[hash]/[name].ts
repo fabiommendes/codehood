@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
-import { serveBlob } from "@/utils/serve-blob";
+import { db } from "@/db";
 
 export const prerender = false;
 
 export const GET: APIRoute = ({ params }) =>
-	serveBlob(params.hash, params.name);
+	db.blob.serve(params.hash, params.name);

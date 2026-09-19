@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { userFactory } from "@/fixtures/user.factory";
 import { buildOpenRpcDocument } from "@/rpc/registry/openrpc-document";
 
@@ -14,7 +14,7 @@ async function login(request: {
 	}>;
 }) {
 	const user = userFactory.build({ role: "INSTRUCTOR" });
-	await userService.create(user, FULL_ACCESS);
+	await db.user.create(user, FULL_ACCESS);
 	const res = await request.post("/api/auth/login", {
 		data: { login: user.username, password: user.password },
 	});
@@ -167,8 +167,8 @@ test("GET /rpc/docs renders Swagger UI over the projected document", async ({
 
 	const document = await (await request.get("/rpc/docs/openapi.json")).json();
 
-	const keys = Object.keys(document.paths);
 	// We verify a few paths, but this list can expand
+	const keys = Object.keys(document.paths);
 	expect(keys).toContain("/rpc#health.check");
 	expect(keys).toContain("/rpc#debug.whoami");
 

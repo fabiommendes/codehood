@@ -1,11 +1,7 @@
 import { type ZodType, z } from "zod";
-import type { UserActor } from "@/core/actor";
-import {
-	type ErrorResponse,
-	InvalidData,
-	NotAllowed,
-	responseFromException,
-} from "@/core/error";
+import type { UserActor } from "@/auth/actor";
+import { InvalidData, NotAllowed, responseFromException } from "@/core/error";
+import type { ErrorResponse } from "@/core/error-response";
 
 /// Actor = User? or User depending if the method is public or not.
 type MaybeActor<IsPublic> = IsPublic extends false
@@ -170,8 +166,7 @@ export async function dispatch(
 	if (!method.isPublic && !actor)
 		return respond({
 			error: errorObject(
-				new NotAllowed({
-					action: `do-${method.name}`,
+				new NotAllowed(`${method.name}.run`, {
 					status: 401,
 					message: "This method requires authentication.",
 				}),
@@ -195,17 +190,10 @@ async function run(
 	// argument order to map an array onto, so by-position params are refused
 	// rather than guessed at.
 	if (Array.isArray(params))
-		throw new InvalidData({
-			errors: {
-				$: [
-					{
-						code: "type-mismatch",
-						message: "Positional params are not supported; use an object.",
-					},
-				],
-			},
-			message: "Positional params are not supported; use an object.",
-		});
+		throw new InvalidData(
+			{},
+			{ message: "Positional params are not supported; use an object." },
+		);
 
 	if (!method.in) return method.handler({ actor, body: undefined });
 

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import type { UserActor } from "@/core/actor";
+import type { UserActor } from "@/auth/actor";
 import { dispatch, RPC_ERROR, type RpcResponse } from "@/rpc/registry";
 
 // Importing the method index is what registers the methods.

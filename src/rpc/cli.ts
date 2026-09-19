@@ -26,14 +26,14 @@ export const courseSyncState = z.object({
  * be updated before pushing.
  */
 export const getState = METHOD("cli.course.preSync", {
-	in: schemas.courseRef,
+	in: schemas.courseNaturalKey,
 	out: courseSyncState,
 	summary: "Report the authenticated actor",
 	description:
 		"Echoes back who the server thinks you are, for diagnosing credentials that point somewhere unexpected.",
 	tags: ["System"],
 	handler: async ({ actor, body }) => {
-		const course = await db.course.findOne({ ref: body }, { actor });
+		const course = await db.course.findOne({ ...body }, { actor });
 		if (!course) throw new NotFound("course", db.course.naturalKey(body));
 
 		// const resources = await db.resource.findMany(

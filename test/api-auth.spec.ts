@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { userFactory } from "@/fixtures/user.factory";
 
 // `POST /api/auth/login` is the CLI's way in, not the browser's — the web app
@@ -12,7 +12,7 @@ test("cli-login issues a bearer token that authenticates API-key middleware", as
 	request,
 }) => {
 	const user = userFactory.build({ role: "INSTRUCTOR" });
-	await userService.create(user, FULL_ACCESS);
+	await db.user.create(user, FULL_ACCESS);
 
 	const login = await request.post("/api/auth/login", {
 		data: { login: user.email, password: user.password },
@@ -33,7 +33,7 @@ test("cli-login accepts a username as well as an email", async ({
 	request,
 }) => {
 	const user = userFactory.build({ role: "INSTRUCTOR" });
-	await userService.create(user, FULL_ACCESS);
+	await db.user.create(user, FULL_ACCESS);
 
 	const login = await request.post("/api/auth/login", {
 		data: { login: user.username, password: user.password },
@@ -58,7 +58,7 @@ test("cli-login rejects a malformed login and a missing password with 400", asyn
 
 test("cli-login rejects bad credentials", async ({ request }) => {
 	const user = userFactory.build({ role: "STUDENT" });
-	await userService.create(user, FULL_ACCESS);
+	await db.user.create(user, FULL_ACCESS);
 
 	const login = await request.post("/api/auth/login", {
 		data: { login: user.username, password: "not-the-password" },
@@ -71,7 +71,7 @@ test("cli-login rejects bad credentials", async ({ request }) => {
 // it guards the `accept: "form"` on `auth.login` against a silent revert.
 test("the web login action refuses a JSON body", async ({ request }) => {
 	const user = userFactory.build({ role: "STUDENT" });
-	await userService.create(user, FULL_ACCESS);
+	await db.user.create(user, FULL_ACCESS);
 
 	const asJson = await request.post("/_actions/auth.login", {
 		data: { login: user.username, password: user.password },

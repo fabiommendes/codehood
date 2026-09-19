@@ -1,0 +1,25 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/edition/
+  body:
+    type: json
+    data: |-
+      {
+        "slug": "2026-2",
+        "name": "2026 · second term",
+        "startAt": "2026-08-15T20:09:44.092Z",
+        "endAt": "2027-01-15T20:09:44.092Z"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
