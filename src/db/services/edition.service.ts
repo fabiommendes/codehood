@@ -1,8 +1,6 @@
 import type { z } from "zod";
-import { canManageEditions } from "@/auth/permissions";
-import type { Actor } from "@/core/actor";
-import { type ActionCode, NotAllowed } from "@/core/error";
-import { Validate } from "@/utils/validate";
+import { ensurePerm } from "@/auth/permissions";
+import { InvalidData } from "@/core/error";
 import {
 	editionCreate,
 	editionFilter,
@@ -10,9 +8,11 @@ import {
 	editionSchema,
 	editionUpdate,
 	editionUpsert,
-} from "../../core/schemas";
-import type { Crud, ServiceOpts } from "../base-service";
+} from "@/core/schemas";
+import type { Crud, ServiceOpts } from "@/db/base-service";
+import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
+import { invalidIfExists } from "../utils";
 
 //
 // Type definitions
@@ -31,7 +31,7 @@ export type EditionUpsert = z.infer<typeof editionUpsert>;
  * Only the writes carry a rule, because an edition slug occupies part of the
  * course URL namespace and is shared by every instructor teaching that term.
  */
-class EditionService
+export class EditionService
 	implements
 		Crud<{
 			entity: Edition;
@@ -58,10 +58,10 @@ class EditionService
 	async create(input: EditionCreate, opts: ServiceOpts): Promise<Edition> {
 		const client = opts.tx ?? this.prisma;
 
-		assertCanWriteEdition(opts.actor, "create-edition");
+		ensurePerm(opts.actor, "edition.create");
 		assertWindow(input.startAt, input.endAt);
 
-		return client.edition.create({
+		return invalidIfExists(client.edition.create, {
 			data: {
 				slug: input.slug,
 				name: input.name,
@@ -124,7 +124,7 @@ class EditionService
 		fields: EditionUpdate,
 		opts: ServiceOpts,
 	): Promise<Edition> {
-		assertCanWriteEdition(opts.actor, "update-edition");
+		ensurePerm(opts.actor, "edition.update");
 		const client = opts.tx ?? this.prisma;
 		const current = await client.edition.findUnique({
 			where: { slug: filter.slug },
@@ -147,7 +147,7 @@ class EditionService
 	 * its editable fields.
 	 *
 	 * Same permission and window checks as `create`/`update`, run once via
-	 * {@link assertCanWriteEdition}/{@link assertWindow} regardless of which
+	 * `assertPerm`/{@link assertWindow} regardless of which
 	 * branch Prisma takes.
 	 */
 	@Validate({
@@ -156,7 +156,7 @@ class EditionService
 		returns: editionSchema,
 	})
 	upsert(input: EditionUpsert, opts: ServiceOpts): Promise<Edition> {
-		assertCanWriteEdition(opts.actor, "upsert-edition");
+		ensurePerm(opts.actor, "edition.create");
 		assertWindow(input.startAt, input.endAt);
 		const client = opts.tx ?? this.prisma;
 
@@ -185,9 +185,7 @@ class EditionService
 	 */
 	@Validate({ service: true, args: [editionPK] })
 	async delete(filter: EditionPK, opts: ServiceOpts): Promise<void> {
-		if (!canManageEditions(opts.actor)) {
-			throw new NotAllowed({ action: "delete-edition" });
-		}
+		ensurePerm(opts.actor, "edition.delete");
 		const client = opts.tx ?? this.prisma;
 		const courses = await client.course.count({
 			where: { editionSlug: filter.slug },
@@ -203,19 +201,15 @@ class EditionService
 
 function assertWindow(startAt: Date, endAt: Date): void {
 	if (startAt >= endAt) {
-		throw new Error("An edition's startAt must be before its endAt.");
+		throw new InvalidData({
+			endAt: [
+				{
+					code: "invalid",
+					message: "An edition's endAt must be after its startAt.",
+				},
+			],
+		});
 	}
-}
-
-/**
- * Enforces {@link canManageEditions}, tagged with `action`.
- *
- * Shared by `create`/`update`/`upsert`: editions are shared infrastructure —
- * their slugs appear in every course URL — so every write path carries the
- * same admin-only rule.
- */
-function assertCanWriteEdition(actor: Actor, action: ActionCode): void {
-	if (!canManageEditions(actor)) throw new NotAllowed({ action });
 }
 
 /** Whether `edition`'s active window contains `at` (default: now). */
@@ -225,5 +219,3 @@ export function isEditionOpen(
 ): boolean {
 	return edition.startAt <= at && at <= edition.endAt;
 }
-
-export const editionService = new EditionService();

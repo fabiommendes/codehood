@@ -1,10 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import {
-	type ApiKey,
-	type ApiKeyCreate,
-	apiKeyService,
-} from "@/db/services/api-key.service";
+import { type ApiKey, type ApiKeyCreate, db } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 import { persistedUserFactory } from "./user.factory";
 
@@ -44,7 +40,7 @@ export const persistedApiKeyFactory = Factory.define<
 			params.createdBy ??
 			(await persistedUserFactory.create({}, { transient: transientParams }));
 
-		return apiKeyService.create(
+		return db.apiKey.create(
 			{
 				...input,
 				createdBy: { username: createdBy.username, name: createdBy.name },

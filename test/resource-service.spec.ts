@@ -1,15 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { fileService } from "@/db/services/file.service";
-import {
-	groupResourcesByType,
-	type Resource,
-	resourceService,
-} from "@/db/services/resource.service";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db, type Resource } from "@/db";
+import { groupResourcesByType } from "@/db/services/resource.service";
 
 // A random suffix, not an incrementing counter: this file's own `tag()`
 // numbering would otherwise collide with the identically-named counters in
@@ -21,7 +13,7 @@ function tag(prefix: string): string {
 
 async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 	const username = tag(role.toLowerCase());
-	return userService.create(
+	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
@@ -36,8 +28,8 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 }
 
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await editionService.findOne({ slug }))) {
-		await editionService.create(
+	if (!(await db.edition.findOne({ slug }))) {
+		await db.edition.create(
 			{
 				slug,
 				name: slug,
@@ -52,12 +44,12 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 
 async function makeCourse(instructorUsername: string) {
 	const disciplineSlug = tag("disc");
-	await disciplineService.create(
+	await db.discipline.create(
 		{ slug: disciplineSlug, name: disciplineSlug },
 		FULL_ACCESS,
 	);
 	await ensureEdition();
-	return courseService.create(
+	return db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
@@ -69,69 +61,64 @@ async function makeCourse(instructorUsername: string) {
 	);
 }
 
-async function makeFile() {
-	return fileService.create(
-		{ bytes: Buffer.from(`bytes ${tag("f")}`), mimeType: "application/pdf" },
-		FULL_ACCESS,
-	);
+function link(url = "https://example.com") {
+	return { type: "LINK" as const, url };
 }
 
-test("each type's shape rule: LINK without data, FILE without fileId, CODE without extra, and MD with a fileId are all refused", async () => {
+test("create rejects malformed `data` per type: LINK without a url, CODE without a language, MD with empty content, FILE without a buffer", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
-	const file = await makeFile();
 	const opts = { actor: instructor };
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: course.id,
 				slug: "a",
-				type: "LINK",
 				title: "t",
-				contentHash: tag("h"),
+				data: { type: "LINK", url: "" },
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: course.id,
 				slug: "b",
-				type: "FILE",
 				title: "t",
-				contentHash: tag("h"),
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
+				data: { type: "CODE", content: "print(1)" } as any,
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: course.id,
 				slug: "c",
-				type: "CODE",
 				title: "t",
-				data: "print(1)",
-				contentHash: tag("h"),
+				data: { type: "MD", content: "" },
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: course.id,
 				slug: "d",
-				type: "MD",
 				title: "t",
-				data: "# hi",
-				fileId: file.id,
-				contentHash: tag("h"),
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
+				data: { type: "FILE", filename: "a.txt" } as any,
+				ref: tag("h"),
 			},
 			opts,
 		),
@@ -143,89 +130,67 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	const courseA = await makeCourse(instructor.username);
 	const courseB = await makeCourse(instructor.username);
 
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: courseA.id,
 			slug: "syllabus",
-			type: "LINK",
 			title: "Syllabus",
-			data: "https://example.com/a",
-			contentHash: tag("h"),
+			data: link("https://example.com/a"),
+			ref: tag("h"),
 		},
 		{ actor: instructor },
 	);
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: courseA.id,
 				slug: "syllabus",
-				type: "LINK",
 				title: "Syllabus again",
-				data: "https://example.com/b",
-				contentHash: tag("h"),
+				data: link("https://example.com/b"),
+				ref: tag("h"),
 			},
 			{ actor: instructor },
 		),
 	).rejects.toThrow();
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: courseB.id,
 				slug: "syllabus",
-				type: "LINK",
 				title: "Syllabus",
-				data: "https://example.com/c",
-				contentHash: tag("h"),
+				data: link("https://example.com/c"),
+				ref: tag("h"),
 			},
 			{ actor: instructor },
 		),
 	).resolves.toMatchObject({ slug: "syllabus" });
 });
 
-test("create rejects a missing contentHash and stores a supplied one verbatim", async () => {
+test("create stores a supplied ref verbatim", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 
-	await expect(
-		resourceService.create(
-			{
-				courseId: course.id,
-				slug: "no-hash",
-				type: "LINK",
-				title: "t",
-				data: "https://example.com",
-				contentHash: "",
-			},
-			{ actor: instructor },
-		),
-	).rejects.toThrow();
-
 	const hash = tag("verbatim-hash");
-	const resource = await resourceService.create(
+	const resource = await db.resource.create(
 		{
 			courseId: course.id,
 			slug: "with-hash",
-			type: "LINK",
 			title: "t",
-			data: "https://example.com",
-			contentHash: hash,
+			data: link(),
+			ref: hash,
 		},
 		{ actor: instructor },
 	);
-	expect(resource.contentHash).toBe(hash);
+	expect(resource.ref).toBe(hash);
 });
 
 test("groupResourcesByType: fixed type order (Files, Links, Notes, Snippets), title order within each, empty groups absent", () => {
 	const base = {
 		id: 0,
-		courseId: 1,
 		description: null,
-		extra: null,
-		fileId: null,
-		file: null,
-		contentHash: "h",
+		ref: "h",
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		slug: "s",
@@ -234,33 +199,29 @@ test("groupResourcesByType: fixed type order (Files, Links, Notes, Snippets), ti
 		{
 			...base,
 			id: 1,
-			type: "CODE" as const,
 			title: "Zebra.py",
-			data: "1",
+			data: { type: "CODE" as const, content: "1", language: "python" },
 			slug: "zebra",
 		},
 		{
 			...base,
 			id: 2,
-			type: "LINK" as const,
 			title: "Beta link",
-			data: "https://a",
+			data: { type: "LINK" as const, url: "https://a" },
 			slug: "beta",
 		},
 		{
 			...base,
 			id: 3,
-			type: "LINK" as const,
 			title: "Alpha link",
-			data: "https://b",
+			data: { type: "LINK" as const, url: "https://b" },
 			slug: "alpha",
 		},
 		{
 			...base,
 			id: 4,
-			type: "MD" as const,
 			title: "Notes",
-			data: "# hi",
+			data: { type: "MD" as const, content: "# hi" },
 			slug: "notes",
 		},
 	];
@@ -277,99 +238,110 @@ test("groupResourcesByType: fixed type order (Files, Links, Notes, Snippets), ti
 	);
 });
 
-test("an enrolled student sees a course's resources; a dropped student sees none; a non-owning admin reads but cannot write", async () => {
+test("an enrolled student sees a course's resources; a non-owning admin reads but cannot write", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const admin = await makeUser("ADMIN");
 	const active = await makeUser("STUDENT");
-	const dropped = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 
-	await courseService.enroll(
-		{ courseId: course.id, userId: active.username },
-		FULL_ACCESS,
-	);
-	await courseService.enroll(
-		{ courseId: course.id, userId: dropped.username },
-		FULL_ACCESS,
-	);
-	await courseService.drop(
-		{ courseId: course.id, userId: dropped.username },
+	await db.enrollment.create(
+		{ courseId: course.id, username: active.username },
 		FULL_ACCESS,
 	);
 
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: course.id,
 			slug: "syllabus",
-			type: "LINK",
 			title: "Syllabus",
-			data: "https://example.com",
-			contentHash: tag("h"),
+			data: link(),
+			ref: tag("h"),
 		},
 		{ actor: instructor },
 	);
 
 	await expect(
-		resourceService.findMany({ courseId: course.id }, { actor: active }),
+		db.resource.findMany({ courseId: course.id }, { actor: active }),
 	).resolves.toHaveLength(1);
 	await expect(
-		resourceService.findMany({ courseId: course.id }, { actor: dropped }),
-	).resolves.toHaveLength(0);
-	await expect(
-		resourceService.findMany({ courseId: course.id }, { actor: admin }),
+		db.resource.findMany({ courseId: course.id }, { actor: admin }),
 	).resolves.toHaveLength(1);
 
 	await expect(
-		resourceService.create(
+		db.resource.create(
 			{
 				courseId: course.id,
 				slug: "admin-attempt",
-				type: "LINK",
 				title: "t",
-				data: "https://example.com",
-				contentHash: tag("h"),
+				data: link(),
+				ref: tag("h"),
 			},
 			{ actor: admin },
 		),
 	).rejects.toThrow();
 });
 
-test("delete removes the resource row; the File it pointed at survives, because another resource may still point at it", async () => {
+test("findMany rejects an actor who cannot see the course at all", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const outsider = await makeUser("STUDENT");
+	const course = await makeCourse(instructor.username);
+
+	await expect(
+		db.resource.findMany({ courseId: course.id }, { actor: outsider }),
+	).rejects.toThrow();
+});
+
+test("delete removes the resource row; a FILE resource's attachment survives on a sibling resource that shares the same bytes", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const courseA = await makeCourse(instructor.username);
 	const courseB = await makeCourse(instructor.username);
-	const file = await makeFile();
+	const buffer = Buffer.from(`shared file bytes ${tag("f")}`);
 
-	const resourceA = await resourceService.create(
+	const resourceA = await db.resource.create(
 		{
 			courseId: courseA.id,
 			slug: "shared",
-			type: "FILE",
 			title: "Shared file",
-			fileId: file.id,
-			contentHash: tag("h"),
+			data: { type: "FILE", filename: "notes.txt", buffer },
+			ref: tag("h"),
 		},
 		{ actor: instructor },
 	);
-	await resourceService.create(
+	const resourceB = await db.resource.create(
 		{
 			courseId: courseB.id,
 			slug: "shared",
-			type: "FILE",
 			title: "Shared file",
-			fileId: file.id,
-			contentHash: tag("h"),
+			data: { type: "FILE", filename: "notes.txt", buffer },
+			ref: tag("h"),
 		},
 		{ actor: instructor },
 	);
 
-	await resourceService.delete({ id: resourceA.id }, { actor: instructor });
+	await db.resource.delete({ id: resourceA.id }, { actor: instructor });
 
 	await expect(
-		resourceService.findOne({ id: resourceA.id }, { actor: instructor }),
+		db.resource.findOne({ id: resourceA.id }, { actor: instructor }),
 	).resolves.toBeNull();
-	const survivor = await fileService.findOne({ id: file.id }, FULL_ACCESS);
-	expect(survivor?.deletedAt).toBeNull();
+
+	// resourceB's own attachment (a separate row, content-addressed onto the
+	// same blob) is untouched by resourceA's deletion.
+	const survivors = await db.attachment.allAttachedTo(
+		{
+			type: "RESOURCE",
+			id: resourceB.id,
+			title: resourceB.title,
+			slug: resourceB.slug,
+		},
+		FULL_ACCESS,
+	);
+	expect(survivors).toHaveLength(1);
+	const survivor = survivors[0];
+	if (!survivor) throw new Error("unreachable: length asserted above");
+	expect(resourceB.data.type).toBe("FILE");
+	expect(resourceB.data.type === "FILE" && resourceB.data.link).toContain(
+		survivor.hash,
+	);
 });
 
 test("upsert creates on first call, updates the same resource on the second, and a different slug creates a separate resource", async () => {
@@ -377,97 +349,94 @@ test("upsert creates on first call, updates the same resource on the second, and
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	const created = await resourceService.upsert(
+	const created = await db.resource.upsert(
 		{
 			courseId: course.id,
 			slug: "upsert-resource",
-			type: "LINK",
 			title: "Before",
 			description: "d1",
-			data: "https://example.com/before",
-			contentHash: tag("h"),
+			data: link("https://example.com/before"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 	expect(created.title).toBe("Before");
 	expect(created.description).toBe("d1");
 
-	const updated = await resourceService.upsert(
+	const updated = await db.resource.upsert(
 		{
 			courseId: course.id,
 			slug: "upsert-resource",
-			type: "LINK",
 			title: "After",
 			description: null,
-			data: "https://example.com/before",
-			contentHash: tag("h"),
+			data: link("https://example.com/before"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 	expect(updated.id).toBe(created.id); // same key, same row
 	expect(updated.title).toBe("After"); // changed
 	expect(updated.description).toBeNull(); // cleared
-	expect(updated.data).toBe("https://example.com/before"); // untouched
+	expect(updated.data).toEqual(link("https://example.com/before")); // untouched
 
-	const other = await resourceService.upsert(
+	const other = await db.resource.upsert(
 		{
 			courseId: course.id,
 			slug: "upsert-resource-2",
-			type: "LINK",
 			title: "Other",
-			data: "https://example.com/other",
-			contentHash: tag("h"),
+			data: link("https://example.com/other"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 	expect(other.id).not.toBe(created.id);
 });
 
-test("upsert enforces shape-by-type on both the create branch and the update branch", async () => {
+test("upsert enforces the `data` shape on both the create branch and the update branch", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	await expect(
-		resourceService.upsert(
+		db.resource.upsert(
 			{
 				courseId: course.id,
 				slug: "shape-new",
-				type: "LINK",
 				title: "t",
-				contentHash: tag("h"),
+				data: { type: "LINK", url: "" },
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 
-	const existing = await resourceService.upsert(
+	const existing = await db.resource.upsert(
 		{
 			courseId: course.id,
 			slug: "shape-existing",
-			type: "LINK",
 			title: "t",
-			data: "https://example.com",
-			contentHash: tag("h"),
+			data: link(),
+			ref: tag("h"),
 		},
 		opts,
 	);
 
 	await expect(
-		resourceService.upsert(
+		db.resource.upsert(
 			{
 				courseId: course.id,
 				slug: "shape-existing",
-				type: "CODE",
 				title: "t",
-				contentHash: tag("h"),
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
+				data: { type: "CODE", content: "x" } as any,
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 
-	const untouched = await resourceService.findOne({ id: existing.id }, opts);
-	expect(untouched?.type).toBe("LINK");
+	const untouched = await db.resource.findOne({ id: existing.id }, opts);
+	expect(untouched?.data.type).toBe("LINK");
 });
 
 function courseRefOf(course: Awaited<ReturnType<typeof makeCourse>>) {
@@ -481,20 +450,19 @@ function courseRefOf(course: Awaited<ReturnType<typeof makeCourse>>) {
 test("findOne addresses a resource by its course's natural key and slug", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
-	const created = await resourceService.create(
+	const created = await db.resource.create(
 		{
 			courseId: course.id,
 			slug: "syllabus",
-			type: "LINK",
 			title: "Syllabus",
-			data: "https://example.com",
-			contentHash: tag("h"),
+			data: link(),
+			ref: tag("h"),
 		},
 		{ actor: instructor },
 	);
 
-	const found = await resourceService.findOne(
-		{ ref: { courseRef: courseRefOf(course), slug: "syllabus" } },
+	const found = await db.resource.findOne(
+		{ ...courseRefOf(course), slug: "syllabus" },
 		{ actor: instructor },
 	);
 	expect(found?.id).toBe(created.id);
@@ -509,139 +477,145 @@ async function statusOf(promise: Promise<unknown>) {
 	return "resolved";
 }
 
-test("findOne by course ref: 404 for no such course, 403 for a course the actor cannot see even if the slug is missing, null for a missing slug", async () => {
+test("findOne by course natural key: 404 for no such course, 403 for an existing slug the actor cannot see, null for a missing slug regardless of visibility", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const outsider = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	const courseRef = courseRefOf(course);
 
-	expect(
-		await statusOf(
-			resourceService.findOne(
-				{
-					ref: {
-						courseRef: { ...courseRef, discipline: tag("nope") },
-						slug: "x",
-					},
-				},
-				{ actor: instructor },
-			),
-		),
-	).toBe(404);
-	expect(
-		await statusOf(
-			resourceService.findOne(
-				{ ref: { courseRef, slug: "missing" } },
-				{ actor: outsider },
-			),
-		),
-	).toBe(403);
-	await expect(
-		resourceService.findOne(
-			{ ref: { courseRef, slug: "missing" } },
-			{ actor: instructor },
-		),
-	).resolves.toBeNull();
-});
-
-test("findMany by course ref: 404 for no such course, 403 for a course the actor cannot see, while by courseId it stays an empty list", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const outsider = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	const courseRef = courseRefOf(course);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: course.id,
 			slug: "syllabus",
-			type: "LINK",
 			title: "Syllabus",
-			data: "https://example.com",
-			contentHash: tag("h"),
+			data: link(),
+			ref: tag("h"),
 		},
 		{ actor: instructor },
 	);
 
 	expect(
 		await statusOf(
-			resourceService.findMany(
-				{ courseRef: { ...courseRef, discipline: tag("nope") } },
+			db.resource.findOne(
+				{ ...courseRef, discipline: tag("nope"), slug: "syllabus" },
 				{ actor: instructor },
 			),
 		),
 	).toBe(404);
 	expect(
 		await statusOf(
-			resourceService.findMany({ courseRef }, { actor: outsider }),
+			db.resource.findOne(
+				{ ...courseRef, slug: "syllabus" },
+				{ actor: outsider },
+			),
 		),
 	).toBe(403);
 	await expect(
-		resourceService.findMany({ courseId: course.id }, { actor: outsider }),
-	).resolves.toEqual([]);
+		db.resource.findOne(
+			{ ...courseRef, slug: "missing" },
+			{ actor: instructor },
+		),
+	).resolves.toBeNull();
+});
+
+test("findMany by course natural key: 404 for no such course, 403 for a course the actor cannot see", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const outsider = await makeUser("STUDENT");
+	const course = await makeCourse(instructor.username);
+	const courseRef = courseRefOf(course);
+	await db.resource.create(
+		{
+			courseId: course.id,
+			slug: "syllabus",
+			title: "Syllabus",
+			data: link(),
+			ref: tag("h"),
+		},
+		{ actor: instructor },
+	);
+
+	expect(
+		await statusOf(
+			db.resource.findMany(
+				{ ...courseRef, discipline: tag("nope") },
+				{ actor: instructor },
+			),
+		),
+	).toBe(404);
+	expect(
+		await statusOf(db.resource.findMany(courseRef, { actor: outsider })),
+	).toBe(403);
 	await expect(
-		resourceService.findMany({ courseRef }, { actor: instructor }),
+		db.resource.findMany(courseRef, { actor: instructor }),
 	).resolves.toHaveLength(1);
 });
 
-test("create and upsert accept a course ref in place of courseId", async () => {
+test("create and upsert accept a course natural key in place of a numeric courseId", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const courseRef = courseRefOf(course);
 	const opts = { actor: instructor };
-	const link = {
-		type: "LINK" as const,
-		title: "t",
-		data: "https://example.com",
-		contentHash: tag("h"),
-	};
 
-	const created = await resourceService.create(
-		{ courseRef, slug: "by-ref", ...link },
+	const created = await db.resource.create(
+		{
+			courseId: courseRef,
+			slug: "by-ref",
+			title: "t",
+			data: link(),
+			ref: tag("h"),
+		},
 		opts,
 	);
-	expect(created.courseId).toBe(course.id);
+	expect(created.slug).toBe("by-ref");
 
-	const first = await resourceService.upsert(
-		{ courseRef, slug: "upsert-by-ref", ...link, title: "Before" },
+	const first = await db.resource.upsert(
+		{
+			courseId: courseRef,
+			slug: "upsert-by-ref",
+			title: "Before",
+			data: link(),
+			ref: tag("h"),
+		},
 		opts,
 	);
-	const second = await resourceService.upsert(
-		{ courseRef, slug: "upsert-by-ref", ...link, title: "After" },
+	const second = await db.resource.upsert(
+		{
+			courseId: courseRef,
+			slug: "upsert-by-ref",
+			title: "After",
+			data: link(),
+			ref: tag("h"),
+		},
 		opts,
 	);
 	expect(second.id).toBe(first.id);
 	expect(second.title).toBe("After");
 });
 
-test("create: 400 without a course or with both courseId and courseRef, 404 for a course ref naming no course", async () => {
+test("create: 400 without a courseId, 404 for a course natural key naming no course", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const courseRef = courseRefOf(course);
 	const opts = { actor: instructor };
-	const link = {
-		type: "LINK" as const,
-		title: "t",
-		data: "https://example.com",
-		contentHash: tag("h"),
-	};
 
 	expect(
-		await statusOf(resourceService.create({ slug: "none", ...link }, opts)),
-	).toBe(400);
-	expect(
 		await statusOf(
-			resourceService.create(
-				{ courseId: course.id, courseRef, slug: "both", ...link },
+			db.resource.create(
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally missing courseId
+				{ slug: "none", title: "t", data: link(), ref: tag("h") } as any,
 				opts,
 			),
 		),
 	).toBe(400);
 	expect(
 		await statusOf(
-			resourceService.create(
+			db.resource.create(
 				{
-					courseRef: { ...courseRef, discipline: tag("nope") },
+					courseId: { ...courseRef, discipline: tag("nope") },
 					slug: "ghost",
-					...link,
+					title: "t",
+					data: link(),
+					ref: tag("h"),
 				},
 				opts,
 			),
@@ -649,24 +623,26 @@ test("create: 400 without a course or with both courseId and courseRef, 404 for 
 	).toBe(404);
 });
 
-for (const slug of ["week-01/notes", "Syllabus", "-lead", "has space", ""]) {
-	test(`create rejects the slug ${JSON.stringify(slug)} with a 400`, async () => {
-		const instructor = await makeUser("INSTRUCTOR");
-		const course = await makeCourse(instructor.username);
-		expect(
-			await statusOf(
-				resourceService.create(
-					{
-						courseId: course.id,
-						slug,
-						type: "LINK",
-						title: "t",
-						data: "https://example.com",
-						contentHash: tag("h"),
-					},
-					{ actor: instructor },
-				),
+// `resourceSchema.slug` is a bare `z.string().min(1)` — the service layer
+// only refuses an empty slug. Kebab-case/format enforcement
+// (`week-01/notes`, `Syllabus`, `-lead`, `has space`, ...) happens at the
+// REST layer via route-segment matching, see
+// `test/api-resource.spec.ts`'s "malformed slug" case.
+test("create rejects an empty slug with a 400", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	expect(
+		await statusOf(
+			db.resource.create(
+				{
+					courseId: course.id,
+					slug: "",
+					title: "t",
+					data: link(),
+					ref: tag("h"),
+				},
+				{ actor: instructor },
 			),
-		).toBe(400);
-	});
-}
+		),
+	).toBe(400);
+});

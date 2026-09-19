@@ -13,6 +13,8 @@
  */
 export const BRANDING: Record<string, Record<string, string>[]> = {
 	ApiKey: [{ field: "id", from: "number", to: "ApiKeyId" }],
+	Attachment: [{ field: "id", from: "number", to: "AttachmentId" }],
+	Blob: [{ field: "id", from: "number", to: "BlobId" }],
 	CalendarEvent: [
 		{ field: "id", from: "number", to: "CalendarEventId" },
 		{ field: "courseId", from: "number", to: "CourseId" },
@@ -20,16 +22,13 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "examId", from: "number", to: "ExamId" },
 	],
 	Course: [{ field: "id", from: "number", to: "CourseId" }],
-	// Discipline: [{ field: "id", from: "number" , to: "DisciplineId"}],
-	// Edition: [{ field: "id", from: "number" , to: "EditionId"}],
 	Enrollment: [
 		{ field: "id", from: "number", to: "EnrollmentId" },
-		{ field: "userId", from: "number", to: "UserId" },
+		{ field: "username", from: "number", to: "UserId" },
 		{ field: "courseId", from: "number", to: "CourseId" },
 	],
 	Exam: [{ field: "id", from: "number", to: "ExamId" }],
 	ExamTags: [{ field: "id", from: "number", to: "ExamTagsId" }],
-	File: [{ field: "id", from: "number", to: "FileId" }],
 	// Group: [{ field: "id", from: "number" , to: "GroupId"}],
 	// GroupMembership: [{ field: "id", from: "number" , to: "GroupMembershipId"}],
 	Invite: [
@@ -44,7 +43,10 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 	QuestionRef: [{ field: "id", from: "number", to: "QuestionRefId" }],
 	// QuestionForExam: [{ field: "id", from: "number" , to: "QuestionForExamId"}],
 	// QuestionTags: [{ field: "id", from: "number" , to: "QuestionTagsId"}],
-	Resource: [{ field: "id", from: "number", to: "ResourceId" }],
+	Resource: [
+		{ field: "id", from: "number", to: "ResourceId" },
+		{ field: "attachmentId", from: "number", to: "AttachmentId" },
+	],
 	Response: [{ field: "id", from: "number", to: "ResponseId" }],
 	Session: [{ field: "id", from: "number", to: "SessionId" }],
 	Submission: [{ field: "id", from: "number", to: "SubmissionId" }],
@@ -58,7 +60,8 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 export function brandSource(args: { model: string; source: string }): string {
 	let source = args.source;
 	const model = args.model;
-	const indexes = BRANDING[model] ?? {};
+	const indexes = BRANDING[model];
+	if (!indexes) return source;
 
 	for (const item of indexes) {
 		const { field, from: srcType, to: destType } = item;

@@ -42,7 +42,9 @@ for (const [extension, mime] of Object.entries(MIME_BY_EXTENSION)) {
 	}
 }
 
-/** The lowercase extension of `filename` including its dot, or `null`. */
+/**
+ * The lowercase extension of `filename` including its dot, or `null`.
+ */
 export function extensionOf(filename: string): string | null {
 	const index = filename.lastIndexOf(".");
 	if (index === -1 || index === filename.length - 1) {
@@ -52,25 +54,36 @@ export function extensionOf(filename: string): string | null {
 }
 
 /**
- * The mime type an attachment is stored under: a known extension wins and any
- * declared value is discarded, otherwise `declared` is kept, falling back to
- * `application/octet-stream`.
+ * The mime type from file name.
+ *
+ * Can provide a default value, if mime is not found in the registry.
+ *
+ * Falling back to `application/octet-stream`.
  */
-export function mimeFor(filename: string, declared?: string | null): string {
+export function mimeFor(
+	filename: string,
+	defaultValue?: string | null,
+): string {
 	const extension = extensionOf(filename);
-	if (extension && extension in MIME_BY_EXTENSION) {
-		return MIME_BY_EXTENSION[extension];
+	if (extension) {
+		return (
+			MIME_BY_EXTENSION[extension] ?? defaultValue ?? "application/octet-stream"
+		);
 	}
-	return declared ?? "application/octet-stream";
+	return defaultValue ?? "application/octet-stream";
 }
 
-/** Guesses a MIME type from a file's extension, defaulting to a generic binary type. */
+/**
+ * Guesses a MIME type from a file's extension, defaulting to a generic binary type.
+ */
 export function guessMimeType(filename: string): string {
 	const extension = filename.split(".").pop()?.toLowerCase() ?? "";
 	return MIME_BY_EXTENSION[`.${extension}`] ?? "application/octet-stream";
 }
 
-/** The conventional extension for a MIME type, or `null` if none is known. */
+/**
+ * The conventional extension for a MIME type, or `null` if none is known.
+ */
 export function extensionForMime(mimeType: string): string | null {
 	return EXTENSION_BY_MIME[mimeType.toLowerCase()] ?? null;
 }

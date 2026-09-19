@@ -3,9 +3,10 @@ import { Factory } from "fishery";
 import {
 	type Course,
 	type CourseCreate,
-	courseService,
-} from "@/db/services/course.service";
-import type { User, UserCreate } from "@/db/services/user.service";
+	db,
+	type User,
+	type UserCreate,
+} from "@/db";
 import { persistedDisciplineFactory } from "./discipline.factory";
 import { persistedEditionFactory } from "./edition.factory";
 import { type PersistParams, serviceOpts } from "./support";
@@ -89,7 +90,7 @@ export const persistedCourseFactory = Factory.define<
 				)
 			).username;
 
-		const course = await courseService.create(
+		const course = await db.course.create(
 			{ ...input, discipline, edition, instructor },
 			opts,
 		);
@@ -100,8 +101,8 @@ export const persistedCourseFactory = Factory.define<
 				{ role: "STUDENT", ...overrides },
 				{ transient: transientParams },
 			);
-			await courseService.enroll(
-				{ courseId: course.id, userId: student.username },
+			await db.enrollment.create(
+				{ courseId: course.id, username: student.username },
 				opts,
 			);
 			students.push(student);

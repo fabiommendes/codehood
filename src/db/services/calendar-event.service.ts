@@ -1,26 +1,15 @@
 /**
  * The dated half of a course's schedule — see
- * `dev/specs/to-review/calendar.md`. Writes are ownership-gated
- * ({@link canWriteCourseContent}); reads follow course-contents visibility
- * ({@link canViewCourseContents}). `examId` is never authored: both `create`
- * and `update` resolve it fresh from {@link examForEvent} on every write.
+ * `dev/specs/to-review/calendar.md`. Writes are ownership-gated (the
+ * `course.update-contents` permission); reads follow course-contents
+ * visibility (`course.read-contents`). `examId` is never authored: both
+ * `create` and `update` resolve it fresh from {@link examForEvent} on every
+ * write.
  */
 import type { z } from "zod";
-import {
-	canViewCourseContents,
-	canWriteCourseContent,
-	courseContentsVisibility,
-} from "@/auth/permissions";
-import type { Actor } from "@/core/actor";
+import type { Actor } from "@/auth/actor";
+import { hasPerm } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/typing";
-import {
-	endOf,
-	localDateOf,
-	toInstant,
-	weekdayOf,
-} from "@/utils/schedule-time";
-import { Validate } from "@/utils/validate";
 import {
 	type CalendarEventId,
 	type CourseId,
@@ -31,8 +20,16 @@ import {
 	calendarEventUpdate,
 	calendarEventUpsert,
 	type TimeSlotId,
-} from "../../core/schemas";
-import { type Crud, type ServiceOpts, upsert } from "../base-service";
+} from "@/core/schemas";
+import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
+import type { FillUndefineds } from "@/typing";
+import {
+	endOf,
+	localDateOf,
+	toInstant,
+	weekdayOf,
+} from "@/utils/schedule-time";
+import { Validate } from "@/utils/validate";
 import {
 	type Prisma,
 	type PrismaClient,
@@ -41,6 +38,7 @@ import {
 	type Weekday,
 } from "../client";
 import { examForEvent } from "../util.exam-link";
+import { courseContentsWhere } from "./course.service";
 
 export type { CalendarEventId } from "../../core/schemas";
 
@@ -74,7 +72,7 @@ const EVENT_INCLUDE = {
 			instructor: { select: { username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
-				select: { userId: true },
+				select: { username: true },
 			},
 		},
 	},
@@ -86,7 +84,7 @@ type DbEvent = Prisma.CalendarEventGetPayload<{
 	include: typeof EVENT_INCLUDE;
 }>;
 
-class CalendarEventService
+export class CalendarEventService
 	implements
 		Crud<{
 			entity: CalendarEvent;
@@ -125,8 +123,8 @@ class CalendarEventService
 			where: { id: input.courseId },
 			select: { instructor: { select: { username: true } } },
 		});
-		if (!course || !canWriteCourseContent(opts.actor, course)) {
-			throw new NotAllowed({ action: "create-calendar-event" });
+		if (!course || !hasPerm(opts.actor, "course.update-contents", course)) {
+			throw new NotAllowed("calendar-event.create");
 		}
 
 		const slot = await client.timeSlot.findUnique({
@@ -204,15 +202,15 @@ class CalendarEventService
 		}
 
 		if (!row) return null;
-		if (!canViewCourseContents(opts.actor, row.course)) {
-			throw new NotAllowed({ action: "read-calendar-event" });
+		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+			throw new NotAllowed("calendar-event.read");
 		}
 		return maskExam(row, opts.actor);
 	}
 
 	/**
-	 * Lists events narrowed to what `actor` may see (see
-	 * {@link courseContentsVisibility}).
+	 * Lists events narrowed to what `actor` may see (see the
+	 * `course.read-contents` permission).
 	 *
 	 * With no `courseIds`, returns everything the actor may see — what
 	 * `/calendar` wants. `from` is inclusive of an event still running at
@@ -237,12 +235,18 @@ class CalendarEventService
 					filter.kinds ? { kind: { in: filter.kinds } } : {},
 					filter.weeks ? { week: { in: filter.weeks } } : {},
 					filter.to !== undefined ? { startAt: { lt: filter.to } } : {},
-					{ course: courseContentsVisibility(opts.actor) },
+					{ course: courseContentsWhere(opts.actor) },
 				],
 			},
 			include: EVENT_INCLUDE,
 			orderBy: { startAt: "asc" },
 		});
+
+		for (const row of rows) {
+			if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+				throw new NotAllowed("calendar-event.read");
+			}
+		}
 
 		const from = filter.from;
 		const inWindow =
@@ -282,8 +286,11 @@ class CalendarEventService
 			where: { id: target.id },
 			include: EVENT_INCLUDE,
 		});
-		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new NotAllowed({ action: "update-calendar-event" });
+		if (
+			!current ||
+			!hasPerm(opts.actor, "course.update-contents", current.course)
+		) {
+			throw new NotAllowed("calendar-event.update");
 		}
 
 		let startAt = current.startAt;
@@ -333,8 +340,8 @@ class CalendarEventService
 	/**
 	 * Upserts an event keyed on `{courseId, slug}`.
 	 *
-	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
-	 * or updating, same as `create`/`update`; the weekday-match and
+	 * PUT semantics: gated on the `course.update-contents` permission whether
+	 * creating or updating, same as `create`/`update`; the weekday-match and
 	 * slot-day-collision checks re-run on whichever branch fires, since
 	 * `date` is always present in `CalendarEventUpsert`.
 	 */
@@ -347,26 +354,21 @@ class CalendarEventService
 		input: CalendarEventUpsert,
 		opts: ServiceOpts,
 	): Promise<CalendarEvent> {
-		return upsert(
-			this.prisma,
-			this,
-			input,
-			opts,
-			{
-				pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
-				assertCreatable: async (i, o) => {
-					const client = o.tx ?? this.prisma;
-					const course = await client.course.findUnique({
-						where: { id: i.courseId },
-						select: { instructor: { select: { username: true } } },
-					});
-					if (!course || !canWriteCourseContent(o.actor, course)) {
-						throw new NotAllowed({ action: "upsert-calendar-event" });
-					}
-				},
+		return upsert(this, input, {
+			...opts,
+			action: "calendar-event.create",
+			pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
+			assertCreatable: async (i, o) => {
+				const client = o.tx ?? this.prisma;
+				const course = await client.course.findUnique({
+					where: { id: i.courseId },
+					select: { instructor: { select: { username: true } } },
+				});
+				if (!course || !hasPerm(o.actor, "course.update-contents", course)) {
+					throw new NotAllowed("calendar-event.create");
+				}
 			},
-			"upsert-calendar-event",
-		);
+		});
 	}
 
 	/**
@@ -384,14 +386,15 @@ class CalendarEventService
 			where: { id: target.id },
 			include: EVENT_INCLUDE,
 		});
-		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new NotAllowed({ action: "delete-calendar-event" });
+		if (
+			!current ||
+			!hasPerm(opts.actor, "course.update-contents", current.course)
+		) {
+			throw new NotAllowed("calendar-event.delete");
 		}
 		await client.calendarEvent.delete({ where: { id: target.id } });
 	}
 }
-
-export const calendarEventService = new CalendarEventService();
 
 //
 // Auxiliary functions
@@ -447,7 +450,7 @@ async function assertNoSlotDayCollision(
  */
 function maskExam(row: DbEvent, actor: Actor): CalendarEvent {
 	const { course, exam, ...rest } = row;
-	const privileged = canWriteCourseContent(actor, course);
+	const privileged = hasPerm(actor, "course.update-contents", course);
 	const visible =
 		exam !== null &&
 		(privileged || (exam.status !== "DRAFT" && exam.status !== "ARCHIVED"));

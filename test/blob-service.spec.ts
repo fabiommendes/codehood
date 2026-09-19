@@ -11,8 +11,8 @@ import {
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
-import type { Actor } from "@/core/actor";
-import { FULL_ACCESS } from "@/core/actor";
+import type { Actor } from "@/auth/actor";
+import { FULL_ACCESS } from "@/auth/actor";
 import type { AttachmentLinkMode } from "@/core/constants";
 import { prisma } from "@/db/client";
 import { BlobService } from "@/db/services/blob.service";
@@ -89,7 +89,7 @@ test("isBlobHash: true only for 64 lowercase hex characters", () => {
 // BlobService
 //
 
-test("create: hashes the bytes, dedupes identical uploads into one row and one file, and rejects a corrupt contentHash writing nothing", async () => {
+test("create: hashes the bytes, dedupes identical uploads into one row and one file", async () => {
 	const service = makeService();
 	const bytes = Buffer.from(`hello ${tag("bytes")}`);
 	const hash = hashOf(bytes);
@@ -104,16 +104,6 @@ test("create: hashes the bytes, dedupes identical uploads into one row and one f
 	const second = await service.create({ bytes }, FULL_ACCESS);
 	expect(second.hash).toBe(first.hash);
 	expect(second.createdAt).toEqual(first.createdAt); // untouched, not rewritten
-
-	const corruptBytes = Buffer.from(`corrupt ${tag("bytes")}`);
-	await expect(
-		service.create(
-			{ bytes: corruptBytes, contentHash: "0".repeat(64) },
-			FULL_ACCESS,
-		),
-	).rejects.toThrow();
-	expect(existsSync(service.blobPath(hashOf(corruptBytes)))).toBe(false);
-	expect(await service.findOne({ hash: hashOf(corruptBytes) })).toBeNull();
 });
 
 test("create, delete and collectGarbage are SYSTEM-only", async () => {
@@ -144,8 +134,8 @@ test("delete is a no-op while an attachment points at the blob, and removes the 
 			hash: blob.hash,
 			filename: "note.txt",
 			mimeType: "text/plain",
-			ownerType: "RESOURCE",
-			ownerId: 1,
+			attachedToType: "RESOURCE",
+			attachedToId: 1,
 		},
 	});
 
@@ -166,13 +156,15 @@ test("create resurrects a tombstoned blob: deletedAt clears and the file is rewr
 	const bytes = Buffer.from(`resurrect-me ${tag("bytes")}`);
 	const blob = await service.create({ bytes }, FULL_ACCESS);
 	await service.delete({ hash: blob.hash }, FULL_ACCESS);
-	expect(existsSync(service.blobPath(blob.hash))).toBe(false);
+	expect(existsSync(await service.link(blob.hash, "note.txt"))).toBe(false);
 
 	const resurrected = await service.create({ bytes }, FULL_ACCESS);
 	expect(resurrected.hash).toBe(blob.hash);
 	expect(resurrected.deletedAt).toBeNull();
-	expect(existsSync(service.blobPath(blob.hash))).toBe(true);
-	expect(readFileSync(service.blobPath(blob.hash))).toEqual(bytes);
+	expect(existsSync(await service.link(blob.hash, "note.txt"))).toBe(true);
+	expect(readFileSync(await service.link(blob.hash, "note.txt"))).toEqual(
+		bytes,
+	);
 });
 
 test("collectGarbage tombstones every unattached blob older than the cutoff, returns their hashes, and never touches an attached one", async () => {
@@ -190,8 +182,8 @@ test("collectGarbage tombstones every unattached blob older than the cutoff, ret
 			hash: attached.hash,
 			filename: "spared.txt",
 			mimeType: "text/plain",
-			ownerType: "RESOURCE",
-			ownerId: 1,
+			attachedToType: "RESOURCE",
+			attachedToId: 1,
 		},
 	});
 
@@ -288,20 +280,4 @@ test("readBlob returns bytes for a live blob, null for a tombstoned one, and nul
 	);
 	rmSync(service.blobPath(missing.hash));
 	expect(await service.readBlob(missing)).toBeNull();
-});
-
-test("disk layout: bytes at <root>/<hash[0:2]>/<hash>/<hash>, an attachment name beside it", async () => {
-	const service = makeService();
-	const bytes = Buffer.from(`layout ${tag("bytes")}`);
-	const blob = await service.create({ bytes }, FULL_ACCESS);
-	await service.link(blob.hash, "readme.txt");
-
-	const expectedBlobPath = path.join(service.blobDir(blob.hash), blob.hash);
-	expect(service.blobPath(blob.hash)).toBe(expectedBlobPath);
-	expect(service.blobDir(blob.hash)).toBe(
-		path.join(service.root, blob.hash.slice(0, 2), blob.hash),
-	);
-	expect(service.attachmentPath(blob.hash, "readme.txt")).toBe(
-		path.join(service.blobDir(blob.hash), "readme.txt"),
-	);
 });

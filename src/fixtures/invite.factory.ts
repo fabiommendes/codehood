@@ -1,10 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import {
-	type Invite,
-	type InviteCreate,
-	inviteService,
-} from "@/db/services/invite.service";
+import { db, type Invite, type InviteCreate } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 import { persistedUserFactory } from "./user.factory";
 
@@ -47,7 +43,7 @@ export const persistedInviteFactory = Factory.define<
 			params.createdBy ??
 			(await persistedUserFactory.create({}, { transient: transientParams }));
 
-		return inviteService.create(
+		return db.invite.create(
 			{
 				...input,
 				createdBy: { username: createdBy.username, name: createdBy.name },

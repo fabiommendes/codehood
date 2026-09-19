@@ -1,13 +1,11 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import {
-	type Edition,
-	type EditionCreate,
-	editionService,
-} from "@/db/services/edition.service";
+import { db, type Edition, type EditionCreate } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
-/** A slug matching `EDITION_RE`: a four-digit year, optionally `-<term>`. */
+/**
+ * A slug matching `EDITION_RE`: a four-digit year, optionally `-<term>`.
+ */
 function fakeEditionSlug(sequence: number): string {
 	const year = 2024 + (sequence % 10);
 	const term = (sequence % 2) + 1;
@@ -40,9 +38,7 @@ export const persistedEditionFactory = Factory.define<
 	PersistParams,
 	Edition
 >(({ sequence, params, transientParams, onCreate }) => {
-	onCreate((input) =>
-		editionService.create(input, serviceOpts(transientParams)),
-	);
+	onCreate((input) => db.edition.create(input, serviceOpts(transientParams)));
 
 	return buildEdition(sequence, params);
 });

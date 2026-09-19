@@ -1,10 +1,8 @@
 import { customAlphabet } from "nanoid";
 import type { z } from "zod";
-import { canManageEnrollment } from "@/auth/permissions";
-import { SYSTEM } from "@/core/actor";
+import { SYSTEM } from "@/auth/actor";
+import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
-import type { FillUndefineds } from "@/typing";
-import { Validate } from "@/utils/validate";
 import {
 	type CourseId,
 	type PassphraseId,
@@ -13,15 +11,17 @@ import {
 	passphrasePK,
 	passphraseSchema,
 	passphraseUpdate,
-} from "../../core/schemas";
-import type { Crud, ServiceOpts } from "../base-service";
+} from "@/core/schemas";
+import type { Crud, ServiceOpts } from "@/db/base-service";
+import type { FillUndefineds } from "@/typing";
+import { Validate } from "@/utils/validate";
 import {
 	type Passphrase as DbPassphrase,
 	type PrismaClient,
 	prisma,
 } from "../client";
 
-export type { PassphraseId } from "../../core/schemas";
+export type { PassphraseId } from "@/core/schemas";
 
 const EXPIRY_MS = 5 * 60 * 1000; // 5 minutes — FR-CRS-041's "live" window.
 
@@ -51,7 +51,7 @@ export type PassphraseUpdate = z.infer<typeof passphraseUpdate>;
  * credential a joining student presents, not something they're granted read
  * access to separately.
  */
-class PassphraseService
+export class PassphraseService
 	implements
 		Crud<{
 			entity: Passphrase;
@@ -72,8 +72,8 @@ class PassphraseService
 	 * Creates a passphrase for `input.courseId`, course-owner (or system)
 	 * only.
 	 *
-	 * `value` defaults to an auto-generated code, retried on the rare
-	 * collision against the system-wide unique constraint; an instructor's
+	 * The passphrase `value` defaults to an auto-generated code, retried on
+	 * the rare collision against the system-wide unique constraint; an instructor's
 	 * own override that collides is refused with a message naming the
 	 * conflict, rather than silently regenerated out from under them.
 	 */
@@ -170,7 +170,7 @@ class PassphraseService
 		if (filter.courseId !== undefined) {
 			await this.requireManageableCourse(filter.courseId, opts, "read");
 		} else if (opts.actor !== SYSTEM) {
-			throw new NotAllowed({ action: "read-passphrase" });
+			throw new NotAllowed("passphrase.read");
 		}
 		const rows = await client.passphrase.findMany({
 			where: {
@@ -245,16 +245,10 @@ class PassphraseService
 		});
 		if (!course) throw new NotFound("course", { id: courseId });
 
-		const canManage = canManageEnrollment(opts.actor, {
-			instructor: course.instructor,
-			enrollments: [],
-		});
-
-		if (!canManage) throw new NotAllowed({ action: `${action}-passphrase` });
+		if (!hasPerm(opts.actor, "enrollment.create", course))
+			throw new NotAllowed(`passphrase.${action}`);
 	}
 }
-
-export const passphraseService = new PassphraseService();
 
 //
 // Auxiliary functions

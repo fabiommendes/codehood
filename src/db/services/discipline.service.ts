@@ -1,9 +1,6 @@
 import type { z } from "zod";
-import { canManageDisciplines } from "@/auth/permissions";
-import type { Actor } from "@/core/actor";
-import { type ActionCode, NotAllowed } from "@/core/error";
-import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/utils/course-url";
-import { Validate } from "@/utils/validate";
+import type { Actor } from "@/auth/actor";
+import { ensurePerm } from "@/auth/permissions";
 import {
 	disciplineCreate,
 	disciplineFilter,
@@ -11,8 +8,10 @@ import {
 	disciplineSchema,
 	disciplineUpdate,
 	disciplineUpsert,
-} from "../../core/schemas";
-import type { Crud, ServiceOpts } from "../base-service";
+} from "@/core/schemas";
+import type { Crud, ServiceOpts } from "@/db/base-service";
+import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
+import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
 
 //
@@ -33,7 +32,7 @@ export type DisciplineUpsert = z.infer<typeof disciplineUpsert>;
  * occupies the root URL namespace shared with every system route (see
  * `docs/design/url-structure.md`).
  */
-class DisciplineService
+export class DisciplineService
 	implements
 		Crud<{
 			entity: Discipline;
@@ -48,6 +47,29 @@ class DisciplineService
 
 	constructor(client: PrismaClient = prisma) {
 		this.prisma = client;
+	}
+
+	/**
+	 * Creates a discipline.
+	 *
+	 * Rejects a slug that doesn't match `DISCIPLINE_SLUG_RE` or that names a
+	 * reserved route — a discipline slug occupies the root URL namespace
+	 * shared with every system route.
+	 */
+	@Validate({
+		service: true,
+		returns: disciplineSchema,
+		args: [disciplineCreate],
+	})
+	async create(
+		input: DisciplineCreate,
+		opts: ServiceOpts,
+	): Promise<Discipline> {
+		assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
+		const client = opts.tx ?? this.prisma;
+		return client.discipline.create({
+			data: { slug: input.slug, name: input.name },
+		});
 	}
 
 	/**
@@ -86,29 +108,6 @@ class DisciplineService
 	}
 
 	/**
-	 * Creates a discipline.
-	 *
-	 * Rejects a slug that doesn't match `DISCIPLINE_SLUG_RE` or that names a
-	 * reserved route — a discipline slug occupies the root URL namespace
-	 * shared with every system route.
-	 */
-	@Validate({
-		service: true,
-		returns: disciplineSchema,
-		args: [disciplineCreate],
-	})
-	async create(
-		input: DisciplineCreate,
-		opts: ServiceOpts,
-	): Promise<Discipline> {
-		assertCanWriteDiscipline(opts.actor, input.slug, "create-discipline");
-		const client = opts.tx ?? this.prisma;
-		return client.discipline.create({
-			data: { slug: input.slug, name: input.name },
-		});
-	}
-
-	/**
 	 * Updates a discipline's name.
 	 *
 	 * `slug` is not editable: it is the first segment of every course URL
@@ -126,7 +125,7 @@ class DisciplineService
 		fields: DisciplineUpdate,
 		opts: ServiceOpts,
 	): Promise<Discipline> {
-		assertCanWriteDiscipline(opts.actor, filter.slug, "update-discipline");
+		assertCanWriteDiscipline(opts.actor, filter.slug, "discipline.update");
 		const client = opts.tx ?? this.prisma;
 		const current = await client.discipline.findUnique({
 			where: { slug: filter.slug },
@@ -154,7 +153,7 @@ class DisciplineService
 		args: [disciplineUpsert],
 	})
 	upsert(input: DisciplineUpsert, opts: ServiceOpts): Promise<Discipline> {
-		assertCanWriteDiscipline(opts.actor, input.slug, "upsert-discipline");
+		assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
 		const client = opts.tx ?? this.prisma;
 		return client.discipline.upsert({
 			where: { slug: input.slug },
@@ -166,37 +165,33 @@ class DisciplineService
 	/**
 	 * Deletes a discipline.
 	 *
-	 * Refuses one that still has courses or questions. The foreign keys
-	 * would raise anyway; checking first is what turns a constraint error
-	 * into a message naming what is in the way.
+	 * Refuses one that still has courses. The foreign key would raise anyway;
+	 * checking first is what turns a constraint error into a message naming
+	 * what is in the way. Questions hang off a course, so a discipline with no
+	 * courses has none.
 	 */
 	@Validate({ service: true, args: [disciplinePK] })
 	async delete(filter: DisciplinePK, opts: ServiceOpts): Promise<void> {
-		if (!canManageDisciplines(opts.actor)) {
-			throw new NotAllowed({ action: "delete-discipline" });
-		}
+		ensurePerm(opts.actor, "discipline.delete");
 		const client = opts.tx ?? this.prisma;
-		const [courses, questions] = await Promise.all([
-			client.course.count({ where: { disciplineSlug: filter.slug } }),
-			client.questionRef.count({ where: { disciplineSlug: filter.slug } }),
-		]);
-		if (courses > 0 || questions > 0) {
+		const courses = await client.course.count({
+			where: { disciplineSlug: filter.slug },
+		});
+		if (courses > 0) {
 			throw new Error(
-				`Discipline "${filter.slug}" still has ${courses} course(s) and ${questions} question(s) and cannot be deleted.`,
+				`Discipline "${filter.slug}" still has ${courses} course(s) and cannot be deleted.`,
 			);
 		}
 		await client.discipline.deleteMany({ where: { slug: filter.slug } });
 	}
 }
 
-export const disciplineService = new DisciplineService();
-
 //
 // Auxiliary functions
 //
 
 /**
- * Enforces {@link canManageDisciplines} and rejects a slug that doesn't
+ * Enforces the `action` permission and rejects a slug that doesn't
  * match {@link DISCIPLINE_SLUG_RE} or that names a reserved route.
  *
  * Shared by `create`/`update`/`upsert`: a discipline slug occupies the root
@@ -206,9 +201,9 @@ export const disciplineService = new DisciplineService();
 function assertCanWriteDiscipline(
 	actor: Actor,
 	slug: string,
-	action: ActionCode,
+	action: "discipline.create" | "discipline.update",
 ): void {
-	if (!canManageDisciplines(actor)) throw new NotAllowed({ action });
+	ensurePerm(actor, action);
 	if (!DISCIPLINE_SLUG_RE.test(slug) || RESERVED_SLUGS.has(slug)) {
 		throw new Error(
 			`"${slug}" is not a valid discipline slug: it must match ${DISCIPLINE_SLUG_RE} and not be a reserved name.`,

@@ -1,42 +1,37 @@
 import type { z } from "zod";
-import {
-	canViewCourseContents,
-	canWriteCourseContent,
-	courseContentsVisibility,
-} from "@/auth/permissions";
-import { SYSTEM } from "@/core/actor";
-import {
-	type ActionCode,
-	InvalidData,
-	NotAllowed,
-	NotFound,
-} from "@/core/error";
+import { SYSTEM } from "@/auth/actor";
+import { hasPerm } from "@/auth/permissions";
+import { type ActionCode, NotAllowed, NotFound } from "@/core/error";
 import {
 	type CourseId,
-	type courseRef,
-	type FileId,
-	type ResourceId,
+	type courseNaturalKey,
 	resourceCreate,
 	resourceFilter,
 	resourcePK,
-	type resourceRef,
 	resourceSchema,
 	resourceUpdate,
 	resourceUpsert,
 } from "@/core/schemas";
+import { db } from "@/db";
+import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
 import type { FillUndefineds, Pretty } from "@/typing";
 import { Validate } from "@/utils/validate";
-import { type Crud, type ServiceOpts, upsert } from "../base-service";
 import {
 	type Prisma,
 	type PrismaClient,
 	type PrismaTx,
 	prisma,
 } from "../client";
-import { ensureExist } from "../utils";
-import { fileService } from "./file.service";
+import {
+	courseRefWhere,
+	ensureAllowed,
+	valueOrNotAllowed,
+	valueOrNotFound,
+} from "../utils";
+import type { Attachment, AttachmentService } from "./attachment.service";
+import { courseContentsWhere } from "./course.service";
 
-export type { ResourceId } from "../../core/schemas";
+export type { ResourceId } from "@/core/schemas";
 
 //
 // Type definitions
@@ -47,8 +42,7 @@ export type ResourceFilter = z.infer<typeof resourceFilter>;
 export type ResourcePK = z.infer<typeof resourcePK>;
 export type ResourceUpdate = z.infer<typeof resourceUpdate>;
 export type ResourceUpsert = z.infer<typeof resourceUpsert>;
-export type ResourceRef = z.infer<typeof resourceRef>;
-type CourseRef = z.infer<typeof courseRef>;
+type CourseRef = z.infer<typeof courseNaturalKey>;
 
 type DbResource = Prisma.ResourceGetPayload<{
 	include: Pretty<typeof resourceInclude>;
@@ -59,19 +53,20 @@ const resourceInclude = {
 	course: {
 		select: {
 			instructor: { select: { username: true } },
-			enrollments: {
-				where: { status: "ACTIVE" as const },
-				select: { userId: true },
-			},
+			enrollments: { select: { username: true } },
 		},
 	},
-	file: true,
+	attachment: {
+		select: {
+			id: true,
+			hash: true,
+			filename: true,
+			mimeType: true,
+		},
+	},
 } satisfies Prisma.ResourceInclude;
 
-/** Whole-string URL check — the heuristic the create/update validation uses. */
-const BARE_URL_RE = /^https?:\/\/\S+$/i;
-
-class ResourceService
+export class ResourceService
 	implements
 		Crud<{
 			entity: Resource;
@@ -83,50 +78,106 @@ class ResourceService
 		}>
 {
 	prisma: PrismaClient;
+	attachment: AttachmentService;
 
-	constructor(client: PrismaClient = prisma) {
+	constructor(attachment: AttachmentService, client: PrismaClient = prisma) {
 		this.prisma = client;
+		this.attachment = attachment;
 	}
 
 	/**
-	 * Creates a resource, rejecting a shape that doesn't match its
-	 * `type` (see {@link validateResourceShape}).
+	 * Creates a resource.
+	 *
+	 * It automatically create the blobs and attachment for FILE resources.
 	 */
-	@Validate({ service: true, returns: resourceSchema, args: [resourceCreate] })
+	@Validate({
+		service: true,
+		returns: resourceSchema,
+		args: [resourceCreate],
+	})
 	async create(input: ResourceCreate, opts: ServiceOpts): Promise<Resource> {
-		const client = opts.tx ?? this.prisma;
-		const courseId = await findWritableCourseId(
-			client,
-			input,
-			opts,
-			"create-resource",
-		);
-		validateResourceShape(input.type, input);
+		const self = this;
 
-		const row = await client.resource.create({
-			data: {
-				courseId,
-				slug: input.slug,
-				type: input.type,
-				title: input.title,
-				description: input.description,
-				data: input.data,
-				extra: input.extra,
-				fileId: input.fileId,
-				contentHash: input.contentHash,
-			},
-			include: resourceInclude,
-		});
-		return toResource(row);
+		async function run(tx: PrismaTx) {
+			const course = await self.courseInfo(input.courseId, {
+				actor: opts.actor,
+				action: "resource.create",
+				perms: "write",
+				tx,
+			});
+
+			const row = await tx.resource.create({
+				data: {
+					courseId: course.id,
+					slug: input.slug,
+					type: input.data.type,
+					title: input.title,
+					description: input.description,
+					data: self.toRawData(input.data),
+					extra: self.toRawExtra(input.data),
+
+					// We set attachment to null and then use the attachment
+					// service to create the real Attachment and Blob
+					attachmentId: null,
+					ref: input.ref,
+				},
+				include: resourceInclude,
+			});
+
+			// Create attachment now that we have the row id.
+			if (input.data.type === "FILE") {
+				const attachment = await self.attachment.create(
+					{
+						attachedTo: { type: "RESOURCE", id: row.id },
+						filename: input.data.filename,
+						uploaderId: course.instructor.username,
+						buffer: input.data.buffer,
+					},
+					{ tx, actor: opts.actor },
+				);
+
+				// The row above was created with `attachmentId: null` since the
+				// attachment can't exist before the resource's own id does — link
+				// it back now, or every re-fetch after this one finds no
+				// attachment and falls back to `fillData`'s "corrupted-file" stub.
+				await tx.resource.update({
+					where: { id: row.id },
+					data: { attachmentId: attachment.id },
+				});
+
+				row.attachment = {
+					id: attachment.id,
+					hash: attachment.hash,
+					filename: attachment.filename,
+					mimeType: attachment.mimeType,
+				};
+			}
+
+			return row && fromDb(row);
+		}
+
+		return opts.tx ? run(opts.tx) : run(this.prisma);
 	}
 
 	/**
 	 * Finds a resource by id or by its `(courseId, slug)` natural key.
 	 *
 	 * Throws `FORBIDDEN` if it exists but `actor` may not see its course's
-	 * contents (see {@link canViewCourseContents}); returns `null` if it
-	 * does not exist.
+	 * contents (see the `course.read-contents` permission); returns `null` if
+	 * it does not exist.
 	 */
+	async findOne(
+		filter: ResourcePK,
+		opts: ServiceOpts & { skipValidation: { output: true } },
+	): Promise<(Resource & { __raw: DbResource }) | null>;
+
+	async findOne(
+		filter: ResourcePK,
+		opts: ServiceOpts extends { skipValidation: { output: true } }
+			? never
+			: ServiceOpts,
+	): Promise<Resource | null>;
+
 	@Validate({
 		service: true,
 		returns: resourceSchema.nullable(),
@@ -135,38 +186,56 @@ class ResourceService
 	async findOne(
 		filter: ResourcePK,
 		opts: ServiceOpts,
-	): Promise<Resource | null> {
-		const client = opts.tx ?? this.prisma;
-		const by = filter as FillUndefineds<ResourcePK>; // zod doesn't narrow to a single field, so we do it here
-		let row: DbResource | null = null;
+	): Promise<(Resource & { __raw?: DbResource }) | null> {
+		const self = this;
 
-		if (by.id !== undefined) {
-			row = await client.resource.findUnique({
-				where: { id: by.id },
-				include: resourceInclude,
+		async function run(tx: PrismaTx) {
+			let by = filter as FillUndefineds<ResourcePK>;
+			let row: DbResource | null = null;
+
+			// Must search the course in the database if search is given by natural
+			// key
+			if (by.discipline !== undefined) {
+				by = { courseId: await self.courseId(by, tx), slug: by.slug };
+			}
+
+			// filter by resource id
+			if (by.id !== undefined) {
+				row = await tx.resource.findUnique({
+					where: { id: by.id },
+					include: resourceInclude,
+				});
+
+				// filter by courseId and resource slug
+			} else if (by.courseId !== undefined) {
+				row = await tx.resource.findUnique({
+					where: { courseId_slug: { courseId: by.courseId, slug: by.slug } },
+					include: resourceInclude,
+				});
+			} else {
+				throw new Error(
+					"Invalid resource filter: must specify either id or courseId and slug",
+				);
+			}
+
+			if (!row) return null;
+
+			ensureAllowed({
+				value: row.course,
+				action: "resource.read",
+				pred: (course) => hasPerm(opts.actor, "course.read-contents", course),
 			});
-		} else if (by.ref) {
-			const ref = by.ref as FillUndefineds<ResourceRef>;
-			const courseId =
-				ref.courseId ??
-				(await findVisibleCourse(client, ref.courseRef, opts, "read-resource"))
-					.id;
-			row = await client.resource.findUnique({
-				where: { courseId_slug: { courseId, slug: ref.slug } },
-				include: resourceInclude,
-			});
+
+			return fromDb(row, { __raw: row });
 		}
 
-		if (!row) return null;
-		if (!canViewCourseContents(opts.actor, row.course)) {
-			throw new NotAllowed({ action: "read-resource" });
-		}
-		return toResource(row);
+		return opts.tx ? run(opts.tx) : run(this.prisma);
 	}
 
 	/**
-	 * Lists resources narrowed to what `actor` may see (see
-	 * {@link courseContentsVisibility}): an admin or the course's own
+	 * Lists resources narrowed to what `actor` may see.
+	 *
+	 * See the `course.read-contents` permission: an admin or the course's own
 	 * instructor sees everything, an actively enrolled student sees the
 	 * course's resources, everyone else sees none.
 	 *
@@ -182,35 +251,35 @@ class ResourceService
 		filter: ResourceFilter,
 		opts: ServiceOpts,
 	): Promise<Resource[]> {
-		async function run(client: PrismaTx) {
-			// A course named by ref must exist and be visible; by id it is only a
-			// SQL filter, as it always was.
-			if (filter.courseRef && !filter.courseId) {
-				const course = await findVisibleCourse(
-					client,
-					filter.courseRef,
-					opts,
-					"read-resource",
-				);
+		const self = this;
 
-				filter = { ...filter };
-				filter.courseId = course.id;
-				delete filter.courseRef;
-			}
+		async function run(tx: PrismaTx) {
+			const course = await self.courseInfo(filter, {
+				tx,
+				actor: opts.actor,
+				action: "resource.read",
+				perms: "read",
+			});
 
-			const rows = await client.resource.findMany({
+			const rows = await tx.resource.findMany({
 				where: {
 					AND: [
-						filter.courseId !== undefined ? { courseId: filter.courseId } : {},
+						course
+							? { courseId: course.id }
+							: { course: courseContentsWhere(opts.actor) },
 						filter.types ? { type: { in: filter.types } } : {},
 						filter.slugs ? { slug: { in: filter.slugs } } : {},
-						{ course: courseContentsVisibility(opts.actor) },
 					],
 				},
 				include: resourceInclude,
 				orderBy: { title: "asc" },
 			});
-			return rows.map(toResource);
+			for (const row of rows) {
+				if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+					throw new NotAllowed("resource.read");
+				}
+			}
+			return rows.map(fromDb);
 		}
 
 		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
@@ -234,271 +303,315 @@ class ResourceService
 		fields: ResourceUpdate,
 		opts: ServiceOpts,
 	): Promise<Resource> {
-		const target = await this.findOne(filter, opts);
-		if (!target) throw new NotFound("resource");
+		const self = this;
 
-		const client = opts.tx ?? this.prisma;
-		const current = await client.resource.findUnique({
-			where: { id: target.id },
-			include: resourceInclude,
-		});
-		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new NotAllowed({ action: "update-resource" });
+		async function run(tx: PrismaTx) {
+			const target = valueOrNotFound(
+				"resource",
+				await self.findOne(filter, {
+					tx,
+					actor: opts.actor,
+					skipValidation: { output: true },
+				}),
+			);
+			const course = target.__raw.course;
+
+			ensureAllowed({
+				value: target.__raw.course,
+				action: "resource.read",
+				pred: (course) => hasPerm(opts.actor, "course.update-contents", course),
+			});
+
+			// Update attachment, if necessary
+			let attachment:
+				| Pick<Attachment, "id" | "hash" | "filename" | "mimeType">
+				| undefined;
+			if (fields.data?.type === "FILE") {
+				const row = await self.attachment.create(
+					{
+						attachedTo: { type: "RESOURCE", id: target.id },
+						filename: fields.data.filename,
+						uploaderId: course.instructor.username,
+						buffer: fields.data.buffer,
+					},
+					{ tx, actor: opts.actor },
+				);
+				attachment = {
+					id: row.id,
+					hash: row.hash,
+					filename: row.filename,
+					mimeType: row.mimeType,
+				};
+			}
+
+			const row = await tx.resource.update({
+				where: { id: target.id },
+				data: {
+					type: fields.data?.type,
+					title: fields.title,
+					description: fields.description,
+					data: fields.data ? self.toRawData(fields.data) : undefined,
+					extra: fields.data ? self.toRawExtra(fields.data) : undefined,
+					attachmentId: attachment?.id,
+					ref: fields.ref,
+				},
+				include: resourceInclude,
+			});
+			row.attachment = attachment ?? null;
+			return fromDb(row);
 		}
 
-		const merged = {
-			type: fields.type ?? current.type,
-			data: fields.data !== undefined ? fields.data : current.data,
-			extra: fields.extra !== undefined ? fields.extra : current.extra,
-			fileId: fields.fileId !== undefined ? fields.fileId : current.fileId,
-		};
-		validateResourceShape(merged.type, merged);
-
-		const row = await client.resource.update({
-			where: { id: target.id },
-			data: {
-				type: fields.type,
-				title: fields.title,
-				description: fields.description,
-				data: fields.data,
-				extra: fields.extra,
-				fileId: fields.fileId,
-				contentHash: fields.contentHash,
-			},
-			include: resourceInclude,
-		});
-		return toResource(row);
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
 	}
 
 	/**
 	 * Upserts a resource keyed on `{courseId | courseRef, slug}`.
 	 *
-	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
-	 * or updating, same as `create`/`update`; the shape-by-type check
+	 * PUT semantics: gated on the `course.update-contents` permission whether
+	 * creating or updating, same as `create`/`update`; the shape-by-type check
 	 * ({@link validateResourceShape}) re-runs on whichever branch fires.
 	 */
-	@Validate({ service: true, returns: resourceSchema, args: [resourceUpsert] })
+	@Validate({
+		service: true,
+		returns: resourceSchema,
+		args: [resourceUpsert],
+	})
 	async upsert(input: ResourceUpsert, opts: ServiceOpts): Promise<Resource> {
-		return upsert(
-			this.prisma,
-			this,
-			input,
-			opts,
-			{
-				pk: (i) => ({ ref: { ...courseKey(i), slug: i.slug } }),
-				assertCreatable: async (i, o) => {
-					await findWritableCourseId(
-						o.tx ?? this.prisma,
-						i,
-						o,
-						"upsert-resource",
-					);
-				},
+		const self = this;
+
+		return upsert(this, input, {
+			...opts,
+			action: "resource.create",
+			pk({ slug, courseId }) {
+				return (
+					typeof courseId === "number"
+						? { slug, courseId }
+						: { slug, ...courseId }
+				) satisfies ResourcePK;
 			},
-			"upsert-resource",
-		);
+			async assertCreatable(input, opts) {
+				const course = await self.courseInfo(input.courseId, opts);
+				if (!hasPerm(opts.actor, "course.update-contents", course))
+					throw new NotAllowed("resource.create");
+			},
+		});
 	}
 
 	/**
-	 * Removes the resource row outright (matching FR-SYNC-013's "deleted"
-	 * row for calendar events — there is no soft delete at this layer).
+	 * Removes the resource row outright.
 	 *
-	 * If it pointed at a `File`, releases that reference: `FileService.delete`
-	 * only reaches the disk once the last resource pointing at the blob is
-	 * gone, since content addressing means another course may still share
-	 * it.
+	 * If it pointed at an `Attachment`, releases that reference:
+	 * `AttachmentService.delete` only reaches the disk once the last resource
+	 * pointing at the blob is gone, since content addressing means another
+	 * course may still share it.
 	 */
 	@Validate({ service: true, args: [resourcePK] })
 	async delete(filter: ResourcePK, opts: ServiceOpts): Promise<void> {
-		const target = await this.findOne(filter, opts);
-		if (!target) throw new NotFound("resource");
+		const self = this;
 
-		const client = opts.tx ?? this.prisma;
-		const current = await client.resource.findUnique({
-			where: { id: target.id },
-			include: resourceInclude,
-		});
-		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new NotAllowed({ action: "delete-resource" });
+		async function run(tx: PrismaTx) {
+			const target = await self.findOne(filter, opts);
+
+			if (!target) throw new NotFound("resource");
+
+			const current = await tx.resource.findUnique({
+				where: { id: target.id },
+				include: resourceInclude,
+			});
+
+			if (
+				!current ||
+				!hasPerm(opts.actor, "course.update-contents", current.course)
+			) {
+				throw new NotAllowed("resource.delete");
+			}
+			// Detach the attachment first: `AttachmentService.delete` resolves
+			// its output by looking the owning resource back up, which fails
+			// once the resource row itself is gone.
+			if (current.attachmentId && current.attachment) {
+				await db.attachment.delete(
+					{ id: current.attachmentId },
+					{ tx, actor: SYSTEM },
+				);
+			}
+
+			await tx.resource.delete({ where: { id: target.id } });
 		}
-		await client.resource.delete({ where: { id: target.id } });
-		if (current.fileId && current.file) {
-			await fileService.delete(
-				{ slugHash: current.file.slugHash },
-				{ tx: client, actor: SYSTEM },
-			);
+		return run(opts.tx ?? this.prisma);
+	}
+
+	//
+	// Private helpers
+	//
+	private toRawData(raw: ResourceCreate["data"]): DbResource["data"] {
+		switch (raw.type) {
+			case "LINK":
+				return raw.url;
+			case "CODE":
+			case "MD":
+				return raw.content;
+			default:
+				return null;
 		}
 	}
-}
 
-export const resourceService = new ResourceService();
+	private toRawExtra(raw: ResourceCreate["data"]): DbResource["extra"] {
+		switch (raw.type) {
+			case "LINK":
+				return null;
+			case "CODE":
+				return raw.language ?? null;
+			default:
+				return null;
+		}
+	}
+
+	/**
+	 * Resolves the course if actor can do the given actions.
+	 *
+	 * Throws `NotFound` or `NotAllowed` if no course is found or the actor may not
+	 * write/read its content.
+	 */
+	private async courseInfo(
+		ref: ResourceCreate["courseId"] | { courseId: CourseId },
+		args: ServiceOpts &
+			({ perms: "read" | "write"; action: ActionCode } | object),
+	): Promise<{
+		id: CourseId;
+		instructor: { username: string };
+		enrollments: { username: string }[];
+	}> {
+		const {
+			tx = this.prisma,
+			perms,
+			action,
+			actor,
+		} = args as ServiceOpts & {
+			perms: "read" | "write";
+			action: ActionCode;
+		};
+
+		const select = {
+			id: true,
+			instructor: { select: { username: true } },
+			enrollments: { select: { username: true } },
+		};
+
+		const course = valueOrNotFound(
+			"course",
+			await tx.course.findUnique({
+				where: courseRefWhere(ref),
+				select,
+			}),
+		);
+
+		if (perms === undefined) return course;
+
+		const pred =
+			perms === "write"
+				? (c: typeof course) => hasPerm(actor, "course.update-contents", c)
+				: (c: typeof course) => hasPerm(actor, "course.read-contents", c);
+		return valueOrNotAllowed(action, course, pred);
+	}
+
+	private async courseId(
+		filter: { courseId: CourseId } | CourseRef,
+		tx: PrismaTx,
+	): Promise<CourseId> {
+		const by = filter as FillUndefineds<ResourcePK>;
+
+		// Must search the course in the database if search is given by natural
+		// key
+		if (by.discipline !== undefined) {
+			const course = await tx.course.findUnique({
+				where: {
+					disciplineSlug_instructorId_editionSlug: {
+						disciplineSlug: by.discipline,
+						instructorId: by.instructor,
+						editionSlug: by.edition,
+					},
+				},
+				select: { id: true },
+			});
+
+			return valueOrNotFound("course", course).id;
+		} else {
+		}
+		throw new Error("Expected either courseId or courseRef to be set.");
+	}
+}
 
 //
 // Auxiliary functions
 //
 
-/**
- * Resolves a course's natural key to a course `actor` may see the contents of.
- *
- * Throws `NotFound` if there is no such course and `NotAllowed` if the actor
- * may not see it, so a caller that named one course never gets a silent miss.
- */
-async function findVisibleCourse(
-	client: PrismaTx | PrismaClient,
-	ref: CourseRef,
-	opts: ServiceOpts,
-	action: ActionCode,
-) {
-	const course = ensureExist(
-		await client.course.findUnique({
-			where: courseRefWhere(ref),
-			select: { id: true, ...resourceInclude.course.select },
-		}),
-		"course",
-	);
-	if (!canViewCourseContents(opts.actor, course))
-		throw new NotAllowed({ action });
-	return course;
-}
-
-/**
- * Picks the one course field a write names.
- *
- * Throws `InvalidData` unless exactly one of `courseId`/`courseRef` is set.
- */
-function courseKey(input: {
-	courseId?: CourseId;
-	courseRef?: CourseRef;
-}): { courseId: CourseId } | { courseRef: CourseRef } {
-	if (input.courseId !== undefined && input.courseRef === undefined)
-		return { courseId: input.courseId };
-	if (input.courseRef !== undefined && input.courseId === undefined)
-		return { courseRef: input.courseRef };
-	throw new InvalidData({
-		errors: {
-			courseId: [
-				{
-					code: "invalid",
-					message: "Expected exactly one of courseId or courseRef.",
-				},
-			],
-		},
-		message: "A resource needs exactly one of courseId or courseRef.",
-	});
-}
-
-/**
- * Resolves the course a write names to its id, if `actor` may write its content.
- *
- * A `courseRef` naming no course is `NotFound`; a `courseId` naming none stays
- * `NotAllowed`, as it always was.
- */
-async function findWritableCourseId(
-	client: PrismaTx | PrismaClient,
-	input: { courseId?: CourseId; courseRef?: CourseRef },
-	opts: ServiceOpts,
-	action: ActionCode,
-): Promise<CourseId> {
-	const key = courseKey(input) as FillUndefineds<ReturnType<typeof courseKey>>;
-	const select = { id: true, instructor: { select: { username: true } } };
-	const course = key.courseRef
-		? ensureExist(
-				await client.course.findUnique({
-					where: courseRefWhere(key.courseRef),
-					select,
-				}),
-				"course",
-			)
-		: await client.course.findUnique({ where: { id: key.courseId }, select });
-	if (!course || !canWriteCourseContent(opts.actor, course))
-		throw new NotAllowed({ action });
-	return course.id as CourseId;
-}
-
-/** The unique-key `where` for a course's natural key. */
-function courseRefWhere(ref: CourseRef) {
-	return {
-		disciplineSlug_instructorId_editionSlug: {
-			disciplineSlug: ref.discipline,
-			instructorId: ref.instructor,
-			editionSlug: ref.edition,
-		},
-	};
-}
-
 // Convert a database resource record to the public-facing resource type.
-function toResource(row: DbResource): Resource {
+function fromDb<T = Record<string, unknown>>(
+	row: DbResource,
+	extra?: T,
+): Resource & T {
+	extra = extra ?? ({} as T);
+
 	return {
-		...row,
-		id: row.id as ResourceId,
-		courseId: row.courseId as CourseId,
-		fileId: row.fileId as FileId | null,
-		file: row.file && { ...row.file, id: row.file.id as FileId },
+		id: row.id,
+		slug: row.slug,
+		title: row.title,
+		description: row.description,
+
+		ref: row.ref,
+		createdAt: row.createdAt,
+		updatedAt: row.updatedAt,
+
+		data: fillData(row),
+
+		...extra,
 	};
 }
 
-/**
- * Enforces the shape each `ResourceType` implies (see the table in
- * `dev/specs/to-do/resources.md`): `LINK` needs `data` and no `fileId`,
- * `FILE` needs `fileId` and no `data`, `MD` needs `data` and no `fileId`,
- * `CODE` needs `data` and `extra` and no `fileId`. A `data` that is nothing
- * but a bare URL is refused for `MD`/`CODE`, on the theory that it was meant
- * to be a `LINK`.
- */
-function validateResourceShape(
-	type: Resource["type"],
-	fields: {
-		data?: string | null;
-		extra?: string | null;
-		fileId?: number | null;
-	},
-): void {
-	const { data, extra, fileId } = fields;
-	// TODO: exception audit: we should use our custom errors classes here!
-	switch (type) {
+function fillData(row: DbResource): Resource["data"] {
+	switch (row.type) {
+		case "FILE": {
+			const filename = row.attachment?.filename ?? "corrupted-file.txt";
+			const hash = row.attachment?.hash ?? "corrupted";
+
+			return {
+				type: "FILE",
+				filename,
+				// TODO: create static routes
+				link: `/files/${hash}/${filename}`,
+				mimeType: row.attachment?.mimeType ?? "text/plain",
+			};
+		}
 		case "LINK":
-			if (!data) throw new Error("A LINK resource requires data (the URL).");
-			if (fileId != null)
-				throw new Error("A LINK resource must not have a fileId.");
-			break;
-		case "FILE":
-			if (fileId == null) throw new Error("A FILE resource requires fileId.");
-			if (data != null) throw new Error("A FILE resource must not have data.");
-			break;
+			return {
+				type: "LINK",
+				url: row.data ?? "<corrupted link>",
+			};
 		case "MD":
-			if (!data)
-				throw new Error("An MD resource requires data (the markdown content).");
-			if (fileId != null)
-				throw new Error("An MD resource must not have a fileId.");
-			break;
+			return {
+				type: "MD",
+				content: row.data ?? "<corrupted markdown>",
+			};
 		case "CODE":
-			if (!data) throw new Error("A CODE resource requires data (the source).");
-			if (!extra)
-				throw new Error("A CODE resource requires extra (the language).");
-			if (fileId != null)
-				throw new Error("A CODE resource must not have a fileId.");
-			break;
-	}
-	if (
-		(type === "MD" || type === "CODE") &&
-		data &&
-		BARE_URL_RE.test(data.trim())
-	) {
-		throw new Error(
-			`A ${type} resource's data looks like a bare URL; use type: LINK for links.`,
-		);
+			return {
+				type: "CODE",
+				content: row.data ?? "<corrupted code>",
+				language: row.extra ?? "text",
+			};
+		default:
+			throw new Error(`Unsupported resource type: ${row.type}`);
 	}
 }
 
 /** One of the four fixed groups the resources page renders, title-sorted, empty groups omitted. */
 export interface ResourceGroup {
-	type: Resource["type"];
+	type: Resource["data"]["type"];
 	label: string;
 	resources: Resource[];
 }
 
 /** Display order and label for each `ResourceType` — never authored, see the spec. */
-const GROUP_ORDER: { type: Resource["type"]; label: string }[] = [
+const GROUP_ORDER: { type: Resource["data"]["type"]; label: string }[] = [
 	{ type: "FILE", label: "Files" },
 	{ type: "LINK", label: "Links" },
 	{ type: "MD", label: "Notes" },
@@ -517,7 +630,7 @@ export function groupResourcesByType(resources: Resource[]): ResourceGroup[] {
 	const groups: ResourceGroup[] = [];
 	for (const { type, label } of GROUP_ORDER) {
 		const inGroup = resources
-			.filter((r) => r.type === type)
+			.filter((r) => r.data.type === type)
 			.sort((a, b) => a.title.localeCompare(b.title));
 		if (inGroup.length > 0) {
 			groups.push({ type, label, resources: inGroup });

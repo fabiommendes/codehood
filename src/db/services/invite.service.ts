@@ -1,33 +1,25 @@
 import type { z } from "zod";
-import { canInvite, canViewInvite, inviteVisibility } from "@/auth/permissions";
+import { type Actor, SYSTEM } from "@/auth/actor";
+import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed, NotFound } from "@/core/error";
-import { Validate } from "@/utils/validate";
 import {
 	inviteCreate,
 	inviteFilter,
 	invitePK,
 	inviteSchema,
-	inviteTokenFilter,
 	inviteUpdate,
-} from "../../core/schemas";
-import type {
-	Create,
-	Delete,
-	FindMany,
-	FindOne,
-	ServiceOpts,
-	Update,
-	Upsert,
-} from "../base-service";
+} from "@/core/schemas";
 import {
-	type Prisma,
-	type PrismaClient,
-	type PrismaTx,
-	prisma,
-} from "../client";
+	CrudBase,
+	type ServiceOpts,
+	type ServiceOptsWithoutTx,
+} from "@/db/base-service";
+import type { FillUndefineds } from "@/typing";
+import { Validate } from "@/utils/validate";
+import type { Prisma, PrismaTx } from "../client";
 
-export type { InviteId } from "../../core/schemas";
+export type { InviteId } from "@/core/schemas";
 
 const DEFAULT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -49,7 +41,6 @@ export class InviteError extends Error {
 //
 export type InviteCreate = z.infer<typeof inviteCreate>;
 export type Invite = z.infer<typeof inviteSchema>;
-export type InviteTokenFilter = z.infer<typeof inviteTokenFilter>;
 export type InvitePK = z.infer<typeof invitePK>;
 export type InviteFilter = z.infer<typeof inviteFilter>;
 export type InviteUpdate = z.infer<typeof inviteUpdate>;
@@ -62,36 +53,30 @@ const inviteInclude = {
 	createdBy: { select: { username: true, name: true } },
 } satisfies Prisma.InviteInclude;
 
-class InviteService
-	implements
-		Create<InviteCreate, Invite>,
-		FindOne<InviteTokenFilter, Invite>,
-		FindMany<InviteFilter, Invite>,
-		Update<InvitePK, InviteUpdate, Invite>,
-		Delete<InvitePK>,
-		Upsert<never, Invite>
-{
-	prisma: PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+export class InviteService extends CrudBase<{
+	entity: Invite;
+	pkFilter: InvitePK;
+	create: InviteCreate;
+	filter: InviteFilter;
+	update: InviteUpdate;
+	upsert: never;
+}> {
 	/**
 	 * Creates an invite, returning the plaintext token and the invite row.
 	 */
 	@Validate({
 		service: true,
 		returns: inviteSchema,
-		args: [inviteCreate],
+		args: [undefined, inviteCreate],
 	})
-	async create(input: InviteCreate, opts: ServiceOpts): Promise<Invite> {
-		if (!canInvite(opts.actor, input.invitedRole)) {
-			throw new NotAllowed({ action: "create-invite" });
-		}
-		const client = opts.tx ?? this.prisma;
+	protected async createTx(
+		tx: PrismaTx,
+		input: InviteCreate,
+		opts: ServiceOptsWithoutTx,
+	): Promise<Invite> {
+		ensurePerm(opts.actor, "invite.create", { invitedRole: input.invitedRole });
 		const token = generateToken();
-		const invite = await client.invite.create({
+		const invite = await tx.invite.create({
 			data: {
 				tokenHash: hashToken(token),
 				kind: input.kind,
@@ -114,24 +99,25 @@ class InviteService
 	/**
 	 * Finds a single invite by its token.
 	 *
-	 * Not actor-filtered: the raw token is the credential (see the invite's
-	 * `tokenHash`), and looking one up is how the invite-acceptance flow
-	 * establishes what the redeemer is allowed to become — there is nothing
-	 * else to check `actor` against yet.
+	 * Not actor-filtered: the raw token is the credential and looking one up
+	 * is how the invite-acceptance flow establishes what the redeemer is
+	 * allowed to become.
 	 */
 	@Validate({
 		service: true,
 		returns: inviteSchema.nullable(),
-		args: [inviteTokenFilter],
+		args: [undefined, invitePK],
 	})
-	async findOne(
-		filter: InviteTokenFilter,
-		opts: ServiceOpts,
+	protected async findOneTx(
+		tx: PrismaTx,
+		filter: InvitePK,
+		_opts: ServiceOptsWithoutTx,
 	): Promise<Invite | null> {
-		const client = opts.tx ?? this.prisma;
+		const by = filter as FillUndefineds<InvitePK>;
+		const where = by.token ? { tokenHash: hashToken(by.token) } : { id: by.id };
 
-		const invite = await client.invite.findUnique({
-			where: { tokenHash: hashToken(filter.token) },
+		const invite = await tx.invite.findUnique({
+			where,
 			include: inviteInclude,
 		});
 
@@ -140,7 +126,7 @@ class InviteService
 
 	/**
 	 * Lists invites narrowed to what `actor` may see (see
-	 * {@link inviteVisibility}): every invite for an admin, self-issued ones
+	 * {@link inviteWhere}): every invite for an admin, self-issued ones
 	 * for an instructor, none for a student.
 	 *
 	 * Never returns a token — only `tokenHash` is stored, so a lost link is
@@ -149,24 +135,29 @@ class InviteService
 	@Validate({
 		service: true,
 		returns: inviteSchema.array(),
-		args: [inviteFilter],
+		args: [undefined, inviteFilter],
 	})
-	async findMany(filter: InviteFilter, opts: ServiceOpts): Promise<Invite[]> {
-		const client = opts.tx ?? this.prisma;
-		const invites = await client.invite.findMany({
+	protected async findManyTx(
+		tx: PrismaTx,
+		filter: InviteFilter,
+		opts: ServiceOptsWithoutTx,
+	): Promise<Invite[]> {
+		const invites = await tx.invite.findMany({
 			where: {
 				AND: [
 					filter.createdById ? { createdById: filter.createdById } : {},
 					filter.kind ? { kind: filter.kind } : {},
 					filter.courseId ? { courseId: filter.courseId } : {},
 					filter.active ? { expiresAt: { gt: new Date() } } : {},
-					inviteVisibility(opts.actor),
+					inviteWhere(opts.actor),
 				],
 			},
 			include: inviteInclude,
 			orderBy: { createdAt: "desc" },
 		});
-		return invites.map(fromDb);
+		const result = invites.map(fromDb);
+		for (const invite of result) ensurePerm(opts.actor, "invite.read", invite);
+		return result;
 	}
 
 	/**
@@ -179,26 +170,22 @@ class InviteService
 	@Validate({
 		service: true,
 		returns: inviteSchema,
-		args: [invitePK, inviteUpdate],
+		args: [undefined, invitePK, inviteUpdate],
 	})
-	async update(
+	protected async updateTx(
+		tx: PrismaTx,
 		filter: InvitePK,
 		fields: InviteUpdate,
-		opts: ServiceOpts,
+		opts: ServiceOptsWithoutTx,
 	): Promise<Invite> {
-		const client = opts.tx ?? this.prisma;
+		const invite = await this.findOne(filter, { ...opts, tx });
 
-		const invite = await client.invite.findUnique({
-			where: { id: filter.id },
-			include: inviteInclude,
-		});
-
-		if (!invite || !canViewInvite(opts.actor, invite)) {
-			throw new NotAllowed({ action: "update-invite" });
+		if (!invite || !hasPerm(opts.actor, "invite.update", invite)) {
+			throw new NotAllowed("invite.update");
 		}
 
-		const updated = await client.invite.update({
-			where: { id: filter.id },
+		const updated = await tx.invite.update({
+			where: { id: invite.id },
 			data: {
 				expiresAt: fields.expiresAt,
 				maxUses: fields.maxUses,
@@ -210,10 +197,7 @@ class InviteService
 
 	// No upsert: `create` mints a token and returns a token-plus-entity
 	// wrapper, not the entity — re-minting a fresh invite token on every sync
-	// is wrong.
-	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
-		throw new Error("Method not implemented.");
-	}
+	// is wrong. Left unimplemented; CrudBase.upsertTx already throws.
 
 	/**
 	 * Revokes an invite.
@@ -221,21 +205,23 @@ class InviteService
 	 * Redemptions cascade with it, which removes the record that an account
 	 * came from this invite but never the account itself.
 	 */
-	@Validate({ service: true, args: [invitePK] })
-	async delete(filter: InvitePK, opts: ServiceOpts): Promise<void> {
-		const client = opts.tx ?? this.prisma;
-		const invite = await client.invite.findUnique({
-			where: { id: filter.id },
-		});
-		if (!invite || !canViewInvite(opts.actor, invite)) {
-			throw new NotAllowed({ action: "delete-invite" });
+	@Validate({ service: true, args: [undefined, invitePK] })
+	protected async deleteTx(
+		tx: PrismaTx,
+		filter: InvitePK,
+		opts: ServiceOptsWithoutTx,
+	): Promise<void> {
+		const invite = await this.findOne(filter, { ...opts, tx });
+		if (!invite || !hasPerm(opts.actor, "invite.delete", invite)) {
+			throw new NotAllowed("invite.delete");
 		}
-		await client.invite.delete({ where: { id: filter.id } });
+
+		await tx.invite.delete({ where: { id: invite.id } });
 	}
 
 	// TODO: validate this schema. Should not impose tasks on the caller.
 	/**
-	 * Redeems an invite for `userId`, atomically re-checking expiry/capacity/email match.
+	 * Redeems an invite for `username`, atomically re-checking expiry/capacity/email match.
 	 *
 	 * Callers should run {@link checkRedeemable} first to avoid doing
 	 * invite-rejected work (e.g. creating the User row) — this transaction
@@ -246,11 +232,8 @@ class InviteService
 	 * Without one, this opens its own.
 	 */
 	redeem(token: string, username: string, email: string, opts: ServiceOpts) {
-		const run = async (tx: PrismaTx) => {
-			const invite = await this.findOne(
-				{ token },
-				{ tx: tx, actor: opts.actor },
-			);
+		return this.$transaction(opts, async (tx, scoped) => {
+			const invite = await this.findOne({ token }, { ...scoped, tx });
 			if (!invite) throw new NotFound("invite", { id: token });
 
 			const errorCode = this.checkRedeemable(invite, email);
@@ -258,18 +241,16 @@ class InviteService
 
 			try {
 				await tx.inviteRedemption.create({
-					data: { inviteId: invite.id, userId: username },
+					data: { inviteId: invite.id, username: username },
 				});
 			} catch {
-				// InviteRedemption.userId is unique: this user already redeemed
+				// InviteRedemption.username is unique: this user already redeemed
 				// a (possibly different) invite.
 				throw new InviteError("already_redeemed");
 			}
 
 			return invite;
-		};
-
-		return opts?.tx ? run(opts.tx) : this.prisma.$transaction(run);
+		});
 	}
 
 	/**
@@ -285,11 +266,16 @@ class InviteService
 	}
 }
 
-export const inviteService = new InviteService();
-
 //
 // Auxiliary functions
 //
+
+/** Prisma `where` fragment implementing the same rule as the `invite.read` permission. */
+export function inviteWhere(actor: Actor): Prisma.InviteWhereInput {
+	if (actor === SYSTEM || actor.role === "ADMIN") return {};
+	if (actor.role === "STUDENT") return { id: { in: [] } };
+	return { createdById: actor.username };
+}
 
 function fromDb(db: DbInvite): Invite {
 	const { _count, createdById: _createdById, ...rest } = db;

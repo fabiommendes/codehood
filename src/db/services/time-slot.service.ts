@@ -1,16 +1,12 @@
 /**
  * The weekly pattern half of a course's schedule — see
- * `dev/specs/to-review/calendar.md`. Writes are ownership-gated
- * ({@link canWriteCourseContent}); reads follow course-contents visibility
- * ({@link canViewCourseContents}). A slot is never archived — deleting one
- * with events attached is refused, naming the count.
+ * `dev/specs/to-review/calendar.md`. Writes are ownership-gated (the
+ * `course.update-contents` permission); reads follow course-contents
+ * visibility (`course.read-contents`). A slot is never archived — deleting
+ * one with events attached is refused, naming the count.
  */
 import type { z } from "zod";
-import {
-	canViewCourseContents,
-	canWriteCourseContent,
-	courseContentsVisibility,
-} from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
 import {
 	type CourseId,
@@ -23,10 +19,11 @@ import {
 	timeSlotUpdate,
 	timeSlotUpsert,
 } from "@/core/schemas";
+import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
-import { type Crud, type ServiceOpts, upsert } from "../base-service";
 import { type Prisma, type PrismaClient, prisma } from "../client";
+import { courseContentsWhere } from "./course.service";
 
 export type { TimeSlotId } from "@/core/schemas";
 export { weekdaySchema } from "@/core/schemas";
@@ -53,13 +50,13 @@ const timeSlotInclude = {
 			instructor: { select: { username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
-				select: { userId: true },
+				select: { username: true },
 			},
 		},
 	},
 } satisfies Prisma.TimeSlotInclude;
 
-class TimeSlotService
+export class TimeSlotService
 	implements
 		Crud<{
 			entity: TimeSlot;
@@ -90,8 +87,8 @@ class TimeSlotService
 			where: { id: input.courseId },
 			select: { instructor: { select: { username: true } } },
 		});
-		if (!course || !canWriteCourseContent(opts.actor, course)) {
-			throw new NotAllowed({ action: "create-time-slot" });
+		if (!course || !hasPerm(opts.actor, "course.update-contents", course)) {
+			throw new NotAllowed("time-slot.create");
 		}
 		validateWindow(input.startMin, input.durationMin);
 
@@ -124,7 +121,7 @@ class TimeSlotService
 			},
 			include: timeSlotInclude,
 		});
-		return toTimeSlot(row);
+		return fromDb(row);
 	}
 
 	/**
@@ -162,15 +159,16 @@ class TimeSlotService
 
 		if (!row) return null;
 
-		const canViewCourse = !canViewCourseContents(opts.actor, row.course);
-		if (canViewCourse) throw new NotAllowed({ action: "read-time-slot" });
+		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+			throw new NotAllowed("time-slot.read");
+		}
 
-		return toTimeSlot(row);
+		return fromDb(row);
 	}
 
 	/**
-	 * Lists slots narrowed to what `actor` may see (see
-	 * {@link courseContentsVisibility}), ordered by weekday then start time
+	 * Lists slots narrowed to what `actor` may see (see the
+	 * `course.read-contents` permission), ordered by weekday then start time
 	 * so the syllabus line reads Monday-first.
 	 */
 	@Validate({
@@ -187,13 +185,18 @@ class TimeSlotService
 			where: {
 				AND: [
 					filter.courseId !== undefined ? { courseId: filter.courseId } : {},
-					{ course: courseContentsVisibility(opts.actor) },
+					{ course: courseContentsWhere(opts.actor) },
 				],
 			},
 			include: timeSlotInclude,
 			orderBy: [{ day: "asc" }, { startMin: "asc" }],
 		});
-		return rows.map(toTimeSlot);
+		for (const row of rows) {
+			if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+				throw new NotAllowed("time-slot.read");
+			}
+		}
+		return rows.map(fromDb);
 	}
 
 	/**
@@ -221,8 +224,11 @@ class TimeSlotService
 			where: { id: target.id },
 			include: timeSlotInclude,
 		});
-		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new NotAllowed({ action: "update-time-slot" });
+		if (
+			!current ||
+			!hasPerm(opts.actor, "course.update-contents", current.course)
+		) {
+			throw new NotAllowed("time-slot.update");
 		}
 
 		const day = fields.day ?? current.day;
@@ -251,38 +257,33 @@ class TimeSlotService
 			},
 			include: timeSlotInclude,
 		});
-		return toTimeSlot(row);
+		return fromDb(row);
 	}
 
 	/**
 	 * Upserts a time slot keyed on `{courseId, slug}`.
 	 *
-	 * PUT semantics: gated on {@link canWriteCourseContent} whether creating
-	 * or updating, same as `create`/`update`; the overlap check re-runs on
+	 * PUT semantics: gated on the `course.update-contents` permission whether
+	 * creating or updating, same as `create`/`update`; the overlap check re-runs on
 	 * whichever branch fires.
 	 */
 	@Validate({ service: true, returns: timeSlotSchema, args: [timeSlotUpsert] })
 	async upsert(input: TimeSlotUpsert, opts: ServiceOpts): Promise<TimeSlot> {
-		return upsert(
-			this.prisma,
-			this,
-			input,
-			opts,
-			{
-				pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
-				assertCreatable: async (i, o) => {
-					const client = o.tx ?? this.prisma;
-					const course = await client.course.findUnique({
-						where: { id: i.courseId },
-						select: { instructor: { select: { username: true } } },
-					});
-					if (!course || !canWriteCourseContent(o.actor, course)) {
-						throw new NotAllowed({ action: "upsert-time-slot" });
-					}
-				},
+		return upsert(this, input, {
+			...opts,
+			action: "time-slot.create",
+			pk: (i) => ({ ref: { courseId: i.courseId, slug: i.slug } }),
+			assertCreatable: async (i, o) => {
+				const client = o.tx ?? this.prisma;
+				const course = await client.course.findUnique({
+					where: { id: i.courseId },
+					select: { instructor: { select: { username: true } } },
+				});
+				if (!course || !hasPerm(o.actor, "course.update-contents", course)) {
+					throw new NotAllowed("time-slot.create");
+				}
 			},
-			"upsert-time-slot",
-		);
+		});
 	}
 
 	/**
@@ -301,8 +302,11 @@ class TimeSlotService
 			where: { id: target.id },
 			include: timeSlotInclude,
 		});
-		if (!current || !canWriteCourseContent(opts.actor, current.course)) {
-			throw new NotAllowed({ action: "delete-time-slot" });
+		if (
+			!current ||
+			!hasPerm(opts.actor, "course.update-contents", current.course)
+		) {
+			throw new NotAllowed("time-slot.delete");
 		}
 		const eventCount = await client.calendarEvent.count({
 			where: { timeSlotId: target.id },
@@ -316,14 +320,12 @@ class TimeSlotService
 	}
 }
 
-export const timeSlotService = new TimeSlotService();
-
 //
 // Auxiliary functions
 //
 
 // Convert a database time slot record to the public-facing time slot type.
-function toTimeSlot(row: DbTimeSlot): TimeSlot {
+function fromDb(row: DbTimeSlot): TimeSlot {
 	const { course: _course, ...rest } = row;
 	return {
 		...rest,

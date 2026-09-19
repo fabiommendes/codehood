@@ -1,6 +1,6 @@
-import type { Actor } from "@/core/actor";
-import { FULL_ACCESS } from "@/core/actor";
-import type { ServiceOpts } from "@/db/base-service";
+import type { Actor } from "@/auth/actor";
+import { FULL_ACCESS } from "@/auth/actor";
+import type { ServiceOpts } from "@/db";
 import type { PrismaTx } from "@/db/client";
 
 /**

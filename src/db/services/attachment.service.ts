@@ -1,35 +1,30 @@
 import type { z } from "zod";
-import { SYSTEM } from "@/core/actor";
+import { SYSTEM, type UserActor } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
-import { NotAllowed } from "@/core/error";
+import { NotAllowed, NotFound } from "@/core/error";
 import {
-	type AttachmentId,
 	attachmentCreate,
 	attachmentFilter,
 	attachmentPK,
 	attachmentSchema,
+	type attachmentToType,
 	attachmentUpdate,
 } from "@/core/schemas";
+import type { ServiceOpts } from "@/db";
 import { sanitizeFilename } from "@/utils/filename";
 import { mimeFor } from "@/utils/mime";
 import { Validate } from "@/utils/validate";
-import type { ServiceOpts } from "../base-service";
 import {
-	type AttachmentOwner,
+	type Prisma,
 	type PrismaClient,
 	type PrismaTx,
 	prisma,
 	type Role,
 } from "../client";
-import { type BlobService, blobService } from "./blob.service";
+import type { BlobService } from "./blob.service";
+import type { ResourceId } from "./resource.service";
 
 export type { AttachmentId } from "@/core/schemas";
-
-// Re-brand a raw attachment row's id — a runtime no-op, since it already
-// carries the right value, just not the branded type.
-function brand<T extends { id: number }>(row: T): T & { id: AttachmentId } {
-	return row as T & { id: AttachmentId };
-}
 
 //
 // Type definitions
@@ -39,6 +34,26 @@ export type AttachmentCreate = z.infer<typeof attachmentCreate>;
 export type AttachmentFilter = z.infer<typeof attachmentFilter>;
 export type AttachmentPK = z.infer<typeof attachmentPK>;
 export type AttachmentUpdate = z.infer<typeof attachmentUpdate>;
+export type AttachmentToType = z.infer<typeof attachmentToType>;
+
+type DbAttachment = Prisma.AttachmentGetPayload<{
+	include: typeof attachmentInclude;
+}>;
+
+/** The minimal course shape the write/read predicates need, loaded alongside every row. */
+const attachmentInclude = {
+	blob: {
+		select: {
+			size: true,
+		},
+	},
+	uploader: {
+		select: {
+			username: true,
+			name: true,
+		},
+	},
+} satisfies Prisma.AttachmentInclude;
 
 /**
  * The ledger over blob storage: who uses which bytes, under what name, and
@@ -47,12 +62,12 @@ export type AttachmentUpdate = z.infer<typeof attachmentUpdate>;
  * Not routed. See `dev/specs/to-do/blob-attachments.md`.
  */
 export class AttachmentService {
-	prisma: PrismaClient;
-	blobs: BlobService;
+	private prisma: PrismaClient;
+	private blob: BlobService;
 
-	constructor(client: PrismaClient = prisma, blobs: BlobService = blobService) {
+	constructor(blob: BlobService, client: PrismaClient = prisma) {
 		this.prisma = client;
-		this.blobs = blobs;
+		this.blob = blob;
 	}
 
 	/**
@@ -66,11 +81,6 @@ export class AttachmentService {
 		returns: attachmentSchema,
 		args: [attachmentCreate],
 	})
-	@Validate({
-		service: true,
-		returns: attachmentSchema,
-		args: [attachmentCreate],
-	})
 	async create(
 		input: AttachmentCreate,
 		opts: ServiceOpts,
@@ -78,34 +88,39 @@ export class AttachmentService {
 		const run = async (tx: PrismaTx): Promise<Attachment> => {
 			const scoped: ServiceOpts = { ...opts, tx };
 			const filename = sanitizeFilename(input.filename);
-			const mimeType = mimeFor(filename, input.mimeType ?? null);
+			const mimeType = mimeFor(filename);
 
-			await this.assertWithinQuota(input.bytes.length, scoped);
+			await this.assertWithinQuota(input.buffer.length, scoped);
 
-			const blob = await this.blobs.create(
-				{ bytes: input.bytes, contentHash: input.contentHash },
+			const blob = await this.blob.create(
+				{ bytes: input.buffer },
 				{ tx, actor: SYSTEM },
 			);
-			await this.blobs.link(blob.hash, filename);
+			await this.blob.link(blob.hash, filename);
+			const username = opts.actor === SYSTEM ? null : opts.actor.username;
 
-			return brand(
+			return this.fromDbWithSource(
 				await tx.attachment.create({
 					data: {
 						hash: blob.hash,
 						filename,
 						mimeType,
-						uploaderUsername: input.uploaderUsername ?? null,
-						ownerType: input.ownerType,
-						ownerId: input.ownerId,
+						uploaderId: input.uploaderId ?? username,
+						attachedToType: input.attachedTo.type,
+						attachedToId: input.attachedTo.id,
 					},
+					include: attachmentInclude,
 				}),
+				tx,
 			);
 		};
 
 		return opts.tx ? run(opts.tx) : this.prisma.$transaction((tx) => run(tx));
 	}
 
-	/** Finds a single attachment by id. */
+	/**
+	 * Finds a single attachment by id.
+	 */
 	@Validate({
 		async: true,
 		returns: attachmentSchema.nullable(),
@@ -116,13 +131,18 @@ export class AttachmentService {
 		opts?: ServiceOpts,
 	): Promise<Attachment | null> {
 		const client = opts?.tx ?? this.prisma;
+
 		const row = await client.attachment.findUnique({
 			where: { id: filter.id },
+			include: attachmentInclude,
 		});
-		return row && brand(row);
+
+		return row && this.fromDbWithSource(row, client);
 	}
 
-	/** Finds many attachments, narrowed by any combination of the filter. */
+	/**
+	 * Finds many attachments, narrowed by any combination of the filter.
+	 */
 	@Validate({
 		async: true,
 		returns: attachmentSchema.array(),
@@ -133,23 +153,26 @@ export class AttachmentService {
 		opts?: ServiceOpts,
 	): Promise<Attachment[]> {
 		const client = opts?.tx ?? this.prisma;
+
 		const rows = await client.attachment.findMany({
 			where: {
 				AND: [
 					filter.ids ? { id: { in: filter.ids } } : {},
 					filter.hashes ? { hash: { in: filter.hashes } } : {},
-					filter.ownerType ? { ownerType: filter.ownerType } : {},
-					filter.ownerIds ? { ownerId: { in: filter.ownerIds } } : {},
-					filter.uploaderUsername
-						? { uploaderUsername: filter.uploaderUsername }
-						: {},
+					filter.type ? { attachedToType: filter.type } : {},
+					filter.attachedTo ? { attachedToId: { in: filter.attachedTo } } : {},
+					filter.uploader ? { uploaderId: filter.uploader } : {},
 				],
 			},
+			include: attachmentInclude,
 		});
-		return rows.map(brand);
+
+		return this.fromDbWithSources(rows, client);
 	}
 
-	/** Renames an attachment, relinking the blob's directory to match. */
+	/**
+	 * Renames an attachment, relinking the blob's directory to match.
+	 */
 	@Validate({
 		service: true,
 		returns: attachmentSchema,
@@ -161,123 +184,138 @@ export class AttachmentService {
 		opts: ServiceOpts,
 	): Promise<Attachment> {
 		const client = opts.tx ?? this.prisma;
+
 		const target = await this.findOne(filter, opts);
-		if (!target) {
-			throw new Error("No attachment matches that filter.");
-		}
+		if (!target) throw new NotFound("attachment", { id: filter.id });
+
 		const filename = sanitizeFilename(fields.filename);
-		if (filename === target.filename) {
-			return target;
-		}
+		if (filename === target.filename) return target;
 
-		await this.blobs.link(target.hash, filename);
-		const updated = brand(
-			await client.attachment.update({
-				where: { id: target.id },
-				data: { filename },
-			}),
-		);
+		await this.blob.link(target.hash, filename);
 
-		const siblings = await client.attachment.count({
+		const updated = await client.attachment.update({
+			where: { id: target.id },
+			data: { filename },
+			include: attachmentInclude,
+		});
+
+		const sameName = await client.attachment.count({
 			where: { hash: target.hash, filename: target.filename },
 		});
-		if (siblings === 0) {
-			await this.blobs.unlink(target.hash, target.filename);
+		if (sameName === 0) {
+			await this.blob.unlink(target.hash, target.filename);
 		}
 
-		return updated;
+		return this.fromDb(updated, target.attachedTo);
 	}
 
 	/**
-	 * Detaches one use of a blob, unlinking its name once no sibling
-	 * attachment shares it.
+	 * Detaches one use of a blob.
+	 *
+	 * Unlink its name once no sibling attachment shares it.
 	 */
 	@Validate({ service: true, args: [attachmentPK] })
 	async delete(filter: AttachmentPK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
+
 		const target = await this.findOne(filter, opts);
-		if (!target) {
-			return;
-		}
+		if (!target) return;
+
 		await client.attachment.delete({ where: { id: target.id } });
-		const siblings = await client.attachment.count({
+
+		const sameName = await client.attachment.count({
 			where: { hash: target.hash, filename: target.filename },
 		});
-		if (siblings === 0) {
-			await this.blobs.unlink(target.hash, target.filename);
+		if (sameName === 0) {
+			await this.blob.unlink(target.hash, target.filename);
+		}
+
+		// Tombstone the blob once nothing (under any name) still points at
+		// it, so a stale `/files/<hash>` URL keeps explaining itself (410)
+		// rather than going flatly 404.
+		const anyName = await client.attachment.count({
+			where: { hash: target.hash },
+		});
+		if (anyName === 0) {
+			await this.blob.delete({ hash: target.hash }, opts);
 		}
 	}
 
 	/**
-	 * Detaches every attachment of one owner, for that owner's own delete.
+	 * Detaches every attachment for a attachedTo entity.
 	 *
 	 * SQLite cannot cascade a polymorphic reference, so an owner service that
 	 * forgets this call leaks its attachments.
 	 */
-	async detachOwner(
-		ownerType: AttachmentOwner,
-		ownerId: number,
+	async detach(
+		type: AttachmentToType,
+		attachedToId: number,
 		opts: ServiceOpts,
-	): Promise<number> {
+	): Promise<{ deleted: number }> {
 		const client = opts.tx ?? this.prisma;
+
 		const rows = await client.attachment.findMany({
-			where: { ownerType, ownerId },
+			where: { attachedToType: type, attachedToId },
 		});
-		if (rows.length === 0) {
-			return 0;
-		}
-		await client.attachment.deleteMany({ where: { ownerType, ownerId } });
+
+		if (rows.length === 0) return { deleted: 0 };
+
+		const deleted = await client.attachment.deleteMany({
+			where: { attachedToType: type, attachedToId },
+		});
+
 		for (const row of rows) {
 			const siblings = await client.attachment.count({
 				where: { hash: row.hash, filename: row.filename },
 			});
-			if (siblings === 0) {
-				await this.blobs.unlink(row.hash, row.filename);
-			}
-		}
-		return rows.length;
-	}
 
-	/** Attachments of many owners at once, keyed by owner id, for stitching. */
-	async forOwners(
-		ownerType: AttachmentOwner,
-		ownerIds: number[],
-		opts?: ServiceOpts,
-	): Promise<Map<number, Attachment[]>> {
-		const client = opts?.tx ?? this.prisma;
-		const rows = await client.attachment.findMany({
-			where: { ownerType, ownerId: { in: ownerIds } },
-		});
-		const map = new Map<number, Attachment[]>();
-		for (const raw of rows) {
-			const row = brand(raw);
-			const list = map.get(row.ownerId);
-			if (list) {
-				list.push(row);
-			} else {
-				map.set(row.ownerId, [row]);
+			if (siblings === 0) {
+				await this.blob.unlink(row.hash, row.filename);
 			}
 		}
-		return map;
+
+		return { deleted: deleted.count };
 	}
 
 	/**
-	 * Bytes charged to a user: the sum of the sizes of the blobs their
-	 * attachments point at.
+	 * Attachments of a specific resource.
+	 */
+	async allAttachedTo(
+		resource: Attachment["attachedTo"],
+		opts?: ServiceOpts,
+	): Promise<Attachment[]> {
+		const client = opts?.tx ?? this.prisma;
+
+		const rows = await client.attachment.findMany({
+			where: { attachedToType: resource.type, attachedToId: resource.id },
+			include: attachmentInclude,
+		});
+
+		return rows.map((raw) => this.fromDb(raw, resource));
+	}
+
+	/**
+	 * Bytes charged to a user
+	 *
+	 * The sum of the sizes of the blobs their attachments point at.
 	 *
 	 * Charged per attachment rather than per distinct byte on disk, so dedupe
 	 * lowers the server's real cost without lowering anyone's bill.
 	 */
 	async usageBytes(username: string, opts?: ServiceOpts): Promise<number> {
 		const client = opts?.tx ?? this.prisma;
+
 		const rows = await client.attachment.findMany({
-			where: { uploaderUsername: username },
+			where: { uploaderId: username },
 			include: { blob: true },
 		});
+
 		return rows.reduce((total, row) => total + row.blob.size, 0);
 	}
 
-	/** The quota a role is held to, `null` when it has none. */
+	/**
+	 * The quota a role is held to, `null` when it has none.
+	 * */
 	quotaFor(role: Role): number | null {
 		return BLOB_QUOTA_BY_ROLE[role];
 	}
@@ -293,15 +331,103 @@ export class AttachmentService {
 		if (opts.actor === SYSTEM) {
 			return;
 		}
-		const quota = this.quotaFor(opts.actor.role);
-		if (quota === null) {
-			return;
-		}
-		const usage = await this.usageBytes(opts.actor.username, opts);
+		const quota = this.quotaFor((opts.actor as UserActor).role);
+		if (quota === null) return;
+
+		const usage = await this.usageBytes(
+			(opts.actor as UserActor).username,
+			opts,
+		);
+
 		if (usage + additionalBytes > quota) {
-			throw new NotAllowed({ action: "create-attachment" });
+			throw new NotAllowed("attachment.create");
+		}
+	}
+
+	private fromDb(
+		raw: DbAttachment,
+		attached: Attachment["attachedTo"],
+	): Attachment {
+		return {
+			id: raw.id,
+			hash: raw.hash,
+			filename: raw.filename,
+			size: raw.blob.size,
+			link: this.blob.attachmentPath(raw.hash, raw.filename),
+			mimeType: raw.mimeType,
+			uploader: raw.uploader
+				? { username: raw.uploader.username, name: raw.uploader.name }
+				: null,
+			attachedTo: attached,
+			createdAt: raw.createdAt,
+		};
+	}
+
+	private async fromDbWithSource(raw: DbAttachment, tx: PrismaTx) {
+		return this.fromDb(raw, await this.attachmentSource(raw, tx));
+	}
+
+	private async fromDbWithSources(raw: DbAttachment[], tx: PrismaTx) {
+		// TODO: Read all question attachments in a single query to avoid N+1 queries
+
+		// Read all resource attachments in a single query to avoid N+1 queries
+		const resources = await tx.resource.findMany({
+			where: {
+				id: {
+					in: raw
+						.filter((r) => r.attachedToType === "RESOURCE")
+						.map((r) => r.attachedToId),
+				},
+			},
+			select: {
+				id: true,
+				title: true,
+				slug: true,
+			},
+		});
+		const resourceMap = Object.fromEntries(
+			resources.map((r) => [r.id, { ...r, type: "RESOURCE" as const }]),
+		);
+
+		// Collect all attachments with their associated resources
+		const results: Attachment[] = [];
+		for (const r of raw) {
+			const resource = resourceMap[r.attachedToId];
+			if (resource) {
+				results.push(this.fromDb(r, resource));
+				continue;
+			}
+
+			// If the attachment is not associated with a resource, we skip it for now.
+			throw new Error(
+				`Attachment with ID ${r.id} is not associated with a known resource`,
+			);
+		}
+		return results;
+	}
+
+	private async attachmentSource(
+		raw: DbAttachment,
+		tx: PrismaTx,
+	): Promise<Attachment["attachedTo"]> {
+		switch (raw.attachedToType) {
+			case "RESOURCE": {
+				const resource = await tx.resource.findUnique({
+					where: { id: raw.attachedToId as ResourceId },
+					select: {
+						id: true,
+						title: true,
+						slug: true,
+					},
+				});
+				if (!resource) {
+					throw new Error(`Resource with ID ${raw.attachedToId} not found`);
+				}
+				return { ...resource, type: "RESOURCE" };
+			}
+			case "QUESTION": {
+				throw new Error("Question support is not yet implemented");
+			}
 		}
 	}
 }
-
-export const attachmentService = new AttachmentService();

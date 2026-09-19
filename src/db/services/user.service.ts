@@ -1,14 +1,8 @@
 import type { z } from "zod";
+import { type Actor, SYSTEM } from "@/auth/actor";
 import { hashPassword, passwordStrengthIssues } from "@/auth/password";
-import {
-	canCreateUser,
-	canEditUser,
-	canViewUser,
-	userVisibility,
-} from "@/auth/permissions";
-import type { Actor } from "@/core/actor";
-import { SYSTEM } from "@/core/actor";
-import { type ActionCode, NotAllowed } from "@/core/error";
+import { ensurePerm } from "@/auth/permissions";
+import { InvalidData, NotAllowed } from "@/core/error";
 import {
 	userCreate,
 	type userFilter,
@@ -17,15 +11,15 @@ import {
 	userUpdate,
 	userUpsert,
 } from "@/core/schemas";
+import {
+	CrudBase,
+	type ServiceOpts,
+	type ServiceOptsWithoutTx,
+	upsert,
+} from "@/db/base-service";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
-import { type Crud, type ServiceOpts, upsert } from "../base-service";
-import {
-	type User as DbUser,
-	type PrismaClient,
-	type PrismaTx,
-	prisma,
-} from "../client";
+import type { User as DbUser, Prisma, PrismaTx } from "../client";
 
 export type { UserId } from "@/core/schemas";
 
@@ -39,29 +33,28 @@ export type UserPK = z.infer<typeof userPK>;
 export type UserUpdate = z.infer<typeof userUpdate>;
 export type UserUpsert = z.infer<typeof userUpsert>;
 
-class UserService
-	implements
-		Crud<{
-			entity: User;
-			pkFilter: UserPK;
-			create: UserCreate;
-			filter: UserFilter;
-			update: UserUpdate;
-			upsert: UserUpsert;
-		}>
-{
-	prisma: PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+export class UserService extends CrudBase<{
+	entity: User;
+	pkFilter: UserPK;
+	create: UserCreate;
+	filter: UserFilter;
+	update: UserUpdate;
+	upsert: UserUpsert;
+}> {
 	/**
 	 * Create a new user.
 	 */
-	@Validate({ service: true, returns: userSchema, args: [userCreate] })
-	async create(input: UserCreate, opts: ServiceOpts): Promise<User> {
-		assertCanCreateUser(opts.actor);
+	@Validate({
+		service: true,
+		returns: userSchema,
+		args: [undefined, userCreate],
+	})
+	protected async createTx(
+		tx: PrismaTx,
+		input: UserCreate,
+		opts: ServiceOptsWithoutTx,
+	): Promise<User> {
+		ensurePerm(opts.actor, "user.create");
 
 		const isAdmin = input.role === "ADMIN";
 		if (!input.githubId && !isAdmin)
@@ -71,10 +64,9 @@ class UserService
 
 		const githubId = input.githubId ?? nullSentinel(input.username);
 		const schoolId = input.schoolId ?? nullSentinel(input.username);
-		const client = opts.tx ?? this.prisma;
 
 		return toUser(
-			await client.user.create({
+			await tx.user.create({
 				data: {
 					email: input.email,
 					name: input.name,
@@ -94,38 +86,43 @@ class UserService
 	 * It accepts a single filter at a time, can search by email, username,
 	 * githubId, schoolId or login (email or username).
 	 */
-	@Validate({ service: true, returns: userSchema.nullable(), args: [userPK] })
-	async findOne(filter: UserPK, opts: ServiceOpts): Promise<User | null> {
-		const client = opts.tx ?? this.prisma;
+	@Validate({
+		service: true,
+		returns: userSchema.nullable(),
+		args: [undefined, userPK],
+	})
+	protected async findOneTx(
+		tx: PrismaTx,
+		filter: UserPK,
+		opts: ServiceOptsWithoutTx,
+	): Promise<User | null> {
 		let user: DbUser | null = null;
 		const by = filter as FillUndefineds<UserPK>; // zod doesn't narrow to a single field, so we do it here
 
 		if (by.email) {
-			user = await client.user.findUnique({
+			user = await tx.user.findUnique({
 				where: { email: by.email },
 			});
 		} else if (by.username) {
-			user = await client.user.findUnique({
+			user = await tx.user.findUnique({
 				where: { username: by.username },
 			});
 		} else if (by.githubId) {
-			user = await client.user.findUnique({
+			user = await tx.user.findUnique({
 				where: { githubId: by.githubId },
 			});
 		} else if (by.schoolId) {
-			user = await client.user.findUnique({
+			user = await tx.user.findUnique({
 				where: { schoolId: by.schoolId },
 			});
 		} else if (by.login) {
-			user = await client.user.findFirst({
+			user = await tx.user.findFirst({
 				where: { OR: [{ email: by.login }, { username: by.login }] },
 			});
 		}
 
 		if (!user) return null;
-		if (!canViewUser(opts.actor, user)) {
-			throw new NotAllowed({ action: "read-user" });
-		}
+		ensurePerm(opts.actor, "user.read", user);
 		return toUser(user);
 	}
 
@@ -134,45 +131,61 @@ class UserService
 	 * see. Newest first.
 	 */
 	@Validate({ service: true, returns: userSchema.array() })
-	async findMany(by: UserFilter, opts: ServiceOpts): Promise<User[]> {
-		const client = opts.tx ?? this.prisma;
-		const users = await client.user.findMany({
+	protected async findManyTx(
+		tx: PrismaTx,
+		by: UserFilter,
+		opts: ServiceOptsWithoutTx,
+	): Promise<User[]> {
+		const users = await tx.user.findMany({
 			where: {
 				AND: [
 					by.usernames ? { username: { in: by.usernames } } : {},
-					userVisibility(opts.actor),
+					userWhere(opts.actor),
 				],
 			},
 			orderBy: { createdAt: "desc" },
 			take: by.take,
 		});
+		for (const user of users) ensurePerm(opts.actor, "user.read", user);
 		return users.map(toUser);
 	}
 
 	/**
 	 * Updates the editable profile fields for a user.
 	 */
-	@Validate({ service: true, returns: userSchema, args: [userPK, userUpdate] })
-	async update(
+	@Validate({
+		service: true,
+		returns: userSchema,
+		args: [undefined, userPK, userUpdate],
+	})
+	protected async updateTx(
+		tx: PrismaTx,
 		filter: UserPK,
 		payload: UserUpdate,
-		opts: ServiceOpts,
+		opts: ServiceOptsWithoutTx,
 	): Promise<User> {
-		const target = await this.findOne(filter, opts);
+		const target = await this.findOne(filter, { ...opts, tx });
 
 		if (!target) throw new Error("user not found");
-		if (!canEditUser(opts.actor, target))
-			throw new NotAllowed({ action: "update-user" });
+		ensurePerm(opts.actor, "user.update", target);
 
-		const client = opts.tx ?? this.prisma;
-		const { githubId, schoolId, ...rest } = payload;
+		const { githubId, schoolId, password, ...rest } = payload;
+
+		if (password) {
+			const issues = await passwordStrengthIssues(password);
+			InvalidData.ensureNoError({ password: issues });
+		}
+
 		return toUser(
-			await client.user.update({
+			await tx.user.update({
 				where: { username: target.username },
 				data: {
 					...rest,
 					githubId: mask(githubId, target.username),
 					schoolId: mask(schoolId, target.username),
+					...(password !== undefined
+						? { passwordHash: await hashPassword(password) }
+						: {}),
 				},
 			}),
 		);
@@ -189,60 +202,63 @@ class UserService
 	 * from `UserUpdate`, is applied as a second write when given; omitted, the
 	 * stored hash is left alone.
 	 */
-	@Validate({ service: true, returns: userSchema, args: [userUpsert] })
-	async upsert(input: UserUpsert, opts: ServiceOpts): Promise<User> {
-		const run = async (tx: PrismaTx): Promise<User> => {
-			const scoped: ServiceOpts = { ...opts, tx };
+	@Validate({
+		service: true,
+		returns: userSchema,
+		args: [undefined, userUpsert],
+	})
+	protected async upsertTx(
+		tx: PrismaTx,
+		input: UserUpsert,
+		opts: ServiceOptsWithoutTx,
+	): Promise<User> {
+		const scoped: ServiceOpts = { ...opts, tx };
 
-			// `assertCreatable` runs on the update branch only, so it doubles as
-			// the signal for which branch `upsert` took. `create` already stores
-			// the password; re-running `updatePassword` after it would hash twice
-			// and apply strength rules `create` does not.
-			let existed = false;
+		// `assertCreatable` runs on the update branch only, so it doubles as
+		// the signal for which branch `upsert` took. `create` already stores
+		// the password; re-running `updatePassword` after it would hash twice
+		// and apply strength rules `create` does not.
+		let existed = false;
 
-			const user = await upsert(
-				this.prisma,
-				this,
-				input,
-				scoped,
-				{
-					pk: (i) => ({ username: i.username }),
-					update: (i) => ({
-						name: i.name,
-						email: i.email,
-						githubId: i.githubId,
-						schoolId: i.schoolId,
-					}),
-					assertCreatable: (_i, o) => {
-						existed = true;
-						assertCanCreateUser(o.actor, "upsert-user");
-					},
-				},
-				"upsert-user",
-			);
+		const user = await upsert(this, input, {
+			...scoped,
+			action: "user.create",
+			pk: (i) => ({ username: i.username }),
+			update: (i) => ({
+				name: i.name,
+				email: i.email,
+				githubId: i.githubId,
+				schoolId: i.schoolId,
+			}),
+			assertCreatable: (_i, o) => {
+				existed = true;
+				ensurePerm(o.actor, "user.create");
+			},
+		});
 
-			if (!existed || input.password === undefined) return user;
-			const { hash } = await this.updatePassword(user, input.password, scoped);
-			return { ...user, passwordHash: hash };
-		};
-		return opts.tx ? run(opts.tx) : this.prisma.$transaction((tx) => run(tx));
+		if (!existed || input.password === undefined) return user;
+		const { hash } = await this.updatePassword(user, input.password, scoped);
+		return { ...user, passwordHash: hash };
 	}
 
 	/**
 	 * Deletes a user. Only SYSTEM can delete users, and it is irreversible.
 	 */
-	@Validate({ service: true, args: [userPK] })
-	async delete(filter: UserPK, opts: ServiceOpts): Promise<void> {
-		if (opts.actor !== SYSTEM) throw new NotAllowed({ action: "delete-user" });
+	@Validate({ service: true, args: [undefined, userPK] })
+	protected async deleteTx(
+		tx: PrismaTx,
+		filter: UserPK,
+		opts: ServiceOptsWithoutTx,
+	): Promise<void> {
+		if (opts.actor !== SYSTEM) throw new NotAllowed("user.delete");
 
-		const client = opts.tx ?? this.prisma;
-		const user = await this.findOne(filter, opts);
+		const user = await this.findOne(filter, { ...opts, tx });
 
 		// TODO: define an error for NotFound entities
 		if (!user) throw new Error("user not found");
 
 		// TODO: delete or soft delete? design decision
-		await client.user.delete({ where: { username: user.username } });
+		await tx.user.delete({ where: { username: user.username } });
 	}
 
 	// TODO: this method should be moved to the auth service.
@@ -255,8 +271,7 @@ class UserService
 		password: string,
 		opts: ServiceOpts,
 	): Promise<{ hash: string }> {
-		if (!canEditUser(opts.actor, user))
-			throw new NotAllowed({ action: "update-user.password" });
+		ensurePerm(opts.actor, "user.update", user);
 
 		// Validate password strength
 		const issues = await passwordStrengthIssues(password);
@@ -287,22 +302,14 @@ class UserService
 	}
 }
 
-export const userService = new UserService();
-
 //
 // Auxiliary functions
 //
 
-/**
- * Enforces {@link canCreateUser}, tagged with `action` — `create()`'s own
- * check, and reused by `upsert()`'s update branch so a request that would
- * fail as a fresh `create` fails the same way when the row already exists.
- */
-function assertCanCreateUser(
-	actor: Actor,
-	action: ActionCode = "create-user",
-): void {
-	if (!canCreateUser(actor)) throw new NotAllowed({ action });
+/** Prisma `where` fragment implementing the same rule as the `user.read` permission. */
+export function userWhere(actor: Actor): Prisma.UserWhereInput {
+	if (actor === SYSTEM || actor.role === "ADMIN") return {};
+	return { username: actor.username };
 }
 
 // The `schoolId`/`githubId` columns are NOT NULL @unique, so an account with

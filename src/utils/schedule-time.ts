@@ -91,7 +91,11 @@ export function toInstant(
 	minutes: number,
 	zone: string = SERVER_TZ,
 ): Date {
-	const [year, month, day] = date.split("-").map(Number);
+	const [year, month, day] = date.split("-").map(Number) as [
+		number,
+		number,
+		number,
+	];
 	const hour = Math.floor(minutes / 60);
 	const minute = minutes % 60;
 
@@ -144,7 +148,8 @@ export function localDateOf(instant: Date, zone: string = SERVER_TZ): string {
 export function weekdayOf(instant: Date, zone: string = SERVER_TZ): Weekday {
 	const p = partsOf(instant, zone);
 	const index = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
-	return WEEKDAY_ORDER[index];
+	// biome-ignore lint/style/noNonNullAssertion: getUTCDay() always returns 0-6, and WEEKDAY_ORDER has exactly 7 entries.
+	return WEEKDAY_ORDER[index]!;
 }
 
 /** `startAt` plus `durationMin`. An event crossing midnight ends on the next local day. */

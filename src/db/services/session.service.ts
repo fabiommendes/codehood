@@ -1,20 +1,20 @@
 import type { z } from "zod";
-import { canManageSessions } from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed } from "@/core/error";
-import type { FillUndefineds } from "@/typing";
-import { Validate } from "@/utils/validate";
 import {
 	type SessionId,
 	sessionCreate,
 	sessionCreateResult,
 	sessionDeletePK,
 	type sessionSchema,
-} from "../../core/schemas";
-import type { Create, Delete, ServiceOpts, Upsert } from "../base-service";
+} from "@/core/schemas";
+import type { Create, Delete, ServiceOpts, Upsert } from "@/db/base-service";
+import type { FillUndefineds } from "@/typing";
+import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
 
-export type { SessionId } from "../../core/schemas";
+export type { SessionId } from "@/core/schemas";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const REFRESH_THRESHOLD_MS = SESSION_TTL_MS / 2;
@@ -27,7 +27,7 @@ export type Session = z.infer<typeof sessionSchema>;
 export type SessionCreateResult = z.infer<typeof sessionCreateResult>;
 export type SessionDeletePK = z.infer<typeof sessionDeletePK>;
 
-class SessionService
+export class SessionService
 	implements
 		Create<SessionCreate, SessionCreateResult>,
 		Delete<SessionDeletePK>,
@@ -53,15 +53,15 @@ class SessionService
 		input: SessionCreate,
 		opts: ServiceOpts,
 	): Promise<SessionCreateResult> {
-		if (!canManageSessions(opts.actor, input.userId)) {
-			throw new NotAllowed({ action: "create-session" });
+		if (!hasPerm(opts.actor, "session.manage", input.username)) {
+			throw new NotAllowed("session.create");
 		}
 		const client = opts.tx ?? this.prisma;
 		const token = generateToken();
 		const session = await client.session.create({
 			data: {
 				tokenHash: hashToken(token),
-				userId: input.userId,
+				username: input.username,
 				expiresAt: new Date(Date.now() + SESSION_TTL_MS),
 			},
 		});
@@ -110,11 +110,11 @@ class SessionService
 	}
 
 	/**
-	 * Revokes the session matching `token`, or every session for `userId`.
+	 * Revokes the session matching `token`, or every session for `username`.
 	 *
 	 * A `token` deletion needs no actor check — holding the raw token is
-	 * itself the proof of ownership (logout). A `userId` deletion ("log out
-	 * everywhere") is gated by {@link canManageSessions}.
+	 * itself the proof of ownership (logout). A `username` deletion ("log out
+	 * everywhere") is gated by the `session.manage` permission.
 	 */
 	@Validate({ service: true, args: [sessionDeletePK] })
 	async delete(filter: SessionDeletePK, opts: ServiceOpts): Promise<void> {
@@ -124,28 +124,26 @@ class SessionService
 			await client.session.deleteMany({
 				where: { tokenHash: hashToken(by.token) },
 			});
-		} else if (by.userId) {
-			if (!canManageSessions(opts.actor, by.userId)) {
-				throw new NotAllowed({ action: "delete-session" });
+		} else if (by.username) {
+			if (!hasPerm(opts.actor, "session.manage", by.username)) {
+				throw new NotAllowed("session.delete");
 			}
-			await client.session.deleteMany({ where: { userId: by.userId } });
+			await client.session.deleteMany({ where: { username: by.username } });
 		}
 	}
 }
 
-export const sessionService = new SessionService();
-
 // Convert a raw session row to the public-facing session type.
 function toSession(session: {
 	id: number;
-	userId: string;
+	username: string;
 	tokenHash: string;
 	expiresAt: Date;
 	createdAt: Date;
 }): Session {
 	return {
 		id: session.id as SessionId,
-		userId: session.userId,
+		username: session.username,
 		tokenHash: session.tokenHash,
 		expiresAt: session.expiresAt,
 		createdAt: session.createdAt,

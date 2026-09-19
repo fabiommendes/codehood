@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/test";
-import type { Actor } from "@/core/actor";
-import { FULL_ACCESS } from "@/core/actor";
+import type { Actor } from "@/auth/actor";
+import { FULL_ACCESS } from "@/auth/actor";
 import type { UserId } from "@/core/schemas";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { userService } from "@/db/services/user.service";
+import { db } from "@/db";
 
 function actorOf(
 	username: UserId,
@@ -16,18 +13,18 @@ function actorOf(
 
 test("create() rejects a reserved slug", async () => {
 	await expect(
-		disciplineService.create({ slug: "login", name: "Login" }, FULL_ACCESS),
+		db.discipline.create({ slug: "login", name: "Login" }, FULL_ACCESS),
 	).rejects.toThrow();
 	await expect(
-		disciplineService.create({ slug: "design", name: "Design" }, FULL_ACCESS),
+		db.discipline.create({ slug: "design", name: "Design" }, FULL_ACCESS),
 	).rejects.toThrow();
 	await expect(
-		disciplineService.create({ slug: "api", name: "API" }, FULL_ACCESS),
+		db.discipline.create({ slug: "api", name: "API" }, FULL_ACCESS),
 	).rejects.toThrow();
 });
 
 test("create() accepts a well-formed slug", async () => {
-	const discipline = await disciplineService.create(
+	const discipline = await db.discipline.create(
 		{ slug: "cs101-disc-test", name: "Intro to CS" },
 		FULL_ACCESS,
 	);
@@ -36,7 +33,7 @@ test("create() accepts a well-formed slug", async () => {
 
 test("create() rejects a non-admin, non-system actor", async () => {
 	await expect(
-		disciplineService.create(
+		db.discipline.create(
 			{ slug: "some-discipline", name: "Some Discipline" },
 			{ actor: actorOf("instructor" as UserId, "INSTRUCTOR") },
 		),
@@ -44,24 +41,24 @@ test("create() rejects a non-admin, non-system actor", async () => {
 });
 
 test("findOne() returns a discipline by slug, or null", async () => {
-	await disciplineService.create(
+	await db.discipline.create(
 		{ slug: "disc-findone", name: "Find One" },
 		FULL_ACCESS,
 	);
-	expect(
-		(await disciplineService.findOne({ slug: "disc-findone" }))?.name,
-	).toBe("Find One");
-	expect(await disciplineService.findOne({ slug: "disc-missing" })).toBeNull();
+	expect((await db.discipline.findOne({ slug: "disc-findone" }))?.name).toBe(
+		"Find One",
+	);
+	expect(await db.discipline.findOne({ slug: "disc-missing" })).toBeNull();
 });
 
 test("update() renames a discipline and refuses a non-admin", async () => {
-	await disciplineService.create(
+	await db.discipline.create(
 		{ slug: "disc-rename", name: "Before" },
 		FULL_ACCESS,
 	);
 
 	await expect(
-		disciplineService.update(
+		db.discipline.update(
 			{ slug: "disc-rename" },
 			{ name: "Nope" },
 			{
@@ -70,7 +67,7 @@ test("update() renames a discipline and refuses a non-admin", async () => {
 		),
 	).rejects.toThrow();
 
-	const updated = await disciplineService.update(
+	const updated = await db.discipline.update(
 		{ slug: "disc-rename" },
 		{ name: "After" },
 		FULL_ACCESS,
@@ -81,8 +78,8 @@ test("update() renames a discipline and refuses a non-admin", async () => {
 
 test("delete() refuses while a course uses the discipline, and succeeds once it does not", async () => {
 	const slug = "disc-delete";
-	await disciplineService.create({ slug, name: "Deletable" }, FULL_ACCESS);
-	await editionService.create(
+	await db.discipline.create({ slug, name: "Deletable" }, FULL_ACCESS);
+	await db.edition.create(
 		{
 			slug: "2201",
 			name: "2201",
@@ -91,7 +88,7 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 		},
 		FULL_ACCESS,
 	);
-	const instructor = await userService.create(
+	const instructor = await db.user.create(
 		{
 			email: "disc-delete@codehood.test",
 			username: "disc-delete-instructor",
@@ -103,7 +100,7 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 		},
 		FULL_ACCESS,
 	);
-	const course = await courseService.create(
+	const course = await db.course.create(
 		{
 			discipline: slug,
 			instructor: instructor.username,
@@ -114,39 +111,39 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 		FULL_ACCESS,
 	);
 
-	await expect(disciplineService.delete({ slug }, FULL_ACCESS)).rejects.toThrow(
+	await expect(db.discipline.delete({ slug }, FULL_ACCESS)).rejects.toThrow(
 		/still has 1 course/,
 	);
 
-	await courseService.delete({ id: course.id }, FULL_ACCESS);
-	await disciplineService.delete({ slug }, FULL_ACCESS);
-	expect(await disciplineService.findOne({ slug })).toBeNull();
+	await db.course.delete({ id: course.id }, FULL_ACCESS);
+	await db.discipline.delete({ slug }, FULL_ACCESS);
+	expect(await db.discipline.findOne({ slug })).toBeNull();
 });
 
 test("upsert creates on first call, updates the same row in place on the second, and a different slug creates a separate row", async () => {
-	const created = await disciplineService.upsert(
+	const created = await db.discipline.upsert(
 		{ slug: "disc-upsert", name: "Before" },
 		FULL_ACCESS,
 	);
 	expect(created.slug).toBe("disc-upsert");
 	expect(created.name).toBe("Before");
 
-	const updated = await disciplineService.upsert(
+	const updated = await db.discipline.upsert(
 		{ slug: "disc-upsert", name: "After" },
 		FULL_ACCESS,
 	);
 	expect(updated.slug).toBe("disc-upsert"); // same key, same row
 	expect(updated.name).toBe("After"); // changed
 
-	const sameSlug = await disciplineService.findMany({ slugs: ["disc-upsert"] });
+	const sameSlug = await db.discipline.findMany({ slugs: ["disc-upsert"] });
 	expect(sameSlug).toHaveLength(1);
 
-	const other = await disciplineService.upsert(
+	const other = await db.discipline.upsert(
 		{ slug: "disc-upsert-2", name: "Other" },
 		FULL_ACCESS,
 	);
 	expect(other.slug).toBe("disc-upsert-2");
-	const both = await disciplineService.findMany({
+	const both = await db.discipline.findMany({
 		slugs: ["disc-upsert", "disc-upsert-2"],
 	});
 	expect(both).toHaveLength(2);

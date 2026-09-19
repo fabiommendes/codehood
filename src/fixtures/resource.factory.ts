@@ -1,11 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import type { CourseId } from "@/db/services/course.service";
-import {
-	type Resource,
-	type ResourceCreate,
-	resourceService,
-} from "@/db/services/resource.service";
+import { db, type Resource, type ResourceCreate, type schema } from "@/db";
 import { persistedCourseFactory } from "./course.factory";
 import { type PersistParams, serviceOpts } from "./support";
 
@@ -20,13 +15,12 @@ function buildResource(
 	params: Partial<ResourceCreate>,
 ): ResourceCreate {
 	return {
-		courseId: params.courseId ?? (0 as CourseId),
+		courseId: params.courseId ?? (0 as schema.CourseId),
 		slug: params.slug ?? `resource-${sequence}`,
-		type: "LINK",
 		title: faker.lorem.words(3),
 		description: faker.lorem.sentence(),
-		data: faker.internet.url(),
-		contentHash: faker.string.hexadecimal({ length: 40 }).slice(2),
+		data: { type: "LINK", url: faker.internet.url() },
+		ref: faker.string.hexadecimal({ length: 40 }).slice(2),
 	};
 }
 
@@ -56,7 +50,7 @@ export const persistedResourceFactory = Factory.define<
 			(await persistedCourseFactory.create({}, { transient: transientParams }))
 				.id;
 
-		return resourceService.create({ ...input, courseId }, opts);
+		return db.resource.create({ ...input, courseId }, opts);
 	});
 
 	return buildResource(sequence, params);

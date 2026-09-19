@@ -1,13 +1,11 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import {
-	type Discipline,
-	type DisciplineCreate,
-	disciplineService,
-} from "@/db/services/discipline.service";
+import { type Discipline, type DisciplineCreate, db } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
-/** A slug matching `DISCIPLINE_SLUG_RE`: lowercase, starts with a letter, no trailing hyphen. */
+/**
+ * A slug matching `DISCIPLINE_SLUG_RE`: lowercase, starts with a letter, no trailing hyphen.
+ */
 function fakeDisciplineSlug(sequence: number): string {
 	const base = faker.commerce
 		.department()
@@ -39,7 +37,7 @@ export const persistedDisciplineFactory = Factory.define<
 	Discipline
 >(({ sequence, params, transientParams, onCreate }) => {
 	onCreate((input) =>
-		disciplineService.create(input, serviceOpts(transientParams)),
+		db.discipline.create(input, serviceOpts(transientParams)),
 	);
 
 	return buildDiscipline(sequence, params);

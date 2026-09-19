@@ -1,10 +1,7 @@
 import { faker } from "@faker-js/faker";
 import { type DeepPartial, Factory } from "fishery";
-import {
-	type Attachment,
-	type AttachmentCreate,
-	attachmentService,
-} from "@/db/services/attachment.service";
+import type { ResourceId } from "@/core/schemas";
+import { type Attachment, type AttachmentCreate, db } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
 function buildAttachment(
@@ -12,11 +9,12 @@ function buildAttachment(
 	params: DeepPartial<AttachmentCreate>,
 ): AttachmentCreate {
 	return {
-		bytes: Buffer.from(`${faker.lorem.paragraphs(2)} ${sequence}`, "utf-8"),
+		buffer: Buffer.from(`${faker.lorem.paragraphs(2)} ${sequence}`, "utf-8"),
 		filename: `file-${sequence}.txt`,
-		mimeType: "text/plain",
-		ownerType: "RESOURCE",
-		ownerId: params.ownerId ?? sequence,
+		attachedTo: {
+			type: "RESOURCE",
+			id: (params.attachedTo?.id as ResourceId) ?? sequence,
+		},
 	};
 }
 
@@ -32,7 +30,7 @@ export const persistedAttachmentFactory = Factory.define<
 	Attachment
 >(({ sequence, params, transientParams, onCreate }) => {
 	onCreate((input) =>
-		attachmentService.create(input, serviceOpts(transientParams)),
+		db.attachment.create(input, serviceOpts(transientParams)),
 	);
 
 	return buildAttachment(sequence, params);

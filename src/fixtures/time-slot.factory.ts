@@ -1,11 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import type { CourseId } from "@/db/services/course.service";
-import {
-	type TimeSlot,
-	type TimeSlotCreate,
-	timeSlotService,
-} from "@/db/services/time-slot.service";
+import { db, type schema, type TimeSlot, type TimeSlotCreate } from "@/db";
 import { persistedCourseFactory } from "./course.factory";
 import { type PersistParams, serviceOpts } from "./support";
 
@@ -24,7 +19,7 @@ function buildTimeSlot(
 	params: Partial<TimeSlotCreate>,
 ): TimeSlotCreate {
 	return {
-		courseId: params.courseId ?? (0 as CourseId),
+		courseId: params.courseId ?? (0 as schema.CourseId),
 		slug: params.slug ?? `slot-${sequence}`,
 		title: faker.lorem.words(2),
 		day: faker.helpers.arrayElement(WEEKDAYS),
@@ -59,7 +54,7 @@ export const persistedTimeSlotFactory = Factory.define<
 			(await persistedCourseFactory.create({}, { transient: transientParams }))
 				.id;
 
-		return timeSlotService.create({ ...input, courseId }, opts);
+		return db.timeSlot.create({ ...input, courseId }, opts);
 	});
 
 	return buildTimeSlot(sequence, params);

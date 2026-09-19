@@ -1,12 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { prisma } from "@/db/client";
-import { calendarEventService } from "@/db/services/calendar-event.service";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { timeSlotService } from "@/db/services/time-slot.service";
-import { userService } from "@/db/services/user.service";
 
 // A random suffix, not an incrementing counter: this file's `tag()` numbering
 // would otherwise collide with identically-named counters in sibling spec
@@ -18,7 +13,7 @@ function tag(prefix: string): string {
 
 async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 	const username = tag(role.toLowerCase());
-	return userService.create(
+	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
@@ -33,8 +28,8 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 }
 
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await editionService.findOne({ slug }))) {
-		await editionService.create(
+	if (!(await db.edition.findOne({ slug }))) {
+		await db.edition.create(
 			{
 				slug,
 				name: slug,
@@ -49,12 +44,12 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 
 async function makeCourse(instructorUsername: string) {
 	const disciplineSlug = tag("disc");
-	await disciplineService.create(
+	await db.discipline.create(
 		{ slug: disciplineSlug, name: disciplineSlug },
 		FULL_ACCESS,
 	);
 	const editionSlug = await ensureEdition();
-	return courseService.create(
+	return db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
@@ -72,7 +67,7 @@ test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot runn
 	const opts = { actor: instructor };
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "a",
@@ -85,7 +80,7 @@ test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot runn
 	).rejects.toThrow();
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "b",
@@ -98,7 +93,7 @@ test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot runn
 	).rejects.toThrow();
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "c",
@@ -111,7 +106,7 @@ test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot runn
 	).rejects.toThrow();
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "d",
@@ -129,7 +124,7 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	await timeSlotService.create(
+	await db.timeSlot.create(
 		{
 			courseId: course.id,
 			slug: "mon",
@@ -142,7 +137,7 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 
 	// Overlaps [840, 960): starts inside it.
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "mon2",
@@ -156,7 +151,7 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 
 	// Adjacent, not overlapping: starts exactly when the first ends.
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "mon3",
@@ -170,7 +165,7 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 
 	// Different weekday, same minutes: no conflict.
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "tue",
@@ -189,7 +184,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	const courseB = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	await timeSlotService.create(
+	await db.timeSlot.create(
 		{
 			courseId: courseA.id,
 			slug: "mon",
@@ -201,7 +196,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	);
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: courseA.id,
 				slug: "mon",
@@ -214,7 +209,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	).rejects.toThrow();
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: courseB.id,
 				slug: "mon",
@@ -232,7 +227,7 @@ test("update moves the hour; the slot's existing events keep their own times", a
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	const slot = await timeSlotService.create(
+	const slot = await db.timeSlot.create(
 		{
 			courseId: course.id,
 			slug: "mon",
@@ -242,7 +237,7 @@ test("update moves the hour; the slot's existing events keep their own times", a
 		},
 		opts,
 	);
-	const event = await calendarEventService.create(
+	const event = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -255,7 +250,7 @@ test("update moves the hour; the slot's existing events keep their own times", a
 		opts,
 	);
 
-	const moved = await timeSlotService.update(
+	const moved = await db.timeSlot.update(
 		{ id: slot.id },
 		{ startMin: 600, durationMin: 90 },
 		opts,
@@ -263,7 +258,7 @@ test("update moves the hour; the slot's existing events keep their own times", a
 	expect(moved.startMin).toBe(600);
 	expect(moved.durationMin).toBe(90);
 
-	const reloaded = await calendarEventService.findOne({ id: event.id }, opts);
+	const reloaded = await db.calendarEvent.findOne({ id: event.id }, opts);
 	expect(reloaded?.startAt.getTime()).toBe(event.startAt.getTime());
 	expect(reloaded?.durationMin).toBe(event.durationMin);
 });
@@ -273,7 +268,7 @@ test("delete throws while events reference the slot, naming the count, and succe
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	const slot = await timeSlotService.create(
+	const slot = await db.timeSlot.create(
 		{
 			courseId: course.id,
 			slug: "mon",
@@ -283,7 +278,7 @@ test("delete throws while events reference the slot, naming the count, and succe
 		},
 		opts,
 	);
-	const event = await calendarEventService.create(
+	const event = await db.calendarEvent.create(
 		{
 			courseId: course.id,
 			timeSlotId: slot.id,
@@ -296,13 +291,11 @@ test("delete throws while events reference the slot, naming the count, and succe
 		opts,
 	);
 
-	await expect(timeSlotService.delete({ id: slot.id }, opts)).rejects.toThrow(
-		/1/,
-	);
+	await expect(db.timeSlot.delete({ id: slot.id }, opts)).rejects.toThrow(/1/);
 
-	await calendarEventService.delete({ id: event.id }, opts);
+	await db.calendarEvent.delete({ id: event.id }, opts);
 	await expect(
-		timeSlotService.delete({ id: slot.id }, opts),
+		db.timeSlot.delete({ id: slot.id }, opts),
 	).resolves.toBeUndefined();
 });
 
@@ -313,7 +306,7 @@ test("an instructor writes their own course's slots; another instructor and a no
 	const course = await makeCourse(instructor.username);
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "mon",
@@ -326,7 +319,7 @@ test("an instructor writes their own course's slots; another instructor and a no
 	).resolves.toMatchObject({ slug: "mon" });
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "tue",
@@ -339,7 +332,7 @@ test("an instructor writes their own course's slots; another instructor and a no
 	).rejects.toThrow();
 
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: course.id,
 				slug: "wed",
@@ -353,7 +346,7 @@ test("an instructor writes their own course's slots; another instructor and a no
 
 	const adminCourse = await makeCourse(admin.username);
 	await expect(
-		timeSlotService.create(
+		db.timeSlot.create(
 			{
 				courseId: adminCourse.id,
 				slug: "mon",
@@ -371,7 +364,7 @@ test("upsert creates on first call, updates the same slot on the second, and a d
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	const created = await timeSlotService.upsert(
+	const created = await db.timeSlot.upsert(
 		{
 			courseId: course.id,
 			slug: "upsert-slot",
@@ -384,7 +377,7 @@ test("upsert creates on first call, updates the same slot on the second, and a d
 	);
 	expect(created.title).toBe("Before");
 
-	const updated = await timeSlotService.upsert(
+	const updated = await db.timeSlot.upsert(
 		{
 			courseId: course.id,
 			slug: "upsert-slot",
@@ -400,7 +393,7 @@ test("upsert creates on first call, updates the same slot on the second, and a d
 	expect(updated.title).toBeNull(); // cleared
 	expect(updated.day).toBe("MONDAY"); // untouched
 
-	const other = await timeSlotService.upsert(
+	const other = await db.timeSlot.upsert(
 		{
 			courseId: course.id,
 			slug: "upsert-slot-2",
@@ -418,7 +411,7 @@ test("upsert enforces the overlap rule against other slots, but not against the 
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
-	await timeSlotService.upsert(
+	await db.timeSlot.upsert(
 		{
 			courseId: course.id,
 			slug: "existing",
@@ -430,7 +423,7 @@ test("upsert enforces the overlap rule against other slots, but not against the 
 	);
 
 	await expect(
-		timeSlotService.upsert(
+		db.timeSlot.upsert(
 			{
 				courseId: course.id,
 				slug: "overlapping",
@@ -444,7 +437,7 @@ test("upsert enforces the overlap rule against other slots, but not against the 
 
 	// Re-upserting "existing" with a shifted window must not collide with itself.
 	await expect(
-		timeSlotService.upsert(
+		db.timeSlot.upsert(
 			{
 				courseId: course.id,
 				slug: "existing",
@@ -464,7 +457,7 @@ test("an upsert nested in the caller's tx rolls back with it, proving it reuses 
 
 	await expect(
 		prisma.$transaction(async (tx) => {
-			await timeSlotService.upsert(
+			await db.timeSlot.upsert(
 				{
 					courseId: course.id,
 					slug: "tx-slot",
@@ -478,7 +471,7 @@ test("an upsert nested in the caller's tx rolls back with it, proving it reuses 
 		}),
 	).rejects.toThrow("rollback");
 
-	const found = await timeSlotService.findOne(
+	const found = await db.timeSlot.findOne(
 		{ ref: { courseId: course.id, slug: "tx-slot" } },
 		opts,
 	);

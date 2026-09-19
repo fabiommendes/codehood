@@ -1,12 +1,5 @@
-import { FULL_ACCESS } from "@/core/actor";
-import { calendarEventService } from "@/db/services/calendar-event.service";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { fileService } from "@/db/services/file.service";
-import { resourceService } from "@/db/services/resource.service";
-import { timeSlotService } from "@/db/services/time-slot.service";
-import { type User, userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db, type User } from "@/db";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -31,7 +24,7 @@ export function ensureDevAdmin(): Promise<void> {
 }
 
 async function createDevAdminIfMissing(): Promise<void> {
-	if ((await userService.findMany({ take: 1 }, FULL_ACCESS)).length > 0) {
+	if ((await db.user.findMany({ take: 1 }, FULL_ACCESS)).length > 0) {
 		console.log("[seed] users already exist, skipping default admin account.");
 		return;
 	}
@@ -80,7 +73,7 @@ export function ensureDemoCourses(): Promise<void> {
 }
 
 async function createDemoCoursesIfMissing(): Promise<void> {
-	const existing = await courseService.findMany({}, FULL_ACCESS);
+	const existing = await db.course.findMany({}, FULL_ACCESS);
 	if (existing.length > 0) {
 		console.log("[seed] courses already exist, skipping demo courses.");
 		return;
@@ -133,7 +126,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		{ slug: "cs101", name: "Introduction to Programming" },
 		{ slug: "cs201", name: "Data Structures" },
 	]) {
-		await disciplineService.create(discipline, FULL_ACCESS);
+		await db.discipline.create(discipline, FULL_ACCESS);
 	}
 
 	// Two terms: 2026-1 is the one the demo courses run in, fixed safely in the
@@ -161,10 +154,10 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			endAt: liveEnd,
 		},
 	]) {
-		await editionService.create(edition, FULL_ACCESS);
+		await db.edition.create(edition, FULL_ACCESS);
 	}
 
-	const cs101 = await courseService.create(
+	const cs101 = await db.course.create(
 		{
 			discipline: "cs101",
 			instructor: ada.username,
@@ -176,7 +169,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	const cs201 = await courseService.create(
+	const cs201 = await db.course.create(
 		{
 			discipline: "cs201",
 			instructor: alan.username,
@@ -190,74 +183,79 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 
 	for (const student of [hopper, hamilton, liskov, bob]) {
-		await courseService.enroll(
-			{ courseId: cs101.id, userId: student.username },
+		await db.enrollment.create(
+			{ courseId: cs101.id, username: student.username },
 			FULL_ACCESS,
 		);
 	}
 
 	for (const student of [liskov, bob]) {
-		await courseService.enroll(
-			{ courseId: cs201.id, userId: student.username },
+		await db.enrollment.create(
+			{ courseId: cs201.id, username: student.username },
 			FULL_ACCESS,
 		);
 	}
 
 	// One resource of each type, so /resources has something real to show —
 	// see dev/specs/to-do/resources.md.
-	const syllabusFile = await fileService.create(
-		{
-			bytes: Buffer.from(
-				"CS101 Syllabus\n\nGrading: 40% exams, 30% homework, 30% participation.\nOffice hours: Tuesdays 2-4pm.\n",
-			),
-			mimeType: "text/plain",
-		},
-		FULL_ACCESS,
+	const syllabusFileBuffer = Buffer.from(
+		"CS101 Syllabus\n\nGrading: 40% exams, 30% homework, 30% participation.\nOffice hours: Tuesdays 2-4pm.\n",
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs101.id,
 			slug: "syllabus",
-			type: "FILE",
 			title: "Syllabus",
 			description: "Grading, schedule, and course policy.",
-			fileId: syllabusFile.id,
-			contentHash: "demo-syllabus-v1",
+			data: {
+				type: "FILE",
+				buffer: syllabusFileBuffer,
+				filename: "syllabus.txt",
+			},
+			ref: "syllabus-hash",
 		},
 		FULL_ACCESS,
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs101.id,
 			slug: "sicp-ch1",
-			type: "LINK",
 			title: "SICP, chapter 1",
-			data: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/6515/sicp.zip/full-text/book/book-Z-H-10.html",
-			contentHash: "demo-sicp-v1",
+			data: {
+				type: "LINK",
+				url: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/6515/sicp.zip/full-text/book/book-Z-H-10.html",
+			},
+			ref: "demo-sicp-v1",
 		},
 		FULL_ACCESS,
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs101.id,
 			slug: "toolchain",
-			type: "MD",
 			title: "Setting up your toolchain",
 			description: "Local dev environment, in three steps.",
-			data: "Install Node 22 and `pnpm`, then run `pnpm dev`.\n\n- Clone the course repository\n- Run `pnpm install`\n- Ask on the forum if anything fails",
-			contentHash: "demo-toolchain-v1",
+			data: {
+				type: "MD",
+				content:
+					"Install Node 22 and `pnpm`, then run `pnpm dev`.\n\n- Clone the course repository\n- Run `pnpm install`\n- Ask on the forum if anything fails",
+			},
+			ref: "demo-toolchain-v1",
 		},
 		FULL_ACCESS,
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs101.id,
 			slug: "factorial",
-			type: "CODE",
 			title: "factorial.py",
-			extra: "python",
-			data: "def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n",
-			contentHash: "demo-factorial-v1",
+			data: {
+				type: "CODE",
+				language: "python",
+				content:
+					"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n",
+			},
+			ref: "demo-factorial-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -265,60 +263,65 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// cs201 gets its own small set, themed for data structures rather than a
 	// copy of cs101's — an empty second course would leave /admin/courses
 	// looking like resources only ever land on the first one seeded.
-	const bigOFile = await fileService.create(
-		{
-			bytes: Buffer.from(
-				"CS201 Cheat Sheet\n\nArray: O(1) index, O(n) insert/delete.\nLinked list: O(n) index, O(1) insert/delete at a known node.\nBalanced tree: O(log n) search/insert/delete.\nHash table: O(1) average, O(n) worst case.\n",
-			),
-			mimeType: "text/plain",
-		},
-		FULL_ACCESS,
+	const bigOFile = Buffer.from(
+		"CS201 Cheat Sheet\n\nArray: O(1) index, O(n) insert/delete.\nLinked list: O(n) index, O(1) insert/delete at a known node.\nBalanced tree: O(log n) search/insert/delete.\nHash table: O(1) average, O(n) worst case.\n",
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs201.id,
 			slug: "complexity-cheat-sheet",
-			type: "FILE",
 			title: "Complexity cheat sheet",
 			description: "Time complexity for the structures covered this term.",
-			fileId: bigOFile.id,
-			contentHash: "demo-cheatsheet-v1",
+			data: {
+				type: "FILE",
+				buffer: bigOFile,
+				filename: "complexity-cheat-sheet.txt",
+			},
+			ref: "demo-cheatsheet-v1",
 		},
 		FULL_ACCESS,
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs201.id,
 			slug: "clrs-trees",
-			type: "LINK",
 			title: "CLRS, chapter 12: Binary search trees",
-			data: "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
-			contentHash: "demo-clrs-v1",
+			data: {
+				type: "LINK",
+				url: "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
+			},
+			ref: "demo-clrs-v1",
 		},
 		FULL_ACCESS,
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs201.id,
 			slug: "when-to-use-what",
-			type: "MD",
 			title: "Which structure, when",
 			description:
 				"A rule of thumb for picking a structure under time pressure.",
-			data: "Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array — you can always change it once a profiler tells you to.",
-			contentHash: "demo-when-to-use-v1",
+			data: {
+				type: "MD",
+				content:
+					"Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array — you can always change it once a profiler tells you to.",
+			},
+			ref: "demo-when-to-use-v1",
 		},
 		FULL_ACCESS,
 	);
-	await resourceService.create(
+	await db.resource.create(
 		{
 			courseId: cs201.id,
 			slug: "linked-list-node",
-			type: "CODE",
 			title: "linked_list.py",
-			extra: "python",
-			data: "class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n",
-			contentHash: "demo-linkedlist-v1",
+			data: {
+				type: "CODE",
+				language: "python",
+				content:
+					"class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n",
+			},
+			ref: "demo-linkedlist-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -328,7 +331,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// data to render (dev/specs/to-review/calendar.md). cs101 gets a holiday
 	// and a cancelled lab so the muted/struck-through rendering has something
 	// to show.
-	const cs101Mon = await timeSlotService.create(
+	const cs101Mon = await db.timeSlot.create(
 		{
 			courseId: cs101.id,
 			slug: "mon",
@@ -339,7 +342,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	const cs101Wed = await timeSlotService.create(
+	const cs101Wed = await db.timeSlot.create(
 		{
 			courseId: cs101.id,
 			slug: "wed",
@@ -422,7 +425,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			description: "Instructor traveling; make-up session posted online.",
 		},
 	]) {
-		await calendarEventService.create(
+		await db.calendarEvent.create(
 			{
 				courseId: cs101.id,
 				timeSlotId: event.slot.id,
@@ -440,7 +443,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		);
 	}
 
-	const cs201Mon = await timeSlotService.create(
+	const cs201Mon = await db.timeSlot.create(
 		{
 			courseId: cs201.id,
 			slug: "mon",
@@ -475,7 +478,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			title: "Binary search trees",
 		},
 	]) {
-		await calendarEventService.create(
+		await db.calendarEvent.create(
 			{
 				courseId: cs201.id,
 				timeSlotId: cs201Mon.id,
@@ -508,12 +511,12 @@ async function demoUser(input: {
 	role: "INSTRUCTOR" | "STUDENT" | "ADMIN";
 	password?: string;
 }): Promise<User> {
-	const existing = await userService.findOne(
+	const existing = await db.user.findOne(
 		{ username: input.username },
 		FULL_ACCESS,
 	);
 	if (existing) return existing;
-	return userService.create(
+	return db.user.create(
 		{
 			...input,
 			githubId: input.username,

@@ -35,6 +35,7 @@ export function parseByteSize(value: string): number {
 		throw new Error(`Invalid byte size: "${value}"`);
 	}
 	const [, amount, suffix] = match;
-	const unit = BYTE_UNITS[suffix ?? "b"];
+	// biome-ignore lint/style/noNonNullAssertion: suffix is undefined (defaulted to "b") or one of the regex's b|kb|mb|gb alternatives — always a BYTE_UNITS key.
+	const unit = BYTE_UNITS[suffix ?? "b"]!;
 	return Math.round(Number(amount) * unit);
 }

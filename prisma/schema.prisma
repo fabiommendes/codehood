@@ -1,3 +1,18 @@
+/// General guidelines
+/// 
+/// * No UUIDs as primary keys: auto-incrementing integers are simpler and
+///   more efficient. This is not a distributed system, so no coordination is 
+///   needed.
+/// * Most models should have some sort of Natural Key. It is not necessarely the
+///   primary key in the database, but something that can uniquely identify the 
+///   record with only user-visible information. The REST Api should use this.
+/// * Public-facing identifiers should be separate from the primary key and unique.
+/// * Sometimes we want a "public-facing" identifier in URLs slugs but no natural
+///   key exists. In those cases, use a separate `publicId` field
+///   with a unique constraint. We default to it being a random string of 10 
+///   URL-safe characters. It must be generated in the service layer with something like
+///   `nanoid(10)` since the DB cannot do it itself.
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -54,7 +69,6 @@ model User {
   courses          Course[]
   enrollments      Enrollment[]
   attachments      Attachment[]
-  questionRefs     QuestionRef[]
   responses        Response[]
   submissions      Submission[]
   exams            Exam[]
@@ -76,12 +90,12 @@ model GroupMembership {
   groupId Int
   group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  user   User   @relation(fields: [userId], references: [username], onDelete: Cascade)
-  userId String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+  username String
 
   isAdmin Boolean @default(false)
 
-  @@unique([groupId, userId])
+  @@unique([groupId, username])
 }
 
 model Session {
@@ -90,8 +104,8 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [username], onDelete: Cascade)
+  username String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
 }
 
 model ApiKey {
@@ -140,34 +154,10 @@ model InviteRedemption {
   invite   Invite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
 
   /// User who redeemed the invite.
-  user   User   @relation(fields: [userId], references: [username])
-  userId String @unique
+  user     User   @relation(fields: [username], references: [username])
+  username String @unique
 
   redeemedAt DateTime @default(now())
-}
-
-//==============================================================================
-// System data
-//==============================================================================
-model File {
-  // AUDIT: is it vulnerable to enumeration attacks?
-  id Int @id @default(autoincrement())
-
-  /// A hash of the file contents used as a slug part when creating urls for the
-  /// file. This is used to derive URLs and also to store the file in the
-  /// filesystem.
-  slugHash String @unique
-
-  mimeType String
-  size     Int
-
-  /// Set when the bytes are removed from disk; the row survives as a
-  /// tombstone so the URL can explain itself instead of 404ing (FR-SYNC-013,
-  /// FR-SYNC-015).
-  deletedAt DateTime?
-
-  createdAt DateTime   @default(now())
-  resources Resource[]
 }
 
 // =============================================================================
@@ -210,25 +200,28 @@ model Attachment {
   /// the last segment of the blob URL.
   filename String
 
-  /// Per use-site, never per bytes.
+  /// Per use-site, never per bytes. Same file can be served under different 
+  /// names by different owners. e.g., an empty text file can be basically 
+  /// anything that is text-based.
   mimeType String
 
   /// Charged for these bytes. Nullable so deleting a user does not delete the
   /// material they uploaded; the quota charge leaves with them.
-  uploaderUsername String?
-  uploader         User?   @relation(fields: [uploaderUsername], references: [username], onDelete: SetNull)
+  uploaderId String? @map("uploaderUsername")
+  uploader   User?   @relation(fields: [uploaderId], references: [username], onDelete: SetNull)
 
   /// Polymorphic owner. SQLite cannot cascade this, so every owner service
   /// detaches in its own delete.
-  ownerType AttachmentOwner
-  ownerId   Int
+  attachedToType AttachmentOwner
+  attachedToId   Int
 
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
+  resources Resource[]
 
-  @@unique([hash, filename, ownerType, ownerId])
-  @@index([ownerType, ownerId])
+  @@unique([hash, filename, attachedToType, attachedToId])
+  @@index([attachedToType, attachedToId])
   @@index([hash])
-  @@index([uploaderUsername])
+  @@index([uploaderId])
 }
 
 // =============================================================================
@@ -281,6 +274,7 @@ model Course {
   passphrases        Passphrase[]
   exams              Exam[]
   questionForCourses QuestionForCourse[]
+  questions          QuestionRef[]
   enrollments        Enrollment[]
   resources          Resource[]
   invites            Invite[]
@@ -293,8 +287,7 @@ model Discipline {
   name      String
   createdAt DateTime @default(now())
 
-  courses   Course[]
-  questions QuestionRef[]
+  courses Course[]
 }
 
 /// An academic term, managed by admins. `slug` is the token that appears in
@@ -320,15 +313,15 @@ model Enrollment {
   id     Int              @id @default(autoincrement())
   status EnrollmentStatus @default(ACTIVE)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [username], onDelete: Cascade)
+  username String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
 
   courseId Int
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  @@unique([userId, courseId])
+  @@unique([username, courseId])
 }
 
 model Passphrase {
@@ -413,13 +406,21 @@ enum ResourceType {
   MD
 }
 
-/// Resource is modelled after the folowing enum:
+/// Resource is modelled after the folowing struct:
 ///
-///   type Resource 
-///       = { type: "link", url: string, title: string, description?: string }
-///       | { type: "file", fileId: string, title: string, description?: string }
-///       | { type: "md", title: string, description?: string, content: string }
-///       | { type: "code", title: string, description?: string, content: string, language: string }
+///   type Resource = {
+///     id: string
+///     title: string
+///     description?: string
+///     contentHash: string
+///     data: ResourceData
+///   }
+///
+///   type ResourceData
+///       = { type: "LINK", url: string }
+///       | { type: "FILE", attachmentId: string }
+///       | { type: "MD", content: string }
+///       | { type: "CODE", content: string, language: string }
 ///
 /// This cannot be represeted cleanly in the DB, hence we denormalize some
 /// fields in a table.
@@ -430,8 +431,7 @@ model Resource {
   courseId Int
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  /// Natural key from the repository path — FR-SYNC-010. Renaming a file in
-  /// the repository is a delete plus a create (FR-SYNC-011).
+  /// Natural key from the repository path
   slug String
 
   title       String
@@ -443,11 +443,11 @@ model Resource {
   /// Language, for CODE resources. Null for LINK, FILE and MD resources.
   extra String?
 
-  fileId Int?
-  file   File? @relation(fields: [fileId], references: [id])
+  attachmentId Int?
+  attachment   Attachment? @relation(fields: [attachmentId], references: [id])
 
   /// Supplied by the writer, opaque to the server.
-  contentHash String
+  ref String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -465,11 +465,17 @@ enum QuestionStatus {
   PUBLISHED
 }
 
+/// The set of question types the server supports. Mirrors mdq's discriminator
+/// (`multiple-choice`, ...), which cannot be spelled here because a Prisma enum
+/// value takes no hyphen; `src/core/schemas/question.ts` pins the two sets together.
 enum QuestionType {
   MULTIPLE_CHOICE
   MULTIPLE_SELECTION
   TRUE_FALSE
   ESSAY
+  NUMERIC
+  SHORT_ANSWER
+  FILL_IN
 }
 
 /// A QuestionRef is the main entity representing a unique question in the system.
@@ -487,20 +493,14 @@ enum QuestionType {
 /// later on.
 model QuestionRef {
   id       Int    @id @default(autoincrement())
-  publicId String
+  publicId String @unique
   slug     String
 
   status QuestionStatus @default(DRAFT)
   type   QuestionType
 
-  disciplineSlug String
-  discipline     Discipline @relation(fields: [disciplineSlug], references: [slug])
-
-  authorId String
-  author   User   @relation(fields: [authorId], references: [username])
-
-  groupId Int?
-  group   Group? @relation(fields: [groupId], references: [id])
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   latestId Int?
   latest   QuestionData? @relation(fields: [latestId], references: [id], name: "latestVersion")
@@ -513,8 +513,10 @@ model QuestionRef {
   questionsForExams  QuestionsForExam[]
   questionForCourses QuestionForCourse[]
   responses          Response[]
+  group              Group?              @relation(fields: [groupId], references: [id])
+  groupId            Int?
 
-  @@unique([slug, authorId, disciplineSlug])
+  @@unique([slug, courseId])
 }
 
 model QuestionData {
@@ -524,9 +526,15 @@ model QuestionData {
   refId Int
   ref   QuestionRef @relation(fields: [refId], references: [id])
 
-  title   String
-  stem    String
-  payload Json
+  title String
+  stem  String
+
+  /// What a student may see, stored on its own so a student-facing read never
+  /// selects the other half. Reassembled with `privatePayload` for grading.
+  publicPayload  Json
+  /// Everything the public half leaves out: the answer key, per-choice scores
+  /// and feedback, instructor comments.
+  privatePayload Json
 
   createdAt DateTime @default(now())
 

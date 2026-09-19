@@ -1,10 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import {
-	type Blob,
-	type BlobCreate,
-	blobService,
-} from "@/db/services/blob.service";
+import { type Blob, type BlobCreate, db } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
 function buildBlob(sequence: number): BlobCreate {
@@ -24,7 +20,7 @@ export const persistedBlobFactory = Factory.define<
 	PersistParams,
 	Blob
 >(({ sequence, transientParams, onCreate }) => {
-	onCreate((input) => blobService.create(input, serviceOpts(transientParams)));
+	onCreate((input) => db.blob.create(input, serviceOpts(transientParams)));
 
 	return buildBlob(sequence);
 });

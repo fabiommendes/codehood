@@ -1,13 +1,11 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import {
-	type User,
-	type UserCreate,
-	userService,
-} from "@/db/services/user.service";
+import { db, type User, type UserCreate } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
-/** A username matching `USERNAME_RE`: lowercase, starts alphanumeric, 2-31 chars. */
+/**
+ * A username matching `USERNAME_RE`: lowercase, starts alphanumeric, 2-31 chars.
+ */
 function fakeUsername(sequence: number): string {
 	const base = faker.internet
 		.username()
@@ -43,7 +41,7 @@ export const persistedUserFactory = Factory.define<
 	PersistParams,
 	User
 >(({ sequence, params, transientParams, onCreate }) => {
-	onCreate((input) => userService.create(input, serviceOpts(transientParams)));
+	onCreate((input) => db.user.create(input, serviceOpts(transientParams)));
 
 	return buildUser(sequence, params);
 });

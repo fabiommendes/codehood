@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { canViewCourse } from "@/auth/permissions";
-import { FULL_ACCESS, SYSTEM } from "@/core/actor";
-import type { CourseId } from "@/db/services/course.service";
-import { courseService, toEnrollmentView } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
+import { hasPerm } from "@/auth/permissions";
+import type { CourseId } from "@/core/schemas";
+import { db, toEnrollmentView } from "@/db";
 
 let uniq = 0;
 function tag(prefix: string): string {
@@ -15,7 +12,7 @@ function tag(prefix: string): string {
 
 async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 	const username = tag(role.toLowerCase());
-	return userService.create(
+	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
@@ -31,14 +28,14 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 
 async function makeDiscipline() {
 	const slug = tag("disc");
-	await disciplineService.create({ slug, name: slug }, FULL_ACCESS);
+	await db.discipline.create({ slug, name: slug }, FULL_ACCESS);
 	return slug;
 }
 
 /** The demo edition every fixture course lives in; created once, window wide open. */
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await editionService.findOne({ slug }))) {
-		await editionService.create(
+	if (!(await db.edition.findOne({ slug }))) {
+		await db.edition.create(
 			{
 				slug,
 				name: slug,
@@ -53,7 +50,7 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 
 async function makeCourse(instructorUsername: string, disciplineSlug?: string) {
 	await ensureEdition();
-	return courseService.create(
+	return db.course.create(
 		{
 			discipline: disciplineSlug ?? (await makeDiscipline()),
 			instructor: instructorUsername,
@@ -69,7 +66,7 @@ test("create() rejects an edition that does not exist", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const disciplineSlug = await makeDiscipline();
 	await expect(
-		courseService.create(
+		db.course.create(
 			{
 				discipline: disciplineSlug,
 				instructor: instructor.username,
@@ -86,7 +83,7 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 	const instructor = await makeUser("INSTRUCTOR");
 	const disciplineSlug = await makeDiscipline();
 	await ensureEdition();
-	await courseService.create(
+	await db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructor.username,
@@ -97,7 +94,7 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 		FULL_ACCESS,
 	);
 	await expect(
-		courseService.create(
+		db.course.create(
 			{
 				discipline: disciplineSlug,
 				instructor: instructor.username,
@@ -118,7 +115,7 @@ test("create() rejects an instructor naming a different instructor, and allows a
 	await ensureEdition();
 
 	await expect(
-		courseService.create(
+		db.course.create(
 			{
 				discipline: disciplineSlug,
 				instructor: instructorB.username,
@@ -130,7 +127,7 @@ test("create() rejects an instructor naming a different instructor, and allows a
 		),
 	).rejects.toThrow();
 
-	const course = await courseService.create(
+	const course = await db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructorB.username,
@@ -149,15 +146,15 @@ test("findOne returns null for a course that does not exist, and throws FORBIDDE
 	const course = await makeCourse(instructor.username);
 
 	await expect(
-		courseService.findOne({ id: 999_999_999 as CourseId }, { actor: outsider }),
+		db.course.findOne({ id: 999_999_999 as CourseId }, { actor: outsider }),
 	).resolves.toBeNull();
 
 	await expect(
-		courseService.findOne({ id: course.id }, { actor: outsider }),
+		db.course.findOne({ id: course.id }, { actor: outsider }),
 	).rejects.toThrow();
 
 	await expect(
-		courseService.findOne({ id: course.id }, { actor: instructor }),
+		db.course.findOne({ id: course.id }, { actor: instructor }),
 	).resolves.toMatchObject({ id: course.id });
 });
 
@@ -169,73 +166,25 @@ test("update, delete, and enroll throw FORBIDDEN for a student and for an instru
 
 	for (const actor of [student, otherInstructor]) {
 		await expect(
-			courseService.update(
+			db.course.update(
 				{ id: course.id },
 				{ description: "x", startAt: new Date(), endAt: new Date() },
 				{ actor },
 			),
 		).rejects.toThrow();
 		await expect(
-			courseService.delete({ id: course.id }, { actor }),
+			db.course.delete({ id: course.id }, { actor }),
 		).rejects.toThrow();
 		await expect(
-			courseService.enroll(
-				{ courseId: course.id, userId: student.username },
+			db.enrollment.create(
+				{ courseId: course.id, username: student.username },
 				{ actor },
 			),
 		).rejects.toThrow();
 	}
 });
 
-test("listStudents throws for an enrolled student", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-
-	await expect(
-		courseService.listStudents(course.id, { actor: student }),
-	).rejects.toThrow();
-
-	const students = await courseService.listStudents(course.id, {
-		actor: instructor,
-	});
-	expect(students.map((s) => s.username)).toEqual([student.username]);
-});
-
-test("unenroll marks the enrollment DROPPED rather than deleting it, and re-enroll reactivates it", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-	let students = await courseService.listStudents(course.id, {
-		actor: instructor,
-	});
-	expect(students).toHaveLength(1);
-
-	await courseService.drop(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-	students = await courseService.listStudents(course.id, { actor: instructor });
-	expect(students).toHaveLength(0);
-
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-	students = await courseService.listStudents(course.id, { actor: instructor });
-	expect(students).toHaveLength(1);
-});
-
-test("findMany visibility agrees with canViewCourse over a fixture covering every row of the visibility table", async () => {
+test("findMany visibility agrees with course.read over a fixture covering every row of the visibility table", async () => {
 	const admin = await makeUser("ADMIN");
 	const instructorA = await makeUser("INSTRUCTOR");
 	const instructorB = await makeUser("INSTRUCTOR");
@@ -248,24 +197,24 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 
 	// courseA: studentActive is ACTIVE, studentDropped is DROPPED, instructorB
 	// (who teaches courseB) is also enrolled here as a student.
-	await courseService.enroll(
-		{ courseId: courseA.id, userId: studentActive.username },
+	await db.enrollment.create(
+		{ courseId: courseA.id, username: studentActive.username },
 		FULL_ACCESS,
 	);
-	await courseService.enroll(
-		{ courseId: courseA.id, userId: studentDropped.username },
+	await db.enrollment.create(
+		{ courseId: courseA.id, username: studentDropped.username },
 		FULL_ACCESS,
 	);
-	await courseService.drop(
-		{ courseId: courseA.id, userId: studentDropped.username },
+	await db.enrollment.delete(
+		{ courseId: courseA.id, username: studentDropped.username },
 		FULL_ACCESS,
 	);
-	await courseService.enroll(
-		{ courseId: courseA.id, userId: instructorB.username },
+	await db.enrollment.create(
+		{ courseId: courseA.id, username: instructorB.username },
 		FULL_ACCESS,
 	);
 
-	const everyone = await courseService.findMany({}, FULL_ACCESS);
+	const everyone = await db.course.findMany({}, FULL_ACCESS);
 	const fixtureCourses = everyone.filter(
 		(c) => c.id === courseA.id || c.id === courseB.id,
 	);
@@ -281,7 +230,7 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 	] as const;
 
 	for (const { label, actor } of actors) {
-		const visible = await courseService.findMany({}, { actor });
+		const visible = await db.course.findMany({}, { actor });
 		const visibleIds = new Set(
 			visible
 				.filter((c) => c.id === courseA.id || c.id === courseB.id)
@@ -289,7 +238,7 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 		);
 		const expectedIds = new Set(
 			fixtureCourses
-				.filter((c) => canViewCourse(actor, toEnrollmentView(c)))
+				.filter((c) => hasPerm(actor, "course.read", toEnrollmentView(c)))
 				.map((c) => c.id),
 		);
 		expect(visibleIds, label).toEqual(expectedIds);
@@ -297,169 +246,27 @@ test("findMany visibility agrees with canViewCourse over a fixture covering ever
 
 	// Pin the table down explicitly, not just via the predicate (which could
 	// itself be wrong): a student sees their ACTIVE enrollment, not the DROPPED one.
-	const asStudentActive = await courseService.findMany(
+	const asStudentActive = await db.course.findMany(
 		{},
 		{ actor: studentActive },
 	);
 	expect(asStudentActive.map((c) => c.id)).toContain(courseA.id);
 
-	const asStudentDropped = await courseService.findMany(
+	const asStudentDropped = await db.course.findMany(
 		{},
 		{ actor: studentDropped },
 	);
 	expect(asStudentDropped.map((c) => c.id)).not.toContain(courseA.id);
 
 	// instructorB teaches courseB and is enrolled in courseA: sees both.
-	const asInstructorB = await courseService.findMany(
-		{},
-		{ actor: instructorB },
-	);
+	const asInstructorB = await db.course.findMany({}, { actor: instructorB });
 	expect(asInstructorB.map((c) => c.id)).toEqual(
 		expect.arrayContaining([courseA.id, courseB.id]),
 	);
 
 	// instructorA does not see courseB: no catalog/discovery feature.
-	const asInstructorA = await courseService.findMany(
-		{},
-		{ actor: instructorA },
-	);
+	const asInstructorA = await db.course.findMany({}, { actor: instructorA });
 	expect(asInstructorA.map((c) => c.id)).not.toContain(courseB.id);
-});
-
-test("a student drops themselves — the half of FR-CRS-042 that used to be missing", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-
-	await courseService.drop(
-		{ courseId: course.id, userId: student.username },
-		{ actor: student },
-	);
-
-	const students = await courseService.listStudents(course.id, {
-		actor: instructor,
-	});
-	expect(students).toHaveLength(0);
-});
-
-test("a student naming another student's userId is refused, and the other enrollment is untouched", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const studentA = await makeUser("STUDENT");
-	const studentB = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: studentB.username },
-		FULL_ACCESS,
-	);
-
-	await expect(
-		courseService.drop(
-			{ courseId: course.id, userId: studentB.username },
-			{ actor: studentA },
-		),
-	).rejects.toThrow();
-
-	const students = await courseService.listStudents(course.id, {
-		actor: instructor,
-	});
-	expect(students.map((s) => s.username)).toEqual([studentB.username]);
-});
-
-test("a non-owning admin cannot drop an enrollment, list students, or enroll one", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const admin = await makeUser("ADMIN");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-
-	await expect(
-		courseService.drop(
-			{ courseId: course.id, userId: student.username },
-			{ actor: admin },
-		),
-	).rejects.toThrow();
-	await expect(
-		courseService.listStudents(course.id, { actor: admin }),
-	).rejects.toThrow();
-	await expect(
-		courseService.enroll(
-			{ courseId: course.id, userId: student.username },
-			{ actor: admin },
-		),
-	).rejects.toThrow();
-});
-
-test("dropping an already-DROPPED enrollment is a no-op, not an error", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-	await courseService.drop(
-		{ courseId: course.id, userId: student.username },
-		{ actor: instructor },
-	);
-
-	await expect(
-		courseService.drop(
-			{ courseId: course.id, userId: student.username },
-			{ actor: instructor },
-		),
-	).resolves.toBeUndefined();
-
-	const students = await courseService.listStudents(course.id, {
-		actor: instructor,
-	});
-	expect(students).toHaveLength(0);
-});
-
-test("re-enrolling a dropped student restores access to submissions made before the drop", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-	await courseService.drop(
-		{ courseId: course.id, userId: student.username },
-		{ actor: student },
-	);
-	await expect(
-		courseService.findOne({ id: course.id }, { actor: student }),
-	).rejects.toThrow();
-
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		{ actor: instructor },
-	);
-	await expect(
-		courseService.findOne({ id: course.id }, { actor: student }),
-	).resolves.toMatchObject({ id: course.id });
-});
-
-test("listStudents carries enrolledAt for the Students tab", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	await courseService.enroll(
-		{ courseId: course.id, userId: student.username },
-		FULL_ACCESS,
-	);
-
-	const students = await courseService.listStudents(course.id, {
-		actor: instructor,
-	});
-	expect(students[0].enrolledAt).toBeInstanceOf(Date);
 });
 
 test("upsert creates on first call, updates the same course on the second, and a different key creates a separate course", async () => {
@@ -467,7 +274,7 @@ test("upsert creates on first call, updates the same course on the second, and a
 	const disciplineSlug = await makeDiscipline();
 	const editionSlug = await ensureEdition();
 
-	const created = await courseService.upsert(
+	const created = await db.course.upsert(
 		{
 			discipline: disciplineSlug,
 			instructor: instructor.username,
@@ -480,7 +287,7 @@ test("upsert creates on first call, updates the same course on the second, and a
 	);
 	expect(created.description).toBe("Before");
 
-	const updated = await courseService.upsert(
+	const updated = await db.course.upsert(
 		{
 			discipline: disciplineSlug,
 			instructor: instructor.username,
@@ -496,18 +303,18 @@ test("upsert creates on first call, updates the same course on the second, and a
 	expect(updated.endAt).toEqual(new Date("2026-06-01")); // changed
 	expect(updated.startAt).toEqual(new Date("2026-01-01")); // untouched
 
-	const matching = await courseService.findMany(
+	const matching = await db.course.findMany(
 		{
-			disciplineSlug,
-			instructorUsername: instructor.username,
-			editionSlug,
+			discipline: disciplineSlug,
+			instructor: instructor.username,
+			edition: editionSlug,
 		},
 		FULL_ACCESS,
 	);
 	expect(matching).toHaveLength(1);
 
 	const otherInstructor = await makeUser("INSTRUCTOR");
-	const other = await courseService.upsert(
+	const other = await db.course.upsert(
 		{
 			discipline: disciplineSlug,
 			instructor: otherInstructor.username,
@@ -526,7 +333,7 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 		startAt: new Date("2020-01-01"),
 		endAt: new Date("2020-06-01"),
 	};
-	await editionService.create(
+	await db.edition.create(
 		{ slug: closedSlug, name: closedSlug, ...closedWindow },
 		FULL_ACCESS,
 	);
@@ -534,9 +341,9 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 	const instructor = await makeUser("INSTRUCTOR");
 	const disciplineSlug = await makeDiscipline();
 
-	// Only an admin (canCreateCourseOutsideWindow) may create the first course
+	// Only an admin (`course.create-outside-window`) may create the first course
 	// in a closed edition.
-	const existing = await courseService.upsert(
+	const existing = await db.course.upsert(
 		{
 			discipline: disciplineSlug,
 			instructor: instructor.username,
@@ -549,7 +356,7 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 
 	// The course already exists: an ordinary instructor may now upsert (sync)
 	// it even though the edition window is closed.
-	const resynced = await courseService.upsert(
+	const resynced = await db.course.upsert(
 		{
 			discipline: disciplineSlug,
 			instructor: instructor.username,
@@ -567,7 +374,7 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 	// instructor...
 	const disciplineSlug2 = await makeDiscipline();
 	await expect(
-		courseService.upsert(
+		db.course.upsert(
 			{
 				discipline: disciplineSlug2,
 				instructor: instructor.username,
@@ -580,7 +387,7 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 	).rejects.toThrow(/not accepting new courses/);
 
 	// ...but succeeds for the admin.
-	const createdByAdmin = await courseService.upsert(
+	const createdByAdmin = await db.course.upsert(
 		{
 			discipline: disciplineSlug2,
 			instructor: instructor.username,

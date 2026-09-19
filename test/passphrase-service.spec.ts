@@ -1,10 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/core/actor";
-import { courseService } from "@/db/services/course.service";
-import { disciplineService } from "@/db/services/discipline.service";
-import { editionService } from "@/db/services/edition.service";
-import { passphraseService } from "@/db/services/passphrase.service";
-import { userService } from "@/db/services/user.service";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 
 let uniq = 0;
 function tag(prefix: string): string {
@@ -16,7 +12,7 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 	// Prefixed "pp" (passphrase) so these usernames can't collide with
 	// another spec file's own tag()-generated fixtures sharing the same DB.
 	const username = tag(`pp-${role.toLowerCase()}`);
-	return userService.create(
+	return db.user.create(
 		{
 			email: `${username}@codehood.test`,
 			username,
@@ -31,8 +27,8 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 }
 
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await editionService.findOne({ slug }))) {
-		await editionService.create(
+	if (!(await db.edition.findOne({ slug }))) {
+		await db.edition.create(
 			{
 				slug,
 				name: slug,
@@ -51,8 +47,8 @@ async function makeCourse(instructorUsername: string) {
 	// independent counter over the same literal "disc" prefix, and the two
 	// collide on a shared test database once both reach the same number.
 	const slug = tag("pp-disc");
-	await disciplineService.create({ slug, name: slug }, FULL_ACCESS);
-	return courseService.create(
+	await db.discipline.create({ slug, name: slug }, FULL_ACCESS);
+	return db.course.create(
 		{
 			discipline: slug,
 			instructor: instructorUsername,
@@ -69,7 +65,7 @@ test("create() auto-generates a 6-character code that expires 5 minutes out", as
 	const course = await makeCourse(instructor.username);
 
 	const before = Date.now();
-	const passphrase = await passphraseService.create(
+	const passphrase = await db.passphrase.create(
 		{ courseId: course.id },
 		{ actor: instructor },
 	);
@@ -84,14 +80,14 @@ test("create() accepts an instructor's own override, and refuses one already in 
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 
-	const passphrase = await passphraseService.create(
+	const passphrase = await db.passphrase.create(
 		{ courseId: course.id, value: "PIZZA1" },
 		{ actor: instructor },
 	);
 	expect(passphrase.value).toBe("PIZZA1");
 
 	await expect(
-		passphraseService.create(
+		db.passphrase.create(
 			{ courseId: course.id, value: "PIZZA1" },
 			{ actor: instructor },
 		),
@@ -106,7 +102,7 @@ test("create() throws FORBIDDEN for a student and for an instructor who does not
 
 	for (const actor of [student, otherInstructor]) {
 		await expect(
-			passphraseService.create({ courseId: course.id }, { actor }),
+			db.passphrase.create({ courseId: course.id }, { actor }),
 		).rejects.toThrow();
 	}
 });
@@ -115,26 +111,26 @@ test("a non-owning admin cannot generate, list, update, or delete a course's pas
 	const instructor = await makeUser("INSTRUCTOR");
 	const admin = await makeUser("ADMIN");
 	const course = await makeCourse(instructor.username);
-	const passphrase = await passphraseService.create(
+	const passphrase = await db.passphrase.create(
 		{ courseId: course.id },
 		{ actor: instructor },
 	);
 
 	await expect(
-		passphraseService.create({ courseId: course.id }, { actor: admin }),
+		db.passphrase.create({ courseId: course.id }, { actor: admin }),
 	).rejects.toThrow();
 	await expect(
-		passphraseService.findMany({ courseId: course.id }, { actor: admin }),
+		db.passphrase.findMany({ courseId: course.id }, { actor: admin }),
 	).rejects.toThrow();
 	await expect(
-		passphraseService.update(
+		db.passphrase.update(
 			{ id: passphrase.id },
 			{ expiresAt: new Date() },
 			{ actor: admin },
 		),
 	).rejects.toThrow();
 	await expect(
-		passphraseService.delete({ id: passphrase.id }, { actor: admin }),
+		db.passphrase.delete({ id: passphrase.id }, { actor: admin }),
 	).rejects.toThrow();
 });
 
@@ -142,12 +138,12 @@ test("findOne({ value }) is not actor-filtered — the value itself is the crede
 	const instructor = await makeUser("INSTRUCTOR");
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
-	const passphrase = await passphraseService.create(
+	const passphrase = await db.passphrase.create(
 		{ courseId: course.id, value: "OPEN99" },
 		{ actor: instructor },
 	);
 
-	const found = await passphraseService.findOne(
+	const found = await db.passphrase.findOne(
 		{ value: "OPEN99" },
 		{ actor: student },
 	);
@@ -157,21 +153,21 @@ test("findOne({ value }) is not actor-filtered — the value itself is the crede
 test("the owning instructor can extend expiry and revoke early", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
-	const passphrase = await passphraseService.create(
+	const passphrase = await db.passphrase.create(
 		{ courseId: course.id },
 		{ actor: instructor },
 	);
 
 	const laterExpiry = new Date(Date.now() + 60 * 60 * 1000);
-	const updated = await passphraseService.update(
+	const updated = await db.passphrase.update(
 		{ id: passphrase.id },
 		{ expiresAt: laterExpiry },
 		{ actor: instructor },
 	);
 	expect(updated.expiresAt.getTime()).toBe(laterExpiry.getTime());
 
-	await passphraseService.delete({ id: passphrase.id }, { actor: instructor });
+	await db.passphrase.delete({ id: passphrase.id }, { actor: instructor });
 	await expect(
-		passphraseService.findOne({ id: passphrase.id }, { actor: instructor }),
+		db.passphrase.findOne({ id: passphrase.id }, { actor: instructor }),
 	).resolves.toBeNull();
 });

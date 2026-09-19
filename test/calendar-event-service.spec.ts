@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { canViewCourseContents } from "@/auth/permissions";
-import { FULL_ACCESS, SYSTEM } from "@/core/actor";
+import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
+import { hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
 import { db, type ServiceOpts } from "@/db";
 import { prisma } from "@/db/client";
@@ -352,16 +352,16 @@ test("a student enrolled in one of two courses sees only that course's events; a
 	const opts = { actor: instructor };
 	const slotA = await makeSlot(courseA.id, opts);
 
-	await db.course.enroll(
-		{ courseId: courseA.id, userId: active.username },
+	await db.enrollment.create(
+		{ courseId: courseA.id, username: active.username },
 		FULL_ACCESS,
 	);
-	await db.course.enroll(
-		{ courseId: courseA.id, userId: dropped.username },
+	await db.enrollment.create(
+		{ courseId: courseA.id, username: dropped.username },
 		FULL_ACCESS,
 	);
-	await db.course.drop(
-		{ courseId: courseA.id, userId: dropped.username },
+	await db.enrollment.delete(
+		{ courseId: courseA.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 
@@ -398,7 +398,7 @@ test("a student enrolled in one of two courses sees only that course's events; a
 	).resolves.toHaveLength(1);
 });
 
-test("canViewCourseContents agreement: findMany's visibility matches the predicate over a fixture of actors", async () => {
+test("course.read-contents agreement: findMany's visibility matches the permission over a fixture of actors", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const otherInstructor = await makeUser("INSTRUCTOR");
 	const admin = await makeUser("ADMIN");
@@ -409,16 +409,16 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	await db.course.enroll(
-		{ courseId: course.id, userId: active.username },
+	await db.enrollment.create(
+		{ courseId: course.id, username: active.username },
 		FULL_ACCESS,
 	);
-	await db.course.enroll(
-		{ courseId: course.id, userId: dropped.username },
+	await db.enrollment.create(
+		{ courseId: course.id, username: dropped.username },
 		FULL_ACCESS,
 	);
-	await db.course.drop(
-		{ courseId: course.id, userId: dropped.username },
+	await db.enrollment.delete(
+		{ courseId: course.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 
@@ -437,7 +437,7 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 
 	const courseShape = {
 		instructor: { username: instructor.username },
-		enrollments: [{ userId: active.username }],
+		enrollments: [{ username: active.username }],
 	};
 	const actors = [
 		{ label: "SYSTEM", actor: SYSTEM },
@@ -454,7 +454,7 @@ test("canViewCourseContents agreement: findMany's visibility matches the predica
 			{ courseIds: [course.id] },
 			{ actor },
 		);
-		const expectVisible = canViewCourseContents(actor, courseShape);
+		const expectVisible = hasPerm(actor, "course.read-contents", courseShape);
 		expect(visible.length > 0, label).toBe(expectVisible);
 	}
 });
@@ -465,8 +465,8 @@ test("a student's event carries exam: null when the linked exam is DRAFT; the in
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
-	await db.course.enroll(
-		{ courseId: course.id, userId: student.username },
+	await db.enrollment.create(
+		{ courseId: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 

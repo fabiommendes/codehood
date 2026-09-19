@@ -1,9 +1,5 @@
 import { Factory } from "fishery";
-import {
-	type Passphrase,
-	type PassphraseCreate,
-	passphraseService,
-} from "@/db/services/passphrase.service";
+import { db, type Passphrase, type PassphraseCreate } from "@/db";
 import { persistedCourseFactory } from "./course.factory";
 import { type PersistParams, serviceOpts } from "./support";
 
@@ -32,7 +28,7 @@ export const persistedPassphraseFactory = Factory.define<
 			(await persistedCourseFactory.create({}, { transient: transientParams }))
 				.id;
 
-		return passphraseService.create({ ...input, courseId }, opts);
+		return db.passphrase.create({ ...input, courseId }, opts);
 	});
 
 	return { courseId: params.courseId ?? 0 };

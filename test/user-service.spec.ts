@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
+import type { Actor } from "@/auth/actor";
+import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
-import { canViewUser } from "@/auth/permissions";
-import type { Actor } from "@/core/actor";
-import { FULL_ACCESS } from "@/core/actor";
+import { hasPerm } from "@/auth/permissions";
 import type { UserId } from "@/core/schemas";
-import { userService } from "@/db/services/user.service";
+import { db } from "@/db";
 
 function actorOf(
 	username: UserId,
@@ -14,7 +14,7 @@ function actorOf(
 }
 
 test("admin without githubId/schoolId has them null, not the sentinel", async () => {
-	const user = await userService.create(
+	const user = await db.user.create(
 		{
 			email: "root@codehood.test",
 			username: "root",
@@ -30,7 +30,7 @@ test("admin without githubId/schoolId has them null, not the sentinel", async ()
 
 test("student requires githubId and schoolId", async () => {
 	await expect(
-		userService.create(
+		db.user.create(
 			{
 				email: "s1@codehood.test",
 				username: "s1",
@@ -44,7 +44,7 @@ test("student requires githubId and schoolId", async () => {
 });
 
 test("update() rejects any attempt to smuggle in a username change", async () => {
-	const user = await userService.create(
+	const user = await db.user.create(
 		{
 			email: "immutable-username@codehood.test",
 			username: "immutable-username",
@@ -65,14 +65,14 @@ test("update() rejects any attempt to smuggle in a username change", async () =>
 	} as any;
 
 	await expect(
-		userService.update(
+		db.user.update(
 			{ username: user.username },
 			fieldsWithSmuggledUsername,
 			FULL_ACCESS,
 		),
 	).rejects.toThrow(/username/i);
 
-	const reloaded = await userService.findOne(
+	const reloaded = await db.user.findOne(
 		{ username: user.username },
 		FULL_ACCESS,
 	);
@@ -81,7 +81,7 @@ test("update() rejects any attempt to smuggle in a username change", async () =>
 
 test("create() rejects an instructor or student actor, accepts an admin", async () => {
 	await expect(
-		userService.create(
+		db.user.create(
 			{
 				email: "not-admin@codehood.test",
 				username: "not-admin",
@@ -95,7 +95,7 @@ test("create() rejects an instructor or student actor, accepts an admin", async 
 		),
 	).rejects.toThrow();
 
-	const created = await userService.create(
+	const created = await db.user.create(
 		{
 			email: "admin-registered@codehood.test",
 			username: "admin-registered",
@@ -110,8 +110,8 @@ test("create() rejects an instructor or student actor, accepts an admin", async 
 	expect(created.username).toBe("admin-registered");
 });
 
-test("findMany visibility agrees with canViewUser: self sees only self, admin sees everyone", async () => {
-	const admin = await userService.create(
+test("findMany visibility agrees with user.read: self sees only self, admin sees everyone", async () => {
+	const admin = await db.user.create(
 		{
 			email: "visibility-admin@codehood.test",
 			username: "visibility-admin",
@@ -121,7 +121,7 @@ test("findMany visibility agrees with canViewUser: self sees only self, admin se
 		},
 		FULL_ACCESS,
 	);
-	const student = await userService.create(
+	const student = await db.user.create(
 		{
 			email: "visibility-student@codehood.test",
 			username: "visibility-student",
@@ -134,23 +134,23 @@ test("findMany visibility agrees with canViewUser: self sees only self, admin se
 		FULL_ACCESS,
 	);
 
-	const everyone = await userService.findMany({}, FULL_ACCESS);
+	const everyone = await db.user.findMany({}, FULL_ACCESS);
 
 	const studentActor = actorOf(student.username as UserId, "STUDENT");
-	const asStudent = await userService.findMany({}, { actor: studentActor });
+	const asStudent = await db.user.findMany({}, { actor: studentActor });
 	expect(asStudent.map((u) => u.username).sort()).toEqual(
 		everyone
-			.filter((u) => canViewUser(studentActor, u))
+			.filter((u) => hasPerm(studentActor, "user.read", u))
 			.map((u) => u.username)
 			.sort(),
 	);
 	expect(asStudent.map((u) => u.username)).toEqual([student.username]);
 
 	const adminActor = actorOf(admin.username as UserId, "ADMIN");
-	const asAdmin = await userService.findMany({}, { actor: adminActor });
+	const asAdmin = await db.user.findMany({}, { actor: adminActor });
 	expect(asAdmin.map((u) => u.username).sort()).toEqual(
 		everyone
-			.filter((u) => canViewUser(adminActor, u))
+			.filter((u) => hasPerm(adminActor, "user.read", u))
 			.map((u) => u.username)
 			.sort(),
 	);
@@ -159,7 +159,7 @@ test("findMany visibility agrees with canViewUser: self sees only self, admin se
 
 test("upsert creates on first call and updates the same row on the second: changed field applied, null clears, absent keeps", async () => {
 	const username = "upsert-happy";
-	const created = await userService.upsert(
+	const created = await db.user.upsert(
 		{
 			email: "upsert-happy@codehood.test",
 			username,
@@ -174,7 +174,7 @@ test("upsert creates on first call and updates the same row on the second: chang
 	expect(created.githubId).toBe("gh-before");
 	expect(created.schoolId).toBe("school-before");
 
-	const updated = await userService.upsert(
+	const updated = await db.user.upsert(
 		{
 			email: "upsert-happy@codehood.test",
 			username,
@@ -189,15 +189,12 @@ test("upsert creates on first call and updates the same row on the second: chang
 	expect(updated.schoolId).toBeNull(); // cleared
 	expect(updated.githubId).toBe("gh-before"); // absent -> kept
 
-	const all = await userService.findMany(
-		{ usernames: [username] },
-		FULL_ACCESS,
-	);
+	const all = await db.user.findMany({ usernames: [username] }, FULL_ACCESS);
 	expect(all).toHaveLength(1);
 });
 
 test("upsert requires create permission even when the actor may update the row: an instructor cannot upsert their own profile, though update() lets them", async () => {
-	const instructor = await userService.create(
+	const instructor = await db.user.create(
 		{
 			email: "upsert-self@codehood.test",
 			username: "upsert-self",
@@ -212,7 +209,7 @@ test("upsert requires create permission even when the actor may update the row: 
 	const selfActor = actorOf(instructor.username as UserId, "INSTRUCTOR");
 
 	await expect(
-		userService.update(
+		db.user.update(
 			{ username: instructor.username },
 			{ name: "Via update" },
 			{ actor: selfActor },
@@ -220,7 +217,7 @@ test("upsert requires create permission even when the actor may update the row: 
 	).resolves.toMatchObject({ name: "Via update" });
 
 	await expect(
-		userService.upsert(
+		db.user.upsert(
 			{
 				email: instructor.email,
 				username: instructor.username,
@@ -229,9 +226,9 @@ test("upsert requires create permission even when the actor may update the row: 
 			},
 			{ actor: selfActor },
 		),
-	).rejects.toMatchObject({ action: "upsert-user" });
+	).rejects.toMatchObject({ action: "user.create" });
 
-	const reloaded = await userService.findOne(
+	const reloaded = await db.user.findOne(
 		{ username: instructor.username },
 		FULL_ACCESS,
 	);
@@ -240,7 +237,7 @@ test("upsert requires create permission even when the actor may update the row: 
 
 test("upsert without a password leaves the stored hash unchanged; with one, resets it", async () => {
 	const username = "upsert-password";
-	await userService.upsert(
+	await db.user.upsert(
 		{
 			email: "upsert-password@codehood.test",
 			username,
@@ -252,11 +249,11 @@ test("upsert without a password leaves the stored hash unchanged; with one, rese
 		},
 		FULL_ACCESS,
 	);
-	const afterCreate = await userService.findOne({ username }, FULL_ACCESS);
+	const afterCreate = await db.user.findOne({ username }, FULL_ACCESS);
 	const hashAfterCreate = afterCreate?.passwordHash as string;
 	expect(hashAfterCreate).toBeTruthy();
 
-	await userService.upsert(
+	await db.user.upsert(
 		{
 			email: "upsert-password@codehood.test",
 			username,
@@ -265,11 +262,11 @@ test("upsert without a password leaves the stored hash unchanged; with one, rese
 		},
 		FULL_ACCESS,
 	);
-	const afterNoPassword = await userService.findOne({ username }, FULL_ACCESS);
+	const afterNoPassword = await db.user.findOne({ username }, FULL_ACCESS);
 	expect(afterNoPassword?.passwordHash).toBe(hashAfterCreate);
 	expect(await verifyPassword(hashAfterCreate, "first-password")).toBe(true);
 
-	await userService.upsert(
+	await db.user.upsert(
 		{
 			email: "upsert-password@codehood.test",
 			username,
@@ -279,7 +276,7 @@ test("upsert without a password leaves the stored hash unchanged; with one, rese
 		},
 		FULL_ACCESS,
 	);
-	const afterNewPassword = await userService.findOne({ username }, FULL_ACCESS);
+	const afterNewPassword = await db.user.findOne({ username }, FULL_ACCESS);
 	expect(afterNewPassword?.passwordHash).not.toBe(hashAfterCreate);
 	expect(
 		await verifyPassword(

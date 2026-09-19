@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { canManageApiKeys } from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
 import { NotAllowed, RuleViolation } from "@/core/error";
 import {
@@ -29,7 +29,7 @@ export type ApiKey = z.infer<typeof apiKeySchema>;
 export type ApiKeyPK = z.infer<typeof apiKeyPK>;
 export type ApiKeyFilter = z.infer<typeof apiKeyFilter>;
 
-class ApiKeyService
+export class ApiKeyService
 	implements
 		Crud<{
 			entity: ApiKey;
@@ -57,8 +57,8 @@ class ApiKeyService
 		args: [apiKeyCreate],
 	})
 	async create(input: ApiKeyCreate, opts: ServiceOpts): Promise<ApiKey> {
-		if (!canManageApiKeys(opts.actor, input.createdBy.username)) {
-			throw new NotAllowed({ action: "create-api-key" });
+		if (!hasPerm(opts.actor, "api-key.manage", input.createdBy.username)) {
+			throw new NotAllowed("api-key.create");
 		}
 		const client = opts.tx ?? this.prisma;
 		const token = generateToken();
@@ -91,8 +91,8 @@ class ApiKeyService
 			include: apiKeyInclude,
 		});
 		if (!apiKey) return null;
-		if (!canManageApiKeys(opts.actor, apiKey.createdById)) {
-			throw new NotAllowed({ action: "read-api-key" });
+		if (!hasPerm(opts.actor, "api-key.manage", apiKey.createdById)) {
+			throw new NotAllowed("api-key.read");
 		}
 		return toApiKey(apiKey);
 	}
@@ -109,7 +109,7 @@ class ApiKeyService
 		args: [apiKeyFilter],
 	})
 	async findMany(filter: ApiKeyFilter, opts: ServiceOpts): Promise<ApiKey[]> {
-		if (!canManageApiKeys(opts.actor, filter.createdById)) return [];
+		if (!hasPerm(opts.actor, "api-key.manage", filter.createdById)) return [];
 		const client = opts.tx ?? this.prisma;
 		const apiKeys = await client.apiKey.findMany({
 			where: { createdById: filter.createdById },
@@ -148,8 +148,8 @@ class ApiKeyService
 	async delete(filter: ApiKeyPK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 		const apiKey = await client.apiKey.findUnique({ where: { id: filter.id } });
-		if (!apiKey || !canManageApiKeys(opts.actor, apiKey.createdById)) {
-			throw new NotAllowed({ action: "delete-api-key" });
+		if (!apiKey || !hasPerm(opts.actor, "api-key.manage", apiKey.createdById)) {
+			throw new NotAllowed("api-key.delete");
 		}
 		await client.apiKey.delete({ where: { id: filter.id } });
 	}
@@ -169,8 +169,6 @@ class ApiKeyService
 		throw new Error("Method not implemented.");
 	}
 }
-
-export const apiKeyService = new ApiKeyService();
 
 //
 // Auxiliary functions

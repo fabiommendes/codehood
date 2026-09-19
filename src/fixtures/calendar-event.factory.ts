@@ -1,13 +1,12 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import type { Weekday } from "@/db/client";
 import {
 	type CalendarEvent,
 	type CalendarEventCreate,
-	calendarEventService,
-} from "@/db/services/calendar-event.service";
-import type { CourseId } from "@/db/services/course.service";
-import type { TimeSlotId } from "@/db/services/time-slot.service";
+	db,
+	type schema,
+} from "@/db";
+import type { Weekday } from "@/db/client";
 import { type PersistParams, serviceOpts } from "./support";
 import { persistedTimeSlotFactory } from "./time-slot.factory";
 
@@ -41,8 +40,8 @@ function buildCalendarEvent(
 	params: Partial<CalendarEventCreate>,
 ): CalendarEventCreate {
 	return {
-		courseId: params.courseId ?? (0 as CourseId),
-		timeSlotId: params.timeSlotId ?? (0 as TimeSlotId),
+		courseId: params.courseId ?? (0 as schema.CourseId),
+		timeSlotId: params.timeSlotId ?? (0 as schema.TimeSlotId),
 		slug: params.slug ?? `event-${sequence}`,
 		date: params.date ?? isoDateForWeekday("MONDAY"),
 		week: params.week ?? 1,
@@ -93,7 +92,7 @@ export const persistedCalendarEventFactory = Factory.define<
 			date ??= isoDateForWeekday(slot.day);
 		}
 
-		return calendarEventService.create(
+		return db.calendarEvent.create(
 			{ ...input, courseId, timeSlotId, date: date ?? input.date },
 			opts,
 		);

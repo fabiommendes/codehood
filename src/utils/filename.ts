@@ -7,10 +7,10 @@ const BLOB_HASH_RE = /^[0-9a-f]{64}$/;
 const MAX_BYTES = 255;
 
 function reject(name: string, reason: string): never {
-	throw new InvalidData({
-		errors: { filename: [{ code: "invalid", message: reason }] },
-		message: `"${name}" is not a valid filename: ${reason}`,
-	});
+	throw new InvalidData(
+		{ filename: [{ code: "invalid", message: reason }] },
+		{ message: `"${name}" is not a valid filename: ${reason}` },
+	);
 }
 
 /**
