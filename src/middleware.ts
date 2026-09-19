@@ -1,11 +1,9 @@
 import { defineMiddleware, sequence } from "astro:middleware";
-import { canManageUsers } from "@/auth/permissions";
-import { apiKeyService } from "@/db/services/api-key.service";
-import { sessionService } from "@/db/services/session.service";
+import { hasPerm } from "@/auth/permissions";
+import { db } from "@/db";
 import * as env from "./core/constants";
+import { SESSION_COOKIE } from "./core/constants";
 import { ensureDemoCourses, ensureDevAdmin } from "./db/bootstrap";
-
-export const SESSION_COOKIE = "session";
 
 /**
  * The session middleware is responsible for validating the session cookie and populating
@@ -18,7 +16,7 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 	const token = context.cookies.get(SESSION_COOKIE)?.value;
 	if (!token) return next();
 
-	const session = await sessionService.validate(token);
+	const session = await db.session.validate(token);
 	if (!session) {
 		context.cookies.delete(SESSION_COOKIE, { path: "/" });
 		return next();
@@ -28,10 +26,7 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 
 	// Re-stamp the cookie so its lifetime tracks the (possibly just-refreshed) sliding expiry.
 	context.cookies.set(SESSION_COOKIE, token, {
-		httpOnly: true,
-		secure: import.meta.env.PROD,
-		sameSite: "lax",
-		path: "/",
+		...env.SESSION_COOKIE_OPTIONS,
 		expires: session.expiresAt,
 	});
 
@@ -48,7 +43,8 @@ export const adminMiddleware = defineMiddleware((context, next) => {
 	if (!context.url.pathname.startsWith("/admin")) return next();
 
 	if (!context.locals.actor) return context.redirect("/login");
-	if (!canManageUsers(context.locals.actor)) return context.redirect("/403");
+	if (!hasPerm(context.locals.actor, "system.manage"))
+		return context.redirect("/403");
 
 	return next();
 });
@@ -62,7 +58,7 @@ export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 		: null;
 	if (!token) return next();
 
-	const apiKey = await apiKeyService.validate(token);
+	const apiKey = await db.apiKey.validate(token);
 	if (apiKey) {
 		context.locals.actor = {
 			role: apiKey.createdBy.role,
