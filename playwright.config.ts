@@ -27,6 +27,9 @@ export default defineConfig({
 			DATABASE_URL: TEST_DATABASE_URL,
 			RESOURCE_ROOT: TEST_RESOURCE_ROOT,
 			NODE_ENV: "test",
+			// Required, no default. The test server is a dev instance: it runs
+			// over plain HTTP, so a Secure session cookie would never come back.
+			ENVIRONMENT: "dev",
 			HOST: "localhost",
 			PORT: "4322",
 		},

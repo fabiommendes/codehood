@@ -3,18 +3,11 @@ import { z } from "astro/zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
-import { SESSION_COOKIE } from "@/core/constants";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { db, InviteError, schema, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { USERNAME_RE } from "@/urls";
 import { withActionErrors } from "./helpers";
-
-const SESSION_COOKIE_OPTS = {
-	httpOnly: true,
-	secure: import.meta.env.PROD,
-	sameSite: "lax" as const,
-	path: "/",
-};
 
 export type PublicUser = Omit<User, "passwordHash" | "createdAt">;
 
@@ -38,7 +31,7 @@ export const auth = {
 				FULL_ACCESS,
 			);
 			context.cookies.set(SESSION_COOKIE, token, {
-				...SESSION_COOKIE_OPTS,
+				...SESSION_COOKIE_OPTIONS,
 				expires: session.expiresAt,
 			});
 			return publicUser(user);
@@ -129,7 +122,7 @@ export const auth = {
 				FULL_ACCESS,
 			);
 			context.cookies.set(SESSION_COOKIE, sessionToken, {
-				...SESSION_COOKIE_OPTS,
+				...SESSION_COOKIE_OPTIONS,
 				expires: session.expiresAt,
 			});
 			return { role: user.role };
@@ -152,7 +145,6 @@ export const auth = {
 						input.courseId != null ? (input.courseId as schema.CourseId) : null,
 					kind: "PERSONAL",
 					maxUses: 1,
-					createdBy: { username: actor.username, name: actor.name },
 				},
 				{ actor },
 			);
@@ -174,7 +166,6 @@ export const auth = {
 					maxUses: input.maxUses ?? null,
 					kind: "CLASSROOM",
 					invitedRole: "STUDENT",
-					createdBy: { username: actor.username, name: actor.name },
 				},
 				{ actor },
 			);

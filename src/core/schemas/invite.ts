@@ -4,7 +4,6 @@ import { userInfo, userRole } from "./user";
 
 export const inviteSchema = z.object({
 	id: inviteId,
-	tokenHash: z.string(),
 	kind: z.enum(["PERSONAL", "CLASSROOM"]),
 	email: z.string().nullable(),
 	invitedRole: userRole,
@@ -22,12 +21,17 @@ export const inviteSchema = z.object({
 export const inviteCreate = inviteSchema
 	.omit({
 		id: true,
-		tokenHash: true,
 		expiresAt: true,
 		createdAt: true,
 		redemptions: true,
+		createdBy: true,
 	})
-	.extend({ expiresInMs: z.number().int().optional() });
+	.extend({
+		expiresInMs: z.number().int().optional(),
+		// Only honoured for SYSTEM callers, which have no actor to derive it
+		// from; any other caller gets `createdBy` from `opts.actor` instead.
+		createdBy: userInfo.optional(),
+	});
 
 export const invitePK = z.union([
 	z.object({ token: z.string().min(1) }),

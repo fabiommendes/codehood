@@ -75,16 +75,9 @@ export const calendarEventCreate = calendarEventSchema
 // event to a different slot is a delete plus a create. Provide `date` to
 // move the event's day; `startMin`/`durationMin` without `date` is rejected,
 // since a wall-clock move always names the day it lands on.
-export const calendarEventUpdate = z.object({
-	date: z.string().optional(),
-	startMin: z.number().int().optional(),
-	durationMin: z.number().int().optional(),
-	week: z.number().int().optional(),
-	kind: eventKindSchema.optional(),
-	title: z.string().optional(),
-	description: z.string().nullish(),
-	contentHash: z.string().optional(),
-});
+export const calendarEventUpdate = calendarEventCreate
+	.omit({ slug: true, courseId: true, timeSlotId: true })
+	.partial();
 
 export const calendarEventUpsert = calendarEventCreate;
 

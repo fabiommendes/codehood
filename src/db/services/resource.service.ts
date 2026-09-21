@@ -53,7 +53,10 @@ const resourceInclude = {
 	course: {
 		select: {
 			instructor: { select: { username: true } },
-			enrollments: { select: { username: true } },
+			enrollments: {
+				where: { status: "ACTIVE" as const },
+				select: { username: true },
+			},
 		},
 	},
 	attachment: {
@@ -130,7 +133,6 @@ export class ResourceService
 					{
 						attachedTo: { type: "RESOURCE", id: row.id },
 						filename: input.data.filename,
-						uploaderId: course.instructor.username,
 						buffer: input.data.buffer,
 					},
 					{ tx, actor: opts.actor },
@@ -314,8 +316,6 @@ export class ResourceService
 					skipValidation: { output: true },
 				}),
 			);
-			const course = target.__raw.course;
-
 			ensureAllowed({
 				value: target.__raw.course,
 				action: "resource.read",
@@ -331,7 +331,6 @@ export class ResourceService
 					{
 						attachedTo: { type: "RESOURCE", id: target.id },
 						filename: fields.data.filename,
-						uploaderId: course.instructor.username,
 						buffer: fields.data.buffer,
 					},
 					{ tx, actor: opts.actor },
@@ -494,7 +493,10 @@ export class ResourceService
 		const select = {
 			id: true,
 			instructor: { select: { username: true } },
-			enrollments: { select: { username: true } },
+			enrollments: {
+				where: { status: "ACTIVE" as const },
+				select: { username: true },
+			},
 		};
 
 		const course = valueOrNotFound(

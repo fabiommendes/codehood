@@ -57,10 +57,38 @@ Then use one of the following, depending on what you want to do:
 | Command              | Action                                      |
 | :------------------- | :------------------------------------------ |
 | `pnpm run init`      | Set the project up from scratch             |
-| `pnpm run configure` | Configure the local environment.            |
-| `pnpm run dev`       | Starts local dev server at `localhost:4321` |
+| `pnpm run dev`       | Start local dev server at `localhost:4321`  |
 | `pnpm run build`     | Build your production site to `./dist/`     |
+| `pnpm run test`      | Run integration tests                       |
+| `pnpm run lint`      | Run linter, typecheck, and story coverage   |
+| `pnpm run manage`    | Run management CLI commands                 |
+| `pnpm run db:reset`  | Reset the dev database and re-seed          |
 | `pnpm run clear`     | Reset the project to a freshly-cloned state |
+
+### Environment variables
+
+| Variable                 | Required | Default              | Meaning                                                       |
+| :----------------------- | :------- | :------------------- | :------------------------------------------------------------ |
+| `ENVIRONMENT`            | yes      | none                 | `dev` or `prod`. The server refuses to boot without it.        |
+| `DATABASE_URL`           | yes      | `file:./dev.db`      | SQLite database to open.                                       |
+| `RESOURCE_ROOT`          | no       | `./storage/resources`| Where resource blobs are written.                              |
+| `ATTACHMENT_LINK_MODE`   | no       | `symlink`            | `symlink`, `hardlink` or `copy`.                               |
+| `BLOB_QUOTA_INSTRUCTOR`  | no       | `1gb`                | Upload quota per instructor.                                   |
+| `BLOB_QUOTA_STUDENT`     | no       | `200mb`              | Upload quota per student.                                      |
+| `DEBUG`                  | no       | `false`              | Verbose error output.                                          |
+
+`ENVIRONMENT` deliberately has no default, and an empty value counts as
+unset. It decides two things a deployment cannot afford to get wrong by
+omission: whether the demo accounts (`admin`/`admin` and friends) may be
+seeded at all, and whether the session cookie is sent with `Secure`. A
+production deployment sets `ENVIRONMENT=prod`; anything else fails at startup
+with a message naming the variable.
+
+An `.env` created before this variable existed will not have it. Add
+`ENVIRONMENT="dev"` to it, or copy `.env.example` over.
+
+Demo accounts are never created by a request. They come from
+`pnpm run db:seed` (and the test runner), and only when `ENVIRONMENT=dev`.
 
 `pnpm run clear` deletes every generated artifact — `node_modules/`, the Prisma
 client, the Astro cache, builds, test output, `dev.db` and the `storage/`
@@ -80,7 +108,7 @@ following tech stack:
 | Rest API          | In-house Astro dynamic endpoints                                                 |
 | Database          | [Prisma](https://www.prisma.io/) ORM with SQLite                                 |
 | Validation        | [Zod](https://zod.dev/)                                                          |
-| Auth              | In-house: Argon2id + session cookies + API keys (see `docs/implemented/auth.md`) |
+| Auth              | In-house: Argon2id + session cookies + API keys (see `dev/specs/to-review/auth.md`) |
 | CSS               | [DaisyUI](https://daisyui.com/) and TailwindCSS                                  |
 | Components        | [SolidJS](https://www.solidjs.com/)                                              |
 | Integration Tests | [Playwright](https://playwright.dev/)                                            |
@@ -89,23 +117,4 @@ following tech stack:
 
 ## Project Structure
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-│   └── favicon.png
-├── src
-│   ├── assets
-│   │   └── astro.svg
-│   ├── components
-│   │   └── Welcome.astro
-│   ├── layouts
-│   │   └── Layout.astro
-│   └── pages
-│       └── index.astro
-└── package.json
-```
-
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
-
+See the "Project layout" table in `AGENTS.md` for a complete breakdown of directories and their purpose.

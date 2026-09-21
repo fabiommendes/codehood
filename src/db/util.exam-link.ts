@@ -1,8 +1,7 @@
 /**
  * The one implementation of the exam <-> calendar-event match, imported by
  * both `TimeSlotService`/`EventService` and (once it exists) `ExamService`.
- * See "The exam link is derived from the clock, never authored" in
- * `dev/specs/to-review/calendar.md`.
+ * The match is derived from the clock and never authored.
  *
  * A standalone module rather than a method on either service, because
  * `exam.service.ts` and `event.service.ts` would otherwise import each other.

@@ -21,9 +21,8 @@ const REFERENCE = /\[\^([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*)\]/g;
  * `[^foo]` is CommonMark's footnote syntax, and the day the footnote plugin is
  * switched on a stem parsed from rendered HTML would come apart. The cost is
  * that Markdown cannot span a blank — `**bold [^x] bold**` is two fragments
- * with unbalanced delimiters — which
- * `dev/specs/to-review/question-fill-in.md` declares unsupported, as mdq.spec's own
- * grammar reads it.
+ * with unbalanced delimiters — which is unsupported, as mdq.spec's own grammar
+ * reads it.
  */
 export function parseFillInStem(stem: string): FillInSegment[] {
 	const segments: FillInSegment[] = [];

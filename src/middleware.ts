@@ -3,7 +3,6 @@ import { hasPerm } from "@/auth/permissions";
 import { db } from "@/db";
 import * as env from "./core/constants";
 import { SESSION_COOKIE } from "./core/constants";
-import { ensureDemoCourses, ensureDevAdmin } from "./db/bootstrap";
 
 /**
  * The session middleware is responsible for validating the session cookie and populating
@@ -71,25 +70,14 @@ export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 	return next();
 });
 
-const devBootstrapMiddleware = defineMiddleware(async (_context, next) => {
-	// Order matters: ensureDemoCourses creates its own users, and ensureDevAdmin
-	// only seeds the admin account while the database has none yet.
-	await ensureDevAdmin();
-	await ensureDemoCourses();
-	return next();
-});
-
 const COMMON_MIDDLEWARES = [
 	sessionMiddleware,
 	apiKeyMiddleware,
 	adminMiddleware,
 ] as const;
 
-const DEVELOPMENT_MIDDLEWARES = [devBootstrapMiddleware] as const;
-
-// The Bootstrap middleware is only run in development mode, so that the demo
-// courses and dev admin account are not created in production.
-export const onRequest =
-	env.ENVIRONMENT === "dev"
-		? sequence(...DEVELOPMENT_MIDDLEWARES, ...COMMON_MIDDLEWARES)
-		: sequence(...COMMON_MIDDLEWARES);
+// No request ever creates a user. Demo accounts and demo courses are seeded
+// by `pnpm run db:seed` and by the test runner, never on the way in: a
+// self-healing seed in the request chain means a deployment that boots
+// against an empty database hands out its own default accounts.
+export const onRequest = sequence(...COMMON_MIDDLEWARES);

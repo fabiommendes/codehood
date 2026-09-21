@@ -1,7 +1,6 @@
 /**
  * Turns free text into a lowercase, hyphenated, filesystem/URL-safe token.
- * Used to build a download filename from a resource's title (see
- * `dev/specs/to-do/resources.md`, "The download name").
+ * Used to build a download filename from a resource's title.
  */
 export function slugify(text: string): string {
 	const slug = text

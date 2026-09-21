@@ -5,6 +5,7 @@ import StudentsTable from "@/components/StudentsTable";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { jsonScriptPayload } from "@/utils/json-script";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -110,8 +111,8 @@ const csvRows = [
     <section class="mt-4">
       <h2 class="text-xl font-semibold">Enrollment</h2>
       <p class="mt-1 text-sm text-base-content/60">
-        Two ways for a student to join: a shareable link, or a passphrase read
-        out in class.
+        Three ways for a student to join: add them by name, hand out a
+        shareable link, or read a passphrase out in class.
       </p>
 
       {
@@ -144,6 +145,13 @@ const csvRows = [
       }
 
       <div class="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          data-open-dialog="add-student-dialog"
+        >
+          Add student
+        </button>
         <button
           type="button"
           class="btn btn-outline btn-sm"
@@ -196,6 +204,92 @@ const csvRows = [
     }
   </main>
 </AppLayout>
+
+<dialog id="add-student-dialog" class="modal">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
+        ✕
+      </button>
+    </form>
+    <h3 class="text-lg font-bold">Add student</h3>
+    <p class="mt-1 text-sm text-base-content/60">
+      Someone who already has an account is enrolled right away. For an email
+      with no account yet, you get a single-use invite link that creates the
+      account and enrolls it.
+    </p>
+
+    <div id="add-student-error" class="alert alert-error mt-4" hidden>
+      <span></span>
+    </div>
+
+    <div id="add-student-invited" class="mt-4" hidden>
+      <p class="text-sm">
+        No account yet — send <span id="add-student-email" class="font-medium"
+        ></span> this link:
+      </p>
+      <div class="join mt-2 w-full">
+        <input
+          type="text"
+          readonly
+          value=""
+          class="input join-item w-full font-mono text-sm"
+          id="personal-invite-url"
+        />
+        <button
+          type="button"
+          class="btn btn-primary join-item"
+          id="copy-personal-invite-url"
+          aria-label="Copy invite link"
+          title="Copy"
+        >
+          <svg
+            id="copy-personal-invite-url-icon"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <path
+              d={COPY_ICON}
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    {/* No `method`/`action`: the submit handler below owns it. A native POST
+        here would hit the page's own handler, which mints a classroom invite. */}
+    <form id="add-student-form" class="mt-4">
+      <input type="hidden" name="courseId" value={course.id} />
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Email or username</legend>
+        <input
+          type="text"
+          name="login"
+          required
+          placeholder="student@example.com"
+          class="input w-full"
+        />
+      </fieldset>
+    </form>
+
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn btn-ghost">Cancel</button>
+      </form>
+      <button type="submit" form="add-student-form" class="btn btn-primary">
+        Add
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
 
 <dialog id="passphrase-dialog" class="modal">
   <div class="modal-box">
@@ -445,10 +539,13 @@ const csvRows = [
 
 <input type="hidden" id="course-id" value={course.id} />
 
+{/* `jsonScriptPayload`, not `JSON.stringify`: the cells are student-supplied
+    and `set:html` writes them raw, so a bare stringify lets a name containing
+    `</script` close this element and inject markup. */}
 <script
   type="application/json"
   id="roster-csv-data"
-  set:html={JSON.stringify(csvRows)}
+  set:html={jsonScriptPayload(csvRows)}
 />
 <script define:vars={{ csvFilename }}>
   // Built client-side from the same rows the table renders, rather than a
@@ -503,6 +600,65 @@ const csvRows = [
     if (span) span.textContent = message;
     box.hidden = false;
   }
+
+  // Copies the value of `inputId` and flips the button's icon to a tick for a
+  // moment, so the instructor sees the copy landed.
+  function wireCopyButton(buttonId: string, inputId: string) {
+    const button = document.getElementById(buttonId);
+    const input = document.getElementById(inputId) as HTMLInputElement | null;
+    const iconPath = document.querySelector(`#${buttonId}-icon path`);
+    if (!button || !input || !iconPath) return;
+
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(input.value);
+      iconPath.setAttribute("d", CHECK_ICON);
+      button.setAttribute("aria-label", "Copied");
+      button.setAttribute("title", "Copied!");
+      setTimeout(() => {
+        iconPath.setAttribute("d", COPY_ICON);
+        button.setAttribute("aria-label", "Copy invite link");
+        button.setAttribute("title", "Copy");
+      }, 1500);
+    });
+  }
+
+  // Add student: an existing account is enrolled, so the page reloads to show
+  // them in the table; an unknown email produces a link that stays on screen
+  // to be copied.
+  const addStudentForm = document.getElementById(
+    "add-student-form",
+  ) as HTMLFormElement | null;
+  const addStudentError = document.getElementById("add-student-error");
+  const addStudentInvited = document.getElementById("add-student-invited");
+
+  addStudentForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (addStudentError) addStudentError.hidden = true;
+    const { data, error } = await actions.course.addStudent(
+      new FormData(addStudentForm),
+    );
+    if (error) {
+      if (addStudentError)
+        showError(addStudentError, error.message || "Something went wrong.");
+      return;
+    }
+    if (data.kind === "enrolled") {
+      window.location.reload();
+      return;
+    }
+    const emailLabel = document.getElementById("add-student-email");
+    if (emailLabel) emailLabel.textContent = data.email;
+    const urlInput = document.getElementById(
+      "personal-invite-url",
+    ) as HTMLInputElement | null;
+    if (urlInput)
+      urlInput.value = new URL(
+        `/invite/${data.token}`,
+        window.location.origin,
+      ).toString();
+    if (addStudentInvited) addStudentInvited.hidden = false;
+    addStudentForm.reset();
+  });
 
   // Passphrase: renew without leaving the dialog open, so the instructor can
   // keep it on screen for students to read.
@@ -566,21 +722,8 @@ const csvRows = [
     if (inviteUrlRow) inviteUrlRow.hidden = false;
   });
 
-  const copyButton = document.getElementById("copy-invite-url");
-  const copyIconPath = document.querySelector("#copy-invite-url-icon path");
-
-  copyButton?.addEventListener("click", async () => {
-    if (!inviteUrlInput || !copyIconPath) return;
-    await navigator.clipboard.writeText(inviteUrlInput.value);
-    copyIconPath.setAttribute("d", CHECK_ICON);
-    copyButton.setAttribute("aria-label", "Copied");
-    copyButton.setAttribute("title", "Copied!");
-    setTimeout(() => {
-      copyIconPath.setAttribute("d", COPY_ICON);
-      copyButton.setAttribute("aria-label", "Copy invite link");
-      copyButton.setAttribute("title", "Copy");
-    }, 1500);
-  });
+  wireCopyButton("copy-invite-url", "invite-url");
+  wireCopyButton("copy-personal-invite-url", "personal-invite-url");
 
   // Revoke invites: revoking one keeps the dialog open with the rest of the
   // list still there — it only closes itself once the last invite is gone.

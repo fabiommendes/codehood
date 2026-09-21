@@ -27,8 +27,7 @@ test("student: redeem a personal invite", async ({ page }) => {
 
 	// A personal invite renders its address into a `readonly` input, so the
 	// redeemer cannot submit a different one. That is also why the service's
-	// `email_mismatch` code is unreachable from this page. See
-	// dev/issues/invite-address-cannot-be-changed.md.
+	// `email_mismatch` code is unreachable from this page.
 	await test.step("the address it was issued to is pinned", async () => {
 		const email = page
 			.getByRole("group", { name: "Email", exact: true })
@@ -108,6 +107,14 @@ test("student: redeem a classroom invite link", async ({ page }) => {
 test("student: log in", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
 
+	await test.step("signed out, the root URL is the marketing landing page", async () => {
+		const response = await page.goto("/");
+		expect(response?.status()).toBe(200);
+		await expect(
+			page.getByRole("heading", { name: /Run your course like a Git repo/ }),
+		).toBeVisible();
+	});
+
 	await test.step("the username works", async () => {
 		await logIn(page, student);
 	});
@@ -129,6 +136,12 @@ test("student: log in", async ({ page }) => {
 		await expect(
 			page.getByText("Invalid email/username or password."),
 		).toBeVisible();
+	});
+
+	await test.step("signed in, the root URL sends them to their courses", async () => {
+		await logIn(page, student);
+		await page.goto("/");
+		await expect(page).toHaveURL("/courses");
 	});
 });
 

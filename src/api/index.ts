@@ -5,9 +5,12 @@
  * should fit nicely in this module.
  */
 
+import { z } from "zod";
+import { SESSION_COOKIE } from "@/core/constants";
+import { NotFound } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
-import { CRUD, GET, PATCH } from "./registry";
+import { CRUD, GET, PATCH, POST } from "./registry";
 import { parseCourseParams } from "./utils";
 
 export const calendarEventApi = CRUD("/api/calendar-event", {
@@ -61,6 +64,33 @@ export const editionApi = CRUD("/api/edition", {
 	key: schema.editionPK,
 	tags: ["Editions"],
 	service: db.edition,
+});
+
+export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
+	name: "Exam",
+	plural: "Exams",
+	keySegment: "/[slug]",
+
+	entity: schema.examSchema,
+	create: schema.examCreate.omit({ courseId: true }),
+	upsert: schema.examUpsert.omit({ courseId: true }),
+	update: schema.examUpdate,
+	filter: schema.examFilterBase,
+	scope: schema.courseNaturalKey,
+	key: schema.examNaturalKey,
+
+	tags: ["Exams"],
+	service: db.exam,
+
+	parseKeyParams(params) {
+		return { ...parseCourseParams(params), slug: params.slug as string };
+	},
+	parseCreateParams(params) {
+		return { courseId: parseCourseParams(params) };
+	},
+	parseListParams(params) {
+		return parseCourseParams(params);
+	},
 });
 
 export const inviteApi = CRUD("/api/invite", {
@@ -181,6 +211,27 @@ export const userApi = {
 			return db.user.update({ username: args.actor.username }, args.body, {
 				actor: args.actor,
 			});
+		},
+	}),
+	changePassword: POST("/api/user/me/change-password", {
+		in: schema.passwordChange.openapi("PasswordChangeRequest"),
+		out: z.object({ success: z.boolean() }).openapi("PasswordChangeResponse"),
+		summary: "Change the current user's password",
+		description:
+			"Requires the current password. Every session the user holds is revoked, so a browser client has to log in again; API keys are left alone.",
+		operationId: "changePassword",
+		tags: userTags,
+		errors: userErrors,
+		handler: async ({ actor, body, cookies }) => {
+			const user = await db.user.findOne(
+				{ username: actor.username },
+				{ actor },
+			);
+			if (!user) throw new NotFound("user", { id: actor.username });
+
+			await db.user.changePassword(user, body, { actor });
+			cookies.delete(SESSION_COOKIE, { path: "/" });
+			return { success: true };
 		},
 	}),
 	...CRUD("/api/user", {

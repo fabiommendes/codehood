@@ -18,9 +18,8 @@ export type LoadCourseResult =
  * repeated on every page.
  *
  * Pass `manage: true` on instructor-only pages (`/manage`, `/roster`) to
- * also require `enrollment.manage`, not just visibility — the same
- * predicate `courseTabs` uses to decide whether those tabs even show up (see
- * `dev/specs/to-do/course-navigation.md`).
+ * also require `enrollment.manage`, not just visibility — the same predicate
+ * `courseTabs` uses to decide whether those tabs even show up.
  */
 export async function loadCourse(
 	Astro: AstroGlobal,

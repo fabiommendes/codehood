@@ -44,6 +44,22 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/exam",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/question",
 		"methods": [
 			"get",
@@ -164,6 +180,12 @@
 		"methods": [
 			"get",
 			"patch"
+		]
+	},
+	{
+		"pattern": "/api/user/me/change-password",
+		"methods": [
+			"post"
 		]
 	}
 ]

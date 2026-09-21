@@ -1,0 +1,24 @@
+info:
+  name: Update
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/calendar-event/1
+  body:
+    type: json
+    data: |-
+      {
+          "kind": "CANCELLED",
+          "description": "Cancelled: public holiday.",
+          "contentHash": "8b04d7f1"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

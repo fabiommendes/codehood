@@ -462,7 +462,7 @@ wrapping.
 
 ## Documentation to update in the same change
 
-- `docs/design/url-structure.md`: add `/<course>/schedule`, remove
+- `src/urls/README.md`: add `/<course>/schedule`, remove
   `/<course>/invite`, and note that the gradebook is reached from Exams.
 - `dev/specs/to-do/calendar.md`: the course calendar sub-route is `/schedule`.
 - `GLOSSARY.md`: `Course URL` gains its sub-route list; no new term — "tab" is

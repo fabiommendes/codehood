@@ -7,15 +7,24 @@ import type { ArrayToUnion } from "@/typing";
 import { parseByteSize } from "@/utils/format-bytes";
 
 /**
- * Read environment variable as string with a default value.
+ * Reads an environment variable as a string, falling back to `defaultValue`.
+ *
+ * An empty or whitespace-only value counts as absent: a variable left blank
+ * in a deployment's environment file is a mistake, not a deliberate empty
+ * string, and silently accepting it is how a production switch ends up
+ * reading as its development default. Without a `defaultValue`, an absent
+ * variable throws instead.
  */
-function readEnv(name: string, defaultValue: string): string {
+function readEnv(name: string, defaultValue?: string): string {
 	const value = process.env[name];
-	if (value === undefined) {
+	if (value === undefined || value.trim() === "") {
 		if (defaultValue !== undefined) {
 			return defaultValue;
 		}
-		throw new Error(`Environment variable ${name} is not defined`);
+		throw new Error(
+			`Environment variable ${name} is not defined. It has no default: ` +
+				"set it explicitly (see the deployment section of README.md).",
+		);
 	}
 	return value;
 }
@@ -43,9 +52,13 @@ function readBoolean(name: string, defaultValue?: boolean): boolean {
 function assertIn<T extends E[], E extends string>(
 	value: string,
 	elems: T,
+	name?: string,
 ): ArrayToUnion<T> {
 	if (!elems.includes(value as T[number])) {
-		throw new Error(`Invalid value: ${value}`);
+		const where = name ? `${name}: ` : "";
+		throw new Error(
+			`${where}invalid value "${value}". Expected one of: ${elems.join(", ")}.`,
+		);
 	}
 	return value as T[number];
 }
@@ -54,10 +67,16 @@ function assertIn<T extends E[], E extends string>(
 //  						  ENVIRONMENT
 // =============================================================================
 export const DEBUG = readBoolean("DEBUG", false);
-export const ENVIRONMENT = assertIn(readEnv("ENVIRONMENT", "dev"), [
-	"dev",
-	"prod",
-]);
+/// The single switch separating a development instance from a deployed one.
+///
+/// Deliberately has no default. It decides whether demo accounts may be
+/// seeded and whether the session cookie carries `Secure`, so a deployment
+/// that forgets it must fail to boot rather than quietly come up as `dev`.
+export const ENVIRONMENT = assertIn(
+	readEnv("ENVIRONMENT"),
+	["dev", "prod"],
+	"ENVIRONMENT",
+);
 export const DEVELOPMENT = ENVIRONMENT === "dev";
 export const PRODUCTION = ENVIRONMENT === "prod";
 
@@ -65,6 +84,12 @@ export const PRODUCTION = ENVIRONMENT === "prod";
 //  						    SESSION
 // =============================================================================
 export const SESSION_COOKIE = "session";
+
+/// The attributes every session cookie is written with, wherever it is set.
+///
+/// The one definition in the project: `secure` follows `ENVIRONMENT` alone,
+/// so a cookie cannot end up without it because a second call site consulted
+/// a different variable.
 export const SESSION_COOKIE_OPTIONS = {
 	httpOnly: true,
 	secure: PRODUCTION,

@@ -1,9 +1,9 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
-import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
-import { SESSION_COOKIE } from "@/core/constants";
-import { db } from "@/db";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
+import { NotAllowed } from "@/core/error";
+import { db, schema } from "@/db";
 
 const FIELD_LABELS: Record<string, string> = {
 	email: "email",
@@ -67,26 +67,43 @@ export const profile = {
 
 	changePassword: defineAction({
 		accept: "form",
-		input: z.object({
-			currentPassword: z.string().min(1),
-			newPassword: z.string().min(8),
-		}),
+		input: schema.passwordChange,
 		handler: async (input, context) => {
 			const actor = requireUser(context);
 			const user = await db.user.findOne(
 				{ username: actor.username },
 				{ actor },
 			);
-			if (
-				!user ||
-				!(await verifyPassword(user.passwordHash, input.currentPassword))
-			) {
+			if (!user) {
 				throw new ActionError({
 					code: "UNAUTHORIZED",
 					message: "Current password is incorrect.",
 				});
 			}
-			await db.user.updatePassword(user, input.newPassword, { actor });
+
+			try {
+				await db.user.changePassword(user, input, { actor });
+			} catch (error) {
+				if (error instanceof NotAllowed) {
+					throw new ActionError({
+						code: "UNAUTHORIZED",
+						message: error.message,
+					});
+				}
+				throw error;
+			}
+
+			// The change revoked every session, this one included. Minting a
+			// replacement keeps the device the change was made from signed in,
+			// while the others still have to log in again.
+			const { token, session } = await db.session.create(
+				{ username: user.username },
+				{ actor },
+			);
+			context.cookies.set(SESSION_COOKIE, token, {
+				...SESSION_COOKIE_OPTIONS,
+				expires: session.expiresAt,
+			});
 		},
 	}),
 

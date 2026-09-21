@@ -33,6 +33,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
 	"logo",
 	"manifest",
 	"profile",
+	"rpc",
 	"sw",
 	"about",
 	"docs",

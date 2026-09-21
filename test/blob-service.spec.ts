@@ -281,3 +281,35 @@ test("readBlob returns bytes for a live blob, null for a tombstoned one, and nul
 	rmSync(service.blobPath(missing.hash));
 	expect(await service.readBlob(missing)).toBeNull();
 });
+
+test("serve sanitizes the URL's filename segment: a CR/LF in it never reaches the header", async () => {
+	const service = makeService();
+	const bytes = Buffer.from(`served ${tag("bytes")}`);
+	const blob = await service.create({ bytes }, FULL_ACCESS);
+	await prisma.attachment.create({
+		data: {
+			hash: blob.hash,
+			filename: "note.txt",
+			mimeType: "text/plain",
+			attachedToType: "RESOURCE",
+			attachedToId: 1,
+		},
+	});
+
+	const injected = await service.serve(blob.hash, "a\r\nX-Injected: 1");
+	expect(injected.status).toBe(200);
+	expect(injected.headers.get("X-Injected")).toBeNull();
+	const disposition = injected.headers.get("Content-Disposition") ?? "";
+	expect(disposition).not.toMatch(/[\r\n]/);
+	expect(disposition).toBe('attachment; filename="a-x-injected-1"');
+
+	// A segment nothing survives of is a 404, like an unknown hash — never a
+	// 500 from the Headers constructor.
+	const empty = await service.serve(blob.hash, "  ");
+	expect(empty.status).toBe(404);
+
+	const plain = await service.serve(blob.hash, "report.pdf");
+	expect(plain.headers.get("Content-Disposition")).toBe(
+		'attachment; filename="report.pdf"',
+	);
+});

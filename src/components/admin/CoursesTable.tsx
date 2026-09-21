@@ -47,7 +47,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 			title: "Students",
 			class: "text-base-content/60",
 			render: (row) => {
-				const count = row.enrollments.length;
+				const count = row.enrollmentCount;
 				return `${count} student${count === 1 ? "" : "s"}`;
 			},
 		},

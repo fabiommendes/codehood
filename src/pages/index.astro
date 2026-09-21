@@ -5,6 +5,10 @@ import ThemeToggle from "@/components/ThemeToggle.astro";
 import Layout from "@/layouts/Layout.astro";
 
 export const prerender = false;
+
+if (Astro.locals.actor) {
+	return Astro.redirect("/courses");
+}
 ---
 
 <Layout title="Codehood — Run your course like a Git repo">

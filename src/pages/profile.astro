@@ -172,6 +172,10 @@ const profileTabs = [
           <div class="card card-border">
             <div class="card-body">
               <h2 class="card-title">Change password</h2>
+              <p class="text-sm text-base-content/60">
+                Changing it signs out every other browser you are logged in on.
+                API keys keep working; revoke those on the API keys tab.
+              </p>
 
               {
                 passwordResult?.error && (

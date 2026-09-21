@@ -4,8 +4,6 @@ import { hasMinimumRole, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm, simplifyTarget } from "@/auth/permissions";
 import { NotAllowed } from "@/core/error";
 import type { UserId } from "@/core/schemas";
-import { courseContentsWhere, courseWhere } from "@/db/services/course.service";
-import { userWhere } from "@/db/services/user.service";
 
 const admin = {
 	role: "ADMIN" as const,
@@ -63,6 +61,19 @@ test("invite permissions follow admin -> instructor -> student", () => {
 		false,
 	);
 	expect(hasPerm(student, "invite.create", invite("STUDENT"))).toBe(false);
+});
+
+test("a course invite needs the right to enrol into that course", () => {
+	const course = courseFixture();
+	const foreign = { id: 8, instructor: { username: "other" } };
+	const target = (c: typeof course | typeof foreign | null) =>
+		({ invitedRole: "STUDENT", course: c }) as const;
+
+	expect(hasPerm(instructor, "invite.create", target(course))).toBe(true);
+	expect(hasPerm(instructor, "invite.create", target(foreign))).toBe(false);
+	expect(hasPerm(instructor, "invite.create", target(null))).toBe(true);
+	expect(hasPerm(admin, "invite.create", target(foreign))).toBe(true);
+	expect(hasPerm(student, "invite.create", target(course))).toBe(false);
 });
 
 test("invite read/update/delete: admins on every invite, instructors on their own, students never", () => {
@@ -124,7 +135,10 @@ test("course.create: SYSTEM and admins may name any instructor; anybody else onl
 	expect(hasPerm(student, "course.create", target("other"))).toBe(false);
 });
 
-test("user.read and userWhere agree: self and admins see everyone, others see only themselves", () => {
+// The matching Prisma `where` fragments are pinned against the database in
+// `permission-where.spec.ts`; asserting their literal shape here would only
+// re-state the implementation.
+test("user.read: self and admins see everyone, others see only themselves", () => {
 	const fixtures = [admin, instructor, student];
 	const actors: Actor[] = [admin, instructor, student, SYSTEM];
 
@@ -135,40 +149,44 @@ test("user.read and userWhere agree: self and admins see everyone, others see on
 				? fixtures
 				: fixtures.filter((u) => u.username === actor.username);
 		expect(visible).toEqual(expected);
-
-		// The Prisma fragment must accept exactly the same rows the predicate does.
-		const fragment = userWhere(actor);
-		if (actor === SYSTEM || actor.role === "ADMIN") {
-			expect(fragment).toEqual({});
-		} else {
-			expect(fragment).toEqual({ username: actor.username });
-		}
 	}
 });
 
-test("enrollment.create/update/manage are owner-only, unlike course.update", () => {
+test("enrollment.create/update: SYSTEM, any admin, or the course's instructor", () => {
 	const course = {
 		instructor: { username: instructor.username },
 		enrollments: [],
 	};
 	const own = { course, user: { username: student.username } };
-	for (const perm of [
-		"enrollment.create",
-		"enrollment.update",
-		"enrollment.manage",
-	] as const) {
-		expect(hasPerm(instructor, perm, course), perm).toBe(true);
+	for (const perm of ["enrollment.create", "enrollment.update"] as const) {
 		expect(hasPerm(SYSTEM, perm, course), perm).toBe(true);
-		// An admin who does not teach the course gets no branch here, even
-		// though course.update keeps granting it for the course record.
-		expect(hasPerm(admin, perm, course), perm).toBe(false);
-		// Naming themselves does not let a student manage their enrollment.
+		expect(hasPerm(admin, perm, course), perm).toBe(true);
+		expect(hasPerm(instructor, perm, course), perm).toBe(true);
+		expect(hasPerm(otherInstructor, perm, course), perm).toBe(false);
+		// Naming themselves does not let a student enroll themselves.
 		expect(hasPerm(student, perm, own), perm).toBe(false);
 	}
-	expect(hasPerm(admin, "course.update", { ...course, id: 1 })).toBe(true);
 });
 
-test("enrollment.read/delete: the owning instructor on any enrollment, a student only on their own", () => {
+test("enrollment.manage is the course's operations right: its instructor only, not a non-owning admin", () => {
+	const course = {
+		instructor: { username: instructor.username },
+		enrollments: [],
+	};
+	const own = { course, user: { username: student.username } };
+
+	expect(hasPerm(SYSTEM, "enrollment.manage", course)).toBe(true);
+	expect(hasPerm(instructor, "enrollment.manage", course)).toBe(true);
+	// The row that separates it from enrollment.create and course.update: an
+	// admin who does not teach the course reaches neither the manage pages nor
+	// the roster.
+	expect(hasPerm(admin, "enrollment.manage", course)).toBe(false);
+	expect(hasPerm(admin, "enrollment.create", course)).toBe(true);
+	expect(hasPerm(admin, "course.update", { ...course, id: 1 })).toBe(true);
+	expect(hasPerm(student, "enrollment.manage", own)).toBe(false);
+});
+
+test("enrollment.read/delete: SYSTEM, an admin or the owning instructor on any enrollment, a student only on their own", () => {
 	const course = { instructor: { username: instructor.username } };
 	const own = { course, user: { username: student.username } };
 	const other = { course, user: { username: "other" } };
@@ -179,8 +197,10 @@ test("enrollment.read/delete: the owning instructor on any enrollment, a student
 		expect(hasPerm(student, perm, other), perm).toBe(false);
 		// A bare course target means every enrollment: owner only.
 		expect(hasPerm(student, perm, course), perm).toBe(false);
-		expect(hasPerm(admin, perm, other), perm).toBe(false);
+		expect(hasPerm(admin, perm, other), perm).toBe(true);
 		expect(hasPerm(SYSTEM, perm, own), perm).toBe(true);
+		// The operations right is the one an admin still does not hold.
+		expect(hasPerm(admin, "enrollment.manage", course), perm).toBe(false);
 	}
 });
 
@@ -199,11 +219,6 @@ test("course.read and course.read-contents agree, for every actor: SYSTEM, admin
 		expect(hasPerm(actor, "course.read-contents", course), label).toBe(
 			expected,
 		);
-	}
-
-	const visibilityActors: Actor[] = [SYSTEM, admin, instructor, student];
-	for (const actor of visibilityActors) {
-		expect(courseContentsWhere(actor)).toEqual(courseWhere(actor));
 	}
 });
 

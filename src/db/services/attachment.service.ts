@@ -59,7 +59,7 @@ const attachmentInclude = {
  * The ledger over blob storage: who uses which bytes, under what name, and
  * who is charged for them.
  *
- * Not routed. See `dev/specs/to-do/blob-attachments.md`.
+ * Not routed.
  */
 export class AttachmentService {
 	private prisma: PrismaClient;
@@ -75,6 +75,11 @@ export class AttachmentService {
 	 * records the use, all in one transaction.
 	 *
 	 * The stored filename is returned, which is not always the one sent.
+	 *
+	 * `uploaderId` in `input` is only honoured for `SYSTEM` calls, which have
+	 * no actor to derive it from; a `SYSTEM` call without it is rejected. Any
+	 * other caller has it derived from `opts.actor` and silently ignored if
+	 * sent.
 	 */
 	@Validate({
 		service: true,
@@ -97,7 +102,10 @@ export class AttachmentService {
 				{ tx, actor: SYSTEM },
 			);
 			await this.blob.link(blob.hash, filename);
-			const username = opts.actor === SYSTEM ? null : opts.actor.username;
+			const uploaderId =
+				opts.actor === SYSTEM
+					? (input.uploaderId ?? null)
+					: opts.actor.username;
 
 			return this.fromDbWithSource(
 				await tx.attachment.create({
@@ -105,7 +113,7 @@ export class AttachmentService {
 						hash: blob.hash,
 						filename,
 						mimeType,
-						uploaderId: input.uploaderId ?? username,
+						uploaderId,
 						attachedToType: input.attachedTo.type,
 						attachedToId: input.attachedTo.id,
 					},
@@ -122,7 +130,6 @@ export class AttachmentService {
 	 * Finds a single attachment by id.
 	 */
 	@Validate({
-		async: true,
 		returns: attachmentSchema.nullable(),
 		args: [attachmentPK],
 	})
@@ -144,7 +151,6 @@ export class AttachmentService {
 	 * Finds many attachments, narrowed by any combination of the filter.
 	 */
 	@Validate({
-		async: true,
 		returns: attachmentSchema.array(),
 		args: [attachmentFilter],
 	})

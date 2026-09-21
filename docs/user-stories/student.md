@@ -62,6 +62,10 @@ with, so they try their username instead, which the form accepts just as well as
 an email. They then fumble the password. The refusal says the credentials are
 wrong without saying which half, and the second attempt gets them in.
 
+Signed in, hitting the site's root sends them straight to their courses rather
+than the marketing landing page, which stays reserved for a visitor with no
+session.
+
 
 ## Finding course material
 
@@ -189,8 +193,10 @@ of the URL of every course an instructor owns.
 
 Student used a lab machine and forgot to log out. They change their password,
 confirming the current one first, and a wrong current password is refused without
-revealing anything about the stored one. They then end every session they hold
-anywhere, including the one they are using, and are sent back to the login page.
+revealing anything about the stored one. The change ends every other session they
+hold, the lab machine's included, while leaving the browser in front of them
+signed in. To end that one too they log out everywhere, which sends them back to
+the login page.
 
 
 ### Leave a course

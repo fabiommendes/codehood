@@ -21,8 +21,12 @@ redeeming an [Invite](../../GLOSSARY.md#invite).
 segment of every course URL owned by that instructor and the target of
 `Course.instructor`.
 
-**FR-ACC-005** — Usernames MUST match `^[a-z0-9][a-z0-9-]{1,30}$`. Underscore is
-excluded: it separates username from edition inside a course URL segment.
+**FR-ACC-005** — Usernames MUST match `^[a-z0-9][a-z0-9_-]{1,30}$`.
+
+> Underscore is allowed. It also separates username from edition inside a
+> course URL segment, but the segment splits at its *last* underscore and
+> FR-CRS-013 forbids one in an edition, so the tail is always the edition and
+> the head is always the username.
 
 ## Roles
 
@@ -40,7 +44,7 @@ content: disciplines, editions, accounts, and course archival.
 internal transactions are not REST callers.
 
 > This overrides the visibility table in
-> `docs/design/service-access-control.md`, which grants `ADMIN` full management
+> `src/db/services/README.md`, which grants `ADMIN` full management
 > of every course. "Manage the course record" and "write the course content" are
 > now separate powers, and admins hold only the first.
 

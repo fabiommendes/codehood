@@ -38,6 +38,8 @@ export const attachmentCreate = attachmentSchema
 	.pick({ filename: true })
 	.extend({
 		buffer: buffer,
+		// Only honoured for SYSTEM callers, which have no actor to derive it
+		// from; any other caller gets `uploaderId` from `opts.actor` instead.
 		uploaderId: username.optional(),
 		attachedTo: z.union([
 			attachedToResource.pick({ type: true, id: true }),

@@ -3,10 +3,9 @@ import { slugify } from "./slugify";
 
 /**
  * The download name a `FILE` resource's row links with —
- * `Resource.title`, slugified, with the extension implied by
- * `File.mimeType`. See "The download name" in
- * `dev/specs/to-do/resources.md`: the name belongs to the use (the resource),
- * not to the bytes (the file), which is why it isn't stored on `File`.
+ * `Resource.title`, slugified, with the extension implied by `File.mimeType`.
+ * The name belongs to the use (the resource), not to the bytes (the file),
+ * which is why it isn't stored on `File`.
  */
 export function fileDownloadName(
 	resource: { title: string },

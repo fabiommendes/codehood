@@ -5,9 +5,9 @@
  * itself.
  *
  * It does not have to agree with any reverse-proxy configuration: a proxy
- * reads a real filename off disk and consults its own, far larger table (see
- * `dev/specs/to-do/blob-attachments.md`). An unknown extension or MIME type is
- * not an error — it just gets no extension, or `application/octet-stream`.
+ * reads a real filename off disk and consults its own, far larger table.
+ * An unknown extension or MIME type is not an error — it just gets no
+ * extension, or `application/octet-stream`.
  *
  * Keys are lowercase and carry their leading dot.
  */

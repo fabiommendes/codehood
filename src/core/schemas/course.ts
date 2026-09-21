@@ -10,7 +10,10 @@ export const courseSchema = z.object({
 	discipline: disciplineInfo,
 	edition: editionInfo,
 	instructor: userInfo,
-	enrollments: userInfo.array(),
+	/// Count of `ACTIVE` enrollments. The roster itself is never in this
+	/// schema — `enrollmentService.findMany` is the only way to list
+	/// classmates, and it enforces `enrollment.read`.
+	enrollmentCount: z.number().int(),
 
 	// Dates
 	startAt: z.date(),
@@ -23,14 +26,25 @@ export const courseSchema = z.object({
 	joinedAt: z.date(),
 });
 
-export const courseCreate = z.object({
-	discipline: z.string().min(1).describe("Discipline slug"),
-	instructor: z.string().min(1).optional().describe("Instructor username"),
-	edition: z.string().min(1).describe("Edition slug"),
-	description: z.string().nullish(),
-	startAt: z.coerce.date(),
-	endAt: z.coerce.date(),
-});
+// Derived from `courseSchema` so a new column shows up here instead of
+// drifting: the related entities are named by slug on the way in, and
+// `description` is nullish so a create can clear it.
+export const courseCreate = courseSchema
+	.omit({
+		id: true,
+		enrollmentCount: true,
+		createdAt: true,
+		updatedAt: true,
+		joinedAt: true,
+	})
+	.extend({
+		discipline: z.string().min(1).describe("Discipline slug"),
+		instructor: z.string().min(1).optional().describe("Instructor username"),
+		edition: z.string().min(1).describe("Edition slug"),
+		description: z.string().nullish(),
+		startAt: z.coerce.date(),
+		endAt: z.coerce.date(),
+	});
 
 export const courseUpsert = courseCreate;
 

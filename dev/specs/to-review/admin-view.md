@@ -103,7 +103,7 @@ what that link grants.
 
 The permission pair lives in `auth/permissions.ts` — `canViewInvite(actor,
 invite)` and `inviteVisibility(actor)`, written adjacent and pinned by an
-agreement test, per `docs/design/service-access-control.md` — and governs all
+agreement test, per `src/db/services/README.md` — and governs all
 four methods. The rule: admins see every invite, instructors see the ones they
 created, students see none.
 

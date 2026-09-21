@@ -102,7 +102,7 @@ test("GET /api/api-key?createdById=<username> returns 200 with a JSON array", as
 // the grammar is a client bug (400), one that does but names nothing is a miss
 // (404), and a course you may not see is a refusal (403). The web app rounds
 // the first down to 404 on purpose; the API does not. See
-// docs/design/url-structure.md.
+// src/urls/README.md.
 test("GET /api/course/[discipline]/[course] resolves a course by its natural key", async ({
 	request,
 }) => {

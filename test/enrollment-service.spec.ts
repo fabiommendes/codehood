@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
+import { hasPerm } from "@/auth/permissions";
 import { NotFound } from "@/core/error";
 import { db } from "@/db";
 
@@ -168,7 +169,7 @@ test("a student naming another student's username is refused, and the other enro
 	expect(students.map((s) => s.username)).toEqual([studentB.username]);
 });
 
-test("a non-owning admin cannot drop an enrollment, list enrollments, or enroll one", async () => {
+test("a non-owning admin may enroll, drop and list, but not the course's operations", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const admin = await makeUser("ADMIN");
 	const student = await makeUser("STUDENT");
@@ -178,21 +179,37 @@ test("a non-owning admin cannot drop an enrollment, list enrollments, or enroll 
 		FULL_ACCESS,
 	);
 
-	await expect(
-		db.enrollment.delete(
+	const other = await makeUser("STUDENT");
+	const enrollment = await db.enrollment.create(
+		{ courseId: course.id, username: other.username },
+		{ actor: admin },
+	);
+	expect(enrollment.username).toBe(other.username);
+
+	expect(
+		(await db.enrollment.findMany({ courseId: course.id }, { actor: admin }))
+			.length,
+	).toBe(2);
+
+	await db.enrollment.delete(
+		{ courseId: course.id, username: student.username },
+		{ actor: admin },
+	);
+	expect(
+		await db.enrollment.findOne(
 			{ courseId: course.id, username: student.username },
-			{ actor: admin },
+			FULL_ACCESS,
 		),
-	).rejects.toThrow();
-	await expect(
-		db.enrollment.findMany({ courseId: course.id }, { actor: admin }),
-	).rejects.toThrow();
-	await expect(
-		db.enrollment.create(
-			{ courseId: course.id, username: student.username },
-			{ actor: admin },
+	).toMatchObject({ status: "DROPPED" });
+
+	// `enrollment.manage` is what stops at the course's own instructor.
+	expect(
+		hasPerm(
+			{ username: admin.username, name: admin.name, role: "ADMIN" },
+			"enrollment.manage",
+			{ instructor: { username: instructor.username } },
 		),
-	).rejects.toThrow();
+	).toBe(false);
 });
 
 test("dropping an already-DROPPED enrollment is a no-op, not an error", async () => {

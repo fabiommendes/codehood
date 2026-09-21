@@ -3,7 +3,7 @@
  */
 
 import type { ZodType } from "zod";
-import { InvalidData } from "@/core/error";
+import { ImproperBehavior, InvalidData } from "@/core/error";
 import type { ServiceOpts } from "@/db/base-service";
 
 type SchemaItem = ZodType<unknown> | undefined;
@@ -21,9 +21,6 @@ export type ValidateOptions = {
 
 	/** The Zod schema to validate the return value against. */
 	returns?: ZodType<unknown>;
-
-	/* If true, the method is async and returns a Promise. */
-	async?: boolean;
 
 	/**
 	 * Zod schemas for the method's parameters, positional (index 0 validates the
@@ -52,11 +49,10 @@ type This = any;
  *
  * Implemented to work as both a legacy (`experimentalDecorators`) and a TC39
  * Stage-3 method decorator: Playwright Test's bundled Babel transform only
- * supports Stage-3 (see `dev/issues/arg-decorator-breaks-playwright-test-transform.md`),
- * while the rest of the toolchain (Astro/Vite, `tsx`) uses the legacy form, so the
- * two calling conventions — `(target, propertyKey, descriptor)` vs. `(value, context)`
- * — need to both work from a single decorated method. `arguments.length` (3 vs. 2)
- * tells them apart.
+ * supports Stage-3, while the rest of the toolchain (Astro/Vite, `tsx`) uses
+ * the legacy form, so the two calling conventions — `(target, propertyKey,
+ * descriptor)` vs. `(value, context)` — need to both work from a single
+ * decorated method. `arguments.length` (3 vs. 2) tells them apart.
  *
  * @param options - The validation options. See {@link ValidateOptions}.
  */
@@ -64,33 +60,32 @@ export function Validate(options: ValidateOptions) {
 	const argSchemas = options.args ?? [];
 	const hasArgSchemas = argSchemas.some((schema) => schema !== undefined);
 
+	const returns = options.returns;
+
+	function checkReturn(value: unknown) {
+		if (!returns) return value;
+		const validationResult = returns.safeParse(value);
+		if (!validationResult.success) {
+			throw InvalidData.fromZodError(validationResult.error, value);
+		}
+		return value;
+	}
+
 	function wrap(originalMethod: (...args: unknown[]) => unknown) {
+		/// Validates the resolved value of an async method rather than its
+		/// pending Promise, without the caller having to declare which it is.
 		function runFunction(self: This, args: unknown[]) {
 			const result = originalMethod.apply(self, args);
-			if (options.returns) {
-				const validationResult = options.returns.safeParse(result);
-				if (!validationResult.success) {
-					throw InvalidData.fromZodError(validationResult.error, result);
-				}
-			}
-			return result;
-		}
-
-		async function runFunctionAsync(self: This, args: unknown[]) {
-			const result = await originalMethod.apply(self, args);
-			if (options.returns) {
-				const validationResult = options.returns.safeParse(result);
-				if (!validationResult.success) {
-					throw InvalidData.fromZodError(validationResult.error, result);
-				}
-			}
-			return result;
+			if (!returns) return result;
+			return isThenable(result)
+				? Promise.resolve(result).then(checkReturn)
+				: checkReturn(result);
 		}
 
 		// If service = true, we change the validation behavior
 		if (options.service) {
 			return async function <T extends unknown[]>(this: This, ...args: T) {
-				const opts = args[args.length - 1] as ServiceOpts;
+				const opts = serviceOpts(originalMethod, args);
 				const skipInputValidation =
 					opts.validate === "none" || opts.validate === "output";
 				const skipOutputValidation =
@@ -100,13 +95,7 @@ export function Validate(options: ValidateOptions) {
 					args = validateArgs(argSchemas, args);
 				return skipOutputValidation
 					? await originalMethod.apply(this, args)
-					: await runFunctionAsync(this, args);
-			};
-		}
-		if (options.async) {
-			return async function <T extends unknown[]>(this: This, ...args: T) {
-				if (hasArgSchemas) args = validateArgs(argSchemas, args);
-				return await runFunctionAsync(this, args);
+					: await runFunction(this, args);
 			};
 		}
 		return function <T extends unknown[]>(this: This, ...args: T) {
@@ -143,4 +132,32 @@ function validateArgs<T extends unknown[]>(schemas: SchemaItem[], args: T): T {
 		}
 	}
 	return args;
+}
+
+/// A decorated method's trailing argument is its `ServiceOpts`; treating
+/// whatever happened to be last as one silently misreads an argument the
+/// caller meant as something else.
+///
+/// Methods declaring `opts` optional may be called without it, which the
+/// declared arity tells apart from a wrong value in the `opts` position.
+function serviceOpts(
+	originalMethod: (...args: unknown[]) => unknown,
+	args: unknown[],
+): ServiceOpts {
+	if (args.length < originalMethod.length) return {} as ServiceOpts;
+	const opts = args[args.length - 1];
+	if (typeof opts !== "object" || opts === null || !("actor" in opts)) {
+		throw new ImproperBehavior(
+			`${originalMethod.name}: the last argument is not a ServiceOpts object`,
+		);
+	}
+	return opts as ServiceOpts;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as PromiseLike<unknown>).then === "function"
+	);
 }

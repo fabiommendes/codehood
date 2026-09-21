@@ -458,11 +458,10 @@ export function gradeBlank(
  * strategies, normalized by the number of blanks.
  *
  * mdq.spec writes fill-in's grading in multiple-selection's vocabulary ("each
- * correct blank *ticked*"), which no numeric or short-answer blank has. Read
- * here, and argued in `dev/specs/to-review/question-fill-in.md`, as: an empty blank
- * is the unticked one, and a filled blank is right or wrong. `all-or-nothing`
- * counts an empty blank as a mistake, which is what fill-in's prose says and
- * where it differs from true/false's.
+ * correct blank *ticked*"), which no numeric or short-answer blank has. An
+ * empty blank is the unticked one, and a filled blank is right or wrong.
+ * `all-or-nothing` counts an empty blank as a mistake, which is what fill-in's
+ * prose says and where it differs from true/false's.
  *
  * Nothing is clamped: a negative total survives the question, and whether it
  * survives into the exam total is the exam's `penalty` policy.

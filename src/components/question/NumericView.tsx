@@ -25,9 +25,7 @@ export interface NumericViewProps {
  * from the key, which is the opposite of what the choice views do. It has to
  * be: correctness here is the tolerance test, and the tolerance is not part of
  * the public half, so comparing the student's number to the key would mark a
- * response inside a declared tolerance wrong. See
- * `dev/specs/to-do/question-numeric.md`, "Review reads the score, because it
- * cannot derive correctness".
+ * response inside a declared tolerance wrong.
  */
 export default function NumericView(props: NumericViewProps): JSX.Element {
 	const mode = () => props.mode ?? "answer";

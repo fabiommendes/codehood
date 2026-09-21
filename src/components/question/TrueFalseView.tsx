@@ -27,12 +27,11 @@ export interface TrueFalseViewProps {
  * Renders a `PublicTrueFalse` question.
  *
  * Each statement gets one three-state toggle — unchecked is False, checked is
- * True, and a centered knob is unmarked — rather than a
- * pair of controls, because a statement can be abstained as well as judged;
- * see `dev/specs/to-do/question-true-false.md`, "Abstaining is a third
- * state". Cycling back to unmarked deletes the statement's entry from the
- * answer map rather than writing a sentinel, since absence is how abstention
- * is represented all the way down to the grader.
+ * True, and a centered knob is unmarked — rather than a pair of controls,
+ * because a statement can be abstained as well as judged. Cycling back to
+ * unmarked deletes the statement's entry from the answer map rather than
+ * writing a sentinel, since absence is how abstention is represented all the
+ * way down to the grader.
  */
 export default function TrueFalseView(props: TrueFalseViewProps): JSX.Element {
 	const mode = () => props.mode ?? "answer";

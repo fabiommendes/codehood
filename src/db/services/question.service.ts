@@ -1,5 +1,5 @@
 /**
- * Questions and their versions — see `dev/specs/to-do/questions.md`.
+ * Questions and their versions.
  *
  * A question lives in exactly one course, so writes are ownership-gated
  * (`canWriteCourseContent`) and reads follow `canViewQuestion`. What a read

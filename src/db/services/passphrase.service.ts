@@ -245,7 +245,9 @@ export class PassphraseService
 		});
 		if (!course) throw new NotFound("course", { id: courseId });
 
-		if (!hasPerm(opts.actor, "enrollment.create", course))
+		// A passphrase is one of the course's operations, not an enrollment
+		// row: `enrollment.manage`, so a non-owning admin cannot mint one.
+		if (!hasPerm(opts.actor, "enrollment.manage", course))
 			throw new NotAllowed(`passphrase.${action}`);
 	}
 }

@@ -100,7 +100,7 @@ export default function UsersTable(props: Props): JSX.Element {
 								action={actions.admin.forceLogout}
 								class="modal-action"
 							>
-								<input type="hidden" name="userId" value={user.username} />
+								<input type="hidden" name="username" value={user.username} />
 								<button type="submit" class="btn btn-error">
 									Log out
 								</button>

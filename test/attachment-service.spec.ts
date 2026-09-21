@@ -381,7 +381,6 @@ test("create refuses an upload that would exceed the actor's quota, writing noth
 			{
 				buffer: tooBig,
 				filename: "over-quota.txt",
-				uploaderId: student.username,
 				attachedTo: { type: "RESOURCE", id: targetResource.id },
 			},
 			{ actor: student },
@@ -392,4 +391,39 @@ test("create refuses an upload that would exceed the actor's quota, writing noth
 	await expect(
 		db.attachment.findMany({ attachedTo: [targetResource.id] }, FULL_ACCESS),
 	).resolves.toHaveLength(0);
+});
+
+test("uploaderId sent by a non-SYSTEM caller is ignored: the actor is always recorded", async () => {
+	const uploader = await makeUser("STUDENT");
+	const impersonated = await makeUser("STUDENT");
+	const resource = await makeResource();
+
+	const attachment = await db.attachment.create(
+		{
+			buffer: Buffer.from(`forge ${tag("bytes")}`),
+			filename: "forge.txt",
+			uploaderId: impersonated.username,
+			attachedTo: { type: "RESOURCE", id: resource.id },
+		},
+		{ actor: uploader },
+	);
+
+	expect(attachment.uploader?.username).toBe(uploader.username);
+});
+
+test("a SYSTEM call passing uploaderId explicitly still works", async () => {
+	const uploader = await makeUser("STUDENT");
+	const resource = await makeResource();
+
+	const attachment = await db.attachment.create(
+		{
+			buffer: Buffer.from(`system-upload ${tag("bytes")}`),
+			filename: "system-upload.txt",
+			uploaderId: uploader.username,
+			attachedTo: { type: "RESOURCE", id: resource.id },
+		},
+		FULL_ACCESS,
+	);
+
+	expect(attachment.uploader?.username).toBe(uploader.username);
 });

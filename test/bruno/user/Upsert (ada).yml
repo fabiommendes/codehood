@@ -10,8 +10,11 @@ http:
     type: json
     data: |-
       {
+        "username": "ada",
         "name": "Ada Lovelace",
-        "username": "ada@local"
+        "email": "ada@codehood.test",
+        "role": "INSTRUCTOR",
+        "password": "correct-horse-battery"
       }
   auth: inherit
 

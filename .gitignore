@@ -44,3 +44,16 @@ TODO.md
 # Incremental typecheck caches, rewritten by every `pnpm run typecheck`.
 tsconfig.tsbuildinfo
 tsconfig.build.tsbuildinfo
+
+# Handoff files
+handoff/
+handoff*.md
+
+
+# Auditoria de seguranca: ambiente isolado do gerador do relatorio
+docs/security-audit/.venv/
+docs/security-audit/__pycache__/
+
+# Base
+.base-ast
+.base-ast-cache

@@ -29,6 +29,7 @@ import {
 import type { ServiceOpts } from "@/db";
 import { blobSecurityHeaders, contentDisposition } from "@/utils/blob-response";
 import { hashBytes } from "@/utils/content-hash";
+import { sanitizeFilename } from "@/utils/filename";
 import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
 
@@ -51,7 +52,7 @@ export type BlobServiceOptions = {
  * per-attachment names linked beside them.
  *
  * Not routed. The REST API reaches blobs only through the higher-level
- * resource and question endpoints. See `dev/specs/to-do/blob-attachments.md`.
+ * resource and question endpoints.
  */
 export class BlobService {
 	prisma: PrismaClient;
@@ -243,15 +244,18 @@ export class BlobService {
 	/**
 	 * Serves the blob named by `hash`, behind both blob routes
 	 * (`/files/[hash]` and `/files/[hash]/[name]`) — see
-	 * `dev/specs/to-do/resources.md`. No authentication check by design
+	 * No authentication check by design
 	 * (FR-NFR-030, amended): the URL is the content's own hash, and nothing
 	 * whose disclosure matters is meant to live in a resource (FR-NFR-032).
 	 *
-	 * `name` is the URL's decorative trailing segment, used verbatim as the
+	 * `name` is the URL's decorative trailing segment, used as the
 	 * `Content-Disposition` filename when present — the page that links here
 	 * already picked it from the resource the visitor clicked; when absent,
-	 * falls back to an attachment still using these bytes. Answers `404` for
-	 * an unknown hash and `410` for a tombstoned one.
+	 * falls back to an attachment still using these bytes. It runs through
+	 * `sanitizeFilename` first, since it reaches a response header straight
+	 * from the URL and a decoded CR/LF in it would otherwise make the header
+	 * constructor throw. Answers `404` for an unknown hash, for a name that
+	 * survives no sanitising, and `410` for a tombstoned one.
 	 */
 	async serve(
 		hash: string | undefined,
@@ -279,7 +283,8 @@ export class BlobService {
 		});
 		if (!attachment) return notFoundResponse();
 
-		const filename = name ?? attachment.filename;
+		const filename = name != null ? safeFilename(name) : attachment.filename;
+		if (filename == null) return notFoundResponse();
 		const headers = new Headers({
 			"Content-Type": attachment.mimeType,
 			"Content-Disposition": contentDisposition(attachment.mimeType, filename),
@@ -324,6 +329,17 @@ export class BlobService {
 		const dest = this.blobPath(hash);
 		await mkdir(path.dirname(dest), { recursive: true });
 		await writeFile(dest, bytes);
+	}
+}
+
+/// Reduces a URL-supplied filename to one safe to put in a response header,
+/// or `null` when nothing is left of it. The segment arrives decoded, so a
+/// `%0d%0a` in it is a real CR/LF by the time it gets here.
+function safeFilename(name: string): string | null {
+	try {
+		return sanitizeFilename(name);
+	} catch {
+		return null;
 	}
 }
 

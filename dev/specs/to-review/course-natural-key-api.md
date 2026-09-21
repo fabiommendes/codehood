@@ -74,7 +74,7 @@ that nothing has to round-trip an id to reach a resource.
 
 ### 4. Status codes
 
-Deliberately different from the web app, which `docs/design/url-structure.md`
+Deliberately different from the web app, which `src/urls/README.md`
 commits to 404 for a malformed segment:
 
 | Case                                  | Status |
@@ -112,7 +112,7 @@ the router cannot address.
 from `src/core/schemas.ts`. `userSchema` stays `z.string()` and keeps its four
 `returns:` sites.
 
-The reasoning belongs in `docs/design/db-service-classes.md`: input schemas
+The reasoning belongs in `src/db/services/README.md`: input schemas
 constrain values, output schemas constrain shape. Output validators are not
 redundant — they whitelist what comes out of Prisma, which is where a column
 added later would otherwise leak, and the typechecker will not catch that. What
@@ -134,11 +134,11 @@ out of scope.
 
 ## Documentation
 
-- `docs/design/url-structure.md`: correct the Username section, which claims
+- `src/urls/README.md`: correct the Username section, which claims
   `acceptInvite` and `profile.update` validate usernames as
   `z.string().min(1)`; name `userCreate` as the remaining gap. Add the course
   API path and the status-code divergence to "API and actions".
-- `docs/design/db-service-classes.md`: the input/output validation paragraph.
+- `src/db/services/README.md`: the input/output validation paragraph.
 - `GLOSSARY.md`: note on "Course URL" that the same address serves the REST API
   under `/api/course/`.
 - `CLAUDE.md`: one-line pointer to the validation paragraph.

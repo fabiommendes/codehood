@@ -1,11 +1,11 @@
 ---
-import MarkdownIt from "markdown-it";
 import CourseHeader from "@/components/CourseHeader.astro";
 import Badge from "@/components/ui/Badge";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
+import { renderMarkdown } from "@/utils/markdown";
 
 export const prerender = false;
 
@@ -35,13 +35,10 @@ if (
 }
 const data = resource.data;
 
-// Content is rendered with no user-supplied HTML: markdown-it runs with
-// `html: false` (raw HTML in a note would execute on the app's own origin —
-// see "Markdown is rendered with HTML off" in dev/specs/to-do/resources.md),
-// and the CODE branch never interprets its text, only highlights it.
+// The CODE branch never interprets its text, only highlights it.
 const bodyHtml =
 	data.type === "MD"
-		? new MarkdownIt({ html: false }).render(data.content)
+		? renderMarkdown(data.content)
 		: await highlightCode(data.content, data.language);
 ---
 

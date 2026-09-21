@@ -36,7 +36,7 @@ not yet applied) and **Open questions**.
 
 `SYSTEM` is not a user. It is the sentinel actor for callers with no person
 behind them, and it bypasses the rules below by design — see
-`docs/design/service-access-control.md`.
+`src/db/services/README.md`.
 
 ## The shape of the system
 

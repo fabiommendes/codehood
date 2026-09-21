@@ -204,8 +204,7 @@ interface BlankControlProps {
  *
  * A choice blank is a `ChoiceSelect`, not a stack of radio cards: the blank is
  * *in* the sentence, and a card list cannot go there. Only the grading is
- * shared with multiple choice — see `dev/specs/to-review/question-fill-in.md`,
- * "Share the model, not the markup".
+ * shared with multiple choice.
  */
 function BlankControl(props: BlankControlProps): JSX.Element {
 	// daisyUI fades a disabled control's border to nearly the page colour. The

@@ -1,8 +1,7 @@
 /**
  * The course tab strip, as a pure function of the course and the viewing
- * actor — see `dev/specs/to-do/course-navigation.md`. No Astro, no Prisma
- * import, so the visibility rule is unit-testable without a browser or a
- * database (`test/course-tabs.spec.ts`).
+ * actor. No Astro, no Prisma import, so the visibility rule is unit-testable
+ * without a browser or a database (`test/course-tabs.spec.ts`).
  */
 
 import type { Actor } from "@/auth/actor";
@@ -14,6 +13,7 @@ export type CourseTabKey =
 	| "exams"
 	| "resources"
 	| "schedule"
+	| "questions"
 	| "students"
 	| "manage";
 
@@ -45,6 +45,7 @@ export function courseTabs(
 	];
 	if (hasPerm(actor, "enrollment.manage", course)) {
 		tabs.push(
+			{ key: "questions", label: "Questions", href: `${href}/questions` },
 			{ key: "students", label: "Students", href: `${href}/roster` },
 			{ key: "manage", label: "Manage", href: `${href}/manage` },
 		);

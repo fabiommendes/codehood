@@ -21,7 +21,7 @@ Real data:
 - `src/db/exam-link.ts`, the one implementation of the exam↔event match, called
   from both sides of the relation.
 - `TimeSlotService` and `EventService` in `src/db/`, full CRUD per
-  `docs/design/db-service-classes.md`.
+  `src/db/services/README.md`.
 - `canViewCourseContents` / `courseContentsVisibility` and
   `canWriteCourseContent` in `src/auth/permissions.ts` — the first split between
   managing a course record and writing its content (FR-ACC-010).
@@ -457,7 +457,7 @@ actor fails to compile.
 
 `TimeSlotService` and `EventService`, not one `CalendarService`: each model is a
 REST resource with its own natural key, and a method missing here is a missing
-endpoint later (`docs/design/db-service-classes.md`). `TimeSlot` is not a join
+endpoint later (`src/db/services/README.md`). `TimeSlot` is not a join
 table — events reference it — so it does not fold into `CourseService` the way
 `Enrollment` did.
 
@@ -558,7 +558,7 @@ original title intact.
 It is named `schedule`, not `calendar`, so that `/calendar` — my week across
 every course — and this page — one course's term — do not sit one path segment
 apart under the same word. It is the Schedule tab in
-`dev/specs/to-do/course-navigation.md`. `docs/design/url-structure.md` gains a
+`dev/specs/to-do/course-navigation.md`. `src/urls/README.md` gains a
 line for it, and no reserved-name check is needed because only top-level
 segments collide.
 

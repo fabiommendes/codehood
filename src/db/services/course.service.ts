@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
-import { type CourseWithEnrollment, hasPerm } from "@/auth/permissions";
+import { hasPerm } from "@/auth/permissions";
 import {
 	type ActionCode,
 	ImproperBehavior,
@@ -47,9 +47,11 @@ type DbCourse = Prisma.CourseGetPayload<{ include: typeof courseInclude }>;
 
 /**
  * What every returned course carries: its discipline and instructor (every
- * view that shows a course shows both), and its `ACTIVE` enrollments —
- * needed by the `course.read` permission to decide visibility without a
- * second query, and by `_count` for the headcount shown on course cards.
+ * view that shows a course shows both), and its `ACTIVE` enrollments — needed
+ * by the `course.read` permission to decide visibility without a second
+ * query, and by `fromDb` for the headcount shown on course cards. The roster
+ * itself never leaves this module: `fromDb` collapses it to
+ * `enrollmentCount` before it reaches the public {@link Course} shape.
  */
 const courseInclude = {
 	discipline: true,
@@ -132,6 +134,22 @@ export class CourseService
 		args: [coursePK],
 	})
 	async findOne(filter: CoursePK, opts: ServiceOpts): Promise<Course | null> {
+		const row = await this.loadRow(filter, opts);
+		return row && fromDb(row, opts.actor);
+	}
+
+	/**
+	 * Loads the raw db row for `filter`, enforcing `course.read`.
+	 *
+	 * Shared by `findOne`, `update`, and `delete` — the latter two need the
+	 * row itself (not the public {@link Course}, which no longer carries
+	 * `enrollments`) to check `course.update`/`course.delete` against
+	 * {@link CourseWithEnrollment}.
+	 */
+	private async loadRow(
+		filter: CoursePK,
+		opts: ServiceOpts,
+	): Promise<DbCourse | null> {
 		const client = opts.tx ?? this.prisma;
 
 		let row: DbCourse | null = null;
@@ -160,7 +178,7 @@ export class CourseService
 		const viewAllowed = hasPerm(opts.actor, "course.read", row);
 		if (!viewAllowed) throw new NotAllowed("course.read");
 
-		return fromDb(row, opts.actor);
+		return row;
 	}
 
 	/**
@@ -211,9 +229,9 @@ export class CourseService
 		fields: CourseUpdate,
 		opts: ServiceOpts,
 	): Promise<Course> {
-		const target = await this.findOne(filter, opts);
+		const target = await this.loadRow(filter, opts);
 		if (!target) throw new Error("course not found");
-		if (!hasPerm(opts.actor, "course.update", toEnrollmentView(target)))
+		if (!hasPerm(opts.actor, "course.update", target))
 			throw new NotAllowed("course.update");
 
 		const client = opts.tx ?? this.prisma;
@@ -262,10 +280,10 @@ export class CourseService
 	 */
 	@Validate({ service: true, args: [coursePK] })
 	async delete(filter: CoursePK, opts: ServiceOpts): Promise<void> {
-		const target = valueOrNotFound("course", await this.findOne(filter, opts));
+		const target = valueOrNotFound("course", await this.loadRow(filter, opts));
 
 		if (!target) throw new Error("course not found");
-		if (!hasPerm(opts.actor, "course.delete", toEnrollmentView(target)))
+		if (!hasPerm(opts.actor, "course.delete", target))
 			throw new NotAllowed("course.delete");
 
 		const client = opts.tx ?? this.prisma;
@@ -278,19 +296,6 @@ export class CourseService
 	naturalKey(courseRef: CourseNaturalKey): string {
 		return `${courseRef.discipline}/${courseRef.instructor}_${courseRef.edition}`;
 	}
-}
-
-/**
- * Adapts a public {@link Course} to the raw-row shape the `course.*`
- * permissions expect ({@link CourseWithEnrollment}) — needed anywhere a page
- * already has the public entity (from {@link courseService.findOne}) rather
- * than a freshly-loaded Prisma row.
- */
-export function toEnrollmentView(course: Course): CourseWithEnrollment {
-	return {
-		instructor: course.instructor,
-		enrollments: course.enrollments.map((e) => ({ username: e.username })),
-	};
 }
 
 //
@@ -383,14 +388,16 @@ function joinedAtFor(row: DbCourse, actor: Actor): Date {
 
 // Convert a database course record (with its `courseInclude` relations) to the public-facing course type.
 function fromDb(row: DbCourse, actor: Actor): Course {
+	// Destructured out rather than left in the `...rest` spread: `@Validate`
+	// only checks its `returns` schema, it does not strip what the schema
+	// doesn't declare, so the raw roster would otherwise still ride along on
+	// the returned object under its own name.
+	const { enrollments, ...rest } = row;
 	return {
-		...row,
+		...rest,
 		id: row.id as CourseId,
 		instructor: row.instructor,
-		enrollments: row.enrollments.map((e) => ({
-			username: e.username,
-			name: e.user.name,
-		})),
+		enrollmentCount: enrollments.length,
 		joinedAt: joinedAtFor(row, actor),
 	};
 }

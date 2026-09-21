@@ -65,23 +65,28 @@ Here are some files and folders agents might be interested in:
 | `GLOSSARY.md`              | Glossary of terms used in the project.                                                |
 | `AGENTS.md`                | This file.                                                                            |
 | `prisma/schema.prisma`     | Database schema.                                                                      |
-| `docs/design/*.md`         | Design and specification documents.                                                   |
+| `<dir>/README.md`          | Longer-lived conventions for that directory (`src/api/`, `src/urls/`, `src/db/services/`, `src/commands/`, `test/stories/`). |
 | `dev/specs/to-do/*.md`     | Detailed guidelines for implementation of specific features.                          |
 | `dev/specs/to-review/*.md` | Specs that are ready for review before implementation.                                |
 | `dev/issues/*.md`          | Store issues and bugs. Once fixed, register in the changelog and delete the file.     |
 | `src/api/`                 | Implements controllers for the REST API.                                              |
 | `src/actions/`             | Implements Astro Actions.                                                             |
-| `src/db/`                  | Implements the database schema and services.                                          |
-| `src/components/`          | Reusable UI components.                                                               |
-| `src/data/`                | Data types used throughout the project. Domain modelling.                             |
-| `src/i18n/locales/`        | Localization files.                                                                   |
-| `src/pages/`               | Astro pages.                                                                          |
-| `src/layouts/`             | Astro layouts.                                                                        |
 | `src/auth/`                | Authentication and authorization. Permission rules.                                   |
-| `src/middleware/`          | Middleware for Astro and the REST API.                                                |
-| `src/services/`            | Services that implement the business logic and expose resources.                      |
-| `src/utils/`               | Utility functions.                                                                    |
 | `src/commands/`            | Management CLI commands.                                                              |
+| `src/components/`          | Reusable UI components.                                                               |
+| `src/core/`                | Core schemas (Zod validators), error types, and constants.                            |
+| `src/db/`                  | Database schema (Prisma) and service classes for data access.                         |
+| `src/fixtures/`            | Test data factories.                                                                  |
+| `src/generated/`           | Generated code from scripts (do not edit).                                            |
+| `src/layouts/`             | Astro layouts.                                                                        |
+| `src/mdq/`                 | Question data models and scoring logic.                                               |
+| `src/middleware/`          | Middleware for Astro and the REST API.                                                |
+| `src/pages/`               | Astro pages.                                                                          |
+| `src/rpc/`                 | RPC endpoint registry and method handlers.                                            |
+| `src/services/`            | Service implementations (e.g. email). Business logic lives in `src/db/services/`.     |
+| `src/typing/`              | Type utilities and branded types.                                                     |
+| `src/urls/`                | URL parsing and course reference utilities.                                           |
+| `src/utils/`               | Utility functions.                                                                    |
 
 
 ## Workflow
@@ -133,15 +138,17 @@ a broken `canViewCourse` and a broken question fixture both reached `main` while
 CI stayed green. If you changed a type, a service signature or a Prisma model,
 run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 
-## Astro Development
+## Development Commands
 
-When starting the dev server, use background mode:
-
-```
-astro dev --background
-```
-
-Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
+| Command                     | Action                                      |
+| :-------------------------- | :------------------------------------------ |
+| `pnpm run dev`              | Start dev server at `localhost:4321`        |
+| `pnpm run build`            | Build for production to `./dist/`           |
+| `pnpm run test`             | Run integration tests (Playwright)          |
+| `pnpm run lint`             | Run linter, typecheck, and story coverage   |
+| `pnpm run manage`           | Run management CLI commands                 |
+| `pnpm run db:seed`          | Seed the dev database                       |
+| `pnpm run db:reset`         | Reset and re-seed the dev database          |
 
 ## Documentation
 
@@ -182,7 +189,7 @@ glossar. Add in alphabetical order.
 Input schemas constrain values, output schemas constrain shape. Keep the
 `returns:` validators — they whitelist what leaves a service — but do not
 repeat a format rule there that the create/update schema already enforces. See
-`docs/design/db-service-classes.md`.
+`src/db/services/README.md`.
 
 ## Skills
 

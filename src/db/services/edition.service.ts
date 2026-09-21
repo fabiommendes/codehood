@@ -75,7 +75,6 @@ export class EditionService
 	 * Finds a single edition by slug.
 	 */
 	@Validate({
-		async: true,
 		returns: editionSchema.nullable(),
 		args: [editionPK],
 	})
@@ -89,7 +88,6 @@ export class EditionService
 	 * `filter.active`.
 	 */
 	@Validate({
-		async: true,
 		returns: editionSchema.array(),
 		args: [editionFilter],
 	})
@@ -111,7 +109,7 @@ export class EditionService
 	 * Updates an edition's editable fields.
 	 *
 	 * `slug` is not editable: it is the token in every course URL under this
-	 * edition (see `docs/design/url-structure.md`), so changing it would
+	 * edition (see `src/urls/README.md`), so changing it would
 	 * move every one of those courses without touching a row.
 	 */
 	@Validate({

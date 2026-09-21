@@ -1,0 +1,160 @@
+---
+import { hasPerm } from "@/auth/permissions";
+import CourseHeader from "@/components/CourseHeader.astro";
+import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
+import Badge from "@/components/ui/Badge";
+import type { Question, QuestionPublic } from "@/db";
+import { db } from "@/db";
+import AppLayout from "@/layouts/AppLayout.astro";
+import {
+	examStatusBadgeClass,
+	examTypeLabels,
+	formatDuration,
+} from "@/utils/exam-display";
+import { loadCourse } from "@/utils/load-course";
+import { renderMarkdown } from "@/utils/markdown";
+import { formatDateTime } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+const canManage = hasPerm(actor, "enrollment.manage", course);
+
+if (!slug) return Astro.rewrite("/404");
+const exam = await db.exam.findOne({ courseId: course.id, slug }, { actor });
+if (!exam) return Astro.rewrite("/404");
+
+// Rendered like a resource note: PLAINTEXT/HTML text is shown as-is rather
+// than interpreted, since neither is safe to trust with raw markup.
+const descriptionHtml =
+	exam.description && exam.format === "MARKDOWN"
+		? renderMarkdown(exam.description)
+		: null;
+const preambleHtml =
+	exam.preamble && exam.format === "MARKDOWN"
+		? renderMarkdown(exam.preamble)
+		: null;
+
+// Each pinned question is fetched with the same `public` flag `canManage`
+// already picks for the rest of the page — `ExamQuestion` never sees more
+// of a question than the actor it renders for is allowed to. A slug that no
+// longer resolves (an archived or otherwise inaccessible question) is
+// dropped rather than shown blank.
+const pinnedQuestions = (
+	await Promise.all(
+		exam.questions.map((question) =>
+			canManage
+				? db.question.findOne(
+						{ courseId: course.id, slug: question.slug, public: false },
+						{ actor },
+					)
+				: db.question.findOne(
+						{ courseId: course.id, slug: question.slug, public: true },
+						{ actor },
+					),
+		),
+	)
+).filter(
+	(question): question is Question | QuestionPublic => question !== null,
+);
+---
+
+<AppLayout title={`${exam.title} · Exams`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={`${href}/exams`} class="text-sm text-base-content/60 hover:text-primary">← Exams</a>
+
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <span class:list={["badge badge-sm", examStatusBadgeClass(exam.status)]}>{exam.status}</span>
+      <span class="badge badge-outline badge-sm">{examTypeLabels[exam.type]}</span>
+    </div>
+    <h2 class="mt-2 text-2xl font-bold">{exam.title}</h2>
+    <div class="mt-2 flex flex-wrap gap-1.5">
+      {
+        exam.tags.map((tag) => (
+          <Badge size="xs" style="outline">
+            {tag}
+          </Badge>
+        ))
+      }
+    </div>
+
+    {
+      exam.description && (
+        <p class="mt-4 text-sm text-base-content/70">
+          {descriptionHtml ? <span set:html={descriptionHtml} /> : exam.description}
+        </p>
+      )
+    }
+
+    <section class="mt-8">
+      <h2 class="text-lg font-semibold">Details</h2>
+      <dl class="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-2">
+        <div>
+          <dt class="text-sm text-base-content/50">Type</dt>
+          <dd class="mt-0.5 font-medium">{examTypeLabels[exam.type]}</dd>
+        </div>
+        <div>
+          <dt class="text-sm text-base-content/50">Status</dt>
+          <dd class="mt-0.5 font-medium">{exam.status}</dd>
+        </div>
+        <div>
+          <dt class="text-sm text-base-content/50">Scheduled</dt>
+          <dd class="mt-0.5 font-medium">
+            {exam.scheduledAt ? formatDateTime(exam.scheduledAt) : "Not scheduled"}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-base-content/50">Duration</dt>
+          <dd class="mt-0.5 font-medium">
+            {formatDuration(exam.durationMs)}
+            {exam.extraTimeMs > 0 && ` (+${Math.round(exam.extraTimeMs / 60_000)} min extra time)`}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm text-base-content/50">Questions</dt>
+          <dd class="mt-0.5 font-medium">{exam.questions.length}</dd>
+        </div>
+        <div>
+          <dt class="text-sm text-base-content/50">Last updated</dt>
+          <dd class="mt-0.5 font-medium">{formatDateTime(exam.updatedAt)}</dd>
+        </div>
+      </dl>
+    </section>
+
+    {
+      exam.preamble && (
+        <section class="mt-8">
+          <h2 class="text-lg font-semibold">Preamble</h2>
+          <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
+            {preambleHtml ? (
+              <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
+            ) : (
+              <p class="whitespace-pre-wrap text-sm">{exam.preamble}</p>
+            )}
+          </div>
+        </section>
+      )
+    }
+
+    <section class="mt-8">
+      <h2 class="text-lg font-semibold">Questions</h2>
+      {
+        pinnedQuestions.length > 0 ? (
+          <div class="mt-3">
+            <ExamQuestionsList questions={pinnedQuestions} canManage={canManage} client:load />
+          </div>
+        ) : (
+          <p class="mt-3 text-sm text-base-content/60">No questions pinned yet.</p>
+        )
+      }
+    </section>
+  </main>
+</AppLayout>

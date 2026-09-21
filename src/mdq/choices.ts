@@ -2,8 +2,7 @@
  * Resolve the stable id of every choice in a list, in order.
  *
  * `id` is optional in the schema, but answers travel as ids rather than
- * positions (see `dev/specs/to-review/questions.md`, "Options carry stable
- * ids"), so scoring and the public representation must agree on the same
+ * positions, so scoring and the public representation must agree on the same
  * fallback or a student's answer addresses a choice the grader cannot find.
  * The fallback slugifies the choice text, which mdq.spec asks to stay stable
  * across reordering, insertion and removal; a text that slugifies to nothing

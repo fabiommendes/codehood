@@ -1,7 +1,6 @@
 /**
- * The weekly pattern half of a course's schedule — see
- * `dev/specs/to-review/calendar.md`. Writes are ownership-gated (the
- * `course.update-contents` permission); reads follow course-contents
+ * The weekly pattern half of a course's schedule. Writes are ownership-gated
+ * (the `course.update-contents` permission); reads follow course-contents
  * visibility (`course.read-contents`). A slot is never archived — deleting
  * one with events attached is refused, naming the count.
  */

@@ -38,8 +38,7 @@ export interface EssayViewProps {
  * shown in a disabled textarea. The other views freeze by disabling their
  * controls because a frozen toggle still displays what it holds; a textarea
  * does not — it hides everything past its own height behind a scrollbar the
- * student can no longer use. See `dev/specs/to-do/question-essay.md`, "Frozen
- * essays are rendered, not disabled".
+ * student can no longer use.
  */
 export default function EssayView(props: EssayViewProps): JSX.Element {
 	const mode = () => props.mode ?? "answer";

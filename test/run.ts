@@ -20,6 +20,8 @@ mkdirSync(TEST_RESOURCE_ROOT, { recursive: true });
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 process.env.RESOURCE_ROOT = TEST_RESOURCE_ROOT;
 process.env.NODE_ENV = "test";
+// `ENVIRONMENT` has no default and the test server runs over plain HTTP.
+process.env.ENVIRONMENT = "dev";
 
 // prisma.config.ts hardcodes its datasource url, so the CLI needs --url to target the
 // test database explicitly. The user has consented (see AskUserQuestion in this session)
@@ -35,6 +37,14 @@ execSync(
 		stdio: "inherit",
 	},
 );
+
+// The demo accounts and courses used to appear on the first request, seeded by
+// a middleware that no longer exists. Seed them here instead, so a spec that
+// logs in as `admin` still finds one.
+execSync("node_modules/.bin/tsx prisma/seed.ts", {
+	env: process.env,
+	stdio: "inherit",
+});
 
 const result = spawnSync(
 	"node_modules/.bin/playwright",

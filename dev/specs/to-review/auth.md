@@ -68,6 +68,25 @@ invites are just the `maxUses = 1` case, so no kind-specific redemption
 logic is needed — only the "does the submitted email match" check differs by
 kind).
 
+#### Who may issue an invite
+
+Two rules combine in `invite.create`:
+
+- **Role hierarchy** — an admin invites instructors and students, an
+  instructor invites students, a student invites nobody. No one invites an
+  admin.
+- **Course ownership** — an invite carrying a `courseId` enrolls its redeemer
+  into that course, so issuing it needs the right to enrol into that course.
+  An instructor may only reference a course they teach; referencing another
+  instructor's course is a 403. An invite with no course is unaffected.
+
+An admin keeps a branch for any course, matching `enrollment.create`: an
+admin may already enrol a student into any course directly, so denying the
+invite that does the same would close nothing. This differs from
+`enrollment.manage` and `course.update-contents`, which have no admin branch
+because they reach into course operations and contents rather than the
+roster.
+
 Accepting = visiting `/invite/[token]`, setting a password and providing
 `githubId`/`schoolId` (required for both `STUDENT` and `INSTRUCTOR`,
 regardless of invite kind — see below), which creates the `User` and inserts
@@ -103,7 +122,7 @@ Nothing can invite the first admin. Three ways in, all sharing one
   `devBootstrapMiddleware` (`src/middleware.ts`), so `astro dev` works even
   if the seed was never run manually.
 - **Everywhere else**: the `manage create-user` and `manage reset-password`
-  commands from `docs/design/management-commands.md` (Commander.js, under
+  commands from `src/commands/README.md` (Commander.js, under
   `src/commands/`), going through `UserService` like everything else.
 
 `ensureDevAdmin()` is gated on `process.env.NODE_ENV === "production"` — in
@@ -214,7 +233,7 @@ model InviteRedemption {
 | `src/middleware/session.ts`        | Reads session cookie, attaches `context.locals.user`, refreshes sliding expiry.                   |
 | `src/middleware/api-key.ts`        | Reads `Authorization: Bearer`, attaches `context.locals.user` for REST routes under `src/api/`.   |
 | `src/actions/auth.ts`              | Astro Actions: `login`, `logout`, `acceptInvite`, `createInvite`, `createApiKey`, `revokeApiKey`. |
-| `src/commands/create-user.ts`      | `manage create-user` (see `docs/design/management-commands.md`).                                  |
+| `src/commands/create-user.ts`      | `manage create-user` (see `src/commands/README.md`).                                  |
 | `src/commands/reset-password.ts`   | `manage reset-password`.                                                                          |
 | `src/pages/login.astro`            | Login form.                                                                                       |
 | `src/pages/invite/[token].astro`   | Accept-invite / set-password form (branches on invite kind).                                      |

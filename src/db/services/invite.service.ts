@@ -2,7 +2,7 @@ import type { z } from "zod";
 import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
-import { NotAllowed, NotFound } from "@/core/error";
+import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import {
 	inviteCreate,
 	inviteFilter,
@@ -63,6 +63,15 @@ export class InviteService extends CrudBase<{
 }> {
 	/**
 	 * Creates an invite, returning the plaintext token and the invite row.
+	 *
+	 * An invite bound to a course requires the right to enrol into that
+	 * course, so the course is loaded first and checked with the invite's
+	 * role.
+	 *
+	 * `createdBy` in `input` is only honoured for `SYSTEM` calls, which have
+	 * no actor to derive it from; a `SYSTEM` call without it is rejected. Any
+	 * other caller has it derived from `opts.actor` and silently ignored if
+	 * sent.
 	 */
 	@Validate({
 		service: true,
@@ -74,7 +83,31 @@ export class InviteService extends CrudBase<{
 		input: InviteCreate,
 		opts: ServiceOptsWithoutTx,
 	): Promise<Invite> {
-		ensurePerm(opts.actor, "invite.create", { invitedRole: input.invitedRole });
+		const course = input.courseId
+			? await tx.course.findUnique({
+					where: { id: input.courseId },
+					select: { id: true, instructor: { select: { username: true } } },
+				})
+			: null;
+		if (input.courseId && !course) {
+			throw new NotFound("course", { id: input.courseId });
+		}
+		ensurePerm(opts.actor, "invite.create", {
+			invitedRole: input.invitedRole,
+			course,
+		});
+		const createdById =
+			opts.actor === SYSTEM ? input.createdBy?.username : opts.actor.username;
+		if (createdById === undefined) {
+			throw new InvalidData({
+				createdBy: [
+					{
+						code: "missing",
+						message: "A SYSTEM call must supply createdBy explicitly.",
+					},
+				],
+			});
+		}
 		const token = generateToken();
 		const invite = await tx.invite.create({
 			data: {
@@ -87,7 +120,7 @@ export class InviteService extends CrudBase<{
 				expiresAt: new Date(
 					Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
 				),
-				createdById: input.createdBy.username,
+				createdById,
 			},
 			include: inviteInclude,
 		});
@@ -97,11 +130,13 @@ export class InviteService extends CrudBase<{
 	}
 
 	/**
-	 * Finds a single invite by its token.
+	 * Finds a single invite by its raw token or by its id.
 	 *
-	 * Not actor-filtered: the raw token is the credential and looking one up
-	 * is how the invite-acceptance flow establishes what the redeemer is
-	 * allowed to become.
+	 * A token lookup is not actor-filtered: the raw token is the credential,
+	 * and looking one up is how the invite-acceptance flow establishes what
+	 * the redeemer is allowed to become. An id lookup is filtered, because
+	 * ids are sequential and would otherwise let any account walk every
+	 * invite's email, role, course and creator.
 	 */
 	@Validate({
 		service: true,
@@ -111,7 +146,7 @@ export class InviteService extends CrudBase<{
 	protected async findOneTx(
 		tx: PrismaTx,
 		filter: InvitePK,
-		_opts: ServiceOptsWithoutTx,
+		opts: ServiceOptsWithoutTx,
 	): Promise<Invite | null> {
 		const by = filter as FillUndefineds<InvitePK>;
 		const where = by.token ? { tokenHash: hashToken(by.token) } : { id: by.id };
@@ -120,8 +155,10 @@ export class InviteService extends CrudBase<{
 			where,
 			include: inviteInclude,
 		});
+		if (invite == null) return null;
+		if (!by.token) ensurePerm(opts.actor, "invite.read", invite);
 
-		return invite == null ? null : fromDb(invite);
+		return fromDb(invite);
 	}
 
 	/**
@@ -278,6 +315,11 @@ export function inviteWhere(actor: Actor): Prisma.InviteWhereInput {
 }
 
 function fromDb(db: DbInvite): Invite {
-	const { _count, createdById: _createdById, ...rest } = db;
+	const {
+		_count,
+		createdById: _createdById,
+		tokenHash: _tokenHash,
+		...rest
+	} = db;
 	return { ...rest, redemptions: _count.redemptions };
 }

@@ -21,7 +21,7 @@ export function buildOpenApiDocument() {
 			title: "Codehood API",
 			version: pkg.version,
 			description:
-				"REST API for the Codehood CLI and grading bots. Authenticated with `Authorization: Bearer <key>`, except where noted — see docs/design/url-structure.md.",
+				"REST API for the Codehood CLI and grading bots. Authenticated with `Authorization: Bearer <key>`, except where noted — see src/urls/README.md.",
 		},
 		servers: [{ url: "/", description: "Same origin as the web app" }],
 		security: [{ BearerAuth: [] }],

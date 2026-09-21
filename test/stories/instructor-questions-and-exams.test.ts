@@ -1,0 +1,128 @@
+import { expect, test } from "@playwright/test";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
+import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { courseHref } from "@/urls";
+import {
+	fillField,
+	logInAs,
+	openTab,
+	resetDatabase,
+	seedUser,
+} from "./helpers";
+
+test.beforeEach(resetDatabase);
+
+test("instructor: browse the question bank", async ({ page }) => {
+	const course = await persistedCourseFactory.create();
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+
+	await logInAs(page, course.instructor);
+
+	await test.step("before anything is pushed, the list says so", async () => {
+		await page.goto(`${href}/questions`);
+		await expect(page.getByText("No questions yet.")).toBeVisible();
+	});
+
+	await db.question.create(
+		{
+			courseId: course.id,
+			slug: "recursion-basics",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "multiple-choice",
+				title: "Recursion basics",
+				stem: "Which of the following is required for a recursive function to terminate?",
+				tags: ["recursion"],
+				choices: [
+					{ id: "base-case", text: "A base case", score: 1 },
+					{ id: "tail-call", text: "A tail call" },
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			courseId: course.id,
+			slug: "linked-list-invariants",
+			status: "DRAFT",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Linked list invariants",
+				stem: "Describe the invariant your `insert` implementation must preserve.",
+				tags: ["data-structures"],
+				input: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
+
+	await test.step("the list shows every question pushed to the course", async () => {
+		await page.goto(`${href}/questions`);
+
+		await expect(page.getByText("Recursion basics")).toBeVisible();
+		await expect(page.getByText("Linked list invariants")).toBeVisible();
+		await expect(page.getByText("2 questions")).toBeVisible();
+	});
+
+	await test.step("opening one shows its title, type and status", async () => {
+		await page.getByText("Recursion basics").click();
+		await expect(page).toHaveURL(`${href}/questions/recursion-basics`);
+
+		await expect(
+			page.getByRole("heading", { name: "Recursion basics" }),
+		).toBeVisible();
+		await expect(page.getByText("Multiple choice").first()).toBeVisible();
+		await expect(
+			page.getByText("PUBLISHED", { exact: true }).first(),
+		).toBeVisible();
+	});
+});
+
+test("instructor: Let a bot grade for me", async ({ page, request }) => {
+	const instructor = await seedUser({ role: "INSTRUCTOR" });
+	await logInAs(page, instructor);
+
+	await test.step("the instructor issues a key of kind Bot", async () => {
+		await page.goto("/profile");
+		await openTab(page, "API keys");
+		await fillField(page, "Key name", "grading bot");
+		await page
+			.getByRole("group", { name: "Kind", exact: true })
+			.getByRole("combobox")
+			.selectOption("BOT");
+		await page.getByRole("button", { name: "Create key" }).click();
+	});
+
+	await expect(
+		page.getByText("New key created. Copy it now — it won't be shown again."),
+	).toBeVisible();
+	await expect(page.getByText("bot", { exact: true })).toBeVisible();
+
+	const token = (await page.getByRole("code").innerText()).trim();
+
+	await test.step("and the bot acts as the instructor who issued it", async () => {
+		const res = await request.get("/api/user/me", {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		expect(res.ok()).toBe(true);
+		expect(await res.json()).toMatchObject({
+			username: instructor.username,
+			role: "INSTRUCTOR",
+		});
+	});
+
+	await test.step("while an unissued key is refused", async () => {
+		const res = await request.get("/api/user/me", {
+			headers: { Authorization: "Bearer not-a-real-key" },
+		});
+		expect(res.ok()).toBe(false);
+	});
+});

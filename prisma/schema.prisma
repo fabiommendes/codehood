@@ -689,6 +689,8 @@ model Exam {
   questionsForExams QuestionsForExam[]
   responses         Response[]
   events            CalendarEvent[]
+
+  @@unique([courseId, slug])
 }
 
 /// A M2M relation table linking Exams to their Questions (QuestionRefs).

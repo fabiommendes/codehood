@@ -1,14 +1,13 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
+import QuestionPreview from "@/components/question/QuestionPreview";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { Question } from "@/mdq/question";
 import { loadCourse } from "@/utils/load-course";
-import {
-	mockQuestions,
-	questionTypeLabels,
-	statusBadgeClass,
-} from "@/utils/mock-questions";
+import { questionTypeLabels, statusBadgeClass } from "@/utils/question-display";
 
 export const prerender = false;
 
@@ -19,33 +18,34 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 if ("redirect" in result) return result.redirect;
 const { course, href } = result;
 
-const question = mockQuestions.find((q) => q.slug === slug);
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+
+if (!slug) return Astro.rewrite("/404");
+const question = await db.question.findOne(
+	{ courseId: course.id, slug, public: false },
+	{ actor },
+);
 if (!question) return Astro.rewrite("/404");
+const { question: doc } = question;
+
+const problems = new Question(doc).validate();
 ---
 
-<AppLayout title={`${question.title} · Questions`}>
+<AppLayout title={`${doc.title ?? question.slug} · Questions`}>
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} active="manage" />
+    <CourseHeader course={course} active="questions" />
 
     <a href={`${href}/questions`} class="text-sm text-base-content/60 hover:text-primary">← Questions</a>
 
     <div class="mt-2 flex flex-wrap items-center gap-2">
       <span class:list={["badge badge-sm", statusBadgeClass(question.status)]}>{question.status}</span>
-      <span class="badge badge-outline badge-sm">{questionTypeLabels[question.type]}</span>
-      {
-        question.sharedBy ? (
-          <Badge size="sm" variant="info" style="soft">
-            Shared by @{question.sharedBy.author} · {question.sharedBy.group}
-          </Badge>
-        ) : (
-          <span class="badge badge-primary badge-sm">Yours</span>
-        )
-      }
+      <span class="badge badge-outline badge-sm">{questionTypeLabels[doc.type]}</span>
     </div>
-    <h2 class="mt-2 text-2xl font-bold">{question.title}</h2>
+    <h2 class="mt-2 text-2xl font-bold">{doc.title ?? question.slug}</h2>
     <div class="mt-2 flex flex-wrap gap-1.5">
       {
-        question.tags.map((tag) => (
+        (doc.tags ?? []).map((tag) => (
           <Badge size="xs" style="outline">
             {tag}
           </Badge>
@@ -53,42 +53,47 @@ if (!question) return Astro.rewrite("/404");
       }
     </div>
 
-    <Alert variant="info" class="mt-6">
-      <span>
-        Preview data — this is a mock detail view. Real content, versions, and rendering come from{" "}
-        <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">mdq-js</code>, which isn't wired up yet.
-      </span>
-    </Alert>
-
-    <section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
-      <h2 class="text-sm font-semibold uppercase text-base-content/50">Stem</h2>
-      <p class="mt-3 text-lg">{question.stem}</p>
-      <p class="mt-4 text-sm text-base-content/50">
-        Answer options, grading configuration, and the private half of this question aren't shown here — the mock
-        only stands in for what an instructor sees, not what a student answers.
-      </p>
-    </section>
+    {
+      problems.length > 0 && (
+        <Alert variant="warning" class="mt-8">
+          <div class="flex flex-col gap-1">
+            <span class="font-semibold">This question has problems mdq.spec does not allow:</span>
+            <ul class="list-inside list-disc text-sm">
+              {problems.map((problem) => (
+                <li>{problem.message}</li>
+              ))}
+            </ul>
+          </div>
+        </Alert>
+      )
+    }
 
     <section class="mt-8">
       <h2 class="text-lg font-semibold">Details</h2>
       <dl class="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-2">
         <div>
           <dt class="text-sm text-base-content/50">Type</dt>
-          <dd class="mt-0.5 font-medium">{questionTypeLabels[question.type]}</dd>
+          <dd class="mt-0.5 font-medium">{questionTypeLabels[doc.type]}</dd>
         </div>
         <div>
           <dt class="text-sm text-base-content/50">Status</dt>
           <dd class="mt-0.5 font-medium">{question.status}</dd>
         </div>
         <div>
-          <dt class="text-sm text-base-content/50">Owner</dt>
-          <dd class="mt-0.5 font-medium">{question.sharedBy ? `@${question.sharedBy.author} (${question.sharedBy.group})` : "You"}</dd>
+          <dt class="text-sm text-base-content/50">Version</dt>
+          <dd class="mt-0.5 font-medium">{question.version}</dd>
         </div>
         <div>
           <dt class="text-sm text-base-content/50">Last updated</dt>
-          <dd class="mt-0.5 font-medium">{question.updatedAt}</dd>
+          <dd class="mt-0.5 font-medium">
+            {question.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          </dd>
         </div>
       </dl>
+    </section>
+
+    <section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
+      <QuestionPreview client:load data={doc} />
     </section>
   </main>
 </AppLayout>

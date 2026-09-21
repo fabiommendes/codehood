@@ -1,0 +1,27 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/time-slot
+  body:
+    type: json
+    data: |-
+      {
+          "courseId": 1,
+          "slug": "mon-morning",
+          "title": "Monday lecture",
+          "day": "MONDAY",
+          "startMin": 480,
+          "durationMin": 100
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

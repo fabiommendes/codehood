@@ -1,0 +1,23 @@
+info:
+  name: Update
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/time-slot/1
+  body:
+    type: json
+    data: |-
+      {
+          "startMin": 540,
+          "durationMin": 50
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -9,6 +9,11 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# `ENVIRONMENT` has no default and a fresh checkout has no `.env`, so the
+# seed, the generators and the build would all refuse to run without it.
+env:
+  ENVIRONMENT: dev
+
 jobs:
   lint:
     runs-on: ubuntu-latest

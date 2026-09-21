@@ -646,3 +646,60 @@ test("create rejects an empty slug with a 400", async () => {
 		),
 	).toBe(400);
 });
+
+test("a dropped student loses access to the course's resources", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const student = await makeUser("STUDENT");
+	const course = await makeCourse(instructor.username);
+
+	await db.enrollment.create(
+		{ courseId: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			courseId: course.id,
+			slug: "handout",
+			title: "Handout",
+			data: link(),
+			ref: tag("h"),
+		},
+		{ actor: instructor },
+	);
+
+	await expect(
+		db.resource.findMany({ courseId: course.id }, { actor: student }),
+	).resolves.toHaveLength(1);
+	await expect(
+		db.resource.findOne(
+			{ courseId: course.id, slug: "handout" },
+			{ actor: student },
+		),
+	).resolves.not.toBeNull();
+
+	// Dropping flips the enrollment to DROPPED rather than deleting the row,
+	// so a rule that only asks "is there an enrollment?" keeps letting them in.
+	await db.enrollment.delete(
+		{ courseId: course.id, username: student.username },
+		{ actor: instructor },
+	);
+
+	await expect(
+		db.resource.findMany({ courseId: course.id }, { actor: student }),
+	).rejects.toThrow();
+	await expect(
+		db.resource.findOne(
+			{ courseId: course.id, slug: "handout" },
+			{ actor: student },
+		),
+	).rejects.toThrow();
+
+	// Re-enrolling restores it.
+	await db.enrollment.create(
+		{ courseId: course.id, username: student.username },
+		{ actor: instructor },
+	);
+	await expect(
+		db.resource.findMany({ courseId: course.id }, { actor: student }),
+	).resolves.toHaveLength(1);
+});

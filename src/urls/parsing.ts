@@ -1,5 +1,5 @@
 /**
- * Pure functions for parsing course URLs, per `docs/design/url-structure.md`.
+ * Pure functions for parsing course URLs, per `src/urls/README.md`.
  */
 
 import { EDITION_RE, RESERVED_USERNAMES, USERNAME_RE } from "./constants";

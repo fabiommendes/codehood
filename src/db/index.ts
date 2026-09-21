@@ -13,6 +13,7 @@ import { CourseService } from "./services/course.service";
 import { DisciplineService } from "./services/discipline.service";
 import { EditionService } from "./services/edition.service";
 import { EnrollmentService } from "./services/enrollment.service";
+import { ExamService } from "./services/exam.service";
 import { InviteService } from "./services/invite.service";
 import { PassphraseService } from "./services/passphrase.service";
 import { QuestionService } from "./services/question.service";
@@ -61,7 +62,6 @@ export type {
 	CourseUpdate,
 	CourseUpsert,
 } from "./services/course.service";
-export { toEnrollmentView } from "./services/course.service";
 export type {
 	Discipline,
 	DisciplineCreate,
@@ -83,6 +83,14 @@ export type {
 	EnrollmentFilter,
 	EnrollmentPK,
 } from "./services/enrollment.service";
+export type {
+	Exam,
+	ExamCreate,
+	ExamFilter,
+	ExamPK,
+	ExamUpdate,
+	ExamUpsert,
+} from "./services/exam.service";
 export type {
 	Invite,
 	InviteCreate,
@@ -158,6 +166,7 @@ export const db = {
 	discipline: new DisciplineService(),
 	edition: new EditionService(),
 	enrollment: new EnrollmentService(),
+	exam: new ExamService(),
 	invite: new InviteService(),
 	passphrase: new PassphraseService(),
 	question: new QuestionService(),

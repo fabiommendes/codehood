@@ -2,7 +2,130 @@
 
 ## Unreleased
 
+### Security
+
+- `invite.create` only checked the invited role, never the invite's course. An
+  instructor could issue a classroom invite carrying another instructor's
+  `courseId`, and whoever redeemed it became an `ACTIVE` enrollment in that
+  course, gaining read access to its contents and roster. The permission
+  target now carries the course, `InviteService.createTx` loads it before the
+  check, and an instructor is refused any course they do not teach. An admin
+  is still allowed on any course, matching `enrollment.create`.
+
+- `courseSchema` declared `enrollments: userInfo.array()`, so every course
+  read (`GET /api/course/...`, the course home page, `/courses`) handed the
+  full roster — civil name and username of every classmate — to any actor
+  who could see the course, including a student with a plain `ACTIVE`
+  enrollment. That directly contradicted `enrollmentService.findMany`'s own
+  documented rule that students cannot list their classmates. `enrollments`
+  is gone from the public schema; a course now exposes `enrollmentCount`
+  instead, and the roster stays behind `enrollmentService.findMany`, which
+  enforces `enrollment.read`. **Breaking change** for any client (including
+  the CLI) that read `Course.enrollments`.
+
+- `inviteCreate` and `attachmentCreate` accepted `createdBy`/`uploaderId` from
+  the request body, so `POST /api/invite` let any caller forge another
+  user's name onto an invite (and, had `attachmentService` ever been routed,
+  onto an attachment). `createdById`/`uploaderId` are now always derived from
+  `opts.actor`; the field in the body is only honoured for `SYSTEM` calls,
+  which have no actor to derive it from, and is silently ignored otherwise.
+
+- Three separate switches decided whether the server was running in
+  production (`ENVIRONMENT`, `NODE_ENV` and `import.meta.env.PROD`), none of
+  them validated at startup. With `ENVIRONMENT` unset it defaulted to `dev`,
+  which put a bootstrap middleware in the request chain: the first request
+  against an empty database created `admin`/`admin`, `instructor` and
+  `student`, all with the username as the password, reachable from the public
+  login page. The same default left the session cookie without `Secure`.
+  `ENVIRONMENT` is now the only switch, has no default, rejects an empty
+  value, and fails the boot with a message naming itself. The dev seed is out
+  of the request chain entirely — no request creates a user — and runs only
+  from `pnpm run db:seed` and the test runner, only under `ENVIRONMENT=dev`.
+  Session cookie attributes come from `SESSION_COOKIE_OPTIONS` alone.
+  **Deployments must now set `ENVIRONMENT`**; an existing `.env` needs the
+  line adding.
+
+- Markdown rendering is now one shared instance (`src/utils/markdown.ts`) with
+  `html: false` spelled out, rather than four call sites each constructing
+  their own — one of which relied on the library's default. And the
+  `[name]` segment of `/files/[hash]/[name]` reaches the
+  `Content-Disposition` header through `sanitizeFilename`; a CR/LF smuggled
+  in as `%0d%0a` used to make the `Headers` constructor throw, answering 500
+  where a 404 belonged.
+
+### Changed
+
+- `@Validate` no longer has an `async` option. It awaits a thenable return
+  value before checking it against `returns:`, so an `async` method whose
+  decorator did not declare itself async no longer validates the pending
+  `Promise` and throws synchronously where the caller cannot catch it.
+  Dropped from the six call sites in `discipline`, `edition` and `attachment`.
+
+- `@Validate({ service: true })` took whatever argument happened to be last as
+  the method's `ServiceOpts`. A call missing that argument silently read a
+  filter or an input object as options instead. The trailing argument is now
+  checked against the method's declared arity and rejected, as an
+  `ImproperBehavior`, when it sits in the `opts` position without being one.
+  Methods that declare `opts` optional (`BlobService.findOne`/`findMany`) may
+  still be called without it.
+
+- `courseCreate`, `timeSlotCreate`/`timeSlotUpdate` and `calendarEventUpdate`
+  are derived from their entity schema with `pick`/`omit`/`extend`/`partial`
+  rather than retyped, so a new column no longer reaches the database with
+  nothing rejecting it on the way in. `timeSlotCreate.title` is `.nullish()`,
+  matching the nullable column. The derivation rule and the
+  `.optional()`/`.nullish()` rule are written down in
+  `src/db/services/README.md`.
+
+- The Drop button on a course's Roster tab and the "end their sessions" button
+  on `/admin/users` both posted the student's username as `userId`, while
+  `course.dropEnrollment` and `admin.forceLogout` read `username`. The drop
+  action's `username` is optional and falls back to the acting user, and
+  `EnrollmentService.delete` updates by `updateMany`, so dropping a student
+  matched no rows and reported success: the button had never dropped anyone.
+  Both forms now post `username`.
+
+- `enrollment.create | enrollment.update | enrollment.manage` was one
+  permission covering two unrelated rights, and granted all three to any
+  admin. It is now two: `enrollment.create | enrollment.update` (SYSTEM, any
+  admin, or the course's instructor enrolls a student; `enrollment.read |
+  enrollment.delete` gained the same admin branch, so an admin lists and drops
+  a roster too) and
+  `enrollment.manage` (the course's operations — manage pages, roster, the
+  management half of the exam UI — its own instructor only). A non-owning
+  admin keeps the course *record* and loses the course's operations, which is
+  what `course.update-contents` and `course.update` already claimed in their
+  comments. `PassphraseService` moved its guard to `enrollment.manage`: a
+  classroom passphrase is a course operation, not an enrollment row.
+
 ### Added
+
+- An "Add student" control on a course's Roster tab, behind a new
+  `course.addStudent` action. An email or username that matches an account is
+  enrolled straight away (reactivating a dropped enrollment); an email with no
+  account behind it gets a single-use personal invite carrying the course, so
+  redeeming it creates the account already enrolled. `auth.createPersonalInvite`
+  had existed since the start with `/admin` as its only caller, which could
+  only invite instructors and to no course, so the "Invite a student
+  personally" story had no UI to test against.
+
+- A story test for `instructor: Invite a student personally`, and
+  `instructor: Drop and re-enroll a student` now re-enrolls through the Roster
+  tab rather than calling `EnrollmentService.create` directly.
+
+- Story tests for `instructor: Enroll the room with a passphrase`,
+  `instructor: Drop and re-enroll a student` and
+  `instructor: Let a bot grade for me`. Coverage goes from 25 to 28 of 54.
+
+- Bruno examples for `/api/calendar-event`, `/api/time-slot` and `/api/invite`,
+  the three routed services that had none.
+- `test/bruno.spec.ts` checks every request in `test/bruno/` against the
+  generated OpenAPI document: the path resolves to a registered route, the
+  method exists on it, and every query parameter and body field is one the
+  route declares, with required fields present and enum values in range. It
+  found seven stale examples on its first run — a `PATCH` aimed at a
+  collection, a `DELETE` carrying a body, two payloads with fields the update
+  schema rejects, and an upsert missing three required fields.
 
 - A JSON-RPC 2.0 endpoint at `POST /rpc`, beside the REST API rather than
   replacing it: REST keeps the CRUD surface, RPC takes the verb-shaped
@@ -80,6 +203,38 @@
   `dev/specs/to-review/course-scoped-resource-api.md`.
 
 ### Fixed
+
+- Stored XSS on a course's Roster tab. The CSV rows went into a
+  `<script type="application/json">` through `set:html={JSON.stringify(...)}`,
+  and `JSON.stringify` leaves `</script` intact — the HTML parser closes a
+  script element on that sequence whatever its `type` says. The cells come from
+  a student's own `name`, `email`, `githubId` and `schoolId`, so a student
+  called `</script><img src=x onerror=...>` ran script in the instructor's or
+  admin's session. `jsonScriptPayload` (`src/utils/json-script.ts`) escapes `<`
+  as `\u003c`, plus U+2028/U+2029. The other `set:html` sites were swept in the
+  same pass: `Tabs.astro` builds CSS from literal tab keys, and the exam,
+  resource and schedule pages render `markdown-it` output with `html: false`,
+  now spelled out on `schedule.astro` rather than left to the default.
+
+- `PATCH /api/user/me` could reset the password. `userUpdate` carried
+  `password` and `UserService.update` only checked its strength, so any
+  momentarily captured session or leaked Bearer key reset the password without
+  knowing the current one and kept the account for good. `password` is out of
+  `userUpdate`, and `POST /api/user/me/change-password` takes
+  `{ currentPassword, newPassword }`, proves the current one and revokes every
+  session the user holds. `profile.changePassword` goes through the same
+  service method and mints a fresh cookie, so the device the change was made
+  from stays signed in while the others do not. API keys are deliberately left
+  alone — revoking every robot on a routine password change is its own outage,
+  and `/profile` lists them for revoking one by one. `PUT /api/user` still
+  accepts a `password` through `userUpsert`; that path is admin-only and is how
+  the CLI seeds accounts.
+
+- `InviteService.findOne({ id })` is filtered through `invite.read`. Only the
+  token lookup stays unfiltered, since the raw token is the credential and the
+  acceptance flow needs it before the redeemer has an account. Ids are
+  sequential, so an unfiltered id lookup let any account walk every invite's
+  email, invited role, course and creator.
 
 - `pnpm run lint` now typechecks. It was `biome ci .`, which does not look at
   types, so `tsc` errors reached `main` and sat there: the `canViewCourse`

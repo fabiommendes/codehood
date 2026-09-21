@@ -1,0 +1,28 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/invite
+  body:
+    type: json
+    data: |-
+      {
+          "kind": "PERSONAL",
+          "email": "newcomer@codehood.test",
+          "invitedRole": "STUDENT",
+          "courseId": 1,
+          "maxUses": 1,
+          "createdBy": { "username": "ada", "name": "Ada Lovelace" },
+          "expiresInMs": 604800000
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

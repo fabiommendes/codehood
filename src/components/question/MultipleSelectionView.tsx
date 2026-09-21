@@ -30,9 +30,7 @@ export interface MultipleSelectionViewProps {
  * checkbox rather than one radio group, and correctness in `review` mode is a
  * judgement — ticked matches `result.correct.has(id)` — rather than a read of
  * what was ticked. A correct choice left unticked therefore renders wrong,
- * and an incorrect choice correctly left alone renders right; see
- * `dev/specs/to-review/question-rendering.md`, "The view derives per-choice
- * correctness, and never gets it handed over".
+ * and an incorrect choice correctly left alone renders right.
  */
 export default function MultipleSelectionView(
 	props: MultipleSelectionViewProps,

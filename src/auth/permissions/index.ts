@@ -112,8 +112,16 @@ export interface CourseWithEnrollment {
 /// A single user's enrollment in a course.
 export type EnrollmentTarget = { course: CourseTarget; user: UserTarget };
 
-/// Role an invite being created grants on redemption.
-export type InviteCreateTarget = { invitedRole: Role };
+/**
+ * Role an invite being created grants on redemption, plus the course it
+ * enrolls into, when it carries one.
+ *
+ * `course` is `null` or absent for an invite that only creates an account.
+ */
+export type InviteCreateTarget = {
+	invitedRole: Role;
+	course?: CourseTarget | null;
+};
 
 /// Existing invite, identified by who issued it. `id` is only used for auditing.
 export type InviteTarget = { id?: number; createdBy: UserTarget };
@@ -161,17 +169,27 @@ const PERMISSIONS = {
 	// ENROLLMENT --------------------------------------------------------------
 	// A course target covers all its enrollments; `{ course, user }` covers one.
 
-	// Rule: only the course's owner enrolls students or runs the course's
-	// operations (invites, roster, manage pages).
-	"enrollment.create | enrollment.update | enrollment.manage": {
+	// Rule: SYSTEM, any admin, or the course's own instructor enrolls a student.
+	"enrollment.create | enrollment.update": {
 		admin: true,
 		other: (actor, target) => isCourseOwner(actor, courseOf(target)),
 		audit: auditEnrollment,
 	} satisfies PermDef<CourseTarget | EnrollmentTarget>,
 
-	// Rule: the course's owner sees and drops any enrollment; a student sees
-	// and drops only their own.
+	// Rule: SYSTEM or the course's own instructor. This is the course's
+	// operations right — the manage pages, the roster, the management half of
+	// the exam UI — not a right over enrollment rows, and a non-owning admin
+	// gets no branch here. Contrast `enrollment.create`, which an admin does
+	// hold, and `course.update-contents`, the other owner-only permission.
+	"enrollment.manage": {
+		other: (actor, target) => isCourseOwner(actor, courseOf(target)),
+		audit: auditEnrollment,
+	} satisfies PermDef<CourseTarget | EnrollmentTarget>,
+
+	// Rule: SYSTEM, any admin, or the course's owner sees and drops any
+	// enrollment; a student sees and drops only their own.
 	"enrollment.read | enrollment.delete": {
+		admin: true,
 		other: (actor, target) =>
 			isCourseOwner(actor, courseOf(target)) ||
 			("user" in target && target.user.username === actor.username),
@@ -181,11 +199,25 @@ const PERMISSIONS = {
 	// INVITE ------------------------------------------------------------------
 	// Rule: invites follow the role hierarchy. Admins invite instructors and
 	// students, instructors invite students, students invite no one.
+	//
+	// An invite carrying a course enrolls its redeemer there, so it also needs
+	// the right to enrol into that course: an instructor only into a course
+	// they teach. An admin keeps a branch for any course, matching
+	// `enrollment.create` — an admin who may enrol a student directly gains
+	// nothing by being denied the invite that does the same.
 	"invite.create": {
 		admin: (_, target) => target.invitedRole !== "ADMIN",
-		instructor: (_, target) => target.invitedRole === "STUDENT",
+		instructor: (actor, target) =>
+			target.invitedRole === "STUDENT" &&
+			(!target.course || isCourseOwner(actor, target.course)),
 		student: false,
-		audit: (target) => ({ invitedRole: target.invitedRole }),
+		audit: (target) => ({
+			invitedRole: target.invitedRole,
+			...(target.course && {
+				...(target.course.id !== undefined && { courseId: target.course.id }),
+				instructor: target.course.instructor.username,
+			}),
+		}),
 	} satisfies PermDef<InviteCreateTarget>,
 
 	// Rule: seeing an invite and controlling it are the same right.

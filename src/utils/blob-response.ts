@@ -1,10 +1,9 @@
 /**
- * How a resource blob is served — see "Serving a blob: an allowlist, not a
- * blocklist" in `dev/specs/to-do/resources.md`. An allowlist rather than a
- * blocklist because the blob sits on the app's own origin with no auth in
- * front of it: an instructor pushing an `.html` file would otherwise be
- * pushing a script that runs with every student's session cookie. SVG is
- * carved out of `image/*` for the same reason, wearing an image MIME type.
+ * How a resource blob is served — an allowlist rather than a blocklist.
+ * The blob sits on the app's own origin with no auth in front of it: an
+ * instructor pushing an `.html` file would otherwise be pushing a script that
+ * runs with every student's session cookie. SVG is carved out of `image/*`
+ * for the same reason, wearing an image MIME type.
  */
 const INLINE_PREFIXES = ["image/", "audio/", "video/"];
 const INLINE_EXACT = new Set(["application/pdf"]);

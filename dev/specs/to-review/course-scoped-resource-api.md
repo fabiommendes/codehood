@@ -122,6 +122,6 @@ Seams:
 
 - Regenerate `src/api/registry/route-patterns.json`.
 - Bump `package.json` version.
-- `docs/design/url-structure.md`: document the `/api/course/...` subtree.
+- `src/urls/README.md`: document the `/api/course/...` subtree.
 - `GLOSSARY.md`: **Course-scoped endpoint**.
 - `CHANGELOG.md` entry; tick the resource part of the `BACKLOG.md` item.

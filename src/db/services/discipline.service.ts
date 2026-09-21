@@ -30,7 +30,7 @@ export type DisciplineUpsert = z.infer<typeof disciplineUpsert>;
  *
  * Only `create`/`update`/`delete` carry a rule, because a discipline slug
  * occupies the root URL namespace shared with every system route (see
- * `docs/design/url-structure.md`).
+ * `src/urls/README.md`).
  */
 export class DisciplineService
 	implements
@@ -76,7 +76,6 @@ export class DisciplineService
 	 * Finds a single discipline by slug.
 	 */
 	@Validate({
-		async: true,
 		returns: disciplineSchema.nullable(),
 		args: [disciplinePK],
 	})
@@ -92,7 +91,6 @@ export class DisciplineService
 	 * Finds many disciplines, optionally narrowed to `filter.slugs`.
 	 */
 	@Validate({
-		async: true,
 		returns: disciplineSchema.array(),
 		args: [disciplineFilter],
 	})
@@ -111,7 +109,7 @@ export class DisciplineService
 	 * Updates a discipline's name.
 	 *
 	 * `slug` is not editable: it is the first segment of every course URL
-	 * under this discipline (see `docs/design/url-structure.md`), so
+	 * under this discipline (see `src/urls/README.md`), so
 	 * changing it would move every one of those courses without touching a
 	 * row.
 	 */

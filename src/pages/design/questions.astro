@@ -652,8 +652,7 @@ const sectionLinks = [
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
       <p class="mb-5 text-sm text-base-content/60">
         Marking is by judgement, not by ticked-ness: a row reads correct when whether it was ticked matches
-        whether <code class="font-mono">result.correct</code> says it should have been, per{" "}
-        <code class="font-mono">dev/specs/to-review/question-rendering.md</code>. The middle card ticked "4"
+        whether <code class="font-mono">result.correct</code> says it should have been. The middle card ticked "4"
         (wrong) and left "2" alone (also wrong &mdash; a correct choice left unticked asserts it is false), so it
         shows feedback attached to a choice the student never touched. The last card grades the same answer with
         the key withheld, and shows no markers at all.
@@ -695,12 +694,10 @@ const sectionLinks = [
       <p class="mb-5 text-sm text-base-content/60">
         Each statement gets one toggle with three states, not a checkbox: unchecked is False, checked is True, and
         the knob centered (the native <code class="font-mono">indeterminate</code> property) is unmarked, because a
-        student can judge a statement or abstain on it; see{" "}
-        <code class="font-mono">dev/specs/to-do/question-true-false.md</code>, "Abstaining is a third state".
-        Clicking (or pressing space) cycles unmarked &rarr; True &rarr; False &rarr; unmarked, so the middle state
-        stays reachable instead of only being where an untouched toggle starts. One card is fully unmarked; the
-        other has "tcp-order" marked True, "udp-guarantee" marked False, and "http2-multiplex" and "dns-tcp" left
-        unmarked, so all three positions show at once.
+        student can judge a statement or abstain on it. Clicking (or pressing space) cycles unmarked &rarr; True
+        &rarr; False &rarr; unmarked, so the middle state stays reachable instead of only being where an untouched
+        toggle starts. One card is fully unmarked; the other has "tcp-order" marked True, "udp-guarantee" marked
+        False, and "http2-multiplex" and "dns-tcp" left unmarked, so all three positions show at once.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Unanswered">
@@ -781,8 +778,7 @@ const sectionLinks = [
         <code class="font-mono">text</code> accepts Markdown, <code class="font-mono">plain</code> does not, and{" "}
         <code class="font-mono">code</code> gets a monospace box with spell-checking off and the{" "}
         <code class="font-mono">highlight</code> language on a badge. There is no rich-text widget and no syntax
-        colouring inside the box; see <code class="font-mono">dev/specs/to-do/question-essay.md</code>, "Three
-        input kinds, two editors, and no rich-text widget".
+        colouring inside the box.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Rich text (empty)">

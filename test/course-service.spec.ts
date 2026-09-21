@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
-import { hasPerm } from "@/auth/permissions";
+import { type CourseWithEnrollment, hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
-import { db, toEnrollmentView } from "@/db";
+import { db } from "@/db";
 
 let uniq = 0;
 function tag(prefix: string): string {
@@ -219,6 +219,20 @@ test("findMany visibility agrees with course.read over a fixture covering every 
 		(c) => c.id === courseA.id || c.id === courseB.id,
 	);
 
+	// `Course` no longer carries the roster (see the enrollment-privacy fix),
+	// so the expected-visibility target is built from what the fixtures did
+	// above, not from a field read off the fetched course.
+	const enrollmentView: Record<number, CourseWithEnrollment> = {
+		[courseA.id]: {
+			instructor: { username: instructorA.username },
+			enrollments: [studentActive.username, instructorB.username],
+		},
+		[courseB.id]: {
+			instructor: { username: instructorB.username },
+			enrollments: [],
+		},
+	};
+
 	const actors = [
 		{ label: "SYSTEM", actor: SYSTEM },
 		{ label: "admin", actor: admin },
@@ -238,7 +252,14 @@ test("findMany visibility agrees with course.read over a fixture covering every 
 		);
 		const expectedIds = new Set(
 			fixtureCourses
-				.filter((c) => hasPerm(actor, "course.read", toEnrollmentView(c)))
+				.filter((c) =>
+					hasPerm(
+						actor,
+						"course.read",
+						// biome-ignore lint/style/noNonNullAssertion: fixtureCourses is filtered to courseA/courseB, both keys of enrollmentView.
+						enrollmentView[c.id]!,
+					),
+				)
 				.map((c) => c.id),
 		);
 		expect(visibleIds, label).toEqual(expectedIds);

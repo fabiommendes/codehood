@@ -1,0 +1,32 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/exam
+  body:
+    type: json
+    data: |-
+      {
+          "slug": "quiz-02",
+          "type": "QUIZ",
+          "status": "DRAFT",
+          "title": "Quiz 2: loops",
+          "description": "A short quiz on loop invariants.",
+          "preamble": "Answer every question.",
+          "durationMs": 1800000,
+          "tags": ["loops"],
+          "questions": [
+            { "slug": "loop-invariants", "version": "v1" }
+          ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

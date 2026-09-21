@@ -4,7 +4,7 @@
 
 A self-service `/profile` page for the logged-in user only — no admin view of
 other users' profiles (that's a separate future feature). Builds entirely on
-existing auth infrastructure (`docs/implemented/auth.md`); no schema changes.
+existing auth infrastructure (`dev/specs/to-review/auth.md`); no schema changes.
 
 ## Design decisions
 
@@ -17,7 +17,7 @@ field-specific message ("That email is already in use.") rather than a raw
 500.
 
 No re-verification step on email change (no email sending exists yet — see
-`docs/implemented/auth.md`'s deferred list). This is a deliberate
+`dev/specs/to-review/auth.md`'s deferred list). This is a deliberate
 simplification: the change takes effect immediately, same trust model as
 everything else in this roll-your-own system.
 
@@ -26,7 +26,7 @@ everything else in this roll-your-own system.
 `username` is shown on the form as a disabled, read-only field — it is set
 once at invite acceptance and never changes after that. `Course.instructor`
 targets `User.username` as its foreign key (see
-`docs/design/url-structure.md`), so a username change would silently move
+`src/urls/README.md`), so a username change would silently move
 every course that instructor owns to a new URL. `userService.update` also rejects any `username` key in its `fields`
 argument at runtime, so the immutability holds even for a caller that
 bypasses the `UpdateProfile` type.

@@ -4,7 +4,7 @@ const BLOB_HASH_RE = /^[0-9a-f]{64}$/;
 
 /**
  * The hash every blob is addressed by, pinned as part of the CLI wire
- * contract (see `dev/specs/to-do/blob-attachments.md`, "Hashing").
+ * contract.
  *
  * Lowercase-hex sha-256 of the raw bytes and nothing else: no filename, no
  * length prefix, no framing.

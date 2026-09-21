@@ -1,6 +1,5 @@
 /**
- * The dated half of a course's schedule — see
- * `dev/specs/to-review/calendar.md`. Writes are ownership-gated (the
+ * The dated half of a course's schedule. Writes are ownership-gated (the
  * `course.update-contents` permission); reads follow course-contents
  * visibility (`course.read-contents`). `examId` is never authored: both
  * `create` and `update` resolve it fresh from {@link examForEvent} on every

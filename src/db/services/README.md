@@ -32,13 +32,21 @@ The precise types are documented in the interface definitions at `src/db/base-se
 Implement the whole set, even when the feature being built only needs part of
 it. You can use never types to flag those missing methods, when possible.
 
-All methods take an `opts` parameter with three optional properties:
+All methods take a required `opts` parameter:
 
-* tx (optional): a Prisma transaction object, used to run the query in a
+* `actor` (**required**): who the call is made on behalf of, used to enforce
+  access control. Either a user or the `SYSTEM` sentinel; trusted callers with
+  no transaction pass the `FULL_ACCESS` constant. It is required rather than
+  optional on purpose: access control that fails open looks like it is
+  working, and an omitted actor would compile fine and quietly return
+  everything.
+* `tx` (optional): a Prisma transaction object, used to run the query in a
   transaction or mock db.
-* actor (optional): a user object, used to enforce access control.
-* validate (optional): "both" (default), "none", "input", or "output". Controls
-  whether input and/or output validation is performed.
+* `validate` (optional): "both" (default), "none", "input", or "output".
+  Controls whether input and/or output validation is performed.
+
+A method that declares `opts?` instead of `opts` reintroduces the fail-open
+hole. Do not add one.
 
 
 ## Input and output validation
@@ -58,6 +66,28 @@ values, but may not be as strict as input schemas in the sense that we trust
 data retrieved from the database is already valid. Double validation may incur
 unnecessary performance overhead and may fire exceptions for minor bugs that
 might otherwise have no impact.
+
+### Deriving create and update schemas
+
+Write `xCreate`/`xUpdate` as `xSchema.pick(...)` / `.omit(...)` / `.extend(...)`
+/ `.partial()` rather than retyping the fields. A retyped schema drifts from its
+entity silently: a new column reaches the database with nothing rejecting it on
+the way in. Where an input field genuinely differs from the entity's, `extend`
+it, so the difference reads as a deliberate difference.
+
+### `.optional()` versus `.nullish()`
+
+- plain — required.
+- `.optional()` — "I am not saying", so the field keeps whatever it has.
+- `.nullish()` — "I can also say nothing", so `null` clears the column.
+
+Every create/update field over a nullable column must be `.nullish()`. An
+`.optional()` field over a nullable column cannot be cleared: `undefined`
+reaches Prisma as "leave it alone".
+
+The exception is output-shape optionality, which is not about a column at all:
+`apiKeySchema.token` and `inviteSchema.token` are `.optional()` because they are
+present only in the create response.
 
 ## Access control and permissions
 

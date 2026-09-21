@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import {
 	courseHref,
@@ -60,16 +61,20 @@ test("DISCIPLINE_SLUG_RE requires a letter start and no trailing hyphen", () => 
 	expect(DISCIPLINE_SLUG_RE.test("C")).toBe(false);
 });
 
+// Read from the filesystem rather than a hand-written list: a top-level route
+// added without reserving its name makes every course under a discipline of
+// that name unreachable, and Astro reports nothing.
 test("RESERVED_SLUGS covers every top-level system route", () => {
-	for (const slug of [
-		"login",
-		"design",
-		"admin",
-		"api",
-		"courses",
-		"profile",
-	]) {
-		expect(RESERVED_SLUGS.has(slug)).toBe(true);
+	const routes = readdirSync("src/pages", { withFileTypes: true })
+		.map((entry) => entry.name.replace(/\.(astro|ts|js)$/, ""))
+		.filter((name) => name !== "index" && DISCIPLINE_SLUG_RE.test(name));
+
+	expect(routes.length).toBeGreaterThan(5);
+	for (const slug of routes) {
+		expect(
+			RESERVED_SLUGS.has(slug),
+			`/${slug} is routed but not in RESERVED_SLUGS`,
+		).toBe(true);
 	}
 	expect(RESERVED_SLUGS.has("cs101")).toBe(false);
 });

@@ -1,7 +1,7 @@
 /**
  * The one place a wall clock (a date plus minutes-since-midnight, as a course
  * author writes it) turns into an instant, and the one place an instant turns
- * back into a wall clock for display. See `dev/specs/to-review/calendar.md`.
+ * back into a wall clock for display.
  *
  * No Prisma import — only a type-only one, erased at compile time — so this
  * module unit-tests without a database. Built on `Intl.DateTimeFormat` with an

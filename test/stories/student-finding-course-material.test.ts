@@ -47,6 +47,11 @@ test("student: see my courses", async ({ page }) => {
 	await test.step("the instructor's tabs on their own course answer 403", async () => {
 		expect((await page.goto(`${hrefOf(mine)}/manage`))?.status()).toBe(403);
 		expect((await page.goto(`${hrefOf(mine)}/roster`))?.status()).toBe(403);
+		expect((await page.goto(`${hrefOf(mine)}/questions`))?.status()).toBe(403);
+		await page.goto(hrefOf(mine));
+		await expect(
+			page.getByRole("tab", { name: "Questions", exact: true }),
+		).toHaveCount(0);
 	});
 });
 

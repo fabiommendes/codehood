@@ -68,7 +68,7 @@ const courses = await db.course.findMany({}, { actor });
                     {isInstructor ? "You're teaching" : course.instructor.name}
                   </p>
                   <p class="mt-3 text-xs text-base-content/50">
-                    {course.edition.slug} · {course.enrollments.length} enrolled
+                    {course.edition.slug} · {course.enrollmentCount} enrolled
                   </p>
                 </div>
               </a>

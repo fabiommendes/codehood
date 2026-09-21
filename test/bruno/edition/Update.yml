@@ -10,7 +10,6 @@ http:
     type: json
     data: |-
       {
-        "slug": "2026-2",
         "name": "2026 · second term",
         "startAt": "2026-08-15T20:09:44.092Z",
         "endAt": "2027-01-15T20:09:44.092Z"

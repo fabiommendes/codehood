@@ -15,7 +15,7 @@ decides only what a row does when you click it.
 - `Resource` gains `slug`, `contentHash`, `updatedAt`, and a `CODE` type;
   `File` gains `deletedAt`.
 - `ResourceService` and `FileService` in `src/db/`, full CRUD per
-  `docs/design/db-service-classes.md`.
+  `src/db/services/README.md`.
 - `/files/<slugHash>/<name>` — the blob route, and the tombstone it serves
   when the bytes are gone (FR-SYNC-013, FR-SYNC-015).
 - `/<discipline>/<course>/resources`, grouped by type, replacing the mock.
@@ -160,7 +160,7 @@ the server compares and rejects a mismatch as a corrupt upload. That is the one
 place a hash is checked rather than trusted, and it costs nothing.
 
 `files` joins `RESERVED_SLUGS` in the same commit, and the system-route table in
-`docs/design/url-structure.md` — FR-CRS-004, and the failure is silent.
+`src/urls/README.md` — FR-CRS-004, and the failure is silent.
 
 ### Serving a blob: an allowlist, not a blocklist
 
@@ -426,7 +426,7 @@ note and a snippet page, and the tombstone page for a deleted file.
 ## Documentation to update in the same change
 
 - `src/utils/course-url.ts`: `files` joins `RESERVED_SLUGS` (FR-CRS-004).
-- `docs/design/url-structure.md`: `/files/<slugHash>/<name>` and
+- `src/urls/README.md`: `/files/<slugHash>/<name>` and
   `/<course>/resources/<slug>` join the route tables.
 - `GLOSSARY.md`: `Resource` and `Resource tombstone` entries.
 - `dev/requirements/08-nonfunctional.md`: **FR-NFR-030 needs amending** — it

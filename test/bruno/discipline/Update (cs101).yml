@@ -10,7 +10,6 @@ http:
     type: json
     data: |-
       {
-        "foo": "sdfds",
         "name": "Intro to programming"
       }
   auth: inherit

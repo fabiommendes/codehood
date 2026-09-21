@@ -22,9 +22,9 @@ function formatDate(date: Date): string {
 
 /**
  * The Students tab's table — the fifth caller of `ui/Table.tsx`, alongside
- * the four admin tables (see dev/specs/to-do/course-navigation.md). The drop
- * control posts to the same `course.dropEnrollment` action a student's own
- * "Leave course" button uses, gated per-actor by `enrollment.delete`.
+ * the four admin tables. The drop control posts to the same
+ * `course.dropEnrollment` action a student's own "Leave course" button uses,
+ * gated per-actor by `enrollment.delete`.
  */
 export default function StudentsTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<EnrolledUser>[] = [
@@ -92,7 +92,7 @@ export default function StudentsTable(props: Props): JSX.Element {
 								class="modal-action"
 							>
 								<input type="hidden" name="courseId" value={props.courseId} />
-								<input type="hidden" name="userId" value={user.username} />
+								<input type="hidden" name="username" value={user.username} />
 								{/* formmethod="dialog" overrides the form's post just for this button, so
 								    Cancel closes the dialog without submitting the drop. */}
 								<button type="submit" formmethod="dialog" class="btn btn-ghost">

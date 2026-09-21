@@ -94,7 +94,7 @@ that keeps `username` immutable. `update` accepts `name`, `startAt`, and
 The foreign key would raise anyway; the service checks first so the caller gets
 "3 courses still use 2026-1" instead of a constraint error.
 
-### Full CRUD, per `docs/design/db-service-classes.md`
+### Full CRUD, per `src/db/services/README.md`
 
 `EditionService` implements `create`, `findOne`, `findMany`, `update`, and
 `delete` even though this spec only needs the first three. Reading is public —

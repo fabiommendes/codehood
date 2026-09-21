@@ -33,10 +33,8 @@ export interface ShortAnswerViewProps {
  * Renders a `PublicShortAnswer` question as one line of text.
  *
  * Correctness in `review` mode comes from `result.score` rather than from the
- * key, as it does for numeric and more so: the key deliberately excludes the
- * question's regexes, so this component could not reproduce the verdict even
- * in principle. See `dev/specs/to-do/question-short-answer.md`, "The answer key
- * is the literals, not the rules".
+ * key: the key deliberately excludes the question's regexes, so this component
+ * could not reproduce the verdict even in principle.
  */
 export default function ShortAnswerView(
 	props: ShortAnswerViewProps,

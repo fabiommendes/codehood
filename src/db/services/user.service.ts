@@ -1,9 +1,14 @@
 import type { z } from "zod";
 import { type Actor, SYSTEM } from "@/auth/actor";
-import { hashPassword, passwordStrengthIssues } from "@/auth/password";
-import { ensurePerm } from "@/auth/permissions";
-import { InvalidData, NotAllowed } from "@/core/error";
 import {
+	hashPassword,
+	passwordStrengthIssues,
+	verifyPassword,
+} from "@/auth/password";
+import { ensurePerm } from "@/auth/permissions";
+import { NotAllowed } from "@/core/error";
+import {
+	passwordChange,
 	userCreate,
 	type userFilter,
 	userPK,
@@ -20,6 +25,7 @@ import {
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
+import { SessionService } from "./session.service";
 
 export type { UserId } from "@/core/schemas";
 
@@ -32,6 +38,10 @@ export type UserFilter = z.infer<typeof userFilter>;
 export type UserPK = z.infer<typeof userPK>;
 export type UserUpdate = z.infer<typeof userUpdate>;
 export type UserUpsert = z.infer<typeof userUpsert>;
+export type PasswordChange = z.infer<typeof passwordChange>;
+
+/// Session sweep on a password change. Honours `opts.tx` when one is open.
+const sessions = new SessionService();
 
 export class UserService extends CrudBase<{
 	entity: User;
@@ -152,6 +162,9 @@ export class UserService extends CrudBase<{
 
 	/**
 	 * Updates the editable profile fields for a user.
+	 *
+	 * The password is not one of them: {@link changePassword} handles it, and
+	 * demands the current password first.
 	 */
 	@Validate({
 		service: true,
@@ -169,12 +182,7 @@ export class UserService extends CrudBase<{
 		if (!target) throw new Error("user not found");
 		ensurePerm(opts.actor, "user.update", target);
 
-		const { githubId, schoolId, password, ...rest } = payload;
-
-		if (password) {
-			const issues = await passwordStrengthIssues(password);
-			InvalidData.ensureNoError({ password: issues });
-		}
+		const { githubId, schoolId, ...rest } = payload;
 
 		return toUser(
 			await tx.user.update({
@@ -183,9 +191,6 @@ export class UserService extends CrudBase<{
 					...rest,
 					githubId: mask(githubId, target.username),
 					schoolId: mask(schoolId, target.username),
-					...(password !== undefined
-						? { passwordHash: await hashPassword(password) }
-						: {}),
 				},
 			}),
 		);
@@ -299,6 +304,40 @@ export class UserService extends CrudBase<{
 			data: { passwordHash: await hashPassword(password) },
 		});
 		return { hash: updated.passwordHash };
+	}
+
+	/**
+	 * Replaces a user's password once the current one is proven, and revokes
+	 * every session they hold.
+	 *
+	 * Proving the current password is what separates a password change from a
+	 * password reset: without it, a session or API key held for a moment
+	 * becomes permanent ownership of the account. `updatePassword` is the
+	 * reset, and stays SYSTEM/admin territory. The session sweep makes a change
+	 * useful as incident response, so a caller that owns a session cookie
+	 * should mint a fresh one afterwards. API keys survive, since revoking
+	 * every robot on a routine password change is its own outage; `/profile`
+	 * lists them for revoking one by one.
+	 *
+	 * @throws NotAllowed when `currentPassword` does not match.
+	 */
+	@Validate({ service: true, args: [userSchema, passwordChange] })
+	async changePassword(
+		user: User,
+		input: PasswordChange,
+		opts: ServiceOpts,
+	): Promise<void> {
+		ensurePerm(opts.actor, "user.update", user);
+
+		if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+			throw new NotAllowed("user.update", {
+				message: "Current password is incorrect.",
+				status: 401,
+			});
+		}
+
+		await this.updatePassword(user, input.newPassword, opts);
+		await sessions.delete({ username: user.username }, opts);
 	}
 }
 

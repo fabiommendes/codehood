@@ -37,6 +37,14 @@ export const userCreate = userSchema
  */
 export const userUpsert = userCreate.partial({ password: true });
 
+/**
+ * Editable profile fields.
+ *
+ * `password` is deliberately absent: a password is changed through
+ * {@link passwordChange}, which proves the current one first. Leaving it here
+ * made `PATCH /api/user/me` a password reset that any momentarily captured
+ * session or leaked API key could use to take the account over for good.
+ */
 export const userUpdate = userSchema
 	.pick({
 		name: true,
@@ -44,11 +52,14 @@ export const userUpdate = userSchema
 		githubId: true,
 		schoolId: true,
 	})
-	.extend({
-		password: z.string().min(1).optional(),
-	})
 	.partial()
 	.strict();
+
+/// Proof of the current password plus the one replacing it.
+export const passwordChange = z.object({
+	currentPassword: z.string().min(1),
+	newPassword: z.string().min(8),
+});
 
 export const userPK = z.union([
 	z.object({ email: z.email() }),

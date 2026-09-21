@@ -11,31 +11,28 @@ Add in alphabetical order.
 
 Also: Astro Action
 Type: platform 
-Code: `src/actions/`
 
 The typed RPC entry point the web app calls for anything that writes. Actions
-validate input with Zod and delegate straight to a [Service](#service); business
-rules do not live here. They are the browser's counterpart to the
-[REST API](#rest-api), which serves the [CLI](#cli).
+validate input with Zod and delegate to a [Service](#service); business rules do
+not live here. The browser's counterpart to the [REST API](#rest-api), which
+serves the [CLI](#cli).
 
 ## Actor
 
 Type: platform
-Code: `Actor`, `AuthUser`, `SYSTEM`, `FULL_ACCESS`
 
-The identity a [Service](#service) call is made on behalf of: either an
-`AuthUser` (`{ id, role }`, exactly what `Astro.locals.user` holds) or the
-`SYSTEM` sentinel. Services decide visibility from the actor themselves rather
+The identity a [Service](#service) call is made on behalf of: either a user,
+carrying their username, role and name, or a system sentinel for calls with no
+person behind them. Services decide visibility from the actor themselves rather
 than trusting callers to filter afterwards.
 
 ## Admin
 
 Type: domain
-Code: `Role.ADMIN`
 
 The [Role](#role) that sees and manages everything. Admins invite instructors,
-and the first one is created outside the app by `manage create-user` or the dev
-seed, since nothing exists yet to invite them.
+and the first one is created outside the app by a management command or dev seed,
+since nothing exists yet to invite them.
 
 ## API key
 
@@ -49,36 +46,32 @@ the key's owner.
 ## Attachment
 
 Type: domain
-Code: `Attachment`, `AttachmentService`
 
-One use of a [Blob](#blob) by one owner — a [Resource](#resource), a
-[Question](#question) — carrying the `filename` and `mimeType` that use is
-served under, and the [User](#user) charged for the bytes. The owner is
-polymorphic (`ownerType`/`ownerId`), so a new kind of owner needs no change to
-blob storage. The last attachment leaving a blob is what makes it collectable.
+One use of a [Blob](#blob) by one owner — a [Resource](#resource) or
+[Question](#question) — carrying the filename and MIME type that use is served
+under, and the [User](#user) charged for the bytes. The owner is polymorphic,
+so a new kind of owner needs no change to blob storage. The last attachment
+leaving a blob makes it collectable.
 
 ## Blob
 
 Also: file, bytes
 Type: domain
-Code: `Blob`, `BlobService`
 
-Anonymous file content, addressed by `hash` — a lowercase-hex sha-256 of its
-own bytes, which doubles as the URL token (`/files/<hash>/<filename>`) and the
-on-disk directory. Content-addressed and deduped, so identical uploads share
-one row; it carries no name and no mime type, since those belong to each
-[Attachment](#attachment). Served with no authentication check, on the
-understanding that knowing the hash is what grants access and that nothing
-whose disclosure matters ever becomes a blob (FR-NFR-032).
+Anonymous file content, addressed by its lowercase-hex SHA-256 hash of its own
+bytes. The hash doubles as the URL token and on-disk directory name.
+Content-addressed and deduplicated, so identical uploads share one row; it
+carries no filename or MIME type, since those belong to each
+[Attachment](#attachment). Served with no authentication check on the
+understanding that knowing the hash grants access.
 
 ## Classroom invite
 
-Type: domain 
-Code: `InviteKind.CLASSROOM`
+Type: domain
 
 A reusable join code for one course, redeemable by anyone holding the link.
-`email` is null, the role is fixed to `STUDENT`, and `maxUses` caps enrollment
-or is null for unlimited. Contrast [Personal invite](#personal-invite).
+The role is fixed to student, and max uses caps enrollment or is unlimited.
+Contrast [Personal invite](#personal-invite).
 
 ## CLI
 
@@ -93,176 +86,155 @@ rather than something typed into web forms. Sync is one-way — there is no
 ## Course
 
 Also: course edition 
-Type: domain 
-Code: `Course`, `CourseService`
+Type: domain
 
 One offering of a [Discipline](#discipline) by one instructor in one
 [Edition](#edition). Those three fields are its unique key and also its
-[Course URL](#course-url), so it owns everything that varies between runs:
+[Course URL](#course-url). It owns everything that varies between runs:
 schedule, exams, enrollments, and passphrases.
 
 ## Course URL
 
-Type: platform 
-Code: `src/utils/course-url.ts`
+Type: platform
 
 The address `/<discipline-slug>/<username>_<edition>`, e.g. `/cs101/ada_2026-1`.
-It is built from the columns of `Course`'s unique key, so no extra id is stored
-and the [CLI](#cli) can construct it offline. There is no `/courses/` prefix,
-which is why [Reserved slug](#reserved-slug) exists. Everything about the
-course hangs off it: `/exams`, `/resources`, `/schedule`, and, for its
-instructor only, `/roster` and `/manage` — one tab strip, on every page,
-built by `courseTabs()`. The [REST API](#rest-api) takes the same address under
-`/api/course/`, so the CLI builds one string for both.
+Built from the columns of the course's unique key, so no extra id is stored and
+the [CLI](#cli) can construct it offline. There is no `/courses/` prefix, which
+is why [Reserved slug](#reserved-slug) exists. Everything about the course hangs
+off it: `/exams`, `/resources`, `/schedule`, and for instructors, `/questions`,
+`/roster`, and `/manage` — one tab strip on every page. The [REST API](#rest-api)
+takes the same address under `/api/course/`, so the CLI builds one string for
+both.
 
 ## Course-scoped endpoint
 
-Type: platform 
-Code: `parseScope` in `src/api/registry/index.ts`
+Type: platform
 
 A [REST API](#rest-api) endpoint nested under a course's
 [Course URL](#course-url), e.g. `/api/course/cs101/ada_2026-1/resource/syllabus`.
 The path names the course, so the body and query never carry it. A course the
-actor may not see is a 403, lists included.
+actor may not see returns 403, including in list operations.
 
 ## Discipline
 
 Also: subject 
-Type: domain 
-Code: `Discipline`
+Type: domain
 
-The stable subject a course teaches, identified by a slug such as `cs101`. A
-discipline outlives the [Courses](#course) that instantiate it and owns the
+The stable subject a course teaches, identified by a slug such as `cs101`.
+A discipline outlives the [Courses](#course) that instantiate it and owns the
 [Question](#question) bank shared across them.
 
 ## Edition
 
 Type: domain
-Code: `Edition`, `EditionService`
 
 An academic term, created by an admin, that separates repeated runs of the same
-discipline by the same instructor. Its slug is a four-digit year with an
-optional term number (`2026`, `2026-1`) and appears in every course URL, so it
-never changes; its window says when new courses may be created for it, and
-closing that window leaves existing courses alone.
+discipline by the same instructor. Its slug is a four-digit year with an optional
+term number (e.g., `2026`, `2026-1`) and appears in every course URL, so it
+never changes. Its window says when new courses may be created for it; closing
+that window leaves existing courses alone.
 
 ## Enrollment
 
 Type: domain
-Code: `Enrollment`
 
-A student's membership in a [Course](#course), with an `ACTIVE` or `DROPPED`
-status; only an active one grants access to course contents. Managed through
-`CourseService` methods rather than a service of its own, since it is a join
-table with no identity of its own.
+A student's membership in a [Course](#course), with an ACTIVE or DROPPED status.
+Only active enrollments grant access to course contents.
 
 ## Event
 
-Type: domain 
-Code: `CalendarEvent`
+Type: domain
 
 One dated occurrence of a [Time slot](#time-slot) — a single class meeting in a
-given week, with its own title, description, and kind (`LECTURE`, `LAB`, `EXAM`,
-`REVIEW`, `SEMINAR`, `PROJECT`, `SELF_STUDY`, `HOLIDAY`, `RECESS`, `CANCELLED`).
+given week, with its own title, description, and kind (lecture, lab, exam,
+review, seminar, project, self-study, holiday, recess, or cancelled).
 May carry a derived link to an [Exam](#exam) whose window overlaps it. This is
-what the calendar renders. The model is `CalendarEvent`, not `Event`, since the
-latter is a DOM global.
+what the calendar renders.
 
 ## Exam
 
-Type: domain 
-Code: `Exam`, `ExamType`, `ExamStatus`
+Type: domain
 
-A set of [Questions](#question) assigned to a course, of type `PRACTICE`,
-`QUIZ`, `EXAM`, or `FINAL`. Its status moves `DRAFT` → `SCHEDULED` → `ONGOING` →
-`COMPLETED` (or `ARCHIVED`), and only `ONGOING` accepts submissions. Each
-question is pinned to a [Question version](#question-version) so the paper does
-not change under the students taking it.
+A set of [Questions](#question) assigned to a course, of type PRACTICE, QUIZ,
+EXAM, or FINAL. Its status moves DRAFT → SCHEDULED → ONGOING → COMPLETED
+(or ARCHIVED), and only ONGOING accepts submissions. Each question is pinned to
+a [Question version](#question-version) so the paper does not change while
+students are taking it.
 
 ## Grading bot
 
 Also: bot 
-Type: domain 
-Code: `ApiKeyKind.BOT`
+Type: domain
 
 An automated client that grades submissions through the
 [REST API](#rest-api) using an [API key](#api-key). A bot currently acts as the
 instructor who issued its key and therefore sees everything that instructor
-sees; narrowing that is open work.
+sees.
 
 ## Group
 
-Type: domain 
-Code: `Group`, `GroupMembership`
+Type: domain
 
 A set of users who share ownership of [Questions](#question), so a teaching team
-can maintain a bank together. Membership carries its own `isAdmin` flag,
-independent of the user's global [Role](#role).
+can maintain a bank together. Membership carries an independent admin flag,
+separate from the user's global [Role](#role).
 
 ## Instructor
 
-Type: domain 
-Code: `Role.INSTRUCTOR`
+Type: domain
 
 The [Role](#role) that owns courses: authors content locally, pushes it with the
 [CLI](#cli), and invites students. An instructor sees only the courses they
-teach plus any they are enrolled in — there is no course catalog.
+teach plus any they are enrolled in.
 
 ## Invite
 
-Type: domain 
-Code: `Invite`, `InviteRedemption`, `InviteService`
+Type: domain
 
 The only way an account comes into existence, since there is no public sign-up.
-An invite fixes the [Role](#role) it grants and expires; redeeming it at
-`/invite/[token]` is what creates the [User](#user). Comes in two kinds:
-[Personal](#personal-invite) and [Classroom](#classroom-invite).
+An invite fixes the [Role](#role) it grants and expires. Redeeming it creates
+the [User](#user). Comes in two kinds: [Personal](#personal-invite) and
+[Classroom](#classroom-invite).
 
 ## Management command
 
-Also: `manage` 
-Type: platform 
-Code: `src/commands/`
+Also: manage
+Type: platform
 
-A Commander.js script for operator tasks that have no UI, such as
-`manage create-user` and `manage reset-password`. Commands go through the
-[Service](#service) layer like everything else, never straight to Prisma.
+A script for operator tasks that have no UI, such as creating users and
+resetting passwords. Commands go through the [Service](#service) layer like
+everything else, never straight to the database.
 
 ## OpenRPC
 
-Type: platform 
-Code: `src/rpc/registry/openrpc-document.ts`
+Type: platform
 
-What [OpenAPI](#rest-api) is to REST, for JSON-RPC. Generated from the same Zod
-schemas the [RPC API](#rpc-api) validates against and served at
-`/openrpc.json`; `/rpc/docs` renders the same registry through Swagger UI.
+The schema specification for JSON-RPC, analogous to OpenAPI for REST.
+Generated from the same Zod schemas the [RPC API](#rpc-api) validates against.
+Served and rendered through Swagger UI.
 
 ## Passphrase
 
-Type: domain 
-Code: `Passphrase`
+Type: domain
 
 A short expiring secret scoped to one [Course](#course), unique across the
-system. Reserved for in-class check-in style flows; nothing reads it yet.
+system. Reserved for in-class check-in flows.
 
 ## Permission pair
 
-Type: platform 
-Code: `src/auth/permissions.ts`
+Type: platform
 
-The two encodings every visibility rule needs: a predicate over a loaded row
-(`canViewCourse`) for `findOne` and the UI, and a Prisma `where` fragment
-(`courseVisibility`) that `findMany` pushes into SQL. They are written adjacent
-and pinned together by a test asserting the two agree, because a drifted pair is
-invisible.
+The two encodings every visibility rule needs: a predicate for deciding whether
+to show a loaded row or render a button, and a SQL fragment for filtering at
+query time rather than in memory. Written adjacent to keep them in sync, since
+drifted pairs let the list page and detail page disagree about a row.
 
 ## Personal invite
 
-Type: domain 
-Code: `InviteKind.PERSONAL`
+Type: domain
 
-A single-use invite addressed to one email, which the invitee must match
-exactly. Used instructor→student and admin→instructor. Contrast
+A single-use invite addressed to one email, which the invitee must match exactly.
+Used from instructor to student or admin to instructor. Contrast
 [Classroom invite](#classroom-invite).
 
 ## Practice session
@@ -275,181 +247,152 @@ both.
 
 ## Public id
 
-Type: platform 
-Code: `publicId`
+Type: platform
 
 A random ten-character URL-safe string on rows whose identifier appears in a URL
-but should not be guessable. Primary keys stay auto-incrementing integers; the
-`publicId` is generated with nanoid in the service layer, not the database.
+but should not be guessable. Primary keys stay auto-incrementing integers,
+while the public id is generated in the service layer.
 
 ## Question
 
 Also: question ref 
-Type: domain 
-Code: `QuestionRef`
+Type: domain
 
-The stable identity of a question: its author, discipline, type
-(`MULTIPLE_CHOICE`, `MULTIPLE_SELECTION`, `TRUE_FALSE`, `ESSAY`), status
-(`DRAFT`, `PUBLISHED`, `ARCHIVED`), and tags. The text lives in its
-[versions](#question-version) instead, so the reference stays lightweight and
-editing never rewrites history.
+The stable identity of a question: its author, discipline, type (multiple-choice,
+multiple-selection, true-false, or essay), status (draft, published, or archived),
+and tags. The text lives in its [versions](#question-version) instead, so the
+reference stays lightweight and editing never rewrites history.
 
 ## Question version
 
-Type: domain 
-Code: `QuestionData`
+Type: domain
 
 One immutable revision of a question's content — title, stem, and a
-type-specific JSON payload — identified by a hash. Editing appends a version and
-repoints `QuestionRef.latest`; exams and courses may pin an older one.
+type-specific JSON payload — identified by a hash. Editing appends a version;
+exams and courses may pin an older one.
 
 ## Reserved slug
 
-Type: platform 
-Code: `RESERVED_SLUGS`
+Type: platform
 
 A top-level name a [Discipline](#discipline) may not take, because
-[Course URLs](#course-url) live in the root namespace. Astro prefers static
-routes over dynamic ones silently, so a discipline named `login` would not
-error — its courses would just become unreachable. Adding a top-level route
-means adding its name to this list in the same commit.
+[Course URLs](#course-url) live in the root namespace. A discipline named
+`login` would conflict with top-level routes and make its courses unreachable.
 
 ## Resource
 
 Type: domain
-Code: `Resource`, `ResourceType`, `ResourceService`
 
-One of the four things a [Course](#course) hands its students — a `FILE` to
-download, a `LINK` to follow, an `MD` note, or a `CODE` snippet — grouped by
-type on `/resources` in a fixed, unauthored order. Pushed by the [CLI](#cli)
-only, never authored in the web app; visible to everyone who may see the
-course's contents, with no separate "unpublished" state. A `FILE` resource
-points at a [Blob](#blob) it does not own, through an
-[Attachment](#attachment) it does — the same bytes may back resources in more
-than one course.
+One of the four things a [Course](#course) gives its students — a file to
+download, a link to follow, a markdown note, or a code snippet — grouped by
+type in a fixed order. Pushed by the [CLI](#cli) only, never authored in the
+web app; visible to everyone who may see the course's contents. A file resource
+points at a [Blob](#blob) it does not own, through an [Attachment](#attachment)
+it does — the same bytes may back resources in more than one course.
 
 ## Resource tombstone
 
 Also: blob tombstone
 Type: domain
-Code: `Blob.deletedAt`
 
-What a [Blob](#blob)'s row becomes once its bytes are removed from disk and no
-[Attachment](#attachment) points at it: the row and its `hash` survive with
-`deletedAt` stamped, so the blob route can answer `410 Gone` and explain what
-happened instead of a bare `404`.
+What a [Blob](#blob)'s row becomes once its bytes are removed and no
+[Attachment](#attachment) points at it. The row and its hash survive with
+a deleted timestamp, so the blob route can answer 410 Gone and explain what
+happened instead of 404.
 
 ## Response
 
-Type: domain 
-Code: `Response`
+Type: domain
 
-One student's answer slot for one question, in an [Exam](#exam) or a
-[Practice session](#practice-session). It holds no answer itself: it collects
-[Submissions](#submission) and decides, via `acceptingSubmissions`, whether more
-may arrive.
+One student's answer slot for one question, in an [Exam](#exam) or
+[Practice session](#practice-session). It collects [Submissions](#submission)
+and decides whether more may arrive.
 
 ## REST API
 
-Type: platform 
-Code: `src/pages/api/` (routes), `src/api/` (controllers)
+Type: platform
 
 The HTTP surface the [CLI](#cli) and [Grading bots](#grading-bot) use,
-authenticated by [API key](#api-key) rather than session cookie. Like
-[Actions](#action), its handlers are thin wrappers over
-[Services](#service).
+authenticated by [API key](#api-key) rather than session cookie. Its handlers
+are thin wrappers over [Services](#service).
 
 ## Role
 
-Type: domain 
-Code: `Role`
+Type: domain
 
 The account-wide permission level — [Admin](#admin), [Instructor](#instructor),
 or [Student](#student) — fixed by the [Invite](#invite) that created the
-account. Per-course authority is decided by ownership and
-[Enrollment](#enrollment), not by role alone.
+account. Per-course authority is decided by ownership and [Enrollment](#enrollment).
 
 ## RPC API
 
 Also: JSON-RPC 
-Type: platform 
-Code: `src/rpc/` (methods), `src/pages/rpc.ts` (endpoint)
+Type: platform
 
-The [JSON-RPC 2.0](https://www.jsonrpc.org/specification) surface at
-`POST /rpc`, for verb-shaped operations the [REST API](#rest-api) would have to
-invent a resource for. Methods are named `namespace.verb`, authenticated the
-same way as everything else, and — like [Actions](#action) — thin wrappers over
+The [JSON-RPC 2.0](https://www.jsonrpc.org/specification) surface for verb-shaped
+operations the [REST API](#rest-api) would have to invent a resource for. Methods
+are authenticated the same way as everything else and are thin wrappers over
 [Services](#service). Described by [OpenRPC](#openrpc).
 
 ## Service
 
 Also: service class, db service 
-Type: platform 
-Code: `src/db/`
+Type: platform
 
-The class wrapping Prisma for one model, exposing `create`, `findOne`,
-`findMany`, `update`, and `delete`, and holding every business rule and access
-check for it. Services do not leak Prisma types upward, and every other layer —
-[Actions](#action), [REST API](#rest-api), [Management commands](#management-command) —
-is a thin wrapper over them. A method that returns different results to
-different people takes an [Actor](#actor) and applies the rule itself.
+The layer wrapping the database for one model, exposing CRUD operations and
+holding every business rule and access check for it. Services do not leak
+database types upward, and every other layer — [Actions](#action),
+[REST API](#rest-api), [Management commands](#management-command) — is a thin
+wrapper over them. A method that returns different results to different people
+takes an [Actor](#actor) and applies the rule itself.
 
 ## Session
 
-Type: domain 
-Code: `Session`, `SessionService`
+Type: domain
 
 A browser login, represented by a 256-bit opaque token in an httpOnly cookie and
 stored only as a SHA-256 hash. Not a JWT, so it can be revoked by deleting the
-row. Expiry slides over 30 days, refreshed once past halfway to avoid writing on
+row. Expiry slides over 30 days, refreshed after halfway to avoid writing on
 every request.
 
 ## Spec
 
-Type: process 
-Code: `dev/specs/`
+Type: process
 
 The document a feature is designed in before it is built, stating requirements
-and naming the design decisions taken. Non-implemented specs live in
-`dev/specs/to-do/`. It moves to `dev/specs/to-review/` when the work lands.
-Longer-lived conventions live in `docs/design/` instead, and bugs go to
-`dev/issues/`.
+and naming the design decisions taken. Specs move to review when work lands.
+Longer-lived conventions live in the README of the directory they govern
+instead; bugs go to a separate issues folder.
 
 ## Student
 
-Type: domain 
-Code: `Role.STUDENT`
+Type: domain
 
 The [Role](#role) that consumes a course through the web app: sees courses they
-have an active [Enrollment](#enrollment) in, answers questions, and cannot list
-classmates. The [CLI](#cli) works for students too, but is never required.
+have an active [Enrollment](#enrollment) in and answers questions. The
+[CLI](#cli) works for students too, but is not required.
 
 ## Submission
 
-Type: domain 
-Code: `Submission`
+Type: domain
 
 One attempt at a [Response](#response), carrying the answer payload plus grade,
-feedback, and status (`PENDING_GRADE`, `WILL_NOT_GRADE`, `GRADED_AUTOMATICALLY`,
-`GRADED_MANUALLY`). Attempts accumulate rather than overwrite, so a response
+feedback, and status. Attempts accumulate rather than overwrite, so a response
 keeps its full history.
 
 ## Time slot
 
-Type: domain 
-Code: `TimeSlot`
+Type: domain
 
 A course's recurring weekly meeting — a weekday and a start and end time. Carries
-an authored slug (its sync identity, stable when the hour moves) and an optional
-title for the syllabus line ("Lecture", "Lab"). Concrete dated meetings are its
-[Events](#event).
+an authored slug (stable when the hour moves) and an optional title for the
+syllabus line. Concrete dated meetings are its [Events](#event).
 
 ## User
 
-Type: domain 
-Code: `User`, `UserService`
+Type: domain
 
-An account, holding a [Role](#role), a unique `username`, and the external
-handles `githubId` and `schoolId` collected at invite acceptance. The username
-is immutable, because it is the foreign key `Course.instructor` targets and a
-path segment of every [Course URL](#course-url) that instructor owns.
+An account, holding a [Role](#role), a unique username, and external handles
+(github id, school id) collected at invite acceptance. The username is immutable
+because it is the foreign key courses reference for the instructor and a path
+segment of every [Course URL](#course-url) that instructor owns.

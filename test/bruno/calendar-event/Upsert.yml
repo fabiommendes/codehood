@@ -1,0 +1,32 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/calendar-event
+  body:
+    type: json
+    data: |-
+      {
+          "courseId": 1,
+          "timeSlotId": 1,
+          "slug": "week-01-lecture",
+          "week": 1,
+          "kind": "LECTURE",
+          "title": "Week 1: recursion",
+          "description": "Base cases and the recursion tree.",
+          "contentHash": "3f1a9c2e",
+          "date": "2026-03-02",
+          "startMin": 480,
+          "durationMin": 100
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

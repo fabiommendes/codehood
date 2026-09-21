@@ -11,7 +11,7 @@ flow, which is the other 0.1.0 item, so exams stay mocked here.
 Real data:
 
 - `CourseService`, plus a `DisciplineService`, following
-  `docs/design/db-service-classes.md`.
+  `src/db/services/README.md`.
 - The actor plumbing in `src/db/base-service.ts`: `SYSTEM`, `FULL_ACCESS`,
   `Actor`, and the `*As` interfaces, plus moving `UserService`,
   `SessionService`, `ApiKeyService`, and `InviteService` onto them.
@@ -75,7 +75,7 @@ product.
 `status` exists so dropping a student later is reversible and keeps the original
 enrollment date. Nothing writes `DROPPED` in this spec.
 
-### URLs follow `docs/design/url-structure.md`
+### URLs follow `src/urls/README.md`
 
 A course is `/<discipline-slug>/<username>_<edition>`. That document is the
 reference; the parts that constrain this implementation are:
@@ -141,9 +141,12 @@ the visibility fragment is the whole `where` clause. That is one query with one
 merged in JavaScript, so the listing page stays a single round trip.
 
 The returned type includes `discipline`, `instructor`, and
-`_count.enrollments`, because every view that shows a course shows its
+`enrollmentCount`, because every view that shows a course shows its
 discipline name, its instructor's name, and its headcount. Splitting those into
-separate calls would mean three queries per card on the listing page.
+separate calls would mean three queries per card on the listing page. The
+roster itself is never in this type — `enrollmentService.findMany` is the only
+way to list a course's students, and it enforces `enrollment.read`, which a
+student does not hold over their classmates.
 
 ### Redeeming a classroom invite enrolls the student
 
@@ -158,8 +161,8 @@ the course whose URL the page was reached through.
 
 ### Access control lives in `CourseService`
 
-The conventions are `docs/design/db-service-classes.md` and
-`docs/design/service-access-control.md`. Course is the first service with real
+The conventions are `src/db/services/README.md` and
+`src/db/services/README.md`. Course is the first service with real
 rules, so the short version: every method that returns different results to
 different people takes `opts.actor`, `opts` is required on those methods, and
 forgetting the actor is a compile error rather than a data leak. Trusted callers
@@ -264,7 +267,7 @@ already extracted for the same reason.
 ### Course creation: a management command plus seed data
 
 `manage create-course <discipline-slug> <instructor> <edition>`, following
-`docs/design/management-commands.md`, prompting for description and term dates,
+`src/commands/README.md`, prompting for description and term dates,
 and creating the `Discipline` if it does not exist yet. Documented in that file
 in the same commit.
 

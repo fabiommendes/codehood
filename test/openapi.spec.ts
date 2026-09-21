@@ -45,20 +45,16 @@ test("GET /api/docs/vendor/<anything not allowlisted> is a 404, not a path trave
 });
 
 test("resources are documented only under their course, and never offer the course as a field", () => {
-	const paths = buildOpenApiDocument().paths ?? {};
+	const document = buildOpenApiDocument();
+	const paths = document.paths ?? {};
 	const collection = paths["/api/course/{discipline}/{course}/resource"];
 	const item = paths["/api/course/{discipline}/{course}/resource/{slug}"];
 
 	expect(
 		Object.keys(paths).filter((p) => p.startsWith("/api/resource")),
 	).toEqual([]);
-	expect(Object.keys(collection ?? {}).sort()).toEqual(["get", "post"]);
-	expect(Object.keys(item ?? {}).sort()).toEqual([
-		"delete",
-		"get",
-		"patch",
-		"put",
-	]);
+	expect(Object.keys(collection ?? {}).sort()).toEqual(["get", "post", "put"]);
+	expect(Object.keys(item ?? {}).sort()).toEqual(["delete", "get", "patch"]);
 
 	const queryNames = (collection?.get?.parameters ?? [])
 		.map((p) => ("name" in p ? p.name : ""))
@@ -66,21 +62,39 @@ test("resources are documented only under their course, and never offer the cour
 	expect(queryNames).not.toContain("courseId");
 	expect(queryNames.some((name) => name.startsWith("courseRef"))).toBe(false);
 
-	const bodyFields = (operation: NonNullable<typeof item>["put"]) => {
+	/// Resolves a `$ref` against the document's component schemas.
+	const deref = (schema: unknown): Record<string, unknown> | undefined => {
+		if (!schema || typeof schema !== "object") return undefined;
+		const ref = (schema as { $ref?: string }).$ref;
+		if (!ref) return schema as Record<string, unknown>;
+		const name = ref.replace("#/components/schemas/", "");
+		return document.components?.schemas?.[name] as
+			| Record<string, unknown>
+			| undefined;
+	};
+
+	const bodyFields = (operation: NonNullable<typeof item>["patch"]) => {
 		const body = operation?.requestBody;
 		const schema =
 			body && "content" in body
 				? body.content["application/json"]?.schema
 				: undefined;
-		return Object.keys(
-			(schema && "properties" in schema ? schema.properties : undefined) ?? {},
-		);
+		const resolved = deref(schema);
+		const properties = resolved?.properties as
+			| Record<string, unknown>
+			| undefined;
+		expect(properties).toBeDefined();
+		return Object.keys(properties ?? {});
 	};
 	expect(bodyFields(collection?.post)).not.toContain("courseId");
 	expect(bodyFields(collection?.post)).not.toContain("courseRef");
 	expect(bodyFields(collection?.post)).toContain("slug");
-	expect(bodyFields(item?.put)).toEqual(
+	expect(bodyFields(collection?.put)).toEqual(
+		expect.not.arrayContaining(["courseId", "courseRef"]),
+	);
+	expect(bodyFields(collection?.put)).toContain("slug");
+	expect(bodyFields(item?.patch)).toEqual(
 		expect.not.arrayContaining(["courseId", "courseRef", "slug"]),
 	);
-	expect(bodyFields(item?.put)).toContain("title");
+	expect(bodyFields(item?.patch)).toContain("title");
 });

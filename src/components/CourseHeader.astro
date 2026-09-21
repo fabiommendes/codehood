@@ -1,10 +1,10 @@
 ---
 // The only header a course page has: badge, title, instructor line, and the
-// tab strip, on every page under /<discipline>/<course>/ — see
-// dev/specs/to-do/course-navigation.md. There is no back-link and no
-// "Instructor view" badge; the strip is the whole of the page's navigation,
-// and an instructor's extra tabs are the only thing that marks them as one.
-import { type Course, toEnrollmentView } from "@/db";
+// tab strip, on every page under /<discipline>/<course>/. There is no
+// back-link and no "Instructor view" badge; the strip is the whole of the
+// page's navigation, and an instructor's extra tabs are the only thing that
+// marks them as one.
+import type { Course } from "@/db";
 import { type CourseTabKey, courseTabs } from "@/utils/course-tabs";
 import Tabs from "./ui/Tabs.astro";
 
@@ -17,8 +17,10 @@ const { course, active } = Astro.props;
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 
+// courseTabs only needs `id`/`instructor` (see its `enrollment.manage` check),
+// both of which the public Course already carries — no enrollment data needed.
 const tabs = courseTabs(
-	toEnrollmentView(course),
+	course,
 	{
 		discipline: course.discipline.slug,
 		instructor: course.instructor.username,

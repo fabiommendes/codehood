@@ -32,6 +32,7 @@ export * from "./course";
 export * from "./discipline";
 export * from "./edition";
 export * from "./enrollment";
+export * from "./exam";
 export * from "./invite";
 export * from "./passphrase";
 export * from "./question";

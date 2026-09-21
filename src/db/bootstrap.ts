@@ -1,4 +1,5 @@
 import { FULL_ACCESS } from "@/auth/actor";
+import { DEVELOPMENT } from "@/core/constants";
 import { db, type User } from "@/db";
 
 const DEV_ADMIN_USERNAME = "admin";
@@ -12,11 +13,14 @@ let devAdminPromise: Promise<void> | null = null;
 
 /**
  * Dev-only convenience: seeds a few default accounts when the database has no users yet.
- * Called from the Prisma seed script (`manage seed` / `prisma db seed`).
+ *
+ * Called from the Prisma seed script (`pnpm run db:seed`) and from the test
+ * runner. These accounts use their own username as a password, so the guard
+ * below is what keeps them out of a deployed instance.
  */
 export function ensureDevAdmin(): Promise<void> {
-	if (process.env.NODE_ENV === "production") {
-		console.log("[seed] production mode: skipping default admin account.");
+	if (!DEVELOPMENT) {
+		console.log("[seed] ENVIRONMENT is not dev: skipping default accounts.");
 		return Promise.resolve();
 	}
 	devAdminPromise ??= createDevAdminIfMissing();
@@ -59,13 +63,12 @@ let demoCoursesPromise: Promise<void> | null = null;
 
 /**
  * Dev-only convenience: seeds two demo courses (with instructors and enrolled
- * students) when the database has no courses yet. Self-healing on first
- * request, same pattern as {@link ensureDevAdmin} — Playwright specs need a
- * course to open, and `/courses` renders nothing useful on a fresh database
- * otherwise.
+ * students) when the database has no courses yet. Same guard as
+ * {@link ensureDevAdmin} — Playwright specs need a course to open, and
+ * `/courses` renders nothing useful on a fresh database otherwise.
  */
 export function ensureDemoCourses(): Promise<void> {
-	if (process.env.NODE_ENV === "production") {
+	if (!DEVELOPMENT) {
 		return Promise.resolve();
 	}
 	demoCoursesPromise ??= createDemoCoursesIfMissing();
@@ -196,8 +199,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		);
 	}
 
-	// One resource of each type, so /resources has something real to show —
-	// see dev/specs/to-do/resources.md.
+	// One resource of each type, so /resources has something real to show.
 	const syllabusFileBuffer = Buffer.from(
 		"CS101 Syllabus\n\nGrading: 40% exams, 30% homework, 30% participation.\nOffice hours: Tuesdays 2-4pm.\n",
 	);
@@ -328,9 +330,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	// A weekly pattern plus a few weeks of the term calendar for each course, so
 	// /calendar, /<course>/schedule, and the course home page all have real
-	// data to render (dev/specs/to-review/calendar.md). cs101 gets a holiday
-	// and a cancelled lab so the muted/struck-through rendering has something
-	// to show.
+	// data to render. cs101 gets a holiday and a cancelled lab so the muted/
+	// struck-through rendering has something to show.
 	const cs101Mon = await db.timeSlot.create(
 		{
 			courseId: cs101.id,
@@ -495,6 +496,219 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			FULL_ACCESS,
 		);
 	}
+
+	// A handful of questions per course, covering several MDQ types and both
+	// draft and published status, so /<course>/questions has real data to list.
+	await db.question.create(
+		{
+			courseId: cs101.id,
+			slug: "recursion-basics",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "multiple-choice",
+				title: "Recursion basics",
+				stem: "Which of the following is required for a recursive function to terminate?",
+				tags: ["recursion", "functions"],
+				choices: [
+					{ id: "base-case", text: "A base case", score: 1 },
+					{ id: "tail-call", text: "A tail call" },
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			courseId: cs101.id,
+			slug: "loop-invariants",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "true-false",
+				title: "Loop invariants",
+				stem: "Judge each statement about loop invariants as true or false.",
+				tags: ["loops"],
+				choices: [
+					{
+						id: "hold-before",
+						text: "An invariant must hold before the first iteration.",
+						correct: true,
+					},
+					{
+						id: "hold-only-after",
+						text: "An invariant must hold only after the loop terminates.",
+						correct: false,
+					},
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			courseId: cs101.id,
+			slug: "linked-list-invariants",
+			status: "DRAFT",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Linked list invariants",
+				stem: "Describe the invariant your `insert` implementation must preserve, and show where it could break.",
+				tags: ["data-structures"],
+				input: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			courseId: cs101.id,
+			slug: "factorial-of-five",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "numeric",
+				title: "Factorial of five",
+				stem: "What is 5! (five factorial)?",
+				tags: ["recursion"],
+				answer: 120,
+				domain: "integer",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			courseId: cs101.id,
+			slug: "big-o-warmup",
+			status: "DRAFT",
+			version: "v1",
+			question: {
+				type: "multiple-selection",
+				title: "Big-O warm-up",
+				stem: "Select every statement below that correctly describes O(n log n) growth.",
+				tags: ["complexity"],
+				choices: [
+					{
+						id: "merge-sort",
+						text: "Merge sort's comparisons grow this way.",
+						correct: true,
+					},
+					{
+						id: "linear-search",
+						text: "Linear search's comparisons grow this way.",
+						correct: false,
+					},
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
+
+	await db.question.create(
+		{
+			courseId: cs201.id,
+			slug: "bst-lookup",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "multiple-choice",
+				title: "BST lookup complexity",
+				stem: "In a balanced binary search tree, what is the worst-case time complexity of a lookup?",
+				tags: ["trees", "complexity"],
+				choices: [
+					{ id: "log-n", text: "O(log n)", score: 1 },
+					{ id: "n", text: "O(n)" },
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			courseId: cs201.id,
+			slug: "stack-vs-queue",
+			status: "DRAFT",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Stack vs. queue",
+				stem: "Describe a scenario where a queue is the wrong structure and a stack is the right one, or vice versa.",
+				tags: ["stacks", "queues"],
+				input: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
+
+	// Exams in several states, so a course page can show a draft being written,
+	// one waiting to start, one running, and one already over.
+	await db.exam.create(
+		{
+			courseId: cs101.id,
+			slug: "quiz-01",
+			type: "QUIZ",
+			status: "COMPLETED",
+			title: "Quiz 1: recursion",
+			description: "A short warm-up quiz on recursive functions.",
+			preamble: "Answer both questions. You may consult the course notes.",
+			scheduledAt: new Date("2026-01-26T14:00:00"),
+			durationMs: 30 * 60 * 1000,
+			tags: ["recursion"],
+			questions: [
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			courseId: cs101.id,
+			slug: "midterm",
+			type: "EXAM",
+			status: "SCHEDULED",
+			title: "Midterm exam",
+			description: "Everything from weeks 1 to 7.",
+			scheduledAt: new Date("2026-03-09T14:00:00"),
+			durationMs: 2 * 60 * 60 * 1000,
+			extraTimeMs: 15 * 60 * 1000,
+			tags: ["midterm"],
+			questions: [
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "loop-invariants", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			courseId: cs101.id,
+			slug: "final",
+			type: "FINAL",
+			status: "DRAFT",
+			title: "Final exam",
+			description: "Still being written.",
+			tags: ["final"],
+			questions: [{ slug: "big-o-warmup", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			courseId: cs201.id,
+			slug: "practice-trees",
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Practice: binary search trees",
+			description: "Ungraded practice, open until the end of the term.",
+			tags: ["trees", "practice"],
+			questions: [{ slug: "bst-lookup", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
 
 	console.log(
 		`[dev] created demo courses cs101/${ada.username}_2026-1 and cs201/${alan.username}_2026-1.`,

@@ -126,9 +126,10 @@ into the course rather than retyping it.
     status: implemented
 
 Instructor knows a student's email and wants them in this course specifically.
-They issue a personal invite from the course, which is single-use, tied to that
-address, and enrolls the student on redemption. If the student has no account
-yet, redeeming the invite creates it.
+They add the student from the roster, by email or username. Someone who already
+has an account is enrolled on the spot. An address with no account behind it
+gets a personal invite instead, which is single-use, tied to that address, and
+creates the account already enrolled when it is redeemed.
 
 
 ### Hand out one join link for the whole class
@@ -189,6 +190,18 @@ exam appends a new version rather than overwriting the old one, and the exam tha
 pinned the previous version still shows what the students actually answered.
 
 
+### Browse the question bank
+
+    status: web
+    url: /[discipline]/[course]/questions
+
+Instructor already pushed questions with the CLI and wants to check what
+landed on the server: which type each one is, whether it is published or
+still a draft, and when it last changed. The course's Questions tab lists
+them, and opening one shows its stem, tags and current status — a read-only
+mirror of what was pushed, since authoring itself still happens locally.
+
+
 ### Share a question bank with a teaching team
 
     status: todo
@@ -230,6 +243,9 @@ still being pending.
 Instructor runs an automated grader for programming answers. They issue an API
 key of kind `BOT`, and the bot posts grades and feedback back through the REST
 API. It currently acts as the instructor who issued its key.
+
+Issuing the key and authenticating with it work today. The REST API registers
+no responses or grades routes yet, so the posting half has nothing to call.
 
 
 ### See the whole class's results

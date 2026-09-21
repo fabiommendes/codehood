@@ -25,23 +25,18 @@ export const weekdaySchema = z.enum([
 	"SATURDAY",
 ]);
 
-export const timeSlotCreate = z.object({
-	courseId: courseId,
-	slug: z.string().min(1),
-	title: z.string().nullish(),
-	day: weekdaySchema,
-	startMin: z.number().int(),
-	durationMin: z.number().int(),
-});
+export const timeSlotCreate = timeSlotSchema
+	.omit({ id: true, createdAt: true, updatedAt: true })
+	.extend({
+		// Nullable column: `null` clears the title, absent leaves it unset.
+		title: z.string().nullish(),
+	});
 
-// `slug` is deliberately absent: it is the sync natural key, and changing it
-// is a delete plus a create (FR-SYNC-011).
-export const timeSlotUpdate = z.object({
-	title: z.string().nullable().optional(),
-	day: weekdaySchema.optional(),
-	startMin: z.number().int().optional(),
-	durationMin: z.number().int().optional(),
-});
+// `slug` and `courseId` are deliberately absent: `slug` is the sync natural
+// key, and changing it is a delete plus a create (FR-SYNC-011).
+export const timeSlotUpdate = timeSlotCreate
+	.omit({ courseId: true, slug: true })
+	.partial();
 
 export const timeSlotUpsert = timeSlotCreate;
 

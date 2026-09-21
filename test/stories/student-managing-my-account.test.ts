@@ -66,12 +66,29 @@ test("student: change my password and log out everywhere", async ({ page }) => {
 		).toBeVisible();
 	});
 
+	// The lab machine of the story: a session the student is not holding.
+	const labMachine = await db.session.create(
+		{ username: student.username },
+		FULL_ACCESS,
+	);
+
 	await test.step("the right one is accepted", async () => {
 		await openTab(page, "Account");
 		await fillField(page, "Current password", student.password);
 		await fillField(page, "New password", "brandnewpassword");
 		await fillField(page, "Confirm new password", "brandnewpassword");
 		await page.getByRole("button", { name: "Change password" }).click();
+		await expect(page.getByText("Password changed.")).toBeVisible();
+	});
+
+	// Changing the password is itself what ends the lab machine's session —
+	// the student does not have to reach "Log out everywhere" for that. The
+	// browser in hand keeps working, so the change does not sign them out of
+	// the device they made it from.
+	await test.step("the session left behind on the lab machine is already dead", async () => {
+		expect(await db.session.validate(labMachine.token)).toBeNull();
+		expect((await page.goto("/profile"))?.status()).toBe(200);
+		await expect(page).not.toHaveURL(/\/login/);
 	});
 
 	await test.step("logging out everywhere ends the session in hand", async () => {
@@ -122,8 +139,9 @@ test("student: leave a course", async ({ page }) => {
 
 	// Nothing was destroyed — an instructor re-enrolling them would restore
 	// access to whatever they already submitted.
-	const stillEnrolled = await db.course.findOne({ id: course.id }, FULL_ACCESS);
-	expect(
-		stillEnrolled?.enrollments.some((e) => e.username === student.username),
-	).toBe(false);
+	const enrollment = await db.enrollment.findOne(
+		{ courseId: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	expect(enrollment?.status).toBe("DROPPED");
 });

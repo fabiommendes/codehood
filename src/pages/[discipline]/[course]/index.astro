@@ -16,11 +16,16 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
 const actor = Astro.locals.actor!;
-// Course.instructor is not an enrollment, so an instructor viewing their own
-// course never matches here — there is nothing for them to leave.
-const isEnrolled = course.enrollments.some(
-	(e) => e.username === actor.username,
+// Looked up by the viewer's own username rather than read off `course` —
+// `Course` no longer carries the roster (see the enrollment-privacy fix), and
+// `enrollment.read` already lets anyone check their own row. An instructor
+// viewing their own course has no enrollment row here — there is nothing for
+// them to leave.
+const ownEnrollment = await db.enrollment.findOne(
+	{ courseId: course.id, username: actor.username },
+	{ actor },
 );
+const isEnrolled = ownEnrollment?.status === "ACTIVE";
 
 function formatDate(date: Date): string {
 	return formatDateTime(date, {
@@ -41,9 +46,8 @@ const WEEKDAY_LABEL: Record<string, string> = {
 	SATURDAY: "Sat",
 };
 
-// The syllabus line and the next few meetings — see "Course home page" in
-// dev/specs/to-review/calendar.md. Both come from the same source the
-// Schedule tab reads; this section is a preview of it, not a copy.
+// The syllabus line and the next few meetings. Both come from the same source
+// the Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await db.timeSlot.findMany({ courseId: course.id }, { actor });
 const nextEvents = await db.calendarEvent.findMany(
 	{ courseIds: [course.id], from: new Date(), limit: 3 },
@@ -70,7 +74,7 @@ const nextEvents = await db.calendarEvent.findMany(
       </div>
       <div class="stat">
         <div class="stat-title">Students</div>
-        <div class="stat-value text-2xl">{course.enrollments.length}</div>
+        <div class="stat-value text-2xl">{course.enrollmentCount}</div>
       </div>
       <div class="stat">
         <div class="stat-title">Resources</div>

@@ -79,9 +79,9 @@ test("the thrown return-validation error is an Error instance", () => {
 	expect(caught).toBeInstanceOf(Error);
 });
 
-test("@Validate (async: true) validates async return values", async () => {
+test("@Validate validates the resolved value of an async method, not its Promise", async () => {
 	class Plain {
-		@Validate({ async: true, returns: z.string().min(10) })
+		@Validate({ returns: z.string().min(10) })
 		async method(): Promise<string> {
 			return "short";
 		}
@@ -90,25 +90,51 @@ test("@Validate (async: true) validates async return values", async () => {
 	await expect(instance.method()).rejects.toThrow();
 });
 
-test("FOOTGUN: forgetting async:true on an async method with `returns` validates the raw Promise instead of the resolved value", async () => {
+test("@Validate rejects asynchronously instead of throwing on the call itself", async () => {
 	class Plain {
-		// No `async: true`, even though `method` is async. This is a real risk since
-		// nothing in the API ties `async` to the underlying method's actual signature.
 		@Validate({ returns: z.string().min(3) })
 		async method(): Promise<string> {
-			return "this is plenty long"; // would pass validation if it were awaited first
+			return "this is plenty long";
 		}
 	}
 	const instance = new Plain();
-	// The call throws synchronously, validating the pending Promise object against the
-	// schema, instead of returning a promise that resolves/rejects based on the real value.
+	// A schema the raw Promise object could never satisfy: the value reaching
+	// it is the resolved string, so the call returns a promise rather than
+	// throwing where the caller cannot catch it.
 	let threwSynchronously = false;
+	let resolved: unknown;
 	try {
-		instance.method();
+		resolved = await instance.method();
 	} catch {
 		threwSynchronously = true;
 	}
-	expect(threwSynchronously).toBe(true);
+	expect(threwSynchronously).toBe(false);
+	expect(resolved).toBe("this is plenty long");
+});
+
+test("@Validate service mode rejects a non-ServiceOpts value in the opts position", async () => {
+	class Service {
+		@Validate({ service: true, args: [z.string().min(1)] })
+		async method(name: string, _: ServiceOpts) {
+			return { name };
+		}
+	}
+	const service = new Service();
+	await expect(
+		// @ts-expect-error - deliberately passing the wrong type, which JS allows
+		service.method("abc", "not-opts"),
+	).rejects.toThrow(/ServiceOpts/);
+});
+
+test("@Validate service mode accepts a method whose opts is optional being called without it", async () => {
+	class Service {
+		@Validate({ service: true, returns: z.object({ name: z.string() }) })
+		async method(name: string, opts?: ServiceOpts) {
+			return { name, actor: opts?.actor };
+		}
+	}
+	const service = new Service();
+	await expect(service.method("abc")).resolves.toMatchObject({ name: "abc" });
 });
 
 //
