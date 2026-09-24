@@ -142,6 +142,20 @@ correctness through type annotations and checks.
 The dev server should be alive at `http://localhost:4321`. If unreacheable or
 error 500, consult with the human.
 
+**The dev server is a scratch pad.** Its data is reset often and none of it is
+precious, including the pre-seeded users, courses and editions. Write to it
+freely: create throwaway courses, push to them, mutate them, cancel events,
+delete what you made. Do not stop to ask before touching server state, and do
+not tiptoe around seeded data to keep it pristine -- verifying against the real
+server beats reasoning about what it would probably do. Creating a discipline
+or an edition is still an admin action the CLI does not perform, so a missing
+one is a finding to report, not something to work around.
+
+Prove server-facing work against it rather than against mocks alone. A green
+unit suite says the code does what you think; only a live push says the server
+agrees. Two spec bugs in the calendar sync were invisible to a full unit suite
+and surfaced on the first real push.
+
 Here are the important endpoints:
 
 - `http://localhost:4321/openapi.json` - OpenAPI spec for the REST API.
