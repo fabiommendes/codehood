@@ -1,0 +1,19 @@
+# Machine state and scratch
+.rtk/
+prompt.md
+prompt/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+*.egg-info/
+
+# Per-developer Claude Code settings; the shared config is CLAUDE.md
+.claude/settings.local.json

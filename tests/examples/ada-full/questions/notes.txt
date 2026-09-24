@@ -1,0 +1,2 @@
+Scratch notes, not a question. `scan_files` flags this as a WARNING and
+`scan_questions` skips it -- the fixture exists to prove that.

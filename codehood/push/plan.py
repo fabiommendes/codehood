@@ -1,0 +1,364 @@
+"""
+The pure core of `codehood push`: a generator that diffs a repository
+against the server's current state and yields a plan.
+
+No client, no ids, no `run()` -- see `dev/specs/to-do/push.md`,
+"Architecture". `run.py` is the only thing in `codehood/push/` that
+executes a `PushOp`.
+
+The two inputs are whole values, `LocalState` and `ServerState`, rather
+than a dozen loose mappings: `slug -> ref` and `slug -> version` are the
+same type and mean different things, and naming them as fields is what
+stops a caller from swapping them silently.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Literal
+
+from .calendar import Event, TimeSlot
+from .question import AnyQuestion, QuestionFile
+from .resource import ResourceData, ResourceFile
+
+__all__ = [
+    "DeleteCalendarEvent",
+    "DeleteQuestion",
+    "DeleteResource",
+    "DeleteTimeSlot",
+    "LocalState",
+    "PushOp",
+    "ServerEvent",
+    "ServerState",
+    "UpsertCalendarEvent",
+    "UpsertCourse",
+    "UpsertQuestion",
+    "UpsertResource",
+    "UpsertTimeSlot",
+    "WarnTimeSlotPinned",
+    "plan_push",
+]
+
+
+#
+# Inputs
+#
+@dataclass(frozen=True)
+class LocalState:
+    """
+    Everything a repository holds that a push can write.
+
+    `start` and `end` come from `calendar.md`, not from the edition: the
+    edition is an institutional term shared across courses, and a course's
+    own span is the instructor's to set -- see the mapping's "Course".
+    """
+
+    discipline: str
+    course: str
+    description: str
+    start: date
+    end: date
+    slots: tuple[TimeSlot, ...] = ()
+    events: tuple[Event, ...] = ()
+    resources: tuple[ResourceFile, ...] = ()
+    questions: tuple[QuestionFile, ...] = ()
+
+
+@dataclass(frozen=True)
+class ServerEvent:
+    """
+    What the sync preflight reports about one calendar event.
+
+    A marker, not a payload: `ref` decides whether to rewrite it and
+    `kind` whether to touch it at all -- see the mapping's "Sync
+    preflight".
+    """
+
+    ref: str
+    kind: Literal["REGULAR", "HOLIDAY", "CANCELLED"]
+
+
+@dataclass(frozen=True)
+class ServerState:
+    """
+    What the server currently holds for a course, as markers only.
+    """
+
+    course_exists: bool = False
+    resources: Mapping[str, str] = field(default_factory=dict)
+    questions: Mapping[str, str] = field(default_factory=dict)
+    time_slots: Mapping[str, str] = field(default_factory=dict)
+    calendar_events: Mapping[tuple[int, str], ServerEvent] = field(default_factory=dict)
+
+
+#
+# Operations
+#
+@dataclass(frozen=True)
+class UpsertCourse:
+    """
+    The course row to `PUT`, keyed by `(discipline, course)`.
+    """
+
+    discipline: str
+    course: str
+    description: str
+    start_at: str | None
+    end_at: str | None
+
+
+@dataclass(frozen=True)
+class UpsertResource:
+    """
+    One resource to `PUT`, whole, whatever its type.
+
+    `data` is the same tagged union the server stores, so the shell has
+    nothing left to infer -- see `push.md`, "Architecture". `ref` is the
+    digest the server hands back on the next read, which is what makes a
+    second push of an unchanged resource a no-op.
+    """
+
+    slug: str
+    title: str
+    description: str | None
+    data: ResourceData
+    ref: str
+    path: Path
+
+
+@dataclass(frozen=True)
+class DeleteResource:
+    """
+    A resource to delete by slug: its local file is gone.
+    """
+
+    slug: str
+
+
+@dataclass(frozen=True)
+class UpsertQuestion:
+    """
+    One question to `PUT`, parsed but untranslated.
+
+    `question` is the same `mdq` union `question.scan_questions` yields;
+    `run.py` is the only place that turns it into the generated request
+    model, dropping the fields the server's schema rejects.
+    """
+
+    slug: str
+    version: str
+    question: AnyQuestion
+    path: Path
+
+
+@dataclass(frozen=True)
+class DeleteQuestion:
+    """
+    A question to delete by slug: its local file is gone.
+    """
+
+    slug: str
+
+
+@dataclass(frozen=True)
+class UpsertTimeSlot:
+    """
+    One time slot to `PUT`, carried whole.
+    """
+
+    slot: TimeSlot
+
+
+@dataclass(frozen=True)
+class DeleteTimeSlot:
+    """
+    A time slot to hard-delete by slug: its `days:` entry is gone.
+    """
+
+    slug: str
+
+
+@dataclass(frozen=True)
+class UpsertCalendarEvent:
+    """
+    One calendar event to `PUT`, carried whole.
+    """
+
+    event: Event
+
+
+@dataclass(frozen=True)
+class DeleteCalendarEvent:
+    """
+    A calendar event to hard-delete, by the `(week, timeSlot)` pair that
+    is both its primary key and its URL.
+    """
+
+    week: int
+    time_slot: str
+
+
+@dataclass(frozen=True)
+class WarnTimeSlotPinned:
+    """
+    Not a write: a time slot the preflight would otherwise prune, kept
+    because a `CANCELLED` calendar event still pins it.
+
+    The cancelled event is never rewritten or pruned (see the mapping's
+    "Calendar events"), so it pins the slot indefinitely, and the server
+    refuses to orphan it -- see "Deletion and pruning". `plan_calendar` is
+    a pure generator with no other channel to explain why a slug it would
+    otherwise delete survives, so this rides `PushOp` itself: `run.py`
+    executes it as a no-op and the CLI prints it like any other planned
+    line.
+    """
+
+    slug: str
+    week: int
+
+
+PushOp = (
+    UpsertCourse
+    | UpsertResource
+    | DeleteResource
+    | UpsertQuestion
+    | DeleteQuestion
+    | UpsertTimeSlot
+    | DeleteTimeSlot
+    | UpsertCalendarEvent
+    | DeleteCalendarEvent
+    | WarnTimeSlotPinned
+)
+
+
+def plan_push(local: LocalState, server: ServerState) -> Iterator[PushOp]:
+    """
+    Diff a repository against the server's current state and yield a plan.
+
+    The course row is always `PUT`, since every write is idempotent and
+    the course carries no comparable hash of its own -- see `push.md`,
+    "Every write is a `PUT`". `server.course_exists` mirrors what the
+    shell already fetched (`fetch_server_state`) so a future check has
+    somewhere to plug in; it does not gate this call, on purpose.
+
+    A resource is planned when its `ref` differs from (or is absent from)
+    `server.resources`; a server slug absent locally is planned for
+    deletion. Questions follow the same rule on `version`.
+
+    Calendar slots and events come last, and in that order: a slot an
+    event needs has to exist before the event is written.
+    """
+    yield UpsertCourse(
+        discipline=local.discipline,
+        course=local.course,
+        description=local.description,
+        start_at=_timestamp(local.start),
+        end_at=_timestamp(local.end),
+    )
+
+    seen_slugs: set[str] = set()
+    for resource in local.resources:
+        seen_slugs.add(resource.slug)
+        if server.resources.get(resource.slug) == resource.ref:
+            continue
+        yield UpsertResource(
+            slug=resource.slug,
+            title=resource.title,
+            description=resource.description,
+            data=resource.data,
+            ref=resource.ref,
+            path=resource.path,
+        )
+
+    for slug in server.resources:
+        if slug not in seen_slugs:
+            yield DeleteResource(slug=slug)
+
+    seen_question_slugs: set[str] = set()
+    for question in local.questions:
+        seen_question_slugs.add(question.slug)
+        if server.questions.get(question.slug) == question.version:
+            continue
+        yield UpsertQuestion(
+            slug=question.slug,
+            version=question.version,
+            question=question.question,
+            path=question.path,
+        )
+
+    for slug in server.questions:
+        if slug not in seen_question_slugs:
+            yield DeleteQuestion(slug=slug)
+
+    yield from plan_calendar(local, server)
+
+
+def plan_calendar(local: LocalState, server: ServerState) -> Iterator[PushOp]:
+    """
+    The calendar half of a plan: delete events, delete slots, upsert
+    slots, upsert events, in that exact order.
+
+    A calendar event references its time slot, so a slot cannot be
+    deleted while an event still points at it; and two slots may not
+    overlap on one weekday, so a slug that changed cannot be created
+    while the old slug still holds its hour. This order is the only one
+    that satisfies both -- see the mapping's "Deletion and pruning".
+
+    An event the server reports as `CANCELLED` is neither rewritten nor
+    pruned -- see the mapping's "Calendar events" -- and that pins its
+    time slot: a slot a `CANCELLED` event still points at is left in
+    place even when no local `days:` entry accounts for it, with a
+    `WarnTimeSlotPinned` naming both.
+    """
+    local_slugs = {slot.slug for slot in local.slots}
+    local_events = {(event.week, event.time_slot): event for event in local.events}
+
+    for key, server_event in server.calendar_events.items():
+        if server_event.kind == "CANCELLED":
+            continue
+        if key not in local_events:
+            week, time_slot = key
+            yield DeleteCalendarEvent(week=week, time_slot=time_slot)
+
+    pinned_slugs: set[str] = set()
+    for (week, time_slot), server_event in server.calendar_events.items():
+        if server_event.kind == "CANCELLED" and time_slot not in local_slugs:
+            pinned_slugs.add(time_slot)
+            yield WarnTimeSlotPinned(slug=time_slot, week=week)
+
+    for slug in server.time_slots:
+        if slug not in local_slugs and slug not in pinned_slugs:
+            yield DeleteTimeSlot(slug=slug)
+
+    for slot in local.slots:
+        if server.time_slots.get(slot.slug) == slot.ref:
+            continue
+        yield UpsertTimeSlot(slot=slot)
+
+    for key, event in local_events.items():
+        matching_server_event = server.calendar_events.get(key)
+        if (
+            matching_server_event is not None
+            and matching_server_event.kind == "CANCELLED"
+        ):
+            continue
+        if matching_server_event is not None and (
+            matching_server_event.ref,
+            matching_server_event.kind,
+        ) == (event.ref, event.kind):
+            continue
+        yield UpsertCalendarEvent(event=event)
+
+
+#
+# Utilities
+#
+def _timestamp(day: date) -> str:
+    """
+    A date as the UTC midnight timestamp the server's `startAt`/`endAt`
+    expect.
+    """
+    return f"{day.isoformat()}T00:00:00.000Z"

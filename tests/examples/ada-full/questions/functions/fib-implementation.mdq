@@ -1,0 +1,12 @@
+---
+title: Implement fib
+type: essay
+input: code
+highlight: python
+tags: [functions, recursion]
+---
+
+Write a function `fib(n)` returning the n-th Fibonacci number, with
+`fib(0) == 0` and `fib(1) == 1`. Iterative or recursive, your choice.
+
+[essay]
