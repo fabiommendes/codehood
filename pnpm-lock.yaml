@@ -72,6 +72,9 @@ importers:
       '@astrojs/check':
         specifier: ^0.9.10
         version: 0.9.10(prettier@3.9.6)(typescript@7.0.2)
+      '@astrojs/language-server':
+        specifier: 2.16.15
+        version: 2.16.15(prettier@3.9.6)(typescript@7.0.2)
       '@biomejs/biome':
         specifier: ^2.5.10
         version: 2.5.10
@@ -132,6 +135,9 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+      typescript-6:
+        specifier: npm:typescript@^6.0.3
+        version: typescript@6.0.3
       vite-node:
         specifier: ^6.0.0
         version: 6.0.0(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(tsx@4.23.12)(yaml@2.9.0)
@@ -4795,6 +4801,11 @@ packages:
   typescript-auto-import-cache@0.3.6:
     resolution: {integrity: sha512-RpuHXrknHdVdK7wv/8ug3Fr0WNsNi5l5aB8MYYuXhq2UH5lnEB1htJ1smhtD5VeCsGr2p8mUDtd83LCQDFVgjQ==}
 
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -7557,7 +7568,7 @@ snapshots:
       '@usebruno/js': 0.51.0(debug@4.4.3)
       '@usebruno/lang': 0.39.0
       '@usebruno/requests': 0.20.0
-      aws4-axios: 3.4.0(axios@1.16.0(debug@4.4.3))
+      aws4-axios: 3.4.0(axios@1.16.0)
       axios: 1.16.0(debug@4.4.3)
       axios-ntlm: 1.4.6(debug@4.4.3)
       chai: 4.5.0
@@ -8009,7 +8020,7 @@ snapshots:
 
   aws-ssl-profiles@1.1.2: {}
 
-  aws4-axios@3.4.0(axios@1.16.0(debug@4.4.3)):
+  aws4-axios@3.4.0(axios@1.16.0):
     dependencies:
       '@aws-sdk/client-sts': 3.1133.0
       aws4: 1.13.2
@@ -10337,6 +10348,8 @@ snapshots:
   typescript-auto-import-cache@0.3.6:
     dependencies:
       semver: 7.8.5
+
+  typescript@6.0.3: {}
 
   typescript@7.0.2:
     optionalDependencies:

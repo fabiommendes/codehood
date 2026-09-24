@@ -499,7 +499,7 @@ function fromDb(row: DbExam): Exam {
 		scheduledAt: row.scheduledAt,
 		duration: fromMs(row.durationMs),
 		extraTime: fromMs(row.extraTimeMs),
-		authorId: row.authorId,
+		author: row.authorId,
 		tags: row.examTags.map((t) => t.tag),
 		questions: row.questionsForExams.map((q) => ({
 			id: q.questionRef.id as Exam["questions"][number]["id"],

@@ -1,11 +1,10 @@
 import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
+import type { z } from "zod";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
-import type { User } from "@/db";
+import type { enrollmentSchema } from "@/core/schemas";
 
-type EnrolledUser = User & {
-	enrolledAt: Date;
-};
+type EnrolledUser = z.infer<typeof enrollmentSchema>;
 
 interface Props {
 	students: EnrolledUser[];

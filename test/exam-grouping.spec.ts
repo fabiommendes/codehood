@@ -19,7 +19,7 @@ function exam(overrides: Partial<Exam> = {}): Exam {
 		scheduledAt: null,
 		duration: null,
 		extraTime: null,
-		authorId: "instructor",
+		author: "instructor",
 		tags: [],
 		questions: [],
 		createdAt: new Date("2026-01-01T00:00:00Z"),

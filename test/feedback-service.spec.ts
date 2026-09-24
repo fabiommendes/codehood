@@ -87,7 +87,7 @@ async function makeGradedSubmission(overrides: ExamOverrides = {}) {
 	const response = await persistedResponseFactory.create({
 		course: course.id,
 		exam: exam.slug,
-		authorId: author.username,
+		author: author.username,
 	});
 	const submission = await persistedSubmissionFactory.create({
 		response: { publicId: response.publicId },
@@ -131,8 +131,8 @@ test("create() by the instructor and SYSTEM grading as a bot each land under the
 		{ actor: instructor },
 	);
 	expect(v1.ref).toBe("first");
-	expect(v1.graderId).toBe(instructor.username);
-	expect(v1.botId).toBeNull();
+	expect(v1.grader).toBe(instructor.username);
+	expect(v1.bot).toBeNull();
 	expect(v1.score).toBe("0.75");
 
 	// Visible to the instructor and, since the exam is PRACTICE, to the author.
@@ -146,13 +146,13 @@ test("create() by the instructor and SYSTEM grading as a bot each land under the
 			submission: { id: submission.id },
 			ref: "bot-pass",
 			score: "1",
-			botId: "grading-bot",
+			bot: "grading-bot",
 		},
 		{ actor: SYSTEM },
 	);
 	expect(v2.ref).toBe("bot-pass");
-	expect(v2.graderId).toBeNull();
-	expect(v2.botId).toBe("grading-bot");
+	expect(v2.grader).toBeNull();
+	expect(v2.bot).toBe("grading-bot");
 
 	const bySubmissionAndRef = await db.feedback.findOne(
 		{ submission: { id: submission.id }, ref: "bot-pass" },
@@ -192,8 +192,8 @@ test("create() by the instructor and SYSTEM grading as a bot each land under the
 	expect(updated.id).toBe(v2.id);
 	expect(updated.score).toBe("0.6");
 	// The grader on record never moves on update.
-	expect(updated.graderId).toBeNull();
-	expect(updated.botId).toBe("grading-bot");
+	expect(updated.grader).toBeNull();
+	expect(updated.bot).toBe("grading-bot");
 
 	await db.feedback.delete({ id: v2.id }, { actor: instructor });
 	expect(await prisma.feedback.findUnique({ where: { id: v2.id } })).toBeNull();
@@ -219,7 +219,8 @@ test("persistedFeedbackFactory provisions its own submission and its exam honors
 			},
 		},
 	);
-	expect(feedback.ref).toBe("pass-1");
+	// The sequence is shared by every file that uses the factory.
+	expect(feedback.ref).toMatch(/^pass-\d+$/);
 
 	const submission = await prisma.submission.findUniqueOrThrow({
 		where: { id: feedback.submissionId },
@@ -229,11 +230,11 @@ test("persistedFeedbackFactory provisions its own submission and its exam honors
 });
 
 //
-// F1/F2 — exactly one of graderId/botId; graderId defaults to the actor;
+// F1/F2 — exactly one of grader/bot; grader defaults to the actor;
 // naming a different grader is refused for anyone but SYSTEM.
 //
 
-test("create() rejects both graderId and botId set, and rejects neither set for SYSTEM", async () => {
+test("create() rejects both grader and bot set, and rejects neither set for SYSTEM", async () => {
 	const { instructor, submission } = await makeGradedSubmission();
 
 	await expect(
@@ -242,8 +243,8 @@ test("create() rejects both graderId and botId set, and rejects neither set for 
 				submission: { id: submission.id },
 				ref: "pass",
 				score: "1",
-				graderId: instructor.username,
-				botId: "bot",
+				grader: instructor.username,
+				bot: "bot",
 			},
 			{ actor: instructor },
 		),
@@ -261,7 +262,7 @@ test("create() rejects both graderId and botId set, and rejects neither set for 
 	).toBe(0);
 });
 
-test("create() defaults graderId to a user actor's own username, and refuses naming a different grader unless the actor is SYSTEM", async () => {
+test("create() defaults grader to a user actor's own username, and refuses naming a different grader unless the actor is SYSTEM", async () => {
 	const { instructor, submission } = await makeGradedSubmission();
 	const someoneElse = await persistedUserFactory.create({
 		role: "INSTRUCTOR",
@@ -271,7 +272,7 @@ test("create() defaults graderId to a user actor's own username, and refuses nam
 		{ submission: { id: submission.id }, ref: "own", score: "1" },
 		{ actor: instructor },
 	);
-	expect(own.graderId).toBe(instructor.username);
+	expect(own.grader).toBe(instructor.username);
 
 	await expect(
 		db.feedback.create(
@@ -279,7 +280,7 @@ test("create() defaults graderId to a user actor's own username, and refuses nam
 				submission: { id: submission.id },
 				ref: "for-another",
 				score: "1",
-				graderId: someoneElse.username,
+				grader: someoneElse.username,
 			},
 			{ actor: instructor },
 		),
@@ -291,11 +292,11 @@ test("create() defaults graderId to a user actor's own username, and refuses nam
 			submission: { id: submission.id },
 			ref: "on-behalf",
 			score: "1",
-			graderId: someoneElse.username,
+			grader: someoneElse.username,
 		},
 		{ actor: SYSTEM },
 	);
-	expect(onBehalf.graderId).toBe(someoneElse.username);
+	expect(onBehalf.grader).toBe(someoneElse.username);
 });
 
 //
@@ -685,7 +686,7 @@ test("two concurrent graders writing different refs both land", async () => {
 				submission: { id: submission.id },
 				ref: "bot",
 				score: "0.6",
-				botId: "grader-bot",
+				bot: "grader-bot",
 			},
 			{ actor: SYSTEM },
 		),

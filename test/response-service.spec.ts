@@ -106,8 +106,8 @@ test("submit() against two questions of an ongoing exam ends with one response h
 	expect(afterSecond.publicId).toBe(afterFirst.publicId);
 	expect(afterSecond.courseId).toBe(course.id);
 	expect(afterSecond.examId).not.toBeNull();
-	expect(afterSecond.examSlug).toBe(exam.slug);
-	expect(afterSecond.authorId).toBe(student.username);
+	expect(afterSecond.exam).toBe(exam.slug);
+	expect(afterSecond.author).toBe(student.username);
 	expect(afterSecond.acceptingSubmissions).toBe(true);
 	expect(afterSecond.practiceSession).toBeNull();
 	expect(afterSecond.submissions).toHaveLength(2);
@@ -155,11 +155,11 @@ test("create() against a graded exam leaves practiceSession null; against a prac
 	const gradedExam = await makeExam(course.id, [], { type: "EXAM" });
 
 	const graded = await db.response.create(
-		{ course: course.id, exam: gradedExam.slug, authorId: student.username },
+		{ course: course.id, exam: gradedExam.slug, author: student.username },
 		{ actor: student },
 	);
 	expect(graded.examId).not.toBeNull();
-	expect(graded.examSlug).toBe(gradedExam.slug);
+	expect(graded.exam).toBe(gradedExam.slug);
 	expect(graded.practiceSession).toBeNull();
 
 	const practiceExam = await makeExam(course.id, [], {
@@ -171,11 +171,11 @@ test("create() against a graded exam leaves practiceSession null; against a prac
 		{
 			course: course.id,
 			exam: practiceExam.slug,
-			authorId: student.username,
+			author: student.username,
 		},
 		{ actor: student },
 	);
-	expect(practice.examSlug).toBe(practiceExam.slug);
+	expect(practice.exam).toBe(practiceExam.slug);
 	expect(practice.practiceSession).not.toBeNull();
 	// slotKey stores the session start as whole unix seconds, so the derived
 	// practiceSession loses sub-second precision — allow a small tolerance
@@ -195,7 +195,7 @@ test("create() refuses a practiceSession named against a graded exam", async () 
 			{
 				course: course.id,
 				exam: gradedExam.slug,
-				authorId: student.username,
+				author: student.username,
 				practiceSession: new Date(),
 			},
 			{ actor: student },
@@ -209,13 +209,13 @@ test("create() against the same graded exam twice collides with the unique (auth
 	const exam = await makeExam(course.id, [], { type: "EXAM" });
 
 	await db.response.create(
-		{ course: course.id, exam: exam.slug, authorId: student.username },
+		{ course: course.id, exam: exam.slug, author: student.username },
 		{ actor: student },
 	);
 
 	await expect(
 		db.response.create(
-			{ course: course.id, exam: exam.slug, authorId: student.username },
+			{ course: course.id, exam: exam.slug, author: student.username },
 			{ actor: student },
 		),
 	).rejects.toBeInstanceOf(InvalidData);
@@ -238,7 +238,7 @@ test("create() refuses an author with no ACTIVE enrollment in the exam's course"
 
 	await expect(
 		db.response.create(
-			{ course: course.id, exam: exam.slug, authorId: notEnrolled.username },
+			{ course: course.id, exam: exam.slug, author: notEnrolled.username },
 			FULL_ACCESS,
 		),
 	).rejects.toBeInstanceOf(InvalidData);
@@ -262,7 +262,7 @@ test("create() refuses a response naming a missing course or exam", async () => 
 			{
 				course: 999_999 as schema.CourseId,
 				exam: "no-such-exam",
-				authorId: student.username,
+				author: student.username,
 			},
 			FULL_ACCESS,
 		),
@@ -270,7 +270,7 @@ test("create() refuses a response naming a missing course or exam", async () => 
 
 	await expect(
 		db.response.create(
-			{ course: course.id, exam: "no-such-exam", authorId: student.username },
+			{ course: course.id, exam: "no-such-exam", author: student.username },
 			{ actor: student },
 		),
 	).rejects.toBeInstanceOf(NotFound);
@@ -286,7 +286,7 @@ for (const status of ["DRAFT", "ARCHIVED"] as const) {
 			{
 				course: course.id,
 				exam: hiddenExam.slug,
-				authorId: student.username,
+				author: student.username,
 			},
 			{ actor: student },
 		);
@@ -294,7 +294,7 @@ for (const status of ["DRAFT", "ARCHIVED"] as const) {
 			{
 				course: course.id,
 				exam: "no-such-exam",
-				authorId: student.username,
+				author: student.username,
 			},
 			{ actor: student },
 		);
@@ -463,7 +463,7 @@ async function makeMatrixFixtures() {
 	const response = await persistedResponseFactory.create({
 		course: course.id,
 		exam: exam.slug,
-		authorId: author.username,
+		author: author.username,
 	});
 
 	return { course, instructor, author, peer, otherInstructor, admin, response };

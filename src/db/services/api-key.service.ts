@@ -64,6 +64,7 @@ export class ApiKeyService
 		const token = generateToken();
 		const apiKey = await client.apiKey.create({
 			data: {
+				publicId: generateToken(9),
 				keyHash: hashToken(token),
 				name: input.name,
 				kind: input.kind,
@@ -77,7 +78,7 @@ export class ApiKeyService
 	}
 
 	/**
-	 * Finds a single API key by id.
+	 * Finds a single API key by id or by its `publicId`.
 	 */
 	@Validate({
 		service: true,
@@ -87,7 +88,7 @@ export class ApiKeyService
 	async findOne(filter: ApiKeyPK, opts: ServiceOpts): Promise<ApiKey | null> {
 		const client = opts.tx ?? this.prisma;
 		const apiKey = await client.apiKey.findUnique({
-			where: { id: filter.id },
+			where: apiKeyWhere(filter),
 			include: apiKeyInclude,
 		});
 		if (!apiKey) return null;
@@ -98,7 +99,7 @@ export class ApiKeyService
 	}
 
 	/**
-	 * Finds all API keys belonging to `filter.createdById`.
+	 * Finds all API keys belonging to `filter.createdBy`.
 	 *
 	 * Filtered, not thrown: an owner whose keys `actor` may not see just gets
 	 * no rows back.
@@ -109,10 +110,10 @@ export class ApiKeyService
 		args: [apiKeyFilter],
 	})
 	async findMany(filter: ApiKeyFilter, opts: ServiceOpts): Promise<ApiKey[]> {
-		if (!hasPerm(opts.actor, "api-key.manage", filter.createdById)) return [];
+		if (!hasPerm(opts.actor, "api-key.manage", filter.createdBy)) return [];
 		const client = opts.tx ?? this.prisma;
 		const apiKeys = await client.apiKey.findMany({
-			where: { createdById: filter.createdById },
+			where: { createdById: filter.createdBy },
 			include: apiKeyInclude,
 			orderBy: { createdAt: "desc" },
 		});
@@ -147,11 +148,13 @@ export class ApiKeyService
 	 */
 	async delete(filter: ApiKeyPK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
-		const apiKey = await client.apiKey.findUnique({ where: { id: filter.id } });
+		const apiKey = await client.apiKey.findUnique({
+			where: apiKeyWhere(filter),
+		});
 		if (!apiKey || !hasPerm(opts.actor, "api-key.manage", apiKey.createdById)) {
 			throw new NotAllowed("api-key.delete");
 		}
-		await client.apiKey.delete({ where: { id: filter.id } });
+		await client.apiKey.delete({ where: { id: apiKey.id } });
 	}
 
 	/**
@@ -174,10 +177,16 @@ export class ApiKeyService
 // Auxiliary functions
 //
 
+/// The `where` matching whichever of the primary keys `filter` carries.
+function apiKeyWhere(filter: ApiKeyPK): Prisma.ApiKeyWhereUniqueInput {
+	return "id" in filter ? { id: filter.id } : { publicId: filter.publicId };
+}
+
 // Convert a database API key record to the public-facing API key type.
 function toApiKey(dbApiKey: DbApiKey): ApiKey {
 	return {
 		id: dbApiKey.id as ApiKeyId,
+		publicId: dbApiKey.publicId,
 		keyHash: dbApiKey.keyHash,
 		name: dbApiKey.name,
 		kind: dbApiKey.kind,

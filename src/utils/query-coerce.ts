@@ -83,11 +83,82 @@ function coerceField(schema: ZodType, raw: RawValue): unknown {
 // biome-ignore-end lint/suspicious/noExplicitAny: see above.
 
 /**
+ * Splits a query key into its path: `"response[publicId]"` becomes
+ * `["response", "publicId"]`, a key with no brackets stays a single-element
+ * path. Supports arbitrary nesting (`"a[b][c]"`), though nothing in this
+ * codebase currently goes deeper than one level.
+ */
+function parseKeyPath(key: string): [string, ...string[]] {
+	const bracketAt = key.indexOf("[");
+	if (bracketAt === -1) return [key];
+
+	const base = key.slice(0, bracketAt);
+	const subs = [...key.slice(bracketAt).matchAll(/\[([^[\]]*)\]/g)].map(
+		(m) => m[1] ?? "",
+	);
+	return [base, ...subs];
+}
+
+/** Sets `path` on `target` to `value`, nesting plain objects with no coercion. */
+function setRaw(
+	target: Record<string, unknown>,
+	path: readonly [string, ...string[]],
+	value: RawValue,
+): void {
+	const [key, ...rest] = path;
+	if (rest.length === 0) {
+		target[key] = value;
+		return;
+	}
+	target[key] ??= Object.create(null);
+	// `rest` is non-empty, checked above.
+	setRaw(
+		target[key] as Record<string, unknown>,
+		rest as [string, ...string[]],
+		value,
+	);
+}
+
+/**
+ * Sets `path` on `target`, coercing the leaf value against whichever field
+ * schema `schema` declares at each step — e.g. `["response", "publicId"]`
+ * against a filter schema resolves `response`'s own object schema, then
+ * `publicId` within it. A path segment `schema` does not declare falls back
+ * to {@link setRaw}: there is nothing left to coerce against.
+ */
+function assign(
+	target: Record<string, unknown>,
+	schema: ZodType,
+	path: readonly [string, ...string[]],
+	value: RawValue,
+): void {
+	const [key, ...rest] = path;
+	// Own keys only: a query key like `__proto__` must not resolve to an
+	// inherited property.
+	const shape = fieldShapeMap(schema);
+	const fieldSchema = Object.hasOwn(shape, key) ? shape[key] : undefined;
+
+	if (rest.length === 0) {
+		target[key] = fieldSchema ? coerceField(fieldSchema, value) : value;
+		return;
+	}
+
+	target[key] ??= Object.create(null);
+	const nested = target[key] as Record<string, unknown>;
+	// `rest` is non-empty, checked above.
+	const restPath = rest as [string, ...string[]];
+	if (fieldSchema) assign(nested, fieldSchema, restPath, value);
+	else setRaw(nested, restPath, value);
+}
+
+/**
  * Coerces a flat map of raw string(s) — as read off a query string or a
  * dynamic route segment — into the types `schema` expects, using the
  * schema's own declared field types as the source of truth: numbers,
  * booleans, and dates become their real type, everything else (strings,
- * enums, ids that are branded numbers) passes through unchanged.
+ * enums, ids that are branded numbers) passes through unchanged. A bracketed
+ * key (`"response[publicId]"`) nests into an object the same way a JSON body
+ * would carry it.
  *
  * This only prepares values that would otherwise always fail `schema`;
  * `schema.safeParse(...)` on the result is still what actually validates
@@ -97,16 +168,13 @@ export function coerceForSchema(
 	schema: ZodType,
 	raw: Record<string, RawValue>,
 ): Record<string, unknown> {
-	const shape = fieldShapeMap(schema);
-
 	// Null-prototype for the same reason as `collectSearchParams`, plus one of
 	// its own: `out.__proto__ = <a Date>` on a plain object would set the
 	// prototype instead of adding a key.
 	const out: Record<string, unknown> = Object.create(null);
 
 	for (const [key, value] of Object.entries(raw)) {
-		const fieldSchema = shape[key];
-		out[key] = fieldSchema ? coerceField(fieldSchema, value) : value;
+		assign(out, schema, parseKeyPath(key), value);
 	}
 
 	return out;

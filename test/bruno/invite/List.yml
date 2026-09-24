@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/invite?createdById=ada&kind=PERSONAL&course=1&active=true
+  url: http://localhost:4321/api/invite?createdBy=ada&kind=PERSONAL&course=1&active=true
   auth: inherit
 
 settings:

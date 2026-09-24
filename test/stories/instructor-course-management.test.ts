@@ -59,7 +59,7 @@ test("instructor: get started with the CLI", async ({ page }) => {
 
 	// The key that came back is a real CLI key the instructor now owns.
 	const keys = await db.apiKey.findMany(
-		{ createdById: instructor.username },
+		{ createdBy: instructor.username },
 		FULL_ACCESS,
 	);
 	expect(keys).toHaveLength(1);

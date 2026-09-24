@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/invite/1
+  url: http://localhost:4321/api/invite/inv_example
   auth: inherit
 
 settings:

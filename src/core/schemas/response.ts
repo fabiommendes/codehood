@@ -11,9 +11,10 @@ export const responseSchema = z.object({
 
 	courseId: courseId,
 	examId: examId,
-	examSlug: slug,
+	/// The exam this attempt belongs to, by slug.
+	exam: slug,
 
-	authorId: username,
+	author: username,
 
 	/**
 	 * When this practice session started, or `null` for a graded exam.
@@ -38,7 +39,8 @@ export const responseCreate = responseSchema
 		publicId: true,
 		courseId: true,
 		examId: true,
-		examSlug: true,
+		exam: true,
+		author: true,
 		practiceSession: true,
 		submissions: true,
 		createdAt: true,
@@ -49,7 +51,7 @@ export const responseCreate = responseSchema
 		exam: slug,
 
 		/// Defaults to the actor, who is the only author a student may write.
-		authorId: username.optional(),
+		author: username.optional(),
 
 		/**
 		 * Which attempt at a practice exam this is, defaulting to the session
@@ -89,7 +91,7 @@ export const responseSubmit = z.object({
 	question: slug,
 
 	/// Defaults to the actor.
-	authorId: username.optional(),
+	author: username.optional(),
 
 	payload: submissionPayload,
 	startedAt: z.date().nullish(),

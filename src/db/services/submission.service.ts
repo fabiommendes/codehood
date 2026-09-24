@@ -61,10 +61,12 @@ type ResponseTarget = Prisma.ResponseGetPayload<{
 	include: ReturnType<typeof responseTargetInclude>;
 }>;
 
-/// The relations needed to build a permission target from a submission row.
+/// The relations needed to build a permission target from a submission row,
+/// plus the response and question its public references are read from.
 function submissionInclude() {
 	return {
 		response: { include: responseTargetInclude() },
+		question: { select: { slug: true } },
 	} satisfies Prisma.SubmissionInclude;
 }
 
@@ -140,6 +142,7 @@ export class SubmissionService extends CrudBase<{
 				automaticallyTriggered: input.automaticallyTriggered ?? false,
 				startedAt: input.startedAt ?? null,
 			},
+			include: submissionInclude(),
 		});
 
 		return fromDb(row);
@@ -451,15 +454,24 @@ export async function resolveExamQuestion(
 	return question;
 }
 
+/// The minimal relations `fromDb` needs to fill in the submission's public
+/// references: the response's `publicId` and the question's `slug`.
+type SubmissionFromDbRow = Prisma.SubmissionGetPayload<{
+	include: {
+		response: { select: { publicId: true } };
+		question: { select: { slug: true } };
+	};
+}>;
+
 /** Converts a database row into the submission entity. */
-export function fromDb(
-	row: Prisma.SubmissionGetPayload<Record<string, never>>,
-): Submission {
+export function fromDb(row: SubmissionFromDbRow): Submission {
 	return {
 		id: row.id as Submission["id"],
 		publicId: row.publicId,
 		responseId: row.responseId as Submission["responseId"],
 		questionId: row.questionId as Submission["questionId"],
+		response: row.response.publicId,
+		question: row.question.slug,
 		status: row.status,
 		automaticallyTriggered: row.automaticallyTriggered,
 		payload: row.payload as Submission["payload"],

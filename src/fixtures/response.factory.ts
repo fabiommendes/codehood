@@ -12,7 +12,7 @@ function buildResponse(
 	return {
 		course: params.course ?? (0 as schema.CourseId),
 		exam: params.exam ?? `exam-${sequence}`,
-		authorId: params.authorId,
+		author: params.author,
 		practiceSession: params.practiceSession,
 		acceptingSubmissions: params.acceptingSubmissions,
 	};
@@ -29,7 +29,7 @@ export const responseFactory = Factory.define<
 /**
  * Builds a `ResponseCreate` payload and persists it via `responseService.create`.
  *
- * `course`, `exam` and `authorId` are provisioned automatically when left
+ * `course`, `exam` and `author` are provisioned automatically when left
  * unset: a fresh course, a fresh `ONGOING` `EXAM`-type exam in it (a graded
  * exam, so the resulting attempt's `practiceSession` is `null`), and a fresh
  * student enrolled in the course. Pass `exam` with a `type: "PRACTICE"` exam's
@@ -58,17 +58,17 @@ export const persistedResponseFactory = Factory.define<
 				)
 			).slug;
 
-		let authorId = params.authorId;
-		if (!authorId) {
+		let author = params.author;
+		if (!author) {
 			const student = await persistedUserFactory.create(
 				{ role: "STUDENT" },
 				{ transient: transientParams },
 			);
 			await db.enrollment.create({ course, username: student.username }, opts);
-			authorId = student.username;
+			author = student.username;
 		}
 
-		return db.response.create({ ...input, course, exam, authorId }, opts);
+		return db.response.create({ ...input, course, exam, author }, opts);
 	});
 
 	return buildResponse(sequence, params);

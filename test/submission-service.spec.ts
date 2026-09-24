@@ -75,7 +75,7 @@ async function makeExam(
 async function makeOpenResponse(
 	courseId: schema.CourseId,
 	questionSlugs: string[],
-	authorId: string,
+	author: string,
 	overrides: { type?: "PRACTICE" | "QUIZ" | "EXAM" } = {},
 ) {
 	const exam = await makeExam(courseId, questionSlugs, {
@@ -85,7 +85,7 @@ async function makeOpenResponse(
 	const response = await persistedResponseFactory.create({
 		course: courseId,
 		exam: exam.slug,
-		authorId,
+		author,
 	});
 	return { exam, response };
 }
@@ -196,7 +196,7 @@ test("create() refuses an attempt against a closed response", async () => {
 	const response = await persistedResponseFactory.create({
 		course: course.id,
 		exam: exam.slug,
-		authorId: student.username,
+		author: student.username,
 		acceptingSubmissions: false,
 	});
 
@@ -243,7 +243,7 @@ for (const { status, allowed } of examStatuses) {
 		// that would otherwise hide a DRAFT/ARCHIVED exam from the student —
 		// that is covered separately in response-service.spec.ts.
 		const response = await persistedResponseFactory.create(
-			{ course: course.id, exam: exam.slug, authorId: student.username },
+			{ course: course.id, exam: exam.slug, author: student.username },
 			{ transient: { actor: FULL_ACCESS.actor } },
 		);
 

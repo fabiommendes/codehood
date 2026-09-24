@@ -256,7 +256,7 @@ test("findMany carries the creator and the redemption count, never a token", asy
 	);
 
 	const [invite] = await db.invite.findMany(
-		{ createdById: instructor.username },
+		{ createdBy: instructor.username },
 		FULL_ACCESS,
 	);
 	expect(invite?.createdBy.username).toBe("list-instructor");

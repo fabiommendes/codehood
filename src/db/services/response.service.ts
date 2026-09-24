@@ -74,7 +74,13 @@ function responseInclude() {
 				course: { select: courseSelect() },
 			},
 		},
-		submissions: { orderBy: { createdAt: "asc" as const } },
+		submissions: {
+			orderBy: { createdAt: "asc" as const },
+			include: {
+				question: { select: { slug: true } },
+				response: { select: { publicId: true } },
+			},
+		},
 	} satisfies Prisma.ResponseInclude;
 }
 
@@ -358,7 +364,7 @@ export class ResponseService extends CrudBase<{
 				{
 					course: input.course,
 					exam: input.exam,
-					authorId: input.authorId,
+					author: input.author,
 				},
 				scoped.actor,
 				"response.submit",
@@ -474,13 +480,11 @@ async function writableResponse(
 }
 
 /// Resolves the author for a write, defaulting to the actor.
-function resolveAuthorId(authorId: string | undefined, actor: Actor): string {
-	if (authorId) return authorId;
+function resolveAuthorId(author: string | undefined, actor: Actor): string {
+	if (author) return author;
 	if (actor === SYSTEM) {
 		throw new InvalidData({
-			authorId: [
-				{ code: "missing", message: "`authorId` is required for SYSTEM" },
-			],
+			author: [{ code: "missing", message: "`author` is required for SYSTEM" }],
 		});
 	}
 	return actor.username;
@@ -490,7 +494,7 @@ function resolveAuthorId(authorId: string | undefined, actor: Actor): string {
 interface AttemptInput {
 	course: ResponseCreate["course"];
 	exam: string;
-	authorId?: string;
+	author?: string;
 	practiceSession?: Date | null;
 }
 
@@ -534,7 +538,7 @@ async function prepareAttempt(
 		throw new NotFound("exam");
 	}
 
-	const authorId = resolveAuthorId(input.authorId, actor);
+	const authorId = resolveAuthorId(input.author, actor);
 
 	ensurePerm(actor, perm, {
 		author: { username: authorId },
@@ -543,7 +547,7 @@ async function prepareAttempt(
 
 	if (!course.enrollments.some((e) => e.username === authorId)) {
 		throw new InvalidData({
-			authorId: [
+			author: [
 				{
 					code: "invalid",
 					message: `"${authorId}" does not hold an active enrollment in this course`,
@@ -659,8 +663,8 @@ function fromDb(row: DbResponse): Response {
 		publicId: row.publicId,
 		courseId: row.exam.courseId as Response["courseId"],
 		examId: row.examId as Response["examId"],
-		examSlug: row.exam.slug,
-		authorId: row.authorId,
+		exam: row.exam.slug,
+		author: row.authorId,
 		practiceSession: slotKeyToDate(row.slotKey),
 		acceptingSubmissions: row.acceptingSubmissions,
 		submissions: row.submissions.map(submissionFromDb),

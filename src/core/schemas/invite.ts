@@ -1,14 +1,17 @@
 import { z } from "zod";
-import { courseId, inviteId, username } from "./base";
-import { courseRef } from "./course";
+import { courseId, inviteId, publicId, username } from "./base";
+import { courseNaturalKey, courseRef } from "./course";
 import { userInfo, userRole } from "./user";
 
 export const inviteSchema = z.object({
 	id: inviteId,
+	publicId: publicId,
 	kind: z.enum(["PERSONAL", "CLASSROOM"]),
 	email: z.string().nullable(),
 	invitedRole: userRole,
 	courseId: courseId.nullable(),
+	/// The course's natural key, or `null` for an invite not bound to one.
+	course: courseNaturalKey.nullable(),
 	maxUses: z.number().int().nullable(),
 	expiresAt: z.date(),
 	redemptions: z.number().int(),
@@ -22,7 +25,9 @@ export const inviteSchema = z.object({
 export const inviteCreate = inviteSchema
 	.omit({
 		id: true,
+		publicId: true,
 		courseId: true,
+		course: true,
 		expiresAt: true,
 		createdAt: true,
 		redemptions: true,
@@ -40,10 +45,11 @@ export const inviteCreate = inviteSchema
 export const invitePK = z.union([
 	z.object({ token: z.string().min(1) }),
 	z.object({ id: inviteId }),
+	z.object({ publicId: publicId }),
 ]);
 
 export const inviteFilter = z.object({
-	createdById: username.optional(),
+	createdBy: username.optional(),
 	kind: inviteSchema.shape.kind.optional(),
 	course: courseRef.optional(),
 	// Only invites that have not expired yet.

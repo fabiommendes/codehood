@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { apiKeyId, username } from "./base";
+import { apiKeyId, publicId, username } from "./base";
 import { userInfo } from "./user";
 
 export const apiKeySchema = z.object({
 	id: apiKeyId,
+	publicId: publicId,
 	keyHash: z.string(),
 	name: z.string().min(1),
 	kind: z.enum(["CLI", "BOT"]),
@@ -19,5 +20,8 @@ export const apiKeyCreate = apiKeySchema.pick({
 	kind: true,
 	createdBy: true,
 });
-export const apiKeyPK = z.object({ id: apiKeyId });
-export const apiKeyFilter = z.object({ createdById: username });
+export const apiKeyPK = z.union([
+	z.object({ id: apiKeyId }),
+	z.object({ publicId: publicId }),
+]);
+export const apiKeyFilter = z.object({ createdBy: username });

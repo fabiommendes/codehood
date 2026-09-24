@@ -2,7 +2,36 @@
 
 ## Unreleased
 
+### Added
+
+- `pnpm run typecheck` now also typechecks `.astro` files through
+  `scripts/astro-check.ts`, which runs the Astro checker on TypeScript 6
+  because `astro check` does not support TypeScript 7 yet.
+
+### Fixed
+
+- A query key such as `__proto__[x]` made list endpoints answer 500.
+- `StudentsTable` typed its rows as full users instead of enrollments.
+
 ### Changed
+
+- The REST API (`src/api/`) never exposes a raw database id: `Invite` and
+  `ApiKey` gained a `publicId` column and are now addressed at
+  `/api/invite/[publicId]` and `/api/api-key/[publicId]` (the old numeric
+  `/[id]` routes are gone); a username field that used to read `authorId`,
+  `graderId`, `botId` or `createdById` now reads `author`, `grader`, `bot` or
+  `createdBy` on the exam, response, feedback, invite and api-key schemas;
+  and a foreign key an API entity used to carry (`courseId`, `examId`,
+  `responseId`, `questionId`, `submissionId`) is replaced over the API by the
+  referenced entity's own public reference (`response.exam` as a slug,
+  `submission.response`/`feedback.submission` as a `publicId`,
+  `submission.question` as a slug). Service outputs are unaffected and still
+  carry every raw id — only the API-facing entity schemas in `src/api/index.ts`
+  omit them. The submission list filter's and create body's `response` field
+  takes `{ publicId }` only over the API; the service still accepts `{ id }`.
+  `coerceForSchema` (`src/utils/query-coerce.ts`) now understands a bracketed
+  query key (`response[publicId]=...`) as a nested object, the same shape a
+  JSON body would carry. See `dev/specs/to-review/api-no-raw-ids.md`.
 
 - Every course-scoped service input — create, upsert, filter, and composite
   key — references its course under one field, `course: CourseRef` (a course

@@ -527,20 +527,20 @@ async function resolveGradableSubmission(
 }
 
 /**
- * Resolves who graded a new pass: exactly one of `graderId`/`botId`.
+ * Resolves who graded a new pass: exactly one of `grader`/`bot`.
  *
- * `graderId` defaults to a user actor's own username when neither is given.
+ * `grader` defaults to a user actor's own username when neither is given.
  * Naming a different grader is refused for anyone but SYSTEM.
  *
  * @throws {@link NotAllowed} If a non-SYSTEM actor names a different grader.
- * @throws {@link InvalidData} If neither or both of `graderId`/`botId` are set.
+ * @throws {@link InvalidData} If neither or both of `grader`/`bot` are set.
  */
 function resolveGrader(
-	input: { graderId?: string | null; botId?: string | null },
+	input: { grader?: string | null; bot?: string | null },
 	actor: Actor,
 ): { graderId: string | null; botId: string | null } {
-	let graderId = input.graderId ?? null;
-	const botId = input.botId ?? null;
+	let graderId = input.grader ?? null;
+	const botId = input.bot ?? null;
 
 	if (actor !== SYSTEM) {
 		if (graderId !== null && graderId !== actor.username) {
@@ -553,10 +553,10 @@ function resolveGrader(
 
 	if ((graderId === null) === (botId === null)) {
 		throw new InvalidData({
-			graderId: [
+			grader: [
 				{
 					code: "invalid",
-					message: "Exactly one of `graderId` or `botId` is required",
+					message: "Exactly one of `grader` or `bot` is required",
 				},
 			],
 		});
@@ -588,17 +588,22 @@ async function writableFeedback(
 	throw new NotAllowed(action);
 }
 
+/// The minimal relation `fromDb` needs to fill in the pass's public reference
+/// to the submission it grades.
+type FeedbackFromDbRow = Prisma.FeedbackGetPayload<{
+	include: { submission: { select: { publicId: true } } };
+}>;
+
 /** Converts a database row into the feedback entity. */
-export function fromDb(
-	row: Prisma.FeedbackGetPayload<Record<string, never>>,
-): Feedback {
+export function fromDb(row: FeedbackFromDbRow): Feedback {
 	return {
 		id: row.id as Feedback["id"],
 		ref: row.ref as Feedback["ref"],
 		submissionId: row.submissionId as Feedback["submissionId"],
+		submission: row.submission.publicId,
 		score: row.score,
-		graderId: row.graderId as Feedback["graderId"],
-		botId: row.botId,
+		grader: row.graderId as Feedback["grader"],
+		bot: row.botId,
 		feedback: row.feedback,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

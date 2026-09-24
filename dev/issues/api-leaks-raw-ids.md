@@ -1,50 +1,20 @@
 ---
 type: note
 status: active
-tags: [api, raw-ids, openapi, entity-schemas]
-relatedTo: [dev/specs/to-do/course-ref-unification.md]
+tags: [actions, raw-ids, web-client]
+relatedTo: [dev/specs/to-review/api-no-raw-ids.md]
 ---
 
-# REST API leaks raw database ids
+# Astro Actions take raw course and api-key ids from the browser
 
-Services may take and return raw ids (`id`, `courseId`, `examId`, ...): they
-are cheap and avoid joins. The REST API must not expose them. Clients address
-entities by natural key or `publicId`.
-
-## Where they leak today
-
-Entity (output) schemas passed to `CRUD()` in `src/api/index.ts` without
-omitting ids:
-
-- exam: `id`
-- question: `id`
-- time-slot: `id`, `courseId`
-- response: `id`, `courseId`, `examId`
-- submission: `id`, `responseId`, `questionId`
-- feedback: `id`, `submissionId`
-- invite: `id`, `courseId` (`/api/invite` is addressed by `[id]`, so it needs a
-  public key first)
-
-Inputs:
-
-- `submissionFilterBase.response` accepts `{ id }`, and so do the submission
-  and feedback keys (`submissionPK`, `feedbackPK`). The API should accept
-  `{ publicId }` only.
-
-Related naming issue: `authorId` and `graderId` hold usernames, not ids. The
-API calls them `author` and `grader`.
-
-Invite has no public key: `tokenHash` is one-way and the token is shown only
-once, so the creator cannot use it to address the invite later. Add a
-`publicId` column (same generator as response and submission) and address
-`/api/invite/[publicId]`. `tokenHash` was rejected as the key: it ties the
-invite's identity to its credential, so rotating the token or changing the
-hash scheme would change the key.
+The REST API no longer exposes raw ids (see
+`dev/specs/to-review/api-no-raw-ids.md`). The Astro Actions used by the web
+app still do: `src/actions/course.ts`, `question.ts` and `auth.ts` take
+`courseId: number`, and `revokeApiKey` takes the api key's numeric `id`.
+`StudentsTable` and `QuestionsTable` receive `courseId` as a prop for those calls.
 
 ## Fix
 
-- Omit raw ids from API entity schemas. References to other entities become
-  their natural key or `publicId`, which the service already has or can join.
-- Narrow API input schemas to non-id forms.
-- Add a test that walks the OpenAPI document and fails on any property named
-  `id` or ending in `Id` under `/api/`.
+- Course-scoped actions take the course natural key (or the page passes the
+  URL's `discipline` and `course` segments).
+- `revokeApiKey` takes the `publicId`.

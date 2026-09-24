@@ -134,7 +134,7 @@ so run it project-wide.
 
 ```
 biome ci .                # style and lint rules
-pnpm run typecheck        # tsc --noEmit
+pnpm run typecheck        # tsc --noEmit, then scripts/astro-check.ts for .astro
 pnpm run stories --check  # story catalogue against test names
 ```
 

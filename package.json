@@ -25,7 +25,7 @@
 		"ui-report": "playwright show-report",
 		"lint:fix": "biome check --write .",
 		"lint": "biome ci . && pnpm run typecheck && pnpm run stories --check",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && astro sync && tsx scripts/astro-check.ts",
 		"stories": "tsx scripts/story-coverage.ts",
 		"coverage": "COVERAGE=1 c8 --reporter=lcov --reporter=text-summary --exclude 'src/generated/**' --exclude 'test/**' --exclude 'prisma/**' --exclude 'scripts/**' --exclude '**/*.config.*' -- tsx test/run.ts",
 		"studio": "pnpm prisma studio --url file://./dev.db",
@@ -58,6 +58,7 @@
 	},
 	"devDependencies": {
 		"@astrojs/check": "^0.9.10",
+		"@astrojs/language-server": "2.16.15",
 		"@biomejs/biome": "^2.5.10",
 		"@faker-js/faker": "^10.6.0",
 		"@playwright/test": "^1.62.1",
@@ -78,6 +79,7 @@
 		"tailwindcss": "^4.3.3",
 		"tsx": "^4.23.12",
 		"typescript": "^7.0.2",
+		"typescript-6": "npm:typescript@^6.0.3",
 		"vite-node": "^6.0.0",
 		"vitest": "^5.0.0"
 	}

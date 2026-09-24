@@ -71,11 +71,14 @@ for (const resource of OPTIONAL_FILTER_RESOURCES) {
 	});
 }
 
-// Unlike the resources above, `apiKeyFilter` requires `createdById` — there is
+// Unlike the resources above, `apiKeyFilter` requires `createdBy` — there is
 // no "list every API key" endpoint by design — so a bare `GET /api/api-key`
 // legitimately 400s even after the fix. This is not bug (a): it's the
 // filter schema doing its job. Supply the required filter instead.
-test("GET /api/api-key?createdById=<username> returns 200 with a JSON array", async ({
+//
+// `createdBy` (a username), not `createdById`: `dev/specs/to-do/api-no-raw-ids.md`
+// renames it because the value it carries is a username, not a raw id.
+test("GET /api/api-key?createdBy=<username> returns 200 with a JSON array", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -86,7 +89,7 @@ test("GET /api/api-key?createdById=<username> returns 200 with a JSON array", as
 	const [adminUser] = await admin.json();
 
 	const res = await request.get(
-		`/api/api-key?createdById=${adminUser.username}`,
+		`/api/api-key?createdBy=${adminUser.username}`,
 		{
 			headers: authHeader(token),
 		},
@@ -361,3 +364,21 @@ test("an injection-shaped filter value returns an empty result, never the whole 
 	expect(res.status()).toBe(200);
 	expect(await res.json()).toEqual([]);
 });
+
+for (const key of [
+	"__proto__[x]",
+	"constructor[prototype][x]",
+	"slugs[__proto__][x]",
+]) {
+	test(`a prototype-shaped query key (${key}) is never a 500`, async ({
+		request,
+	}) => {
+		const token = await adminToken(request);
+		const res = await request.get(
+			`/api/discipline?${encodeURIComponent(key)}=1`,
+			{ headers: authHeader(token) },
+		);
+		expect(res.status()).toBeLessThan(500);
+		expect(({} as Record<string, unknown>).x).toBeUndefined();
+	});
+}

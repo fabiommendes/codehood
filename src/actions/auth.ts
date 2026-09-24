@@ -4,7 +4,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
-import { db, InviteError, schema, type User } from "@/db";
+import { db, InviteError, type schema, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { USERNAME_RE } from "@/urls";
 import { withActionErrors } from "./helpers";
@@ -194,10 +194,13 @@ export const auth = {
 
 	revokeApiKey: defineAction({
 		accept: "form",
-		input: schema.apiKeyPK,
+		// A plain `{ id: number }`, not `schema.apiKeyPK`: Astro's form parser
+		// coerces a flat object schema's numeric fields, but can't introspect a
+		// union, so `id` would arrive as an uncoerced string and fail `apiKeyId`.
+		input: z.object({ id: z.coerce.number().int() }),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await db.apiKey.delete({ id: input.id }, { actor });
+			await db.apiKey.delete({ id: input.id as schema.ApiKeyId }, { actor });
 		}),
 	}),
 };

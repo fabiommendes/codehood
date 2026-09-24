@@ -16,8 +16,9 @@ import { parseCourseParams, parseWeekParam } from "./utils";
 export const apiKeyApi = CRUD("/api/api-key", {
 	name: "Api Key",
 	plural: "Api Keys",
-	// The hash is the stored credential; it never leaves the server.
-	entity: schema.apiKeySchema.omit({ keyHash: true }),
+	keySegment: "/[publicId]",
+	// The raw id never leaves the server, and the hash is the stored credential.
+	entity: schema.apiKeySchema.omit({ id: true, keyHash: true }),
 	create: schema.apiKeyCreate,
 	update: null,
 	filter: schema.apiKeyFilter,
@@ -114,7 +115,9 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	plural: "Exams",
 	keySegment: "/[slug]",
 
-	entity: schema.examSchema,
+	entity: schema.examSchema.omit({ id: true }).extend({
+		questions: z.array(schema.examQuestionSchema.omit({ id: true })),
+	}),
 	create: schema.examCreate.omit({ course: true }),
 	update: schema.examUpdate,
 	filter: schema.examFilterBase,
@@ -135,7 +138,8 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 export const inviteApi = CRUD("/api/invite", {
 	name: "Invite",
 	plural: "Invites",
-	entity: schema.inviteSchema,
+	keySegment: "/[publicId]",
+	entity: schema.inviteSchema.omit({ id: true, courseId: true }),
 	create: schema.inviteCreate,
 	update: null,
 	filter: schema.inviteFilter,
@@ -172,7 +176,12 @@ export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
 	plural: "Questions",
 	keySegment: "/[slug]",
 
-	entity: schema.questionSchema,
+	// `db.question` reads return either the full document or its public half
+	// (`QuestionView`), so the API entity mirrors that union, minus `id`.
+	entity: z.union([
+		schema.questionSchema.omit({ id: true }),
+		schema.questionPublicSchema.omit({ id: true }),
+	]),
 	create: schema.questionCreate.omit({ course: true }),
 	update: schema.questionUpdate,
 	filter: schema.questionFilterBase,
@@ -191,12 +200,24 @@ export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
 	},
 });
 
+// Nested inside a response's `submissions` array too, so both `responseApi`
+// and `submitApi` reuse it — a raw id under an array is still a raw id.
+const apiSubmissionEntity = schema.submissionSchema.omit({
+	id: true,
+	responseId: true,
+	questionId: true,
+});
+
+const apiResponseEntity = schema.responseSchema
+	.omit({ id: true, courseId: true, examId: true })
+	.extend({ submissions: z.array(apiSubmissionEntity) });
+
 export const responseApi = CRUD("/api/course/[discipline]/[course]/response", {
 	name: "Response",
 	plural: "Responses",
 	keySegment: "/[publicId]",
 
-	entity: schema.responseSchema,
+	entity: apiResponseEntity,
 	create: schema.responseCreate.omit({ course: true }),
 	update: schema.responseUpdate,
 	filter: schema.responseFilterBase,
@@ -214,6 +235,10 @@ export const responseApi = CRUD("/api/course/[discipline]/[course]/response", {
 	},
 });
 
+// Over the API a response is only ever named by its `publicId`; the service
+// itself still accepts `{ id }` too, e.g. from pages.
+const submissionResponseRef = z.object({ publicId: schema.publicId });
+
 export const submissionApi = CRUD(
 	"/api/course/[discipline]/[course]/submission",
 	{
@@ -221,11 +246,13 @@ export const submissionApi = CRUD(
 		plural: "Submissions",
 		keySegment: "/[publicId]",
 
-		entity: schema.submissionSchema,
-		create: schema.submissionCreate,
+		entity: apiSubmissionEntity,
+		create: schema.submissionCreate.extend({ response: submissionResponseRef }),
 		upsert: false,
 		update: schema.submissionUpdate,
-		filter: schema.submissionFilterBase,
+		filter: schema.submissionFilterBase.extend({
+			response: submissionResponseRef.optional(),
+		}),
 		scope: courseScope,
 		key: schema.submissionPK,
 
@@ -253,7 +280,7 @@ export const feedbackApi = CRUD(
 		plural: "Feedback",
 		keySegment: "/[ref]",
 
-		entity: schema.feedbackSchema,
+		entity: schema.feedbackSchema.omit({ id: true, submissionId: true }),
 		// PUT addresses the collection, so the `ref` of the pass being written
 		// travels in the body, same as it does on POST.
 		create: schema.feedbackCreate.omit({ submission: true }),
@@ -285,7 +312,7 @@ export const feedbackApi = CRUD(
 
 export const submitApi = POST("/api/course/[discipline]/[course]/submit", {
 	in: schema.responseSubmit.omit({ course: true }),
-	out: schema.responseSchema,
+	out: apiResponseEntity,
 	summary: "Answer a question",
 	description:
 		"Resolves the answer slot for the question — creating it when the student has not answered before — and appends one attempt to it. Returns the slot with every attempt it now holds.",
@@ -315,7 +342,7 @@ export const timeSlotApi = CRUD("/api/course/[discipline]/[course]/time-slot", {
 	plural: "Time Slots",
 	keySegment: "/[slug]",
 
-	entity: schema.timeSlotSchema,
+	entity: schema.timeSlotSchema.omit({ id: true, courseId: true }),
 	create: schema.timeSlotCreate.omit({ course: true }),
 	update: schema.timeSlotUpdate,
 	filter: schema.timeSlotFilterBase,

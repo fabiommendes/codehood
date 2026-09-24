@@ -49,7 +49,7 @@ export const examSchema = z.object({
 	duration: duration.nullable(),
 	extraTime: duration.nullable(),
 
-	authorId: z.string(),
+	author: z.string(),
 
 	tags: z.array(z.string().min(1)),
 	questions: z.array(examQuestionSchema),
@@ -61,7 +61,7 @@ export const examSchema = z.object({
 export const examCreate = examSchema
 	.omit({
 		id: true,
-		authorId: true,
+		author: true,
 		extraTime: true,
 		createdAt: true,
 		updatedAt: true,

@@ -110,10 +110,11 @@ model Session {
 
 model ApiKey {
   // AUDIT: is it vulnerable to enumeration attacks?
-  id      Int        @id @default(autoincrement())
-  keyHash String     @unique
-  name    String
-  kind    ApiKeyKind
+  id       Int        @id @default(autoincrement())
+  publicId String     @unique
+  keyHash  String     @unique
+  name     String
+  kind     ApiKeyKind
 
   // User who owns this key.
   createdById String
@@ -126,6 +127,7 @@ model ApiKey {
 model Invite {
   // AUDIT: is it vulnerable to enumeration attacks?
   id        Int        @id @default(autoincrement())
+  publicId  String     @unique
   tokenHash String     @unique
   kind      InviteKind
 

@@ -32,14 +32,14 @@ function buildFeedback(
 ): FeedbackCreate {
 	// A pass needs exactly one grader, and the default actor is SYSTEM, which
 	// has no username to fall back on — so an unattributed pass is a bot's.
-	const unattributed = !params.graderId && !params.botId;
+	const unattributed = !params.grader && !params.bot;
 
 	return {
 		submission: params.submission ?? { id: 0 as schema.SubmissionId },
 		ref: params.ref ?? `pass-${_sequence}`,
 		score: params.score ?? "1",
-		graderId: params.graderId,
-		botId: params.botId ?? (unattributed ? "fixture-bot" : undefined),
+		grader: params.grader,
+		bot: params.bot ?? (unattributed ? "fixture-bot" : undefined),
 		feedback: params.feedback,
 	};
 }

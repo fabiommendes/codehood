@@ -48,10 +48,13 @@ export type InviteUpdate = z.infer<typeof inviteUpdate>;
 
 type DbInvite = Prisma.InviteGetPayload<{ include: typeof inviteInclude }>;
 
-/** The creator and redemption count every returned invite carries. */
+/** The creator, redemption count and course every returned invite carries. */
 const inviteInclude = {
 	_count: { select: { redemptions: true } },
 	createdBy: { select: { username: true, name: true } },
+	course: {
+		select: { disciplineSlug: true, instructorId: true, editionSlug: true },
+	},
 } satisfies Prisma.InviteInclude;
 
 export class InviteService extends CrudBase<{
@@ -112,6 +115,7 @@ export class InviteService extends CrudBase<{
 		const token = generateToken();
 		const invite = await tx.invite.create({
 			data: {
+				publicId: generateToken(9),
 				tokenHash: hashToken(token),
 				kind: input.kind,
 				email: input.email,
@@ -150,7 +154,11 @@ export class InviteService extends CrudBase<{
 		opts: ServiceOptsWithoutTx,
 	): Promise<Invite | null> {
 		const by = filter as FillUndefineds<InvitePK>;
-		const where = by.token ? { tokenHash: hashToken(by.token) } : { id: by.id };
+		const where = by.token
+			? { tokenHash: hashToken(by.token) }
+			: by.publicId
+				? { publicId: by.publicId }
+				: { id: by.id };
 
 		const invite = await tx.invite.findUnique({
 			where,
@@ -193,7 +201,7 @@ export class InviteService extends CrudBase<{
 		const invites = await tx.invite.findMany({
 			where: {
 				AND: [
-					filter.createdById ? { createdById: filter.createdById } : {},
+					filter.createdBy ? { createdById: filter.createdBy } : {},
 					filter.kind ? { kind: filter.kind } : {},
 					course ? { courseId: course.id } : {},
 					filter.active ? { expiresAt: { gt: new Date() } } : {},
@@ -330,7 +338,18 @@ function fromDb(db: DbInvite): Invite {
 		_count,
 		createdById: _createdById,
 		tokenHash: _tokenHash,
+		course,
 		...rest
 	} = db;
-	return { ...rest, redemptions: _count.redemptions };
+	return {
+		...rest,
+		redemptions: _count.redemptions,
+		course: course
+			? {
+					discipline: course.disciplineSlug,
+					instructor: course.instructorId,
+					edition: course.editionSlug,
+				}
+			: null,
+	};
 }

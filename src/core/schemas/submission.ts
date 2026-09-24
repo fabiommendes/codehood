@@ -37,6 +37,11 @@ export const submissionSchema = z.object({
 	responseId: responseId,
 	questionId: questionRefId,
 
+	/// The response this answer belongs to, by `publicId`.
+	response: publicId,
+	/// The question this answers, by slug.
+	question: slug,
+
 	status: submissionStatus,
 	automaticallyTriggered: z.boolean(),
 	payload: submissionPayload,
@@ -51,6 +56,8 @@ export const submissionCreate = submissionSchema
 		publicId: true,
 		responseId: true,
 		questionId: true,
+		response: true,
+		question: true,
 		createdAt: true,
 	})
 	.extend({

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { feedbackId, slug, submissionId, username } from "./base";
+import { feedbackId, publicId, slug, submissionId, username } from "./base";
 import { courseRef } from "./course";
 import { submissionPK } from "./submission";
 
@@ -51,13 +51,16 @@ export const feedbackSchema = z.object({
 
 	submissionId: submissionId,
 
+	/// The submission this pass grades, by `publicId`.
+	submission: publicId,
+
 	score: score,
 
 	/// The user who graded, or `null` when a bot did.
-	graderId: username.nullable(),
+	grader: username.nullable(),
 
 	/// The bot that graded, or `null` when a user did.
-	botId: z.string().nullable(),
+	bot: z.string().nullable(),
 
 	feedback: z.string().nullable(),
 
@@ -69,6 +72,7 @@ export const feedbackCreate = feedbackSchema
 	.omit({
 		id: true,
 		submissionId: true,
+		submission: true,
 		createdAt: true,
 		updatedAt: true,
 	})
@@ -77,9 +81,9 @@ export const feedbackCreate = feedbackSchema
 		submission: submissionRef,
 
 		/// Defaults to the actor, who is the only grader a user may write.
-		graderId: username.nullish(),
+		grader: username.nullish(),
 
-		botId: z.string().nullish(),
+		bot: z.string().nullish(),
 		feedback: z.string().nullish(),
 	});
 
