@@ -3,7 +3,8 @@ import { z } from "astro/zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
 import { db, type schema } from "@/db";
-import { withActionErrors, withServiceErrors } from "./helpers";
+import { parseCourseParams } from "@/urls";
+import { withServiceErrors } from "./helpers";
 
 /** Outcome of {@link course.addStudent}: an enrolment, or an invite to accept first. */
 export type AddStudentResult =
@@ -24,13 +25,14 @@ export const course = {
 	addStudent: defineAction({
 		accept: "form",
 		input: z.object({
-			courseId: z.coerce.number().int(),
+			discipline: z.string().min(1),
+			course: z.string().min(1),
 			login: z.string().trim().min(1),
 		}),
-		handler: withActionErrors(
+		handler: withServiceErrors(
 			async (input, context): Promise<AddStudentResult> => {
 				const actor = requireUser(context);
-				const courseId = input.courseId as schema.CourseId;
+				const course = parseCourseParams(input);
 
 				// FULL_ACCESS: `user.read` is admin-or-self, and an instructor
 				// filling in the roster is neither. Nothing about the account
@@ -45,7 +47,7 @@ export const course = {
 						});
 					}
 					await db.enrollment.create(
-						{ course: courseId, username: user.username as schema.UserId },
+						{ course, username: user.username as schema.UserId },
 						{ actor },
 					);
 					return { kind: "enrolled", username: user.username, name: user.name };
@@ -62,7 +64,7 @@ export const course = {
 					{
 						email: input.login,
 						invitedRole: "STUDENT",
-						course: courseId,
+						course,
 						kind: "PERSONAL",
 						maxUses: 1,
 					},
@@ -83,14 +85,16 @@ export const course = {
 	dropEnrollment: defineAction({
 		accept: "form",
 		input: z.object({
-			courseId: z.coerce.number().int(),
+			discipline: z.string().min(1),
+			course: z.string().min(1),
 			username: z.string().optional(),
 		}),
-		handler: withActionErrors(async (input, context) => {
+		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
+			const course = parseCourseParams(input);
 			await db.enrollment.delete(
 				{
-					course: input.courseId as schema.CourseId,
+					course,
 					username:
 						(input.username as schema.UserId | undefined) ?? actor.username,
 				},
@@ -109,15 +113,18 @@ export const course = {
 	generatePassphrase: defineAction({
 		accept: "form",
 		input: z.object({
-			courseId: z.coerce.number().int(),
+			discipline: z.string().min(1),
+			course: z.string().min(1),
 			value: z.string().trim().min(1).optional(),
 		}),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			return db.passphrase.create(
-				{ course: input.courseId as schema.CourseId, value: input.value },
+			const course = parseCourseParams(input);
+			const passphrase = await db.passphrase.create(
+				{ course, value: input.value },
 				{ actor },
 			);
+			return { value: passphrase.value, expiresAt: passphrase.expiresAt };
 		}),
 	}),
 };

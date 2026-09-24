@@ -4,11 +4,15 @@ import type { z } from "zod";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { enrollmentSchema } from "@/core/schemas";
 
-type EnrolledUser = z.infer<typeof enrollmentSchema>;
+/// The columns this table renders — the full `enrollmentSchema` row minus the
+/// course's raw database id, which never reaches the browser.
+type EnrolledUser = Omit<z.infer<typeof enrollmentSchema>, "courseId">;
 
 interface Props {
 	students: EnrolledUser[];
-	courseId: number;
+	/// The course's URL segments, e.g. `discipline: "cs101"`, `course: "ada_2026-1"`.
+	discipline: string;
+	course: string;
 }
 
 function formatDate(date: Date): string {
@@ -90,7 +94,12 @@ export default function StudentsTable(props: Props): JSX.Element {
 								action={actions.course.dropEnrollment}
 								class="modal-action"
 							>
-								<input type="hidden" name="courseId" value={props.courseId} />
+								<input
+									type="hidden"
+									name="discipline"
+									value={props.discipline}
+								/>
+								<input type="hidden" name="course" value={props.course} />
 								<input type="hidden" name="username" value={user.username} />
 								{/* formmethod="dialog" overrides the form's post just for this button, so
 								    Cancel closes the dialog without submitting the drop. */}

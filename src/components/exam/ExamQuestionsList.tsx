@@ -3,8 +3,12 @@ import type { PreviewTab } from "@/components/question/QuestionPreview";
 import type { Question, QuestionPublic } from "@/db";
 import ExamQuestion from "./ExamQuestion";
 
+/// A pinned question as this island renders it — minus the raw database id,
+/// which never reaches the browser.
+export type ExamQuestionRow = Omit<Question, "id"> | Omit<QuestionPublic, "id">;
+
 export interface ExamQuestionsListProps {
-	questions: (Question | QuestionPublic)[];
+	questions: ExamQuestionRow[];
 	/** Whoever may write the course's contents also sees the answer key. */
 	canManage: boolean;
 }

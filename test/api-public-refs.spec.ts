@@ -11,6 +11,7 @@ import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
+import { findRawIdKeys } from "./helpers/raw-ids";
 
 /**
  * `dev/specs/to-do/api-no-raw-ids.md`, REST-level behavior:
@@ -73,43 +74,6 @@ async function adminHeaders(request: APIRequestContext) {
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
 	return { Authorization: `Bearer ${token}` };
-}
-
-/**
- * Exemptions the ruling on this spec's ambiguities carved out:
- *
- * - `publicId` is the rule's own stated exception.
- * - `githubId`/`schoolId` are external identity-provider ids, not raw
- *   database ids.
- * - `question` (the question entity's MDQ document) is exempted as a whole
- *   subtree: its choices carry author-chosen `id`s that name a choice, not a
- *   database row, so the scan never descends into it.
- */
-const EXEMPT_KEYS = new Set(["publicId", "githubId", "schoolId"]);
-const SKIP_SUBTREE_KEYS = new Set(["question"]);
-
-/// `id` itself, or anything ending in `Id` — except the exemptions above.
-function isRawId(key: string): boolean {
-	if (EXEMPT_KEYS.has(key)) return false;
-	return key === "id" || /Id$/.test(key);
-}
-
-/// Every `"a.b.c"`-style path to a `id`/`*Id` key found anywhere in `value`.
-function findRawIdKeys(value: unknown, path = ""): string[] {
-	if (Array.isArray(value)) {
-		return value.flatMap((item, i) => findRawIdKeys(item, `${path}[${i}]`));
-	}
-	if (value && typeof value === "object") {
-		return Object.entries(value as Record<string, unknown>).flatMap(
-			([key, v]) => {
-				const here = path ? `${path}.${key}` : key;
-				const hit = isRawId(key) ? [here] : [];
-				if (SKIP_SUBTREE_KEYS.has(key)) return hit;
-				return [...hit, ...findRawIdKeys(v, here)];
-			},
-		);
-	}
-	return [];
 }
 
 /**

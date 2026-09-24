@@ -1,8 +1,9 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
-import { db, type schema } from "@/db";
+import { db } from "@/db";
 import { USERNAME_RE } from "@/urls";
+import { publicUser } from "./auth";
 import { withServiceErrors } from "./helpers";
 
 export const admin = {
@@ -96,10 +97,10 @@ export const admin = {
 
 	revokeInvite: defineAction({
 		accept: "form",
-		input: z.object({ id: z.coerce.number().int() }),
+		input: z.object({ publicId: z.string().min(1) }),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await db.invite.delete({ id: input.id as schema.InviteId }, { actor });
+			await db.invite.delete({ publicId: input.publicId }, { actor });
 		}),
 	}),
 
@@ -130,7 +131,8 @@ export const admin = {
 					`A user with username ${input.username} already exists.`,
 				);
 			}
-			return db.user.create(input, { actor });
+			const user = await db.user.create(input, { actor });
+			return publicUser(user);
 		}),
 	}),
 };

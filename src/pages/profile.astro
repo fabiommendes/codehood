@@ -323,7 +323,11 @@ const profileTabs = [
                           {key.kind.toLowerCase()}
                         </span>
                         <form method="POST" action={actions.auth.revokeApiKey}>
-                          <input type="hidden" name="id" value={key.id} />
+                          <input
+                            type="hidden"
+                            name="publicId"
+                            value={key.publicId}
+                          />
                           <button type="submit" class="btn btn-sm btn-ghost">
                             Revoke
                           </button>

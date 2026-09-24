@@ -1,4 +1,5 @@
 import { type Accessor, type JSX, Match, Switch } from "solid-js";
+import type { ExamQuestionRow } from "@/components/exam/ExamQuestionsList";
 import EssayView from "@/components/question/EssayView";
 import FillInView from "@/components/question/FillInView";
 import MultipleChoiceView from "@/components/question/MultipleChoiceView";
@@ -9,7 +10,7 @@ import QuestionPreview, {
 } from "@/components/question/QuestionPreview";
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
-import type { Question, QuestionPublic } from "@/db";
+import type { QuestionPublic } from "@/db";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -23,7 +24,7 @@ import type * as schema from "@/mdq/schemas-generated";
 
 export interface ExamQuestionProps {
 	/** The pinned version of the question, as `question.service` handed it back. */
-	question: Question | QuestionPublic;
+	question: ExamQuestionRow;
 	/** Whoever may write the course's contents also sees the answer key. */
 	canManage: boolean;
 	/**

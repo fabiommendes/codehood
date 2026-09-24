@@ -10,8 +10,9 @@ import { SESSION_COOKIE } from "@/core/constants";
 import { NotFound } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
+import { parseCourseParams } from "@/urls";
 import { CRUD, GET, PATCH, POST } from "./registry";
-import { parseCourseParams, parseWeekParam } from "./utils";
+import { parseWeekParam } from "./utils";
 
 export const apiKeyApi = CRUD("/api/api-key", {
 	name: "Api Key",

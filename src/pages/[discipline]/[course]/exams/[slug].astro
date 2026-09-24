@@ -60,9 +60,11 @@ const pinnedQuestions = (
 					),
 		),
 	)
-).filter(
-	(question): question is Question | QuestionPublic => question !== null,
-);
+)
+	.filter(
+		(question): question is Question | QuestionPublic => question !== null,
+	)
+	.map(({ id: _id, ...question }) => question);
 ---
 
 <AppLayout title={`${exam.title} · Exams`}>

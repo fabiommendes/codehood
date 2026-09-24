@@ -4,11 +4,14 @@ import { db, type Edition, type EditionCreate } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
 /**
- * A slug matching `EDITION_RE`: a four-digit year, optionally `-<term>`.
+ * A slug matching `EDITION_RE`: a four-digit year and a `-<term>`.
+ *
+ * The term is random rather than derived from the sequence: every test worker
+ * restarts the sequence, and they all share one database.
  */
 function fakeEditionSlug(sequence: number): string {
 	const year = 2024 + (sequence % 10);
-	const term = (sequence % 2) + 1;
+	const term = faker.number.int({ min: 1, max: 999_999 });
 	return `${year}-${term}`;
 }
 

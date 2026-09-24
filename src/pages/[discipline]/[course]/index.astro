@@ -23,6 +23,13 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse already required Astro.locals.user.
 const actor = Astro.locals.actor!;
+
+// The course's URL segments, read off the loaded course — see roster.astro's
+// `courseParams` for why not `Astro.params` directly.
+const courseParams = {
+	discipline: course.discipline.slug,
+	course: `${course.instructor.username}_${course.edition.slug}`,
+};
 // Looked up by the viewer's own username rather than read off `course` —
 // `Course` no longer carries the roster (see the enrollment-privacy fix), and
 // `enrollment.read` already lets anyone check their own row. An instructor
@@ -227,7 +234,8 @@ const nextEvents = await db.calendarEvent.findMany(
           <span>Something went wrong. Try again.</span>
         </div>
         <form id="leave-course-form" class="modal-action">
-          <input type="hidden" name="courseId" value={course.id} />
+          <input type="hidden" name="discipline" value={courseParams.discipline} />
+          <input type="hidden" name="course" value={courseParams.course} />
           <button type="submit" class="btn btn-error">
             Leave course
           </button>

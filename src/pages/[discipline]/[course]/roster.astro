@@ -20,6 +20,14 @@ const { course, href } = result;
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 
+// The course's URL segments, read off the loaded course rather than
+// `Astro.params` so they're guaranteed defined — every course-scoped action
+// takes these instead of the course's raw database id.
+const courseParams = {
+	discipline: course.discipline.slug,
+	course: `${course.instructor.username}_${course.edition.slug}`,
+};
+
 const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
 const passphraseResult = Astro.getActionResult(
 	actions.course.generatePassphrase,
@@ -42,7 +50,7 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 
 	const { data, error } = await Astro.callAction(
 		actions.auth.createClassroomInvite,
-		{ courseId: course.id, maxUses },
+		{ ...courseParams, maxUses },
 	);
 
 	if (error) {
@@ -196,7 +204,12 @@ const csvRows = [
           No students enrolled yet.
         </p>
       ) : (
-        <StudentsTable students={students} courseId={course.id} client:load />
+        <StudentsTable
+          students={students.map(({ courseId: _courseId, ...s }) => s)}
+          discipline={courseParams.discipline}
+          course={courseParams.course}
+          client:load
+        />
       )
     }
   </main>
@@ -261,7 +274,8 @@ const csvRows = [
     {/* No `method`/`action`: the submit handler below owns it. A native POST
         here would hit the page's own handler, which mints a classroom invite. */}
     <form id="add-student-form" class="mt-4">
-      <input type="hidden" name="courseId" value={course.id} />
+      <input type="hidden" name="discipline" value={courseParams.discipline} />
+      <input type="hidden" name="course" value={courseParams.course} />
       <fieldset class="fieldset">
         <legend class="fieldset-legend">Email or username</legend>
         <input
@@ -331,7 +345,8 @@ const csvRows = [
       id="passphrase-form"
       class="mt-4"
     >
-      <input type="hidden" name="courseId" value={course.id} />
+      <input type="hidden" name="discipline" value={courseParams.discipline} />
+      <input type="hidden" name="course" value={courseParams.course} />
       <details class="collapse collapse-arrow">
         <summary class="collapse-title min-h-0 px-0 py-2 text-sm font-medium"
           >Advanced options</summary
@@ -486,7 +501,7 @@ const csvRows = [
             return (
               <div
                 class="card card-border bg-base-100"
-                data-invite-id={invite.id}
+                data-invite-id={invite.publicId}
               >
                 <div class="card-body flex-row items-center gap-4 py-3">
                   <div class="min-w-0 flex-1">
@@ -507,7 +522,7 @@ const csvRows = [
                     action={actions.admin.revokeInvite}
                     data-role="revoke-invite"
                   >
-                    <input type="hidden" name="id" value={invite.id} />
+                    <input type="hidden" name="publicId" value={invite.publicId} />
                     <button
                       type="submit"
                       class="btn btn-outline btn-error btn-sm"
@@ -534,7 +549,8 @@ const csvRows = [
   </form>
 </dialog>
 
-<input type="hidden" id="course-id" value={course.id} />
+<input type="hidden" id="course-discipline" value={courseParams.discipline} />
+<input type="hidden" id="course-segment" value={courseParams.course} />
 
 {/* `jsonScriptPayload`, not `JSON.stringify`: the cells are student-supplied
     and `set:html` writes them raw, so a bare stringify lets a name containing
@@ -573,9 +589,12 @@ const csvRows = [
 <script>
   import { actions } from "astro:actions";
 
-  const courseId = Number(
-    (document.getElementById("course-id") as HTMLInputElement).value,
-  );
+  const discipline = (
+    document.getElementById("course-discipline") as HTMLInputElement
+  ).value;
+  const course = (
+    document.getElementById("course-segment") as HTMLInputElement
+  ).value;
 
   // Mirrors COPY_ICON/CHECK_ICON in the frontmatter — duplicated here since a
   // processed <script> (needed for the astro:actions import) can't read
@@ -703,7 +722,8 @@ const csvRows = [
     const maxUsesRaw = new FormData(inviteForm).get("maxUses");
     const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
     const { data, error } = await actions.auth.createClassroomInvite({
-      courseId,
+      discipline,
+      course,
       maxUses,
     });
     if (error) {

@@ -12,6 +12,8 @@
 
 - A query key such as `__proto__[x]` made list endpoints answer 500.
 - `StudentsTable` typed its rows as full users instead of enrollments.
+- The edition test factory only produced ten slugs, so suites that created many
+  courses failed on a duplicate edition.
 
 ### Changed
 
@@ -44,7 +46,26 @@
   `parseListParams` pairs that only reshaped the course. See
   `dev/specs/to-review/course-ref-unification.md`.
 
+- The web app's Astro Actions and hydrated islands follow the same no-raw-id
+  rule as the REST API. Course-scoped actions (`course.addStudent`,
+  `course.dropEnrollment`, `course.generatePassphrase`,
+  `question.updateStatus`, `auth.createClassroomInvite`,
+  `auth.createPersonalInvite`) take `discipline`/`course` URL segments instead
+  of a numeric `courseId`; `parseCourseParams` moved from `src/api/utils.ts`
+  to `src/urls/` so both layers share it. `auth.revokeApiKey` and
+  `admin.revokeInvite` take `publicId` instead of `id`. `generatePassphrase`
+  and `question.updateStatus` return only the fields their callers render
+  instead of the full service entity. `StudentsTable`, `QuestionsTable`,
+  `ExamsTable` and `ExamQuestionsList` receive minimal row types (and the
+  course as `{ discipline, course }`) instead of whole service entities
+  carrying `id`/`courseId`. See `dev/specs/to-review/actions-no-raw-ids.md`.
+
 ### Security
+
+- `admin.createUser` returned the created `User` entity straight from the
+  service as the Astro Action's result, `passwordHash` included. It now
+  returns `publicUser()`'s whitelist, the same shape `auth.login` and
+  `auth.acceptInvite` already returned.
 
 - A request carrying both a session cookie and an `Authorization: Bearer`
   header was authenticated by the cookie, silently ignoring the token. The

@@ -27,12 +27,17 @@ import { questionTypeLabels, statusBadgeClass } from "@/utils/question-display";
 import type { AssertEqual } from "@/utils/types";
 import { ArchiveIcon, DraftIcon, GoIcon, PublishIcon } from "./icons";
 
+/// A question row as this table renders it — `Question` minus the raw
+/// database id, which never reaches the browser.
+type QuestionRow = Omit<Question, "id">;
+
 interface Props {
-	questions: Question[];
+	questions: QuestionRow[];
 	/** The course's base URL, e.g. `/cs101/ada_2026-1` — questions link to `${href}/questions/${slug}`. */
 	href: string;
-	/** The course's id, needed by the Actions column's status-cycle control. */
-	courseId: number;
+	/** The course's URL segments, needed by the Actions column's status-cycle control. */
+	discipline: string;
+	course: string;
 }
 
 // `@/core/schemas` pulls in a `z.instanceof(Buffer)` schema that only exists
@@ -132,7 +137,7 @@ function readStateFromUrl(): {
 	};
 }
 
-function titleOf(question: Question): string {
+function titleOf(question: QuestionRow): string {
 	return question.question.title ?? question.slug;
 }
 
@@ -291,7 +296,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 	 * optimistically reflecting the new status in the table and rolling back
 	 * if the action fails.
 	 */
-	async function cycleStatus(question: Question): Promise<void> {
+	async function cycleStatus(question: QuestionRow): Promise<void> {
 		const previous = question.status;
 		const next = STATUS_CYCLE[previous];
 
@@ -299,7 +304,8 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		setStatusOverrides((current) => ({ ...current, [question.slug]: next }));
 
 		const { error } = await actions.question.updateStatus({
-			courseId: props.courseId,
+			discipline: props.discipline,
+			course: props.course,
 			slug: question.slug,
 			status: next,
 		});
@@ -364,7 +370,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		}
 
 		const dirMul = direction === "asc" ? 1 : -1;
-		const compare = (a: Question, b: Question): number => {
+		const compare = (a: QuestionRow, b: QuestionRow): number => {
 			switch (field) {
 				case "title":
 					return titleOf(a).localeCompare(titleOf(b));
@@ -381,7 +387,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		return rows.sort((a, b) => dirMul * compare(a, b));
 	});
 
-	const columns: ColumnConfig<Question>[] = [
+	const columns: ColumnConfig<QuestionRow>[] = [
 		{
 			title: "Title",
 			class: "font-medium",

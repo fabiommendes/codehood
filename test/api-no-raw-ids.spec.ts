@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
+import { isRawId, SKIP_SUBTREE_KEYS } from "./helpers/raw-ids";
 
 /**
  * `dev/specs/to-do/api-no-raw-ids.md`, section 5: no request or response
@@ -13,24 +14,11 @@ type Json = Record<string, unknown>;
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 
-/**
- * Exemptions the ruling on this spec's ambiguities carved out:
- *
- * - `publicId` is the rule's own stated exception.
- * - `githubId`/`schoolId` are external identity-provider ids, not raw
- *   database ids.
- * - `question` (the question entity's MDQ document) is exempted as a whole
- *   subtree: its choices carry author-chosen `id`s that name a choice, not a
- *   database row, so the walk never descends into it.
- */
-const EXEMPT_PROPERTIES = new Set(["publicId", "githubId", "schoolId"]);
-const SKIP_SUBTREE_PROPERTIES = new Set(["question"]);
-
-/// `id` itself, or anything ending in `Id` — except the exemptions above.
-function isRawId(name: string): boolean {
-	if (EXEMPT_PROPERTIES.has(name)) return false;
-	return name === "id" || /Id$/.test(name);
-}
+// The exemption list and `isRawId` predicate live in `./helpers/raw-ids`,
+// shared with `api-public-refs.spec.ts` (and reused, under
+// `SKIP_SUBTREE_PROPERTIES`'s old name, as `SKIP_SUBTREE_KEYS`). See that
+// module's doc comment for what each exemption is and why.
+const SKIP_SUBTREE_PROPERTIES = SKIP_SUBTREE_KEYS;
 
 /// Resolves a `$ref` against `document.components.schemas`, returning
 /// `undefined` (instead of looping forever) the second time the same schema

@@ -4,10 +4,10 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
-import { db, InviteError, type schema, type User } from "@/db";
+import { db, InviteError, type User } from "@/db";
 import { prisma } from "@/db/client";
-import { USERNAME_RE } from "@/urls";
-import { withActionErrors } from "./helpers";
+import { parseCourseParams, USERNAME_RE } from "@/urls";
+import { withActionErrors, withServiceErrors } from "./helpers";
 
 export type PublicUser = Omit<User, "passwordHash" | "createdAt">;
 
@@ -133,18 +133,25 @@ export const auth = {
 		input: z.object({
 			email: z.email(),
 			role: z.enum(["INSTRUCTOR", "STUDENT"]),
-			courseId: z.number().int().optional(),
+			// Absent for an invite not bound to a course (e.g. an admin inviting
+			// an instructor); both segments are required together otherwise.
+			discipline: z.string().min(1).optional(),
+			course: z.string().min(1).optional(),
 		}),
-		handler: withActionErrors(async (input, context) => {
+		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
+			const course =
+				input.discipline && input.course
+					? parseCourseParams({
+							discipline: input.discipline,
+							course: input.course,
+						})
+					: undefined;
 			const { token } = await db.invite.create(
 				{
 					email: input.email,
 					invitedRole: input.role,
-					course:
-						input.courseId != null
-							? (input.courseId as schema.CourseId)
-							: undefined,
+					course,
 					kind: "PERSONAL",
 					maxUses: 1,
 				},
@@ -156,15 +163,20 @@ export const auth = {
 
 	createClassroomInvite: defineAction({
 		input: z.object({
-			courseId: z.number().int(),
+			discipline: z.string().min(1),
+			course: z.string().min(1),
 			maxUses: z.number().int().positive().optional(),
 		}),
-		handler: withActionErrors(async (input, context) => {
+		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
+			const course = parseCourseParams({
+				discipline: input.discipline,
+				course: input.course,
+			});
 			const { token } = await db.invite.create(
 				{
 					email: null,
-					course: input.courseId as schema.CourseId,
+					course,
 					maxUses: input.maxUses ?? null,
 					kind: "CLASSROOM",
 					invitedRole: "STUDENT",
@@ -194,13 +206,10 @@ export const auth = {
 
 	revokeApiKey: defineAction({
 		accept: "form",
-		// A plain `{ id: number }`, not `schema.apiKeyPK`: Astro's form parser
-		// coerces a flat object schema's numeric fields, but can't introspect a
-		// union, so `id` would arrive as an uncoerced string and fail `apiKeyId`.
-		input: z.object({ id: z.coerce.number().int() }),
+		input: z.object({ publicId: z.string().min(1) }),
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
-			await db.apiKey.delete({ id: input.id as schema.ApiKeyId }, { actor });
+			await db.apiKey.delete({ publicId: input.publicId }, { actor });
 		}),
 	}),
 };
@@ -220,7 +229,10 @@ function inviteErrorMessage(code: InviteError["code"]): string {
 	}
 }
 
-function publicUser(user: User): PublicUser {
+/**
+ * Strips a `User` down to what an action may safely return to the browser.
+ */
+export function publicUser(user: User): PublicUser {
 	return {
 		email: user.email,
 		name: user.name,

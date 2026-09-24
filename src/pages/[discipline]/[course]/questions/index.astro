@@ -21,6 +21,13 @@ const questions = await db.question.findMany(
 	{ course: course.id, public: false },
 	{ actor },
 );
+
+// The course's URL segments, read off the loaded course — see roster.astro's
+// `courseParams` for why not `Astro.params` directly.
+const courseParams = {
+	discipline: course.discipline.slug,
+	course: `${course.instructor.username}_${course.edition.slug}`,
+};
 ---
 
 <AppLayout title={`Questions · ${course.discipline.name}`}>
@@ -31,9 +38,10 @@ const questions = await db.question.findMany(
     <p class="mt-1 text-sm text-base-content/60">{course.discipline.name}</p>
 
     <QuestionsTable
-      questions={questions}
+      questions={questions.map(({ id: _id, ...q }) => q)}
       href={href}
-      courseId={course.id}
+      discipline={courseParams.discipline}
+      course={courseParams.course}
       client:load
     />
   </main>

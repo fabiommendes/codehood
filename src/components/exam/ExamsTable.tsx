@@ -26,8 +26,13 @@ import {
 } from "@/utils/exam-display";
 import { durationToMinutes, formatDateTime } from "@/utils/schedule-time";
 
+/// An exam row as this table renders it — `Exam` minus the raw database id
+/// and its pinned questions' own ids, neither of which reach the browser.
+/// The table never renders `questions` at all.
+type ExamRow = Omit<Exam, "id" | "questions">;
+
 interface Props {
-	exams: Exam[];
+	exams: ExamRow[];
 	/** The course's base URL, e.g. `/cs101/ada_2026-1` — exams link to `${href}/exams/${slug}`. */
 	href: string;
 }
@@ -111,7 +116,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 		}
 
 		const dirMul = direction === "asc" ? 1 : -1;
-		const compare = (a: Exam, b: Exam): number => {
+		const compare = (a: ExamRow, b: ExamRow): number => {
 			switch (field) {
 				case "type":
 					return examTypeLabels[a.type].localeCompare(examTypeLabels[b.type]);
@@ -124,7 +129,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 		return rows.sort((a, b) => dirMul * compare(a, b));
 	});
 
-	const columns: ColumnConfig<Exam>[] = [
+	const columns: ColumnConfig<ExamRow>[] = [
 		{
 			title: "Title",
 			class: "font-medium",

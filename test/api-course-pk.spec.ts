@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { parseCourseParams } from "@/api/utils";
+import { parseCourseParams } from "@/urls";
 
 /**
  * `parseCourseParams` is the whole grammar of a course's REST address, and it

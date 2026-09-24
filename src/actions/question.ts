@@ -1,7 +1,8 @@
 import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
-import { db, type schema } from "@/db";
+import { db } from "@/db";
+import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
 export const question = {
@@ -16,16 +17,17 @@ export const question = {
 	 */
 	updateStatus: defineAction({
 		input: z.object({
-			courseId: z.coerce.number().int(),
+			discipline: z.string().min(1),
+			course: z.string().min(1),
 			slug: z.string().min(1),
 			status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
 		}),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const courseId = input.courseId as schema.CourseId;
+			const course = parseCourseParams(input);
 
 			const existing = await db.question.findOne(
-				{ course: courseId, slug: input.slug, public: false },
+				{ course, slug: input.slug, public: false },
 				{ actor },
 			);
 			if (!existing) {
@@ -36,9 +38,9 @@ export const question = {
 			}
 
 			if (existing.status === "ARCHIVED") {
-				return db.question.upsert(
+				const updated = await db.question.upsert(
 					{
-						course: courseId,
+						course,
 						slug: input.slug,
 						status: input.status,
 						version: existing.version,
@@ -46,13 +48,15 @@ export const question = {
 					},
 					{ actor },
 				);
+				return { status: updated.status };
 			}
 
-			return db.question.update(
-				{ course: courseId, slug: input.slug },
+			const updated = await db.question.update(
+				{ course, slug: input.slug },
 				{ status: input.status },
 				{ actor },
 			);
+			return { status: updated.status };
 		}),
 	}),
 };

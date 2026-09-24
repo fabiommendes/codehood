@@ -53,12 +53,12 @@ export default function InvitesTable(props: Props): JSX.Element {
 					<button
 						type="button"
 						class="btn btn-outline btn-error btn-sm"
-						data-open-dialog={`revoke-invite-${row.id}`}
+						data-open-dialog={`revoke-invite-${row.publicId}`}
 					>
 						Revoke
 					</button>
 
-					<dialog id={`revoke-invite-${row.id}`} class="modal">
+					<dialog id={`revoke-invite-${row.publicId}`} class="modal">
 						<div class="modal-box">
 							<form method="dialog">
 								<button
@@ -80,7 +80,7 @@ export default function InvitesTable(props: Props): JSX.Element {
 								action={actions.admin.revokeInvite}
 								class="modal-action"
 							>
-								<input type="hidden" name="id" value={row.id} />
+								<input type="hidden" name="publicId" value={row.publicId} />
 								<button type="submit" class="btn btn-error">
 									Revoke
 								</button>
