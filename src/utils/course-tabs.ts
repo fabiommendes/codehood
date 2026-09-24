@@ -6,7 +6,7 @@
 
 import type { Actor } from "@/auth/actor";
 import { type CourseTarget, hasPerm } from "@/auth/permissions";
-import { type CourseRef, courseHref } from "@/urls";
+import { type CourseNaturalKey, courseHref } from "@/urls";
 
 export type CourseTabKey =
 	| "home"
@@ -33,7 +33,7 @@ export interface CourseTab {
  */
 export function courseTabs(
 	course: CourseTarget,
-	ref: CourseRef,
+	ref: CourseNaturalKey,
 	actor: Actor,
 ): readonly CourseTab[] {
 	const href = courseHref(ref);

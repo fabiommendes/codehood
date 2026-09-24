@@ -7,7 +7,6 @@ import {
 	disciplinePK,
 	disciplineSchema,
 	disciplineUpdate,
-	disciplineUpsert,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
@@ -22,7 +21,6 @@ export type Discipline = z.infer<typeof disciplineSchema>;
 export type DisciplineFilter = z.infer<typeof disciplineFilter>;
 export type DisciplinePK = z.infer<typeof disciplinePK>;
 export type DisciplineUpdate = z.infer<typeof disciplineUpdate>;
-export type DisciplineUpsert = z.infer<typeof disciplineUpsert>;
 
 /**
  * Every discipline is public — there is no catalog-visibility rule — so
@@ -40,7 +38,6 @@ export class DisciplineService
 			create: DisciplineCreate;
 			filter: DisciplineFilter;
 			update: DisciplineUpdate;
-			upsert: DisciplineUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -148,9 +145,9 @@ export class DisciplineService
 	@Validate({
 		service: true,
 		returns: disciplineSchema,
-		args: [disciplineUpsert],
+		args: [disciplineCreate],
 	})
-	upsert(input: DisciplineUpsert, opts: ServiceOpts): Promise<Discipline> {
+	upsert(input: DisciplineCreate, opts: ServiceOpts): Promise<Discipline> {
 		assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
 		const client = opts.tx ?? this.prisma;
 		return client.discipline.upsert({

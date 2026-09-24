@@ -12,10 +12,22 @@
  * `toInstant` is for writers; `formatDateTime`/`formatTime`/`localDateOf`/
  * `weekdayOf` are for readers. Never mix the two.
  */
-import type { Weekday } from "@/db/client";
+import { SERVER_TZ as ENV_SERVER_TZ } from "astro:env/client";
+import type { ClockTime, Duration } from "@/core/schemas";
+import type { Weekday } from "@/db/";
 
+// This module is reachable from hydrated islands (e.g. `ExamsTable`), so it
+// runs in the browser too, where a plain `process.env` read would throw —
+// `astro:env/client` (schema in `astro.config.mjs`) is safe on both sides for
+// exactly that reason.
+//
+// Caveat this doesn't solve, only makes legible: `astro:env/client` values
+// are inlined into the bundle at BUILD time, not read from the running
+// process's environment at request time. If `SERVER_TZ` changes without a
+// rebuild, or differs between the machine that built the deployed artifact
+// and the one running it, this stays at whatever value the build saw.
 /** The server's configured time zone (FR-NFR-020) — every instant is rendered here. */
-export const SERVER_TZ: string = process.env.TZ ?? "America/Sao_Paulo";
+export const SERVER_TZ: string = ENV_SERVER_TZ;
 
 const WEEKDAY_ORDER: readonly Weekday[] = [
 	"SUNDAY",
@@ -138,13 +150,54 @@ export function formatTime(minutes: number): string {
 	return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+/**
+ * Minutes-since-midnight as a wall clock — the inverse of {@link toMinutes}.
+ */
+export function toClockTime(minutes: number): ClockTime {
+	return {
+		hour: Math.floor(minutes / 60),
+		minute: minutes % 60,
+	};
+}
+
+/**
+ * A wall clock as minutes-since-midnight — the inverse of {@link toClockTime}.
+ */
+export function toMinutes(time: ClockTime): number {
+	return time.hour * 60 + time.minute;
+}
+
+/** `minutes` as a {@link Duration}, carrying whole hours out of the minutes. */
+export function toDuration(minutes: number): Duration {
+	return {
+		hours: Math.floor(minutes / 60),
+		minutes: minutes % 60,
+	};
+}
+
+/** A {@link Duration} as a plain count of minutes, treating an absent field as zero. */
+export function durationToMinutes(length: Duration): number {
+	return (length.hours ?? 0) * 60 + (length.minutes ?? 0);
+}
+
+/** time as "HH:MM".
+ * Delegates to {@link formatTime}.
+ */
+export function formatClock(time: ClockTime): string {
+	return formatTime(toMinutes(time));
+}
+
 /** `instant`'s local calendar day in `zone` (default `SERVER_TZ`), as `YYYY-MM-DD` — for grouping a month grid. */
 export function localDateOf(instant: Date, zone: string = SERVER_TZ): string {
 	const p = partsOf(instant, zone);
 	return `${String(p.year).padStart(4, "0")}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
-/** `instant`'s local weekday in `zone` (default `SERVER_TZ`) — for the slot-agreement check. */
+/**
+ * instant's local weekday in zone
+ *
+ * Defaults to `SERVER_TZ` — for the slot-agreement check.
+ */
 export function weekdayOf(instant: Date, zone: string = SERVER_TZ): Weekday {
 	const p = partsOf(instant, zone);
 	const index = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
@@ -152,7 +205,78 @@ export function weekdayOf(instant: Date, zone: string = SERVER_TZ): Weekday {
 	return WEEKDAY_ORDER[index]!;
 }
 
-/** `startAt` plus `durationMin`. An event crossing midnight ends on the next local day. */
+/**
+ * startAt plus durationMin.
+ *
+ * An event crossing midnight ends on the next local day.
+ */
 export function endOf(startAt: Date, durationMin: number): Date {
 	return new Date(startAt.getTime() + durationMin * 60_000);
+}
+
+/**
+ * Convert Weekday to ISO weekday number.
+ *
+ * Monday = 1, Sunday = 7.
+ */
+export function isoWeekDay(weekday: Weekday): number {
+	// We use a switch statement to avoid relying on the order of WEEKDAY enum or any array lookups.
+	switch (weekday) {
+		case "MONDAY":
+			return 1;
+		case "TUESDAY":
+			return 2;
+		case "WEDNESDAY":
+			return 3;
+		case "THURSDAY":
+			return 4;
+		case "FRIDAY":
+			return 5;
+		case "SATURDAY":
+			return 6;
+		case "SUNDAY":
+			return 7;
+		default:
+			throw new Error(`Invalid weekday: ${weekday}`);
+	}
+}
+
+/**
+ * The first date on or after `startAt` whose local weekday in `zone` is
+ * `targetWeekday`.
+ *
+ * `startAt` itself qualifies: a course that opens on a Monday holds its
+ * Monday slot in week 0 on the start date, not seven days later.
+ *
+ * @param zone The time zone `startAt`'s weekday is read in, defaulting to
+ *   `SERVER_TZ`.
+ */
+export function weekdayOnOrAfter(
+	startAt: Date,
+	targetWeekday: Weekday,
+	zone: string = SERVER_TZ,
+): Date {
+	const currentWeekday = weekdayOf(startAt, zone);
+	const daysUntilTarget =
+		(isoWeekDay(targetWeekday) - isoWeekDay(currentWeekday) + 7) % 7;
+	const result = new Date(startAt);
+	result.setDate(result.getDate() + daysUntilTarget);
+	return result;
+}
+
+export function dateOffsetBy(
+	date: Date,
+	offsets: { days?: number; hours?: number; minutes?: number },
+): Date {
+	const result = new Date(date);
+	if (offsets.days) {
+		result.setDate(result.getDate() + offsets.days);
+	}
+	if (offsets.hours) {
+		result.setHours(result.getHours() + offsets.hours);
+	}
+	if (offsets.minutes) {
+		result.setMinutes(result.getMinutes() + offsets.minutes);
+	}
+	return result;
 }

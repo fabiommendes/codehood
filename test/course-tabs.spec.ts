@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Actor } from "@/auth/actor";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
-import { type CourseRef, courseHref } from "@/urls";
+import { type CourseNaturalKey, courseHref } from "@/urls";
 import { type CourseTab, courseTabs } from "@/utils/course-tabs";
 
 const admin = { username: "admin", role: "ADMIN" as const };
@@ -18,7 +18,7 @@ const course = {
 	instructor: { username: owner.username },
 	enrollments: [{ username: student.username }],
 };
-const ref: CourseRef = {
+const ref: CourseNaturalKey = {
 	discipline: "cs101",
 	instructor: owner.username,
 	edition: "2026-1",

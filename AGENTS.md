@@ -65,7 +65,7 @@ Here are some files and folders agents might be interested in:
 | `GLOSSARY.md`              | Glossary of terms used in the project.                                                |
 | `AGENTS.md`                | This file.                                                                            |
 | `prisma/schema.prisma`     | Database schema.                                                                      |
-| `<dir>/README.md`          | Longer-lived conventions for that directory (`src/api/`, `src/urls/`, `src/db/services/`, `src/commands/`, `test/stories/`). |
+| `<dir>/README.md`          | Longer-lived conventions for each directory[^readme].                                 |
 | `dev/specs/to-do/*.md`     | Detailed guidelines for implementation of specific features.                          |
 | `dev/specs/to-review/*.md` | Specs that are ready for review before implementation.                                |
 | `dev/issues/*.md`          | Store issues and bugs. Once fixed, register in the changelog and delete the file.     |
@@ -88,26 +88,31 @@ Here are some files and folders agents might be interested in:
 | `src/urls/`                | URL parsing and course reference utilities.                                           |
 | `src/utils/`               | Utility functions.                                                                    |
 
+[^readme]: Currently it exists at `src/api/`, `src/urls/`, `src/db/services/`, `src/commands/`, `test/stories/`.
 
 ## Workflow
 
-Start by planning a feature. It can be planned in a conversation or already
-documented in a spec file. If it is not documented, create a new spec file in
-`dev/specs/to-do/` and write down the requirements and design decisions.
+If human asks for some coding/implementation task, sStart by planning the
+requested feature. It can be planned in a conversation or already documented in
+a spec file. 
 
 Analyse the requirements and be explicit about design decisions. Pick what you
 think is the best approach and document it. Ask human only if the decision produces 
 irreversible consequences (e.g., database migrations, breaking external tools).
 
-Once the spec is ready, implement the feature and the corresponding tests. Design
-the tests so it can provide some proof that the implementation is correct. You
-can collect screenshots or other evidence to support your claims. Show them
-to the human.
+If the implementation is not trivial, it is probably better to use the `ttdd`
+skill (note: not `tdd`). This is a `disable-model-invocation` skill, so you may need
+to ask human to invoke it explicitly. Confirm with the human before writing code. 
 
-Once completed, move the spec file to `dev/specs/to-review/` and update the
-changelog. If you find any bugs, create a new issue in `dev/issues/`. If the
-bug is simple, create a regression test and fix it. If it is complex, ask the
-human for help.
+Once the spec is ready, implement the feature and the corresponding tests.
+Design the tests so it can provide some proof that the implementation is
+correct. You can collect screenshots or other evidence to support your claims.
+Show them to the human.
+
+Once completed, move any implemented spec files to `dev/specs/to-review/` and
+update the changelog. If you find any bugs, create a new issue in `dev/issues/`.
+If the bug is simple, create a regression test and fix it. If it is complex, ask
+the human for help.
 
 ## Linting
 
@@ -140,15 +145,42 @@ run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 
 ## Development Commands
 
-| Command                     | Action                                      |
-| :-------------------------- | :------------------------------------------ |
-| `pnpm run dev`              | Start dev server at `localhost:4321`        |
-| `pnpm run build`            | Build for production to `./dist/`           |
-| `pnpm run test`             | Run integration tests (Playwright)          |
-| `pnpm run lint`             | Run linter, typecheck, and story coverage   |
-| `pnpm run manage`           | Run management CLI commands                 |
-| `pnpm run db:seed`          | Seed the dev database                       |
-| `pnpm run db:reset`         | Reset and re-seed the dev database          |
+| Command             | Action                                        |
+| :------------------ | :-------------------------------------------- |
+| `pnpm run dev`      | Start dev server at `localhost:4321`          |
+| `pnpm run build`    | Build for production to `./dist/`             |
+| `pnpm run test`     | Run integration tests (Playwright). See below |
+| `pnpm run lint`     | Run linter, typecheck, and story coverage     |
+| `pnpm run manage`   | Run management CLI commands                   |
+| `pnpm run db:seed`  | Seed the dev database                         |
+| `pnpm run db:reset` | Reset and re-seed the dev database            |
+
+### Test output
+
+`test/run.ts` wipes the test database and pushes the schema before Playwright
+starts, so `playwright test` on its own refuses to run. Everything after the
+script name is forwarded to Playwright.
+
+Runs are isolated from each other: the script takes the first free port at or
+above 4322 and puts that run's database and blobs under `test/.tmp/<port>/`, so
+a second run started while one is going does not wipe the database in use. Set
+`TEST_PORT` to pin it.
+
+It defaults to `--reporter=dot`, which prints one character per test instead of
+one line, and still streams as the suite runs. Pass `--reporter=line` to see
+which test is currently running, or `--reporter=list` for the full log.
+
+```bash
+rtk pnpm test                                   # whole suite, dot reporter
+rtk pnpm exec tsx test/run.ts test/foo.spec.ts  # one file
+rtk pnpm test -- --reporter=line                # name each test as it runs
+```
+
+`--rtk` runs Playwright through `rtk playwright` instead. Reach for it only on a
+suite expected to pass: it reduces a green run to a single `PASS (n) FAIL (0)`
+line, but its parser gives up on a red one and passes through 2000 characters of
+raw config JSON. The `dot` default reports failures far better, so prefer it
+whenever something is actually broken.
 
 ## Documentation
 
@@ -182,7 +214,7 @@ replacing <TERM> with the term you want to look up.
 
 If a new concept or word is introduced in a conversation, ask the human if it
 should be added to the glossary. Be extremely succint when adding entries to the
-glossar. Add in alphabetical order.
+glossary. Add in alphabetical order.
 
 ## Validation
 

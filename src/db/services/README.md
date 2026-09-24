@@ -131,3 +131,41 @@ be any difference in behavior compared to a hard delete.
 
 Most services also have a corresponding REST API. If the API is available,
 implement the examples in the /test/bruno directory.
+
+
+## Creating a Service class workflow
+
+1. Define the database model the service will wrap.
+2. Verify the fields that require branding and update `src/db/branding.ts` accordingly.
+3. Create the schema definitions in `src/core/schema`. The schema specifies
+   which parts of the database are exposed and abstracted away to the service
+   consumers.
+4. Pause implementation and ask for human review and feedback on the proposed
+   schemas before proceeding. It is important to get human approval before
+   moving forward to the next step.
+5. Consult if the new entity should be exposed to the permissions system. If so,
+   add an entry in `src/auth/permissions.ts` for the new entity and possibly
+   update the access control rules accordingly.
+6. Create a stub service class with empty method implementations for the basic
+   CRUD operations. That is a point a human might fill in with some helper
+   methods and business logic.
+7. Verify if the service class exposes functionality in the REST API. If so,
+   define the API endpoints in `src/api/index.ts`. Then endpoints might be
+   scoped (generally to a course) or root endpoints. This take a decision and
+   might require confirmation by a human.
+8. If the REST API exists, create examples in the `/test/bruno` directory. This
+   helps with testing and validation. If REST API exists, restart the dev server
+   to register the new endpoints. This is done during startup and is not
+   refreshed by hot reload.
+9. Implement test fixtures in `src/fixtures/<service-name>.factory.ts`. This
+   project uses "fishery". Do not duplicate code if existing factories can be
+   used to implement related entities.
+10. Now we start the /ttdd workflow: one implementer agent implement methods in
+    order: create, findOne, findMany, update, upsert, and delete. Another tester
+    agent creates tests to ensure that each method adheres to the access control
+    rules and handles errors appropriately. Adopts the /ttdd skill/methodology
+    for that.
+11. Implement a initial seed in `src/db/bootstrap.ts`.
+12. Ensure there are tests for the non-trivial business logic and
+   authentication/authorization rules.
+13. Review the work done by each sub-agent.

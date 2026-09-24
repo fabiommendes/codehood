@@ -25,7 +25,7 @@ test("a student's name cannot break out of the roster's JSON payload", async ({
 	});
 	const student = await seedUser({ role: "STUDENT", name: PAYLOAD });
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 

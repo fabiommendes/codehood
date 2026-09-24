@@ -22,13 +22,12 @@ export type EnrollmentCreate = z.infer<typeof enrollmentCreate>;
 export type EnrollmentFilter = z.infer<typeof enrollmentFilter>;
 export type EnrollmentPK = z.infer<typeof enrollmentPK>;
 export type EnrollmentUpdate = never;
-export type EnrollmentUpsert = never;
 
 type DbEnrollment = Prisma.EnrollmentGetPayload<{
 	include: typeof enrollmentInclude;
 }>;
 
-type CourseRef = EnrollmentCreate["courseId"];
+type CourseRef = EnrollmentCreate["course"];
 
 // The full user row, so `toUser` can unmask `githubId`/`schoolId`.
 const enrollmentInclude = { user: true } satisfies Prisma.EnrollmentInclude;
@@ -48,7 +47,7 @@ export class EnrollmentService
 			create: EnrollmentCreate;
 			filter: EnrollmentFilter;
 			update: EnrollmentUpdate;
-			upsert: EnrollmentUpsert;
+			upsert: false;
 		}>
 {
 	prisma: PrismaClient;
@@ -73,7 +72,7 @@ export class EnrollmentService
 		opts: ServiceOpts,
 	): Promise<Enrollment> {
 		const client = opts.tx ?? this.prisma;
-		const course = await this.course(input.courseId, opts);
+		const course = await this.course(input.course, opts);
 		ensurePerm(opts.actor, "enrollment.create", course.view);
 
 		const row = await client.enrollment.upsert({
@@ -102,7 +101,7 @@ export class EnrollmentService
 		opts: ServiceOpts,
 	): Promise<Enrollment | null> {
 		const client = opts.tx ?? this.prisma;
-		const course = await this.course(filter.courseId, opts);
+		const course = await this.course(filter.course, opts);
 		ensurePerm(opts.actor, "enrollment.read", {
 			course: course.view,
 			user: { username: filter.username },
@@ -132,8 +131,7 @@ export class EnrollmentService
 		opts: ServiceOpts,
 	): Promise<Enrollment[]> {
 		const client = opts.tx ?? this.prisma;
-		const ref = "courseId" in filter ? filter.courseId : filter;
-		const course = await this.course(ref, opts);
+		const course = await this.course(filter.course, opts);
 		ensurePerm(opts.actor, "enrollment.read", course.view);
 
 		const rows = await client.enrollment.findMany({
@@ -169,7 +167,7 @@ export class EnrollmentService
 	@Validate({ service: true, args: [enrollmentPK] })
 	async delete(filter: EnrollmentPK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
-		const course = await this.course(filter.courseId, opts);
+		const course = await this.course(filter.course, opts);
 		ensurePerm(opts.actor, "enrollment.delete", {
 			course: course.view,
 			user: { username: filter.username },

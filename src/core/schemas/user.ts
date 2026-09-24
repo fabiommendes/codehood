@@ -32,12 +32,6 @@ export const userCreate = userSchema
 	});
 
 /**
- * PUT-shaped input: `password` is optional and, when present on an existing
- * user, resets the stored one.
- */
-export const userUpsert = userCreate.partial({ password: true });
-
-/**
  * Editable profile fields.
  *
  * `password` is deliberately absent: a password is changed through

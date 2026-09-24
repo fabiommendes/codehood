@@ -28,6 +28,10 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "courseId", from: "number", to: "CourseId" },
 	],
 	Exam: [{ field: "id", from: "number", to: "ExamId" }],
+	Feedback: [
+		{ field: "id", from: "number", to: "FeedbackId" },
+		{ field: "submissionId", from: "number", to: "SubmissionId" },
+	],
 	ExamTags: [{ field: "id", from: "number", to: "ExamTagsId" }],
 	// Group: [{ field: "id", from: "number" , to: "GroupId"}],
 	// GroupMembership: [{ field: "id", from: "number" , to: "GroupMembershipId"}],
@@ -45,11 +49,19 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 	// QuestionTags: [{ field: "id", from: "number" , to: "QuestionTagsId"}],
 	Resource: [
 		{ field: "id", from: "number", to: "ResourceId" },
+		{ field: "courseId", from: "number", to: "CourseId" },
 		{ field: "attachmentId", from: "number", to: "AttachmentId" },
 	],
-	Response: [{ field: "id", from: "number", to: "ResponseId" }],
+	Response: [
+		{ field: "id", from: "number", to: "ResponseId" },
+		{ field: "examId", from: "number", to: "ExamId" },
+	],
 	Session: [{ field: "id", from: "number", to: "SessionId" }],
-	Submission: [{ field: "id", from: "number", to: "SubmissionId" }],
+	Submission: [
+		{ field: "id", from: "number", to: "SubmissionId" },
+		{ field: "responseId", from: "number", to: "ResponseId" },
+		{ field: "questionId", from: "number", to: "QuestionRefId" },
+	],
 	TimeSlot: [{ field: "id", from: "number", to: "TimeSlotId" }],
 	User: [{ field: "id", from: "number", to: "UserId" }],
 };

@@ -1,6 +1,10 @@
 import { defineConfig } from "@playwright/test";
-import { TEST_DATABASE_URL } from "./test/db-path";
-import { TEST_RESOURCE_ROOT } from "./test/resource-root";
+import {
+	TEST_BASE_URL,
+	TEST_DATABASE_URL,
+	TEST_PORT,
+	TEST_RESOURCE_ROOT,
+} from "./test/env";
 
 export default defineConfig({
 	testDir: "./test",
@@ -10,17 +14,17 @@ export default defineConfig({
 	// otherwise invisible.
 	globalSetup: "./test/global-setup.ts",
 	use: {
-		baseURL: "http://localhost:4322",
+		baseURL: TEST_BASE_URL,
 		// Astro's CSRF protection for form-accepting actions checks the Origin header,
 		// which a real browser always sends but Playwright's bare `request` fixture doesn't.
-		extraHTTPHeaders: { origin: "http://localhost:4322" },
+		extraHTTPHeaders: { origin: TEST_BASE_URL },
 	},
 	webServer: {
 		// `astro dev` refuses a second concurrent instance for the project (see AGENTS.md:
 		// agents run one in the background), so tests build once and run the standalone
 		// Node adapter server on its own port instead.
 		command: "node_modules/.bin/astro build && node dist/server/entry.mjs",
-		url: "http://localhost:4322",
+		url: TEST_BASE_URL,
 		reuseExistingServer: false,
 		timeout: 60_000,
 		env: {
@@ -31,7 +35,7 @@ export default defineConfig({
 			// over plain HTTP, so a Secure session cookie would never come back.
 			ENVIRONMENT: "dev",
 			HOST: "localhost",
-			PORT: "4322",
+			PORT: String(TEST_PORT),
 		},
 	},
 });

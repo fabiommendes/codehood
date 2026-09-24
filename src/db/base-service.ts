@@ -1,10 +1,19 @@
 import type { Actor } from "@/auth/actor";
-import type { CourseWithEnrollment } from "@/auth/permissions";
+import {
+	type CourseWithEnrollment,
+	ensurePerm,
+	hasPerm,
+} from "@/auth/permissions";
 import type { ActionCode } from "@/core/error";
 import { NotAllowed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
-import type { CourseRef } from "@/urls";
-import { type PrismaClient, type PrismaTx, prisma } from "./client";
+import type { CourseNaturalKey } from "@/urls";
+import {
+	type Prisma,
+	type PrismaClient,
+	type PrismaTx,
+	prisma,
+} from "./client";
 import { courseRefWhere, valueOrNotFound } from "./utils";
 
 /**
@@ -57,8 +66,9 @@ export interface Upsert<In, Out> {
 	/**
 	 * Update an entity if it exists, or create it if it does not (upsert).
 	 *
-	 * PUT semantics: keyed on the entity's natural key, never on `id`. Fields
-	 * left `undefined` keep their stored value; send `null` to clear one.
+	 * PUT semantics: keyed on the entity's natural key, never on `id`, and
+	 * taking the same input `create` does. Fields left `undefined` keep their
+	 * stored value; send `null` to clear one.
 	 */
 	upsert<Opt extends ServiceOpts>(input: In, opts: Opt): Promise<Out>;
 }
@@ -77,28 +87,34 @@ type CrudT<
 	Pk = Entity extends { id: unknown } ? { id: Entity["id"] } : unknown,
 	Create = Omit<Entity, "id">,
 	Update = Partial<Create>,
-	Upsert = Create,
 > = {
 	entity: Entity;
 	filter: Filter;
 	create?: Create;
 	pkFilter?: Pk;
 	update?: Update;
-	upsert?: Upsert;
+
+	/// `false` switches `upsert` off, so calling it is a type error rather
+	/// than a `Method not implemented` at run time. Defaults to on.
+	upsert?: boolean;
 };
+
+/// `upsert` takes exactly what `create` takes, unless `T` switched it off.
+type UpsertIn<T extends { create?: unknown; upsert?: boolean }> =
+	T["upsert"] extends false ? never : T["create"];
 
 /**
  * Expected composition of interfaces for a CRUD based service. Declare `never`
  * as the type of some operation to omit it from the service.
  */
 export interface Crud<
-	T extends CrudT<unknown, unknown, unknown, unknown, unknown, unknown>,
+	T extends CrudT<unknown, unknown, unknown, unknown, unknown>,
 > extends Create<T["create"], T["entity"]>,
 		FindMany<T["filter"], T["entity"]>,
 		FindOne<T["pkFilter"], T["entity"]>,
 		Update<T["pkFilter"], T["update"], T["entity"]>,
 		Delete<T["pkFilter"]>,
-		Upsert<T["upsert"], T["entity"]> {}
+		Upsert<UpsertIn<T>, T["entity"]> {}
 
 //
 // Utilities and reusable logic
@@ -117,7 +133,6 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 		pkFilter: PkFilter;
 		create: CreateIn;
 		update: UpdateIn;
-		upsert: In;
 	}>,
 	input: In,
 	args: ServiceOpts & {
@@ -192,14 +207,14 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
  * themselves.
  */
 export class CrudBase<
-	T extends CrudT<unknown, unknown, unknown, unknown, unknown, unknown>,
+	T extends CrudT<unknown, unknown, unknown, unknown, unknown>,
 > implements
 		Create<T["create"], T["entity"]>,
 		FindMany<T["filter"], T["entity"]>,
 		FindOne<T["pkFilter"], T["entity"]>,
 		Update<T["pkFilter"], T["update"], T["entity"]>,
 		Delete<T["pkFilter"]>,
-		Upsert<T["upsert"], T["entity"]>
+		Upsert<UpsertIn<T>, T["entity"]>
 {
 	protected readonly prisma: PrismaTx | PrismaClient;
 
@@ -319,7 +334,7 @@ export class CrudBase<
 	 * in a transaction-aware manner.
 	 */
 	upsert<Opt extends ServiceOpts>(
-		input: T["upsert"],
+		input: UpsertIn<T>,
 		opts: Opt,
 	): Promise<T["entity"]> {
 		return this.$transaction(opts, (tx, scoped) =>
@@ -329,7 +344,7 @@ export class CrudBase<
 
 	protected upsertTx<Opt extends ServiceOptsWithoutTx>(
 		_tx: PrismaTx,
-		_input: T["upsert"],
+		_input: UpsertIn<T>,
 		_opts: Opt,
 	): Promise<T["entity"]> {
 		throw new Error("Method not implemented.");
@@ -367,25 +382,48 @@ export class CrudBase<
 	 * @throws {@link NotAllowed}
 	 * If actor is not permitted to access the course with the desired action.
 	 */
-	protected async course<
-		Opt extends ServiceOpts & { action?: "view" | "manage" },
-	>(
-		ref: CourseRef | CourseId,
+	protected async course<StartAt extends boolean>(
+		ref: CourseNaturalKey | CourseId,
 		tx: PrismaTx | undefined,
-		opts: Opt,
-	): Promise<CourseWithEnrollment & { id: CourseId }> {
+		opts: ServiceOpts,
+		select?: {
+			startAt?: StartAt;
+			enrollments?: boolean;
+			perm?: "course.read" | "course.read-contents" | "course.update-contents";
+		},
+	): Promise<
+		Prisma.CourseGetPayload<{
+			select: {
+				id: true;
+				instructor: { select: { username: true } };
+				enrollments: { select: { username: true } };
+				startAt: StartAt extends true ? true : false;
+			};
+		}>
+	> {
 		const client = tx ?? opts.tx ?? this.prisma;
 
 		let course = await client.course.findUnique({
 			where: courseRefWhere(ref),
-			select: { id: true, instructor: { select: { username: true } } },
+			select: {
+				id: true,
+				instructor: { select: { username: true } },
+				startAt: select?.startAt ?? true,
+				enrollments: {
+					select: {
+						username:
+							select?.enrollments ??
+							(true || select?.perm === "course.read-contents"),
+					},
+				},
+			},
 		});
 		course = valueOrNotFound("course", course);
+		course.enrollments ??= [];
 
-		return {
-			id: course.id as CourseId,
-			instructor: course.instructor,
-			enrollments: [],
-		};
+		if (select?.perm) ensurePerm(opts.actor, select.perm, course);
+
+		// biome-ignore lint/suspicious/noExplicitAny: intentional cast for flexible return type
+		return course as any;
 	}
 }

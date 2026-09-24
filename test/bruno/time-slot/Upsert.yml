@@ -5,17 +5,16 @@ info:
 
 http:
   method: PUT
-  url: http://localhost:4321/api/time-slot
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/time-slot
   body:
     type: json
     data: |-
       {
-          "courseId": 1,
           "slug": "mon-morning",
           "title": "Monday lecture",
           "day": "MONDAY",
-          "startMin": 480,
-          "durationMin": 100
+          "start": { "hour": 8, "minute": 0 },
+          "duration": { "hours": 1, "minutes": 40 }
       }
   auth: inherit
 

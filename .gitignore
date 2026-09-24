@@ -45,10 +45,11 @@ TODO.md
 tsconfig.tsbuildinfo
 tsconfig.build.tsbuildinfo
 
-# Handoff files
+# Handoff and prompt files
 handoff/
 handoff*.md
-
+prompt.md
+prompt/
 
 # Auditoria de seguranca: ambiente isolado do gerador do relatorio
 docs/security-audit/.venv/

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/time-slot?courseId=1
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/time-slot
   auth: inherit
 
 settings:

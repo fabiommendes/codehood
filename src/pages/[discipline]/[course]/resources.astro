@@ -19,10 +19,7 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 const canWrite = hasPerm(actor, "course.update-contents", course);
 
-const resources = await db.resource.findMany(
-	{ courseId: course.id },
-	{ actor },
-);
+const resources = await db.resource.findMany({ course: course.id }, { actor });
 const groups = groupResourcesByType(resources);
 
 // Blob URLs carry no auth check of their own (FR-NFR-030); this page's referrer

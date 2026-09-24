@@ -22,6 +22,30 @@ export function entityOr404<T>(entity: T | null): T {
 }
 
 /**
+ * Turns a calendar event's `week` path segment into a non-negative integer.
+ *
+ * Throws `InvalidData` (400) for anything else, on the same reasoning as
+ * `parseCourseParams`: the caller is a tool, and it can act on a 400.
+ */
+export function parseWeekParam(raw: string): number {
+	const week = Number(raw);
+	if (!Number.isInteger(week) || week < 0) {
+		throw new InvalidData(
+			{
+				week: [
+					{
+						code: "type-mismatch",
+						message: "Expected a non-negative integer.",
+					},
+				],
+			},
+			{ message: `"${raw}" is not a week number.` },
+		);
+	}
+	return week;
+}
+
+/**
  * Turns a course's two path segments into a course natural Key
  *
  * Throws `InvalidData` (400) for a segment that does not match the grammar.
@@ -51,17 +75,4 @@ export function parseCourseParams(params: Record<string, string>) {
 			edition: segment.edition,
 		}),
 	);
-}
-
-/**
- * Turns a course's two path segments plus `[slug]` into a `resourcePkRef`.
- */
-export function parseResourceParams(params: Record<string, string>) {
-	const courseRef = parseCourseParams(params);
-	const validated = schema.resourcePkRef.safeParse({
-		ref: { courseRef, slug: params.slug },
-	});
-	if (validated.error)
-		throw InvalidData.fromZodError(validated.error, validated.data);
-	return validated.data;
 }

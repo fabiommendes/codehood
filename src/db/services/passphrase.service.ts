@@ -5,6 +5,7 @@ import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
 import {
 	type CourseId,
+	type CourseRef,
 	type PassphraseId,
 	passphraseCreate,
 	passphraseFilter,
@@ -20,6 +21,7 @@ import {
 	type PrismaClient,
 	prisma,
 } from "../client";
+import { courseRefWhere } from "../utils";
 
 export type { PassphraseId } from "@/core/schemas";
 
@@ -59,7 +61,7 @@ export class PassphraseService
 			create: PassphraseCreate;
 			filter: PassphraseFilter;
 			update: PassphraseUpdate;
-			upsert: never;
+			upsert: false;
 		}>
 {
 	prisma: PrismaClient;
@@ -86,7 +88,11 @@ export class PassphraseService
 		input: PassphraseCreate,
 		opts: ServiceOpts,
 	): Promise<Passphrase> {
-		await this.requireManageableCourse(input.courseId, opts, "create");
+		const course = await this.requireManageableCourse(
+			input.course,
+			opts,
+			"create",
+		);
 		const client = opts.tx ?? this.prisma;
 		const expiresAt = new Date(Date.now() + EXPIRY_MS);
 
@@ -100,7 +106,7 @@ export class PassphraseService
 			}
 			return toPassphrase(
 				await client.passphrase.create({
-					data: { courseId: input.courseId, value: input.value, expiresAt },
+					data: { courseId: course.id, value: input.value, expiresAt },
 				}),
 			);
 		}
@@ -110,7 +116,7 @@ export class PassphraseService
 			if (await client.passphrase.findUnique({ where: { value } })) continue;
 			return toPassphrase(
 				await client.passphrase.create({
-					data: { courseId: input.courseId, value, expiresAt },
+					data: { courseId: course.id, value, expiresAt },
 				}),
 			);
 		}
@@ -167,15 +173,16 @@ export class PassphraseService
 		opts: ServiceOpts,
 	): Promise<Passphrase[]> {
 		const client = opts.tx ?? this.prisma;
-		if (filter.courseId !== undefined) {
-			await this.requireManageableCourse(filter.courseId, opts, "read");
+		let course: { id: CourseId } | undefined;
+		if (filter.course !== undefined) {
+			course = await this.requireManageableCourse(filter.course, opts, "read");
 		} else if (opts.actor !== SYSTEM) {
 			throw new NotAllowed("passphrase.read");
 		}
 		const rows = await client.passphrase.findMany({
 			where: {
 				AND: [
-					filter.courseId ? { courseId: filter.courseId } : {},
+					course ? { courseId: course.id } : {},
 					filter.active ? { expiresAt: { gt: new Date() } } : {},
 				],
 			},
@@ -233,22 +240,24 @@ export class PassphraseService
 	// Utility methods
 	//
 	private async requireManageableCourse(
-		courseId: number,
+		ref: CourseRef,
 		opts: ServiceOpts,
 		action: "read" | "create" | "update" | "delete",
-	): Promise<void> {
+	): Promise<{ id: CourseId }> {
 		const client = opts.tx ?? this.prisma;
 
 		const course = await client.course.findUnique({
-			where: { id: courseId as CourseId },
-			select: { instructor: { select: { username: true } } },
+			where: courseRefWhere(ref),
+			select: { id: true, instructor: { select: { username: true } } },
 		});
-		if (!course) throw new NotFound("course", { id: courseId });
+		if (!course) throw new NotFound("course");
 
 		// A passphrase is one of the course's operations, not an enrollment
 		// row: `enrollment.manage`, so a non-owning admin cannot mint one.
 		if (!hasPerm(opts.actor, "enrollment.manage", course))
 			throw new NotAllowed(`passphrase.${action}`);
+
+		return { id: course.id as CourseId };
 	}
 }
 

@@ -98,3 +98,58 @@ test("resources are documented only under their course, and never offer the cour
 	);
 	expect(bodyFields(item?.patch)).toContain("title");
 });
+
+test("time slots are documented only under their course, and the flat /api/time-slot path is gone", () => {
+	const document = buildOpenApiDocument();
+	const paths = document.paths ?? {};
+	const collection = paths["/api/course/{discipline}/{course}/time-slot"];
+	const item = paths["/api/course/{discipline}/{course}/time-slot/{slug}"];
+
+	expect(
+		Object.keys(paths).filter(
+			(p) => p.startsWith("/api/time-slot") || p === "/api/time-slot",
+		),
+	).toEqual([]);
+	expect(collection).toBeDefined();
+	expect(item).toBeDefined();
+	expect(Object.keys(collection ?? {}).sort()).toEqual(["get", "post", "put"]);
+	expect(Object.keys(item ?? {}).sort()).toEqual(["delete", "get", "patch"]);
+
+	const queryNames = (collection?.get?.parameters ?? [])
+		.map((p) => ("name" in p ? p.name : ""))
+		.filter((name) => !["discipline", "course"].includes(name));
+	expect(queryNames).not.toContain("courseId");
+});
+
+// Every `/api/course/{discipline}/{course}/...` collection carries its course
+// in the path, so its `GET` query string must never re-offer it as a field —
+// see `dev/specs/to-review/course-ref-unification.md`. `feedback` is nested
+// one level deeper, under the submission it grades.
+const courseScopedCollections = [
+	"/api/course/{discipline}/{course}/calendar-event",
+	"/api/course/{discipline}/{course}/exam",
+	"/api/course/{discipline}/{course}/resource",
+	"/api/course/{discipline}/{course}/question",
+	"/api/course/{discipline}/{course}/response",
+	"/api/course/{discipline}/{course}/submission",
+	"/api/course/{discipline}/{course}/time-slot",
+	"/api/course/{discipline}/{course}/submission/{publicId}/feedback",
+];
+
+for (const path of courseScopedCollections) {
+	test(`${path}: the list query string never re-offers the course as a field`, () => {
+		const document = buildOpenApiDocument();
+		const collection = document.paths?.[path];
+		expect(collection?.get).toBeDefined();
+
+		const queryNames = (collection?.get?.parameters ?? [])
+			.map((p) => ("name" in p ? p.name : ""))
+			.filter((name) => !["discipline", "course", "publicId"].includes(name));
+		expect(queryNames).not.toContain("courseId");
+		expect(queryNames).not.toContain("course");
+		expect(queryNames.some((name) => name.startsWith("courseRef"))).toBe(false);
+		expect(queryNames).not.toContain("discipline");
+		expect(queryNames).not.toContain("instructor");
+		expect(queryNames).not.toContain("edition");
+	});
+}

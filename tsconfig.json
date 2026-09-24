@@ -17,7 +17,10 @@
 		"forceConsistentCasingInFileNames": true,
 		"paths": {
 			"@/*": ["./src/*"],
-			"@prisma/*": ["./node_modules/.prisma/client/*"]
+			"@prisma/*": ["./node_modules/.prisma/client/*"],
+			// Test-only: see test/astro-env-client.ts for why this is safe
+			// alongside the real Astro build.
+			"astro:env/client": ["./test/astro-env-client.ts"]
 		}
 	},
 	"include": [".astro/types.d.ts", "**/*"],

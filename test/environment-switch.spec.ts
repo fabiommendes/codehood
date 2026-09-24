@@ -39,9 +39,15 @@ test("ENVIRONMENT has no default: absent or empty fails the boot by name", () =>
 
 	const nonsense = loadConstants({ ENVIRONMENT: "staging" });
 	expect(nonsense.ok).toBe(false);
-	expect(nonsense.output).toContain("dev, prod");
+	expect(nonsense.output).toContain("dev, development, prod, production");
 
 	expect(loadConstants({ ENVIRONMENT: "prod" })).toMatchObject({ ok: true });
+});
+
+test("the long spellings of ENVIRONMENT are accepted as aliases", () => {
+	for (const value of ["dev", "development", "prod", "production"]) {
+		expect(loadConstants({ ENVIRONMENT: value })).toMatchObject({ ok: true });
+	}
 });
 
 test("the session cookie is Secure exactly when ENVIRONMENT is prod", () => {

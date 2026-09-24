@@ -137,10 +137,10 @@ with `Authorization: Bearer <key>`. The live set of paths is
 A course is addressed in the API by the same natural key it uses on the web, so
 the CLI builds one string and uses it for both. There is no `/api/course/<id>`.
 Course-scoped endpoints hang off that address the way the web pages do
-(`/api/course/<discipline>/<username>_<edition>/{resource,question,exam}`) and
-never take the course in a body or query string. A resource's slug is flat, so
-it is always exactly one segment; the CLI normalizes repository paths into that
-form. The remaining course-scoped resources — `time-slot`, `calendar-event` and
+(`/api/course/<discipline>/<username>_<edition>/{resource,question,exam,time-slot}`)
+and never take the course in a body or query string. A resource's slug is
+flat, so it is always exactly one segment; the CLI normalizes repository paths
+into that form. The remaining course-scoped resources — `calendar-event` and
 `passphrase` — still use flat addresses until they are converted. Everything
 else under `/api/` is addressed by a single segment carrying its primary key.
 

@@ -1,0 +1,24 @@
+info:
+  name: Upsert
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/submission/sub_example/feedback
+  body:
+    type: json
+    data: |-
+      {
+          "ref": "first-pass",
+          "score": "0.9",
+          "feedback": "Revised after the appeal."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

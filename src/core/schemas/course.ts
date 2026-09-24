@@ -46,8 +46,6 @@ export const courseCreate = courseSchema
 		endAt: z.coerce.date(),
 	});
 
-export const courseUpsert = courseCreate;
-
 export const courseUpdate = courseSchema
 	.pick({
 		description: true,
@@ -78,6 +76,15 @@ export const courseNaturalKey = z.object({
 // places that never carry the brand (coerced action input, another entity's
 // foreign key), the same reasoning as `apiKeyService.revoke`'s `id`.
 export const coursePK = z.union([z.object({ id: courseId }), courseNaturalKey]);
+
+/**
+ * Refers to a course either by its numeric id or by its natural key.
+ *
+ * The one shape every course-scoped service input uses under `course`, in
+ * create, upsert, filter and composite-key schemas alike.
+ */
+export const courseRef = z.union([courseId, courseNaturalKey]);
+export type CourseRef = z.infer<typeof courseRef>;
 
 export const courseFilter = z
 	.object({

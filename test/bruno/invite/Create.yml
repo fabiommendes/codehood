@@ -13,7 +13,7 @@ http:
           "kind": "PERSONAL",
           "email": "newcomer@codehood.test",
           "invitedRole": "STUDENT",
-          "courseId": 1,
+          "course": 1,
           "maxUses": 1,
           "createdBy": { "username": "ada", "name": "Ada Lovelace" },
           "expiresInMs": 604800000

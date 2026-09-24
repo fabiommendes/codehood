@@ -1,11 +1,18 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
+import ExamRow from "@/components/exam/ExamRow.astro";
 import ListRow from "@/components/ListRow.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
-import { db } from "@/db";
+import { db, groupExamsForStudent } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
-import { formatDateTime, formatTime } from "@/utils/schedule-time";
+import {
+	durationToMinutes,
+	formatClock,
+	formatDateTime,
+	formatTime,
+	toMinutes,
+} from "@/utils/schedule-time";
 
 export const prerender = false;
 
@@ -22,7 +29,7 @@ const actor = Astro.locals.actor!;
 // viewing their own course has no enrollment row here — there is nothing for
 // them to leave.
 const ownEnrollment = await db.enrollment.findOne(
-	{ courseId: course.id, username: actor.username },
+	{ course: course.id, username: actor.username },
 	{ actor },
 );
 const isEnrolled = ownEnrollment?.status === "ACTIVE";
@@ -46,9 +53,18 @@ const WEEKDAY_LABEL: Record<string, string> = {
 	SATURDAY: "Sat",
 };
 
+// Same call and grouping the exam list page uses — the "Upcoming exams"
+// section is a preview of the `upcoming` group, falling back to `practice`
+// when there is none.
+const exams = await db.exam.findMany({ course: course.id }, { actor });
+const examGroups = groupExamsForStudent(exams);
+const upcomingExams =
+	examGroups.find((g) => g.key === "upcoming") ??
+	examGroups.find((g) => g.key === "practice");
+
 // The syllabus line and the next few meetings. Both come from the same source
 // the Schedule tab reads; this section is a preview of it, not a copy.
-const slots = await db.timeSlot.findMany({ courseId: course.id }, { actor });
+const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
 const nextEvents = await db.calendarEvent.findMany(
 	{ courseIds: [course.id], from: new Date(), limit: 3 },
 	{ actor },
@@ -70,7 +86,7 @@ const nextEvents = await db.calendarEvent.findMany(
     >
       <div class="stat">
         <div class="stat-title">Exams</div>
-        <div class="stat-value text-2xl">3</div>
+        <div class="stat-value text-2xl">{exams.length}</div>
       </div>
       <div class="stat">
         <div class="stat-title">Students</div>
@@ -82,22 +98,22 @@ const nextEvents = await db.calendarEvent.findMany(
       </div>
     </div>
 
-    <section class="mt-10">
-      <SectionHeader title="Upcoming exams" href={`${href}/exams`} />
+    {
+      upcomingExams && (
+        <section class="mt-10">
+          <SectionHeader
+            title={upcomingExams.key === "practice" ? "Practice" : "Upcoming exams"}
+            href={`${href}/exams`}
+          />
 
-      <div class="mt-4 flex flex-col gap-3">
-        <ListRow href={`${href}/exams/midterm`}>
-          <p class="font-medium">Midterm Exam</p>
-          <p class="text-sm text-base-content/60">Due Mar 15 · 10 questions</p>
-          <span slot="trailing" class="badge badge-success">Open</span>
-        </ListRow>
-        <ListRow muted>
-          <p class="font-medium">Final Project</p>
-          <p class="text-sm text-base-content/60">Opens Apr 10</p>
-          <span slot="trailing" class="badge badge-outline">Upcoming</span>
-        </ListRow>
-      </div>
-    </section>
+          <div class="mt-4 flex flex-col gap-3">
+            {upcomingExams.exams.map((exam) => (
+              <ExamRow exam={exam} href={href} />
+            ))}
+          </div>
+        </section>
+      )
+    }
 
     <section class="mt-10">
       <SectionHeader title="Resources" href={`${href}/resources`} />
@@ -130,7 +146,7 @@ const nextEvents = await db.calendarEvent.findMany(
               {slots
                 .map(
                   (slot) =>
-                    `${slot.title ?? "Meeting"} · ${WEEKDAY_LABEL[slot.day]} ${formatTime(slot.startMin)}–${formatTime(slot.startMin + slot.durationMin)}`,
+                    `${slot.title ?? "Meeting"} · ${WEEKDAY_LABEL[slot.day]} ${formatClock(slot.start)}–${formatTime(toMinutes(slot.start) + durationToMinutes(slot.duration))}`,
                 )
                 .join(", ")}
             </p>

@@ -18,8 +18,6 @@ export const disciplineUpdate = disciplineSchema
 	})
 	.partial();
 
-export const disciplineUpsert = disciplineCreate;
-
 export const disciplinePK = disciplineSchema.pick({
 	slug: true,
 });

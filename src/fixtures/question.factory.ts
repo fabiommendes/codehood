@@ -25,7 +25,7 @@ function buildQuestion(
 	transient: QuestionParams,
 ): QuestionCreate {
 	return {
-		courseId: params.courseId ?? (0 as schema.CourseId),
+		course: params.course ?? (0 as schema.CourseId),
 		slug: params.slug ?? `question-${sequence}`,
 		status: "PUBLISHED",
 		version: "1",
@@ -46,7 +46,7 @@ export const questionFactory = Factory.define<
 /**
  * Builds a `QuestionCreate` payload and persists it via `questionService.create`.
  *
- * `courseId` is provisioned automatically (a fresh course) when left unset.
+ * `course` is provisioned automatically (a fresh course) when left unset.
  *
  * Returns a `QuestionView`: the service hands back the public half to an actor
  * who may not write the course, and the default actor's full access is not
@@ -60,12 +60,12 @@ export const persistedQuestionFactory = Factory.define<
 >(({ sequence, params, transientParams, onCreate }) => {
 	onCreate(async (input) => {
 		const opts = serviceOpts(transientParams);
-		const courseId =
-			params.courseId ??
+		const course =
+			params.course ??
 			(await persistedCourseFactory.create({}, { transient: transientParams }))
 				.id;
 
-		return db.question.create({ ...input, courseId }, opts);
+		return db.question.create({ ...input, course }, opts);
 	});
 
 	return buildQuestion(sequence, params, transientParams);

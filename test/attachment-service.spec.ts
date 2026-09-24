@@ -65,7 +65,7 @@ test.beforeAll(async () => {
 });
 
 async function makeResource() {
-	return persistedResourceFactory.create({ courseId: sharedCourseId });
+	return persistedResourceFactory.create({ course: sharedCourseId });
 }
 
 test("create sanitises the filename and derives the mime type from a known extension", async () => {

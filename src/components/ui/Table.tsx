@@ -1,5 +1,5 @@
 import type { JSX } from "solid-js";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 
 /**
  * Describes one column: its header text, how to render a row's cell, and the
@@ -15,12 +15,25 @@ export interface ColumnConfig<T> {
 	class?: string;
 	headerClass?: string;
 	render: (row: T) => JSX.Element;
+	/// Opaque key identifying this column for sorting. Omit to leave the
+	/// column's header a plain, unclickable label.
+	sortKey?: string;
+}
+
+/** The active sort column and direction, keyed by a column's `sortKey`. */
+export interface TableSort {
+	key: string;
+	direction: "asc" | "desc";
 }
 
 interface TableProps<T> {
 	columns: ColumnConfig<T>[];
 	data: T[];
 	class?: string;
+	/** Current sort state; drives the direction indicator and `aria-sort` on the active header. */
+	sort?: TableSort;
+	/** Called with a column's `sortKey` when that column's header is clicked. */
+	onSort?: (key: string) => void;
 }
 
 /**
@@ -44,7 +57,43 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 				<thead>
 					<tr class="uppercase">
 						<For each={props.columns}>
-							{(column) => <th class={column.headerClass}>{column.title}</th>}
+							{(column) => {
+								const sortable = () =>
+									column.sortKey !== undefined && props.onSort !== undefined;
+								const active = () =>
+									sortable() && props.sort?.key === column.sortKey;
+								return (
+									<th
+										class={column.headerClass}
+										aria-sort={
+											active()
+												? props.sort?.direction === "asc"
+													? "ascending"
+													: "descending"
+												: undefined
+										}
+									>
+										<Show when={sortable()} fallback={column.title}>
+											<button
+												type="button"
+												class="inline-flex items-center gap-1"
+												onClick={() => {
+													if (column.sortKey !== undefined) {
+														props.onSort?.(column.sortKey);
+													}
+												}}
+											>
+												{column.title}
+												<Show when={active()}>
+													<span aria-hidden="true">
+														{props.sort?.direction === "asc" ? "▲" : "▼"}
+													</span>
+												</Show>
+											</button>
+										</Show>
+									</th>
+								);
+							}}
 						</For>
 					</tr>
 				</thead>

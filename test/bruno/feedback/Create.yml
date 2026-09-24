@@ -1,0 +1,24 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/submission/sub_example/feedback
+  body:
+    type: json
+    data: |-
+      {
+          "ref": "first-pass",
+          "score": "0.75",
+          "feedback": "Correct approach, minor slip in the base case."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

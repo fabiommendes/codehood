@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
+import { NotFound } from "@/core/error";
+import type { TimeSlotId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 
@@ -42,6 +44,7 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 	return slug;
 }
 
+/** A fresh course, and the three pieces of its natural key. */
 async function makeCourse(instructorUsername: string) {
 	const disciplineSlug = tag("disc");
 	await db.discipline.create(
@@ -49,7 +52,7 @@ async function makeCourse(instructorUsername: string) {
 		FULL_ACCESS,
 	);
 	const editionSlug = await ensureEdition();
-	return db.course.create(
+	const course = await db.course.create(
 		{
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
@@ -59,21 +62,27 @@ async function makeCourse(instructorUsername: string) {
 		},
 		FULL_ACCESS,
 	);
+	return {
+		course,
+		discipline: disciplineSlug,
+		instructor: instructorUsername,
+		edition: editionSlug,
+	};
 }
 
-test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot running past midnight", async () => {
+test("create rejects a zero-length slot and one running past midnight", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "a",
 				day: "MONDAY",
-				startMin: 600,
-				durationMin: 0,
+				start: { hour: 10, minute: 0 },
+				duration: { minutes: 0 },
 			},
 			opts,
 		),
@@ -82,37 +91,11 @@ test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot runn
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
-				slug: "b",
-				day: "MONDAY",
-				startMin: -1,
-				durationMin: 60,
-			},
-			opts,
-		),
-	).rejects.toThrow();
-
-	await expect(
-		db.timeSlot.create(
-			{
-				courseId: course.id,
-				slug: "c",
-				day: "MONDAY",
-				startMin: 1440,
-				durationMin: 60,
-			},
-			opts,
-		),
-	).rejects.toThrow();
-
-	await expect(
-		db.timeSlot.create(
-			{
-				courseId: course.id,
+				course: course.id,
 				slug: "d",
 				day: "MONDAY",
-				startMin: 1400,
-				durationMin: 60,
+				start: { hour: 23, minute: 20 },
+				duration: { hours: 1 },
 			},
 			opts,
 		),
@@ -121,29 +104,29 @@ test("create rejects durationMin <= 0, startMin outside 0..1439, and a slot runn
 
 test("create rejects a second slot overlapping an existing one on the same weekday in the same course", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	await db.timeSlot.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "mon",
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		opts,
 	);
 
-	// Overlaps [840, 960): starts inside it.
+	// Overlaps [14:00, 16:00): starts inside it.
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "mon2",
 				day: "MONDAY",
-				startMin: 900,
-				durationMin: 60,
+				start: { hour: 15, minute: 0 },
+				duration: { hours: 1 },
 			},
 			opts,
 		),
@@ -153,11 +136,11 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "mon3",
 				day: "MONDAY",
-				startMin: 960,
-				durationMin: 60,
+				start: { hour: 16, minute: 0 },
+				duration: { hours: 1 },
 			},
 			opts,
 		),
@@ -167,11 +150,11 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "tue",
 				day: "TUESDAY",
-				startMin: 840,
-				durationMin: 120,
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 2 },
 			},
 			opts,
 		),
@@ -180,17 +163,17 @@ test("create rejects a second slot overlapping an existing one on the same weekd
 
 test("create rejects a duplicate slug in one course, and accepts the same slug in another", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const courseA = await makeCourse(instructor.username);
-	const courseB = await makeCourse(instructor.username);
+	const { course: courseA } = await makeCourse(instructor.username);
+	const { course: courseB } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	await db.timeSlot.create(
 		{
-			courseId: courseA.id,
+			course: courseA.id,
 			slug: "mon",
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		opts,
 	);
@@ -198,11 +181,11 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: courseA.id,
+				course: courseA.id,
 				slug: "mon",
 				day: "TUESDAY",
-				startMin: 600,
-				durationMin: 60,
+				start: { hour: 10, minute: 0 },
+				duration: { hours: 1 },
 			},
 			opts,
 		),
@@ -211,11 +194,11 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: courseB.id,
+				course: courseB.id,
 				slug: "mon",
 				day: "MONDAY",
-				startMin: 840,
-				durationMin: 120,
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 2 },
 			},
 			opts,
 		),
@@ -224,69 +207,67 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 
 test("update moves the hour; the slot's existing events keep their own times", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	const slot = await db.timeSlot.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "mon",
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		opts,
 	);
 	const event = await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 
 	const moved = await db.timeSlot.update(
 		{ id: slot.id },
-		{ startMin: 600, durationMin: 90 },
+		{ start: { hour: 10, minute: 0 }, duration: { hours: 1, minutes: 30 } },
 		opts,
 	);
-	expect(moved.startMin).toBe(600);
-	expect(moved.durationMin).toBe(90);
+	expect(moved.start).toEqual({ hour: 10, minute: 0 });
+	expect(moved.duration).toEqual({ hours: 1, minutes: 30 });
 
+	// The event's own `startAt` was computed once at creation and is never
+	// recomputed by a later slot move — moving the slot's hour does not move
+	// a single row in `CalendarEvent`.
 	const reloaded = await db.calendarEvent.findOne({ id: event.id }, opts);
 	expect(reloaded?.startAt.getTime()).toBe(event.startAt.getTime());
-	expect(reloaded?.durationMin).toBe(event.durationMin);
 });
 
 test("delete throws while events reference the slot, naming the count, and succeeds once they are gone", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	const slot = await db.timeSlot.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "mon",
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		opts,
 	);
 	const event = await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -303,16 +284,16 @@ test("an instructor writes their own course's slots; another instructor and a no
 	const instructor = await makeUser("INSTRUCTOR");
 	const otherInstructor = await makeUser("INSTRUCTOR");
 	const admin = await makeUser("ADMIN");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "mon",
 				day: "MONDAY",
-				startMin: 840,
-				durationMin: 120,
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 2 },
 			},
 			{ actor: instructor },
 		),
@@ -321,11 +302,11 @@ test("an instructor writes their own course's slots; another instructor and a no
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "tue",
 				day: "TUESDAY",
-				startMin: 840,
-				durationMin: 120,
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 2 },
 			},
 			{ actor: otherInstructor },
 		),
@@ -334,25 +315,25 @@ test("an instructor writes their own course's slots; another instructor and a no
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "wed",
 				day: "WEDNESDAY",
-				startMin: 840,
-				durationMin: 120,
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 2 },
 			},
 			{ actor: admin },
 		),
 	).rejects.toThrow();
 
-	const adminCourse = await makeCourse(admin.username);
+	const { course: adminCourse } = await makeCourse(admin.username);
 	await expect(
 		db.timeSlot.create(
 			{
-				courseId: adminCourse.id,
+				course: adminCourse.id,
 				slug: "mon",
 				day: "MONDAY",
-				startMin: 840,
-				durationMin: 120,
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 2 },
 			},
 			{ actor: admin },
 		),
@@ -361,17 +342,17 @@ test("an instructor writes their own course's slots; another instructor and a no
 
 test("upsert creates on first call, updates the same slot on the second, and a different slug creates a separate slot", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	const created = await db.timeSlot.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "upsert-slot",
 			title: "Before",
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		opts,
 	);
@@ -379,27 +360,27 @@ test("upsert creates on first call, updates the same slot on the second, and a d
 
 	const updated = await db.timeSlot.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "upsert-slot",
 			title: null,
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 90,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1, minutes: 30 },
 		},
 		opts,
 	);
 	expect(updated.id).toBe(created.id); // same key, same row
-	expect(updated.durationMin).toBe(90); // changed
+	expect(updated.duration).toEqual({ hours: 1, minutes: 30 }); // changed
 	expect(updated.title).toBeNull(); // cleared
 	expect(updated.day).toBe("MONDAY"); // untouched
 
 	const other = await db.timeSlot.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "upsert-slot-2",
 			day: "TUESDAY",
-			startMin: 840,
-			durationMin: 60,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1 },
 		},
 		opts,
 	);
@@ -408,16 +389,16 @@ test("upsert creates on first call, updates the same slot on the second, and a d
 
 test("upsert enforces the overlap rule against other slots, but not against the slot's own current row", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	await db.timeSlot.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "existing",
 			day: "MONDAY",
-			startMin: 840,
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		opts,
 	);
@@ -425,11 +406,11 @@ test("upsert enforces the overlap rule against other slots, but not against the 
 	await expect(
 		db.timeSlot.upsert(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "overlapping",
 				day: "MONDAY",
-				startMin: 900,
-				durationMin: 60,
+				start: { hour: 15, minute: 0 },
+				duration: { hours: 1 },
 			},
 			opts,
 		),
@@ -439,31 +420,31 @@ test("upsert enforces the overlap rule against other slots, but not against the 
 	await expect(
 		db.timeSlot.upsert(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "existing",
 				day: "MONDAY",
-				startMin: 850,
-				durationMin: 120,
+				start: { hour: 14, minute: 10 },
+				duration: { hours: 2 },
 			},
 			opts,
 		),
-	).resolves.toMatchObject({ startMin: 850 });
+	).resolves.toMatchObject({ start: { hour: 14, minute: 10 } });
 });
 
 test("an upsert nested in the caller's tx rolls back with it, proving it reuses that transaction rather than opening its own", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const course = await makeCourse(instructor.username);
+	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 
 	await expect(
 		prisma.$transaction(async (tx) => {
 			await db.timeSlot.upsert(
 				{
-					courseId: course.id,
+					course: course.id,
 					slug: "tx-slot",
 					day: "MONDAY",
-					startMin: 840,
-					durationMin: 120,
+					start: { hour: 14, minute: 0 },
+					duration: { hours: 2 },
 				},
 				{ ...opts, tx },
 			);
@@ -472,8 +453,167 @@ test("an upsert nested in the caller's tx rolls back with it, proving it reuses 
 	).rejects.toThrow("rollback");
 
 	const found = await db.timeSlot.findOne(
-		{ ref: { courseId: course.id, slug: "tx-slot" } },
+		{ course: course.id, slug: "tx-slot" },
 		opts,
 	);
 	expect(found).toBeNull();
+});
+
+test("findOne, update and delete accept the {id} PK form", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const { course } = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await db.timeSlot.create(
+		{
+			course: course.id,
+			slug: "pk-id",
+			day: "MONDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1 },
+		},
+		opts,
+	);
+
+	const pk = { id: slot.id };
+	expect(await db.timeSlot.findOne(pk, opts)).toMatchObject({ slug: "pk-id" });
+	expect((await db.timeSlot.update(pk, { title: "moved" }, opts)).title).toBe(
+		"moved",
+	);
+	await db.timeSlot.delete(pk, opts);
+	expect(await db.timeSlot.findOne(pk, opts)).toBeNull();
+});
+
+test("findOne, update and delete accept the {course, slug} PK form", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const { course } = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	await db.timeSlot.create(
+		{
+			course: course.id,
+			slug: "pk-course-slug",
+			day: "MONDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1 },
+		},
+		opts,
+	);
+
+	const pk = { course: course.id, slug: "pk-course-slug" };
+	expect(await db.timeSlot.findOne(pk, opts)).toMatchObject({
+		slug: "pk-course-slug",
+	});
+	expect((await db.timeSlot.update(pk, { title: "moved" }, opts)).title).toBe(
+		"moved",
+	);
+	await db.timeSlot.delete(pk, opts);
+	expect(await db.timeSlot.findOne(pk, opts)).toBeNull();
+});
+
+test("findOne, update and delete accept the course-natural-key-plus-slug PK form", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const {
+		course,
+		discipline,
+		instructor: instructorUsername,
+		edition,
+	} = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	await db.timeSlot.create(
+		{
+			course: course.id,
+			slug: "pk-natural",
+			day: "MONDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1 },
+		},
+		opts,
+	);
+
+	const pk = {
+		course: { discipline, instructor: instructorUsername, edition },
+		slug: "pk-natural",
+	};
+	expect(await db.timeSlot.findOne(pk, opts)).toMatchObject({
+		slug: "pk-natural",
+	});
+	expect((await db.timeSlot.update(pk, { title: "moved" }, opts)).title).toBe(
+		"moved",
+	);
+	await db.timeSlot.delete(pk, opts);
+	expect(await db.timeSlot.findOne(pk, opts)).toBeNull();
+});
+
+test("create and upsert accept course as a natural key, not just its numeric id", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const {
+		course,
+		discipline,
+		instructor: instructorUsername,
+		edition,
+	} = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const courseRef = { discipline, instructor: instructorUsername, edition };
+
+	const created = await db.timeSlot.create(
+		{
+			course: courseRef,
+			slug: "via-create",
+			day: "MONDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1 },
+		},
+		opts,
+	);
+	expect(created.courseId).toBe(course.id);
+
+	const upserted = await db.timeSlot.upsert(
+		{
+			course: courseRef,
+			slug: "via-upsert",
+			day: "TUESDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 1 },
+		},
+		opts,
+	);
+	expect(upserted.courseId).toBe(course.id);
+});
+
+test("findOne/update/delete throw NotFound, not a bare Error, for a missing slot or a natural key naming no course", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const missingId = { id: -1 as TimeSlotId };
+	const ghostCourse = {
+		course: {
+			discipline: tag("ghost"),
+			instructor: instructor.username,
+			edition: "2026-1",
+		},
+		slug: "mon",
+	};
+
+	await expect(db.timeSlot.findOne(missingId, opts)).resolves.toBeNull();
+	await expect(
+		db.timeSlot.update(missingId, { title: "x" }, opts),
+	).rejects.toBeInstanceOf(NotFound);
+	await expect(db.timeSlot.delete(missingId, opts)).rejects.toBeInstanceOf(
+		NotFound,
+	);
+
+	await expect(db.timeSlot.findOne(ghostCourse, opts)).rejects.toBeInstanceOf(
+		NotFound,
+	);
+	await expect(
+		db.timeSlot.create(
+			{
+				course: ghostCourse.course,
+				slug: "mon",
+				day: "MONDAY",
+				start: { hour: 14, minute: 0 },
+				duration: { hours: 1 },
+			},
+			opts,
+		),
+	).rejects.toBeInstanceOf(NotFound);
 });

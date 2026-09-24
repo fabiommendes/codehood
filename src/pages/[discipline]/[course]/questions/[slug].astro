@@ -23,7 +23,7 @@ const actor = Astro.locals.actor!;
 
 if (!slug) return Astro.rewrite("/404");
 const question = await db.question.findOne(
-	{ courseId: course.id, slug, public: false },
+	{ course: course.id, slug, public: false },
 	{ actor },
 );
 if (!question) return Astro.rewrite("/404");

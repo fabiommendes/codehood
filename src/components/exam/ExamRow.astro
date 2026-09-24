@@ -1,0 +1,34 @@
+---
+// A single exam as a `ListRow` card: title, a detail line (type, duration,
+// schedule), and a trailing status badge. Shared by the student exam list and
+// the course home page's "Upcoming exams" section.
+import ListRow from "@/components/ListRow.astro";
+import type { Exam } from "@/db";
+import {
+	examStatusBadgeClass,
+	examTypeLabels,
+	formatDuration,
+} from "@/utils/exam-display";
+import { formatDateTime } from "@/utils/schedule-time";
+
+interface Props {
+	exam: Exam;
+	/** The course's base URL, e.g. `/cs101/ada_2026-1` — links to `${href}/exams/${slug}`. */
+	href: string;
+}
+
+const { exam, href } = Astro.props;
+
+const schedule = exam.scheduledAt
+	? formatDateTime(exam.scheduledAt)
+	: "Not scheduled";
+const detail = `${examTypeLabels[exam.type]} · ${formatDuration(exam.duration)} · ${schedule}`;
+---
+
+<ListRow href={`${href}/exams/${exam.slug}`}>
+  <p class="font-medium">{exam.title}</p>
+  <p class="text-sm text-base-content/60">{detail}</p>
+  <span slot="trailing" class:list={["badge badge-sm", examStatusBadgeClass(exam.status)]}>
+    {exam.status}
+  </span>
+</ListRow>

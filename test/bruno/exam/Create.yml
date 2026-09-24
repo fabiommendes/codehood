@@ -16,7 +16,7 @@ http:
           "title": "Quiz 2: loops",
           "description": "A short quiz on loop invariants.",
           "preamble": "Answer every question.",
-          "durationMs": 1800000,
+          "duration": { "minutes": 30 },
           "tags": ["loops"],
           "questions": [
             { "slug": "loop-invariants", "version": "v1" }

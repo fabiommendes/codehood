@@ -11,19 +11,63 @@ import { NotFound } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
 import { CRUD, GET, PATCH, POST } from "./registry";
-import { parseCourseParams } from "./utils";
+import { parseCourseParams, parseWeekParam } from "./utils";
 
-export const calendarEventApi = CRUD("/api/calendar-event", {
-	name: "Calendar Event",
-	plural: "Calendar Events",
-	entity: schema.calendarEventSchema,
-	create: schema.calendarEventCreate,
-	update: schema.calendarEventUpdate,
-	filter: schema.calendarEventFilter,
-	key: schema.calendarEventPK,
-	tags: ["Calendar Events"],
-	service: db.calendarEvent,
+export const apiKeyApi = CRUD("/api/api-key", {
+	name: "Api Key",
+	plural: "Api Keys",
+	// The hash is the stored credential; it never leaves the server.
+	entity: schema.apiKeySchema.omit({ keyHash: true }),
+	create: schema.apiKeyCreate,
+	update: null,
+	filter: schema.apiKeyFilter,
+	key: schema.apiKeyPK,
+	tags: ["Api Keys"],
+	service: db.apiKey,
 });
+
+const courseScope = z.object({ course: schema.courseRef });
+
+export const calendarEventApi = CRUD(
+	"/api/course/[discipline]/[course]/calendar-event",
+	{
+		name: "Calendar Event",
+		plural: "Calendar Events",
+		keySegment: "/[week]/[timeSlot]",
+
+		// The ids are the service's business: over the API an event is the
+		// `(course, week, time slot)` it occupies, and its slot is a slug.
+		entity: schema.calendarEventSchema
+			.omit({ id: true, courseId: true })
+			.extend({
+				timeSlot: schema.timeSlotSchema.pick({
+					slug: true,
+					day: true,
+					start: true,
+					duration: true,
+				}),
+			}),
+		create: schema.calendarEventCreateScoped,
+		update: schema.calendarEventUpdate,
+		filter: schema.calendarEventFilterBase,
+		scope: courseScope,
+		key: schema.calendarEventPK,
+
+		tags: ["Calendar Events"],
+		service: db.calendarEvent,
+
+		parseKeyParams(params) {
+			return {
+				course: parseCourseParams(params),
+				week: parseWeekParam(params.week as string),
+				timeSlot: params.timeSlot as string,
+			};
+		},
+		parseScopeParams: (params: Record<string, string>) => ({
+			course: parseCourseParams(params),
+		}),
+	},
+);
 
 export const courseApi = CRUD("/api/course", {
 	name: "Course",
@@ -33,7 +77,6 @@ export const courseApi = CRUD("/api/course", {
 	entity: schema.courseSchema.omit({ id: true }),
 	create: schema.courseCreate,
 	update: schema.courseUpdate,
-	upsert: schema.courseUpsert,
 	filter: schema.courseFilter,
 	key: schema.courseNaturalKey,
 	tags: ["Courses"],
@@ -72,24 +115,20 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	keySegment: "/[slug]",
 
 	entity: schema.examSchema,
-	create: schema.examCreate.omit({ courseId: true }),
-	upsert: schema.examUpsert.omit({ courseId: true }),
+	create: schema.examCreate.omit({ course: true }),
 	update: schema.examUpdate,
 	filter: schema.examFilterBase,
-	scope: schema.courseNaturalKey,
-	key: schema.examNaturalKey,
+	scope: courseScope,
+	key: schema.examPK,
 
 	tags: ["Exams"],
 	service: db.exam,
 
 	parseKeyParams(params) {
-		return { ...parseCourseParams(params), slug: params.slug as string };
+		return { course: parseCourseParams(params), slug: params.slug as string };
 	},
-	parseCreateParams(params) {
-		return { courseId: parseCourseParams(params) };
-	},
-	parseListParams(params) {
-		return parseCourseParams(params);
+	parseScopeParams(params) {
+		return { course: parseCourseParams(params) };
 	},
 });
 
@@ -110,25 +149,21 @@ export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	plural: "Resources",
 	keySegment: "/[slug]",
 
-	entity: schema.resourceSchema.omit({ id: true }),
-	create: schema.resourceCreate.omit({ courseId: true }),
-	upsert: schema.resourceUpsert.omit({ courseId: true }),
+	entity: schema.resourceSchema.omit({ id: true, courseId: true }),
+	create: schema.resourceCreate.omit({ course: true }),
 	update: schema.resourceUpdate,
 	filter: schema.resourceFilterBase,
-	scope: schema.courseNaturalKey,
-	key: schema.resourceNaturalKey,
+	scope: courseScope,
+	key: schema.resourcePK,
 
 	tags: ["Resources"],
 	service: db.resource,
 
 	parseKeyParams(params) {
-		return { ...parseCourseParams(params), slug: params.slug as string };
+		return { course: parseCourseParams(params), slug: params.slug as string };
 	},
-	parseCreateParams(params) {
-		return { courseId: parseCourseParams(params) };
-	},
-	parseListParams(params) {
-		return parseCourseParams(params);
+	parseScopeParams(params) {
+		return { course: parseCourseParams(params) };
 	},
 });
 
@@ -138,25 +173,129 @@ export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
 	keySegment: "/[slug]",
 
 	entity: schema.questionSchema,
-	create: schema.questionCreate.omit({ courseId: true }),
-	upsert: schema.questionUpsert.omit({ courseId: true }),
+	create: schema.questionCreate.omit({ course: true }),
 	update: schema.questionUpdate,
 	filter: schema.questionFilterBase,
-	scope: schema.courseNaturalKey,
-	key: schema.questionNaturalKey,
+	scope: courseScope,
+	key: schema.questionPK,
 	findOneQuery: schema.questionFindOneQuery,
 
 	tags: ["Questions"],
 	service: db.question,
 
 	parseKeyParams(params) {
-		return { ...parseCourseParams(params), slug: params.slug as string };
+		return { course: parseCourseParams(params), slug: params.slug as string };
 	},
-	parseCreateParams(params) {
-		return { courseId: parseCourseParams(params) };
+	parseScopeParams(params) {
+		return { course: parseCourseParams(params) };
 	},
-	parseListParams(params) {
-		return parseCourseParams(params);
+});
+
+export const responseApi = CRUD("/api/course/[discipline]/[course]/response", {
+	name: "Response",
+	plural: "Responses",
+	keySegment: "/[publicId]",
+
+	entity: schema.responseSchema,
+	create: schema.responseCreate.omit({ course: true }),
+	update: schema.responseUpdate,
+	filter: schema.responseFilterBase,
+	scope: courseScope,
+	key: schema.responsePK,
+
+	tags: ["Responses"],
+	service: db.response,
+
+	parseKeyParams(params) {
+		return { publicId: params.publicId as string };
+	},
+	parseScopeParams(params) {
+		return { course: parseCourseParams(params) };
+	},
+});
+
+export const submissionApi = CRUD(
+	"/api/course/[discipline]/[course]/submission",
+	{
+		name: "Submission",
+		plural: "Submissions",
+		keySegment: "/[publicId]",
+
+		entity: schema.submissionSchema,
+		create: schema.submissionCreate,
+		upsert: false,
+		update: schema.submissionUpdate,
+		filter: schema.submissionFilterBase,
+		scope: courseScope,
+		key: schema.submissionPK,
+
+		tags: ["Submissions"],
+		service: db.submission,
+
+		parseKeyParams(params) {
+			return { publicId: params.publicId as string };
+		},
+		parseScopeParams(params) {
+			return { course: parseCourseParams(params) };
+		},
+	},
+);
+
+/**
+ * Nested under the submission it grades: a `ref` is only unique once the
+ * submission is known, so `(submission, ref)` is addressed by the path rather
+ * than by an opaque id.
+ */
+export const feedbackApi = CRUD(
+	"/api/course/[discipline]/[course]/submission/[publicId]/feedback",
+	{
+		name: "Feedback",
+		plural: "Feedback",
+		keySegment: "/[ref]",
+
+		entity: schema.feedbackSchema,
+		// PUT addresses the collection, so the `ref` of the pass being written
+		// travels in the body, same as it does on POST.
+		create: schema.feedbackCreate.omit({ submission: true }),
+		update: schema.feedbackUpdate,
+		filter: schema.feedbackFilterBase.omit({ submission: true }),
+		scope: courseScope,
+		key: schema.feedbackPK,
+
+		tags: ["Feedback"],
+		service: db.feedback,
+
+		parseKeyParams(params) {
+			return {
+				submission: { publicId: params.publicId as string },
+				ref: params.ref as string,
+			};
+		},
+		parseCreateParams(params) {
+			return { submission: { publicId: params.publicId as string } };
+		},
+		parseListParams(params) {
+			return {
+				course: parseCourseParams(params),
+				submission: { publicId: params.publicId as string },
+			};
+		},
+	},
+);
+
+export const submitApi = POST("/api/course/[discipline]/[course]/submit", {
+	in: schema.responseSubmit.omit({ course: true }),
+	out: schema.responseSchema,
+	summary: "Answer a question",
+	description:
+		"Resolves the answer slot for the question — creating it when the student has not answered before — and appends one attempt to it. Returns the slot with every attempt it now holds.",
+	operationId: "submit",
+	tags: ["Responses"],
+	handler: async ({ actor, body, params }) => {
+		return db.response.submit(
+			{ ...body, course: parseCourseParams(params) },
+			{ actor },
+		);
 	},
 });
 
@@ -171,15 +310,27 @@ export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
 //     service: db.session,
 // });
 
-export const timeSlotApi = CRUD("/api/time-slot", {
+export const timeSlotApi = CRUD("/api/course/[discipline]/[course]/time-slot", {
 	name: "TimeSlot",
+	plural: "Time Slots",
+	keySegment: "/[slug]",
+
 	entity: schema.timeSlotSchema,
-	create: schema.timeSlotCreate,
+	create: schema.timeSlotCreate.omit({ course: true }),
 	update: schema.timeSlotUpdate,
-	filter: schema.timeSlotFilter,
+	filter: schema.timeSlotFilterBase,
+	scope: courseScope,
 	key: schema.timeSlotPK,
+
 	tags: ["Time Slots"],
 	service: db.timeSlot,
+
+	parseKeyParams(params) {
+		return { course: parseCourseParams(params), slug: params.slug as string };
+	},
+	parseScopeParams(params) {
+		return { course: parseCourseParams(params) };
+	},
 });
 
 // TODO: document Errors

@@ -2,8 +2,8 @@ import { z } from "zod";
 import { publicQuestionSchema } from "@/mdq/public-schemas";
 import { questionSchema as mdqQuestionSchema } from "@/mdq/schemas-generated";
 import type { AssertEqual } from "@/utils/types";
-import { courseId, questionRefId, slug } from "./base";
-import { courseNaturalKey } from "./course";
+import { questionRefId, slug } from "./base";
+import { courseRef } from "./course";
 
 export const questionSchema = z.object({
 	slug: slug,
@@ -26,16 +26,12 @@ export const questionPublicSchema = questionSchema
 export const questionCreate = questionSchema
 	.omit({ createdAt: true, updatedAt: true, id: true })
 	.extend({
-		courseId: z.union([courseId, courseNaturalKey]),
+		course: courseRef,
 	});
 
-export const questionUpsert = questionCreate;
-
 export const questionUpdate = questionCreate
-	.omit({ slug: true, courseId: true })
+	.omit({ slug: true, course: true })
 	.partial();
-
-export const questionNaturalKey = courseNaturalKey.extend({ slug: slug });
 
 /**
  * Which view a read returns: `true` forces the public half, `false` demands
@@ -49,8 +45,7 @@ const questionPKPublicFlag = questionFindOneQuery.shape;
 export const questionPK = z.union([
 	z.object({ id: questionRefId, ...questionPKPublicFlag }),
 	z.object({ publicId: z.string().min(1), ...questionPKPublicFlag }),
-	z.object({ courseId: z.number(), slug: slug, ...questionPKPublicFlag }),
-	questionNaturalKey.extend(questionPKPublicFlag),
+	z.object({ course: courseRef, slug: slug, ...questionPKPublicFlag }),
 ]);
 
 export const questionFilterBase = z.object({
@@ -61,10 +56,7 @@ export const questionFilterBase = z.object({
 	...questionPKPublicFlag,
 });
 
-export const questionFilter = z.union([
-	questionFilterBase.extend({ courseId: courseId }),
-	questionFilterBase.extend(courseNaturalKey.shape),
-]);
+export const questionFilter = questionFilterBase.extend({ course: courseRef });
 
 export const questionStatus = questionSchema.shape.status;
 

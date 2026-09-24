@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/calendar-event?courseIds=1&from=2026-03-01&to=2026-07-01&kinds=LECTURE&kinds=LAB&limit=50
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/calendar-event?from=2026-03-01&to=2026-07-01&kinds=REGULAR&kinds=HOLIDAY&limit=50
   auth: inherit
 
 settings:

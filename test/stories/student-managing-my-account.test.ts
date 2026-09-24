@@ -110,7 +110,7 @@ test("student: leave a course", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create();
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	const href = courseHref({
@@ -140,7 +140,7 @@ test("student: leave a course", async ({ page }) => {
 	// Nothing was destroyed — an instructor re-enrolling them would restore
 	// access to whatever they already submitted.
 	const enrollment = await db.enrollment.findOne(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	expect(enrollment?.status).toBe("DROPPED");

@@ -1,3 +1,4 @@
+import { actions } from "astro:actions";
 import {
 	createEffect,
 	createMemo,
@@ -9,16 +10,29 @@ import {
 	Show,
 } from "solid-js";
 import Badge from "@/components/ui/Badge";
-import Table, { type ColumnConfig } from "@/components/ui/Table";
+import Table, {
+	type ColumnConfig,
+	type TableSort,
+} from "@/components/ui/Table";
+import {
+	applySortToParams,
+	compareNullsLast,
+	type SortState,
+	sortStateFromParams,
+	toggleSortState,
+} from "@/components/ui/table-sort";
 import type { QuestionType } from "@/core/schemas";
 import type { Question } from "@/db/services/question.service";
 import { questionTypeLabels, statusBadgeClass } from "@/utils/question-display";
 import type { AssertEqual } from "@/utils/types";
+import { ArchiveIcon, DraftIcon, GoIcon, PublishIcon } from "./icons";
 
 interface Props {
 	questions: Question[];
 	/** The course's base URL, e.g. `/cs101/ada_2026-1` — questions link to `${href}/questions/${slug}`. */
 	href: string;
+	/** The course's id, needed by the Actions column's status-cycle control. */
+	courseId: number;
 }
 
 // `@/core/schemas` pulls in a `z.instanceof(Buffer)` schema that only exists
@@ -53,16 +67,31 @@ const STATUS_PARAM: Record<Question["status"], string> = {
 	ARCHIVED: "archived",
 };
 
-type SortKey = "title-asc" | "title-desc" | "updated-asc" | "updated-desc";
+/// What the Actions column's status button moves a question to next.
+const STATUS_CYCLE: Record<Question["status"], Question["status"]> = {
+	ARCHIVED: "DRAFT",
+	DRAFT: "PUBLISHED",
+	PUBLISHED: "ARCHIVED",
+};
 
-const DEFAULT_SORT: SortKey = "updated-desc";
+/// What the status button shows, keyed by the status it moves *to* — the
+/// button expresses the outcome of clicking it, not the state it's leaving.
+const STATUS_ACTION: Record<
+	Question["status"],
+	{ label: string; Icon: () => JSX.Element; tone?: string }
+> = {
+	PUBLISHED: { label: "Publish", Icon: PublishIcon, tone: "text-success" },
+	ARCHIVED: { label: "Archive", Icon: ArchiveIcon },
+	DRAFT: { label: "Move to draft", Icon: DraftIcon },
+};
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-	{ value: "updated-desc", label: "Recently updated" },
-	{ value: "updated-asc", label: "Least recently updated" },
-	{ value: "title-asc", label: "Title (A–Z)" },
-	{ value: "title-desc", label: "Title (Z–A)" },
-];
+const SORT_FIELDS = ["title", "type", "status", "tags", "updated"] as const;
+type SortField = (typeof SORT_FIELDS)[number];
+
+const DEFAULT_SORT: SortState<SortField> = {
+	field: "updated",
+	direction: "desc",
+};
 
 function statusesFromParam(value: string | null): Set<Question["status"]> {
 	if (!value) return new Set();
@@ -87,25 +116,19 @@ function tagsFromParam(value: string | null): Set<string> {
 	return new Set(value.split(",").map((tag) => decodeURIComponent(tag)));
 }
 
-function sortFromParam(value: string | null): SortKey {
-	return SORT_OPTIONS.some((option) => option.value === value)
-		? (value as SortKey)
-		: DEFAULT_SORT;
-}
-
 /** Reads the current filter/sort state from the page's query string. */
 function readStateFromUrl(): {
 	statuses: Set<Question["status"]>;
 	types: Set<Question["question"]["type"]>;
 	tags: Set<string>;
-	sort: SortKey;
+	sort: SortState<SortField>;
 } {
 	const params = new URLSearchParams(window.location.search);
 	return {
 		statuses: statusesFromParam(params.get("status")),
 		types: typesFromParam(params.get("type")),
 		tags: tagsFromParam(params.get("tags")),
-		sort: sortFromParam(params.get("sort")),
+		sort: sortStateFromParams(params, SORT_FIELDS, DEFAULT_SORT),
 	};
 }
 
@@ -130,12 +153,31 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		new Set(),
 	);
 	const [tags, setTags] = createSignal<Set<string>>(new Set());
-	const [sort, setSort] = createSignal<SortKey>(DEFAULT_SORT);
+	const [sort, setSort] = createSignal<SortState<SortField>>(DEFAULT_SORT);
 	const [typeMenuOpen, setTypeMenuOpen] = createSignal(false);
 	const [tagMenuOpen, setTagMenuOpen] = createSignal(false);
 
+	// `props.questions` comes from Astro and never changes underneath us, so a
+	// status the Actions column just set is tracked here — keyed by slug —
+	// and layered over the prop rather than mutated in place.
+	const [statusOverrides, setStatusOverrides] = createSignal<
+		Record<string, Question["status"]>
+	>({});
+	const [pendingSlugs, setPendingSlugs] = createSignal<Set<string>>(new Set());
+
 	let typeMenuRoot: HTMLDivElement | undefined;
 	let tagMenuRoot: HTMLDivElement | undefined;
+
+	/// `props.questions` with any locally-applied status override layered on
+	/// top — the base every filter/sort/render reads from instead of the raw prop.
+	const effectiveQuestions = createMemo(() => {
+		const overrides = statusOverrides();
+		if (Object.keys(overrides).length === 0) return props.questions;
+		return props.questions.map((question) => {
+			const status = overrides[question.slug];
+			return status === undefined ? question : { ...question, status };
+		});
+	});
 
 	/// Every tag any question in the bank carries, deduplicated and sorted —
 	/// the source of truth for both the dropdown's options and which tags a
@@ -186,7 +228,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 				[...currentTags].map((tag) => encodeURIComponent(tag)).join(","),
 			);
 		}
-		if (currentSort !== DEFAULT_SORT) params.set("sort", currentSort);
+		applySortToParams(params, currentSort, DEFAULT_SORT);
 
 		const query = params.toString();
 		const url = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
@@ -240,6 +282,42 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		});
 	}
 
+	function toggleSort(field: SortField): void {
+		setSort((current) => toggleSortState(current, field));
+	}
+
+	/**
+	 * Cycles a question's status (ARCHIVED → DRAFT → PUBLISHED → ARCHIVED),
+	 * optimistically reflecting the new status in the table and rolling back
+	 * if the action fails.
+	 */
+	async function cycleStatus(question: Question): Promise<void> {
+		const previous = question.status;
+		const next = STATUS_CYCLE[previous];
+
+		setPendingSlugs((current) => new Set(current).add(question.slug));
+		setStatusOverrides((current) => ({ ...current, [question.slug]: next }));
+
+		const { error } = await actions.question.updateStatus({
+			courseId: props.courseId,
+			slug: question.slug,
+			status: next,
+		});
+
+		if (error) {
+			setStatusOverrides((current) => ({
+				...current,
+				[question.slug]: previous,
+			}));
+		}
+
+		setPendingSlugs((current) => {
+			const next = new Set(current);
+			next.delete(question.slug);
+			return next;
+		});
+	}
+
 	const hasActiveFilters = createMemo(
 		() => statuses().size > 0 || types().size > 0 || tags().size > 0,
 	);
@@ -255,7 +333,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		const currentTypes = types();
 		const currentTags = tags();
 
-		return props.questions.filter((question) => {
+		return effectiveQuestions().filter((question) => {
 			if (currentStatuses.size > 0 && !currentStatuses.has(question.status)) {
 				return false;
 			}
@@ -272,26 +350,42 @@ export default function QuestionsTable(props: Props): JSX.Element {
 
 	const sorted = createMemo(() => {
 		const rows = [...filtered()];
-		switch (sort()) {
-			case "title-asc":
-				return rows.sort((a, b) => titleOf(a).localeCompare(titleOf(b)));
-			case "title-desc":
-				return rows.sort((a, b) => titleOf(b).localeCompare(titleOf(a)));
-			case "updated-asc":
-				return rows.sort(
-					(a, b) => a.updatedAt.getTime() - b.updatedAt.getTime(),
-				);
-			default:
-				return rows.sort(
-					(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-				);
+		const { field, direction } = sort();
+
+		if (field === "tags") {
+			return rows.sort((a, b) =>
+				compareNullsLast(
+					a.question.tags?.[0],
+					b.question.tags?.[0],
+					direction,
+					(x, y) => x.localeCompare(y),
+				),
+			);
 		}
+
+		const dirMul = direction === "asc" ? 1 : -1;
+		const compare = (a: Question, b: Question): number => {
+			switch (field) {
+				case "title":
+					return titleOf(a).localeCompare(titleOf(b));
+				case "type":
+					return questionTypeLabels[a.question.type].localeCompare(
+						questionTypeLabels[b.question.type],
+					);
+				case "status":
+					return STATUS_LABELS[a.status].localeCompare(STATUS_LABELS[b.status]);
+				default:
+					return a.updatedAt.getTime() - b.updatedAt.getTime();
+			}
+		};
+		return rows.sort((a, b) => dirMul * compare(a, b));
 	});
 
 	const columns: ColumnConfig<Question>[] = [
 		{
 			title: "Title",
 			class: "font-medium",
+			sortKey: "title" satisfies SortField,
 			render: (question) => (
 				<a
 					href={`${props.href}/questions/${question.slug}`}
@@ -304,10 +398,12 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		{
 			title: "Type",
 			class: "text-base-content/60",
+			sortKey: "type" satisfies SortField,
 			render: (question) => questionTypeLabels[question.question.type],
 		},
 		{
 			title: "Status",
+			sortKey: "status" satisfies SortField,
 			render: (question) => (
 				<span class={`badge badge-sm ${statusBadgeClass(question.status)}`}>
 					{question.status}
@@ -316,6 +412,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		},
 		{
 			title: "Tags",
+			sortKey: "tags" satisfies SortField,
 			render: (question) => (
 				<div class="flex flex-wrap gap-1">
 					<For each={question.question.tags ?? []}>
@@ -331,13 +428,50 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		{
 			title: "Updated",
 			class: "text-base-content/60",
+			sortKey: "updated" satisfies SortField,
 			render: (question) =>
 				question.updatedAt.toLocaleDateString("en-US", {
 					month: "short",
 					day: "numeric",
 				}),
 		},
+		{
+			title: "Actions",
+			class: "text-right",
+			headerClass: "text-right",
+			render: (question) => {
+				const action = STATUS_ACTION[STATUS_CYCLE[question.status]];
+				const pending = () => pendingSlugs().has(question.slug);
+				return (
+					<div class="flex justify-end gap-1">
+						<button
+							type="button"
+							class={`btn btn-ghost btn-square btn-sm ${action.tone ?? ""}`}
+							disabled={pending()}
+							aria-label={action.label}
+							title={action.label}
+							onClick={() => cycleStatus(question)}
+						>
+							<action.Icon />
+						</button>
+						<a
+							href={`${props.href}/questions/${question.slug}`}
+							class="btn btn-ghost btn-square btn-sm"
+							aria-label={`Open ${titleOf(question)}`}
+							title="Open question"
+						>
+							<GoIcon />
+						</a>
+					</div>
+				);
+			},
+		},
 	];
+
+	const tableSort = createMemo<TableSort>(() => ({
+		key: sort().field,
+		direction: sort().direction,
+	}));
 
 	return (
 		<div class="mt-4 flex flex-col gap-4">
@@ -386,6 +520,15 @@ export default function QuestionsTable(props: Props): JSX.Element {
 									</label>
 								)}
 							</For>
+							<Show when={types().size > 0}>
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs self-end"
+									onClick={() => setTypes(new Set())}
+								>
+									Clear
+								</button>
+							</Show>
 						</div>
 					</Show>
 				</div>
@@ -420,21 +563,19 @@ export default function QuestionsTable(props: Props): JSX.Element {
 										</label>
 									)}
 								</For>
+								<Show when={tags().size > 0}>
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs self-end"
+										onClick={() => setTags(new Set())}
+									>
+										Clear
+									</button>
+								</Show>
 							</div>
 						</Show>
 					</div>
 				</Show>
-
-				<select
-					class="select select-sm w-auto"
-					value={sort()}
-					onChange={(event) => setSort(event.currentTarget.value as SortKey)}
-					aria-label="Sort by"
-				>
-					<For each={SORT_OPTIONS}>
-						{(option) => <option value={option.value}>{option.label}</option>}
-					</For>
-				</select>
 
 				<span class="text-sm text-base-content/60">
 					{sorted().length} of {props.questions.length} question
@@ -467,7 +608,12 @@ export default function QuestionsTable(props: Props): JSX.Element {
 						</p>
 					}
 				>
-					<Table columns={columns} data={sorted()} />
+					<Table
+						columns={columns}
+						data={sorted()}
+						sort={tableSort()}
+						onSort={(key) => toggleSort(key as SortField)}
+					/>
 				</Show>
 			</Show>
 		</div>

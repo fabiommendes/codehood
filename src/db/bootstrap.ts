@@ -187,14 +187,14 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	for (const student of [hopper, hamilton, liskov, bob]) {
 		await db.enrollment.create(
-			{ courseId: cs101.id, username: student.username },
+			{ course: cs101.id, username: student.username },
 			FULL_ACCESS,
 		);
 	}
 
 	for (const student of [liskov, bob]) {
 		await db.enrollment.create(
-			{ courseId: cs201.id, username: student.username },
+			{ course: cs201.id, username: student.username },
 			FULL_ACCESS,
 		);
 	}
@@ -205,7 +205,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "syllabus",
 			title: "Syllabus",
 			description: "Grading, schedule, and course policy.",
@@ -220,7 +220,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "sicp-ch1",
 			title: "SICP, chapter 1",
 			data: {
@@ -233,7 +233,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "toolchain",
 			title: "Setting up your toolchain",
 			description: "Local dev environment, in three steps.",
@@ -248,7 +248,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "factorial",
 			title: "factorial.py",
 			data: {
@@ -270,7 +270,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "complexity-cheat-sheet",
 			title: "Complexity cheat sheet",
 			description: "Time complexity for the structures covered this term.",
@@ -285,7 +285,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "clrs-trees",
 			title: "CLRS, chapter 12: Binary search trees",
 			data: {
@@ -298,7 +298,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "when-to-use-what",
 			title: "Which structure, when",
 			description:
@@ -314,7 +314,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.resource.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "linked-list-node",
 			title: "linked_list.py",
 			data: {
@@ -334,23 +334,23 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// struck-through rendering has something to show.
 	const cs101Mon = await db.timeSlot.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "mon",
 			title: "Lecture",
 			day: "MONDAY",
-			startMin: 840, // 14:00
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		FULL_ACCESS,
 	);
 	const cs101Wed = await db.timeSlot.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "wed",
 			title: "Lab",
 			day: "WEDNESDAY",
-			startMin: 840, // 14:00
-			durationMin: 120,
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
 		},
 		FULL_ACCESS,
 	);
@@ -358,42 +358,36 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		{
 			slug: "w01-mon",
 			slot: cs101Mon,
-			date: "2026-01-05",
 			week: 1,
-			kind: "LECTURE" as const,
+			kind: "REGULAR" as const,
 			title: "Course overview and tooling",
-			durationMin: 120,
 			description: "Setting up the toolchain; how the term is graded.",
 		},
 		{
 			slug: "w01-wed",
 			slot: cs101Wed,
-			date: "2026-01-07",
 			week: 1,
-			kind: "LAB" as const,
+			kind: "REGULAR" as const,
 			title: "Environment setup",
 			description: "Installing the interpreter and the course CLI.",
 		},
 		{
 			slug: "w02-mon",
 			slot: cs101Mon,
-			date: "2026-01-12",
 			week: 2,
-			kind: "LECTURE" as const,
+			kind: "REGULAR" as const,
 			title: "Variables and control flow",
 		},
 		{
 			slug: "w02-wed",
 			slot: cs101Wed,
-			date: "2026-01-14",
 			week: 2,
-			kind: "LAB" as const,
+			kind: "REGULAR" as const,
 			title: "Practice: control flow",
 		},
 		{
 			slug: "w03-mon",
 			slot: cs101Mon,
-			date: "2026-01-19",
 			week: 3,
 			kind: "HOLIDAY" as const,
 			title: "Martin Luther King Jr. Day",
@@ -402,43 +396,35 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		{
 			slug: "w03-wed",
 			slot: cs101Wed,
-			date: "2026-01-21",
 			week: 3,
-			kind: "LAB" as const,
+			kind: "REGULAR" as const,
 			title: "Practice: functions",
 		},
 		{
 			slug: "w04-mon",
 			slot: cs101Mon,
-			date: "2026-01-26",
 			week: 4,
-			kind: "LECTURE" as const,
+			kind: "REGULAR" as const,
 			title: "Functions and recursion",
 		},
 		{
 			slug: "w04-wed",
 			slot: cs101Wed,
-			date: "2026-01-28",
 			week: 4,
 			kind: "CANCELLED" as const,
-			durationMin: 0,
 			title: "Lab: recursion practice",
 			description: "Instructor traveling; make-up session posted online.",
 		},
 	]) {
 		await db.calendarEvent.create(
 			{
-				courseId: cs101.id,
-				timeSlotId: event.slot.id,
-				slug: event.slug,
-				date: event.date,
-				startMin: event.slot.startMin,
+				course: cs101.id,
+				timeSlot: event.slot.id,
 				week: event.week,
 				kind: event.kind,
 				title: event.title,
-				durationMin: event.durationMin ?? 120,
 				description: event.description ?? null,
-				contentHash: `demo-${event.slug}-v1`,
+				ref: `demo-${event.slug}-v1`,
 			},
 			FULL_ACCESS,
 		);
@@ -446,52 +432,45 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	const cs201Mon = await db.timeSlot.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "mon",
 			title: "Lecture",
 			day: "MONDAY",
-			startMin: 600, // 10:00
-			durationMin: 90,
+			start: { hour: 10, minute: 0 },
+			duration: { hours: 1, minutes: 30 },
 		},
 		FULL_ACCESS,
 	);
 	for (const event of [
 		{
 			slug: "w01-mon",
-			date: "2026-01-05",
 			week: 1,
-			kind: "LECTURE" as const,
+			kind: "REGULAR" as const,
 			title: "Arrays and linked lists",
 			description: "Time and space complexity of the basic sequences.",
 		},
 		{
 			slug: "w02-mon",
-			date: "2026-01-12",
 			week: 2,
-			kind: "LECTURE" as const,
+			kind: "REGULAR" as const,
 			title: "Stacks and queues",
 		},
 		{
 			slug: "w03-mon",
-			date: "2026-01-19",
 			week: 3,
-			kind: "LECTURE" as const,
+			kind: "REGULAR" as const,
 			title: "Binary search trees",
 		},
 	]) {
 		await db.calendarEvent.create(
 			{
-				courseId: cs201.id,
-				timeSlotId: cs201Mon.id,
-				slug: event.slug,
-				date: event.date,
-				startMin: cs201Mon.startMin,
+				course: cs201.id,
+				timeSlot: cs201Mon.id,
 				week: event.week,
 				kind: event.kind,
 				title: event.title,
 				description: event.description ?? "",
-				durationMin: 120,
-				contentHash: `demo-cs201-${event.slug}-v1`,
+				ref: `demo-cs201-${event.slug}-v1`,
 			},
 			FULL_ACCESS,
 		);
@@ -501,7 +480,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// draft and published status, so /<course>/questions has real data to list.
 	await db.question.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "recursion-basics",
 			status: "PUBLISHED",
 			version: "v1",
@@ -520,7 +499,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.question.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "loop-invariants",
 			status: "PUBLISHED",
 			version: "v1",
@@ -547,7 +526,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.question.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "linked-list-invariants",
 			status: "DRAFT",
 			version: "v1",
@@ -563,7 +542,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.question.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "factorial-of-five",
 			status: "PUBLISHED",
 			version: "v1",
@@ -580,7 +559,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.question.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "big-o-warmup",
 			status: "DRAFT",
 			version: "v1",
@@ -608,7 +587,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	await db.question.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "bst-lookup",
 			status: "PUBLISHED",
 			version: "v1",
@@ -627,7 +606,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.question.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "stack-vs-queue",
 			status: "DRAFT",
 			version: "v1",
@@ -646,7 +625,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// one waiting to start, one running, and one already over.
 	await db.exam.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "quiz-01",
 			type: "QUIZ",
 			status: "COMPLETED",
@@ -654,7 +633,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			description: "A short warm-up quiz on recursive functions.",
 			preamble: "Answer both questions. You may consult the course notes.",
 			scheduledAt: new Date("2026-01-26T14:00:00"),
-			durationMs: 30 * 60 * 1000,
+			duration: { minutes: 30 },
 			tags: ["recursion"],
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
@@ -665,15 +644,14 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.exam.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "midterm",
 			type: "EXAM",
 			status: "SCHEDULED",
 			title: "Midterm exam",
 			description: "Everything from weeks 1 to 7.",
 			scheduledAt: new Date("2026-03-09T14:00:00"),
-			durationMs: 2 * 60 * 60 * 1000,
-			extraTimeMs: 15 * 60 * 1000,
+			duration: { hours: 2 },
 			tags: ["midterm"],
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
@@ -683,11 +661,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+	await db.exam.update(
+		{ course: cs101.id, slug: "midterm" },
+		{ extraTime: { minutes: 15 } },
+		FULL_ACCESS,
+	);
 	await db.exam.create(
 		{
-			courseId: cs101.id,
+			course: cs101.id,
 			slug: "final",
-			type: "FINAL",
+			type: "EXAM",
 			status: "DRAFT",
 			title: "Final exam",
 			description: "Still being written.",
@@ -698,7 +681,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await db.exam.create(
 		{
-			courseId: cs201.id,
+			course: cs201.id,
 			slug: "practice-trees",
 			type: "PRACTICE",
 			status: "ONGOING",

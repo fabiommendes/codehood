@@ -19,12 +19,12 @@ function buildTimeSlot(
 	params: Partial<TimeSlotCreate>,
 ): TimeSlotCreate {
 	return {
-		courseId: params.courseId ?? (0 as schema.CourseId),
+		course: params.course ?? (0 as schema.CourseId),
 		slug: params.slug ?? `slot-${sequence}`,
 		title: faker.lorem.words(2),
 		day: faker.helpers.arrayElement(WEEKDAYS),
-		startMin: 8 * 60,
-		durationMin: 60,
+		start: { hour: 8, minute: 0 },
+		duration: { hours: 1 },
 	};
 }
 
@@ -39,7 +39,7 @@ export const timeSlotFactory = Factory.define<
 /**
  * Builds a `TimeSlotCreate` payload and persists it via `timeSlotService.create`.
  *
- * `courseId` is provisioned automatically (a fresh course) when left unset.
+ * `course` is provisioned automatically (a fresh course) when left unset.
  */
 export const persistedTimeSlotFactory = Factory.define<
 	TimeSlotCreate,
@@ -49,12 +49,12 @@ export const persistedTimeSlotFactory = Factory.define<
 >(({ sequence, params, transientParams, onCreate }) => {
 	onCreate(async (input) => {
 		const opts = serviceOpts(transientParams);
-		const courseId =
-			params.courseId ??
+		const course =
+			params.course ??
 			(await persistedCourseFactory.create({}, { transient: transientParams }))
 				.id;
 
-		return db.timeSlot.create({ ...input, courseId }, opts);
+		return db.timeSlot.create({ ...input, course }, opts);
 	});
 
 	return buildTimeSlot(sequence, params);

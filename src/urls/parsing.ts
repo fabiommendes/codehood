@@ -4,7 +4,7 @@
 
 import { EDITION_RE, RESERVED_USERNAMES, USERNAME_RE } from "./constants";
 
-export interface CourseRef {
+export interface CourseNaturalKey {
 	discipline: string;
 	instructor: string;
 	edition: string;

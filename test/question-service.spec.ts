@@ -68,7 +68,7 @@ test("create() stores the question with its first version", async () => {
 
 	const question = await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "recursion-basics",
 			status: "PUBLISHED",
 			version: "v1",
@@ -109,7 +109,7 @@ test("create() titles an untitled question after its slug", async () => {
 
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "untitled-one",
 			status: "DRAFT",
 			version: "v1",
@@ -129,7 +129,7 @@ test("create() accepts the course's natural key in place of its id", async () =>
 
 	const question = await db.question.create(
 		{
-			courseId: {
+			course: {
 				discipline: course.discipline.slug,
 				instructor: course.instructor.username,
 				edition: course.edition.slug,
@@ -152,7 +152,7 @@ test("create() refuses an instructor who does not own the course", async () => {
 	await expect(
 		db.question.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "not-mine",
 				status: "DRAFT",
 				version: "v1",
@@ -173,7 +173,7 @@ test("create() refuses a document whose fields disagree, and writes nothing", as
 	await expect(
 		db.question.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "broken-fill-in",
 				status: "DRAFT",
 				version: "v1",
@@ -198,7 +198,7 @@ test("create() refuses a document whose fields disagree, and writes nothing", as
 test("create() refuses a second question with the same slug in one course", async () => {
 	const { course, opts } = await makeCourse();
 	const input = {
-		courseId: course.id,
+		course: course.id,
 		slug: "same-slug",
 		status: "DRAFT" as const,
 		version: "v1",
@@ -216,7 +216,7 @@ test("create() allows the same slug in a different course", async () => {
 	for (const { course, opts } of [first, second]) {
 		await db.question.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "shared-slug",
 				status: "DRAFT",
 				version: "v1",
@@ -246,7 +246,7 @@ test("findMany() lists only the questions of the requested course, by id or by n
 
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -256,7 +256,7 @@ test("findMany() lists only the questions of the requested course, by id or by n
 	);
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q2",
 			status: "PUBLISHED",
 			version: "v1",
@@ -266,7 +266,7 @@ test("findMany() lists only the questions of the requested course, by id or by n
 	);
 	await db.question.create(
 		{
-			courseId: other.course.id,
+			course: other.course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -275,14 +275,16 @@ test("findMany() lists only the questions of the requested course, by id or by n
 		other.opts,
 	);
 
-	const byId = await db.question.findMany({ courseId: course.id }, opts);
+	const byId = await db.question.findMany({ course: course.id }, opts);
 	expect(byId.map((q) => q.slug).sort()).toEqual(["q1", "q2"]);
 
 	const byNaturalKey = await db.question.findMany(
 		{
-			discipline: course.discipline.slug,
-			instructor: course.instructor.username,
-			edition: course.edition.slug,
+			course: {
+				discipline: course.discipline.slug,
+				instructor: course.instructor.username,
+				edition: course.edition.slug,
+			},
 		},
 		opts,
 	);
@@ -293,7 +295,7 @@ test("findMany() gives the instructor the full document, including private field
 	const { course, opts } = await makeCourse();
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -302,7 +304,7 @@ test("findMany() gives the instructor the full document, including private field
 		opts,
 	);
 
-	const questions = await db.question.findMany({ courseId: course.id }, opts);
+	const questions = await db.question.findMany({ course: course.id }, opts);
 
 	expect(questions).toHaveLength(1);
 	const [question] = questions as [z.infer<typeof questionSchema>];
@@ -315,12 +317,12 @@ test("findMany() gives an enrolled student only the public half", async () => {
 	const { course, opts } = await makeCourse();
 	const student = await persistedUserFactory.create({ role: "STUDENT" });
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -330,7 +332,7 @@ test("findMany() gives an enrolled student only the public half", async () => {
 	);
 
 	const questions = await db.question.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: student },
 	);
 
@@ -346,7 +348,7 @@ test("findMany() refuses an actor with no visibility into the course", async () 
 	const stranger = await persistedUserFactory.create({ role: "STUDENT" });
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -356,7 +358,7 @@ test("findMany() refuses an actor with no visibility into the course", async () 
 	);
 
 	await expect(
-		db.question.findMany({ courseId: course.id }, { actor: stranger }),
+		db.question.findMany({ course: course.id }, { actor: stranger }),
 	).rejects.toThrow();
 });
 
@@ -364,7 +366,7 @@ test("findMany() narrows by slugs and by status", async () => {
 	const { course, opts } = await makeCourse();
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -374,7 +376,7 @@ test("findMany() narrows by slugs and by status", async () => {
 	);
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q2",
 			status: "DRAFT",
 			version: "v1",
@@ -384,13 +386,13 @@ test("findMany() narrows by slugs and by status", async () => {
 	);
 
 	const bySlug = await db.question.findMany(
-		{ courseId: course.id, slugs: ["q1"] },
+		{ course: course.id, slugs: ["q1"] },
 		opts,
 	);
 	expect(bySlug.map((q) => q.slug)).toEqual(["q1"]);
 
 	const byStatus = await db.question.findMany(
-		{ courseId: course.id, statuses: ["DRAFT"] },
+		{ course: course.id, statuses: ["DRAFT"] },
 		opts,
 	);
 	expect(byStatus.map((q) => q.slug)).toEqual(["q2"]);
@@ -400,13 +402,17 @@ test("findMany() narrows by slugs and by status", async () => {
 // update / upsert / delete
 //
 
+function toDbWhere(pk: { course: number; slug: string }) {
+	return { courseId: pk.course, slug: pk.slug };
+}
+
 async function seedQuestion(
 	status: "DRAFT" | "PUBLISHED" | "ARCHIVED" = "PUBLISHED",
 ) {
 	const ctx = await makeCourse();
 	await db.question.create(
 		{
-			courseId: ctx.course.id,
+			course: ctx.course.id,
 			slug: "q1",
 			status,
 			version: "v1",
@@ -414,7 +420,7 @@ async function seedQuestion(
 		},
 		ctx.opts,
 	);
-	const pk = { courseId: ctx.course.id, slug: "q1" };
+	const pk = { course: ctx.course.id, slug: "q1" };
 	return { ...ctx, pk };
 }
 
@@ -449,7 +455,7 @@ test("update() appends a version, repoints latest, and leaves the old version un
 	expect(versions[0]).toEqual(before);
 
 	const ref = await prisma.questionRef.findFirstOrThrow({
-		where: pk,
+		where: toDbWhere(pk),
 		include: { questionTags: true },
 	});
 	expect(ref.latestId).toBe(versions[1]?.id);
@@ -557,7 +563,8 @@ test("update() refuses an admin who does not teach the course", async () => {
 		db.question.update(pk, { status: "DRAFT" }, { actor: admin }),
 	).rejects.toThrow();
 	expect(
-		(await prisma.questionRef.findFirstOrThrow({ where: pk })).status,
+		(await prisma.questionRef.findFirstOrThrow({ where: toDbWhere(pk) }))
+			.status,
 	).toBe("PUBLISHED");
 	expect(await versionsOf(course.id)).toHaveLength(1);
 });
@@ -567,7 +574,7 @@ test("update() refuses a missing question", async () => {
 
 	await expect(
 		db.question.update(
-			{ courseId: course.id, slug: "nope" },
+			{ course: course.id, slug: "nope" },
 			{ status: "DRAFT" },
 			opts,
 		),
@@ -577,7 +584,7 @@ test("update() refuses a missing question", async () => {
 test("upsert() creates the question when absent and appends a version when present", async () => {
 	const { course, opts } = await makeCourse();
 	const input = {
-		courseId: course.id,
+		course: course.id,
 		slug: "q1",
 		status: "DRAFT" as const,
 		version: "v1",
@@ -599,7 +606,7 @@ test("upsert() creates the question when absent and appends a version when prese
 test("upsert() with the same payload twice is idempotent", async () => {
 	const { course, opts } = await makeCourse();
 	const input = {
-		courseId: course.id,
+		course: course.id,
 		slug: "q1",
 		status: "DRAFT" as const,
 		version: "v1",
@@ -620,7 +627,7 @@ test("upsert() refuses an instructor who does not own the course, on either bran
 		await expect(
 			db.question.upsert(
 				{
-					courseId: course.id,
+					course: course.id,
 					slug,
 					status: "DRAFT",
 					version: "v9",
@@ -640,7 +647,9 @@ test("delete() archives the question and keeps its versions", async () => {
 
 	await db.question.delete(pk, opts);
 
-	const ref = await prisma.questionRef.findFirstOrThrow({ where: pk });
+	const ref = await prisma.questionRef.findFirstOrThrow({
+		where: toDbWhere(pk),
+	});
 	expect(ref.status).toBe("ARCHIVED");
 	expect(ref.latestId).not.toBeNull();
 	expect(await versionsOf(course.id)).toHaveLength(1);
@@ -654,7 +663,8 @@ test("delete() is idempotent on an archived question", async () => {
 	await db.question.delete(pk, opts);
 
 	expect(
-		(await prisma.questionRef.findFirstOrThrow({ where: pk })).status,
+		(await prisma.questionRef.findFirstOrThrow({ where: toDbWhere(pk) }))
+			.status,
 	).toBe("ARCHIVED");
 });
 
@@ -671,19 +681,22 @@ test("update() on an archived question is refused", async () => {
 
 	expect(await versionsOf(course.id)).toHaveLength(1);
 	expect(
-		(await prisma.questionRef.findFirstOrThrow({ where: pk })).status,
+		(await prisma.questionRef.findFirstOrThrow({ where: toDbWhere(pk) }))
+			.status,
 	).toBe("ARCHIVED");
 });
 
 for (const method of ["create", "upsert"] as const) {
 	test(`${method}() revives an archived question in place, keeping its history`, async () => {
 		const { course, opts, pk } = await seedQuestion();
-		const before = await prisma.questionRef.findFirstOrThrow({ where: pk });
+		const before = await prisma.questionRef.findFirstOrThrow({
+			where: toDbWhere(pk),
+		});
 		await db.question.delete(pk, opts);
 
 		const revived = await db.question[method](
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "q1",
 				status: "DRAFT",
 				version: "v2",
@@ -694,7 +707,9 @@ for (const method of ["create", "upsert"] as const) {
 
 		expect(revived.status).toBe("DRAFT");
 		expect(revived.version).toBe("v2");
-		const after = await prisma.questionRef.findFirstOrThrow({ where: pk });
+		const after = await prisma.questionRef.findFirstOrThrow({
+			where: toDbWhere(pk),
+		});
 		expect(after.id).toBe(before.id);
 		expect(after.publicId).toBe(before.publicId);
 		expect((await versionsOf(course.id)).map((v) => v.versionHash)).toEqual([
@@ -710,7 +725,7 @@ test("create() still refuses a slug held by a live question", async () => {
 	await expect(
 		db.question.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "q1",
 				status: "DRAFT",
 				version: "v2",
@@ -728,7 +743,8 @@ test("delete() refuses an instructor who does not own the course", async () => {
 
 	await expect(db.question.delete(pk, { actor: stranger })).rejects.toThrow();
 	expect(
-		(await prisma.questionRef.findFirstOrThrow({ where: pk })).status,
+		(await prisma.questionRef.findFirstOrThrow({ where: toDbWhere(pk) }))
+			.status,
 	).toBe("PUBLISHED");
 });
 
@@ -736,7 +752,7 @@ test("delete() refuses a missing question", async () => {
 	const { course, opts } = await seedQuestion();
 
 	await expect(
-		db.question.delete({ courseId: course.id, slug: "nope" }, opts),
+		db.question.delete({ course: course.id, slug: "nope" }, opts),
 	).rejects.toMatchObject({ status: 404 });
 });
 
@@ -750,7 +766,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 	const enrolled = await persistedUserFactory.create({ role: "STUDENT" });
 	const admin = await persistedUserFactory.create({ role: "ADMIN" });
 	await db.enrollment.create(
-		{ courseId: a.course.id, username: enrolled.username },
+		{ course: a.course.id, username: enrolled.username },
 		FULL_ACCESS,
 	);
 
@@ -758,7 +774,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 		for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
 			await db.question.create(
 				{
-					courseId: course.id,
+					course: course.id,
 					slug: status.toLowerCase(),
 					status,
 					version: "v1",
@@ -799,7 +815,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 			if (!isPublic && allowed.length === 0) {
 				await expect(
 					db.question.findMany(
-						{ courseId: a.course.id, public: isPublic },
+						{ course: a.course.id, public: isPublic },
 						{ actor },
 					),
 				).rejects.toMatchObject({ status: 403 });
@@ -807,7 +823,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 			}
 
 			const listed = await db.question.findMany(
-				{ courseId: a.course.id, public: isPublic },
+				{ course: a.course.id, public: isPublic },
 				{ actor },
 			);
 
@@ -846,13 +862,13 @@ test("an enrolled student sees only published questions", async () => {
 	const { course, opts } = await makeCourse();
 	const student = await persistedUserFactory.create({ role: "STUDENT" });
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
 		await db.question.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: status.toLowerCase(),
 				status,
 				version: "v1",
@@ -863,7 +879,7 @@ test("an enrolled student sees only published questions", async () => {
 	}
 
 	const listed = await db.question.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: student },
 	);
 	expect(listed.map((q) => q.slug)).toEqual(["published"]);
@@ -872,7 +888,7 @@ test("an enrolled student sees only published questions", async () => {
 	for (const slug of ["draft", "archived"]) {
 		expect(
 			await db.question.findOne(
-				{ courseId: course.id, slug },
+				{ course: course.id, slug },
 				{ actor: student },
 			),
 		).toBeNull();
@@ -885,7 +901,7 @@ test("an admin who does not teach the course reads only the public half of publi
 	for (const status of ["DRAFT", "PUBLISHED"] as const) {
 		await db.question.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: status.toLowerCase(),
 				status,
 				version: "v1",
@@ -896,11 +912,11 @@ test("an admin who does not teach the course reads only the public half of publi
 	}
 
 	const found = await db.question.findOne(
-		{ courseId: course.id, slug: "published" },
+		{ course: course.id, slug: "published" },
 		{ actor: admin },
 	);
 	const listed = await db.question.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: admin },
 	);
 
@@ -911,7 +927,7 @@ test("an admin who does not teach the course reads only the public half of publi
 	}
 	expect(
 		await db.question.findOne(
-			{ courseId: course.id, slug: "draft" },
+			{ course: course.id, slug: "draft" },
 			{ actor: admin },
 		),
 	).toBeNull();
@@ -931,7 +947,8 @@ test("writes to a draft by a non-author are 404, as if it never existed", async 
 		});
 	}
 	expect(
-		(await prisma.questionRef.findFirstOrThrow({ where: pk })).status,
+		(await prisma.questionRef.findFirstOrThrow({ where: toDbWhere(pk) }))
+			.status,
 	).toBe("DRAFT");
 });
 
@@ -943,7 +960,7 @@ test("findOne() and findMany() honour `public` for the author", async () => {
 	const { course, opts } = await makeCourse();
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -951,7 +968,7 @@ test("findOne() and findMany() honour `public` for the author", async () => {
 		},
 		opts,
 	);
-	const pk = { courseId: course.id, slug: "q1" };
+	const pk = { course: course.id, slug: "q1" };
 
 	// The overloads narrow the return type; these assignments are the check.
 	const full: Question | null = await db.question.findOne(
@@ -963,11 +980,11 @@ test("findOne() and findMany() honour `public` for the author", async () => {
 		opts,
 	);
 	const fullList: Question[] = await db.question.findMany(
-		{ courseId: course.id, public: false },
+		{ course: course.id, public: false },
 		opts,
 	);
 	const halfList: QuestionPublic[] = await db.question.findMany(
-		{ courseId: course.id, public: true },
+		{ course: course.id, public: true },
 		opts,
 	);
 
@@ -985,12 +1002,12 @@ test("asking for the whole document without the right to it is refused", async (
 	const { course, opts } = await makeCourse();
 	const student = await persistedUserFactory.create({ role: "STUDENT" });
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",
@@ -1001,13 +1018,13 @@ test("asking for the whole document without the right to it is refused", async (
 
 	await expect(
 		db.question.findOne(
-			{ courseId: course.id, slug: "q1", public: false },
+			{ course: course.id, slug: "q1", public: false },
 			{ actor: student },
 		),
 	).rejects.toMatchObject({ status: 403 });
 	await expect(
 		db.question.findMany(
-			{ courseId: course.id, public: false },
+			{ course: course.id, public: false },
 			{ actor: student },
 		),
 	).rejects.toMatchObject({ status: 403 });
@@ -1015,7 +1032,7 @@ test("asking for the whole document without the right to it is refused", async (
 	// The same reads without the flag succeed with the public half.
 	expect(
 		await db.question.findOne(
-			{ courseId: course.id, slug: "q1" },
+			{ course: course.id, slug: "q1" },
 			{ actor: student },
 		),
 	).not.toBeNull();

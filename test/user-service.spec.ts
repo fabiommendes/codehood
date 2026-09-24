@@ -180,6 +180,7 @@ test("upsert creates on first call and updates the same row on the second: chang
 			username,
 			name: "After",
 			role: "STUDENT",
+			password: "x",
 			schoolId: null,
 		},
 		FULL_ACCESS,
@@ -223,6 +224,7 @@ test("upsert requires create permission even when the actor may update the row: 
 				username: instructor.username,
 				name: "Via upsert",
 				role: "INSTRUCTOR",
+				password: "x",
 			},
 			{ actor: selfActor },
 		),
@@ -235,7 +237,7 @@ test("upsert requires create permission even when the actor may update the row: 
 	expect(reloaded?.name).toBe("Via update");
 });
 
-test("upsert without a password leaves the stored hash unchanged; with one, resets it", async () => {
+test("upsert never touches an existing user's password: that goes through passwordChange", async () => {
 	const username = "upsert-password";
 	await db.user.upsert(
 		{
@@ -253,35 +255,20 @@ test("upsert without a password leaves the stored hash unchanged; with one, rese
 	const hashAfterCreate = afterCreate?.passwordHash as string;
 	expect(hashAfterCreate).toBeTruthy();
 
+	// `password` is required on the create branch, so a PUT carries one even
+	// when the user is already there. It is ignored rather than applied.
 	await db.user.upsert(
 		{
 			email: "upsert-password@codehood.test",
 			username,
 			name: "Pw2",
 			role: "STUDENT",
-		},
-		FULL_ACCESS,
-	);
-	const afterNoPassword = await db.user.findOne({ username }, FULL_ACCESS);
-	expect(afterNoPassword?.passwordHash).toBe(hashAfterCreate);
-	expect(await verifyPassword(hashAfterCreate, "first-password")).toBe(true);
-
-	await db.user.upsert(
-		{
-			email: "upsert-password@codehood.test",
-			username,
-			name: "Pw3",
-			role: "STUDENT",
 			password: "second-password",
 		},
 		FULL_ACCESS,
 	);
-	const afterNewPassword = await db.user.findOne({ username }, FULL_ACCESS);
-	expect(afterNewPassword?.passwordHash).not.toBe(hashAfterCreate);
-	expect(
-		await verifyPassword(
-			afterNewPassword?.passwordHash as string,
-			"second-password",
-		),
-	).toBe(true);
+	const afterUpdate = await db.user.findOne({ username }, FULL_ACCESS);
+	expect(afterUpdate?.name).toBe("Pw2");
+	expect(afterUpdate?.passwordHash).toBe(hashAfterCreate);
+	expect(await verifyPassword(hashAfterCreate, "first-password")).toBe(true);
 });

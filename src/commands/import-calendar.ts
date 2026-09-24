@@ -4,7 +4,9 @@ import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { FULL_ACCESS } from "@/auth/actor";
-import { type CalendarEventCreate, db, type TimeSlot } from "@/db";
+import type { ClockTime } from "@/core/schemas";
+import { db, type TimeSlot } from "@/db";
+import { toDuration } from "@/utils/schedule-time";
 
 const WEEKDAYS = [
 	"SUNDAY",
@@ -16,6 +18,8 @@ const WEEKDAYS = [
 	"SATURDAY",
 ] as const;
 
+// Legacy manifests may still carry the old ten-value kind. Anything that
+// is not HOLIDAY or CANCELLED collapses to REGULAR (see EventKind).
 const EVENT_KINDS = [
 	"LECTURE",
 	"LAB",
@@ -24,10 +28,17 @@ const EVENT_KINDS = [
 	"SEMINAR",
 	"PROJECT",
 	"SELF_STUDY",
+	"REGULAR",
 	"HOLIDAY",
 	"RECESS",
 	"CANCELLED",
 ] as const;
+
+/** Maps a manifest's (possibly legacy) kind onto the current `EventKind`. */
+function toEventKind(kind: (typeof EVENT_KINDS)[number] | undefined) {
+	if (kind === "HOLIDAY" || kind === "CANCELLED") return kind;
+	return "REGULAR" as const;
+}
 
 const slotEntrySchema = z.object({
 	slug: z.string().min(1),
@@ -37,10 +48,17 @@ const slotEntrySchema = z.object({
 	duration: z.number().int().positive(),
 });
 
+// `date`/`start`/`duration` are accepted so an older manifest still parses,
+// but they are no longer authored: an event's time is derived from its
+// course, week, and slot. `slug` is kept only for console output — identity
+// is now `(course, week, slot)`.
 const eventEntrySchema = z.object({
 	slug: z.string().min(1),
 	slot: z.string().min(1),
-	date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	date: z
+		.string()
+		.regex(/^\d{4}-\d{2}-\d{2}$/)
+		.optional(),
 	start: z
 		.string()
 		.regex(/^\d{1,2}:\d{2}$/)
@@ -60,12 +78,12 @@ const manifestSchema = z.object({
 type SlotEntry = z.infer<typeof slotEntrySchema>;
 type EventEntry = z.infer<typeof eventEntrySchema>;
 
-/** `"14:00"` -> `840`. */
-function parseClock(clock: string): number {
+/** `"14:00"` -> `{ hour: 14, minute: 0 }`. */
+function parseClock(clock: string): ClockTime {
 	const [hourRaw, minuteRaw] = clock.split(":");
 	const hour = Number(hourRaw);
 	const minute = Number(minuteRaw);
-	return hour * 60 + minute;
+	return { hour, minute };
 }
 
 function canonicalHash(entry: unknown): string {
@@ -120,7 +138,7 @@ export const importCalendarCommand = new Command("import-calendar")
 			for (const entry of manifest.slots) {
 				try {
 					const existing = await db.timeSlot.findOne(
-						{ ref: { courseId: course.id, slug: entry.slug } },
+						{ course: course.id, slug: entry.slug },
 						FULL_ACCESS,
 					);
 					let slot: TimeSlot;
@@ -130,8 +148,8 @@ export const importCalendarCommand = new Command("import-calendar")
 							{
 								title: entry.title,
 								day: entry.day,
-								startMin: parseClock(entry.start),
-								durationMin: entry.duration,
+								start: parseClock(entry.start),
+								duration: toDuration(entry.duration),
 							},
 							FULL_ACCESS,
 						);
@@ -139,12 +157,12 @@ export const importCalendarCommand = new Command("import-calendar")
 					} else {
 						slot = await db.timeSlot.create(
 							{
-								courseId: course.id,
+								course: course.id,
 								slug: entry.slug,
 								title: entry.title,
 								day: entry.day,
-								startMin: parseClock(entry.start),
-								durationMin: entry.duration,
+								start: parseClock(entry.start),
+								duration: toDuration(entry.duration),
 							},
 							FULL_ACCESS,
 						);
@@ -159,9 +177,9 @@ export const importCalendarCommand = new Command("import-calendar")
 				}
 			}
 
-			const seenEventSlugs = new Set<string>();
+			// Identity is `(course, week, slot)`, not the manifest's own `slug`.
+			const seenEventKeys = new Set<string>();
 			for (const entry of manifest.events) {
-				seenEventSlugs.add(entry.slug);
 				const slot = slotsBySlug.get(entry.slot);
 				if (!slot) {
 					console.error(
@@ -170,54 +188,42 @@ export const importCalendarCommand = new Command("import-calendar")
 					process.exitCode = 1;
 					continue;
 				}
+				seenEventKeys.add(`${entry.week}:${slot.id}`);
+				const kind = toEventKind(entry.kind);
 				try {
-					const built: Omit<
-						CalendarEventCreate,
-						"courseId" | "timeSlotId" | "slug"
-					> = {
-						date: entry.date,
-						startMin: entry.start ? parseClock(entry.start) : 0,
-						durationMin: entry.duration ?? 120,
-						week: entry.week,
-						kind: entry.kind ?? "LECTURE",
-						title: entry.title,
-						description: entry.description ?? null,
-						contentHash: canonicalHash(entry),
-					};
 					const existing = await db.calendarEvent.findOne(
-						{ ref: { courseId: course.id, slug: entry.slug } },
+						{ course: course.id, week: entry.week, timeSlot: slot.id },
 						FULL_ACCESS,
 					);
 					if (existing) {
 						await db.calendarEvent.update(
 							{ id: existing.id },
 							{
-								date: built.date,
-								startMin: built.startMin,
-								durationMin: built.durationMin,
-								week: built.week,
-								kind: built.kind,
-								title: built.title,
-								description: built.description ?? undefined,
-								contentHash: built.contentHash,
+								kind,
+								title: entry.title,
+								description: entry.description ?? null,
+								ref: canonicalHash(entry),
 							},
 							FULL_ACCESS,
 						);
 						console.log(
-							`Updated  event ${entry.slug} (${entry.kind ?? "LECTURE"}).`,
+							`Updated  event ${entry.slug} (week ${entry.week}, ${kind}).`,
 						);
 					} else {
 						await db.calendarEvent.create(
 							{
-								...built,
-								courseId: course.id,
-								timeSlotId: slot.id,
-								slug: entry.slug,
+								course: course.id,
+								timeSlot: slot.id,
+								week: entry.week,
+								kind,
+								title: entry.title,
+								description: entry.description ?? null,
+								ref: canonicalHash(entry),
 							},
 							FULL_ACCESS,
 						);
 						console.log(
-							`Created  event ${entry.slug} (${entry.kind ?? "LECTURE"}).`,
+							`Created  event ${entry.slug} (week ${entry.week}, ${kind}).`,
 						);
 					}
 				} catch (error) {
@@ -234,9 +240,11 @@ export const importCalendarCommand = new Command("import-calendar")
 					FULL_ACCESS,
 				);
 				for (const event of current) {
-					if (!seenEventSlugs.has(event.slug)) {
+					if (!seenEventKeys.has(`${event.week}:${event.timeSlot.id}`)) {
 						await db.calendarEvent.delete({ id: event.id }, FULL_ACCESS);
-						console.log(`Pruned   event ${event.slug} (${event.kind}).`);
+						console.log(
+							`Pruned   event week ${event.week} (${event.timeSlot.slug}, ${event.kind}).`,
+						);
 					}
 				}
 			}

@@ -5,6 +5,7 @@ import type { Weekday } from "@/db/client";
 import { prisma } from "@/db/client";
 import { persistedUserFactory, userFactory } from "@/fixtures/user.factory";
 import { SERVER_TZ } from "@/utils/schedule-time";
+import { TEST_BASE_URL } from "../env";
 
 /**
  * Mirrors `SESSION_COOKIE` in `src/middleware.ts`.
@@ -15,7 +16,7 @@ import { SERVER_TZ } from "@/utils/schedule-time";
 const SESSION_COOKIE = "session";
 
 /** Where `playwright.config.ts` serves the build under test. */
-const BASE_URL = "http://localhost:4322";
+const BASE_URL = TEST_BASE_URL;
 
 /**
  * Empties every table, so a story starts from a world it fully controls.

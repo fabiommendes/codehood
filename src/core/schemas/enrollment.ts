@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { courseId, username } from "./base";
-import { courseNaturalKey } from "./course";
+import { courseRef } from "./course";
 import { userSchema } from "./user";
 
 export const enrollmentStatus = z.enum(["ACTIVE", "DROPPED"]);
@@ -23,7 +23,7 @@ export const enrollmentSchema = userSchema
 	});
 
 export const enrollmentCreate = z.object({
-	courseId: z.union([courseId, courseNaturalKey]),
+	course: courseRef,
 	username: username,
 });
 
@@ -35,7 +35,6 @@ export const enrollmentFilterBase = z.object({
 	status: enrollmentStatus.optional(),
 });
 
-export const enrollmentFilter = z.union([
-	enrollmentFilterBase.extend({ courseId: courseId }),
-	enrollmentFilterBase.extend(courseNaturalKey.shape),
-]);
+export const enrollmentFilter = enrollmentFilterBase.extend({
+	course: courseRef,
+});

@@ -243,7 +243,7 @@ export class AttachmentService {
 			where: { hash: target.hash },
 		});
 		if (anyName === 0) {
-			await this.blob.delete({ hash: target.hash }, opts);
+			await this.blob.delete({ hash: target.hash }, { ...opts, actor: SYSTEM });
 		}
 	}
 

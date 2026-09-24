@@ -18,6 +18,7 @@ import {
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
+import { courseRefWhere, valueOrNotFound } from "../utils";
 
 export type { InviteId } from "@/core/schemas";
 
@@ -59,7 +60,7 @@ export class InviteService extends CrudBase<{
 	create: InviteCreate;
 	filter: InviteFilter;
 	update: InviteUpdate;
-	upsert: never;
+	upsert: false;
 }> {
 	/**
 	 * Creates an invite, returning the plaintext token and the invite row.
@@ -83,14 +84,14 @@ export class InviteService extends CrudBase<{
 		input: InviteCreate,
 		opts: ServiceOptsWithoutTx,
 	): Promise<Invite> {
-		const course = input.courseId
+		const course = input.course
 			? await tx.course.findUnique({
-					where: { id: input.courseId },
+					where: courseRefWhere(input.course),
 					select: { id: true, instructor: { select: { username: true } } },
 				})
 			: null;
-		if (input.courseId && !course) {
-			throw new NotFound("course", { id: input.courseId });
+		if (input.course && !course) {
+			throw new NotFound("course");
 		}
 		ensurePerm(opts.actor, "invite.create", {
 			invitedRole: input.invitedRole,
@@ -115,7 +116,7 @@ export class InviteService extends CrudBase<{
 				kind: input.kind,
 				email: input.email,
 				invitedRole: input.invitedRole,
-				courseId: input.courseId,
+				courseId: course?.id,
 				maxUses: input.maxUses ?? null,
 				expiresAt: new Date(
 					Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
@@ -179,12 +180,22 @@ export class InviteService extends CrudBase<{
 		filter: InviteFilter,
 		opts: ServiceOptsWithoutTx,
 	): Promise<Invite[]> {
+		const course = filter.course
+			? valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(filter.course),
+						select: { id: true },
+					}),
+				)
+			: null;
+
 		const invites = await tx.invite.findMany({
 			where: {
 				AND: [
 					filter.createdById ? { createdById: filter.createdById } : {},
 					filter.kind ? { kind: filter.kind } : {},
-					filter.courseId ? { courseId: filter.courseId } : {},
+					course ? { courseId: course.id } : {},
 					filter.active ? { expiresAt: { gt: new Date() } } : {},
 					inviteWhere(opts.actor),
 				],

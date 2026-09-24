@@ -63,6 +63,16 @@ function assertIn<T extends E[], E extends string>(
 	return value as T[number];
 }
 
+/**
+ * Normalize a validated `ENVIRONMENT` value to the short form the rest of the
+ * codebase compares against.
+ */
+function normalizeEnvironment(
+	value: "dev" | "development" | "prod" | "production",
+): "dev" | "prod" {
+	return value === "development" || value === "dev" ? "dev" : "prod";
+}
+
 // =============================================================================
 //  						  ENVIRONMENT
 // =============================================================================
@@ -72,10 +82,16 @@ export const DEBUG = readBoolean("DEBUG", false);
 /// Deliberately has no default. It decides whether demo accounts may be
 /// seeded and whether the session cookie carries `Secure`, so a deployment
 /// that forgets it must fail to boot rather than quietly come up as `dev`.
-export const ENVIRONMENT = assertIn(
-	readEnv("ENVIRONMENT"),
-	["dev", "prod"],
-	"ENVIRONMENT",
+///
+/// Accepts the long spellings `development` and `production` as aliases for
+/// `dev` and `prod`, normalized here so every other call site keeps comparing
+/// against the short form.
+export const ENVIRONMENT = normalizeEnvironment(
+	assertIn(
+		readEnv("ENVIRONMENT"),
+		["dev", "development", "prod", "production"],
+		"ENVIRONMENT",
+	),
 );
 export const DEVELOPMENT = ENVIRONMENT === "dev";
 export const PRODUCTION = ENVIRONMENT === "prod";
@@ -141,9 +157,22 @@ export const BLOB_QUOTA_BY_ROLE: Record<Role, number | null> = {
 export const BLOB_GC_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * How long a practice session stays open.
+ *
+ * A student who answers the same question again within the window continues
+ * the session they were in; after it, they start a new one.
+ */
+export const PRACTICE_SESSION_WINDOW_MS = 12 * 60 * 60 * 1000;
+
+/// Whether to echo the resolved environment at startup. Off unless asked for:
+/// the lines are noise in a test run, where they interleave with the reporter.
+const LOG_ENV = readBoolean("LOG_ENV", false);
+
+/**
  * Log environment variables to the console for debugging purposes.
  */
 function logEnvVariables(vars: [string, unknown][]): void {
+	if (!LOG_ENV) return;
 	for (const [name, value] of vars) {
 		console.log(`[env] ${name}=${value}`);
 	}

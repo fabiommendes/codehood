@@ -17,7 +17,7 @@ import type { AttachmentLinkMode } from "@/core/constants";
 import { prisma } from "@/db/client";
 import { BlobService } from "@/db/services/blob.service";
 import { hashBytes, isBlobHash } from "@/utils/content-hash";
-import { TEST_RESOURCE_ROOT } from "./resource-root";
+import { TEST_RESOURCE_ROOT } from "./env";
 
 // A random suffix, not an incrementing counter: this file's own numbering
 // would otherwise collide with identically-named counters in sibling spec

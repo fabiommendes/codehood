@@ -6,7 +6,7 @@
 		"node": ">=22.12.0"
 	},
 	"scripts": {
-		"dev": "pnpm run generate && astro dev",
+		"dev": "ENVIRONMENT=dev pnpm run generate && ENVIRONMENT=dev LOG_ENV=true astro dev",
 		"build": "pnpm run generate && astro build",
 		"preview": "astro preview",
 		"manage": "tsx src/commands/index.ts",
@@ -48,6 +48,7 @@
 		"shiki": "^4.4.3",
 		"solid-js": "^1.9.15",
 		"swagger-ui-dist": "^5.32.14",
+		"temporal-polyfill": "^1.0.5",
 		"wildleek": "^2.0.0",
 		"yaml": "^2.9.0",
 		"zod": "^4.4.3"

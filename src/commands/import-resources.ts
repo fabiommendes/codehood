@@ -76,7 +76,7 @@ export const importResourcesCommand = new Command("import-resources")
 				try {
 					const built = await buildCreateInput(entry, manifestDir);
 					const existing = await db.resource.findOne(
-						{ courseId: course.id, slug: entry.slug },
+						{ course: course.id, slug: entry.slug },
 						FULL_ACCESS,
 					);
 					let resource: Resource;
@@ -89,7 +89,7 @@ export const importResourcesCommand = new Command("import-resources")
 						console.log(`Updated  ${entry.slug} (${entry.type}).`);
 					} else {
 						resource = await db.resource.create(
-							{ ...built, courseId: course.id, slug: entry.slug },
+							{ ...built, course: course.id, slug: entry.slug },
 							FULL_ACCESS,
 						);
 						console.log(`Created  ${entry.slug} (${entry.type}).`);
@@ -108,7 +108,7 @@ export const importResourcesCommand = new Command("import-resources")
 
 			if (options.prune) {
 				const current = await db.resource.findMany(
-					{ courseId: course.id },
+					{ course: course.id },
 					FULL_ACCESS,
 				);
 				for (const resource of current) {
@@ -141,7 +141,7 @@ export const importResourcesCommand = new Command("import-resources")
 async function buildCreateInput(
 	entry: ResourceEntry,
 	manifestDir: string,
-): Promise<Omit<ResourceCreate, "courseId" | "slug">> {
+): Promise<Omit<ResourceCreate, "course" | "slug">> {
 	if (entry.type === "FILE") {
 		if (!entry.file) {
 			throw new Error("a FILE resource needs a `file` path.");

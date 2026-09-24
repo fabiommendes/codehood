@@ -20,7 +20,6 @@ import {
 	questionPublicSchema,
 	questionSchema,
 	questionUpdate,
-	questionUpsert,
 } from "@/core/schemas";
 import {
 	CrudBase,
@@ -48,7 +47,6 @@ export type QuestionCreate = z.infer<typeof questionCreate>;
 export type QuestionFilter = z.infer<typeof questionFilter>;
 export type QuestionPK = z.infer<typeof questionPK>;
 export type QuestionUpdate = z.infer<typeof questionUpdate>;
-export type QuestionUpsert = z.infer<typeof questionUpsert>;
 
 /** What a read returns: the authored document, or the student-safe half. */
 export type QuestionView = Question | QuestionPublic;
@@ -101,7 +99,6 @@ export class QuestionService extends CrudBase<{
 	create: QuestionCreate;
 	filter: QuestionFilter;
 	update: QuestionUpdate;
-	upsert: QuestionUpsert;
 }> {
 	// Overloads only narrow the return type on `filter.public`; the logic and
 	// its docs live in `findOneTx`/`findManyTx`.
@@ -158,7 +155,7 @@ export class QuestionService extends CrudBase<{
 		opts: ServiceOptsWithoutTx,
 	): Promise<Question> {
 		assertWellFormed(input.question);
-		const course = await writableCourse(tx, input.courseId, opts.actor);
+		const course = await writableCourse(tx, input.course, opts.actor);
 
 		const archived = await tx.questionRef.findFirst({
 			where: { courseId: course.id, slug: input.slug, status: "ARCHIVED" },
@@ -205,13 +202,15 @@ export class QuestionService extends CrudBase<{
 
 		if (!row) return null;
 
+		const full = hasPerm(opts.actor, "course.update-contents", row.course);
+
+		// A draft or archived question does not exist for a non-author, whether
+		// or not they may read the course's contents.
+		if (!full && row.status !== "PUBLISHED") return null;
+
 		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
-			// A draft or archived question does not exist for a non-author.
-			if (row.status !== "PUBLISHED") return null;
 			throw new NotAllowed("question.read");
 		}
-
-		const full = hasPerm(opts.actor, "course.update-contents", row.course);
 		if (filter.public === false && !full) {
 			throw new NotAllowed("question.read");
 		}
@@ -248,15 +247,7 @@ export class QuestionService extends CrudBase<{
 		const course = valueOrNotFound(
 			"course",
 			await tx.course.findUnique({
-				where: courseRefWhere(
-					"courseId" in filter
-						? filter.courseId
-						: {
-								discipline: filter.discipline,
-								instructor: filter.instructor,
-								edition: filter.edition,
-							},
-				),
+				where: courseRefWhere(filter.course),
 				select: {
 					id: true,
 					instructor: { select: { username: true } },
@@ -357,16 +348,16 @@ export class QuestionService extends CrudBase<{
 	@Validate({
 		service: true,
 		returns: questionSchema,
-		args: [undefined, questionUpsert],
+		args: [undefined, questionCreate],
 	})
 	protected async upsertTx(
 		tx: PrismaTx,
-		input: QuestionUpsert,
+		input: QuestionCreate,
 		opts: ServiceOptsWithoutTx,
 	): Promise<QuestionView> {
 		// Checked up front so both branches refuse a non-author the same way,
 		// without telling them whether the question exists.
-		const course = await writableCourse(tx, input.courseId, opts.actor);
+		const course = await writableCourse(tx, input.course, opts.actor);
 		const scoped = { ...opts, tx };
 
 		const existing = await tx.questionRef.findUnique({
@@ -374,12 +365,12 @@ export class QuestionService extends CrudBase<{
 			select: { status: true },
 		});
 		if (!existing || existing.status === "ARCHIVED") {
-			return this.create({ ...input, courseId: course.id }, scoped);
+			return this.create({ ...input, course: course.id }, scoped);
 		}
 
 		const { status, version, question } = input;
 		return this.update(
-			{ courseId: course.id, slug: input.slug },
+			{ course: course.id, slug: input.slug },
 			{ status, version, question },
 			scoped,
 		);
@@ -506,24 +497,24 @@ function fromDbPublic(row: DbQuestionPublic): QuestionPublic {
 function refWhere(filter: QuestionPK): Prisma.QuestionRefWhereInput {
 	if ("id" in filter) return { id: filter.id };
 	if ("publicId" in filter) return { publicId: filter.publicId };
-	if ("courseId" in filter) {
-		return { courseId: filter.courseId, slug: filter.slug };
-	}
 
 	return {
 		slug: filter.slug,
-		course: {
-			disciplineSlug: filter.discipline,
-			instructorId: filter.instructor,
-			editionSlug: filter.edition,
-		},
+		course:
+			typeof filter.course === "number"
+				? { id: filter.course }
+				: {
+						disciplineSlug: filter.course.discipline,
+						instructorId: filter.course.instructor,
+						editionSlug: filter.course.edition,
+					},
 	};
 }
 
 /** Finds the course a question is written to, refusing an actor who may not write its content. */
 async function writableCourse(
 	tx: PrismaTx,
-	ref: QuestionCreate["courseId"],
+	ref: QuestionCreate["course"],
 	actor: ServiceOpts["actor"],
 ) {
 	return valueOrNotAllowed(

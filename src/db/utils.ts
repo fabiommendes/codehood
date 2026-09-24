@@ -1,5 +1,4 @@
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
-import type { z } from "zod";
 import { DEVELOPMENT } from "@/core/constants";
 import {
 	type ActionCode,
@@ -9,16 +8,13 @@ import {
 	NotFound,
 } from "@/core/error";
 import type { InvalidDataCode } from "@/core/error-response";
-import type { CourseId, courseNaturalKey } from "@/core/schemas";
+import type { CourseRef } from "@/core/schemas";
 
 /**
  * The unique-key `where` for a course given by id or by natural key.
  */
-export function courseRefWhere(
-	ref: z.infer<typeof courseNaturalKey> | CourseId | { courseId: CourseId },
-) {
+export function courseRefWhere(ref: CourseRef) {
 	if (typeof ref === "number") return { id: ref };
-	if ("courseId" in ref) return { id: ref.courseId };
 
 	return {
 		disciplineSlug_instructorId_editionSlug: {

@@ -1,0 +1,24 @@
+info:
+  name: Submit
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/submit
+  body:
+    type: json
+    data: |-
+      {
+          "exam": "quiz-02",
+          "question": "foo",
+          "payload": { "base-case": true }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

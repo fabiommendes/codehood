@@ -14,7 +14,6 @@ import {
 	userPK,
 	userSchema,
 	userUpdate,
-	userUpsert,
 } from "@/core/schemas";
 import {
 	CrudBase,
@@ -37,7 +36,6 @@ export type User = z.infer<typeof userSchema>;
 export type UserFilter = z.infer<typeof userFilter>;
 export type UserPK = z.infer<typeof userPK>;
 export type UserUpdate = z.infer<typeof userUpdate>;
-export type UserUpsert = z.infer<typeof userUpsert>;
 export type PasswordChange = z.infer<typeof passwordChange>;
 
 /// Session sweep on a password change. Honours `opts.tx` when one is open.
@@ -49,7 +47,6 @@ export class UserService extends CrudBase<{
 	create: UserCreate;
 	filter: UserFilter;
 	update: UserUpdate;
-	upsert: UserUpsert;
 }> {
 	/**
 	 * Create a new user.
@@ -203,27 +200,21 @@ export class UserService extends CrudBase<{
 	 * PUT semantics: admin-only whether creating or updating — the create
 	 * permission ({@link assertCanCreateUser}) is enforced on the update
 	 * branch too, so a student cannot reach a wider write through `upsert`
-	 * than `update` already grants for their own profile. `password`, absent
-	 * from `UserUpdate`, is applied as a second write when given; omitted, the
-	 * stored hash is left alone.
+	 * than `update` already grants for their own profile. `password` is only
+	 * read on the create branch: an existing user's stored one is left alone,
+	 * and is changed through {@link passwordChange} instead.
 	 */
 	@Validate({
 		service: true,
 		returns: userSchema,
-		args: [undefined, userUpsert],
+		args: [undefined, userCreate],
 	})
 	protected async upsertTx(
 		tx: PrismaTx,
-		input: UserUpsert,
+		input: UserCreate,
 		opts: ServiceOptsWithoutTx,
 	): Promise<User> {
 		const scoped: ServiceOpts = { ...opts, tx };
-
-		// `assertCreatable` runs on the update branch only, so it doubles as
-		// the signal for which branch `upsert` took. `create` already stores
-		// the password; re-running `updatePassword` after it would hash twice
-		// and apply strength rules `create` does not.
-		let existed = false;
 
 		const user = await upsert(this, input, {
 			...scoped,
@@ -235,15 +226,10 @@ export class UserService extends CrudBase<{
 				githubId: i.githubId,
 				schoolId: i.schoolId,
 			}),
-			assertCreatable: (_i, o) => {
-				existed = true;
-				ensurePerm(o.actor, "user.create");
-			},
+			assertCreatable: (_i, o) => ensurePerm(o.actor, "user.create"),
 		});
 
-		if (!existed || input.password === undefined) return user;
-		const { hash } = await this.updatePassword(user, input.password, scoped);
-		return { ...user, passwordHash: hash };
+		return user;
 	}
 
 	/**
@@ -268,7 +254,9 @@ export class UserService extends CrudBase<{
 
 	// TODO: this method should be moved to the auth service.
 	/**
-	 * Update password for a user. Returns the password hash.
+	 * Update password for a user.
+	 *
+	 * Returns the password hash.
 	 */
 	@Validate({ service: true, args: [userSchema] })
 	async updatePassword(
@@ -306,6 +294,7 @@ export class UserService extends CrudBase<{
 		return { hash: updated.passwordHash };
 	}
 
+	// TODO: move to the auth service.
 	/**
 	 * Replaces a user's password once the current one is proven, and revokes
 	 * every session they hold.

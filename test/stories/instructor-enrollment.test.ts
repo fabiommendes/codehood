@@ -72,7 +72,7 @@ test("instructor: hand out one join link for the whole class", async ({
 	// The cap is the part the UI cannot show back, and the part an instructor
 	// is relying on when they post the link publicly.
 	const invites = await db.invite.findMany(
-		{ courseId: course.id, kind: "CLASSROOM" },
+		{ course: course.id, kind: "CLASSROOM" },
 		FULL_ACCESS,
 	);
 	expect(invites).toHaveLength(1);
@@ -119,7 +119,7 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 	// The short life is the whole point of a passphrase over an invite link,
 	// and it is the one part the page states rather than demonstrates.
 	const [passphrase] = await db.passphrase.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		FULL_ACCESS,
 	);
 	expect(passphrase?.value).toBe(value);
@@ -179,7 +179,7 @@ test("instructor: Drop and re-enroll a student", async ({ page }) => {
 	// half the UI cannot show back, and the half the instructor is relying on
 	// when the drop turns out to be a mistake.
 	const enrollment = await db.enrollment.findOne(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	expect(enrollment).toMatchObject({ status: "DROPPED" });
@@ -196,7 +196,7 @@ test("instructor: Drop and re-enroll a student", async ({ page }) => {
 		).toBeVisible();
 
 		const restored = await db.enrollment.findOne(
-			{ courseId: course.id, username: student.username },
+			{ course: course.id, username: student.username },
 			FULL_ACCESS,
 		);
 		expect(restored).toMatchObject({ status: "ACTIVE" });
@@ -279,7 +279,7 @@ test("instructor: Invite a student personally", async ({ page }) => {
 	// The invite is single-use and carries the course, which is what makes
 	// redeeming it an enrollment rather than a bare sign-up.
 	const invites = await db.invite.findMany(
-		{ courseId: course.id, kind: "PERSONAL" },
+		{ course: course.id, kind: "PERSONAL" },
 		FULL_ACCESS,
 	);
 	expect(invites).toHaveLength(1);

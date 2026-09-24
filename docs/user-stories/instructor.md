@@ -202,6 +202,18 @@ them, and opening one shows its stem, tags and current status — a read-only
 mirror of what was pushed, since authoring itself still happens locally.
 
 
+### Browse the exam list
+
+    status: web
+    url: /[discipline]/[course]/exams
+
+Instructor wants to see every exam in the course — draft, scheduled or already
+run — and check its type, status, schedule and duration at a glance. The
+course's Exams tab lists them, sorted by whichever column they click, so
+finding the one exam that is still a draft among a term's worth of quizzes
+does not mean reading the whole table.
+
+
 ### Share a question bank with a teaching team
 
     status: todo

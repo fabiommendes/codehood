@@ -1,7 +1,9 @@
 // Presentation helpers shared by the exam list and detail pages
 // (src/pages/[discipline]/[course]/exams/*).
 
+import type { Duration } from "@/core/schemas";
 import type { Exam } from "@/db";
+import { durationToMinutes } from "@/utils/schedule-time";
 
 type ExamStatus = Exam["status"];
 type ExamType = Exam["type"];
@@ -10,7 +12,6 @@ export const examTypeLabels: Record<ExamType, string> = {
 	PRACTICE: "Practice",
 	QUIZ: "Quiz",
 	EXAM: "Exam",
-	FINAL: "Final",
 };
 
 /** The DaisyUI badge class matching an exam's status. */
@@ -30,7 +31,7 @@ export function examStatusBadgeClass(status: ExamStatus): string {
 }
 
 /** `"90 min"`, or `"Untimed"` when the exam carries no duration. */
-export function formatDuration(durationMs: number | null): string {
-	if (durationMs === null) return "Untimed";
-	return `${Math.round(durationMs / 60_000)} min`;
+export function formatDuration(duration: Duration | null): string {
+	if (duration === null) return "Untimed";
+	return `${durationToMinutes(duration)} min`;
 }

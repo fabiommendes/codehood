@@ -7,6 +7,7 @@ import {
 	SERVER_TZ,
 	toInstant,
 	weekdayOf,
+	weekdayOnOrAfter,
 } from "@/utils/schedule-time";
 
 const NY = "America/New_York";
@@ -68,4 +69,50 @@ test("endOf adds minutes, and an event crossing midnight ends on the next local 
 	expect(localDateOf(startAt, zone)).toBe("2026-01-05");
 	expect(localDateOf(end, zone)).toBe("2026-01-06");
 	expect(end.getTime() - startAt.getTime()).toBe(120 * 60_000);
+});
+
+test("weekdayOnOrAfter keeps a date that already falls on the target weekday", () => {
+	const zone = "America/Sao_Paulo";
+	// 2026-01-05 is a Monday.
+	const monday = toInstant("2026-01-05", 9 * 60, zone);
+	const result = weekdayOnOrAfter(monday, "MONDAY", zone);
+
+	expect(localDateOf(result, zone)).toBe("2026-01-05");
+	expect(result.getTime()).toBe(monday.getTime());
+});
+
+test("weekdayOnOrAfter advances to the coming weekday, wrapping across the week", () => {
+	const zone = "America/Sao_Paulo";
+	const monday = toInstant("2026-01-05", 9 * 60, zone);
+
+	// Later in the same week.
+	expect(localDateOf(weekdayOnOrAfter(monday, "WEDNESDAY", zone), zone)).toBe(
+		"2026-01-07",
+	);
+	// ISO weeks end on Sunday, so Sunday is six days out, not the day before.
+	expect(localDateOf(weekdayOnOrAfter(monday, "SUNDAY", zone), zone)).toBe(
+		"2026-01-11",
+	);
+
+	// Wrapping from the end of the week back to its start.
+	const saturday = toInstant("2026-01-10", 9 * 60, zone);
+	expect(localDateOf(weekdayOnOrAfter(saturday, "MONDAY", zone), zone)).toBe(
+		"2026-01-12",
+	);
+});
+
+test("weekdayOnOrAfter reads the starting weekday in the given zone, not the process's", () => {
+	// 2026-01-05T02:00:00Z is Monday in UTC but still Sunday 23:00 in
+	// America/Sao_Paulo, so the two zones disagree on where the next Monday is.
+	const instant = new Date("2026-01-05T02:00:00Z");
+
+	expect(localDateOf(weekdayOnOrAfter(instant, "MONDAY", "UTC"), "UTC")).toBe(
+		"2026-01-05",
+	);
+	expect(
+		localDateOf(
+			weekdayOnOrAfter(instant, "MONDAY", "America/Sao_Paulo"),
+			"America/Sao_Paulo",
+		),
+	).toBe("2026-01-05");
 });

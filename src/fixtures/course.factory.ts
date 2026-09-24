@@ -102,7 +102,7 @@ export const persistedCourseFactory = Factory.define<
 				{ transient: transientParams },
 			);
 			await db.enrollment.create(
-				{ courseId: course.id, username: student.username },
+				{ course: course.id, username: student.username },
 				opts,
 			);
 			students.push(student);

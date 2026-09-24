@@ -5,13 +5,13 @@ info:
 
 http:
   method: PATCH
-  url: http://localhost:4321/api/time-slot/1
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/time-slot/mon
   body:
     type: json
     data: |-
       {
-          "startMin": 540,
-          "durationMin": 50
+          "start": { "hour": 9, "minute": 0 },
+          "duration": { "minutes": 50 }
       }
   auth: inherit
 

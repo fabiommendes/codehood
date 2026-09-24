@@ -48,15 +48,21 @@ export const adminMiddleware = defineMiddleware((context, next) => {
 	return next();
 });
 
+/**
+ * Authenticates a request from its `Authorization: Bearer` API key.
+ *
+ * A bearer token replaces whatever actor the session cookie resolved, and an
+ * invalid token leaves the request unauthenticated rather than falling back to
+ * the cookie.
+ */
 export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
-	if (context.locals.actor) return next(); // already authenticated via session cookie
-
 	const header = context.request.headers.get("authorization");
 	const token = header?.startsWith("Bearer ")
 		? header.slice("Bearer ".length)
 		: null;
 	if (!token) return next();
 
+	context.locals.actor = undefined;
 	const apiKey = await db.apiKey.validate(token);
 	if (apiKey) {
 		context.locals.actor = {

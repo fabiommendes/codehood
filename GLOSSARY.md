@@ -156,7 +156,7 @@ what the calendar renders.
 Type: domain
 
 A set of [Questions](#question) assigned to a course, of type PRACTICE, QUIZ,
-EXAM, or FINAL. Its status moves DRAFT → SCHEDULED → ONGOING → COMPLETED
+or EXAM. Its status moves DRAFT → SCHEDULED → ONGOING → COMPLETED
 (or ARCHIVED), and only ONGOING accepts submissions. Each question is pinned to
 a [Question version](#question-version) so the paper does not change while
 students are taking it.
@@ -241,9 +241,10 @@ Used from instructor to student or admin to instructor. Contrast
 
 Type: domain
 
-A timestamp on a [Response](#response) marking it as self-study rather than part
-of an [Exam](#exam). Responses carry either an exam or a practice session, never
-both.
+One attempt at a [Practice](#exam)-type [Exam](#exam). A student may take as
+many as they like, so each gets its own [Response](#response), told apart by
+the session's start time. A graded exam has no practice session and exactly one
+response.
 
 ## Public id
 
@@ -304,9 +305,9 @@ happened instead of 404.
 
 Type: domain
 
-One student's answer slot for one question, in an [Exam](#exam) or
-[Practice session](#practice-session). It collects [Submissions](#submission)
-and decides whether more may arrive.
+One student's attempt at one [Exam](#exam). It collects the
+[Submissions](#submission) they make for each question in it, and decides
+whether more may arrive.
 
 ## REST API
 
@@ -376,9 +377,9 @@ have an active [Enrollment](#enrollment) in and answers questions. The
 
 Type: domain
 
-One attempt at a [Response](#response), carrying the answer payload plus grade,
-feedback, and status. Attempts accumulate rather than overwrite, so a response
-keeps its full history.
+One attempt at a single question inside a [Response](#response), carrying the
+answer payload plus grade, feedback, and status. Attempts accumulate rather than
+overwrite, so a response keeps its full history.
 
 ## Time slot
 

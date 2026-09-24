@@ -7,7 +7,6 @@ import {
 	editionPK,
 	editionSchema,
 	editionUpdate,
-	editionUpsert,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
 import { Validate } from "@/utils/validate";
@@ -22,7 +21,6 @@ export type Edition = z.infer<typeof editionSchema>;
 export type EditionFilter = z.infer<typeof editionFilter>;
 export type EditionPK = z.infer<typeof editionPK>;
 export type EditionUpdate = z.infer<typeof editionUpdate>;
-export type EditionUpsert = z.infer<typeof editionUpsert>;
 
 /**
  * Every user sees every edition — they are labels on courses, not secrets —
@@ -39,7 +37,6 @@ export class EditionService
 			create: EditionCreate;
 			filter: EditionFilter;
 			update: EditionUpdate;
-			upsert: EditionUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -150,10 +147,10 @@ export class EditionService
 	 */
 	@Validate({
 		service: true,
-		args: [editionUpsert],
+		args: [editionCreate],
 		returns: editionSchema,
 	})
-	upsert(input: EditionUpsert, opts: ServiceOpts): Promise<Edition> {
+	upsert(input: EditionCreate, opts: ServiceOpts): Promise<Edition> {
 		ensurePerm(opts.actor, "edition.create");
 		assertWindow(input.startAt, input.endAt);
 		const client = opts.tx ?? this.prisma;

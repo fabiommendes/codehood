@@ -14,15 +14,27 @@ import { DisciplineService } from "./services/discipline.service";
 import { EditionService } from "./services/edition.service";
 import { EnrollmentService } from "./services/enrollment.service";
 import { ExamService } from "./services/exam.service";
+import { FeedbackService } from "./services/feedback.service";
 import { InviteService } from "./services/invite.service";
 import { PassphraseService } from "./services/passphrase.service";
 import { QuestionService } from "./services/question.service";
 import { ResourceService } from "./services/resource.service";
+import { ResponseService } from "./services/response.service";
 import { SessionService } from "./services/session.service";
+import { SubmissionService } from "./services/submission.service";
 import { TimeSlotService } from "./services/time-slot.service";
 import { UserService } from "./services/user.service";
 
-export type { ServiceOpts } from "@/db/base-service";
+export type {
+	ApiKeyKind,
+	EnrollmentStatus,
+	ExamStatus,
+	InviteKind,
+	ResourceType,
+	Role,
+	SubmissionStatus,
+} from "../generated/prisma/client";
+export type { ServiceOpts } from "./base-service";
 
 export type {
 	ApiKey,
@@ -50,7 +62,7 @@ export type {
 	CalendarEventPK,
 	CalendarEventUpdate,
 	EventKind,
-	LinkedExam,
+	Weekday,
 } from "./services/calendar-event.service";
 export { isMeeting } from "./services/calendar-event.service";
 export type {
@@ -60,7 +72,6 @@ export type {
 	CourseNaturalKey,
 	CoursePK,
 	CourseUpdate,
-	CourseUpsert,
 } from "./services/course.service";
 export type {
 	Discipline,
@@ -87,10 +98,18 @@ export type {
 	Exam,
 	ExamCreate,
 	ExamFilter,
+	ExamGroup,
 	ExamPK,
 	ExamUpdate,
-	ExamUpsert,
 } from "./services/exam.service";
+export { groupExamsForStudent } from "./services/exam.service";
+export type {
+	Feedback,
+	FeedbackCreate,
+	FeedbackFilter,
+	FeedbackPK,
+	FeedbackUpdate,
+} from "./services/feedback.service";
 export type {
 	Invite,
 	InviteCreate,
@@ -114,7 +133,6 @@ export type {
 	QuestionPK,
 	QuestionPublic,
 	QuestionUpdate,
-	QuestionUpsert,
 	QuestionView,
 } from "./services/question.service";
 export type {
@@ -127,11 +145,27 @@ export type {
 } from "./services/resource.service";
 export { groupResourcesByType } from "./services/resource.service";
 export type {
+	Response,
+	ResponseCreate,
+	ResponseFilter,
+	ResponsePK,
+	ResponseSubmit,
+	ResponseUpdate,
+} from "./services/response.service";
+export { PRACTICE_SESSION_WINDOW_MS } from "./services/response.service";
+export type {
 	Session,
 	SessionCreate,
 	SessionCreateResult,
 	SessionDeletePK,
 } from "./services/session.service";
+export type {
+	Submission,
+	SubmissionCreate,
+	SubmissionFilter,
+	SubmissionPK,
+	SubmissionUpdate,
+} from "./services/submission.service";
 export type {
 	TimeSlot,
 	TimeSlotCreate,
@@ -167,11 +201,14 @@ export const db = {
 	edition: new EditionService(),
 	enrollment: new EnrollmentService(),
 	exam: new ExamService(),
+	feedback: new FeedbackService(),
 	invite: new InviteService(),
 	passphrase: new PassphraseService(),
 	question: new QuestionService(),
 	resource: new ResourceService(attachmentService),
+	response: new ResponseService(),
 	session: new SessionService(),
+	submission: new SubmissionService(),
 	timeSlot: new TimeSlotService(),
 	user: new UserService(),
 } as const;

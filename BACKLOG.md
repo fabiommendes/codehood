@@ -48,14 +48,13 @@ Backlog items are categorized in sections, not on priority.
 * [ ] Add support for RPC since rest cant handle everything.
 * [ ] Check options for RPC UI. Use openapi? Is there a better alternative? 
   Is gRPC too much trouble?
-* [ ] Extend the natural-key REST addressing to the course-scoped subtree:
-  `time-slot`, `calendar-event`, `passphrase` and `exam` (`resource` is done,
-  see `dev/specs/to-review/course-scoped-resource-api.md`). Their `*Ref`
-  schemas are `{ courseId: number, slug }`, so the CLI still has to resolve a
-  numeric course id before it can touch anything inside a course. Nest them
-  under the course path with `CRUD`'s `parseScope`, `pkPath` and `upsert`
-  options, the way `resourceApi` does. Once every endpoint
-  is addressable naturally, drop `id` from the REST responses (but never from
+* [ ] Extend the natural-key REST addressing to `passphrase`, which has no
+  REST endpoint yet (`calendar-event`, `resource`, `exam` and `time-slot` are
+  done — see `dev/specs/to-review/course-scoped-resource-api.md` and
+  `dev/specs/to-review/course-ref-unification.md`). `passphraseCreate` and
+  `passphraseFilter` already take `course: CourseRef`, so registering the
+  `CRUD` route is the only piece left. Once every endpoint is addressable
+  naturally, drop `id` from the REST responses (but never from
   `courseSchema`, which the frontend and services keep using).
 
 ## Features

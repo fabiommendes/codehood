@@ -62,16 +62,15 @@ test("student: read the course home page", async ({ page }) => {
 	});
 	await enroll(course.id, student.username);
 
-	const { date, day } = futureDate(2);
+	const { day } = futureDate(2);
 	const slot = await persistedTimeSlotFactory.create({
-		courseId: course.id,
+		course: course.id,
 		day,
 		title: "Lecture",
 	});
 	await persistedCalendarEventFactory.create({
-		courseId: course.id,
-		timeSlotId: slot.id,
-		date,
+		course: course.id,
+		timeSlot: slot.id,
 		week: 1,
 		title: "Introduction to recursion",
 	});
@@ -99,7 +98,7 @@ test("student: browse course resources", async ({ page }) => {
 	// directly, exactly what the factory does under the hood.
 	const fileResource = await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "lecture-notes",
 			title: "Lecture notes",
 			data: { type: "FILE", buffer, filename: "lecture-notes.pdf" },
@@ -108,7 +107,7 @@ test("student: browse course resources", async ({ page }) => {
 		FULL_ACCESS,
 	);
 	await persistedResourceFactory.create({
-		courseId: course.id,
+		course: course.id,
 		title: "Syllabus overview",
 		data: { type: "LINK", url: "https://example.com/syllabus" },
 	});
@@ -157,29 +156,24 @@ test("student: follow the course schedule", async ({ page }) => {
 	const course = await persistedCourseFactory.create();
 	await enroll(course.id, student.username);
 
-	const week1 = futureDate(3);
-	const week2 = futureDate(10); // 7 days later — same weekday, no slot/day collision
+	const { day } = futureDate(3);
 	const slot = await persistedTimeSlotFactory.create({
-		courseId: course.id,
-		day: week1.day,
+		course: course.id,
+		day,
 		title: "Lecture",
-		startMin: 9 * 60,
-		durationMin: 50,
+		start: { hour: 9, minute: 0 },
+		duration: { minutes: 50 },
 	});
 	await persistedCalendarEventFactory.create({
-		courseId: course.id,
-		timeSlotId: slot.id,
-		date: week1.date,
+		course: course.id,
+		timeSlot: slot.id,
 		week: 1,
-		kind: "LECTURE",
 		title: "Kickoff",
 		description: "Course overview and expectations.",
 	});
 	await persistedCalendarEventFactory.create({
-		courseId: course.id,
-		timeSlotId: slot.id,
-		slug: "week-2",
-		date: week2.date,
+		course: course.id,
+		timeSlot: slot.id,
 		week: 2,
 		kind: "CANCELLED",
 		title: "Second lecture",
@@ -210,16 +204,15 @@ test("student: see all my courses in one calendar", async ({ page }) => {
 	await enroll(courseA.id, student.username);
 	await enroll(courseB.id, student.username);
 
-	const { date, day } = futureDate(2);
+	const { day } = futureDate(2);
 	for (const course of [courseA, courseB]) {
 		const slot = await persistedTimeSlotFactory.create({
-			courseId: course.id,
+			course: course.id,
 			day,
 		});
 		await persistedCalendarEventFactory.create({
-			courseId: course.id,
-			timeSlotId: slot.id,
-			date,
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: `${course.discipline.name} kickoff`,
 		});
@@ -242,7 +235,10 @@ test("student: see all my courses in one calendar", async ({ page }) => {
 
 /** Enrolls an already-seeded student, which the course factory's `students` cannot do. */
 async function enroll(courseId: Course["id"], username: string) {
-	await db.enrollment.create({ courseId, username: username }, FULL_ACCESS);
+	await db.enrollment.create(
+		{ course: courseId, username: username },
+		FULL_ACCESS,
+	);
 }
 
 /** The course's public URL, from the three columns of its unique key. */

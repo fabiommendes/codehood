@@ -118,7 +118,7 @@ async function courseWithDroppedStudent() {
 	);
 	const [active, dropped] = course.students as [User, User];
 	await db.enrollment.delete(
-		{ courseId: course.id, username: dropped.username },
+		{ course: course.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 	return { instructor, course, active, dropped };
@@ -220,7 +220,7 @@ test("questionWhere selects exactly the rows question.read and question.read-pub
 	const rows: { id: number; target: QuestionWithCourse }[] = [];
 	for (const status of statuses) {
 		const input = questionFactory.build({
-			courseId: course.id,
+			course: course.id,
 			slug: `where-${status.toLowerCase()}`,
 		});
 		const question = await db.question.create(

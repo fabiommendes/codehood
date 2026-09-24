@@ -2,7 +2,39 @@
 
 ## Unreleased
 
+### Changed
+
+- Every course-scoped service input — create, upsert, filter, and composite
+  key — references its course under one field, `course: CourseRef` (a course
+  id or its natural key), replacing the mix of `course`, `courseId` and a
+  flat `discipline`/`instructor`/`edition` spread the schemas and the API
+  used before. `src/core/schemas/course.ts` exports `courseRef`/`CourseRef`.
+  Output (entity) schemas are unaffected and still carry `courseId`.
+  Course-scoped `CRUD()` registrations declare the scope once via
+  `parseScopeParams`, replacing per-route `parseCreateParams`/
+  `parseListParams` pairs that only reshaped the course. See
+  `dev/specs/to-review/course-ref-unification.md`.
+
 ### Security
+
+- A request carrying both a session cookie and an `Authorization: Bearer`
+  header was authenticated by the cookie, silently ignoring the token. The
+  bearer token now takes precedence, and an invalid one leaves the request
+  unauthenticated instead of falling back to the cookie.
+
+- `ResponseService.prepareAttempt` checked that an exam existed but never that
+  the actor could see it, so an enrolled student could open a response against
+  a `DRAFT` or `ARCHIVED` exam and submit answers into it. The refusal also
+  told them a hidden exam existed under that slug. It now mirrors
+  `exam.service.ts`: a draft or archived exam is `NotFound` for anyone who may
+  not write the course's contents, indistinguishable from a missing slug.
+
+- `SubmissionService.createTx` answered `NotAllowed` when the actor could not
+  read the response being referenced, which confirmed that another student's
+  response existed under a given `publicId`. Referencing a response one may
+  not read is now `NotFound`, matching a response that never existed;
+  `NotAllowed` is reserved for a row the actor can already see but may not
+  write.
 
 - `invite.create` only checked the invited role, never the invite's course. An
   instructor could issue a classroom invite carrying another instructor's
@@ -53,6 +85,92 @@
   in as `%0d%0a` used to make the `Headers` constructor throw, answering 500
   where a 404 belonged.
 
+- `QuestionService.findOne` hid a `DRAFT` or `ARCHIVED` question only from an
+  actor without `course.read-contents`, so an enrolled student, who has that
+  permission, could read an unpublished question by slug. `findMany` already
+  filtered by status. `findOne` now mirrors it: anyone without
+  `course.update-contents` gets `null` for a question that is not `PUBLISHED`.
+
+- `BlobService.create`, `delete` and `collectGarbage` lost their SYSTEM-only
+  guard in the actor-aware service refactor, leaving the content store writable
+  by any actor that could reach it. The guard is back;
+  `AttachmentService.delete` now reaches the blob as SYSTEM, as its `create`
+  already did.
+
+### Changed
+
+- Exams carry `duration` and `extraTime` as `{ hours, minutes }` or `null`
+  instead of `durationMs` and `extraTimeMs`; the database still stores
+  milliseconds. `extraTime` is only accepted on update, and no extra time reads
+  as `null`. A create without `format` gets `MARKDOWN`. The list filter's
+  `slugs` is now `exams`.
+
+- There is no separate upsert schema any more. `xUpsert` was `xCreate` verbatim
+  for nine of the eleven models, and the two that diverged were not worth the
+  split: `userUpsert` made `password` optional so a PUT could reset it, and
+  `feedbackUpsert` added a `version` that `create` assigned itself. A PUT now
+  carries exactly the body a POST does, and `CRUD()`'s `upsert` option is only
+  spelled out to disable it (`upsert: null`). `CrudT` lost its `Upsert` type
+  parameter with them: `Crud` and `CrudBase` derive `upsert`'s input from
+  `create`. Switching the operation off is now `upsert: false` on a service's
+  type map, or on a `CRUD()` registration to withhold the `PUT` route, in place
+  of the old `upsert: never`/`upsert: null`. `CrudRouteOptions` lost `UpsertT`
+  and `UpsertExtra`, and `parseUpsertParams` with them: an upsert reads the
+  same path parameters `create` does.
+
+- A grading pass is addressed by a `ref` its writer chose, unique within the
+  submission, instead of by a `version` the server counted out:
+  `Feedback.version Int` is now `ref String`, the unique constraint moves with
+  it, and `.../submission/{publicId}/feedback/{ref}` replaces the `v1`/`v2`
+  segment. `create` refuses a ref the submission already carries and `upsert`
+  revises it, so the two take the same body. The rules about never filling a
+  gap in the numbering are gone with the numbering: deleting a pass frees its
+  ref. Listings order by `createdAt` rather than by version.
+
+- `UserService.upsert` no longer resets an existing user's password. `password`
+  is required, as it is on `create`, and read only when the PUT creates the
+  user; changing one goes through `/api/user/me/change-password`, which proves
+  the current password first.
+
+- Calendar events moved under their course:
+  `/api/course/{discipline}/{course}/calendar-event`, addressed by the
+  `{week}/{timeSlot}` pair that is unique within a course rather than by an
+  autoincrement id. `calendarEventNaturalKey` spells that key out, and the
+  listing takes the course from the path instead of a `courseIds` query
+  parameter. Over the API a time slot is its slug and the entity carries
+  neither `id`, `courseId` nor `timeSlot.id`; the service still accepts and
+  returns all three, so the CLI can write a calendar with nothing but the
+  names it already has on disk.
+
+### Fixed
+
+- Two test runs at once no longer fight over one database. `test/run.ts` takes
+  the first free port at or above 4322 and derives that run's database and blob
+  directory from it (`test/.tmp/<port>/`), where before every run wiped
+  `test/.tmp/test.db` and bound 4322. Set `TEST_PORT` to pin the port. The
+  probe connects rather than binding, since `localhost` resolves to both
+  `127.0.0.1` and `::1` and a bind landing on the other family reports a busy
+  port as free.
+
+- `InvalidData` deleted the `$` key from its `errors` map, discarding the
+  root-level messages `fromZodError` groups under it and that
+  `src/core/error-response.ts` documents as the object-wide slot. Root errors
+  now survive, and a hand-built `InvalidData` without an explicit `message`
+  summarises its field errors instead of reporting a bare "Validation Error".
+
+- `GET /api/api-key` and `/api/api-key/[id]` came back: the route was dropped
+  when CRUD routes started being generated from the service registry. The
+  entity omits `keyHash`.
+
+- `nextDayForWeekday` always moved at least one day forward, so a course
+  starting on its own slot's weekday put week 0 seven days after the start
+  date. It is now `weekdayOnOrAfter`, which returns `startAt` itself when it
+  already falls on the target weekday.
+
+- Attachment symlinks point at the bare hash beside them rather than an
+  absolute path, which is what `BlobService.link`'s own idempotency check
+  already expected, so relinking no longer rewrites a correct link.
+
 ### Changed
 
 - `@Validate` no longer has an `async` option. It awaits a thenable return
@@ -85,6 +203,19 @@
   matched no rows and reported success: the button had never dropped anyone.
   Both forms now post `username`.
 
+- `TimeSlotService` moves to `CrudBase` with `*Tx` methods, mirroring
+  `ExamService`. `timeSlotSchema.startMin: number` is now `start: { hour,
+  minute }` — `src/utils/schedule-time.ts` gained `toClockTime`/`toMinutes`/
+  `formatClock` for the conversion; `durationMin` is unchanged, since a
+  duration is a quantity of minutes, not a wall-clock reading. `timeSlotPK`
+  drops the `{ ref: ... }` wrapper in favor of `{ id } | { courseId, slug } |
+  courseNaturalKey & { slug }`, and REST moves from `/api/time-slot` to
+  `/api/course/<discipline>/<instructor>_<edition>/time-slot`, the same
+  conversion `resource` and `exam` already went through. Listing slots now
+  requires a course; the flat `GET /api/time-slot` that allowed cross-course
+  listing is gone. **Breaking change** for any client (including the CLI)
+  that read `TimeSlot.startMin` or called the flat endpoint.
+
 - `enrollment.create | enrollment.update | enrollment.manage` was one
   permission covering two unrelated rights, and granted all three to any
   admin. It is now two: `enrollment.create | enrollment.update` (SYSTEM, any
@@ -99,6 +230,48 @@
   classroom passphrase is a course operation, not an enrollment row.
 
 ### Added
+
+- `FeedbackService`, with its REST endpoints nested under
+  `/api/course/{discipline}/{course}/submission/{publicId}/feedback`. A
+  feedback is one grading pass over one submission, carrying a score, an
+  optional comment and either the user or the bot that produced it. Passes
+  accumulate rather than replace: each is numbered within its submission, so
+  `(submissionId, version)` is the natural key and URLs address a pass as `v1`,
+  `v2`. The score is stored as the exact string sent — a decimal or an `n/d`
+  fraction, either signed, in `[-1, 1]` — so a third stays a third.
+- `Exam.gradesReleasedAt`, the column behind an instructor releasing grades.
+  When a student may read a grade now follows the exam's type: a `PRACTICE`
+  releases it as soon as it is written, a `QUIZ` once its window closes, and an
+  `EXAM` only once `gradesReleasedAt` is set. An unreleased grade is invisible
+  to its student rather than refused, so the refusal cannot announce that a
+  grade exists.
+- `ResponseService` and `SubmissionService`, with their REST endpoints under
+  `/api/course/{discipline}/{course}/response`, `.../submission` and
+  `.../submit`. A response is one student's attempt at one exam and collects
+  the submissions they make for each question in it; answering the same
+  question again appends an attempt rather than replacing one, so a response
+  keeps its history. `submit` resolves the attempt and appends the answer in a
+  single call, which is all a student client needs. Both resources are
+  addressed by `publicId`, never by the autoincrement id.
+
+- `Response.slotKey` tells repeat attempts apart: `0` for a graded exam, which
+  a student answers once, and the session's start as a unix timestamp for a
+  practice exam, which they may attempt as often as they like. A practice
+  attempt is reused while it is inside `PRACTICE_SESSION_WINDOW_MS` of its
+  start. It is a plain integer rather than a nullable date because
+  `@@unique([authorId, examId, slotKey])` would not otherwise constrain
+  anything: SQLite treats a null in a unique tuple as distinct from every
+  other null, so the index would pass duplicates in silence.
+
+- A student's Exams tab is a sectioned list of exam cards instead of the
+  instructor's sortable table: Open, Practice, Upcoming, and Past exams and
+  grades, each ordered by schedule and omitted when empty. The table stays for
+  whoever may write the course's contents, since it is the only view carrying
+  drafts, tags and sortable columns. `groupExamsForStudent` holds the placement
+  and ordering rules as a pure function next to `groupResourcesByType`, and
+  `ExamRow.astro` renders one exam as a `ListRow` card for both this page and
+  the course home page, whose "Upcoming exams" section now reads real exams and
+  falls back to practice exams when nothing is scheduled.
 
 - An "Add student" control on a course's Roster tab, behind a new
   `course.addStudent` action. An email or username that matches an account is

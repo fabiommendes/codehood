@@ -37,7 +37,7 @@ export class ApiKeyService
 			create: ApiKeyCreate;
 			filter: ApiKeyFilter;
 			update: never;
-			upsert: never;
+			upsert: false;
 		}>
 {
 	prisma: PrismaClient;

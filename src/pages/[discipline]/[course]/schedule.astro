@@ -8,14 +8,21 @@ import { type CalendarEvent, db, isMeeting } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 import { renderMarkdown } from "@/utils/markdown";
-import { endOf, formatTime, SERVER_TZ } from "@/utils/schedule-time";
+import {
+	durationToMinutes,
+	endOf,
+	formatClock,
+	formatTime,
+	SERVER_TZ,
+	toMinutes,
+} from "@/utils/schedule-time";
 
 export const prerender = false;
 
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course, href } = result;
+const { course } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -30,8 +37,7 @@ const WEEKDAY_LABEL: Record<string, string> = {
 	SATURDAY: "Sat",
 };
 
-const slots = await db.timeSlot.findMany({ courseId: course.id }, { actor });
-const slotDayById = new Map(slots.map((s) => [s.id, s.day]));
+const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
 
 const events = await db.calendarEvent.findMany(
 	{ courseIds: [course.id] },
@@ -52,7 +58,9 @@ const timeFmt = new Intl.DateTimeFormat("en-US", {
 });
 function timeRange(event: CalendarEvent): string {
 	const start = timeFmt.format(event.startAt);
-	const end = timeFmt.format(endOf(event.startAt, event.durationMin));
+	const end = timeFmt.format(
+		endOf(event.startAt, durationToMinutes(event.timeSlot.duration)),
+	);
 	return `${start}–${end}`;
 }
 
@@ -84,8 +92,8 @@ const meetingsHeld = events.filter(
             {slots.map((slot) => (
               <span class="badge badge-outline gap-1.5">
                 {slot.title ?? "Meeting"} · {WEEKDAY_LABEL[slot.day]}{" "}
-                {formatTime(slot.startMin)}–
-                {formatTime(slot.startMin + slot.durationMin)}
+                {formatClock(slot.start)}–
+                {formatTime(toMinutes(slot.start) + durationToMinutes(slot.duration))}
               </span>
             ))}
           </div>
@@ -108,10 +116,7 @@ const meetingsHeld = events.filter(
                     {weekEvents.map((event) => {
                       const meeting = isMeeting(event.kind);
                       const cancelled = event.kind === "CANCELLED";
-                      const dayLabel =
-                        WEEKDAY_LABEL[
-                          slotDayById.get(event.timeSlotId) ?? ""
-                        ] ?? "";
+                      const dayLabel = WEEKDAY_LABEL[event.timeSlot.day] ?? "";
                       return (
                         <div
                           class:list={[
@@ -146,14 +151,6 @@ const meetingsHeld = events.filter(
                                 >
                                   {event.kind}
                                 </span>
-                                {event.exam && (
-                                  <a
-                                    href={`${href}/exams`}
-                                    class="ml-auto text-sm text-primary hover:underline"
-                                  >
-                                    {event.exam.title} →
-                                  </a>
-                                )}
                               </div>
                               {event.description && (
                                 <div

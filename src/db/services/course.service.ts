@@ -16,7 +16,6 @@ import {
 	coursePK,
 	courseSchema,
 	courseUpdate,
-	courseUpsert,
 } from "@/core/schemas";
 import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
 import type { FillUndefineds } from "@/typing";
@@ -40,7 +39,6 @@ export type CourseCreate = z.infer<typeof courseCreate>;
 export type CourseFilter = z.infer<typeof courseFilter>;
 export type CoursePK = z.infer<typeof coursePK>;
 export type CourseUpdate = z.infer<typeof courseUpdate>;
-export type CourseUpsert = z.infer<typeof courseUpsert>;
 export type CourseNaturalKey = z.infer<typeof courseNaturalKey>;
 
 type DbCourse = Prisma.CourseGetPayload<{ include: typeof courseInclude }>;
@@ -82,7 +80,6 @@ export class CourseService
 			create: CourseCreate;
 			filter: CourseFilter;
 			update: CourseUpdate;
-			upsert: CourseUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -253,8 +250,8 @@ export class CourseService
 	 * `create`-branch-only, or last term's material would become permanently
 	 * un-syncable.
 	 */
-	@Validate({ service: true, returns: courseSchema, args: [courseUpsert] })
-	async upsert(input: CourseUpsert, opts: ServiceOpts): Promise<Course> {
+	@Validate({ service: true, returns: courseSchema, args: [courseCreate] })
+	async upsert(input: CourseCreate, opts: ServiceOpts): Promise<Course> {
 		return upsert(this, input, {
 			...opts,
 			action: "course.create",

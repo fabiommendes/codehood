@@ -1,98 +1,80 @@
 import { z } from "zod";
-import { calendarEventId, courseId, examId, timeSlotId } from "./base";
+import { calendarEventId, courseId, slug, timeSlotId } from "./base";
+import { courseRef } from "./course";
 import { timeSlotSchema } from "./time-slot";
 
-export const eventKindSchema = z.enum([
-	"LECTURE",
-	"LAB",
-	"EXAM",
-	"REVIEW",
-	"SEMINAR",
-	"PROJECT",
-	"SELF_STUDY",
-	"HOLIDAY",
-	"RECESS",
-	"CANCELLED",
-]);
-
-// The linked exam's public summary — never the full `Exam` row, and never
-// present at all unless {@link maskExam} decides `actor` may see it.
-export const linkedExamSchema = z.object({
-	id: examId,
-	slug: z.string(),
-	title: z.string(),
-});
+export const eventKindSchema = z.enum(["REGULAR", "HOLIDAY", "CANCELLED"]);
 
 export const calendarEventSchema = z.object({
 	id: calendarEventId,
 	courseId: courseId,
-	timeSlotId: timeSlotId,
-	examId: examId.nullable(),
-	exam: linkedExamSchema.nullable(),
-
-	// Natural key from the repository path — FR-SYNC-010.
-	slug: z.string().min(1),
-	startAt: z.date(),
-	durationMin: z.number().int(),
-	week: z.number().int(),
-
 	kind: eventKindSchema,
 	title: z.string().min(1),
 	description: z.string().nullable(),
 
+	/// The exact start time of the event. Declares timezone of the server.
+	startAt: z.date(),
+
+	/// Week relative to the start of the course, counting from zero. Weeks
+	/// start on Monday (ISO 8601).
+	week: z.number().int(),
+
+	/// Time slot information (local time of the course).
+	timeSlot: timeSlotSchema.pick({
+		id: true,
+		day: true,
+		slug: true,
+		duration: true,
+		start: true,
+	}),
+
 	// Supplied by the writer, opaque to the server.
-	contentHash: z.string().min(1),
+	ref: z.string().min(1),
+
 	createdAt: z.date(),
 	updatedAt: z.date(),
-
-	timeSlot: timeSlotSchema,
 });
 
 export const calendarEventCreate = calendarEventSchema
 	.omit({
 		id: true,
+		courseId: true,
 		createdAt: true,
 		updatedAt: true,
-		exam: true,
-		// Computed by the service
 		startAt: true,
-		examId: true,
 		timeSlot: true,
 	})
 	.extend({
-		// The calendar day this event happens, `YYYY-MM-DD`, in the server zone.
-		date: z.string(),
-		// Minutes since 00:00; defaults to the slot's `startMin` when omitted.
-		startMin: z.number().int().optional(),
-		// Defaults to the slot's `durationMin` when omitted.
-		durationMin: z.number().int().optional(),
-		// Defaults to the Prisma column default (`LECTURE`) when omitted.
+		// Defaults to the Prisma column default (`REGULAR`) when omitted.
 		kind: eventKindSchema.optional(),
+		course: courseRef,
+		timeSlot: z.union([timeSlotId, slug]),
 		description: z.string().nullable().optional(),
 	});
 
-// `slug`, `courseId`, and `timeSlotId` are deliberately absent: moving an
-// event to a different slot is a delete plus a create. Provide `date` to
-// move the event's day; `startMin`/`durationMin` without `date` is rejected,
-// since a wall-clock move always names the day it lands on.
+// `week`, `course`, and `timeSlot` are deliberately absent: moving an
+// event to a different slot is a delete plus a create.
 export const calendarEventUpdate = calendarEventCreate
-	.omit({ slug: true, courseId: true, timeSlotId: true })
+	.omit({ course: true, timeSlot: true, week: true })
 	.partial();
 
-export const calendarEventUpsert = calendarEventCreate;
-
-export const calendarEventRef = z.object({
-	courseId: courseId,
-	slug: z.string(),
-});
+/// The create body of an API already scoped to a course: the course comes
+/// from the path, and the slot is addressed the same way the URL addresses
+/// it. The service still takes either form.
+export const calendarEventCreateScoped = calendarEventCreate
+	.omit({ course: true })
+	.extend({ timeSlot: slug });
 
 export const calendarEventPK = z.union([
 	z.object({ id: calendarEventId }),
-	z.object({ ref: calendarEventRef }),
+	z.object({
+		course: courseRef,
+		week: z.number().int(),
+		timeSlot: z.union([timeSlotId, slug]),
+	}),
 ]);
 
-export const calendarEventFilter = z.object({
-	courseIds: z.array(z.number()).optional(),
+export const calendarEventFilterBase = z.object({
 	// Inclusive: events whose window ends at or after it.
 	from: z.date().optional(),
 	// Exclusive: events starting before it.
@@ -102,3 +84,21 @@ export const calendarEventFilter = z.object({
 	// For "the next three meetings" on the course page.
 	limit: z.number().int().positive().optional(),
 });
+
+export const calendarEventFilterByCourse = calendarEventFilterBase.extend({
+	course: courseRef,
+});
+
+/// Without any course, the listing spans every course the actor may read,
+/// which is what `/calendar` wants.
+export const calendarEventFilterByCourseIds = calendarEventFilterBase.extend({
+	courseIds: z.array(z.number()).optional(),
+});
+
+// The single-course form comes first: `course` is required, so it only
+// matches a filter that actually carries it, while every field of the
+// `courseIds` form is optional and would otherwise swallow it.
+export const calendarEventFilter = z.union([
+	calendarEventFilterByCourse,
+	calendarEventFilterByCourseIds,
+]);

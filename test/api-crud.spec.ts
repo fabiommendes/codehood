@@ -40,7 +40,6 @@ const OPTIONAL_FILTER_RESOURCES = [
 	"course",
 	"discipline",
 	"edition",
-	"time-slot",
 	"user",
 ] as const;
 
@@ -216,11 +215,13 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 	expect(new Date(body.endAt).toISOString()).toBe(endAt);
 });
 
-test("GET /api/calendar-event returns 200 with a JSON array", async ({
+// Calendar events live under their course: the listing has no "every course"
+// form over the API, so the course segments are the whole filter here.
+test("GET /api/course/<discipline>/<course>/calendar-event returns 200 with a JSON array", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
-	const res = await request.get("/api/calendar-event", {
+	const res = await request.get("/api/course/cs101/ada_2026-1/calendar-event", {
 		headers: authHeader(token),
 	});
 	expect(res.status()).toBe(200);

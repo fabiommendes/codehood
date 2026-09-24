@@ -5,6 +5,10 @@ import { type PersistParams, serviceOpts } from "./support";
 
 /**
  * A slug matching `DISCIPLINE_SLUG_RE`: lowercase, starts with a letter, no trailing hyphen.
+ *
+ * The sequence alone is not unique enough: it restarts per factory instance,
+ * while `slug` is unique across a whole test database, so a random suffix
+ * carries the uniqueness instead of faker's short department list.
  */
 function fakeDisciplineSlug(sequence: number): string {
 	const base = faker.commerce
@@ -12,7 +16,8 @@ function fakeDisciplineSlug(sequence: number): string {
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
-	return `${base || "discipline"}-${sequence}`;
+	const suffix = Math.random().toString(36).slice(2, 10);
+	return `${base || "discipline"}-${sequence}-${suffix}`;
 }
 
 function buildDiscipline(

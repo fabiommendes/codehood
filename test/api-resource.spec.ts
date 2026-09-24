@@ -85,7 +85,7 @@ test("GET lists a course's resources and GET <slug> reads one, by natural key", 
 }) => {
 	const { instructor, course, url } = await makeCourse();
 	const created = await db.resource.create(
-		{ courseId: course.id, slug: "syllabus", ...link() },
+		{ course: course.id, slug: "syllabus", ...link() },
 		{ actor: instructor },
 	);
 	const headers = await tokenFor(request, instructor.username);
@@ -177,7 +177,7 @@ test("status codes: 400 malformed segment or slug, 404 no course or no slug, 403
 		`/api/course/${tag("nope")}/`,
 	);
 	await db.resource.create(
-		{ courseId: course.id, slug: "syllabus", ...link() },
+		{ course: course.id, slug: "syllabus", ...link() },
 		{ actor: instructor },
 	);
 

@@ -177,7 +177,7 @@ test("update, delete, and enroll throw FORBIDDEN for a student and for an instru
 		).rejects.toThrow();
 		await expect(
 			db.enrollment.create(
-				{ courseId: course.id, username: student.username },
+				{ course: course.id, username: student.username },
 				{ actor },
 			),
 		).rejects.toThrow();
@@ -198,19 +198,19 @@ test("findMany visibility agrees with course.read over a fixture covering every 
 	// courseA: studentActive is ACTIVE, studentDropped is DROPPED, instructorB
 	// (who teaches courseB) is also enrolled here as a student.
 	await db.enrollment.create(
-		{ courseId: courseA.id, username: studentActive.username },
+		{ course: courseA.id, username: studentActive.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.create(
-		{ courseId: courseA.id, username: studentDropped.username },
+		{ course: courseA.id, username: studentDropped.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.delete(
-		{ courseId: courseA.id, username: studentDropped.username },
+		{ course: courseA.id, username: studentDropped.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.create(
-		{ courseId: courseA.id, username: instructorB.username },
+		{ course: courseA.id, username: instructorB.username },
 		FULL_ACCESS,
 	);
 

@@ -25,10 +25,8 @@ export type CrudRouteOptions<
 	FilterT,
 	KeyT,
 	UpdateT,
-	UpsertT,
 	ScopeT,
 	CreateExtra = Record<string, unknown>,
-	UpsertExtra = CreateExtra,
 > = {
 	/**
 	 * The dynamic part of the path that addresses one entity. Defaults to `/[id]`,
@@ -44,26 +42,21 @@ export type CrudRouteOptions<
 	/// Get additional parameters to include when creating or upserting an entity from the path.
 	parseCreateParams?: (params: Record<string, string>) => CreateExtra;
 
-	/// Get additional parameters to include when upserting an entity from the path.
-	parseUpsertParams?: (
-		params: Record<string, string>,
-	) => Record<string, unknown>;
-
 	/// Turns the dynamic segments of a scoped collection path to.
 	/// Useful for scoping list views to a parent resource.
 	parseListParams?: (params: Record<string, string>) => Record<string, unknown>;
 
 	/// Reused by Filter, Create and Upsert
-	parseScopeParams?: (
-		params: Record<string, string>,
-	) => Record<string, unknown>;
+	parseScopeParams?: (params: Record<string, string>) => CreateExtra;
 
 	name: string;
 	plural?: string;
 
 	entity: ZodType<EntityT>;
 	create: ZodType<CreateT> | null;
-	upsert?: ZodType<UpsertT> | null;
+	/// `false` withholds the `PUT` route; by default an upsert is generated
+	/// and takes the same body as `create`.
+	upsert?: false;
 	update: ZodType<UpdateT> | null;
 
 	/// Filter type for list views
@@ -95,7 +88,7 @@ export type CrudRouteOptions<
 		Create<CreateT & CreateExtra, EntityT> &
 		Update<KeyT, UpdateT, EntityT> &
 		Delete<KeyT> &
-		Upsert<UpsertT & UpsertExtra, EntityT>;
+		Upsert<CreateT & CreateExtra, EntityT>;
 };
 
 /**
@@ -114,17 +107,7 @@ export type CrudRouteOptions<
  *    by the findOne, update and delete operations.
  *
  */
-export function CRUD<
-	Entity,
-	Create,
-	Filter,
-	Key,
-	Update,
-	Upsert,
-	Scope,
-	CreateExtra,
-	UpsertExtra,
->(
+export function CRUD<Entity, Create, Filter, Key, Update, Scope, CreateExtra>(
 	path: `/api/${string}`,
 	options: CrudRouteOptions<
 		Entity,
@@ -132,27 +115,15 @@ export function CRUD<
 		Filter,
 		Key,
 		Update,
-		Upsert,
 		Scope,
-		CreateExtra,
-		UpsertExtra
+		CreateExtra
 	>,
 ) {
 	const api = new CRUDApi(path, options);
 	return api.generate();
 }
 
-class CRUDApi<
-	Entity,
-	Create,
-	Filter,
-	Key,
-	Update,
-	Upsert,
-	Scope,
-	CreateExtra,
-	UpsertExtra,
-> {
+class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	path: string;
 	options: CrudRouteOptions<
 		Entity,
@@ -160,10 +131,8 @@ class CRUDApi<
 		Filter,
 		Key,
 		Update,
-		Upsert,
 		Scope,
-		CreateExtra,
-		UpsertExtra
+		CreateExtra
 	>;
 	private name: string;
 	private namePlural: string;
@@ -186,10 +155,8 @@ class CRUDApi<
 			Filter,
 			Key,
 			Update,
-			Upsert,
 			Scope,
-			CreateExtra,
-			UpsertExtra
+			CreateExtra
 		>,
 	) {
 		this.path = path;
@@ -211,7 +178,7 @@ class CRUDApi<
 			findOne: !this.options.skipFindOne || undefined,
 			findMany: this.options.filter !== null || undefined,
 			upsert:
-				(this.options.upsert !== null && this.options.update !== null) ||
+				(this.options.upsert !== false && this.options.update !== null) ||
 				undefined,
 			update: this.options.update !== null || undefined,
 			delete: !this.options.skipDelete || undefined,
@@ -271,25 +238,6 @@ class CRUDApi<
 		params: Record<string, string>,
 	): Record<string, unknown> {
 		return (
-			this.options?.parseCreateParams?.(params) ??
-			this.options?.parseScopeParams?.(params) ??
-			{}
-		);
-	}
-
-	/**
-	 * We try options in the order:
-	 *
-	 * - parseUpsertParams
-	 * - parseCreateParams
-	 * - parseScopedParams
-	 * - empty object
-	 */
-	parseUpsertUrlParams(
-		params: Record<string, string>,
-	): Record<string, unknown> {
-		return (
-			this.options?.parseUpsertParams?.(params) ??
 			this.options?.parseCreateParams?.(params) ??
 			this.options?.parseScopeParams?.(params) ??
 			{}
@@ -374,7 +322,7 @@ class CRUDApi<
 				this.has.upsert &&
 				PUT(this.path, {
 					operationId: this.operationId("upsert"),
-					in: (this.options.upsert ?? this.options.create) as ZodType<Upsert>,
+					in: this.options.create as ZodType<Create>,
 					out: this.options.entity,
 					summary: `Upsert a single ${this.name}. Creates if it does not exist, update otherwise.`,
 					tags: this.options.tags,
@@ -514,14 +462,14 @@ class CRUDApi<
 	 */
 	async upsertHandler(args: {
 		actor: UserActor;
-		body: Upsert;
+		body: Create;
 		params: Record<string, string>;
 	}): Promise<Entity> {
 		const { actor, body, params } = args;
-		const extra = this.parseUpsertUrlParams(params);
+		const extra = this.parseCreateUrlParams(params);
 
 		// Merge the request body with any extra fields derived from the route parameters.
-		const input = { ...body, ...extra } as Upsert & UpsertExtra;
+		const input = { ...body, ...extra } as Create & CreateExtra;
 
 		return this.service.upsert(input, { actor });
 	}

@@ -4,13 +4,12 @@ import { hasPerm } from "@/auth/permissions";
 import { type ActionCode, NotAllowed, NotFound } from "@/core/error";
 import {
 	type CourseId,
-	type courseNaturalKey,
+	type CourseRef,
 	resourceCreate,
 	resourceFilter,
 	resourcePK,
 	resourceSchema,
 	resourceUpdate,
-	resourceUpsert,
 } from "@/core/schemas";
 import { db } from "@/db";
 import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
@@ -41,8 +40,6 @@ export type Resource = z.infer<typeof resourceSchema>;
 export type ResourceFilter = z.infer<typeof resourceFilter>;
 export type ResourcePK = z.infer<typeof resourcePK>;
 export type ResourceUpdate = z.infer<typeof resourceUpdate>;
-export type ResourceUpsert = z.infer<typeof resourceUpsert>;
-type CourseRef = z.infer<typeof courseNaturalKey>;
 
 type DbResource = Prisma.ResourceGetPayload<{
 	include: Pretty<typeof resourceInclude>;
@@ -52,6 +49,7 @@ type DbResource = Prisma.ResourceGetPayload<{
 const resourceInclude = {
 	course: {
 		select: {
+			id: true,
 			instructor: { select: { username: true } },
 			enrollments: {
 				where: { status: "ACTIVE" as const },
@@ -77,7 +75,6 @@ export class ResourceService
 			create: ResourceCreate;
 			filter: ResourceFilter;
 			update: ResourceUpdate;
-			upsert: ResourceUpsert;
 		}>
 {
 	prisma: PrismaClient;
@@ -102,7 +99,7 @@ export class ResourceService
 		const self = this;
 
 		async function run(tx: PrismaTx) {
-			const course = await self.courseInfo(input.courseId, {
+			const course = await self.courseInfo(input.course, {
 				actor: opts.actor,
 				action: "resource.create",
 				perms: "write",
@@ -192,14 +189,8 @@ export class ResourceService
 		const self = this;
 
 		async function run(tx: PrismaTx) {
-			let by = filter as FillUndefineds<ResourcePK>;
+			const by = filter as FillUndefineds<ResourcePK>;
 			let row: DbResource | null = null;
-
-			// Must search the course in the database if search is given by natural
-			// key
-			if (by.discipline !== undefined) {
-				by = { courseId: await self.courseId(by, tx), slug: by.slug };
-			}
 
 			// filter by resource id
 			if (by.id !== undefined) {
@@ -208,15 +199,18 @@ export class ResourceService
 					include: resourceInclude,
 				});
 
-				// filter by courseId and resource slug
-			} else if (by.courseId !== undefined) {
+				// filter by course and resource slug
+			} else if (by.course !== undefined) {
+				const courseId = await self.courseId(by.course, tx);
 				row = await tx.resource.findUnique({
-					where: { courseId_slug: { courseId: by.courseId, slug: by.slug } },
+					where: {
+						courseId_slug: { courseId, slug: by.slug },
+					},
 					include: resourceInclude,
 				});
 			} else {
 				throw new Error(
-					"Invalid resource filter: must specify either id or courseId and slug",
+					"Invalid resource filter: must specify either id or course and slug",
 				);
 			}
 
@@ -256,7 +250,7 @@ export class ResourceService
 		const self = this;
 
 		async function run(tx: PrismaTx) {
-			const course = await self.courseInfo(filter, {
+			const course = await self.courseInfo(filter.course, {
 				tx,
 				actor: opts.actor,
 				action: "resource.read",
@@ -373,23 +367,19 @@ export class ResourceService
 	@Validate({
 		service: true,
 		returns: resourceSchema,
-		args: [resourceUpsert],
+		args: [resourceCreate],
 	})
-	async upsert(input: ResourceUpsert, opts: ServiceOpts): Promise<Resource> {
+	async upsert(input: ResourceCreate, opts: ServiceOpts): Promise<Resource> {
 		const self = this;
 
 		return upsert(this, input, {
 			...opts,
 			action: "resource.create",
-			pk({ slug, courseId }) {
-				return (
-					typeof courseId === "number"
-						? { slug, courseId }
-						: { slug, ...courseId }
-				) satisfies ResourcePK;
+			pk({ slug, course }) {
+				return { slug, course } satisfies ResourcePK;
 			},
 			async assertCreatable(input, opts) {
-				const course = await self.courseInfo(input.courseId, opts);
+				const course = await self.courseInfo(input.course, opts);
 				if (!hasPerm(opts.actor, "course.update-contents", course))
 					throw new NotAllowed("resource.create");
 			},
@@ -472,7 +462,7 @@ export class ResourceService
 	 * write/read its content.
 	 */
 	private async courseInfo(
-		ref: ResourceCreate["courseId"] | { courseId: CourseId },
+		ref: ResourceCreate["course"],
 		args: ServiceOpts &
 			({ perms: "read" | "write"; action: ActionCode } | object),
 	): Promise<{
@@ -516,30 +506,14 @@ export class ResourceService
 		return valueOrNotAllowed(action, course, pred);
 	}
 
-	private async courseId(
-		filter: { courseId: CourseId } | CourseRef,
-		tx: PrismaTx,
-	): Promise<CourseId> {
-		const by = filter as FillUndefineds<ResourcePK>;
+	private async courseId(ref: CourseRef, tx: PrismaTx): Promise<CourseId> {
+		if (typeof ref === "number") return ref;
 
-		// Must search the course in the database if search is given by natural
-		// key
-		if (by.discipline !== undefined) {
-			const course = await tx.course.findUnique({
-				where: {
-					disciplineSlug_instructorId_editionSlug: {
-						disciplineSlug: by.discipline,
-						instructorId: by.instructor,
-						editionSlug: by.edition,
-					},
-				},
-				select: { id: true },
-			});
-
-			return valueOrNotFound("course", course).id;
-		} else {
-		}
-		throw new Error("Expected either courseId or courseRef to be set.");
+		const course = await tx.course.findUnique({
+			where: courseRefWhere(ref),
+			select: { id: true },
+		});
+		return valueOrNotFound("course", course).id;
 	}
 }
 
@@ -560,6 +534,7 @@ function fromDb<T = Record<string, unknown>>(
 		title: row.title,
 		description: row.description,
 
+		courseId: row.courseId,
 		ref: row.ref,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

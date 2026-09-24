@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/calendar-event/1
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/calendar-event/1/mon
   auth: inherit
 
 settings:

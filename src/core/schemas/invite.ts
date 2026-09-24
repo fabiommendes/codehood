@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { courseId, inviteId, username } from "./base";
+import { courseRef } from "./course";
 import { userInfo, userRole } from "./user";
 
 export const inviteSchema = z.object({
@@ -21,12 +22,15 @@ export const inviteSchema = z.object({
 export const inviteCreate = inviteSchema
 	.omit({
 		id: true,
+		courseId: true,
 		expiresAt: true,
 		createdAt: true,
 		redemptions: true,
 		createdBy: true,
 	})
 	.extend({
+		// Absent for an invite not bound to a course.
+		course: courseRef.optional(),
 		expiresInMs: z.number().int().optional(),
 		// Only honoured for SYSTEM callers, which have no actor to derive it
 		// from; any other caller gets `createdBy` from `opts.actor` instead.
@@ -41,7 +45,7 @@ export const invitePK = z.union([
 export const inviteFilter = z.object({
 	createdById: username.optional(),
 	kind: inviteSchema.shape.kind.optional(),
-	courseId: z.number().optional(),
+	course: courseRef.optional(),
 	// Only invites that have not expired yet.
 	active: z.boolean().optional(),
 });

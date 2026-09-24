@@ -135,7 +135,7 @@ course they are enrolled in.
 
 ### See the exams assigned to me
 
-    status: todo
+    status: implemented
 
 Student opens the Exams tab and sees the exams for the course with their type and
 status: which are upcoming and when, which are open now, and which are finished.

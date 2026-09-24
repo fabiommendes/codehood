@@ -66,7 +66,7 @@ test("create() auto-generates a 6-character code that expires 5 minutes out", as
 
 	const before = Date.now();
 	const passphrase = await db.passphrase.create(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: instructor },
 	);
 
@@ -81,14 +81,14 @@ test("create() accepts an instructor's own override, and refuses one already in 
 	const course = await makeCourse(instructor.username);
 
 	const passphrase = await db.passphrase.create(
-		{ courseId: course.id, value: "PIZZA1" },
+		{ course: course.id, value: "PIZZA1" },
 		{ actor: instructor },
 	);
 	expect(passphrase.value).toBe("PIZZA1");
 
 	await expect(
 		db.passphrase.create(
-			{ courseId: course.id, value: "PIZZA1" },
+			{ course: course.id, value: "PIZZA1" },
 			{ actor: instructor },
 		),
 	).rejects.toThrow(/already in use/);
@@ -102,7 +102,7 @@ test("create() throws FORBIDDEN for a student and for an instructor who does not
 
 	for (const actor of [student, otherInstructor]) {
 		await expect(
-			db.passphrase.create({ courseId: course.id }, { actor }),
+			db.passphrase.create({ course: course.id }, { actor }),
 		).rejects.toThrow();
 	}
 });
@@ -112,15 +112,15 @@ test("a non-owning admin cannot generate, list, update, or delete a course's pas
 	const admin = await makeUser("ADMIN");
 	const course = await makeCourse(instructor.username);
 	const passphrase = await db.passphrase.create(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: instructor },
 	);
 
 	await expect(
-		db.passphrase.create({ courseId: course.id }, { actor: admin }),
+		db.passphrase.create({ course: course.id }, { actor: admin }),
 	).rejects.toThrow();
 	await expect(
-		db.passphrase.findMany({ courseId: course.id }, { actor: admin }),
+		db.passphrase.findMany({ course: course.id }, { actor: admin }),
 	).rejects.toThrow();
 	await expect(
 		db.passphrase.update(
@@ -139,7 +139,7 @@ test("findOne({ value }) is not actor-filtered — the value itself is the crede
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	const passphrase = await db.passphrase.create(
-		{ courseId: course.id, value: "OPEN99" },
+		{ course: course.id, value: "OPEN99" },
 		{ actor: instructor },
 	);
 
@@ -154,7 +154,7 @@ test("the owning instructor can extend expiry and revoke early", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const passphrase = await db.passphrase.create(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: instructor },
 	);
 

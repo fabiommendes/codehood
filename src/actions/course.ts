@@ -45,7 +45,7 @@ export const course = {
 						});
 					}
 					await db.enrollment.create(
-						{ courseId, username: user.username as schema.UserId },
+						{ course: courseId, username: user.username as schema.UserId },
 						{ actor },
 					);
 					return { kind: "enrolled", username: user.username, name: user.name };
@@ -62,7 +62,7 @@ export const course = {
 					{
 						email: input.login,
 						invitedRole: "STUDENT",
-						courseId,
+						course: courseId,
 						kind: "PERSONAL",
 						maxUses: 1,
 					},
@@ -90,7 +90,7 @@ export const course = {
 			const actor = requireUser(context);
 			await db.enrollment.delete(
 				{
-					courseId: input.courseId as schema.CourseId,
+					course: input.courseId as schema.CourseId,
 					username:
 						(input.username as schema.UserId | undefined) ?? actor.username,
 				},
@@ -115,7 +115,7 @@ export const course = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return db.passphrase.create(
-				{ courseId: input.courseId, value: input.value },
+				{ course: input.courseId as schema.CourseId, value: input.value },
 				{ actor },
 			);
 		}),

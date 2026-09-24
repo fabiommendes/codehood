@@ -18,7 +18,7 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 
 const questions = await db.question.findMany(
-	{ courseId: course.id, public: false },
+	{ course: course.id, public: false },
 	{ actor },
 );
 ---
@@ -30,6 +30,11 @@ const questions = await db.question.findMany(
     <h2 class="mt-6 text-xl font-semibold">Questions</h2>
     <p class="mt-1 text-sm text-base-content/60">{course.discipline.name}</p>
 
-    <QuestionsTable questions={questions} href={href} client:load />
+    <QuestionsTable
+      questions={questions}
+      href={href}
+      courseId={course.id}
+      client:load
+    />
   </main>
 </AppLayout>

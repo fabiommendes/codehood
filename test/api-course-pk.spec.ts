@@ -7,19 +7,19 @@ import { parseCourseParams } from "@/api/utils";
  * it produces over HTTP are covered in `api-crud.spec.ts`.
  */
 
-test("splits a course segment into a coursePkRef", () => {
+test("splits a course segment into a course natural key", () => {
 	expect(
 		parseCourseParams({ discipline: "cs101", course: "ada_2026-1" }),
-	).toEqual({
-		ref: { discipline: "cs101", instructor: "ada", edition: "2026-1" },
-	});
+	).toEqual({ discipline: "cs101", instructor: "ada", edition: "2026-1" });
 });
 
 test("accepts an edition with no term number", () => {
 	expect(
 		parseCourseParams({ discipline: "algorithms", course: "hopper_2027" }),
 	).toEqual({
-		ref: { discipline: "algorithms", instructor: "hopper", edition: "2027" },
+		discipline: "algorithms",
+		instructor: "hopper",
+		edition: "2027",
 	});
 });
 
@@ -29,11 +29,9 @@ test("splits at the last underscore", () => {
 	expect(
 		parseCourseParams({ discipline: "cs101", course: "ada_lovelace_2026-1" }),
 	).toEqual({
-		ref: {
-			discipline: "cs101",
-			instructor: "ada_lovelace",
-			edition: "2026-1",
-		},
+		discipline: "cs101",
+		instructor: "ada_lovelace",
+		edition: "2026-1",
 	});
 });
 

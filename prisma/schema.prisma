@@ -70,8 +70,8 @@ model User {
   enrollments      Enrollment[]
   attachments      Attachment[]
   responses        Response[]
-  submissions      Submission[]
   exams            Exam[]
+  feedbacks        Feedback[]
 }
 
 model Group {
@@ -238,15 +238,8 @@ enum Weekday {
 }
 
 enum EventKind {
-  LECTURE
-  LAB
-  EXAM
-  REVIEW
-  SEMINAR
-  PROJECT
-  SELF_STUDY
+  REGULAR
   HOLIDAY
-  RECESS
   CANCELLED
 }
 
@@ -343,7 +336,8 @@ model TimeSlot {
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   /// Authored: `mon`, `wed-lab`. Stable when the hour changes.
-  slug  String
+  slug String
+
   /// Optional label for the syllabus line: "Lecture", "Lab".
   title String?
 
@@ -362,8 +356,7 @@ model TimeSlot {
 
 model CalendarEvent {
   id          Int       @id @default(autoincrement())
-  slug        String
-  kind        EventKind @default(LECTURE)
+  kind        EventKind @default(REGULAR)
   title       String
   description String?
 
@@ -373,21 +366,22 @@ model CalendarEvent {
   timeSlotId Int
   timeSlot   TimeSlot @relation(fields: [timeSlotId, courseId], references: [id, courseId])
 
-  startAt     DateTime
-  durationMin Int
-  week        Int
+  startAt DateTime
 
-  /// The exam whose window overlaps this one.
-  examId Int?
-  exam   Exam? @relation(fields: [examId], references: [id], onDelete: SetNull)
+  /// Denormalized from the associated time slot. MUST never go out of sync.
+  durationMin Int
+
+  /// Week relative to the start of the course. 
+  /// First week is 0, week starts at MONDAY (ISO 8601).
+  week Int
 
   /// Supplied by the writer, opaque to the server. See the manifest decision.
-  contentHash String
+  ref String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([courseId, slug])
+  @@unique([courseId, week, timeSlotId])
   @@index([courseId, startAt])
 }
 
@@ -512,9 +506,9 @@ model QuestionRef {
   questionTags       QuestionTags[]
   questionsForExams  QuestionsForExam[]
   questionForCourses QuestionForCourse[]
-  responses          Response[]
   group              Group?              @relation(fields: [groupId], references: [id])
   groupId            Int?
+  submissions        Submission[]
 
   @@unique([slug, courseId])
 }
@@ -574,50 +568,98 @@ enum SubmissionStatus {
   GRADED_MANUALLY
 }
 
-/// A student response to a single question in a exam or practice session.
+/// One student's attempt at an exam. Collects the submissions they make for
+/// each question in it.
 model Response {
-  id Int @id @default(autoincrement())
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
 
+  /// If false, new submissions are not accepted.
   acceptingSubmissions Boolean @default(true)
-
-  questionId Int
-  question   QuestionRef @relation(fields: [questionId], references: [id])
 
   authorId String
   author   User   @relation(fields: [authorId], references: [username])
 
-  examId Int?
-  exam   Exam? @relation(fields: [examId], references: [id])
+  examId Int
+  exam   Exam @relation(fields: [examId], references: [id])
 
-  practiceSession DateTime?
+  /// Which attempt at `exam` this is. Zero for a graded exam, which a student
+  /// answers once; the session's start as a unix timestamp in seconds for a
+  /// practice exam, which they may attempt as often as they like.
+  ///
+  /// A plain column rather than a nullable date so the unique index below
+  /// actually constrains both cases: SQLite treats a null in a unique tuple as
+  /// distinct from every other null, and would let duplicates through.
+  slotKey Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   submissions Submission[]
 
+  @@unique([authorId, examId, slotKey])
   @@map("ResponseRef")
 }
 
+/// One student's attempt at a single question, within their response to an exam.
 model Submission {
-  id Int @id @default(autoincrement())
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
+
+  /// The UI may submit on the student behalf. This can be used for backup and
+  /// tracking student progress in the question resolution.
+  automaticallyTriggered Boolean @default(false)
 
   status SubmissionStatus @default(PENDING_GRADE)
 
   responseId Int
   response   Response @relation(fields: [responseId], references: [id])
 
+  questionId Int
+  question   QuestionRef @relation(fields: [questionId], references: [id])
+
   payload Json
 
-  feedbackData Json?
-  feedback     String?
-  scorePercent Float?
+  /// When the student started working on this submission. Not always available.
+  startedAt DateTime?
+  createdAt DateTime  @default(now())
 
+  feedbacks Feedback[]
+}
+
+/// Feedback provided for a submission, either by a human grader or an 
+/// automated bot.
+model Feedback {
+  id Int @id @default(autoincrement())
+
+  /// Supplied by the writer, opaque to the server. The public half of the
+  /// natural key: unique within the submission and addressed directly in URLs.
+  ref String
+
+  /// The attempt being graded. A submission may collect more than one, e.g. a
+  /// bot's grade followed by the instructor's revision.
+  submissionId Int
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /// String to represent exact decimal or fractional values.
+  /// This is a number between -1 and 1 (although usually non-negative).
+  score String
+
+  /// User responsible for grading this submission.
+  /// Null if the grading was done automatically in the Codehood system.
   graderId String?
   grader   User?   @relation(fields: [graderId], references: [username])
 
+  /// This is used to identify the bot that provided automated feedback and grade
+  /// for this submission. Null for human-graded submissions.
+  botId String?
+
+  feedback String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([submissionId, ref])
 }
 
 // =============================================================================
@@ -647,10 +689,19 @@ enum ExamStatus {
 }
 
 enum ExamType {
+  /// A practice exam used for self-assessment and learning. Practice exams are 
+  /// not graded and students have immediate feedback and access to the answer key.
+  /// Students can attempt practice exams multiple times.
   PRACTICE
+
+  /// A quiz is a short assessment, typically covering a limited set of topics.
+  /// Quizzes are graded and students receive feedback after submission.
   QUIZ
+
+  /// A full-length exam covering a broader range of topics. Exams are graded and
+  /// students receive feedback only after the exam has ended and instructor
+  /// has released the grades.
   EXAM
-  FINAL
 }
 
 enum TextFormat {
@@ -660,8 +711,12 @@ enum TextFormat {
 }
 
 model Exam {
-  id     Int        @id @default(autoincrement())
-  type   ExamType   @default(EXAM)
+  id Int @id @default(autoincrement())
+
+  /// Exam cannot change its type once created.
+  type ExamType @default(EXAM)
+
+  /// Current status of the exam.
   status ExamStatus @default(DRAFT)
   slug   String
 
@@ -679,6 +734,11 @@ model Exam {
   /// exam's window for the calendar-link match in src/db/exam-link.ts.
   extraTimeMs Int       @default(0)
 
+  /// When the instructor released this exam's grades to its students. Null
+  /// until they do. Only consulted for an `EXAM`: a `PRACTICE` releases a
+  /// score as soon as it is written and a `QUIZ` when its window closes.
+  gradesReleasedAt DateTime?
+
   authorId String
   author   User   @relation(fields: [authorId], references: [username])
 
@@ -688,7 +748,6 @@ model Exam {
   examTags          ExamTags[]
   questionsForExams QuestionsForExam[]
   responses         Response[]
-  events            CalendarEvent[]
 
   @@unique([courseId, slug])
 }

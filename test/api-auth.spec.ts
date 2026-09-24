@@ -85,3 +85,39 @@ test("the web login action refuses a JSON body", async ({ request }) => {
 	});
 	expect(asForm.ok()).toBe(true);
 });
+
+// A caller that holds a session cookie and also sends a bearer token asked for
+// the token's identity explicitly, so the cookie must not override it.
+test("a bearer token outranks a session cookie on the same request", async ({
+	request,
+}) => {
+	const first = userFactory.build({ role: "STUDENT" });
+	const second = userFactory.build({ role: "STUDENT" });
+	await db.user.create(first, FULL_ACCESS);
+	await db.user.create(second, FULL_ACCESS);
+
+	const tokenOf = async (user: typeof first) => {
+		const login = await request.post("/api/auth/login", {
+			data: { login: user.username, password: user.password },
+		});
+		expect(login.ok()).toBe(true);
+		return (await login.json()).token as string;
+	};
+	const firstToken = await tokenOf(first);
+	// Logging in again leaves `second`'s session cookie on `request`.
+	await tokenOf(second);
+
+	const me = await request.get("/api/user/me", {
+		headers: { Authorization: `Bearer ${firstToken}` },
+	});
+	expect(me.status()).toBe(200);
+	expect((await me.json()).username).toBe(first.username);
+
+	const bogus = await request.get("/api/user/me", {
+		headers: { Authorization: "Bearer not-a-real-token" },
+	});
+	expect(bogus.status()).toBe(401);
+
+	const cookieOnly = await request.get("/api/user/me");
+	expect((await cookieOnly.json()).username).toBe(second.username);
+});

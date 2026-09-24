@@ -9,18 +9,27 @@ export {
 	type AttachmentId,
 	type BlobId,
 	type CalendarEventId,
+	type ClockTime,
 	type CourseId,
+	clockTime,
+	type Duration,
+	duration,
 	type ExamId,
+	type FeedbackId,
 	type InviteId,
 	type MimeType,
 	mimeType,
 	type PassphraseId,
+	type PublicId,
+	publicId,
 	type QuestionDataId,
 	type QuestionRefId,
 	type ResourceId,
+	type ResponseId,
 	type SessionId,
 	type Slug,
 	type SlugHash,
+	type SubmissionId,
 	slugHash,
 	type TimeSlotId,
 	type UserId,
@@ -33,10 +42,13 @@ export * from "./discipline";
 export * from "./edition";
 export * from "./enrollment";
 export * from "./exam";
+export * from "./feedback";
 export * from "./invite";
 export * from "./passphrase";
 export * from "./question";
 export * from "./resource";
+export * from "./response";
 export * from "./session";
+export * from "./submission";
 export * from "./time-slot";
 export * from "./user";

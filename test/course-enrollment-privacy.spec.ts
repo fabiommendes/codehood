@@ -65,7 +65,7 @@ async function makeCourseWithStudent() {
 		FULL_ACCESS,
 	);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	return { instructor, student, course, disciplineSlug };

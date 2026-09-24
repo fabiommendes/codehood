@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { courseId, examId, questionRefId, slug } from "./base";
-import { courseNaturalKey } from "./course";
+import { duration, examId, questionRefId, slug } from "./base";
+import { courseRef } from "./course";
 
 export const examStatus = z.enum([
 	"DRAFT",
@@ -10,9 +10,15 @@ export const examStatus = z.enum([
 	"COMPLETED",
 ]);
 
-export const examType = z.enum(["PRACTICE", "QUIZ", "EXAM", "FINAL"]);
+export const examType = z.enum(["PRACTICE", "QUIZ", "EXAM"]);
 
 export const textFormat = z.enum(["PLAINTEXT", "MARKDOWN", "HTML"]);
+
+/// How long an exam runs. A zero length is refused: an untimed exam has none.
+export const examDuration = duration.refine(
+	(d) => (d.hours ?? 0) + (d.minutes ?? 0) > 0,
+	{ message: "Duration must be longer than zero" },
+);
 
 /// A question in an exam, pinned to the version the exam was assembled with.
 export const examQuestionSchema = z.object({
@@ -29,7 +35,6 @@ export const examQuestionInput = z.object({
 
 export const examSchema = z.object({
 	id: examId,
-	courseId: courseId,
 	slug: slug,
 
 	type: examType,
@@ -41,8 +46,8 @@ export const examSchema = z.object({
 	format: textFormat,
 
 	scheduledAt: z.date().nullable(),
-	durationMs: z.number().int().positive().nullable(),
-	extraTimeMs: z.number().int().nonnegative(),
+	duration: duration.nullable(),
+	extraTime: duration.nullable(),
 
 	authorId: z.string(),
 
@@ -56,13 +61,13 @@ export const examSchema = z.object({
 export const examCreate = examSchema
 	.omit({
 		id: true,
-		courseId: true,
 		authorId: true,
+		extraTime: true,
 		createdAt: true,
 		updatedAt: true,
 	})
 	.extend({
-		courseId: z.union([courseId, courseNaturalKey]),
+		course: courseRef,
 
 		type: examType.optional(),
 		status: examStatus.optional(),
@@ -71,35 +76,28 @@ export const examCreate = examSchema
 		description: z.string().nullish(),
 		preamble: z.string().nullish(),
 		scheduledAt: z.date().nullish(),
-		durationMs: z.number().int().positive().nullish(),
-		extraTimeMs: z.number().int().nonnegative().optional(),
+		duration: examDuration.nullish(),
 
 		tags: z.array(z.string().min(1)).optional(),
 		questions: z.array(examQuestionInput).optional(),
 	});
 
-export const examUpsert = examCreate;
-
+/// Extra time is granted to an existing exam, so only an update carries it.
 export const examUpdate = examCreate
-	.omit({ slug: true, courseId: true })
+	.omit({ slug: true, course: true })
+	.extend({ extraTime: duration.nullish() })
 	.partial();
-
-export const examNaturalKey = courseNaturalKey.extend({ slug: slug });
 
 export const examPK = z.union([
 	z.object({ id: examId }),
-	z.object({ courseId: courseId, slug: slug }),
-	examNaturalKey,
+	z.object({ course: courseRef, slug: slug }),
 ]);
 
 export const examFilterBase = z.object({
-	slugs: z.array(slug).optional(),
+	exams: z.array(slug).optional(),
 	statuses: z.array(examStatus).optional(),
 	types: z.array(examType).optional(),
 	tags: z.array(z.string().min(1)).optional(),
 });
 
-export const examFilter = z.union([
-	examFilterBase.extend({ courseId: courseId }),
-	examFilterBase.extend(courseNaturalKey.shape),
-]);
+export const examFilter = examFilterBase.extend({ course: courseRef });

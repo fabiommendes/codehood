@@ -9,28 +9,23 @@ import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { ExamId } from "@/core/schemas";
+import type { Duration, ExamId } from "@/core/schemas";
 import {
 	examCreate,
 	examFilter,
 	examPK,
 	examSchema,
 	examUpdate,
-	examUpsert,
 } from "@/core/schemas";
 import {
 	CrudBase,
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import {
-	courseRefWhere,
-	invalidIfExists,
-	valueOrNotAllowed,
-	valueOrNotFound,
-} from "../utils";
+import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
 export { examStatus, examType, textFormat } from "@/core/schemas";
 export type { ExamId };
@@ -43,7 +38,6 @@ export type ExamCreate = z.infer<typeof examCreate>;
 export type ExamFilter = z.infer<typeof examFilter>;
 export type ExamPK = z.infer<typeof examPK>;
 export type ExamUpdate = z.infer<typeof examUpdate>;
-export type ExamUpsert = z.infer<typeof examUpsert>;
 
 /// The course shape the permission predicates need, plus the exam's own relations.
 function examInclude() {
@@ -77,7 +71,6 @@ export class ExamService extends CrudBase<{
 	create: ExamCreate;
 	filter: ExamFilter;
 	update: ExamUpdate;
-	upsert: ExamUpsert;
 }> {
 	/**
 	 * Creates an exam in a course, with its tags and its pinned questions.
@@ -95,7 +88,9 @@ export class ExamService extends CrudBase<{
 		input: ExamCreate,
 		opts: ServiceOptsWithoutTx,
 	): Promise<Exam> {
-		const course = await writableCourse(tx, input.courseId, opts.actor);
+		const course = await this.course(input.course, tx, opts, {
+			perm: "course.update-contents",
+		});
 		const questions = await resolveQuestions(tx, course.id, input.questions);
 
 		const row = await invalidIfExists(tx.exam.create.bind(tx.exam), {
@@ -107,10 +102,9 @@ export class ExamService extends CrudBase<{
 				title: input.title,
 				description: input.description ?? null,
 				preamble: input.preamble ?? null,
-				format: input.format,
+				format: input.format ?? "MARKDOWN",
 				scheduledAt: input.scheduledAt ?? null,
-				durationMs: input.durationMs ?? null,
-				extraTimeMs: input.extraTimeMs,
+				durationMs: toMs(input.duration) ?? null,
 				authorId:
 					opts.actor === SYSTEM
 						? course.instructor.username
@@ -176,15 +170,7 @@ export class ExamService extends CrudBase<{
 		const course = valueOrNotFound(
 			"course",
 			await tx.course.findUnique({
-				where: courseRefWhere(
-					"courseId" in filter
-						? filter.courseId
-						: {
-								discipline: filter.discipline,
-								instructor: filter.instructor,
-								edition: filter.edition,
-							},
-				),
+				where: courseRefWhere(filter.course),
 				select: {
 					id: true,
 					instructor: { select: { username: true } },
@@ -205,7 +191,7 @@ export class ExamService extends CrudBase<{
 			where: {
 				courseId: course.id,
 				...(full ? {} : { status: { notIn: ["DRAFT", "ARCHIVED"] } }),
-				...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
+				...(filter.exams ? { slug: { in: filter.exams } } : {}),
 				...(filter.statuses ? { status: { in: filter.statuses } } : {}),
 				...(filter.types ? { type: { in: filter.types } } : {}),
 				...(filter.tags
@@ -251,8 +237,9 @@ export class ExamService extends CrudBase<{
 				preamble: fields.preamble,
 				format: fields.format,
 				scheduledAt: fields.scheduledAt,
-				durationMs: fields.durationMs,
-				extraTimeMs: fields.extraTimeMs,
+				durationMs: toMs(fields.duration),
+				// The column is not nullable: no extra time is stored as zero.
+				extraTimeMs: fields.extraTime === null ? 0 : toMs(fields.extraTime),
 				...(fields.tags && {
 					examTags: {
 						deleteMany: {},
@@ -278,31 +265,29 @@ export class ExamService extends CrudBase<{
 	@Validate({
 		service: true,
 		returns: examSchema,
-		args: [undefined, examUpsert],
+		args: [undefined, examCreate],
 	})
 	protected async upsertTx(
 		tx: PrismaTx,
-		input: ExamUpsert,
+		input: ExamCreate,
 		opts: ServiceOptsWithoutTx,
 	): Promise<Exam> {
 		// Checked up front so both branches refuse a non-author the same way,
 		// without telling them whether the exam exists.
-		const course = await writableCourse(tx, input.courseId, opts.actor);
+		const course = await this.course(input.course, tx, opts, {
+			perm: "course.update-contents",
+		});
+
 		const scoped = { ...opts, tx };
 
 		const existing = await tx.exam.findUnique({
 			where: { courseId_slug: { courseId: course.id, slug: input.slug } },
 			select: { id: true },
 		});
-		if (!existing)
-			return this.create({ ...input, courseId: course.id }, scoped);
+		if (!existing) return this.create({ ...input, course: course.id }, scoped);
 
-		const { slug: _slug, courseId: _courseId, ...fields } = input;
-		return this.update(
-			{ courseId: course.id, slug: input.slug },
-			fields,
-			scoped,
-		);
+		const { slug: _slug, course: _course, ...fields } = input;
+		return this.update({ course: course.id, slug: input.slug }, fields, scoped);
 	}
 
 	/**
@@ -334,37 +319,18 @@ export class ExamService extends CrudBase<{
 /** The `where` matching whichever of the primary keys `filter` carries. */
 function examWhere(filter: ExamPK): Prisma.ExamWhereInput {
 	if ("id" in filter) return { id: filter.id };
-	if ("courseId" in filter) {
-		return { courseId: filter.courseId, slug: filter.slug };
-	}
 
 	return {
 		slug: filter.slug,
-		course: {
-			disciplineSlug: filter.discipline,
-			instructorId: filter.instructor,
-			editionSlug: filter.edition,
-		},
+		course:
+			typeof filter.course === "number"
+				? { id: filter.course }
+				: {
+						disciplineSlug: filter.course.discipline,
+						instructorId: filter.course.instructor,
+						editionSlug: filter.course.edition,
+					},
 	};
-}
-
-/** Finds the course an exam is written to, refusing an actor who may not write its contents. */
-async function writableCourse(
-	tx: PrismaTx,
-	ref: ExamCreate["courseId"],
-	actor: ServiceOpts["actor"],
-) {
-	return valueOrNotAllowed(
-		"exam.create",
-		valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(ref),
-				select: { id: true, instructor: { select: { username: true } } },
-			}),
-		),
-		(c) => hasPerm(actor, "course.update-contents", c),
-	);
 }
 
 /**
@@ -435,11 +401,94 @@ async function resolveQuestions(
 	}));
 }
 
+/** One of the four fixed groups the student exam list renders, empty groups omitted. */
+export interface ExamGroup {
+	key: "open" | "practice" | "upcoming" | "past";
+	label: string;
+	exams: Exam[];
+}
+
+/** Whether `exam` belongs to the group `key`, per the spec's status/type table. */
+function belongsTo(key: ExamGroup["key"], exam: Exam): boolean {
+	switch (key) {
+		case "open":
+			return exam.status === "ONGOING" && exam.type !== "PRACTICE";
+		case "practice":
+			return exam.type === "PRACTICE" && exam.status !== "COMPLETED";
+		case "upcoming":
+			return exam.status === "SCHEDULED" && exam.type !== "PRACTICE";
+		case "past":
+			return exam.status === "COMPLETED";
+	}
+}
+
+/** Orders exams within a group, unscheduled exams sorted last. */
+function sortGroup(key: ExamGroup["key"], exams: Exam[]): Exam[] {
+	if (key === "practice") {
+		return [...exams].sort((a, b) => a.title.localeCompare(b.title));
+	}
+
+	const dirMul = key === "past" ? -1 : 1;
+	return [...exams].sort((a, b) => {
+		if (a.scheduledAt === null && b.scheduledAt === null) return 0;
+		if (a.scheduledAt === null) return 1;
+		if (b.scheduledAt === null) return -1;
+		return dirMul * (a.scheduledAt.getTime() - b.scheduledAt.getTime());
+	});
+}
+
+/** Display order and label for each `ExamGroup` key — never authored, see the spec. */
+const GROUP_ORDER: { key: ExamGroup["key"]; label: string }[] = [
+	{ key: "open", label: "Open" },
+	{ key: "practice", label: "Practice" },
+	{ key: "upcoming", label: "Upcoming" },
+	{ key: "past", label: "Past exams and grades" },
+];
+
+/**
+ * Groups exams into the four fixed sections the student exam list renders.
+ *
+ * Section order fixed (Open, Practice, Upcoming, Past exams and grades), each
+ * ordered per the spec's table, empty sections absent. `DRAFT` and `ARCHIVED`
+ * exams are dropped here too, not just by the service that narrows what an
+ * actor may see, so a draft cannot leak into a student-shaped section if this
+ * function is ever reused. Exported as a pure function so the grouping/
+ * ordering is unit-testable independent of the database.
+ */
+export function groupExamsForStudent(exams: Exam[]): ExamGroup[] {
+	const visible = exams.filter(
+		(exam) => exam.status !== "DRAFT" && exam.status !== "ARCHIVED",
+	);
+
+	const groups: ExamGroup[] = [];
+	for (const { key, label } of GROUP_ORDER) {
+		const inGroup = sortGroup(
+			key,
+			visible.filter((exam) => belongsTo(key, exam)),
+		);
+		if (inGroup.length > 0) {
+			groups.push({ key, label, exams: inGroup });
+		}
+	}
+	return groups;
+}
+
+/** A {@link Duration} as the milliseconds the database stores, passing `null` and `undefined` through. */
+function toMs<T extends null | undefined>(length: Duration | T): number | T {
+	if (length === null || length === undefined) return length;
+	return durationToMinutes(length) * 60_000;
+}
+
+/** Stored milliseconds as a {@link Duration}, a missing or zero length read as `null`. */
+function fromMs(ms: number | null): Duration | null {
+	if (!ms) return null;
+	return toDuration(Math.round(ms / 60_000));
+}
+
 /** Converts a database row into the exam entity. */
 function fromDb(row: DbExam): Exam {
 	return {
 		id: row.id as ExamId,
-		courseId: row.courseId as Exam["courseId"],
 		slug: row.slug,
 		type: row.type,
 		status: row.status,
@@ -448,8 +497,8 @@ function fromDb(row: DbExam): Exam {
 		preamble: row.preamble,
 		format: row.format,
 		scheduledAt: row.scheduledAt,
-		durationMs: row.durationMs,
-		extraTimeMs: row.extraTimeMs,
+		duration: fromMs(row.durationMs),
+		extraTime: fromMs(row.extraTimeMs),
 		authorId: row.authorId,
 		tags: row.examTags.map((t) => t.tag),
 		questions: row.questionsForExams.map((q) => ({

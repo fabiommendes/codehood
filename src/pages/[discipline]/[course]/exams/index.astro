@@ -1,7 +1,9 @@
 ---
+import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
+import ExamRow from "@/components/exam/ExamRow.astro";
 import ExamsTable from "@/components/exam/ExamsTable";
-import { db } from "@/db";
+import { db, groupExamsForStudent } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 
@@ -14,11 +16,13 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
+const canWrite = hasPerm(actor, "course.update-contents", course);
 
 // No `public`/`manage` flag here, unlike questions — the exam service
 // already narrows DRAFT/ARCHIVED rows to whoever may write the course's
 // contents, so this list is exactly what `actor` may see.
-const exams = await db.exam.findMany({ courseId: course.id }, { actor });
+const exams = await db.exam.findMany({ course: course.id }, { actor });
+const groups = canWrite ? [] : groupExamsForStudent(exams);
 ---
 
 <AppLayout title={`Exams · ${course.discipline.name}`}>
@@ -29,12 +33,27 @@ const exams = await db.exam.findMany({ courseId: course.id }, { actor });
     <p class="mt-1 text-sm text-base-content/60">{course.discipline.name}</p>
 
     {
-      exams.length > 0 ? (
+      exams.length === 0 ? (
+        <p class="mt-4 text-sm text-base-content/60">No exams yet.</p>
+      ) : canWrite ? (
         <div class="mt-4">
-          <ExamsTable exams={exams} href={href} />
+          <ExamsTable exams={exams} href={href} client:load />
         </div>
       ) : (
-        <p class="mt-4 text-sm text-base-content/60">No exams yet.</p>
+        <div class="mt-4 flex flex-col gap-6">
+          {groups.map((group) => (
+            <section>
+              <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">
+                {group.label}
+              </h3>
+              <div class="mt-2 flex flex-col gap-3">
+                {group.exams.map((exam) => (
+                  <ExamRow exam={exam} href={href} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       )
     }
   </main>

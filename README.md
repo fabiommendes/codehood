@@ -69,23 +69,38 @@ Then use one of the following, depending on what you want to do:
 
 | Variable                 | Required | Default              | Meaning                                                       |
 | :----------------------- | :------- | :------------------- | :------------------------------------------------------------ |
-| `ENVIRONMENT`            | yes      | none                 | `dev` or `prod`. The server refuses to boot without it.        |
+| `ENVIRONMENT`            | yes      | none                 | `dev`/`development` or `prod`/`production`. The server refuses to boot without it. |
 | `DATABASE_URL`           | yes      | `file:./dev.db`      | SQLite database to open.                                       |
 | `RESOURCE_ROOT`          | no       | `./storage/resources`| Where resource blobs are written.                              |
 | `ATTACHMENT_LINK_MODE`   | no       | `symlink`            | `symlink`, `hardlink` or `copy`.                               |
 | `BLOB_QUOTA_INSTRUCTOR`  | no       | `1gb`                | Upload quota per instructor.                                   |
 | `BLOB_QUOTA_STUDENT`     | no       | `200mb`              | Upload quota per student.                                      |
 | `DEBUG`                  | no       | `false`              | Verbose error output.                                          |
+| `LOG_ENV`                | no       | `false`              | Echo the resolved environment at startup. Set by `pnpm run dev`. |
+| `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in (FR-NFR-020).            |
 
 `ENVIRONMENT` deliberately has no default, and an empty value counts as
 unset. It decides two things a deployment cannot afford to get wrong by
 omission: whether the demo accounts (`admin`/`admin` and friends) may be
 seeded at all, and whether the session cookie is sent with `Secure`. A
-production deployment sets `ENVIRONMENT=prod`; anything else fails at startup
-with a message naming the variable.
+production deployment sets `ENVIRONMENT=prod` (or `production`); anything
+else fails at startup with a message naming the variable.
 
 An `.env` created before this variable existed will not have it. Add
 `ENVIRONMENT="dev"` to it, or copy `.env.example` over.
+
+`SERVER_TZ` is declared through `astro:env` (`astro.config.mjs`), not read
+directly from `process.env`, because `src/utils/schedule-time.ts` runs both
+server-side and inside hydrated islands (`ExamsTable`, `QuestionsTable`) —
+`astro:env/client` is the one mechanism that is safe to read on both sides. It
+is deliberately not called `TZ`: that name is a Node special that also
+changes the process's own default time zone for anything that skips an
+explicit `timeZone` argument, not just this module, so a deployment that used
+to rely on `process.env.TZ` here must set `SERVER_TZ` explicitly — `TZ` alone
+no longer does anything for this. It is also baked into the build rather than
+read from the running process's environment: a changed `SERVER_TZ` takes
+effect on the next `pnpm run build`, not the next restart, and the build
+machine's value is what ships, not the deployed machine's.
 
 Demo accounts are never created by a request. They come from
 `pnpm run db:seed` (and the test runner), and only when `ENVIRONMENT=dev`.

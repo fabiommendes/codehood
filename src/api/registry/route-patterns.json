@@ -1,5 +1,19 @@
 [
 	{
+		"pattern": "/api/api-key",
+		"methods": [
+			"get",
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/api-key/[id]",
+		"methods": [
+			"delete",
+			"get"
+		]
+	},
+	{
 		"pattern": "/api/auth/login",
 		"methods": [
 			"post"
@@ -12,22 +26,6 @@
 		]
 	},
 	{
-		"pattern": "/api/calendar-event",
-		"methods": [
-			"get",
-			"post",
-			"put"
-		]
-	},
-	{
-		"pattern": "/api/calendar-event/[id]",
-		"methods": [
-			"delete",
-			"get",
-			"patch"
-		]
-	},
-	{
 		"pattern": "/api/course",
 		"methods": [
 			"get",
@@ -37,6 +35,22 @@
 	},
 	{
 		"pattern": "/api/course/[discipline]/[course]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/calendar-event",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/calendar-event/[week]/[timeSlot]",
 		"methods": [
 			"delete",
 			"get",
@@ -85,6 +99,75 @@
 	},
 	{
 		"pattern": "/api/course/[discipline]/[course]/resource/[slug]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/response",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/response/[publicId]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/submission",
+		"methods": [
+			"get",
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/submission/[publicId]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/submission/[publicId]/feedback",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/submission/[publicId]/feedback/[ref]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/submit",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/time-slot",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/time-slot/[slug]",
 		"methods": [
 			"delete",
 			"get",
@@ -141,22 +224,6 @@
 		"methods": [
 			"delete",
 			"get"
-		]
-	},
-	{
-		"pattern": "/api/time-slot",
-		"methods": [
-			"get",
-			"post",
-			"put"
-		]
-	},
-	{
-		"pattern": "/api/time-slot/[id]",
-		"methods": [
-			"delete",
-			"get",
-			"patch"
 		]
 	},
 	{

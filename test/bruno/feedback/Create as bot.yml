@@ -1,0 +1,25 @@
+info:
+  name: Create as bot
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/submission/sub_example/feedback
+  body:
+    type: json
+    data: |-
+      {
+          "ref": "first-pass",
+          "score": "1/3",
+          "botId": "autograder-v1",
+          "feedback": "One of three cases passed."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

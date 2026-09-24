@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { EDITION_RE } from "@/urls";
 import "./base";
+import { editionSlug } from "./base";
 
 export const editionSchema = z.object({
-	slug: z.string().regex(EDITION_RE),
+	slug: editionSlug,
 	name: z.string().min(1),
 	startAt: z.coerce.date(),
 	endAt: z.coerce.date(),
@@ -24,8 +24,6 @@ export const editionUpdate = editionSchema
 		endAt: true,
 	})
 	.partial();
-
-export const editionUpsert = editionCreate;
 
 export const editionPK = editionSchema.pick({
 	slug: true,

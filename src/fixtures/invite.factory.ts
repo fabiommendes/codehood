@@ -9,7 +9,7 @@ function buildInvite(params: Partial<InviteCreate>): InviteCreate {
 		kind: "PERSONAL",
 		invitedRole: "STUDENT",
 		email: null,
-		courseId: null,
+		course: params.course,
 		maxUses: null,
 		createdBy: params.createdBy,
 	};

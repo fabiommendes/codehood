@@ -65,16 +65,16 @@ test("findMany throws for an enrolled student", async () => {
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 
 	await expect(
-		db.enrollment.findMany({ courseId: course.id }, { actor: student }),
+		db.enrollment.findMany({ course: course.id }, { actor: student }),
 	).rejects.toThrow();
 
 	const students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{
 			actor: instructor,
 		},
@@ -88,11 +88,11 @@ test("delete marks the enrollment DROPPED rather than deleting it, and create re
 	const course = await makeCourse(instructor.username);
 
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	let students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{
 			actor: instructor,
 		},
@@ -100,21 +100,21 @@ test("delete marks the enrollment DROPPED rather than deleting it, and create re
 	expect(students).toHaveLength(1);
 
 	await db.enrollment.delete(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: instructor },
 	);
 	expect(students).toHaveLength(0);
 
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{ actor: instructor },
 	);
 	expect(students).toHaveLength(1);
@@ -125,17 +125,17 @@ test("a student drops themselves — the half of FR-CRS-042 that used to be miss
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 
 	await db.enrollment.delete(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: student },
 	);
 
 	const students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{
 			actor: instructor,
 		},
@@ -149,19 +149,19 @@ test("a student naming another student's username is refused, and the other enro
 	const studentB = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: studentB.username },
+		{ course: course.id, username: studentB.username },
 		FULL_ACCESS,
 	);
 
 	await expect(
 		db.enrollment.delete(
-			{ courseId: course.id, username: studentB.username },
+			{ course: course.id, username: studentB.username },
 			{ actor: studentA },
 		),
 	).rejects.toThrow();
 
 	const students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{
 			actor: instructor,
 		},
@@ -175,29 +175,29 @@ test("a non-owning admin may enroll, drop and list, but not the course's operati
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 
 	const other = await makeUser("STUDENT");
 	const enrollment = await db.enrollment.create(
-		{ courseId: course.id, username: other.username },
+		{ course: course.id, username: other.username },
 		{ actor: admin },
 	);
 	expect(enrollment.username).toBe(other.username);
 
 	expect(
-		(await db.enrollment.findMany({ courseId: course.id }, { actor: admin }))
+		(await db.enrollment.findMany({ course: course.id }, { actor: admin }))
 			.length,
 	).toBe(2);
 
 	await db.enrollment.delete(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: admin },
 	);
 	expect(
 		await db.enrollment.findOne(
-			{ courseId: course.id, username: student.username },
+			{ course: course.id, username: student.username },
 			FULL_ACCESS,
 		),
 	).toMatchObject({ status: "DROPPED" });
@@ -217,23 +217,23 @@ test("dropping an already-DROPPED enrollment is a no-op, not an error", async ()
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.delete(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: instructor },
 	);
 
 	await expect(
 		db.enrollment.delete(
-			{ courseId: course.id, username: student.username },
+			{ course: course.id, username: student.username },
 			{ actor: instructor },
 		),
 	).resolves.toBeUndefined();
 
 	const students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{
 			actor: instructor,
 		},
@@ -246,11 +246,11 @@ test("re-enrolling a dropped student restores access to submissions made before 
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.delete(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: student },
 	);
 	await expect(
@@ -258,7 +258,7 @@ test("re-enrolling a dropped student restores access to submissions made before 
 	).rejects.toThrow();
 
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: instructor },
 	);
 	await expect(
@@ -271,12 +271,12 @@ test("findMany carries the full student view with enrolledAt for the Students ta
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 
 	const students = await db.enrollment.findMany(
-		{ courseId: course.id },
+		{ course: course.id },
 		{
 			actor: instructor,
 		},
@@ -306,7 +306,7 @@ test("create returns the enrollment, and a cleared githubId/schoolId comes back 
 	const course = await makeCourse(instructor.username);
 
 	const enrollment = await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: instructor },
 	);
 	expect(enrollment).toMatchObject({
@@ -326,11 +326,11 @@ test("findOne is visible to the owner and to the student, refused to a classmate
 	const course = await makeCourse(instructor.username);
 	for (const s of [student, classmate]) {
 		await db.enrollment.create(
-			{ courseId: course.id, username: s.username },
+			{ course: course.id, username: s.username },
 			FULL_ACCESS,
 		);
 	}
-	const pk = { courseId: course.id, username: student.username };
+	const pk = { course: course.id, username: student.username };
 
 	await expect(
 		db.enrollment.findOne(pk, { actor: instructor }),
@@ -350,7 +350,7 @@ test("findOne is visible to the owner and to the student, refused to a classmate
 	const stranger = await makeUser("STUDENT");
 	await expect(
 		db.enrollment.findOne(
-			{ courseId: course.id, username: stranger.username },
+			{ course: course.id, username: stranger.username },
 			{ actor: instructor },
 		),
 	).resolves.toBeNull();
@@ -363,12 +363,12 @@ test("findMany accepts a course natural key and a status filter", async () => {
 	const course = await makeCourse(instructor.username);
 	for (const s of [active, dropped]) {
 		await db.enrollment.create(
-			{ courseId: course.id, username: s.username },
+			{ course: course.id, username: s.username },
 			FULL_ACCESS,
 		);
 	}
 	await db.enrollment.delete(
-		{ courseId: course.id, username: dropped.username },
+		{ course: course.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 
@@ -377,11 +377,14 @@ test("findMany accepts a course natural key and a status filter", async () => {
 		instructor: instructor.username,
 		edition: course.edition.slug,
 	};
-	const byKey = await db.enrollment.findMany(key, { actor: instructor });
+	const byKey = await db.enrollment.findMany(
+		{ course: key },
+		{ actor: instructor },
+	);
 	expect(byKey.map((e) => e.username)).toEqual([active.username]);
 
 	const droppedOnly = await db.enrollment.findMany(
-		{ ...key, status: "DROPPED" },
+		{ course: key, status: "DROPPED" },
 		{ actor: instructor },
 	);
 	expect(droppedOnly.map((e) => e.username)).toEqual([dropped.username]);
@@ -392,7 +395,7 @@ test("create and delete accept a course natural key", async () => {
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);
 	const pk = {
-		courseId: {
+		course: {
 			discipline: course.discipline.slug,
 			instructor: instructor.username,
 			edition: course.edition.slug,
@@ -419,11 +422,11 @@ test("an unknown course is NotFound, and update/upsert are not implemented", asy
 	};
 
 	await expect(
-		db.enrollment.findMany(unknown, { actor: instructor }),
+		db.enrollment.findMany({ course: unknown }, { actor: instructor }),
 	).rejects.toBeInstanceOf(NotFound);
 	await expect(
 		db.enrollment.update(
-			{ courseId: unknown, username: student.username },
+			{ course: unknown, username: student.username },
 			undefined as never,
 			FULL_ACCESS,
 		),

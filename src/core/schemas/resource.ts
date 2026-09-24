@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { attachmentSchema } from "./attachment";
 import { buffer, courseId, resourceId, slug } from "./base";
-import { courseNaturalKey } from "./course";
+import { courseRef } from "./course";
 
 export const resourceSchema = z.object({
 	id: resourceId,
+	courseId: courseId,
 	slug: z.string().min(1),
 	title: z.string().min(1),
 	description: z.string().nullable(),
@@ -61,13 +62,14 @@ export const resourceFileDataCreate = resourceFileData
 export const resourceCreate = resourceSchema
 	.omit({
 		id: true,
+		courseId: true,
 		createdAt: true,
 		updatedAt: true,
 		description: true,
 		data: true,
 	})
 	.extend({
-		courseId: z.union([courseId, courseNaturalKey]),
+		course: courseRef,
 		description: resourceSchema.shape.description.nullish(),
 		data: z.union([
 			resourceLinkData,
@@ -77,39 +79,18 @@ export const resourceCreate = resourceSchema
 		]),
 	});
 
-export const resourceUpsert = resourceCreate;
-
 export const resourceUpdate = resourceCreate
-	.omit({ slug: true, courseId: true })
+	.omit({ slug: true, course: true })
 	.partial();
 
-export const resourceNaturalKey = courseNaturalKey.extend({ slug: slug });
 export const resourcePK = z.union([
 	z.object({ id: resourceId }),
-	z.object({ courseId: z.number(), slug: slug }),
-	resourceNaturalKey,
+	z.object({ course: courseRef, slug: slug }),
 ]);
-
-// What the REST layer accepts, as opposed to what the service resolves: a
-// resource's address is `/api/course/<discipline>/<instructor>_<edition>/resource/<slug>`.
-export const resourcePkRef = z.object({
-	ref: z.object({ courseRef: courseNaturalKey, slug: slug }),
-});
 
 export const resourceFilterBase = z.object({
 	types: z.array(resourceTypeSchema).optional(),
 	slugs: z.array(z.string()).optional(),
 });
 
-export const resourceFilterByCourseId = resourceFilterBase.extend({
-	courseId: courseId,
-});
-
-export const resourceFilterByCourseNaturalKey = resourceFilterBase.extend(
-	courseNaturalKey.shape,
-);
-
-export const resourceFilter = z.union([
-	resourceFilterByCourseId,
-	resourceFilterByCourseNaturalKey,
-]);
+export const resourceFilter = resourceFilterBase.extend({ course: courseRef });

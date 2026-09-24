@@ -27,7 +27,7 @@ const actor = Astro.locals.actor!;
 const canManage = hasPerm(actor, "enrollment.manage", course);
 
 if (!slug) return Astro.rewrite("/404");
-const exam = await db.exam.findOne({ courseId: course.id, slug }, { actor });
+const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
 if (!exam) return Astro.rewrite("/404");
 
 // Rendered like a resource note: PLAINTEXT/HTML text is shown as-is rather
@@ -51,11 +51,11 @@ const pinnedQuestions = (
 		exam.questions.map((question) =>
 			canManage
 				? db.question.findOne(
-						{ courseId: course.id, slug: question.slug, public: false },
+						{ course: course.id, slug: question.slug, public: false },
 						{ actor },
 					)
 				: db.question.findOne(
-						{ courseId: course.id, slug: question.slug, public: true },
+						{ course: course.id, slug: question.slug, public: true },
 						{ actor },
 					),
 		),
@@ -114,8 +114,8 @@ const pinnedQuestions = (
         <div>
           <dt class="text-sm text-base-content/50">Duration</dt>
           <dd class="mt-0.5 font-medium">
-            {formatDuration(exam.durationMs)}
-            {exam.extraTimeMs > 0 && ` (+${Math.round(exam.extraTimeMs / 60_000)} min extra time)`}
+            {formatDuration(exam.duration)}
+            {exam.extraTime && ` (+${formatDuration(exam.extraTime)} extra time)`}
           </dd>
         </div>
         <div>

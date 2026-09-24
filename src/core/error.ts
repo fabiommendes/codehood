@@ -136,11 +136,10 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 			status?: number;
 		},
 	) {
-		const message = args?.message ?? "Validation Error";
+		const message = args?.message ?? summarizeErrors(errors);
 		super(message, "invalid-data", args?.status ?? 400);
 
 		errors = { ...errors };
-		delete errors.$;
 
 		this.errors = {};
 		for (const [k, v] of Object.entries(errors)) {
@@ -432,4 +431,20 @@ function validationErrorCodeFromZodIssue(
 		default:
 			return "invalid";
 	}
+}
+
+/// Renders field errors as `field: message; field: message`, mirroring the
+/// summary `InvalidData.fromZodError` builds, so a hand-built error is not
+/// reduced to a bare "Validation Error".
+function summarizeErrors(errors: {
+	[key: string]: InvalidDataResponse["errors"][string] | undefined | null;
+}): string {
+	const summaries: string[] = [];
+	for (const [key, issues] of Object.entries(errors)) {
+		for (const issue of issues ?? []) {
+			if (!issue.message) continue;
+			summaries.push(key === "$" ? issue.message : `${key}: ${issue.message}`);
+		}
+	}
+	return summaries.length > 0 ? summaries.join("; ") : "Validation Error";
 }

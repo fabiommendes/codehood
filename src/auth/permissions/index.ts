@@ -34,6 +34,9 @@ export type RoleEntity =
 	| "discipline"
 	| "edition"
 	| "question"
+	| "response"
+	| "submission"
+	| "feedback"
 	| "api-key"
 	| "session";
 
@@ -43,6 +46,7 @@ type ExtraPerms =
 	| "course.read-contents"
 	| "course.update-contents"
 	| "question.read-public"
+	| "response.submit"
 	| "api-key.manage"
 	| "session.manage"
 	| "enrollment.manage"
@@ -140,6 +144,27 @@ export interface QuestionWithCourse {
 	status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
 	course: CourseTarget | CourseWithEnrollment;
 }
+
+/**
+ * The shape the `response.*` and `submission.*` permissions need from a
+ * loaded response row: who wrote it and the course it belongs to.
+ *
+ * `id` is only used for auditing.
+ */
+export interface ResponseWithCourse {
+	id?: number;
+	author: UserTarget;
+	course: CourseWithEnrollment;
+}
+
+/**
+ * What `feedback.read` needs on top of the response's own shape: whether the
+ * exam has released this grade to its students yet.
+ *
+ * Release is computed by the service from the exam's type, window and
+ * `gradesReleasedAt`, never authored on the feedback itself.
+ */
+export type FeedbackTarget = ResponseWithCourse & { released: boolean };
 
 /// Permissions are declared in a single object so hasPerm can statically verify
 /// the target types at compile time.
@@ -306,6 +331,54 @@ const PERMISSIONS = {
 		audit: auditQuestion,
 	} satisfies PermDef<QuestionWithCourse>,
 
+	// RESPONSE / SUBMISSION ------------------------------------------------------
+	// Rule: a student writes their own work in a course they are enrolled in;
+	// the course's instructor writes on anyone's behalf. No admin branch: an
+	// admin who does not teach the course has no business answering for a
+	// student, matching `course.update-contents`.
+	"response.create | response.submit | submission.create": {
+		other: (actor, target) =>
+			isCourseOwner(actor, target.course) ||
+			(target.author.username === actor.username &&
+				isEnrolled(actor, target.course)),
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// Rule: the author sees their own work, the instructor sees everyone's.
+	"response.read | submission.read": {
+		other: (actor, target) =>
+			isCourseOwner(actor, target.course) ||
+			target.author.username === actor.username,
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// Rule: the instructor alone. Closing a slot and re-grading an attempt are
+	// the instructor's calls; a student changes their work by submitting again.
+	"response.update | response.delete | submission.update | submission.delete": {
+		other: (actor, target) => isCourseOwner(actor, target.course),
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// FEEDBACK -------------------------------------------------------------------
+	// Rule: the course's instructor grades; SYSTEM grades on a bot's behalf.
+	// No student branch — a student does not grade their own work — and no
+	// admin branch, matching `submission.update`.
+	"feedback.create | feedback.update | feedback.delete": {
+		other: (actor, target) => isCourseOwner(actor, target.course),
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// Rule: the instructor reads every grade at any time; the graded student
+	// reads their own once the exam has released it. An unreleased grade is
+	// invisible rather than refused, so the refusal itself does not announce
+	// that a grade exists.
+	"feedback.read": {
+		other: (actor, target) =>
+			isCourseOwner(actor, target.course) ||
+			(target.author.username === actor.username && target.released),
+		audit: auditResponse,
+	} satisfies PermDef<FeedbackTarget>,
+
 	// API KEY / SESSION ----------------------------------------------------------
 	// Rule: the owner, any admin, or SYSTEM.
 	"api-key.manage | session.manage": {
@@ -364,6 +437,15 @@ function auditCourse(target: CourseTarget | CourseWithEnrollment): JSONObject {
 	return {
 		...(target.id !== undefined && { id: target.id }),
 		instructor: target.instructor.username,
+	};
+}
+
+/// Audit record of a response target: its `id`, if carried, its author, and its course's audit record.
+function auditResponse(target: ResponseWithCourse): JSONObject {
+	return {
+		...(target.id !== undefined && { id: target.id }),
+		author: target.author.username,
+		course: auditCourse(target.course),
 	};
 }
 

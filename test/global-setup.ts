@@ -1,4 +1,4 @@
-import { TEST_DATABASE_URL } from "./db-path";
+import { TEST_DATABASE_URL } from "./env";
 
 /**
  * Fails the run when the test process is not pointed at the test database.

@@ -191,7 +191,14 @@ async function run(
 	// rather than guessed at.
 	if (Array.isArray(params))
 		throw new InvalidData(
-			{},
+			{
+				$: [
+					{
+						code: "type-mismatch",
+						message: "Positional params are not supported; use an object.",
+					},
+				],
+			},
 			{ message: "Positional params are not supported; use an object." },
 		);
 

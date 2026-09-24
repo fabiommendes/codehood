@@ -15,7 +15,7 @@ function buildResource(
 	params: Partial<ResourceCreate>,
 ): ResourceCreate {
 	return {
-		courseId: params.courseId ?? (0 as schema.CourseId),
+		course: params.course ?? (0 as schema.CourseId),
 		slug: params.slug ?? `resource-${sequence}`,
 		title: faker.lorem.words(3),
 		description: faker.lorem.sentence(),
@@ -35,7 +35,7 @@ export const resourceFactory = Factory.define<
 /**
  * Builds a `ResourceCreate` payload and persists it via `resourceService.create`.
  *
- * `courseId` is provisioned automatically (a fresh course) when left unset.
+ * `course` is provisioned automatically (a fresh course) when left unset.
  */
 export const persistedResourceFactory = Factory.define<
 	ResourceCreate,
@@ -46,11 +46,11 @@ export const persistedResourceFactory = Factory.define<
 	onCreate(async (input) => {
 		const opts = serviceOpts(transientParams);
 		const courseId =
-			params.courseId ??
+			params.course ??
 			(await persistedCourseFactory.create({}, { transient: transientParams }))
 				.id;
 
-		return db.resource.create({ ...input, courseId }, opts);
+		return db.resource.create({ ...input, course: courseId }, opts);
 	});
 
 	return buildResource(sequence, params);

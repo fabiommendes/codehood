@@ -12,13 +12,15 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import type { z } from "zod";
+import { SYSTEM } from "@/auth/actor";
 import type { AttachmentLinkMode } from "@/core/constants";
 import {
 	ATTACHMENT_LINK_MODE,
 	BLOB_GC_GRACE_MS,
 	RESOURCE_ROOT,
 } from "@/core/constants";
-import { InvalidData } from "@/core/error";
+import { InvalidData, NotAllowed } from "@/core/error";
+import type { NotAllowedAction } from "@/core/error-response";
 import {
 	blobCreate,
 	blobFilter,
@@ -66,14 +68,16 @@ export class BlobService {
 	}
 
 	/**
-	 * Hashes `bytes`, rejects a mismatch against `input.contentHash` as
-	 * corrupt, writes the blob and dedupes on the hash.
+	 * Hashes `bytes`, writes the blob and dedupes on the hash.
 	 *
 	 * Identical bytes already on file return the existing row untouched, and a
 	 * re-push of bytes whose blob was tombstoned resurrects it.
+	 *
+	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
 	 */
 	@Validate({ service: true, returns: blobSchema, args: [blobCreate] })
 	async create(input: BlobCreate, opts: ServiceOpts): Promise<Blob> {
+		assertSystem(opts, "blob.create");
 		const hash = hashBytes(input.bytes);
 		const client = opts.tx ?? this.prisma;
 		const existing = await client.blob.findUnique({ where: { hash } });
@@ -131,9 +135,12 @@ export class BlobService {
 	 *
 	 * A blob any attachment still points at is left untouched: a business-level
 	 * no-op, not a skipped access check.
+	 *
+	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
 	 */
 	@Validate({ service: true, args: [blobPK] })
 	async delete(filter: BlobPK, opts: ServiceOpts): Promise<void> {
+		assertSystem(opts, "blob.delete");
 		const client = opts.tx ?? this.prisma;
 		const target = await this.findOne(filter, opts);
 		if (!target || target.deletedAt) return;
@@ -152,10 +159,13 @@ export class BlobService {
 
 	/**
 	 * Remove all blobs no attachment points at.
+	 *
+	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
 	 */
 	async collectGarbage(
 		opts: ServiceOpts & { olderThan?: Date },
 	): Promise<string[]> {
+		assertSystem(opts, "blob.run");
 		const client = opts.tx ?? this.prisma;
 		const olderThan = opts.olderThan ?? new Date(Date.now() - BLOB_GC_GRACE_MS);
 
@@ -207,7 +217,9 @@ export class BlobService {
 
 		switch (this.linkMode) {
 			case "symlink":
-				await symlink(this.blobPath(hash), dest);
+				// Relative to the blob's own directory, so the tree survives a
+				// move of the storage root.
+				await symlink(hash, dest);
 				return dest;
 			case "hardlink":
 				await fsLink(this.blobPath(hash), dest);
@@ -366,4 +378,10 @@ function tombstoneResponse(): Response {
 			...blobSecurityHeaders(),
 		},
 	});
+}
+
+/// Blob bytes are written and reclaimed by the server itself; no user actor
+/// may reach them directly.
+function assertSystem(opts: ServiceOpts, action: NotAllowedAction): void {
+	if (opts.actor !== SYSTEM) throw new NotAllowed(action);
 }

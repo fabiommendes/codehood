@@ -22,7 +22,7 @@ if (!slug) {
 }
 
 const resource = await db.resource.findOne(
-	{ courseId: course.id, slug },
+	{ course: course.id, slug },
 	{ actor },
 );
 // LINK and FILE resources act from their row on the list page — they have no

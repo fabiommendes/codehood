@@ -30,7 +30,7 @@ test("instructor: browse the question bank", async ({ page }) => {
 
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "recursion-basics",
 			status: "PUBLISHED",
 			version: "v1",
@@ -49,7 +49,7 @@ test("instructor: browse the question bank", async ({ page }) => {
 	);
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "linked-list-invariants",
 			status: "DRAFT",
 			version: "v1",
@@ -84,6 +84,62 @@ test("instructor: browse the question bank", async ({ page }) => {
 			page.getByText("PUBLISHED", { exact: true }).first(),
 		).toBeVisible();
 	});
+});
+
+test("instructor: browse the exam list", async ({ page }) => {
+	const course = await persistedCourseFactory.create();
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+
+	await db.exam.create(
+		{
+			course: course.id,
+			slug: "alpha-quiz",
+			title: "Alpha quiz",
+			type: "QUIZ",
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course: course.id,
+			slug: "zulu-final",
+			title: "Zulu final",
+			type: "EXAM",
+		},
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, course.instructor);
+
+	// Regression coverage for a bug where the table's hydrated island failed
+	// silently: the server-rendered rows looked fine, but every header click
+	// was dead because a module it imported threw during hydration.
+	const consoleErrors: string[] = [];
+	page.on("console", (message) => {
+		if (message.type() === "error") consoleErrors.push(message.text());
+	});
+
+	await page.goto(`${href}/exams`);
+
+	const titleCells = page.locator("table tbody tr td:first-child");
+
+	await test.step("exams list title-ascending by default", async () => {
+		await expect(titleCells.first()).toHaveText("Alpha quiz");
+		await expect(titleCells.last()).toHaveText("Zulu final");
+	});
+
+	await test.step("clicking Title again reverses the order", async () => {
+		await page.getByRole("button", { name: "Title" }).click();
+
+		await expect(titleCells.first()).toHaveText("Zulu final");
+		await expect(titleCells.last()).toHaveText("Alpha quiz");
+	});
+
+	expect(consoleErrors).toEqual([]);
 });
 
 test("instructor: Let a bot grade for me", async ({ page, request }) => {

@@ -101,7 +101,7 @@ export const auth = {
 					);
 					if (invite.courseId) {
 						await db.enrollment.create(
-							{ courseId: invite.courseId, username: createdUser.username },
+							{ course: invite.courseId, username: createdUser.username },
 							{ ...FULL_ACCESS, tx },
 						);
 					}
@@ -141,8 +141,10 @@ export const auth = {
 				{
 					email: input.email,
 					invitedRole: input.role,
-					courseId:
-						input.courseId != null ? (input.courseId as schema.CourseId) : null,
+					course:
+						input.courseId != null
+							? (input.courseId as schema.CourseId)
+							: undefined,
 					kind: "PERSONAL",
 					maxUses: 1,
 				},
@@ -162,7 +164,7 @@ export const auth = {
 			const { token } = await db.invite.create(
 				{
 					email: null,
-					courseId: input.courseId as schema.CourseId,
+					course: input.courseId as schema.CourseId,
 					maxUses: input.maxUses ?? null,
 					kind: "CLASSROOM",
 					invitedRole: "STUDENT",

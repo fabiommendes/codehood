@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { courseId, passphraseId } from "./base";
+import { courseRef } from "./course";
 
 export const passphraseSchema = z.object({
 	id: passphraseId,
@@ -10,10 +11,7 @@ export const passphraseSchema = z.object({
 });
 
 export const passphraseCreate = z.object({
-	// `id`/`courseId` are plain numbers here, not the branded ids above:
-	// this is sourced from a coerced action input, which never carries the
-	// brand — the same reasoning as `coursePK`/`courseEnrollInput`.
-	courseId: z.number(),
+	course: courseRef,
 	// Overrides the auto-generated value. Stored verbatim — no format is enforced.
 	value: z.string().min(1).optional(),
 });
@@ -28,7 +26,7 @@ export const passphrasePK = z.union([
 ]);
 
 export const passphraseFilter = z.object({
-	courseId: z.number().optional(),
+	course: courseRef.optional(),
 	// Only passphrases whose `expiresAt` is still in the future.
 	active: z.boolean().optional(),
 });

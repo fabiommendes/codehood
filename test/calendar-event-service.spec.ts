@@ -3,8 +3,7 @@ import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
 import { db, type ServiceOpts } from "@/db";
-import { prisma } from "@/db/client";
-import { relinkExam } from "@/db/util.exam-link";
+import { localDateOf, weekdayOf } from "@/utils/schedule-time";
 
 // Random suffix, not an incrementing counter: shared test database across
 // spec files. Prefixed "cal-" so it never collides with another file's tag().
@@ -55,7 +54,9 @@ async function makeCourse(instructorUsername: string) {
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
 			edition: editionSlug,
-			startAt: new Date("2026-01-01"),
+			// A Monday in SERVER_TZ (09:00 local), so a MONDAY slot's week 0
+			// lands exactly on the course's start date.
+			startAt: new Date("2026-01-05T12:00:00Z"),
 			endAt: new Date("2026-05-01"),
 		},
 		FULL_ACCESS,
@@ -67,55 +68,76 @@ async function makeSlot(
 	opts: ServiceOpts = { actor: SYSTEM },
 ) {
 	return db.timeSlot.create(
-		{ courseId, slug: "mon", day: "MONDAY", startMin: 840, durationMin: 120 },
+		{
+			course: courseId,
+			slug: "mon",
+			day: "MONDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
+		},
 		opts,
 	);
 }
 
-test("create given only a day fills startAt and durationMin from the slot, and keeps explicit values when given", async () => {
+test("create derives startAt and the timeSlot shape from the slot, offset by week", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
 	const slot = await makeSlot(course.id, opts);
 
-	const defaulted = await db.calendarEvent.create(
+	const week1 = await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05", // a Monday
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
-	expect(defaulted.durationMin).toBe(slot.durationMin);
-	// 2026-01-05 at slot.startMin (840 = 14:00) in the server zone.
-	expect(defaulted.startAt.getTime()).toBeGreaterThan(
-		new Date("2026-01-05T00:00:00Z").getTime(),
-	);
+	expect(week1.timeSlot.id).toBe(slot.id);
+	expect(week1.timeSlot.duration).toEqual(slot.duration);
+	expect(week1.timeSlot.start).toEqual(slot.start);
+	expect(weekdayOf(week1.startAt)).toBe("MONDAY");
 
-	const explicit = await db.calendarEvent.create(
+	const week3 = await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w03",
-			date: "2026-01-19",
-			startMin: 900,
-			durationMin: 45,
+			course: course.id,
+			timeSlot: slot.id,
 			week: 3,
-			title: "Midterm",
-			kind: "EXAM",
-			contentHash: tag("h"),
+			title: "Later",
+			ref: tag("h"),
 		},
 		opts,
 	);
-	expect(explicit.durationMin).toBe(45);
-	expect(explicit.timeSlot.id).toBe(slot.id);
+	// Three weeks later than week 1, same slot.
+	expect(week3.startAt.getTime() - week1.startAt.getTime()).toBe(
+		2 * 7 * 24 * 60 * 60_000,
+	);
 });
 
-test("create rejects a slot belonging to another course, and an event whose startAt falls on a different weekday than its slot", async () => {
+test("week 0 on the course's own start weekday is the start date, not a week later", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts);
+
+	const week0 = await db.calendarEvent.create(
+		{
+			course: course.id,
+			timeSlot: slot.id,
+			week: 0,
+			title: "First class",
+			ref: tag("h"),
+		},
+		opts,
+	);
+
+	expect(localDateOf(week0.startAt)).toBe(localDateOf(course.startAt));
+	expect(weekdayOf(week0.startAt)).toBe("MONDAY");
+});
+
+test("create rejects a slot belonging to another course", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const courseA = await makeCourse(instructor.username);
 	const courseB = await makeCourse(instructor.username);
@@ -125,36 +147,18 @@ test("create rejects a slot belonging to another course, and an event whose star
 	await expect(
 		db.calendarEvent.create(
 			{
-				courseId: courseB.id,
-				timeSlotId: slotA.id,
-				slug: "w01",
-				date: "2026-01-05",
+				course: courseB.id,
+				timeSlot: slotA.id,
 				week: 1,
 				title: "Intro",
-				contentHash: tag("h"),
-			},
-			opts,
-		),
-	).rejects.toThrow();
-
-	// 2026-01-06 is a Tuesday; slotA is MONDAY.
-	await expect(
-		db.calendarEvent.create(
-			{
-				courseId: courseA.id,
-				timeSlotId: slotA.id,
-				slug: "w01",
-				date: "2026-01-06",
-				week: 1,
-				title: "Intro",
-				contentHash: tag("h"),
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 });
 
-test("create rejects a second event on the same slot on the same local day", async () => {
+test("create rejects a second event on the same (course, week, slot)", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
@@ -162,13 +166,11 @@ test("create rejects a second event on the same slot on the same local day", asy
 
 	await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -176,21 +178,18 @@ test("create rejects a second event on the same slot on the same local day", asy
 	await expect(
 		db.calendarEvent.create(
 			{
-				courseId: course.id,
-				timeSlotId: slot.id,
-				slug: "w01-again",
-				date: "2026-01-05",
-				startMin: 900, // still the same local day
+				course: course.id,
+				timeSlot: slot.id,
 				week: 1,
 				title: "Intro, again",
-				contentHash: tag("h"),
+				ref: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 });
 
-test("create rejects a missing contentHash; update stores the supplied one verbatim", async () => {
+test("create rejects a missing ref; update stores the supplied one verbatim", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
@@ -199,13 +198,11 @@ test("create rejects a missing contentHash; update stores the supplied one verba
 	await expect(
 		db.calendarEvent.create(
 			{
-				courseId: course.id,
-				timeSlotId: slot.id,
-				slug: "w01",
-				date: "2026-01-05",
+				course: course.id,
+				timeSlot: slot.id,
 				week: 1,
 				title: "Intro",
-				contentHash: "",
+				ref: "",
 			},
 			opts,
 		),
@@ -213,13 +210,11 @@ test("create rejects a missing contentHash; update stores the supplied one verba
 
 	const event = await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -227,10 +222,10 @@ test("create rejects a missing contentHash; update stores the supplied one verba
 	const newHash = tag("verbatim");
 	const updated = await db.calendarEvent.update(
 		{ id: event.id },
-		{ contentHash: newHash },
+		{ ref: newHash },
 		opts,
 	);
-	expect(updated.contentHash).toBe(newHash);
+	expect(updated.ref).toBe(newHash);
 });
 
 test("delete removes the row; a subsequent findOne returns null (no archive)", async () => {
@@ -241,13 +236,11 @@ test("delete removes the row; a subsequent findOne returns null (no archive)", a
 
 	const event = await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -265,60 +258,57 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 	const slotA = await makeSlot(courseA.id, opts);
 	const slotB = await db.timeSlot.create(
 		{
-			courseId: courseB.id,
+			course: courseB.id,
 			slug: "mon",
 			day: "MONDAY",
-			startMin: 600,
-			durationMin: 60,
+			start: { hour: 10, minute: 0 },
+			duration: { hours: 1 },
 		},
 		opts,
 	);
 
-	// Runs 14:00-16:00 on 2026-01-05: still running at a `from` of 15:00.
+	// courseA/slotA week 0: runs 14:00-16:00 on the course's own start week —
+	// still running at a `from` of 15:00.
 	const stillRunning = await db.calendarEvent.create(
 		{
-			courseId: courseA.id,
-			timeSlotId: slotA.id,
-			slug: "still-running",
-			date: "2026-01-05",
-			week: 1,
-			kind: "LECTURE",
+			course: courseA.id,
+			timeSlot: slotA.id,
+			week: 0,
+			kind: "HOLIDAY",
 			title: "Still running at from",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
-	// Strictly inside [from, to): the ordering/kind-filter fixture.
+	// courseA/slotA week 1: one week later — strictly inside [from, to), the
+	// ordering/kind-filter fixture.
 	const inBetween = await db.calendarEvent.create(
 		{
-			courseId: courseA.id,
-			timeSlotId: slotA.id,
-			slug: "in-between",
-			date: "2026-01-12",
-			week: 3,
-			kind: "LECTURE",
+			course: courseA.id,
+			timeSlot: slotA.id,
+			week: 1,
+			kind: "HOLIDAY",
 			title: "In between",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
-	// Starts exactly at `to`: excluded.
+	// courseB/slotB week 2: two weeks later than courseA's own week 0 — later
+	// than `inBetween` regardless of the two slots' different start times.
+	// Its own `startAt` becomes `to`, so it is excluded by exclusivity.
 	const startsAtTo = await db.calendarEvent.create(
 		{
-			courseId: courseB.id,
-			timeSlotId: slotB.id,
-			slug: "starts-at-to",
-			date: "2026-01-19",
-			startMin: 600,
+			course: courseB.id,
+			timeSlot: slotB.id,
 			week: 2,
-			kind: "LAB",
+			kind: "CANCELLED",
 			title: "Starts exactly at to",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 
-	const from = new Date("2026-01-05T18:00:00Z"); // 15:00 America/Sao_Paulo, inside stillRunning's window
+	const from = new Date(stillRunning.startAt.getTime() + 60 * 60_000); // 1h into stillRunning's window
 	const to = startsAtTo.startAt;
 
 	const results = await db.calendarEvent.findMany(
@@ -328,16 +318,16 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 	expect(results.map((r) => r.id)).toEqual([stillRunning.id, inBetween.id]);
 
 	const kindFiltered = await db.calendarEvent.findMany(
-		{ courseIds: [courseA.id, courseB.id], kinds: ["LECTURE"] },
+		{ courseIds: [courseA.id, courseB.id], kinds: ["HOLIDAY"] },
 		opts,
 	);
-	expect(kindFiltered.every((e) => e.kind === "LECTURE")).toBe(true);
+	expect(kindFiltered.every((e) => e.kind === "HOLIDAY")).toBe(true);
 	expect(kindFiltered.map((e) => e.id).sort()).toEqual(
 		[stillRunning.id, inBetween.id].sort(),
 	);
 
 	const weekFiltered = await db.calendarEvent.findMany(
-		{ courseIds: [courseA.id, courseB.id], weeks: [3] },
+		{ courseIds: [courseA.id, courseB.id], weeks: [1] },
 		opts,
 	);
 	expect(weekFiltered.map((e) => e.id)).toEqual([inBetween.id]);
@@ -353,27 +343,25 @@ test("a student enrolled in one of two courses sees only that course's events; a
 	const slotA = await makeSlot(courseA.id, opts);
 
 	await db.enrollment.create(
-		{ courseId: courseA.id, username: active.username },
+		{ course: courseA.id, username: active.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.create(
-		{ courseId: courseA.id, username: dropped.username },
+		{ course: courseA.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.delete(
-		{ courseId: courseA.id, username: dropped.username },
+		{ course: courseA.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 
 	await db.calendarEvent.create(
 		{
-			courseId: courseA.id,
-			timeSlotId: slotA.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: courseA.id,
+			timeSlot: slotA.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -410,27 +398,25 @@ test("course.read-contents agreement: findMany's visibility matches the permissi
 	const slot = await makeSlot(course.id, opts);
 
 	await db.enrollment.create(
-		{ courseId: course.id, username: active.username },
+		{ course: course.id, username: active.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.create(
-		{ courseId: course.id, username: dropped.username },
+		{ course: course.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 	await db.enrollment.delete(
-		{ courseId: course.id, username: dropped.username },
+		{ course: course.id, username: dropped.username },
 		FULL_ACCESS,
 	);
 
 	await db.calendarEvent.create(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w01",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -459,68 +445,7 @@ test("course.read-contents agreement: findMany's visibility matches the permissi
 	}
 });
 
-test("a student's event carries exam: null when the linked exam is DRAFT; the instructor's carries the exam", async () => {
-	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
-	const course = await makeCourse(instructor.username);
-	const opts = { actor: instructor };
-	const slot = await makeSlot(course.id, opts);
-	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
-		FULL_ACCESS,
-	);
-
-	const event = await db.calendarEvent.create(
-		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "w03-midterm",
-			date: "2026-01-19", // Monday, 14:00-16:00
-			week: 3,
-			kind: "EXAM",
-			title: "Midterm slot",
-			contentHash: tag("h"),
-		},
-		opts,
-	);
-
-	const exam = await prisma.exam.create({
-		data: {
-			slug: tag("exam"),
-			status: "DRAFT",
-			courseId: course.id,
-			title: "Midterm",
-			authorId: instructor.username,
-			scheduledAt: event.startAt,
-			durationMs: 60 * 60_000,
-		},
-	});
-	await relinkExam(prisma, exam.id);
-
-	const asStudent = await db.calendarEvent.findOne(
-		{ id: event.id },
-		{ actor: student },
-	);
-	expect(asStudent?.exam).toBeNull();
-
-	const asInstructor = await db.calendarEvent.findOne(
-		{ id: event.id },
-		{ actor: instructor },
-	);
-	expect(asInstructor?.exam).toMatchObject({ id: exam.id, title: "Midterm" });
-
-	await prisma.exam.update({
-		where: { id: exam.id },
-		data: { status: "SCHEDULED" },
-	});
-	const asStudentAfterPublish = await db.calendarEvent.findOne(
-		{ id: event.id },
-		{ actor: student },
-	);
-	expect(asStudentAfterPublish?.exam?.id).toBe(exam.id);
-});
-
-test("upsert creates on first call, updates the same event on the second, and a different slug creates a separate event", async () => {
+test("upsert creates on first call, updates the same event on the second, and a different week creates a separate event", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
@@ -528,14 +453,12 @@ test("upsert creates on first call, updates the same event on the second, and a 
 
 	const created = await db.calendarEvent.upsert(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "upsert-event",
-			date: "2026-01-05", // Monday, matches the slot
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Before",
 			description: "d1",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -544,14 +467,12 @@ test("upsert creates on first call, updates the same event on the second, and a 
 
 	const updated = await db.calendarEvent.upsert(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "upsert-event",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "After",
 			description: null,
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
@@ -562,82 +483,69 @@ test("upsert creates on first call, updates the same event on the second, and a 
 
 	const other = await db.calendarEvent.upsert(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "upsert-event-2",
-			date: "2026-01-12",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 2,
 			title: "Other",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 	expect(other.id).not.toBe(created.id);
 });
 
-test("upsert enforces the weekday-match and slot-day-collision rules, but not against the event's own current row", async () => {
+test("upsert is gated on course.update-contents whether creating or updating", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
+	const outsider = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
-	const slot = await makeSlot(course.id, opts); // MONDAY
+	const slot = await makeSlot(course.id, opts);
 
-	// 2026-01-06 is a Tuesday; the slot is MONDAY.
 	await expect(
 		db.calendarEvent.upsert(
 			{
-				courseId: course.id,
-				timeSlotId: slot.id,
-				slug: "weekday-mismatch",
-				date: "2026-01-06",
+				course: course.id,
+				timeSlot: slot.id,
 				week: 1,
 				title: "t",
-				contentHash: tag("h"),
+				ref: tag("h"),
 			},
-			opts,
+			{ actor: outsider },
 		),
 	).rejects.toThrow();
 
 	const existing = await db.calendarEvent.upsert(
 		{
-			courseId: course.id,
-			timeSlotId: slot.id,
-			slug: "day-collision-existing",
-			date: "2026-01-05",
+			course: course.id,
+			timeSlot: slot.id,
 			week: 1,
 			title: "Existing",
-			contentHash: tag("h"),
+			ref: tag("h"),
 		},
 		opts,
 	);
 
-	// A different event on the same slot, same local day, is refused.
 	await expect(
 		db.calendarEvent.upsert(
 			{
-				courseId: course.id,
-				timeSlotId: slot.id,
-				slug: "day-collision-new",
-				date: "2026-01-05",
-				startMin: 900,
+				course: course.id,
+				timeSlot: slot.id,
 				week: 1,
-				title: "New",
-				contentHash: tag("h"),
+				title: "Existing, resynced",
+				ref: tag("h"),
 			},
-			opts,
+			{ actor: outsider },
 		),
 	).rejects.toThrow();
 
-	// Re-upserting the existing event on the same day must not collide with itself.
 	await expect(
 		db.calendarEvent.upsert(
 			{
-				courseId: course.id,
-				timeSlotId: slot.id,
-				slug: "day-collision-existing",
-				date: "2026-01-05",
+				course: course.id,
+				timeSlot: slot.id,
 				week: 1,
 				title: "Existing, resynced",
-				contentHash: tag("h"),
+				ref: tag("h"),
 			},
 			opts,
 		),

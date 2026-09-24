@@ -15,7 +15,7 @@ test("student: redeem a personal invite", async ({ page }) => {
 		kind: "PERSONAL",
 		invitedRole: "STUDENT",
 		email: "invitee@codehood.test",
-		courseId: course.id,
+		course: course.id,
 		maxUses: 1,
 		createdBy: course.instructor,
 	});
@@ -68,7 +68,7 @@ test("student: redeem a personal invite", async ({ page }) => {
 			kind: "PERSONAL",
 			invitedRole: "STUDENT",
 			email: "late@codehood.test",
-			courseId: course.id,
+			course: course.id,
 			createdBy: course.instructor,
 		});
 		await expire(stale.token);
@@ -84,7 +84,7 @@ test("student: redeem a classroom invite link", async ({ page }) => {
 		kind: "CLASSROOM",
 		invitedRole: "STUDENT",
 		email: null,
-		courseId: course.id,
+		course: course.id,
 		maxUses: 5,
 		createdBy: course.instructor,
 	});

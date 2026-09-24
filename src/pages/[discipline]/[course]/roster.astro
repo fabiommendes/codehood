@@ -54,16 +54,13 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 	}
 }
 
-const students = await db.enrollment.findMany(
-	{ courseId: course.id },
-	{ actor },
-);
+const students = await db.enrollment.findMany({ course: course.id }, { actor });
 const invites = await db.invite.findMany(
-	{ courseId: course.id, kind: "CLASSROOM" },
+	{ course: course.id, kind: "CLASSROOM" },
 	{ actor },
 );
 const activePassphrases = await db.passphrase.findMany(
-	{ courseId: course.id, active: true },
+	{ course: course.id, active: true },
 	{ actor },
 );
 const currentPassphrase = activePassphrases[0] ?? null;

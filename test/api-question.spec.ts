@@ -76,7 +76,7 @@ test("GET <slug>?public=true forces the public half even for the question's own 
 	const { instructor, course, url } = await makeCourse();
 	await db.question.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "q1",
 			status: "PUBLISHED",
 			version: "v1",

@@ -73,7 +73,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 	await expect(
 		db.resource.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "a",
 				title: "t",
 				data: { type: "LINK", url: "" },
@@ -86,7 +86,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 	await expect(
 		db.resource.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "b",
 				title: "t",
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
@@ -100,7 +100,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 	await expect(
 		db.resource.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "c",
 				title: "t",
 				data: { type: "MD", content: "" },
@@ -113,7 +113,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 	await expect(
 		db.resource.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "d",
 				title: "t",
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
@@ -132,7 +132,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 
 	await db.resource.create(
 		{
-			courseId: courseA.id,
+			course: courseA.id,
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link("https://example.com/a"),
@@ -144,7 +144,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	await expect(
 		db.resource.create(
 			{
-				courseId: courseA.id,
+				course: courseA.id,
 				slug: "syllabus",
 				title: "Syllabus again",
 				data: link("https://example.com/b"),
@@ -157,7 +157,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	await expect(
 		db.resource.create(
 			{
-				courseId: courseB.id,
+				course: courseB.id,
 				slug: "syllabus",
 				title: "Syllabus",
 				data: link("https://example.com/c"),
@@ -175,7 +175,7 @@ test("create stores a supplied ref verbatim", async () => {
 	const hash = tag("verbatim-hash");
 	const resource = await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "with-hash",
 			title: "t",
 			data: link(),
@@ -245,13 +245,13 @@ test("an enrolled student sees a course's resources; a non-owning admin reads bu
 	const course = await makeCourse(instructor.username);
 
 	await db.enrollment.create(
-		{ courseId: course.id, username: active.username },
+		{ course: course.id, username: active.username },
 		FULL_ACCESS,
 	);
 
 	await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
@@ -261,16 +261,16 @@ test("an enrolled student sees a course's resources; a non-owning admin reads bu
 	);
 
 	await expect(
-		db.resource.findMany({ courseId: course.id }, { actor: active }),
+		db.resource.findMany({ course: course.id }, { actor: active }),
 	).resolves.toHaveLength(1);
 	await expect(
-		db.resource.findMany({ courseId: course.id }, { actor: admin }),
+		db.resource.findMany({ course: course.id }, { actor: admin }),
 	).resolves.toHaveLength(1);
 
 	await expect(
 		db.resource.create(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "admin-attempt",
 				title: "t",
 				data: link(),
@@ -287,7 +287,7 @@ test("findMany rejects an actor who cannot see the course at all", async () => {
 	const course = await makeCourse(instructor.username);
 
 	await expect(
-		db.resource.findMany({ courseId: course.id }, { actor: outsider }),
+		db.resource.findMany({ course: course.id }, { actor: outsider }),
 	).rejects.toThrow();
 });
 
@@ -299,7 +299,7 @@ test("delete removes the resource row; a FILE resource's attachment survives on 
 
 	const resourceA = await db.resource.create(
 		{
-			courseId: courseA.id,
+			course: courseA.id,
 			slug: "shared",
 			title: "Shared file",
 			data: { type: "FILE", filename: "notes.txt", buffer },
@@ -309,7 +309,7 @@ test("delete removes the resource row; a FILE resource's attachment survives on 
 	);
 	const resourceB = await db.resource.create(
 		{
-			courseId: courseB.id,
+			course: courseB.id,
 			slug: "shared",
 			title: "Shared file",
 			data: { type: "FILE", filename: "notes.txt", buffer },
@@ -351,7 +351,7 @@ test("upsert creates on first call, updates the same resource on the second, and
 
 	const created = await db.resource.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "upsert-resource",
 			title: "Before",
 			description: "d1",
@@ -365,7 +365,7 @@ test("upsert creates on first call, updates the same resource on the second, and
 
 	const updated = await db.resource.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "upsert-resource",
 			title: "After",
 			description: null,
@@ -381,7 +381,7 @@ test("upsert creates on first call, updates the same resource on the second, and
 
 	const other = await db.resource.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "upsert-resource-2",
 			title: "Other",
 			data: link("https://example.com/other"),
@@ -400,7 +400,7 @@ test("upsert enforces the `data` shape on both the create branch and the update 
 	await expect(
 		db.resource.upsert(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "shape-new",
 				title: "t",
 				data: { type: "LINK", url: "" },
@@ -412,7 +412,7 @@ test("upsert enforces the `data` shape on both the create branch and the update 
 
 	const existing = await db.resource.upsert(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "shape-existing",
 			title: "t",
 			data: link(),
@@ -424,7 +424,7 @@ test("upsert enforces the `data` shape on both the create branch and the update 
 	await expect(
 		db.resource.upsert(
 			{
-				courseId: course.id,
+				course: course.id,
 				slug: "shape-existing",
 				title: "t",
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
@@ -452,7 +452,7 @@ test("findOne addresses a resource by its course's natural key and slug", async 
 	const course = await makeCourse(instructor.username);
 	const created = await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
@@ -462,7 +462,7 @@ test("findOne addresses a resource by its course's natural key and slug", async 
 	);
 
 	const found = await db.resource.findOne(
-		{ ...courseRefOf(course), slug: "syllabus" },
+		{ course: courseRefOf(course), slug: "syllabus" },
 		{ actor: instructor },
 	);
 	expect(found?.id).toBe(created.id);
@@ -485,7 +485,7 @@ test("findOne by course natural key: 404 for no such course, 403 for an existing
 
 	await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
@@ -497,7 +497,10 @@ test("findOne by course natural key: 404 for no such course, 403 for an existing
 	expect(
 		await statusOf(
 			db.resource.findOne(
-				{ ...courseRef, discipline: tag("nope"), slug: "syllabus" },
+				{
+					course: { ...courseRef, discipline: tag("nope") },
+					slug: "syllabus",
+				},
 				{ actor: instructor },
 			),
 		),
@@ -505,14 +508,14 @@ test("findOne by course natural key: 404 for no such course, 403 for an existing
 	expect(
 		await statusOf(
 			db.resource.findOne(
-				{ ...courseRef, slug: "syllabus" },
+				{ course: courseRef, slug: "syllabus" },
 				{ actor: outsider },
 			),
 		),
 	).toBe(403);
 	await expect(
 		db.resource.findOne(
-			{ ...courseRef, slug: "missing" },
+			{ course: courseRef, slug: "missing" },
 			{ actor: instructor },
 		),
 	).resolves.toBeNull();
@@ -525,7 +528,7 @@ test("findMany by course natural key: 404 for no such course, 403 for a course t
 	const courseRef = courseRefOf(course);
 	await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
@@ -537,20 +540,22 @@ test("findMany by course natural key: 404 for no such course, 403 for a course t
 	expect(
 		await statusOf(
 			db.resource.findMany(
-				{ ...courseRef, discipline: tag("nope") },
+				{ course: { ...courseRef, discipline: tag("nope") } },
 				{ actor: instructor },
 			),
 		),
 	).toBe(404);
 	expect(
-		await statusOf(db.resource.findMany(courseRef, { actor: outsider })),
+		await statusOf(
+			db.resource.findMany({ course: courseRef }, { actor: outsider }),
+		),
 	).toBe(403);
 	await expect(
-		db.resource.findMany(courseRef, { actor: instructor }),
+		db.resource.findMany({ course: courseRef }, { actor: instructor }),
 	).resolves.toHaveLength(1);
 });
 
-test("create and upsert accept a course natural key in place of a numeric courseId", async () => {
+test("create and upsert accept a course natural key in place of a numeric course id", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const courseRef = courseRefOf(course);
@@ -558,7 +563,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 
 	const created = await db.resource.create(
 		{
-			courseId: courseRef,
+			course: courseRef,
 			slug: "by-ref",
 			title: "t",
 			data: link(),
@@ -570,7 +575,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 
 	const first = await db.resource.upsert(
 		{
-			courseId: courseRef,
+			course: courseRef,
 			slug: "upsert-by-ref",
 			title: "Before",
 			data: link(),
@@ -580,7 +585,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 	);
 	const second = await db.resource.upsert(
 		{
-			courseId: courseRef,
+			course: courseRef,
 			slug: "upsert-by-ref",
 			title: "After",
 			data: link(),
@@ -592,7 +597,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 	expect(second.title).toBe("After");
 });
 
-test("create: 400 without a courseId, 404 for a course natural key naming no course", async () => {
+test("create: 400 without a course, 404 for a course natural key naming no course", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const courseRef = courseRefOf(course);
@@ -601,7 +606,7 @@ test("create: 400 without a courseId, 404 for a course natural key naming no cou
 	expect(
 		await statusOf(
 			db.resource.create(
-				// biome-ignore lint/suspicious/noExplicitAny: intentionally missing courseId
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally missing course
 				{ slug: "none", title: "t", data: link(), ref: tag("h") } as any,
 				opts,
 			),
@@ -611,7 +616,7 @@ test("create: 400 without a courseId, 404 for a course natural key naming no cou
 		await statusOf(
 			db.resource.create(
 				{
-					courseId: { ...courseRef, discipline: tag("nope") },
+					course: { ...courseRef, discipline: tag("nope") },
 					slug: "ghost",
 					title: "t",
 					data: link(),
@@ -635,7 +640,7 @@ test("create rejects an empty slug with a 400", async () => {
 		await statusOf(
 			db.resource.create(
 				{
-					courseId: course.id,
+					course: course.id,
 					slug: "",
 					title: "t",
 					data: link(),
@@ -653,12 +658,12 @@ test("a dropped student loses access to the course's resources", async () => {
 	const course = await makeCourse(instructor.username);
 
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
 	await db.resource.create(
 		{
-			courseId: course.id,
+			course: course.id,
 			slug: "handout",
 			title: "Handout",
 			data: link(),
@@ -668,11 +673,11 @@ test("a dropped student loses access to the course's resources", async () => {
 	);
 
 	await expect(
-		db.resource.findMany({ courseId: course.id }, { actor: student }),
+		db.resource.findMany({ course: course.id }, { actor: student }),
 	).resolves.toHaveLength(1);
 	await expect(
 		db.resource.findOne(
-			{ courseId: course.id, slug: "handout" },
+			{ course: course.id, slug: "handout" },
 			{ actor: student },
 		),
 	).resolves.not.toBeNull();
@@ -680,26 +685,26 @@ test("a dropped student loses access to the course's resources", async () => {
 	// Dropping flips the enrollment to DROPPED rather than deleting the row,
 	// so a rule that only asks "is there an enrollment?" keeps letting them in.
 	await db.enrollment.delete(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: instructor },
 	);
 
 	await expect(
-		db.resource.findMany({ courseId: course.id }, { actor: student }),
+		db.resource.findMany({ course: course.id }, { actor: student }),
 	).rejects.toThrow();
 	await expect(
 		db.resource.findOne(
-			{ courseId: course.id, slug: "handout" },
+			{ course: course.id, slug: "handout" },
 			{ actor: student },
 		),
 	).rejects.toThrow();
 
 	// Re-enrolling restores it.
 	await db.enrollment.create(
-		{ courseId: course.id, username: student.username },
+		{ course: course.id, username: student.username },
 		{ actor: instructor },
 	);
 	await expect(
-		db.resource.findMany({ courseId: course.id }, { actor: student }),
+		db.resource.findMany({ course: course.id }, { actor: student }),
 	).resolves.toHaveLength(1);
 });
