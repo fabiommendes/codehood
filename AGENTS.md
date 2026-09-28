@@ -198,7 +198,7 @@ files take precedence over this one.
 - Run its tests from `cli/` with `rtk uv run pytest`.
 - Biome skips `cli/`.
 - Sync with the standalone repository only when the human asks:
-  `git subtree push --prefix=cli git@github.com:fabiommendes/codehood-cli.git master`
+  `git subtree push --prefix=cli git@github.com:fabiommendes/codehood-cli.git main`
   (or `subtree pull` with the same arguments).
 
 ## Documentation
