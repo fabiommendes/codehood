@@ -6,34 +6,26 @@ and geeky types. As an instructor, you should consider it if you like the idea
 of storing your course in plain text files under version control and if you and
 your students are comfortable with using it from the command line.
 
-In Codehood, most course material is stored and crafted locally in a Git repository. The instructor uses a CLI tool to syncronize with the remote server
-and make updates and new content available to students. This includes questions, 
+In Codehood, most course material is stored and crafted locally in a Git
+repository. The instructor uses a CLI tool to synchronize with the remote server
+and make updates and new content available to students. This includes questions,
 exams, calendar, downloadable resources, and more.
 
 Students mostly use Codehood as a regular web-based LMS. The CLI is available,
-and might be the prefered way for some students, but it is not necessary.
+and might be the preferred way for some students, but it is not necessary.
+
+This repository holds the server and, in [`cli/`](cli/), the CLI.
 
 
 ## How does it work?
 
-If you are an instructor, start creating a new course by running the `codehood init`. This will create the scaffolding that the CLI uses to manage the course
-and syncronize with the remote server. 
-
-Each course will look something like this:
-
-```text
-course/
-├── codehood.toml
-├── content/
-│   ├── calendar/
-│   ├── exams/
-│   ├── questions/
-│   └── resources/
-└── README.md
-```
+If you are an instructor, start a new course by running `codehood init`. This
+creates the scaffolding that the CLI uses to manage the course and synchronize
+with the remote server. See [cli/README.md](cli/README.md) for the layout of a
+course repository.
 
 You can edit this content adding or modifying any resource. After the work is
-done, fire `codehood push` to syncronize the changes with the remote server.
+done, run `codehood push` to synchronize the changes with the remote server.
 The server never modifies the content, hence there is no `codehood pull`
 command.
 
@@ -133,3 +125,9 @@ following tech stack:
 ## Project Structure
 
 See the "Project layout" table in `AGENTS.md` for a complete breakdown of directories and their purpose.
+
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems as described in
+[SECURITY.md](SECURITY.md).

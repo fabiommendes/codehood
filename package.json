@@ -2,6 +2,14 @@
 	"name": "codehood-server",
 	"type": "module",
 	"version": "0.0.2",
+	"private": true,
+	"description": "Server for Codehood, an LMS for geeky types.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/fabiommendes/codehood.git"
+	},
+	"homepage": "https://github.com/fabiommendes/codehood",
+	"bugs": "https://github.com/fabiommendes/codehood/issues",
 	"engines": {
 		"node": ">=22.12.0"
 	},
