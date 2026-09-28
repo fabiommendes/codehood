@@ -19,6 +19,43 @@ Backlog items are categorized in sections, not on priority.
   "explicitly null" -- `UpsertCourse` really does mean to send a null
   `startAt` -- so it is not a one-line `exclude_none=True`.
 
+* **`ShapeRegistry` never walks inside a `$ref`, so a component's own
+  nested shapes go unnamed.** `_collect` stops at a `$ref`, so the inline
+  objects inside a component schema are registered only because some path
+  happens to inline an identical copy of them. Remove the copy and
+  generation dies: `ENDPOINTS = {"createExam", "readExam"}` today raises
+  `KeyError` on `ExamCreate.questions`'s item shape, because only the
+  `$ref`ed body reaches it. This is pre-existing -- the `$ref` early return
+  and the unguarded `self._names[...]` lookup both predate the naming work
+  -- and the announced spec refresh will detonate it: once `upsertX` `$ref`s
+  `XCreate` instead of inlining a body, nothing inline reaches
+  `ExamCreate.questions[]`, `ResourceCreate.data`, or `TimeSlotCreate.start`
+  again. Fix is to walk `$ref`ed component schemas as collection roots,
+  which also changes some names, so it wants its own slice and its own
+  verification.
+
+* **A projection is only recognised when the server names the property
+  after the component.** `{slug, day, start, duration}` under a property
+  called `timeSlot` becomes `TimeSlotAtCalendarEvent`; the same shape under
+  a property called anything else keeps its property name. Subset-plus-
+  equal-shapes alone is far too loose to name by -- a bare `{id}` is a
+  strict subset of eight components -- so the property name is what makes a
+  match unambiguous. A projection reached through an *array* is also missed,
+  because an array item's candidate is `{Property}Item`, not `{Property}`.
+  Neither case exists in today's spec; revisit if one appears.
+
+* **`api.generate` ignores the repo's own spec copy.** With no argument it
+  tries `./openapi.json`, then falls back to the live dev server, and never
+  looks at `resources/openapi/codehood.json` -- the copy `CLAUDE.md` names
+  as the one that should be in sync. The default should be the repo copy, so
+  a regeneration is reproducible with the server down.
+
+* **`api.generate` does not format what it writes.** The generator emits
+  single-quoted, tightly spaced source; the committed `generated.py` is the
+  `ruff format` of that. Regenerating without remembering the second step
+  produces a 1000-line cosmetic diff. Either format in the generator or make
+  it a documented two-step.
+
 
 ## Features
 

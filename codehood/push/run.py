@@ -40,10 +40,14 @@ from .resource import CodeData, FileData, MdData, ResourceData
 
 __all__ = ["OpResult", "fetch_server_state", "run_plan"]
 
-#: The generated request-side members of `Resource.data`. `DataFile` is the
-#: upload shape (`filename` plus `buffer`), not the read-back shape
-#: (`link`, `mimeType`, `filename`), which the generator names `Data`.
-type RequestData = generated.DataMd | generated.DataCode | generated.DataFile
+#: The generated request-side members of `Resource.data`. The `FILE` member
+#: exists twice in the spec -- the upload shape (`filename` plus `buffer`)
+#: and the read-back shape (`link`, `mimeType`, `filename`) -- so the
+#: generator qualifies both by the schema that owns them:
+#: `ResourceCreateDataFile` is the one a push sends.
+type RequestData = (
+    generated.DataMd | generated.DataCode | generated.ResourceCreateDataFile
+)
 
 #: Fields `mdq`'s models carry that the server's `additionalProperties:
 #: false` question schema rejects -- see `dev/specs/to-do/push-questions.md`,
@@ -196,7 +200,7 @@ def _run_upsert_course(op: UpsertCourse, *, client: httpx.Client) -> OpResult:
     plan.
     """
     instructor, _, edition = op.course.partition("_")
-    body = generated.UpsertCourseRequest(
+    body = generated.CourseCreate(
         discipline=op.discipline,
         instructor=instructor,
         edition=edition,
@@ -226,7 +230,7 @@ def _run_upsert_resource(
             message=f"blocked: the server accepts no FILE upload yet ({op.path})",
         )
 
-    body = generated.UpsertResourceRequest(
+    body = generated.ResourceCreate(
         slug=op.slug,
         title=op.title,
         description=op.description,
@@ -280,7 +284,7 @@ def _run_upsert_question(
     # `exclude_none` above. `model_construct` skips validation and keeps
     # `question` as the plain dict `generated.upsert_question`'s own
     # `model_dump(by_alias=True)` then serializes verbatim.
-    body = generated.UpsertQuestionRequest.model_construct(
+    body = generated.QuestionCreate.model_construct(
         slug=op.slug, status="DRAFT", version=op.version, question=payload
     )
     try:
@@ -313,7 +317,7 @@ def _run_delete_question(
 def _run_upsert_time_slot(
     op: UpsertTimeSlot, *, discipline: str, course: str, client: httpx.Client
 ) -> OpResult:
-    body = generated.UpsertTimeslotRequest(
+    body = generated.TimeSlotCreate(
         slug=op.slot.slug,
         title=op.slot.title,
         day=op.slot.day,
@@ -346,7 +350,7 @@ def _run_delete_time_slot(
 def _run_upsert_calendar_event(
     op: UpsertCalendarEvent, *, discipline: str, course: str, client: httpx.Client
 ) -> OpResult:
-    body = generated.UpsertCalendarEventRequest(
+    body = generated.CalendarEventCreate(
         kind=op.event.kind,
         title=op.event.title,
         description=op.event.description,
@@ -394,14 +398,14 @@ def _run_warn_time_slot_pinned(op: WarnTimeSlotPinned) -> OpResult:
     )
 
 
-def _server_event(item: generated.ListCalendarEventResponseItem) -> ServerEvent:
+def _server_event(item: generated.CalendarEvent) -> ServerEvent:
     """
     Project one item of the calendar-event listing down to its markers.
     """
     return ServerEvent(ref=item.ref, kind=item.kind)
 
 
-def _time_slot_ref(item: generated.Timeslot) -> str:
+def _time_slot_ref(item: generated.TimeSlot) -> str:
     """
     Recompute a server-listed time slot's `ref` from the fields the listing
     returned, via the same `TimeSlot` dataclass the core uses -- the server

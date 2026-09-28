@@ -860,10 +860,15 @@ def test_tagged_union_members_are_named_after_their_tag(monkeypatch):
     assert set(namespace["DataCode"].model_fields) == {"type", "content", "language"}
 
 
-def test_untagged_union_members_keep_the_old_naming(monkeypatch):
+def test_untagged_union_members_fall_back_to_the_owner_then_a_counter(monkeypatch):
     """
     Nothing distinguishes members with no tag, so they fall back to the
-    container's name and the existing collision counter.
+    schema that owns them and only then to a counter.
+
+    The counter is the last resort, not the scheme: two siblings sharing
+    one owner and one base name are the only thing left that it can tell
+    apart. Both names still carry the owner, so adding an unrelated
+    endpoint cannot renumber either of them.
     """
     schema = {
         "type": "object",
@@ -887,5 +892,173 @@ def test_untagged_union_members_keep_the_old_naming(monkeypatch):
     }
     monkeypatch.setattr("codehood.api.generate.ENDPOINTS", {"health"})
     source = Generator(_spec_with_response_schema(schema)).generate()
-    assert "class Data(Model):" in source
-    assert "class Data2(Model):" in source
+    assert "class HealthResponseData(Model):" in source
+    assert "class HealthResponseData2(Model):" in source
+
+
+#
+# Component schemas: identity and projections
+#
+def _spec_with_component_and_inline(component: dict, inline: dict) -> dict:
+    """
+    A spec where `readTimeslot` `$ref`s `TimeSlot` and `listTimeslot`
+    returns `inline` -- the shape the server actually inlines.
+    """
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Fixture", "version": "0.0.1"},
+        "components": {"schemas": {"TimeSlot": component}},
+        "paths": {
+            "/api/time-slot/{slug}": {
+                "get": {
+                    "operationId": "readTimeslot",
+                    "responses": {
+                        "200": {
+                            "description": "ok",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/TimeSlot"}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/calendar-event": {
+                "get": {
+                    "operationId": "listCalendar-event",
+                    "responses": {
+                        "200": {
+                            "description": "ok",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "array", "items": inline}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        },
+    }
+
+
+_TIME_SLOT_COMPONENT = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "slug": {"type": "string"},
+        "title": {"type": "string", "nullable": True},
+        "day": {"type": "string", "enum": ["MONDAY", "TUESDAY"]},
+    },
+    "required": ["id", "slug", "title", "day"],
+}
+
+
+def test_an_inline_shape_identical_to_a_component_is_that_component(monkeypatch):
+    """
+    The server inlines on the read paths what it `$ref`s on the create
+    path. An inline copy of a component schema is the same type, so it
+    takes the component's name and is rendered once -- otherwise `listX`
+    hands back a site-named twin of `X` that no caller can pass where an
+    `X` is wanted.
+    """
+    inline = {
+        "type": "object",
+        "properties": {
+            # Same properties, same order, but documented differently --
+            # identity is structural, not textual.
+            "id": {"type": "integer", "description": "the row id"},
+            "slug": {"type": "string", "examples": ["mon-08"]},
+            "title": {"type": "string", "nullable": True},
+            "day": {"type": "string", "enum": ["MONDAY", "TUESDAY"]},
+        },
+        "required": ["id", "slug", "title", "day"],
+    }
+    monkeypatch.setattr(
+        "codehood.api.generate.ENDPOINTS", {"readTimeslot", "listCalendar-event"}
+    )
+    source = Generator(
+        _spec_with_component_and_inline(_TIME_SLOT_COMPONENT, inline)
+    ).generate()
+
+    assert source.count("class TimeSlot(Model):") == 1
+    assert "ListCalendarEventResponseItem" not in source
+    assert "-> TimeSlot:" in source.split("def read_timeslot(")[1]
+    assert "-> list[TimeSlot]:" in source.split("def list_calendar_event(")[1]
+
+
+def test_an_inline_subset_of_a_component_is_named_a_projection(monkeypatch):
+    """
+    `listCalendarEvent` embeds a cut-down time slot: every property of
+    `TimeSlot` except the title and the id. That is a projection, named
+    after the component it projects and the *entity* the operation is
+    about -- `TimeSlotAtCalendarEvent`. The CRUD verb and the fact that it
+    arrived in a list response are noise: the same shape reached from
+    `readCalendarEvent` is the same class.
+    """
+    inline = {
+        "type": "object",
+        "properties": {
+            "week": {"type": "integer"},
+            "timeSlot": {
+                "type": "object",
+                "properties": {
+                    "slug": {"type": "string"},
+                    "day": {"type": "string", "enum": ["MONDAY", "TUESDAY"]},
+                },
+                # Required-ness differs from the component's; that is a
+                # presentation detail of the site, not a different type.
+                "required": ["slug"],
+            },
+        },
+        "required": ["week", "timeSlot"],
+    }
+    monkeypatch.setattr(
+        "codehood.api.generate.ENDPOINTS", {"readTimeslot", "listCalendar-event"}
+    )
+    source = Generator(
+        _spec_with_component_and_inline(_TIME_SLOT_COMPONENT, inline)
+    ).generate()
+
+    assert "class TimeSlotAtCalendarEvent(Model):" in source
+    assert "ListCalendarEventResponseItemTimeSlot" not in source
+    assert "time_slot: TimeSlotAtCalendarEvent" in source
+
+    namespace = _exec_generated(source)
+    event = namespace["CalendarEvent"].model_validate(
+        {"week": 3, "timeSlot": {"slug": "mon-08", "day": "MONDAY"}}
+    )
+    assert event.time_slot.slug == "mon-08"
+    assert isinstance(event.time_slot, namespace["TimeSlotAtCalendarEvent"])
+
+
+def test_a_subset_of_a_component_it_is_not_named_after_is_not_a_projection(monkeypatch):
+    """
+    Subset-of-a-component alone names nothing: on the real spec a bare
+    `{id}` is a strict subset of eight of them. The property has to be
+    named after the component for the match to mean anything, and
+    `pinnedAt` is not.
+    """
+    inline = {
+        "type": "object",
+        "properties": {
+            "week": {"type": "integer"},
+            "pinnedAt": {
+                "type": "object",
+                "properties": {"slug": {"type": "string"}},
+                "required": ["slug"],
+            },
+        },
+        "required": ["week", "pinnedAt"],
+    }
+    monkeypatch.setattr(
+        "codehood.api.generate.ENDPOINTS", {"readTimeslot", "listCalendar-event"}
+    )
+    source = Generator(
+        _spec_with_component_and_inline(_TIME_SLOT_COMPONENT, inline)
+    ).generate()
+
+    assert "AtCalendarEvent" not in source
+    assert "class PinnedAt(Model):" in source
+    assert "pinned_at: PinnedAt" in source

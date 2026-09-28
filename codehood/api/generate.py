@@ -13,7 +13,8 @@ from __future__ import annotations
 import json
 import keyword
 import re
-from collections.abc import Iterable
+from collections import Counter
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Annotated, Any, NamedTuple
 
@@ -51,6 +52,7 @@ ENDPOINTS = {
     *_crud("question"),
     *_crud("timeslot"),
     *_crud("calendar-event"),
+    *_crud("exam"),
     # `file` is absent: `/api/file` is not in the document while the
     # multipart upload is being written (see `ROADBLOCKS.md` item 1).
 }
@@ -213,6 +215,16 @@ class Generator:
 #
 # UTILITIES
 #
+def _unique(items: Iterable[str]) -> list[str]:
+    """
+    `items` with repeats dropped, first-seen order kept.
+    """
+    seen: dict[str, None] = {}
+    for item in items:
+        seen.setdefault(item, None)
+    return list(seen)
+
+
 def _dependency_order(dependencies: dict[str, set[str]]) -> list[str]:
     """
     Model names ordered so a model is defined after everything it names.
@@ -341,11 +353,15 @@ def field_name(property_name: str) -> str:
 #: Name-candidate tiers, best first -- see the spec's naming rules.
 #: A tagged union member outranks every other candidate: `DataMd` says what
 #: the shape *is*, where the container's own `Data` says only where it was
-#: found, and all four members of a union are found in the same place.
+#: found, and all four members of a union are found in the same place. A
+#: projection of a component schema (`_TIER_SUBTYPE`, see
+#: `_projection_name`) comes next: it names the entity the shape is a
+#: cut-down view of, which the property name alone cannot say.
 _TIER_VARIANT = 0
-_TIER_PROPERTY = 1
-_TIER_ENTITY = 2
-_TIER_SITE = 3
+_TIER_SUBTYPE = 1
+_TIER_PROPERTY = 2
+_TIER_ENTITY = 3
+_TIER_SITE = 4
 
 #: CRUD verbs `_crud` builds operation ids from. Stripping one off an
 #: operation id leaves the entity the operation is about, which is the best
@@ -354,14 +370,90 @@ _TIER_SITE = 3
 _CRUD_VERBS = ("create", "read", "list", "update", "delete", "upsert")
 
 
-def canonical(schema: JSONSchema) -> str:
+def shape_id(schema: JSONSchema) -> str:
     """
-    A schema's identity for deduplication: its JSON with keys sorted.
+    An inline object schema's identity for deduplication: its *structure*.
 
-    Only byte-identical schemas collapse into one class -- see the spec's
-    "Fuzzy deduplication" exclusion.
+    The server is TypeScript/zod, i.e. structurally typed, so two inline
+    schemas with the same shape are the same type and deserve one generated
+    class. Raw JSON is the wrong identity for that: the exam's `duration`
+    and the time slot's `duration` differ only by a `nullable` flag and a
+    `description`, neither of which `render_model` emits, yet byte
+    comparison calls them two types.
+
+    So the identity is the reduction of a schema to what the generator
+    actually renders -- see `_structure`. A node's own `nullable` is
+    dropped here because it lands on the *field* that holds the object, not
+    on the class.
     """
-    return json.dumps(schema, sort_keys=True)
+    structure = _structure(schema)
+    if isinstance(structure, dict):
+        structure.pop("nullable", None)
+    return json.dumps(structure, sort_keys=True)
+
+
+def _structure(schema: JSONSchema) -> object:
+    """
+    A schema reduced to the parts that reach generated source.
+
+    `type`, `enum`, `nullable`, union members, array items, property names
+    with their optionality, and `additionalProperties`. Everything else --
+    `description`, `minimum`, `pattern`, `examples`, `format` -- is
+    documentation the generator drops, so it must not split one class into
+    two. A `$ref` reduces to the reference itself: it renders as the target
+    class's name, which an inline copy of the same shape would not.
+
+    Property *order* is kept, since it is the order fields are emitted in.
+    """
+    if not isinstance(schema, dict):
+        return None
+    if "$ref" in schema:
+        return {"$ref": schema["$ref"]}
+
+    node: dict[str, object] = {}
+    for key in ("type", "enum", "nullable"):
+        if key in schema:
+            node[key] = schema[key]
+    for key in ("anyOf", "oneOf", "allOf"):
+        members = schema.get(key)
+        if members is not None:
+            node[key] = [_structure(member) for member in members]
+    if schema.get("type") == "array":
+        node["items"] = _structure(schema.get("items", {}))
+
+    properties = schema.get("properties")
+    if properties is not None:
+        required = set(schema.get("required", []))
+        node["properties"] = [
+            [name, name in required, _structure(property_schema)]
+            for name, property_schema in properties.items()
+        ]
+
+    additional = schema.get("additionalProperties")
+    if isinstance(additional, dict):
+        node["additionalProperties"] = _structure(additional)
+    elif additional is not None:
+        node["additionalProperties"] = bool(additional)
+    return node
+
+
+def _is_projection(schema: JSONSchema, component: JSONSchema) -> bool:
+    """
+    Whether `schema` is a strictly smaller view of `component`.
+
+    Every property of `schema` is a property of `component` with the same
+    shape, and `component` has at least one more. `required` is compared by
+    neither: the same embedded thing is optional at one site and mandatory
+    at another, and that says nothing about which type it is.
+    """
+    properties = schema.get("properties") or {}
+    component_properties = component.get("properties") or {}
+    if not set(properties) < set(component_properties):
+        return False
+    return all(
+        _structure(property_schema) == _structure(component_properties[name])
+        for name, property_schema in properties.items()
+    )
 
 
 class ShapeRegistry:
@@ -381,13 +473,33 @@ class ShapeRegistry:
         self.spec = spec
         #: shape -> {tier: {candidate names}}, filled by `_collect`.
         self._candidates: dict[str, dict[int, set[str]]] = {}
+        #: shape -> shapes holding it as a property value, filled by
+        #: `_collect`. A contested name is qualified by one of these.
+        self._owners: dict[str, set[str]] = {}
+        #: shape -> how deeply nested the shallowest occurrence of it is,
+        #: counting one per property hop. Used only to pick which owner
+        #: qualifies a contested name.
+        self._depths: dict[str, int] = {}
+        #: Every `$ref`able object schema, by class name and by shape. An
+        #: inline shape that matches one *is* it (`_assign_names`) or is a
+        #: projection of it (`_projection_name`).
+        self._components = {
+            py_class_name(name): schema
+            for name, schema in spec.components.schemas.items()
+            if isinstance(schema, dict) and schema.get("properties")
+        }
+        self._component_shapes: dict[str, str] = {}
+        for class_name in sorted(self._components):
+            self._component_shapes.setdefault(
+                shape_id(self._components[class_name]), class_name
+            )
         endpoints = spec.operations()
         for operation_id in sorted(operation_ids):
             self._collect_operation(operation_id, endpoints[operation_id].operation)
         self._names = self._assign_names()
 
     def name_for(self, schema: JSONSchema) -> str:
-        return self._names[canonical(schema)]
+        return self._names[shape_id(schema)]
 
     #
     # Collection
@@ -401,7 +513,9 @@ class ShapeRegistry:
             media = request_body.content.get("application/json")
             if media is not None:
                 self._collect(
-                    media.content_schema, [(_TIER_SITE, f"{op_pascal}Request")]
+                    media.content_schema,
+                    [(_TIER_SITE, f"{op_pascal}Request")],
+                    entity=entity,
                 )
 
         for status, response in operation.responses.items():
@@ -414,20 +528,37 @@ class ShapeRegistry:
                     candidates.append((_TIER_ENTITY, entity))
             else:
                 candidates = [(_TIER_SITE, f"{op_pascal}Error{status}")]
-            self._collect(media.content_schema, candidates)
+            self._collect(media.content_schema, candidates, entity=entity)
 
-    def _collect(self, schema: JSONSchema, candidates: list[tuple[int, str]]) -> None:
+    def _collect(
+        self,
+        schema: JSONSchema,
+        candidates: list[tuple[int, str]],
+        owner: str | None = None,
+        depth: int = 0,
+        entity: str | None = None,
+    ) -> None:
         """
         Walk one schema, recording a name candidate for every inline
         object under it. `candidates` are `(tier, name)` for *this* node;
-        a property's shape proposes `Pascal(property)` at tier 1, and an
-        array's items propose their container's names with `Item` appended.
+        a property's shape proposes `Pascal(property)` at `_TIER_PROPERTY`,
+        and an array's items propose their container's names with `Item`
+        appended.
+
+        `owner` is the shape of the nearest enclosing object, used to
+        qualify a name two shapes fight over. A union member or an array
+        item is held by whatever holds its container, so it inherits the
+        same owner. `entity` is what the whole operation is about, carried
+        all the way down because a projection is named after it -- see
+        `_projection_name`.
         """
         if not isinstance(schema, dict) or "$ref" in schema:
             return
 
         for member in schema.get("anyOf") or schema.get("oneOf") or []:
-            self._collect(member, _variant_candidates(member, candidates))
+            self._collect(
+                member, _variant_candidates(member, candidates), owner, depth, entity
+            )
 
         if schema.get("type") == "array":
             # A site name describes the whole response, so its item is that
@@ -438,7 +569,9 @@ class ShapeRegistry:
                 (tier, name if tier == _TIER_ENTITY else f"{name}Item")
                 for tier, name in candidates
             ]
-            self._collect(schema.get("items", {}), item_candidates)
+            self._collect(
+                schema.get("items", {}), item_candidates, owner, depth, entity
+            )
             return
 
         if schema.get("type") != "object":
@@ -446,53 +579,194 @@ class ShapeRegistry:
 
         additional = schema.get("additionalProperties")
         if isinstance(additional, dict):
-            self._collect(additional, [])
+            self._collect(additional, [], owner, depth, entity)
 
         properties = schema.get("properties")
         if not properties:
             return
 
-        tiers = self._candidates.setdefault(canonical(schema), {})
+        shape = shape_id(schema)
+        tiers = self._candidates.setdefault(shape, {})
         for tier, name in candidates:
             tiers.setdefault(tier, set()).add(name)
+        projection = self._projection_name(schema, candidates, entity)
+        if projection is not None:
+            tiers.setdefault(_TIER_SUBTYPE, set()).add(projection)
+        if owner is not None:
+            self._owners.setdefault(shape, set()).add(owner)
+        self._depths[shape] = min(self._depths.get(shape, depth), depth)
 
         for property_name, property_schema in properties.items():
             self._collect(
                 property_schema,
                 [(_TIER_PROPERTY, pascal(safe_field_name(property_name)))],
+                shape,
+                depth + 1,
+                entity,
             )
+
+    def _projection_name(
+        self,
+        schema: JSONSchema,
+        candidates: list[tuple[int, str]],
+        entity: str | None,
+    ) -> str | None:
+        """
+        `{Component}At{Entity}` when `schema` is a cut-down view of a
+        component schema, else `None`.
+
+        `listCalendarEvent`'s items embed `{slug, day, start, duration}`:
+        every property of the `TimeSlot` component except the title and the
+        ids, with the same shape on each one. That is a *projection* of a
+        time slot, and `TimeSlotAtCalendarEvent` says so. The qualifier is
+        the entity the operation is about, never the operation id or the
+        site, because being in a list response is noise -- the same
+        projection reached from `readCalendarEvent` is the same class.
+
+        A projection is only offered to a shape whose property is named
+        after the component (`timeSlot` -> `TimeSlot`). Subset-of-a-
+        component on its own is far too loose to name anything by: on this
+        spec a bare `{id}` is a strict subset of eight components, and a
+        request body is a strict subset of the entity it writes. The
+        property name is what makes the match unambiguous -- exactly one
+        component can answer to it -- and a shape the server did not name
+        after the component is not being presented as one.
+
+        Required-ness may differ between the two; that is a presentation
+        detail of the site, not evidence of a different thing.
+        """
+        if entity is None:
+            return None
+        for tier, name in candidates:
+            if tier != _TIER_PROPERTY:
+                continue
+            component = self._components.get(name)
+            if component is not None and _is_projection(schema, component):
+                return f"{name}At{entity}"
+        return None
 
     #
     # Naming
     #
     def _assign_names(self) -> dict[str, str]:
         """
-        Give each shape its best free candidate, best tier first and
-        alphabetical within a tier, so the result never depends on which
-        operation happened to be walked first.
+        Give each shape a name that depends only on that shape's own
+        candidates and on which names the whole document contests.
+
+        A shape structurally identical to a `$ref`able component schema is
+        that schema: it takes the component's class name and renders once,
+        however many inline copies of it the document carries. The server
+        inlines the same entity on the read paths that it `$ref`s on the
+        create path, so this is what keeps `readExam` and `listExam`
+        returning `Exam` rather than a site-named twin of it.
+
+        Otherwise a shape takes its best *uncontested* candidate: best tier
+        first, alphabetical within a tier, skipping any name a `$ref`ed component
+        schema already owns or that a second shape also proposes. A bare
+        name therefore means "exactly one shape in the spec wants this",
+        which is a property a reader can rely on and which no other shape's
+        arrival can quietly take away.
+
+        When every candidate is contested, the shape is named
+        `{Owner}{Best}` -- the owner being the object that holds it as a
+        property (`QuestionTrueFalseChoicesItem`). Qualifying by owner
+        rather than by a counter is what makes the output stable: a counter
+        numbers shapes in order of appearance, so adding one endpoint
+        renumbers models belonging to another (this is exactly how the time
+        slot's `Duration` silently became `Duration2`), while an owner is a
+        fact about the shape itself.
         """
-        taken = {py_class_name(name) for name in self.spec.components.schemas}
+        reserved = {py_class_name(name) for name in self.spec.components.schemas}
+        ordered = {
+            shape: _unique(
+                [name for tier in sorted(tiers) for name in sorted(tiers[tier])]
+            )
+            for shape, tiers in self._candidates.items()
+        }
+        proposals = Counter(name for names in ordered.values() for name in names)
+        # Every name any shape proposes is off limits as a qualified name:
+        # whether the proposer actually ends up using it is irrelevant, and
+        # ignoring that keeps qualification order-independent too.
+        blocked = reserved | set(proposals)
+
         names: dict[str, str] = {}
-        for shape in sorted(self._candidates):
-            names[shape] = self._pick(self._candidates[shape], taken)
+        resolving: set[str] = set()
+
+        def resolve(shape: str) -> str:
+            if shape in names:
+                return names[shape]
+            if shape in resolving:
+                # A shape reachable from itself cannot qualify its own name.
+                return ""
+            resolving.add(shape)
+            component = self._component_shapes.get(shape)
+            if component is not None:
+                names[shape] = component
+                resolving.discard(shape)
+                return component
+            candidates = ordered[shape]
+            free = next(
+                (
+                    name
+                    for name in candidates
+                    if name not in reserved and proposals[name] == 1
+                ),
+                None,
+            )
+            names[shape] = free or self._qualify(
+                candidates, self._owners.get(shape, set()), resolve, blocked, names
+            )
+            resolving.discard(shape)
+            return names[shape]
+
+        for shape in sorted(ordered):
+            resolve(shape)
         return names
 
-    @staticmethod
-    def _pick(tiers: dict[int, set[str]], taken: set[str]) -> str:
-        ordered = [name for tier in sorted(tiers) for name in sorted(tiers[tier])]
-        for name in ordered:
-            if name not in taken:
-                taken.add(name)
-                return name
-        # Every candidate is spoken for by a `$ref`ed schema or another
-        # shape; fall back to the last one with a counter rather than
-        # silently merging two different shapes into one class.
-        base = ordered[-1]
+    def _qualify(
+        self,
+        candidates: list[str],
+        owners: set[str],
+        resolve: Callable[[str], str],
+        blocked: set[str],
+        names: dict[str, str],
+    ) -> str:
+        """
+        `{Owner}{Best}` for a shape whose every candidate is contested.
+
+        A shape can be reached from several owners -- the multiple-choice
+        choice appears both under a multiple-choice question and under a
+        fill-in blank -- and then the *outermost* owner qualifies it, the
+        one closest to the API surface, alphabetically first on a tie. The
+        shallow owner is the one a reader meets first, so `Question...` is
+        a better prefix than `BlanksItem...` for the same shape.
+        """
+        base = candidates[0] if candidates else "Shape"
+        owner_names = [
+            name
+            for _depth, name in sorted(
+                (self._depths.get(owner, 0), resolve(owner)) for owner in owners
+            )
+            if name
+        ]
+        taken = blocked | set(names.values())
+        for owner_name in owner_names:
+            qualified = f"{owner_name}{base}"
+            if qualified not in taken:
+                return qualified
+
+        # Nothing left but a counter: the shape has no owner at all (a
+        # response body is held by nothing), or its owner already qualifies
+        # a sibling that wants the same name -- two untagged members of one
+        # union, which share both owner and base and so cannot be told
+        # apart by either. Nothing in today's spec reaches this. The counter
+        # still counts onto the owner-qualified name, so at worst one shape
+        # of a pair carries a digit rather than both names being positional.
+        stem = f"{owner_names[0]}{base}" if owner_names else base
         suffix = 2
-        while f"{base}{suffix}" in taken:
+        while f"{stem}{suffix}" in taken:
             suffix += 1
-        taken.add(f"{base}{suffix}")
-        return f"{base}{suffix}"
+        return f"{stem}{suffix}"
 
 
 def _variant_candidates(

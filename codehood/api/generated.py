@@ -37,31 +37,6 @@ class CalendarEventCreate(Model):
     time_slot: str = Field(alias="timeSlot")
 
 
-class ChoicesItem(Model):
-    id: str | None = None
-    text: str
-    correct: bool | None = None
-    marker: str | None = None
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class ChoicesItem2(Model):
-    id: str | None = None
-    text: str
-    correct: bool | None = None
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class ChoicesItem3(Model):
-    id: str | None = None
-    text: str
-    score: float | None = None
-    feedback: str | None = None
-    comment: str | None = None
-
-
 class CourseCreate(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -73,25 +48,10 @@ class CourseCreate(Model):
     end_at: str | None = Field(alias="endAt")
 
 
-class Data(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    link: str
-    mime_type: str = Field(alias="mimeType")
-    filename: str
-    type: Literal["FILE"]
-
-
 class DataCode(Model):
     type: Literal["CODE"]
     content: str
     language: str
-
-
-class DataFile(Model):
-    filename: str
-    type: Literal["FILE"]
-    buffer: str
 
 
 class DataLink(Model):
@@ -138,11 +98,6 @@ class Edition(Model):
     created_at: str | None = Field(alias="createdAt")
 
 
-class Edition2(Model):
-    slug: str
-    name: str
-
-
 class EditionCreate(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -150,6 +105,17 @@ class EditionCreate(Model):
     name: str
     start_at: str | None = Field(alias="startAt")
     end_at: str | None = Field(alias="endAt")
+
+
+class ExamCreateQuestionsItem(Model):
+    slug: str
+    version: str | None = None
+
+
+class ExamQuestionsItem(Model):
+    id: int
+    slug: str
+    version: str | None
 
 
 class HealthResponse(Model):
@@ -160,29 +126,6 @@ class HealthResponse(Model):
 class Instructor(Model):
     name: str
     username: str
-
-
-class ListDisciplineResponseItem(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    slug: str
-    name: str
-    created_at: str = Field(alias="createdAt")
-
-
-class ListEditionResponseItem(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    slug: str
-    name: str
-    start_at: str | None = Field(alias="startAt")
-    end_at: str | None = Field(alias="endAt")
-    created_at: str | None = Field(alias="createdAt")
-
-
-class ListUserResponseItem(Model):
-    username: str
-    name: str
 
 
 class LoginRequest(Model):
@@ -216,6 +159,46 @@ class QuestionEssay(Model):
     input: Literal["code", "text", "plain"] | None = None
     highlight: str | None = None
     answer_key: str | None = Field(default=None, alias="answerKey")
+
+
+class QuestionMultipleChoiceChoicesItem(Model):
+    id: str | None = None
+    text: str
+    score: float | None = None
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class QuestionMultipleSelectionChoicesItem(Model):
+    id: str | None = None
+    text: str
+    correct: bool | None = None
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class QuestionTrueFalseChoicesItem(Model):
+    id: str | None = None
+    text: str
+    correct: bool | None = None
+    marker: str | None = None
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class ResourceCreateDataFile(Model):
+    filename: str
+    type: Literal["FILE"]
+    buffer: str
+
+
+class ResourceDataFile(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    link: str
+    mime_type: str = Field(alias="mimeType")
+    filename: str
+    type: Literal["FILE"]
 
 
 class Start(Model):
@@ -264,54 +247,6 @@ class UpdateUserRequest(Model):
     school_id: str | None = Field(default=None, alias="schoolId")
 
 
-class UpsertCalendarEventRequest(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    kind: Literal["REGULAR", "HOLIDAY", "CANCELLED"] | None = None
-    title: str
-    description: str | None = None
-    week: int
-    ref: str
-    time_slot: str = Field(alias="timeSlot")
-
-
-class UpsertCourseRequest(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    description: str | None = None
-    discipline: str
-    edition: str
-    instructor: str | None = None
-    start_at: str | None = Field(alias="startAt")
-    end_at: str | None = Field(alias="endAt")
-
-
-class UpsertDisciplineRequest(Model):
-    slug: str
-    name: str
-
-
-class UpsertEditionRequest(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    slug: str
-    name: str
-    start_at: str | None = Field(alias="startAt")
-    end_at: str | None = Field(alias="endAt")
-
-
-class UpsertUserRequest(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    email: str
-    name: str
-    username: str
-    role: Literal["STUDENT", "INSTRUCTOR", "ADMIN"]
-    github_id: str | None = Field(default=None, alias="githubId")
-    school_id: str | None = Field(default=None, alias="schoolId")
-    password: str
-
-
 class User(Model):
     username: str
     name: str
@@ -332,7 +267,7 @@ class UserCreate(Model):
 class BlanksItemMultipleChoice(Model):
     id: str
     type: Literal["multiple-choice"]
-    choices: list[ChoicesItem3]
+    choices: list[QuestionMultipleChoiceChoicesItem]
 
 
 class BlanksItemNumeric(Model):
@@ -351,8 +286,8 @@ class Course(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     description: str | None
-    discipline: UpsertDisciplineRequest
-    edition: Edition2
+    discipline: DisciplineCreate
+    edition: DisciplineCreate
     instructor: Instructor
     enrollment_count: int = Field(alias="enrollmentCount")
     start_at: str = Field(alias="startAt")
@@ -362,31 +297,43 @@ class Course(Model):
     joined_at: str = Field(alias="joinedAt")
 
 
-class ListCourseResponseItem(Model):
+class Exam(Model):
     model_config = ConfigDict(populate_by_name=True)
 
+    id: int
+    slug: str
+    type: Literal["PRACTICE", "QUIZ", "EXAM"]
+    status: Literal["DRAFT", "ARCHIVED", "SCHEDULED", "ONGOING", "COMPLETED"]
+    title: str
     description: str | None
-    discipline: UpsertDisciplineRequest
-    edition: Edition2
-    instructor: Instructor
-    enrollment_count: int = Field(alias="enrollmentCount")
-    start_at: str = Field(alias="startAt")
-    end_at: str = Field(alias="endAt")
+    preamble: str | None
+    format: Literal["PLAINTEXT", "MARKDOWN", "HTML"]
+    scheduled_at: str | None = Field(alias="scheduledAt")
+    duration: Duration | None
+    extra_time: Duration | None = Field(alias="extraTime")
+    author_id: str = Field(alias="authorId")
+    tags: list[str]
+    questions: list[ExamQuestionsItem]
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
-    joined_at: str = Field(alias="joinedAt")
 
 
-class ListResourceResponseItem(Model):
+class ExamCreate(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     slug: str
+    type: Literal["PRACTICE", "QUIZ", "EXAM"] | None = None
+    status: Literal["DRAFT", "ARCHIVED", "SCHEDULED", "ONGOING", "COMPLETED"] | None = (
+        None
+    )
     title: str
-    description: str | None
-    data: DataLink | Data | DataCode | DataMd
-    ref: str
-    created_at: str = Field(alias="createdAt")
-    updated_at: str = Field(alias="updatedAt")
+    description: str | None = None
+    preamble: str | None = None
+    format: Literal["PLAINTEXT", "MARKDOWN", "HTML"] | None = None
+    scheduled_at: str | None = Field(default=None, alias="scheduledAt")
+    duration: Duration | None = None
+    tags: list[str] | None = None
+    questions: list[ExamCreateQuestionsItem] | None = None
 
 
 class QuestionMultipleChoice(Model):
@@ -402,7 +349,7 @@ class QuestionMultipleChoice(Model):
     tags: list[str] | None = None
     meta: dict[str, object | None] | None = None
     type: Literal["multiple-choice"]
-    choices: list[ChoicesItem3]
+    choices: list[QuestionMultipleChoiceChoicesItem]
     shuffle: bool | None = None
 
 
@@ -419,7 +366,7 @@ class QuestionMultipleSelection(Model):
     tags: list[str] | None = None
     meta: dict[str, object | None] | None = None
     type: Literal["multiple-selection"]
-    choices: list[ChoicesItem2]
+    choices: list[QuestionMultipleSelectionChoicesItem]
     shuffle: bool | None = None
 
 
@@ -482,7 +429,7 @@ class QuestionTrueFalse(Model):
     tags: list[str] | None = None
     meta: dict[str, object | None] | None = None
     type: Literal["true-false"]
-    choices: list[ChoicesItem]
+    choices: list[QuestionTrueFalseChoicesItem]
     shuffle: bool | None = None
 
 
@@ -492,7 +439,7 @@ class Resource(Model):
     slug: str
     title: str
     description: str | None
-    data: DataLink | Data | DataCode | DataMd
+    data: DataLink | ResourceDataFile | DataCode | DataMd
     ref: str
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
@@ -503,7 +450,7 @@ class ResourceCreate(Model):
     title: str
     ref: str
     description: str | None = None
-    data: DataLink | DataFile | DataCode | DataMd
+    data: DataLink | ResourceCreateDataFile | DataCode | DataMd
 
 
 class TimeSlot(Model):
@@ -522,7 +469,7 @@ class TimeSlot(Model):
     updated_at: str = Field(alias="updatedAt")
 
 
-class TimeSlot2(Model):
+class TimeSlotAtCalendarEvent(Model):
     slug: str
     day: Literal[
         "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"
@@ -541,27 +488,29 @@ class TimeSlotCreate(Model):
     duration: Duration
 
 
-class Timeslot(Model):
+class UpdateExamRequest(Model):
     model_config = ConfigDict(populate_by_name=True)
 
-    id: int
-    course_id: int = Field(alias="courseId")
-    slug: str
-    title: str | None
-    day: Literal[
-        "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"
-    ]
-    start: Start
-    duration: Duration
-    created_at: str = Field(alias="createdAt")
-    updated_at: str = Field(alias="updatedAt")
+    type: Literal["PRACTICE", "QUIZ", "EXAM"] | None = None
+    status: Literal["DRAFT", "ARCHIVED", "SCHEDULED", "ONGOING", "COMPLETED"] | None = (
+        None
+    )
+    title: str | None = None
+    description: str | None = None
+    preamble: str | None = None
+    format: Literal["PLAINTEXT", "MARKDOWN", "HTML"] | None = None
+    scheduled_at: str | None = Field(default=None, alias="scheduledAt")
+    duration: Duration | None = None
+    tags: list[str] | None = None
+    questions: list[ExamCreateQuestionsItem] | None = None
+    extra_time: Duration | None = Field(default=None, alias="extraTime")
 
 
 class UpdateResourceRequest(Model):
     title: str | None = None
     ref: str | None = None
     description: str | None = None
-    data: DataLink | DataFile | DataCode | DataMd | None = None
+    data: DataLink | ResourceCreateDataFile | DataCode | DataMd | None = None
 
 
 class UpdateTimeslotRequest(Model):
@@ -576,24 +525,6 @@ class UpdateTimeslotRequest(Model):
     duration: Duration | None = None
 
 
-class UpsertResourceRequest(Model):
-    slug: str
-    title: str
-    ref: str
-    description: str | None = None
-    data: DataLink | DataFile | DataCode | DataMd
-
-
-class UpsertTimeslotRequest(Model):
-    slug: str
-    title: str | None = None
-    day: Literal[
-        "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"
-    ]
-    start: Start
-    duration: Duration
-
-
 class CalendarEvent(Model):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -602,21 +533,7 @@ class CalendarEvent(Model):
     description: str | None
     start_at: str = Field(alias="startAt")
     week: int
-    time_slot: TimeSlot2 = Field(alias="timeSlot")
-    ref: str
-    created_at: str = Field(alias="createdAt")
-    updated_at: str = Field(alias="updatedAt")
-
-
-class ListCalendarEventResponseItem(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    kind: Literal["REGULAR", "HOLIDAY", "CANCELLED"]
-    title: str
-    description: str | None
-    start_at: str = Field(alias="startAt")
-    week: int
-    time_slot: TimeSlot2 = Field(alias="timeSlot")
+    time_slot: TimeSlotAtCalendarEvent = Field(alias="timeSlot")
     ref: str
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
@@ -637,26 +554,6 @@ class QuestionFillIn(Model):
     type: Literal["fill-in"]
     blanks: list[BlanksItemMultipleChoice | BlanksItemShortAnswer | BlanksItemNumeric]
     shuffle: bool | None = None
-
-
-class ListQuestionResponseItem(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    slug: str
-    id: int
-    status: Literal["DRAFT", "PUBLISHED", "ARCHIVED"]
-    version: str
-    created_at: str = Field(alias="createdAt")
-    updated_at: str = Field(alias="updatedAt")
-    question: (
-        QuestionMultipleChoice
-        | QuestionMultipleSelection
-        | QuestionTrueFalse
-        | QuestionEssay
-        | QuestionNumeric
-        | QuestionShortAnswer
-        | QuestionFillIn
-    )
 
 
 class Question(Model):
@@ -707,21 +604,6 @@ class UpdateQuestionRequest(Model):
         | QuestionFillIn
         | None
     ) = None
-
-
-class UpsertQuestionRequest(Model):
-    slug: str
-    status: Literal["DRAFT", "PUBLISHED", "ARCHIVED"]
-    version: str
-    question: (
-        QuestionMultipleChoice
-        | QuestionMultipleSelection
-        | QuestionTrueFalse
-        | QuestionEssay
-        | QuestionNumeric
-        | QuestionShortAnswer
-        | QuestionFillIn
-    )
 
 
 class HealthError(CodehoodAPIError):
@@ -840,6 +722,30 @@ def create_edition(
     )
     if response.status_code == 200:
         return Edition.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def create_exam(
+    *,
+    discipline: str,
+    course: str,
+    body: ExamCreate,
+    client: httpx.Client | None = None,
+) -> Exam:
+    """
+    Creates a new Exam.
+    """
+    client = client if client is not None else get_client()
+    response = client.post(
+        "/api/course/{discipline}/{course}/exam".format(
+            discipline=discipline, course=course
+        ),
+        json=body.model_dump(mode="json", by_alias=True),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Exam.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1003,6 +909,25 @@ def delete_edition(*, slug: str, client: httpx.Client | None = None) -> Deleted:
     raise CodehoodAPIError(response.status_code, Model())
 
 
+def delete_exam(
+    *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
+) -> Deleted:
+    """
+    Delete a single Exam by primary key.
+    """
+    client = client if client is not None else get_client()
+    response = client.delete(
+        "/api/course/{discipline}/{course}/exam/{slug}".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Deleted.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
 def delete_question(
     *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
 ) -> Deleted:
@@ -1100,7 +1025,7 @@ def list_calendar_event(
     weeks: list[int] | None = None,
     limit: int | None = None,
     client: httpx.Client | None = None,
-) -> list[ListCalendarEventResponseItem]:
+) -> list[CalendarEvent]:
     """
     Find multiple Calendar Events.
     """
@@ -1115,9 +1040,7 @@ def list_calendar_event(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListCalendarEventResponseItem]).validate_python(
-            response.json()
-        )
+        return TypeAdapter(list[CalendarEvent]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1128,7 +1051,7 @@ def list_course(
     discipline: str | None = None,
     edition: str | None = None,
     client: httpx.Client | None = None,
-) -> list[ListCourseResponseItem]:
+) -> list[Course]:
     """
     Find multiple Courses.
     """
@@ -1141,16 +1064,14 @@ def list_course(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListCourseResponseItem]).validate_python(
-            response.json()
-        )
+        return TypeAdapter(list[Course]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def list_discipline(
     *, slugs: list[str] | None = None, client: httpx.Client | None = None
-) -> list[ListDisciplineResponseItem]:
+) -> list[Discipline]:
     """
     Find multiple Disciplines.
     """
@@ -1161,9 +1082,7 @@ def list_discipline(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListDisciplineResponseItem]).validate_python(
-            response.json()
-        )
+        return TypeAdapter(list[Discipline]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1173,7 +1092,7 @@ def list_edition(
     slugs: list[str] | None = None,
     active: bool | None = None,
     client: httpx.Client | None = None,
-) -> list[ListEditionResponseItem]:
+) -> list[Edition]:
     """
     Find multiple Editions.
     """
@@ -1184,9 +1103,37 @@ def list_edition(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListEditionResponseItem]).validate_python(
-            response.json()
-        )
+        return TypeAdapter(list[Edition]).validate_python(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def list_exam(
+    *,
+    discipline: str,
+    course: str,
+    exams: list[str] | None = None,
+    statuses: list[Literal["DRAFT", "ARCHIVED", "SCHEDULED", "ONGOING", "COMPLETED"]]
+    | None = None,
+    types: list[Literal["PRACTICE", "QUIZ", "EXAM"]] | None = None,
+    tags: list[str] | None = None,
+    client: httpx.Client | None = None,
+) -> list[Exam]:
+    """
+    Find multiple Exams.
+    """
+    client = client if client is not None else get_client()
+    response = client.get(
+        "/api/course/{discipline}/{course}/exam".format(
+            discipline=discipline, course=course
+        ),
+        params=query_params(
+            {"exams": exams, "statuses": statuses, "types": types, "tags": tags}
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return TypeAdapter(list[Exam]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1212,7 +1159,7 @@ def list_question(
     tags: list[str] | None = None,
     public: bool | None = None,
     client: httpx.Client | None = None,
-) -> list[ListQuestionResponseItem]:
+) -> list[Question]:
     """
     Find multiple Questions.
     """
@@ -1233,9 +1180,7 @@ def list_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListQuestionResponseItem]).validate_python(
-            response.json()
-        )
+        return TypeAdapter(list[Question]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1247,7 +1192,7 @@ def list_resource(
     types: list[Literal["LINK", "FILE", "CODE", "MD"]] | None = None,
     slugs: list[str] | None = None,
     client: httpx.Client | None = None,
-) -> list[ListResourceResponseItem]:
+) -> list[Resource]:
     """
     Find multiple Resources.
     """
@@ -1260,9 +1205,7 @@ def list_resource(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListResourceResponseItem]).validate_python(
-            response.json()
-        )
+        return TypeAdapter(list[Resource]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1278,7 +1221,7 @@ def list_timeslot(
     ]
     | None = None,
     client: httpx.Client | None = None,
-) -> list[Timeslot]:
+) -> list[TimeSlot]:
     """
     Find multiple Time Slots.
     """
@@ -1291,7 +1234,7 @@ def list_timeslot(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Timeslot]).validate_python(response.json())
+        return TypeAdapter(list[TimeSlot]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1301,7 +1244,7 @@ def list_user(
     usernames: list[str] | None = None,
     take: int | None = None,
     client: httpx.Client | None = None,
-) -> list[ListUserResponseItem]:
+) -> list[User]:
     """
     Find multiple Users.
     """
@@ -1312,7 +1255,7 @@ def list_user(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[ListUserResponseItem]).validate_python(response.json())
+        return TypeAdapter(list[User]).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1352,7 +1295,7 @@ def read_calendar_event(
     week: str,
     time_slot: str,
     client: httpx.Client | None = None,
-) -> ListCalendarEventResponseItem:
+) -> CalendarEvent:
     """
     Find a single Calendar Event.
     """
@@ -1364,14 +1307,14 @@ def read_calendar_event(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListCalendarEventResponseItem.model_validate(response.json())
+        return CalendarEvent.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def read_course(
     *, discipline: str, course: str, client: httpx.Client | None = None
-) -> ListCourseResponseItem:
+) -> Course:
     """
     Find a single Course.
     """
@@ -1383,14 +1326,12 @@ def read_course(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListCourseResponseItem.model_validate(response.json())
+        return Course.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
-def read_discipline(
-    *, slug: str, client: httpx.Client | None = None
-) -> ListDisciplineResponseItem:
+def read_discipline(*, slug: str, client: httpx.Client | None = None) -> Discipline:
     """
     Find a single Discipline.
     """
@@ -1399,14 +1340,12 @@ def read_discipline(
         "/api/discipline/{slug}".format(slug=slug), headers=auth_headers(client)
     )
     if response.status_code == 200:
-        return ListDisciplineResponseItem.model_validate(response.json())
+        return Discipline.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
-def read_edition(
-    *, slug: str, client: httpx.Client | None = None
-) -> ListEditionResponseItem:
+def read_edition(*, slug: str, client: httpx.Client | None = None) -> Edition:
     """
     Find a single Edition.
     """
@@ -1415,7 +1354,26 @@ def read_edition(
         "/api/edition/{slug}".format(slug=slug), headers=auth_headers(client)
     )
     if response.status_code == 200:
-        return ListEditionResponseItem.model_validate(response.json())
+        return Edition.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def read_exam(
+    *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
+) -> Exam:
+    """
+    Find a single Exam.
+    """
+    client = client if client is not None else get_client()
+    response = client.get(
+        "/api/course/{discipline}/{course}/exam/{slug}".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Exam.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1427,7 +1385,7 @@ def read_question(
     slug: str,
     public: bool | None = None,
     client: httpx.Client | None = None,
-) -> ListQuestionResponseItem:
+) -> Question:
     """
     Find a single Question.
     """
@@ -1440,14 +1398,14 @@ def read_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListQuestionResponseItem.model_validate(response.json())
+        return Question.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def read_resource(
     *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
-) -> ListResourceResponseItem:
+) -> Resource:
     """
     Find a single Resource.
     """
@@ -1459,14 +1417,14 @@ def read_resource(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListResourceResponseItem.model_validate(response.json())
+        return Resource.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def read_timeslot(
     *, discipline: str, course: str, slug: str, client: httpx.Client | None = None
-) -> Timeslot:
+) -> TimeSlot:
     """
     Find a single TimeSlot.
     """
@@ -1478,14 +1436,12 @@ def read_timeslot(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return Timeslot.model_validate(response.json())
+        return TimeSlot.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
-def read_user(
-    *, username: str, client: httpx.Client | None = None
-) -> ListUserResponseItem:
+def read_user(*, username: str, client: httpx.Client | None = None) -> User:
     """
     Find a single User.
     """
@@ -1494,7 +1450,7 @@ def read_user(
         "/api/user/{username}".format(username=username), headers=auth_headers(client)
     )
     if response.status_code == 200:
-        return ListUserResponseItem.model_validate(response.json())
+        return User.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1507,7 +1463,7 @@ def update_calendar_event(
     time_slot: str,
     body: UpdateCalendarEventRequest,
     client: httpx.Client | None = None,
-) -> ListCalendarEventResponseItem:
+) -> CalendarEvent:
     """
     Update a single Calendar Event.
     """
@@ -1520,7 +1476,7 @@ def update_calendar_event(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListCalendarEventResponseItem.model_validate(response.json())
+        return CalendarEvent.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1531,7 +1487,7 @@ def update_course(
     course: str,
     body: UpdateCourseRequest,
     client: httpx.Client | None = None,
-) -> ListCourseResponseItem:
+) -> Course:
     """
     Update a single Course.
     """
@@ -1544,14 +1500,14 @@ def update_course(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListCourseResponseItem.model_validate(response.json())
+        return Course.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def update_discipline(
     *, slug: str, body: UpdateDisciplineRequest, client: httpx.Client | None = None
-) -> ListDisciplineResponseItem:
+) -> Discipline:
     """
     Update a single Discipline.
     """
@@ -1562,14 +1518,14 @@ def update_discipline(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListDisciplineResponseItem.model_validate(response.json())
+        return Discipline.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def update_edition(
     *, slug: str, body: UpdateEditionRequest, client: httpx.Client | None = None
-) -> ListEditionResponseItem:
+) -> Edition:
     """
     Update a single Edition.
     """
@@ -1580,7 +1536,32 @@ def update_edition(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListEditionResponseItem.model_validate(response.json())
+        return Edition.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def update_exam(
+    *,
+    discipline: str,
+    course: str,
+    slug: str,
+    body: UpdateExamRequest,
+    client: httpx.Client | None = None,
+) -> Exam:
+    """
+    Update a single Exam.
+    """
+    client = client if client is not None else get_client()
+    response = client.patch(
+        "/api/course/{discipline}/{course}/exam/{slug}".format(
+            discipline=discipline, course=course, slug=slug
+        ),
+        json=body.model_dump(mode="json", by_alias=True),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Exam.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1592,7 +1573,7 @@ def update_question(
     slug: str,
     body: UpdateQuestionRequest,
     client: httpx.Client | None = None,
-) -> ListQuestionResponseItem:
+) -> Question:
     """
     Update a single Question.
     """
@@ -1605,7 +1586,7 @@ def update_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListQuestionResponseItem.model_validate(response.json())
+        return Question.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1617,7 +1598,7 @@ def update_resource(
     slug: str,
     body: UpdateResourceRequest,
     client: httpx.Client | None = None,
-) -> ListResourceResponseItem:
+) -> Resource:
     """
     Update a single Resource.
     """
@@ -1630,7 +1611,7 @@ def update_resource(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListResourceResponseItem.model_validate(response.json())
+        return Resource.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1642,7 +1623,7 @@ def update_timeslot(
     slug: str,
     body: UpdateTimeslotRequest,
     client: httpx.Client | None = None,
-) -> Timeslot:
+) -> TimeSlot:
     """
     Update a single TimeSlot.
     """
@@ -1655,14 +1636,14 @@ def update_timeslot(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return Timeslot.model_validate(response.json())
+        return TimeSlot.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def update_user(
     *, username: str, body: UpdateUserRequest, client: httpx.Client | None = None
-) -> ListUserResponseItem:
+) -> User:
     """
     Update a single User.
     """
@@ -1673,7 +1654,7 @@ def update_user(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListUserResponseItem.model_validate(response.json())
+        return User.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1682,9 +1663,9 @@ def upsert_calendar_event(
     *,
     discipline: str,
     course: str,
-    body: UpsertCalendarEventRequest,
+    body: CalendarEventCreate,
     client: httpx.Client | None = None,
-) -> ListCalendarEventResponseItem:
+) -> CalendarEvent:
     """
     Upsert a single Calendar Event. Creates if it does not exist, update otherwise.
     """
@@ -1697,14 +1678,12 @@ def upsert_calendar_event(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListCalendarEventResponseItem.model_validate(response.json())
+        return CalendarEvent.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
-def upsert_course(
-    *, body: UpsertCourseRequest, client: httpx.Client | None = None
-) -> ListCourseResponseItem:
+def upsert_course(*, body: CourseCreate, client: httpx.Client | None = None) -> Course:
     """
     Upsert a single Course. Creates if it does not exist, update otherwise.
     """
@@ -1715,14 +1694,14 @@ def upsert_course(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListCourseResponseItem.model_validate(response.json())
+        return Course.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def upsert_discipline(
-    *, body: UpsertDisciplineRequest, client: httpx.Client | None = None
-) -> ListDisciplineResponseItem:
+    *, body: DisciplineCreate, client: httpx.Client | None = None
+) -> Discipline:
     """
     Upsert a single Discipline. Creates if it does not exist, update otherwise.
     """
@@ -1733,14 +1712,14 @@ def upsert_discipline(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListDisciplineResponseItem.model_validate(response.json())
+        return Discipline.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def upsert_edition(
-    *, body: UpsertEditionRequest, client: httpx.Client | None = None
-) -> ListEditionResponseItem:
+    *, body: EditionCreate, client: httpx.Client | None = None
+) -> Edition:
     """
     Upsert a single Edition. Creates if it does not exist, update otherwise.
     """
@@ -1751,7 +1730,31 @@ def upsert_edition(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListEditionResponseItem.model_validate(response.json())
+        return Edition.model_validate(response.json())
+    response.raise_for_status()
+    raise CodehoodAPIError(response.status_code, Model())
+
+
+def upsert_exam(
+    *,
+    discipline: str,
+    course: str,
+    body: ExamCreate,
+    client: httpx.Client | None = None,
+) -> Exam:
+    """
+    Upsert a single Exam. Creates if it does not exist, update otherwise.
+    """
+    client = client if client is not None else get_client()
+    response = client.put(
+        "/api/course/{discipline}/{course}/exam".format(
+            discipline=discipline, course=course
+        ),
+        json=body.model_dump(mode="json", by_alias=True),
+        headers=auth_headers(client),
+    )
+    if response.status_code == 200:
+        return Exam.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1760,9 +1763,9 @@ def upsert_question(
     *,
     discipline: str,
     course: str,
-    body: UpsertQuestionRequest,
+    body: QuestionCreate,
     client: httpx.Client | None = None,
-) -> ListQuestionResponseItem:
+) -> Question:
     """
     Upsert a single Question. Creates if it does not exist, update otherwise.
     """
@@ -1775,7 +1778,7 @@ def upsert_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListQuestionResponseItem.model_validate(response.json())
+        return Question.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1784,9 +1787,9 @@ def upsert_resource(
     *,
     discipline: str,
     course: str,
-    body: UpsertResourceRequest,
+    body: ResourceCreate,
     client: httpx.Client | None = None,
-) -> ListResourceResponseItem:
+) -> Resource:
     """
     Upsert a single Resource. Creates if it does not exist, update otherwise.
     """
@@ -1799,7 +1802,7 @@ def upsert_resource(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListResourceResponseItem.model_validate(response.json())
+        return Resource.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -1808,9 +1811,9 @@ def upsert_timeslot(
     *,
     discipline: str,
     course: str,
-    body: UpsertTimeslotRequest,
+    body: TimeSlotCreate,
     client: httpx.Client | None = None,
-) -> Timeslot:
+) -> TimeSlot:
     """
     Upsert a single TimeSlot. Creates if it does not exist, update otherwise.
     """
@@ -1823,14 +1826,12 @@ def upsert_timeslot(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return Timeslot.model_validate(response.json())
+        return TimeSlot.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
-def upsert_user(
-    *, body: UpsertUserRequest, client: httpx.Client | None = None
-) -> ListUserResponseItem:
+def upsert_user(*, body: UserCreate, client: httpx.Client | None = None) -> User:
     """
     Upsert a single User. Creates if it does not exist, update otherwise.
     """
@@ -1841,6 +1842,6 @@ def upsert_user(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return ListUserResponseItem.model_validate(response.json())
+        return User.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())

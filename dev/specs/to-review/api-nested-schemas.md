@@ -53,22 +53,35 @@ inlines what are really shared entities; the generator un-inlines them.
 
 **Structurally identical schemas become one class.** A pre-pass walks every
 operation reachable from `ENDPOINTS`, collects each inline object schema,
-and keys it by its canonical (sort-keyed) JSON. Against today's spec that
-turns 29 name-sites into 15 classes: `readCourse`'s response,
+and keys it by its *structure* (`shape_id`) -- what the generator renders,
+with the documentation keys it drops left out. `readCourse`'s response,
 `listCourse`'s array item, and `createCourse`/`updateCourse`'s responses
-are byte-identical schemas, and `discipline` nested inside all of them is
-the same schema again as `readDiscipline`'s whole response.
+are one schema, and `discipline` nested inside all of them is the same
+schema again as `readDiscipline`'s whole response.
 
-**Naming.** Each site a shape appears at proposes a candidate name; the
-shape takes the best one, by tier, alphabetically within a tier:
+**A shape identical to a component schema *is* that component.** The server
+inlines on the read paths what it `$ref`s on the create path, so a shape
+whose `shape_id` matches a component's takes that component's class name
+and renders once. `readExam` and `listExam` speak `Exam`, not a site-named
+twin of it.
 
-1. **A property name it appears under** -- `Pascal(property)`, so the
+**Naming.** Otherwise, each site a shape appears at proposes a candidate
+name; the shape takes the best one, by tier, alphabetically within a tier:
+
+1. **A discriminated-union tag** -- `Data` + `MD` -> `DataMd`.
+2. **A projection of a component schema** -- a strict property subset of a
+   component, with equal shapes on every shared property, reached through a
+   property named after that component, is `<Component>At<Entity>`:
+   `listCalendarEvent`'s embedded `{slug, day, start, duration}` is
+   `TimeSlotAtCalendarEvent`. The qualifier is the entity the operation is
+   about, never the operation id -- the verb and the list-ness are noise.
+3. **A property name it appears under** -- `Pascal(property)`, so the
    `discipline` field's shape is `Discipline`. A shape used as a field
    somewhere has already been given a name by the server; use it.
-2. **The entity name of a CRUD operation whose 2xx response it is** --
+4. **The entity name of a CRUD operation whose 2xx response it is** --
    `readCourse`/`listCourse`/... -> `Course`. The generator already knows
    this verb list; it is `_crud`'s, not a guess about English.
-3. **The site itself** -- `<Op>Request`, `<Op>Response`,
+5. **The site itself** -- `<Op>Request`, `<Op>Response`,
    `<Op>ResponseItem`, `<Op>Error<Status>`.
 
 An array of inline objects names its item type `<candidate>Item`
@@ -76,9 +89,12 @@ An array of inline objects names its item type `<candidate>Item`
 already describes the item rather than the list: `listCourse` returns
 `list[Course]`, not `list[CourseItem]`.
 
-A minted name never overwrites a `$ref`ed schema's name or another shape's:
-on a clash the shape falls through to its next candidate, and to a numeric
-suffix if it runs out. Nothing in today's spec clashes.
+A name is only taken bare when exactly one shape proposes it and no
+component schema owns it. A shape whose every candidate is contested is
+named `<Owner><Best>` after the object that holds it, outermost owner
+first. A numeric suffix is the last resort, not the scheme -- it is
+reachable only for two untagged union members sharing one owner and one
+base name, which nothing in today's spec has.
 
 This replaces an earlier nested-class design (`ReadCourseResponse.Discipline`).
 Nested classes made every occurrence of `discipline` a *different* type,
@@ -153,9 +169,14 @@ and no `anyOf`/`oneOf`. The error keeps naming the offending schema.
   `disciplineSlug`. Function *arguments* are snake_cased (see below), but
   doing the same to every model field means an alias on every field of
   every model, and is its own change.
-- **Fuzzy deduplication.** Only *byte-identical* (canonical-JSON) schemas
-  merge. Two shapes that differ by one optional field stay two classes;
-  guessing that they are "the same really" is not the generator's call.
+- **Fuzzy deduplication.** Only *structurally identical* schemas merge --
+  same fields, in the same order, with the same types, optionality and
+  aliases, ignoring the documentation keys the generator never emits
+  (`description`, `minimum`, `nullable` on the object itself). Two shapes
+  that differ by one optional field stay two classes; guessing that they
+  are "the same really" is not the generator's call. (Superseded the
+  original byte-identical rule: it split the exam's `duration` from the
+  time slot's over a `nullable` flag neither class carries.)
 
 ## Proving it works
 
