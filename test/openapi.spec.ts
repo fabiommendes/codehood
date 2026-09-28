@@ -7,6 +7,35 @@ test("documents both REST endpoints, unauthenticated", () => {
 	expect(document.paths?.["/api/auth/login"]?.post?.security).toEqual([]);
 });
 
+test("every patterned string carries an example that matches its pattern", () => {
+	const offenders: string[] = [];
+
+	function walk(node: unknown, path: string) {
+		if (Array.isArray(node)) {
+			for (const [i, child] of node.entries()) walk(child, `${path}[${i}]`);
+			return;
+		}
+		if (typeof node !== "object" || node === null) return;
+
+		const schema = node as Record<string, unknown>;
+		if (typeof schema.pattern === "string") {
+			const example = schema.example;
+			if (
+				typeof example !== "string" ||
+				!new RegExp(schema.pattern).test(example)
+			) {
+				offenders.push(`${path} ${schema.pattern} ${String(example)}`);
+			}
+		}
+		for (const [key, child] of Object.entries(schema)) {
+			walk(child, `${path}/${key}`);
+		}
+	}
+
+	walk(buildOpenApiDocument(), "");
+	expect(offenders).toEqual([]);
+});
+
 test("GET /openapi.json is generated on demand and matches the registrations", async ({
 	request,
 }) => {

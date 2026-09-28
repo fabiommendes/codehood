@@ -202,7 +202,7 @@ export const importCalendarCommand = new Command("import-calendar")
 								kind,
 								title: entry.title,
 								description: entry.description ?? null,
-								ref: canonicalHash(entry),
+								rev: canonicalHash(entry),
 							},
 							FULL_ACCESS,
 						);
@@ -218,7 +218,7 @@ export const importCalendarCommand = new Command("import-calendar")
 								kind,
 								title: entry.title,
 								description: entry.description ?? null,
-								ref: canonicalHash(entry),
+								rev: canonicalHash(entry),
 							},
 							FULL_ACCESS,
 						);

@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- Swagger UI filled regex-constrained strings with random matching text. Every
+  patterned schema, including the generated MDQ ones, now carries an OpenAPI
+  `example`, and a test fails if a new pattern ships without one.
 - A query key such as `__proto__[x]` made list endpoints answer 500.
 - `StudentsTable` typed its rows as full users instead of enrollments.
 - The edition test factory only produced ten slugs, so suites that created many
@@ -17,6 +20,10 @@
 
 ### Changed
 
+- The writer-supplied `ref` on `Resource` and `CalendarEvent` is now `rev`, a
+  nullable revision marker for the CLI. `Course`, `Exam` and `Question` gained
+  the same field. `rev` is optional on create and can be set or cleared
+  through `update` and `upsert`. Clients that sent `ref` must send `rev`.
 - The REST API (`src/api/`) never exposes a raw database id: `Invite` and
   `ApiKey` gained a `publicId` column and are now addressed at
   `/api/invite/[publicId]` and `/api/api-key/[publicId]` (the old numeric

@@ -111,6 +111,7 @@ export class CourseService
 					raise(new ImproperBehavior(SYSTEM_TO_INSTRUCTOR_ERROR)),
 				editionSlug: input.edition,
 				description: input.description,
+				rev: input.rev,
 				startAt: input.startAt,
 				endAt: input.endAt,
 			},

@@ -76,7 +76,7 @@ function link(title = "Syllabus") {
 	return {
 		title,
 		data: { type: "LINK" as const, url: "https://example.com" },
-		ref: tag("h"),
+		rev: tag("h"),
 	};
 }
 
@@ -99,8 +99,8 @@ test("GET lists a course's resources and GET <slug> reads one, by natural key", 
 	const one = await request.get(`${url}/syllabus`, { headers });
 	expect(one.status()).toBe(200);
 	// The entity schema omits `id` (REST addresses a resource by its course's
-	// natural key + slug, not the numeric id) — compare on `ref` instead.
-	expect((await one.json()).ref).toBe(created.ref);
+	// natural key + slug, not the numeric id) — compare on `rev` instead.
+	expect((await one.json()).rev).toBe(created.rev);
 });
 
 test("/api/resource is gone", async ({ request }) => {

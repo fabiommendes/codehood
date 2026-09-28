@@ -100,7 +100,7 @@ async function seed(
 			timeSlot: "mon",
 			week: overrides.week ?? 1,
 			title: overrides.title ?? "Week 1: recursion",
-			ref: tag("ref"),
+			rev: tag("ref"),
 		},
 		{ actor: instructor },
 	);
@@ -112,7 +112,7 @@ function event(overrides: Partial<{ week: number; title: string }> = {}) {
 		week: overrides.week ?? 1,
 		kind: "REGULAR",
 		title: overrides.title ?? "Week 1: recursion",
-		ref: tag("ref"),
+		rev: tag("ref"),
 	};
 }
 
@@ -183,7 +183,7 @@ test("the API addresses a slot by slug only, while the service still takes its i
 			timeSlot: slot.id,
 			week: 1,
 			title: "x",
-			ref: tag("r"),
+			rev: tag("r"),
 		},
 		{ actor: instructor },
 	);

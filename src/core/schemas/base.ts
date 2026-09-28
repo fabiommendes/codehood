@@ -60,7 +60,10 @@ export type TimeSlotId = z.infer<typeof timeSlotId>;
 
 // We do not brand since it is not likely to be confused with other numeric IDs.
 // due to both its type (not an int) and name (not id).
-export const username = z.string().regex(USERNAME_RE, "Invalid username.");
+export const username = z
+	.string()
+	.regex(USERNAME_RE, "Invalid username.")
+	.openapi({ example: "ada" });
 export type UserId = z.infer<typeof username>;
 
 // =============================================================================
@@ -75,27 +78,33 @@ export const slug = z
 		/^[a-z0-9][a-z0-9._-]*$/,
 		"Lowercase letters, digits, '.', '_' and '-', starting with a letter or digit.",
 	)
-	.openapi({
-		examples: ["some-slug", "v1", "with_underscore"],
-	});
+	.openapi({ example: "intro-to-recursion" });
 export type Slug = z.infer<typeof slug>;
 
 /// An opaque random identifier, safe to place in a URL or hand to a client.
 export const publicId = z
 	.string()
-	.regex(/^[A-Za-z0-9_-]+$/, "Invalid public id.");
+	.regex(/^[A-Za-z0-9_-]+$/, "Invalid public id.")
+	.openapi({ example: "k3Vx9QpL2a" });
 export type PublicId = z.infer<typeof publicId>;
 
 // TODO: validate with proper validator
 export const slugHash = z.string().min(1);
 export type SlugHash = z.infer<typeof slugHash>;
 
+/// Revision marker supplied by the writer, opaque to the server. The CLI uses it
+/// to tell whether the stored copy of an entity matches its local one.
+export const rev = z.string().min(1);
+
 // TODO: validate with proper validator
 export const mimeType = z.string().min(1);
 export type MimeType = z.infer<typeof mimeType>;
 
 /// The edition slug identifier
-export const editionSlug = z.string().regex(EDITION_RE);
+export const editionSlug = z
+	.string()
+	.regex(EDITION_RE)
+	.openapi({ example: "2026-1" });
 export type EditionSlug = z.infer<typeof editionSlug>;
 
 export const buffer = z

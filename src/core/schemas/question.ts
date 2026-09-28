@@ -2,7 +2,7 @@ import { z } from "zod";
 import { publicQuestionSchema } from "@/mdq/public-schemas";
 import { questionSchema as mdqQuestionSchema } from "@/mdq/schemas-generated";
 import type { AssertEqual } from "@/utils/types";
-import { questionRefId, slug } from "./base";
+import { questionRefId, rev, slug } from "./base";
 import { courseRef } from "./course";
 
 export const questionSchema = z.object({
@@ -10,6 +10,7 @@ export const questionSchema = z.object({
 	id: questionRefId,
 	status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
 	version: z.string().min(1),
+	rev: rev.nullable(),
 	createdAt: z.date(),
 	updatedAt: z.date(),
 
@@ -27,6 +28,7 @@ export const questionCreate = questionSchema
 	.omit({ createdAt: true, updatedAt: true, id: true })
 	.extend({
 		course: courseRef,
+		rev: rev.nullish(),
 	});
 
 export const questionUpdate = questionCreate

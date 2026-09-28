@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { duration, examId, questionRefId, slug } from "./base";
+import { duration, examId, questionRefId, rev, slug } from "./base";
 import { courseRef } from "./course";
 
 export const examStatus = z.enum([
@@ -50,6 +50,7 @@ export const examSchema = z.object({
 	extraTime: duration.nullable(),
 
 	author: z.string(),
+	rev: rev.nullable(),
 
 	tags: z.array(z.string().min(1)),
 	questions: z.array(examQuestionSchema),
@@ -77,6 +78,7 @@ export const examCreate = examSchema
 		preamble: z.string().nullish(),
 		scheduledAt: z.date().nullish(),
 		duration: examDuration.nullish(),
+		rev: rev.nullish(),
 
 		tags: z.array(z.string().min(1)).optional(),
 		questions: z.array(examQuestionInput).optional(),

@@ -124,7 +124,7 @@ export class CalendarEventService extends CrudBase<{
 				kind: input.kind ?? "REGULAR",
 				title: input.title,
 				description: input.description,
-				ref: input.ref,
+				rev: input.rev,
 			},
 			include: EVENT_INCLUDE,
 		});
@@ -213,7 +213,7 @@ export class CalendarEventService extends CrudBase<{
 	}
 
 	/**
-	 * Changes `title`/`description`/`kind`/`ref`. The event's time is never
+	 * Changes `title`/`description`/`kind`/`rev`. The event's time is never
 	 * writable here — it is always derived from the course, week, and slot.
 	 */
 	@Validate({
@@ -240,7 +240,7 @@ export class CalendarEventService extends CrudBase<{
 				title: fields.title,
 				description: fields.description,
 				kind: fields.kind,
-				ref: fields.ref,
+				rev: fields.rev,
 			},
 			include: EVENT_INCLUDE,
 		});

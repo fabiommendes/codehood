@@ -109,7 +109,7 @@ const cases: CourseRefCase[] = [
 					slug: `car-resource-${label}`,
 					title: label,
 					data: { type: "LINK", url: "https://example.com" },
-					ref: `car-ref-${label}`,
+					rev: `car-ref-${label}`,
 				},
 				{ actor: fx.actor },
 			);
@@ -193,7 +193,7 @@ const cases: CourseRefCase[] = [
 					timeSlot: slot.id,
 					week: 1,
 					title: label,
-					ref: `car-cal-${label}`,
+					rev: `car-cal-${label}`,
 				},
 				{ actor: fx.actor },
 			);

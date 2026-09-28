@@ -317,6 +317,15 @@ The HTTP surface the [CLI](#cli) and [Grading bots](#grading-bot) use,
 authenticated by [API key](#api-key) rather than session cookie. Its handlers
 are thin wrappers over [Services](#service).
 
+## Rev
+
+Type: platform
+
+Optional revision marker the [CLI](#cli) writes on the entities it syncs
+([Course](#course), [Event](#event), [Exam](#exam), [Question](#question),
+[Resource](#resource)). Opaque to the server. The CLI compares it with its local
+copy to detect changes and conflicts. Not an identifier.
+
 ## Role
 
 Type: domain

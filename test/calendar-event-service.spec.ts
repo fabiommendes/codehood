@@ -91,7 +91,7 @@ test("create derives startAt and the timeSlot shape from the slot, offset by wee
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -106,7 +106,7 @@ test("create derives startAt and the timeSlot shape from the slot, offset by wee
 			timeSlot: slot.id,
 			week: 3,
 			title: "Later",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -128,7 +128,7 @@ test("week 0 on the course's own start weekday is the start date, not a week lat
 			timeSlot: slot.id,
 			week: 0,
 			title: "First class",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -151,7 +151,7 @@ test("create rejects a slot belonging to another course", async () => {
 				timeSlot: slotA.id,
 				week: 1,
 				title: "Intro",
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -170,7 +170,7 @@ test("create rejects a second event on the same (course, week, slot)", async () 
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -182,14 +182,14 @@ test("create rejects a second event on the same (course, week, slot)", async () 
 				timeSlot: slot.id,
 				week: 1,
 				title: "Intro, again",
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
 	).rejects.toThrow();
 });
 
-test("create rejects a missing ref; update stores the supplied one verbatim", async () => {
+test("create rejects an empty rev; update stores the supplied one verbatim", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
@@ -202,7 +202,7 @@ test("create rejects a missing ref; update stores the supplied one verbatim", as
 				timeSlot: slot.id,
 				week: 1,
 				title: "Intro",
-				ref: "",
+				rev: "",
 			},
 			opts,
 		),
@@ -214,18 +214,18 @@ test("create rejects a missing ref; update stores the supplied one verbatim", as
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
 		},
 		opts,
 	);
+	expect(event.rev).toBeNull();
 
 	const newHash = tag("verbatim");
 	const updated = await db.calendarEvent.update(
 		{ id: event.id },
-		{ ref: newHash },
+		{ rev: newHash },
 		opts,
 	);
-	expect(updated.ref).toBe(newHash);
+	expect(updated.rev).toBe(newHash);
 });
 
 test("delete removes the row; a subsequent findOne returns null (no archive)", async () => {
@@ -240,7 +240,7 @@ test("delete removes the row; a subsequent findOne returns null (no archive)", a
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -276,7 +276,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 			week: 0,
 			kind: "HOLIDAY",
 			title: "Still running at from",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -289,7 +289,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 			week: 1,
 			kind: "HOLIDAY",
 			title: "In between",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -303,7 +303,7 @@ test("findMany: window overlap on `from`, exclusivity on `to`, kind/week filters
 			week: 2,
 			kind: "CANCELLED",
 			title: "Starts exactly at to",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -361,7 +361,7 @@ test("a student enrolled in one of two courses sees only that course's events; a
 			timeSlot: slotA.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -416,7 +416,7 @@ test("course.read-contents agreement: findMany's visibility matches the permissi
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -458,7 +458,7 @@ test("upsert creates on first call, updates the same event on the second, and a 
 			week: 1,
 			title: "Before",
 			description: "d1",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -472,7 +472,7 @@ test("upsert creates on first call, updates the same event on the second, and a 
 			week: 1,
 			title: "After",
 			description: null,
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -487,7 +487,7 @@ test("upsert creates on first call, updates the same event on the second, and a 
 			timeSlot: slot.id,
 			week: 2,
 			title: "Other",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -508,7 +508,7 @@ test("upsert is gated on course.update-contents whether creating or updating", a
 				timeSlot: slot.id,
 				week: 1,
 				title: "t",
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			{ actor: outsider },
 		),
@@ -520,7 +520,7 @@ test("upsert is gated on course.update-contents whether creating or updating", a
 			timeSlot: slot.id,
 			week: 1,
 			title: "Existing",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -532,7 +532,7 @@ test("upsert is gated on course.update-contents whether creating or updating", a
 				timeSlot: slot.id,
 				week: 1,
 				title: "Existing, resynced",
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			{ actor: outsider },
 		),
@@ -545,7 +545,7 @@ test("upsert is gated on course.update-contents whether creating or updating", a
 				timeSlot: slot.id,
 				week: 1,
 				title: "Existing, resynced",
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),

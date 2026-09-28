@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { courseId, slug, username } from "./base";
+import { courseId, rev, slug, username } from "./base";
 import { disciplineInfo } from "./discipline";
 import { editionInfo } from "./edition";
 import { userInfo } from "./user";
@@ -14,6 +14,7 @@ export const courseSchema = z.object({
 	/// schema — `enrollmentService.findMany` is the only way to list
 	/// classmates, and it enforces `enrollment.read`.
 	enrollmentCount: z.number().int(),
+	rev: rev.nullable(),
 
 	// Dates
 	startAt: z.date(),
@@ -42,6 +43,7 @@ export const courseCreate = courseSchema
 		instructor: z.string().min(1).optional().describe("Instructor username"),
 		edition: z.string().min(1).describe("Edition slug"),
 		description: z.string().nullish(),
+		rev: rev.nullish(),
 		startAt: z.coerce.date(),
 		endAt: z.coerce.date(),
 	});
@@ -52,6 +54,7 @@ export const courseUpdate = courseSchema
 		startAt: true,
 		endAt: true,
 	})
+	.extend({ rev: rev.nullish() })
 	.partial();
 
 /**

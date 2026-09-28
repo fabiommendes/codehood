@@ -258,6 +258,9 @@ model Course {
   instructorId String
   instructor   User   @relation(fields: [instructorId], references: [username])
 
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -377,8 +380,8 @@ model CalendarEvent {
   /// First week is 0, week starts at MONDAY (ISO 8601).
   week Int
 
-  /// Supplied by the writer, opaque to the server. See the manifest decision.
-  ref String
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -442,8 +445,8 @@ model Resource {
   attachmentId Int?
   attachment   Attachment? @relation(fields: [attachmentId], references: [id])
 
-  /// Supplied by the writer, opaque to the server.
-  ref String
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -500,6 +503,9 @@ model QuestionRef {
 
   latestId Int?
   latest   QuestionData? @relation(fields: [latestId], references: [id], name: "latestVersion")
+
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -743,6 +749,9 @@ model Exam {
 
   authorId String
   author   User   @relation(fields: [authorId], references: [username])
+
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

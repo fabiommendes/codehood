@@ -214,7 +214,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				buffer: syllabusFileBuffer,
 				filename: "syllabus.txt",
 			},
-			ref: "syllabus-hash",
+			rev: "syllabus-hash",
 		},
 		FULL_ACCESS,
 	);
@@ -227,7 +227,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				type: "LINK",
 				url: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/6515/sicp.zip/full-text/book/book-Z-H-10.html",
 			},
-			ref: "demo-sicp-v1",
+			rev: "demo-sicp-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -242,7 +242,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				content:
 					"Install Node 22 and `pnpm`, then run `pnpm dev`.\n\n- Clone the course repository\n- Run `pnpm install`\n- Ask on the forum if anything fails",
 			},
-			ref: "demo-toolchain-v1",
+			rev: "demo-toolchain-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -257,7 +257,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				content:
 					"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n",
 			},
-			ref: "demo-factorial-v1",
+			rev: "demo-factorial-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -279,7 +279,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				buffer: bigOFile,
 				filename: "complexity-cheat-sheet.txt",
 			},
-			ref: "demo-cheatsheet-v1",
+			rev: "demo-cheatsheet-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -292,7 +292,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				type: "LINK",
 				url: "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
 			},
-			ref: "demo-clrs-v1",
+			rev: "demo-clrs-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -308,7 +308,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				content:
 					"Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array — you can always change it once a profiler tells you to.",
 			},
-			ref: "demo-when-to-use-v1",
+			rev: "demo-when-to-use-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -323,7 +323,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				content:
 					"class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n",
 			},
-			ref: "demo-linkedlist-v1",
+			rev: "demo-linkedlist-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -424,7 +424,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				kind: event.kind,
 				title: event.title,
 				description: event.description ?? null,
-				ref: `demo-${event.slug}-v1`,
+				rev: `demo-${event.slug}-v1`,
 			},
 			FULL_ACCESS,
 		);
@@ -470,7 +470,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				kind: event.kind,
 				title: event.title,
 				description: event.description ?? "",
-				ref: `demo-cs201-${event.slug}-v1`,
+				rev: `demo-cs201-${event.slug}-v1`,
 			},
 			FULL_ACCESS,
 		);

@@ -368,10 +368,10 @@ export class QuestionService extends CrudBase<{
 			return this.create({ ...input, course: course.id }, scoped);
 		}
 
-		const { status, version, question } = input;
+		const { status, version, question, rev } = input;
 		return this.update(
 			{ course: course.id, slug: input.slug },
-			{ status, version, question },
+			{ status, version, question, rev },
 			scoped,
 		);
 	}
@@ -467,6 +467,7 @@ function fromDb(row: DbQuestion): Question {
 		slug: row.slug,
 		status: row.status,
 		version: latest.versionHash,
+		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 		// Prisma types a stored JSON object's values as possibly `undefined`,
@@ -487,6 +488,7 @@ function fromDbPublic(row: DbQuestionPublic): QuestionPublic {
 		slug: row.slug,
 		status: row.status,
 		version: latest.versionHash,
+		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 		question: latest.publicPayload as unknown as PublicQuestion,
@@ -576,6 +578,7 @@ async function applyWrite(
 			where: { id: ref.id },
 			data: {
 				status: fields.status,
+				rev: fields.rev,
 				latestId,
 				...(question && {
 					type: toDbType(question.type),

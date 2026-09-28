@@ -12,7 +12,7 @@ http:
       {
           "kind": "CANCELLED",
           "description": "Cancelled: public holiday.",
-          "ref": "8b04d7f1"
+          "rev": "8b04d7f1"
       }
   auth: inherit
 

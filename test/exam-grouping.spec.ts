@@ -20,6 +20,7 @@ function exam(overrides: Partial<Exam> = {}): Exam {
 		duration: null,
 		extraTime: null,
 		author: "instructor",
+		rev: null,
 		tags: [],
 		questions: [],
 		createdAt: new Date("2026-01-01T00:00:00Z"),

@@ -105,6 +105,7 @@ export class ExamService extends CrudBase<{
 				format: input.format ?? "MARKDOWN",
 				scheduledAt: input.scheduledAt ?? null,
 				durationMs: toMs(input.duration) ?? null,
+				rev: input.rev,
 				authorId:
 					opts.actor === SYSTEM
 						? course.instructor.username
@@ -238,6 +239,7 @@ export class ExamService extends CrudBase<{
 				format: fields.format,
 				scheduledAt: fields.scheduledAt,
 				durationMs: toMs(fields.duration),
+				rev: fields.rev,
 				// The column is not nullable: no extra time is stored as zero.
 				extraTimeMs: fields.extraTime === null ? 0 : toMs(fields.extraTime),
 				...(fields.tags && {
@@ -500,6 +502,7 @@ function fromDb(row: DbExam): Exam {
 		duration: fromMs(row.durationMs),
 		extraTime: fromMs(row.extraTimeMs),
 		author: row.authorId,
+		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
 		questions: row.questionsForExams.map((q) => ({
 			id: q.questionRef.id as Exam["questions"][number]["id"],

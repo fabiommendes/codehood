@@ -13,7 +13,7 @@ http:
           "slug": "foo",
           "title": "Title",
           "description": "Hello world!",
-          "ref": "abc",
+          "rev": "abc",
           "data": {
             "type": "MD",
             "content": "# Foo\n\nFoo Bar"

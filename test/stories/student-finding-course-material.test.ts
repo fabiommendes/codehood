@@ -102,7 +102,7 @@ test("student: browse course resources", async ({ page }) => {
 			slug: "lecture-notes",
 			title: "Lecture notes",
 			data: { type: "FILE", buffer, filename: "lecture-notes.pdf" },
-			ref: "lecture-notes-hash",
+			rev: "lecture-notes-hash",
 		},
 		FULL_ACCESS,
 	);

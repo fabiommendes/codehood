@@ -15,7 +15,7 @@ http:
           "kind": "REGULAR",
           "title": "Week 1: recursion",
           "description": "Base cases and the recursion tree.",
-          "ref": "3f1a9c2e"
+          "rev": "3f1a9c2e"
       }
   auth: inherit
 

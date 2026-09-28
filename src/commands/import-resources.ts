@@ -133,7 +133,7 @@ export const importResourcesCommand = new Command("import-resources")
 	);
 
 /**
- * Builds the fields shared by `create` and `update`, computing `ref`
+ * Builds the fields shared by `create` and `update`, computing `rev`
  * locally the way the CLI will: for `FILE`, the raw bytes' sha-256; for
  * everything else, a hash of the resource's own fields, since `data`/`extra`
  * carry the content the file hash would otherwise cover.
@@ -152,7 +152,7 @@ async function buildCreateInput(
 		return {
 			title: entry.title,
 			description: entry.description,
-			ref: resourceContentHash(entry, fileHash),
+			rev: resourceContentHash(entry, fileHash),
 			data: {
 				type: "FILE",
 				filename: path.basename(entry.file),
@@ -163,7 +163,7 @@ async function buildCreateInput(
 	return {
 		title: entry.title,
 		description: entry.description,
-		ref: resourceContentHash(entry),
+		rev: resourceContentHash(entry),
 		data: buildResourceData(entry),
 	};
 }

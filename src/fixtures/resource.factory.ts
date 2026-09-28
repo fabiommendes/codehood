@@ -20,7 +20,7 @@ function buildResource(
 		title: faker.lorem.words(3),
 		description: faker.lorem.sentence(),
 		data: { type: "LINK", url: faker.internet.url() },
-		ref: faker.string.hexadecimal({ length: 40 }).slice(2),
+		rev: faker.string.hexadecimal({ length: 40 }).slice(2),
 	};
 }
 

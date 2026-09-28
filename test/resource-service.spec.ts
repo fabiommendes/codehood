@@ -77,7 +77,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 				slug: "a",
 				title: "t",
 				data: { type: "LINK", url: "" },
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -91,7 +91,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 				title: "t",
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
 				data: { type: "CODE", content: "print(1)" } as any,
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -104,7 +104,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 				slug: "c",
 				title: "t",
 				data: { type: "MD", content: "" },
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -118,7 +118,7 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 				title: "t",
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
 				data: { type: "FILE", filename: "a.txt" } as any,
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -136,7 +136,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link("https://example.com/a"),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -148,7 +148,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 				slug: "syllabus",
 				title: "Syllabus again",
 				data: link("https://example.com/b"),
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			{ actor: instructor },
 		),
@@ -161,14 +161,14 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 				slug: "syllabus",
 				title: "Syllabus",
 				data: link("https://example.com/c"),
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			{ actor: instructor },
 		),
 	).resolves.toMatchObject({ slug: "syllabus" });
 });
 
-test("create stores a supplied ref verbatim", async () => {
+test("create stores a supplied rev verbatim", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const course = await makeCourse(instructor.username);
 
@@ -179,18 +179,18 @@ test("create stores a supplied ref verbatim", async () => {
 			slug: "with-hash",
 			title: "t",
 			data: link(),
-			ref: hash,
+			rev: hash,
 		},
 		{ actor: instructor },
 	);
-	expect(resource.ref).toBe(hash);
+	expect(resource.rev).toBe(hash);
 });
 
 test("groupResourcesByType: fixed type order (Files, Links, Notes, Snippets), title order within each, empty groups absent", () => {
 	const base = {
 		id: 0,
 		description: null,
-		ref: "h",
+		rev: "h",
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		slug: "s",
@@ -255,7 +255,7 @@ test("an enrolled student sees a course's resources; a non-owning admin reads bu
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -274,7 +274,7 @@ test("an enrolled student sees a course's resources; a non-owning admin reads bu
 				slug: "admin-attempt",
 				title: "t",
 				data: link(),
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			{ actor: admin },
 		),
@@ -303,7 +303,7 @@ test("delete removes the resource row; a FILE resource's attachment survives on 
 			slug: "shared",
 			title: "Shared file",
 			data: { type: "FILE", filename: "notes.txt", buffer },
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -313,7 +313,7 @@ test("delete removes the resource row; a FILE resource's attachment survives on 
 			slug: "shared",
 			title: "Shared file",
 			data: { type: "FILE", filename: "notes.txt", buffer },
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -356,7 +356,7 @@ test("upsert creates on first call, updates the same resource on the second, and
 			title: "Before",
 			description: "d1",
 			data: link("https://example.com/before"),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -370,7 +370,7 @@ test("upsert creates on first call, updates the same resource on the second, and
 			title: "After",
 			description: null,
 			data: link("https://example.com/before"),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -385,7 +385,7 @@ test("upsert creates on first call, updates the same resource on the second, and
 			slug: "upsert-resource-2",
 			title: "Other",
 			data: link("https://example.com/other"),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -404,7 +404,7 @@ test("upsert enforces the `data` shape on both the create branch and the update 
 				slug: "shape-new",
 				title: "t",
 				data: { type: "LINK", url: "" },
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -416,7 +416,7 @@ test("upsert enforces the `data` shape on both the create branch and the update 
 			slug: "shape-existing",
 			title: "t",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -429,7 +429,7 @@ test("upsert enforces the `data` shape on both the create branch and the update 
 				title: "t",
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally malformed input
 				data: { type: "CODE", content: "x" } as any,
-				ref: tag("h"),
+				rev: tag("h"),
 			},
 			opts,
 		),
@@ -456,7 +456,7 @@ test("findOne addresses a resource by its course's natural key and slug", async 
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -489,7 +489,7 @@ test("findOne by course natural key: 404 for no such course, 403 for an existing
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -532,7 +532,7 @@ test("findMany by course natural key: 404 for no such course, 403 for a course t
 			slug: "syllabus",
 			title: "Syllabus",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);
@@ -567,7 +567,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 			slug: "by-ref",
 			title: "t",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -579,7 +579,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 			slug: "upsert-by-ref",
 			title: "Before",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -589,7 +589,7 @@ test("create and upsert accept a course natural key in place of a numeric course
 			slug: "upsert-by-ref",
 			title: "After",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -620,7 +620,7 @@ test("create: 400 without a course, 404 for a course natural key naming no cours
 					slug: "ghost",
 					title: "t",
 					data: link(),
-					ref: tag("h"),
+					rev: tag("h"),
 				},
 				opts,
 			),
@@ -644,7 +644,7 @@ test("create rejects an empty slug with a 400", async () => {
 					slug: "",
 					title: "t",
 					data: link(),
-					ref: tag("h"),
+					rev: tag("h"),
 				},
 				{ actor: instructor },
 			),
@@ -667,7 +667,7 @@ test("a dropped student loses access to the course's resources", async () => {
 			slug: "handout",
 			title: "Handout",
 			data: link(),
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		{ actor: instructor },
 	);

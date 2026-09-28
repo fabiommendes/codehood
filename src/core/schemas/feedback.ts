@@ -39,7 +39,8 @@ export const score = z
 	.refine((text) => {
 		const value = scoreValue(text);
 		return value !== null && value >= -1 && value <= 1;
-	}, "Score must be a number between -1 and 1.");
+	}, "Score must be a number between -1 and 1.")
+	.openapi({ example: "3/4" });
 
 export const feedbackSchema = z.object({
 	id: feedbackId,

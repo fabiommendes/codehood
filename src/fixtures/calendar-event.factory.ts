@@ -19,7 +19,7 @@ function buildCalendarEvent(
 		kind: "REGULAR",
 		title: faker.lorem.words(3),
 		description: faker.lorem.sentence(),
-		ref: faker.string.hexadecimal({ length: 40 }).slice(2),
+		rev: faker.string.hexadecimal({ length: 40 }).slice(2),
 	};
 }
 

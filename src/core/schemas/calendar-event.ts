@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { calendarEventId, courseId, slug, timeSlotId } from "./base";
+import { calendarEventId, courseId, rev, slug, timeSlotId } from "./base";
 import { courseRef } from "./course";
 import { timeSlotSchema } from "./time-slot";
 
@@ -28,8 +28,7 @@ export const calendarEventSchema = z.object({
 		start: true,
 	}),
 
-	// Supplied by the writer, opaque to the server.
-	ref: z.string().min(1),
+	rev: rev.nullable(),
 
 	createdAt: z.date(),
 	updatedAt: z.date(),
@@ -50,6 +49,7 @@ export const calendarEventCreate = calendarEventSchema
 		course: courseRef,
 		timeSlot: z.union([timeSlotId, slug]),
 		description: z.string().nullable().optional(),
+		rev: rev.nullish(),
 	});
 
 // `week`, `course`, and `timeSlot` are deliberately absent: moving an

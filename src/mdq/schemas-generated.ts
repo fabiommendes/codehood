@@ -22,6 +22,7 @@ export const essaySchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -35,6 +36,7 @@ export const essaySchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -95,7 +97,12 @@ export const essaySchema = z
 		 * A model answer. It guides the instructor while grading and MAY be shown to
 		 * students as feedback afterwards.
 		 */
-		answerKey: z.string().min(1).regex(/\S/).optional(),
+		answerKey: z
+			.string()
+			.min(1)
+			.regex(/\S/)
+			.meta({ example: "photosynthesis" })
+			.optional(),
 	})
 	.strict();
 export type Essay = z.infer<typeof essaySchema>;
@@ -108,7 +115,10 @@ export type Essay = z.infer<typeof essaySchema>;
 export const examIncludeSchema = z
 	.object({
 		/** The id of the question to pull in. */
-		include: z.string().regex(/^.*(\/?([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*))+$/),
+		include: z
+			.string()
+			.regex(/^.*(\/?([a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*))+$/)
+			.meta({ example: "recursion-01" }),
 	})
 	.strict();
 export type ExamInclude = z.infer<typeof examIncludeSchema>;
@@ -120,6 +130,7 @@ export const multipleChoiceChoiceSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "berlin" })
 			.optional(),
 		/** A textual display for the choice. */
 		text: z.string().min(1),
@@ -158,6 +169,7 @@ export const multipleChoiceSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -171,6 +183,7 @@ export const multipleChoiceSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -233,6 +246,7 @@ export const multipleSelectionChoiceSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "berlin" })
 			.optional(),
 		/** A textual display for the choice. */
 		text: z.string().min(1),
@@ -272,6 +286,7 @@ export const multipleSelectionSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -285,6 +300,7 @@ export const multipleSelectionSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -347,6 +363,7 @@ export const trueFalseChoiceSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "berlin" })
 			.optional(),
 		/** A textual display for the statement. */
 		text: z.string().min(1),
@@ -388,6 +405,7 @@ export const trueFalseSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -401,6 +419,7 @@ export const trueFalseSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -496,6 +515,7 @@ export const numericSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -509,6 +529,7 @@ export const numericSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -559,6 +580,7 @@ export const numericSchema = z
 		unit: z
 			.string()
 			.regex(/^[\w.-_]+$/)
+			.meta({ example: "kg" })
 			.optional(),
 		/** The domain/kind of number for the response. */
 		domain: z.enum(["integer", "decimal", "fraction"]).optional(),
@@ -577,7 +599,11 @@ export type Numeric = z.infer<typeof numericSchema>;
  * backticks, and a plain literal compared inexactly otherwise; a lone `*` is a
  * wildcard matching every response.
  */
-export const shortAnswerPatternStringSchema = z.string().min(1).regex(/\S/);
+export const shortAnswerPatternStringSchema = z
+	.string()
+	.min(1)
+	.regex(/\S/)
+	.meta({ example: "photosynthesis" });
 export type ShortAnswerPatternString = z.infer<
 	typeof shortAnswerPatternStringSchema
 >;
@@ -623,6 +649,7 @@ export const shortAnswerSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -636,6 +663,7 @@ export const shortAnswerSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -736,7 +764,8 @@ export type ShortAnswer = z.infer<typeof shortAnswerSchema>;
  */
 export const fillInBlankIdSchema = z
 	.string()
-	.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/);
+	.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+	.meta({ example: "capital" });
 export type FillInBlankId = z.infer<typeof fillInBlankIdSchema>;
 
 /**
@@ -791,6 +820,7 @@ export const fillInNumericBlankSchema = z
 		unit: z
 			.string()
 			.regex(/^[\w.\-]+$/)
+			.meta({ example: "kg" })
 			.optional(),
 		/** The domain/kind of number for the response. */
 		domain: z.enum(["integer", "decimal", "fraction"]).optional(),
@@ -834,6 +864,7 @@ export const fillInSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "q1" })
 			.optional(),
 		/**
 		 * A universally unique identifier (UUID) for the question. Used to reference
@@ -847,6 +878,7 @@ export const fillInSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, e.g. shown in question listings, tables of contents,
@@ -943,6 +975,7 @@ export const examSchema = z
 		id: z
 			.string()
 			.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+			.meta({ example: "midterm" })
 			.optional(),
 		/** Universally unique identifier for the exam. */
 		uuid: z
@@ -950,6 +983,7 @@ export const examSchema = z
 			.regex(
 				/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 			)
+			.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 			.optional(),
 		/**
 		 * Human readable title, normally taken from the H1 heading. When the
@@ -1014,6 +1048,7 @@ export const questionBaseSchema = z.object({
 	id: z
 		.string()
 		.regex(/^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/)
+		.meta({ example: "q1" })
 		.optional(),
 	/**
 	 * A universally unique identifier (UUID) for the question. Used to reference
@@ -1027,6 +1062,7 @@ export const questionBaseSchema = z.object({
 		.regex(
 			/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 		)
+		.meta({ example: "123e4567-e89b-12d3-a456-426614174000" })
 		.optional(),
 	/**
 	 * Human readable title, e.g. shown in question listings, tables of contents,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { attachmentSchema } from "./attachment";
-import { buffer, courseId, resourceId, slug } from "./base";
+import { buffer, courseId, resourceId, rev, slug } from "./base";
 import { courseRef } from "./course";
 
 export const resourceSchema = z.object({
@@ -15,7 +15,7 @@ export const resourceSchema = z.object({
 		z.lazy(() => resourceCodeData),
 		z.lazy(() => resourceMdData),
 	]),
-	ref: z.string(),
+	rev: rev.nullable(),
 	createdAt: z.date(),
 	updatedAt: z.date(),
 });
@@ -71,6 +71,7 @@ export const resourceCreate = resourceSchema
 	.extend({
 		course: courseRef,
 		description: resourceSchema.shape.description.nullish(),
+		rev: rev.nullish(),
 		data: z.union([
 			resourceLinkData,
 			resourceFileDataCreate,

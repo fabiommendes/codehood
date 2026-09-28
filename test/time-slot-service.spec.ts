@@ -226,7 +226,7 @@ test("update moves the hour; the slot's existing events keep their own times", a
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);
@@ -267,7 +267,7 @@ test("delete throws while events reference the slot, naming the count, and succe
 			timeSlot: slot.id,
 			week: 1,
 			title: "Intro",
-			ref: tag("h"),
+			rev: tag("h"),
 		},
 		opts,
 	);

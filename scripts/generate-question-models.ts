@@ -70,6 +70,20 @@ const GLOBALLY_IGNORED_KEYS = new Set([
 	"format",
 ]);
 
+/**
+ * OpenAPI examples for patterns `mdq.schema.json` gives none for.
+ *
+ * Without one, Swagger UI fills a patterned string with random text that
+ * matches the regex. Keyed by the pattern source.
+ */
+const PATTERN_EXAMPLES: Record<string, string> = {
+	"\\S": "photosynthesis",
+	"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$":
+		"123e4567-e89b-12d3-a456-426614174000",
+	"^[\\w.\\-]+$": "kg",
+	"^[\\w.-_]+$": "kg",
+};
+
 /** `description` and `default` are consumed (into JSDoc), never dropped silently. */
 const GLOBALLY_CONSUMED_KEYS = new Set(["description", "default"]);
 
@@ -350,8 +364,28 @@ function compileString(node: JsonObject, ctx: CompileCtx): string {
 	}
 	if (typeof node.pattern === "string") {
 		expr += `.regex(${emitRegex(node.pattern)})`;
+		expr += `.meta({ example: ${JSON.stringify(patternExample(node, ctx))} })`;
 	}
 	return expr;
+}
+
+/**
+ * Picks the OpenAPI example for a patterned string: the node's first
+ * `examples` entry, else the {@link PATTERN_EXAMPLES} fallback.
+ *
+ * @throws {Error} If neither exists, so a new pattern cannot ship without one.
+ */
+function patternExample(node: JsonObject, ctx: CompileCtx): string {
+	const pattern = node.pattern as string;
+	const example = Array.isArray(node.examples)
+		? node.examples.find((e) => typeof e === "string")
+		: PATTERN_EXAMPLES[pattern];
+	if (typeof example !== "string") {
+		throw new Error(
+			`No example for pattern ${pattern} in ${ctx.label}; add one to PATTERN_EXAMPLES`,
+		);
+	}
+	return example;
 }
 
 function compileNumber(node: JsonObject, ctx: CompileCtx): string {

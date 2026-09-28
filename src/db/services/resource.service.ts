@@ -119,7 +119,7 @@ export class ResourceService
 					// We set attachment to null and then use the attachment
 					// service to create the real Attachment and Blob
 					attachmentId: null,
-					ref: input.ref,
+					rev: input.rev,
 				},
 				include: resourceInclude,
 			});
@@ -346,7 +346,7 @@ export class ResourceService
 					data: fields.data ? self.toRawData(fields.data) : undefined,
 					extra: fields.data ? self.toRawExtra(fields.data) : undefined,
 					attachmentId: attachment?.id,
-					ref: fields.ref,
+					rev: fields.rev,
 				},
 				include: resourceInclude,
 			});
@@ -535,7 +535,7 @@ function fromDb<T = Record<string, unknown>>(
 		description: row.description,
 
 		courseId: row.courseId,
-		ref: row.ref,
+		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 
