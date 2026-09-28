@@ -43,6 +43,12 @@ For a large change, open an issue first to discuss the design. A change to the
 REST API usually touches both the server and the CLI, and can land in a single
 pull request.
 
+## License
+
+Contributions to the server are licensed under the AGPL-3.0-or-later, and
+contributions to `cli/` under the MIT License, the same terms as the code they
+change.
+
 ## Conduct
 
 This project follows a [code of conduct](CODE_OF_CONDUCT.md). Report security

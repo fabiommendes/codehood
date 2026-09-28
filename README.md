@@ -131,3 +131,9 @@ See the "Project layout" table in `AGENTS.md` for a complete breakdown of direct
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems as described in
 [SECURITY.md](SECURITY.md).
+
+
+## License
+
+The server is licensed under the [GNU Affero General Public License v3.0 or
+later](LICENSE). The CLI in `cli/` is licensed under the [MIT License](cli/LICENSE).
