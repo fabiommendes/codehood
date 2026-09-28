@@ -1,0 +1,102 @@
+"""
+Tests for `codehood login` / `codehood logout`. See
+`dev/specs/to-review/login.md`, "Proving it works".
+"""
+
+from __future__ import annotations
+
+import pytest
+from typer.testing import CliRunner
+
+from codehood.api import base as base_module
+from codehood.api import generated as generated_module
+from codehood.cli.base import app
+from codehood.models.base import Model
+
+runner = CliRunner()
+
+
+class _ErrorPayload(Model):
+    """
+    Stands in for whatever the server sends on a failed login. It has no
+    generated counterpart: the spec documents no error response for
+    `login`, so the CLI only ever sees the base `CodehoodAPIError`.
+    """
+
+    message: str
+
+
+TOML = (
+    '[course]\ndiscipline = "cs101"\ninstructor = "ada"\nedition = "2026-1"\n'
+    '\n[server]\nurl = "https://codehood.example.edu"\n'
+)
+
+
+@pytest.fixture(autouse=True)
+def credentials_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(base_module, "CREDENTIALS_PATH", tmp_path / "credentials.toml")
+
+
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    (tmp_path / "codehood.toml").write_text(TOML, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+def test_login_outside_a_repo_errors_cleanly(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["login"])
+    assert result.exit_code == 1
+    assert "not a codehood repository" in result.output
+
+
+def test_login_happy_path_stores_token_and_never_prints_it(repo, monkeypatch):
+    monkeypatch.setattr(
+        generated_module,
+        "login",
+        lambda **kwargs: generated_module.LoginResponse(token="super-secret-token"),
+    )
+    result = runner.invoke(app, ["login"], input="ada\npassword123\n")
+    assert result.exit_code == 0
+    assert "logged in to https://codehood.example.edu" in result.output
+    assert "super-secret-token" not in result.output
+    assert (
+        base_module.load_token("https://codehood.example.edu") == "super-secret-token"
+    )
+
+
+def test_login_bad_credentials_exits_nonzero_and_stores_nothing(repo, monkeypatch):
+    def _raise(**kwargs):
+        # The server documents no error response for `login`, so there is no
+        # generated subclass for one -- the CLI catches the base class.
+        raise base_module.CodehoodAPIError(
+            401, _ErrorPayload(message="invalid credentials")
+        )
+
+    monkeypatch.setattr(generated_module, "login", _raise)
+    result = runner.invoke(app, ["login"], input="ada\nwrong\n")
+    assert result.exit_code == 1
+    assert "invalid credentials" in result.output
+    assert base_module.load_token("https://codehood.example.edu") is None
+
+
+def test_logout_outside_a_repo_errors_cleanly(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["logout"])
+    assert result.exit_code == 1
+    assert "not a codehood repository" in result.output
+
+
+def test_logout_deletes_an_existing_token(repo):
+    base_module.save_token("https://codehood.example.edu", "abc123")
+    result = runner.invoke(app, ["logout"])
+    assert result.exit_code == 0
+    assert "logged out of https://codehood.example.edu" in result.output
+    assert base_module.load_token("https://codehood.example.edu") is None
+
+
+def test_logout_with_nothing_stored_says_so_without_erroring(repo):
+    result = runner.invoke(app, ["logout"])
+    assert result.exit_code == 0
+    assert "not logged in to https://codehood.example.edu" in result.output

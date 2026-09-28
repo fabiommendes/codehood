@@ -1,0 +1,7 @@
+[course]
+discipline = "cs101"
+instructor = "ada"
+edition = "2026-1"
+
+[server]
+url = "http://localhost:4321"
