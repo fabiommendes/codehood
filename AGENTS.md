@@ -1,8 +1,9 @@
 # Codehood
 
 Codehood is a simple Learning Management System (LMS) optimized for geeky types. In Codehood, most course material is stored and crafted locally
-and syncronized with the server using a CLI tool. This project only includes the
-server component and it interacts with the CLI via a REST API.
+and syncronized with the server using a CLI tool. This repository holds the
+server and, under `cli/`, the CLI (see [CLI](#cli)). They talk only through the
+REST API.
 
 The server is built with Astro, SolidJS and DaisyUI for the frontend. The database
 is managed with Prisma ORM and SQLite. All database tables have Service classes
@@ -87,6 +88,7 @@ Here are some files and folders agents might be interested in:
 | `src/typing/`              | Type utilities and branded types.                                                     |
 | `src/urls/`                | URL parsing and course reference utilities.                                           |
 | `src/utils/`               | Utility functions.                                                                    |
+| `cli/`                     | The Python CLI, a git subtree. See [CLI](#cli).                                       |
 
 [^readme]: Currently it exists at `src/api/`, `src/urls/`, `src/db/services/`, `src/commands/`, `test/stories/`.
 
@@ -181,6 +183,23 @@ suite expected to pass: it reduces a green run to a single `PASS (n) FAIL (0)`
 line, but its parser gives up on a red one and passes through 2000 characters of
 raw config JSON. The `dot` default reports failures far better, so prefer it
 whenever something is actually broken.
+
+## CLI
+
+`cli/` is the Codehood CLI, a Python project (uv, pytest, Textual) with its own
+conventions. It is a git subtree of
+[codehood-cli](https://github.com/fabiommendes/codehood-cli). Before any work in
+`cli/`, or any server change the CLI depends on (REST endpoints, schemas, the
+OpenAPI spec), read `cli/README.md` and `cli/CLAUDE.md`. Inside `cli/`, those
+files take precedence over this one.
+
+- The CLI takes `mdq` from `../../mdq/mdq-py`, a checkout of
+  [mdq-spec](https://github.com/fabiommendes/mdq-spec) next to this repository.
+- Run its tests from `cli/` with `rtk uv run pytest`.
+- Biome skips `cli/`.
+- Sync with the standalone repository only when the human asks:
+  `git subtree push --prefix=cli git@github.com:fabiommendes/codehood-cli.git master`
+  (or `subtree pull` with the same arguments).
 
 ## Documentation
 

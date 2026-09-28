@@ -81,3 +81,23 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      # `cli/pyproject.toml` takes `mdq` from `../../mdq/mdq-py`, so the two
+      # repositories are checked out side by side.
+      - uses: actions/checkout@v4
+        with:
+          path: codehood
+
+      - uses: actions/checkout@v4
+        with:
+          repository: fabiommendes/mdq-spec
+          path: mdq
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Run CLI tests
+        working-directory: codehood/cli
+        run: uv run pytest
