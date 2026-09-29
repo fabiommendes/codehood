@@ -105,6 +105,10 @@ export class FeedbackService extends CrudBase<{
 	 * The grader is the actor unless a `botId` says a bot graded; exactly one
 	 * of the two identifies it.
 	 *
+	 * The submission's status becomes `GRADED_MANUALLY` when a user graded and
+	 * `GRADED_AUTOMATICALLY` when a bot did, whatever it was before, in the same
+	 * transaction as the pass. A refused write leaves it untouched.
+	 *
 	 * @throws {@link NotFound}
 	 * If no submission matches `input.submission`, or `actor` may not even read
 	 * the one that does.
@@ -143,6 +147,7 @@ export class FeedbackService extends CrudBase<{
 			},
 			include: feedbackInclude(),
 		});
+		await markGraded(tx, submission.id, graderId);
 
 		return fromDb(row);
 	}
@@ -296,6 +301,9 @@ export class FeedbackService extends CrudBase<{
 	 *
 	 * Keyed on `(submission, ref)`, never on `id`.
 	 *
+	 * Writing a new pass moves the submission's status as {@link createTx}
+	 * does. Revising an existing pass leaves it as it is.
+	 *
 	 * @throws {@link NotFound}
 	 * If no submission matches `input.submission`, or `actor` may not even read
 	 * the one that does.
@@ -359,6 +367,7 @@ export class FeedbackService extends CrudBase<{
 			},
 			include: feedbackInclude(),
 		});
+		await markGraded(tx, submission.id, graderId);
 
 		return fromDb(row);
 	}
@@ -527,6 +536,20 @@ async function resolveGradableSubmission(
 
 	ensurePerm(actor, "feedback.create", responseTargetFrom(submission.response));
 	return submission;
+}
+
+/// Sets a submission's status to reflect who graded it last: a user or a bot.
+async function markGraded(
+	tx: PrismaTx,
+	submissionId: DbSubmission["id"],
+	graderId: string | null,
+): Promise<void> {
+	await tx.submission.update({
+		where: { id: submissionId },
+		data: {
+			status: graderId !== null ? "GRADED_MANUALLY" : "GRADED_AUTOMATICALLY",
+		},
+	});
 }
 
 /**

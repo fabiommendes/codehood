@@ -1,0 +1,39 @@
+---
+/**
+ * A student's saved answer as visible text, or as the question's read-only
+ * view when the answer is a pick among choices.
+ */
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import type { QuestionPublic } from "@/db";
+import AnswerView from "./AnswerView";
+import { displayAnswer } from "./answer-text";
+
+interface Props {
+	/// The public half of the question, as the student saw it.
+	question: QuestionPublic["question"];
+	payload: AnswerPayload | undefined;
+}
+
+const { question, payload } = Astro.props;
+const shown = displayAnswer(question.type, payload);
+---
+
+{shown.kind === "empty" && <p class="text-base-content/60">No answer written.</p>}
+{
+  shown.kind === "text" && (
+    <p class:list={["text-base-content", shown.multiline && "whitespace-pre-wrap"]}>{shown.text}</p>
+  )
+}
+{
+  shown.kind === "blanks" && (
+    <dl class="flex flex-col gap-1">
+      {shown.entries.map(([id, text]) => (
+        <div class="flex gap-2">
+          <dt class="font-mono text-sm text-base-content/60">{id}</dt>
+          <dd class="whitespace-pre-wrap">{text}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+{shown.kind === "choices" && <AnswerView client:load question={question} payload={payload} />}

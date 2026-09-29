@@ -1,0 +1,137 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import Answer from "@/components/grading/Answer.astro";
+import AnswerKey from "@/components/grading/AnswerKey";
+import AnswerView from "@/components/grading/AnswerView";
+import GradeForm from "@/components/grading/GradeForm";
+import type { QuestionPublic } from "@/db";
+import { db } from "@/db";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { Question } from "@/mdq/question";
+import { formatScore } from "@/services/exam-result";
+import { answersTo } from "@/services/grading";
+import { loadGrading } from "@/utils/load-grading";
+
+export const prerender = false;
+
+const {
+	discipline,
+	course: courseSegment,
+	slug,
+	question: questionSlug,
+} = Astro.params;
+const result = await loadGrading(Astro, discipline, courseSegment, slug);
+if ("redirect" in result) return result.redirect;
+const { course, href, exam, questions, answers } = result;
+
+const position = questions.indexOf(questionSlug ?? "");
+if (!questionSlug || position < 0) return Astro.rewrite("/404");
+
+// biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+const stored = await db.question.findOne(
+	{ course: course.id, slug: questionSlug, public: false },
+	{ actor },
+);
+if (!stored) return Astro.rewrite("/404");
+
+const doc = stored.question;
+const title = doc.title ?? stored.slug;
+const asked = new Question(doc).toPublic() as QuestionPublic["question"];
+// An essay's model answer is a hint for the grader, not a correct answer.
+const hasKey = doc.type !== "essay";
+
+const previous = questions[position - 1];
+const next = questions[position + 1];
+const queueHref = `${href}/exams/${exam.slug}/grading`;
+
+const { pending, resolved } = answersTo(questionSlug, answers);
+const shown = [...pending, ...resolved].map((answer, index) => ({
+	answer,
+	label: `Answer ${index + 1}`,
+	isPending: answer.state === "pending",
+}));
+---
+
+<AppLayout title={`${title} · Grading · ${exam.title}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={queueHref} class="text-sm text-base-content/60 hover:text-primary">← Grading</a>
+
+    <h2 class="mt-2 text-2xl font-bold">{title}</h2>
+
+    <nav class="mt-3 flex gap-4 text-sm">
+      {previous && <a href={`${queueHref}/${previous}`} class="link">Previous question</a>}
+      {next && <a href={`${queueHref}/${next}`} class="link">Next question</a>}
+    </nav>
+
+    <section class="mt-6 rounded-box border border-base-300 bg-base-100 p-6">
+      <AnswerView client:load question={asked} />
+    </section>
+
+    {
+      hasKey && (
+        <section class="mt-6">
+          <h3 class="text-lg font-semibold">Correct answer</h3>
+          <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
+            <AnswerKey client:load question={doc} />
+          </div>
+        </section>
+      )
+    }
+
+    {shown.length === 0 && <p class="mt-8 text-base-content/70">No answers to grade.</p>}
+
+    <div class="mt-8 flex flex-col gap-6">
+      {
+        shown.map(({ answer, label, isPending }, index) => (
+          <>
+            {!isPending && (index === 0 || shown[index - 1]?.isPending) && (
+              <h3 class="text-lg font-semibold">Graded</h3>
+            )}
+            <article aria-label={label} class="card card-border bg-base-100">
+              <div class="card-body">
+                <p class="text-sm font-semibold text-base-content/60">{label}</p>
+                <Answer question={asked} payload={answer.payload as AnswerPayload} />
+
+                {isPending && (
+                  <GradeForm
+                    client:load
+                    discipline={discipline!}
+                    course={courseSegment!}
+                    exam={exam.slug}
+                    submission={answer.submission}
+                  />
+                )}
+
+                {answer.state === "graded" && answer.verdict !== null && (
+                  <p class="mt-4 text-lg font-semibold">{formatScore(answer.verdict)}</p>
+                )}
+                {answer.state === "not-graded" && <p class="mt-4 font-semibold">Not graded</p>}
+                {!isPending &&
+                  answer.passes.map(
+                    (pass) =>
+                      pass.comment && (
+                        <p class="mt-1 whitespace-pre-wrap text-sm text-base-content/70">{pass.comment}</p>
+                      ),
+                  )}
+              </div>
+            </article>
+          </>
+        ))
+      }
+    </div>
+  </main>
+</AppLayout>
+
+<script>
+  import { FOCUS_KEY } from "@/components/grading/focus";
+
+  // Only a page reloaded by a save asks for focus; an ordinary load leaves it alone.
+  if (sessionStorage.getItem(FOCUS_KEY) === location.pathname) {
+    sessionStorage.removeItem(FOCUS_KEY);
+    document.querySelector<HTMLInputElement>("[data-score-input]")?.focus();
+  }
+</script>

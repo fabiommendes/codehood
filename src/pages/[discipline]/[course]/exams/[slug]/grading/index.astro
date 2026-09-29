@@ -1,0 +1,73 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import { db } from "@/db";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { gradingQueue } from "@/services/grading";
+import { loadGrading } from "@/utils/load-grading";
+import { questionTypeLabels } from "@/utils/question-display";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadGrading(Astro, discipline, courseSegment, slug);
+if ("redirect" in result) return result.redirect;
+const { course, href, exam, questions, answers } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+
+const stored = await db.question.findMany(
+	{ course: course.id, public: false },
+	{ actor },
+);
+const bySlug = new Map(stored.map((entry) => [entry.slug, entry.question]));
+
+const queue = gradingQueue(questions, answers);
+const rows = queue.map((entry) => {
+	const doc = bySlug.get(entry.question);
+	const counts = [
+		entry.pending > 0 && `${entry.pending} pending`,
+		entry.graded > 0 && `${entry.graded} graded`,
+		entry.notGraded > 0 && `${entry.notGraded} not graded`,
+	].filter(Boolean);
+	return {
+		slug: entry.question,
+		title: doc?.title ?? entry.question,
+		type: doc ? questionTypeLabels[doc.type] : null,
+		counts: counts.length > 0 ? counts.join(" · ") : "No answers",
+	};
+});
+
+const nothingLeft =
+	answers.length > 0 && !answers.some((answer) => answer.state === "pending");
+---
+
+<AppLayout title={`Grading · ${exam.title}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-base-content/60 hover:text-primary">← {exam.title}</a>
+
+    <h2 class="mt-2 text-2xl font-bold">Grading</h2>
+
+    {nothingLeft && <p class="mt-4 text-base-content/70">Nothing left to grade.</p>}
+
+    <ul aria-label="Questions" class="mt-6 flex flex-col gap-3">
+      {
+        rows.map((row) => (
+          <li class="card card-border bg-base-100 transition-colors hover:border-primary">
+            <div class="card-body flex-row items-center gap-4 py-4">
+              <div class="min-w-0 flex-1">
+                <a href={`${href}/exams/${exam.slug}/grading/${row.slug}`} class="font-medium hover:text-primary">
+                  {row.title}
+                </a>
+                {row.type && <p class="text-sm text-base-content/60">{row.type}</p>}
+              </div>
+              <span class="text-sm">{row.counts}</span>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</AppLayout>

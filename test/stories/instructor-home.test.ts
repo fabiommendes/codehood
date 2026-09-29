@@ -201,7 +201,7 @@ test("instructor: see what needs my attention", async ({ page }) => {
 		).toHaveAttribute("href", exam(algebra, "midterm"));
 		await expect(
 			section(page, "To grade").getByRole("link", { name: /Written exam/ }),
-		).toHaveAttribute("href", exam(algebra, "written"));
+		).toHaveAttribute("href", `${exam(algebra, "written")}/grading`);
 		await expect(
 			section(page, "Ready to release").getByRole("link", { name: /Final/ }),
 		).toHaveAttribute("href", exam(compilers, "final"));

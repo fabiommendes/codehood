@@ -3,8 +3,8 @@
  *
  * A submission is append-only: it records what a student sent and when.
  * Answering the same question twice appends a second submission rather than
- * replacing the first. Only its grading status moves afterwards, and only by
- * whoever teaches the course.
+ * replacing the first. Only its grading status moves afterwards: whoever
+ * teaches the course sets it, and recording a grading pass marks it graded.
  */
 import type { z } from "zod";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
