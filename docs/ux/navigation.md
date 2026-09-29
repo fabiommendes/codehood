@@ -30,7 +30,7 @@ pages), use `CenteredLayout` or `ErrorLayout` and carry no navigation.
 /calendar                           my schedule across every course
 /profile                            account, password, API keys
 /getting-started                    CLI setup
-/admin, /admin/*                    admin area (AdminTabs)
+/admin, /admin/*                    admin area (AdminHeader)
 /<discipline>/<instructor>_<edition>             course home
 /<discipline>/<instructor>_<edition>/<tab>       course tab
 /<discipline>/<instructor>_<edition>/<tab>/<slug> item inside a tab

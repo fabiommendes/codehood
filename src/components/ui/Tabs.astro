@@ -1,11 +1,11 @@
 ---
 // Reusable tab strip: a flat underline style (a subtle full-width rule, the
-// active tab picked out in bold primary) used both by AdminTabs (page-linked
+// active tab picked out in bold primary) used both by AdminHeader (page-linked
 // tabs across /admin/*) and by same-page tabs like /profile.
 //
 // Two modes, chosen by whether `name` is set:
 //   - Link mode (no `name`): each item needs an `href` — plain <a> tabs that
-//     navigate, exactly what AdminTabs needs. The strip scrolls horizontally
+//     navigate, exactly what AdminHeader needs. The strip scrolls horizontally
 //     when the tabs outgrow it, and `overflow-y-hidden` is load-bearing: CSS
 //     promotes an `overflow-y` of `visible` to `auto` the moment the other
 //     axis is not `visible`, and the active tab's `-mb-px` puts its border one
@@ -81,6 +81,7 @@ const panelCss = name
 				<a
 					role="tab"
 					href={item.href}
+					aria-selected={item.key === active ? "true" : "false"}
 					class:list={[
 						"-mb-px shrink-0 border-b-2 pb-3 text-sm",
 						item.key === active

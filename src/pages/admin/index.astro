@@ -2,9 +2,8 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import AdminTabs from "@/components/AdminTabs.astro";
+import AdminHeader from "@/components/AdminHeader.astro";
 import InvitesTable from "@/components/admin/InvitesTable";
-import PageKicker from "@/components/PageKicker.astro";
 import { db, type Invite, isEditionOpen } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -74,17 +73,10 @@ const pendingInvites: Invite[] = invites.filter(
 
 <AppLayout title="Admin · Overview">
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <AdminTabs active="overview" />
-
-    <PageKicker text="Admin" />
-    <h1 class="text-3xl font-bold">Overview</h1>
-    <p class="mt-2 max-w-xl text-base-content/60">
-      Everything an admin can do from one place — invite instructors, manage the
-      catalogs you own, and reach the levers that live nowhere else.
-    </p>
+    <AdminHeader active="overview" />
 
     <div
-      class="stats stats-vertical sm:stats-horizontal mt-8 border border-base-300 bg-base-100"
+      class="stats stats-vertical sm:stats-horizontal border border-base-300 bg-base-100"
     >
       <div class="stat">
         <div class="stat-title">Users</div>

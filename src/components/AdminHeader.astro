@@ -1,8 +1,7 @@
 ---
-// The admin section's tab strip, shared by every page under /admin. Some
-// destinations don't have a page yet; their tab just isn't reachable until
-// they do, the same way /design/forms existed as a stub before it had real
-// content.
+// The header of every page under /admin: title, one line on what the section
+// covers, and the tab strip. Same shape as CourseHeader, so the tabs stay in
+// place while moving between pages and each page starts with its content.
 import Tabs from "@/components/ui/Tabs.astro";
 
 interface Props {
@@ -20,4 +19,13 @@ const items = [
 ] as const;
 ---
 
-<Tabs items={items} active={active} />
+<div>
+	<h1 class="text-3xl font-bold">Admin</h1>
+	<p class="mt-1 text-base-content/60">
+		Accounts, catalogs and every course on this instance.
+	</p>
+</div>
+
+<div class="mt-6">
+	<Tabs items={items} active={active} />
+</div>

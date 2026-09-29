@@ -1,9 +1,8 @@
 ---
 export const prerender = false;
 
-import AdminTabs from "@/components/AdminTabs.astro";
+import AdminHeader from "@/components/AdminHeader.astro";
 import CoursesTable from "@/components/admin/CoursesTable";
-import PageKicker from "@/components/PageKicker.astro";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -17,12 +16,10 @@ const courses = await db.course.findMany({}, { actor });
 
 <AppLayout title="Admin · Courses">
 	<main class="mx-auto max-w-4xl px-4 py-10">
-		<AdminTabs active="courses" />
+		<AdminHeader active="courses" />
 
-		<PageKicker text="Admin" />
-		<h1 class="text-3xl font-bold">Courses</h1>
-		<p class="mt-2 max-w-xl text-base-content/60">
-			Every course across every discipline — read-only. Instructors own
+		<p class="max-w-xl text-base-content/60">
+			Every course across every discipline, read-only. Instructors own
 			the record; admins see it and, once courses can be archived, retire
 			it.
 		</p>

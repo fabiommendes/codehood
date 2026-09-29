@@ -24,7 +24,7 @@ test("admin: create a discipline", async ({ page }) => {
 	await test.step("admin opens the disciplines catalog", async () => {
 		await page.goto("/admin/disciplines");
 		await expect(
-			page.getByRole("heading", { name: "Disciplines", level: 1 }),
+			page.getByRole("tab", { name: "Disciplines", selected: true }),
 		).toBeVisible();
 	});
 

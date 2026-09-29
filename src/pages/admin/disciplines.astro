@@ -2,11 +2,10 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import AdminTabs from "@/components/AdminTabs.astro";
+import AdminHeader from "@/components/AdminHeader.astro";
 import DisciplinesTable, {
 	type DisciplineRow,
 } from "@/components/admin/DisciplinesTable";
-import PageKicker from "@/components/PageKicker.astro";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -39,13 +38,11 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
 
 <AppLayout title="Admin · Disciplines">
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <AdminTabs active="disciplines" />
+    <AdminHeader active="disciplines" />
 
-    <PageKicker text="Admin" />
-    <h1 class="text-3xl font-bold">Disciplines</h1>
-    <p class="mt-2 max-w-xl text-base-content/60">
+    <p class="max-w-xl text-base-content/60">
       One of two catalogs admins own outright. The slug is permanent once
-      created — it's the first segment of every course URL underneath it.
+      created: it is the first segment of every course URL underneath it.
     </p>
 
     {

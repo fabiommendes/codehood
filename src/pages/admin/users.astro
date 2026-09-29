@@ -2,9 +2,8 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import AdminTabs from "@/components/AdminTabs.astro";
+import AdminHeader from "@/components/AdminHeader.astro";
 import UsersTable from "@/components/admin/UsersTable";
-import PageKicker from "@/components/PageKicker.astro";
 import { db, type User } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -30,11 +29,12 @@ const counts = {
 
 <AppLayout title="Admin · Users">
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <AdminTabs active="users" />
+    <AdminHeader active="users" />
 
-    <PageKicker text="Admin" />
-    <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-3xl font-bold">Users</h1>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-base-content/60">
+        Every account on this Codehood instance: {users.length} in total.
+      </p>
       <button
         type="button"
         class="btn btn-primary btn-sm"
@@ -43,9 +43,6 @@ const counts = {
         Add new user
       </button>
     </div>
-    <p class="mt-2 text-base-content/60">
-      Every account on this Codehood instance — {users.length} total.
-    </p>
 
     {
       createUserResult?.error && (

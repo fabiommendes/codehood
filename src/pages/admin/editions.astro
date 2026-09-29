@@ -2,11 +2,10 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
-import AdminTabs from "@/components/AdminTabs.astro";
+import AdminHeader from "@/components/AdminHeader.astro";
 import EditionsTable, {
 	type EditionRow,
 } from "@/components/admin/EditionsTable";
-import PageKicker from "@/components/PageKicker.astro";
 import { db, isEditionOpen } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -42,11 +41,9 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
 
 <AppLayout title="Admin · Editions">
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <AdminTabs active="editions" />
+    <AdminHeader active="editions" />
 
-    <PageKicker text="Admin" />
-    <h1 class="text-3xl font-bold">Editions</h1>
-    <p class="mt-2 max-w-xl text-base-content/60">
+    <p class="max-w-xl text-base-content/60">
       Terms and their active windows. Instructors can only create courses inside
       a window; admins and the system account can create in any edition.
     </p>
