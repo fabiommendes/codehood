@@ -1,8 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { type Course, db } from "@/db";
+import { prisma } from "@/db/client";
 import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { courseHref } from "@/urls";
@@ -75,6 +77,38 @@ test("student: read the course home page", async ({ page }) => {
 		title: "Introduction to recursion",
 	});
 
+	// Three active students, one who dropped; two exams a student sees, one draft.
+	for (const username of ["home-peer-1", "home-peer-2"]) {
+		await seedUser({ role: "STUDENT", username });
+		await enroll(course.id, username);
+	}
+	await seedUser({ role: "STUDENT", username: "home-dropout" });
+	await enroll(course.id, "home-dropout");
+	await prisma.enrollment.update({
+		where: {
+			username_courseId: { username: "home-dropout", courseId: course.id },
+		},
+		data: { status: "DROPPED" },
+	});
+	for (const [slug, status] of [
+		["home-exam-1", "SCHEDULED"],
+		["home-exam-2", "ONGOING"],
+		["home-exam-draft", "DRAFT"],
+	] as const) {
+		await persistedExamFactory.create({ course: course.id, slug, status });
+	}
+
+	// Four resources, more than the home page lists.
+	const resourceTitles: Record<string, string> = {
+		"lecture-notes": "Lecture notes",
+		"problem-set-1": "Problem set 1",
+		"reading-list": "Reading list",
+		"lab-guide": "Lab guide",
+	};
+	for (const [slug, title] of Object.entries(resourceTitles)) {
+		await persistedResourceFactory.create({ course: course.id, slug, title });
+	}
+
 	await logInAs(page, student);
 	await page.goto(hrefOf(course));
 
@@ -84,6 +118,51 @@ test("student: read the course home page", async ({ page }) => {
 	await expect(page.getByText(course.instructor.name)).toBeVisible();
 	await expect(page.getByText(course.description as string)).toBeVisible();
 	await expect(page.getByText("Introduction to recursion")).toBeVisible();
+
+	await test.step("the stats count what the student can see, not placeholder numbers", async () => {
+		await expect(stat(page, "Exams")).toHaveText(/^\s*Exams\s*2\b/);
+		await expect(stat(page, "Students")).toHaveText(/^\s*Students\s*3\b/);
+		await expect(stat(page, "Resources")).toHaveText(/^\s*Resources\s*4\b/);
+	});
+
+	await test.step("the Resources section lists at most three real resources, each linking to its page", async () => {
+		const resources = section(page, "Resources");
+
+		await expect(resources.locator('a[href*="/resources/"]')).toHaveCount(3);
+		let listed = 0;
+		for (const [slug, title] of Object.entries(resourceTitles)) {
+			const link = resources.getByRole("link", { name: title });
+			if ((await link.count()) === 0) continue;
+			listed++;
+			await expect(link).toHaveAttribute(
+				"href",
+				`${hrefOf(course)}/resources/${slug}`,
+			);
+		}
+		expect(listed).toBe(3);
+
+		await expect(
+			resources.getByRole("link", { name: "View all" }),
+		).toHaveAttribute("href", `${hrefOf(course)}/resources`);
+	});
+
+	await test.step("no placeholder rows appear", async () => {
+		await expect(page.getByText("Syllabus")).toHaveCount(0);
+		await expect(page.getByText("Course repository")).toHaveCount(0);
+		await expect(page.getByText("codehood-cs101/coursework")).toHaveCount(0);
+	});
+
+	await test.step("a course without resources says so and lists no rows", async () => {
+		const bare = await persistedCourseFactory.create();
+		await enroll(bare.id, student.username);
+		await page.goto(hrefOf(bare));
+
+		const resources = section(page, "Resources");
+		await expect(resources).toContainText("No resources yet");
+		await expect(resources.locator('a[href*="/resources/"]')).toHaveCount(0);
+		await expect(stat(page, "Resources")).toHaveText(/^\s*Resources\s*0\b/);
+		await expect(page.getByText("Syllabus")).toHaveCount(0);
+	});
 });
 
 test("student: browse course resources", async ({ page }) => {
@@ -250,4 +329,19 @@ function hrefOf(
 		instructor: course.instructor.username,
 		edition: course.edition.slug,
 	});
+}
+
+/// The `<section>` wrapping the heading `title`.
+function section(page: Page, title: string) {
+	return page.locator("section").filter({
+		has: page.getByRole("heading", { name: title, exact: true }),
+	});
+}
+
+/// The stats block entry labelled `label`: the parent of the label text, read as "Exams 2 ...".
+function stat(page: Page, label: string) {
+	return page
+		.getByText(label, { exact: true })
+		.locator("xpath=..")
+		.filter({ hasText: new RegExp(`^\\s*${label}\\s*\\d`) });
 }

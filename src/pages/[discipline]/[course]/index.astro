@@ -72,6 +72,22 @@ const upcomingExams =
 // The syllabus line and the next few meetings. Both come from the same source
 // the Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
+const resources = await db.resource.findMany({ course: course.id }, { actor });
+
+/// What kind of resource this is, in words: a file's type, a link, markdown, or a code language.
+function resourceKind(resource: (typeof resources)[number]): string {
+	switch (resource.data.type) {
+		case "FILE":
+			return resource.data.mimeType;
+		case "LINK":
+			return "Link";
+		case "MD":
+			return "Markdown";
+		case "CODE":
+			return resource.data.language;
+	}
+}
+
 const nextEvents = await db.calendarEvent.findMany(
 	{ courseIds: [course.id], from: new Date(), limit: 3 },
 	{ actor },
@@ -101,7 +117,7 @@ const nextEvents = await db.calendarEvent.findMany(
       </div>
       <div class="stat">
         <div class="stat-title">Resources</div>
-        <div class="stat-value text-2xl">7</div>
+        <div class="stat-value text-2xl">{resources.length}</div>
       </div>
     </div>
 
@@ -125,18 +141,22 @@ const nextEvents = await db.calendarEvent.findMany(
     <section class="mt-10">
       <SectionHeader title="Resources" href={`${href}/resources`} />
 
-      <div class="mt-4 flex flex-col gap-3">
-        <ListRow href={`${href}/resources`}>
-          <p class="font-medium">Syllabus</p>
-          <p class="text-sm text-base-content/60">PDF · updated Jan 8</p>
-        </ListRow>
-        <ListRow href={`${href}/resources`}>
-          <p class="font-medium">Course repository</p>
-          <p class="text-sm text-base-content/60">
-            github.com/codehood-cs101/coursework
+      {
+        resources.length === 0 ? (
+          <p class="mt-4 text-sm text-base-content/60">
+            No resources yet — the instructor publishes them with the CLI.
           </p>
-        </ListRow>
-      </div>
+        ) : (
+          <div class="mt-4 flex flex-col gap-3">
+            {resources.slice(0, 3).map((resource) => (
+              <ListRow href={`${href}/resources/${resource.slug}`}>
+                <p class="font-medium">{resource.title}</p>
+                <p class="text-sm text-base-content/60">{resourceKind(resource)}</p>
+              </ListRow>
+            ))}
+          </div>
+        )
+      }
     </section>
 
     <section class="mt-10">
