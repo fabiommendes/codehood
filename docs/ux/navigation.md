@@ -135,6 +135,9 @@ and hide the design system link outside development.
 
 ### N5. The calendar opens on an empty month
 
+Done: `/calendar` without `?month` opens on the month of the next event, or of
+the last one when nothing is left.
+
 `/calendar` always opens on the current month. When the term is over or has not
 started, the user sees "No events this month" and has to page through months to
 find anything (violates P3). Proposal: open on the month of the next event, or
@@ -142,6 +145,9 @@ of the most recent one when nothing is left.
 
 
 ### N6. Getting started is hard to find
+
+Done: every empty section of a course the viewer teaches (home, resources,
+schedule, exams) links to `/getting-started` with "Set up the CLI".
 
 `/getting-started` is linked only from the profile page. Instructors reach it
 when they have nothing pushed yet, which is when an empty course page could link

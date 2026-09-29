@@ -1,7 +1,9 @@
 ---
 // The viewer's own schedule, aggregated across every course they take or
 // teach (FR-CAL-021). A real month grid, navigated with ?month=YYYY-MM,
-// defaulting to the current month in the server zone.
+// defaulting to the month of the next event (or of the last one) in the server
+// zone.
+import type { Actor } from "@/auth/actor";
 import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
@@ -52,8 +54,26 @@ const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
 const [year, month] = (
 	monthMatch
 		? [Number(monthMatch[1]), Number(monthMatch[2])]
-		: localDateOf(now).slice(0, 7).split("-").map(Number)
+		: localDateOf(await defaultMonthDate(actor))
+				.slice(0, 7)
+				.split("-")
+				.map(Number)
 ) as [number, number];
+
+/// A date in the month to open on: the next event's, else the last one's, else today's.
+async function defaultMonthDate(viewer: Actor): Promise<Date> {
+	if (courseIds.length === 0) return now;
+	const [next] = await db.calendarEvent.findMany(
+		{ courseIds, from: now, limit: 1 },
+		{ actor: viewer },
+	);
+	if (next) return next.startAt;
+	const past = await db.calendarEvent.findMany(
+		{ courseIds, to: now },
+		{ actor: viewer },
+	);
+	return past.at(-1)?.startAt ?? now;
+}
 
 const monthStart = toInstant(`${year}-${String(month).padStart(2, "0")}-01`, 0);
 const nextMonthYear = month === 12 ? year + 1 : year;

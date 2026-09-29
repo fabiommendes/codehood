@@ -20,6 +20,10 @@ Instructor has just been given an account and has no idea what to do next. The
 getting-started page walks them through installing the CLI, issuing an API key,
 pointing the CLI at this server and pushing a first course, in that order.
 
+They do not have to know the page exists. Every empty section of a course they
+teach, whether resources, schedule or exams, links to it, while their students
+see only that nothing is published yet.
+
 
 ### Create a new course
 

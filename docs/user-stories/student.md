@@ -145,6 +145,17 @@ rather than one tab per course. The personal calendar merges the events of every
 course they are enrolled in.
 
 
+### Open the calendar on the next event
+
+    status: implemented
+    url: /calendar
+
+Student opens the calendar in the break between terms. Instead of an empty
+current month, it opens on the month of their next event. When nothing is left,
+it opens on the month of the last one, so the calendar never starts on a blank
+page while the student has events somewhere.
+
+
 ## Exams and practice
 
 ### See the exams assigned to me

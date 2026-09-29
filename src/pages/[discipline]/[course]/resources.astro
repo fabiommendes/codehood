@@ -1,5 +1,6 @@
 ---
 import { hasPerm } from "@/auth/permissions";
+import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
@@ -81,7 +82,8 @@ function rowHref(resource: (typeof resources)[number]): string {
               ./resources.yaml
             </code>{" "}
             from the CLI. Every file it uploads gets a permanent,
-            unauthenticated URL — nothing whose disclosure matters belongs here.
+            unauthenticated URL — nothing whose disclosure matters belongs here.{" "}
+            <CliSetupLink />
           </span>
         </Alert>
       )

@@ -1,5 +1,6 @@
 ---
 import { hasPerm } from "@/auth/permissions";
+import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ExamsTable from "@/components/exam/ExamsTable";
@@ -63,7 +64,15 @@ if (!canWrite) {
 
     {
       exams.length === 0 ? (
-        <p class="mt-4 text-sm text-base-content/60">No exams yet.</p>
+        <p class="mt-4 text-sm text-base-content/60">
+          {canWrite ? (
+            <>
+              No exams pushed yet. <CliSetupLink />
+            </>
+          ) : (
+            "No exams yet."
+          )}
+        </p>
       ) : canWrite ? (
         <div class="mt-4">
           <ExamsTable

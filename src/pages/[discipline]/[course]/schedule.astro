@@ -2,6 +2,8 @@
 // The course's own term calendar (FR-CAL-020), grouped by authored week.
 // Read-only: the only way schedule data gets in is `manage import-calendar`
 // and the demo seed.
+import { hasPerm } from "@/auth/permissions";
+import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { type CalendarEvent, db, isMeeting } from "@/db";
@@ -26,6 +28,7 @@ const { course } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
+const canWrite = hasPerm(actor, "course.update-contents", course);
 
 const WEEKDAY_LABEL: Record<string, string> = {
 	SUNDAY: "Sun",
@@ -83,7 +86,13 @@ const meetingsHeld = events.filter(
       slots.length === 0 ? (
         <Alert variant="info" class="mt-6">
           <span>
-            No schedule published yet — the instructor pushes it with the CLI.
+            {canWrite ? (
+              <>
+                No schedule pushed yet. <CliSetupLink />
+              </>
+            ) : (
+              "No schedule published yet — the instructor pushes it with the CLI."
+            )}
           </span>
         </Alert>
       ) : (

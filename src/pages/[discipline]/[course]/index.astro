@@ -1,4 +1,6 @@
 ---
+import { hasPerm } from "@/auth/permissions";
+import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ListRow from "@/components/ListRow.astro";
@@ -41,6 +43,7 @@ const ownEnrollment = await db.enrollment.findOne(
 	{ actor },
 );
 const isEnrolled = ownEnrollment?.status === "ACTIVE";
+const canWrite = hasPerm(actor, "course.update-contents", course);
 
 function formatDate(date: Date): string {
 	return formatDateTime(date, {
@@ -155,7 +158,13 @@ const nextEvents = await db.calendarEvent.findMany(
       {
         resources.length === 0 ? (
           <p class="mt-4 text-sm text-base-content/60">
-            No resources yet — the instructor publishes them with the CLI.
+            {canWrite ? (
+              <>
+                No resources pushed yet. <CliSetupLink />
+              </>
+            ) : (
+              "No resources yet — the instructor publishes them with the CLI."
+            )}
           </p>
         ) : (
           <div class="mt-4 flex flex-col gap-3">
@@ -176,7 +185,13 @@ const nextEvents = await db.calendarEvent.findMany(
       {
         slots.length === 0 ? (
           <p class="mt-4 text-sm text-base-content/60">
-            No schedule published yet — the instructor pushes it with the CLI.
+            {canWrite ? (
+              <>
+                No schedule pushed yet. <CliSetupLink />
+              </>
+            ) : (
+              "No schedule published yet — the instructor pushes it with the CLI."
+            )}
           </p>
         ) : (
           <>

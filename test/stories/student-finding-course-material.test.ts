@@ -8,6 +8,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { courseHref } from "@/urls";
+import { SERVER_TZ } from "@/utils/schedule-time";
 import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);
@@ -306,6 +307,63 @@ test("student: see all my courses in one calendar", async ({ page }) => {
 	await expect(
 		page.getByText(`${courseB.discipline.name} kickoff`),
 	).toBeVisible();
+});
+
+test("student: open the calendar on the next event", async ({ page }) => {
+	const student = await seedUser({ role: "STUDENT" });
+	await logInAs(page, student);
+	const monthOf = (date: Date) =>
+		new Intl.DateTimeFormat("en-US", {
+			month: "long",
+			year: "numeric",
+			timeZone: SERVER_TZ,
+		}).format(date);
+
+	// A term that ended a year ago, with a single event in its first week.
+	const past = await persistedCourseFactory.create({
+		startAt: new Date(Date.now() - 400 * 86_400_000),
+		endAt: new Date(Date.now() - 300 * 86_400_000),
+	});
+	await enroll(past.id, student.username);
+	const last = await persistedCalendarEventFactory.create({
+		course: past.id,
+		week: 1,
+		title: "Old lab",
+	});
+
+	await test.step("with nothing left, it opens on the last event's month", async () => {
+		await page.goto("/calendar");
+		await expect(page.getByText(monthOf(last.startAt))).toBeVisible();
+		await expect(page.getByText("Old lab")).toBeVisible();
+	});
+
+	// A term starting now, whose only event is months away.
+	const next = await persistedCourseFactory.create();
+	await enroll(next.id, student.username);
+	const upcoming = await persistedCalendarEventFactory.create({
+		course: next.id,
+		week: 12,
+		title: "Far-off review session",
+	});
+	expect(monthOf(upcoming.startAt)).not.toBe(monthOf(new Date()));
+
+	await test.step("with an event ahead, it opens on that event's month", async () => {
+		await page.goto("/calendar");
+		await expect(page.getByText(monthOf(upcoming.startAt))).toBeVisible();
+	});
+
+	await test.step("an explicit month still wins", async () => {
+		const now = new Date();
+		const month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+		await page.goto(`/calendar?month=${month}`);
+		await expect(
+			page.getByText(
+				monthOf(
+					new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15)),
+				),
+			),
+		).toBeVisible();
+	});
 });
 
 //
