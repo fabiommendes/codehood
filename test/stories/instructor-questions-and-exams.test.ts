@@ -198,7 +198,7 @@ test("instructor: Let a bot grade for me", async ({ page, request }) => {
 	});
 
 	await expect(
-		page.getByText("New key created. Copy it now — it won't be shown again."),
+		page.getByText("New key created. Copy it now, it won't be shown again."),
 	).toBeVisible();
 	await expect(page.getByText("bot", { exact: true })).toBeVisible();
 

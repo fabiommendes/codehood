@@ -122,7 +122,7 @@ export class PassphraseService
 				await client.passphrase.findUnique({ where: { value: input.value } })
 			) {
 				throw new Error(
-					`Passphrase "${input.value}" is already in use — try another.`,
+					`Passphrase "${input.value}" is already in use. Try another.`,
 				);
 			}
 			return toPassphrase(
@@ -141,7 +141,7 @@ export class PassphraseService
 				}),
 			);
 		}
-		throw new Error("Could not generate a unique passphrase — try again.");
+		throw new Error("Could not generate a unique passphrase. Try again.");
 	}
 
 	/**
