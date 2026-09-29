@@ -9,6 +9,8 @@ export interface GradeFormProps {
 	exam: string;
 	/// The `publicId` of the answer being graded.
 	submission: string;
+	/// When given, the form offers a Cancel button that calls it.
+	onCancel?: () => void;
 }
 
 /**
@@ -17,6 +19,7 @@ export interface GradeFormProps {
  * Saving reloads the page, so the answer moves under "Graded" and the queue
  * is renumbered by the server; the reload asks the page to focus the score of
  * the next pending answer. A refused score or write is shown on the form.
+ * Cancelling only calls `onCancel`; nothing is written.
  */
 export default function GradeForm(props: GradeFormProps): JSX.Element {
 	const scoreId = `score-${props.submission}`;
@@ -81,9 +84,18 @@ export default function GradeForm(props: GradeFormProps): JSX.Element {
 				)}
 			</Show>
 			<div>
-				<button type="submit" class="btn btn-primary" disabled={busy()}>
-					Save grade
-				</button>
+				<div class="flex gap-2">
+					<button type="submit" class="btn btn-primary" disabled={busy()}>
+						Save grade
+					</button>
+					<Show when={props.onCancel}>
+						{(cancel) => (
+							<button type="button" class="btn btn-ghost" onClick={cancel()}>
+								Cancel
+							</button>
+						)}
+					</Show>
+				</div>
 			</div>
 		</form>
 	);

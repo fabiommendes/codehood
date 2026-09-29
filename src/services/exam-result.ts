@@ -10,7 +10,18 @@ import { scoreValue } from "@/core/score";
 import type { Feedback } from "@/db/services/feedback.service";
 import type { Submission } from "@/db/services/submission.service";
 
-export type QuestionOutcomeStatus = "graded" | "pending" | "unanswered";
+export type QuestionOutcomeStatus =
+	| "graded"
+	| "pending"
+	| "unanswered"
+	| "not-graded";
+
+/// The part of a submission the result depends on. A missing `status` reads as `PENDING_GRADE`.
+export type ResultSubmission = Pick<
+	Submission,
+	"publicId" | "question" | "createdAt"
+> &
+	Partial<Pick<Submission, "status">>;
 
 /** How one question of the exam went. */
 export interface QuestionOutcome {
@@ -26,8 +37,8 @@ export interface QuestionOutcome {
 export interface ExamResult {
 	/// One entry per exam question, in exam order.
 	questions: QuestionOutcome[];
-	/// Mean of the question scores in `[-1, 1]`, unanswered counting as zero;
-	/// `null` while any answered question is still `pending`.
+	/// Mean of the question scores in `[-1, 1]`, unanswered and not-graded
+	/// counting as zero; `null` while any answered question is still `pending`.
 	total: number | null;
 }
 
@@ -39,13 +50,17 @@ export interface ExamResult {
  * current verdict. An answered question with no feedback is `pending`, never
  * zero. A question with no submission is `unanswered` and scores zero.
  *
+ * A counting submission whose status is `WILL_NOT_GRADE` is `not-graded`,
+ * whatever feedback it has: its score is `null`, it counts as zero in the
+ * total, it is not pending, and it keeps its comments.
+ *
  * @params questions The exam's question slugs, in exam order.
  * @params submissions Every submission of the attempt, any order.
  * @params feedback The feedback the viewer may see on those submissions.
  */
 export function examResult(
 	questions: string[],
-	submissions: Pick<Submission, "publicId" | "question" | "createdAt">[],
+	submissions: ResultSubmission[],
 	feedback: Pick<Feedback, "submission" | "score" | "feedback" | "updatedAt">[],
 ): ExamResult {
 	const outcomes = questions.map((slug) =>
@@ -57,7 +72,7 @@ export function examResult(
 /// The outcome of one question: its newest submission, judged by the newest feedback on it.
 function outcomeOf(
 	slug: string,
-	submissions: Pick<Submission, "publicId" | "question" | "createdAt">[],
+	submissions: ResultSubmission[],
 	feedback: Pick<Feedback, "submission" | "score" | "feedback" | "updatedAt">[],
 ): QuestionOutcome {
 	const counting = submissions
@@ -80,6 +95,10 @@ function outcomeOf(
 		.map((entry) => entry.feedback)
 		.filter((text): text is string => !!text?.trim());
 
+	if (counting.status === "WILL_NOT_GRADE") {
+		return { question: slug, status: "not-graded", score: null, comments };
+	}
+
 	const verdict = passes[0] ? scoreValue(passes[0].score) : null;
 	if (verdict === null) {
 		return { question: slug, status: "pending", score: null, comments };
@@ -87,7 +106,7 @@ function outcomeOf(
 	return { question: slug, status: "graded", score: verdict, comments };
 }
 
-/// The mean score, unanswered counting as zero; `null` with no questions or any pending.
+/// The mean score, unanswered and not-graded counting as zero; `null` with no questions or any pending.
 function totalOf(outcomes: QuestionOutcome[]): number | null {
 	if (outcomes.length === 0) return null;
 	if (outcomes.some((outcome) => outcome.status === "pending")) return null;

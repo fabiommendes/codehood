@@ -393,6 +393,7 @@ function Outcome(props: { outcome: QuestionOutcome | undefined }): JSX.Element {
 							<Match when={outcome().status === "unanswered"}>
 								Not answered
 							</Match>
+							<Match when={outcome().status === "not-graded"}>Not graded</Match>
 						</Switch>
 					</p>
 					<For each={outcome().comments}>

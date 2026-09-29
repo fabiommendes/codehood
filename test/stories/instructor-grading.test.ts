@@ -174,4 +174,41 @@ test("instructor: grade submissions by hand", async ({ page }) => {
 		await expect(page.getByText(/\d+%/)).toHaveCount(0);
 		await expect(page.getByText("Missing the base case")).toHaveCount(0);
 	});
+	await test.step("the instructor marks one remaining answer will-not-grade, with a comment for the student", async () => {
+		await page.context().clearCookies();
+		await logInAs(page, teacher);
+		await page.goto(`${grading}/q-short`);
+
+		await expect(page).toHaveURL(`${grading}/q-short`);
+		await expect(
+			page.getByRole("heading", {
+				level: 2,
+				name: "Typed capital",
+				exact: true,
+			}),
+		).toBeVisible();
+		const answer = page.getByRole("article").filter({ hasText: "Bravo reply" });
+		await answer.getByRole("button", { name: "Will not grade" }).click();
+		const dialog = page.getByRole("dialog");
+		await expect(dialog.getByText("Will not grade this answer?")).toBeVisible();
+		await dialog.getByLabel("Comment for the student").fill("Submitted empty");
+		await dialog.getByRole("button", { name: "Mark as not graded" }).click();
+
+		await expect(dialog).toBeHidden();
+		await expect(answer).toContainText("Not graded");
+		await expect(answer).toContainText("Submitted empty");
+	});
+
+	await test.step("the queue reads it under not graded", async () => {
+		await page.getByRole("link", { name: "← Grading", exact: true }).click();
+
+		await expect(page).toHaveURL(grading);
+		const item = page
+			.getByRole("list", { name: "Questions" })
+			.getByRole("listitem")
+			.filter({ hasText: "Typed capital" });
+		await expect(item).toContainText("1 pending");
+		await expect(item).toContainText("1 graded");
+		await expect(item).toContainText("1 not graded");
+	});
 });

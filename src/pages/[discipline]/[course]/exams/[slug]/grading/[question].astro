@@ -2,9 +2,9 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import Answer from "@/components/grading/Answer.astro";
+import AnswerControls from "@/components/grading/AnswerControls";
 import AnswerKey from "@/components/grading/AnswerKey";
 import AnswerView from "@/components/grading/AnswerView";
-import GradeForm from "@/components/grading/GradeForm";
 import type { QuestionPublic } from "@/db";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -45,6 +45,15 @@ const hasKey = doc.type !== "essay";
 const previous = questions[position - 1];
 const next = questions[position + 1];
 const queueHref = `${href}/exams/${exam.slug}/grading`;
+
+// The course's instructor is the only person who grades; a bot's pass names no one.
+const instructor = course.instructor;
+const graderName = (pass: { grader: string | null }): string =>
+	pass.grader === null
+		? "Graded automatically"
+		: pass.grader === instructor.username
+			? instructor.name
+			: pass.grader;
 
 const { pending, resolved } = answersTo(questionSlug, answers);
 const shown = [...pending, ...resolved].map((answer, index) => ({
@@ -96,27 +105,37 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                 <p class="text-sm font-semibold text-base-content/60">{label}</p>
                 <Answer question={asked} payload={answer.payload as AnswerPayload} />
 
-                {isPending && (
-                  <GradeForm
-                    client:load
-                    discipline={discipline!}
-                    course={courseSegment!}
-                    exam={exam.slug}
-                    submission={answer.submission}
-                  />
+                {!isPending && (
+                  <>
+                    <p class="mt-4 text-lg font-semibold">
+                      {answer.state === "graded" && answer.verdict !== null
+                        ? formatScore(answer.verdict)
+                        : "Not graded"}
+                    </p>
+                    {answer.passes.length > 0 && (
+                    <ul aria-label="Grading history" class="mt-2 flex flex-col gap-2">
+                      {answer.passes.map((pass) => (
+                        <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
+                          <p>
+                            <span class="font-medium">{pass.score === null ? "No score" : formatScore(pass.score)}</span>
+                            <span class="text-base-content/60"> · {graderName(pass)}</span>
+                          </p>
+                          {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                    )}
+                  </>
                 )}
 
-                {answer.state === "graded" && answer.verdict !== null && (
-                  <p class="mt-4 text-lg font-semibold">{formatScore(answer.verdict)}</p>
-                )}
-                {answer.state === "not-graded" && <p class="mt-4 font-semibold">Not graded</p>}
-                {!isPending &&
-                  answer.passes.map(
-                    (pass) =>
-                      pass.comment && (
-                        <p class="mt-1 whitespace-pre-wrap text-sm text-base-content/70">{pass.comment}</p>
-                      ),
-                  )}
+                <AnswerControls
+                  client:load
+                  discipline={discipline!}
+                  course={courseSegment!}
+                  exam={exam.slug}
+                  submission={answer.submission}
+                  state={answer.state}
+                />
               </div>
             </article>
           </>
