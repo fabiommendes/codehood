@@ -7,6 +7,7 @@
 import type { Actor } from "@/auth/actor";
 import { type CourseTarget, hasPerm } from "@/auth/permissions";
 import { type CourseNaturalKey, courseHref } from "@/urls";
+import { COURSE_TAB_LABELS } from "./breadcrumbs";
 
 export type CourseTabKey =
 	| "home"
@@ -39,15 +40,35 @@ export function courseTabs(
 	const href = courseHref(ref);
 	const tabs: CourseTab[] = [
 		{ key: "home", label: "Home", href },
-		{ key: "exams", label: "Exams", href: `${href}/exams` },
-		{ key: "resources", label: "Resources", href: `${href}/resources` },
-		{ key: "schedule", label: "Schedule", href: `${href}/schedule` },
+		{ key: "exams", label: COURSE_TAB_LABELS.exams, href: `${href}/exams` },
+		{
+			key: "resources",
+			label: COURSE_TAB_LABELS.resources,
+			href: `${href}/resources`,
+		},
+		{
+			key: "schedule",
+			label: COURSE_TAB_LABELS.schedule,
+			href: `${href}/schedule`,
+		},
 	];
 	if (hasPerm(actor, "enrollment.manage", course)) {
 		tabs.push(
-			{ key: "questions", label: "Questions", href: `${href}/questions` },
-			{ key: "students", label: "Students", href: `${href}/roster` },
-			{ key: "grades", label: "Grades", href: `${href}/grades` },
+			{
+				key: "questions",
+				label: COURSE_TAB_LABELS.questions,
+				href: `${href}/questions`,
+			},
+			{
+				key: "students",
+				label: COURSE_TAB_LABELS.roster,
+				href: `${href}/roster`,
+			},
+			{
+				key: "grades",
+				label: COURSE_TAB_LABELS.grades,
+				href: `${href}/grades`,
+			},
 		);
 	}
 	return tabs;

@@ -3,6 +3,7 @@
 // covers, and the tab strip. Same shape as CourseHeader, so the tabs stay in
 // place while moving between pages and each page starts with its content.
 import Tabs from "@/components/ui/Tabs.astro";
+import { ADMIN_TABS } from "@/utils/admin-tabs";
 
 interface Props {
 	active: "overview" | "users" | "courses" | "disciplines" | "editions";
@@ -10,13 +11,7 @@ interface Props {
 
 const { active } = Astro.props;
 
-const items = [
-	{ key: "overview", label: "Overview", href: "/admin" },
-	{ key: "users", label: "Users", href: "/admin/users" },
-	{ key: "courses", label: "Courses", href: "/admin/courses" },
-	{ key: "disciplines", label: "Disciplines", href: "/admin/disciplines" },
-	{ key: "editions", label: "Editions", href: "/admin/editions" },
-] as const;
+const items = ADMIN_TABS;
 ---
 
 <div>
