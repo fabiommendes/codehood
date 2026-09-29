@@ -9,13 +9,17 @@ and the decisions behind them. Principles referenced as P1, P2, and so on are in
 
 Signed-in pages use `AppLayout`:
 
-- **Top bar.** Logo (links home), theme toggle, logout.
-- **Sidebar.** Global destinations (Home, My courses, Calendar, Profile, and
-  Admin for admins), then one entry per course the user takes or teaches. It
-  collapses into a drawer below the `lg` breakpoint.
+- **Top bar.** Logo (links home), theme toggle, and the user menu: avatar,
+  name and role (the avatar alone on phones), holding Profile, Set up the CLI
+  and Log out.
+- **Sidebar.** Global destinations (Home, My courses, Calendar, and Admin for
+  admins), then one entry per course the user takes or teaches. The current
+  page or course is highlighted. A hand-drawn sketch closes the column; it is
+  decoration only (see `docs/ui/identity.md`). It collapses into a drawer
+  below the `lg` breakpoint.
 - **Content.** The page itself. Course pages start with the course header and
-  tab strip.
-- **Footer.** Logo and a few repeated links.
+  tab strip; admin pages with the admin header and its tabs.
+- **Footer.** One line: logo, a link to the source code, and the version.
 
 Pages without a session, or outside the app (login, invite redemption, error
 pages), use `CenteredLayout` or `ErrorLayout` and carry no navigation.
