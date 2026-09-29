@@ -4,9 +4,21 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
+/// Where to go after logging in. Only paths on this site are accepted, so the
+/// parameter cannot send someone to another origin.
+const localPath = (value: unknown) =>
+	typeof value === "string" && /^\/(?![/\\])/.test(value) ? value : "/";
+
+// The action posts back to `?_action=...`, which drops the query string, so the
+// form carries `next` along.
 const result = Astro.getActionResult(actions.auth.login);
+const next = localPath(
+	result
+		? (await Astro.request.clone().formData()).get("next")
+		: Astro.url.searchParams.get("next"),
+);
 if (result && !result.error) {
-	return Astro.redirect("/");
+	return Astro.redirect(next);
 }
 ---
 
@@ -20,6 +32,7 @@ if (result && !result.error) {
   }
 
   <form method="POST" action={actions.auth.login} class="flex flex-col gap-4">
+    <input type="hidden" name="next" value={next} />
     <fieldset class="fieldset">
       <legend class="fieldset-legend">Email or username</legend>
       <input type="text" name="login" required class="input w-full" />

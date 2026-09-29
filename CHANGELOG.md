@@ -16,7 +16,14 @@
   brand` regenerates `public/logo.svg` and the favicons. `/design/brand`,
   `/design/motifs` and `/design/themes` show the logo, the motifs and both
   themes.
+- The landing page follows the new identity: houses on a hill that light up
+  at night, cut-paper cards over a wall of Athos Bulcão tiles, two illustrated
+  reasons to use Codehood, and a string of party lights. Its closing card takes
+  a course code and, through the login, opens `/courses/join` with the code
+  filled in.
 - The login and invite pages sit on a wall of Athos Bulcão tiles.
+- `/login?next=<path>` returns to that path after logging in. Only paths on
+  the same site are accepted.
 - Students join a course at `/courses/join` by typing the passphrase the
   instructor shows in class, and land on the course home enrolled. `/courses`
   offers "Join a course" in its header and in its empty state. An unknown code
