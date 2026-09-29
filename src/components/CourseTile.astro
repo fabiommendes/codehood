@@ -1,0 +1,34 @@
+---
+import { courseTile } from "@/components/brand/paper";
+
+interface Props {
+	/// Any string unique to the course, such as its URL; the same seed always yields the same tile.
+	seed: string;
+	size?: number;
+	class?: string;
+}
+
+const { seed, size = 20, class: className } = Astro.props;
+
+/// Classes for the figures and grounds; their colors live in global.css so the
+/// tile follows the theme toggle.
+const FIGURES = ["ct-f0", "ct-f1", "ct-f2", "ct-f3", "ct-f4"];
+const GROUNDS = ["ct-g0", "ct-g1"];
+---
+
+<svg
+  width={size}
+  height={size}
+  viewBox="0 0 60 60"
+  aria-hidden="true"
+  class:list={["course-tile", className]}
+>
+  {
+    courseTile(seed, FIGURES, GROUNDS).map((tile) => (
+      <g style={`transform:rotate(${tile.rotate}deg)`}>
+        <path d={tile.ground} class={tile.groundFill} />
+        <path d={tile.figure} class={tile.figureFill} />
+      </g>
+    ))
+  }
+</svg>

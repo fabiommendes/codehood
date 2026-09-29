@@ -1,0 +1,40 @@
+---
+import { SCENES, type SceneName } from "./scenes";
+
+interface Props {
+	name: SceneName;
+	class?: string;
+}
+
+const { name, class: className } = Astro.props;
+const { parts, caption } = SCENES[name];
+
+/// Filter ids are per scene so several scenes can share a page.
+const cut = `scene-cut-${name}`;
+const glow = `scene-glow-${name}`;
+---
+
+<svg viewBox="0 0 360 200" role="img" aria-label={caption} class:list={["scene", className]}>
+  <filter id={cut} x="-30%" y="-30%" width="160%" height="160%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="4" result="noise" />
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" />
+  </filter>
+  <filter id={glow} x="-80%" y="-80%" width="260%" height="260%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+    <feMerge>
+      <feMergeNode in="blur" />
+      <feMergeNode in="SourceGraphic" />
+    </feMerge>
+  </filter>
+  {parts.map((p) => <path d={p.d} fill={p.fill} filter={`url(#${p.glow ? glow : cut})`} />)}
+</svg>
+
+<style>
+  .scene {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    background: #0d211a;
+    border-radius: 18px 6px 20px 8px / 8px 20px 6px 18px;
+  }
+</style>

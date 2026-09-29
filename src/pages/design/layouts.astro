@@ -8,7 +8,7 @@ const layouts = [
 		name: "Layout",
 		path: "src/layouts/Layout.astro",
 		description:
-			"The base HTML shell: <html>/<head>, global CSS, fonts, favicon. Every other layout wraps this one — pages never use it directly.",
+			"The base HTML shell: <html>/<head>, global CSS (themes, fonts, paper grain), favicon. Every other layout wraps this one. Pages never use it directly.",
 		usage: `<Layout title="Page title">\n  ...\n</Layout>`,
 		demo: "/design/layouts/layout",
 	},
@@ -16,7 +16,7 @@ const layouts = [
 		name: "AppLayout",
 		path: "src/layouts/AppLayout.astro",
 		description:
-			"The logged-in app shell: a navbar (logo, Log in/Log out) plus a sidebar (Home, My courses, Profile, and a static course list — mocked, not real enrollment data yet). Sidebar is always visible on large screens, a checkbox-driven drawer on small ones. Used by the homepage, profile page, and the course mockups.",
+			"The logged-in app shell: a navbar (logo, theme toggle, Log in/Log out) plus a sidebar with the main navigation and the course list. Sidebar is always visible on large screens, a checkbox-driven drawer on small ones. Used by the homepage, profile page, and the course mockups.",
 		usage: `<AppLayout title="Profile">\n  ...\n</AppLayout>`,
 		demo: "/design/layouts/app-layout",
 	},
@@ -24,7 +24,7 @@ const layouts = [
 		name: "CenteredLayout",
 		path: "src/layouts/CenteredLayout.astro",
 		description:
-			"A single centered card on a muted background, with the logo and a heading above a slot. Used by login and invite-acceptance — anywhere a page's whole job is one form.",
+			"A single centered card on the paper-grain page background, with the logo and a heading above a slot. Used by login and invite-acceptance, anywhere a page's whole job is one form. Login is a loud screen; see Elements.",
 		usage: `<CenteredLayout title="Log in">\n  <form>...</form>\n</CenteredLayout>`,
 		demo: "/design/layouts/centered-layout",
 	},
@@ -32,7 +32,7 @@ const layouts = [
 		name: "DesignLayout",
 		path: "src/layouts/DesignLayout.astro",
 		description:
-			"This page's own shell: a slim navbar plus the Overview/Typography/Colors/Layouts/Elements/Forms tab strip.",
+			"This page's own shell: a slim navbar, the theme toggle and the tab strip that links every page of the design system.",
 		usage: `<DesignLayout title="Layouts" active="layouts">\n  ...\n</DesignLayout>`,
 		demo: "/design/layouts/design-layout",
 	},
@@ -120,7 +120,7 @@ const layouts = [
               class="font-mono text-xs">navbar-end</code
             >, a bottom border, and <code class="font-mono text-xs"
               >bg-base-100</code
-            > — see AppLayout and DesignLayout above.
+            >; see AppLayout and DesignLayout above.
           </p>
         </div>
       </div>

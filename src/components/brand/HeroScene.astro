@@ -1,0 +1,317 @@
+---
+import { along, band, circle, halfU, rect, roof, star, wall } from "./paper";
+
+interface Props {
+	class?: string;
+}
+
+const { class: className } = Astro.props;
+
+/// Height of the hill at `x`: the quadratic from (-20, 380) through (240, 120) to (500, 380).
+const hill = (x: number) => {
+	const t = (x + 20) / 520;
+	return 380 - 520 * t * (1 - t);
+};
+
+/// A house standing with its lower-left corner at (x, base), scaled by `k`,
+/// with color slots for its wall, roof and two windows.
+const house = (x: number, base: number, k: number, n: number) => {
+	const y = base - 32 * k;
+	return {
+		wall: wall(x, y, k),
+		roof: roof(x, y, k),
+		windows: [
+			rect(x + 3 * k, y + 13 * k, 5 * k, 5 * k),
+			rect(x + 16.5 * k, y + 13 * k, 5 * k, 5 * k),
+		],
+		peak: [x + 12 * k, y - 2 * k] as const,
+		n,
+	};
+};
+
+const back = [160, 212, 264].map((x, i) =>
+	house(x, hill(x + 20) - 24, 1.3, i + 7),
+);
+const front = [86, 136, 186, 236, 286, 336, 386].map((x, i) =>
+	house(x, hill(x + 19) + 6, 1.6, i),
+);
+
+/// Strings of bulbs hanging from roof to roof, across the front row.
+const peak = (i: number) => front[i]?.peak ?? ([0, 0] as const);
+const [p0, p3, p6] = [peak(0), peak(3), peak(6)];
+const wires = [
+	[p0[0], p0[1], (p0[0] + p3[0]) / 2, p3[1] + 40, p3[0], p3[1]],
+	[p3[0], p3[1], (p3[0] + p6[0]) / 2, p3[1] + 40, p6[0], p6[1]],
+] as const;
+const bulbs = wires.flatMap((w) => along(...w, 9));
+
+const stars: [number, number, number][] = [
+	[60, 40, 5],
+	[150, 70, 3.5],
+	[250, 28, 4],
+	[300, 110, 3],
+	[440, 150, 3.5],
+	[30, 150, 3],
+];
+
+const fireflies: [number, number, number][] = [
+	[40, 330, 2.4],
+	[120, 350, 2],
+	[230, 340, 1.8],
+	[330, 352, 2.2],
+	[450, 330, 2],
+];
+---
+
+<svg
+  viewBox="0 0 480 380"
+  role="img"
+  aria-label="Houses on a hill, with strings of lights between the roofs"
+  class:list={["hero-scene", className]}
+>
+  <filter id="hero-glow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+    <feMerge>
+      <feMergeNode in="blur" />
+      <feMergeNode in="SourceGraphic" />
+    </feMerge>
+  </filter>
+  <filter id="hero-cut" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="4" result="noise" />
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" />
+  </filter>
+
+  <g class="day">
+    <path class="sun" d={circle(390, 80, 36)} filter="url(#hero-cut)" />
+    <path class="cloud" d={halfU(120, 90, 34, 16) + halfU(150, 90, 22, 22)} filter="url(#hero-cut)" />
+    <path class="cloud" d={halfU(300, 150, 26, 12) + halfU(322, 150, 16, 16)} filter="url(#hero-cut)" />
+  </g>
+  <g class="night">
+    <path class="moon glow" d={circle(390, 80, 28)} />
+    <path class="moon-cut" d={circle(401, 71, 24)} />
+    {stars.map(([x, y, r]) => <path class="star glow" d={star(x, y, r)} />)}
+  </g>
+
+  <path class="hill-back" d="M200 380Q420 170 560 380Z" filter="url(#hero-cut)" />
+  <path class="hill" d="M-20 380Q240 120 500 380Z" filter="url(#hero-cut)" />
+
+  {
+    [...back, ...front].map((h) => (
+      <g filter="url(#hero-cut)">
+        <path class={`wall w-${h.n % 7}`} d={h.wall} />
+        <path class={`roof r-${h.n % 7}`} d={h.roof} />
+        {h.windows.map((d, j) => (
+          <path class={`window glow win-${(h.n + j) % 5}`} d={d} />
+        ))}
+      </g>
+    ))
+  }
+
+  {
+    wires.map((w) => (
+      <path class="wire" d={band(...w, 1.2)} />
+    ))
+  }
+  {bulbs.map(([x, y], i) => <path class={`bulb glow b-${i % 5}`} d={circle(x, y + 4, 4)} />)}
+
+  <g class="night">
+    {fireflies.map(([x, y, r]) => <path class="firefly glow" d={circle(x, y, r)} />)}
+  </g>
+</svg>
+
+<style>
+  .hero-scene {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+
+    --sun: #f2b800;
+    --cloud: #fffdf8;
+    --hill: #eadfc8;
+    --hill-back: #e0cfae;
+    --wire: #a89e8c;
+    --window: #fffdf8;
+    --w0: #1b4b9b;
+    --w1: #b5452a;
+    --w2: #f2b800;
+    --w3: #3c8d2f;
+    --w4: #a8309a;
+    --w5: #2670c0;
+    --w6: #e0731f;
+    --b0: #a8309a;
+    --b1: #f2b800;
+    --b2: #2670c0;
+    --b3: #3c8d2f;
+    --b4: #e0731f;
+  }
+
+  :global([data-theme="codehood-dark"]) .hero-scene {
+    --hill: #173a2f;
+    --hill-back: #12302a;
+    --wire: #4d6f62;
+    --w0: #f7faf8;
+    --w1: #a9bab2;
+    --w2: #6f8a7e;
+    --w3: #c3d0ca;
+    --w4: #a9bab2;
+    --w5: #f7faf8;
+    --w6: #6f8a7e;
+    --b0: #ff4d97;
+    --b1: #ffc400;
+    --b2: #00d2e6;
+    --b3: #b5f000;
+    --b4: #4aa0ff;
+  }
+
+  .night {
+    display: none;
+  }
+
+  :global([data-theme="codehood-dark"]) .hero-scene .night {
+    display: inline;
+  }
+
+  :global([data-theme="codehood-dark"]) .hero-scene .day {
+    display: none;
+  }
+
+  /* Light sources only glow at night. */
+  :global([data-theme="codehood-dark"]) .hero-scene .glow {
+    filter: url(#hero-glow);
+  }
+
+  .sun {
+    fill: var(--sun);
+  }
+
+  .cloud {
+    fill: var(--cloud);
+  }
+
+  .moon,
+  .star {
+    fill: #f7faf8;
+  }
+
+  .moon-cut {
+    fill: var(--color-base-200);
+  }
+
+  .firefly {
+    fill: #b5f000;
+  }
+
+  .hill {
+    fill: var(--hill);
+  }
+
+  .hill-back {
+    fill: var(--hill-back);
+  }
+
+  .wire {
+    fill: var(--wire);
+  }
+
+  .w-0 {
+    fill: var(--w0);
+  }
+
+  .w-1 {
+    fill: var(--w1);
+  }
+
+  .w-2 {
+    fill: var(--w2);
+  }
+
+  .w-3 {
+    fill: var(--w3);
+  }
+
+  .w-4 {
+    fill: var(--w4);
+  }
+
+  .w-5 {
+    fill: var(--w5);
+  }
+
+  .w-6 {
+    fill: var(--w6);
+  }
+
+  /* Roofs take the color two houses along, so no house matches its own roof. */
+  .r-0 {
+    fill: var(--w2);
+  }
+
+  .r-1 {
+    fill: var(--w3);
+  }
+
+  .r-2 {
+    fill: var(--w4);
+  }
+
+  .r-3 {
+    fill: var(--w5);
+  }
+
+  .r-4 {
+    fill: var(--w6);
+  }
+
+  .r-5 {
+    fill: var(--w0);
+  }
+
+  .r-6 {
+    fill: var(--w1);
+  }
+
+  .window {
+    fill: var(--window);
+  }
+
+  :global([data-theme="codehood-dark"]) .win-0 {
+    fill: var(--b1);
+  }
+
+  :global([data-theme="codehood-dark"]) .win-1 {
+    fill: var(--b0);
+  }
+
+  :global([data-theme="codehood-dark"]) .win-2 {
+    fill: var(--b1);
+  }
+
+  :global([data-theme="codehood-dark"]) .win-3 {
+    fill: var(--b2);
+  }
+
+  :global([data-theme="codehood-dark"]) .win-4 {
+    fill: var(--b3);
+  }
+
+  .b-0 {
+    fill: var(--b0);
+  }
+
+  .b-1 {
+    fill: var(--b1);
+  }
+
+  .b-2 {
+    fill: var(--b2);
+  }
+
+  .b-3 {
+    fill: var(--b3);
+  }
+
+  .b-4 {
+    fill: var(--b4);
+  }
+</style>

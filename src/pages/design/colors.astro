@@ -3,60 +3,204 @@ import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
 
-const surfaces = [
-	{
-		name: "base-100",
-		bg: "bg-base-100",
-		fg: "text-base-content",
-		border: true,
-	},
+interface Token {
+	name: string;
+	/// Utility class for the fill.
+	bg: string;
+	/// Utility class for the content color drawn on the fill.
+	fg: string;
+	role: string;
+	light: { value: string; content: string };
+	dark: { value: string; content: string };
+}
+
+const surfaces: Token[] = [
 	{
 		name: "base-200",
 		bg: "bg-base-200",
 		fg: "text-base-content",
-		border: true,
+		role: "Page background",
+		light: { value: "#f7f3ea", content: "#1f2a24" },
+		dark: { value: "#0d211a", content: "#e6f0ea" },
+	},
+	{
+		name: "base-100",
+		bg: "bg-base-100",
+		fg: "text-base-content",
+		role: "Cards, surfaces",
+		light: { value: "#fffdf8", content: "#1f2a24" },
+		dark: { value: "#15302a", content: "#e6f0ea" },
 	},
 	{
 		name: "base-300",
 		bg: "bg-base-300",
 		fg: "text-base-content",
-		border: true,
+		role: "Borders, dividers",
+		light: { value: "#e6dfd0", content: "#1f2a24" },
+		dark: { value: "#1f4034", content: "#e6f0ea" },
 	},
 ];
 
-const brand = [
-	{ name: "primary", bg: "bg-primary", fg: "text-primary-content" },
-	{ name: "secondary", bg: "bg-secondary", fg: "text-secondary-content" },
-	{ name: "accent", bg: "bg-accent", fg: "text-accent-content" },
-	{ name: "neutral", bg: "bg-neutral", fg: "text-neutral-content" },
+const roles: Token[] = [
+	{
+		name: "primary",
+		bg: "bg-primary",
+		fg: "text-primary-content",
+		role: "Main action, links",
+		light: { value: "#1b4b9b", content: "#ffffff" },
+		dark: { value: "#4aa0ff", content: "#04121f" },
+	},
+	{
+		name: "secondary",
+		bg: "bg-secondary",
+		fg: "text-secondary-content",
+		role: "Secondary action",
+		light: { value: "#f2b800", content: "#1f2a24" },
+		dark: { value: "#ffc400", content: "#0d211a" },
+	},
+	{
+		name: "accent",
+		bg: "bg-accent",
+		fg: "text-accent-content",
+		role: "Highlights, new items",
+		light: { value: "#a8309a", content: "#ffffff" },
+		dark: { value: "#ff4d97", content: "#0d211a" },
+	},
+	{
+		name: "neutral",
+		bg: "bg-neutral",
+		fg: "text-neutral-content",
+		role: "Inverted surfaces, code blocks",
+		light: { value: "#1f2a24", content: "#f7f3ea" },
+		dark: { value: "#081510", content: "#e6f0ea" },
+	},
 ];
 
-const status = [
-	{ name: "info", bg: "bg-info", fg: "text-info-content" },
-	{ name: "success", bg: "bg-success", fg: "text-success-content" },
-	{ name: "warning", bg: "bg-warning", fg: "text-warning-content" },
-	{ name: "error", bg: "bg-error", fg: "text-error-content" },
+const status: Token[] = [
+	{
+		name: "info",
+		bg: "bg-info",
+		fg: "text-info-content",
+		role: "Information, focus ring",
+		light: { value: "#2670c0", content: "#ffffff" },
+		dark: { value: "#00d2e6", content: "#0d211a" },
+	},
+	{
+		name: "success",
+		bg: "bg-success",
+		fg: "text-success-content",
+		role: "Success",
+		light: { value: "#337a27", content: "#ffffff" },
+		dark: { value: "#4cd08a", content: "#0d211a" },
+	},
+	{
+		name: "warning",
+		bg: "bg-warning",
+		fg: "text-warning-content",
+		role: "Warning",
+		light: { value: "#e0731f", content: "#1f2a24" },
+		dark: { value: "#ff6f1a", content: "#0d211a" },
+	},
+	{
+		name: "error",
+		bg: "bg-error",
+		fg: "text-error-content",
+		role: "Errors, destructive actions",
+		light: { value: "#b5452a", content: "#ffffff" },
+		dark: { value: "#ff5c5c", content: "#0d211a" },
+	},
 ];
+
+const groups = [
+	{ title: "Base surfaces", tokens: surfaces },
+	{ title: "Brand roles", tokens: roles },
+	{ title: "Status roles", tokens: status },
+];
+
+const themes = [
+	{
+		id: "codehood",
+		key: "light",
+		title: "Cerrado (light)",
+		blurb: "Lime-washed walls, red earth, ipês and tile blue.",
+	},
+	{
+		id: "codehood-dark",
+		key: "dark",
+		title: "Forest (dark)",
+		blurb:
+			"A forest at night, lit by a party. Saturated colors are light sources.",
+	},
+] as const;
 ---
 
 <DesignLayout title="Colors" active="colors">
   <section class="mb-14">
     <h1 class="text-3xl font-bold">Colors</h1>
     <p class="mt-3 max-w-2xl text-base-content/70">
-      Semantic color names, not hex codes. Every color below is a daisyUI theme token defined once in{" "}
-      <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/styles/global.css</code>, so pages
-      stay correct if the theme ever changes.
+      Two themes, <strong>Cerrado</strong> (light) and <strong>Forest</strong> (dark), defined once as daisyUI
+      tokens in <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/styles/global.css</code>.
+      Dark is at least as important as light: most students use it. Pages use semantic names, never hex. Each
+      swatch is a real token, rendered inside a <code class="font-mono text-sm">data-theme</code> wrapper, so it
+      shows the same in either page theme.
     </p>
   </section>
 
+  {
+    groups.map((group) => (
+      <section class="mb-14">
+        <h2 class="mb-5 text-xl font-semibold">{group.title}</h2>
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {themes.map((theme) => (
+            <div data-theme={theme.id} class="rounded-box border border-base-300 bg-base-200 p-4">
+              <p class="mb-3 text-sm font-semibold text-base-content">{theme.title}</p>
+              <div class="flex flex-col gap-3">
+                {group.tokens.map((token) => (
+                  <div class:list={["rounded-box p-4", token.bg, token.fg, token.bg === "bg-base-300" && "border border-base-300"]}>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                      <p class="font-medium">{token.name}</p>
+                      <p class="text-sm">{token.role}</p>
+                    </div>
+                    <p class="mt-1 font-mono text-xs opacity-80">
+                      fill {token[theme.key].value} · content {token[theme.key].content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    ))
+  }
+
   <section class="mb-14">
-    <h2 class="mb-5 text-xl font-semibold">Base surfaces</h2>
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <h2 class="mb-5 text-xl font-semibold">Text and decoration</h2>
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {
-        surfaces.map((color) => (
-          <div class:list={["rounded-box p-5", color.bg, color.fg, color.border && "border border-base-300"]}>
-            <p class="font-medium">{color.name}</p>
-            <p class="font-mono text-xs opacity-70">{color.bg}</p>
+        themes.map((theme) => (
+          <div data-theme={theme.id} class="rounded-box border border-base-300 bg-base-200 p-4 text-base-content">
+            <p class="mb-3 text-sm font-semibold">{theme.title}</p>
+            <div class="card card-border bg-base-100">
+              <div class="card-body gap-2">
+                <p>
+                  Text, <span class="font-mono text-xs">{theme.key === "light" ? "#1f2a24" : "#e6f0ea"}</span>
+                </p>
+                <p class="text-base-content/70">
+                  Secondary text, a mix of content on the surface. Muted reference:{" "}
+                  <span class="font-mono text-xs">{theme.key === "light" ? "#5f6862" : "#8fb3a4"}</span>
+                </p>
+                <a href="#colors" class="link link-primary w-fit">
+                  A link in primary
+                </a>
+                {theme.key === "dark" && (
+                  <p class="flex items-center gap-2">
+                    <span class="inline-block size-3 rounded-full" style="background:#b5f000" />
+                    <span class="font-mono text-xs">firefly #b5f000, decorative light only</span>
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         ))
       }
@@ -64,35 +208,44 @@ const status = [
   </section>
 
   <section class="mb-14">
-    <h2 class="mb-5 text-xl font-semibold">Brand colors</h2>
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {
-        brand.map((color) => (
-          <div class:list={["rounded-box p-5", color.bg, color.fg]}>
-            <p class="font-medium">{color.name}</p>
-            <p class="font-mono text-xs opacity-80">{color.bg}</p>
-          </div>
-        ))
-      }
+    <h2 class="mb-3 text-xl font-semibold">Contrast</h2>
+    <ul class="max-w-2xl list-disc space-y-2 pl-5 text-sm text-base-content/70">
+      <li>
+        Every text pair meets WCAG AA (4.5:1). Text on backgrounds and cards is above 12:1 in both themes, muted
+        text above 5:1, and each role color against its content color above 4.5:1.
+      </li>
+      <li>
+        <strong class="text-base-content">Light secondary (ipê yellow) is a fill only.</strong> It is 1.6:1 as text
+        on the background. Never use it for text or icons on the page.
+      </li>
+      <li>
+        <strong class="text-base-content">Light warning is a fill only</strong> too: 2.9:1 as text. Use{" "}
+        <code class="font-mono">text-error</code> or a badge when a warning must be read.
+      </li>
+    </ul>
+    <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div data-theme="codehood" class="rounded-box border border-base-300 bg-base-200 p-4">
+        <p class="mb-2 text-xs text-base-content/60">Light, fills (correct)</p>
+        <div class="flex flex-wrap gap-2">
+          <span class="badge badge-secondary">secondary</span>
+          <span class="badge badge-warning">warning</span>
+        </div>
+      </div>
+      <div data-theme="codehood" class="rounded-box border border-base-300 bg-base-200 p-4">
+        <p class="mb-2 text-xs text-base-content/60">Light, as text (never)</p>
+        <p class="text-secondary line-through">secondary text</p>
+        <p class="text-warning line-through">warning text</p>
+      </div>
     </div>
-    <p class="mt-4 text-sm text-base-content/60">
-      Use <code class="font-mono">primary</code> for the one most important action on a page. Reach for{" "}
-      <code class="font-mono">secondary</code>/<code class="font-mono">accent</code> sparingly &mdash; most of a
-      page should stay in the base surfaces above.
-    </p>
   </section>
 
   <section>
-    <h2 class="mb-5 text-xl font-semibold">Status colors</h2>
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {
-        status.map((color) => (
-          <div class:list={["rounded-box p-5", color.bg, color.fg]}>
-            <p class="font-medium">{color.name}</p>
-            <p class="font-mono text-xs opacity-80">{color.bg}</p>
-          </div>
-        ))
-      }
-    </div>
+    <h2 class="mb-3 text-xl font-semibold">Usage</h2>
+    <p class="max-w-2xl text-sm text-base-content/60">
+      Use <code class="font-mono">primary</code> for the one most important action on a page. Reach for{" "}
+      <code class="font-mono">secondary</code> and <code class="font-mono">accent</code> sparingly; most of a page
+      stays in the base surfaces. The CLI maps the same roles onto the 16 ANSI colors: red is error, green
+      success, yellow secondary or warning, blue primary, magenta accent, cyan info.
+    </p>
   </section>
 </DesignLayout>

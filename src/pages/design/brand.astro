@@ -1,0 +1,412 @@
+---
+import {
+	along,
+	band,
+	circle,
+	halfL,
+	halfU,
+	LOGO,
+	LOGO_BOX,
+	LOGO_SQUARES,
+	type LogoPiece,
+	type Part,
+	pieceStyle,
+	poly,
+	quarter,
+	rect,
+	star,
+} from "@/components/brand/paper";
+import Logo from "@/components/Logo.astro";
+import PageKicker from "@/components/PageKicker.astro";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+type Colors = Record<LogoPiece | "pixel" | "wire" | "accent", string>;
+
+/// Mirrors the --lp-* variables in src/styles/global.css.
+const LIGHT: Colors = {
+	c: "#1b4b9b",
+	o1: "#b5452a",
+	d1: "#f2b800",
+	e: "#3c8d2f",
+	wall: "#1b4b9b",
+	roof: "#b5452a",
+	window: "#f2b800",
+	o2: "#b5452a",
+	o3: "#3c8d2f",
+	d2: "#f2b800",
+	pixel: "#ddd6c6",
+	wire: "#a89e8c",
+	accent: "#1b4b9b",
+};
+
+const DARK: Colors = {
+	c: "#f7faf8",
+	o1: "#a9bab2",
+	d1: "#6f8a7e",
+	e: "#a9bab2",
+	wall: "#f7faf8",
+	roof: "#a9bab2",
+	window: "#ffc400",
+	o2: "#f7faf8",
+	o3: "#6f8a7e",
+	d2: "#a9bab2",
+	pixel: "#2c5244",
+	wire: "#4d6f62",
+	accent: "#4aa0ff",
+};
+
+const BULBS = ["#ff4d97", "#ffc400", "#00d2e6", "#b5f000", "#4aa0ff"];
+
+const SLOTS: [number, number][] = [
+	[-14.1, 18.25],
+	[-2.1, 6.25],
+	[129.9, 42.25],
+	[141.9, 30.25],
+];
+
+/// One trumpet flower pointing away from (cx, cy): a narrow tube that flares
+/// into a round mouth of radius `m` at distance `len`.
+const trumpet = (cx: number, cy: number, a: number, len: number, m: number) => {
+	const ex = cx + Math.cos(a) * len;
+	const ey = cy + Math.sin(a) * len;
+	const px = -Math.sin(a);
+	const py = Math.cos(a);
+	return {
+		body:
+			poly(
+				cx + px * 0.5,
+				cy + py * 0.5,
+				ex + px * m * 0.8,
+				ey + py * m * 0.8,
+				ex - px * m * 0.8,
+				ey - py * m * 0.8,
+				cx - px * 0.5,
+				cy - py * 0.5,
+			) + circle(ex, ey, m),
+		throat: circle(ex, ey, m * 0.38),
+	};
+};
+
+/// A round cluster of trumpets, as ipês bloom, in two shades with contrasting throats.
+const cluster = (
+	cx: number,
+	cy: number,
+	r: number,
+	c: { base: string; light: string; throat: string },
+): Part[] => {
+	const flowers = Array.from({ length: 8 }, (_, i) =>
+		trumpet(cx, cy, (i * Math.PI) / 4 + r, r * 0.62, r * 0.36),
+	);
+	return [
+		{ d: circle(cx, cy, r * 0.4), fill: c.base },
+		{
+			d: flowers
+				.filter((_, i) => i % 2 === 0)
+				.map((f) => f.body)
+				.join(""),
+			fill: c.base,
+		},
+		{
+			d: flowers
+				.filter((_, i) => i % 2 === 1)
+				.map((f) => f.body)
+				.join(""),
+			fill: c.light,
+		},
+		{ d: flowers.map((f) => f.throat).join(""), fill: c.throat },
+	];
+};
+
+type Ipe = "purple" | "pink" | "yellow" | "white";
+
+const IPES: Record<
+	Ipe,
+	{ name: string; window: string; base: string; light: string; throat: string }
+> = {
+	purple: {
+		name: "Purple ipê",
+		window: "June 1 to July 15",
+		base: "#a8309a",
+		light: "#c952b6",
+		throat: "#f2c230",
+	},
+	pink: {
+		name: "Pink ipê",
+		window: "July 16 to August 5",
+		base: "#e04f94",
+		light: "#f47fb4",
+		throat: "#f7d046",
+	},
+	yellow: {
+		name: "Yellow ipê",
+		window: "August 6 to September 5",
+		base: "#f2b800",
+		light: "#ffd24a",
+		throat: "#b5452a",
+	},
+	white: {
+		name: "White ipê",
+		window: "September 6 to 30",
+		base: "#e6e0d4",
+		light: "#ffffff",
+		throat: "#f2c230",
+	},
+};
+
+/// Which ipê is in bloom in Brasília on `date`, or null outside the flowering.
+/// The windows are approximate and shift every year with the rains.
+const ipeInBloom = (date: Date): Ipe | null => {
+	const md = (date.getMonth() + 1) * 100 + date.getDate();
+	if (md >= 601 && md <= 715) return "purple";
+	if (md >= 716 && md <= 805) return "pink";
+	if (md >= 806 && md <= 905) return "yellow";
+	if (md >= 906 && md <= 930) return "white";
+	return null;
+};
+
+interface Flank {
+	name: string;
+	use: string;
+	parts: (c: Colors) => Part[];
+	/// Drawn over the logo instead of under it.
+	over?: boolean;
+}
+
+const flanks: Flank[] = [
+	{
+		name: "Squares",
+		use: "Default.",
+		parts: (c) => LOGO_SQUARES.map((d) => ({ d, fill: c.pixel })),
+	},
+	{
+		name: "Party lights",
+		use: "Celebrations: released grades, end of term.",
+		over: true,
+		parts: (c) => [
+			{ d: band(-16, 0, 68, 44, 158, -2, 0.6), fill: c.wire },
+			...along(-16, 0, 68, 44, 158, -2, 11).map(([x, y], i) => ({
+				d: circle(x, y + 2.5, 2.6),
+				fill: BULBS[i % BULBS.length] ?? "#ffc400",
+				glow: true,
+			})),
+		],
+	},
+	{
+		name: "Fireflies",
+		use: "Night: landing page and empty states in the dark theme.",
+		parts: () => [
+			{ d: circle(-10, 26, 2.2), fill: "#b5f000", glow: true },
+			{ d: circle(-2, 12, 1.4), fill: "#ffc400", glow: true },
+			{ d: circle(4, 34, 1.7), fill: "#b5f000", glow: true },
+			{ d: "M124 30L152 42L151 44Z", fill: "#f7faf8", glow: true },
+			{ d: star(152, 43, 3.4), fill: "#f7faf8", glow: true },
+		],
+	},
+	{
+		name: "Athos tiles",
+		use: "Tiled backgrounds, printed material.",
+		parts: (c) =>
+			SLOTS.flatMap(([x, y], i) => [
+				{ d: rect(x, y, 12, 12), fill: c.pixel },
+				{
+					d:
+						[
+							halfU(x + 6, y + 12, 5),
+							quarter(x, y, 7),
+							halfL(x + 12, y + 6, 5),
+							circle(x + 6, y + 6, 3),
+						][i] ?? "",
+					fill: c.accent,
+				},
+			]),
+	},
+	...(Object.keys(IPES) as Ipe[]).map(
+		(kind): Flank => ({
+			name: IPES[kind].name,
+			use: `Dry season, ${IPES[kind].window}.`,
+			parts: () =>
+				[
+					[-10, 30, 8],
+					[0, 16, 9],
+					[-4, 38, 6],
+					[10, 34, 5],
+					[140, 46, 9],
+					[152, 34, 8],
+					[146, 22, 6],
+					[132, 34, 5],
+				].flatMap(([x = 0, y = 0, r = 6]) => cluster(x, y, r, IPES[kind])),
+		}),
+	),
+];
+
+const compose = (c: Colors, f: Flank): Part[] => {
+	const core = LOGO.map((p) => ({
+		d: p.d,
+		fill: c[p.piece],
+		window: p.piece === "window",
+	}));
+	const all = f.over ? [...core, ...f.parts(c)] : [...f.parts(c), ...core];
+	return all.map((p, i) => ({ ...p, rot: (((i * 37) % 7) - 3) * 0.8 }));
+};
+
+const today = new Date();
+const bloomingNow = ipeInBloom(today);
+
+const pieces = [
+	["C", "Bar with a round left end"],
+	["o", "Disc, overlapping the C"],
+	["D", "Bar with a round right end"],
+	["e", "Staircase of three steps"],
+	[
+		"H",
+		"A house: the gap of the H is the door, a triangle is the roof, one lit window",
+	],
+	["o o", "Two discs, stepped diagonally"],
+	["D", "Bar with a round right end, raised"],
+	["Flanks", "Two slots, one at each side, whose motif depends on the context"],
+];
+---
+
+<DesignLayout title="Brand" active="brand">
+  <svg width="0" height="0" class="absolute" aria-hidden="true">
+    <defs>
+      <filter id="flank-cut" x="-30%" y="-30%" width="160%" height="160%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="2" seed="4" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" />
+      </filter>
+      <filter id="flank-glow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="mb-10 max-w-2xl">
+    <PageKicker text="Identity" />
+    <h1 class="text-3xl font-bold">Brand</h1>
+    <p class="mt-3 text-base-content/70">
+      The logo, its flanks and how it behaves at small sizes. Rationale in <code>docs/ui/identity.md</code>; the
+      static files in <code>public/</code> are generated with <code>pnpm run brand</code>.
+    </p>
+  </div>
+
+  <h2 class="mb-4 text-2xl font-bold">Logo</h2>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      ["codehood", "codehood-dark"].map((theme) => (
+        <div data-theme={theme} class="card bg-base-200 p-8 text-base-content">
+          <Logo height={96} />
+          <div class="mt-8 flex flex-wrap items-end gap-6">
+            {[48, 32, 24, 20, 16].map((h) => (
+              <div class="grid justify-items-start gap-1">
+                <Logo height={h} />
+                <span class="font-mono text-xs text-base-content/60">{h}px</span>
+              </div>
+            ))}
+          </div>
+          <div class="mt-6 flex items-end gap-6">
+            {[64, 32, 16].map((h) => (
+              <div class="grid justify-items-start gap-1">
+                <Logo height={h} variant="mark" />
+                <span class="font-mono text-xs text-base-content/60">mark {h}px</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+  </div>
+  <p class="mt-4 max-w-2xl text-sm text-base-content/70">
+    From 32 px up: cut edges, tilt and flanks; multiply blending in the light theme. Below 32 px, in the dark theme only:
+    tone steps and a 1.5 px outline at 50% around the whole drawing. The mark is for favicons and app icons.
+  </p>
+
+  <h2 class="mt-12 mb-4 text-2xl font-bold">Pieces</h2>
+  <table class="table max-w-2xl">
+    <tbody>
+      {
+        pieces.map(([piece, shape]) => (
+          <tr>
+            <td class="font-mono">{piece}</td>
+            <td>{shape}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <h2 class="mt-12 mb-2 text-2xl font-bold">Flanks</h2>
+  <p class="mb-6 max-w-2xl text-base-content/70">
+    The core never changes. The flank slots take a motif chosen by context and stay inside the same box, so the logo
+    never changes width. Flanks are dropped below 32 px.
+  </p>
+  <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      flanks.map((f) => (
+        <article>
+          {[
+            ["codehood", LIGHT],
+            ["codehood-dark", DARK],
+          ].map(([theme, colors]) => (
+            <div data-theme={theme as string} class="card mb-2 bg-base-200 px-6 py-5">
+              <svg class="flank" viewBox={LOGO_BOX.full} role="img" aria-label={`codehood with ${f.name.toLowerCase()}`}>
+                {compose(colors as Colors, f).map((p) => (
+                  <path
+                    d={p.d}
+                    fill={p.fill}
+                    style={pieceStyle(p)}
+                    class:list={[theme === "codehood" && !("window" in p && p.window) && "multiply"]}
+                    filter={"glow" in p && p.glow ? "url(#flank-glow)" : "url(#flank-cut)"}
+                  />
+                ))}
+              </svg>
+            </div>
+          ))}
+          <h3 class="font-bold">{f.name}</h3>
+          <p class="text-sm text-base-content/70">{f.use}</p>
+        </article>
+      ))
+    }
+  </div>
+
+  <h2 class="mt-12 mb-2 text-2xl font-bold">Ipê calendar</h2>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    During Brasília's dry season the flanks follow the ipê in bloom, and fall back to the squares outside it. The
+    windows are approximate and should become configuration. Today ({today.toISOString().slice(0, 10)}):
+    <strong>{bloomingNow ? IPES[bloomingNow].name : "squares"}</strong>.
+  </p>
+  <table class="table max-w-xl">
+    <tbody>
+      {
+        (Object.keys(IPES) as Ipe[]).map((kind) => (
+          <tr>
+            <td>{IPES[kind].name}</td>
+            <td>{IPES[kind].window}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</DesignLayout>
+
+<style>
+  .flank {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .flank path {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .multiply {
+    mix-blend-mode: multiply;
+  }
+</style>

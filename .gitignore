@@ -54,7 +54,3 @@ prompt/
 # Base
 .base-ast
 .base-ast-cache
-# Temporary: the design agent's work in progress. Tracked files in these
-# directories are unaffected; remove these lines once its work is committed.
-docs/ui/
-src/pages/design/*

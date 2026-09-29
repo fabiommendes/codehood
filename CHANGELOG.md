@@ -7,6 +7,15 @@
 - `/calendar` opens on the month of the next event, or of the last one when
   nothing is left, instead of an empty current month. Every empty section of a
   course the viewer teaches links to `/getting-started`.
+- New visual identity, described in `docs/ui/identity.md`. The light theme
+  takes its colors from the Cerrado and the dark theme from a forest at night;
+  both meet WCAG AA for text. Headings use Fraunces, body text Atkinson
+  Hyperlegible and code JetBrains Mono. The logo keeps the original pieces with
+  a house in place of the H: colored in the light theme, white and gray with
+  one lit window in the dark theme, and simplified below 32 px. `pnpm run
+  brand` regenerates `public/logo.svg` and the favicons. `/design/brand`,
+  `/design/motifs` and `/design/themes` show the logo, the motifs and both
+  themes.
 - Students join a course at `/courses/join` by typing the passphrase the
   instructor shows in class, and land on the course home enrolled. `/courses`
   offers "Join a course" in its header and in its empty state. An unknown code
@@ -49,6 +58,14 @@
   the release button already said, and the exam page and the instructor home
   ask the same function whether an exam can be released. Exam timing rules
   moved to `src/services/exam-state.ts`.
+- `ResponseService.upsert` opened an attempt on an exam that was not open, so
+  a student's exam page read "Submitted" for an exam they never took. It now
+  refuses, like `create`, unless the actor is the course's instructor, who
+  may still backfill attempts, through the web or the CLI.
+- A dropped student could still read a course's resources: the resource
+  service matched any enrollment row, not only `ACTIVE` ones.
+- `@Validate` threw a plain `{ errors, properties }` object on a failed
+  validation. It now throws `InvalidData`, an `Error`.
 - The discipline test factory drew names from a short list, so two courses in
   one test could share a name and "student: see my courses" failed now and
   then.

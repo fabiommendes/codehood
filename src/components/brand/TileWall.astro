@@ -1,0 +1,99 @@
+---
+import { rect, tileDesigns } from "./paper";
+
+interface Props {
+	cols?: number;
+	rows?: number;
+	/// Changes which figures and turns the wall gets.
+	seed?: number;
+	/// How much the wall competes with what sits on it. `full` is the tile
+	/// colors as they are; `soft`, for section backgrounds, fades the figures
+	/// into the ground so the cards on top read first.
+	tone?: "full" | "soft";
+	class?: string;
+}
+
+const {
+	cols = 36,
+	rows = 30,
+	seed = 1,
+	tone = "soft",
+	class: className,
+} = Astro.props;
+
+/// Mixes a tile index and the seed into 32 well-spread bits, so neighbors in
+/// any direction get unrelated figures, colors and turns, as when Athos's
+/// panels were laid by hand.
+const hash = (i: number) => {
+	let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(seed + 1, 0x85ebca6b);
+	h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+	h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+	return (h ^ (h >>> 16)) >>> 0;
+};
+
+/// A wall of Athos Bulcão-style tiles that covers its box, for section
+/// backgrounds. Tiles keep a fixed size (`--tw-size`) and the wall is cropped
+/// to the box, so narrow screens show fewer tiles instead of bigger ones.
+/// Colors come from the ct-* classes in global.css, shared with CourseTile, so
+/// the wall follows the theme.
+const tiles = Array.from({ length: cols * rows }, (_, i) => {
+	const x = (i % cols) * 30;
+	const y = Math.floor(i / cols) * 30;
+	const h = hash(i);
+	const design = tileDesigns[h % tileDesigns.length] ?? tileDesigns[0];
+	return {
+		ground: rect(x, y, 30, 30),
+		figure: design?.(x, y) ?? "",
+		groundClass: `ct-g${(i + Math.floor(i / cols)) % 2}`,
+		figureClass: `ct-f${(h >>> 8) % 5}`,
+		rotate: ((h >>> 16) % 4) * 90,
+	};
+});
+---
+
+<div class:list={["tile-wall", `tile-wall-${tone}`, className]} aria-hidden="true">
+  <svg
+    viewBox={`0 0 ${cols * 30} ${rows * 30}`}
+    style={`--tw-cols:${cols};--tw-rows:${rows}`}
+    class="course-tile"
+  >
+    {
+      tiles.map((t) => (
+        <g style={`transform:rotate(${t.rotate}deg)`}>
+          <path d={t.ground} class={t.groundClass} />
+          <path d={t.figure} class:list={["tw-figure", t.figureClass]} />
+        </g>
+      ))
+    }
+  </svg>
+</div>
+
+<style>
+  .tile-wall {
+    --tw-size: 40px;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .tile-wall {
+      --tw-size: 60px;
+    }
+  }
+
+  .tile-wall svg {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: calc(var(--tw-cols) * var(--tw-size));
+    height: calc(var(--tw-rows) * var(--tw-size));
+    max-width: none;
+    translate: -50% 0;
+    border-radius: 0;
+  }
+
+  .tile-wall-soft .tw-figure {
+    opacity: 0.45;
+  }
+</style>

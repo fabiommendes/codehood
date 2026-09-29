@@ -1,52 +1,71 @@
 ---
+import { LOGO, LOGO_BOX, LOGO_SQUARES, MARK } from "@/components/brand/paper";
+
 interface Props {
 	height?: number;
 	class?: string;
 	style?: string;
+	/// `mark` draws the compact mark (C, o and the house) instead of the full logo.
+	variant?: "full" | "mark";
 }
 
-const { height = 28, class: className, style } = Astro.props;
-// Native aspect ratio of public/logo.svg's viewBox (40.633763 x 11.641667).
-const width = height * (40.633763 / 11.641667);
+const { height = 28, class: className, style, variant = "full" } = Astro.props;
+
+/// Below this height the logo drops cut edges, tilt and flanks, and switches to
+/// tone steps with a translucent outline in the dark theme (see
+/// docs/ui/identity.md).
+const SMALL = 32;
+
+const small = variant === "mark" || height < SMALL;
+const pieces = variant === "mark" ? MARK : LOGO;
+const box =
+	variant === "mark" ? LOGO_BOX.mark : small ? LOGO_BOX.core : LOGO_BOX.full;
+const [, , boxWidth = 1, boxHeight = 1] = box.split(" ").map(Number);
+const width = (height * boxWidth) / boxHeight;
+
+/// Tilts each piece a little, as if glued by hand. Deterministic so the logo
+/// looks the same on every render.
+const tilt = (i: number) =>
+	small ? undefined : `transform:rotate(${(((i * 37) % 7) - 3) * 0.8}deg)`;
 ---
 
 <svg
   width={width}
   height={height}
   style={style}
-  viewBox="0 0 40.633763 11.641667"
+  viewBox={box}
   xmlns="http://www.w3.org/2000/svg"
-  class:list={["brand-mark", className]}
+  role="img"
+  aria-label="codehood"
+  class:list={["brand-logo", small && "is-small", className]}
 >
-  <g transform="matrix(0.24186762,0,0,0.24186762,3.406645,-73.072857)">
-    <path
-      class="brand-mark-blue"
-      style="fill-opacity:1;stroke:none;stroke-width:0.176835"
-      d="m 24.650578,308.12047 a 17.99893,17.99893 0 0 0 -15.5869601,8.99988 17.99893,17.99893 0 0 0 0,17.99965 17.99893,17.99893 0 0 0 15.5869601,8.99798 h 8.999843 v -35.99751 z m 44.999978,-2.00179 v 32.00054 h 8.000552 v -16.00108 h 7.998898 v 16.00108 h 8.000545 v -32.00054 h -8.000545 v 8.00054 h -7.998898 v -8.00054 z"
-    ></path>
-    <path
-      class="brand-mark-red"
-      style="fill-opacity:1;stroke:none;stroke-width:0.117897"
-      d="m 33.65115,314.11872 a 12,12 0 0 0 -12.000508,12.0005 12,12 0 0 0 12.000508,11.99928 12,12 0 0 0 11.99927,-11.99928 12,12 0 0 0 -11.99927,-12.0005 z m 67.99912,-11.9995 a 12,12 0 0 0 -12.000503,12.0005 12,12 0 0 0 12.000503,11.99928 12,12 0 0 0 11.99927,-11.99928 12,12 0 0 0 -11.99927,-12.0005 z"
-    ></path>
-    <path
-      class="brand-mark-yellow"
-      style="fill-opacity:1;stroke:none;stroke-width:0.117897"
-      d="m 125.64992,302.11924 a 12,12 0 0 1 10.39192,6.00024 12,12 0 0 1 0,12.0005 12,12 0 0 1 -10.39192,5.99902 h -6.00026 v -23.99976 z m -73.999246,12.0002 a 12,12 0 0 1 10.39192,6.00026 12,12 0 0 1 0,12.0005 12,12 0 0 1 -10.39192,5.99902 H 45.65042 v -23.99978 z"
-    ></path>
-    <path
-      class="brand-mark-green"
-      style="fill-opacity:1;stroke:none;stroke-width:0.271456"
-      d="m 57.65042,326.11985 v 7.99916 8.00042 8.00042 h 8.000824 7.999588 7.999588 v -8.00042 h -7.999588 v -8.00042 h -7.999588 v -7.99916 z m 56.00037,-12.00073 a 12,12 0 0 0 -12.00051,12.0005 12,12 0 0 0 12.00051,11.99926 12,12 0 0 0 11.99927,-11.99926 12,12 0 0 0 -11.99927,-12.0005 z"
-    ></path>
-    <g
-      transform="matrix(0,-1,-1,0,134.03428,371.90287)"
-      class="brand-mark-glyph"
-    >
+  {
+    small ? (
+      <g class="lp-outline">
+        {pieces.map((p) => (
+          <path d={p.d} stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+        ))}
+      </g>
+    ) : (
+      <>
+        <filter id="brand-cut" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="2" seed="4" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" />
+        </filter>
+        {LOGO_SQUARES.map((d, i) => (
+          <path class="lp-pixel" d={d} style={tilt(i)} filter="url(#brand-cut)" />
+        ))}
+      </>
+    )
+  }
+  {
+    pieces.map((p, i) => (
       <path
-        style="fill-opacity:1;stroke-width:0.109098;stroke-linecap:round;stroke-linejoin:round"
-        d="m 45.65126,136.11903 h 12 v 12 h -12 z m 12,-12 h 12 v 12 h -12 z m -36,-132 h 12 v 12 h -12 z m 12,-12 h 12 v 12 h -12 z"
-      ></path>
-    </g>
-  </g>
+        class={`lp-${p.piece}`}
+        d={p.d}
+        style={tilt(i + LOGO_SQUARES.length)}
+        filter={small ? undefined : "url(#brand-cut)"}
+      />
+    ))
+  }
 </svg>

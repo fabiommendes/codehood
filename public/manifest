@@ -1,10 +1,10 @@
 {
     "short_name": "Codehood",
-    "name": "Codehood, the learning community",
+    "name": "Codehood",
     "icons": [
         {
-            "src": "./img/logo/favicon.png",
-            "sizes": "256x256, 512x512",
+            "src": "/favicon.png",
+            "sizes": "1024x1024",
             "type": "image/png",
             "purpose": "any maskable"
         }

@@ -1,0 +1,233 @@
+---
+import { flower, ICONS } from "@/components/brand/icons";
+import {
+	along,
+	arch,
+	band,
+	circle,
+	courseTile,
+	halfD,
+	halfU,
+	type Part,
+	poly,
+	rect,
+	roof,
+	seg,
+	star,
+	tileDesigns,
+	wall,
+} from "@/components/brand/paper";
+import PageKicker from "@/components/PageKicker.astro";
+import Scene from "@/components/brand/Scene.astro";
+import { NIGHT as N, SCENES, type SceneName } from "@/components/brand/scenes";
+import TileWall from "@/components/brand/TileWall.astro";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+
+export const prerender = false;
+
+/// Brasília palette: Cerrado, Niemeyer's concrete and Athos Bulcão's tiles.
+const B = {
+	sky: "#2d7dd2",
+	tile: "#1b4b9b",
+	earth: "#b5452a",
+	ipe: "#f2b800",
+	ipeRoxo: "#b0369d",
+	buriti: "#3c8d2f",
+	wolf: "#e0731f",
+	concrete: "#b9b4aa",
+	lime: "#f7f3ea",
+	ink: "#1f2a24",
+};
+
+const wallOf = (
+	cols: number,
+	rows: number,
+	ground: (i: number) => string,
+	figure: (i: number) => string,
+) =>
+	Array.from({ length: cols * rows }, (_, i) => {
+		const x = (i % cols) * 30;
+		const y = Math.floor(i / cols) * 30;
+		const design =
+			tileDesigns[(i * 5 + Math.floor(i / 3)) % tileDesigns.length] ??
+			tileDesigns[0];
+		return {
+			ground: rect(x, y, 30, 30),
+			figure: design?.(x, y) ?? "",
+			groundFill: ground(i),
+			figureFill: figure(i),
+			rotate: ((i * 7 + 3) % 4) * 90,
+		};
+	});
+
+const classicWall = wallOf(
+	12,
+	4,
+	() => "#f4f1ea",
+	() => B.tile,
+);
+
+
+const cerradoWall = wallOf(
+	12,
+	4,
+	(i) => [B.lime, "#efe4cf", B.lime][i % 3] ?? B.lime,
+	(i) => [B.tile, B.earth, B.ipe, B.buriti, B.ipeRoxo][(i * 3) % 5] ?? B.tile,
+);
+
+const COURSES = ["cs101", "mat201", "fis110", "prog2", "algo3"];
+
+/// Figure and ground colors for course tiles in each theme.
+const TILE_THEMES = [
+	{
+		theme: "codehood",
+		figures: [B.tile, B.earth, B.ipe, B.buriti, B.ipeRoxo],
+		grounds: ["#f7f3ea", "#efe4cf"],
+	},
+	{
+		theme: "codehood-dark",
+		figures: ["#4aa0ff", "#ff4d97", "#ffc400", "#b5f000", "#00d2e6"],
+		grounds: ["#15302a", "#1f4034"],
+	},
+];
+
+---
+
+<DesignLayout title="Motifs" active="motifs">
+  <div class="mb-10 max-w-2xl">
+    <PageKicker text="Identity" />
+    <h1 class="text-3xl font-bold">Motifs</h1>
+    <p class="mt-3 text-base-content/70">
+      Tiles, icons and illustrations built from the same pieces as the logo. Where each one belongs is in
+      <code>docs/ui/identity.md</code>.
+    </p>
+  </div>
+
+  <h2 class="mb-2 text-2xl font-bold">Athos Bulcão tiles</h2>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    Square tiles with one figure each, rotated in steps of 90°, as the workers who laid Athos Bulcão's panels did.
+  </p>
+  {
+    [classicWall, cerradoWall].map((w) => (
+      <svg class="tiles mb-4" viewBox="0 0 360 120" aria-hidden="true">
+        {w.map((t) => (
+          <g style={`transform:rotate(${t.rotate}deg);transform-box:fill-box;transform-origin:center`}>
+            <path d={t.ground} fill={t.groundFill} />
+            <path d={t.figure} fill={t.figureFill} />
+          </g>
+        ))}
+      </svg>
+    ))
+  }
+
+  <h3 class="mt-8 mb-2 text-lg font-bold">Course tiles</h3>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    A 2×2 block derived from the course code, for course lists and the sidebar. The same course always gets the
+    same block.
+  </p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      TILE_THEMES.map((t) => (
+        <div data-theme={t.theme} class="card flex-row flex-wrap gap-5 bg-base-200 p-6 text-base-content">
+          {COURSES.map((code) => (
+            <div class="grid justify-items-center gap-1">
+              <svg class="course" viewBox="0 0 60 60" aria-hidden="true">
+                {courseTile(code, t.figures, t.grounds).map((tile) => (
+                  <g style={`transform:rotate(${tile.rotate}deg);transform-box:fill-box;transform-origin:center`}>
+                    <path d={tile.ground} fill={tile.groundFill} />
+                    <path d={tile.figure} fill={tile.figureFill} />
+                  </g>
+                ))}
+              </svg>
+              <code class="text-xs">{code}</code>
+            </div>
+          ))}
+        </div>
+      ))
+    }
+  </div>
+
+  <h3 class="mt-8 mb-2 text-lg font-bold">Tiled wall</h3>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    On loud pages a whole section can sit on a tiled wall, with paper cards taped on top. Never as a thin strip.
+    Walls use the soft tone (figures at 45%) so the cards read first.
+  </p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      ["codehood", "codehood-dark"].map((theme) => (
+        <div data-theme={theme} class="relative overflow-hidden rounded-box p-10">
+          <TileWall seed={3} />
+          <div class="card tape tilt-l relative bg-base-100 p-6 text-base-content shadow-xl">
+            <p class="font-display text-xl font-bold">Three steps, and you're teaching.</p>
+            <p class="text-sm text-base-content/70">A paper card on the wall.</p>
+          </div>
+        </div>
+      ))
+    }
+  </div>
+
+  <h2 class="mt-12 mb-2 text-2xl font-bold">Icons</h2>
+  <p class="mb-4 max-w-2xl text-base-content/70">Filled, two tones, on a 24-unit grid. Shown at 48 and 24 px.</p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      [
+        { theme: "codehood", ink: B.ink, accent: B.sky, paper: B.lime },
+        { theme: "codehood-dark", ink: N.white, accent: N.amber, paper: N.ground },
+      ].map((t) => (
+        <div data-theme={t.theme} class="card grid grid-cols-3 gap-4 bg-base-200 p-6 text-base-content">
+          {ICONS.map((ic) => (
+            <div class="grid justify-items-start gap-1">
+              <div class="flex items-end gap-3">
+                {[48, 24].map((size) => (
+                  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+                    {ic.parts(t.ink, t.accent, t.paper).map((p) => (
+                      <path d={p.d} fill={p.fill} />
+                    ))}
+                  </svg>
+                ))}
+              </div>
+              <span class="text-xs text-base-content/70">{ic.name}</span>
+            </div>
+          ))}
+        </div>
+      ))
+    }
+  </div>
+
+  <h2 class="mt-12 mb-2 text-2xl font-bold">Illustrations</h2>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    Figurative, but suggested by the logo's pieces. Generic computing and science ideas. Night scenes on a dark
+    panel in both themes; light sources glow.
+  </p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      (Object.keys(SCENES) as SceneName[]).map((name) => (
+        <figure>
+          <Scene name={name} />
+          <figcaption class="mt-2 text-sm text-base-content/70">{SCENES[name].caption}</figcaption>
+        </figure>
+      ))
+    }
+  </div>
+</DesignLayout>
+
+<style>
+  svg {
+    overflow: visible;
+  }
+
+  .tiles {
+    display: block;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .course {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+</style>

@@ -8,6 +8,8 @@ interface Props {
 	title: string;
 	active:
 		| "overview"
+		| "brand"
+		| "motifs"
 		| "typography"
 		| "colors"
 		| "layouts"
@@ -20,6 +22,9 @@ const { title, active } = Astro.props;
 
 const tabs = [
 	{ key: "overview", label: "Overview", href: "/design" },
+	{ key: "brand", label: "Brand", href: "/design/brand" },
+	{ key: "motifs", label: "Motifs", href: "/design/motifs" },
+	{ key: "themes", label: "Themes", href: "/design/themes" },
 	{ key: "typography", label: "Typography", href: "/design/typography" },
 	{ key: "colors", label: "Colors", href: "/design/colors" },
 	{ key: "layouts", label: "Layouts", href: "/design/layouts" },

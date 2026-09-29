@@ -1,0 +1,86 @@
+---
+import { along, band, circle } from "./paper";
+
+interface Props {
+	/// Number of bulbs on the string.
+	count?: number;
+	class?: string;
+}
+
+const { count = 15, class: className } = Astro.props;
+
+const bulbs = along(0, 4, 300, 34, 600, 4, count);
+---
+
+<svg viewBox="0 0 600 44" aria-hidden="true" preserveAspectRatio="none" class:list={["party-lights", className]}>
+  <filter id="party-glow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+    <feMerge>
+      <feMergeNode in="blur" />
+      <feMergeNode in="SourceGraphic" />
+    </feMerge>
+  </filter>
+  <path class="wire" d={band(0, 4, 300, 34, 600, 4, 1)} />
+  {bulbs.map(([x, y], i) => <path class={`bulb b-${i % 5}`} d={circle(x, y + 5, 5)} />)}
+</svg>
+
+<style>
+  .party-lights {
+    display: block;
+    width: 100%;
+    height: 44px;
+    overflow: visible;
+  }
+
+  .wire {
+    fill: #a89e8c;
+  }
+
+  .b-0 {
+    fill: #a8309a;
+  }
+
+  .b-1 {
+    fill: #f2b800;
+  }
+
+  .b-2 {
+    fill: #2670c0;
+  }
+
+  .b-3 {
+    fill: #3c8d2f;
+  }
+
+  .b-4 {
+    fill: #e0731f;
+  }
+
+  :global([data-theme="codehood-dark"]) .wire {
+    fill: #4d6f62;
+  }
+
+  :global([data-theme="codehood-dark"]) .bulb {
+    filter: url(#party-glow);
+  }
+
+  :global([data-theme="codehood-dark"]) .b-0 {
+    fill: #ff4d97;
+  }
+
+  :global([data-theme="codehood-dark"]) .b-1 {
+    fill: #ffc400;
+  }
+
+  :global([data-theme="codehood-dark"]) .b-2 {
+    fill: #00d2e6;
+  }
+
+  :global([data-theme="codehood-dark"]) .b-3 {
+    fill: #b5f000;
+  }
+
+  :global([data-theme="codehood-dark"]) .b-4 {
+    fill: #4aa0ff;
+  }
+</style>

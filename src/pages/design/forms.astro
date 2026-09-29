@@ -1,19 +1,206 @@
 ---
 import Alert from "@/components/ui/Alert";
+import Button from "@/components/ui/Button";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
+
+const states = [
+	{ label: "Default", input: "", hint: "Shown below the field." },
+	{
+		label: "Success",
+		input: "input-success",
+		hint: "",
+		message: "That handle is free.",
+		messageClass: "text-success",
+	},
+	{
+		label: "Warning",
+		input: "input-warning",
+		hint: "",
+		message: "This will be visible to students.",
+		messageClass: "text-base-content/70",
+	},
+	{
+		label: "Error",
+		input: "input-error",
+		hint: "",
+		message: "Enter a valid e-mail address.",
+		messageClass: "text-error",
+	},
+] as const;
 ---
 
 <DesignLayout title="Forms" active="forms">
-  <section class="max-w-2xl">
+  <section class="mb-14 max-w-2xl">
     <h1 class="text-3xl font-bold">Forms</h1>
     <p class="mt-3 text-base-content/70">
-      Inputs, selects, fieldsets, and validation states &mdash; used today on the login, invite-acceptance, and
-      profile pages, but not yet pulled together into a documented, reusable set here.
+      Forms are quiet screens: inputs, selects and options use a plain 8 px radius, no tilt or tape. Every field
+      is a plain daisyUI class with a visible label. Focus uses the <code class="font-mono text-sm">info</code>{" "}
+      color.
     </p>
-    <Alert variant="info" class="mt-6">
-      <span>This page is under construction. Come back once the form patterns settle.</span>
-    </Alert>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Text fields</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">fieldset</code> + <code class="font-mono">legend</code> +{" "}
+      <code class="font-mono">input</code>, with <code class="font-mono">label</code> for help text.
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Name</legend>
+          <input type="text" class="input w-full" placeholder="Ada Lovelace" />
+          <p class="label">Shown to instructors and classmates.</p>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">E-mail</legend>
+          <input type="email" class="input w-full" placeholder="ada@example.com" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Password</legend>
+          <input type="password" class="input w-full" value="correct horse" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Course code</legend>
+          <input type="text" class="input w-full font-mono" value="MAT-101" />
+          <p class="label">Mono face for codes.</p>
+        </fieldset>
+        <fieldset class="fieldset" disabled>
+          <legend class="fieldset-legend">Disabled</legend>
+          <input type="text" class="input w-full" value="Cannot edit" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Search</legend>
+          <label class="input w-full">
+            <span class="label">Find</span>
+            <input type="search" placeholder="Course or student" />
+          </label>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Select and textarea</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Role</legend>
+          <select class="select w-full">
+            <option disabled selected>Pick a role</option>
+            <option>Student</option>
+            <option>Instructor</option>
+            <option>Admin</option>
+          </select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Language</legend>
+          <select class="select w-full">
+            <option>Português</option>
+            <option>English</option>
+          </select>
+        </fieldset>
+        <fieldset class="fieldset sm:col-span-2">
+          <legend class="fieldset-legend">Feedback</legend>
+          <textarea class="textarea h-24 w-full" placeholder="Explique a sua resposta."></textarea>
+          <p class="label">Markdown is supported.</p>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Checkbox, radio and toggle</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Notify me about</legend>
+          <label class="label cursor-pointer gap-2 text-base-content">
+            <input type="checkbox" class="checkbox checkbox-primary" checked />
+            Released grades
+          </label>
+          <label class="label cursor-pointer gap-2 text-base-content">
+            <input type="checkbox" class="checkbox checkbox-primary" />
+            New resources
+          </label>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Exam mode</legend>
+          <label class="label cursor-pointer gap-2 text-base-content">
+            <input type="radio" name="mode" class="radio radio-primary" checked />
+            Timed
+          </label>
+          <label class="label cursor-pointer gap-2 text-base-content">
+            <input type="radio" name="mode" class="radio radio-primary" />
+            Untimed
+          </label>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Visibility</legend>
+          <label class="label cursor-pointer gap-2 text-base-content">
+            <input type="checkbox" class="toggle toggle-primary" checked />
+            Published
+          </label>
+          <label class="label cursor-pointer gap-2 text-base-content">
+            <input type="checkbox" class="toggle toggle-primary" disabled />
+            Locked
+          </label>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Validation states</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      <code class="font-mono">input-success</code>, <code class="font-mono">input-warning</code> and{" "}
+      <code class="font-mono">input-error</code>, always with a message below: color alone is not enough. Message
+      text uses <code class="font-mono">text-error</code> and <code class="font-mono">text-success</code>, never{" "}
+      <code class="font-mono">text-warning</code> (fill only in the light theme).
+    </p>
+    <div class="card card-border bg-base-100">
+      <div class="card-body grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {
+          states.map((state) => (
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">{state.label}</legend>
+              <input type="text" class:list={["input w-full", state.input]} value="Some value" aria-invalid={state.input === "input-error"} />
+              <p class:list={["label", "message" in state && state.messageClass]}>
+                {"message" in state ? state.message : state.hint}
+              </p>
+            </fieldset>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">A complete form</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      One primary action, an optional ghost cancel, and an <code class="font-mono">Alert</code> for the result.
+    </p>
+    <div class="card card-border max-w-md bg-base-100">
+      <form class="card-body gap-4" onsubmit="return false">
+        <Alert variant="error">
+          <span>Could not save. Check the highlighted field.</span>
+        </Alert>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Title</legend>
+          <input type="text" class="input input-error w-full" value="" aria-invalid="true" />
+          <p class="label text-error">Title is required.</p>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Description</legend>
+          <textarea class="textarea h-20 w-full"></textarea>
+        </fieldset>
+        <div class="card-actions justify-end">
+          <Button variant="ghost">Cancel</Button>
+          <Button variant="primary" type="submit">Save</Button>
+        </div>
+      </form>
+    </div>
   </section>
 </DesignLayout>

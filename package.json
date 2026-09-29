@@ -22,6 +22,7 @@
 		"generate": "pnpm run route-patterns && pnpm run question-models",
 		"question-models": "tsx scripts/generate-question-models.ts",
 		"sidebar-art": "tsx scripts/generate-sidebar-art.ts",
+		"brand": "tsx scripts/generate-brand.ts",
 		"route-patterns": "tsx scripts/generate-route-patterns.ts",
 		"clear": "node scripts/clean.mjs",
 		"init": "node scripts/init.mjs",

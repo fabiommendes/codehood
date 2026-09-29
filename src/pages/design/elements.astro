@@ -32,6 +32,11 @@ const badgeVariants = [
 ] as const;
 const alertVariants = ["info", "success", "warning", "error"] as const;
 
+const themes = [
+	{ id: "codehood", title: "Cerrado (light)" },
+	{ id: "codehood-dark", title: "Forest (dark)" },
+] as const;
+
 const tableRows = [
 	{ name: "my laptop", kind: "cli", lastUsed: "yesterday" },
 	{ name: "grading bot", kind: "bot", lastUsed: "never" },
@@ -67,6 +72,72 @@ const tabItems = [
       >. These aren't recreations for the showcase &mdash; every example below
       is the same component the rest of the app imports.
     </p>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Both themes</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      The same components inside a <code class="font-mono">data-theme</code> wrapper for each theme. Cards and
+      buttons get the irregular hand-cut radius from <code class="font-mono">global.css</code>; badges and chips
+      use a smaller one, inputs a plain 8 px.
+    </p>
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {
+        themes.map((theme) => (
+          <div data-theme={theme.id} class="flex flex-col gap-4 rounded-box border border-base-300 bg-base-200 p-4 text-base-content">
+            <p class="text-sm font-semibold">{theme.title}</p>
+            <div class="flex flex-wrap gap-2">
+              {buttonVariants.map((variant) => (
+                <Button variant={variant}>{variant}</Button>
+              ))}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              {badgeVariants.map((variant) => (
+                <Badge variant={variant}>{variant}</Badge>
+              ))}
+            </div>
+            <div class="flex flex-col gap-2">
+              {alertVariants.map((variant) => (
+                <Alert variant={variant}>
+                  <span class="capitalize">{variant}</span>: a {variant} message.
+                </Alert>
+              ))}
+            </div>
+            <Card title="Card">
+              <p class="text-sm text-base-content/70">Surface on base-100, border on base-300.</p>
+            </Card>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">Loud and quiet screens</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      Personality is strong at the edges and quiet where people work. Quiet screens keep the colors, type and
+      rounded paper shapes, and drop tilt, tape and illustration.
+    </p>
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title">Loud</h3>
+          <p class="text-sm text-base-content/70">
+            Landing page, login, empty states, error pages, released grades, first visit. May use tilt (cards
+            alternate -0.4° and 0.3°), tape, illustration and motifs.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title">Quiet</h3>
+          <p class="text-sm text-base-content/70">
+            Exam in progress, reading a resource or question, grade tables, rosters, forms. Radius and color only:
+            no tilt, tape or illustration. Everything on this page is shown quiet.
+          </p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="mb-14">
@@ -250,12 +321,13 @@ const tabItems = [
     <h2 class="mb-2 text-xl font-semibold">PageKicker &amp; BrandSquares</h2>
     <p class="mb-5 text-sm text-base-content/60">
       <code class="font-mono">{`<PageKicker text="..." squares />`}</code> &mdash;
-      the small uppercase label above a page's heading, seen at the top of this design
-      section index. The
+      the small mono eyebrow above a page's heading, seen at the top of the design
+      index. The
       <code class="font-mono">squares</code> prop pairs it with <code
         class="font-mono">&lt;BrandSquares /&gt;</code
-      >, the continuous multicolor logo stripe; only the landing page's hero
-      kicker uses it, every other kicker is text-only.
+      >, a short stripe running through the primary, error, warning and success
+      tokens; only the landing page's hero kicker uses it, every other kicker
+      is text-only.
     </p>
     <div class="card card-border bg-base-100">
       <div class="card-body gap-4">

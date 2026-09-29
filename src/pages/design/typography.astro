@@ -34,7 +34,8 @@ const headings = [
     <h1 class="text-3xl font-bold">Typography</h1>
     <p class="mt-3 max-w-2xl text-base-content/70">
       Three typefaces, each with one job: a display face for headings, a body face for everything you read, and a
-      monospace face for anything that's code.
+      monospace face for code, course codes and timers. All three cover Latin Extended, so Portuguese renders
+      without fallback glyphs.
     </p>
   </section>
 
@@ -42,28 +43,46 @@ const headings = [
     <div class="card card-border bg-base-100">
       <div class="card-body">
         <span class="badge badge-outline badge-sm font-mono">font-display</span>
-        <p class="font-display mt-3 text-2xl font-semibold">Space Grotesk</p>
-        <p class="text-sm text-base-content/60">Headings only.</p>
+        <p class="font-display mt-3 text-2xl font-bold">Fraunces</p>
+        <p class="text-sm text-base-content/60">
+          Headings, course names, empty-state titles. Weight 700 with <code class="font-mono">SOFT</code> 100 and{" "}
+          <code class="font-mono">WONK</code> 1, applied to h1 to h6 in <code class="font-mono">global.css</code>.
+        </p>
       </div>
     </div>
     <div class="card card-border bg-base-100">
       <div class="card-body">
         <span class="badge badge-outline badge-sm font-mono">font-sans</span>
-        <p class="font-sans mt-3 text-2xl font-semibold">IBM Plex Sans</p>
-        <p class="text-sm text-base-content/60">Body copy, UI labels, buttons.</p>
+        <p class="font-sans mt-3 text-2xl font-semibold">Atkinson Hyperlegible</p>
+        <p class="text-sm text-base-content/60">Body copy, UI labels, buttons, exams. Designed for low-vision readers.</p>
       </div>
     </div>
     <div class="card card-border bg-base-100">
       <div class="card-body">
         <span class="badge badge-outline badge-sm font-mono">font-mono</span>
-        <p class="font-mono mt-3 text-2xl font-semibold">IBM Plex Mono</p>
-        <p class="text-sm text-base-content/60">Code, tokens, terminal output.</p>
+        <p class="font-mono mt-3 text-2xl font-semibold">JetBrains Mono</p>
+        <p class="text-sm text-base-content/60">Code, course codes, timers, eyebrows.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-5 text-xl font-semibold">Portuguese sample</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body gap-4">
+        <p class="font-display text-3xl font-bold">Programação, avaliação e coração</p>
+        <p>A açaí, o pão de queijo e a lição de casa: você não vai encontrar glifos faltando aqui.</p>
+        <p class="font-mono text-sm">ÁÀÂÃÉÊÍÓÔÕÚÇ áàâãéêíóôõúç · MAT-101 · 01:29:59</p>
       </div>
     </div>
   </section>
 
   <section class="mb-14">
     <h2 class="mb-5 text-xl font-semibold">Heading scale</h2>
+    <p class="mb-5 text-sm text-base-content/60">
+      Headings pick up Fraunces automatically. Sizes and weights below are utility classes; the font is not set per
+      element.
+    </p>
     <div class="card card-border bg-base-100">
       <div class="card-body divide-y divide-base-300">
         {
@@ -118,7 +137,7 @@ const headings = [
       <div class="card-body gap-4">
         <p>
           Inline code, like <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code>,
-          sits inside a sentence with a subtle background.
+          sits inside a sentence with a subtle background. Course codes and timers use the same face: <span class="font-mono text-sm">MAT-101</span>, <span class="font-mono text-sm">00:42:10</span>.
         </p>
         <pre class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
   syncing content/questions/*.q.md

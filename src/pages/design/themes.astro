@@ -1,0 +1,821 @@
+---
+/// The light (Cerrado) and dark (Forest) themes side by side, rendering the
+/// same screens with the chosen logo, tokens and motifs.
+
+import {
+	along,
+	band,
+	C,
+	circle,
+	courseTile,
+	D,
+	glue,
+	O,
+	type Part,
+	pieceStyle,
+	rect,
+	roof,
+	S,
+	seg,
+	wall,
+} from "@/components/brand/paper";
+
+export const prerender = false;
+
+interface Logo {
+	c: string;
+	o1: string;
+	d1: string;
+	e: string;
+	wall: string;
+	roof: string;
+	window: string;
+	o2: string;
+	o3: string;
+	d2: string;
+	pixel: string;
+}
+
+const logo = (l: Logo): Part[] =>
+	glue([
+		...[
+			[-14.1, 18.25],
+			[-2.1, 6.25],
+			[129.9, 42.25],
+			[141.9, 30.25],
+		].map(([x = 0, y = 0]) => ({ d: rect(x, y, 12, 12), fill: l.pixel })),
+		{ d: C(6.65, 12.12), fill: l.c },
+		{ d: O(33.65, 30.12), fill: l.o1 },
+		{ d: D(45.65, 18.12), fill: l.d1 },
+		{ d: S(57.65, 30.12), fill: l.e },
+		{ d: wall(69.65, 10.12), fill: l.wall },
+		{ d: roof(69.65, 10.12), fill: l.roof },
+		{ d: rect(73.15, 23.12, 5, 5), fill: l.window },
+		{ d: O(101.65, 18.12), fill: l.o2 },
+		{ d: O(113.65, 30.12), fill: l.o3 },
+		{ d: D(119.65, 6.12), fill: l.d2 },
+	]);
+
+interface Theme {
+	id: "light" | "dark";
+	name: string;
+	logo: Logo;
+	vars: Record<string, string>;
+	figures: string[];
+	grounds: string[];
+	bulbs: string[];
+	tree: { edge: string; inner: string[]; leaves: string[] };
+	term: Record<
+		"bg" | "fg" | "muted" | "red" | "yellow" | "green" | "blue",
+		string
+	>;
+}
+
+const themes: Theme[] = [
+	{
+		id: "light",
+		name: "Light · Cerrado",
+		logo: {
+			c: "#1b4b9b",
+			o1: "#b5452a",
+			d1: "#f2b800",
+			e: "#3c8d2f",
+			wall: "#1b4b9b",
+			roof: "#b5452a",
+			window: "#f2b800",
+			o2: "#b5452a",
+			o3: "#3c8d2f",
+			d2: "#f2b800",
+			pixel: "#ddd6c6",
+		},
+
+		vars: {
+			"--bg": "#f7f3ea",
+			"--surface": "#fffdf8",
+			"--line": "#e6dfd0",
+			"--ink": "#1f2a24",
+			"--muted": "#5f6862",
+			"--primary": "#1b4b9b",
+			"--on-primary": "#ffffff",
+			"--secondary": "#f2b800",
+			"--on-secondary": "#1f2a24",
+			"--accent": "#a8309a",
+			"--success": "#337a27",
+			"--warning": "#e0731f",
+			"--error": "#b5452a",
+			"--on-status": "#ffffff",
+			"--tape": "rgb(242 184 0 / 0.45)",
+			"--shadow": "0 10px 18px -10px rgb(60 40 20 / 0.3)",
+		},
+		figures: ["#1b4b9b", "#b5452a", "#f2b800", "#3c8d2f", "#a8309a"],
+		grounds: ["#f7f3ea", "#efe4cf"],
+		bulbs: ["#a8309a", "#f2b800", "#2d7dd2", "#3c8d2f", "#e0731f"],
+		tree: {
+			edge: "#b9c2bd",
+			inner: ["#1f2a24", "#8a9690"],
+			leaves: ["#f2b800", "#3c8d2f", "#2d7dd2", "#a8309a"],
+		},
+		term: {
+			bg: "#1f2a24",
+			fg: "#f7f3ea",
+			muted: "#8a9690",
+			red: "#e8795f",
+			yellow: "#f2c94c",
+			green: "#7cc46c",
+			blue: "#6fa8e8",
+		},
+	},
+	{
+		id: "dark",
+		name: "Dark · Forest",
+		logo: {
+			c: "#f7faf8",
+			o1: "#a9bab2",
+			d1: "#6f8a7e",
+			e: "#a9bab2",
+			wall: "#f7faf8",
+			roof: "#a9bab2",
+			window: "#ffc400",
+			o2: "#f7faf8",
+			o3: "#6f8a7e",
+			d2: "#a9bab2",
+			pixel: "#2c5244",
+		},
+		vars: {
+			"--bg": "#0d211a",
+			"--surface": "#15302a",
+			"--line": "#1f4034",
+			"--ink": "#e6f0ea",
+			"--muted": "#8fb3a4",
+			"--primary": "#4aa0ff",
+			"--on-primary": "#04121f",
+			"--secondary": "#ffc400",
+			"--on-secondary": "#0d211a",
+			"--accent": "#ff4d97",
+			"--success": "#4cd08a",
+			"--warning": "#ff6f1a",
+			"--error": "#ff5c5c",
+			"--on-status": "#0d211a",
+			"--tape": "rgb(255 196 0 / 0.3)",
+			"--shadow": "0 14px 24px -14px rgb(0 0 0 / 0.8)",
+		},
+		figures: ["#1f8bff", "#ff2d87", "#ffc400", "#b5f000", "#00d2e6"],
+		grounds: ["#15302a", "#1f4034"],
+		bulbs: ["#ff2d87", "#ffc400", "#00d2e6", "#b5f000", "#1f8bff"],
+		tree: {
+			edge: "#2c5244",
+			inner: ["#f7faf8", "#a9bab2"],
+			leaves: ["#ffc400", "#b5f000", "#00d2e6", "#ff2d87"],
+		},
+		term: {
+			bg: "#081510",
+			fg: "#e6f0ea",
+			muted: "#6f8a7e",
+			red: "#ff3838",
+			yellow: "#ffc400",
+			green: "#4cd08a",
+			blue: "#1f8bff",
+		},
+	},
+];
+
+const COURSES = [
+	{ code: "cs101", name: "Intro to Computer Science" },
+	{ code: "mat201", name: "Linear Algebra" },
+	{ code: "prog2", name: "Programming II" },
+];
+
+/// A binary tree for empty states: paper for inner nodes, color for the leaves.
+const tree = (t: Theme["tree"]): Part[] => {
+	const nodes: [number, number, number][] = [
+		[90, 92, 9],
+		[56, 60, 8],
+		[124, 60, 8],
+		[38, 26, 7],
+		[74, 26, 7],
+		[106, 26, 7],
+		[142, 26, 7],
+	];
+	const at = (i: number): [number, number] => {
+		const [x = 0, y = 0] = nodes[i] ?? [];
+		return [x, y];
+	};
+	return [
+		{ d: rect(87, 92, 6, 26), fill: t.edge },
+		...[
+			[0, 1],
+			[0, 2],
+			[1, 3],
+			[1, 4],
+			[2, 5],
+			[2, 6],
+		].map(([a = 0, b = 0]) => ({
+			d: seg(...at(a), ...at(b), 2.5),
+			fill: t.edge,
+		})),
+		...nodes.map(([x, y, r], i) => ({
+			d: circle(x, y, r),
+			fill: (i < 3 ? t.inner[i === 0 ? 0 : 1] : t.leaves[i - 3]) ?? t.edge,
+			glow: i >= 3,
+		})),
+	];
+};
+
+const bulbs = (colors: string[]): Part[] =>
+	along(0, 4, 150, 34, 300, 4, 13).map(([x, y], i) => ({
+		d: circle(x, y + 3, 3.4),
+		fill: colors[i % colors.length] ?? "#fff",
+		glow: true,
+	}));
+
+const styleOf = (t: Theme) =>
+	[
+		...Object.entries(t.vars).map(([k, v]) => `${k}:${v}`),
+		...Object.entries(t.term).map(([k, v]) => `--t-${k}:${v}`),
+	].join(";");
+
+const glowIf = (t: Theme, p: Part) =>
+	p.glow && t.id === "dark" ? "url(#glow)" : undefined;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Light and dark themes — Codehood</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..800,0..100,0..1&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap"
+    />
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <filter id="cut-light">
+          <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="2" seed="4" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" />
+        </filter>
+        <filter id="cut-dark" x="-30%" y="-30%" width="160%" height="160%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="2" seed="4" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.2" result="piece" />
+          <feDropShadow in="piece" dx="0" dy="0.7" stdDeviation="0.6" flood-color="#000" flood-opacity="0.6" />
+        </filter>
+        <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+    </svg>
+
+    <div class="columns">
+      {
+        themes.map((t) => (
+          <section class={`theme theme-${t.id}`} style={styleOf(t)}>
+            <header class="topbar">
+              <svg class="logo" viewBox="-18 2 176 56" role="img" aria-label="codehood">
+                {logo(t.logo).map((p, i) => (
+                  <path
+                    d={p.d}
+                    fill={p.fill}
+                    style={pieceStyle(p)}
+                    class:list={[i === 10 && "window"]}
+                    filter={`url(#cut-${t.id})`}
+                  />
+                ))}
+              </svg>
+              <span class="who">
+                Ada Lovelace <span class="badge badge-muted">Student</span>
+              </span>
+            </header>
+
+            <p class="eyebrow">{t.name}</p>
+
+            <div class="layout">
+              <nav class="sidebar">
+                <a href="#" class="active">Home</a>
+                <a href="#">My courses</a>
+                <a href="#">Calendar</a>
+                <p class="eyebrow">Courses</p>
+                {COURSES.map((c) => (
+                  <a href="#" class="course-link">
+                    <svg viewBox="0 0 60 60" aria-hidden="true">
+                      {courseTile(c.code, t.figures, t.grounds).map((tile) => (
+                        <g style={`transform:rotate(${tile.rotate}deg);transform-box:fill-box;transform-origin:center`}>
+                          <path d={tile.ground} fill={tile.groundFill} />
+                          <path d={tile.figure} fill={tile.figureFill} />
+                        </g>
+                      ))}
+                    </svg>
+                    {c.code}
+                  </a>
+                ))}
+              </nav>
+
+              <main class="content">
+                <div class="panel celebrate">
+                  <svg class="lights" viewBox="0 0 300 30" aria-hidden="true">
+                    <path d={band(0, 4, 150, 34, 300, 4, 0.8)} fill="var(--muted)" />
+                    {bulbs(t.bulbs).map((p) => (
+                      <path d={p.d} fill={p.fill} filter={glowIf(t, p)} />
+                    ))}
+                  </svg>
+                  <p class="display">Midterm grades are out</p>
+                  <p class="muted">cs101 · released today at 14:00</p>
+                  <button class="btn btn-primary" type="button">
+                    See results
+                  </button>
+                </div>
+
+                <div class="panel">
+                  <div class="course-card">
+                    <svg viewBox="0 0 60 60" aria-hidden="true">
+                      {courseTile("cs101", t.figures, t.grounds).map((tile) => (
+                        <g style={`transform:rotate(${tile.rotate}deg);transform-box:fill-box;transform-origin:center`}>
+                          <path d={tile.ground} fill={tile.groundFill} />
+                          <path d={tile.figure} fill={tile.figureFill} />
+                        </g>
+                      ))}
+                    </svg>
+                    <div>
+                      <p class="code">cs101 · 2026-2</p>
+                      <p class="display course-name">Intro to Computer Science</p>
+                      <p class="muted">Ada Lovelace · you take this course</p>
+                    </div>
+                  </div>
+                  <div class="next">
+                    <span class="badge badge-success">Open now</span>
+                    <span>Quiz 3 · closes in 2 hours</span>
+                    <button class="btn btn-secondary btn-sm" type="button">
+                      Continue
+                    </button>
+                  </div>
+                </div>
+
+                <div class="panel quiet">
+                  <div class="exam-head">
+                    <span>Quiz 3 · question 2 of 6</span>
+                    <span class="timer">23 min left</span>
+                  </div>
+                  <p class="question">
+                    What does <code>git rebase</code> rewrite?
+                  </p>
+                  {["The commit history of the current branch", "The working tree only", "Nothing, it only moves HEAD"].map((o, i) => (
+                    <label class:list={["option", i === 0 && "selected"]}>
+                      <input type="radio" name={`q-${t.id}`} checked={i === 0} />
+                      <span>{o}</span>
+                    </label>
+                  ))}
+                  <div class="row end">
+                    <button class="btn btn-ghost" type="button">
+                      Previous
+                    </button>
+                    <button class="btn btn-primary" type="button">
+                      Next
+                    </button>
+                  </div>
+                </div>
+
+                <div class="panel components">
+                  <div class="row">
+                    <span class="badge badge-success">Graded</span>
+                    <span class="badge badge-warning">Late</span>
+                    <span class="badge badge-error">Closed</span>
+                    <span class="badge badge-accent">New</span>
+                    <span class="badge badge-muted">Draft</span>
+                  </div>
+                  <label class="field">
+                    <span>Email or username</span>
+                    <input type="text" value="ada@example.edu" />
+                  </label>
+                  <p>
+                    Body text with a <a href="#">link</a> and <code>inline code</code>.
+                  </p>
+                </div>
+
+                <div class="panel empty">
+                  <svg class="tree" viewBox="20 10 140 110" aria-hidden="true">
+                    {tree(t.tree).map((p) => (
+                      <path d={p.d} fill={p.fill} filter={glowIf(t, p)} />
+                    ))}
+                  </svg>
+                  <p class="display">No exams yet</p>
+                  <p class="muted">Your instructor publishes exams with the CLI.</p>
+                </div>
+
+                <pre class="terminal"><span class="t-blue">$</span> codehood push
+<span class="t-muted">pushing ada/cs101 2026-2</span>
+<span class="t-green">✓</span> 12 questions synced
+<span class="t-yellow">!</span> exams/quiz3.md: duration missing
+<span class="t-red">✗</span> questions/q7.mdq.md: 2 correct choices</pre>
+              </main>
+            </div>
+          </section>
+        ))
+      }
+    </div>
+  </body>
+</html>
+
+<style is:global>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    line-height: 1.5;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 1200px) {
+    .columns {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .theme {
+    min-width: 0;
+    padding: 0 28px 48px;
+    color: var(--ink);
+    background: var(--bg);
+  }
+
+  .display {
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-variation-settings:
+      "SOFT" 100,
+      "WONK" 1;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    font-size: 1.4rem;
+    margin: 0;
+  }
+
+  .eyebrow,
+  .code,
+  .timer {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+  }
+
+  .eyebrow {
+    margin: 20px 0 12px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .muted,
+  .code {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  a {
+    color: var(--primary);
+  }
+
+  code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9em;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .logo {
+    height: 36px;
+    overflow: visible;
+  }
+
+  svg {
+    overflow: visible;
+  }
+
+  svg path {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .theme-light .logo path:not(.window) {
+    mix-blend-mode: multiply;
+  }
+
+  .who {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.9rem;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 24px;
+  }
+
+  .sidebar {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+  }
+
+  .sidebar a {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 10px;
+    color: var(--ink);
+    text-decoration: none;
+    border-radius: 10px 4px 12px 5px / 5px 12px 4px 10px;
+  }
+
+  .sidebar a.active {
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
+    font-weight: 700;
+  }
+
+  .course-link {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+  }
+
+  .course-link svg {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .content {
+    display: grid;
+    gap: 22px;
+    min-width: 0;
+  }
+
+  .panel {
+    position: relative;
+    padding: 20px;
+    background: var(--surface);
+    border-radius: 18px 6px 20px 8px / 8px 20px 6px 18px;
+    box-shadow:
+      inset 0 0 0 1px var(--line),
+      var(--shadow);
+  }
+
+  .panel:not(.quiet)::before {
+    content: "";
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    width: 72px;
+    height: 20px;
+    background: var(--tape);
+    transform: translateX(-50%) rotate(-3deg);
+  }
+
+  .panel:nth-child(odd):not(.quiet) {
+    transform: rotate(-0.4deg);
+  }
+
+  .panel:nth-child(even):not(.quiet) {
+    transform: rotate(0.3deg);
+  }
+
+  .celebrate {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    padding-top: 44px;
+  }
+
+  .celebrate::before {
+    display: none;
+  }
+
+  .lights {
+    position: absolute;
+    top: 6px;
+    left: 20px;
+    width: calc(100% - 40px);
+    height: 30px;
+  }
+
+  .btn {
+    margin-top: 8px;
+    padding: 0.6em 1.1em;
+    font: 700 0.95rem "Atkinson Hyperlegible", sans-serif;
+    border: 0;
+    border-radius: 18px 6px 20px 8px / 8px 20px 6px 18px;
+    box-shadow: 0 2px 0 rgb(0 0 0 / 0.2);
+    cursor: pointer;
+  }
+
+  .btn-sm {
+    margin: 0 0 0 auto;
+    padding: 0.35em 0.9em;
+    font-size: 0.85rem;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+
+  .btn-secondary {
+    background: var(--secondary);
+    color: var(--on-secondary);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    box-shadow: none;
+    text-decoration: underline wavy;
+    text-underline-offset: 4px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.1em 0.65em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--on-status);
+    border-radius: 10px 4px 12px 5px / 5px 12px 4px 10px;
+  }
+
+  .badge-success {
+    background: var(--success);
+  }
+
+  .badge-warning {
+    background: var(--warning);
+  }
+
+  .badge-error {
+    background: var(--error);
+  }
+
+  .badge-accent {
+    background: var(--accent);
+  }
+
+  .badge-muted {
+    background: color-mix(in srgb, var(--muted) 22%, var(--surface));
+    color: var(--ink);
+  }
+
+  .course-card {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .course-card svg {
+    flex: none;
+    width: 60px;
+    height: 60px;
+    border-radius: 10px 4px 12px 5px / 5px 12px 4px 10px;
+    overflow: hidden;
+  }
+
+  .next,
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .next {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+    font-size: 0.9rem;
+  }
+
+  .row.end {
+    justify-content: flex-end;
+  }
+
+  .exam-head {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .timer {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .question {
+    margin: 12px 0;
+    font-size: 1.1rem;
+  }
+
+  .option {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .option.selected {
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+    border-color: var(--primary);
+  }
+
+  .option input {
+    accent-color: var(--primary);
+  }
+
+  .components {
+    display: grid;
+    gap: 14px;
+  }
+
+  .components p {
+    margin: 0;
+  }
+
+  .field {
+    display: grid;
+    gap: 4px;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+
+  .field input {
+    padding: 0.55em 0.75em;
+    font: 400 1rem "Atkinson Hyperlegible", sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .empty {
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .tree {
+    width: 140px;
+    height: 110px;
+  }
+
+  .terminal {
+    margin: 0;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font: 0.85rem/1.6 "JetBrains Mono", monospace;
+    color: var(--t-fg);
+    background: var(--t-bg);
+    border-radius: 8px;
+  }
+
+  .t-muted {
+    color: var(--t-muted);
+  }
+
+  .t-red {
+    color: var(--t-red);
+  }
+
+  .t-yellow {
+    color: var(--t-yellow);
+  }
+
+  .t-green {
+    color: var(--t-green);
+  }
+
+  .t-blue {
+    color: var(--t-blue);
+  }
+</style>
