@@ -111,13 +111,13 @@ export const protocolsTrueFalse: TrueFalse = trueFalse({
 			id: "tcp-order",
 			text: "TCP guarantees ordered delivery.",
 			correct: true,
-			feedback: "True — TCP reassembles segments in order.",
+			feedback: "True: TCP reassembles segments in order.",
 		},
 		{
 			id: "udp-guarantee",
 			text: "UDP guarantees delivery.",
 			correct: false,
-			feedback: "False — UDP makes no delivery guarantee at all.",
+			feedback: "False: UDP makes no delivery guarantee at all.",
 		},
 	],
 });

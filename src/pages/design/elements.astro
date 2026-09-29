@@ -69,7 +69,7 @@ const tabItems = [
       Reusable pieces from <code
         class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm"
         >src/components/ui/</code
-      >. These aren't recreations for the showcase &mdash; every example below
+      >. These aren't recreations for the showcase. Every example below
       is the same component the rest of the app imports.
     </p>
   </section>
@@ -143,7 +143,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Button</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Button variant="primary">`}</code> &mdash; renders
+      <code class="font-mono">{`<Button variant="primary">`}</code>: renders
       an
       <code class="font-mono">&lt;a&gt;</code> instead of a <code
         class="font-mono">&lt;button&gt;</code
@@ -163,7 +163,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Badge</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Badge variant="success">`}</code> &mdash; used for
+      <code class="font-mono">{`<Badge variant="success">`}</code>: used for
       role labels and API key kinds elsewhere in the app.
     </p>
     <div class="card card-border bg-base-100">
@@ -180,14 +180,14 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Alert</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Alert variant="error">`}</code> &mdash; the same
+      <code class="font-mono">{`<Alert variant="error">`}</code>: the same
       pattern used for action-result messages on the login, invite, and profile pages.
     </p>
     <div class="flex flex-col gap-3">
       {
         alertVariants.map((variant) => (
           <Alert variant={variant}>
-            <span class="capitalize">{variant}</span> &mdash; this is what a{" "}
+            <span class="capitalize">{variant}</span>: this is what a{" "}
             {variant} message looks like.
           </Alert>
         ))
@@ -198,7 +198,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Card</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Card title="...">`}</code> &mdash; a bordered container
+      <code class="font-mono">{`<Card title="...">`}</code>: a bordered container
       with an optional title; every section on this page (including this one) is one.
     </p>
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -220,7 +220,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Divider &amp; list</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      Not (yet) wrapped in components &mdash; plain daisyUI classes, used as-is
+      Not (yet) wrapped in components: plain daisyUI classes, used as-is
       on the profile page's API key list.
     </p>
     <div class="card card-border bg-base-100">
@@ -248,7 +248,7 @@ const tabItems = [
         <div class="divider"></div>
         <p class="text-xs text-base-content/50">
           <code class="font-mono">divider</code> separates the list from whatever
-          follows it &mdash; on the profile page, the create-key form.
+          follows it. On the profile page, that is the create-key form.
         </p>
       </div>
     </div>
@@ -257,7 +257,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Table</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Table columns={...} data={...} />`}</code> &mdash;
+      <code class="font-mono">{`<Table columns={...} data={...} />`}</code>:
       a data-driven
       <code class="font-mono">&lt;table&gt;</code>; each column declares its
       header and how to render a row's cell, so the markup never repeats per
@@ -269,7 +269,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Tabs</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<Tabs items={...} active="..." />`}</code> &mdash;
+      <code class="font-mono">{`<Tabs items={...} active="..." />`}</code>:
       the tab strip on this very page. Link mode (shown above, no <code
         class="font-mono">name</code
       > prop) renders <code class="font-mono">&lt;a&gt;</code>
@@ -286,7 +286,7 @@ const tabItems = [
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">ListRow</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<ListRow href="..." muted>`}</code> &mdash; a single-row
+      <code class="font-mono">{`<ListRow href="..." muted>`}</code>: a single-row
       card with optional leading/trailing slots. Renders an <code
         class="font-mono">&lt;a&gt;</code
       > when given
@@ -320,7 +320,7 @@ const tabItems = [
   <section>
     <h2 class="mb-2 text-xl font-semibold">PageKicker &amp; BrandSquares</h2>
     <p class="mb-5 text-sm text-base-content/60">
-      <code class="font-mono">{`<PageKicker text="..." squares />`}</code> &mdash;
+      <code class="font-mono">{`<PageKicker text="..." squares />`}</code>:
       the small mono eyebrow above a page's heading, seen at the top of the design
       index. The
       <code class="font-mono">squares</code> prop pairs it with <code

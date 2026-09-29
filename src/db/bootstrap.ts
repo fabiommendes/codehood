@@ -306,7 +306,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			data: {
 				type: "MD",
 				content:
-					"Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array — you can always change it once a profiler tells you to.",
+					"Need order-preserving iteration? Array or linked list.\n\nNeed fast lookup by key? Hash table.\n\nNeed sorted order *and* fast insert? Balanced tree.\n\nWhen in doubt, start with an array. You can always change it once a profiler tells you to.",
 			},
 			rev: "demo-when-to-use-v1",
 		},
@@ -391,7 +391,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			week: 3,
 			kind: "HOLIDAY" as const,
 			title: "Martin Luther King Jr. Day",
-			description: "No class — university holiday.",
+			description: "No class (university holiday).",
 		},
 		{
 			slug: "w03-wed",
