@@ -1,0 +1,41 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import GradesTable from "@/components/grading/GradesTable.astro";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { loadCourse } from "@/utils/load-course";
+import { loadGradesTable } from "@/utils/load-grading";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+const table = await loadGradesTable(course.id, actor, new Date());
+---
+
+<AppLayout title={`Grades · ${course.discipline.name}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="grades" />
+
+    <h2 class="mt-8 text-2xl font-bold">Grades</h2>
+
+    {
+      table.columns.length === 0 ? (
+        <p class="mt-4 text-base-content/60">No exams yet.</p>
+      ) : table.rows.length === 0 ? (
+        <div class="mt-4">
+          <p class="text-base-content/60">No students enrolled yet.</p>
+          <a href={`${href}/roster`} class="link mt-2 inline-block">Students</a>
+        </div>
+      ) : (
+        <GradesTable href={href} table={table} />
+      )
+    }
+  </main>
+</AppLayout>

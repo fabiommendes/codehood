@@ -331,9 +331,25 @@ export function attemptRows(
 		};
 	});
 
-	return rows.sort(
-		(a, b) =>
-			a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
-			a.author.localeCompare(b.author),
+	return rows.sort((a, b) =>
+		compareStudents(
+			{ name: a.name, username: a.author },
+			{ name: b.name, username: b.author },
+		),
+	);
+}
+
+/**
+ * Orders students by name without regard to case, ties by username.
+ *
+ * Meant as a `sort` comparator.
+ */
+export function compareStudents(
+	a: { name: string; username: string },
+	b: { name: string; username: string },
+): number {
+	return (
+		a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
+		a.username.localeCompare(b.username)
 	);
 }

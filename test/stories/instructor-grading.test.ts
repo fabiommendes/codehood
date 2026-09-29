@@ -212,3 +212,187 @@ test("instructor: grade submissions by hand", async ({ page }) => {
 		await expect(item).toContainText("1 not graded");
 	});
 });
+
+test("instructor: see the whole class's results", async ({ page }) => {
+	const teacher = await seedUser({ role: "INSTRUCTOR", username: "classroom" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	await db.question.create(
+		{
+			course: course.id,
+			slug: "q-short",
+			status: "PUBLISHED",
+			version: "1",
+			question: {
+				...capitalShortAnswer,
+				id: "q-short",
+				title: "Typed capital",
+			},
+		},
+		FULL_ACCESS,
+	);
+	const people = [
+		await seedUser({
+			role: "STUDENT",
+			username: "cl-caio",
+			name: "Caio Nunes",
+		}),
+		await seedUser({ role: "STUDENT", username: "cl-bia", name: "Bia Lima" }),
+		await seedUser({
+			role: "STUDENT",
+			username: "cl-ana",
+			name: "Ana Prado",
+		}),
+	];
+	for (const person of people) {
+		await db.enrollment.create(
+			{ course: course.id, username: person.username },
+			FULL_ACCESS,
+		);
+	}
+	const [caio, bia, ana] = people;
+
+	/// A closed exam answered by `sittings`: each student's score, or none for a student who skipped it.
+	async function closedExam(
+		slug: string,
+		title: string,
+		daysAgo: number,
+		sittings: Array<[(typeof people)[number] | undefined, string]>,
+	) {
+		const exam = await persistedExamFactory.create({
+			course: course.id,
+			slug,
+			title,
+			type: "EXAM",
+			status: "ONGOING",
+			questions: [{ slug: "q-short" }],
+		});
+		for (const [student, score] of sittings) {
+			if (!student) continue;
+			const response = await db.response.submit(
+				{
+					course: course.id,
+					exam: slug,
+					question: "q-short",
+					payload: { text: `${student.username} on ${slug}` },
+				},
+				{ actor: student },
+			);
+			await db.feedback.create(
+				{
+					submission: {
+						publicId: response.submissions.at(-1)?.publicId ?? "",
+					},
+					ref: "pass-1",
+					score,
+					grader: teacher.username,
+				},
+				FULL_ACCESS,
+			);
+			await db.response.finish(
+				{ course: course.id, exam: slug },
+				{ actor: student },
+			);
+		}
+		await prisma.exam.update({
+			where: { id: exam.id },
+			data: {
+				status: "COMPLETED",
+				scheduledAt: new Date(Date.now() - daysAgo * 24 * 60 * MINUTE),
+			},
+		});
+	}
+	// Ana 80% and Bia 60% on the midterm, Caio missed it; Ana 100% and Caio 50% on the final, Bia missed it.
+	await closedExam("midterm", "Midterm exam", 30, [
+		[ana, "0.8"],
+		[bia, "0.6"],
+	]);
+	await closedExam("final", "Final exam", 10, [
+		[ana, "1"],
+		[caio, "0.5"],
+	]);
+	await logInAs(page, teacher);
+
+	await test.step("the Grades tab of the course opens the class's results", async () => {
+		await page.goto(href);
+		await expect(page).toHaveURL(href);
+		await page.getByRole("tab", { name: "Grades", exact: true }).click();
+
+		await expect(page).toHaveURL(`${href}/grades`);
+		await expect(
+			page.getByRole("heading", { level: 2, name: "Grades", exact: true }),
+		).toBeVisible();
+	});
+
+	await test.step("every student is a row and every exam a column, with the class average under each exam", async () => {
+		const table = page.getByRole("table", { name: "Grades", exact: true });
+		await expect(page.getByRole("rowheader")).toHaveText([
+			"Ana Prado",
+			"Bia Lima",
+			"Caio Nunes",
+		]);
+		await expect(table.getByRole("columnheader").getByRole("link")).toHaveText([
+			"Midterm exam",
+			"Final exam",
+		]);
+		const header = (title: string) =>
+			table.getByRole("columnheader").filter({
+				has: page.getByRole("link", { name: title, exact: true }),
+			});
+		await expect(header("Midterm exam")).toContainText("avg 70% · 2 of 3");
+		await expect(header("Final exam")).toContainText("avg 75% · 2 of 3");
+
+		const cells = (name: string) =>
+			page
+				.getByRole("row")
+				.filter({
+					has: page.getByRole("rowheader", { name, exact: true }),
+				})
+				.getByRole("cell");
+		await expect(cells("Ana Prado")).toHaveText(["80%", "100%"]);
+		await expect(cells("Bia Lima")).toHaveText(["60%", "Missed"]);
+		await expect(cells("Caio Nunes")).toHaveText(["Missed", "50%"]);
+	});
+
+	await test.step("a cell leads to that student's attempt, and back returns to the table", async () => {
+		await page
+			.getByRole("row")
+			.filter({
+				has: page.getByRole("rowheader", { name: "Bia Lima", exact: true }),
+			})
+			.getByRole("cell")
+			.first()
+			.getByRole("link")
+			.click();
+
+		await expect(page).toHaveURL(`${href}/exams/midterm/attempts/cl-bia`);
+		await expect(
+			page.getByRole("heading", { level: 2, name: "Bia Lima", exact: true }),
+		).toBeVisible();
+
+		await page.goBack();
+
+		await expect(page).toHaveURL(`${href}/grades`);
+		await expect(
+			page.getByRole("heading", { level: 2, name: "Grades", exact: true }),
+		).toBeVisible();
+	});
+
+	await test.step("a column header leads to the exam", async () => {
+		await page
+			.getByRole("columnheader")
+			.getByRole("link", { name: "Final exam", exact: true })
+			.click();
+
+		await expect(page).toHaveURL(`${href}/exams/final`);
+		await expect(
+			page.getByRole("heading", { name: "Final exam" }).first(),
+		).toBeVisible();
+	});
+});

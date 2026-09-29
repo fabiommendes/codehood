@@ -7,6 +7,7 @@ import {
 	type Exam,
 	type Feedback,
 } from "@/db";
+import { type GradesTable, gradesTable } from "@/services/grades-table";
 import {
 	type CountingAnswer,
 	countingAnswers,
@@ -98,4 +99,23 @@ export async function loadStudents(
 		...active.map(({ username, name }) => ({ username, name, dropped: false })),
 		...dropped.map(({ username, name }) => ({ username, name, dropped: true })),
 	];
+}
+
+/**
+ * Builds the course's grades table at `now`.
+ *
+ * One query per kind of data, never one per student or exam.
+ */
+export async function loadGradesTable(
+	course: Course["id"],
+	actor: UserActor,
+	now: Date,
+): Promise<GradesTable> {
+	const [exams, students, attempts, feedback] = await Promise.all([
+		db.exam.findMany({ course }, { actor }),
+		loadStudents(course, actor),
+		db.response.findMany({ course, practice: false }, { actor }),
+		db.feedback.findMany({ course }, { actor }),
+	]);
+	return gradesTable(exams, students, attempts, feedback, now);
 }

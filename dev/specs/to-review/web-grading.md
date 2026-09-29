@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-review
+status: implemented
 tags: [grading, exams, instructor, web]
 relatedTo: [feedback-service, exam-result, auto-grading, instructor-home]
 ---
@@ -256,12 +256,20 @@ Choices made without the requester's answer:
   question out of the mean, would let a student gain from a blank answer.
 - The grades table lives at `<course>/grades`, since `<course>/gradebook`
   was removed for showing fabricated data and now answers 404.
+- An attempt in progress shows its total as "—" in the exam's results.
+- "Show names" is the query parameter `names=1`, so no student name reaches
+  the page unless it is asked for.
+- The comment of a will-not-grade is stored as a grading pass with score
+  zero; the submission's status decides what is shown.
 - Rubrics are left out. The comment field is free text.
 
 Answered by the requester:
 
 - Grading goes question by question, not student by student.
 - Auto-grading is a separate spec, blocked until mdq-js lands.
+- R10 stays, with its own tab. A course total is a separate feature: the
+  requester favors a configuration on the course (weighted means, maybe
+  formulas over exam slugs) over a weight on each exam.
 
 ## Open questions
 

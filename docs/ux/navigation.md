@@ -63,6 +63,7 @@ Schedule    /<course>/schedule
 ─────────── everyone above; whoever manages the course also sees:
 Questions   /<course>/questions
 Students    /<course>/roster
+Grades      /<course>/grades
 ```
 
 The instructor's tabs are appended, never interleaved, so the first four tabs
@@ -80,7 +81,7 @@ A page for a single exam, question or resource keeps its tab active and shows a
 `← <List>` link above the item's title. Tab roots have no back-link.
 
 
-### Grading belongs to an exam, not to the course
+### Grading belongs to an exam, the class's results to the course
 
     status: adopted
 
@@ -98,6 +99,10 @@ These pages keep the Exams tab active and link back to the page above them.
 Answers on the grading page carry no student name unless the URL has
 `?names=1`, which the "Show names" switch sets and the links between grading
 pages keep.
+
+The Grades tab shows every student against every exam. It only reads: each
+cell leads to the student's attempt and each column to its exam, where the
+grading happens. It has no course total, since exams carry no weights yet.
 
 The earlier `/gradebook` page showed fabricated data and was removed, along
 with the empty Manage tab. `/manage` redirects to the Students tab.

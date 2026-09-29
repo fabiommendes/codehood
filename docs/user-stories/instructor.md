@@ -280,8 +280,8 @@ no responses or grades routes yet, so the posting half has nothing to call.
 
 ### See the whole class's results
 
-    status: todo
+    status: implemented
 
 Instructor wants to know how the class did, not one student at a time. The
-gradebook shows every student against every exam, so an exam everybody failed is
-visible as a column rather than something they have to piece together.
+Grades tab shows every student against every exam, so an exam everybody failed
+is visible as a column rather than something they have to piece together.

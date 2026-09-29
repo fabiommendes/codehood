@@ -13,6 +13,9 @@
   will-not-grade, which counts as zero and reads "Not graded".
   `<course>/exams/<slug>/attempts/<username>` shows one student's attempt
   whole. The home page's "To grade" items open the queue.
+- The instructor's Grades tab, at `<course>/grades`, shows every active
+  student against every exam and quiz: the total, "Pending", "In progress" or
+  "Missed", with each column's average and how many students attempted it.
 - Recording a grading pass, on the web or through the services, marks the
   submission `GRADED_MANUALLY` or `GRADED_AUTOMATICALLY`.
 - `/calendar` opens on the month of the next event, or of the last one when

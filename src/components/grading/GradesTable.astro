@@ -1,0 +1,78 @@
+---
+/**
+ * Every active student against every exam, with the totals the instructor has graded so far.
+ */
+import { formatScore } from "@/services/exam-result";
+import type { GradeCell, GradesTable } from "@/services/grades-table";
+
+interface Props {
+	/// The course's URL prefix.
+	href: string;
+	table: GradesTable;
+}
+
+const { href, table } = Astro.props;
+
+const label = (cell: GradeCell): string => {
+	switch (cell.kind) {
+		case "total":
+			return formatScore(cell.total);
+		case "pending":
+			return "Pending";
+		case "in-progress":
+			return "In progress";
+		case "missed":
+			return "Missed";
+		case "empty":
+			return "";
+	}
+};
+const hasAttempt = (cell: GradeCell): boolean =>
+	cell.kind === "total" ||
+	cell.kind === "pending" ||
+	cell.kind === "in-progress";
+---
+
+<div class="mt-6 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+  <table aria-label="Grades" class="table min-w-max">
+    <thead>
+      <tr>
+        <th scope="col" class="sticky left-0 z-10 bg-base-100">Student</th>
+        {
+          table.columns.map((column) => (
+            <th scope="col" class="align-top">
+              <a href={`${href}/exams/${column.exam.slug}`} class="link">
+                {column.exam.title}
+              </a>
+              <div class="mt-1 text-xs font-normal text-base-content/60">
+                {column.mean === null ? "no average" : `avg ${formatScore(column.mean)}`} · {column.attempted} of {column.students}
+              </div>
+            </th>
+          ))
+        }
+      </tr>
+    </thead>
+    <tbody>
+      {
+        table.rows.map((row) => (
+          <tr>
+            <th scope="row" class="sticky left-0 z-10 bg-base-100 font-medium">
+              {row.name}
+            </th>
+            {row.cells.map((cell, index) => (
+              <td>
+                {hasAttempt(cell) ? (
+                  <a href={`${href}/exams/${table.columns[index]?.exam.slug}/attempts/${row.username}`} class="link">
+                    {label(cell)}
+                  </a>
+                ) : (
+                  label(cell)
+                )}
+              </td>
+            ))}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>
