@@ -187,9 +187,9 @@ test("student: join a course with an in-class passphrase", async ({ page }) => {
 	await test.step("a student with no courses is offered a way to join one", async () => {
 		await logInAs(page, student);
 		await page.goto("/courses");
-		await expect(
-			page.getByRole("link", { name: "Join a course" }).first(),
-		).toHaveAttribute("href", "/courses/join");
+		const join = page.getByRole("link", { name: "Join a course" });
+		await expect(join).toHaveCount(1);
+		await expect(join).toHaveAttribute("href", "/courses/join");
 	});
 
 	const submitCode = async (typed: string) => {

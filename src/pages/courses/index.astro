@@ -32,9 +32,13 @@ const courses = await db.course.findMany({}, { actor });
           {isAdmin ? "Every course on this instance." : "Courses you take or teach."}
         </p>
       </div>
-      <a href="/courses/join" class="btn btn-primary rounded-full">
-        Join a course
-      </a>
+      {
+        courses.length > 0 && (
+          <a href="/courses/join" class="btn btn-primary rounded-full">
+            Join a course
+          </a>
+        )
+      }
     </div>
 
     {
