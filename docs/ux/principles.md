@@ -44,9 +44,8 @@ never before it.
 The same applies to the page someone lands on after logging in: it shows what
 needs their attention, not a directory of everything they have access to.
 
-Known violations: the exam page opens with a "Details" block that repeats its
-badges and offers no action; `/courses` is the landing page and is only a list
-of cards.
+Known violation: for the instructor, the exam page shows details and questions
+but not who submitted or what is left to grade.
 
 
 ## 3. Time is part of the state
@@ -61,11 +60,6 @@ Dates are written relative when they are near ("in 3 days", "closed 2 weeks
 ago") and absolute when they are far or when precision matters, with the
 absolute form always available on hover. Durations under pressure, such as an
 exam in progress, show the time left, not the time allowed.
-
-Known violations: a midterm dated in March still reads `SCHEDULED` and sits
-under "Upcoming" in September; the calendar opens on the current month even
-when every event is months away.
-
 
 ## 4. Speak the user's language, not the schema's
 
@@ -84,10 +78,6 @@ such as a course code, it is shown alongside a human name.
 A screen shows real data, or it is visibly marked as a preview in full. It never
 mixes the two. A hardcoded count beside a real one teaches the user that none of
 the numbers can be trusted.
-
-Known violations: the course home page shows a fixed "Resources 7" and two
-hardcoded resource rows above the real schedule.
-
 
 ## 6. Empty states say who acts next
 
