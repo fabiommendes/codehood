@@ -24,7 +24,7 @@ const ROLE_LABEL = {
 <details class="dropdown dropdown-end" open={open}>
   <summary class="btn btn-ghost h-auto min-h-10 gap-2 px-2 py-1 font-normal">
     <Avatar username={user.username} size={32} />
-    <span class="hidden text-left leading-tight sm:grid">
+    <span class="hidden text-left leading-tight whitespace-nowrap sm:grid">
       <span class="font-semibold">{user.name}</span>
       <span class="text-xs text-base-content/70">{ROLE_LABEL[user.role]}</span>
     </span>
