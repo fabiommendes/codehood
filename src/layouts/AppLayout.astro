@@ -1,5 +1,6 @@
 ---
 import { actions } from "astro:actions";
+import Avatar from "@/components/Avatar.astro";
 import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
 import CourseTile from "@/components/CourseTile.astro";
 import Logo from "@/components/Logo.astro";
@@ -115,7 +116,8 @@ function sidebarSketch(): { art: SketchArt; seed?: string } {
           user ? (
             <details class="dropdown dropdown-end">
               <summary class="btn btn-ghost h-auto min-h-10 gap-2 px-2 py-1 font-normal">
-                <span class="grid text-right leading-tight">
+                <Avatar username={user.username} size={32} />
+                <span class="hidden text-left leading-tight sm:grid">
                   <span class="font-semibold">{user.name}</span>
                   <span class="text-xs text-base-content/70">{ROLE_LABEL[user.role]}</span>
                 </span>
@@ -123,9 +125,19 @@ function sidebarSketch(): { art: SketchArt; seed?: string } {
                   <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </summary>
-              <ul class="menu dropdown-content z-40 mt-2 w-48 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+              <ul class="menu dropdown-content z-40 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+                <li class="menu-title flex-row items-center gap-3 px-3 pt-1 pb-2 font-normal text-base-content">
+                  <Avatar username={user.username} size={36} />
+                  <span class="grid leading-tight">
+                    <span class="font-semibold">{user.name}</span>
+                    <span class="text-xs text-base-content/60">@{user.username}</span>
+                  </span>
+                </li>
                 <li>
                   <a href="/profile">Profile</a>
+                </li>
+                <li>
+                  <a href="/getting-started">Set up the CLI</a>
                 </li>
                 <li>
                   <form method="POST" action={actions.auth.logout} class="p-0">

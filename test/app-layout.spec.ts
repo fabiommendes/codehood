@@ -23,6 +23,9 @@ test("the top bar says who is signed in and holds Profile and Log out", async ({
 		"href",
 		"/profile",
 	);
+	await expect(
+		menu.getByRole("link", { name: "Set up the CLI" }),
+	).toHaveAttribute("href", "/getting-started");
 	await menu.getByRole("button", { name: "Log out" }).click();
 	await page.goto("/profile");
 	await expect(page).toHaveURL(/\/login/);

@@ -1,0 +1,31 @@
+---
+import CourseTile from "@/components/CourseTile.astro";
+
+interface Props {
+	/// Seeds the tile, so a user keeps the same one everywhere.
+	username: string;
+	/// A picture of the user. Without one the avatar is an Athos tile.
+	src?: string | null;
+	size?: number;
+	class?: string;
+}
+
+const { username, src, size = 32, class: className } = Astro.props;
+---
+
+<span
+  class:list={[
+    "inline-grid shrink-0 overflow-hidden rounded-full ring-1 ring-base-300",
+    className,
+  ]}
+  style={`width:${size}px;height:${size}px`}
+  aria-hidden="true"
+>
+  {
+    src ? (
+      <img src={src} alt="" width={size} height={size} class="h-full w-full object-cover" />
+    ) : (
+      <CourseTile seed={`user:${username}`} size={size} />
+    )
+  }
+</span>
