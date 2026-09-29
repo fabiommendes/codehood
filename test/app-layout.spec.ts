@@ -88,3 +88,17 @@ test("on a course page the sidebar marks that course as the current page", async
 		1,
 	);
 });
+
+test("the footer names the version and links to the source code", async ({
+	page,
+}) => {
+	const student = await seedUser({ role: "STUDENT" });
+	await logInAs(page, student);
+	await page.goto("/courses");
+
+	const footer = page.locator("footer");
+	await expect(footer).toContainText(/v\d+\.\d+\.\d+/);
+	await expect(
+		footer.getByRole("link", { name: "Source code" }),
+	).toHaveAttribute("href", /github\.com/);
+});

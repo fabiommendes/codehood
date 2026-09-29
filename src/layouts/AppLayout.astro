@@ -7,6 +7,7 @@ import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { courseHref } from "@/urls";
+import { homepage, version } from "../../package.json";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -174,18 +175,18 @@ function sidebarSketch(): { art: SketchArt; seed?: string } {
           <slot />
         </div>
         <footer
-          class="relative z-10 border-t border-base-300 px-6 py-8 text-center"
+          class="relative z-10 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-base-300 px-6 py-3 text-sm text-base-content/60"
         >
-          <Logo height={64} class="mx-auto opacity-50" />
+          <Logo height={22} />
+          <a href={homepage} class="hover:text-primary">Source code</a>
           {
             import.meta.env.DEV && (
-              <nav class="mt-4 text-sm">
-                <a href="/design" class="text-base-content/60 hover:text-primary">
-                  Design system
-                </a>
-              </nav>
+              <a href="/design" class="hover:text-primary">
+                Design system
+              </a>
             )
           }
+          <span class="ml-auto font-mono text-xs">v{version}</span>
         </footer>
       </div>
 
