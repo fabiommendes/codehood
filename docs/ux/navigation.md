@@ -26,6 +26,7 @@ pages), use `CenteredLayout` or `ErrorLayout` and carry no navigation.
 ```
 /                                   landing page; signed-in users go to /courses
 /courses                            my courses
+/courses/join                       join a course with a passphrase
 /calendar                           my schedule across every course
 /profile                            account, password, API keys
 /getting-started                    CLI setup

@@ -2,7 +2,13 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
-import { db, type schema } from "@/db";
+import {
+	db,
+	PassphraseError,
+	type PassphraseErrorCode,
+	type PassphraseRedemption,
+	type schema,
+} from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
@@ -110,6 +116,29 @@ export const course = {
 	 * once and expires on its own, the same way a generated invite link is
 	 * shown once and revoked rather than edited.
 	 */
+	/**
+	 * Enrolls the caller in the course an in-class passphrase belongs to, and
+	 * returns that course so the page can redirect to it.
+	 */
+	joinCourse: defineAction({
+		accept: "form",
+		input: z.object({ value: z.string().trim().min(1) }),
+		handler: async (input, context): Promise<PassphraseRedemption> => {
+			const actor = requireUser(context);
+			try {
+				return await db.passphrase.redeem(input.value, { actor });
+			} catch (error) {
+				if (error instanceof PassphraseError) {
+					throw new ActionError({
+						code: "BAD_REQUEST",
+						message: passphraseErrorMessage(error.code, input.value),
+					});
+				}
+				throw error;
+			}
+		},
+	}),
+
 	generatePassphrase: defineAction({
 		accept: "form",
 		input: z.object({
@@ -128,3 +157,18 @@ export const course = {
 		}),
 	}),
 };
+
+/// User-facing text for a refused passphrase, quoting the code as typed.
+function passphraseErrorMessage(
+	code: PassphraseErrorCode,
+	value: string,
+): string {
+	switch (code) {
+		case "unknown":
+			return `No course uses the code "${value}". Check it for typos.`;
+		case "expired":
+			return `The code "${value}" has expired. Ask your instructor for a new one.`;
+		case "own_course":
+			return "You teach this course, so you can't join it as a student.";
+	}
+}

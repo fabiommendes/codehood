@@ -5,7 +5,16 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedInviteFactory } from "@/fixtures/invite.factory";
-import { fillField, logIn, openTab, resetDatabase, seedUser } from "./helpers";
+import { persistedPassphraseFactory } from "@/fixtures/passphrase.factory";
+import { courseHref } from "@/urls";
+import {
+	fillField,
+	logIn,
+	logInAs,
+	openTab,
+	resetDatabase,
+	seedUser,
+} from "./helpers";
 
 test.beforeEach(resetDatabase);
 
@@ -148,6 +157,101 @@ test("student: log in", async ({ page }) => {
 		await expect(
 			page.getByRole("link", { name: "Home" }).first(),
 		).toHaveAttribute("aria-current", "page");
+	});
+});
+
+test("student: join a course with an in-class passphrase", async ({ page }) => {
+	const student = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create();
+	const live = await persistedPassphraseFactory.create({ course: course.id });
+	const staleCourse = await persistedCourseFactory.create();
+	const stale = await persistedPassphraseFactory.create({
+		course: staleCourse.id,
+	});
+	await db.passphrase.update(
+		{ id: stale.id },
+		{ expiresAt: new Date(Date.now() - 60_000) },
+		FULL_ACCESS,
+	);
+	const enrolledIn = (target: typeof course) =>
+		db.enrollment.findOne(
+			{ course: target.id, username: student.username },
+			FULL_ACCESS,
+		);
+
+	await test.step("the join page is for signed-in users only", async () => {
+		await page.goto("/courses/join");
+		await expect(page).toHaveURL(/\/login/);
+	});
+
+	await test.step("a student with no courses is offered a way to join one", async () => {
+		await logInAs(page, student);
+		await page.goto("/courses");
+		await expect(
+			page.getByRole("link", { name: "Join a course" }).first(),
+		).toHaveAttribute("href", "/courses/join");
+	});
+
+	const submitCode = async (typed: string) => {
+		await page.goto("/courses/join");
+		await page.getByLabel("Course code").fill(typed);
+		await page.getByRole("button", { name: "Join" }).click();
+	};
+
+	await test.step("a code no course uses is refused, keeping what was typed", async () => {
+		await submitCode("nope22");
+		await expect(page).toHaveURL(/\/courses\/join/);
+		await expect(page.getByText("No course uses the code")).toBeVisible();
+		await expect(page.getByLabel("Course code")).toHaveValue("nope22");
+	});
+
+	await test.step("an expired code says so, and enrolls nobody", async () => {
+		await submitCode(stale.value);
+		await expect(page).toHaveURL(/\/courses\/join/);
+		await expect(page.getByText("has expired")).toBeVisible();
+		await expect(page.getByLabel("Course code")).toHaveValue(stale.value);
+		expect(await enrolledIn(staleCourse)).toBeNull();
+	});
+
+	await test.step("a live code, typed lowercase with spaces, lands on the course home", async () => {
+		await submitCode(`  ${live.value.toLowerCase()}  `);
+		const href = courseHref({
+			discipline: course.discipline.slug,
+			instructor: course.instructor.username,
+			edition: course.edition.slug,
+		});
+		await expect(page).toHaveURL(
+			(url) => url.pathname === href && url.searchParams.has("joined"),
+		);
+		await expect(
+			page.getByText(`You joined ${course.discipline.name}`),
+		).toBeVisible();
+		expect((await enrolledIn(course))?.status).toBe("ACTIVE");
+	});
+
+	await test.step("the course is on their list, and joining another stays on offer", async () => {
+		await page.goto("/courses");
+		await expect(
+			page.getByRole("heading", { name: course.discipline.name }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("link", { name: "Join a course" }).first(),
+		).toHaveAttribute("href", "/courses/join");
+	});
+
+	await test.step("the course's own instructor is told they teach it", async () => {
+		await page.context().clearCookies();
+		await logInAs(page, course.instructor);
+		await submitCode(live.value);
+		await expect(page).toHaveURL(/\/courses\/join/);
+		await expect(page.getByText("You teach this course")).toBeVisible();
+		await expect(page.getByLabel("Course code")).toHaveValue(live.value);
+		expect(
+			await db.enrollment.findOne(
+				{ course: course.id, username: course.instructor.username },
+				FULL_ACCESS,
+			),
+		).toBeNull();
 	});
 });
 

@@ -18,7 +18,9 @@ import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
 	type Passphrase as DbPassphrase,
+	type Prisma,
 	type PrismaClient,
+	type PrismaTx,
 	prisma,
 } from "../client";
 import { courseRefWhere } from "../utils";
@@ -40,6 +42,25 @@ export type Passphrase = z.infer<typeof passphraseSchema>;
 export type PassphraseFilter = z.infer<typeof passphraseFilter>;
 export type PassphrasePK = z.infer<typeof passphrasePK>;
 export type PassphraseUpdate = z.infer<typeof passphraseUpdate>;
+
+/// Why a passphrase could not be redeemed.
+export type PassphraseErrorCode = "unknown" | "expired" | "own_course";
+
+/** Refusal from {@link PassphraseService.redeem}, carrying a machine-readable `code`. */
+export class PassphraseError extends Error {
+	constructor(public code: PassphraseErrorCode) {
+		super(code);
+	}
+}
+
+/** The course a redeemed passphrase enrolled its redeemer in. */
+export interface PassphraseRedemption {
+	discipline: string;
+	instructor: string;
+	edition: string;
+	/// The discipline's display name.
+	name: string;
+}
 
 /**
  * A short-lived, course-scoped join code.
@@ -215,6 +236,70 @@ export class PassphraseService
 				data: { expiresAt: fields.expiresAt },
 			}),
 		);
+	}
+
+	/**
+	 * Enrolls the actor in the course a live passphrase belongs to.
+	 *
+	 * Surrounding whitespace is ignored, and a value that does not match as
+	 * typed is retried in upper case. Enrolling an already active student is a
+	 * no-op, and a `DROPPED` enrollment is reactivated. Any signed-in user may
+	 * redeem, except the course's own instructor.
+	 *
+	 * @throws PassphraseError `unknown` when no passphrase has this value,
+	 *   `expired` when it is past `expiresAt`, `own_course` when the actor
+	 *   teaches the course.
+	 */
+	async redeem(
+		value: string,
+		opts: ServiceOpts,
+	): Promise<PassphraseRedemption> {
+		if (opts.actor === SYSTEM) throw new NotAllowed("enrollment.create");
+		const username = opts.actor.username;
+		const typed = value.trim();
+
+		const run = async (tx: PrismaTx) => {
+			const select = {
+				id: true,
+				expiresAt: true,
+				course: {
+					select: {
+						id: true,
+						disciplineSlug: true,
+						instructorId: true,
+						editionSlug: true,
+						discipline: { select: { name: true } },
+					},
+				},
+			} satisfies Prisma.PassphraseSelect;
+			const row =
+				(await tx.passphrase.findUnique({ where: { value: typed }, select })) ??
+				(await tx.passphrase.findUnique({
+					where: { value: typed.toUpperCase() },
+					select,
+				}));
+			if (!row) throw new PassphraseError("unknown");
+			if (row.expiresAt <= new Date()) throw new PassphraseError("expired");
+
+			const { course } = row;
+			if (course.instructorId === username)
+				throw new PassphraseError("own_course");
+
+			// Enrolls as a trusted internal step: the redeemer has no
+			// `enrollment.create` right on the course.
+			await tx.enrollment.upsert({
+				where: { username_courseId: { username, courseId: course.id } },
+				update: { status: "ACTIVE" },
+				create: { username, courseId: course.id },
+			});
+			return {
+				discipline: course.disciplineSlug,
+				instructor: course.instructorId,
+				edition: course.editionSlug,
+				name: course.discipline.name,
+			};
+		};
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
 	}
 
 	// No upsert: `value` is server-generated unless pinned, and the only

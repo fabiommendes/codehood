@@ -39,7 +39,8 @@ says the invite is exhausted rather than handing them a form that cannot work.
 
 ### Join a course with an in-class passphrase
 
-    status: todo
+    status: implemented
+    url: /courses/join
 
 Student is sitting in the first lecture with an account already, and the
 instructor puts a six-character code on the projector. Student types it in and

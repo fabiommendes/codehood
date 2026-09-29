@@ -21,8 +21,15 @@ const courses = await db.course.findMany({}, { actor });
 <AppLayout title="My courses">
   <main class="mx-auto max-w-5xl px-4 py-10">
     <PageKicker text="Term overview" squares />
-    <h1 class="text-3xl font-bold">My courses</h1>
-    <p class="mt-2 text-base-content/70">Courses you take or teach.</p>
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold">My courses</h1>
+        <p class="mt-2 text-base-content/70">Courses you take or teach.</p>
+      </div>
+      <a href="/courses/join" class="btn btn-primary rounded-full">
+        Join a course
+      </a>
+    </div>
 
     {
       justLeft && (
@@ -37,9 +44,16 @@ const courses = await db.course.findMany({}, { actor });
 
     {
       courses.length === 0 ? (
-        <p class="mt-8 text-base-content/60">
-          You're not enrolled in or teaching any courses yet.
-        </p>
+        <div class="mt-8 rounded-box border border-dashed border-base-300 p-8 text-center">
+          <p class="font-medium">No courses yet</p>
+          <p class="mt-1 text-sm text-base-content/60">
+            Courses you take or teach show up here. Enter the code your
+            instructor shows in class to join one.
+          </p>
+          <a href="/courses/join" class="btn btn-primary mt-4 rounded-full">
+            Join a course
+          </a>
+        </div>
       ) : (
         <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => {

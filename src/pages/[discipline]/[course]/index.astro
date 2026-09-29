@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ListRow from "@/components/ListRow.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
+import Alert from "@/components/ui/Alert";
 import { db, groupExamsForStudent } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
@@ -88,6 +89,8 @@ function resourceKind(resource: (typeof resources)[number]): string {
 	}
 }
 
+const justJoined = Astro.url.searchParams.has("joined");
+
 const nextEvents = await db.calendarEvent.findMany(
 	{ courseIds: [course.id], from: new Date(), limit: 3 },
 	{ actor },
@@ -96,6 +99,14 @@ const nextEvents = await db.calendarEvent.findMany(
 
 <AppLayout title={course.discipline.name}>
   <main class="mx-auto max-w-4xl px-4 py-10">
+    {
+      justJoined && (
+        <Alert variant="success" class="mb-6">
+          <span>You joined {course.discipline.name}.</span>
+        </Alert>
+      )
+    }
+
     <CourseHeader course={course} active="home" />
 
     {

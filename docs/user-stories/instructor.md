@@ -187,8 +187,8 @@ course from the Manage tab, put it on the projector and read it out. Students in
 the room type it in and are enrolled, and the code expires a few minutes later so
 it does not become a link that circulates all term.
 
-Generating and displaying the code works today. The student side that consumes it
-does not exist yet, see "Join a course with an in-class passphrase".
+Students redeem it at `/courses/join`, see "Join a course with an in-class
+passphrase".
 
 
 ## Questions and exams

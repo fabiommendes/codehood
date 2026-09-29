@@ -218,7 +218,7 @@ Served and rendered through Swagger UI.
 Type: domain
 
 A short expiring secret scoped to one [Course](#course), unique across the
-system. Reserved for in-class check-in flows.
+system. A student types it at `/courses/join` to enroll in that course.
 
 ## Permission pair
 

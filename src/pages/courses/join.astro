@@ -1,0 +1,72 @@
+---
+import { actions } from "astro:actions";
+import PageKicker from "@/components/PageKicker.astro";
+import Alert from "@/components/ui/Alert";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHref } from "@/urls";
+
+export const prerender = false;
+
+if (!Astro.locals.actor) {
+	const next = Astro.url.pathname + Astro.url.search;
+	return Astro.redirect(`/login?next=${encodeURIComponent(next)}`);
+}
+
+const result = Astro.getActionResult(actions.course.joinCourse);
+if (result && !result.error) {
+	return Astro.redirect(`${courseHref(result.data)}?joined`);
+}
+
+// On failure this page renders as the response to the POST, so the form body is
+// the only place the typed code survives.
+// A link from the landing page carries the code in `?code=`.
+let typed = Astro.url.searchParams.get("code") ?? "";
+if (result?.error) {
+	const value = (await Astro.request.clone().formData()).get("value");
+	if (typeof value === "string") typed = value;
+}
+---
+
+<AppLayout title="Join a course">
+  <main class="mx-auto max-w-md px-4 py-10">
+    <PageKicker text="Enrollment" squares />
+    <h1 class="text-3xl font-bold">Join a course</h1>
+
+    {
+      result?.error && (
+        <Alert variant="error" class="mt-6">
+          <span>{result.error.message}</span>
+        </Alert>
+      )
+    }
+
+    <form
+      method="POST"
+      action={actions.course.joinCourse}
+      class="mt-6 flex flex-col gap-4"
+    >
+      <fieldset class="fieldset">
+        <label class="fieldset-legend" for="join-value">Course code</label>
+        <input
+          type="text"
+          id="join-value"
+          name="value"
+          value={typed}
+          required
+          autofocus
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          class="input w-full font-mono uppercase tracking-widest"
+        />
+        <p class="label">Your instructor shows the code in class.</p>
+      </fieldset>
+
+      <div class="card-actions">
+        <button type="submit" class="btn btn-primary btn-block rounded-full">
+          Join
+        </button>
+      </div>
+    </form>
+  </main>
+</AppLayout>

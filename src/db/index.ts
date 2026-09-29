@@ -123,8 +123,11 @@ export type {
 	PassphraseCreate,
 	PassphraseFilter,
 	PassphrasePK,
+	PassphraseErrorCode,
+	PassphraseRedemption,
 	PassphraseUpdate,
 } from "./services/passphrase.service";
+export { PassphraseError } from "./services/passphrase.service";
 export type {
 	Question,
 	QuestionCreate,
