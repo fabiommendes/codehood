@@ -14,8 +14,7 @@ export type CourseTabKey =
 	| "resources"
 	| "schedule"
 	| "questions"
-	| "students"
-	| "manage";
+	| "students";
 
 export interface CourseTab {
 	key: CourseTabKey;
@@ -28,7 +27,7 @@ export interface CourseTab {
  * "it's the third tab" means the same thing to a student and an instructor
  * looking at the same course. The instructor's two tabs are appended, never
  * interleaved, exactly when the actor has `enrollment.manage` — the same
- * predicate `loadCourse({ manage: true })` runs on `/manage` and `/roster`,
+ * predicate `loadCourse({ manage: true })` runs on `/roster`,
  * so a visible tab never 403s.
  */
 export function courseTabs(
@@ -47,7 +46,6 @@ export function courseTabs(
 		tabs.push(
 			{ key: "questions", label: "Questions", href: `${href}/questions` },
 			{ key: "students", label: "Students", href: `${href}/roster` },
-			{ key: "manage", label: "Manage", href: `${href}/manage` },
 		);
 	}
 	return tabs;

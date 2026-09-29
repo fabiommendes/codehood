@@ -68,7 +68,7 @@ export interface PassphraseRedemption {
  * The in-class counterpart to a classroom invite link.
  *
  * There is no management UI for these: an instructor generates one from
- * `/manage`, reads it out, and it expires on its own five minutes later.
+ * the Students tab, reads it out, and it expires on its own five minutes later.
  * `findOne({ value })` is deliberately not actor-filtered, the same
  * reasoning as `InviteService.findOne` by token — the value itself is the
  * credential a joining student presents, not something they're granted read

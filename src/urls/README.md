@@ -52,20 +52,18 @@ Everything belonging to a course hangs off its address:
 | `/<course>/questions`, `/<course>/questions/<slug>` | instructor  |
 | `/<course>/roster`                                  | instructor  |
 | `/<course>/manage`                                  | instructor  |
-| `/<course>/gradebook`                               | instructor  |
 
 Every one of these renders the same tab strip (`CourseHeader.astro`,
 `courseTabs()` in `src/utils/course-tabs.ts`); which tabs show up is a function
 of the course and the viewer, not of which URL they typed. A student never sees
 the instructor tabs and gets a 403 if they follow the link anyway (FR-CRS-033).
-The gradebook is reached from an exam on the Exams tab rather than through its
-own tab; it keeps its URL but carries no entry in the strip.
+`/<course>/manage` has no tab and redirects to `/<course>/roster`.
 
 Instructor-only pages live under the course rather than in a separate
 `/teaching/` tree. Two reasons. Every course link works the same way regardless
 of who is following it, and an instructor can open the plain course URL to see
 what their students see. There is no `/invite` route for issuing one —
-generating a classroom join code lives on the Manage tab.
+generating a classroom join code lives on the Students tab.
 
 `/<discipline-slug>` on its own is not routed yet. It is reserved for a future
 page listing every edition of a discipline. Do not use it for anything else.

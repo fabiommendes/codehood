@@ -72,7 +72,47 @@ test("instructor: browse the question bank", async ({ page }) => {
 		await expect(page.getByText("2 questions")).toBeVisible();
 	});
 
+	await test.step("each question's status reads as a word, not as the stored enum", async () => {
+		// The status filter buttons carry the same words as the badges.
+		const rows = page.getByRole("row");
+		await expect(
+			rows.getByText("Published", { exact: true }).first(),
+		).toBeVisible();
+		await expect(
+			rows.getByText("Draft", { exact: true }).first(),
+		).toBeVisible();
+		for (const raw of ["PUBLISHED", "DRAFT"]) {
+			await expect(page.getByText(raw, { exact: true })).toHaveCount(0);
+		}
+	});
+
+	await test.step("so does an archived one", async () => {
+		await db.question.create(
+			{
+				course: course.id,
+				slug: "retired-question",
+				status: "ARCHIVED",
+				version: "v1",
+				question: {
+					type: "essay",
+					title: "Retired question",
+					stem: "No longer used.",
+					tags: ["retired"],
+					input: "text",
+				},
+			},
+			FULL_ACCESS,
+		);
+		await page.goto(`${href}/questions`);
+		await expect(page.getByText("Retired question")).toBeVisible();
+		await expect(
+			page.getByRole("row").getByText("Archived", { exact: true }).first(),
+		).toBeVisible();
+		await expect(page.getByText("ARCHIVED", { exact: true })).toHaveCount(0);
+	});
+
 	await test.step("opening one shows its title, type and status", async () => {
+		await page.goto(`${href}/questions`);
 		await page.getByText("Recursion basics").click();
 		await expect(page).toHaveURL(`${href}/questions/recursion-basics`);
 
@@ -81,7 +121,7 @@ test("instructor: browse the question bank", async ({ page }) => {
 		).toBeVisible();
 		await expect(page.getByText("Multiple choice").first()).toBeVisible();
 		await expect(
-			page.getByText("PUBLISHED", { exact: true }).first(),
+			page.getByText("Published", { exact: true }).first(),
 		).toBeVisible();
 	});
 });

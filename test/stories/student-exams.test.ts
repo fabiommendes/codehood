@@ -91,7 +91,9 @@ test("student: take an exam", async ({ page }) => {
 		await expect(page.getByText(closed.title)).toBeVisible();
 
 		await expect(page.getByText("Open now", { exact: true })).toBeVisible();
-		await expect(page.getByText("Closed", { exact: true })).toBeVisible();
+		// A closed exam the student never attempted is "Missed" to them.
+		await expect(page.getByText("Missed", { exact: true })).toBeVisible();
+		await expect(page.getByText("Closed", { exact: true })).toHaveCount(0);
 		// Once as the section heading, once as the exam's badge.
 		await expect(
 			section(page, "Upcoming").getByText("Upcoming", { exact: true }),
@@ -100,6 +102,8 @@ test("student: take an exam", async ({ page }) => {
 		for (const raw of ["SCHEDULED", "ONGOING", "COMPLETED"]) {
 			await expect(page.getByText(raw, { exact: true })).toHaveCount(0);
 		}
+		// Date-times use a 24-hour clock.
+		await expect(page.getByText(/\b(AM|PM)\b/)).toHaveCount(0);
 	});
 
 	await test.step("an upcoming exam says when it opens and offers no way to start", async () => {
@@ -107,6 +111,7 @@ test("student: take an exam", async ({ page }) => {
 
 		await expect(page.getByText("Opens").first()).toBeVisible();
 		await expect(page.getByText("Upcoming", { exact: true })).toBeVisible();
+		await expect(page.getByText(/\b(AM|PM)\b/)).toHaveCount(0);
 		await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(
 			0,
 		);
@@ -116,7 +121,8 @@ test("student: take an exam", async ({ page }) => {
 		await page.goto(`${href}/exams/${closed.slug}`);
 
 		await expect(page.getByText("You did not take this exam")).toBeVisible();
-		await expect(page.getByText("Closed", { exact: true })).toBeVisible();
+		await expect(page.getByText("Missed", { exact: true })).toBeVisible();
+		await expect(page.getByText("Closed", { exact: true })).toHaveCount(0);
 		await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(
 			0,
 		);
@@ -225,6 +231,19 @@ test("student: take an exam", async ({ page }) => {
 		await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(
 			0,
 		);
+	});
+
+	// "Missed" is about the viewer's own attempt, so it is not the exam's label.
+	await test.step("the instructor sees the same closed exam as Closed, never Missed", async () => {
+		await page.context().clearCookies();
+		await logInAs(page, course.instructor);
+
+		await page.goto(`${href}/exams`);
+		await expect(page.getByText("Missed", { exact: true })).toHaveCount(0);
+
+		await page.goto(`${href}/exams/${closed.slug}`);
+		await expect(page.getByText("Closed", { exact: true })).toBeVisible();
+		await expect(page.getByText("Missed", { exact: true })).toHaveCount(0);
 	});
 });
 

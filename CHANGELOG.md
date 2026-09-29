@@ -111,6 +111,22 @@
 
 ### Changed
 
+- Date-times use a 24-hour clock everywhere, as in "Mon, Sep 28, 22:03".
+- Event kinds and question statuses read as words ("Holiday", "Published")
+  instead of stored enum values, and a regular meeting carries no kind badge.
+- A closed exam the student never attempted reads "Missed" instead of
+  "Closed".
+- The calendar shows event titles whole, truncated only by the cell's width,
+  and offers "Today" when another month is shown.
+- An admin's course list is headed "All courses". The 403 page no longer
+  prints the URL segment, and the 404 page sends an anonymous visitor to the
+  home page instead of the course list.
+
+### Removed
+
+- The `/gradebook` page, which showed fabricated data, and the empty Manage
+  tab. `/manage` redirects to the Students tab.
+
 - The writer-supplied `ref` on `Resource` and `CalendarEvent` is now `rev`, a
   nullable revision marker for the CLI. `Course`, `Exam` and `Question` gained
   the same field. `rev` is optional on create and can be set or cleared

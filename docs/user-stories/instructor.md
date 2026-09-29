@@ -75,7 +75,7 @@ marked with the course they belong to.
     status: todo
 
 Instructor pushed content and wants to confirm the server has what they think it
-has. The Manage tab reports what has been synced and when, so a failed push does
+has. The course reports what has been synced and when, so a failed push does
 not go unnoticed until a student complains.
 
 
@@ -187,7 +187,7 @@ zero.
 
 Instructor is in front of the class on day one and wants everyone actually
 present enrolled before they leave. They generate a short passphrase for the
-course from the Manage tab, put it on the projector and read it out. Students in
+course from the Students tab, put it on the projector and read it out. Students in
 the room type it in and are enrolled, and the code expires a few minutes later so
 it does not become a link that circulates all term.
 

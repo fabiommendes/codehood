@@ -4,11 +4,17 @@ import ErrorLayout from "@/layouts/ErrorLayout.astro";
 export const prerender = false;
 
 Astro.response.status = 404;
+const signedIn = Boolean(Astro.locals.actor);
 ---
 
 <ErrorLayout code="404" title="Page not found" scene="missingLeaf">
   The page you're looking for doesn't exist, or may have moved.
   <div slot="actions">
-    <a href="/courses" class="btn btn-primary rounded-full">← Back to my courses</a>
+    <a
+      href={signedIn ? "/courses" : "/"}
+      class="btn btn-primary rounded-full"
+    >
+      {signedIn ? "← Back to my courses" : "← Back to the home page"}
+    </a>
   </div>
 </ErrorLayout>

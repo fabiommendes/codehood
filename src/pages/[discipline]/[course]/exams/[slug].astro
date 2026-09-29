@@ -96,7 +96,8 @@ const attempt = canManage
 			)
 		).at(-1) ?? null);
 const state = attemptState(exam, attempt, now);
-const badge = examBadge(phase, state);
+// The instructor has no attempt of their own, so the phase is all they see.
+const badge = examBadge(phase, canManage ? undefined : state);
 
 // The results are only fetched when nothing else already blocks the release.
 let canRelease = false;

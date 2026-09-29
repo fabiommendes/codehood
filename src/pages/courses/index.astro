@@ -11,6 +11,7 @@ export const prerender = false;
 const actor = Astro.locals.actor;
 if (!actor) return Astro.redirect("/login");
 
+const isAdmin = actor.role === "ADMIN";
 const justLeft = Astro.url.searchParams.has("left");
 
 // No "my courses" filter needed: the actor already is one. This returns
@@ -19,13 +20,17 @@ const justLeft = Astro.url.searchParams.has("left");
 const courses = await db.course.findMany({}, { actor });
 ---
 
-<AppLayout title="My courses">
+<AppLayout title={isAdmin ? "All courses" : "My courses"}>
   <main class="mx-auto max-w-5xl px-4 py-10">
     <PageKicker text="Term overview" squares />
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold">My courses</h1>
-        <p class="mt-2 text-base-content/70">Courses you take or teach.</p>
+        <h1 class="text-3xl font-bold">
+          {isAdmin ? "All courses" : "My courses"}
+        </h1>
+        <p class="mt-2 text-base-content/70">
+          {isAdmin ? "Every course on this instance." : "Courses you take or teach."}
+        </p>
       </div>
       <a href="/courses/join" class="btn btn-primary rounded-full">
         Join a course

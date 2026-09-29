@@ -23,7 +23,11 @@ import {
 } from "@/components/ui/table-sort";
 import type { QuestionType } from "@/core/schemas";
 import type { Question } from "@/db/services/question.service";
-import { questionTypeLabels, statusBadgeClass } from "@/utils/question-display";
+import {
+	questionStatusLabels,
+	questionTypeLabels,
+	statusBadgeClass,
+} from "@/utils/question-display";
 import type { AssertEqual } from "@/utils/types";
 import { ArchiveIcon, DraftIcon, GoIcon, PublishIcon } from "./icons";
 
@@ -59,11 +63,7 @@ const TYPE_OPTIONS = [
 ] as const;
 true satisfies AssertEqual<(typeof TYPE_OPTIONS)[number], QuestionType>;
 
-const STATUS_LABELS: Record<Question["status"], string> = {
-	DRAFT: "Draft",
-	PUBLISHED: "Published",
-	ARCHIVED: "Archived",
-};
+const STATUS_LABELS = questionStatusLabels;
 
 /// Lowercase URL spellings for the status filter, keyed by the schema's uppercase values.
 const STATUS_PARAM: Record<Question["status"], string> = {
@@ -412,7 +412,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			sortKey: "status" satisfies SortField,
 			render: (question) => (
 				<span class={`badge badge-sm ${statusBadgeClass(question.status)}`}>
-					{question.status}
+					{STATUS_LABELS[question.status]}
 				</span>
 			),
 		},

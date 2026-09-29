@@ -1,5 +1,5 @@
 ---
-// The course's own term calendar (FR-CAL-020), grouped by authored week.
+// The course's own term calendar (FR-CAL-020), grouped by week.
 // Read-only: the only way schedule data gets in is `manage import-calendar`
 // and the demo seed.
 import { hasPerm } from "@/auth/permissions";
@@ -8,6 +8,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { type CalendarEvent, db, isMeeting } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
 import { renderMarkdown } from "@/utils/markdown";
 import {
@@ -78,8 +79,10 @@ const meetingsHeld = events.filter(
 
     <h2 class="text-xl font-semibold">Schedule</h2>
     <p class="mt-1 text-sm text-base-content/60">
-      {course.discipline.name} · {course.edition.slug} — the term, grouped by authored
-      week.
+      {course.discipline.name} · {course.edition.slug}
+    </p>
+    <p class="text-sm text-base-content/60">
+      The term, week by week.
     </p>
 
     {
@@ -107,7 +110,7 @@ const meetingsHeld = events.filter(
             ))}
           </div>
           <p class="mt-3 text-xs text-base-content/50">
-            {meetingsHeld} meeting(s) held so far.
+            {meetingsHeld} {meetingsHeld === 1 ? "meeting" : "meetings"} held so far.
           </p>
 
           {events.length === 0 ? (
@@ -152,14 +155,16 @@ const meetingsHeld = events.filter(
                                 >
                                   {event.title}
                                 </p>
-                                <span
-                                  class:list={[
-                                    "badge badge-sm",
-                                    meeting ? "badge-outline" : "badge-ghost",
-                                  ]}
-                                >
-                                  {event.kind}
-                                </span>
+                                {eventKindLabel(event.kind) && (
+                                  <span
+                                    class:list={[
+                                      "badge badge-sm",
+                                      meeting ? "badge-outline" : "badge-ghost",
+                                    ]}
+                                  >
+                                    {eventKindLabel(event.kind)}
+                                  </span>
+                                )}
                               </div>
                               {event.description && (
                                 <div

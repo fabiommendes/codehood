@@ -83,6 +83,10 @@ const monthEnd = toInstant(
 	0,
 );
 
+const currentMonth = localDateOf(now).slice(0, 7);
+const shownMonth = `${year}-${String(month).padStart(2, "0")}`;
+const todayHref = `/calendar?month=${currentMonth}`;
+
 const prevMonth = month === 1 ? 12 : month - 1;
 const prevMonthYear = month === 1 ? year - 1 : year;
 const nextHref = `/calendar?month=${nextMonthYear}-${String(nextMonth).padStart(2, "0")}`;
@@ -153,7 +157,16 @@ const upcoming =
           class="btn btn-ghost btn-sm"
           aria-label="Previous month">←</a
         >
-        <p class="font-display text-lg font-semibold">{monthLabel}</p>
+        <div class="flex items-center gap-3">
+          <p class="font-display text-lg font-semibold">{monthLabel}</p>
+          {
+            shownMonth !== currentMonth && (
+              <a href={todayHref} class="btn btn-ghost btn-xs">
+                Today
+              </a>
+            )
+          }
+        </div>
         <a href={nextHref} class="btn btn-ghost btn-sm" aria-label="Next month"
           >→</a
         >
@@ -191,16 +204,17 @@ const upcoming =
                   </span>
                 )}
                 {dayEvents.slice(0, 2).map((event) => (
-                  <span class="flex items-center gap-1 text-[10px] text-base-content/60">
+                  <span
+                    title={event.title}
+                    class="flex w-full min-w-0 items-center gap-1 text-[10px] text-base-content/60"
+                  >
                     <span
                       class:list={[
                         "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
                         courseColor.get(event.courseId),
                       ]}
                     />
-                    {event.title.length > 10
-                      ? `${event.title.slice(0, 9)}…`
-                      : event.title}
+                    <span class="truncate">{event.title}</span>
                   </span>
                 ))}
                 {dayEvents.length > 2 && (

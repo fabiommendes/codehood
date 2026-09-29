@@ -61,6 +61,7 @@ ago") and absolute when they are far or when precision matters, with the
 absolute form always available on hover. Durations under pressure, such as an
 exam in progress, show the time left, not the time allowed.
 
+
 ## 4. Speak the user's language, not the schema's
 
     status: adopted
@@ -78,6 +79,7 @@ such as a course code, it is shown alongside a human name.
 A screen shows real data, or it is visibly marked as a preview in full. It never
 mixes the two. A hardcoded count beside a real one teaches the user that none of
 the numbers can be trusted.
+
 
 ## 6. Empty states say who acts next
 

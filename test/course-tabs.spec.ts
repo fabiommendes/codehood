@@ -28,31 +28,43 @@ function keys(tabs: readonly CourseTab[]): string[] {
 	return tabs.map((t) => t.key);
 }
 
-test("instructor: the questions tab sits before students and manage, with the right href", () => {
+test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Students, in that order", () => {
 	const tabs = courseTabs(course, ref, owner as Actor);
-	const questionsTab = tabs.find((t) => t.key === "questions");
 
-	expect(questionsTab).toEqual({
+	expect(tabs.map((t) => t.label)).toEqual([
+		"Home",
+		"Exams",
+		"Resources",
+		"Schedule",
+		"Questions",
+		"Students",
+	]);
+	expect(keys(tabs)).toEqual([
+		"home",
+		"exams",
+		"resources",
+		"schedule",
+		"questions",
+		"students",
+	]);
+});
+
+test("instructor: the questions and students tabs carry the right hrefs", () => {
+	const tabs = courseTabs(course, ref, owner as Actor);
+
+	expect(tabs.find((t) => t.key === "questions")).toEqual({
 		key: "questions",
 		label: "Questions",
 		href: `${courseHref(ref)}/questions`,
 	});
-	const questionsIndex = keys(tabs).indexOf("questions");
-	expect(questionsIndex).toBeLessThan(keys(tabs).indexOf("students"));
-	expect(questionsIndex).toBeLessThan(keys(tabs).indexOf("manage"));
+	expect(tabs.find((t) => t.key === "students")).toEqual({
+		key: "students",
+		label: "Students",
+		href: `${courseHref(ref)}/roster`,
+	});
 });
 
-test("student: the questions tab is absent", () => {
-	expect(keys(courseTabs(course, ref, student as Actor))).not.toContain(
-		"questions",
-	);
-});
-
-test("a non-owning admin gets no manage tabs: enrollment.manage is the course's own instructor", () => {
-	expect(keys(courseTabs(course, ref, admin as Actor))).not.toContain("manage");
-});
-
-test("the pinning test: manage appears iff enrollment.manage agrees, for every actor", () => {
+test("no actor gets a manage tab", () => {
 	const actors: Actor[] = [
 		admin as Actor,
 		owner as Actor,
@@ -61,12 +73,42 @@ test("the pinning test: manage appears iff enrollment.manage agrees, for every a
 		SYSTEM,
 	];
 	for (const actor of actors) {
-		const hasManageTab = keys(courseTabs(course, ref, actor)).includes(
-			"manage",
-		);
 		expect(
-			hasManageTab,
+			keys(courseTabs(course, ref, actor)),
 			String(actor === SYSTEM ? "SYSTEM" : actor.username),
-		).toBe(hasPerm(actor, "enrollment.manage", course));
+		).not.toContain("manage");
+	}
+});
+
+test("student: the questions and students tabs are absent", () => {
+	const tabs = keys(courseTabs(course, ref, student as Actor));
+
+	expect(tabs).toEqual(["home", "exams", "resources", "schedule"]);
+});
+
+test("a non-owning admin gets no instructor tabs: enrollment.manage is the course's own instructor", () => {
+	expect(keys(courseTabs(course, ref, admin as Actor))).toEqual([
+		"home",
+		"exams",
+		"resources",
+		"schedule",
+	]);
+});
+
+test("the pinning test: the instructor tabs appear iff enrollment.manage agrees, for every actor", () => {
+	const actors: Actor[] = [
+		admin as Actor,
+		owner as Actor,
+		otherInstructor as Actor,
+		student as Actor,
+		SYSTEM,
+	];
+	for (const actor of actors) {
+		const tabs = keys(courseTabs(course, ref, actor));
+		const allowed = hasPerm(actor, "enrollment.manage", course);
+		const name = String(actor === SYSTEM ? "SYSTEM" : actor.username);
+
+		expect(tabs.includes("questions"), name).toBe(allowed);
+		expect(tabs.includes("students"), name).toBe(allowed);
 	}
 });

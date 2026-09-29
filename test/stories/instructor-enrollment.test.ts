@@ -21,12 +21,40 @@ test("instructor: see who is enrolled", async ({ page }) => {
 
 	await logInAs(page, instructor);
 
-	await test.step("the instructor's own course offers Manage and Roster", async () => {
-		expect((await page.goto(`${href}/manage`))?.status()).toBe(200);
+	await test.step("the instructor's own course offers a Students tab and no Manage tab", async () => {
 		expect((await page.goto(`${href}/roster`))?.status()).toBe(200);
+		await expect(page.getByRole("tab")).toHaveText([
+			"Home",
+			"Exams",
+			"Resources",
+			"Schedule",
+			"Questions",
+			"Students",
+		]);
+		await expect(
+			page.getByRole("tab", { name: "Students", exact: true }),
+		).toHaveAttribute("href", `${href}/roster`);
+	});
+
+	await test.step("an old link to /manage lands on the roster", async () => {
+		await page.goto(`${href}/manage`);
+		await expect(page).toHaveURL(`${href}/roster`);
+	});
+
+	await test.step("the gradebook page is gone, even for the instructor", async () => {
+		expect((await page.goto(`${href}/gradebook`))?.status()).toBe(404);
+	});
+
+	await test.step("their course list keeps the personal heading", async () => {
+		await page.goto("/courses");
+		await expect(
+			page.getByRole("heading", { name: "My courses", exact: true }),
+		).toBeVisible();
+		await expect(page.getByText("Courses you take or teach.")).toBeVisible();
 	});
 
 	await test.step("and the roster lists every enrolled student", async () => {
+		await page.goto(`${href}/roster`);
 		for (const student of course.students) {
 			await expect(
 				page.getByRole("row").filter({ hasText: student.name }),

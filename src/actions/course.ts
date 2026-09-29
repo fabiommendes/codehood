@@ -110,7 +110,7 @@ export const course = {
 	}),
 
 	/**
-	 * Generates a passphrase for the Manage tab's Enrollment panel — an
+	 * Generates a passphrase for the Students tab's Enrollment panel — an
 	 * auto-generated code unless the instructor overrides it, live for 5
 	 * minutes (`PassphraseService`). There is no follow-up action: it is shown
 	 * once and expires on its own, the same way a generated invite link is

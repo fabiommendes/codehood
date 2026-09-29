@@ -4,7 +4,6 @@ import {
 	formatDateTime,
 	formatTime,
 	localDateOf,
-	SERVER_TZ,
 	slotInstant,
 	toInstant,
 	weekdayOf,
@@ -36,16 +35,9 @@ test("formatTime pads minutes-since-midnight into HH:MM", () => {
 });
 
 test("formatDateTime renders in SERVER_TZ, not whatever the process's own default zone is", () => {
+	// Noon wall clock in SERVER_TZ, whatever that zone is. 2026-06-15 is a Monday.
 	const instant = toInstant("2026-06-15", 12 * 60);
-	const expected = new Intl.DateTimeFormat("en-US", {
-		timeZone: SERVER_TZ,
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-		hour: "numeric",
-		minute: "2-digit",
-	}).format(instant);
-	expect(formatDateTime(instant)).toBe(expected);
+	expect(formatDateTime(instant)).toBe("Mon, Jun 15, 12:00");
 
 	// Explicitly rendering in a different zone must diverge from SERVER_TZ's
 	// rendering (SERVER_TZ defaults to America/Sao_Paulo, UTC-3; UTC never
@@ -53,6 +45,21 @@ test("formatDateTime renders in SERVER_TZ, not whatever the process's own defaul
 	// hardcoding a display regardless of the requested zone.
 	const inUtc = formatDateTime(instant, { timeZone: "UTC" });
 	expect(inUtc).not.toBe(formatDateTime(instant));
+});
+
+test("formatDateTime uses a 24-hour clock, with no AM/PM marker", () => {
+	const cases: [string, string][] = [
+		["2026-09-28T22:03:00Z", "Mon, Sep 28, 22:03"],
+		["2026-09-28T09:05:00Z", "Mon, Sep 28, 09:05"],
+		["2026-09-28T12:00:00Z", "Mon, Sep 28, 12:00"],
+		// Midnight is 00:xx of the new day, never "24:xx" of the old one.
+		["2026-09-29T00:05:00Z", "Tue, Sep 29, 00:05"],
+	];
+	for (const [iso, expected] of cases) {
+		const rendered = formatDateTime(new Date(iso), { timeZone: "UTC" });
+		expect(rendered).toBe(expected);
+		expect(rendered).not.toMatch(/AM|PM/i);
+	}
 });
 
 test("weekdayOf reads an instant near midnight as the local day, not the UTC one", () => {

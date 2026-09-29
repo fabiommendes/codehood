@@ -57,6 +57,8 @@ export function examBadge(
 			return { label: "Awaiting grading", className: "badge-info" };
 		case "results":
 			return { label: "Graded", className: "badge-primary" };
+		case "missed":
+			return { label: "Missed", className: "badge-error" };
 		default:
 			return {
 				label: examPhaseLabels[phase],

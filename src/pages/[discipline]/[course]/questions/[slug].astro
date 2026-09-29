@@ -7,7 +7,11 @@ import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { loadCourse } from "@/utils/load-course";
-import { questionTypeLabels, statusBadgeClass } from "@/utils/question-display";
+import {
+	questionStatusLabels,
+	questionTypeLabels,
+	statusBadgeClass,
+} from "@/utils/question-display";
 
 export const prerender = false;
 
@@ -39,7 +43,7 @@ const problems = new Question(doc).validate();
     <a href={`${href}/questions`} class="text-sm text-base-content/60 hover:text-primary">← Questions</a>
 
     <div class="mt-2 flex flex-wrap items-center gap-2">
-      <span class:list={["badge badge-sm", statusBadgeClass(question.status)]}>{question.status}</span>
+      <span class:list={["badge badge-sm", statusBadgeClass(question.status)]}>{questionStatusLabels[question.status]}</span>
       <span class="badge badge-outline badge-sm">{questionTypeLabels[doc.type]}</span>
     </div>
     <h2 class="mt-2 text-2xl font-bold">{doc.title ?? question.slug}</h2>
@@ -77,7 +81,7 @@ const problems = new Question(doc).validate();
         </div>
         <div>
           <dt class="text-sm text-base-content/50">Status</dt>
-          <dd class="mt-0.5 font-medium">{question.status}</dd>
+          <dd class="mt-0.5 font-medium">{questionStatusLabels[question.status]}</dd>
         </div>
         <div>
           <dt class="text-sm text-base-content/50">Version</dt>

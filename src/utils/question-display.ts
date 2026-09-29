@@ -16,6 +16,13 @@ export const questionTypeLabels: Record<QuestionType, string> = {
 	"fill-in": "Fill in the blank",
 };
 
+/** Sentence-case label for each question status. */
+export const questionStatusLabels: Record<QuestionStatus, string> = {
+	DRAFT: "Draft",
+	PUBLISHED: "Published",
+	ARCHIVED: "Archived",
+};
+
 /** The DaisyUI badge class matching a question's status. */
 export function statusBadgeClass(status: QuestionStatus): string {
 	switch (status) {

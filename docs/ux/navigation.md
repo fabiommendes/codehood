@@ -59,7 +59,6 @@ Schedule    /<course>/schedule
 ─────────── everyone above; whoever manages the course also sees:
 Questions   /<course>/questions
 Students    /<course>/roster
-Manage      /<course>/manage
 ```
 
 The instructor's tabs are appended, never interleaved, so the first four tabs
@@ -67,7 +66,6 @@ sit in the same positions for students and instructors. A tab the viewer cannot
 open is not shown (P1). The list is computed by `courseTabs()` in
 `src/utils/course-tabs.ts`.
 
-Origin: the course-navigation spec, now in git history.
 
 
 ### Items inside a tab link back to their list
@@ -78,15 +76,15 @@ A page for a single exam, question or resource keeps its tab active and shows a
 `← <List>` link above the item's title. Tab roots have no back-link.
 
 
-### The gradebook belongs to an exam, not to the course
+### Grading belongs to an exam, not to the course
 
     status: adopted
 
-The gradebook has no tab. An instructor reaches it from the exam whose
-submissions they want to see.
+An instructor reaches the submissions of an exam, and the queue to grade them,
+from that exam's page. `dev/specs/to-review/web-grading.md` specifies both.
 
-Known issue: nothing links to `/gradebook` yet, so it can only be reached by
-typing the URL.
+The earlier `/gradebook` page showed fabricated data and was removed, along
+with the empty Manage tab. `/manage` redirects to the Students tab.
 
 
 ## Open problems

@@ -123,7 +123,7 @@ export function toInstant(
 	return new Date(naiveUtcMs - secondOffset);
 }
 
-/** Renders `instant` in `SERVER_TZ` — FR-CAL-022's only implementation. */
+/** Renders `instant` in `SERVER_TZ` on a zero-padded 24-hour clock, e.g. "Mon, Sep 28, 22:03". */
 export function formatDateTime(
 	instant: Date,
 	opts?: Intl.DateTimeFormatOptions,
@@ -133,8 +133,9 @@ export function formatDateTime(
 		weekday: "short",
 		month: "short",
 		day: "numeric",
-		hour: "numeric",
+		hour: "2-digit",
 		minute: "2-digit",
+		hourCycle: "h23",
 		...opts,
 	}).format(instant);
 }

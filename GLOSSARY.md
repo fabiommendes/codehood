@@ -101,8 +101,8 @@ The address `/<discipline-slug>/<username>_<edition>`, e.g. `/cs101/ada_2026-1`.
 Built from the columns of the course's unique key, so no extra id is stored and
 the [CLI](#cli) can construct it offline. There is no `/courses/` prefix, which
 is why [Reserved slug](#reserved-slug) exists. Everything about the course hangs
-off it: `/exams`, `/resources`, `/schedule`, and for instructors, `/questions`,
-`/roster`, and `/manage` — one tab strip on every page. The [REST API](#rest-api)
+off it: `/exams`, `/resources`, `/schedule`, and for instructors, `/questions`
+and `/roster` — one tab strip on every page. The [REST API](#rest-api)
 takes the same address under `/api/course/`, so the CLI builds one string for
 both.
 
