@@ -4,6 +4,11 @@
 
 ### Added
 
+- The top bar says where you are once the page header scrolls away: a
+  breadcrumb such as `cs201 · 2026-1 › Exams › Midterm › Grading`, aligned
+  with the page column, on every course, admin and signed-in page. The logo
+  now sits centered over the sidebar column. Phones keep the back-links and
+  show no breadcrumb.
 - The instructor grades on the web. An exam page lists who attempted it, how
   much each student answered, what waits for a grade and each total, and
   leads to the grading queue at `<course>/exams/<slug>/grading`. Grading goes

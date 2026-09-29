@@ -1,12 +1,16 @@
 ---
 import Avatar from "@/components/Avatar.astro";
+import Logo from "@/components/Logo.astro";
 import AppFooter from "@/components/nav/AppFooter.astro";
 import AppSidebar, {
 	type SidebarCourse,
 } from "@/components/nav/AppSidebar.astro";
+import Breadcrumbs from "@/components/nav/Breadcrumbs.astro";
 import PencilFilter from "@/components/nav/PencilFilter.astro";
 import UserMenu from "@/components/nav/UserMenu.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
+import type { Crumb } from "@/utils/breadcrumbs";
 
 export const prerender = false;
 
@@ -36,6 +40,26 @@ const SAMPLE_USER = {
 	username: "grace",
 	role: "INSTRUCTOR",
 } as const;
+/// Sample trails for the top bar: a typical one and one long enough to truncate.
+const SAMPLE_TRAILS: Crumb[][] = [
+	[
+		{ label: "cs201 · 2026-1", href: "#" },
+		{ label: "Exams", href: "#" },
+		{ label: "Midterm", href: "#" },
+		{ label: "Grading", href: "#" },
+		{ label: "Two sums" },
+	],
+	[
+		{ label: "cs201 · 2026-1", href: "#" },
+		{ label: "Exams", href: "#" },
+		{
+			label:
+				"Final exam on balanced search trees, hash tables with open addressing, and amortized analysis",
+			href: "#",
+		},
+		{ label: "Grace Hopper" },
+	],
+];
 const SIDEBAR_PAGES = [
 	["Home", "/"],
 	["My courses", "/courses"],
@@ -56,7 +80,7 @@ const layouts = [
 		name: "AppLayout",
 		path: "src/layouts/AppLayout.astro",
 		description:
-			"The signed-in app shell: a top bar (logo, theme toggle, user menu), the sidebar and a one-line footer, all from src/components/nav/ (see Navigation below). The sidebar is always visible on large screens and a drawer on small ones. Used by every signed-in page.",
+			"The signed-in app shell: a top bar (logo, breadcrumb, theme toggle, user menu), the sidebar and a one-line footer, all from src/components/nav/ (see Navigation below). The sidebar is always visible on large screens and a drawer on small ones. Used by every signed-in page.",
 		usage: `<AppLayout title="Profile">\n  ...\n</AppLayout>`,
 		demo: "/design/layouts/app-layout",
 	},
@@ -120,6 +144,34 @@ const layouts = [
       item and the open menu are outlined in pencil (<code>.pencil</code>); menu items have hand-cut corners
       (<code>.cut</code>). The sketch at the foot of the sidebar depends on the area.
     </p>
+
+    <h3 class="mb-3 font-semibold">Top bar</h3>
+    <p class="mb-3 max-w-2xl text-sm text-base-content/70">
+      The logo is centered over the sidebar column. The breadcrumb fades in once the page header scrolls under the
+      bar; phones show neither the breadcrumb nor the user's name.
+    </p>
+    <div class="mb-8 grid gap-4">
+      {
+        ["codehood", "codehood-dark"].map((theme) =>
+          SAMPLE_TRAILS.map((trail) => (
+            <div data-theme={theme} class="overflow-hidden rounded-box border border-base-300 text-base-content">
+              <div class="navbar min-h-16 bg-base-100 p-0">
+                <div class="navbar-start w-64 shrink-0 justify-center self-stretch border-r border-base-300 px-4">
+                  <Logo height={36} />
+                </div>
+                <div class="navbar-end w-auto min-w-0 flex-1 gap-2 px-4">
+                  <Breadcrumbs trail={trail} static />
+                  <div class="flex shrink-0 items-center gap-2">
+                    <ThemeToggle />
+                    <UserMenu user={SAMPLE_USER} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )),
+        )
+      }
+    </div>
 
     <h3 class="mb-3 font-semibold">AppSidebar</h3>
     {

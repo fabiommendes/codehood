@@ -306,3 +306,21 @@ light logo's hues blended with screen, the counterpart of the multiply used on
 paper. The monochrome logo stays as `tone="mono"` and "lamps on" as
 `tone="lamps"`, for dark grounds where color would compete. The favicon
 follows: dark tabs get the lighter hues and lose the outline.
+
+
+### Round 18: navigation
+
+The sidebar dropped its icon chips for plain icons (variant C). Edges were
+compared on the current item and the open user menu: a pencil outline in
+`base-300` (`.pencil`) won; menu items keep hand-cut corners (`.cut`). The
+sketch at the foot of the sidebar follows the area: athos seeded by the course
+URL inside a course, loose on `/courses`, construction on the calendar, a
+protractor in admin and a blueprint elsewhere. The footer shrank to one line
+(logo, source code, version); CLI setup moved to the user menu.
+
+Three top bars were compared: the logo against the sidebar's edge, the logo
+centered over the sidebar column, and the centered logo plus a breadcrumb
+aligned with the content. The third won. On phones the logo sits centered
+between the menu button and the user menu, and the breadcrumb is left out.
+The breadcrumb is quiet text that fades in once the page header scrolls under
+the bar; the rules are in `docs/ux/navigation.md`.

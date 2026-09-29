@@ -7,9 +7,11 @@ import type { Crumb } from "@/utils/breadcrumbs";
 
 interface Props {
 	trail: readonly Crumb[];
+	/// Always shown, ignoring the page header, for the design pages.
+	static?: boolean;
 }
 
-const { trail } = Astro.props;
+const { trail, static: isStatic = false } = Astro.props;
 ---
 
 {
@@ -17,6 +19,8 @@ const { trail } = Astro.props;
     <nav
       aria-label="Breadcrumb"
       data-breadcrumbs
+      data-static={isStatic || undefined}
+      data-shown={isStatic || undefined}
       class="breadcrumbs hidden min-w-0 flex-1 overflow-hidden pr-4 text-sm text-base-content/60 lg:flex"
     >
       <ul>
@@ -87,7 +91,9 @@ const { trail } = Astro.props;
 </style>
 
 <script>
-  const nav = document.querySelector<HTMLElement>("[data-breadcrumbs]");
+  const nav = document.querySelector<HTMLElement>(
+    "[data-breadcrumbs]:not([data-static])",
+  );
   if (nav) {
     const header =
       document.querySelector("[data-page-header]") ??
