@@ -185,7 +185,7 @@ understanding developed.
 
 ### See my grades and feedback
 
-    status: todo
+    status: implemented
 
 Student wants to know how they did. They see, per exam, the grade for each
 question, the total, and whatever written feedback the instructor or grading bot

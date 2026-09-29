@@ -18,6 +18,11 @@ import NumericView from "@/components/question/NumericView";
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
 import type { AttemptState, QuestionPublic } from "@/db";
+import {
+	type ExamResult,
+	formatScore,
+	type QuestionOutcome,
+} from "@/db/exam-result";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -55,6 +60,8 @@ export interface ExamAttemptProps {
 	questions: { slug: string; question: QuestionPublic["question"] }[];
 	/// The student's latest answer per question slug.
 	answers: Record<string, AnswerPayload>;
+	/// The graded outcome per question, present once the grades are released.
+	result?: ExamResult;
 }
 
 /// How long typing pauses before a text answer is saved.
@@ -90,8 +97,9 @@ function timeLeft(deadline: Date, now: Date): string {
  * `not-open` shows when the exam opens; `can-start` offers "Start exam";
  * `in-progress` renders the questions in answer mode, saves each answer as it
  * changes, shows the time left, and offers "Submit exam" behind a
- * confirmation; `submitted` shows the saved answers read-only; `missed` says
- * the student did not take it.
+ * confirmation; `submitted` shows the saved answers read-only; `results`
+ * adds the score and comments on each answer; `missed` says the student did
+ * not take it.
  */
 export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const target = {
@@ -271,11 +279,35 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					<p class="text-lg font-medium">You did not take this exam</p>
 				</Match>
 
-				<Match when={kind() === "in-progress" || kind() === "submitted"}>
+				<Match
+					when={
+						kind() === "in-progress" ||
+						kind() === "submitted" ||
+						kind() === "results"
+					}
+				>
+					<Show when={kind() === "results" && props.result?.total != null}>
+						<p class="text-2xl font-bold">
+							Your score{" "}
+							<span class="text-primary">
+								{formatScore(props.result?.total ?? 0)}
+							</span>
+						</p>
+					</Show>
+
 					<div class="flex flex-wrap items-center justify-between gap-3">
 						<Show
 							when={kind() === "in-progress"}
-							fallback={<p class="text-lg font-medium">Submitted</p>}
+							fallback={
+								<div>
+									<p class="text-lg font-medium">Submitted</p>
+									<Show when={kind() === "submitted"}>
+										<p class="text-sm text-base-content/70">
+											Results are not released yet.
+										</p>
+									</Show>
+								</div>
+							}
 						>
 							<span class="text-lg font-medium">
 								<Show when={deadline()} fallback="Take your time">
@@ -307,6 +339,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 											change(entry.slug, entry.question.type, payload)
 										}
 									/>
+									<Show when={kind() === "results" && props.result}>
+										{(result) => (
+											<Outcome
+												outcome={result().questions.find(
+													(outcome) => outcome.question === entry.slug,
+												)}
+											/>
+										)}
+									</Show>
 									<Show when={saveErrors()[entry.slug]}>
 										{(message) => (
 											<p role="alert" class="text-sm text-error">
@@ -353,6 +394,38 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				</Match>
 			</Switch>
 		</div>
+	);
+}
+
+/// The verdict on one question: its score or why it has none, and the comments.
+function Outcome(props: { outcome: QuestionOutcome | undefined }): JSX.Element {
+	return (
+		<Show when={props.outcome}>
+			{(outcome) => (
+				<div class="mt-2 border-t border-base-300 pt-3">
+					<p class="font-semibold">
+						<Switch>
+							<Match when={outcome().status === "graded"}>
+								{formatScore(outcome().score ?? 0)}
+							</Match>
+							<Match when={outcome().status === "pending"}>
+								Waiting to be graded
+							</Match>
+							<Match when={outcome().status === "unanswered"}>
+								Not answered
+							</Match>
+						</Switch>
+					</p>
+					<For each={outcome().comments}>
+						{(comment) => (
+							<p class="mt-1 whitespace-pre-wrap text-sm text-base-content/70">
+								{comment}
+							</p>
+						)}
+					</For>
+				</div>
+			)}
+		</Show>
 	);
 }
 

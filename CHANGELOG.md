@@ -11,6 +11,11 @@
   Submitting asks for confirmation first.
 - `ResponseService.finish` closes a student's graded attempt to further
   answers.
+- Students see their results once grades are released: the total, each
+  question's score and every comment on it, newest first. A question still
+  waiting for a grade says so instead of showing zero, and the Exams tab shows
+  the total next to each released exam. Exams now expose `gradesReleasedAt`,
+  read-only.
 - `pnpm run typecheck` now also typechecks `.astro` files through
   `scripts/astro-check.ts`, which runs the Astro checker on TypeScript 6
   because `astro check` does not support TypeScript 7 yet.

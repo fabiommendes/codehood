@@ -511,6 +511,7 @@ function fromDb(row: DbExam): Exam {
 		duration: fromMs(row.durationMs),
 		extraTime: fromMs(row.extraTimeMs),
 		author: row.authorId,
+		gradesReleasedAt: row.gradesReleasedAt,
 		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
 		questions: row.questionsForExams.map((q) => ({

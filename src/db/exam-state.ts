@@ -14,7 +14,8 @@ import type { Exam } from "./services/exam.service";
 export type ExamTiming = Pick<
 	Exam,
 	"type" | "status" | "scheduledAt" | "duration" | "extraTime"
->;
+> &
+	Partial<Pick<Exam, "gradesReleasedAt">>;
 
 /// The part of a response its state depends on.
 export interface AttemptTiming {
@@ -39,6 +40,7 @@ export type AttemptState =
 	| { kind: "can-start" }
 	| { kind: "in-progress"; deadline: Date | null }
 	| { kind: "submitted" }
+	| { kind: "results" }
 	| { kind: "missed" };
 
 /**
@@ -119,6 +121,7 @@ export function attemptDeadline(
  * - An attempt that stopped accepting submissions, or whose deadline passed:
  *   `submitted`.
  * - `closed` exam with no attempt: `missed`.
+ * - What would be `submitted` is `results` once {@link resultsReleased} holds.
  *
  * `draft` and `archived` exams are never shown to students; they report
  * `not-open` with `opensAt: null`.
@@ -135,13 +138,40 @@ export function attemptState(
 		case "archived":
 			return { kind: "not-open", opensAt: null };
 		case "closed":
-			return attempt ? { kind: "submitted" } : { kind: "missed" };
+			return attempt ? submittedState(exam, now) : { kind: "missed" };
 		case "open": {
 			if (!attempt) return { kind: "can-start" };
 			const deadline = attemptDeadline(exam, attempt);
 			const active =
 				attempt.acceptingSubmissions && (!deadline || now <= deadline);
-			return active ? { kind: "in-progress", deadline } : { kind: "submitted" };
+			return active
+				? { kind: "in-progress", deadline }
+				: submittedState(exam, now);
 		}
+	}
+}
+
+/// A finished attempt is `results` once grades are released, `submitted` before.
+function submittedState(exam: ExamTiming, now: Date): AttemptState {
+	return resultsReleased(exam, now)
+		? { kind: "results" }
+		: { kind: "submitted" };
+}
+
+/**
+ * Whether the students of `exam` may see their grades at `now`.
+ *
+ * A `PRACTICE` exam releases at once, a `QUIZ` once its phase is `closed`,
+ * and any other type only when `gradesReleasedAt` is set and not in the
+ * future. A missing `gradesReleasedAt` counts as not released.
+ */
+export function resultsReleased(exam: ExamTiming, now: Date): boolean {
+	switch (exam.type) {
+		case "PRACTICE":
+			return true;
+		case "QUIZ":
+			return examPhase(exam, now) === "closed";
+		default:
+			return !!exam.gradesReleasedAt && exam.gradesReleasedAt <= now;
 	}
 }

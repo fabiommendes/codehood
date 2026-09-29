@@ -7,6 +7,7 @@ import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
 import Badge from "@/components/ui/Badge";
 import type { Question, QuestionPublic } from "@/db";
 import { attemptState, db, examPhase, examPhaseLabels } from "@/db";
+import { examResult } from "@/db/exam-result";
 import AppLayout from "@/layouts/AppLayout.astro";
 import {
 	examPhaseBadgeClass,
@@ -89,6 +90,20 @@ const attempt = canManage
 		).at(-1) ?? null);
 const state = attemptState(exam, attempt, now);
 
+// Feedback reaches a student only once released, and only on their own work;
+// the service enforces both, this just asks for it when the results show.
+const examOutcome =
+	state.kind === "results" && attempt
+		? examResult(
+				exam.questions.map((question) => question.slug),
+				attempt.submissions,
+				await db.feedback.findMany(
+					{ course: course.id, exam: slug, author: actor.username },
+					{ actor },
+				),
+			)
+		: undefined;
+
 // Fetched with `public: true` above, so a student's copy never held an answer key.
 const attemptQuestions = pinnedQuestions.map(({ slug, question }) => ({
 	slug,
@@ -96,7 +111,9 @@ const attemptQuestions = pinnedQuestions.map(({ slug, question }) => ({
 }));
 // Questions stay on the server until the student is in the attempt.
 const showQuestions =
-	state.kind === "in-progress" || state.kind === "submitted";
+	state.kind === "in-progress" ||
+	state.kind === "submitted" ||
+	state.kind === "results";
 const latestAnswers: Record<string, AnswerPayload> = {};
 for (const submission of attempt?.submissions ?? []) {
 	latestAnswers[submission.question] = submission.payload as AnswerPayload;
@@ -144,6 +161,7 @@ for (const submission of attempt?.submissions ?? []) {
             now={now}
             questions={showQuestions ? attemptQuestions : []}
             answers={latestAnswers}
+            result={examOutcome}
           />
         </section>
       )

@@ -49,6 +49,9 @@ export const examSchema = z.object({
 	duration: duration.nullable(),
 	extraTime: duration.nullable(),
 
+	/// When the instructor released an `EXAM`'s grades. Read-only here.
+	gradesReleasedAt: z.date().nullable(),
+
 	author: z.string(),
 	rev: rev.nullable(),
 
@@ -64,6 +67,7 @@ export const examCreate = examSchema
 		id: true,
 		author: true,
 		extraTime: true,
+		gradesReleasedAt: true,
 		createdAt: true,
 		updatedAt: true,
 	})

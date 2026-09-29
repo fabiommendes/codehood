@@ -3,7 +3,8 @@ import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ExamsTable from "@/components/exam/ExamsTable";
-import { db, groupExamsForStudent } from "@/db";
+import { db, groupExamsForStudent, resultsReleased } from "@/db";
+import { examResult, formatScore } from "@/db/exam-result";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { loadCourse } from "@/utils/load-course";
 
@@ -22,7 +23,34 @@ const canWrite = hasPerm(actor, "course.update-contents", course);
 // already narrows DRAFT/ARCHIVED rows to whoever may write the course's
 // contents, so this list is exactly what `actor` may see.
 const exams = await db.exam.findMany({ course: course.id }, { actor });
-const groups = canWrite ? [] : groupExamsForStudent(exams);
+const now = new Date();
+const groups = canWrite ? [] : groupExamsForStudent(exams, now);
+
+// A student's released total per exam slug, from one attempts query and one
+// feedback query for the whole course. Pending or unreleased exams have none.
+const scores = new Map<string, string>();
+if (!canWrite) {
+	const [attempts, feedback] = await Promise.all([
+		db.response.findMany(
+			{ course: course.id, author: actor.username, practice: false },
+			{ actor },
+		),
+		db.feedback.findMany(
+			{ course: course.id, author: actor.username },
+			{ actor },
+		),
+	]);
+	for (const exam of exams) {
+		const attempt = attempts.find((entry) => entry.exam === exam.slug);
+		if (!attempt || !resultsReleased(exam, now)) continue;
+		const { total } = examResult(
+			exam.questions.map((question) => question.slug),
+			attempt.submissions,
+			feedback,
+		);
+		if (total !== null) scores.set(exam.slug, formatScore(total));
+	}
+}
 ---
 
 <AppLayout title={`Exams · ${course.discipline.name}`}>
@@ -52,7 +80,7 @@ const groups = canWrite ? [] : groupExamsForStudent(exams);
               </h3>
               <div class="mt-2 flex flex-col gap-3">
                 {group.exams.map((exam) => (
-                  <ExamRow exam={exam} href={href} />
+                  <ExamRow exam={exam} href={href} score={scores.get(exam.slug)} />
                 ))}
               </div>
             </section>

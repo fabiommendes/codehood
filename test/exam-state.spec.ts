@@ -6,6 +6,7 @@ import {
 	attemptState,
 	examPhase,
 	examPhaseLabels,
+	resultsReleased,
 } from "@/db";
 
 const MINUTE = 60_000;
@@ -373,4 +374,143 @@ test("attemptState: closed exam with an attempt is submitted, even one still acc
 			at(30),
 		),
 	).toEqual({ kind: "submitted" });
+});
+
+// ---------------------------------------------------------------------------
+// resultsReleased
+// ---------------------------------------------------------------------------
+
+test("resultsReleased: a PRACTICE exam is always released", () => {
+	for (const status of [
+		"DRAFT",
+		"SCHEDULED",
+		"ONGOING",
+		"COMPLETED",
+	] as const) {
+		for (const [, now] of timeline) {
+			expect(resultsReleased(timed({ type: "PRACTICE", status }), now)).toBe(
+				true,
+			);
+		}
+	}
+});
+
+test("resultsReleased: a QUIZ is released once its phase is closed", () => {
+	const quiz = timed({ type: "QUIZ" });
+	expect(resultsReleased(quiz, new Date(at(120).getTime() + 1))).toBe(true);
+	expect(resultsReleased(quiz, at(10_000))).toBe(true);
+	expect(
+		resultsReleased(timed({ type: "QUIZ", status: "COMPLETED" }), at(30)),
+	).toBe(true);
+});
+
+test("resultsReleased: a QUIZ is not released before its phase is closed", () => {
+	const quiz = timed({ type: "QUIZ" });
+	expect(resultsReleased(quiz, at(-60))).toBe(false);
+	expect(resultsReleased(quiz, START)).toBe(false);
+	expect(resultsReleased(quiz, new Date(at(120).getTime() - 1))).toBe(false);
+});
+
+test("resultsReleased: an EXAM is released from the moment gradesReleasedAt is reached", () => {
+	const exam = timed({ gradesReleasedAt: at(300) });
+	expect(resultsReleased(exam, new Date(at(300).getTime() - 1))).toBe(false);
+	expect(resultsReleased(exam, at(300))).toBe(true);
+	expect(resultsReleased(exam, at(10_000))).toBe(true);
+});
+
+test("resultsReleased: an EXAM without gradesReleasedAt is never released, even when closed", () => {
+	expect(resultsReleased(timed({ gradesReleasedAt: null }), at(10_000))).toBe(
+		false,
+	);
+	expect(resultsReleased(timed(), at(10_000))).toBe(false);
+	expect(
+		resultsReleased(
+			timed({ status: "COMPLETED", gradesReleasedAt: null }),
+			at(10_000),
+		),
+	).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// attemptState: results
+// ---------------------------------------------------------------------------
+
+test("attemptState: a submitted attempt is results once grades are released", () => {
+	const exam = timed({ gradesReleasedAt: at(130) });
+	const finished = attempt({ acceptingSubmissions: false });
+
+	expect(attemptState(exam, finished, at(60))).toEqual({ kind: "submitted" });
+	expect(attemptState(exam, finished, at(130))).toEqual({ kind: "results" });
+});
+
+test("attemptState: a submitted attempt stays submitted while grades are not released", () => {
+	const finished = attempt({ acceptingSubmissions: false });
+
+	expect(attemptState(timed(), finished, at(10_000))).toEqual({
+		kind: "submitted",
+	});
+	expect(
+		attemptState(timed({ gradesReleasedAt: at(500) }), finished, at(200)),
+	).toEqual({ kind: "submitted" });
+});
+
+test("attemptState: an attempt on a closed QUIZ is results", () => {
+	expect(attemptState(timed({ type: "QUIZ" }), attempt(), at(121))).toEqual({
+		kind: "results",
+	});
+});
+
+test("attemptState: an attempt past its own deadline is results once released", () => {
+	const exam = timed({
+		status: "ONGOING",
+		scheduledAt: null,
+		gradesReleasedAt: at(0),
+	});
+
+	expect(attemptState(exam, attempt({ createdAt: at(0) }), at(121))).toEqual({
+		kind: "results",
+	});
+});
+
+test("attemptState: a finished PRACTICE attempt is results", () => {
+	const finished = attempt({ acceptingSubmissions: false });
+
+	expect(attemptState(timed({ type: "PRACTICE" }), finished, at(60))).toEqual({
+		kind: "results",
+	});
+});
+
+test("attemptState: in-progress, can-start, not-open and missed are unaffected by released grades", () => {
+	const released = { gradesReleasedAt: at(-1000) };
+
+	expect(attemptState(timed(released), attempt(), at(60))).toEqual({
+		kind: "in-progress",
+		deadline: at(120),
+	});
+	expect(attemptState(timed(released), null, at(60))).toEqual({
+		kind: "can-start",
+	});
+	expect(attemptState(timed(released), null, at(-30))).toEqual({
+		kind: "not-open",
+		opensAt: START,
+	});
+	expect(attemptState(timed(released), null, at(121))).toEqual({
+		kind: "missed",
+	});
+});
+
+test("attemptState: a missed QUIZ stays missed although its grades are released", () => {
+	expect(attemptState(timed({ type: "QUIZ" }), null, at(121))).toEqual({
+		kind: "missed",
+	});
+});
+
+test("attemptState: an open PRACTICE exam keeps an attempt in progress and lets a student start", () => {
+	const practice = timed({ type: "PRACTICE" });
+
+	expect(attemptState(practice, null, at(60))).toEqual({ kind: "can-start" });
+	expect(attemptState(practice, attempt(), at(60))).toEqual({
+		kind: "in-progress",
+		deadline: at(120),
+	});
 });

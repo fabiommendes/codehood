@@ -22,6 +22,7 @@ function exam(overrides: Partial<Exam> = {}): Exam {
 		scheduledAt: null,
 		duration: null,
 		extraTime: null,
+		gradesReleasedAt: null,
 		author: "instructor",
 		rev: null,
 		tags: [],
