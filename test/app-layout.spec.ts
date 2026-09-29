@@ -62,3 +62,26 @@ test("sidebar courses show code and edition, and mark the ones the user teaches"
 	);
 	await expect(enrolled).not.toContainText("teaching");
 });
+
+test("on a course page the sidebar marks that course as the current page", async ({
+	page,
+}) => {
+	const teacher = await seedUser({ role: "INSTRUCTOR" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	await logInAs(page, teacher);
+	await page.goto("/courses");
+
+	const entry = page
+		.locator(".drawer-side a")
+		.filter({ hasText: course.discipline.slug });
+	const href = await entry.getAttribute("href");
+	await expect(entry).not.toHaveAttribute("aria-current", "page");
+
+	await page.goto(`${href}/exams`);
+	await expect(entry).toHaveAttribute("aria-current", "page");
+	await expect(page.locator(".drawer-side a[aria-current=page]")).toHaveCount(
+		1,
+	);
+});

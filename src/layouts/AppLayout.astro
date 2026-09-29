@@ -2,7 +2,6 @@
 import { actions } from "astro:actions";
 import CourseTile from "@/components/CourseTile.astro";
 import Logo from "@/components/Logo.astro";
-import SidebarArt from "@/components/SidebarArt.astro";
 import SidebarArtAlt from "@/components/SidebarArtAlt.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
@@ -81,7 +80,7 @@ const currentPath = Astro.url.pathname;
 function isActive(href: string): boolean {
 	// `/` renders the home page by rewrite, so the request path reads `/home`.
 	if (href === "/") return currentPath === "/" || currentPath === "/home";
-	return currentPath.startsWith(href);
+	return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 ---
 
@@ -229,7 +228,11 @@ function isActive(href: string): boolean {
               <li>
                 <a
                   href={course.href}
-                  class="gap-3 text-base-content hover:bg-base-200"
+                  aria-current={isActive(course.href) ? "page" : undefined}
+                  class:list={[
+                    "gap-3 text-base-content hover:bg-base-200",
+                    isActive(course.href) && "bg-base-200 font-semibold",
+                  ]}
                 >
                   <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
                   <span class="flex-1 truncate">
