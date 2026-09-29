@@ -69,12 +69,26 @@ session.
 
 ## Finding course material
 
+### See what needs my attention
+
+    status: todo
+    url: /
+
+Student logs in the evening before a busy day and wants to know what is coming,
+without opening each course. The home page leads with what needs them: an exam
+that is open now and how long it has left, the exams coming up in the next days,
+today's meetings across every course, and results released since their last
+visit. Each item links straight to the page where they act on it. On a quiet
+week the page says there is nothing pending and shows the next thing on the
+calendar, however far away it is.
+
+
 ### See my courses
 
     status: implemented
     url: /courses
 
-Student opens the site and sees exactly the courses they are actively enrolled
+Student opens My courses and sees exactly the courses they are actively enrolled
 in, each one linking to its course page. A course they dropped, or were dropped
 from, is not in the list.
 
@@ -141,10 +155,15 @@ Student opens the Exams tab and sees the exams for the course with their type an
 status: which are upcoming and when, which are open now, and which are finished.
 Exams the instructor is still drafting are not there.
 
+The status follows the clock. An exam whose window has closed is listed as
+finished even if nobody touched it since, and dates near today read as "in 3
+days" or "closed yesterday", so the student never has to compare a date with
+the calendar to know whether they missed something.
+
 
 ### Take an exam
 
-    status: todo
+    status: implemented
 
 Student opens an exam that is ongoing and answers its questions. Progress is kept
 as they go, so when the browser crashes halfway through they log back in, reopen
