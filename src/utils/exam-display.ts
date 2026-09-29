@@ -3,7 +3,11 @@
 
 import type { Duration } from "@/core/schemas";
 import type { Exam } from "@/db";
-import type { ExamPhase } from "@/services/exam-state";
+import {
+	type AttemptState,
+	type ExamPhase,
+	examPhaseLabels,
+} from "@/services/exam-state";
 import { durationToMinutes } from "@/utils/schedule-time";
 
 type ExamType = Exam["type"];
@@ -33,5 +37,30 @@ export function examPhaseBadgeClass(phase: ExamPhase): string {
 			return "badge-warning";
 		case "closed":
 			return "badge-success";
+	}
+}
+
+/**
+ * The badge for an exam as one viewer sees it: their own finished attempt
+ * when there is one, the exam's phase otherwise.
+ *
+ * @example
+ * examBadge("open", { kind: "submitted" }); // { label: "Awaiting grading", ... }
+ * examBadge("open"); // { label: "Open now", className: "badge-warning" }
+ */
+export function examBadge(
+	phase: ExamPhase,
+	state?: AttemptState,
+): { label: string; className: string } {
+	switch (state?.kind) {
+		case "submitted":
+			return { label: "Awaiting grading", className: "badge-info" };
+		case "results":
+			return { label: "Graded", className: "badge-primary" };
+		default:
+			return {
+				label: examPhaseLabels[phase],
+				className: examPhaseBadgeClass(phase),
+			};
 	}
 }

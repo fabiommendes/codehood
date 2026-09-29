@@ -199,7 +199,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		} else {
 			const { error } = await actions.exam.finish(target);
 			if (error) setFailure(error.message);
-			else setKind("submitted");
+			// The server decides what follows: awaiting grading, or the results.
+			else window.location.reload();
 		}
 		dialog?.close();
 		setBusy(false);

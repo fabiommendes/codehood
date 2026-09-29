@@ -7,7 +7,11 @@ import ExamsTable from "@/components/exam/ExamsTable";
 import { db, groupExamsForStudent } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { examResult, formatScore } from "@/services/exam-result";
-import { resultsReleased } from "@/services/exam-state";
+import {
+	type AttemptState,
+	attemptState,
+	resultsReleased,
+} from "@/services/exam-state";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -28,8 +32,10 @@ const exams = await db.exam.findMany({ course: course.id }, { actor });
 const now = new Date();
 const groups = canWrite ? [] : groupExamsForStudent(exams, now);
 
-// A student's released total per exam slug, from one attempts query and one
-// feedback query for the whole course. Pending or unreleased exams have none.
+// A student's attempt state and released total per exam slug, from one
+// attempts query and one feedback query for the whole course. Pending or
+// unreleased exams have no total.
+const states = new Map<string, AttemptState>();
 const scores = new Map<string, string>();
 if (!canWrite) {
 	const [attempts, feedback] = await Promise.all([
@@ -44,6 +50,7 @@ if (!canWrite) {
 	]);
 	for (const exam of exams) {
 		const attempt = attempts.find((entry) => entry.exam === exam.slug);
+		states.set(exam.slug, attemptState(exam, attempt ?? null, now));
 		if (!attempt || !resultsReleased(exam, now)) continue;
 		const { total } = examResult(
 			exam.questions.map((question) => question.slug),
@@ -90,7 +97,12 @@ if (!canWrite) {
               </h3>
               <div class="mt-2 flex flex-col gap-3">
                 {group.exams.map((exam) => (
-                  <ExamRow exam={exam} href={href} score={scores.get(exam.slug)} />
+                  <ExamRow
+                    exam={exam}
+                    href={href}
+                    score={scores.get(exam.slug)}
+                    state={states.get(exam.slug)}
+                  />
                 ))}
               </div>
             </section>

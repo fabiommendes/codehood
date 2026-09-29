@@ -4,9 +4,9 @@
 // the course home page's "Upcoming exams" section.
 import ListRow from "@/components/ListRow.astro";
 import type { Exam } from "@/db";
-import { examPhase, examPhaseLabels } from "@/services/exam-state";
+import { type AttemptState, examPhase } from "@/services/exam-state";
 import {
-	examPhaseBadgeClass,
+	examBadge,
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
@@ -18,11 +18,13 @@ interface Props {
 	href: string;
 	/** The student's total as a percentage, when their grades are released and complete. */
 	score?: string;
+	/** The viewer's own attempt state, which replaces the phase badge once they have submitted. */
+	state?: AttemptState;
 }
 
-const { exam, href, score } = Astro.props;
+const { exam, href, score, state } = Astro.props;
 
-const phase = examPhase(exam, new Date());
+const badge = examBadge(examPhase(exam, new Date()), state);
 const schedule = exam.scheduledAt
 	? formatDateTime(exam.scheduledAt)
 	: "Not scheduled";
@@ -34,8 +36,6 @@ const detail = `${examTypeLabels[exam.type]} · ${formatDuration(exam.duration)}
   <p class="text-sm text-base-content/60">{detail}</p>
   <span slot="trailing" class="flex items-center gap-3">
     {score && <span class="text-lg font-semibold">{score}</span>}
-    <span class:list={["badge badge-sm", examPhaseBadgeClass(phase)]}>
-      {examPhaseLabels[phase]}
-    </span>
+    <span class:list={["badge badge-sm", badge.className]}>{badge.label}</span>
   </span>
 </ListRow>

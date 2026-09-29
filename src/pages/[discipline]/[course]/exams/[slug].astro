@@ -13,11 +13,10 @@ import { examResult } from "@/services/exam-result";
 import {
 	attemptState,
 	examPhase,
-	examPhaseLabels,
 	gradeReleaseBlocker,
 } from "@/services/exam-state";
 import {
-	examPhaseBadgeClass,
+	examBadge,
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
@@ -96,6 +95,7 @@ const attempt = canManage
 			)
 		).at(-1) ?? null);
 const state = attemptState(exam, attempt, now);
+const badge = examBadge(phase, state);
 
 // The results are only fetched when nothing else already blocks the release.
 let canRelease = false;
@@ -151,7 +151,7 @@ for (const submission of attempt?.submissions ?? []) {
     <a href={`${href}/exams`} class="text-sm text-base-content/60 hover:text-primary">← Exams</a>
 
     <div class="mt-2 flex flex-wrap items-center gap-2">
-      <span class:list={["badge badge-sm", examPhaseBadgeClass(phase)]}>{examPhaseLabels[phase]}</span>
+      <span class:list={["badge badge-sm", badge.className]}>{badge.label}</span>
       <span class="badge badge-outline badge-sm">{examTypeLabels[exam.type]}</span>
     </div>
     <h2 class="mt-2 text-2xl font-bold">{exam.title}</h2>

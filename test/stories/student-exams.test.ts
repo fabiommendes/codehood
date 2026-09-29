@@ -198,6 +198,10 @@ test("student: take an exam", async ({ page }) => {
 			.click();
 
 		await expect(page.getByText("Submitted").first()).toBeVisible();
+		await expect(
+			page.getByText("Awaiting grading", { exact: true }),
+		).toBeVisible();
+		await expect(page.getByText("Open now", { exact: true })).toHaveCount(0);
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeDisabled();
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
 		await expect(page.getByRole("textbox")).not.toBeEditable();
@@ -212,6 +216,9 @@ test("student: take an exam", async ({ page }) => {
 		await page.reload();
 
 		await expect(page.getByText("Submitted").first()).toBeVisible();
+		await expect(
+			page.getByText("Awaiting grading", { exact: true }),
+		).toBeVisible();
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
 		await expect(page.getByRole("textbox")).toHaveValue("Brasília");
 		await expect(page.getByRole("textbox")).not.toBeEditable();
@@ -373,6 +380,9 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await page.goto(`${href}/exams/${midterm.exam.slug}`);
 
 		await expect(page.getByText("Submitted").first()).toBeVisible();
+		await expect(
+			page.getByText("Awaiting grading", { exact: true }),
+		).toBeVisible();
 		await expect(page.getByText(/not released/i)).toBeVisible();
 		await expect(page.getByText(/\d+%/)).toHaveCount(0);
 		await expect(page.getByText("Well argued")).toHaveCount(0);
@@ -386,6 +396,10 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await expect(page.getByText("Your score")).toHaveCount(0);
 		await expect(page.getByText("Waiting to be graded")).toHaveCount(1);
 		await expect(page.getByText(/\b0%/)).toHaveCount(0);
+		await expect(page.getByText("Graded", { exact: true })).toBeVisible();
+		await expect(
+			page.getByText("Awaiting grading", { exact: true }),
+		).toHaveCount(0);
 	});
 
 	await test.step("each graded question shows its score and its comments, newest first", async () => {
@@ -435,6 +449,13 @@ test("student: see my grades and feedback", async ({ page }) => {
 		// Only the two released exams show a percentage; the final shows none.
 		await expect(past.getByText(/\d+%/)).toHaveCount(2);
 		await expect(page.getByText("75%")).toHaveCount(0);
+		// Each row carries the student's own state: graded or still awaiting it.
+		await expect(
+			past.getByRole("link").filter({ hasText: "Midterm" }),
+		).toContainText("Graded");
+		await expect(
+			past.getByRole("link").filter({ hasText: "Final" }),
+		).toContainText("Awaiting grading");
 	});
 
 	await test.step("another student sees none of these grades", async () => {

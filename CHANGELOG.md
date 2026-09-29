@@ -60,6 +60,10 @@
 
 ### Fixed
 
+- The exam page's badge still read "Open now" after the student submitted.
+  A student's badge now reads "Awaiting grading" once they submit and
+  "Graded" once results are released, on the exam page and the Exams tab.
+  Submitting reloads the page, so released results show at once.
 - The course home showed a hardcoded "Resources 7" and two fixed resource
   rows. Both now come from the course's resources, with an empty state that
   says who publishes them.
