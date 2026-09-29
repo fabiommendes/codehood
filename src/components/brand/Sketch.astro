@@ -9,16 +9,27 @@ export type SketchArt =
 	| "protractor"
 	| "alvorada"
 	| "plot"
-	| "athos";
+	| "athos"
+	| "loose";
 
 interface Props {
 	art: SketchArt;
-	/// Changes the layout of `athos`; the other drawings ignore it.
-	seed?: number;
+	/// Changes the layout of `athos`; the other drawings ignore it. A string
+	/// is hashed, so a course URL gives the same panel every time.
+	seed?: number | string;
 	class?: string;
 }
 
-const { art, seed = 1, class: className } = Astro.props;
+const { art, seed: rawSeed = 1, class: className } = Astro.props;
+
+/// FNV-1a, to turn a string seed into a number.
+const seed =
+	typeof rawSeed === "number"
+		? rawSeed
+		: [...rawSeed].reduce(
+				(h, ch) => Math.imul(h ^ (ch.codePointAt(0) ?? 0), 0x01000193) >>> 0,
+				0x811c9dc5,
+			);
 
 interface Stroke {
 	d: string;
@@ -77,6 +88,41 @@ const athos = (): Stroke[] => {
 		}
 	});
 	return strokes;
+};
+
+/// Loose Athos tiles waiting to be laid: a row on the ground, a small stack,
+/// one leaning on it. Each tile keeps its figure, turned with it.
+const loose = (): Stroke[] => {
+	const size = 32;
+	const tiles: [number, number, number][] = [
+		[8, 118, -3],
+		[43, 118, 2],
+		[78, 117, -2],
+		[158, 118, 1],
+		[160, 85, -4],
+		[156, 51, 7],
+		[118, 108, -16],
+		[208, 110, 21],
+	];
+	const lit = 5;
+	return tiles
+		.flatMap(([x, y, angle], i) => {
+			const cx = x + size / 2;
+			const cy = y + size / 2;
+			const h = hash(i);
+			const design = tileDesigns[h % tileDesigns.length] ?? tileDesigns[0];
+			const on = i === lit;
+			return [
+				{ d: rect(x, y, size, size), turn: [angle, cx, cy] },
+				{
+					d: design?.(x + 1, y + 1) ?? "",
+					turn: [angle + ((h >>> 8) % 4) * 90, cx, cy],
+					accent: on,
+					lit: on,
+				},
+			] satisfies Stroke[];
+		})
+		.concat([{ d: "M2 151H254" }]);
 };
 
 const ARTS: Record<SketchArt, Stroke[]> = {
@@ -163,6 +209,7 @@ const ARTS: Record<SketchArt, Stroke[]> = {
 		{ d: "M164 74V140M164 70H24", dashed: true, accent: true },
 	],
 	athos: athos(),
+	loose: loose(),
 };
 
 const strokes = ARTS[art];
