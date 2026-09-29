@@ -108,8 +108,6 @@ accounts (an instructor who also takes a course, an admin testing a student
 account), and acting under the wrong identity is an easy mistake to make and a
 hard one to notice.
 
-Known violation: the top bar shows only a logout icon.
-
 
 ## 8. The CLI writes, the web shows
 

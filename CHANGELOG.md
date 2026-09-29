@@ -22,6 +22,11 @@
   a course code and, through the login, opens `/courses/join` with the code
   filled in.
 - The login and invite pages sit on a wall of Athos Bulcão tiles.
+- The top bar shows who is signed in, with their role, in a menu that holds
+  Profile and Log out. Sidebar courses read `cs101 · 2026-1`, mark the ones the
+  user teaches, and carry a tile block derived from the course instead of a
+  colored dot that changed with list order. The footer no longer repeats the
+  sidebar, and links to the design system only in development.
 - `/login?next=<path>` returns to that path after logging in. Only paths on
   the same site are accepted.
 - Students join a course at `/courses/join` by typing the passphrase the

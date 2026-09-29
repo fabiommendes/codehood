@@ -112,12 +112,19 @@ behaviour is the "See what needs my attention" story in
 
 ### N2. No visible identity
 
+Done: the top bar has a user menu with the display name and role, holding
+Profile and Log out (`src/layouts/AppLayout.astro`). Profile left the sidebar.
+
 The top bar shows a logout icon and nothing else (violates P7). Proposal: a user
 menu in the top bar with the display name and role, holding Profile and Log out.
 Profile can then leave the sidebar.
 
 
 ### N3. Sidebar course entries are ambiguous
+
+Done: entries read `cs101 · 2026-1`, courses the user teaches carry a
+"teaching" badge, and the course tile is seeded by the course URL, so it is the
+same everywhere.
 
 Courses in the sidebar are labelled by discipline code only (`cs101`). Two
 editions of the same discipline, or the same discipline taught by two
@@ -127,6 +134,9 @@ courses the user teaches, and derive the colour from the course.
 
 
 ### N4. The footer repeats navigation and exposes internal pages
+
+Done: the footer drops My courses and Profile; the design system link shows
+in development only.
 
 The footer repeats My courses and Profile from the sidebar and links to the
 design system, which is a development page. Proposal: drop the repeated links

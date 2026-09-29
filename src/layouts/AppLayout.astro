@@ -1,5 +1,6 @@
 ---
 import { actions } from "astro:actions";
+import CourseTile from "@/components/CourseTile.astro";
 import Logo from "@/components/Logo.astro";
 import SidebarArt from "@/components/SidebarArt.astro";
 import SidebarArtAlt from "@/components/SidebarArtAlt.astro";
@@ -42,14 +43,6 @@ const nav = [
 		active: "border-info",
 		glow: "from-info/10",
 	},
-	{
-		label: "Profile",
-		href: "/profile",
-		icon: "M12 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM4.5 20c1.2-3.5 4.2-5.5 7.5-5.5s6.3 2 7.5 5.5",
-		chip: "bg-accent/10 text-accent",
-		active: "border-accent",
-		glow: "from-accent/10",
-	},
 	...(user?.role === "ADMIN"
 		? [
 				{
@@ -64,23 +57,23 @@ const nav = [
 		: []),
 ];
 
-// Cycle the logo's colors for course markers.
-const DOT_COLORS = [
-	"bg-primary",
-	"bg-error",
-	"bg-warning",
-	"bg-secondary",
-	"bg-info",
-];
+/// Human labels for the role shown in the user menu.
+const ROLE_LABEL = {
+	STUDENT: "Student",
+	INSTRUCTOR: "Instructor",
+	ADMIN: "Admin",
+} as const;
+
 const courses = user
-	? (await db.course.findMany({}, { actor: user })).map((course, i) => ({
+	? (await db.course.findMany({}, { actor: user })).map((course) => ({
 			code: course.discipline.slug,
+			edition: course.edition.slug,
+			teaching: course.instructor.username === user.username,
 			href: courseHref({
 				discipline: course.discipline.slug,
 				instructor: course.instructor.username,
 				edition: course.edition.slug,
 			}),
-			dot: DOT_COLORS[i % DOT_COLORS.length],
 		}))
 	: [];
 
@@ -121,23 +114,29 @@ function isActive(href: string): boolean {
         <ThemeToggle />
         {
           user ? (
-            <form method="POST" action={actions.auth.logout}>
-              <button
-                type="submit"
-                class="btn btn-square btn-ghost"
-                aria-label="Log out"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M15 4H8a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7M18.5 12H10m8.5 0-3-3m3 3-3 3"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
+            <details class="dropdown dropdown-end">
+              <summary class="btn btn-ghost h-auto min-h-10 gap-2 px-2 py-1 font-normal">
+                <span class="grid text-right leading-tight">
+                  <span class="font-semibold">{user.name}</span>
+                  <span class="text-xs text-base-content/70">{ROLE_LABEL[user.role]}</span>
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-              </button>
-            </form>
+              </summary>
+              <ul class="menu dropdown-content z-40 mt-2 w-48 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+                <li>
+                  <a href="/profile">Profile</a>
+                </li>
+                <li>
+                  <form method="POST" action={actions.auth.logout} class="p-0">
+                    <button type="submit" class="w-full px-3 py-1.5 text-left">
+                      Log out
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </details>
           ) : (
             <a href="/login" class="btn btn-primary btn-sm rounded-full">
               Log in
@@ -167,22 +166,15 @@ function isActive(href: string): boolean {
           class="relative z-10 border-t border-base-300 px-6 py-8 text-center"
         >
           <Logo height={64} class="mx-auto opacity-50" />
-          <nav
-            class="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm"
-          >
-            <a href="/courses" class="text-base-content/60 hover:text-primary"
-              >My courses</a
-            >
-            <a href="/profile" class="text-base-content/60 hover:text-primary"
-              >Profile</a
-            >
-            <a href="/design" class="text-base-content/60 hover:text-primary"
-              >Design system</a
-            >
-          </nav>
-          <p class="mt-4 text-xs text-base-content/50">
-            the learning community
-          </p>
+          {
+            import.meta.env.DEV && (
+              <nav class="mt-4 text-sm">
+                <a href="/design" class="text-base-content/60 hover:text-primary">
+                  Design system
+                </a>
+              </nav>
+            )
+          }
         </footer>
       </div>
 
@@ -239,13 +231,12 @@ function isActive(href: string): boolean {
                   href={course.href}
                   class="gap-3 text-base-content hover:bg-base-200"
                 >
-                  <span
-                    class:list={[
-                      "inline-block h-2.5 w-2.5 rounded-full",
-                      course.dot,
-                    ]}
-                  />
-                  {course.code}
+                  <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
+                  <span class="flex-1 truncate">
+                    <span class="font-mono">{course.code}</span>
+                    <span class="text-base-content/60"> · {course.edition}</span>
+                  </span>
+                  {course.teaching && <span class="badge badge-ghost badge-xs">teaching</span>}
                 </a>
               </li>
             ))
