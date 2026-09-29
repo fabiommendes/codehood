@@ -11,7 +11,7 @@ Astro.response.status = 403;
 const course = Astro.url.searchParams.get("course");
 ---
 
-<ErrorLayout code="403" title="Access denied" codeClass="text-warning/30">
+<ErrorLayout code="403" title="Access denied" scene="lockedHouse">
   {
     course ? (
       <>

@@ -1,0 +1,36 @@
+---
+/**
+ * An illustrated message for a page with nothing to show yet, saying who acts
+ * next. The default slot holds the explanation; the `actions` slot, buttons.
+ */
+import Scene from "@/components/brand/Scene.astro";
+import type { SceneName } from "@/components/brand/scenes";
+
+interface Props {
+	/// The illustration beside the message.
+	scene: SceneName;
+	title: string;
+	class?: string;
+}
+
+const { scene, title, class: className } = Astro.props;
+---
+
+<section class:list={["grid items-center gap-8 md:grid-cols-[minmax(0,20rem)_1fr]", className]}>
+  <div class="tape tilt-l shadow-lg">
+    <Scene name={scene} />
+  </div>
+  <div>
+    <h2 class="text-2xl font-bold">{title}</h2>
+    <div class="mt-2 max-w-md text-base-content/70">
+      <slot />
+    </div>
+    {
+      Astro.slots.has("actions") && (
+        <div class="mt-5 flex flex-wrap gap-3">
+          <slot name="actions" />
+        </div>
+      )
+    }
+  </div>
+</section>

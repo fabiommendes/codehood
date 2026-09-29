@@ -273,3 +273,13 @@ keep a fixed size, so phones show more of them instead of bigger ones.
 items. The closing card takes the course code (the in-class passphrase) and
 sends it through the login to `/courses/join`. The footer lost the second
 mark. No tagline: "the learning community" was a placeholder and is gone.
+
+
+### Round 15: empty and error pages
+
+Error pages show a scene that tells the error: a binary tree with a missing
+leaf (404), a padlocked house (403), a program stopped on a red line (500).
+The big numeral became a small "Error 404" eyebrow. `/courses` with no courses
+and a home page with nothing to do use the star graph and the fully lit tree.
+Empty sections inside working pages stay as text, since those screens are
+quiet.

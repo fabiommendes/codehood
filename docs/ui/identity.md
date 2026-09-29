@@ -239,6 +239,22 @@ sources (leaves, screens, bulbs, stars) glow. On the light theme the panel
 reads as a picture taped to the page. `src/components/brand/Scene.astro`
 renders them from `scenes.ts`.
 
+Where they appear:
+
+| Place                              | Scene                                   |
+| :--------------------------------- | :-------------------------------------- |
+| 404                                | the tree with one leaf missing          |
+| 403                                | a house on the hill with a padlock      |
+| 500                                | the late-night desk, stopped on a red line |
+| Landing, "Why Codehood"            | late-night coding, the star graph       |
+| `/courses` with no courses         | the star graph over the neighborhood    |
+| Home with nothing to do            | the tree with every leaf lit            |
+
+Error pages put the scene in a taped card on a tile wall (`ErrorLayout`).
+Empty pages use `EmptyState`: the scene beside a title, the explanation and
+the next action. An empty section inside a working page (no resources yet, no
+schedule yet) stays a line of text.
+
 
 ## Icons
 

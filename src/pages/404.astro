@@ -6,7 +6,7 @@ export const prerender = false;
 Astro.response.status = 404;
 ---
 
-<ErrorLayout code="404" title="Page not found" codeClass="text-primary/25">
+<ErrorLayout code="404" title="Page not found" scene="missingLeaf">
   The page you're looking for doesn't exist, or may have moved.
   <div slot="actions">
     <a href="/courses" class="btn btn-primary rounded-full">← Back to my courses</a>

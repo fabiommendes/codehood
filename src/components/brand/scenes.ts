@@ -25,10 +25,26 @@ export const NIGHT = {
 	lime: "#b5f000",
 	azure: "#1f8bff",
 	cyan: "#00d2e6",
+	red: "#ff5c5c",
 };
 
-/// A binary tree whose canopy is a tree of nodes; the leaves are lit.
-const binaryTree = (() => {
+/// A short dashed segment from (ax, ay) to (bx, by), in `n` dashes.
+const dashed = (ax: number, ay: number, bx: number, by: number, n: number) =>
+	Array.from({ length: n }, (_, i) => {
+		const t0 = i / n;
+		const t1 = (i + 0.55) / n;
+		return seg(
+			ax + (bx - ax) * t0,
+			ay + (by - ay) * t0,
+			ax + (bx - ax) * t1,
+			ay + (by - ay) * t1,
+			3,
+		);
+	}).join("");
+
+/// A binary tree whose canopy is a tree of nodes; the leaves are lit. With
+/// `missing`, that node is an empty ring at the end of a dashed edge.
+const tree = (missing?: number) => {
 	const nodes: [number, number][] = [
 		[180, 140],
 		[124, 100],
@@ -70,14 +86,26 @@ const binaryTree = (() => {
 		{ d: rect(0, 186, 360, 14), fill: "#0a1a14" },
 		{ d: rect(176, 140, 8, 48), fill: "#2c5244" },
 		...edges.map(([a = 0, b = 0]) => ({
-			d: seg(...at(a), ...at(b), 3),
+			d:
+				b === missing
+					? dashed(...at(a), ...at(b), 4)
+					: seg(...at(a), ...at(b), 3),
 			fill: "#2c5244",
 		})),
-		...nodes.map(([x, y], i) => ({
-			d: circle(x, y, i === 0 ? 14 : 12),
-			fill: fills[i] ?? NIGHT.white,
-			glow: i >= 3,
-		})),
+		...nodes.flatMap(([x, y], i): Part[] =>
+			i === missing
+				? [
+						{ d: circle(x, y, 12), fill: NIGHT.gray2 },
+						{ d: circle(x, y, 9.5), fill: NIGHT.ground },
+					]
+				: [
+						{
+							d: circle(x, y, i === 0 ? 14 : 12),
+							fill: fills[i] ?? NIGHT.white,
+							glow: i >= 3,
+						},
+					],
+		),
 		...[
 			[40, 170, 1.6],
 			[120, 160, 1.9],
@@ -89,10 +117,30 @@ const binaryTree = (() => {
 			glow: true,
 		})),
 	] as Part[];
-})();
+};
+
+/// A line of code on the monitor: indent, length and color.
+type CodeLine = [indent: number, length: number, fill: string];
+
+const CODE: CodeLine[] = [
+	[0, 60, NIGHT.azure],
+	[12, 84, NIGHT.magenta],
+	[12, 50, NIGHT.amber],
+	[24, 70, NIGHT.lime],
+	[12, 40, NIGHT.cyan],
+	[0, 30, NIGHT.azure],
+];
+
+/// A program that stopped: dimmed lines, then one long red one.
+const CRASH: CodeLine[] = [
+	[0, 60, NIGHT.gray2],
+	[12, 84, NIGHT.gray2],
+	[12, 50, NIGHT.gray2],
+	[24, 118, NIGHT.red],
+];
 
 /// Someone coding late at night, seen from behind, with the moon at the window.
-const lateNight: Part[] = [
+const desk = (lines: CodeLine[]): Part[] => [
 	{ d: rect(24, 20, 70, 56), fill: "#15302a" },
 	{ d: circle(58, 46, 12), fill: NIGHT.white, glow: true },
 	{ d: circle(64, 42, 11), fill: "#15302a" },
@@ -101,19 +149,16 @@ const lateNight: Part[] = [
 	{ d: rect(0, 160, 360, 40), fill: NIGHT.slab },
 	{ d: rect(150, 40, 170, 104), fill: NIGHT.slab },
 	{ d: rect(158, 48, 154, 88), fill: "#081510" },
-	...[
-		[0, 60, NIGHT.azure],
-		[12, 84, NIGHT.magenta],
-		[12, 50, NIGHT.amber],
-		[24, 70, NIGHT.lime],
-		[12, 40, NIGHT.cyan],
-		[0, 30, NIGHT.azure],
-	].map(([indent, len, fill], i) => ({
-		d: rect(166 + Number(indent), 56 + i * 11, Number(len), 5),
-		fill: String(fill),
-		glow: true,
+	...lines.map(([indent, len, fill], i) => ({
+		d: rect(166 + indent, 56 + i * 11, len, 5),
+		fill,
+		glow: fill !== NIGHT.gray2,
 	})),
-	{ d: rect(166, 122, 5, 7), fill: NIGHT.white, glow: true },
+	{
+		d: rect(166, 56 + lines.length * 11 + 1, 5, 7),
+		fill: NIGHT.white,
+		glow: true,
+	},
 	{ d: rect(228, 144, 14, 12), fill: "#2c5244" },
 	{ d: rect(210, 154, 50, 6), fill: "#2c5244" },
 	{ d: rect(56, 136, 16, 24), fill: NIGHT.gray1 },
@@ -180,16 +225,72 @@ const constellation = (() => {
 	] as Part[];
 })();
 
+/// A house on the hill with its door shut and padlocked; the neighbors are lit.
+const lockedHouse = (() => {
+	const k = 2.6;
+	const x = 180 - 12 * k;
+	const y = 176 - 32 * k;
+	const neighbor = (hx: number, base: number, hk: number): Part[] => {
+		const hy = base - 32 * hk;
+		return [
+			{ d: wall(hx, hy, hk), fill: NIGHT.gray2 },
+			{ d: roof(hx, hy, hk), fill: NIGHT.gray1 },
+			{
+				d: rect(hx + 3.5 * hk, hy + 13 * hk, 5 * hk, 5 * hk),
+				fill: NIGHT.amber,
+				glow: true,
+			},
+		];
+	};
+	return [
+		...[
+			[48, 36, 3],
+			[300, 30, 3.5],
+			[96, 70, 2],
+			[262, 86, 2.2],
+		].map(([sx = 0, sy = 0, r = 2]) => ({
+			d: star(sx, sy, r),
+			fill: NIGHT.white,
+			glow: true,
+		})),
+		{ d: "M-10 205Q180 120 370 205Z", fill: "#173a2f" },
+		...neighbor(76, 186, 1),
+		...neighbor(262, 184, 1.1),
+		{ d: wall(x, y, k), fill: NIGHT.white },
+		{ d: roof(x, y, k), fill: NIGHT.gray1 },
+		{ d: rect(x + 3 * k, y + 13 * k, 5 * k, 5 * k), fill: "#2c5244" },
+		{ d: rect(x + 16 * k, y + 13 * k, 5 * k, 5 * k), fill: "#2c5244" },
+		{ d: rect(x + 9 * k, y + 22 * k, 6 * k, 10 * k), fill: NIGHT.gray2 },
+		{ d: arch(173, y + 20 * k, 14, 16), fill: NIGHT.amber },
+		{ d: arch(176.5, y + 20 * k + 3.5, 7, 12), fill: NIGHT.gray2 },
+		{ d: rect(170, y + 25 * k, 20, 15), fill: NIGHT.amber, glow: true },
+		{ d: circle(180, y + 25 * k + 6, 2.2), fill: NIGHT.ground },
+		{ d: rect(179, y + 25 * k + 7, 2, 5), fill: NIGHT.ground },
+	] as Part[];
+})();
+
 /// Every illustration, with the caption that doubles as its accessible label.
 export const SCENES = {
 	binaryTree: {
-		parts: binaryTree,
+		parts: tree(),
 		caption: "A binary tree: inner nodes in paper, the leaves lit.",
 	},
-	lateNight: { parts: lateNight, caption: "Coding late at night." },
+	lateNight: { parts: desk(CODE), caption: "Coding late at night." },
 	constellation: {
 		parts: constellation,
 		caption: "A graph of stars over the neighborhood.",
+	},
+	missingLeaf: {
+		parts: tree(6),
+		caption: "A binary tree with one leaf missing.",
+	},
+	lockedHouse: {
+		parts: lockedHouse,
+		caption: "A house on the hill with a padlock on its door.",
+	},
+	crash: {
+		parts: desk(CRASH),
+		caption: "A program stopped on a red line, late at night.",
 	},
 } satisfies Record<string, { parts: Part[]; caption: string }>;
 

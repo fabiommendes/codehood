@@ -1,4 +1,7 @@
 ---
+import Scene from "@/components/brand/Scene.astro";
+import type { SceneName } from "@/components/brand/scenes";
+import TileWall from "@/components/brand/TileWall.astro";
 import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import Layout from "./Layout.astro";
@@ -6,28 +9,34 @@ import Layout from "./Layout.astro";
 interface Props {
 	code: string;
 	title: string;
-	// Tailwind text-color utility for the big background numeral, e.g. "text-error/30".
-	codeClass?: string;
+	/// The illustration that tells the error at a glance.
+	scene: SceneName;
 }
 
-const { code, title, codeClass = "text-primary/25" } = Astro.props;
+const { code, title, scene } = Astro.props;
 ---
 
 <Layout title={`${code} — ${title} — Codehood`}>
-  <main class="relative flex min-h-screen flex-col items-center justify-center gap-10 bg-base-200 p-4 text-center">
-    <ThemeToggle class="absolute top-4 right-4" />
-    <a href="/">
-      <Logo height={52} />
-    </a>
-    <div>
-      <p class:list={["font-display text-8xl leading-none font-bold", codeClass]}>{code}</p>
-      <h1 class="mt-4 text-2xl font-bold">{title}</h1>
-      <p class="mt-2 max-w-sm text-base-content/60">
-        <slot />
-      </p>
-    </div>
-    <div class="flex flex-wrap items-center justify-center gap-3">
-      <slot name="actions" />
+  <main class="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-base-200 p-4 py-12">
+    <TileWall seed={13} class="-z-10" />
+    <ThemeToggle class="absolute top-4 right-4 z-10" />
+    <div class="card card-border tape w-full max-w-lg bg-base-100 shadow-xl">
+      <div class="card-body items-center gap-5 text-center">
+        <a href="/" aria-label="Codehood home">
+          <Logo height={34} />
+        </a>
+        <Scene name={scene} />
+        <div>
+          <p class="font-mono text-xs tracking-widest text-primary uppercase">Error {code}</p>
+          <h1 class="mt-1 text-2xl font-bold">{title}</h1>
+          <p class="mx-auto mt-2 max-w-sm text-base-content/70">
+            <slot />
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <slot name="actions" />
+        </div>
+      </div>
     </div>
   </main>
 </Layout>

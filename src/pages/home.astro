@@ -1,4 +1,5 @@
 ---
+import EmptyState from "@/components/EmptyState.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { formatScore } from "@/services/exam-result";
@@ -266,10 +267,9 @@ const clock = (date: Date) =>
 
     {
       !busy && (
-        <section class="mt-8">
-          <p class="text-lg font-medium">Nothing needs you right now</p>
-          {home.next && (
-            <p class="mt-1 text-sm text-base-content/70">
+        <EmptyState scene="binaryTree" title="Nothing needs you right now" class="mt-10">
+          {home.next ? (
+            <p>
               Next:{" "}
               <span class="font-medium">
                 {home.next.kind === "exam" ? home.next.exam.title : home.next.event.title}
@@ -277,8 +277,10 @@ const clock = (date: Date) =>
               · <span class="font-mono">{home.next.course.code}</span> ·{" "}
               <span title={exact(home.next.at)}>{formatRelative(home.next.at, now)}</span>
             </p>
+          ) : (
+            <p>Nothing is scheduled ahead in your courses.</p>
           )}
-        </section>
+        </EmptyState>
       )
     }
   </main>
