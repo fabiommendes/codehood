@@ -21,7 +21,7 @@ const courses = await db.course.findMany({}, { actor });
 ---
 
 <AppLayout title={isAdmin ? "All courses" : "My courses"}>
-  <main class="mx-auto max-w-5xl px-4 py-10">
+  <main class="mx-auto max-w-4xl px-4 py-10">
     <PageKicker text="Term overview" squares />
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
@@ -62,7 +62,7 @@ const courses = await db.course.findMany({}, { actor });
           </a>
         </EmptyState>
       ) : (
-        <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {courses.map((course) => {
             const href = courseHref({
               discipline: course.discipline.slug,

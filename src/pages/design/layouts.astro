@@ -80,7 +80,7 @@ const layouts = [
 		name: "AppLayout",
 		path: "src/layouts/AppLayout.astro",
 		description:
-			"The signed-in app shell: a top bar (logo, breadcrumb, theme toggle, user menu), the sidebar and a one-line footer, all from src/components/nav/ (see Navigation below). The sidebar is always visible on large screens and a drawer on small ones. Used by every signed-in page.",
+			"The signed-in app shell: a top bar (logo, breadcrumb, theme toggle, user menu), the sidebar and a one-line footer, all from src/components/nav/ (see Navigation below). The sidebar is always visible on large screens and a drawer on small ones. Used by every signed-in page. Page content sits in a `mx-auto max-w-4xl px-4` column; narrower content caps an inner element inside it, left-aligned.",
 		usage: `<AppLayout title="Profile">\n  ...\n</AppLayout>`,
 		demo: "/design/layouts/app-layout",
 	},

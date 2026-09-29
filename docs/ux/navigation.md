@@ -10,8 +10,10 @@ and the decisions behind them. Principles referenced as P1, P2, and so on are in
 Signed-in pages use `AppLayout`:
 
 - **Top bar.** Logo (links home, centered over the sidebar column), the
-  breadcrumb, the theme toggle, and the user menu: avatar, name and role (the
-  avatar alone on phones), holding Profile, Set up the CLI and Log out.
+  breadcrumb, the theme toggle, and the user menu: avatar, name and role,
+  holding Profile, Set up the CLI and Log out. Below `lg` the bar is
+  symmetric: the menu button, the logo in the middle, and the avatar alone; the
+  theme switch moves into the user menu.
 - **Sidebar.** Global destinations (Home, My courses, Calendar, and Admin for
   admins), then one entry per course the user takes or teaches. The current
   page or course is highlighted. A hand-drawn sketch closes the column; it is
@@ -20,6 +22,12 @@ Signed-in pages use `AppLayout`:
 - **Content.** The page itself. Course pages start with the course header and
   tab strip; admin pages with the admin header and its tabs.
 - **Footer.** One line: logo, a link to the source code, and the version.
+
+Every page puts its content in the same column, `mx-auto max-w-4xl px-4`, so
+the left edge is the same on all of them and the breadcrumb lines up with it.
+Prose and short forms that need a narrower measure cap an inner element
+(`max-w-2xl`, `max-w-md`) inside that column, left-aligned. They never narrow
+or widen the column itself.
 
 Pages without a session, or outside the app (login, invite redemption, error
 pages), use `CenteredLayout` or `ErrorLayout` and carry no navigation.
