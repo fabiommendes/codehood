@@ -1,4 +1,5 @@
 ---
+import TileWall from "@/components/brand/TileWall.astro";
 import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import Layout from "./Layout.astro";
@@ -11,10 +12,10 @@ const { title } = Astro.props;
 ---
 
 <Layout title={`${title} — Codehood`}>
-  <main class="relative flex min-h-screen items-center justify-center bg-base-200 p-4">
-    <ThemeToggle class="absolute top-4 right-4" />
-    <div class="card card-border w-full max-w-sm overflow-hidden bg-base-100 shadow-md">
-      <div class="stripe-brand h-1.5"></div>
+  <main class="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-base-200 p-4 py-12">
+    <TileWall seed={7} class="-z-10" />
+    <ThemeToggle class="absolute top-4 right-4 z-10" />
+    <div class="card card-border tape w-full max-w-sm bg-base-100 shadow-xl">
       <div class="card-body">
         <a href="/" class="mb-2">
           <Logo height={34} />

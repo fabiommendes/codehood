@@ -16,6 +16,7 @@
   brand` regenerates `public/logo.svg` and the favicons. `/design/brand`,
   `/design/motifs` and `/design/themes` show the logo, the motifs and both
   themes.
+- The login and invite pages sit on a wall of Athos Bulcão tiles.
 - Students join a course at `/courses/join` by typing the passphrase the
   instructor shows in class, and land on the course home enrolled. `/courses`
   offers "Join a course" in its header and in its empty state. An unknown code
