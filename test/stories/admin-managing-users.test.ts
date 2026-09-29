@@ -23,7 +23,7 @@ test("admin: invite an instructor", async ({ page }) => {
 	// an invite that was created but shows no link is useless to them.
 	const link = page.locator("#invite-url");
 	await expect(
-		page.getByText("Invite created — it expires in 7 days."),
+		page.getByText("Invite created. It expires in 7 days."),
 	).toBeVisible();
 	await expect(link).toHaveValue(/\/invite\/.+/);
 
