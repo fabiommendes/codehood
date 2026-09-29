@@ -249,6 +249,12 @@ Quiet screens use the radius and nothing else from this list.
   seed, and loose Athos tiles waiting to be laid. Two pencil passes with different wobble go over each line; one accent
   line in primary and at most one lit spot. Technical, but made by a person.
   Quiet enough for working screens.
+  One closes the sidebar, chosen by area: blueprint on Home, the profile and
+  pages without their own; loose tiles on My courses; construction on the
+  calendar; protractor in admin; and in a course an Athos panel seeded like
+  the course tile, so the drawing reinforces which course is open. It is
+  decoration only (`aria-hidden`): the course is always named in text.
+  Alvorada and plot are kept for new sections.
 
 
 ## Illustration
