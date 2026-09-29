@@ -1,0 +1,243 @@
+---
+// Geometric drawings in hand-drawn outline: a technical sketch made by a
+// person. Two pencil passes with different wobble go over each line.
+import { rect, tileDesigns } from "./paper";
+
+export type SketchArt =
+	| "construction"
+	| "blueprint"
+	| "protractor"
+	| "alvorada"
+	| "plot"
+	| "athos";
+
+interface Props {
+	art: SketchArt;
+	/// Changes the layout of `athos`; the other drawings ignore it.
+	seed?: number;
+	class?: string;
+}
+
+const { art, seed = 1, class: className } = Astro.props;
+
+interface Stroke {
+	d: string;
+	/// Drawn in the accent color instead of the line color.
+	accent?: boolean;
+	/// Filled with the lit-window color.
+	lit?: boolean;
+	dashed?: boolean;
+	/// Degrees and the center to turn the path around.
+	turn?: [number, number, number];
+}
+
+const circle = (cx: number, cy: number, r: number) =>
+	`M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+const cross = (x: number, y: number, s = 4) =>
+	`M${x - s} ${y}h${2 * s}M${x} ${y - s}v${2 * s}`;
+const line = (x1: number, y1: number, x2: number, y2: number) =>
+	`M${x1} ${y1}L${x2} ${y2}`;
+const polar = (cx: number, cy: number, r: number, deg: number) => {
+	const a = (deg * Math.PI) / 180;
+	return [cx + r * Math.cos(a), cy - r * Math.sin(a)] as const;
+};
+
+/// Mixes an index and the seed into well-spread bits, as TileWall does.
+const hash = (i: number) => {
+	let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(seed + 1, 0x85ebca6b);
+	h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+	return (h ^ (h >>> 16)) >>> 0;
+};
+
+/// A panel of Athos Bulcão tiles being laid by hand: full rows at the bottom,
+/// a ragged top, one figure lit.
+const athos = (): Stroke[] => {
+	const size = 30;
+	const rows = [8, 8 - (hash(90) % 3), 3 + (hash(91) % 3)];
+	const strokes: Stroke[] = [];
+	const lit = hash(92) % (rows[0] ?? 8);
+	rows.forEach((count, row) => {
+		const y = 150 - (row + 1) * size;
+		for (let col = 0; col < count; col++) {
+			const x = 8 + (row % 2 === 0 ? col : 7 - col) * size;
+			const h = hash(row * 16 + col);
+			const design = tileDesigns[h % tileDesigns.length] ?? tileDesigns[0];
+			const turn: [number, number, number] = [
+				((h >>> 8) % 4) * 90,
+				x + size / 2,
+				y + size / 2,
+			];
+			strokes.push({ d: rect(x, y, size, size) });
+			strokes.push({
+				d: design?.(x, y) ?? "",
+				turn,
+				accent: row === 0 && col === lit,
+				lit: row === 0 && col === lit,
+			});
+		}
+	});
+	return strokes;
+};
+
+const ARTS: Record<SketchArt, Stroke[]> = {
+	construction: [
+		{ d: circle(84, 104, 48) },
+		{ d: circle(158, 98, 32) },
+		{ d: "M84 56L125.6 128L42.4 128Z" },
+		{ d: cross(84, 104) },
+		{ d: cross(158, 98) },
+		{ d: line(6, 150, 250, 58) },
+		{ d: "M196 44A62 62 0 0 1 214 138", dashed: true },
+		{ d: "M126 98A32 32 0 0 1 158 66", accent: true },
+		{ d: circle(129.5, 83, 2.5), lit: true },
+	],
+	blueprint: [
+		{ d: "M92 72H166V140H92Z" },
+		{ d: "M86 74L129 36L172 74" },
+		{ d: "M120 140V112H138V140" },
+		{ d: "M100 86H114V100H100Z", lit: true },
+		{ d: line(10, 140, 246, 140) },
+		...Array.from({ length: 23 }, (_, i) => ({
+			d: line(14 + i * 10, 146, 20 + i * 10, 140),
+		})),
+		{ d: "M92 20H166M92 15V25M166 15V25", accent: true },
+		{ d: "M92 28V66M166 28V66", dashed: true },
+		{ d: "M190 72V140M185 72H195M185 140H195", accent: true },
+		{ d: circle(40, 56, 11) },
+		{ d: "M40 40L44 56L40 52L36 56Z" },
+	],
+	protractor: [
+		{ d: "M36 140A92 92 0 0 1 220 140Z" },
+		{ d: "M66 140A62 62 0 0 1 190 140" },
+		...Array.from({ length: 19 }, (_, i) => {
+			const [x1, y1] = polar(128, 140, i % 3 === 0 ? 76 : 84, i * 10);
+			const [x2, y2] = polar(128, 140, 92, i * 10);
+			return { d: line(x1, y1, x2, y2) };
+		}),
+		{
+			d: (() => {
+				const [x, y] = polar(128, 140, 110, 60);
+				return line(128, 140, x, y);
+			})(),
+			accent: true,
+		},
+		{
+			d: (() => {
+				const [x, y] = polar(128, 140, 26, 60);
+				return `M154 140A26 26 0 0 0 ${x} ${y}`;
+			})(),
+			accent: true,
+		},
+		{ d: "M8 146H248" },
+		...Array.from({ length: 25 }, (_, i) => ({
+			d: line(12 + i * 10, 146, 12 + i * 10, i % 5 === 0 ? 138 : 142),
+		})),
+	],
+	alvorada: [
+		{ d: "M8 48H248M8 58H248" },
+		...[36, 84, 132, 180, 228].map((cx) => ({
+			d: `M${cx - 14} 58Q${cx - 12} 112 ${cx} 138Q${cx + 12} 112 ${cx + 14} 58`,
+		})),
+		{ d: line(8, 138, 248, 138) },
+		{ d: "M20 146H90M110 146H200M40 152H150", dashed: true },
+		{ d: circle(214, 24, 9), accent: true },
+	],
+	plot: [
+		{ d: "M24 140H244M238 135L244 140L238 145" },
+		{ d: "M24 140V14M19 20L24 14L29 20" },
+		...[60, 100, 140, 180, 220].map((x) => ({ d: line(x, 137, x, 143) })),
+		{
+			d: `M24 ${120}${Array.from({ length: 22 }, (_, i) => {
+				const x = 24 + (i + 1) * 10;
+				const y = 120 - 70 * Math.abs(Math.sin((i + 1) / 7)) * (1 - i / 40);
+				return `L${x} ${y.toFixed(1)}`;
+			}).join("")}`,
+		},
+		...[
+			[54, 92],
+			[92, 64],
+			[134, 60],
+			[196, 92],
+		].map(([x = 0, y = 0]) => ({ d: circle(x, y, 3.5) })),
+		{ d: circle(164, 70, 4), lit: true },
+		{ d: "M164 74V140M164 70H24", dashed: true, accent: true },
+	],
+	athos: athos(),
+};
+
+const strokes = ARTS[art];
+---
+
+<svg
+  viewBox="0 0 256 156"
+  class:list={["sketch", className]}
+  aria-hidden="true"
+>
+  <defs>
+    <filter id="sketch-a" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" />
+      <feDisplacementMap in="SourceGraphic" scale="3" />
+    </filter>
+    <filter id="sketch-b" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="11" />
+      <feDisplacementMap in="SourceGraphic" scale="3.5" />
+    </filter>
+  </defs>
+  {
+    ["sketch-a", "sketch-b"].map((filter, pass) => (
+      <g filter={`url(#${filter})`} class:list={[pass === 1 && "second"]}>
+        {strokes.map((s) => (
+          <path
+            d={s.d}
+            transform={s.turn && `rotate(${s.turn.join(" ")})`}
+            class:list={[s.accent ? "accent" : "ink", s.lit && "lit", s.dashed && "dashed"]}
+          />
+        ))}
+      </g>
+    ))
+  }
+</svg>
+
+<style>
+  .sketch {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  path {
+    fill: none;
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .ink {
+    stroke: color-mix(in srgb, var(--color-base-content) 38%, transparent);
+  }
+
+  .accent {
+    stroke: var(--color-primary);
+  }
+
+  .lit {
+    fill: var(--color-secondary);
+    stroke: color-mix(in srgb, var(--color-base-content) 38%, transparent);
+  }
+
+  .dashed {
+    stroke-dasharray: 4 5;
+  }
+
+  /* The second pass wobbles differently and sits lighter, as a pencil
+     going over the same line twice. */
+  .second path {
+    stroke-width: 0.8;
+    opacity: 0.55;
+  }
+
+  .second .lit {
+    fill: none;
+  }
+</style>

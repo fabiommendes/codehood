@@ -243,6 +243,12 @@ Quiet screens use the radius and nothing else from this list.
 - **Fireflies and stars.** Night decoration in the dark theme.
 - **The house.** From the logo's H. Home icon, and small houses on a hill
   for community-themed art.
+- **Sketches.** Geometric drawings in hand-drawn outline (`Sketch`):
+  compass construction, the logo's house as a blueprint, a protractor, the
+  Alvorada columns, a plotted curve, and Athos tiles in outline, laid from a
+  seed. Two pencil passes with different wobble go over each line; one accent
+  line in primary and at most one lit spot. Technical, but made by a person.
+  Quiet enough for working screens.
 
 
 ## Illustration

@@ -18,6 +18,7 @@ import {
 	wall,
 } from "@/components/brand/paper";
 import Scene from "@/components/brand/Scene.astro";
+import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
 import { NIGHT as N, SCENES, type SceneName } from "@/components/brand/scenes";
 import TileWall from "@/components/brand/TileWall.astro";
 import PageKicker from "@/components/PageKicker.astro";
@@ -178,6 +179,39 @@ const TILE_THEMES = [
       ))
     }
   </div>
+
+  <h2 class="mt-12 mb-2 text-2xl font-bold">Sketches</h2>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    Geometric drawings in hand-drawn outline, <code>Sketch</code>: technical, but made by a person. Two pencil passes
+    with different wobble go over each line; one accent line in primary, at most one lit spot. <code>athos</code> takes
+    a seed and lays a different panel for each.
+  </p>
+  {
+    ["codehood", "codehood-dark"].map((theme) => (
+      <div data-theme={theme} class="mb-4 grid grid-cols-2 gap-3 rounded-box bg-base-100 p-4 text-base-content md:grid-cols-4">
+        {(
+          [
+            ["construction", 1],
+            ["blueprint", 1],
+            ["protractor", 1],
+            ["alvorada", 1],
+            ["plot", 1],
+            ["athos", 1],
+            ["athos", 2],
+            ["athos", 3],
+          ] as [SketchArt, number][]
+        ).map(([art, seed]) => (
+          <figure class="grid gap-1">
+            <Sketch art={art} seed={seed} />
+            <figcaption class="font-mono text-xs text-base-content/60">
+              {art}
+              {art === "athos" && ` · seed ${seed}`}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    ))
+  }
 
   <h2 class="mt-12 mb-2 text-2xl font-bold">Icons</h2>
   <p class="mb-4 max-w-2xl text-base-content/70">Filled, two tones, on a 24-unit grid. Shown at 48 and 24 px.</p>
