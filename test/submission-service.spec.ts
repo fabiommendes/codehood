@@ -217,7 +217,9 @@ test("create() refuses an attempt against a closed response", async () => {
 });
 
 //
-// R5 — a submission is refused unless the exam is ONGOING.
+// R5 — a submission is refused unless the exam is open at the moment of the
+// call; the stored status feeds that answer but is not the whole of it (see
+// exam-attempt-service.spec.ts for the schedule-driven cases).
 //
 
 const examStatuses: {
@@ -235,17 +237,15 @@ for (const { status, allowed } of examStatuses) {
 		const { course } = await makeCourse();
 		const student = await enrollStudent(course.id);
 		const question = await makeQuestion(course.id);
-		const exam = await makeExam(course.id, [question.slug], {
-			status,
-			type: "EXAM",
-		});
-		// SYSTEM opens the response directly, sidestepping the visibility rule
-		// that would otherwise hide a DRAFT/ARCHIVED exam from the student —
-		// that is covered separately in response-service.spec.ts.
-		const response = await persistedResponseFactory.create(
-			{ course: course.id, exam: exam.slug, author: student.username },
-			{ transient: { actor: FULL_ACCESS.actor } },
+		// The response is opened while the exam is ONGOING, then the exam moves
+		// to the status under test: opening an attempt against a DRAFT,
+		// SCHEDULED or COMPLETED exam is itself refused, so it cannot be setup.
+		const { exam, response } = await makeOpenResponse(
+			course.id,
+			[question.slug],
+			student.username,
 		);
+		await prisma.exam.update({ where: { id: exam.id }, data: { status } });
 
 		const attempt = db.submission.create(
 			{

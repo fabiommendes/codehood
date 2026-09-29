@@ -85,6 +85,15 @@ export const responseFilter = responseFilterBase.extend({ course: courseRef });
  * The client that answers a question does not know whether it has started the
  * exam already, and should not have to ask.
  */
+/// Closes one student's graded attempt to further answers.
+export const responseFinish = z.object({
+	course: courseRef,
+	exam: slug,
+
+	/// Defaults to the actor.
+	author: username.optional(),
+});
+
 export const responseSubmit = z.object({
 	course: courseRef,
 	exam: slug,

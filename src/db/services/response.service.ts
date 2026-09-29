@@ -16,6 +16,7 @@ import type { ResponseId } from "@/core/schemas";
 import {
 	responseCreate,
 	responseFilter,
+	responseFinish,
 	responsePK,
 	responseSchema,
 	responseSubmit,
@@ -30,6 +31,9 @@ import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 import {
+	assertAcceptingSubmissions,
+	assertExamOpen,
+	examTimingSelect,
 	resolveExamQuestion,
 	fromDb as submissionFromDb,
 } from "./submission.service";
@@ -43,6 +47,7 @@ export { PRACTICE_SESSION_WINDOW_MS };
 export type Response = z.infer<typeof responseSchema>;
 export type ResponseCreate = z.infer<typeof responseCreate>;
 export type ResponseFilter = z.infer<typeof responseFilter>;
+export type ResponseFinish = z.infer<typeof responseFinish>;
 export type ResponsePK = z.infer<typeof responsePK>;
 export type ResponseSubmit = z.infer<typeof responseSubmit>;
 export type ResponseUpdate = z.infer<typeof responseUpdate>;
@@ -67,9 +72,8 @@ function responseInclude() {
 	return {
 		exam: {
 			select: {
+				...examTimingSelect,
 				slug: true,
-				status: true,
-				type: true,
 				courseId: true,
 				course: { select: courseSelect() },
 			},
@@ -125,6 +129,7 @@ export class ResponseService extends CrudBase<{
 			opts.actor,
 			"response.create",
 		);
+		assertExamOpen(exam, new Date());
 
 		const slotKey =
 			exam.type === "PRACTICE"
@@ -337,6 +342,69 @@ export class ResponseService extends CrudBase<{
 	//
 
 	/**
+	 * Closes the author's graded attempt at an exam to further answers.
+	 *
+	 * The student's "Submit exam". Calling it on an attempt that is already
+	 * closed returns it unchanged. The author may close their own attempt; the
+	 * course's instructor may close anyone's.
+	 *
+	 * @throws {@link NotFound}
+	 * If the author has no attempt at the exam, or it belongs to someone the
+	 * actor may not see.
+	 */
+	@Validate({
+		service: true,
+		returns: responseSchema,
+		args: [responseFinish],
+	})
+	finish<Opt extends ServiceOpts>(
+		input: ResponseFinish,
+		opts: Opt,
+	): Promise<Response> {
+		return this.$transaction(opts, async (tx, scoped) => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(input.course),
+					select: courseSelect(),
+				}),
+			);
+			const authorId = resolveAuthorId(input.author, scoped.actor);
+			if (
+				!isCourseOwner(scoped.actor, course) &&
+				(scoped.actor === SYSTEM || scoped.actor.username !== authorId)
+			) {
+				throw new NotFound("response");
+			}
+
+			const exam = valueOrNotFound(
+				"exam",
+				await tx.exam.findUnique({
+					where: { courseId_slug: { courseId: course.id, slug: input.exam } },
+					select: { id: true },
+				}),
+			);
+			const row = valueOrNotFound(
+				"response",
+				await tx.response.findUnique({
+					where: {
+						authorId_examId_slotKey: { authorId, examId: exam.id, slotKey: 0 },
+					},
+					include: responseInclude(),
+				}),
+			);
+			if (!row.acceptingSubmissions) return fromDb(row);
+
+			const updated = await tx.response.update({
+				where: { id: row.id },
+				data: { acceptingSubmissions: false },
+				include: responseInclude(),
+			});
+			return fromDb(updated);
+		});
+	}
+
+	/**
 	 * Resolves the attempt and appends one submission to it, in one call.
 	 *
 	 * This is what a client answering a question actually does; `upsert` then
@@ -345,8 +413,8 @@ export class ResponseService extends CrudBase<{
 	 * appends a second submission rather than replacing the first.
 	 *
 	 * @throws {@link InvalidData}
-	 * If the attempt is closed to new submissions, its exam is not `ONGOING`,
-	 * or the question is not one the exam carries.
+	 * If the attempt is closed to new submissions, its exam is not open,
+	 * its deadline has passed, or the question is not one the exam carries.
 	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
 	 */
 	@Validate({
@@ -370,7 +438,7 @@ export class ResponseService extends CrudBase<{
 				"response.submit",
 			);
 
-			assertAcceptingSubmissions(row);
+			assertAcceptingSubmissions(row, new Date());
 			const question = await resolveExamQuestion(
 				tx,
 				row.exam.courseId,
@@ -527,7 +595,7 @@ async function prepareAttempt(
 		"exam",
 		await tx.exam.findUnique({
 			where: { courseId_slug: { courseId: course.id, slug: input.exam } },
-			select: { id: true, slug: true, status: true, type: true },
+			select: { id: true, slug: true, ...examTimingSelect },
 		}),
 	);
 
@@ -618,32 +686,6 @@ async function resolveOrCreateAttempt(
 		},
 		include: responseInclude(),
 	});
-}
-
-/**
- * Refuses a submission against a closed attempt or a non-`ONGOING` exam.
- */
-function assertAcceptingSubmissions(row: {
-	acceptingSubmissions: boolean;
-	exam: { status: string };
-}): void {
-	if (!row.acceptingSubmissions) {
-		throw new InvalidData({
-			response: [
-				{
-					code: "invalid",
-					message: "This response is not accepting new submissions",
-				},
-			],
-		});
-	}
-	if (row.exam.status !== "ONGOING") {
-		throw new InvalidData({
-			exam: [
-				{ code: "invalid", message: "This exam is not currently ongoing" },
-			],
-		});
-	}
 }
 
 /// `0` for a graded exam's slot, otherwise a unix timestamp in seconds.

@@ -25,6 +25,7 @@ import {
 import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
+import { examPhase } from "../exam-state";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
 export { examStatus, examType, textFormat } from "@/core/schemas";
@@ -411,16 +412,17 @@ export interface ExamGroup {
 }
 
 /** Whether `exam` belongs to the group `key`, per the spec's status/type table. */
-function belongsTo(key: ExamGroup["key"], exam: Exam): boolean {
+function belongsTo(key: ExamGroup["key"], exam: Exam, now: Date): boolean {
+	const phase = examPhase(exam, now);
 	switch (key) {
 		case "open":
-			return exam.status === "ONGOING" && exam.type !== "PRACTICE";
+			return phase === "open" && exam.type !== "PRACTICE";
 		case "practice":
-			return exam.type === "PRACTICE" && exam.status !== "COMPLETED";
+			return exam.type === "PRACTICE" && phase !== "closed";
 		case "upcoming":
-			return exam.status === "SCHEDULED" && exam.type !== "PRACTICE";
+			return phase === "upcoming" && exam.type !== "PRACTICE";
 		case "past":
-			return exam.status === "COMPLETED";
+			return phase === "closed";
 	}
 }
 
@@ -456,8 +458,15 @@ const GROUP_ORDER: { key: ExamGroup["key"]; label: string }[] = [
  * actor may see, so a draft cannot leak into a student-shaped section if this
  * function is ever reused. Exported as a pure function so the grouping/
  * ordering is unit-testable independent of the database.
+ *
+ * Membership follows {@link examPhase} at `now`, not the stored status alone:
+ * a `SCHEDULED` exam whose window has passed is in "Past", one inside its
+ * window is in "Open".
  */
-export function groupExamsForStudent(exams: Exam[]): ExamGroup[] {
+export function groupExamsForStudent(
+	exams: Exam[],
+	now: Date = new Date(),
+): ExamGroup[] {
 	const visible = exams.filter(
 		(exam) => exam.status !== "DRAFT" && exam.status !== "ARCHIVED",
 	);
@@ -466,7 +475,7 @@ export function groupExamsForStudent(exams: Exam[]): ExamGroup[] {
 	for (const { key, label } of GROUP_ORDER) {
 		const inGroup = sortGroup(
 			key,
-			visible.filter((exam) => belongsTo(key, exam)),
+			visible.filter((exam) => belongsTo(key, exam, now)),
 		);
 		if (inGroup.length > 0) {
 			groups.push({ key, label, exams: inGroup });

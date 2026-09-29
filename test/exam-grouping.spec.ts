@@ -4,6 +4,9 @@ import { groupExamsForStudent } from "@/db";
 
 let nextId = 1;
 
+/// A moment before every scheduled date used by the older cases.
+const NOW = new Date("2025-12-01T00:00:00Z");
+
 /** A minimal, valid `Exam` literal — override only the fields a case cares about. */
 function exam(overrides: Partial<Exam> = {}): Exam {
 	const id = nextId++;
@@ -81,7 +84,7 @@ test("every non-draft, non-archived (status, type) pair lands in exactly one sec
 		),
 	);
 
-	const groups = groupExamsForStudent(exams);
+	const groups = groupExamsForStudent(exams, NOW);
 
 	for (const key of ["open", "practice", "upcoming", "past"] as const) {
 		const want = expected[key] ?? [];
@@ -112,7 +115,7 @@ test("DRAFT and ARCHIVED exams are dropped regardless of type", () => {
 		exam({ status: "ARCHIVED", type: "PRACTICE" }),
 	];
 
-	const groups = groupExamsForStudent(exams);
+	const groups = groupExamsForStudent(exams, NOW);
 	expect(groups).toEqual([]);
 });
 
@@ -124,7 +127,7 @@ test("labels are fixed and match the spec", () => {
 		exam({ status: "COMPLETED", type: "EXAM", title: "Past one" }),
 	];
 
-	const groups = groupExamsForStudent(exams);
+	const groups = groupExamsForStudent(exams, NOW);
 	expect(sectionOf(groups, "open")?.label).toBe("Open");
 	expect(sectionOf(groups, "practice")?.label).toBe("Practice");
 	expect(sectionOf(groups, "upcoming")?.label).toBe("Upcoming");
@@ -139,7 +142,7 @@ test("sections appear in fixed order — Open, Practice, Upcoming, Past — and 
 		exam({ status: "ONGOING", type: "EXAM" }),
 	];
 
-	const groups = groupExamsForStudent(exams);
+	const groups = groupExamsForStudent(exams, NOW);
 	expect(groups.map((g) => g.key)).toEqual([
 		"open",
 		"practice",
@@ -168,7 +171,7 @@ test("Open section: ordered by scheduledAt ascending, unscheduled exams last", (
 		scheduledAt: null,
 	});
 
-	const groups = groupExamsForStudent([unscheduled, late, early]);
+	const groups = groupExamsForStudent([unscheduled, late, early], NOW);
 	expect(titles(sectionOf(groups, "open")?.exams ?? [])).toEqual([
 		"Early",
 		"Late",
@@ -188,7 +191,7 @@ test("Open section excludes PRACTICE exams even when ONGOING", () => {
 		title: "Ongoing practice",
 	});
 
-	const groups = groupExamsForStudent([ongoingExam, ongoingPractice]);
+	const groups = groupExamsForStudent([ongoingExam, ongoingPractice], NOW);
 	expect(titles(sectionOf(groups, "open")?.exams ?? [])).toEqual(["Real exam"]);
 	expect(titles(sectionOf(groups, "practice")?.exams ?? [])).toEqual([
 		"Ongoing practice",
@@ -212,7 +215,7 @@ test("Practice section: ordered by title ascending, COMPLETED practice exams exc
 		title: "Finished drill",
 	});
 
-	const groups = groupExamsForStudent([zebra, alpha, completed]);
+	const groups = groupExamsForStudent([zebra, alpha, completed], NOW);
 	expect(titles(sectionOf(groups, "practice")?.exams ?? [])).toEqual([
 		"Alpha drill",
 		"Zebra drill",
@@ -244,7 +247,10 @@ test("Upcoming section: ordered by scheduledAt ascending, unscheduled exams last
 		title: "Scheduled practice",
 	});
 
-	const groups = groupExamsForStudent([unscheduled, late, early, practice]);
+	const groups = groupExamsForStudent(
+		[unscheduled, late, early, practice],
+		NOW,
+	);
 	expect(titles(sectionOf(groups, "upcoming")?.exams ?? [])).toEqual([
 		"Early quiz",
 		"Late final",
@@ -272,7 +278,7 @@ test("Past section: ordered by scheduledAt descending, unscheduled exams last, a
 		scheduledAt: null,
 	});
 
-	const groups = groupExamsForStudent([older, unscheduled, newer]);
+	const groups = groupExamsForStudent([older, unscheduled, newer], NOW);
 	expect(titles(sectionOf(groups, "past")?.exams ?? [])).toEqual([
 		"Newer",
 		"Older",
@@ -281,7 +287,7 @@ test("Past section: ordered by scheduledAt descending, unscheduled exams last, a
 });
 
 test("empty input yields no sections", () => {
-	expect(groupExamsForStudent([])).toEqual([]);
+	expect(groupExamsForStudent([], NOW)).toEqual([]);
 });
 
 test("grouping is a pure function: same input, same output, input left untouched", () => {
@@ -291,9 +297,139 @@ test("grouping is a pure function: same input, same output, input left untouched
 	];
 	const snapshot = JSON.stringify(exams);
 
-	const first = groupExamsForStudent(exams);
-	const second = groupExamsForStudent(exams);
+	const first = groupExamsForStudent(exams, NOW);
+	const second = groupExamsForStudent(exams, NOW);
 
 	expect(JSON.stringify(exams)).toEqual(snapshot);
 	expect(second).toEqual(first);
+});
+
+// ---------------------------------------------------------------------------
+// Membership follows the clock, not only the stored status
+// ---------------------------------------------------------------------------
+
+/// 90 minutes plus 30 of extra time: the window runs 10:00 to 12:00 on `WINDOW_START`.
+const WINDOW_START = new Date("2026-03-10T10:00:00Z");
+const TIMED = {
+	duration: { hours: 1, minutes: 30 },
+	extraTime: { minutes: 30 },
+};
+
+function scheduledAt(minutesFromStart: number): Date {
+	return new Date(WINDOW_START.getTime() + minutesFromStart * 60_000);
+}
+
+test("a SCHEDULED exam whose window has passed lands in Past", () => {
+	const finished = exam({
+		status: "SCHEDULED",
+		title: "Finished",
+		scheduledAt: WINDOW_START,
+		...TIMED,
+	});
+
+	const groups = groupExamsForStudent([finished], scheduledAt(121));
+	expect(groups.map((g) => g.key)).toEqual(["past"]);
+	expect(titles(sectionOf(groups, "past")?.exams ?? [])).toEqual(["Finished"]);
+});
+
+test("a SCHEDULED exam inside its window lands in Open", () => {
+	const running = exam({
+		status: "SCHEDULED",
+		title: "Running",
+		scheduledAt: WINDOW_START,
+		...TIMED,
+	});
+
+	const groups = groupExamsForStudent([running], scheduledAt(60));
+	expect(groups.map((g) => g.key)).toEqual(["open"]);
+	expect(titles(sectionOf(groups, "open")?.exams ?? [])).toEqual(["Running"]);
+});
+
+test("a SCHEDULED exam that has not started lands in Upcoming", () => {
+	const later = exam({
+		status: "SCHEDULED",
+		title: "Later",
+		scheduledAt: WINDOW_START,
+		...TIMED,
+	});
+
+	const groups = groupExamsForStudent([later], scheduledAt(-1));
+	expect(groups.map((g) => g.key)).toEqual(["upcoming"]);
+	expect(titles(sectionOf(groups, "upcoming")?.exams ?? [])).toEqual(["Later"]);
+});
+
+test("an untimed SCHEDULED exam moves from Upcoming to Open at its start and stays there", () => {
+	const untimed = exam({
+		status: "SCHEDULED",
+		title: "Untimed",
+		scheduledAt: WINDOW_START,
+	});
+
+	const before = groupExamsForStudent([untimed], scheduledAt(-1));
+	const atStart = groupExamsForStudent([untimed], WINDOW_START);
+	const muchLater = groupExamsForStudent([untimed], scheduledAt(100_000));
+	expect(before.map((g) => g.key)).toEqual(["upcoming"]);
+	expect(atStart.map((g) => g.key)).toEqual(["open"]);
+	expect(muchLater.map((g) => g.key)).toEqual(["open"]);
+});
+
+test("a SCHEDULED exam without a date stays in Upcoming whatever the clock says", () => {
+	const undated = exam({ status: "SCHEDULED", title: "Undated", ...TIMED });
+
+	const groups = groupExamsForStudent([undated], scheduledAt(100_000));
+	expect(groups.map((g) => g.key)).toEqual(["upcoming"]);
+});
+
+test("an ONGOING timed exam moves to Past once its window has passed", () => {
+	const ongoing = exam({
+		status: "ONGOING",
+		title: "Ongoing",
+		scheduledAt: WINDOW_START,
+		...TIMED,
+	});
+
+	expect(
+		groupExamsForStudent([ongoing], scheduledAt(60)).map((g) => g.key),
+	).toEqual(["open"]);
+	expect(
+		groupExamsForStudent([ongoing], scheduledAt(121)).map((g) => g.key),
+	).toEqual(["past"]);
+});
+
+test("a scheduled PRACTICE exam stays in Practice after its window", () => {
+	const drill = exam({
+		status: "SCHEDULED",
+		type: "PRACTICE",
+		title: "Drill",
+		scheduledAt: WINDOW_START,
+		...TIMED,
+	});
+
+	const groups = groupExamsForStudent([drill], scheduledAt(10_000));
+	expect(groups.map((g) => g.key)).toEqual(["practice"]);
+});
+
+test("extra time keeps an exam in Open past its plain duration", () => {
+	const running = exam({
+		status: "SCHEDULED",
+		title: "Running",
+		scheduledAt: WINDOW_START,
+		...TIMED,
+	});
+
+	// 100 minutes in: past the 90 minute duration, inside the 30 minute extra time.
+	const groups = groupExamsForStudent([running], scheduledAt(100));
+	expect(groups.map((g) => g.key)).toEqual(["open"]);
+});
+
+test("without an explicit now, grouping uses the current clock", () => {
+	const longGone = exam({
+		status: "SCHEDULED",
+		title: "Long gone",
+		scheduledAt: new Date("2001-01-01T10:00:00Z"),
+		...TIMED,
+	});
+
+	const groups = groupExamsForStudent([longGone]);
+	expect(groups.map((g) => g.key)).toEqual(["past"]);
 });

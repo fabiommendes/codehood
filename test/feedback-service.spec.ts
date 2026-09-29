@@ -72,16 +72,14 @@ async function makeGradedSubmission(overrides: ExamOverrides = {}) {
 		course: course.id,
 		slug: tag("q-"),
 	});
-	// Answered first, closed afterwards: a submission is only accepted against
-	// an `ONGOING` exam, so an exam wanted in any other state gets there the
-	// way a real one does, once the work is in.
+	// Answered first, closed afterwards: a submission is only accepted while
+	// the exam is open, so an exam wanted in any other state or schedule gets
+	// there the way a real one does, once the work is in.
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: tag("exam-"),
 		type: overrides.type ?? "EXAM",
 		status: "ONGOING",
-		scheduledAt: overrides.scheduledAt,
-		duration: overrides.duration,
 		questions: [{ slug: question.slug }],
 	});
 	const response = await persistedResponseFactory.create({
@@ -97,17 +95,26 @@ async function makeGradedSubmission(overrides: ExamOverrides = {}) {
 	// Straight through `prisma`: `status` moves past what the service allows
 	// once answered, and no public schema exposes `gradesReleasedAt` yet.
 	const status = overrides.status ?? "ONGOING";
-	if (status !== "ONGOING" || overrides.gradesReleasedAt !== undefined) {
-		await prisma.exam.update({
-			where: { id: exam.id },
-			data: {
-				status,
-				...(overrides.gradesReleasedAt !== undefined
-					? { gradesReleasedAt: overrides.gradesReleasedAt }
-					: {}),
-			},
-		});
-	}
+	await prisma.exam.update({
+		where: { id: exam.id },
+		data: {
+			status,
+			...(overrides.scheduledAt !== undefined
+				? { scheduledAt: overrides.scheduledAt }
+				: {}),
+			...(overrides.duration
+				? {
+						durationMs:
+							((overrides.duration.hours ?? 0) * 60 +
+								(overrides.duration.minutes ?? 0)) *
+							60_000,
+					}
+				: {}),
+			...(overrides.gradesReleasedAt !== undefined
+				? { gradesReleasedAt: overrides.gradesReleasedAt }
+				: {}),
+		},
+	});
 
 	return { course, instructor, author, question, exam, submission };
 }

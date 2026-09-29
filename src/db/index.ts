@@ -35,7 +35,16 @@ export type {
 	SubmissionStatus,
 } from "../generated/prisma/client";
 export type { ServiceOpts } from "./base-service";
-
+export {
+	type AttemptState,
+	type AttemptTiming,
+	attemptDeadline,
+	attemptState,
+	type ExamPhase,
+	type ExamTiming,
+	examPhase,
+	examPhaseLabels,
+} from "./exam-state";
 export type {
 	ApiKey,
 	ApiKeyCreate,

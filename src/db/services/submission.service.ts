@@ -20,8 +20,10 @@ import {
 	submissionUpdate,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import { toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
+import { attemptDeadline, type ExamTiming, examPhase } from "../exam-state";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
 export { submissionStatus } from "@/core/schemas";
@@ -36,12 +38,39 @@ export type SubmissionFilter = z.infer<typeof submissionFilter>;
 export type SubmissionPK = z.infer<typeof submissionPK>;
 export type SubmissionUpdate = z.infer<typeof submissionUpdate>;
 
+/// The exam columns {@link examTimingFromDb} reads.
+export const examTimingSelect = {
+	status: true,
+	type: true,
+	scheduledAt: true,
+	durationMs: true,
+	extraTimeMs: true,
+} satisfies Prisma.ExamSelect;
+
+/// Stored milliseconds as a {@link Duration}, a missing or zero length read as `null`.
+function msToDuration(ms: number | null): ExamTiming["duration"] {
+	return ms ? toDuration(Math.round(ms / 60_000)) : null;
+}
+
+/** The {@link ExamTiming} of an exam row selected with {@link examTimingSelect}. */
+export function examTimingFromDb(
+	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>,
+): ExamTiming {
+	return {
+		type: exam.type,
+		status: exam.status,
+		scheduledAt: exam.scheduledAt,
+		duration: msToDuration(exam.durationMs),
+		extraTime: msToDuration(exam.extraTimeMs),
+	};
+}
+
 /// The relations needed to build a permission target from a response row.
 function responseTargetInclude() {
 	return {
 		exam: {
 			select: {
-				status: true,
+				...examTimingSelect,
 				courseId: true,
 				course: {
 					select: {
@@ -87,7 +116,7 @@ export class SubmissionService extends CrudBase<{
 	 * Appends an answer to a response.
 	 *
 	 * The response must still be accepting submissions, its exam must be
-	 * `ONGOING`, and the question must be one the exam carries.
+	 * open and within the response's deadline, and the question must be one the exam carries.
 	 *
 	 * @throws {@link NotFound}
 	 * If no response matches `input.response`, or `actor` may not even read
@@ -124,7 +153,7 @@ export class SubmissionService extends CrudBase<{
 			course: response.exam.course,
 		});
 
-		assertAcceptingSubmissions(response);
+		assertAcceptingSubmissions(response, new Date());
 		const question = await resolveExamQuestion(
 			tx,
 			response.exam.courseId,
@@ -388,12 +417,35 @@ async function writableSubmission(
 }
 
 /**
- * Refuses a submission against a closed response or a non-`ONGOING` exam.
+ * Refuses a write against an exam that is not open at `now`.
+ *
+ * @throws {@link InvalidData} Unless the exam's phase is `open`.
  */
-function assertAcceptingSubmissions(response: {
-	acceptingSubmissions: boolean;
-	exam: { status: string };
-}): void {
+export function assertExamOpen(
+	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>,
+	now: Date,
+): void {
+	if (examPhase(examTimingFromDb(exam), now) !== "open") {
+		throw new InvalidData({
+			exam: [{ code: "invalid", message: "This exam is not currently open" }],
+		});
+	}
+}
+
+/**
+ * Refuses a submission against a closed response, an exam that is not open,
+ * or a response whose deadline has passed.
+ *
+ * @throws {@link InvalidData}
+ */
+export function assertAcceptingSubmissions(
+	response: {
+		acceptingSubmissions: boolean;
+		createdAt: Date;
+		exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>;
+	},
+	now: Date,
+): void {
 	if (!response.acceptingSubmissions) {
 		throw new InvalidData({
 			response: [
@@ -404,10 +456,16 @@ function assertAcceptingSubmissions(response: {
 			],
 		});
 	}
-	if (response.exam.status !== "ONGOING") {
+	assertExamOpen(response.exam, now);
+
+	const deadline = attemptDeadline(examTimingFromDb(response.exam), response);
+	if (deadline && now > deadline) {
 		throw new InvalidData({
-			exam: [
-				{ code: "invalid", message: "This exam is not currently ongoing" },
+			response: [
+				{
+					code: "invalid",
+					message: "The time to answer this exam has run out",
+				},
 			],
 		});
 	}

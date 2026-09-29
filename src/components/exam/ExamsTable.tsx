@@ -19,8 +19,9 @@ import {
 	toggleSortState,
 } from "@/components/ui/table-sort";
 import type { Exam } from "@/db";
+import { examPhase, examPhaseLabels } from "@/db/exam-state";
 import {
-	examStatusBadgeClass,
+	examPhaseBadgeClass,
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
@@ -85,6 +86,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 
 	const sorted = createMemo(() => {
 		const rows = [...props.exams];
+		const now = new Date();
 		const { field, direction } = sort();
 
 		if (field === "tags") {
@@ -121,7 +123,9 @@ export default function ExamsTable(props: Props): JSX.Element {
 				case "type":
 					return examTypeLabels[a.type].localeCompare(examTypeLabels[b.type]);
 				case "status":
-					return a.status.localeCompare(b.status);
+					return examPhaseLabels[examPhase(a, now)].localeCompare(
+						examPhaseLabels[examPhase(b, now)],
+					);
 				default:
 					return a.title.localeCompare(b.title);
 			}
@@ -149,11 +153,14 @@ export default function ExamsTable(props: Props): JSX.Element {
 		{
 			title: "Status",
 			sortKey: "status" satisfies SortField,
-			render: (exam) => (
-				<span class={`badge badge-sm ${examStatusBadgeClass(exam.status)}`}>
-					{exam.status}
-				</span>
-			),
+			render: (exam) => {
+				const phase = examPhase(exam, new Date());
+				return (
+					<span class={`badge badge-sm ${examPhaseBadgeClass(phase)}`}>
+						{examPhaseLabels[phase]}
+					</span>
+				);
+			},
 		},
 		{
 			title: "Scheduled",

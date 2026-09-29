@@ -22,7 +22,7 @@ test("student: see the exams assigned to me", async ({ page }) => {
 		title: "Ongoing midterm",
 		type: "EXAM",
 		status: "ONGOING",
-		scheduledAt: new Date(now - DAY),
+		scheduledAt: new Date(now - 10 * 60_000),
 		duration: { minutes: 60 },
 	});
 	const practice = await persistedExamFactory.create({

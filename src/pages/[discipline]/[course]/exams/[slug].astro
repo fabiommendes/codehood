@@ -1,13 +1,15 @@
 ---
 import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
 import Badge from "@/components/ui/Badge";
 import type { Question, QuestionPublic } from "@/db";
-import { db } from "@/db";
+import { attemptState, db, examPhase, examPhaseLabels } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import {
-	examStatusBadgeClass,
+	examPhaseBadgeClass,
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
@@ -29,6 +31,9 @@ const canManage = hasPerm(actor, "enrollment.manage", course);
 if (!slug) return Astro.rewrite("/404");
 const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
 if (!exam) return Astro.rewrite("/404");
+
+const now = new Date();
+const phase = examPhase(exam, now);
 
 // Rendered like a resource note: PLAINTEXT/HTML text is shown as-is rather
 // than interpreted, since neither is safe to trust with raw markup.
@@ -65,6 +70,37 @@ const pinnedQuestions = (
 		(question): question is Question | QuestionPublic => question !== null,
 	)
 	.map(({ id: _id, ...question }) => question);
+
+// A student sees the exam through their own attempt: what they may do now,
+// and, once they are in it, the questions with their latest saved answers.
+// Practice exams open a new attempt per session, so the newest one counts.
+const attempt = canManage
+	? null
+	: ((
+			await db.response.findMany(
+				{
+					course: course.id,
+					exam: slug,
+					author: actor.username,
+					practice: exam.type === "PRACTICE" ? undefined : false,
+				},
+				{ actor },
+			)
+		).at(-1) ?? null);
+const state = attemptState(exam, attempt, now);
+
+// Fetched with `public: true` above, so a student's copy never held an answer key.
+const attemptQuestions = pinnedQuestions.map(({ slug, question }) => ({
+	slug,
+	question: question as QuestionPublic["question"],
+}));
+// Questions stay on the server until the student is in the attempt.
+const showQuestions =
+	state.kind === "in-progress" || state.kind === "submitted";
+const latestAnswers: Record<string, AnswerPayload> = {};
+for (const submission of attempt?.submissions ?? []) {
+	latestAnswers[submission.question] = submission.payload as AnswerPayload;
+}
 ---
 
 <AppLayout title={`${exam.title} · Exams`}>
@@ -74,7 +110,7 @@ const pinnedQuestions = (
     <a href={`${href}/exams`} class="text-sm text-base-content/60 hover:text-primary">← Exams</a>
 
     <div class="mt-2 flex flex-wrap items-center gap-2">
-      <span class:list={["badge badge-sm", examStatusBadgeClass(exam.status)]}>{exam.status}</span>
+      <span class:list={["badge badge-sm", examPhaseBadgeClass(phase)]}>{examPhaseLabels[phase]}</span>
       <span class="badge badge-outline badge-sm">{examTypeLabels[exam.type]}</span>
     </div>
     <h2 class="mt-2 text-2xl font-bold">{exam.title}</h2>
@@ -96,16 +132,29 @@ const pinnedQuestions = (
       )
     }
 
+    {
+      !canManage && (
+        <section class="mt-8">
+          <ExamAttempt
+            client:load
+            discipline={discipline!}
+            course={courseSegment!}
+            exam={slug}
+            state={state}
+            now={now}
+            questions={showQuestions ? attemptQuestions : []}
+            answers={latestAnswers}
+          />
+        </section>
+      )
+    }
+
     <section class="mt-8">
       <h2 class="text-lg font-semibold">Details</h2>
       <dl class="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-2">
         <div>
           <dt class="text-sm text-base-content/50">Type</dt>
           <dd class="mt-0.5 font-medium">{examTypeLabels[exam.type]}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-base-content/50">Status</dt>
-          <dd class="mt-0.5 font-medium">{exam.status}</dd>
         </div>
         <div>
           <dt class="text-sm text-base-content/50">Scheduled</dt>
@@ -146,17 +195,19 @@ const pinnedQuestions = (
       )
     }
 
-    <section class="mt-8">
-      <h2 class="text-lg font-semibold">Questions</h2>
-      {
-        pinnedQuestions.length > 0 ? (
-          <div class="mt-3">
-            <ExamQuestionsList questions={pinnedQuestions} canManage={canManage} client:load />
-          </div>
-        ) : (
-          <p class="mt-3 text-sm text-base-content/60">No questions pinned yet.</p>
-        )
-      }
-    </section>
+    {
+      canManage && (
+        <section class="mt-8">
+          <h2 class="text-lg font-semibold">Questions</h2>
+          {pinnedQuestions.length > 0 ? (
+            <div class="mt-3">
+              <ExamQuestionsList questions={pinnedQuestions} canManage={canManage} client:load />
+            </div>
+          ) : (
+            <p class="mt-3 text-sm text-base-content/60">No questions pinned yet.</p>
+          )}
+        </section>
+      )
+    }
   </main>
 </AppLayout>

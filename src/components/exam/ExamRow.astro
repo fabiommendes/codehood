@@ -4,8 +4,9 @@
 // the course home page's "Upcoming exams" section.
 import ListRow from "@/components/ListRow.astro";
 import type { Exam } from "@/db";
+import { examPhase, examPhaseLabels } from "@/db/exam-state";
 import {
-	examStatusBadgeClass,
+	examPhaseBadgeClass,
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
@@ -19,6 +20,7 @@ interface Props {
 
 const { exam, href } = Astro.props;
 
+const phase = examPhase(exam, new Date());
 const schedule = exam.scheduledAt
 	? formatDateTime(exam.scheduledAt)
 	: "Not scheduled";
@@ -28,7 +30,7 @@ const detail = `${examTypeLabels[exam.type]} · ${formatDuration(exam.duration)}
 <ListRow href={`${href}/exams/${exam.slug}`}>
   <p class="font-medium">{exam.title}</p>
   <p class="text-sm text-base-content/60">{detail}</p>
-  <span slot="trailing" class:list={["badge badge-sm", examStatusBadgeClass(exam.status)]}>
-    {exam.status}
+  <span slot="trailing" class:list={["badge badge-sm", examPhaseBadgeClass(phase)]}>
+    {examPhaseLabels[phase]}
   </span>
 </ListRow>

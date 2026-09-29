@@ -4,12 +4,24 @@
 
 ### Added
 
+- Students take exams in the web app. The exam page offers one action per
+  state: when it opens, "Start exam", the questions in answer mode with the
+  time left and "Submit exam", the submitted answers read-only, or a note
+  that the exam was missed. Answers save as they change and survive a reload.
+  Submitting asks for confirmation first.
+- `ResponseService.finish` closes a student's graded attempt to further
+  answers.
 - `pnpm run typecheck` now also typechecks `.astro` files through
   `scripts/astro-check.ts`, which runs the Astro checker on TypeScript 6
   because `astro check` does not support TypeScript 7 yet.
 
 ### Fixed
 
+- An exam's phase now follows the clock (`src/db/exam-state.ts`): a
+  `SCHEDULED` exam opens at its date and closes when its window ends, without
+  anyone updating its status. Starting an attempt and answering require an
+  open exam and an attempt within its deadline. Exam badges and lists show
+  labels such as "Open now" and "Closed" instead of the raw status.
 - Swagger UI filled regex-constrained strings with random matching text. Every
   patterned schema, including the generated MDQ ones, now carries an OpenAPI
   `example`, and a test fails if a new pattern ships without one.
