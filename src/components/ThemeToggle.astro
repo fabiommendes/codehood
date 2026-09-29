@@ -1,11 +1,21 @@
 ---
 interface Props {
 	class?: string;
+	/// `menu` renders a labeled menu item that names the theme it switches to,
+	/// for the user menu on small screens.
+	variant?: "icon" | "menu";
 }
 
-const { class: className } = Astro.props;
+const { class: className, variant = "icon" } = Astro.props;
 ---
 
+{
+  variant === "menu" ? (
+    <button type="button" class={className} data-theme-toggle>
+      <span class="theme-only-light">Dark theme</span>
+      <span class="theme-only-dark">Light theme</span>
+    </button>
+  ) : (
 <button type="button" class:list={["btn btn-square btn-ghost", className]} aria-label="Toggle dark mode" data-theme-toggle>
   <svg class="theme-icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6" />
@@ -20,6 +30,8 @@ const { class: className } = Astro.props;
     <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
   </svg>
 </button>
+  )
+}
 
 <style is:global>
   /* Only the icon matching the active theme is shown — see the inline anti-flash
@@ -28,6 +40,10 @@ const { class: className } = Astro.props;
     display: none;
   }
   [data-theme="codehood"] .theme-icon-moon {
+    display: none;
+  }
+  [data-theme="codehood-dark"] .theme-only-light,
+  [data-theme="codehood"] .theme-only-dark {
     display: none;
   }
 </style>

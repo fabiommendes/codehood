@@ -1,9 +1,11 @@
 ---
-// The user menu in AppLayout's top bar: avatar, name and role (the avatar
-// alone on phones), opening Profile, Set up the CLI and Log out.
+// The user menu in AppLayout's top bar: avatar, name and role, opening
+// Profile, Set up the CLI and Log out. Below `lg` it shows the avatar alone
+// and also holds the theme switch, which leaves the bar there.
 import { actions } from "astro:actions";
 import type { UserActor } from "@/auth/actor";
 import Avatar from "@/components/Avatar.astro";
+import ThemeToggle from "@/components/ThemeToggle.astro";
 
 interface Props {
 	user: UserActor;
@@ -22,13 +24,13 @@ const ROLE_LABEL = {
 ---
 
 <details class="dropdown dropdown-end" open={open}>
-  <summary class="btn btn-ghost h-auto min-h-10 gap-2 px-2 py-1 font-normal">
+  <summary class="btn btn-ghost h-auto min-h-10 gap-2 px-0 py-1 font-normal lg:px-2">
     <Avatar username={user.username} size={32} />
-    <span class="hidden text-left leading-tight whitespace-nowrap sm:grid">
+    <span class="hidden text-left leading-tight whitespace-nowrap lg:grid">
       <span class="font-semibold">{user.name}</span>
       <span class="text-xs text-base-content/70">{ROLE_LABEL[user.role]}</span>
     </span>
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg class="hidden lg:block" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   </summary>
@@ -45,6 +47,9 @@ const ROLE_LABEL = {
     </li>
     <li>
       <a href="/getting-started" class="cut">Set up the CLI</a>
+    </li>
+    <li class="lg:hidden">
+      <ThemeToggle variant="menu" class="cut" />
     </li>
     <li>
       <form method="POST" action={actions.auth.logout} class="cut p-0">

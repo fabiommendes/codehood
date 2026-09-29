@@ -65,10 +65,10 @@ const courses = user
           <Logo height={36} class="h-8 w-auto lg:h-9" />
         </a>
       </div>
-      <div class="navbar-end w-auto min-w-0 flex-1 gap-2 px-4">
+      <div class="navbar-end w-auto min-w-0 flex-1 gap-2 pr-5.5 pl-4 lg:px-4">
         <Breadcrumbs trail={crumbs} />
         <div class="flex shrink-0 items-center gap-2">
-          <ThemeToggle />
+          <ThemeToggle class={user ? "hidden lg:inline-flex" : undefined} />
           {
             user ? (
               <UserMenu user={user} />
