@@ -4,6 +4,17 @@
 
 ### Added
 
+- The instructor grades on the web. An exam page lists who attempted it, how
+  much each student answered, what waits for a grade and each total, and
+  leads to the grading queue at `<course>/exams/<slug>/grading`. Grading goes
+  question by question, with answers anonymous until "Show names" is turned
+  on. Each answer takes a score as a whole percentage and a comment; a grade
+  can be changed, which keeps the earlier ones, and an answer can be marked
+  will-not-grade, which counts as zero and reads "Not graded".
+  `<course>/exams/<slug>/attempts/<username>` shows one student's attempt
+  whole. The home page's "To grade" items open the queue.
+- Recording a grading pass, on the web or through the services, marks the
+  submission `GRADED_MANUALLY` or `GRADED_AUTOMATICALLY`.
 - `/calendar` opens on the month of the next event, or of the last one when
   nothing is left, instead of an empty current month. Every empty section of a
   course the viewer teaches links to `/getting-started`.

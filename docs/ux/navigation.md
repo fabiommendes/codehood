@@ -84,8 +84,20 @@ A page for a single exam, question or resource keeps its tab active and shows a
 
     status: adopted
 
-An instructor reaches the submissions of an exam, and the queue to grade them,
-from that exam's page. `dev/specs/to-review/web-grading.md` specifies both.
+An instructor reaches the attempts at an exam, and the queue to grade them,
+from that exam's page:
+
+```
+<course>/exams/<slug>                       results: one row per attempt
+<course>/exams/<slug>/grading               the queue: the exam's questions
+<course>/exams/<slug>/grading/<question>    every answer to one question
+<course>/exams/<slug>/attempts/<username>   one student's attempt
+```
+
+These pages keep the Exams tab active and link back to the page above them.
+Answers on the grading page carry no student name unless the URL has
+`?names=1`, which the "Show names" switch sets and the links between grading
+pages keep.
 
 The earlier `/gradebook` page showed fabricated data and was removed, along
 with the empty Manage tab. `/manage` redirects to the Students tab.

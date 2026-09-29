@@ -257,7 +257,7 @@ exam where they are already looking.
 
 ### Grade submissions by hand
 
-    status: todo
+    status: implemented
 
 Instructor reads essay answers, assigns a grade and writes feedback. Answers that
 were graded automatically are already done and marked as such, so the manual

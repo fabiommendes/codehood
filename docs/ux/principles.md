@@ -44,9 +44,6 @@ never before it.
 The same applies to the page someone lands on after logging in: it shows what
 needs their attention, not a directory of everything they have access to.
 
-Known violation: for the instructor, the exam page shows details and questions
-but not who submitted or what is left to grade.
-
 
 ## 3. Time is part of the state
 
