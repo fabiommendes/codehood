@@ -6,6 +6,7 @@ import Badge from "@/components/ui/Badge";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 import {
 	questionStatusLabels,
@@ -36,7 +37,9 @@ const { question: doc } = question;
 const problems = new Question(doc).validate();
 ---
 
-<AppLayout title={`${doc.title ?? question.slug} · Questions`}>
+<AppLayout title={`${doc.title ?? question.slug} · Questions`}
+  trail={breadcrumbs(Astro.url, { course, item: doc.title ?? question.slug })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="questions" />
 

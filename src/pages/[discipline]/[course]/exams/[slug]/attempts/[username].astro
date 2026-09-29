@@ -9,6 +9,7 @@ import { Question } from "@/mdq/question";
 import { examResult, formatScore } from "@/services/exam-result";
 import { attemptState } from "@/services/exam-state";
 import { attemptRows } from "@/services/grading";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
 import { formatDateTime } from "@/utils/schedule-time";
@@ -65,7 +66,9 @@ const stateLabel = (status: string, score: number | null): string => {
 };
 ---
 
-<AppLayout title={`${row.name} · ${exam.title}`}>
+<AppLayout title={`${row.name} · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, student: row.name })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 

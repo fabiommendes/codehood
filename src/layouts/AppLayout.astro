@@ -2,18 +2,24 @@
 import Logo from "@/components/Logo.astro";
 import AppFooter from "@/components/nav/AppFooter.astro";
 import AppSidebar from "@/components/nav/AppSidebar.astro";
+import Breadcrumbs from "@/components/nav/Breadcrumbs.astro";
 import PencilFilter from "@/components/nav/PencilFilter.astro";
 import UserMenu from "@/components/nav/UserMenu.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { courseHref } from "@/urls";
+import { breadcrumbs, type Crumb } from "@/utils/breadcrumbs";
 import Layout from "./Layout.astro";
 
 interface Props {
 	title?: string;
+	/// The breadcrumb in the top bar; defaults to the trail built from the URL
+	/// and `title`.
+	trail?: readonly Crumb[];
 }
 
-const { title } = Astro.props;
+const { title, trail } = Astro.props;
+const crumbs = trail ?? breadcrumbs(Astro.url, { page: title });
 const user = Astro.locals.actor;
 
 const courses = user
@@ -59,17 +65,20 @@ const courses = user
           <Logo height={36} class="h-8 w-auto lg:h-9" />
         </a>
       </div>
-      <div class="navbar-end w-auto flex-1 gap-2 px-4">
-        <ThemeToggle />
-        {
-          user ? (
-            <UserMenu user={user} />
-          ) : (
-            <a href="/login" class="btn btn-primary btn-sm rounded-full">
-              Log in
-            </a>
-          )
-        }
+      <div class="navbar-end w-auto min-w-0 flex-1 gap-2 px-4">
+        <Breadcrumbs trail={crumbs} />
+        <div class="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
+          {
+            user ? (
+              <UserMenu user={user} />
+            ) : (
+              <a href="/login" class="btn btn-primary btn-sm rounded-full">
+                Log in
+              </a>
+            )
+          }
+        </div>
       </div>
     </div>
 

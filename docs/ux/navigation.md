@@ -9,9 +9,9 @@ and the decisions behind them. Principles referenced as P1, P2, and so on are in
 
 Signed-in pages use `AppLayout`:
 
-- **Top bar.** Logo (links home), theme toggle, and the user menu: avatar,
-  name and role (the avatar alone on phones), holding Profile, Set up the CLI
-  and Log out.
+- **Top bar.** Logo (links home, centered over the sidebar column), the
+  breadcrumb, the theme toggle, and the user menu: avatar, name and role (the
+  avatar alone on phones), holding Profile, Set up the CLI and Log out.
 - **Sidebar.** Global destinations (Home, My courses, Calendar, and Admin for
   admins), then one entry per course the user takes or teaches. The current
   page or course is highlighted. A hand-drawn sketch closes the column; it is
@@ -52,8 +52,9 @@ paste into a chat or a syllabus.
     status: adopted
 
 Every page under a course shows the course header (code, name, instructor,
-edition) and a tab strip. The strip is the only navigation inside a course, and
-every tab is one click from every other.
+edition) and a tab strip. The strip is the only way to move between tabs, and
+every tab is one click from every other. The breadcrumb only leads upward, to
+pages the strip and the back-links already reach.
 
 ```
 Home        /<course>
@@ -106,6 +107,35 @@ grading happens. It has no course total, since exams carry no weights yet.
 
 The earlier `/gradebook` page showed fabricated data and was removed, along
 with the empty Manage tab. `/manage` redirects to the Students tab.
+
+
+### The top bar shows where you are once the header scrolls away
+
+    status: adopted
+
+The top bar is sticky, the page header is not. Once the header leaves the
+viewport, a breadcrumb in the middle of the bar, aligned with the content,
+says where the page sits:
+
+```
+cs201 · 2026-1 › Exams › Midterm › Grading › Two sums
+cs201 · 2026-1 › Exams › Midterm › Grace Hopper
+Admin › Users
+Calendar
+```
+
+Crumbs use the words the pages use (P4): the course as the sidebar writes it,
+tabs as the strip does, items by title, never slugs. Outside courses and admin
+the trail is just the page title. Every crumb but the last is a link, and each
+leads to a page that some other path also reaches; the breadcrumb is never the
+only way somewhere. The grading page for one question never shows a student
+name.
+
+The breadcrumb stays in the DOM and in the accessibility tree while hidden, so
+showing it shifts nothing. It is quiet text (P2) and truncates its middle crumbs
+before the user menu gives up any room (P7). Phones do not show it, and keep the
+`← <List>` back-links. The trail is computed by `breadcrumbs()` in
+`src/utils/breadcrumbs.ts`.
 
 
 ## Open problems

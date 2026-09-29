@@ -18,6 +18,7 @@ import {
 	gradeReleaseBlocker,
 } from "@/services/exam-state";
 import { type AttemptRow, attemptRows } from "@/services/grading";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import {
 	examBadge,
 	examTypeLabels,
@@ -152,7 +153,9 @@ for (const submission of attempt?.submissions ?? []) {
 }
 ---
 
-<AppLayout title={`${exam.title} · Exams`}>
+<AppLayout title={`${exam.title} · Exams`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 

@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import QuestionsTable from "@/components/question/QuestionsTable";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -30,7 +31,9 @@ const courseParams = {
 };
 ---
 
-<AppLayout title={`Questions · ${course.discipline.name}`}>
+<AppLayout title={`Questions · ${course.discipline.name}`}
+  trail={breadcrumbs(Astro.url, { course })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="questions" />
 

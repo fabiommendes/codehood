@@ -8,6 +8,7 @@ import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { db, groupExamsForStudent } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
 import {
@@ -101,7 +102,9 @@ const nextEvents = await db.calendarEvent.findMany(
 );
 ---
 
-<AppLayout title={course.discipline.name}>
+<AppLayout title={course.discipline.name}
+  trail={breadcrumbs(Astro.url, { course })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     {
       justJoined && (

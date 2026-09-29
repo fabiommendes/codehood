@@ -12,6 +12,7 @@ import {
 	attemptState,
 	resultsReleased,
 } from "@/services/exam-state";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -62,7 +63,9 @@ if (!canWrite) {
 }
 ---
 
-<AppLayout title={`Exams · ${course.discipline.name}`}>
+<AppLayout title={`Exams · ${course.discipline.name}`}
+  trail={breadcrumbs(Astro.url, { course })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 

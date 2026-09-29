@@ -6,6 +6,7 @@ import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
 import { db, groupResourcesByType } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 import { fileDownloadName } from "@/utils/resource-url";
 
@@ -62,7 +63,9 @@ function rowHref(resource: (typeof resources)[number]): string {
 }
 ---
 
-<AppLayout title={`${course.discipline.name} · Resources`}>
+<AppLayout title={`${course.discipline.name} · Resources`}
+  trail={breadcrumbs(Astro.url, { course })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />
 

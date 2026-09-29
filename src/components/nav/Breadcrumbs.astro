@@ -1,0 +1,109 @@
+---
+// The breadcrumb in AppLayout's top bar. Desktop only. It fades in once the
+// page header has scrolled under the bar, but stays in the layout and in the
+// accessibility tree while faded out, so nothing shifts and keyboard users can
+// still tab into it.
+import type { Crumb } from "@/utils/breadcrumbs";
+
+interface Props {
+	trail: readonly Crumb[];
+}
+
+const { trail } = Astro.props;
+---
+
+{
+  trail.length > 0 && (
+    <nav
+      aria-label="Breadcrumb"
+      data-breadcrumbs
+      class="breadcrumbs hidden min-w-0 flex-1 overflow-hidden pr-4 text-sm text-base-content/60 lg:flex"
+    >
+      <ul>
+        {trail.map((crumb) => (
+          <li>
+            {crumb.href ? (
+              <a href={crumb.href}>{crumb.label}</a>
+            ) : (
+              <span aria-current="page" class="text-base-content">
+                {crumb.label}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+<style>
+  /* Lines the first crumb up with the usual page column (`mx-auto max-w-4xl
+     px-4`): the bar's section spans the same width as the content area, less
+     its own 1rem padding on each side. */
+  [data-breadcrumbs] {
+    padding-left: max(0px, calc((100% + 2rem - 56rem) / 2));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+  }
+  /* Daisy scrolls the list; here it shrinks. Middle crumbs share the room
+     left by the course and the last crumb equally, each capped at its own
+     width, so a long title gives way before a short one. The last crumb
+     truncates only once it takes more than 40% of the bar; the course never.
+     Separators stay whole. */
+  [data-breadcrumbs] > ul {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  [data-breadcrumbs] > ul > li {
+    flex: 1 1 0;
+    min-width: 2.25rem;
+    max-width: max-content;
+  }
+  [data-breadcrumbs] > ul > li::before {
+    flex-shrink: 0;
+  }
+  [data-breadcrumbs] > ul > li:first-child {
+    flex: none;
+  }
+  [data-breadcrumbs] > ul > li:last-child {
+    flex: none;
+    max-width: 40%;
+  }
+  [data-breadcrumbs] > ul > li > a,
+  [data-breadcrumbs] > ul > li > span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  [data-breadcrumbs][data-shown],
+  [data-breadcrumbs]:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+</style>
+
+<script>
+  const nav = document.querySelector<HTMLElement>("[data-breadcrumbs]");
+  if (nav) {
+    const header =
+      document.querySelector("[data-page-header]") ??
+      document.querySelector(".drawer-content h1");
+    if (!header) {
+      nav.dataset.shown = "";
+    } else {
+      // The sticky bar covers the top 4rem, so a header behind it is gone.
+      const bar = nav.closest(".navbar")?.getBoundingClientRect().height ?? 64;
+      new IntersectionObserver(
+        ([entry]) => {
+          if (entry?.isIntersecting) delete nav.dataset.shown;
+          else nav.dataset.shown = "";
+        },
+        { rootMargin: `-${bar}px 0px 0px 0px` },
+      ).observe(header);
+    }
+  }
+</script>

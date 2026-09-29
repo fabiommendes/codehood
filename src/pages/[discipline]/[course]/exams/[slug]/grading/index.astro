@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { gradingQueue } from "@/services/grading";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { loadGrading } from "@/utils/load-grading";
 import { questionTypeLabels } from "@/utils/question-display";
@@ -44,7 +45,9 @@ const nothingLeft =
 	answers.length > 0 && !answers.some((answer) => answer.state === "pending");
 ---
 
-<AppLayout title={`Grading · ${exam.title}`}>
+<AppLayout title={`Grading · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 

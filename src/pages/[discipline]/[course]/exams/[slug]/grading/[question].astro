@@ -11,6 +11,7 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { formatScore } from "@/services/exam-result";
 import { answersTo } from "@/services/grading";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
 
@@ -75,7 +76,9 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
 }));
 ---
 
-<AppLayout title={`${title} · Grading · ${exam.title}`}>
+<AppLayout title={`${title} · Grading · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, question: title })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 

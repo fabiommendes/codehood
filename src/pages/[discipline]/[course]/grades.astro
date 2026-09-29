@@ -2,6 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import GradesTable from "@/components/grading/GradesTable.astro";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 import { loadGradesTable } from "@/utils/load-grading";
 
@@ -19,7 +20,9 @@ const actor = Astro.locals.actor!;
 const table = await loadGradesTable(course.id, actor, new Date());
 ---
 
-<AppLayout title={`Grades · ${course.discipline.name}`}>
+<AppLayout title={`Grades · ${course.discipline.name}`}
+  trail={breadcrumbs(Astro.url, { course })}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="grades" />
 
