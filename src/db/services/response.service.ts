@@ -286,8 +286,11 @@ export class ResponseService extends CrudBase<{
 	 *
 	 * Keyed on the graded exam's single slot, or the open practice session, so
 	 * a client that does not know whether it has started the exam already
-	 * still lands on one row.
+	 * still lands on one row. The course's instructor may do so on an exam
+	 * that is not open, to backfill an attempt; anyone else may not.
 	 *
+	 * @throws {@link InvalidData}
+	 * If the exam is not open and `actor` is not the course's instructor.
 	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
 	 */
 	@Validate({
@@ -653,7 +656,8 @@ async function prepareAttempt(
  * Resolves the attempt for `upsert` and `submit`: a graded exam's single
  * `slotKey = 0` row is found or created; a practice exam reuses the newest
  * attempt still within {@link PRACTICE_SESSION_WINDOW_MS} of now, or opens a
- * fresh one otherwise.
+ * fresh one otherwise. Only the course's instructor may reach an exam that is
+ * not open.
  */
 async function resolveOrCreateAttempt(
 	tx: PrismaTx,
@@ -661,7 +665,15 @@ async function resolveOrCreateAttempt(
 	actor: Actor,
 	perm: "response.create" | "response.submit",
 ): Promise<DbResponse> {
-	const { exam, authorId } = await prepareAttempt(tx, input, actor, perm);
+	const { course, exam, authorId } = await prepareAttempt(
+		tx,
+		input,
+		actor,
+		perm,
+	);
+	if (!hasPerm(actor, "course.update-contents", course)) {
+		assertExamOpen(exam, new Date());
+	}
 
 	if (exam.type !== "PRACTICE") {
 		const existing = await tx.response.findUnique({

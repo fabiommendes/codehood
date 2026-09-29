@@ -583,3 +583,39 @@ test("findMany(): a student is narrowed to their own responses; naming another a
 	);
 	expect(asInstructor).toHaveLength(1);
 });
+
+//
+// upsert() and the exam phase
+//
+
+for (const status of ["SCHEDULED", "COMPLETED"] as const) {
+	test(`upsert() refuses a student an attempt on a ${status} exam and leaves no row behind`, async () => {
+		const { course } = await makeCourse();
+		const student = await enrollStudent(course.id);
+		const exam = await makeExam(course.id, [], { status });
+
+		await expect(
+			db.response.upsert(
+				{ course: course.id, exam: exam.slug, author: student.username },
+				{ actor: student },
+			),
+		).rejects.toBeInstanceOf(InvalidData);
+
+		const rows = await prisma.response.count({
+			where: { authorId: student.username },
+		});
+		expect(rows).toBe(0);
+	});
+
+	test(`upsert() lets the owning instructor open a student's attempt on a ${status} exam`, async () => {
+		const { course, instructor } = await makeCourse();
+		const student = await enrollStudent(course.id);
+		const exam = await makeExam(course.id, [], { status });
+
+		const response = await db.response.upsert(
+			{ course: course.id, exam: exam.slug, author: student.username },
+			{ actor: instructor },
+		);
+		expect(response.author).toBe(student.username);
+	});
+}

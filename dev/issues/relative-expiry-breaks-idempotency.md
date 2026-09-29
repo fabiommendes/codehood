@@ -6,7 +6,7 @@ is sent: the resulting `expiresAt` depends on when the server received the call,
 not on what the caller asked for.
 
 That is why `invite` and `passphrase` are excluded from
-`dev/specs/to-do/service-upsert.md`: an upsert whose result depends on wall
+`dev/specs/to-review/service-upsert.md`: an upsert whose result depends on wall
 clock is not an upsert. It is also the reason `inviteUpdate` already takes an
 absolute `expiresAt` while `inviteCreate` does not — the two halves of the same
 entity disagree about how expiry is expressed.
@@ -14,7 +14,9 @@ entity disagree about how expiry is expressed.
 ## Fix
 
 - `inviteCreate.expiresInMs` → `expiresAt: z.date()`.
-- `passphraseCreate` gains an explicit `expiresAt`.
+- `passphraseCreate` gains an explicit `expiresAt`. Derive it from
+  `passphraseSchema` while at it (see
+  [schemas-verbose-and-optional-vs-nullable.md](schemas-verbose-and-optional-vs-nullable.md) §1).
 - Export `expiresIn(ms: number): Date` from `src/utils/` for callers that think
   in durations, so the convenience survives without living in the schema.
 
