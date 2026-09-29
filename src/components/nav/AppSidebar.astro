@@ -1,0 +1,132 @@
+---
+// The sidebar of AppLayout: global destinations, the user's courses, and a
+// sketch at the foot chosen by area. The current page or course is outlined
+// in pencil.
+import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
+import CourseTile from "@/components/CourseTile.astro";
+
+export interface SidebarCourse {
+	code: string;
+	edition: string;
+	href: string;
+	teaching: boolean;
+}
+
+interface Props {
+	courses: SidebarCourse[];
+	currentPath: string;
+	admin?: boolean;
+}
+
+const { courses, currentPath, admin = false } = Astro.props;
+
+const nav = [
+	{
+		label: "Home",
+		href: "/",
+		icon: "M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9",
+	},
+	{
+		label: "My courses",
+		href: "/courses",
+		icon: "M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 17.5A2.5 2.5 0 0 1 6.5 15H20",
+	},
+	{
+		label: "Calendar",
+		href: "/calendar",
+		icon: "M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z",
+	},
+	...(admin
+		? [
+				{
+					label: "Admin",
+					href: "/admin",
+					icon: "M12 3.5 4.5 6.5v5c0 5 3.2 8.5 7.5 9.5 4.3-1 7.5-4.5 7.5-9.5v-5L12 3.5Z",
+				},
+			]
+		: []),
+];
+
+function isActive(href: string): boolean {
+	// `/` renders the home page by rewrite, so the request path reads `/home`.
+	if (href === "/") return currentPath === "/" || currentPath === "/home";
+	return currentPath === href || currentPath.startsWith(`${href}/`);
+}
+
+/// One drawing per area, and inside a course an Athos panel seeded like the
+/// course tile, so each course keeps its own.
+function sketch(): { art: SketchArt; seed?: string } {
+	const course = courses.find((c) => isActive(c.href));
+	if (course) return { art: "athos", seed: course.href };
+	if (isActive("/courses")) return { art: "loose" };
+	if (isActive("/calendar")) return { art: "construction" };
+	if (isActive("/admin")) return { art: "protractor" };
+	const [discipline, edition] = currentPath.split("/").filter(Boolean);
+	if (edition?.includes("_"))
+		return { art: "athos", seed: `/${discipline}/${edition}` };
+	return { art: "blueprint" };
+}
+---
+
+<div class="flex h-full w-64 flex-col border-r border-base-300 bg-base-100">
+  <ul class="menu min-h-0 w-full flex-1 flex-nowrap gap-1 overflow-y-auto p-4">
+    {
+      nav.map((item) => (
+        <li>
+          <a
+            href={item.href}
+            aria-current={isActive(item.href) ? "page" : undefined}
+            class:list={[
+              "cut gap-3 hover:bg-base-200",
+              isActive(item.href)
+                ? "pencil relative font-semibold text-primary"
+                : "text-base-content",
+            ]}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              class:list={[!isActive(item.href) && "opacity-60"]}
+            >
+              <path
+                d={item.icon}
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            {item.label}
+          </a>
+        </li>
+      ))
+    }
+
+    {courses.length > 0 && <li class="menu-title mt-4">Courses</li>}
+    {
+      courses.map((course) => (
+        <li>
+          <a
+            href={course.href}
+            aria-current={isActive(course.href) ? "page" : undefined}
+            class:list={[
+              "cut gap-3 text-base-content hover:bg-base-200",
+              isActive(course.href) && "pencil relative font-semibold",
+            ]}
+          >
+            <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
+            <span class="flex-1 truncate">
+              <span class="font-mono">{course.code}</span>
+              <span class="text-base-content/60"> · {course.edition}</span>
+            </span>
+            {course.teaching && <span class="badge badge-ghost badge-xs">teaching</span>}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+  <Sketch {...sketch()} class="shrink-0 px-2 pb-2" />
+</div>

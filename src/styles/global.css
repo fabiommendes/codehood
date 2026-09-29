@@ -304,6 +304,29 @@ h6 {
 	filter: url(#brand-cut) drop-shadow(0 0 2px rgb(255 196 0 / 0.4));
 }
 
+/* Hand-made edges for menus. .cut gives an element the buttons' hand-cut
+   corners. .pencil outlines it in the border color with a slight wobble,
+   from the #pencil filter (PencilFilter.astro); the outline sits on a layer
+   behind the content, so text stays sharp. The element must be positioned. */
+.cut {
+	border-radius: 12px 4px 14px 6px / 6px 14px 4px 12px;
+}
+
+.pencil {
+	isolation: isolate;
+}
+
+.pencil::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	border: 1.2px solid var(--color-base-300);
+	border-radius: 12px 4px 14px 6px / 6px 14px 4px 12px;
+	filter: url(#pencil);
+}
+
 /* Loud screens only (docs/ui/identity.md): cards glued slightly askew, some
    held by a strip of tape. Quiet screens never use these. */
 .tilt-l {

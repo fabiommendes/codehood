@@ -1,0 +1,14 @@
+---
+// The SVG filter behind the .pencil outline in global.css: a slight wobble,
+// as if the border were drawn by hand. Render it once per page that uses
+// .pencil.
+---
+
+<svg width="0" height="0" class="absolute" aria-hidden="true">
+  <defs>
+    <filter id="pencil" x="-5%" y="-10%" width="110%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.025" numOctaves="1" seed="9" />
+      <feDisplacementMap in="SourceGraphic" scale="1.6" />
+    </filter>
+  </defs>
+</svg>

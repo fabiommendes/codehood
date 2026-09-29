@@ -7,9 +7,9 @@ import type { SceneName } from "@/components/brand/scenes";
 import TileWall from "@/components/brand/TileWall.astro";
 import CourseTile from "@/components/CourseTile.astro";
 import Logo from "@/components/Logo.astro";
+import AppFooter from "@/components/nav/AppFooter.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import Layout from "@/layouts/Layout.astro";
-import { homepage, version } from "../../package.json";
 
 export const prerender = false;
 
@@ -242,13 +242,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
       </section>
     </main>
 
-    <footer class="border-t border-base-300 bg-base-100/60">
-      <div class="wrap flex flex-wrap items-center gap-x-5 gap-y-2 py-3 text-sm text-base-content/60">
-        <Logo height={22} />
-        <a href={homepage} class="hover:text-primary">Source code</a>
-        <span class="ml-auto font-mono text-xs">v{version}</span>
-      </div>
-    </footer>
+    <AppFooter class="wrap bg-base-100/60" />
   </div>
 </Layout>
 

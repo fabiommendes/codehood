@@ -1,0 +1,55 @@
+---
+// The user menu in AppLayout's top bar: avatar, name and role (the avatar
+// alone on phones), opening Profile, Set up the CLI and Log out.
+import { actions } from "astro:actions";
+import type { UserActor } from "@/auth/actor";
+import Avatar from "@/components/Avatar.astro";
+
+interface Props {
+	user: UserActor;
+	/// Renders the menu open, for the design pages.
+	open?: boolean;
+}
+
+const { user, open = false } = Astro.props;
+
+/// Human labels for the role shown in the menu.
+const ROLE_LABEL = {
+	STUDENT: "Student",
+	INSTRUCTOR: "Instructor",
+	ADMIN: "Admin",
+} as const;
+---
+
+<details class="dropdown dropdown-end" open={open}>
+  <summary class="btn btn-ghost h-auto min-h-10 gap-2 px-2 py-1 font-normal">
+    <Avatar username={user.username} size={32} />
+    <span class="hidden text-left leading-tight sm:grid">
+      <span class="font-semibold">{user.name}</span>
+      <span class="text-xs text-base-content/70">{ROLE_LABEL[user.role]}</span>
+    </span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </summary>
+  <ul class="menu dropdown-content pencil cut z-40 mt-2 w-56 bg-base-100 p-2 shadow-lg">
+    <li class="menu-title flex-row items-center gap-3 px-3 pt-1 pb-2 font-normal text-base-content">
+      <Avatar username={user.username} size={36} />
+      <span class="grid leading-tight">
+        <span class="font-semibold">{user.name}</span>
+        <span class="text-xs text-base-content/60">@{user.username}</span>
+      </span>
+    </li>
+    <li>
+      <a href="/profile" class="cut">Profile</a>
+    </li>
+    <li>
+      <a href="/getting-started" class="cut">Set up the CLI</a>
+    </li>
+    <li>
+      <form method="POST" action={actions.auth.logout} class="cut p-0">
+        <button type="submit" class="w-full px-3 py-1.5 text-left">Log out</button>
+      </form>
+    </li>
+  </ul>
+</details>
