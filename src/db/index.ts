@@ -121,9 +121,9 @@ export { InviteError } from "./services/invite.service";
 export type {
 	Passphrase,
 	PassphraseCreate,
+	PassphraseErrorCode,
 	PassphraseFilter,
 	PassphrasePK,
-	PassphraseErrorCode,
 	PassphraseRedemption,
 	PassphraseUpdate,
 } from "./services/passphrase.service";
