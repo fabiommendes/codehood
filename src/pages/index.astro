@@ -9,6 +9,7 @@ import CourseTile from "@/components/CourseTile.astro";
 import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import Layout from "@/layouts/Layout.astro";
+import { homepage, version } from "../../package.json";
 
 export const prerender = false;
 
@@ -241,9 +242,11 @@ const features: { scene: SceneName; title: string; body: string }[] = [
       </section>
     </main>
 
-    <footer class="bg-base-100/60">
-      <div class="wrap flex flex-wrap items-center justify-between gap-4 py-8">
-        <Logo height={28} />
+    <footer class="border-t border-base-300 bg-base-100/60">
+      <div class="wrap flex flex-wrap items-center gap-x-5 gap-y-2 py-3 text-sm text-base-content/60">
+        <Logo height={22} />
+        <a href={homepage} class="hover:text-primary">Source code</a>
+        <span class="ml-auto font-mono text-xs">v{version}</span>
       </div>
     </footer>
   </div>
