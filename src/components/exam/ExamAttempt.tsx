@@ -275,15 +275,6 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						kind() === "results"
 					}
 				>
-					<Show when={kind() === "results" && props.result?.total != null}>
-						<p class="text-2xl font-bold">
-							Your score{" "}
-							<span class="text-primary">
-								{formatScore(props.result?.total ?? 0)}
-							</span>
-						</p>
-					</Show>
-
 					<div class="flex flex-wrap items-center justify-between gap-3">
 						<Show
 							when={kind() === "in-progress"}
@@ -317,7 +308,6 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					<For each={props.questions}>
 						{(entry) => (
 							<div class="card card-border overflow-hidden bg-base-100/50 shadow-md">
-								<div class="stripe-brand h-1.5" />
 								{/* focusout bubbles, so leaving any control of the question saves it. */}
 								<div class="card-body" onFocusOut={() => saveNow(entry.slug)}>
 									<AnswerField

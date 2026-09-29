@@ -144,12 +144,6 @@ h6 {
 	background-size: 120px 120px;
 }
 
-/* A thin multi-color bar echoing the logo's four block colors — used in place of a
-   plain border wherever a flat gray line would feel too corporate. */
-.stripe-brand {
-	background: linear-gradient(90deg, #1b4b9b, #b5452a, #f2b800, #3c8d2f);
-}
-
 /* Logo.astro colors each piece through a --lp-* variable so the theme toggle,
    which runs on the client, can recolor it. Light: the Cerrado colors, blended
    with multiply like tissue paper. Dark: white and grays with one lit window.

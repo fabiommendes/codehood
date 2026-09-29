@@ -21,6 +21,7 @@ import Scene from "@/components/brand/Scene.astro";
 import { NIGHT as N, SCENES, type SceneName } from "@/components/brand/scenes";
 import TileWall from "@/components/brand/TileWall.astro";
 import PageKicker from "@/components/PageKicker.astro";
+import ReleasedScore from "@/components/ReleasedScore.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
@@ -159,6 +160,20 @@ const TILE_THEMES = [
             <p class="font-display text-xl font-bold">Three steps, and you're teaching.</p>
             <p class="text-sm text-base-content/70">A paper card on the wall.</p>
           </div>
+        </div>
+      ))
+    }
+  </div>
+
+  <h3 class="mt-8 mb-2 text-lg font-bold">Released score</h3>
+  <p class="mb-4 max-w-2xl text-base-content/70">
+    Yellow ipê bouquets flank a student's score once grades are released, at the top of the exam page.
+  </p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      ["codehood", "codehood-dark"].map((theme) => (
+        <div data-theme={theme} class="rounded-box bg-base-200 p-8 text-base-content">
+          <ReleasedScore score={0.67} releasedAt={new Date(2026, 8, 28)} />
         </div>
       ))
     }

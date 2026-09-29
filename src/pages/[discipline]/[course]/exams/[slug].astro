@@ -5,6 +5,7 @@ import type { AnswerPayload } from "@/components/exam/answer-payload";
 import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
+import ReleasedScore from "@/components/ReleasedScore.astro";
 import Badge from "@/components/ui/Badge";
 import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
@@ -185,6 +186,14 @@ for (const submission of attempt?.submissions ?? []) {
             canRelease={canRelease}
             now={now}
           />
+        </section>
+      )
+    }
+
+    {
+      !canManage && examOutcome?.total != null && (
+        <section class="mt-8">
+          <ReleasedScore score={examOutcome.total} releasedAt={exam.gradesReleasedAt} />
         </section>
       )
     }

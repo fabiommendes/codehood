@@ -58,7 +58,6 @@ export default function ExamQuestionsList(
 			<For each={props.questions}>
 				{(question) => (
 					<div class="card card-border overflow-hidden bg-base-100/50 shadow-md">
-						<div class="stripe-brand h-1.5" />
 						<div class="card-body">
 							<ExamQuestion
 								question={question}

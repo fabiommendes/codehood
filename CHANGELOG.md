@@ -26,6 +26,9 @@
   missing leaf (404), a padlocked house (403), a program stopped on a red line
   (500). `/courses` with no courses and a home page with nothing to do show an
   illustrated empty state with the next step.
+- A student's released score opens the exam page on a paper card between
+  bouquets of yellow ipê. The four-color stripe over each question card is
+  gone.
 - The top bar shows who is signed in, with their role, in a menu that holds
   Profile and Log out. Sidebar courses read `cs101 · 2026-1`, mark the ones the
   user teaches, and carry a tile block derived from the course instead of a

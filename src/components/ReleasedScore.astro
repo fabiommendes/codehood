@@ -1,0 +1,52 @@
+---
+/**
+ * The score of an exam whose grades were released, on a paper card between
+ * two bouquets of yellow ipê.
+ */
+import { cluster, IPES } from "@/components/brand/ipe";
+import { formatScore } from "@/services/exam-result";
+
+interface Props {
+	/// Mean score in `[-1, 1]`.
+	score: number;
+	releasedAt?: Date | null;
+}
+
+const { score, releasedAt } = Astro.props;
+
+/// Three yellow ipê clusters in a 60-unit box, the big one drawn last, facing
+/// the score from the left or, mirrored, from the right. Always yellow: the
+/// white ipê of late September vanishes on a light card.
+const bouquet = (mirror: boolean) =>
+	(
+		[
+			[8, -14, 10],
+			[6, 14, 9],
+			[-12, 0, 13],
+		] as const
+	).flatMap(([dx, dy, r]) =>
+		cluster(30 + (mirror ? -dx : dx), 30 + dy, r, IPES.yellow),
+	);
+---
+
+<section class="card card-border tape bg-base-100 shadow-lg">
+  <div class="card-body flex-row items-center justify-center gap-6 py-6">
+    <svg viewBox="0 0 60 60" width="88" height="88" class="shrink-0" aria-hidden="true">
+      {bouquet(false).map((p) => <path d={p.d} fill={p.fill} />)}
+    </svg>
+    <div class="text-center">
+      <p class="font-mono text-xs tracking-widest whitespace-nowrap text-primary uppercase">Your score</p>
+      <p class="font-display text-5xl font-bold">{formatScore(score)}</p>
+      {
+        releasedAt && (
+          <p class="text-sm text-base-content/70">
+            Released {releasedAt.toLocaleDateString("en", { day: "numeric", month: "short" })}
+          </p>
+        )
+      }
+    </div>
+    <svg viewBox="0 0 60 60" width="88" height="88" class="shrink-0" aria-hidden="true">
+      {bouquet(true).map((p) => <path d={p.d} fill={p.fill} />)}
+    </svg>
+  </div>
+</section>

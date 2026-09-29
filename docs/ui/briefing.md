@@ -283,3 +283,13 @@ The big numeral became a small "Error 404" eyebrow. `/courses` with no courses
 and a home page with nothing to do use the star graph and the fully lit tree.
 Empty sections inside working pages stay as text, since those screens are
 quiet.
+
+
+### Round 16: released grades
+
+Three treatments were compared for a student's released score, each with a
+high and a low score: party lights, ipê bouquets beside the number, and a
+single flower. The ipê won: party lights over 38% read as mockery. The
+clusters just touch; tighter overlaps turned into a yellow blob. The card sits
+at the top of the exam page; the old four-color `.stripe-brand` bar is gone
+from the exam cards.
