@@ -3,6 +3,7 @@ import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { UserId } from "@/core/schemas";
 import { db } from "@/db";
+import { disciplineFactory } from "@/fixtures/discipline.factory";
 
 function actorOf(
 	username: UserId,
@@ -147,4 +148,9 @@ test("upsert creates on first call, updates the same row in place on the second,
 		slugs: ["disc-upsert", "disc-upsert-2"],
 	});
 	expect(both).toHaveLength(2);
+});
+
+test("the discipline factory gives every discipline its own display name", () => {
+	const names = disciplineFactory.buildList(500).map((d) => d.name);
+	expect(new Set(names).size).toBe(names.length);
 });

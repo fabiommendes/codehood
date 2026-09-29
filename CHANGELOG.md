@@ -26,6 +26,9 @@
 
 ### Fixed
 
+- The discipline test factory drew names from a short list, so two courses in
+  one test could share a name and "student: see my courses" failed now and
+  then.
 - An exam's phase now follows the clock (`src/db/exam-state.ts`): a
   `SCHEDULED` exam opens at its date and closes when its window ends, without
   anyone updating its status. Starting an attempt and answering require an

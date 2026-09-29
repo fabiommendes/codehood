@@ -26,7 +26,9 @@ function buildDiscipline(
 ): DisciplineCreate {
 	return {
 		slug: params.slug ?? fakeDisciplineSlug(sequence),
-		name: faker.commerce.department(),
+		// Faker's department list is short; the suffix keeps two courses in one
+		// test from sharing a display name.
+		name: `${faker.commerce.department()} ${Math.random().toString(36).slice(2, 7)}`,
 	};
 }
 
