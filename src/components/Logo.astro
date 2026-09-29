@@ -7,13 +7,23 @@ interface Props {
 	style?: string;
 	/// `mark` draws the compact mark (C, o and the house) instead of the full logo.
 	variant?: "full" | "mark";
+	/// `mono` draws white and grays with a lit window; `lamps` also lights both
+	/// D. Both are for dark grounds, in either theme. The default follows the
+	/// theme.
+	tone?: "color" | "mono" | "lamps";
 }
 
-const { height = 28, class: className, style, variant = "full" } = Astro.props;
+const {
+	height = 28,
+	class: className,
+	style,
+	variant = "full",
+	tone = "color",
+} = Astro.props;
 
 /// Below this height the logo drops cut edges, tilt and flanks, and switches to
-/// tone steps with a translucent outline in the dark theme (see
-/// docs/ui/identity.md).
+/// lighter colors in the dark theme, or tone steps with a translucent outline
+/// in the monochrome tones (see docs/ui/identity.md).
 const SMALL = 32;
 
 const small = variant === "mark" || height < SMALL;
@@ -37,7 +47,7 @@ const tilt = (i: number) =>
   xmlns="http://www.w3.org/2000/svg"
   role="img"
   aria-label="codehood"
-  class:list={["brand-logo", small && "is-small", className]}
+  class:list={["brand-logo", small && "is-small", tone !== "color" && `tone-${tone}`, className]}
 >
   {
     small ? (

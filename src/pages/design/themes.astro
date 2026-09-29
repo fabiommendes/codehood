@@ -129,16 +129,16 @@ const themes: Theme[] = [
 		id: "dark",
 		name: "Dark · Forest",
 		logo: {
-			c: "#f7faf8",
-			o1: "#a9bab2",
-			d1: "#6f8a7e",
-			e: "#a9bab2",
-			wall: "#f7faf8",
-			roof: "#a9bab2",
-			window: "#ffc400",
-			o2: "#f7faf8",
-			o3: "#6f8a7e",
-			d2: "#a9bab2",
+			c: "#3d7fe6",
+			o1: "#e2603f",
+			d1: "#f2b800",
+			e: "#4fae3f",
+			wall: "#3d7fe6",
+			roof: "#e2603f",
+			window: "#f2b800",
+			o2: "#e2603f",
+			o3: "#4fae3f",
+			d2: "#f2b800",
 			pixel: "#2c5244",
 		},
 		vars: {
@@ -517,6 +517,10 @@ const glowIf = (t: Theme, p: Part) =>
 
   .theme-light .logo path:not(.window) {
     mix-blend-mode: multiply;
+  }
+
+  .theme-dark .logo path:not(.window) {
+    mix-blend-mode: screen;
   }
 
   .who {

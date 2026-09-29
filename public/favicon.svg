@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -4 76 76">
 <style>
 .c{fill:#1b4b9b}.o1{fill:#b5452a}.wall{fill:#1b4b9b}.roof{fill:#b5452a}.window{fill:#f2b800}
-.line{display:none}
-@media (prefers-color-scheme: dark){.c{fill:#ffffff}.o1{fill:#7d948a}.wall{fill:#ffffff}.roof{fill:#7d948a}.window{fill:#ffc400}.line{display:inline;fill:#fff;stroke:#fff}}
+@media (prefers-color-scheme: dark){.c{fill:#5a95f0}.o1{fill:#e8704f}.wall{fill:#5a95f0}.roof{fill:#e8704f}.window{fill:#f2b800}}
 </style>
-<g class="line" opacity="0.5" stroke-width="3" stroke-linejoin="round"><path d="M18 0h9v36h-9A18 18 0 0 1 18 0Z"/><path d="M15 18A12 12 0 1 0 39 18A12 12 0 1 0 15 18Z"/><path d="M43 14H67V36H58V26H52V36H43Z"/><path d="M40 15L55 2L70 15Z"/><path d="M46.5 17h5v5h-5Z"/></g>
 <path class="c" d="M18 0h9v36h-9A18 18 0 0 1 18 0Z"/>
 <path class="o1" d="M15 18A12 12 0 1 0 39 18A12 12 0 1 0 15 18Z"/>
 <path class="wall" d="M43 14H67V36H58V26H52V36H43Z"/>

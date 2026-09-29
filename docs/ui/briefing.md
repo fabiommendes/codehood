@@ -293,3 +293,16 @@ single flower. The ipê won: party lights over 38% read as mockery. The
 clusters just touch; tighter overlaps turned into a yellow blob. The card sits
 at the top of the exam page; the old four-color `.stripe-brand` bar is gone
 from the exam cards.
+
+
+### Round 17: dark logo
+
+The dark logo (white and grays with one amber window) read dim next to the
+colored light one. Seven variants were compared in the dark navbar and on
+the page: wider tone steps, warm paper tones, lit D, pastel colors, colored
+gels and the dark theme's own neon tokens. Two were tried across the app:
+"lamps on" (monochrome with both D in amber) and "colored gels". Gels won: the
+light logo's hues blended with screen, the counterpart of the multiply used on
+paper. The monochrome logo stays as `tone="mono"` and "lamps on" as
+`tone="lamps"`, for dark grounds where color would compete. The favicon
+follows: dark tabs get the lighter hues and lose the outline.

@@ -146,10 +146,10 @@ h6 {
 
 /* Logo.astro colors each piece through a --lp-* variable so the theme toggle,
    which runs on the client, can recolor it. Light: the Cerrado colors, blended
-   with multiply like tissue paper. Dark: white and grays with one lit window.
-   Small sizes (.is-small) use tone steps, so neighboring pieces sit far apart
-   in lightness; in dark mode a translucent outline goes around the whole
-   drawing. */
+   with multiply like tissue paper. Dark: the same colors blended with screen,
+   like colored light, so overlaps get brighter. Small sizes (.is-small) drop
+   the blending and use slightly lighter colors in the dark theme. The dark
+   rules skip logos inside a nested light-theme element, as on /design pages. */
 .brand-logo {
 	--lp-c: #1b4b9b;
 	--lp-o1: #b5452a;
@@ -167,7 +167,38 @@ h6 {
 	--lp-outline: 0;
 }
 
-[data-theme="codehood-dark"] .brand-logo {
+[data-theme="codehood-dark"]
+	.brand-logo:not(:where([data-theme="codehood"] *)) {
+	--lp-c: #3d7fe6;
+	--lp-o1: #e2603f;
+	--lp-d1: #f2b800;
+	--lp-e: #4fae3f;
+	--lp-wall: #3d7fe6;
+	--lp-roof: #e2603f;
+	--lp-window: #f2b800;
+	--lp-o2: #e2603f;
+	--lp-o3: #4fae3f;
+	--lp-d2: #f2b800;
+	--lp-pixel: #2c5244;
+	--lp-line: #ffffff;
+	--lp-blend: screen;
+}
+
+[data-theme="codehood-dark"]
+	.brand-logo.is-small:not(:where([data-theme="codehood"] *)) {
+	--lp-c: #5a95f0;
+	--lp-o1: #e8704f;
+	--lp-e: #5cbf4b;
+	--lp-wall: #5a95f0;
+	--lp-roof: #e8704f;
+	--lp-o2: #e8704f;
+	--lp-o3: #5cbf4b;
+}
+
+/* Monochrome tones (Logo tone="mono" | "lamps"), for dark grounds in either
+   theme: white and grays with a lit window; "lamps" also lights both D. Small
+   sizes switch to tone steps inside a translucent white outline. */
+.brand-logo:is(.tone-mono, .tone-lamps) {
 	--lp-c: #f7faf8;
 	--lp-o1: #a9bab2;
 	--lp-d1: #6f8a7e;
@@ -184,7 +215,7 @@ h6 {
 	--lp-outline: 0.5;
 }
 
-[data-theme="codehood-dark"] .brand-logo.is-small {
+.brand-logo.is-small:is(.tone-mono, .tone-lamps) {
 	--lp-c: #ffffff;
 	--lp-o1: #7d948a;
 	--lp-d1: #c3d0ca;
@@ -194,6 +225,12 @@ h6 {
 	--lp-o2: #7d948a;
 	--lp-o3: #ffffff;
 	--lp-d2: #7d948a;
+}
+
+.brand-logo.tone-lamps,
+.brand-logo.is-small.tone-lamps {
+	--lp-d1: #ffc400;
+	--lp-d2: #ffc400;
 }
 
 .brand-logo path {
@@ -256,6 +293,15 @@ h6 {
 
 .lp-pixel {
 	fill: var(--lp-pixel);
+}
+
+/* The lit pieces of the monochrome tones glow a little. */
+.brand-logo:not(.is-small):is(.tone-mono, .tone-lamps) .lp-window {
+	filter: drop-shadow(0 0 1.5px rgb(255 196 0 / 0.8));
+}
+
+.brand-logo:not(.is-small).tone-lamps :is(.lp-d1, .lp-d2) {
+	filter: url(#brand-cut) drop-shadow(0 0 2px rgb(255 196 0 / 0.4));
 }
 
 /* Loud screens only (docs/ui/identity.md): cards glued slightly askew, some

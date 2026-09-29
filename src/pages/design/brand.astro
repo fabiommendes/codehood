@@ -43,16 +43,16 @@ const LIGHT: Colors = {
 };
 
 const DARK: Colors = {
-	c: "#f7faf8",
-	o1: "#a9bab2",
-	d1: "#6f8a7e",
-	e: "#a9bab2",
-	wall: "#f7faf8",
-	roof: "#a9bab2",
-	window: "#ffc400",
-	o2: "#f7faf8",
-	o3: "#6f8a7e",
-	d2: "#a9bab2",
+	c: "#3d7fe6",
+	o1: "#e2603f",
+	d1: "#f2b800",
+	e: "#4fae3f",
+	wall: "#3d7fe6",
+	roof: "#e2603f",
+	window: "#f2b800",
+	o2: "#e2603f",
+	o3: "#4fae3f",
+	d2: "#f2b800",
 	pixel: "#2c5244",
 	wire: "#4d6f62",
 	accent: "#4aa0ff",
@@ -223,9 +223,45 @@ const pieces = [
     }
   </div>
   <p class="mt-4 max-w-2xl text-sm text-base-content/70">
-    From 32 px up: cut edges, tilt and flanks; multiply blending in the light theme. Below 32 px, in the dark theme only:
-    tone steps and a 1.5 px outline at 50% around the whole drawing. The mark is for favicons and app icons.
+    From 32 px up: cut edges, tilt and flanks; the pieces blend with multiply in the light theme and with screen in
+    the dark one. Below 32 px the blending goes and, in the dark theme, the colors get slightly lighter. The mark is for
+    favicons and app icons.
   </p>
+
+  <h2 class="mt-12 mb-2 text-2xl font-bold">Monochrome tones</h2>
+  <p class="mb-6 max-w-2xl text-base-content/70">
+    For dark grounds where the colored logo competes with what surrounds it: photos, illustrations, the neutral surface
+    of the light theme. <code>tone="mono"</code> keeps one warm accent, the lit window;{" "}
+    <code>tone="lamps"</code> also lights both D. Below 32 px they switch to tone steps inside a 1.5 px white outline at
+    50%, around the whole drawing.
+  </p>
+  <div class="grid gap-5 md:grid-cols-2">
+    {
+      (["mono", "lamps"] as const).map((tone) => (
+        <div>
+          <div data-theme="codehood-dark" class="card bg-base-200 p-8">
+            <Logo height={96} tone={tone} />
+            <div class="mt-8 flex flex-wrap items-end gap-6">
+              {[48, 24, 16].map((h) => (
+                <div class="grid justify-items-start gap-1">
+                  <Logo height={h} tone={tone} />
+                  <span class="font-mono text-xs text-base-content/60">{h}px</span>
+                </div>
+              ))}
+              <div class="grid justify-items-start gap-1">
+                <Logo height={32} variant="mark" tone={tone} />
+                <span class="font-mono text-xs text-base-content/60">mark</span>
+              </div>
+            </div>
+          </div>
+          <div data-theme="codehood" class="card mt-2 bg-neutral px-8 py-5">
+            <Logo height={48} tone={tone} />
+          </div>
+          <p class="mt-2 font-mono text-sm">tone="{tone}"</p>
+        </div>
+      ))
+    }
+  </div>
 
   <h2 class="mt-12 mb-4 text-2xl font-bold">Pieces</h2>
   <table class="table max-w-2xl">
@@ -261,7 +297,9 @@ const pieces = [
                     d={p.d}
                     fill={p.fill}
                     style={pieceStyle(p)}
-                    class:list={[theme === "codehood" && !("window" in p && p.window) && "multiply"]}
+                    class:list={[
+                      !("window" in p && p.window) && (theme === "codehood" ? "multiply" : "screen"),
+                    ]}
                     filter={"glow" in p && p.glow ? "url(#flank-glow)" : "url(#flank-cut)"}
                   />
                 ))}
@@ -309,5 +347,9 @@ const pieces = [
 
   .multiply {
     mix-blend-mode: multiply;
+  }
+
+  .screen {
+    mix-blend-mode: screen;
   }
 </style>

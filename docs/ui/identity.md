@@ -50,21 +50,34 @@ filter) and a deterministic tilt of up to 2.4°.
 
 ### Colors
 
-In the light theme the logo keeps its colors, taken from the Cerrado palette.
-In the dark theme it is monochrome, with one warm accent: the lit window.
+Both themes use the colors of the Cerrado palette. In the light theme the
+pieces blend with multiply, like tissue paper; in the dark theme the same hues,
+a little lighter, blend with screen, like colored light, so overlaps get
+brighter instead of darker. The window never blends.
 
 | Piece                     | Light (on Lime wash) | Dark (on Forest) |
 | :------------------------ | :------------------- | :--------------- |
-| C, house wall             | `#1b4b9b`            | `#f7faf8`        |
-| First o, roof, middle o   | `#b5452a`            | `#a9bab2`, `#a9bab2`, `#f7faf8` |
-| Both D                    | `#f2b800`            | `#6f8a7e`, `#a9bab2` |
-| e, last o                 | `#3c8d2f`            | `#a9bab2`, `#6f8a7e` |
-| Window                    | `#f2b800`            | `#ffc400`        |
+| C, house wall             | `#1b4b9b`            | `#3d7fe6`        |
+| First o, roof, middle o   | `#b5452a`            | `#e2603f`        |
+| Both D, window            | `#f2b800`            | `#f2b800`        |
+| e, last o                 | `#3c8d2f`            | `#4fae3f`        |
 | Flank squares             | `#ddd6c6`            | `#2c5244`        |
 
-The exact per-piece values are the `--lp-*` variables in `global.css`. On
-light grounds the pieces blend with multiply, like tissue paper, except the
-window. On dark grounds they stack with a small shadow.
+The exact per-piece values are the `--lp-*` variables in `global.css`.
+
+### Monochrome tones
+
+For dark grounds where the colored logo competes with its surroundings
+(photos, illustrations, the neutral surface of the light theme), `Logo` takes a
+`tone` in either theme:
+
+| Tone    | Pieces                                                     |
+| :------ | :--------------------------------------------------------- |
+| `mono`  | White and green-grays, one warm accent: the lit window     |
+| `lamps` | As `mono`, with both D lit in amber                        |
+
+Large sizes give the lit pieces a faint glow and stack the rest without
+blending.
 
 ### Flanks
 
@@ -100,17 +113,20 @@ Outside these windows the flanks fall back to the squares.
 
 ### Small sizes
 
-Below 32 px the logo loses cut edges, tilt and flanks. In the dark theme a
-white 1.5 px outline at 50% opacity goes around the whole drawing, never around
-each piece, and the pieces switch to tone steps, so neighboring pieces sit far
-apart in lightness:
+Below 32 px the logo loses cut edges, tilt, flanks and blending. In the dark
+theme the colors get slightly lighter (`#5a95f0`, `#e8704f`, `#5cbf4b`) and
+there is no outline.
 
-| Piece            | Dark      |
-| :--------------- | :-------- |
-| C, wall, last o  | `#ffffff` |
+The monochrome tones switch to tone steps, so neighboring pieces sit far apart
+in lightness, and a white 1.5 px outline at 50% opacity goes around the whole
+drawing, never around each piece:
+
+| Piece            | Monochrome |
+| :--------------- | :--------- |
+| C, wall, last o  | `#ffffff`  |
 | First o, roof, middle o, last D | `#7d948a` |
-| First D          | `#c3d0ca` |
-| e                | `#52695f` |
+| First D          | `#c3d0ca`  |
+| e                | `#52695f`  |
 
 The light theme keeps its colors, which already differ in lightness, and has
 no outline: it added clutter without helping legibility.
@@ -283,7 +299,7 @@ current with this document.
 
 | Page                 | Content                                              |
 | :------------------- | :--------------------------------------------------- |
-| `/design/brand`      | Logo in both themes and all sizes, pieces, flanks, ipê calendar |
+| `/design/brand`      | Logo in both themes and all sizes, monochrome tones, pieces, flanks, ipê calendar |
 | `/design/motifs`     | Athos Bulcão tiles, course tiles, icons, illustrations |
 | `/design/themes`     | Both themes side by side, rendering the same screens |
 | `/design/typography`, `/design/colors`, `/design/elements` | Type, tokens and components |

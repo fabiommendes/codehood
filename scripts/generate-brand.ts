@@ -34,25 +34,20 @@ const LIGHT: Record<LogoPiece | "pixel", string> = {
 	pixel: "#ddd6c6",
 };
 
-/// Dark tone steps, used at small sizes on dark grounds.
+/// Dark colors at small sizes, lighter than the large logo's.
 const DARK_SMALL: Record<LogoPiece | "pixel", string> = {
-	c: "#ffffff",
-	o1: "#7d948a",
-	d1: "#c3d0ca",
-	e: "#52695f",
-	wall: "#ffffff",
-	roof: "#7d948a",
-	window: "#ffc400",
-	o2: "#7d948a",
-	o3: "#ffffff",
-	d2: "#7d948a",
+	c: "#5a95f0",
+	o1: "#e8704f",
+	d1: "#f2b800",
+	e: "#5cbf4b",
+	wall: "#5a95f0",
+	roof: "#e8704f",
+	window: "#f2b800",
+	o2: "#e8704f",
+	o3: "#5cbf4b",
+	d2: "#f2b800",
 	pixel: "#2c5244",
 };
-
-const outline = (pieces: typeof MARK, color: string) =>
-	`<g opacity="0.5" fill="${color}" stroke="${color}" stroke-width="3" stroke-linejoin="round">${pieces
-		.map((p) => `<path d="${p.d}"/>`)
-		.join("")}</g>`;
 
 const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOGO_BOX.full}" width="352" height="112">
 <g>
@@ -63,14 +58,12 @@ ${LOGO.map((p) => `<path fill="${LIGHT[p.piece]}" d="${p.d}"${p.piece === "windo
 `;
 
 /// The favicon follows the browser's color scheme: Cerrado colors on light
-/// tabs, tone steps with a light outline on dark ones.
+/// tabs, their lighter dark-theme versions on dark ones.
 const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOGO_BOX.mark}">
 <style>
 ${MARK.map((p) => `.${p.piece}{fill:${LIGHT[p.piece]}}`).join("")}
-.line{display:none}
-@media (prefers-color-scheme: dark){${MARK.map((p) => `.${p.piece}{fill:${DARK_SMALL[p.piece]}}`).join("")}.line{display:inline;fill:#fff;stroke:#fff}}
+@media (prefers-color-scheme: dark){${MARK.map((p) => `.${p.piece}{fill:${DARK_SMALL[p.piece]}}`).join("")}}
 </style>
-<g class="line" opacity="0.5" stroke-width="3" stroke-linejoin="round">${MARK.map((p) => `<path d="${p.d}"/>`).join("")}</g>
 ${MARK.map((p) => `<path class="${p.piece}" d="${p.d}"/>`).join("\n")}
 </svg>
 `;
@@ -78,7 +71,6 @@ ${MARK.map((p) => `<path class="${p.piece}" d="${p.d}"/>`).join("\n")}
 /// Raster icons can't follow the color scheme, so they sit on a Forest tile.
 const tileSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -13 94 94">
 <rect x="-12" y="-13" width="94" height="94" rx="20" fill="#0d211a"/>
-${outline(MARK, "#ffffff")}
 ${MARK.map((p) => `<path fill="${DARK_SMALL[p.piece]}" d="${p.d}"/>`).join("\n")}
 </svg>
 `;
