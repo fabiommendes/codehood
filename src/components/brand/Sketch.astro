@@ -105,24 +105,23 @@ const loose = (): Stroke[] => {
 		[208, 110, 21],
 	];
 	const lit = 5;
-	return tiles
-		.flatMap(([x, y, angle], i) => {
-			const cx = x + size / 2;
-			const cy = y + size / 2;
-			const h = hash(i);
-			const design = tileDesigns[h % tileDesigns.length] ?? tileDesigns[0];
-			const on = i === lit;
-			return [
-				{ d: rect(x, y, size, size), turn: [angle, cx, cy] },
-				{
-					d: design?.(x + 1, y + 1) ?? "",
-					turn: [angle + ((h >>> 8) % 4) * 90, cx, cy],
-					accent: on,
-					lit: on,
-				},
-			] satisfies Stroke[];
-		})
-		.concat([{ d: "M2 151H254" }]);
+	const strokes = tiles.flatMap(([x, y, angle], i): Stroke[] => {
+		const cx = x + size / 2;
+		const cy = y + size / 2;
+		const h = hash(i);
+		const design = tileDesigns[h % tileDesigns.length] ?? tileDesigns[0];
+		const on = i === lit;
+		return [
+			{ d: rect(x, y, size, size), turn: [angle, cx, cy] },
+			{
+				d: design?.(x + 1, y + 1) ?? "",
+				turn: [angle + ((h >>> 8) % 4) * 90, cx, cy],
+				accent: on,
+				lit: on,
+			},
+		];
+	});
+	return [...strokes, { d: "M2 151H254" }];
 };
 
 const ARTS: Record<SketchArt, Stroke[]> = {
