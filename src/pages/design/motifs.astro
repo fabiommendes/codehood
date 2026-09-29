@@ -17,10 +17,10 @@ import {
 	tileDesigns,
 	wall,
 } from "@/components/brand/paper";
-import PageKicker from "@/components/PageKicker.astro";
 import Scene from "@/components/brand/Scene.astro";
 import { NIGHT as N, SCENES, type SceneName } from "@/components/brand/scenes";
 import TileWall from "@/components/brand/TileWall.astro";
+import PageKicker from "@/components/PageKicker.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
@@ -67,7 +67,6 @@ const classicWall = wallOf(
 	() => B.tile,
 );
 
-
 const cerradoWall = wallOf(
 	12,
 	4,
@@ -90,7 +89,6 @@ const TILE_THEMES = [
 		grounds: ["#15302a", "#1f4034"],
 	},
 ];
-
 ---
 
 <DesignLayout title="Motifs" active="motifs">
