@@ -775,6 +775,9 @@ model QuestionsForExam {
 
   version String?
 
+  /// Where the question sits in the exam, counting from zero.
+  position Int @default(0)
+
   @@id([examId, questionRefId])
 }
 

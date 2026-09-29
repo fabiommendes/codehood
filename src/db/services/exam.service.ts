@@ -63,6 +63,11 @@ function examInclude() {
 				version: true,
 				questionRef: { select: { id: true, slug: true } },
 			},
+			// Rows written before `position` existed all hold zero and keep their old order.
+			orderBy: [
+				{ position: "asc" as const },
+				{ questionRefId: "asc" as const },
+			],
 		},
 	} satisfies Prisma.ExamInclude;
 }
@@ -480,7 +485,9 @@ async function resolveQuestions(
 	tx: PrismaTx,
 	courseId: number,
 	questions: ExamCreate["questions"],
-): Promise<{ questionRefId: number; version: string | null }[]> {
+): Promise<
+	{ questionRefId: number; version: string | null; position: number }[]
+> {
 	if (!questions?.length) return [];
 
 	const slugs = questions.map((q) => q.slug);
@@ -500,10 +507,11 @@ async function resolveQuestions(
 		});
 	}
 
-	return questions.map((q) => ({
+	return questions.map((q, position) => ({
 		// Checked above: every slug resolved.
 		questionRefId: bySlug.get(q.slug) as number,
 		version: q.version ?? null,
+		position,
 	}));
 }
 

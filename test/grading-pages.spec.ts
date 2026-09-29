@@ -246,12 +246,11 @@ test("grading queue: lists the questions in exam order with their counts and lin
 	page,
 }) => {
 	const { teacher, course, href } = await setup("queue1");
-	// An exam keeps its questions in the order they were created in the
-	// course, so they are created in exam order, which is not the
-	// alphabetical order of their slugs or titles.
+	await question(course, "q-essay", "Essay prompt");
 	await question(course, "q-mc", "Choice prompt");
 	await question(course, "q-none", "Unanswered prompt");
-	await question(course, "q-essay", "Essay prompt");
+	// Exam order is neither the order the questions were created in, nor the
+	// alphabetical order of their slugs or titles.
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: "midterm",

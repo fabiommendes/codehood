@@ -81,6 +81,9 @@
 
 ### Fixed
 
+- An exam keeps its questions in the order it was given. They used to come
+  back in the order the questions were created in the course, on every page.
+  Exams stored before this keep the order they showed.
 - Calendar events now start at their slot's clock time in `SERVER_TZ`. They
   used the server process's own time zone, so a server running in UTC stored
   a 14:00 São Paulo slot as 14:00 UTC.
