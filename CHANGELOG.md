@@ -4,6 +4,9 @@
 
 ### Added
 
+- `/calendar` opens on the month of the next event, or of the last one when
+  nothing is left, instead of an empty current month. Every empty section of a
+  course the viewer teaches links to `/getting-started`.
 - Students join a course at `/courses/join` by typing the passphrase the
   instructor shows in class, and land on the course home enrolled. `/courses`
   offers "Join a course" in its header and in its empty state. An unknown code
