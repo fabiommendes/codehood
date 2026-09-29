@@ -26,6 +26,22 @@ export function courseRefWhere(ref: CourseRef) {
 }
 
 /**
+ * A relation filter matching the course given by id or by natural key.
+ *
+ * Unlike {@link courseRefWhere}, usable inside another model's `where`, e.g.
+ * `{ exam: { course: courseRefMatch(ref) } }`.
+ */
+export function courseRefMatch(ref: CourseRef) {
+	if (typeof ref === "number") return { id: ref };
+
+	return {
+		disciplineSlug: ref.discipline,
+		instructorId: ref.instructor,
+		editionSlug: ref.edition,
+	};
+}
+
+/**
  * Ensure object exists or throw a NotFound error.
  *
  * The optional arguments are passed to the {@link NotFound} constructor.

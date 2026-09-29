@@ -39,7 +39,8 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
  * Runs after `sessionMiddleware`, which is what populates `locals.user`.
  */
 export const adminMiddleware = defineMiddleware((context, next) => {
-	if (!context.url.pathname.startsWith("/admin")) return next();
+	const { pathname } = context.url;
+	if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return next();
 
 	if (!context.locals.actor) return context.redirect("/login");
 	if (!hasPerm(context.locals.actor, "system.manage"))

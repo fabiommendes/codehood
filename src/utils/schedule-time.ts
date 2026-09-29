@@ -264,19 +264,40 @@ export function weekdayOnOrAfter(
 	return result;
 }
 
-export function dateOffsetBy(
-	date: Date,
-	offsets: { days?: number; hours?: number; minutes?: number },
+/**
+ * The instant a weekly slot meets in the given week of a course.
+ *
+ * Week 0 falls on the first `weekday` on or after `courseStart`. `startMin` is
+ * a wall clock in `zone`, so the meeting keeps its clock time whatever the
+ * process's own time zone, and across DST changes.
+ *
+ * @param zone The time zone the slot's clock time is read in, defaulting to
+ *   `SERVER_TZ`.
+ */
+export function slotInstant(
+	courseStart: Date,
+	weekday: Weekday,
+	week: number,
+	startMin: number,
+	zone: string = SERVER_TZ,
 ): Date {
-	const result = new Date(date);
-	if (offsets.days) {
-		result.setDate(result.getDate() + offsets.days);
-	}
-	if (offsets.hours) {
-		result.setHours(result.getHours() + offsets.hours);
-	}
-	if (offsets.minutes) {
-		result.setMinutes(result.getMinutes() + offsets.minutes);
-	}
-	return result;
+	const daysUntilWeekday =
+		(isoWeekDay(weekday) - isoWeekDay(weekdayOf(courseStart, zone)) + 7) % 7;
+	const day = addDays(
+		localDateOf(courseStart, zone),
+		daysUntilWeekday + week * 7,
+	);
+	return toInstant(day, startMin, zone);
+}
+
+/// The `YYYY-MM-DD` day `days` calendar days after `date`.
+function addDays(date: string, days: number): string {
+	const [year, month, day] = date.split("-").map(Number) as [
+		number,
+		number,
+		number,
+	];
+	return new Date(Date.UTC(year, month - 1, day + days))
+		.toISOString()
+		.slice(0, 10);
 }

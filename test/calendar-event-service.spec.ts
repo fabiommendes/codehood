@@ -3,7 +3,7 @@ import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
 import { db, type ServiceOpts } from "@/db";
-import { localDateOf, weekdayOf } from "@/utils/schedule-time";
+import { localDateOf, toInstant, weekdayOf } from "@/utils/schedule-time";
 
 // Random suffix, not an incrementing counter: shared test database across
 // spec files. Prefixed "cal-" so it never collides with another file's tag().
@@ -113,6 +113,27 @@ test("create derives startAt and the timeSlot shape from the slot, offset by wee
 	// Three weeks later than week 1, same slot.
 	expect(week3.startAt.getTime() - week1.startAt.getTime()).toBe(
 		2 * 7 * 24 * 60 * 60_000,
+	);
+});
+
+test("create stores the slot's clock time in SERVER_TZ, whatever the process's own time zone", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts);
+
+	const event = await db.calendarEvent.create(
+		{
+			course: course.id,
+			timeSlot: slot.id,
+			week: 2,
+			title: "t",
+			rev: tag("h"),
+		},
+		opts,
+	);
+	expect(event.startAt.getTime()).toBe(
+		toInstant(localDateOf(event.startAt), 14 * 60).getTime(),
 	);
 });
 

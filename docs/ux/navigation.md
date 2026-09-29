@@ -67,7 +67,7 @@ sit in the same positions for students and instructors. A tab the viewer cannot
 open is not shown (P1). The list is computed by `courseTabs()` in
 `src/utils/course-tabs.ts`.
 
-Origin: `dev/specs/to-review/course-navigation.md`.
+Origin: the course-navigation spec, now in git history.
 
 
 ### Items inside a tab link back to their list

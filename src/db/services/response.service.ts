@@ -29,7 +29,12 @@ import {
 } from "@/db/base-service";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
+import {
+	courseRefMatch,
+	courseRefWhere,
+	invalidIfExists,
+	valueOrNotFound,
+} from "../utils";
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
@@ -471,9 +476,15 @@ export class ResponseService extends CrudBase<{
 
 // Private utilities -----------------------------------------------------------
 
-/// The `where` matching whichever of the primary keys `filter` carries.
+/// The `where` matching whichever of the primary keys `filter` carries, within its course if it names one.
 function responseWhere(filter: ResponsePK): Prisma.ResponseWhereInput {
-	return "id" in filter ? { id: filter.id } : { publicId: filter.publicId };
+	if ("id" in filter) return { id: filter.id };
+	return {
+		publicId: filter.publicId,
+		...(filter.course !== undefined && {
+			exam: { course: courseRefMatch(filter.course) },
+		}),
+	};
 }
 
 /// Whether `actor` teaches the course the attempt belongs to, or is SYSTEM.

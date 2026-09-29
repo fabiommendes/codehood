@@ -26,7 +26,9 @@ export const resourceTypeSchema = z.enum(["LINK", "FILE", "CODE", "MD"]);
 // The db stores this information in the data/extra columns for each resource.
 export const resourceLinkData = z.object({
 	type: z.literal("LINK"),
-	url: z.string().min(1),
+	/// Web URLs only: the link lands in an `<a href>`, where a `javascript:`
+	/// or `data:` URL would run script on the app's origin.
+	url: z.url({ protocol: /^https?$/ }),
 });
 
 export const resourceFileData = attachmentSchema

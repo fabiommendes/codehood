@@ -120,7 +120,7 @@ test("api-key.manage and session.manage: owner, admin, or SYSTEM", () => {
 	}
 });
 
-test("course.create: SYSTEM and admins may name any instructor; anybody else only themselves", () => {
+test("course.create: SYSTEM and admins may name any instructor; an instructor only themselves", () => {
 	const target = (username: string) => ({ instructor: { username } });
 	expect(hasPerm(SYSTEM, "course.create", target("anyone"))).toBe(true);
 	expect(hasPerm(admin, "course.create", target("anyone"))).toBe(true);
@@ -128,9 +128,8 @@ test("course.create: SYSTEM and admins may name any instructor; anybody else onl
 		hasPerm(instructor, "course.create", target(instructor.username)),
 	).toBe(true);
 	expect(hasPerm(instructor, "course.create", target("other"))).toBe(false);
-	// The actor's role is not otherwise consulted: a student naming themselves passes.
 	expect(hasPerm(student, "course.create", target(student.username))).toBe(
-		true,
+		false,
 	);
 	expect(hasPerm(student, "course.create", target("other"))).toBe(false);
 });

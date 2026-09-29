@@ -5,6 +5,7 @@ import {
 	formatTime,
 	localDateOf,
 	SERVER_TZ,
+	slotInstant,
 	toInstant,
 	weekdayOf,
 	weekdayOnOrAfter,
@@ -115,4 +116,26 @@ test("weekdayOnOrAfter reads the starting weekday in the given zone, not the pro
 			"America/Sao_Paulo",
 		),
 	).toBe("2026-01-05");
+});
+
+test("slotInstant lands on the slot's weekday and clock time in the zone, week after week, across a DST change", () => {
+	// 2026-03-02 is a Monday; New York springs forward on 2026-03-08.
+	const courseStart = toInstant("2026-03-02", 9 * 60, NY);
+
+	const week0 = slotInstant(courseStart, "WEDNESDAY", 0, 14 * 60, NY);
+	const week1 = slotInstant(courseStart, "WEDNESDAY", 1, 14 * 60, NY);
+
+	expect(week0.getTime()).toBe(toInstant("2026-03-04", 14 * 60, NY).getTime());
+	expect(week1.getTime()).toBe(toInstant("2026-03-11", 14 * 60, NY).getTime());
+	// One hour short of a week: the clock time holds, not the elapsed time.
+	expect(week1.getTime() - week0.getTime()).toBe((7 * 24 - 1) * 3600_000);
+});
+
+test("slotInstant reads the course start's weekday in the zone, not in UTC", () => {
+	// Sunday 23:00 in Sao Paulo is already Monday in UTC.
+	const zone = "America/Sao_Paulo";
+	const courseStart = toInstant("2026-01-04", 23 * 60, zone);
+
+	const monday = slotInstant(courseStart, "MONDAY", 0, 8 * 60, zone);
+	expect(localDateOf(monday, zone)).toBe("2026-01-05");
 });

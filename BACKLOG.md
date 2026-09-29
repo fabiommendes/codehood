@@ -50,8 +50,7 @@ Backlog items are categorized in sections, not on priority.
   Is gRPC too much trouble?
 * [ ] Extend the natural-key REST addressing to `passphrase`, which has no
   REST endpoint yet (`calendar-event`, `resource`, `exam` and `time-slot` are
-  done — see `dev/specs/to-review/course-scoped-resource-api.md` and
-  `dev/specs/to-review/course-ref-unification.md`). `passphraseCreate` and
+  done). `passphraseCreate` and
   `passphraseFilter` already take `course: CourseRef`, so registering the
   `CRUD` route is the only piece left. Once every endpoint is addressable
   naturally, drop `id` from the REST responses (but never from

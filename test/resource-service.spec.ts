@@ -125,6 +125,38 @@ test("create rejects malformed `data` per type: LINK without a url, CODE without
 	).rejects.toThrow();
 });
 
+test("create and update reject a LINK url that is not http or https", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+
+	for (const url of [
+		"javascript:alert(1)",
+		"data:text/html,<script>alert(1)</script>",
+		"not a url",
+	]) {
+		await expect(
+			db.resource.create(
+				{ course: course.id, slug: tag("s"), title: "t", data: link(url) },
+				opts,
+			),
+			url,
+		).rejects.toMatchObject({ code: "invalid-data" });
+	}
+
+	const resource = await db.resource.create(
+		{ course: course.id, slug: tag("s"), title: "t", data: link() },
+		opts,
+	);
+	await expect(
+		db.resource.update(
+			{ id: resource.id },
+			{ data: link("javascript:alert(1)") },
+			opts,
+		),
+	).rejects.toMatchObject({ code: "invalid-data" });
+});
+
 test("create rejects a duplicate slug in one course, and accepts the same slug in another", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const courseA = await makeCourse(instructor.username);

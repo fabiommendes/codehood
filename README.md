@@ -115,7 +115,7 @@ following tech stack:
 | Rest API          | In-house Astro dynamic endpoints                                                 |
 | Database          | [Prisma](https://www.prisma.io/) ORM with SQLite                                 |
 | Validation        | [Zod](https://zod.dev/)                                                          |
-| Auth              | In-house: Argon2id + session cookies + API keys (see `dev/specs/to-review/auth.md`) |
+| Auth              | In-house: Argon2id + session cookies + API keys |
 | CSS               | [DaisyUI](https://daisyui.com/) and TailwindCSS                                  |
 | Components        | [SolidJS](https://www.solidjs.com/)                                              |
 | Integration Tests | [Playwright](https://playwright.dev/)                                            |

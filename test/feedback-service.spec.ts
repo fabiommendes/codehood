@@ -663,6 +663,61 @@ test("create() ignores a smuggled submissionId and always resolves its own submi
 	expect(created.submissionId).not.toBe(foreignSubmission.id);
 });
 
+test("only SYSTEM records a bot's pass: an instructor naming a bot is refused on create and upsert", async () => {
+	const { instructor, submission } = await makeGradedSubmission();
+
+	for (const write of [db.feedback.create, db.feedback.upsert]) {
+		await expect(
+			write.call(
+				db.feedback,
+				{
+					submission: { id: submission.id },
+					ref: "as-bot",
+					score: "1",
+					bot: "grading-bot",
+				},
+				{ actor: instructor },
+			),
+		).rejects.toBeInstanceOf(NotAllowed);
+	}
+
+	expect(
+		await prisma.feedback.count({ where: { submissionId: submission.id } }),
+	).toBe(0);
+});
+
+test("upsert() over an existing pass still checks who the input names: another grader or a bot is NotAllowed, both is InvalidData, and the pass is left as it was", async () => {
+	const { instructor, submission } = await makeGradedSubmission();
+	const someoneElse = await persistedUserFactory.create({
+		role: "INSTRUCTOR",
+	});
+	const key = { submission: { id: submission.id }, ref: "pass" };
+	await db.feedback.create({ ...key, score: "1" }, { actor: instructor });
+
+	await expect(
+		db.feedback.upsert(
+			{ ...key, score: "0", grader: someoneElse.username },
+			{ actor: instructor },
+		),
+	).rejects.toBeInstanceOf(NotAllowed);
+	await expect(
+		db.feedback.upsert(
+			{ ...key, score: "0", bot: "grading-bot" },
+			{ actor: instructor },
+		),
+	).rejects.toBeInstanceOf(NotAllowed);
+	await expect(
+		db.feedback.upsert(
+			{ ...key, score: "0", grader: instructor.username, bot: "grading-bot" },
+			{ actor: instructor },
+		),
+	).rejects.toBeInstanceOf(InvalidData);
+
+	const pass = await db.feedback.findOne(key, { actor: instructor });
+	expect(pass?.score).toBe("1");
+	expect(pass?.grader).toBe(instructor.username);
+});
+
 test("two concurrent graders writing different refs both land", async () => {
 	const { instructor, submission } = await makeGradedSubmission();
 

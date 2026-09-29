@@ -271,11 +271,13 @@ const PERMISSIONS = {
 	"course.create-outside-window": { admin: true },
 
 	// COURSE --------------------------------------------------------------------
-	// Rule: SYSTEM and admins may name any instructor; anybody else only
-	// themselves. The actor's role is otherwise not consulted.
+	// Rule: SYSTEM and admins may name any instructor; an instructor only
+	// themselves. Students never create courses.
 	"course.create": {
 		admin: true,
-		other: (actor, target) => actor.username === target.instructor.username,
+		other: (actor, target) =>
+			actor.role === "INSTRUCTOR" &&
+			actor.username === target.instructor.username,
 		audit: auditCourse,
 	} satisfies PermDef<CourseTarget>,
 

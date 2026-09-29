@@ -229,7 +229,10 @@ export const responseApi = CRUD("/api/course/[discipline]/[course]/response", {
 	service: db.response,
 
 	parseKeyParams(params) {
-		return { publicId: params.publicId as string };
+		return {
+			publicId: params.publicId as string,
+			course: parseCourseParams(params),
+		};
 	},
 	parseScopeParams(params) {
 		return { course: parseCourseParams(params) };
@@ -248,7 +251,9 @@ export const submissionApi = CRUD(
 		keySegment: "/[publicId]",
 
 		entity: apiSubmissionEntity,
-		create: schema.submissionCreate.extend({ response: submissionResponseRef }),
+		create: schema.submissionCreate
+			.omit({ course: true })
+			.extend({ response: submissionResponseRef }),
 		upsert: false,
 		update: schema.submissionUpdate,
 		filter: schema.submissionFilterBase.extend({
@@ -261,13 +266,24 @@ export const submissionApi = CRUD(
 		service: db.submission,
 
 		parseKeyParams(params) {
-			return { publicId: params.publicId as string };
+			return {
+				publicId: params.publicId as string,
+				course: parseCourseParams(params),
+			};
 		},
 		parseScopeParams(params) {
 			return { course: parseCourseParams(params) };
 		},
 	},
 );
+
+/// The submission a feedback path is nested under, bound to the path's course.
+function submissionInCourse(params: Record<string, string>) {
+	return {
+		publicId: params.publicId as string,
+		course: parseCourseParams(params),
+	};
+}
 
 /**
  * Nested under the submission it grades: a `ref` is only unique once the
@@ -295,17 +311,17 @@ export const feedbackApi = CRUD(
 
 		parseKeyParams(params) {
 			return {
-				submission: { publicId: params.publicId as string },
+				submission: submissionInCourse(params),
 				ref: params.ref as string,
 			};
 		},
 		parseCreateParams(params) {
-			return { submission: { publicId: params.publicId as string } };
+			return { submission: submissionInCourse(params) };
 		},
 		parseListParams(params) {
 			return {
 				course: parseCourseParams(params),
-				submission: { publicId: params.publicId as string },
+				submission: submissionInCourse(params),
 			};
 		},
 	},

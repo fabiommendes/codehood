@@ -60,6 +60,9 @@
 
 ### Fixed
 
+- Calendar events now start at their slot's clock time in `SERVER_TZ`. They
+  used the server process's own time zone, so a server running in UTC stored
+  a 14:00 São Paulo slot as 14:00 UTC.
 - The exam page's badge still read "Open now" after the student submitted.
   A student's badge now reads "Awaiting grading" once they submit and
   "Graded" once results are released, on the exam page and the Exams tab.
@@ -150,6 +153,18 @@
 
 ### Security
 
+- A LINK resource only accepts `http` and `https` URLs. A `javascript:` URL
+  ran script on the app's origin from the resources page.
+- Responses, submissions and feedback addressed under a course path must
+  belong to that course. The course segments were ignored, so a row could be
+  read or written through another course's URL, and a malformed course
+  segment still answered 200.
+- The admin guard covers `/admin` and the paths under it only. A discipline
+  slugged `administration` sent every non-admin to `/403`.
+- Only SYSTEM records a bot's grading pass, and a feedback `upsert` over an
+  existing pass refuses naming another grader or a bot, as `create` does.
+- Students can no longer create courses. Admins and instructors still can;
+  an instructor only names themselves.
 - `admin.createUser` returned the created `User` entity straight from the
   service as the Astro Action's result, `passwordHash` included. It now
   returns `publicUser()`'s whitelist, the same shape `auth.login` and

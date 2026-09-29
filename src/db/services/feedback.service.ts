@@ -13,7 +13,7 @@ import { type Actor, SYSTEM } from "@/auth/actor";
 import type { FeedbackTarget, ResponseWithCourse } from "@/auth/permissions";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { FeedbackId } from "@/core/schemas";
+import type { CourseRef, FeedbackId } from "@/core/schemas";
 import {
 	feedbackCreate,
 	feedbackFilter,
@@ -25,7 +25,12 @@ import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
 import { resultsReleased } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
+import {
+	courseRefMatch,
+	courseRefWhere,
+	invalidIfExists,
+	valueOrNotFound,
+} from "../utils";
 import { examTimingFromDb, examTimingSelect } from "./submission.service";
 
 export type { FeedbackId };
@@ -294,11 +299,15 @@ export class FeedbackService extends CrudBase<{
 	 * @throws {@link NotFound}
 	 * If no submission matches `input.submission`, or `actor` may not even read
 	 * the one that does.
+	 * Revising keeps the pass's original grader or bot; a grader or bot named
+	 * in `input` must still be one the actor may write as.
+	 *
 	 * @throws {@link InvalidData}
-	 * If neither or both of `graderId` and `botId` are given, when writing a
-	 * new pass.
+	 * If both `graderId` and `botId` are given, or neither when writing a new
+	 * pass.
 	 * @throws {@link NotAllowed}
-	 * If `actor` may read the submission but not grade it.
+	 * If `actor` may read the submission but not grade it, or names a grader
+	 * or bot it may not write as.
 	 */
 	@Validate({
 		service: true,
@@ -323,6 +332,10 @@ export class FeedbackService extends CrudBase<{
 		});
 
 		if (existing) {
+			// The pass keeps its grader, but naming one still has to be allowed.
+			if (input.grader != null || input.bot != null) {
+				resolveGrader(input, opts.actor);
+			}
 			const row = await tx.feedback.update({
 				where: { id: existing.id },
 				data: {
@@ -396,11 +409,17 @@ export function isCourseOwner(
 	return actor.username === course.instructor.username;
 }
 
-/// The `where` matching whichever of a submission ref's primary keys `ref` carries.
+/// The `where` matching whichever of a submission ref's primary keys `ref` carries, within its course if it names one.
 function submissionRefWhere(
-	ref: { id: number } | { publicId: string },
+	ref: { id: number } | { publicId: string; course?: CourseRef },
 ): Prisma.SubmissionWhereInput {
-	return "id" in ref ? { id: ref.id } : { publicId: ref.publicId };
+	if ("id" in ref) return { id: ref.id };
+	return {
+		publicId: ref.publicId,
+		...(ref.course !== undefined && {
+			response: { exam: { course: courseRefMatch(ref.course) } },
+		}),
+	};
 }
 
 /// The `where` matching whichever of the primary keys `filter` carries.
@@ -491,7 +510,7 @@ function restrictToAuthor(
  */
 async function resolveGradableSubmission(
 	tx: PrismaTx,
-	ref: { id: number } | { publicId: string },
+	ref: { id: number } | { publicId: string; course?: CourseRef },
 	actor: Actor,
 ): Promise<DbSubmission> {
 	const submission = valueOrNotFound(
@@ -514,9 +533,10 @@ async function resolveGradableSubmission(
  * Resolves who graded a new pass: exactly one of `grader`/`bot`.
  *
  * `grader` defaults to a user actor's own username when neither is given.
- * Naming a different grader is refused for anyone but SYSTEM.
+ * Naming a different grader, or any bot, is refused for anyone but SYSTEM.
  *
- * @throws {@link NotAllowed} If a non-SYSTEM actor names a different grader.
+ * @throws {@link NotAllowed}
+ * If a non-SYSTEM actor names a different grader or a bot.
  * @throws {@link InvalidData} If neither or both of `grader`/`bot` are set.
  */
 function resolveGrader(
@@ -543,6 +563,12 @@ function resolveGrader(
 					message: "Exactly one of `grader` or `bot` is required",
 				},
 			],
+		});
+	}
+
+	if (actor !== SYSTEM && botId !== null) {
+		throw new NotAllowed("feedback.create", {
+			message: "Only SYSTEM may record a bot's grading pass",
 		});
 	}
 

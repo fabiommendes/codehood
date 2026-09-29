@@ -20,11 +20,10 @@ import {
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
 import {
-	dateOffsetBy,
 	endOf,
+	slotInstant,
 	toClockTime,
 	toDuration,
-	weekdayOnOrAfter,
 } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
@@ -104,15 +103,12 @@ export class CalendarEventService extends CrudBase<{
 			);
 		}
 
-		// Start with the slot's weekday in the course's first week, at 00:00
-		// local time, then offset by the authored week and the slot's own
-		// start time.
-		let timestamp = weekdayOnOrAfter(course.startAt, slot.day);
-		timestamp.setHours(0, 0, 0, 0);
-		timestamp = dateOffsetBy(timestamp, {
-			days: input.week * 7,
-			minutes: slot.startMin,
-		});
+		const timestamp = slotInstant(
+			course.startAt,
+			slot.day,
+			input.week,
+			slot.startMin,
+		);
 
 		const row = await tx.calendarEvent.create({
 			data: {

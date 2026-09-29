@@ -11,7 +11,7 @@ import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
 import { ensurePerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { SubmissionId } from "@/core/schemas";
+import type { CourseRef, SubmissionId } from "@/core/schemas";
 import {
 	submissionCreate,
 	submissionFilter,
@@ -28,7 +28,12 @@ import {
 import { toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
+import {
+	courseRefMatch,
+	courseRefWhere,
+	invalidIfExists,
+	valueOrNotFound,
+} from "../utils";
 
 export { submissionStatus } from "@/core/schemas";
 export type { SubmissionId };
@@ -142,7 +147,11 @@ export class SubmissionService extends CrudBase<{
 		const response = valueOrNotFound(
 			"response",
 			await tx.response.findFirst({
-				where: responseRefWhere(input.response),
+				where: responseRefWhere(
+					"publicId" in input.response && input.course !== undefined
+						? { ...input.response, course: input.course }
+						: input.response,
+				),
 				include: responseTargetInclude(),
 			}),
 		);
@@ -348,16 +357,28 @@ export class SubmissionService extends CrudBase<{
 
 // Private utilities -----------------------------------------------------------
 
-/// The `where` matching whichever of the primary keys `ref` carries.
+/// The `where` matching whichever of the primary keys `ref` carries, within its course if it names one.
 function responseRefWhere(
-	ref: { id: number } | { publicId: string },
+	ref: { id: number } | { publicId: string; course?: CourseRef },
 ): Prisma.ResponseWhereInput {
-	return "id" in ref ? { id: ref.id } : { publicId: ref.publicId };
+	if ("id" in ref) return { id: ref.id };
+	return {
+		publicId: ref.publicId,
+		...(ref.course !== undefined && {
+			exam: { course: courseRefMatch(ref.course) },
+		}),
+	};
 }
 
-/// The `where` matching whichever of the primary keys `filter` carries.
+/// The `where` matching whichever of the primary keys `filter` carries, within its course if it names one.
 function submissionWhere(filter: SubmissionPK): Prisma.SubmissionWhereInput {
-	return "id" in filter ? { id: filter.id } : { publicId: filter.publicId };
+	if ("id" in filter) return { id: filter.id };
+	return {
+		publicId: filter.publicId,
+		...(filter.course !== undefined && {
+			response: { exam: { course: courseRefMatch(filter.course) } },
+		}),
+	};
 }
 
 /// Whether `actor` teaches the course the response belongs to, or is SYSTEM.

@@ -28,7 +28,7 @@ A consequence: there is no "preview as student" button. If an instructor cannot
 tell what a student sees by ignoring the controls marked as theirs, the page has
 drifted and needs fixing.
 
-Origin: `dev/specs/to-review/course-navigation.md`.
+Origin: the course-navigation spec, now in git history.
 
 
 ## 2. Every page answers "what do I do next?"

@@ -27,7 +27,11 @@ export const submissionPayload = z.record(z.string(), z.unknown());
 /// Identifies a response from outside the response schema, which imports this module.
 export const responseRef = z.union([
 	z.object({ id: responseId }),
-	z.object({ publicId: publicId }),
+	z.object({
+		publicId: publicId,
+		/// When given, a response from any other course is not found.
+		course: courseRef.optional(),
+	}),
 ]);
 
 export const submissionSchema = z.object({
@@ -62,6 +66,8 @@ export const submissionCreate = submissionSchema
 	})
 	.extend({
 		response: responseRef,
+		/// When given, a response from any other course is not found.
+		course: courseRef.optional(),
 
 		/// The question being answered, which must be one the exam carries.
 		question: slug,
@@ -78,7 +84,11 @@ export const submissionUpdate = submissionSchema
 
 export const submissionPK = z.union([
 	z.object({ id: submissionId }),
-	z.object({ publicId: publicId }),
+	z.object({
+		publicId: publicId,
+		/// When given, a submission from any other course is not found.
+		course: courseRef.optional(),
+	}),
 ]);
 
 export const submissionFilterBase = z.object({
