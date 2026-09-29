@@ -22,10 +22,11 @@ import {
 	feedbackUpdate,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import { resultsReleased } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { examEndsAt } from "../util.exam-link";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
+import { examTimingFromDb, examTimingSelect } from "./submission.service";
 
 export type { FeedbackId };
 
@@ -42,11 +43,7 @@ export type FeedbackUpdate = z.infer<typeof feedbackUpdate>;
 /// that has to resolve a submission's course and release rule.
 function examReleaseSelect() {
 	return {
-		type: true,
-		status: true,
-		scheduledAt: true,
-		durationMs: true,
-		extraTimeMs: true,
+		...examTimingSelect,
 		gradesReleasedAt: true,
 		courseId: true,
 		course: {
@@ -382,25 +379,12 @@ export class FeedbackService extends CrudBase<{
 
 // Private utilities -----------------------------------------------------------
 
-/**
- * Whether `exam` has released its grades to its students as of `now`.
- *
- * A `PRACTICE` releases a score the moment it is written, a `QUIZ` once its
- * window has closed, and an `EXAM` only when its instructor says so. A `QUIZ`
- * with no `scheduledAt` has no window to close, so it falls back to the exam
- * being `COMPLETED`.
- */
-export function releasedToStudents(exam: ExamRelease, now: Date): boolean {
-	switch (exam.type) {
-		case "PRACTICE":
-			return true;
-		case "QUIZ": {
-			const endsAt = examEndsAt(exam);
-			return endsAt ? endsAt <= now : exam.status === "COMPLETED";
-		}
-		default:
-			return exam.gradesReleasedAt !== null && exam.gradesReleasedAt <= now;
-	}
+/// Whether `exam` has released its grades to its students as of `now`, see {@link resultsReleased}.
+function releasedToStudents(exam: ExamRelease, now: Date): boolean {
+	return resultsReleased(
+		{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
+		now,
+	);
 }
 
 /// Whether `actor` teaches the course the graded work belongs to, or is SYSTEM.

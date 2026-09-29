@@ -31,6 +31,14 @@
 
 ### Fixed
 
+- One rule decides when students see their grades. A student could read the
+  feedback on an untimed `QUIZ` while it was still open, because the feedback
+  service ended its window 1 ms after the start; an untimed `QUIZ` now releases
+  when it is `COMPLETED`, as the exam page already assumed.
+  `ExamService.releaseGrades` now refuses while an answer waits for a grade, as
+  the release button already said, and the exam page and the instructor home
+  ask the same function whether an exam can be released. Exam timing rules
+  moved to `src/services/exam-state.ts`.
 - The discipline test factory drew names from a short list, so two courses in
   one test could share a name and "student: see my courses" failed now and
   then.

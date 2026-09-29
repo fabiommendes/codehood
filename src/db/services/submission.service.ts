@@ -20,10 +20,14 @@ import {
 	submissionUpdate,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	attemptDeadline,
+	type ExamTiming,
+	examPhase,
+} from "@/services/exam-state";
 import { toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { attemptDeadline, type ExamTiming, examPhase } from "../exam-state";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
 export { submissionStatus } from "@/core/schemas";

@@ -1,13 +1,18 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
-import type { AttemptTiming, ExamPhase, ExamTiming } from "@/db";
+import type { ExamResult, QuestionOutcomeStatus } from "@/services/exam-result";
 import {
+	type AttemptTiming,
 	attemptDeadline,
 	attemptState,
+	type ExamPhase,
+	type ExamTiming,
 	examPhase,
 	examPhaseLabels,
+	gradeReleaseBlocker,
+	releaseMoment,
 	resultsReleased,
-} from "@/db";
+} from "@/services/exam-state";
 
 const MINUTE = 60_000;
 
@@ -513,4 +518,125 @@ test("attemptState: an open PRACTICE exam keeps an attempt in progress and lets 
 		kind: "in-progress",
 		deadline: at(120),
 	});
+});
+
+// ---------------------------------------------------------------------------
+// releaseMoment
+// ---------------------------------------------------------------------------
+
+test("releaseMoment: a timed QUIZ releases at its window end, and not before", () => {
+	const quiz = timed({ type: "QUIZ" });
+	expect(releaseMoment(quiz, at(60))).toBeNull();
+	expect(releaseMoment(quiz, at(10_000))).toEqual(at(120));
+});
+
+test("releaseMoment: a QUIZ completed before or without a window end has no known moment", () => {
+	expect(
+		releaseMoment(timed({ type: "QUIZ", status: "COMPLETED" }), at(30)),
+	).toBeNull();
+	expect(
+		releaseMoment(untimed({ type: "QUIZ", status: "COMPLETED" }), at(30)),
+	).toBeNull();
+});
+
+test("releaseMoment: an untimed QUIZ still open is not released", () => {
+	const quiz = untimed({ type: "QUIZ" });
+	expect(resultsReleased(quiz, at(10_000))).toBe(false);
+	expect(releaseMoment(quiz, at(10_000))).toBeNull();
+});
+
+test("releaseMoment: an EXAM releases at gradesReleasedAt once reached", () => {
+	const exam = timed({ gradesReleasedAt: at(300) });
+	expect(releaseMoment(exam, at(200))).toBeNull();
+	expect(releaseMoment(exam, at(400))).toEqual(at(300));
+});
+
+test("releaseMoment: a PRACTICE exam is released with no known moment", () => {
+	expect(releaseMoment(timed({ type: "PRACTICE" }), at(30))).toBeNull();
+});
+
+test("releaseMoment: whenever it returns a moment, resultsReleased holds and the moment is not after now", () => {
+	fc.assert(
+		fc.property(
+			fc.constantFrom("PRACTICE", "QUIZ", "EXAM"),
+			fc.constantFrom("SCHEDULED", "ONGOING", "COMPLETED"),
+			fc.option(fc.integer({ min: -500, max: 500 })),
+			fc.option(fc.integer({ min: 1, max: 300 })),
+			fc.option(fc.integer({ min: -500, max: 500 })),
+			fc.integer({ min: -1000, max: 1000 }),
+			(type, status, start, minutes, released, when) => {
+				const exam = timed({
+					type,
+					status,
+					scheduledAt: start === null ? null : at(start),
+					duration: minutes === null ? null : { minutes },
+					extraTime: null,
+					gradesReleasedAt: released === null ? null : at(released),
+				});
+				const now = at(when);
+				const moment = releaseMoment(exam, now);
+				if (moment === null) return;
+				expect(resultsReleased(exam, now)).toBe(true);
+				expect(moment.getTime()).toBeLessThanOrEqual(now.getTime());
+			},
+		),
+	);
+});
+
+// ---------------------------------------------------------------------------
+// gradeReleaseBlocker
+// ---------------------------------------------------------------------------
+
+/// A result whose questions have the given statuses.
+function result(...statuses: QuestionOutcomeStatus[]): ExamResult {
+	return {
+		questions: statuses.map((status, i) => ({
+			question: `q${i}`,
+			status,
+			score: status === "graded" ? 1 : null,
+			comments: [],
+		})),
+		total: null,
+	};
+}
+
+test("gradeReleaseBlocker: a closed, unreleased EXAM with every answer graded can be released", () => {
+	const exam = timed({ status: "COMPLETED" });
+	expect(
+		gradeReleaseBlocker(exam, [result("graded", "unanswered")], at(30)),
+	).toBeNull();
+});
+
+test("gradeReleaseBlocker: an EXAM nobody attempted can be released", () => {
+	expect(gradeReleaseBlocker(timed(), [], at(10_000))).toBeNull();
+});
+
+test("gradeReleaseBlocker: only an EXAM is released by hand", () => {
+	for (const type of ["PRACTICE", "QUIZ"] as const) {
+		expect(
+			gradeReleaseBlocker(timed({ type, status: "COMPLETED" }), [], at(30)),
+		).toBe("not-an-exam");
+	}
+});
+
+test("gradeReleaseBlocker: an EXAM not closed yet cannot be released", () => {
+	expect(gradeReleaseBlocker(timed(), [], at(-60))).toBe("not-closed");
+	expect(gradeReleaseBlocker(timed(), [], at(30))).toBe("not-closed");
+	expect(gradeReleaseBlocker(untimed(), [], at(10_000))).toBe("not-closed");
+});
+
+test("gradeReleaseBlocker: an EXAM already released reports released", () => {
+	expect(
+		gradeReleaseBlocker(timed({ gradesReleasedAt: at(200) }), [], at(300)),
+	).toBe("released");
+});
+
+test("gradeReleaseBlocker: one answer waiting for a grade blocks the release", () => {
+	expect(
+		gradeReleaseBlocker(
+			timed(),
+			[result("graded"), result("graded", "pending")],
+			at(10_000),
+		),
+	).toBe("pending");
 });

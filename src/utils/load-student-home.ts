@@ -1,6 +1,7 @@
 import type { UserActor } from "@/auth/actor";
-import { db, resultsReleased } from "@/db";
+import { db } from "@/db";
 import { examResult } from "@/services/exam-result";
+import { resultsReleased } from "@/services/exam-state";
 import {
 	type HomeCourse,
 	type HomeEvent,

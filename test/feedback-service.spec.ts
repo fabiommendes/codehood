@@ -3,7 +3,6 @@ import { type Actor, FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import { db, type schema, type User } from "@/db";
 import { prisma } from "@/db/client";
-import { releasedToStudents } from "@/db/services/feedback.service";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedFeedbackFactory } from "@/fixtures/feedback.factory";
@@ -362,9 +361,8 @@ for (const { score, valid } of scoreCases) {
 // F4 — release, by exam type. Integration-level matrix through db.feedback,
 // with generous margins around the QUIZ window so the test is not sensitive
 // to the few milliseconds elapsed between building `now` and the service's
-// own clock read. The exact-boundary case (endsAt === now) is exercised
-// separately below against the exported `releasedToStudents` predicate,
-// which takes `now` as a plain argument.
+// own clock read. The exact boundaries belong to `resultsReleased`, and
+// test/exam-state.spec.ts covers them.
 //
 
 interface ReleaseCase {
@@ -404,6 +402,16 @@ const releaseCases: ReleaseCase[] = [
 			"a QUIZ with no scheduledAt falls back to its status: COMPLETED releases",
 		overrides: { type: "QUIZ", status: "COMPLETED", scheduledAt: null },
 		releasedToAuthor: true,
+	},
+	{
+		label:
+			"an untimed QUIZ past its scheduled start is not released until COMPLETED",
+		overrides: {
+			type: "QUIZ",
+			status: "ONGOING",
+			scheduledAt: new Date(Date.now() - 10 * 60_000),
+		},
+		releasedToAuthor: false,
 	},
 	{
 		label:
@@ -462,31 +470,6 @@ for (const { label, overrides, releasedToAuthor } of releaseCases) {
 		}
 	});
 }
-
-test("releasedToStudents() treats endsAt === now as closed, and one millisecond earlier as still open", () => {
-	const now = new Date("2026-06-01T12:00:00.000Z");
-	const baseCourse = {
-		instructor: { username: "instructor" },
-		enrollments: [],
-	};
-	const closedAtBoundary = {
-		type: "QUIZ" as const,
-		status: "ONGOING" as const,
-		scheduledAt: new Date(+now - 60 * 60_000),
-		durationMs: 60 * 60_000,
-		extraTimeMs: 0,
-		gradesReleasedAt: null,
-		courseId: 1,
-		course: baseCourse,
-	};
-	const stillOpen = {
-		...closedAtBoundary,
-		scheduledAt: new Date(+closedAtBoundary.scheduledAt + 1),
-	};
-
-	expect(releasedToStudents(closedAtBoundary, now)).toBe(true);
-	expect(releasedToStudents(stillOpen, now)).toBe(false);
-});
 
 //
 // F5/access control — {author, peer, owning instructor, other instructor,

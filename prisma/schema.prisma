@@ -739,12 +739,12 @@ model Exam {
   scheduledAt DateTime?
   durationMs  Int?
   /// Extra time granted on top of durationMs (FR-EXAM-020/022), part of the
-  /// exam's window for the calendar-link match in src/db/exam-link.ts.
+  /// exam's window (src/services/exam-state.ts).
   extraTimeMs Int       @default(0)
 
   /// When the instructor released this exam's grades to its students. Null
   /// until they do. Only consulted for an `EXAM`: a `PRACTICE` releases a
-  /// score as soon as it is written and a `QUIZ` when its window closes.
+  /// score as soon as it is written and a `QUIZ` once it is closed.
   gradesReleasedAt DateTime?
 
   authorId String

@@ -6,9 +6,15 @@
  * needs the instructor at `now`.
  */
 
-import type { AttemptTiming, Exam } from "@/db";
-import { attemptState, examPhase, windowEnd } from "@/db/exam-state";
+import type { Exam } from "@/db";
 import type { ExamResult } from "./exam-result";
+import {
+	type AttemptTiming,
+	attemptState,
+	examPhase,
+	gradeReleaseBlocker,
+	windowEnd,
+} from "./exam-state";
 import type { HomeCourse } from "./student-home";
 
 /// One exam of a course the instructor teaches, with every student's attempt.
@@ -43,7 +49,7 @@ export interface InstructorHome {
 	}[];
 	/// Exams with submitted attempts that still have answers without a verdict, most pending first.
 	toGrade: { course: HomeCourse; exam: Exam; pending: number }[];
-	/// `EXAM` exams that are closed, unreleased, have at least one attempt and nothing pending.
+	/// Exams with at least one attempt whose grades the instructor may release now.
 	toRelease: { course: HomeCourse; exam: Exam; attempts: number }[];
 	/// Courses whose question bank has validation problems.
 	problems: { course: HomeCourse; questions: number }[];
@@ -106,11 +112,12 @@ export function instructorHome(
 	const toRelease = shown
 		.filter(
 			({ exam, attempts }) =>
-				exam.type === "EXAM" &&
-				examPhase(exam, now) === "closed" &&
-				!exam.gradesReleasedAt &&
 				attempts.length > 0 &&
-				attempts.every(({ result }) => pendingIn(result) === 0),
+				gradeReleaseBlocker(
+					exam,
+					attempts.map(({ result }) => result),
+					now,
+				) === null,
 		)
 		.map(({ course, exam, attempts }) => ({
 			course,

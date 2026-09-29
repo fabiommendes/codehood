@@ -209,6 +209,20 @@ for (const { label, shape } of notReleasable) {
 	});
 }
 
+test("releaseGrades: an answer still waiting for a grade blocks the release and changes nothing", async () => {
+	const { pk, exam, instructor, feedback } = await gradedExam();
+	await prisma.feedback.delete({ where: { id: feedback.id } });
+
+	const error = await db.exam
+		.releaseGrades(pk, { actor: instructor })
+		.then(() => null)
+		.catch((e) => e);
+
+	expect(error).toBeInstanceOf(InvalidData);
+	expect(JSON.stringify(error.errors)).toContain("waiting for a grade");
+	expect(await storedRelease(exam.id)).toBeNull();
+});
+
 test("releaseGrades: a student of the course is refused and nothing changes", async () => {
 	const { pk, exam, student } = await gradedExam();
 

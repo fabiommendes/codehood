@@ -3,12 +3,14 @@
  *
  * The stored `status` records what the instructor decided (draft, archived,
  * started by hand, completed); the clock decides the rest. Every page and
- * service that asks "can this exam be answered now?" goes through here, so
- * the answer never depends on someone remembering to update a column.
+ * service that asks "can this exam be answered now?" or "may students see
+ * their grades?" goes through here, so the answer never depends on someone
+ * remembering to update a column.
  */
 
+import type { Exam } from "@/db/services/exam.service";
 import { durationToMinutes } from "@/utils/schedule-time";
-import type { Exam } from "./services/exam.service";
+import type { ExamResult } from "./exam-result";
 
 /// The part of an exam its phase depends on.
 export type ExamTiming = Pick<
@@ -174,4 +176,56 @@ export function resultsReleased(exam: ExamTiming, now: Date): boolean {
 		default:
 			return !!exam.gradesReleasedAt && exam.gradesReleasedAt <= now;
 	}
+}
+
+/**
+ * When the students of `exam` got their grades, or `null` if they have not yet or the moment is unknown.
+ *
+ * An `EXAM` releases at `gradesReleasedAt` and a timed, scheduled `QUIZ` at
+ * the end of its window. A `PRACTICE` exam, and a `QUIZ` completed by hand
+ * before or without a window end, are released with no known moment.
+ */
+export function releaseMoment(exam: ExamTiming, now: Date): Date | null {
+	if (!resultsReleased(exam, now)) return null;
+	switch (exam.type) {
+		case "PRACTICE":
+			return null;
+		case "QUIZ": {
+			const end = windowEnd(exam);
+			return end && end <= now ? end : null;
+		}
+		default:
+			return exam.gradesReleasedAt ?? null;
+	}
+}
+
+/// Why an instructor may not release an exam's grades, see {@link gradeReleaseBlocker}.
+export type GradeReleaseBlocker =
+	| "not-an-exam"
+	| "not-closed"
+	| "released"
+	| "pending";
+
+/**
+ * What stops the instructor from releasing the grades of `exam` at `now`, or `null` if nothing does.
+ *
+ * Only an `EXAM` is released by hand: a `QUIZ` and a `PRACTICE` exam release
+ * on their own. It must be `closed`, not released yet, and no answer in
+ * `results` may still wait for a grade. An exam nobody attempted can be
+ * released.
+ *
+ * @params results The result of every graded attempt, as the instructor sees it.
+ */
+export function gradeReleaseBlocker(
+	exam: ExamTiming,
+	results: ExamResult[],
+	now: Date,
+): GradeReleaseBlocker | null {
+	if (exam.type !== "EXAM") return "not-an-exam";
+	if (examPhase(exam, now) !== "closed") return "not-closed";
+	if (exam.gradesReleasedAt) return "released";
+	const pending = results.some((result) =>
+		result.questions.some((outcome) => outcome.status === "pending"),
+	);
+	return pending ? "pending" : null;
 }

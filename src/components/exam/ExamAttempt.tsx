@@ -17,7 +17,7 @@ import MultipleSelectionView from "@/components/question/MultipleSelectionView";
 import NumericView from "@/components/question/NumericView";
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
-import type { AttemptState, QuestionPublic } from "@/db";
+import type { QuestionPublic } from "@/db";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -32,6 +32,7 @@ import {
 	formatScore,
 	type QuestionOutcome,
 } from "@/services/exam-result";
+import type { AttemptState } from "@/services/exam-state";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import {

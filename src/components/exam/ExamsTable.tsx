@@ -19,7 +19,7 @@ import {
 	toggleSortState,
 } from "@/components/ui/table-sort";
 import type { Exam } from "@/db";
-import { examPhase, examPhaseLabels } from "@/db/exam-state";
+import { examPhase, examPhaseLabels } from "@/services/exam-state";
 import {
 	examPhaseBadgeClass,
 	examTypeLabels,

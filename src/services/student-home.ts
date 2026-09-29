@@ -5,10 +5,16 @@
  * and calendar events, and this picks what needs their attention at `now`.
  */
 
-import type { AttemptTiming, Exam } from "@/db";
-import { attemptDeadline, attemptState, examPhase } from "@/db/exam-state";
+import type { Exam } from "@/db";
 import { localDateOf } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
+import {
+	type AttemptTiming,
+	attemptState,
+	examPhase,
+	releaseMoment,
+	windowEnd,
+} from "./exam-state";
 
 /// How far ahead an exam counts as coming up, and how far back a release counts as new.
 export const HOME_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
@@ -69,8 +75,8 @@ export interface StudentHome {
  * Builds the student's home page sections at `now`.
  *
  * `PRACTICE` exams never appear: they are always open and would crowd out
- * what has a deadline. An exam's release moment is `gradesReleasedAt` for an
- * `EXAM` and the end of its window for a `QUIZ`.
+ * what has a deadline. An exam counts as a recent result by its
+ * {@link releaseMoment}, so one released with no known moment never does.
  */
 export function studentHome(
 	exams: HomeExam[],
@@ -86,9 +92,7 @@ export function studentHome(
 		.flatMap(({ course, exam, attempt }) => {
 			const state = attemptState(exam, attempt, now);
 			if (state.kind === "can-start") {
-				return [
-					{ course, exam, deadline: windowEnd(exam, now), started: false },
-				];
+				return [{ course, exam, deadline: windowEnd(exam), started: false }];
 			}
 			if (state.kind === "in-progress") {
 				return [{ course, exam, deadline: state.deadline, started: true }];
@@ -134,18 +138,6 @@ export function studentHome(
 		results,
 		next: busy ? null : nextThing(visible, events, now),
 	};
-}
-
-/// When a scheduled, timed exam closes for everyone, or `null` when it has no such window.
-function windowEnd(exam: Exam, now: Date): Date | null {
-	if (!exam.scheduledAt) return null;
-	return attemptDeadline(exam, { createdAt: now, acceptingSubmissions: true });
-}
-
-/// When the exam's results became visible: `gradesReleasedAt`, or the window end for a `QUIZ`.
-function releaseMoment(exam: Exam, now: Date): Date | null {
-	if (exam.type === "QUIZ") return windowEnd(exam, now);
-	return exam.gradesReleasedAt ?? null;
 }
 
 /// Orders dates ascending with `null` last.

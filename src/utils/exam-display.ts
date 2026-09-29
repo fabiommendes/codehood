@@ -3,7 +3,7 @@
 
 import type { Duration } from "@/core/schemas";
 import type { Exam } from "@/db";
-import type { ExamPhase } from "@/db/exam-state";
+import type { ExamPhase } from "@/services/exam-state";
 import { durationToMinutes } from "@/utils/schedule-time";
 
 type ExamType = Exam["type"];

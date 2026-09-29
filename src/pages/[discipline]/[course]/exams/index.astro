@@ -3,9 +3,10 @@ import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ExamsTable from "@/components/exam/ExamsTable";
-import { db, groupExamsForStudent, resultsReleased } from "@/db";
+import { db, groupExamsForStudent } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { examResult, formatScore } from "@/services/exam-result";
+import { resultsReleased } from "@/services/exam-state";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;

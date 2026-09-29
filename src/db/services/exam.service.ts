@@ -22,10 +22,15 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { type ExamResult, examResult } from "@/services/exam-result";
+import {
+	examPhase,
+	type GradeReleaseBlocker,
+	gradeReleaseBlocker,
+} from "@/services/exam-state";
 import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { examPhase } from "../exam-state";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
 export { examStatus, examType, textFormat } from "@/core/schemas";
@@ -297,13 +302,14 @@ export class ExamService extends CrudBase<{
 	 * Releases an exam's grades to its students now.
 	 *
 	 * Sets `gradesReleasedAt` to the current time. Calling it again on a
-	 * released exam returns it unchanged. Only an `EXAM` whose phase
-	 * is `closed` can be released: a `QUIZ` and a `PRACTICE` release on their
-	 * own schedule.
+	 * released exam returns it unchanged. Only a closed `EXAM` with no answer
+	 * still waiting for a grade can be released: a `QUIZ` and a `PRACTICE`
+	 * release on their own schedule.
 	 *
 	 * @throws {@link NotFound} If the exam does not exist or `actor` may not see it.
 	 * @throws {@link NotAllowed} If `actor` may not write the course's contents.
-	 * @throws {@link InvalidData} If the exam is not an `EXAM` or is not closed.
+	 * @throws {@link InvalidData}
+	 * If the exam is not an `EXAM`, is not closed, or has an answer waiting for a grade.
 	 */
 	@Validate({ service: true, returns: examSchema, args: [examPK] })
 	releaseGrades<Opt extends ServiceOpts>(
@@ -328,17 +334,16 @@ export class ExamService extends CrudBase<{
 			}
 
 			const exam = fromDb(row);
-			if (exam.type !== "EXAM" || examPhase(exam, new Date()) !== "closed") {
+			const now = new Date();
+			const blocker =
+				gradeReleaseBlocker(exam, [], now) ??
+				gradeReleaseBlocker(exam, await attemptResults(tx, row), now);
+			if (blocker === "released") return exam;
+			if (blocker) {
 				throw new InvalidData({
-					exam: [
-						{
-							code: "invalid",
-							message: "Only a closed exam can have its grades released",
-						},
-					],
+					exam: [{ code: "invalid", message: releaseRefusals[blocker] }],
 				});
 			}
-			if (exam.gradesReleasedAt) return exam;
 
 			const updated = await tx.exam.update({
 				where: { id: row.id },
@@ -374,6 +379,48 @@ export class ExamService extends CrudBase<{
 //
 // Auxiliary functions
 //
+
+/// Why {@link ExamService.releaseGrades} refuses, for each blocker it reports.
+const releaseRefusals: Record<
+	Exclude<GradeReleaseBlocker, "released">,
+	string
+> = {
+	"not-an-exam": "Only an EXAM has its grades released by hand",
+	"not-closed": "Only a closed exam can have its grades released",
+	pending: "Answers still waiting for a grade block the release",
+};
+
+/// The result of every attempt at `exam`, with all feedback as the instructor sees it.
+async function attemptResults(
+	tx: PrismaTx,
+	exam: DbExam,
+): Promise<ExamResult[]> {
+	const attempts = await tx.response.findMany({
+		where: { examId: exam.id },
+		select: {
+			submissions: {
+				select: {
+					publicId: true,
+					createdAt: true,
+					question: { select: { slug: true } },
+					feedbacks: {
+						select: { score: true, feedback: true, updatedAt: true },
+					},
+				},
+			},
+		},
+	});
+	const slugs = exam.questionsForExams.map((q) => q.questionRef.slug);
+	return attempts.map(({ submissions }) =>
+		examResult(
+			slugs,
+			submissions.map((s) => ({ ...s, question: s.question.slug })),
+			submissions.flatMap((s) =>
+				s.feedbacks.map((f) => ({ ...f, submission: s.publicId })),
+			),
+		),
+	);
+}
 
 /** The `where` matching whichever of the primary keys `filter` carries. */
 function examWhere(filter: ExamPK): Prisma.ExamWhereInput {

@@ -167,8 +167,8 @@ release is the whole of the student's read rule.
 | F1 | Exactly one of `graderId` and `botId` is set. Both, or neither, is `InvalidData`. |
 | F2 | `graderId` defaults to a user actor's own username. Naming a different grader is refused for anyone but SYSTEM. SYSTEM with no `botId` and no `graderId` is `InvalidData` (F1). |
 | F3 | `score` is a decimal or an `n/d` fraction, either form signed, in `[-1, 1]`: `0.5`, `-0.25`, `1/3`, `-2/3`. Stored and returned as the exact string sent. Anything outside the range, or not in one of those two forms, is `InvalidData`. A zero denominator is `InvalidData`, not a division by zero. |
-| F4 | Release, by exam type: `PRACTICE` the moment the score is written; `QUIZ` once its window has closed, i.e. `scheduledAt + durationMs + extraTimeMs` is in the past, or its status is `COMPLETED` when it carries no `scheduledAt`; `EXAM` only when `gradesReleasedAt` is non-null and in the past. An unreleased feedback does not exist as far as its author is concerned. |
-| F4b | The window arithmetic is the one already in `src/db/util.exam-link.ts`, extracted there as `examEndsAt(exam)` and called from both places rather than repeated. The clock is injected, never read from `Date.now()` inside the rule. |
+| F4 | Release, by exam type: `PRACTICE` the moment the score is written; `QUIZ` once its phase is `closed`, i.e. strictly after `scheduledAt + duration + extraTime`, or once it is `COMPLETED` when it has no scheduled, timed window; `EXAM` only when `gradesReleasedAt` is non-null and in the past. An unreleased feedback does not exist as far as its author is concerned. |
+| F4b | The rule is `resultsReleased(exam, now)` in `src/services/exam-state.ts`, the one the exam pages and home pages use; the feedback service delegates to it rather than repeating it. The clock is injected into the rule, never read inside it. |
 | F5 | Feedback the actor may not read is `NotFound`, not `NotAllowed` — including a write that merely references it, and including an unreleased row read by its own author. `NotAllowed` is reserved for a row the actor can see but may not write. |
 | F6 | `findMany` narrows a student to released feedback on their own submissions, in the database query. An `author` filter naming somebody else is `NotAllowed`, not quietly emptied. |
 | F7 | `create` against a submission the actor may not read is `NotFound`; against one they can read but not grade, `NotAllowed`. |
@@ -212,9 +212,11 @@ release is the whole of the student's read rule.
 - F3 is a pure predicate over a string — table-driven, valid and invalid
   columns in one list, asserting the stored string is unchanged for the valid
   ones.
-- F4 is a matrix, driven from a `{type, status, scheduledAt, gradesReleasedAt,
-  now, releasedToAuthor}` table, with `now` supplied rather than slept on. It
-  covers both sides of the `QUIZ` boundary and an unscheduled `QUIZ`.
+- F4 is a matrix through the service, driven from a `{type, status,
+  scheduledAt, gradesReleasedAt, releasedToAuthor}` table, with margins wide
+  enough to absorb the service's own clock read. It covers an untimed and an
+  unscheduled `QUIZ`. The exact boundaries are tested on `resultsReleased`,
+  which takes `now` as an argument.
 - F1/F2 get one focused test each; F5 asserts the error class, not merely that
   it threw.
 - Access control: `{author, peer, owning instructor, other instructor, admin,
