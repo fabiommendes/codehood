@@ -79,8 +79,8 @@ function windowMs(exam: ExamTiming): number | null {
 	return (durationToMinutes(exam.duration) + extra) * 60_000;
 }
 
-/// The moment a scheduled, timed exam closes for everyone, or `null` otherwise.
-function windowEnd(exam: ExamTiming): Date | null {
+/** The moment a scheduled, timed exam closes for everyone, or `null` otherwise. */
+export function windowEnd(exam: ExamTiming): Date | null {
 	const length = windowMs(exam);
 	if (!exam.scheduledAt || length === null) return null;
 	return new Date(exam.scheduledAt.getTime() + length);

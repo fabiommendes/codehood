@@ -20,6 +20,11 @@
   them: exams open now, exams in the next week, today's meetings and results
   released in the last week. A quiet week says so and shows the next thing
   ahead. `/courses` keeps the full list.
+- Instructors see their own sections on the home page, above any course they
+  take: exams in progress with how many students submitted, answers waiting
+  for a grade, exams ready to release, and courses with invalid questions.
+- Instructors release an exam's grades from its page ("Release results", with
+  a confirmation), through the new `ExamService.releaseGrades`.
 - `pnpm run typecheck` now also typechecks `.astro` files through
   `scripts/astro-check.ts`, which runs the Astro checker on TypeScript 6
   because `astro check` does not support TypeScript 7 yet.

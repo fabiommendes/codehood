@@ -294,6 +294,62 @@ export class ExamService extends CrudBase<{
 	}
 
 	/**
+	 * Releases an exam's grades to its students now.
+	 *
+	 * Sets `gradesReleasedAt` to the current time. Calling it again on a
+	 * released exam returns it unchanged. Only an `EXAM` whose phase
+	 * is `closed` can be released: a `QUIZ` and a `PRACTICE` release on their
+	 * own schedule.
+	 *
+	 * @throws {@link NotFound} If the exam does not exist or `actor` may not see it.
+	 * @throws {@link NotAllowed} If `actor` may not write the course's contents.
+	 * @throws {@link InvalidData} If the exam is not an `EXAM` or is not closed.
+	 */
+	@Validate({ service: true, returns: examSchema, args: [examPK] })
+	releaseGrades<Opt extends ServiceOpts>(
+		filter: ExamPK,
+		opts: Opt,
+	): Promise<Exam> {
+		return this.$transaction(opts, async (tx, scoped) => {
+			const row = valueOrNotFound(
+				"exam",
+				await tx.exam.findFirst({
+					where: examWhere(filter),
+					include: examInclude(),
+				}),
+			);
+
+			if (!hasPerm(scoped.actor, "course.update-contents", row.course)) {
+				const seen =
+					row.status !== "DRAFT" &&
+					row.status !== "ARCHIVED" &&
+					hasPerm(scoped.actor, "course.read-contents", row.course);
+				throw seen ? new NotAllowed("exam.update") : new NotFound("exam");
+			}
+
+			const exam = fromDb(row);
+			if (exam.type !== "EXAM" || examPhase(exam, new Date()) !== "closed") {
+				throw new InvalidData({
+					exam: [
+						{
+							code: "invalid",
+							message: "Only a closed exam can have its grades released",
+						},
+					],
+				});
+			}
+			if (exam.gradesReleasedAt) return exam;
+
+			const updated = await tx.exam.update({
+				where: { id: row.id },
+				data: { gradesReleasedAt: new Date() },
+				include: examInclude(),
+			});
+			return fromDb(updated);
+		});
+	}
+
+	/**
 	 * Archives an exam rather than removing it.
 	 *
 	 * Responses point at the exam they were written for, so the row stays

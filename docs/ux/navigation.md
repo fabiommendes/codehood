@@ -94,8 +94,8 @@ Each item below is a proposal. Once it is decided, it moves to Decisions above.
 
 ### N1. Signing in lands on a list, not on what is next
 
-Approved. The student half is built (`src/pages/home.astro`); the instructor
-sections are next.
+Done: `src/pages/home.astro` shows the instructor's sections above the
+student's. Push status joins it once content sync exists.
 
 `/courses` is the landing page after login. It violates P2: a student with an
 exam tomorrow sees the same grid of cards as on a quiet week. Proposal: make

@@ -46,6 +46,19 @@ export const exam = {
 		}),
 	}),
 
+	/** Releases the exam's grades to its students (instructor only). */
+	releaseGrades: defineAction({
+		input: examParams,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			const released = await db.exam.releaseGrades(
+				{ course: parseCourseParams(input), slug: input.exam },
+				{ actor },
+			);
+			return { releasedAt: released.gradesReleasedAt };
+		}),
+	}),
+
 	/** Closes the actor's attempt; no further answers are accepted. */
 	finish: defineAction({
 		input: examParams,

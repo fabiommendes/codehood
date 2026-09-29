@@ -4,6 +4,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
+import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import Badge from "@/components/ui/Badge";
 import type { Question, QuestionPublic } from "@/db";
 import { attemptState, db, examPhase, examPhaseLabels } from "@/db";
@@ -90,6 +91,29 @@ const attempt = canManage
 		).at(-1) ?? null);
 const state = attemptState(exam, attempt, now);
 
+// Releasing makes sense once the exam is closed and no answer awaits a grade.
+let canRelease = false;
+if (
+	canManage &&
+	exam.type === "EXAM" &&
+	phase === "closed" &&
+	!exam.gradesReleasedAt
+) {
+	const [attempts, feedback] = await Promise.all([
+		db.response.findMany(
+			{ course: course.id, exam: slug, practice: false },
+			{ actor },
+		),
+		db.feedback.findMany({ course: course.id, exam: slug }, { actor }),
+	]);
+	const slugs = exam.questions.map((question) => question.slug);
+	canRelease = attempts.every((entry) =>
+		examResult(slugs, entry.submissions, feedback).questions.every(
+			(outcome) => outcome.status !== "pending",
+		),
+	);
+}
+
 // Feedback reaches a student only once released, and only on their own work;
 // the service enforces both, this just asks for it when the results show.
 const examOutcome =
@@ -146,6 +170,22 @@ for (const submission of attempt?.submissions ?? []) {
         <p class="mt-4 text-sm text-base-content/70">
           {descriptionHtml ? <span set:html={descriptionHtml} /> : exam.description}
         </p>
+      )
+    }
+
+    {
+      canManage && (
+        <section class="mt-6">
+          <ReleaseGrades
+            client:load
+            discipline={discipline!}
+            course={courseSegment!}
+            exam={slug}
+            releasedAt={exam.gradesReleasedAt}
+            canRelease={canRelease}
+            now={now}
+          />
+        </section>
       )
     }
 

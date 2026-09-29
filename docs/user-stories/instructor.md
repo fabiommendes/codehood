@@ -54,14 +54,14 @@ while last term's course stays untouched and readable.
 
 ### See what needs my attention
 
-    status: todo
+    status: implemented
     url: /
 
 Instructor logs in during the term and wants to know what needs them today
 across every course they teach. The home page leads with exams in progress and
 how many students have submitted, submissions waiting to be graded by hand,
-results ready to release, and the last push that failed or left questions with
-validation problems. Each item links to the page where they deal with it. When
+results ready to release, and courses whose question bank has validation
+problems. A failed push joins this list once the sync status exists. Each item links to the page where they deal with it. When
 they also take a course as a student, those items appear on the same page,
 marked with the course they belong to.
 
