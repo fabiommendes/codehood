@@ -115,6 +115,11 @@ Design the tests so it can provide some proof that the implementation is
 correct. You can collect screenshots or other evidence to support your claims.
 Show them to the human.
 
+Every new feature needs data in the dev server to exercise it. Before calling
+a feature done, check that `src/db/bootstrap.ts` seeds examples that reach
+each of its states, and add them when it does not. A page that can only be
+seen after arranging rows by hand is not finished.
+
 Once completed, move any implemented spec files to `dev/specs/to-review/` and
 update the changelog. If you find any bugs, create a new issue in `dev/issues/`.
 If the bug is simple, create a regression test and fix it. If it is complex, ask

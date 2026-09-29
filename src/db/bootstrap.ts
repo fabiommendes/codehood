@@ -1,6 +1,6 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
-import { db, type User } from "@/db";
+import { type Course, db, type User } from "@/db";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -693,8 +693,161 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
+
 	console.log(
 		`[dev] created demo courses cs101/${ada.username}_2026-1 and cs201/${alan.username}_2026-1.`,
+	);
+}
+
+/// One student's answers to the seeded test, by question slug.
+type SeededAnswers = Partial<
+	Record<
+		"recursion-basics" | "factorial-of-five" | "explain-recursion",
+		Record<string, unknown>
+	>
+>;
+
+/**
+ * Seeds a closed, unreleased exam with answers in every grading state.
+ *
+ * Gives the grading queue, the exam's results, the attempt pages and the
+ * grades table something to show: answers graded by a bot and by the
+ * instructor, pending ones, one marked will-not-grade, and questions left
+ * unanswered.
+ */
+async function seedGradedExam(
+	course: Course["id"],
+	instructor: User,
+	students: { hopper: User; hamilton: User; liskov: User; bob: User },
+): Promise<void> {
+	const exam = "test-01";
+
+	await db.question.create(
+		{
+			course,
+			slug: "explain-recursion",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Explain recursion",
+				stem: "Explain, in your own words, why a recursive function needs a base case.",
+				tags: ["recursion"],
+				input: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 1: recursion",
+			description: "Closed and waiting to be graded.",
+			tags: ["recursion"],
+			questions: [
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "explain-recursion", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+
+	const answer = async (
+		student: User,
+		answers: SeededAnswers,
+	): Promise<Record<string, string>> => {
+		const submissions: Record<string, string> = {};
+		for (const [question, payload] of Object.entries(answers)) {
+			const response = await db.response.submit(
+				{ course, exam, question, payload },
+				{ actor: student },
+			);
+			submissions[question] = response.submissions.at(-1)?.publicId ?? "";
+		}
+		await db.response.finish({ course, exam }, { actor: student });
+		return submissions;
+	};
+	const botGrades = (submission: string | undefined, score: string) =>
+		db.feedback.create(
+			{
+				submission: { publicId: submission ?? "" },
+				ref: "auto-1",
+				score,
+				bot: "auto",
+			},
+			FULL_ACCESS,
+		);
+
+	// Hopper: objective answers graded by the bot, the essay still pending.
+	const hopper = await answer(students.hopper, {
+		"recursion-basics": { choice: "base-case" },
+		"factorial-of-five": { value: 120 },
+		"explain-recursion": {
+			essay:
+				"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
+		},
+	});
+	await botGrades(hopper["recursion-basics"], "1");
+	await botGrades(hopper["factorial-of-five"], "1");
+
+	// Hamilton: everything graded, the essay by the instructor with a comment.
+	const hamilton = await answer(students.hamilton, {
+		"recursion-basics": { choice: "tail-call" },
+		"factorial-of-five": { value: 100 },
+		"explain-recursion": {
+			essay: "The base case is where the function returns a value directly.",
+		},
+	});
+	await botGrades(hamilton["recursion-basics"], "0");
+	await botGrades(hamilton["factorial-of-five"], "0");
+	await db.feedback.create(
+		{
+			submission: { publicId: hamilton["explain-recursion"] ?? "" },
+			ref: "manual-1",
+			score: "0.8",
+			feedback: "Right, but say what happens without one.",
+		},
+		{ actor: instructor },
+	);
+
+	// Liskov: one question unanswered, and an empty essay marked will-not-grade.
+	const liskov = await answer(students.liskov, {
+		"recursion-basics": { choice: "base-case" },
+		"explain-recursion": { essay: "" },
+	});
+	await botGrades(liskov["recursion-basics"], "1");
+	await db.feedback.create(
+		{
+			submission: { publicId: liskov["explain-recursion"] ?? "" },
+			ref: "manual-1",
+			score: "0",
+			feedback: "Submitted empty.",
+		},
+		{ actor: instructor },
+	);
+	await db.submission.update(
+		{ publicId: liskov["explain-recursion"] ?? "" },
+		{ status: "WILL_NOT_GRADE" },
+		FULL_ACCESS,
+	);
+
+	// Bob: nothing graded yet, not even the objective answer.
+	await answer(students.bob, {
+		"recursion-basics": { choice: "tail-call" },
+		"explain-recursion": {
+			essay: "Recursion is when a function calls itself until it is done.",
+		},
+	});
+
+	await db.exam.update(
+		{ course, slug: exam },
+		{ status: "COMPLETED" },
+		FULL_ACCESS,
 	);
 }
 
