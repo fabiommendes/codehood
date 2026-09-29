@@ -85,7 +85,7 @@ export default function StudentsTable(props: Props): JSX.Element {
 								Drop {user.name} from this course?
 							</h3>
 							<p class="mt-2 text-sm text-base-content/70">
-								Their access ends immediately. Nothing is deleted — their
+								Their access ends immediately. Nothing is deleted. Their
 								submissions stay in the gradebook, and re-enrolling restores
 								access.
 							</p>

@@ -167,7 +167,7 @@ const nextEvents = await db.calendarEvent.findMany(
                 No resources pushed yet. <CliSetupLink />
               </>
             ) : (
-              "No resources yet — the instructor publishes them with the CLI."
+              "No resources yet. The instructor publishes them with the CLI."
             )}
           </p>
         ) : (
@@ -194,7 +194,7 @@ const nextEvents = await db.calendarEvent.findMany(
                 No schedule pushed yet. <CliSetupLink />
               </>
             ) : (
-              "No schedule published yet — the instructor pushes it with the CLI."
+              "No schedule published yet. The instructor pushes it with the CLI."
             )}
           </p>
         ) : (
@@ -272,15 +272,14 @@ const nextEvents = await db.calendarEvent.findMany(
         <h3 class="text-lg font-bold">Leave {course.discipline.name}?</h3>
         <ul class="mt-3 flex flex-col gap-2 pl-5 text-sm text-base-content/70 list-disc">
           <li>
-            Your access to everything in this course ends immediately —
-            including your own past submissions.
+            Your access to everything in this course ends immediately, including your own past submissions.
           </li>
           <li>
             Nothing is deleted. Your submissions stay on record, and your
             instructor still sees them.
           </li>
           <li>
-            Rejoining needs a new classroom invite or a live passphrase — you
+            Rejoining needs a new classroom invite or a live passphrase. You
             can't undo this yourself.
           </li>
         </ul>

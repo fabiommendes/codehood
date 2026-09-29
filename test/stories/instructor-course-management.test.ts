@@ -96,7 +96,7 @@ test("instructor: get started with the CLI", async ({ page }) => {
 	await test.step("and generating a CLI key is one click away", async () => {
 		await page.getByRole("button", { name: "Generate CLI key" }).click();
 		await expect(
-			page.getByText("Key created — copy it now, it won't be shown again."),
+			page.getByText("Key created. Copy it now, it won't be shown again."),
 		).toBeVisible();
 	});
 

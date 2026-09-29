@@ -5,6 +5,7 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { formatScore } from "@/services/exam-result";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
 import { loadStudentHome } from "@/utils/load-student-home";
+import { plural } from "@/utils/plural";
 import { formatRelative, formatTimeLeft } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 
@@ -32,8 +33,6 @@ const studentBusy =
 	0;
 const busy = teachingBusy || studentBusy;
 
-const plural = (count: number, one: string, many: string) =>
-	`${count} ${count === 1 ? one : many}`;
 const card =
 	"card card-border bg-base-100 transition-colors hover:border-primary";
 

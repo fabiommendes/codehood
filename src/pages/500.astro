@@ -8,7 +8,7 @@ const error = Astro.props.error as Error | undefined;
 ---
 
 <ErrorLayout code="500" title="Something went wrong" scene="crash">
-  An unexpected error occurred on our end. Try again in a moment — if it keeps happening, let us know.
+  An unexpected error occurred on our end. Try again in a moment. If it keeps happening, let us know.
   <div slot="actions" class="flex flex-col items-center gap-4">
     <div class="flex flex-wrap items-center justify-center gap-3">
       <button type="button" class="btn btn-primary rounded-full" onclick="location.reload()">

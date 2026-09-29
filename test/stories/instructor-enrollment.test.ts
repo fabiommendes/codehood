@@ -127,7 +127,7 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 		await page.goto(`${href}/roster`);
 		await page.getByRole("button", { name: "Passphrase" }).click();
 		await expect(
-			page.getByText("No active passphrase — generate one below."),
+			page.getByText("No active passphrase. Generate one below."),
 		).toBeVisible();
 	});
 
