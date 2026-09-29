@@ -1,9 +1,5 @@
 import type { Actor } from "@/auth/actor";
-import {
-	type CourseWithEnrollment,
-	ensurePerm,
-	hasPerm,
-} from "@/auth/permissions";
+import { ensurePerm } from "@/auth/permissions";
 import type { ActionCode } from "@/core/error";
 import { NotAllowed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";

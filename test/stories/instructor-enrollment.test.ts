@@ -152,9 +152,9 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 		FULL_ACCESS,
 	);
 	expect(passphrase?.value).toBe(value);
+	if (!passphrase) throw new Error("expected a passphrase for the course");
 	const lifetimeMin =
-		(passphrase!.expiresAt.getTime() - passphrase!.createdAt.getTime()) /
-		60_000;
+		(passphrase.expiresAt.getTime() - passphrase.createdAt.getTime()) / 60_000;
 	expect(lifetimeMin).toBeLessThanOrEqual(5);
 
 	await test.step("renewing replaces it, so a code read out earlier stops being the one on screen", async () => {
@@ -170,7 +170,8 @@ test("instructor: Drop and re-enroll a student", async ({ page }) => {
 		{ instructor: instructor.username },
 		{ transient: { students: 1 } },
 	);
-	const student = course.students[0]!;
+	const student = course.students[0];
+	if (!student) throw new Error("expected the course to have a student");
 	const href = courseHref({
 		discipline: course.discipline.slug,
 		instructor: instructor.username,

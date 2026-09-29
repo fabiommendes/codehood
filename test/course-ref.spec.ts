@@ -11,12 +11,9 @@ import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { CourseId, courseNaturalKey } from "@/core/schemas";
 import { db } from "@/db";
-import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { persistedPassphraseFactory } from "@/fixtures/passphrase.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
-import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
@@ -169,7 +166,7 @@ const cases: CourseRefCase[] = [
 	},
 	{
 		name: "enrollment",
-		async create(fx, course, label) {
+		async create(fx, course) {
 			const student = await persistedUserFactory.create({ role: "STUDENT" });
 			return db.enrollment.create(
 				{ course, username: student.username },
@@ -204,7 +201,7 @@ const cases: CourseRefCase[] = [
 	},
 	{
 		name: "response",
-		async create(fx, course) {
+		async create(_fx, course) {
 			// SYSTEM provisions the exam and the response's own enrolled author:
 			// the point here is the course reference, not the write permission
 			// matrix (already covered by response-service.spec.ts), and an
@@ -222,7 +219,7 @@ const cases: CourseRefCase[] = [
 	},
 	{
 		name: "submission",
-		async create(fx, course) {
+		async create(_fx, course) {
 			const question = await persistedQuestionFactory.create({ course });
 			const exam = await persistedExamFactory.create({
 				course,
