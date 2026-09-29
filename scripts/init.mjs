@@ -61,14 +61,12 @@ run("Branding generated types", "pnpm", [
 run("Applying migrations", "pnpm", ["exec", "prisma", "migrate", "deploy"]);
 run("Seeding the database", "pnpm", ["exec", "prisma", "db", "seed"]);
 
-// 4. Code generators. `generate` covers route-patterns and the OpenAPI
-// document, the two `dev` and `build` also run; sidebar art is derived from
-// SVGs that rarely change, so only init bothers with it.
+// 4. Code generators. `generate` writes the route patterns and the OpenAPI
+// document, which `dev` and `build` also do.
 run("Generating route patterns and OpenAPI document", "pnpm", [
 	"run",
 	"generate",
 ]);
-run("Generating sidebar art", "pnpm", ["run", "sidebar-art"]);
 
 // 5. The generators write their own indentation, which is not Biome's. Format
 // just their output, so `pnpm run lint` passes on a freshly-initialized tree.
@@ -78,8 +76,6 @@ run("Formatting generated files", "pnpm", [
 	"check",
 	"--write",
 	"src/api/registry/route-patterns.json",
-	"src/components/SidebarArt.astro",
-	"src/components/SidebarArtAlt.astro",
 ]);
 
 console.log("\n✔ Project ready. Run `pnpm run dev` to start the server.");

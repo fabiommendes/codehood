@@ -398,61 +398,6 @@ h6 {
 	fill: #00d2e6;
 }
 
-/* SidebarArt.astro's shapes follow the same rules as the logo: Cerrado colors
-   blended with multiply in light mode, grays and one warm accent in dark mode. */
-.brand-mark :is(path, g) {
-	mix-blend-mode: multiply;
-}
-
-.brand-mark-blue {
-	fill: #1b4b9b;
-}
-
-.brand-mark-red {
-	fill: #b5452a;
-}
-
-.brand-mark-yellow {
-	fill: #f2b800;
-}
-
-.brand-mark-green {
-	fill: #3c8d2f;
-}
-
-.brand-mark-glyph {
-	fill: #f7f3ea;
-}
-
-.brand-mark-gray {
-	fill: #e6dfd0;
-}
-
-[data-theme="codehood-dark"] .brand-mark :is(path, g) {
-	mix-blend-mode: normal;
-}
-
-[data-theme="codehood-dark"] .brand-mark-blue,
-[data-theme="codehood-dark"] .brand-mark-glyph {
-	fill: #f7faf8;
-}
-
-[data-theme="codehood-dark"] .brand-mark-yellow {
-	fill: #6f8a7e;
-}
-
-[data-theme="codehood-dark"] .brand-mark-green {
-	fill: #a9bab2;
-}
-
-[data-theme="codehood-dark"] .brand-mark-red {
-	fill: #ffc400;
-}
-
-[data-theme="codehood-dark"] .brand-mark-gray {
-	fill: #1f4034;
-}
-
 /* Small blue uppercase eyebrow label above a heading — matches the landing page's
    section kickers (src/pages/index.astro's .landing .kicker). */
 .kicker {
