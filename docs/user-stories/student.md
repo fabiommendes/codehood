@@ -62,23 +62,22 @@ with, so they try their username instead, which the form accepts just as well as
 an email. They then fumble the password. The refusal says the credentials are
 wrong without saying which half, and the second attempt gets them in.
 
-Signed in, hitting the site's root sends them straight to their courses rather
-than the marketing landing page, which stays reserved for a visitor with no
-session.
+Signed in, hitting the site's root shows their home page rather than the
+marketing landing page, which stays reserved for a visitor with no session.
 
 
 ## Finding course material
 
 ### See what needs my attention
 
-    status: todo
+    status: implemented
     url: /
 
 Student logs in the evening before a busy day and wants to know what is coming,
 without opening each course. The home page leads with what needs them: an exam
 that is open now and how long it has left, the exams coming up in the next days,
-today's meetings across every course, and results released since their last
-visit. Each item links straight to the page where they act on it. On a quiet
+today's meetings across every course, and results released in the last
+week. Each item links straight to the page where they act on it. On a quiet
 week the page says there is nothing pending and shows the next thing on the
 calendar, however far away it is.
 

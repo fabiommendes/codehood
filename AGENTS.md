@@ -84,11 +84,15 @@ Here are some files and folders agents might be interested in:
 | `src/middleware/`          | Middleware for Astro and the REST API.                                                |
 | `src/pages/`               | Astro pages.                                                                          |
 | `src/rpc/`                 | RPC endpoint registry and method handlers.                                            |
-| `src/services/`            | Service implementations (e.g. email). Business logic lives in `src/db/services/`.     |
+| `src/services/`            | Domain logic that never queries the database: grading, email. Data access: `src/db/`. |
 | `src/typing/`              | Type utilities and branded types.                                                     |
 | `src/urls/`                | URL parsing and course reference utilities.                                           |
 | `src/utils/`               | Utility functions.                                                                    |
 | `cli/`                     | The Python CLI, a git subtree. See [CLI](#cli).                                       |
+
+Code that does not read or write the database stays out of `src/db/`, even when
+it works on entities: domain rules (grading, exam results) go to
+`src/services/`, generic helpers to `src/utils/`.
 
 [^readme]: Currently it exists at `src/api/`, `src/urls/`, `src/db/services/`, `src/commands/`, `test/stories/`.
 

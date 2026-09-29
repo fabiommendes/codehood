@@ -86,7 +86,9 @@ const courses = user
 
 const currentPath = Astro.url.pathname;
 function isActive(href: string): boolean {
-	return href === "/" ? currentPath === "/" : currentPath.startsWith(href);
+	// `/` renders the home page by rewrite, so the request path reads `/home`.
+	if (href === "/") return currentPath === "/" || currentPath === "/home";
+	return currentPath.startsWith(href);
 }
 ---
 

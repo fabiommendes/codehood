@@ -36,12 +36,6 @@ export type {
 } from "../generated/prisma/client";
 export type { ServiceOpts } from "./base-service";
 export {
-	type ExamResult,
-	examResult,
-	formatScore,
-	type QuestionOutcome,
-} from "./exam-result";
-export {
 	type AttemptState,
 	type AttemptTiming,
 	attemptDeadline,

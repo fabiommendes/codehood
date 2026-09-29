@@ -18,11 +18,6 @@ import NumericView from "@/components/question/NumericView";
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
 import type { AttemptState, QuestionPublic } from "@/db";
-import {
-	type ExamResult,
-	formatScore,
-	type QuestionOutcome,
-} from "@/db/exam-result";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -32,6 +27,12 @@ import type {
 	PublicShortAnswer,
 	PublicTrueFalse,
 } from "@/mdq/public";
+import {
+	type ExamResult,
+	formatScore,
+	type QuestionOutcome,
+} from "@/services/exam-result";
+import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import {
 	type AnswerPayload,
@@ -66,20 +67,6 @@ export interface ExamAttemptProps {
 
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
-
-const RELATIVE = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
-
-/// A moment as "in 3 days" when it is within a week, and as a full date otherwise.
-function relativeOrAbsolute(date: Date, now: Date): string {
-	const minutes = Math.round((date.getTime() - now.getTime()) / 60_000);
-	if (minutes < 60) return RELATIVE.format(minutes, "minute");
-	if (minutes < 24 * 60)
-		return RELATIVE.format(Math.round(minutes / 60), "hour");
-	if (minutes < 7 * 24 * 60) {
-		return RELATIVE.format(Math.round(minutes / (24 * 60)), "day");
-	}
-	return formatDateTime(date, { year: "numeric" });
-}
 
 /// The time left until `deadline` as "42 min left", or seconds in the last minute.
 function timeLeft(deadline: Date, now: Date): string {
@@ -254,7 +241,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										datetime={date().toISOString()}
 										title={formatDateTime(date(), { year: "numeric" })}
 									>
-										{relativeOrAbsolute(date(), now())}
+										{formatRelative(date(), now())}
 									</time>
 								</>
 							)}

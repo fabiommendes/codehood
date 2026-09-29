@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
-import { examResult, formatScore } from "@/db";
+import { examResult, formatScore } from "@/services/exam-result";
 
 const T0 = new Date("2026-03-10T10:00:00Z");
 

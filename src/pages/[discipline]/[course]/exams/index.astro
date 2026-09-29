@@ -4,8 +4,8 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ExamsTable from "@/components/exam/ExamsTable";
 import { db, groupExamsForStudent, resultsReleased } from "@/db";
-import { examResult, formatScore } from "@/db/exam-result";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { examResult, formatScore } from "@/services/exam-result";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;

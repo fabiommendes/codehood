@@ -7,8 +7,8 @@
  */
 
 import { scoreValue } from "@/core/score";
-import type { Feedback } from "./services/feedback.service";
-import type { Submission } from "./services/submission.service";
+import type { Feedback } from "@/db/services/feedback.service";
+import type { Submission } from "@/db/services/submission.service";
 
 export type QuestionOutcomeStatus = "graded" | "pending" | "unanswered";
 

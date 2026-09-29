@@ -138,10 +138,16 @@ test("student: log in", async ({ page }) => {
 		).toBeVisible();
 	});
 
-	await test.step("signed in, the root URL sends them to their courses", async () => {
+	await test.step("signed in, the root URL shows their home page", async () => {
 		await logIn(page, student);
 		await page.goto("/");
-		await expect(page).toHaveURL("/courses");
+		await expect(page).toHaveURL("/");
+		await expect(
+			page.getByRole("heading", { name: "Run your course like a Git repo." }),
+		).toHaveCount(0);
+		await expect(
+			page.getByRole("link", { name: "Home" }).first(),
+		).toHaveAttribute("aria-current", "page");
 	});
 });
 
