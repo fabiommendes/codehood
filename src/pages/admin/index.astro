@@ -6,6 +6,7 @@ import AdminHeader from "@/components/AdminHeader.astro";
 import InvitesTable from "@/components/admin/InvitesTable";
 import { db, type Invite, isEditionOpen } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { plural } from "@/utils/plural";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
@@ -82,15 +83,15 @@ const pendingInvites: Invite[] = invites.filter(
         <div class="stat-title">Users</div>
         <div class="stat-value text-2xl">{users.length}</div>
         <div class="stat-desc">
-          {userCounts.ADMIN} admins · {userCounts.INSTRUCTOR} instructors · {
-            userCounts.STUDENT
-          } students
+          {plural(userCounts.ADMIN, "admin")} · {
+            plural(userCounts.INSTRUCTOR, "instructor")
+          } · {plural(userCounts.STUDENT, "student")}
         </div>
       </div>
       <div class="stat">
         <div class="stat-title">Courses</div>
         <div class="stat-value text-2xl">{courses.length}</div>
-        <div class="stat-desc">across {disciplines.length} disciplines</div>
+        <div class="stat-desc">across {plural(disciplines.length, "discipline")}</div>
       </div>
       <div class="stat">
         <div class="stat-title">Disciplines</div>
@@ -134,7 +135,7 @@ const pendingInvites: Invite[] = invites.filter(
               <div>
                 <h3 class="text-sm font-semibold">Invite an instructor</h3>
                 <p class="mt-1 text-sm text-base-content/60">
-                  Generate a one-time signup link — they set their own password
+                  Generate a one-time signup link. They set their own password
                   and details.
                 </p>
               </div>
@@ -250,7 +251,7 @@ const pendingInvites: Invite[] = invites.filter(
         inviteUrl && (
           <>
             <div role="alert" class="alert alert-success mt-4">
-              <span>Invite created — it expires in 7 days.</span>
+              <span>Invite created. It expires in 7 days.</span>
             </div>
             <div class="join mt-3 w-full">
               <input
@@ -315,9 +316,9 @@ const pendingInvites: Invite[] = invites.filter(
         disciplineResult && !disciplineResult.error && (
           <div role="alert" class="alert alert-success mt-4">
             <span>
-              Discipline "{disciplineResult.data.slug}" created —{" "}
+              Discipline "{disciplineResult.data.slug}" created.{" "}
               <a href="/admin/disciplines" class="underline">
-                see it on the Disciplines tab
+                See it on the Disciplines tab
               </a>
               .
             </span>
@@ -335,9 +336,9 @@ const pendingInvites: Invite[] = invites.filter(
         editionResult && !editionResult.error && (
           <div role="alert" class="alert alert-success mt-4">
             <span>
-              Edition "{editionResult.data.slug}" created —{" "}
+              Edition "{editionResult.data.slug}" created.{" "}
               <a href="/admin/editions" class="underline">
-                see it on the Editions tab
+                See it on the Editions tab
               </a>
               .
             </span>
@@ -381,7 +382,7 @@ const pendingInvites: Invite[] = invites.filter(
         </form>
         <h3 class="text-lg font-bold">Invite an instructor</h3>
         <p class="mt-2 text-sm text-base-content/70">
-          They redeem this link to create their own account — password, GitHub
+          They redeem this link to create their own account. Password, GitHub
           handle, and school id are theirs to supply.
         </p>
         <form method="POST" class="mt-4 flex flex-col gap-4">

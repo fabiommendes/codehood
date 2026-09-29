@@ -2,6 +2,7 @@ import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { Course } from "@/db";
 import { courseHref } from "@/urls";
+import { plural } from "@/utils/plural";
 
 interface Props {
 	courses: Course[];
@@ -48,7 +49,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 			class: "text-base-content/60",
 			render: (row) => {
 				const count = row.enrollmentCount;
-				return `${count} student${count === 1 ? "" : "s"}`;
+				return plural(count, "student");
 			},
 		},
 		{

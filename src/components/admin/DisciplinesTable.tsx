@@ -1,6 +1,7 @@
 import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
+import { plural } from "@/utils/plural";
 
 /**
  * One row's worth of pre-computed display data — free of `Discipline` and
@@ -29,8 +30,7 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 		{
 			title: "Courses",
 			class: "text-base-content/60",
-			render: (row) =>
-				`${row.courseCount} course${row.courseCount === 1 ? "" : "s"}`,
+			render: (row) => plural(row.courseCount, "course"),
 		},
 		{
 			title: "Actions",
@@ -69,7 +69,7 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 							aria-label={`Delete ${row.slug}`}
 							title={
 								row.courseCount > 0
-									? `${row.courseCount} course(s) still use this discipline`
+									? `${plural(row.courseCount, "course")} still use${row.courseCount === 1 ? "s" : ""} this discipline`
 									: "Delete"
 							}
 						>
