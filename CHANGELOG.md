@@ -86,6 +86,17 @@
 
 ### Fixed
 
+- The course home no longer links files and links to a page that does not
+  exist; their rows lead to the Resources tab, where they act.
+- Resources read as "PDF file", "Link" and "Note" instead of a MIME type,
+  "external" and "markdown".
+- On phones the course home shows its three counters in one row, and a tab
+  strip with more tabs than fit scrolls to the active one and fades the edge
+  that hides the rest.
+- The grading page shows the statement of a question once: in the answer
+  key, or alone for an essay, without an empty "Your answer" box.
+- The top section of the Students tab is titled "Add students", not
+  "Enrollment".
 - An exam keeps its questions in the order it was given. They used to come
   back in the order the questions were created in the course, on every page.
   Exams stored before this keep the order they showed.

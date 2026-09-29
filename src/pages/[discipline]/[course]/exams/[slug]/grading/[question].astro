@@ -4,7 +4,6 @@ import type { AnswerPayload } from "@/components/exam/answer-payload";
 import Answer from "@/components/grading/Answer.astro";
 import AnswerControls from "@/components/grading/AnswerControls";
 import AnswerKey from "@/components/grading/AnswerKey";
-import AnswerView from "@/components/grading/AnswerView";
 import type { QuestionPublic } from "@/db";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -14,6 +13,7 @@ import { answersTo } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
+import { renderMarkdown } from "@/utils/markdown";
 
 export const prerender = false;
 
@@ -43,6 +43,10 @@ const title = doc.title ?? stored.slug;
 const asked = new Question(doc).toPublic() as QuestionPublic["question"];
 // An essay's model answer is a hint for the grader, not a correct answer.
 const hasKey = doc.type !== "essay";
+// The answer key carries the statement, so only a question without one shows it alone.
+const statementHtml = renderMarkdown(
+	[asked.preamble, asked.stem, asked.epilogue].filter(Boolean).join("\n\n"),
+);
 
 const previous = questions[position - 1];
 const next = questions[position + 1];
@@ -92,18 +96,20 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
       <a href={gradingHref(here, { names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">Show names</a>
     </nav>
 
-    <section class="mt-6 rounded-box border border-base-300 bg-base-100 p-6">
-      <AnswerView client:load question={asked} />
-    </section>
-
     {
-      hasKey && (
+      hasKey ? (
         <section class="mt-6">
           <h3 class="text-lg font-semibold">Correct answer</h3>
           <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
             <AnswerKey client:load question={doc} />
           </div>
         </section>
+      ) : (
+        <section
+          aria-label="Question"
+          class="prose prose-sm mt-6 max-w-none rounded-box border border-base-300 bg-base-100 p-6"
+          set:html={statementHtml}
+        />
       )
     }
 

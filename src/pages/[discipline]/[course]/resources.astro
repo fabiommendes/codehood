@@ -8,6 +8,7 @@ import { db, groupResourcesByType } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
+import { resourceKind } from "@/utils/resource-kind";
 import { fileDownloadName } from "@/utils/resource-url";
 
 export const prerender = false;
@@ -36,19 +37,6 @@ const ICONS = {
 } as const;
 
 const DOWNLOAD_ICON = "M12 4v11m0 0 4-4m-4 4-4-4M5 19h14";
-
-function detail(resource: (typeof resources)[number]): string {
-	switch (resource.data.type) {
-		case "FILE":
-			return resource.data.mimeType;
-		case "LINK":
-			return "external";
-		case "MD":
-			return "markdown";
-		case "CODE":
-			return resource.data.language;
-	}
-}
 
 function rowHref(resource: (typeof resources)[number]): string {
 	switch (resource.data.type) {
@@ -150,7 +138,7 @@ function rowHref(resource: (typeof resources)[number]): string {
                       </span>
                       <p class="font-medium">{resource.title}</p>
                       <p class="text-sm text-base-content/60">
-                        {detail(resource)}
+                        {resourceKind(resource.data)}
                       </p>
                       {downloadHref && (
                         <a

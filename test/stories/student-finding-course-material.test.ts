@@ -133,7 +133,12 @@ test("student: read the course home page", async ({ page }) => {
 		"lab-guide": "Lab guide",
 	};
 	for (const [slug, title] of Object.entries(resourceTitles)) {
-		await persistedResourceFactory.create({ course: course.id, slug, title });
+		await persistedResourceFactory.create({
+			course: course.id,
+			slug,
+			title,
+			data: { type: "MD", content: `# ${title}` },
+		});
 	}
 
 	await logInAs(page, student);
