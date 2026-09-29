@@ -10,6 +10,7 @@ import { scoreValue } from "@/core/score";
 import type { Feedback } from "@/db/services/feedback.service";
 import type { Response } from "@/db/services/response.service";
 import type { Submission } from "@/db/services/submission.service";
+import { examResult } from "./exam-result";
 import { attemptState, type ExamTiming } from "./exam-state";
 
 /// Where a counting answer stands: waiting for a grade, graded, or marked will-not-grade.
@@ -239,3 +240,100 @@ export function parsePercentScore(text: string): string | null {
 
 /// What the grading form shows when the typed score is refused.
 export const SCORE_ERROR = "Score must be a whole number between 0 and 100.";
+
+/// A student of the course, as the results list shows them.
+export interface GradedStudent {
+	username: string;
+	name: string;
+	/// Whether the student's enrollment is no longer active.
+	dropped: boolean;
+}
+
+/// One student's attempt at an exam, as one row of the exam's results.
+export interface AttemptRow {
+	/// The student's username.
+	author: string;
+	/// The student's name, or their username when `students` does not list them.
+	name: string;
+	dropped: boolean;
+	/// `submitted` once the attempt is closed to answers, `in-progress` before.
+	state: "in-progress" | "submitted";
+	/// How many of the exam's questions have a counting answer.
+	answered: number;
+	/// How many questions the exam has.
+	questions: number;
+	/// How many counting answers wait for a grade; always zero while `in-progress`.
+	pending: number;
+	/// The attempt's total in `[-1, 1]`, or `null` while `in-progress` or with an answer pending.
+	total: number | null;
+	/// When the student started the attempt.
+	startedAt: Date;
+}
+
+/**
+ * The results of an exam, one row per attempt, sorted by the student's name.
+ *
+ * The total follows `examResult`: the mean of the question scores, with
+ * unanswered and will-not-grade questions counting as zero. Names compare
+ * without regard to case, and ties fall back to the username.
+ *
+ * @params questions The exam's question slugs.
+ * @params feedback Every grading pass on the exam, released or not.
+ * @params students The course's students, dropped ones included.
+ */
+export function attemptRows(
+	exam: ExamTiming,
+	questions: string[],
+	attempts: GradingAttempt[],
+	feedback: GradingFeedback[],
+	students: GradedStudent[],
+	now: Date,
+): AttemptRow[] {
+	const studentsByUsername = new Map(
+		students.map((student) => [student.username, student]),
+	);
+	const pendingByAuthor = new Map<string, number>();
+	for (const answer of countingAnswers(
+		exam,
+		questions,
+		attempts,
+		feedback,
+		now,
+	)) {
+		if (answer.state !== "pending") continue;
+		pendingByAuthor.set(
+			answer.author,
+			(pendingByAuthor.get(answer.author) ?? 0) + 1,
+		);
+	}
+
+	const rows = attempts.map((attempt): AttemptRow => {
+		const { kind } = attemptState(exam, attempt, now);
+		const closed = kind === "submitted" || kind === "results";
+		const student = studentsByUsername.get(attempt.author);
+		const answered = new Set(
+			attempt.submissions
+				.map((submission) => submission.question)
+				.filter((slug) => questions.includes(slug)),
+		).size;
+		return {
+			author: attempt.author,
+			name: student?.name ?? attempt.author,
+			dropped: student?.dropped ?? false,
+			state: closed ? "submitted" : "in-progress",
+			answered,
+			questions: questions.length,
+			pending: closed ? (pendingByAuthor.get(attempt.author) ?? 0) : 0,
+			total: closed
+				? examResult(questions, attempt.submissions, feedback).total
+				: null,
+			startedAt: attempt.createdAt,
+		};
+	});
+
+	return rows.sort(
+		(a, b) =>
+			a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
+			a.author.localeCompare(b.author),
+	);
+}

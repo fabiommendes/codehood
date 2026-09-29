@@ -11,7 +11,8 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { formatScore } from "@/services/exam-result";
 import { answersTo } from "@/services/grading";
-import { loadGrading } from "@/utils/load-grading";
+import { gradingHref, wantsNames } from "@/utils/grading-urls";
+import { loadGrading, loadStudents } from "@/utils/load-grading";
 
 export const prerender = false;
 
@@ -44,7 +45,18 @@ const hasKey = doc.type !== "essay";
 
 const previous = questions[position - 1];
 const next = questions[position + 1];
+const names = wantsNames(Astro.url);
 const queueHref = `${href}/exams/${exam.slug}/grading`;
+const here = `${queueHref}/${questionSlug}`;
+// Student names reach the page only when asked for.
+const studentNames = new Map(
+	names
+		? (await loadStudents(course.id, actor)).map((student) => [
+				student.username,
+				student.name,
+			])
+		: [],
+);
 
 // The course's instructor is the only person who grades; a bot's pass names no one.
 const instructor = course.instructor;
@@ -67,13 +79,14 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 
-    <a href={queueHref} class="text-sm text-base-content/60 hover:text-primary">← Grading</a>
+    <a href={gradingHref(queueHref, { names })} class="text-sm text-base-content/60 hover:text-primary">← Grading</a>
 
     <h2 class="mt-2 text-2xl font-bold">{title}</h2>
 
     <nav class="mt-3 flex gap-4 text-sm">
-      {previous && <a href={`${queueHref}/${previous}`} class="link">Previous question</a>}
-      {next && <a href={`${queueHref}/${next}`} class="link">Next question</a>}
+      {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names })} class="link">Previous question</a>}
+      {next && <a href={gradingHref(`${queueHref}/${next}`, { names })} class="link">Next question</a>}
+      <a href={gradingHref(here, { names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">Show names</a>
     </nav>
 
     <section class="mt-6 rounded-box border border-base-300 bg-base-100 p-6">
@@ -100,9 +113,10 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
             {!isPending && (index === 0 || shown[index - 1]?.isPending) && (
               <h3 class="text-lg font-semibold">Graded</h3>
             )}
-            <article aria-label={label} class="card card-border bg-base-100">
+            <article id={`answer-${answer.submission}`} aria-label={label} class="card card-border bg-base-100">
               <div class="card-body">
                 <p class="text-sm font-semibold text-base-content/60">{label}</p>
+                {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
                 <Answer question={asked} payload={answer.payload as AnswerPayload} />
 
                 {!isPending && (

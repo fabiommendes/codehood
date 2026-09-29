@@ -1,6 +1,17 @@
 import type { AstroGlobal } from "astro";
-import { type Course, db, type Exam } from "@/db";
-import { type CountingAnswer, countingAnswers } from "@/services/grading";
+import type { UserActor } from "@/auth/actor";
+import {
+	type Response as Attempt,
+	type Course,
+	db,
+	type Exam,
+	type Feedback,
+} from "@/db";
+import {
+	type CountingAnswer,
+	countingAnswers,
+	type GradedStudent,
+} from "@/services/grading";
 import { loadCourse } from "./load-course";
 
 export type LoadGradingResult =
@@ -13,6 +24,10 @@ export type LoadGradingResult =
 			questions: string[];
 			/// The counting answers of every closed attempt, in submission order.
 			answers: CountingAnswer[];
+			/// Every non-practice attempt at the exam.
+			attempts: Attempt[];
+			/// Every grading pass on the exam, released or not.
+			feedback: Feedback[];
 	  }
 	| { redirect: Response };
 
@@ -60,5 +75,27 @@ export async function loadGrading(
 		exam,
 		questions,
 		answers: countingAnswers(exam, questions, attempts, feedback, new Date()),
+		attempts,
+		feedback,
 	};
+}
+
+/**
+ * The students of a course, dropped ones included.
+ *
+ * The enrollment service lists one status per query, so this makes one for
+ * each.
+ */
+export async function loadStudents(
+	course: Course["id"],
+	actor: UserActor,
+): Promise<GradedStudent[]> {
+	const [active, dropped] = await Promise.all([
+		db.enrollment.findMany({ course, status: "ACTIVE" }, { actor }),
+		db.enrollment.findMany({ course, status: "DROPPED" }, { actor }),
+	]);
+	return [
+		...active.map(({ username, name }) => ({ username, name, dropped: false })),
+		...dropped.map(({ username, name }) => ({ username, name, dropped: true })),
+	];
 }

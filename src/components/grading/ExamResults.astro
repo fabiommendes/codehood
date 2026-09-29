@@ -1,0 +1,63 @@
+---
+/**
+ * The instructor's view of how an exam went: one row per attempt, and the way into grading.
+ */
+import type { AttemptRow } from "@/services/grading";
+import { attemptTotalLabel } from "./attempt-total";
+
+interface Props {
+	/// The exam page's URL.
+	href: string;
+	rows: AttemptRow[];
+}
+
+const { href, rows } = Astro.props;
+const pending = rows.reduce((sum, row) => sum + row.pending, 0);
+---
+
+<section class="mt-8">
+  <h2 class="text-lg font-semibold">Results</h2>
+
+  {
+    rows.length === 0 ? (
+      <p class="mt-3 text-sm text-base-content/60">No attempts yet.</p>
+    ) : (
+      <>
+        <p class="mt-3">
+          <a href={`${href}/grading`} class="link">
+            {pending > 0 ? `Grade answers (${pending} pending)` : "Review grades"}
+          </a>
+        </p>
+        <div class="mt-3 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+          <table aria-label="Results" class="table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Attempt</th>
+                <th>Answered</th>
+                <th>To grade</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr>
+                  <td>
+                    <a href={`${href}/attempts/${row.author}`} class="link">
+                      {row.name}
+                    </a>
+                    {row.dropped && <span class="badge badge-outline badge-sm ml-2">dropped</span>}
+                  </td>
+                  <td>{row.state === "submitted" ? "Submitted" : "In progress"}</td>
+                  <td>{`${row.answered} of ${row.questions} answered`}</td>
+                  <td>{row.pending > 0 ? `${row.pending} pending` : ""}</td>
+                  <td>{attemptTotalLabel(row.total, row.state)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    )
+  }
+</section>

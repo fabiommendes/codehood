@@ -1,0 +1,132 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import Answer from "@/components/grading/Answer.astro";
+import { attemptTotalLabel } from "@/components/grading/attempt-total";
+import { db } from "@/db";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { Question } from "@/mdq/question";
+import { examResult, formatScore } from "@/services/exam-result";
+import { attemptState } from "@/services/exam-state";
+import { attemptRows } from "@/services/grading";
+import { gradingHref } from "@/utils/grading-urls";
+import { loadGrading, loadStudents } from "@/utils/load-grading";
+import { formatDateTime } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug, username } = Astro.params;
+const result = await loadGrading(Astro, discipline, courseSegment, slug);
+if ("redirect" in result) return result.redirect;
+const { course, href, exam, questions, attempts, feedback } = result;
+
+const attempt = attempts.find((entry) => entry.author === username);
+if (!attempt) return Astro.rewrite("/404");
+
+// biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+const now = new Date();
+const [students, stored] = await Promise.all([
+	loadStudents(course.id, actor),
+	db.question.findMany({ course: course.id, public: false }, { actor }),
+]);
+const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
+
+// The results table builds its row the same way, so the two never disagree.
+const [row] = attemptRows(exam, questions, [attempt], feedback, students, now);
+if (!row) return Astro.rewrite("/404");
+const closed = row.state === "submitted";
+const outcomes = examResult(questions, attempt.submissions, feedback);
+
+const rows = outcomes.questions.map((outcome, index) => {
+	const doc = docs.get(outcome.question);
+	const counting = attempt.submissions
+		.filter((submission) => submission.question === outcome.question)
+		.reduce<(typeof attempt.submissions)[number] | null>(
+			(newest, submission) =>
+				!newest || submission.createdAt > newest.createdAt
+					? submission
+					: newest,
+			null,
+		);
+	return {
+		label: `Question ${index + 1}`,
+		outcome,
+		title: doc?.title ?? outcome.question,
+		asked: doc ? new Question(doc).toPublic() : null,
+		counting,
+	};
+});
+
+const stateLabel = (status: string, score: number | null): string => {
+	if (status === "not-graded") return "Not graded";
+	if (status === "graded" && score !== null) return formatScore(score);
+	return "Waiting to be graded";
+};
+---
+
+<AppLayout title={`${row.name} · ${exam.title}`}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-base-content/60 hover:text-primary">← {exam.title}</a>
+
+    <h2 class="mt-2 text-2xl font-bold">
+      {row.name}
+      {row.dropped && <span class="badge badge-outline badge-sm ml-2">dropped</span>}
+    </h2>
+
+    <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-3">
+      <div>
+        <dt class="text-sm text-base-content/50">Started</dt>
+        <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>
+      </div>
+      <div>
+        <dt class="text-sm text-base-content/50">Submitted</dt>
+        <dd class="mt-0.5 font-medium">
+          {closed ? formatDateTime(attempt.updatedAt, { year: "numeric" }) : "In progress"}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-base-content/50">Total</dt>
+        <dd class="mt-0.5 font-medium">{attemptTotalLabel(row.total, row.state)}</dd>
+      </div>
+    </dl>
+
+    <div class="mt-8 flex flex-col gap-6">
+      {
+        rows.map(({ label, outcome, title, asked, counting }) => (
+          <article aria-label={label} class="card card-border bg-base-100">
+            <div class="card-body">
+              <h3 class="text-lg font-semibold">{title}</h3>
+              {counting && asked ? (
+                <>
+                  <Answer question={asked} payload={counting.payload as AnswerPayload} />
+                  <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
+                  {outcome.comments.map((comment) => (
+                    <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>
+                  ))}
+                  {closed && (
+                    <p class="mt-2">
+                      <a
+                        class="link"
+                        href={gradingHref(`${href}/exams/${exam.slug}/grading/${outcome.question}`, {
+                          names: true,
+                          anchor: `answer-${counting.publicId}`,
+                        })}
+                      >
+                        Grade this answer
+                      </a>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p class="text-base-content/60">Not answered</p>
+              )}
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </main>
+</AppLayout>

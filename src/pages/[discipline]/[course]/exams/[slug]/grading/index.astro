@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { gradingQueue } from "@/services/grading";
+import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { loadGrading } from "@/utils/load-grading";
 import { questionTypeLabels } from "@/utils/question-display";
 
@@ -12,6 +13,7 @@ const { discipline, course: courseSegment, slug } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
 const { course, href, exam, questions, answers } = result;
+const names = wantsNames(Astro.url);
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
@@ -58,7 +60,7 @@ const nothingLeft =
           <li class="card card-border bg-base-100 transition-colors hover:border-primary">
             <div class="card-body flex-row items-center gap-4 py-4">
               <div class="min-w-0 flex-1">
-                <a href={`${href}/exams/${exam.slug}/grading/${row.slug}`} class="font-medium hover:text-primary">
+                <a href={gradingHref(`${href}/exams/${exam.slug}/grading/${row.slug}`, { names })} class="font-medium hover:text-primary">
                   {row.title}
                 </a>
                 {row.type && <p class="text-sm text-base-content/60">{row.type}</p>}
