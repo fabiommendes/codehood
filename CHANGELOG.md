@@ -4,6 +4,10 @@
 
 ### Added
 
+- Students join a course at `/courses/join` by typing the passphrase the
+  instructor shows in class, and land on the course home enrolled. `/courses`
+  offers "Join a course" in its header and in its empty state. An unknown code
+  and an expired one get different messages.
 - Students take exams in the web app. The exam page offers one action per
   state: when it opens, "Start exam", the questions in answer mode with the
   time left and "Submit exam", the submitted answers read-only, or a note
@@ -31,6 +35,9 @@
 
 ### Fixed
 
+- The course home showed a hardcoded "Resources 7" and two fixed resource
+  rows. Both now come from the course's resources, with an empty state that
+  says who publishes them.
 - One rule decides when students see their grades. A student could read the
   feedback on an untimed `QUIZ` while it was still open, because the feedback
   service ended its window 1 ms after the start; an untimed `QUIZ` now releases
