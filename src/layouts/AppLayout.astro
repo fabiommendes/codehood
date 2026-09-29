@@ -37,7 +37,7 @@ const courses = user
       class="navbar sticky top-0 z-30 border-b border-base-300 bg-base-100 p-0"
     >
       <div
-        class="navbar-start gap-2 px-4 lg:w-64 lg:shrink-0 lg:border-r lg:border-base-300"
+        class="navbar-start gap-2 px-4 lg:w-64 lg:shrink-0 lg:justify-center lg:self-stretch lg:border-r lg:border-base-300"
       >
         <label
           for="app-drawer"
@@ -52,8 +52,11 @@ const courses = user
               stroke-linecap="round"></path>
           </svg>
         </label>
-        <a href="/" class="flex items-center gap-2">
-          <Logo height={36} />
+        <a
+          href="/"
+          class="absolute left-1/2 flex -translate-x-1/2 items-center lg:static lg:translate-x-0"
+        >
+          <Logo height={36} class="h-8 w-auto lg:h-9" />
         </a>
       </div>
       <div class="navbar-end w-auto flex-1 gap-2 px-4">
