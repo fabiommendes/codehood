@@ -1,7 +1,47 @@
 ---
+import Avatar from "@/components/Avatar.astro";
+import AppFooter from "@/components/nav/AppFooter.astro";
+import AppSidebar, {
+	type SidebarCourse,
+} from "@/components/nav/AppSidebar.astro";
+import PencilFilter from "@/components/nav/PencilFilter.astro";
+import UserMenu from "@/components/nav/UserMenu.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
 
 export const prerender = false;
+
+/// Sample data for the navigation pieces below.
+const SAMPLE_COURSES: SidebarCourse[] = [
+	{
+		code: "cs201",
+		edition: "2026-1",
+		href: "/cs201/alan_2026-1",
+		teaching: false,
+	},
+	{
+		code: "cs101",
+		edition: "2026-1",
+		href: "/cs101/ada_2026-1",
+		teaching: true,
+	},
+	{
+		code: "ma141",
+		edition: "2026-1",
+		href: "/ma141/euler_2026-1",
+		teaching: false,
+	},
+];
+const SAMPLE_USER = {
+	name: "Grace Hopper",
+	username: "grace",
+	role: "INSTRUCTOR",
+} as const;
+const SIDEBAR_PAGES = [
+	["Home", "/"],
+	["My courses", "/courses"],
+	["A course", "/cs201/alan_2026-1/exams"],
+	["Admin", "/admin"],
+] as const;
 
 const layouts = [
 	{
@@ -16,7 +56,7 @@ const layouts = [
 		name: "AppLayout",
 		path: "src/layouts/AppLayout.astro",
 		description:
-			"The logged-in app shell: a navbar (logo, theme toggle, Log in/Log out) plus a sidebar with the main navigation and the course list. Sidebar is always visible on large screens, a checkbox-driven drawer on small ones. Used by the homepage, profile page, and the course mockups.",
+			"The signed-in app shell: a top bar (logo, theme toggle, user menu), the sidebar and a one-line footer, all from src/components/nav/ (see Navigation below). The sidebar is always visible on large screens and a drawer on small ones. Used by every signed-in page.",
 		usage: `<AppLayout title="Profile">\n  ...\n</AppLayout>`,
 		demo: "/design/layouts/app-layout",
 	},
@@ -70,6 +110,60 @@ const layouts = [
         </div>
       ))
     }
+  </section>
+
+  <section class="mb-12">
+    <PencilFilter />
+    <h2 class="mb-2 text-xl font-semibold">Navigation</h2>
+    <p class="mb-5 max-w-2xl text-sm text-base-content/70">
+      The pieces AppLayout is built from, in <code>src/components/nav/</code>, rendered with sample data. The current
+      item and the open menu are outlined in pencil (<code>.pencil</code>); menu items have hand-cut corners
+      (<code>.cut</code>). The sketch at the foot of the sidebar depends on the area.
+    </p>
+
+    <h3 class="mb-3 font-semibold">AppSidebar</h3>
+    {
+      ["codehood", "codehood-dark"].map((theme) => (
+        <div class="mb-4 flex flex-wrap gap-4">
+          {SIDEBAR_PAGES.map(([label, path]) => (
+            <figure class="grid gap-1">
+              <div data-theme={theme} class="h-[520px] overflow-hidden rounded-box border border-base-300 text-base-content">
+                <AppSidebar courses={SAMPLE_COURSES} currentPath={path} admin />
+              </div>
+              {theme === "codehood" && <figcaption class="text-xs text-base-content/60">{label}</figcaption>}
+            </figure>
+          ))}
+        </div>
+      ))
+    }
+
+    <h3 class="mt-8 mb-3 font-semibold">UserMenu and Avatar</h3>
+    <div class="grid gap-4 md:grid-cols-2">
+      {
+        ["codehood", "codehood-dark"].map((theme) => (
+          <div data-theme={theme} class="relative h-72 rounded-box border border-base-300 bg-base-100 p-4 text-base-content">
+            <div class="flex justify-end">
+              <UserMenu user={SAMPLE_USER} open />
+            </div>
+          </div>
+        ))
+      }
+    </div>
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      {["ada", "alan", "grace", "linus", "barbara", "edsger"].map((u) => <Avatar username={u} size={36} />)}
+      <span class="text-sm text-base-content/60">Avatar without a picture: a tile seeded by the username.</span>
+    </div>
+
+    <h3 class="mt-8 mb-3 font-semibold">AppFooter</h3>
+    <div class="grid gap-4 md:grid-cols-2">
+      {
+        ["codehood", "codehood-dark"].map((theme) => (
+          <div data-theme={theme} class="rounded-box border border-base-300 bg-base-100 text-base-content">
+            <AppFooter class="px-4" />
+          </div>
+        ))
+      }
+    </div>
   </section>
 
   <section>
