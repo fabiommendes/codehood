@@ -119,3 +119,41 @@ test("an attempt left open when the exam window ends shows as submitted", async 
 	);
 	await expect(page.getByText("You did not take this exam")).toHaveCount(0);
 });
+
+test("an answer lost to a network failure says so, and later answers still save", async ({
+	page,
+}) => {
+	const { student, course, href } = await setup();
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "live",
+		status: "ONGOING",
+		questions: [{ slug: "capital" }],
+	});
+	await db.response.create(
+		{ course: course.id, exam: exam.slug, author: student.username },
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, student);
+	await page.goto(`${href}/exams/${exam.slug}`);
+
+	const answerAction = "**/_actions/exam.answer**";
+	await page.route(answerAction, (route) => route.abort());
+	await page.getByRole("radio", { name: "Rio de Janeiro" }).check();
+	await expect(page.getByText("Not saved", { exact: true })).toBeVisible();
+	await expect(page.getByText("1 answer not saved").first()).toBeVisible();
+
+	await page.unroute(answerAction);
+	await page.getByRole("radio", { name: "Brasília" }).check();
+	await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+	await expect
+		.poll(async () => {
+			const response = await prisma.response.findFirst({
+				where: { authorId: student.username, examId: exam.id },
+				include: { submissions: { orderBy: { id: "desc" }, take: 1 } },
+			});
+			return response?.submissions[0]?.payload ?? null;
+		})
+		.toEqual({ choice: "brasilia" });
+});

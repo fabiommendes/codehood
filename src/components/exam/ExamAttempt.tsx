@@ -44,6 +44,7 @@ import {
 	essayOf,
 	fromAnswers,
 	fromChoices,
+	isAnswered,
 	isTextEntry,
 	numberOf,
 	textOf,
@@ -74,22 +75,34 @@ const NOTICE = "rounded-box border border-base-300 bg-base-200 p-4 text-sm";
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
 
-/// The time left until `deadline` as "42 min left", or seconds in the last minute.
-function timeLeft(deadline: Date, now: Date): string {
-	const seconds = Math.max(
-		0,
-		Math.ceil((deadline.getTime() - now.getTime()) / 1000),
-	);
+/// Whole seconds from `now` until `deadline`, never negative.
+function secondsLeft(deadline: Date, now: Date): number {
+	return Math.max(0, Math.ceil((deadline.getTime() - now.getTime()) / 1000));
+}
+
+/// The time left as "42 min left", or seconds in the last minute.
+function timeLeft(seconds: number): string {
 	if (seconds < 60) return `${seconds} s left`;
 	return `${Math.ceil(seconds / 60)} min left`;
 }
+
+/// The colour of the time left: warning in the last five minutes, error in the last one.
+function timeClass(seconds: number): string {
+	if (seconds < 60) return "text-error";
+	if (seconds <= 5 * 60) return "text-warning";
+	return "";
+}
+
+/// Where a question lands when its number is picked: below the top bar and the attempt bar.
+const QUESTION_SCROLL_MARGIN = "scroll-mt-48";
 
 /**
  * A student's side of an exam page: the one action their state allows, and the questions.
  *
  * `not-open` shows when the exam opens; `can-start` offers "Start <noun>";
  * `in-progress` renders the questions in answer mode, saves each answer as it
- * changes, shows the time left, and offers "Submit <noun>" behind a
+ * changes, and keeps a bar in view with the time left, the questions
+ * answered, whether everything is saved, and "Submit <noun>" behind a
  * confirmation; `submitted` shows the saved answers read-only; `results`
  * adds the score and comments on each answer; `missed` says the student did
  * not take it.
@@ -112,6 +125,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		...props.answers,
 	});
 	const [saveErrors, setSaveErrors] = createSignal<Record<string, string>>({});
+	// Questions with a change not yet confirmed by the server.
+	const [unsaved, setUnsaved] = createSignal<ReadonlySet<string>>(new Set());
 	let dialog: HTMLDialogElement | undefined;
 
 	const opensAt = () =>
@@ -132,6 +147,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		});
 	}
 
+	function markUnsaved(slug: string, value: boolean): void {
+		setUnsaved((current) => {
+			const next = new Set(current);
+			if (value) next.add(slug);
+			else next.delete(slug);
+			return next;
+		});
+	}
+
 	function saveNow(slug: string): void {
 		const timer = timers.get(slug);
 		if (timer !== undefined) clearTimeout(timer);
@@ -142,19 +166,23 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		pending.delete(slug);
 
 		queue = queue.then(async () => {
-			const { error } = await actions.exam.answer({
-				...target,
-				question: slug,
-				payload,
-			});
-			if (!error) {
+			// A dropped connection throws rather than returning an error; catching
+			// it keeps the queue alive for the saves that follow.
+			const message = await actions.exam
+				.answer({ ...target, question: slug, payload })
+				.then(
+					({ error }) => error?.message ?? null,
+					() => "the connection failed",
+				);
+			if (message === null) {
 				setSaveError(slug, null);
+				if (!pending.has(slug)) markUnsaved(slug, false);
 				return;
 			}
 
 			// A newer answer typed meanwhile supersedes the failed one.
 			if (!pending.has(slug)) pending.set(slug, payload);
-			setSaveError(slug, error.message);
+			setSaveError(slug, message);
 		});
 	}
 
@@ -168,6 +196,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	function change(slug: string, type: string, payload: AnswerPayload): void {
 		setAnswers((current) => ({ ...current, [slug]: payload }));
 		pending.set(slug, payload);
+		markUnsaved(slug, true);
 		if (!isTextEntry(type)) {
 			saveNow(slug);
 			return;
@@ -293,28 +322,43 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							</Show>
 						}
 					>
-						<div class={`${NOTICE} flex items-center justify-between gap-3`}>
-							<span class="font-medium">
-								<Show when={deadline()} fallback="Take your time">
-									{(limit) => timeLeft(limit(), now())}
-								</Show>
-							</span>
-							<button
-								type="button"
-								class="btn btn-primary btn-sm"
-								disabled={busy()}
-								onClick={() => dialog?.showModal()}
-							>
-								Submit {props.noun}
-							</button>
-						</div>
+						<AttemptBar
+							noun={props.noun}
+							seconds={(() => {
+								const limit = deadline();
+								return limit ? secondsLeft(limit, now()) : null;
+							})()}
+							questions={props.questions.map((entry, index) => ({
+								number: index + 1,
+								answered: isAnswered(answers()[entry.slug]),
+								failed: saveErrors()[entry.slug] !== undefined,
+							}))}
+							saving={unsaved().size > 0}
+							busy={busy()}
+							onSubmit={() => dialog?.showModal()}
+						/>
 					</Show>
 
 					<For each={props.questions}>
-						{(entry) => (
-							<div class="card card-border overflow-hidden bg-base-100/50">
+						{(entry, index) => (
+							<div
+								id={`question-${index() + 1}`}
+								class={`card card-border overflow-hidden bg-base-100/50 ${QUESTION_SCROLL_MARGIN}`}
+							>
 								{/* focusout bubbles, so leaving any control of the question saves it. */}
 								<div class="card-body" onFocusOut={() => saveNow(entry.slug)}>
+									<div class="flex items-baseline justify-between gap-3">
+										<span class="kicker">
+											Question {index() + 1} of {props.questions.length}
+										</span>
+										<Show when={kind() === "in-progress"}>
+											<SaveState
+												failed={saveErrors()[entry.slug] !== undefined}
+												saving={unsaved().has(entry.slug)}
+												answered={isAnswered(answers()[entry.slug])}
+											/>
+										</Show>
+									</div>
 									<AnswerField
 										question={entry.question}
 										payload={answers()[entry.slug]}
@@ -378,6 +422,113 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				</Match>
 			</Switch>
 		</div>
+	);
+}
+
+interface AttemptBarProps {
+	noun: string;
+	/// Seconds until the deadline, or `null` when the attempt has none.
+	seconds: number | null;
+	questions: { number: number; answered: boolean; failed: boolean }[];
+	/// Whether some change still waits for the server.
+	saving: boolean;
+	busy: boolean;
+	onSubmit: () => void;
+}
+
+/// The bar that stays in view while answering: time, progress, saving, submit, and a way to each question.
+function AttemptBar(props: AttemptBarProps): JSX.Element {
+	const answered = () => props.questions.filter((q) => q.answered).length;
+	const failed = () => props.questions.filter((q) => q.failed).length;
+
+	const saveStatus = () => (
+		<Switch>
+			<Match when={failed() > 0}>
+				<span class="text-error">
+					{failed() === 1
+						? "1 answer not saved"
+						: `${failed()} answers not saved`}
+				</span>
+			</Match>
+			<Match when={props.saving}>
+				<span class="text-base-content/60">Saving…</span>
+			</Match>
+			<Match when={answered() > 0}>
+				<span class="text-base-content/60">✓ All answers saved</span>
+			</Match>
+		</Switch>
+	);
+
+	return (
+		<div class="sticky top-16 z-20 -mx-4 border-b border-base-300 bg-base-100 px-4 py-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+					<Show
+						when={props.seconds !== null}
+						fallback={<span class="font-semibold">No time limit</span>}
+					>
+						<span
+							class={`font-semibold tabular-nums ${timeClass(props.seconds ?? 0)}`}
+						>
+							{timeLeft(props.seconds ?? 0)}
+						</span>
+					</Show>
+					<span class="text-base-content/60">
+						{answered()} of {props.questions.length} answered
+					</span>
+					<span class="hidden sm:inline">{saveStatus()}</span>
+				</div>
+				<button
+					type="button"
+					class="btn btn-primary btn-sm shrink-0"
+					disabled={props.busy}
+					onClick={props.onSubmit}
+				>
+					Submit {props.noun}
+				</button>
+			</div>
+			<nav aria-label="Questions" class="mt-2 flex flex-wrap gap-1.5">
+				<For each={props.questions}>
+					{(question) => (
+						<a
+							href={`#question-${question.number}`}
+							aria-label={`Question ${question.number}${question.answered ? ", answered" : ""}`}
+							class={`btn btn-xs btn-square ${
+								question.failed
+									? "btn-error"
+									: question.answered
+										? "btn-primary"
+										: "btn-outline"
+							}`}
+						>
+							{question.number}
+						</a>
+					)}
+				</For>
+			</nav>
+			<p class="mt-1 text-xs sm:hidden">{saveStatus()}</p>
+		</div>
+	);
+}
+
+/// One question's save state while answering; nothing until it has an answer.
+function SaveState(props: {
+	failed: boolean;
+	saving: boolean;
+	answered: boolean;
+}): JSX.Element {
+	return (
+		<Switch>
+			<Match when={props.failed}>
+				<span class="text-xs text-error">Not saved</span>
+			</Match>
+			<Match when={props.saving}>
+				<span class="text-xs text-base-content/50">Saving…</span>
+			</Match>
+			<Match when={props.answered}>
+				<span class="text-xs text-base-content/50">Saved</span>
+			</Match>
+		</Switch>
 	);
 }
 

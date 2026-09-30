@@ -66,7 +66,7 @@ export function fromAnswers(
 	return { answers: Object.fromEntries(answers) };
 }
 
-/// Whether editing a question of this type is a discrete pick, saved at once rather than debounced.
+/// Whether answers of this type are typed, so saving waits for a pause rather than happening at once.
 export function isTextEntry(type: string): boolean {
 	return (
 		type === "short-answer" ||
@@ -74,4 +74,16 @@ export function isTextEntry(type: string): boolean {
 		type === "numeric" ||
 		type === "fill-in"
 	);
+}
+
+/** Whether a payload holds an answer: a pick, a verdict, or some non-blank text. */
+export function isAnswered(payload: AnswerPayload | undefined): boolean {
+	if (!payload) return false;
+	if ("choice" in payload) return payload.choice !== "";
+	if ("choices" in payload) return payload.choices.length > 0;
+	if ("answers" in payload) return Object.keys(payload.answers).length > 0;
+	if ("value" in payload) return payload.value !== null;
+	if ("text" in payload) return payload.text.trim() !== "";
+	if ("essay" in payload) return payload.essay.trim() !== "";
+	return Object.values(payload.blanks).some((blank) => blank.trim() !== "");
 }

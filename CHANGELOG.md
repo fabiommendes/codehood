@@ -4,6 +4,13 @@
 
 ### Added
 
+- Taking an exam keeps a bar in view under the top bar: the time left,
+  orange in the last five minutes and red in the last one, how many
+  questions are answered, whether every answer is saved, the submit button,
+  and one numbered button per question that jumps to it and fills in once
+  answered. Each question is numbered and says when its answer is saved.
+  The exam's preamble shows as Instructions before the questions, and the
+  buttons name the exam type ("Start quiz").
 - The instructor's exam page shows statistics per question, in exam order:
   how many attempts answered it, the average score and the share of answers
   with full score, both over graded answers only, and how many answers still
@@ -97,6 +104,9 @@
 
 ### Fixed
 
+- An answer that failed to save because the connection dropped stopped
+  every later answer from saving. The failure now shows on the question and
+  the next change retries it.
 - The roster's CSV leaves the cell of a missing GitHub username or school id
   empty instead of writing `null`.
 - The course home no longer links files and links to a page that does not
