@@ -763,7 +763,7 @@ async function seedGradedExam(
 			type: "EXAM",
 			status: "ONGOING",
 			title: "Test 1: recursion",
-			description: "Closed and waiting to be graded.",
+			description: "Base cases, the call stack and recursive definitions.",
 			tags: ["recursion"],
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
