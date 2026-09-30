@@ -101,20 +101,20 @@ make the final grade visible to students with no formula language at all.
 Formulas are worth their cost only once pushing a computed column proves to
 be a chore.
 
+## Decided, second round
+
+- **Missing and unfinished data.** The function reads `None` for an exam
+  that is `Missed`, `Pending`, `In progress` or not yet held, with the
+  state beside the score, so it can tell a miss from a pending grade.
+- **What the student sees, and when.** A pushed column is hidden from
+  students until the instructor releases it, on the web, like an exam's
+  results. Until then only the instructor sees it.
+- **Type and scale.** A column is a number or a label, declared with the
+  column. The server shows a number as pushed and has no scale of its own.
+  The final letter grade is a label column.
+
 ## Open
 
-- **Missing and unfinished data.** What the function reads for an exam that
-  is `Missed`, `Pending`, `In progress` or not yet held. Proposal: `None`
-  for all four, with the state beside the score, so the function can tell
-  a miss from a pending grade.
-- **What the student sees, and when.** A pushed column built from exams
-  whose results are not released would leak them (`resultsReleased` in
-  `src/services/exam-state.ts`). Proposal: a column is hidden from students
-  until the instructor releases it, on the web like an exam's results.
-- **Scale and rounding.** Scores are stored in `[-1, 1]` and shown as whole
-  percentages; the reference case grades from 0 to 10 and ends in a label.
-  Proposal: a column is a number or a label, declared with the column, and
-  the server shows numbers as pushed, with no scale of its own.
 - **Which columns the table shows.** All pushed columns beside the exams,
   or a declared subset, and which one is "the" course grade.
 - **The function's contract.** Its name and file, what it receives (one
