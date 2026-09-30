@@ -147,3 +147,24 @@ export function XIcon(): JSX.Element {
 		</svg>
 	);
 }
+
+/** Primary-colored check mark, for the option a student picked in a frozen question. */
+export function SelectedIcon(): JSX.Element {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			class="h-[18px] w-[18px] shrink-0 text-primary"
+			aria-hidden="true"
+		>
+			<title>Your answer</title>
+			<path
+				d="M20 6 9 17l-5-5"
+				stroke="currentColor"
+				stroke-width="2.4"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			/>
+		</svg>
+	);
+}

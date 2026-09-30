@@ -20,6 +20,7 @@ import type {
 	PublicShortAnswer,
 	PublicTrueFalse,
 } from "@/mdq/public";
+import { Question } from "@/mdq/question";
 import type * as schema from "@/mdq/schemas-generated";
 
 export interface ExamQuestionProps {
@@ -51,10 +52,17 @@ export interface ExamQuestionProps {
 export default function ExamQuestion(props: ExamQuestionProps): JSX.Element {
 	return (
 		<Switch>
-			<Match when={props.canManage}>
+			<Match when={props.canManage && props.tab?.() === "key"}>
 				<QuestionPreview
 					data={props.question.question as schema.Question}
 					tab={props.tab}
+				/>
+			</Match>
+			<Match when={props.canManage}>
+				<PublicQuestionView
+					question={new Question(
+						props.question.question as schema.Question,
+					).toPublic()}
 				/>
 			</Match>
 			<Match when={!props.canManage}>

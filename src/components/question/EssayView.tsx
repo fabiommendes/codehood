@@ -100,9 +100,25 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 			<Show
 				when={mode() === "answer"}
 				fallback={
-					<Panel label="Your answer">
-						<AnswerText input={input()} text={text()} />
-					</Panel>
+					<Show
+						when={mode() === "readonly"}
+						fallback={
+							<Panel label="Your answer">
+								<AnswerText input={input()} text={text()} />
+							</Panel>
+						}
+					>
+						<Show when={props.value !== undefined}>
+							<div>
+								<p class="text-xs font-medium text-base-content/60">
+									Your answer
+								</p>
+								<div class="mt-1 border-l-2 border-base-300 pl-4 text-sm">
+									<AnswerText input={input()} text={text()} />
+								</div>
+							</div>
+						</Show>
+					</Show>
 				}
 			>
 				<div class="flex flex-col gap-2">

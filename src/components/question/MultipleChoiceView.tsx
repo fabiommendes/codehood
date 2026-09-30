@@ -10,7 +10,7 @@ import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
 import type { PublicMultipleChoice } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
-import { CheckIcon, XIcon } from "./icons";
+import { CheckIcon, SelectedIcon, XIcon } from "./icons";
 import Markdown from "./Markdown";
 import { feedbackVariant, scoreBadge, scoreLabel } from "./scoreDisplay";
 import type { QuestionMode } from "./types";
@@ -68,6 +68,14 @@ export default function MultipleChoiceView(
 		return "";
 	}
 
+	/// A frozen question marks the picked option with a check and mutes the rest.
+	const frozen = () => mode() === "readonly";
+	function frozenClass(choiceId: string): string {
+		return selected() === choiceId
+			? "border-primary bg-primary/5"
+			: "border-base-300 text-base-content/60";
+	}
+
 	return (
 		<div class="flex flex-col gap-4">
 			<Show when={mode() === "review" && props.result}>
@@ -94,12 +102,16 @@ export default function MultipleChoiceView(
 				<For each={props.question.choices}>
 					{(choice) => (
 						<label
-							class={`flex cursor-pointer items-center gap-3 rounded-box border border-base-300 p-3 ${rowClass(choice.id)}`}
+							class={
+								frozen()
+									? `flex items-center gap-3 rounded-box border p-3 ${frozenClass(choice.id)}`
+									: `flex cursor-pointer items-center gap-3 rounded-box border border-base-300 p-3 ${rowClass(choice.id)}`
+							}
 						>
 							<input
 								type="radio"
 								name={name}
-								class="radio"
+								class={frozen() ? "sr-only" : "radio"}
 								disabled={mode() !== "answer"}
 								checked={selected() === choice.id}
 								onChange={() => select(choice.id)}
@@ -107,7 +119,16 @@ export default function MultipleChoiceView(
 									props.result?.feedback ? feedbackId : undefined
 								}
 							/>
-							<span class="flex-1">
+							<Show when={frozen()}>
+								<span class="inline-flex w-[18px] shrink-0">
+									<Show when={selected() === choice.id}>
+										<SelectedIcon />
+									</Show>
+								</span>
+							</Show>
+							<span
+								class={`flex-1 ${frozen() && selected() === choice.id ? "font-medium" : ""}`}
+							>
 								<Markdown text={choice.text} inline />
 							</span>
 							<Show

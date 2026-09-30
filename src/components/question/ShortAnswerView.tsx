@@ -95,45 +95,66 @@ export default function ShortAnswerView(
 				<Markdown text={props.question.stem} />
 			</div>
 
-			<div class="flex flex-col gap-2">
-				<div class="flex flex-wrap items-center gap-3">
-					<TextInput
-						id={inputId}
-						class="w-full max-w-sm"
-						value={text()}
-						onChange={edit}
-						disabled={mode() !== "answer"}
-						ariaLabel="Your answer"
-						ariaDescribedBy={
-							warning()
-								? warningId
-								: props.result?.feedback
-									? feedbackId
-									: undefined
-						}
-					/>
-					<Show when={settled()}>
-						<Show when={correct()} fallback={<XIcon />}>
-							<CheckIcon />
+			<Show
+				when={mode() !== "readonly"}
+				fallback={
+					<Show when={props.value !== undefined}>
+						<Show
+							when={props.value?.trim()}
+							fallback={
+								<p class="text-sm italic text-base-content/50">
+									No answer submitted.
+								</p>
+							}
+						>
+							<p class="text-sm">
+								<span class="text-base-content/60">Your answer:</span>{" "}
+								<span class="font-mono font-medium">{props.value}</span>
+							</p>
 						</Show>
 					</Show>
-				</div>
+				}
+			>
+				<div class="flex flex-col gap-2">
+					<div class="flex flex-wrap items-center gap-3">
+						<TextInput
+							id={inputId}
+							class="w-full max-w-sm"
+							value={text()}
+							onChange={edit}
+							disabled={mode() !== "answer"}
+							ariaLabel="Your answer"
+							ariaDescribedBy={
+								warning()
+									? warningId
+									: props.result?.feedback
+										? feedbackId
+										: undefined
+							}
+						/>
+						<Show when={settled()}>
+							<Show when={correct()} fallback={<XIcon />}>
+								<CheckIcon />
+							</Show>
+						</Show>
+					</div>
 
-				<Show when={warning()}>
-					{(flagged) => (
-						<p id={warningId} class="text-sm text-warning">
-							{flagged().feedback ??
-								"That does not look like the kind of answer this question expects."}
+					<Show when={warning()}>
+						{(flagged) => (
+							<p id={warningId} class="text-sm text-warning">
+								{flagged().feedback ??
+									"That does not look like the kind of answer this question expects."}
+							</p>
+						)}
+					</Show>
+
+					<Show when={props.question.openEnded && mode() === "answer"}>
+						<p class="text-xs text-base-content/60">
+							This question is graded by hand.
 						</p>
-					)}
-				</Show>
-
-				<Show when={props.question.openEnded && mode() === "answer"}>
-					<p class="text-xs text-base-content/60">
-						This question is graded by hand.
-					</p>
-				</Show>
-			</div>
+					</Show>
+				</div>
+			</Show>
 
 			<Show when={props.question.epilogue}>
 				<div class="text-base-content/70">

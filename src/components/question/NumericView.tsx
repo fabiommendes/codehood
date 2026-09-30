@@ -58,38 +58,62 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 				<Markdown text={props.question.stem} />
 			</div>
 
-			<div class="flex flex-wrap items-center gap-3">
-				<NumericInput
-					id={inputId}
-					class="w-48"
-					domain={props.question.domain}
-					unit={props.question.unit}
-					decimalPlaces={props.question.decimalPlaces}
-					value={props.value}
-					onChange={(next) => props.onChange?.(next)}
-					disabled={mode() !== "answer"}
-					ariaLabel="Your answer"
-					ariaDescribedBy={props.result?.feedback ? feedbackId : undefined}
-				/>
-
-				<Show when={graded()}>
-					<Show when={correct()} fallback={<XIcon />}>
-						<CheckIcon />
+			<Show
+				when={mode() !== "readonly"}
+				fallback={
+					<Show when={props.value !== undefined}>
+						<Show
+							when={props.value !== null}
+							fallback={
+								<p class="text-sm italic text-base-content/50">
+									No answer submitted.
+								</p>
+							}
+						>
+							<p class="text-sm">
+								<span class="text-base-content/60">Your answer:</span>{" "}
+								<span class="font-mono font-medium">
+									{format(props.value ?? null)}
+									{props.question.unit ? ` ${props.question.unit}` : ""}
+								</span>
+							</p>
+						</Show>
 					</Show>
-				</Show>
+				}
+			>
+				<div class="flex flex-wrap items-center gap-3">
+					<NumericInput
+						id={inputId}
+						class="w-48"
+						domain={props.question.domain}
+						unit={props.question.unit}
+						decimalPlaces={props.question.decimalPlaces}
+						value={props.value}
+						onChange={(next) => props.onChange?.(next)}
+						disabled={mode() !== "answer"}
+						ariaLabel="Your answer"
+						ariaDescribedBy={props.result?.feedback ? feedbackId : undefined}
+					/>
 
-				{/*
-				 * The expected value is the one thing the key controls. The check
-				 * and the x above are not: the score badge next to them already
-				 * says whether the response was accepted.
-				 */}
-				<Show when={graded() && props.result?.correct !== undefined}>
-					<span class="text-sm text-base-content/60">
-						Expected {format(props.result?.correct ?? null)}
-						{props.question.unit ? ` ${props.question.unit}` : ""}
-					</span>
-				</Show>
-			</div>
+					<Show when={graded()}>
+						<Show when={correct()} fallback={<XIcon />}>
+							<CheckIcon />
+						</Show>
+					</Show>
+
+					{/*
+					 * The expected value is the one thing the key controls. The check
+					 * and the x above are not: the score badge next to them already
+					 * says whether the response was accepted.
+					 */}
+					<Show when={graded() && props.result?.correct !== undefined}>
+						<span class="text-sm text-base-content/60">
+							Expected {format(props.result?.correct ?? null)}
+							{props.question.unit ? ` ${props.question.unit}` : ""}
+						</span>
+					</Show>
+				</div>
+			</Show>
 
 			<Show when={props.question.epilogue}>
 				<div class="text-base-content/70">

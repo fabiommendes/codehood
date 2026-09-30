@@ -10,7 +10,7 @@ import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
 import type { PublicMultipleSelection } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
-import { CheckIcon, XIcon } from "./icons";
+import { CheckIcon, SelectedIcon, XIcon } from "./icons";
 import Markdown from "./Markdown";
 import { feedbackVariant, scoreBadge, scoreLabel } from "./scoreDisplay";
 import type { QuestionMode } from "./types";
@@ -77,6 +77,14 @@ export default function MultipleSelectionView(
 			: "bg-error/10 border-error";
 	}
 
+	/// A frozen question marks the ticked options with a check and mutes the rest.
+	const frozen = () => mode() === "readonly";
+	function frozenClass(choiceId: string): string {
+		return selected().has(choiceId)
+			? "border-primary bg-primary/5"
+			: "border-base-300 text-base-content/60";
+	}
+
 	function choiceFeedback(choiceId: string): string | undefined {
 		return props.result?.choices?.find((c) => c.id === choiceId)?.feedback;
 	}
@@ -109,13 +117,23 @@ export default function MultipleSelectionView(
 						const inputId = `${name}-${choice.id}`;
 						return (
 							<div
-								class={`flex flex-col gap-1 rounded-box border border-base-300 p-3 ${rowClass(choice.id)}`}
+								class={
+									frozen()
+										? `flex flex-col gap-1 rounded-box border p-3 ${frozenClass(choice.id)}`
+										: `flex flex-col gap-1 rounded-box border border-base-300 p-3 ${rowClass(choice.id)}`
+								}
 							>
-								<label class="flex cursor-pointer items-center gap-3">
+								<label
+									class={
+										frozen()
+											? "flex items-center gap-3"
+											: "flex cursor-pointer items-center gap-3"
+									}
+								>
 									<input
 										id={inputId}
 										type="checkbox"
-										class="checkbox"
+										class={frozen() ? "sr-only" : "checkbox"}
 										disabled={mode() !== "answer"}
 										checked={selected().has(choice.id)}
 										onChange={() => toggle(choice.id)}
@@ -123,7 +141,16 @@ export default function MultipleSelectionView(
 											props.result?.feedback ? feedbackId : undefined
 										}
 									/>
-									<span class="flex-1">
+									<Show when={frozen()}>
+										<span class="inline-flex w-[18px] shrink-0">
+											<Show when={selected().has(choice.id)}>
+												<SelectedIcon />
+											</Show>
+										</span>
+									</Show>
+									<span
+										class={`flex-1 ${frozen() && selected().has(choice.id) ? "font-medium" : ""}`}
+									>
 										<Markdown text={choice.text} inline />
 									</span>
 									<Show

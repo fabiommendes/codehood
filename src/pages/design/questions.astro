@@ -568,8 +568,8 @@ const sectionLinks = [
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
       <p class="mb-5 text-sm text-base-content/60">
-        Same visuals as answer mode, but the inputs are disabled and nothing is clickable &mdash; for showing a
-        question back to a student without letting them change it, before grading exists.
+        The question shown back to a student without letting them change it: the picked option carries a check and
+        the others are muted, and typed answers read as plain text.
       </p>
       <Card>
         <MultipleChoiceView question={capitals.toPublic()} mode="readonly" value="rio" />
