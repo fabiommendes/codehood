@@ -58,7 +58,7 @@ export function examBadge(
 		case "results":
 			return { label: "Graded", className: "badge-primary" };
 		case "missed":
-			return { label: "Missed", className: "badge-error" };
+			return { label: "Missed", className: "badge-ghost" };
 		default:
 			return {
 				label: examPhaseLabels[phase],
