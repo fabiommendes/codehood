@@ -490,6 +490,22 @@ test("student: open the calendar on the next event", async ({ page }) => {
 			),
 		).toBeVisible();
 	});
+
+	await test.step("paging stops at the first and the last event", async () => {
+		await page.goto(`/calendar?month=${localDateOf(last.startAt).slice(0, 7)}`);
+		await expect(
+			page.getByRole("link", { name: "Previous month" }),
+		).toHaveCount(0);
+		await expect(page.getByRole("link", { name: "Next month" })).toBeVisible();
+
+		await page.goto(
+			`/calendar?month=${localDateOf(upcoming.startAt).slice(0, 7)}`,
+		);
+		await expect(page.getByRole("link", { name: "Next month" })).toHaveCount(0);
+		await expect(
+			page.getByRole("link", { name: "Previous month" }),
+		).toBeVisible();
+	});
 });
 
 //

@@ -104,6 +104,8 @@
 
 ### Fixed
 
+- The calendar's month paging stops at the first and the last event (and
+  today), instead of walking through empty months in both directions.
 - An answer that failed to save because the connection dropped stopped
   every later answer from saving. The failure now shows on the question and
   the next change retries it.

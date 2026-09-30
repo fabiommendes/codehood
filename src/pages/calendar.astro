@@ -92,6 +92,24 @@ const prevMonthYear = month === 1 ? year - 1 : year;
 const nextHref = `/calendar?month=${nextMonthYear}-${String(nextMonth).padStart(2, "0")}`;
 const prevHref = `/calendar?month=${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`;
 
+// Paging stops at the months that hold something: the first and last event,
+// and today. Beyond them every month is empty.
+const allEvents =
+	courseIds.length > 0
+		? await db.calendarEvent.findMany({ courseIds }, { actor })
+		: [];
+const eventMonths = allEvents.map((event) =>
+	localDateOf(event.startAt).slice(0, 7),
+);
+const firstMonth = [currentMonth, ...eventMonths].reduce((a, b) =>
+	a < b ? a : b,
+);
+const lastMonth = [currentMonth, ...eventMonths].reduce((a, b) =>
+	a > b ? a : b,
+);
+const hasPrev = shownMonth > firstMonth;
+const hasNext = shownMonth < lastMonth;
+
 const monthEvents =
 	courseIds.length > 0
 		? await db.calendarEvent.findMany(
@@ -152,11 +170,17 @@ const upcoming =
 
     <div class="mt-8 rounded-box border border-base-300 bg-base-100 p-5">
       <div class="flex items-center justify-between">
-        <a
-          href={prevHref}
-          class="btn btn-ghost btn-sm"
-          aria-label="Previous month">←</a
-        >
+        {
+          hasPrev ? (
+            <a href={prevHref} class="btn btn-ghost btn-sm" aria-label="Previous month">
+              ←
+            </a>
+          ) : (
+            <span class="btn btn-ghost btn-sm invisible" aria-hidden="true">
+              ←
+            </span>
+          )
+        }
         <div class="flex items-center gap-3">
           <p class="font-display text-lg font-semibold">{monthLabel}</p>
           {
@@ -167,9 +191,17 @@ const upcoming =
             )
           }
         </div>
-        <a href={nextHref} class="btn btn-ghost btn-sm" aria-label="Next month"
-          >→</a
-        >
+        {
+          hasNext ? (
+            <a href={nextHref} class="btn btn-ghost btn-sm" aria-label="Next month">
+              →
+            </a>
+          ) : (
+            <span class="btn btn-ghost btn-sm invisible" aria-hidden="true">
+              →
+            </span>
+          )
+        }
       </div>
 
       <div

@@ -37,7 +37,8 @@ Found by walking every page as a student, an instructor and an admin, at
 ## Exams
 
 - A closed exam that nobody attempted offers "Release results" as its primary
-  action (P2). Releasing it publishes nothing.
+  action (P2). `gradeReleaseBlocker` allows it on purpose; the question is
+  whether the button should still be the page's primary action.
 - An exam with no schedule reads "Scheduled: Not scheduled" and can be
   "Closed" at the same time (P3). Nothing on the page says what closed it.
 - The student's page for a submitted exam shows a bare "Submitted" with no
@@ -48,8 +49,6 @@ Found by walking every page as a student, an instructor and an admin, at
 
 - The Students tab lives at `/roster` (P4). Renaming the URL breaks links
   already shared.
-- The calendar's previous and next links have no bounds, so they page through
-  empty months for years in both directions.
 - "Set up the CLI" is in every user's menu and `/getting-started` tells
   students to scaffold a course (P2).
 - The footer shows a "Design system" link in development only; check that a
