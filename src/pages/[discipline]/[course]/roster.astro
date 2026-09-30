@@ -1,12 +1,12 @@
 ---
 import { actions } from "astro:actions";
 import CourseHeader from "@/components/CourseHeader.astro";
+import CsvDownload from "@/components/CsvDownload.astro";
 import StudentsTable from "@/components/StudentsTable";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
-import { jsonScriptPayload } from "@/utils/json-script";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -104,8 +104,8 @@ const csvRows = [
 		s.name,
 		s.username,
 		s.email,
-		s.githubId,
-		s.schoolId,
+		s.githubId ?? "",
+		s.schoolId ?? "",
 		s.enrolledAt.toISOString().slice(0, 10),
 	]),
 ];
@@ -189,14 +189,12 @@ const csvRows = [
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-xl font-semibold">Students</h2>
-      <button
-        type="button"
-        id="download-roster-csv"
-        class="btn btn-outline btn-sm"
+      <CsvDownload
+        id="roster-csv"
+        filename={csvFilename}
+        rows={csvRows}
         disabled={students.length === 0}
-      >
-        Download CSV
-      </button>
+      />
     </div>
     <p class="mt-1 text-base-content/60">
       {course.discipline.name} · {students.length} enrolled
@@ -555,40 +553,6 @@ const csvRows = [
 
 <input type="hidden" id="course-discipline" value={courseParams.discipline} />
 <input type="hidden" id="course-segment" value={courseParams.course} />
-
-{/* `jsonScriptPayload`, not `JSON.stringify`: the cells are student-supplied
-    and `set:html` writes them raw, so a bare stringify lets a name containing
-    `</script` close this element and inject markup. */}
-<script
-  type="application/json"
-  id="roster-csv-data"
-  set:html={jsonScriptPayload(csvRows)}
-/>
-<script define:vars={{ csvFilename }}>
-  // Built client-side from the same rows the table renders, rather than a
-  // dedicated endpoint — the roster is already small (see admin-view.md's
-  // "unpaginated, with an expiry date" note on user tables) and this avoids
-  // standing up an authenticated download route for one button.
-  function csvCell(value) {
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  }
-
-  const button = document.getElementById("download-roster-csv");
-  button?.addEventListener("click", () => {
-    const rows = JSON.parse(
-      document.getElementById("roster-csv-data")?.textContent ?? "[]",
-    );
-    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = csvFilename;
-    link.click();
-    URL.revokeObjectURL(url);
-  });
-</script>
 
 <script>
   import { actions } from "astro:actions";

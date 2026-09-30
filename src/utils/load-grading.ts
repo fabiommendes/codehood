@@ -7,7 +7,11 @@ import {
 	type Exam,
 	type Feedback,
 } from "@/db";
-import { type GradesTable, gradesTable } from "@/services/grades-table";
+import {
+	type GradesTable,
+	gradesCsvRows,
+	gradesTable,
+} from "@/services/grades-table";
 import {
 	type CountingAnswer,
 	countingAnswers,
@@ -101,21 +105,36 @@ export async function loadStudents(
 	];
 }
 
+/// A course's grades as the page shows them and as the CSV file holds them.
+export interface CourseGrades {
+	/// The active students against every exam.
+	table: GradesTable;
+	/// The rows of the CSV file, which lists the dropped students too.
+	csvRows: (string | number)[][];
+}
+
 /**
- * Builds the course's grades table at `now`.
+ * Builds the course's grades table and its CSV rows at `now`.
  *
  * One query per kind of data, never one per student or exam.
  */
-export async function loadGradesTable(
+export async function loadGrades(
 	course: Course["id"],
 	actor: UserActor,
 	now: Date,
-): Promise<GradesTable> {
+): Promise<CourseGrades> {
 	const [exams, students, attempts, feedback] = await Promise.all([
 		db.exam.findMany({ course }, { actor }),
 		loadStudents(course, actor),
 		db.response.findMany({ course, practice: false }, { actor }),
 		db.feedback.findMany({ course }, { actor }),
 	]);
-	return gradesTable(exams, students, attempts, feedback, now);
+	return {
+		table: gradesTable(exams, students, attempts, feedback, now),
+		csvRows: gradesCsvRows(
+			gradesTable(exams, students, attempts, feedback, now, {
+				withDropped: true,
+			}),
+		),
+	};
 }

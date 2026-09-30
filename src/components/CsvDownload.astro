@@ -1,0 +1,63 @@
+---
+/**
+ * A button that downloads rows as a CSV file.
+ *
+ * The file is built in the browser from rows embedded in the page, so a page
+ * that already shows the data needs no download route of its own.
+ */
+import type { CsvValue } from "@/utils/csv";
+import { jsonScriptPayload } from "@/utils/json-script";
+
+interface Props {
+	/// Identifies the download: the button is `download-<id>`, the rows `<id>-data`.
+	id: string;
+	/// The name the file is saved with.
+	filename: string;
+	/// The rows of the file, header first.
+	rows: readonly (readonly CsvValue[])[];
+	disabled?: boolean;
+}
+
+const { id, filename, rows, disabled = false } = Astro.props;
+---
+
+<button
+  type="button"
+  id={`download-${id}`}
+  class="btn btn-outline btn-sm"
+  data-csv-rows={`${id}-data`}
+  data-csv-filename={filename}
+  disabled={disabled}
+>
+  Download CSV
+</button>
+{/* `jsonScriptPayload`, not `JSON.stringify`: the cells are user-supplied and
+    `set:html` writes them raw, so a bare stringify lets a name containing
+    `</script` close this element and inject markup. */}
+<script
+  type="application/json"
+  id={`${id}-data`}
+  set:html={jsonScriptPayload(rows)}
+/>
+
+<script>
+  import { toCsv } from "@/utils/csv";
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "button[data-csv-rows]",
+  )) {
+    button.addEventListener("click", () => {
+      const source = document.getElementById(button.dataset.csvRows ?? "");
+      const rows = JSON.parse(source?.textContent ?? "[]");
+      const blob = new Blob([toCsv(rows)], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = button.dataset.csvFilename ?? "data.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+</script>

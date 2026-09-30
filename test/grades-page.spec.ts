@@ -517,3 +517,56 @@ test("grades: the instructor's tabs end with Grades, which is the current one; a
 		"Schedule",
 	]);
 });
+
+test("grades: Download CSV saves every student, dropped ones too, with totals as numbers", async ({
+	page,
+}) => {
+	const { teacher, course, href } = await setup("gr9");
+	const ana = await enrolledStudent(course, "gr9-ana", "Prado, Ana");
+	const bia = await enrolledStudent(course, "gr9-bia", "Bia Lima");
+	const dan = await enrolledStudent(course, "gr9-dan", "Dan Dropped");
+	await enrolledStudent(course, "gr9-eva", "Eva Absent");
+	await makeExam(course, "midterm", "Midterm exam", { kind: "closed" }, [
+		{ student: ana, score: "0.8" },
+		{ student: bia, score: null },
+		{ student: dan, score: "1" },
+	]);
+	await prisma.enrollment.updateMany({
+		where: { username: dan.username },
+		data: { status: "DROPPED" },
+	});
+	await logInAs(page, teacher);
+	await openGrades(page, href);
+
+	const [download] = await Promise.all([
+		page.waitForEvent("download"),
+		page.getByRole("button", { name: "Download CSV" }).click(),
+	]);
+
+	expect(download.suggestedFilename()).toBe(
+		`grades-${course.discipline.slug}-${course.edition.slug}.csv`,
+	);
+	const stream = await download.createReadStream();
+	const chunks: Buffer[] = [];
+	for await (const chunk of stream) chunks.push(chunk as Buffer);
+	expect(Buffer.concat(chunks).toString("utf8").split("\r\n")).toEqual([
+		"username,name,status,midterm",
+		"gr9-bia,Bia Lima,active,",
+		"gr9-dan,Dan Dropped,dropped,100",
+		"gr9-eva,Eva Absent,active,",
+		'gr9-ana,"Prado, Ana",active,80',
+	]);
+});
+
+test("grades: a course with no exams offers no CSV", async ({ page }) => {
+	const { teacher, course, href } = await setup("gr10");
+	await enrolledStudent(course, "gr10-ana", "Ana Prado");
+	await logInAs(page, teacher);
+
+	await page.goto(`${href}/grades`);
+
+	await expect(page.getByText("No exams yet.")).toBeVisible();
+	await expect(page.getByRole("button", { name: "Download CSV" })).toHaveCount(
+		0,
+	);
+});

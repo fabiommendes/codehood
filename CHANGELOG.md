@@ -4,6 +4,11 @@
 
 ### Added
 
+- The Grades tab downloads its table as CSV, `grades-<discipline>-<edition>.csv`:
+  one row per student with `username`, `name` and `status`, and one column
+  per exam headed by the exam's slug. Totals are numbers from 0 to 100 and a
+  cell with no total is empty. Students who dropped are in the file, marked
+  `dropped`, though the table on the page leaves them out.
 - The top bar says where you are once the page header scrolls away: a
   breadcrumb such as `cs201 · 2026-1 › Exams › Midterm › Grading`, aligned
   with the page column, on every course, admin and signed-in page. The logo
@@ -86,6 +91,8 @@
 
 ### Fixed
 
+- The roster's CSV leaves the cell of a missing GitHub username or school id
+  empty instead of writing `null`.
 - The course home no longer links files and links to a page that does not
   exist; their rows lead to the Resources tab, where they act.
 - Resources read as "PDF file", "Link" and "Note" instead of a MIME type,

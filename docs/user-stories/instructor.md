@@ -285,3 +285,7 @@ no responses or grades routes yet, so the posting half has nothing to call.
 Instructor wants to know how the class did, not one student at a time. The
 Grades tab shows every student against every exam, so an exam everybody failed
 is visible as a column rather than something they have to piece together.
+
+"Download CSV" saves the table as a file for a spreadsheet: one row per
+student, the ones who dropped included and marked, and one column per exam
+with totals as numbers from 0 to 100. A cell with no total yet is empty.

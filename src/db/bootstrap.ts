@@ -124,6 +124,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		role: "STUDENT",
 		password: "bob",
 	});
+	const dijkstra = await demoUser({
+		email: "dijkstra@codehood.local",
+		username: "dijkstra",
+		name: "Edsger Dijkstra",
+		role: "STUDENT",
+		password: "dijkstra",
+	});
 
 	for (const discipline of [
 		{ slug: "cs101", name: "Introduction to Programming" },
@@ -191,6 +198,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			FULL_ACCESS,
 		);
 	}
+
+	// A student who dropped: absent from the grades table, present in its CSV.
+	await db.enrollment.create(
+		{ course: cs101.id, username: dijkstra.username },
+		FULL_ACCESS,
+	);
+	await db.enrollment.delete(
+		{ course: cs101.id, username: dijkstra.username },
+		FULL_ACCESS,
+	);
 
 	for (const student of [liskov, bob]) {
 		await db.enrollment.create(

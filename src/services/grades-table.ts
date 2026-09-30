@@ -44,6 +44,8 @@ export interface GradesColumn {
 export interface GradesRow {
 	username: string;
 	name: string;
+	/// Whether the student's enrollment is no longer active.
+	dropped: boolean;
 	/// One cell per column, in column order.
 	cells: GradeCell[];
 }
@@ -56,14 +58,20 @@ export interface GradesTable {
 /// An attempt, with the slug of the exam it belongs to.
 export type TableAttempt = GradingAttempt & { exam: string };
 
+/// Which students a grades table lists.
+export interface GradesTableOptions {
+	/// Lists the students who dropped the course along with the active ones.
+	withDropped?: boolean;
+}
+
 /**
  * Builds the table of a course's results at `now`.
  *
  * Columns are the exams of type `EXAM` and `QUIZ` whose phase is neither
  * `draft` nor `archived`, by scheduled date, unscheduled ones last, ties by
- * title. Rows are the students who are not `dropped`, by name without regard
- * to case, ties by username. Attempts of students who are not listed count
- * nowhere.
+ * title. Rows are the students who are not `dropped`, unless `withDropped`
+ * asks for them too, by name without regard to case, ties by username.
+ * Attempts of students who are not listed count nowhere.
  *
  * @params attempts Every non-practice attempt of the course.
  * @params feedback Every grading pass of the course, released or not.
@@ -74,9 +82,10 @@ export function gradesTable(
 	attempts: TableAttempt[],
 	feedback: GradingFeedback[],
 	now: Date,
+	options: GradesTableOptions = {},
 ): GradesTable {
 	const listed = students
-		.filter((student) => !student.dropped)
+		.filter((student) => options.withDropped || !student.dropped)
 		.sort(compareStudents);
 	const usernames = new Set(listed.map((student) => student.username));
 
@@ -139,9 +148,36 @@ export function gradesTable(
 		rows: listed.map((student, index) => ({
 			username: student.username,
 			name: student.name,
+			dropped: student.dropped,
 			cells: cellsByExam.map((cells) => cells[index] ?? { kind: "empty" }),
 		})),
 	};
+}
+
+/**
+ * Writes a grades table as the rows of a CSV file, header first.
+ *
+ * Each exam is a column headed by its slug. A total is a number from -100 to
+ * 100 with at most two decimals, and a cell with no total is empty, so every
+ * exam column stays numeric.
+ */
+export function gradesCsvRows(table: GradesTable): (string | number)[][] {
+	return [
+		[
+			"username",
+			"name",
+			"status",
+			...table.columns.map((column) => column.exam.slug),
+		],
+		...table.rows.map((row) => [
+			row.username,
+			row.name,
+			row.dropped ? "dropped" : "active",
+			...row.cells.map((cell) =>
+				cell.kind === "total" ? Math.round(cell.total * 10000) / 100 : "",
+			),
+		]),
+	];
 }
 
 /// Orders exams by scheduled date, unscheduled ones last, ties by title.

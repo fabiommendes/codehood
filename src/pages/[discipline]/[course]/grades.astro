@@ -1,10 +1,11 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
+import CsvDownload from "@/components/CsvDownload.astro";
 import GradesTable from "@/components/grading/GradesTable.astro";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
-import { loadGradesTable } from "@/utils/load-grading";
+import { loadGrades } from "@/utils/load-grading";
 
 export const prerender = false;
 
@@ -17,7 +18,10 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
 const actor = Astro.locals.actor!;
-const table = await loadGradesTable(course.id, actor, new Date());
+const { table, csvRows } = await loadGrades(course.id, actor, new Date());
+// The file lists students the table leaves out, so it can have rows when the table has none.
+const hasGrades = table.columns.length > 0 && csvRows.length > 1;
+const csvFilename = `grades-${course.discipline.slug}-${course.edition.slug}.csv`;
 ---
 
 <AppLayout title={`Grades · ${course.discipline.name}`}
@@ -26,7 +30,14 @@ const table = await loadGradesTable(course.id, actor, new Date());
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="grades" />
 
-    <h2 class="mt-8 text-2xl font-bold">Grades</h2>
+    <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-2xl font-bold">Grades</h2>
+      {
+        hasGrades && (
+          <CsvDownload id="grades-csv" filename={csvFilename} rows={csvRows} />
+        )
+      }
+    </div>
 
     {
       table.columns.length === 0 ? (

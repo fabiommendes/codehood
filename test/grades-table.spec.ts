@@ -3,6 +3,7 @@ import fc from "fast-check";
 import type { Exam } from "@/db";
 import {
 	type GradeCell,
+	gradesCsvRows,
 	gradesTable,
 	type TableAttempt,
 } from "@/services/grades-table";
@@ -509,8 +510,8 @@ test("gradesTable: no exams leaves no columns, with the students still listed an
 
 	expect(table.columns).toEqual([]);
 	expect(table.rows).toEqual([
-		{ username: "ana", name: "Ana", cells: [] },
-		{ username: "bia", name: "Bia", cells: [] },
+		{ username: "ana", name: "Ana", dropped: false, cells: [] },
+		{ username: "bia", name: "Bia", dropped: false, cells: [] },
 	]);
 });
 
@@ -522,4 +523,72 @@ test("gradesTable: no students leaves no rows, with every column at zero", () =>
 	for (const column of table.columns) {
 		expect(column).toMatchObject({ students: 0, attempted: 0, mean: null });
 	}
+});
+
+//
+// The CSV file
+//
+
+test("gradesTable: withDropped lists the students who dropped, marked as such", () => {
+	const dan = student("dan", "Dan", true);
+	const sitting = sat("exam", "dan", { q1: "1" });
+
+	const table = gradesTable(
+		[single("exam")],
+		[ana, dan],
+		[sitting.attempt],
+		sitting.feedback,
+		NOW,
+		{ withDropped: true },
+	);
+
+	expect(
+		table.rows.map((row) => [row.username, row.dropped, row.cells[0]]),
+	).toEqual([
+		["ana", false, { kind: "missed" }],
+		["dan", true, { kind: "total", total: 1 }],
+	]);
+});
+
+test("gradesCsvRows: one column per exam headed by its slug, totals from 0 to 100, other cells empty", () => {
+	const bia = student("bia", "Bia");
+	const dan = student("dan", "Dan", true);
+	const sittings = [
+		sat("exam", "ana", { q1: "0.875" }),
+		sat("exam", "bia", { q1: null }),
+		sat("quiz", "ana", { q1: "1" }, { open: true }),
+		sat("quiz", "dan", { q1: "-0.25" }),
+	];
+
+	const rows = gradesCsvRows(
+		gradesTable(
+			[
+				single("exam", { scheduledAt: at(-500) }),
+				single("quiz", { type: "QUIZ", status: "ONGOING" }),
+			],
+			[ana, bia, dan],
+			sittings.map((s) => s.attempt),
+			sittings.flatMap((s) => s.feedback),
+			NOW,
+			{ withDropped: true },
+		),
+	);
+
+	expect(rows).toEqual([
+		["username", "name", "status", "exam", "quiz"],
+		["ana", "Ana", "active", 87.5, ""],
+		["bia", "Bia", "active", "", ""],
+		["dan", "Dan", "dropped", "", -25],
+	]);
+});
+
+test("gradesCsvRows: a total is rounded to two decimals", () => {
+	const sitting = sat("exam", "ana", { q1: "1", q2: "0" });
+	const third = sat("three", "ana", { q1: "0.3333333" });
+
+	const rows = gradesCsvRows(
+		tableOf([exam("exam"), single("three")], [ana], [sitting, third]),
+	);
+
+	expect(rows[1]).toEqual(["ana", "Ana", "active", 50, 33.33]);
 });
