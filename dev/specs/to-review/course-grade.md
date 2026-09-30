@@ -19,12 +19,26 @@ waits for an answer, and no requirement is numbered until they are settled.
 
 ## Decided
 
-- The configuration of the course grade lives in the course folder's
-  `codehood.toml` and reaches the server with `codehood push`. The web shows
-  the result and never edits the rule (P8).
+- The configuration of the course grade lives in the course folder and
+  reaches the server with `codehood push`. The web shows the result and
+  never edits the rule (P8).
 - The CSV download of the grades table ships first and does not depend on
-  this spec.
+  this spec. Done.
 - A flat weight per exam is not enough. See the reference case.
+- **Option C below.** The instructor computes the grades on their own
+  machine and pushes the result as columns. Codehood defines no formula
+  language: the computation is a Python function the instructor writes,
+  which the CLI calls with the course's grades and whose result it pushes.
+  The script is the instructor's, runs on their machine and reads only
+  their own data, so it raises no security question. Hooking arbitrary
+  Python into other CLI tasks is a later step; this is its first case.
+- **The substitute exam** has no rule of its own. It is one more score the
+  function reads. The two policies in use, replacing an exam the student
+  missed with a justification and replacing the lowest score outright, are
+  both written by the instructor.
+- **Students in a pushed file** are identified by school id by default. The
+  CLI already downloads the roster, so it can map any other field (GitHub
+  username, email) to the student itself and send usernames to the server.
 
 ## Reference case
 
@@ -89,19 +103,22 @@ be a chore.
 
 ## Open
 
-- **Which option.** A, B or C.
-- **The substitute exam.** Whether it replaces a chosen exam, the lowest
-  one, or the one that raises the result the most, and whether a student who
-  scores lower on it keeps the original.
-- **Identifying students in a pushed file.** By username, school id or
-  email, and what happens to a row that matches no enrolled student.
-- **Missing and unfinished data.** What a formula reads for an exam that is
-  `Missed`, `Pending`, `In progress` or not yet held.
-- **What the student sees, and when.** A course grade built from exams whose
-  results are not released would leak them (`resultsReleased` in
-  `src/services/exam-state.ts`). Pushed columns need a release rule of their
-  own.
+- **Missing and unfinished data.** What the function reads for an exam that
+  is `Missed`, `Pending`, `In progress` or not yet held. Proposal: `None`
+  for all four, with the state beside the score, so the function can tell
+  a miss from a pending grade.
+- **What the student sees, and when.** A pushed column built from exams
+  whose results are not released would leak them (`resultsReleased` in
+  `src/services/exam-state.ts`). Proposal: a column is hidden from students
+  until the instructor releases it, on the web like an exam's results.
 - **Scale and rounding.** Scores are stored in `[-1, 1]` and shown as whole
   percentages; the reference case grades from 0 to 10 and ends in a label.
+  Proposal: a column is a number or a label, declared with the column, and
+  the server shows numbers as pushed, with no scale of its own.
+- **Which columns the table shows.** All pushed columns beside the exams,
+  or a declared subset, and which one is "the" course grade.
+- **The function's contract.** Its name and file, what it receives (one
+  student's scores, or the whole table), and what it returns. Lives in the
+  CLI's spec, not here.
 - **Schema.** Where columns and their values are stored. This is a
   migration and needs approval before any code.
