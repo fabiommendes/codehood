@@ -196,6 +196,54 @@ export function gradingQueue(
 	});
 }
 
+/// How the answers to one question of the exam went, for reviewing the exam after it runs.
+export interface QuestionStats extends QueueEntry {
+	/// How many closed attempts have a counting answer to the question, in any state.
+	answered: number;
+	/// The mean verdict of the `graded` answers in `[-1, 1]`, or `null` when none is graded.
+	average: number | null;
+	/// The share of `graded` answers with full score in `[0, 1]`, or `null` when none is graded.
+	correct: number | null;
+}
+
+/**
+ * Summarizes the counting answers of an exam per question, one entry per slug of `questions` and in that order.
+ *
+ * The answers are the ones `countingAnswers` picks: the newest submission per
+ * question of each closed attempt, judged by its newest pass. `answered`
+ * counts them all. `average` and `correct` read only the `graded` ones: a
+ * `pending` answer waits for a grade, a `not-graded` (will-not-grade) one
+ * counts neither in them nor as pending, and a question an attempt left
+ * unanswered counts nowhere. Full score means a verdict of at least 1.
+ *
+ * @params questions The exam's question slugs, in exam order.
+ * @params feedback Every grading pass on the exam, released or not.
+ */
+export function questionStats(
+	exam: ExamTiming,
+	questions: string[],
+	attempts: GradingAttempt[],
+	feedback: GradingFeedback[],
+	now: Date,
+): QuestionStats[] {
+	const answers = countingAnswers(exam, questions, attempts, feedback, now);
+	return gradingQueue(questions, answers).map((entry) => {
+		const verdicts = answers
+			.filter((answer) => answer.question === entry.question)
+			.map((answer) => answer.verdict)
+			.filter((verdict): verdict is number => verdict !== null);
+		const graded = verdicts.length;
+		return {
+			...entry,
+			answered: entry.pending + entry.graded + entry.notGraded,
+			average:
+				graded > 0 ? verdicts.reduce((sum, v) => sum + v, 0) / graded : null,
+			correct:
+				graded > 0 ? verdicts.filter((v) => v >= 1).length / graded : null,
+		};
+	});
+}
+
 /**
  * The answers to one question, split into the ones waiting for a grade and the rest.
  *

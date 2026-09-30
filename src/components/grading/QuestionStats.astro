@@ -1,0 +1,64 @@
+---
+/**
+ * The instructor's per-question view of an exam: how many answered, how they scored, and what still waits for a grade.
+ */
+import { formatScore } from "@/services/exam-result";
+import type { QuestionStats } from "@/services/grading";
+
+interface Props {
+	/// The exam page's URL.
+	href: string;
+	/// One entry per exam question, in exam order.
+	stats: QuestionStats[];
+	/// The display title of each question, by slug; a missing one falls back to the slug.
+	titles: Map<string, string>;
+}
+
+const { href, stats, titles } = Astro.props;
+const anyAnswer = stats.some((entry) => entry.answered > 0);
+---
+
+<section class="mt-8">
+  <h2 class="text-lg font-semibold">Question statistics</h2>
+
+  {
+    anyAnswer ? (
+      <div class="mt-3 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <table aria-label="Question statistics" class="table table-sm">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th class="text-right">Answered</th>
+              <th class="text-right">Average</th>
+              <th class="text-right">Correct</th>
+              <th class="text-right">To grade</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map((entry) => (
+              <tr>
+                <td>{titles.get(entry.question) ?? entry.question}</td>
+                <td class="text-right tabular-nums">{entry.answered}</td>
+                <td class="text-right tabular-nums">
+                  {entry.average === null ? "" : formatScore(entry.average)}
+                </td>
+                <td class="text-right tabular-nums">
+                  {entry.correct === null ? "" : formatScore(entry.correct)}
+                </td>
+                <td class="text-right tabular-nums">
+                  {entry.pending > 0 && (
+                    <a href={`${href}/grading/${entry.question}`} class="link">
+                      {entry.pending}
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p class="mt-3 text-sm text-base-content/60">No answers yet.</p>
+    )
+  }
+</section>

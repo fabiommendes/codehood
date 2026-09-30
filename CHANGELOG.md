@@ -4,6 +4,12 @@
 
 ### Added
 
+- The instructor's exam page shows statistics per question, in exam order:
+  how many attempts answered it, the average score and the share of answers
+  with full score, both over graded answers only, and how many answers still
+  wait for a grade, linked to that question's grading page. Only the newest
+  answer of each closed attempt counts; will-not-grade and unanswered
+  questions stay out of the average and are not pending.
 - The Grades tab downloads its table as CSV, `grades-<discipline>-<edition>.csv`:
   one row per student with `username`, `name` and `status`, and one column
   per exam headed by the exam's slug. Totals are numbers from 0 to 100 and a

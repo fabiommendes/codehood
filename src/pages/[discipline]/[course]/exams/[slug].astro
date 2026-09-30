@@ -6,6 +6,7 @@ import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
+import QuestionStatsTable from "@/components/grading/QuestionStats.astro";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
@@ -17,7 +18,12 @@ import {
 	examPhaseLabels,
 	gradeReleaseBlocker,
 } from "@/services/exam-state";
-import { type AttemptRow, attemptRows } from "@/services/grading";
+import {
+	type AttemptRow,
+	attemptRows,
+	type QuestionStats,
+	questionStats,
+} from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import {
 	examBadge,
@@ -114,6 +120,8 @@ const badge = examBadge(phase, canManage ? undefined : state);
 // One fetch serves both the release control and the results table.
 let canRelease = false;
 let resultRows: AttemptRow[] = [];
+let statsRows: QuestionStats[] = [];
+const questionTitles = new Map<string, string>();
 if (canManage && exam.type !== "PRACTICE") {
 	const [attempts, feedback, students] = await Promise.all([
 		db.response.findMany(
@@ -129,6 +137,12 @@ if (canManage && exam.type !== "PRACTICE") {
 	);
 	canRelease = gradeReleaseBlocker(exam, results, now) === null;
 	resultRows = attemptRows(exam, slugs, attempts, feedback, students, now);
+	statsRows = questionStats(exam, slugs, attempts, feedback, now);
+	for (const pinned of pinnedQuestions) {
+		if (pinned.question.title) {
+			questionTitles.set(pinned.slug, pinned.question.title);
+		}
+	}
 }
 
 const pendingAnswers = resultRows.reduce((sum, row) => sum + row.pending, 0);
@@ -285,6 +299,16 @@ for (const submission of attempt?.submissions ?? []) {
     }
 
     {
+    {
+      canManage && exam.type !== "PRACTICE" && (
+        <QuestionStatsTable
+          href={`${href}/exams/${exam.slug}`}
+          stats={statsRows}
+          titles={questionTitles}
+        />
+      )
+    }
+
       canManage && (
         <section class="mt-8">
           <h2 class="text-lg font-semibold">Details</h2>
