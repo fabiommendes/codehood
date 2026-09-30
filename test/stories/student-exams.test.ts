@@ -120,7 +120,7 @@ test("student: take an exam", async ({ page }) => {
 	await test.step("a closed exam the student never started says so and offers no way to start", async () => {
 		await page.goto(`${href}/exams/${closed.slug}`);
 
-		await expect(page.getByText("You did not take this exam")).toBeVisible();
+		await expect(page.getByText("You did not take this quiz.")).toBeVisible();
 		await expect(page.getByText("Missed", { exact: true })).toBeVisible();
 		await expect(page.getByText("Closed", { exact: true })).toHaveCount(0);
 		await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(
@@ -210,8 +210,8 @@ test("student: take an exam", async ({ page }) => {
 		await expect(page.getByText("Open now", { exact: true })).toHaveCount(0);
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeDisabled();
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
-		await expect(page.getByRole("textbox")).not.toBeEditable();
-		await expect(page.getByRole("textbox")).toHaveValue("Brasília");
+		await expect(page.getByRole("textbox")).toHaveCount(0);
+		await expect(page.getByText("Your answer: Brasília")).toBeVisible();
 		await expect(page.getByRole("button", { name: "Submit exam" })).toHaveCount(
 			0,
 		);
@@ -226,8 +226,8 @@ test("student: take an exam", async ({ page }) => {
 			page.getByText("Awaiting grading", { exact: true }),
 		).toBeVisible();
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
-		await expect(page.getByRole("textbox")).toHaveValue("Brasília");
-		await expect(page.getByRole("textbox")).not.toBeEditable();
+		await expect(page.getByRole("textbox")).toHaveCount(0);
+		await expect(page.getByText("Your answer: Brasília")).toBeVisible();
 		await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(
 			0,
 		);
@@ -402,7 +402,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await expect(
 			page.getByText("Awaiting grading", { exact: true }),
 		).toBeVisible();
-		await expect(page.getByText(/not released/i)).toBeVisible();
+		await expect(page.getByText(/results are not out yet/i)).toBeVisible();
 		await expect(page.getByText(/\d+%/)).toHaveCount(0);
 		await expect(page.getByText("Well argued")).toHaveCount(0);
 		await expect(page.getByText("Your score")).toHaveCount(0);
@@ -436,8 +436,8 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeDisabled();
 		await expect(page.getByRole("radio", { name: "Mercury" })).toBeChecked();
 		await expect(page.getByRole("radio", { name: "Mercury" })).toBeDisabled();
-		await expect(page.getByRole("textbox")).toHaveValue("Brasilia");
-		await expect(page.getByRole("textbox")).not.toBeEditable();
+		await expect(page.getByRole("textbox")).toHaveCount(0);
+		await expect(page.getByText("Your answer: Brasilia")).toBeVisible();
 	});
 
 	await test.step("once the last question is graded the total appears", async () => {

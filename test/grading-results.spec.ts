@@ -578,7 +578,8 @@ test("results: the grading link counts the pending answers across students, and 
 
 		await expect(page).toHaveURL(`${href}/exams/midterm`);
 		await expect(resultsHeading(page)).toBeVisible();
-		const link = page.getByRole("link", { name: "Grade answers (3 pending)" });
+		await expect(page.getByText("3 answers wait for a grade")).toBeVisible();
+		const link = page.getByRole("link", { name: "Grade answers" });
 		await expect(link).toHaveAttribute("href", `${href}/exams/midterm/grading`);
 		await expect(page.getByRole("link", { name: "Review grades" })).toHaveCount(
 			0,

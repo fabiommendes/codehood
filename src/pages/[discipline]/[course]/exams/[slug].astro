@@ -7,7 +7,6 @@ import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
 import ReleasedScore from "@/components/ReleasedScore.astro";
-import Badge from "@/components/ui/Badge";
 import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -15,6 +14,7 @@ import { examResult } from "@/services/exam-result";
 import {
 	attemptState,
 	examPhase,
+	examPhaseLabels,
 	gradeReleaseBlocker,
 } from "@/services/exam-state";
 import { type AttemptRow, attemptRows } from "@/services/grading";
@@ -27,6 +27,7 @@ import {
 import { loadCourse } from "@/utils/load-course";
 import { loadStudents } from "@/utils/load-grading";
 import { renderMarkdown } from "@/utils/markdown";
+import { plural } from "@/utils/plural";
 import { formatDateTime } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -43,6 +44,13 @@ const canManage = hasPerm(actor, "enrollment.manage", course);
 if (!slug) return Astro.rewrite("/404");
 const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
 if (!exam) return Astro.rewrite("/404");
+
+/// What the exam is called in a sentence.
+const examNouns = {
+	PRACTICE: "practice exam",
+	QUIZ: "quiz",
+	EXAM: "exam",
+} as const;
 
 const now = new Date();
 const phase = examPhase(exam, now);
@@ -123,6 +131,23 @@ if (canManage && exam.type !== "PRACTICE") {
 	resultRows = attemptRows(exam, slugs, attempts, feedback, students, now);
 }
 
+const pendingAnswers = resultRows.reduce((sum, row) => sum + row.pending, 0);
+
+// One line under the title: what the exam is, when, and how long.
+const meta = [
+	examTypeLabels[exam.type],
+	exam.extraTime
+		? `${formatDuration(exam.duration)} (+${formatDuration(exam.extraTime)} extra time)`
+		: formatDuration(exam.duration),
+	exam.scheduledAt
+		? formatDateTime(exam.scheduledAt)
+		: canManage
+			? "Not scheduled"
+			: null,
+	canManage ? plural(exam.questions.length, "question") : null,
+	exam.tags.length > 0 ? exam.tags.join(", ") : null,
+].filter((part): part is string => part !== null);
+
 // Feedback reaches a student only once released, and only on their own work;
 // the service enforces both, this just asks for it when the results show.
 const examOutcome =
@@ -161,19 +186,12 @@ for (const submission of attempt?.submissions ?? []) {
 
     <a href={`${href}/exams`} class="text-sm text-base-content/60 hover:text-primary">← Exams</a>
 
-    <div class="mt-2 flex flex-wrap items-center gap-2">
-      <span class:list={["badge badge-sm", badge.className]}>{badge.label}</span>
-      <span class="badge badge-outline badge-sm">{examTypeLabels[exam.type]}</span>
-    </div>
-    <h2 class="mt-2 text-2xl font-bold">{exam.title}</h2>
-    <div class="mt-2 flex flex-wrap gap-1.5">
-      {
-        exam.tags.map((tag) => (
-          <Badge size="xs" style="outline">
-            {tag}
-          </Badge>
-        ))
-      }
+    <div class="mt-2 flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-2xl font-bold">{exam.title}</h2>
+        <p class="mt-1 text-sm text-base-content/60">{meta.join(" · ")}</p>
+      </div>
+      <span class:list={["badge badge-sm mt-1.5 shrink-0", badge.className]}>{badge.label}</span>
     </div>
 
     {
@@ -181,6 +199,25 @@ for (const submission of attempt?.submissions ?? []) {
         <p class="mt-4 text-sm text-base-content/70">
           {descriptionHtml ? <span set:html={descriptionHtml} /> : exam.description}
         </p>
+      )
+    }
+
+    {
+      canManage && pendingAnswers > 0 && (
+        <div
+          role="status"
+          class="mt-6 flex items-center justify-between gap-4 rounded-box border border-base-300 bg-base-200 p-4 text-sm"
+        >
+          <span>
+            {examPhaseLabels[phase]}.{" "}
+            {pendingAnswers === 1
+              ? "1 answer waits for a grade."
+              : `${pendingAnswers} answers wait for a grade.`}
+          </span>
+          <a href={`${href}/exams/${exam.slug}/grading`} class="btn btn-primary btn-sm">
+            Grade answers
+          </a>
+        </div>
       )
     }
 
@@ -216,6 +253,7 @@ for (const submission of attempt?.submissions ?? []) {
             discipline={discipline!}
             course={courseSegment!}
             exam={slug}
+            noun={examNouns[exam.type]}
             state={state}
             now={now}
             questions={showQuestions ? attemptQuestions : []}
@@ -232,36 +270,25 @@ for (const submission of attempt?.submissions ?? []) {
       )
     }
 
-    <section class="mt-8">
-      <h2 class="text-lg font-semibold">Details</h2>
-      <dl class="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-2">
-        <div>
-          <dt class="text-sm text-base-content/50">Type</dt>
-          <dd class="mt-0.5 font-medium">{examTypeLabels[exam.type]}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-base-content/50">Scheduled</dt>
-          <dd class="mt-0.5 font-medium">
-            {exam.scheduledAt ? formatDateTime(exam.scheduledAt) : "Not scheduled"}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-sm text-base-content/50">Duration</dt>
-          <dd class="mt-0.5 font-medium">
-            {formatDuration(exam.duration)}
-            {exam.extraTime && ` (+${formatDuration(exam.extraTime)} extra time)`}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-sm text-base-content/50">Questions</dt>
-          <dd class="mt-0.5 font-medium">{exam.questions.length}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-base-content/50">Last updated</dt>
-          <dd class="mt-0.5 font-medium">{formatDateTime(exam.updatedAt)}</dd>
-        </div>
-      </dl>
-    </section>
+    {
+      canManage && (
+        <section class="mt-8">
+          <h2 class="text-lg font-semibold">Details</h2>
+          <dl class="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 text-sm sm:grid-cols-2">
+            <div>
+              <dt class="text-base-content/50">Extra time</dt>
+              <dd class="mt-0.5 font-medium">
+                {exam.extraTime ? formatDuration(exam.extraTime) : "None"}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-base-content/50">Last updated</dt>
+              <dd class="mt-0.5 font-medium">{formatDateTime(exam.updatedAt)}</dd>
+            </div>
+          </dl>
+        </section>
+      )
+    }
 
     {
       exam.preamble && (

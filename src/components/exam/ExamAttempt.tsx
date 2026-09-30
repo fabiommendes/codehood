@@ -54,6 +54,8 @@ export interface ExamAttemptProps {
 	discipline: string;
 	course: string;
 	exam: string;
+	/// What to call the exam in a sentence: "quiz", "exam".
+	noun: string;
 	/// Where the viewing student stands, computed on the server at `now`.
 	state: AttemptState;
 	/// Server time when the page rendered, so the countdown ignores client clock skew.
@@ -65,6 +67,9 @@ export interface ExamAttemptProps {
 	/// The graded outcome per question, present once the grades are released.
 	result?: ExamResult;
 }
+
+/// The box every state sentence of an attempt sits in.
+const NOTICE = "rounded-box border border-base-300 bg-base-200 p-4 text-sm";
 
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
@@ -234,7 +239,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 			<Switch>
 				<Match when={kind() === "not-open"}>
-					<p class="text-lg font-medium">
+					<p role="status" class={NOTICE}>
 						<Show when={opensAt()} fallback="Not open yet">
 							{(date) => (
 								<>
@@ -265,7 +270,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				</Match>
 
 				<Match when={kind() === "missed"}>
-					<p class="text-lg font-medium">You did not take this exam</p>
+					<p role="status" class={NOTICE}>
+						You did not take this {props.noun}.
+					</p>
 				</Match>
 
 				<Match
@@ -275,39 +282,36 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						kind() === "results"
 					}
 				>
-					<div class="flex flex-wrap items-center justify-between gap-3">
-						<Show
-							when={kind() === "in-progress"}
-							fallback={
-								<div>
-									<p class="text-lg font-medium">Submitted</p>
-									<Show when={kind() === "submitted"}>
-										<p class="text-sm text-base-content/70">
-											Results are not released yet.
-										</p>
-									</Show>
-								</div>
-							}
-						>
-							<span class="text-lg font-medium">
+					<Show
+						when={kind() === "in-progress"}
+						fallback={
+							<p role="status" class={NOTICE}>
+								{kind() === "submitted"
+									? "Submitted. Results are not out yet."
+									: "Submitted."}
+							</p>
+						}
+					>
+						<div class={`${NOTICE} flex items-center justify-between gap-3`}>
+							<span class="font-medium">
 								<Show when={deadline()} fallback="Take your time">
 									{(limit) => timeLeft(limit(), now())}
 								</Show>
 							</span>
 							<button
 								type="button"
-								class="btn btn-primary"
+								class="btn btn-primary btn-sm"
 								disabled={busy()}
 								onClick={() => dialog?.showModal()}
 							>
 								Submit exam
 							</button>
-						</Show>
-					</div>
+						</div>
+					</Show>
 
 					<For each={props.questions}>
 						{(entry) => (
-							<div class="card card-border overflow-hidden bg-base-100/50 shadow-md">
+							<div class="card card-border overflow-hidden bg-base-100/50">
 								{/* focusout bubbles, so leaving any control of the question saves it. */}
 								<div class="card-body" onFocusOut={() => saveNow(entry.slug)}>
 									<AnswerField
