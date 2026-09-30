@@ -241,6 +241,10 @@ export default function TrueFalseView(props: TrueFalseViewProps): JSX.Element {
 				</For>
 			</fieldset>
 
+			<Show when={mode() === "readonly" && judgements().size === 0}>
+				<p class="text-sm italic text-base-content/50">No answer submitted.</p>
+			</Show>
+
 			<Show when={props.question.epilogue}>
 				<div class="text-base-content/70">
 					<Markdown text={props.question.epilogue} />

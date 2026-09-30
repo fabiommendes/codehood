@@ -135,6 +135,15 @@ export default function FillInView(props: FillInViewProps): JSX.Element {
 				</For>
 			</p>
 
+			<Show
+				when={
+					mode() === "readonly" &&
+					Object.values(answers()).every((answer) => answer === "")
+				}
+			>
+				<p class="text-sm italic text-base-content/50">No answer submitted.</p>
+			</Show>
+
 			<Show when={props.question.epilogue}>
 				<div class="text-base-content/70">
 					<Markdown text={props.question.epilogue} />

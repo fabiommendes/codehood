@@ -179,6 +179,13 @@ A set of users who share ownership of [Questions](#question), so a teaching team
 can maintain a bank together. Membership carries an independent admin flag,
 separate from the user's global [Role](#role).
 
+## Instructions
+
+Type: domain
+
+What a student reads before answering. For an [Exam](#exam), its preamble. For
+a [Question](#question), its preamble plus its stem.
+
 ## Instructor
 
 Type: domain

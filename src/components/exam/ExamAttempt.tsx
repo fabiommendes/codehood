@@ -54,7 +54,7 @@ export interface ExamAttemptProps {
 	discipline: string;
 	course: string;
 	exam: string;
-	/// What to call the exam in a sentence: "quiz", "exam".
+	/// What to call the exam in a sentence and on its buttons: "quiz", "exam".
 	noun: string;
 	/// Where the viewing student stands, computed on the server at `now`.
 	state: AttemptState;
@@ -87,9 +87,9 @@ function timeLeft(deadline: Date, now: Date): string {
 /**
  * A student's side of an exam page: the one action their state allows, and the questions.
  *
- * `not-open` shows when the exam opens; `can-start` offers "Start exam";
+ * `not-open` shows when the exam opens; `can-start` offers "Start <noun>";
  * `in-progress` renders the questions in answer mode, saves each answer as it
- * changes, shows the time left, and offers "Submit exam" behind a
+ * changes, shows the time left, and offers "Submit <noun>" behind a
  * confirmation; `submitted` shows the saved answers read-only; `results`
  * adds the score and comments on each answer; `missed` says the student did
  * not take it.
@@ -264,7 +264,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							disabled={busy()}
 							onClick={start}
 						>
-							Start exam
+							Start {props.noun}
 						</button>
 					</div>
 				</Match>
@@ -282,14 +282,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						kind() === "results"
 					}
 				>
+					{/* Once the results are out, the score above says it all. */}
 					<Show
 						when={kind() === "in-progress"}
 						fallback={
-							<p role="status" class={NOTICE}>
-								{kind() === "submitted"
-									? "Submitted. Results are not out yet."
-									: "Submitted."}
-							</p>
+							<Show when={kind() === "submitted"}>
+								<p role="status" class={NOTICE}>
+									Submitted. Results are not out yet.
+								</p>
+							</Show>
 						}
 					>
 						<div class={`${NOTICE} flex items-center justify-between gap-3`}>
@@ -304,7 +305,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 								disabled={busy()}
 								onClick={() => dialog?.showModal()}
 							>
-								Submit exam
+								Submit {props.noun}
 							</button>
 						</div>
 					</Show>
@@ -346,10 +347,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 					<dialog ref={dialog} class="modal">
 						<div class="modal-box">
-							<h3 class="text-lg font-bold">Submit this exam?</h3>
+							<h3 class="text-lg font-bold">Submit this {props.noun}?</h3>
 							<p class="mt-2 text-sm text-base-content/70">
-								Your answers can't be changed after you submit. They are kept
-								and sent for grading. Questions you left blank stay blank.
+								Your answers can't be changed after you submit. Questions you
+								left blank stay blank.
 							</p>
 							<div class="modal-action">
 								<button
@@ -366,7 +367,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									disabled={busy()}
 									onClick={submit}
 								>
-									Submit exam
+									Submit {props.noun}
 								</button>
 							</div>
 						</div>
@@ -389,6 +390,7 @@ function Outcome(props: { outcome: QuestionOutcome | undefined }): JSX.Element {
 					<p class="font-semibold">
 						<Switch>
 							<Match when={outcome().status === "graded"}>
+								<span class="font-normal text-base-content/60">Score</span>{" "}
 								{formatScore(outcome().score ?? 0)}
 							</Match>
 							<Match when={outcome().status === "pending"}>
