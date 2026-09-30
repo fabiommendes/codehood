@@ -230,6 +230,7 @@ for (const submission of attempt?.submissions ?? []) {
         </section>
       )
     }
+
     {
       canManage && pendingAnswers > 0 && (
         <div
@@ -299,7 +300,6 @@ for (const submission of attempt?.submissions ?? []) {
     }
 
     {
-    {
       canManage && exam.type !== "PRACTICE" && (
         <QuestionStatsTable
           href={`${href}/exams/${exam.slug}`}
@@ -309,6 +309,7 @@ for (const submission of attempt?.submissions ?? []) {
       )
     }
 
+    {
       canManage && (
         <section class="mt-8">
           <h2 class="text-lg font-semibold">Details</h2>
@@ -327,7 +328,6 @@ for (const submission of attempt?.submissions ?? []) {
         </section>
       )
     }
-
 
     {
       canManage && (
