@@ -67,14 +67,17 @@ const WEEKDAY_LABEL: Record<string, string> = {
 	SATURDAY: "Sat",
 };
 
-// Same call and grouping the exam list page uses — the "Upcoming exams"
-// section is a preview of the `upcoming` group, falling back to `practice`
-// when there is none.
+// Same call and grouping the exam list page uses. The "Exams" section previews
+// the `open` and `upcoming` groups, falling back to `practice` when both are
+// empty.
 const exams = await db.exam.findMany({ course: course.id }, { actor });
 const examGroups = groupExamsForStudent(exams);
-const upcomingExams =
-	examGroups.find((g) => g.key === "upcoming") ??
-	examGroups.find((g) => g.key === "practice");
+const groupExams = (key: string) =>
+	examGroups.find((g) => g.key === key)?.exams ?? [];
+const currentExams = [...groupExams("open"), ...groupExams("upcoming")];
+const previewExams =
+	currentExams.length > 0 ? currentExams : groupExams("practice");
+const previewTitle = currentExams.length > 0 ? "Exams" : "Practice";
 
 // The syllabus line and the next few meetings. Both come from the same source
 // the Schedule tab reads; this section is a preview of it, not a copy.
@@ -134,15 +137,12 @@ const nextEvents = await db.calendarEvent.findMany(
     </div>
 
     {
-      upcomingExams && (
+      previewExams.length > 0 && (
         <section class="mt-10">
-          <SectionHeader
-            title={upcomingExams.key === "practice" ? "Practice" : "Upcoming exams"}
-            href={`${href}/exams`}
-          />
+          <SectionHeader title={previewTitle} href={`${href}/exams`} />
 
           <div class="mt-4 flex flex-col gap-3">
-            {upcomingExams.exams.map((exam) => (
+            {previewExams.map((exam) => (
               <ExamRow exam={exam} href={href} />
             ))}
           </div>

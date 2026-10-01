@@ -80,13 +80,15 @@ test("student: see the exams assigned to me", async ({ page }) => {
 		await expect(page.getByRole("table")).toHaveCount(0);
 	});
 
-	await test.step("the course home page lists the upcoming exam under Upcoming exams", async () => {
+	await test.step("the course home page lists the open exam, then the upcoming one, under Exams", async () => {
 		await page.goto(hrefOf(course));
 
-		await expect(
-			page.getByRole("heading", { name: "Upcoming exams", exact: true }),
-		).toBeVisible();
-		await expect(page.getByText(upcoming.title)).toBeVisible();
+		const rows = section(page, "Exams")
+			.getByRole("link")
+			.filter({ hasNotText: "View all" });
+		await expect(rows).toHaveCount(2);
+		await expect(rows.nth(0)).toContainText(open.title);
+		await expect(rows.nth(1)).toContainText(upcoming.title);
 	});
 
 	await test.step("a course with only practice exams falls back to the Practice heading", async () => {
@@ -107,7 +109,7 @@ test("student: see the exams assigned to me", async ({ page }) => {
 		).toBeVisible();
 		await expect(page.getByText(drill.title)).toBeVisible();
 		await expect(
-			page.getByRole("heading", { name: "Upcoming exams", exact: true }),
+			page.getByRole("heading", { name: "Exams", exact: true }),
 		).toHaveCount(0);
 	});
 
@@ -118,7 +120,7 @@ test("student: see the exams assigned to me", async ({ page }) => {
 		await page.goto(hrefOf(examlessCourse));
 
 		await expect(
-			page.getByRole("heading", { name: "Upcoming exams", exact: true }),
+			page.getByRole("heading", { name: "Exams", exact: true }),
 		).toHaveCount(0);
 		await expect(
 			page.getByRole("heading", { name: "Practice", exact: true }),
@@ -152,7 +154,7 @@ function hrefOf(
 /**
  * Scopes assertions to one exam section: the `<section>` wrapping the
  * heading named `title`, the same convention the course home page already
- * uses for "Upcoming exams", "Resources" and "Schedule".
+ * uses for "Exams", "Resources" and "Schedule".
  */
 function section(page: import("@playwright/test").Page, title: string) {
 	return page.locator("section").filter({
