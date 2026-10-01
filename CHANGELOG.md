@@ -120,6 +120,9 @@
 
 ### Fixed
 
+- Accepting an invite with a username, email, GitHub username or school id
+  already in use says which one in plain words instead of showing a database
+  error, and the form keeps what was typed.
 - A course's schedule counted the meetings still ahead among those "held so
   far".
 - An open exam shows on its course's home page, before the upcoming ones.
@@ -198,6 +201,8 @@
 
 ### Changed
 
+- The invite page says who sent the invite and, for a course invite, which
+  course it joins. A personal invite's pinned email looks read-only.
 - A course's home page previews the three resources added last, newest
   first, instead of the first three by title.
 - A course's schedule shows each meeting's date next to its weekday and time,

@@ -4,43 +4,7 @@ import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
 import { db, schema } from "@/db";
-
-const FIELD_LABELS: Record<string, string> = {
-	email: "email",
-	githubId: "GitHub username",
-	schoolId: "school id",
-};
-
-/**
- * Turns a Prisma unique-constraint violation into a message naming the conflicting field.
- */
-function uniqueConstraintMessage(error: unknown): string | null {
-	if (
-		typeof error !== "object" ||
-		error === null ||
-		(error as { code?: string }).code !== "P2002"
-	) {
-		return null;
-	}
-	// The classic engine reports meta.target; the better-sqlite3 driver adapter instead
-	// nests it under meta.driverAdapterError.cause.constraint.fields. Check both shapes.
-	const meta = (error as { meta?: Record<string, unknown> }).meta ?? {};
-	const adapterFields = (
-		meta.driverAdapterError as
-			| { cause?: { constraint?: { fields?: unknown } } }
-			| undefined
-	)?.cause?.constraint?.fields;
-	const target = meta.target ?? adapterFields;
-	const fields = Array.isArray(target)
-		? target
-		: typeof target === "string"
-			? [target]
-			: [];
-	const field = fields.map((f) => FIELD_LABELS[f]).find(Boolean);
-	return field
-		? `That ${field} is already in use.`
-		: "One of those values is already in use.";
-}
+import { uniqueConstraintMessage } from "./helpers";
 
 export const profile = {
 	update: defineAction({

@@ -31,7 +31,7 @@ test("student: redeem a personal invite", async ({ page }) => {
 
 	await test.step("the invite page says what is being joined", async () => {
 		await page.goto(`/invite/${invite.token}`);
-		await expect(page.getByText("You're accepting an invite")).toBeVisible();
+		await expect(page.getByText("invited you to")).toBeVisible();
 	});
 
 	// A personal invite renders its address into a `readonly` input, so the
@@ -98,13 +98,42 @@ test("student: redeem a classroom invite link", async ({ page }) => {
 		createdBy: course.instructor,
 	});
 
+	const taken = await seedUser({ role: "STUDENT" });
+
+	await test.step("the invite says who invited them and to which course", async () => {
+		await page.goto(`/invite/${invite.token}`);
+		await expect(
+			page.getByText(`${course.instructor.name} invited you to`),
+		).toBeVisible();
+		await expect(page.getByText(course.discipline.name)).toBeVisible();
+	});
+
+	await test.step("an account detail already taken is refused in plain words, keeping what was typed", async () => {
+		await acceptInvite(page, {
+			email: "classmate@codehood.test",
+			username: taken.username,
+			name: "A Classmate",
+			password: "correcthorse",
+		});
+		// The helper reuses the username as the GitHub one, so either may clash first.
+		await expect(page.getByRole("alert")).toHaveText(
+			/That (username|GitHub username) is already in use\./,
+		);
+		await expect(
+			page.getByRole("group", { name: "Name", exact: true }).locator("input"),
+		).toHaveValue("A Classmate");
+	});
+
 	// Not addressed to anyone, so the student supplies their own email.
-	await page.goto(`/invite/${invite.token}`);
-	await acceptInvite(page, {
-		email: "classmate@codehood.test",
-		username: "classmate",
-		name: "A Classmate",
-		password: "correcthorse",
+	await test.step("with a free username the account is created", async () => {
+		await page.goto(`/invite/${invite.token}`);
+		await acceptInvite(page, {
+			email: "classmate@codehood.test",
+			username: "classmate",
+			name: "A Classmate",
+			password: "correcthorse",
+		});
+		await expect(page).not.toHaveURL(/\/invite\//);
 	});
 
 	await page.goto("/courses");

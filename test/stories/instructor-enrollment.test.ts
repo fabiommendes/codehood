@@ -94,8 +94,10 @@ test("instructor: hand out one join link for the whole class", async ({
 		// "Anyone" in the story means someone with no account and no session.
 		await page.context().clearCookies();
 		await page.goto(url);
-		await expect(page.getByText("You're accepting an invite")).toBeVisible();
-		await expect(page.locator("strong")).toHaveText("student");
+		await expect(page.getByText("invited you to")).toBeVisible();
+		await expect(
+			page.getByText(/invited you to .* as a student\./),
+		).toBeVisible();
 	});
 
 	// The cap is the part the UI cannot show back, and the part an instructor

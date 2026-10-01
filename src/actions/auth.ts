@@ -7,7 +7,11 @@ import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { db, InviteError, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { parseCourseParams, USERNAME_RE } from "@/urls";
-import { withActionErrors, withServiceErrors } from "./helpers";
+import {
+	uniqueConstraintMessage,
+	withActionErrors,
+	withServiceErrors,
+} from "./helpers";
 
 export type PublicUser = Omit<User, "passwordHash" | "createdAt">;
 
@@ -114,6 +118,8 @@ export const auth = {
 						message: inviteErrorMessage(error.code),
 					});
 				}
+				const taken = uniqueConstraintMessage(error);
+				if (taken) throw new ActionError({ code: "CONFLICT", message: taken });
 				throw error;
 			}
 

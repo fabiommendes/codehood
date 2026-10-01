@@ -38,10 +38,12 @@ test("admin: invite an instructor", async ({ page }) => {
 		// The recipient is not the admin, and has no account yet.
 		await page.context().clearCookies();
 		await page.goto(url);
-		await expect(page.getByText("You're accepting an invite")).toBeVisible();
+		await expect(page.getByText("invited you to")).toBeVisible();
 		// The page names the role it grants; "instructor" alone would match the
 		// surrounding copy too.
-		await expect(page.locator("strong")).toHaveText("instructor");
+		await expect(
+			page.getByText(/invited you to .* as an instructor\./),
+		).toBeVisible();
 	});
 
 	// Issued for the address the admin typed, and for an instructor — the role

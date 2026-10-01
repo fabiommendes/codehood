@@ -17,6 +17,23 @@ const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
 	invite?.maxUses != null ? invite.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
+const course =
+	isValid && invite?.courseId
+		? await db.course.findOne({ id: invite.courseId }, FULL_ACCESS)
+		: null;
+const role = invite?.invitedRole.toLowerCase();
+
+// A rejected submission renders this page again; refill what was typed,
+// passwords aside.
+const submitted =
+	result?.error && Astro.request.method === "POST"
+		? await Astro.request.formData().catch(() => null)
+		: null;
+/// The value typed into `field` before a rejected submission, or empty.
+function typed(field: string): string {
+	const value = submitted?.get(field);
+	return typeof value === "string" ? value : "";
+}
 ---
 
 <CenteredLayout title="Accept invite">
@@ -41,9 +58,18 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
           </div>
         )}
 
-        <p class="text-sm text-base-content/60">
-          You're accepting an invite to join as{" "}
-          <strong>{invite.invitedRole.toLowerCase()}</strong>.
+        <p class="text-sm text-base-content/70">
+          {invite.createdBy.name} invited you to{" "}
+          {course ? (
+            <strong>
+              {course.discipline.name} ({course.edition.slug})
+            </strong>
+          ) : (
+            "Codehood"
+          )}{" "}
+          as {role === "instructor" || role === "admin" ? "an" : "a"}{" "}
+          <strong>{role}</strong>.
+          Create your account to accept.
         </p>
 
         <form
@@ -59,30 +85,34 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
               type="email"
               name="email"
               required
-              class="input w-full"
-              value={invite.email ?? ""}
+              autocomplete="email"
+              class:list={[
+                "input w-full",
+                invite.kind === "PERSONAL" && "bg-base-200 text-base-content/70",
+              ]}
+              value={invite.email ?? typed("email")}
               readonly={invite.kind === "PERSONAL"}
             />
           </fieldset>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">Username</legend>
-            <input type="text" name="username" required class="input w-full" />
+            <input type="text" name="username" required autocomplete="username" class="input w-full" value={typed("username")} />
           </fieldset>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">Name</legend>
-            <input type="text" name="name" required class="input w-full" />
+            <input type="text" name="name" required autocomplete="name" class="input w-full" value={typed("name")} />
           </fieldset>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">GitHub username</legend>
-            <input type="text" name="githubId" required class="input w-full" />
+            <input type="text" name="githubId" required class="input w-full" value={typed("githubId")} />
           </fieldset>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">School id</legend>
-            <input type="text" name="schoolId" required class="input w-full" />
+            <input type="text" name="schoolId" required class="input w-full" value={typed("schoolId")} />
           </fieldset>
 
           <fieldset class="fieldset">
@@ -93,6 +123,7 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
               id="password"
               required
               minlength="8"
+              autocomplete="new-password"
               class="input w-full"
             />
           </fieldset>
@@ -104,6 +135,7 @@ const isValid = Boolean(invite) && !isExpired && !isExhausted;
               id="passwordConfirm"
               required
               minlength="8"
+              autocomplete="new-password"
               class="input w-full"
             />
             <p class="label whitespace-normal" id="passwordMismatch" hidden>
