@@ -349,7 +349,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// A weekly pattern plus a few weeks of the term calendar for each course, so
 	// /calendar, /<course>/schedule, and the course home page all have real
 	// data to render. cs101 gets a holiday and a cancelled lab so the muted/
-	// struck-through rendering has something to show.
+	// struck-through rendering has something to show, and descriptions from
+	// none to a full lesson plan, so the schedule shows how they sit together.
 	const cs101Mon = await db.timeSlot.create(
 		{
 			course: cs101.id,
@@ -379,7 +380,17 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			week: 1,
 			kind: "REGULAR" as const,
 			title: "Course overview and tooling",
-			description: "Setting up the toolchain; how the term is graded.",
+			description: [
+				"How the term works and the tools we use all semester.",
+				"",
+				"- Course policies: grading, late work, collaboration",
+				"- The weekly rhythm: lecture on Monday, lab on Wednesday",
+				"- Tour of the editor, the terminal and `codehood`",
+				"- Where to ask for help: office hours and the forum",
+				"",
+				"Before Wednesday, read [the setup guide](https://docs.python.org/3/using/index.html)",
+				"and bring a laptop.",
+			].join("\n"),
 		},
 		{
 			slug: "w01-wed",
@@ -395,6 +406,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			week: 2,
 			kind: "REGULAR" as const,
 			title: "Variables and control flow",
+			description: [
+				"- Names, values and types: `int`, `float`, `str`, `bool`",
+				"- Comparisons and boolean logic",
+				"- `if`, `elif` and `else`",
+				"- `while` loops and when they stop",
+				"- `for` over a `range`",
+			].join("\n"),
 		},
 		{
 			slug: "w02-wed",
@@ -417,6 +435,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			week: 3,
 			kind: "REGULAR" as const,
 			title: "Practice: functions",
+			description: "Exercises 3.1 to 3.8 in pairs.",
 		},
 		{
 			slug: "w04-mon",
@@ -424,6 +443,18 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			week: 4,
 			kind: "REGULAR" as const,
 			title: "Functions and recursion",
+			description: [
+				"Functions as the unit of reuse, then functions that call themselves.",
+				"",
+				"1. Parameters, arguments and return values",
+				"2. Local and global scope",
+				"3. The call stack, drawn by hand",
+				"4. Recursion: base case and recursive step",
+				"5. Factorial, Fibonacci and why the naive Fibonacci is slow",
+				"",
+				"We finish with a live trace of `fib(5)` and count the calls.",
+				"Chapter 4 of the notes covers everything here.",
+			].join("\n"),
 		},
 		{
 			slug: "w04-wed",
@@ -455,9 +486,38 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			(7 * 24 * 3600 * 1000),
 	);
 	for (const event of [
-		{ slot: cs101Mon, week: weeksSoFar + 1, title: "Review: recursion" },
-		{ slot: cs101Wed, week: weeksSoFar + 1, title: "Project clinic" },
-		{ slot: cs101Mon, week: weeksSoFar + 2, title: "Review: data structures" },
+		{
+			slot: cs101Mon,
+			week: weeksSoFar + 1,
+			title: "Review: recursion",
+			description: [
+				"- Recursion on lists and strings",
+				"- Turning a recursion into a loop",
+				"- Common mistakes: a missing base case, a step that never shrinks",
+			].join("\n"),
+		},
+		{
+			slot: cs101Wed,
+			week: weeksSoFar + 1,
+			title: "Project clinic",
+			description: "Bring your project questions.",
+		},
+		{
+			slot: cs101Mon,
+			week: weeksSoFar + 2,
+			title: "Review: data structures",
+			description: [
+				"Lists, dictionaries and sets side by side, and how to pick one.",
+				"",
+				"- Lists: order and indexing, `append` versus `insert`",
+				"- Dictionaries: lookups by key, iterating over `items()`",
+				"- Sets: membership tests and removing duplicates",
+				"- The cost of each operation, from the complexity cheat sheet",
+				"",
+				"Solve the [practice set](https://example.com/cs101/ds-practice) before class;",
+				"we go over the hardest three together.",
+			].join("\n"),
+		},
 	]) {
 		await db.calendarEvent.create(
 			{
@@ -465,6 +525,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				timeSlot: event.slot.id,
 				week: event.week,
 				title: event.title,
+				description: event.description,
 				rev: `demo-upcoming-${event.week}-${event.slot.slug}-v1`,
 			},
 			FULL_ACCESS,
