@@ -7,11 +7,22 @@
 interface Props {
 	href?: string;
 	openDialog?: string;
+	/** Downloads the link instead of following it, saved under this file name. */
+	download?: string;
+	/** Opens the link in another tab, without a referrer. */
+	external?: boolean;
 	muted?: boolean;
 	class?: string;
 }
 
-const { href, openDialog, muted = false, class: className } = Astro.props;
+const {
+	href,
+	openDialog,
+	download,
+	external = false,
+	muted = false,
+	class: className,
+} = Astro.props;
 
 const cardClass = [
 	// A visible rule and a faint tint set the row apart from the page, which
@@ -30,6 +41,9 @@ const Tag = href ? "a" : openDialog ? "button" : "div";
 
 <Tag
   href={href}
+  download={download}
+  target={external ? "_blank" : undefined}
+  rel={external ? "noopener noreferrer" : undefined}
   type={openDialog ? "button" : undefined}
   data-open-dialog={openDialog}
   class={cardClass}

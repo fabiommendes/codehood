@@ -8,7 +8,7 @@ import { db, groupResourcesByType } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
-import { resourceKind } from "@/utils/resource-kind";
+import { resourceDetail } from "@/utils/resource-kind";
 import { fileDownloadName } from "@/utils/resource-url";
 
 export const prerender = false;
@@ -36,8 +36,13 @@ const ICONS = {
 	CODE: "m9 8-4 4 4 4M15 8l4 4-4 4M13.5 6.5l-3 11",
 } as const;
 
-const DOWNLOAD_ICON = "M12 4v11m0 0 4-4m-4 4-4-4M5 19h14";
+/// What a click on the row does, for the rows that leave the page: a download, or another tab.
+const TRAILING_ICONS: Partial<Record<keyof typeof ICONS, string>> = {
+	FILE: "M12 4v11m0 0 4-4m-4 4-4-4M5 19h14",
+	LINK: "M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
+};
 
+/// Where a row that is not a file leads: the link itself, or the resource's own page.
 function rowHref(resource: (typeof resources)[number]): string {
 	switch (resource.data.type) {
 		case "FILE":
@@ -90,114 +95,52 @@ function rowHref(resource: (typeof resources)[number]): string {
             </h3>
             <div class="mt-2 flex flex-col gap-3">
               {group.resources.map((resource) => {
-                const downloadFile =
+                const file =
                   resource.data.type === "FILE" ? resource.data : undefined;
-                const downloadName = downloadFile
-                  ? fileDownloadName(resource, downloadFile)
-                  : undefined;
-                const downloadHref = downloadFile?.link;
-                const linkUrl =
-                  resource.data.type === "LINK" ? rowHref(resource) : undefined;
-                const linkDialogId = linkUrl
-                  ? `link-resource-${resource.slug}`
-                  : undefined;
                 return (
-                  <>
-                    <ListRow
-                      href={
-                        downloadHref || linkDialogId
-                          ? undefined
-                          : rowHref(resource)
-                      }
-                      openDialog={linkDialogId}
+                  <ListRow
+                    href={file ? file.link : rowHref(resource)}
+                    download={file ? fileDownloadName(resource, file) : undefined}
+                    external={resource.data.type === "LINK"}
+                  >
+                    <span
+                      slot="leading"
+                      class="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary/10 text-primary"
                     >
-                      <span
-                        slot="leading"
-                        class="grid h-10 w-10 shrink-0 place-items-center rounded-field bg-primary/10 text-primary"
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d={ICONS[resource.data.type]}
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <p class="font-medium">{resource.title}</p>
+                    <p class="text-sm text-base-content/60">
+                      {resourceDetail(resource)}
+                    </p>
+                    {TRAILING_ICONS[resource.data.type] && (
+                      <svg
+                        slot="trailing"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        class="shrink-0 text-base-content/60"
+                        aria-hidden="true"
                       >
-                        <svg
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <path
-                            d={ICONS[resource.data.type]}
-                            stroke="currentColor"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                      </span>
-                      <p class="font-medium">{resource.title}</p>
-                      <p class="text-sm text-base-content/60">
-                        {resourceKind(resource.data)}
-                      </p>
-                      {downloadHref && (
-                        <a
-                          slot="trailing"
-                          href={downloadHref}
-                          download={downloadName}
-                          aria-label={`Download ${resource.title}`}
-                          title="Download"
-                          class="btn btn-square btn-ghost shrink-0"
-                        >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                          >
-                            <path
-                              d={DOWNLOAD_ICON}
-                              stroke="currentColor"
-                              stroke-width="1.6"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                            />
-                          </svg>
-                        </a>
-                      )}
-                    </ListRow>
-                    {linkDialogId && linkUrl && (
-                      <dialog id={linkDialogId} class="modal">
-                        <div class="modal-box">
-                          <form method="dialog">
-                            <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
-                              ✕
-                            </button>
-                          </form>
-                          <h3 class="text-lg font-bold">
-                            Do you want to go to this link?
-                          </h3>
-                          <p class="mt-3 break-all text-sm">
-                            <a href={linkUrl} class="link link-primary">
-                              {linkUrl}
-                            </a>
-                          </p>
-                          <div class="modal-action">
-                            <form method="dialog">
-                              <button type="submit" class="btn btn-ghost">
-                                Cancel
-                              </button>
-                            </form>
-                            <a
-                              href={linkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="btn btn-primary"
-                            >
-                              Open in another tab
-                            </a>
-                          </div>
-                        </div>
-                        <form method="dialog" class="modal-backdrop">
-                          <button>close</button>
-                        </form>
-                      </dialog>
+                        <path
+                          d={TRAILING_ICONS[resource.data.type]}
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
                     )}
-                  </>
+                  </ListRow>
                 );
               })}
             </div>

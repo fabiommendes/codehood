@@ -8,7 +8,7 @@ import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);
 
-test("a link on the course home leads to the Resources tab", async ({
+test("a link on the course home opens its site in another tab", async ({
 	page,
 }) => {
 	const student = await seedUser({ role: "STUDENT" });
@@ -21,6 +21,8 @@ test("a link on the course home leads to the Resources tab", async ({
 		course: course.id,
 		slug: "outside-reading",
 		title: "Outside reading",
+		description: null,
+		data: { type: "LINK", url: "https://www.example.com/reading" },
 	});
 	const href = courseHref({
 		discipline: course.discipline.slug,
@@ -31,8 +33,8 @@ test("a link on the course home leads to the Resources tab", async ({
 	await logInAs(page, student);
 	await page.goto(href);
 
-	// A link has no page of its own; it acts from its row on the list.
-	await expect(
-		page.getByRole("link", { name: "Outside reading" }),
-	).toHaveAttribute("href", `${href}/resources`);
+	const row = page.getByRole("link", { name: /Outside reading/ });
+	await expect(row).toHaveAttribute("href", "https://www.example.com/reading");
+	await expect(row).toHaveAttribute("target", "_blank");
+	await expect(row).toContainText("example.com");
 });

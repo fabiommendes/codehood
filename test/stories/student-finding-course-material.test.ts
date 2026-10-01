@@ -213,6 +213,7 @@ test("student: browse course resources", async ({ page }) => {
 	await persistedResourceFactory.create({
 		course: course.id,
 		title: "Syllabus overview",
+		description: null,
 		data: { type: "LINK", url: "https://example.com/syllabus" },
 	});
 
@@ -229,9 +230,7 @@ test("student: browse course resources", async ({ page }) => {
 	});
 
 	await test.step("clicking a file gives its bytes under its original filename", async () => {
-		const downloadLink = page.getByRole("link", {
-			name: "Download Lecture notes",
-		});
+		const downloadLink = page.getByRole("link", { name: /Lecture notes/ });
 		const href = await downloadLink.getAttribute("href");
 		const downloadName = await downloadLink.getAttribute("download");
 		expect(href).toBeTruthy();
@@ -242,6 +241,13 @@ test("student: browse course resources", async ({ page }) => {
 		expect(response.headers()["content-disposition"]).toContain(
 			downloadName as string,
 		);
+	});
+
+	await test.step("clicking a link opens its site in another tab", async () => {
+		const link = page.getByRole("link", { name: /Syllabus overview/ });
+		await expect(link).toHaveAttribute("href", "https://example.com/syllabus");
+		await expect(link).toHaveAttribute("target", "_blank");
+		await expect(link).toContainText("example.com");
 	});
 
 	await test.step("an old link to a since-removed file explains itself", async () => {

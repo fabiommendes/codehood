@@ -29,3 +29,30 @@ export function resourceKind(data: ResourceKindData): string {
 			return data.language;
 	}
 }
+
+/// The part of a resource its list row describes it by.
+type ResourceDetailData = {
+	description: string | null;
+	data: ResourceKindData | { type: "LINK"; url: string };
+};
+
+/**
+ * The line under a resource's title in a list: its description, or else what
+ * tells it apart from its neighbours (a link's site, a file's kind, a
+ * snippet's language).
+ *
+ * @example
+ * resourceDetail({ description: null, data: { type: "LINK", url: "https://www.python.org/doc" } }); // "python.org"
+ */
+export function resourceDetail(resource: ResourceDetailData): string {
+	if (resource.description) return resource.description;
+	const { data } = resource;
+	if (data.type === "LINK" && "url" in data) {
+		try {
+			return new URL(data.url).hostname.replace(/^www\./, "");
+		} catch {
+			return "Link";
+		}
+	}
+	return resourceKind(data);
+}

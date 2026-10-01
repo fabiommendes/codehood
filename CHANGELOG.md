@@ -196,6 +196,11 @@
 
 ### Changed
 
+- A resource's whole row acts on it: a file downloads, a link opens its
+  site in another tab without a confirmation dialog. The line under the
+  title shows the resource's description, or else a link's site, a file's
+  kind or a snippet's language.
+- A snippet's code stays readable in the light theme.
 - A course's home page drops its row of counts, and leaving the course is a
   link at the bottom instead of a card.
 - Date-times use a 24-hour clock everywhere, as in "Mon, Sep 28, 22:03".

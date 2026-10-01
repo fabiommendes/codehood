@@ -13,7 +13,8 @@ import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
-import { resourceKind } from "@/utils/resource-kind";
+import { resourceDetail } from "@/utils/resource-kind";
+import { fileDownloadName } from "@/utils/resource-url";
 import {
 	durationToMinutes,
 	formatClock,
@@ -88,11 +89,16 @@ const examPreview = courseHomeExams(
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
 const resources = await db.resource.findMany({ course: course.id }, { actor });
 
-/// Where a resource's row leads: its own page, or the list for files and links, which act from their row there.
+/// Where a resource's row leads: the file's download, the link itself, or the resource's own page.
 function resourceHref(resource: (typeof resources)[number]): string {
-	return resource.data.type === "MD" || resource.data.type === "CODE"
-		? `${href}/resources/${resource.slug}`
-		: `${href}/resources`;
+	switch (resource.data.type) {
+		case "FILE":
+			return resource.data.link;
+		case "LINK":
+			return resource.data.url;
+		default:
+			return `${href}/resources/${resource.slug}`;
+	}
 }
 
 const justJoined = Astro.url.searchParams.has("joined");
@@ -154,9 +160,17 @@ const nextEvents = await db.calendarEvent.findMany(
         ) : (
           <div class="mt-4 flex flex-col gap-3">
             {resources.slice(0, 3).map((resource) => (
-              <ListRow href={resourceHref(resource)}>
+              <ListRow
+                href={resourceHref(resource)}
+                download={
+                  resource.data.type === "FILE"
+                    ? fileDownloadName(resource, resource.data)
+                    : undefined
+                }
+                external={resource.data.type === "LINK"}
+              >
                 <p class="font-medium">{resource.title}</p>
-                <p class="text-sm text-base-content/60">{resourceKind(resource.data)}</p>
+                <p class="text-sm text-base-content/60">{resourceDetail(resource)}</p>
               </ListRow>
             ))}
           </div>
