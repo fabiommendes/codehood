@@ -11,6 +11,8 @@ function buildExam(sequence: number, params: Partial<ExamCreate>): ExamCreate {
 		title: params.title ?? faker.lorem.words(3),
 		type: params.type ?? "EXAM",
 		status: params.status ?? "SCHEDULED",
+		scheduledAt: params.scheduledAt,
+		duration: params.duration,
 	};
 }
 

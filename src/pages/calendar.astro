@@ -1,17 +1,22 @@
 ---
 // The viewer's own schedule, aggregated across every course they take or
 // teach (FR-CAL-021): what comes up next, then a month grid navigated with
-// ?month=YYYY-MM and the month's events listed by day, so a phone, which only
-// has room for dots in the grid, still reads every title. The month defaults
-// to the next event's (or the last one's) in the server zone.
-import type { Actor } from "@/auth/actor";
+// ?month=YYYY-MM and the month's meetings and dated exams listed by day, so a
+// phone, which only has room for dots in the grid, still reads every title.
+// The month defaults to the next entry's (or the last one's) in the server
+// zone.
 import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import {
+	type CalendarEntry,
+	calendarEntries,
+} from "@/services/calendar-entries";
 import { courseHref } from "@/urls";
+import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { formatDateTime, localDateOf, toInstant } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -50,31 +55,34 @@ const courseHrefs = new Map(
 const courseNames = new Map(courses.map((c) => [c.id, c.discipline.name]));
 
 const now = new Date();
+
+const events =
+	courseIds.length > 0
+		? await db.calendarEvent.findMany({ courseIds }, { actor })
+		: [];
+const exams = (
+	await Promise.all(
+		courses.map(async (course) =>
+			(
+				await db.exam.findMany({ course: course.id }, { actor })
+			).map((exam) => ({ courseId: course.id, exam })),
+		),
+	)
+).flat();
+const entries = calendarEntries(events, exams);
+
 const monthParam = Astro.url.searchParams.get("month");
 const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
+// Without ?month, open on the next entry's month, else the last one's, else today's.
+const defaultMonthDate =
+	entries.find((entry) => entry.endAt >= now)?.startAt ??
+	entries.at(-1)?.startAt ??
+	now;
 const [year, month] = (
 	monthMatch
 		? [Number(monthMatch[1]), Number(monthMatch[2])]
-		: localDateOf(await defaultMonthDate(actor))
-				.slice(0, 7)
-				.split("-")
-				.map(Number)
+		: localDateOf(defaultMonthDate).slice(0, 7).split("-").map(Number)
 ) as [number, number];
-
-/// A date in the month to open on: the next event's, else the last one's, else today's.
-async function defaultMonthDate(viewer: Actor): Promise<Date> {
-	if (courseIds.length === 0) return now;
-	const [next] = await db.calendarEvent.findMany(
-		{ courseIds, from: now, limit: 1 },
-		{ actor: viewer },
-	);
-	if (next) return next.startAt;
-	const past = await db.calendarEvent.findMany(
-		{ courseIds, to: now },
-		{ actor: viewer },
-	);
-	return past.at(-1)?.startAt ?? now;
-}
 
 const monthStart = toInstant(`${year}-${String(month).padStart(2, "0")}-01`, 0);
 const nextMonthYear = month === 12 ? year + 1 : year;
@@ -94,37 +102,31 @@ const prevMonthYear = month === 1 ? year - 1 : year;
 const nextHref = `/calendar?month=${nextMonthYear}-${String(nextMonth).padStart(2, "0")}`;
 const prevHref = `/calendar?month=${prevMonthYear}-${String(prevMonth).padStart(2, "0")}`;
 
-// Paging stops at the months that hold something: the first and last event,
+// Paging stops at the months that hold something: the first and last entry,
 // and today. Beyond them every month is empty.
-const allEvents =
-	courseIds.length > 0
-		? await db.calendarEvent.findMany({ courseIds }, { actor })
-		: [];
-const eventMonths = allEvents.map((event) =>
-	localDateOf(event.startAt).slice(0, 7),
+const entryMonths = entries.map((entry) =>
+	localDateOf(entry.startAt).slice(0, 7),
 );
-const firstMonth = [currentMonth, ...eventMonths].reduce((a, b) =>
+const firstMonth = [currentMonth, ...entryMonths].reduce((a, b) =>
 	a < b ? a : b,
 );
-const lastMonth = [currentMonth, ...eventMonths].reduce((a, b) =>
+const lastMonth = [currentMonth, ...entryMonths].reduce((a, b) =>
 	a > b ? a : b,
 );
 const hasPrev = shownMonth > firstMonth;
 const hasNext = shownMonth < lastMonth;
 
-const monthEvents =
-	courseIds.length > 0
-		? await db.calendarEvent.findMany(
-				{ courseIds, from: monthStart, to: monthEnd },
-				{ actor },
-			)
-		: [];
+const monthEntries = entries.filter(
+	(entry) => entry.startAt >= monthStart && entry.startAt < monthEnd,
+);
 
-const eventsByDay = new Map<string, typeof monthEvents>();
-for (const event of monthEvents) {
-	const day = localDateOf(event.startAt);
-	eventsByDay.set(day, [...(eventsByDay.get(day) ?? []), event]);
+const entriesByDay = new Map<string, CalendarEntry[]>();
+for (const entry of monthEntries) {
+	const day = localDateOf(entry.startAt);
+	entriesByDay.set(day, [...(entriesByDay.get(day) ?? []), entry]);
 }
+
+const upcoming = entries.filter((entry) => entry.endAt >= now).slice(0, 5);
 
 /// A day's heading in the month's list, e.g. "Mon, Jan 12".
 function dayLabel(instant: Date): string {
@@ -140,12 +142,31 @@ function startTime(instant: Date): string {
 	});
 }
 
-/// Where an event's course lists it.
-function scheduleHref(
-	courseId: (typeof courses)[number]["id"],
-): string | undefined {
-	const href = courseHrefs.get(courseId);
-	return href ? `${href}/schedule` : undefined;
+/// Where an entry leads: a meeting to its course's schedule, an exam to its own page.
+function entryHref(entry: CalendarEntry): string | undefined {
+	const href = courseHrefs.get(entry.courseId);
+	if (!href) return undefined;
+	return entry.kind === "exam"
+		? `${href}/exams/${entry.exam.slug}`
+		: `${href}/schedule`;
+}
+
+/// An entry's title as its course wrote it.
+function entryTitle(entry: CalendarEntry): string {
+	return entry.kind === "exam" ? entry.exam.title : entry.event.title;
+}
+
+/// The marker shape before an entry, a dot for a meeting and a square for an exam.
+function markerShape(entry: CalendarEntry): string {
+	return entry.kind === "exam" ? "rounded-[2px]" : "rounded-full";
+}
+
+/// A grid cell's first `count` entries, exams ahead of meetings so an exam is the last to fold into "+N more".
+function cellEntries(dayEntries: CalendarEntry[], count: number) {
+	return [
+		...dayEntries.filter((entry) => entry.kind === "exam"),
+		...dayEntries.filter((entry) => entry.kind === "event"),
+	].slice(0, count);
 }
 
 const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -166,14 +187,6 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
 	year: "numeric",
 	timeZone: "UTC",
 }).format(new Date(Date.UTC(year, month - 1, 1)));
-
-const upcoming =
-	courseIds.length > 0
-		? await db.calendarEvent.findMany(
-				{ courseIds, from: now, limit: 5 },
-				{ actor },
-			)
-		: [];
 ---
 
 <AppLayout title="Calendar">
@@ -192,28 +205,39 @@ const upcoming =
       )
     }
 
-    <section class="mt-8">
+    <section class="mt-8" aria-label="Upcoming">
       <SectionHeader title="Upcoming" />
       {
         upcoming.length === 0 ? (
           <p class="mt-4 text-sm text-base-content/60">Nothing coming up.</p>
         ) : (
           <div class="mt-4 flex flex-col gap-3">
-            {upcoming.map((event) => (
-              <ListRow href={scheduleHref(event.courseId)}>
+            {upcoming.map((entry) => (
+              <ListRow href={entryHref(entry)}>
                 <span
                   slot="leading"
                   class:list={[
-                    "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
-                    courseColor.get(event.courseId),
+                    "inline-block h-2.5 w-2.5 shrink-0",
+                    markerShape(entry),
+                    courseColor.get(entry.courseId),
                   ]}
                 />
-                <p class="font-medium">{event.title}</p>
+                <p class="font-medium">
+                  {entryTitle(entry)}
+                  {entry.kind === "exam" && (
+                    <span class="badge badge-secondary badge-sm ml-2">
+                      {examTypeLabels[entry.exam.type]}
+                    </span>
+                  )}
+                </p>
                 <p class="text-sm text-base-content/60">
-                  {courseNames.get(event.courseId)}
+                  {courseNames.get(entry.courseId)}
+                  {entry.kind === "exam" && entry.exam.duration && (
+                    <span> · {formatDuration(entry.exam.duration)}</span>
+                  )}
                 </p>
                 <span slot="trailing" class="text-sm text-base-content/60">
-                  {formatDateTime(event.startAt)}
+                  {formatDateTime(entry.startAt)}
                 </span>
               </ListRow>
             ))}
@@ -268,17 +292,17 @@ const upcoming =
           cells.map((day) => {
             if (!day) return <div />;
             const dayKey = `${shownMonth}-${String(day).padStart(2, "0")}`;
-            const dayEvents = eventsByDay.get(dayKey) ?? [];
+            const dayEntries = entriesByDay.get(dayKey) ?? [];
             const isToday = dayKey === today;
             const isPast = dayKey < today;
-            const Cell = dayEvents.length > 0 ? "a" : "div";
+            const Cell = dayEntries.length > 0 ? "a" : "div";
             return (
               <Cell
-                href={dayEvents.length > 0 ? `#day-${dayKey}` : undefined}
+                href={dayEntries.length > 0 ? `#day-${dayKey}` : undefined}
                 aria-current={isToday ? "date" : undefined}
                 class:list={[
                   "flex h-14 flex-col items-center gap-1 rounded-field border p-1 text-sm sm:h-16",
-                  dayEvents.length > 0
+                  dayEntries.length > 0
                     ? "border-primary/40 bg-primary/5 transition-colors hover:border-primary"
                     : "border-base-300",
                   isToday && "border-primary ring-1 ring-primary",
@@ -288,7 +312,7 @@ const upcoming =
                   class:list={[
                     isToday
                       ? "rounded-full bg-primary px-1.5 font-semibold text-primary-content"
-                      : dayEvents.length > 0
+                      : dayEntries.length > 0
                         ? "font-semibold"
                         : "text-base-content/70",
                     isPast && !isToday && "opacity-50",
@@ -296,34 +320,55 @@ const upcoming =
                 >
                   {day}
                 </span>
-                {/* Phones get one dot per event; the titles are in the list below. */}
+                {/* Phones get one marker per entry; the titles are in the list below. */}
                 <span class="flex gap-0.5 sm:hidden">
-                  {dayEvents.slice(0, 3).map((event) => (
+                  {cellEntries(dayEntries, 3).map((entry) => (
                     <span
                       class:list={[
-                        "inline-block h-1.5 w-1.5 rounded-full",
-                        courseColor.get(event.courseId),
+                        "inline-block h-1.5 w-1.5",
+                        markerShape(entry),
+                        courseColor.get(entry.courseId),
                       ]}
                     />
                   ))}
                 </span>
-                {dayEvents.slice(0, 2).map((event) => (
-                  <span
-                    title={event.title}
-                    class="hidden w-full min-w-0 items-center gap-1 text-[10px] text-base-content/60 sm:flex"
-                  >
+                {cellEntries(dayEntries, 2).map((entry) =>
+                  entry.kind === "exam" ? (
                     <span
-                      class:list={[
-                        "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
-                        courseColor.get(event.courseId),
-                      ]}
-                    />
-                    <span class="truncate">{event.title}</span>
-                  </span>
-                ))}
-                {dayEvents.length > 2 && (
+                      title={entry.exam.title}
+                      class="hidden w-full min-w-0 items-center gap-1 rounded-sm bg-secondary/15 px-0.5 text-[10px] text-base-content sm:flex"
+                    >
+                      <span
+                        class:list={[
+                          "inline-block h-1.5 w-1.5 shrink-0",
+                          markerShape(entry),
+                          courseColor.get(entry.courseId),
+                        ]}
+                      />
+                      <span class="shrink-0 font-semibold">
+                        {examTypeLabels[entry.exam.type]}
+                      </span>
+                      <span class="truncate">{entry.exam.title}</span>
+                    </span>
+                  ) : (
+                    <span
+                      title={entry.event.title}
+                      class="hidden w-full min-w-0 items-center gap-1 text-[10px] text-base-content/60 sm:flex"
+                    >
+                      <span
+                        class:list={[
+                          "inline-block h-1.5 w-1.5 shrink-0",
+                          markerShape(entry),
+                          courseColor.get(entry.courseId),
+                        ]}
+                      />
+                      <span class="truncate">{entry.event.title}</span>
+                    </span>
+                  ),
+                )}
+                {dayEntries.length > 2 && (
                   <span class="hidden text-[10px] text-base-content/40 sm:inline">
-                    +{dayEvents.length - 2} more
+                    +{dayEntries.length - 2} more
                   </span>
                 )}
               </Cell>
@@ -333,19 +378,19 @@ const upcoming =
       </div>
 
       {
-        monthEvents.length === 0 && courses.length > 0 && (
+        monthEntries.length === 0 && courses.length > 0 && (
           <p class="mt-4 text-center text-sm text-base-content/50">
-            No events this month.
+            Nothing scheduled this month.
           </p>
         )
       }
     </div>
 
     {
-      monthEvents.length > 0 && (
+      monthEntries.length > 0 && (
         <section class="mt-6" aria-label={`Events in ${monthLabel}`}>
           <ol class="flex flex-col gap-4">
-            {[...eventsByDay].map(([dayKey, dayEvents]) => (
+            {[...entriesByDay].map(([dayKey, dayEntries]) => (
               <li id={`day-${dayKey}`} class="group scroll-mt-20">
                 <h3
                   class:list={[
@@ -353,43 +398,59 @@ const upcoming =
                     dayKey < today && "text-base-content/50",
                   ]}
                 >
-                  {dayLabel(dayEvents[0]!.startAt)}
+                  {dayLabel(dayEntries[0]!.startAt)}
                   {dayKey === today && <span class="badge badge-primary badge-sm ml-2">Today</span>}
                 </h3>
                 <ul class="mt-2 divide-y divide-base-300 rounded-box border border-base-300 bg-base-100 group-target:border-primary">
-                  {dayEvents.map((event) => (
+                  {dayEntries.map((entry) => (
                     <li>
                       <a
-                        href={scheduleHref(event.courseId)}
+                        href={entryHref(entry)}
                         class="flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-base-200"
                       >
                         <span class="w-12 shrink-0 tabular-nums text-base-content/60">
-                          {startTime(event.startAt)}
+                          {startTime(entry.startAt)}
                         </span>
                         <span
                           class:list={[
-                            "inline-block h-2 w-2 shrink-0 self-center rounded-full",
-                            courseColor.get(event.courseId),
+                            "inline-block h-2 w-2 shrink-0 self-center",
+                            markerShape(entry),
+                            courseColor.get(entry.courseId),
                           ]}
                         />
-                        <span class="min-w-0 flex-1">
-                          <span
-                            class:list={[
-                              "font-medium",
-                              event.kind === "CANCELLED" && "line-through opacity-60",
-                            ]}
-                          >
-                            {event.title}
-                          </span>
-                          {event.kind !== "REGULAR" && (
-                            <span class="badge badge-ghost badge-sm ml-2">
-                              {event.kind === "HOLIDAY" ? "Holiday" : "Cancelled"}
+                        {entry.kind === "exam" ? (
+                          <span class="min-w-0 flex-1">
+                            <span class="font-medium">{entry.exam.title}</span>
+                            <span class="badge badge-secondary badge-sm ml-2">
+                              {examTypeLabels[entry.exam.type]}
                             </span>
-                          )}
-                          <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
-                            {courseNames.get(event.courseId)}
+                            <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
+                              {courseNames.get(entry.courseId)}
+                              {entry.exam.duration && (
+                                <span> · {formatDuration(entry.exam.duration)}</span>
+                              )}
+                            </span>
                           </span>
-                        </span>
+                        ) : (
+                          <span class="min-w-0 flex-1">
+                            <span
+                              class:list={[
+                                "font-medium",
+                                entry.event.kind === "CANCELLED" && "line-through opacity-60",
+                              ]}
+                            >
+                              {entry.event.title}
+                            </span>
+                            {entry.event.kind !== "REGULAR" && (
+                              <span class="badge badge-ghost badge-sm ml-2">
+                                {entry.event.kind === "HOLIDAY" ? "Holiday" : "Cancelled"}
+                              </span>
+                            )}
+                            <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
+                              {courseNames.get(entry.courseId)}
+                            </span>
+                          </span>
+                        )}
                       </a>
                     </li>
                   ))}

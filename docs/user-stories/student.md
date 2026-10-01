@@ -142,7 +142,9 @@ later why nothing happened.
 
 Student is enrolled in several courses at once and wants one view of the week
 rather than one tab per course. The personal calendar merges the events of every
-course they are enrolled in.
+course they are enrolled in, and the exams and quizzes that have a date sit on
+their day next to the meetings, marked as such and linking to the exam. Exams
+the instructor is still drafting are not there.
 
 
 ### Open the calendar on the next event

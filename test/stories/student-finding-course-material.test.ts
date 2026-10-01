@@ -451,6 +451,48 @@ test("student: see all my courses in one calendar", async ({ page }) => {
 		await expect(day).toContainText("Cancelled");
 	});
 
+	await test.step("a scheduled exam sits on its day next to the meetings, and a draft does not", async () => {
+		const scheduledAt = new Date(Date.now() + 5 * 86_400_000);
+		const quiz = await persistedExamFactory.create({
+			course: courseA.id,
+			slug: "cal-quiz",
+			title: "Recursion quiz",
+			type: "QUIZ",
+			scheduledAt,
+			duration: { minutes: 30 },
+		});
+		await persistedExamFactory.create({
+			course: courseA.id,
+			slug: "cal-draft",
+			title: "Unannounced final",
+			status: "DRAFT",
+			scheduledAt,
+		});
+		const dayKey = localDateOf(scheduledAt);
+		await page.goto(`/calendar?month=${dayKey.slice(0, 7)}`);
+
+		await expect(page.locator(`a[href="#day-${dayKey}"]`)).toContainText(
+			"Quiz",
+		);
+		const day = page.locator(`#day-${dayKey}`);
+		const row = day.getByRole("link", { name: /Recursion quiz/ });
+		await expect(row).toContainText("Quiz");
+		await expect(row).toContainText(courseA.discipline.name);
+		await expect(row).toContainText("30 min");
+		await expect(row).toHaveAttribute(
+			"href",
+			`${hrefOf(courseA)}/exams/${quiz.slug}`,
+		);
+		await expect(page.getByText("Unannounced final")).toHaveCount(0);
+
+		await page.goto("/calendar");
+		await expect(
+			page
+				.getByRole("region", { name: "Upcoming" })
+				.getByRole("link", { name: /Recursion quiz/ }),
+		).toBeVisible();
+	});
+
 	const currentMonth = monthOfNow();
 
 	await test.step("browsing another month offers a way back to today", async () => {
