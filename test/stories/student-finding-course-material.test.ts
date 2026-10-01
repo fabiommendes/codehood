@@ -419,6 +419,38 @@ test("student: see all my courses in one calendar", async ({ page }) => {
 		await expect(chip).not.toContainText("…");
 	});
 
+	await test.step("a day with events leads to the month's list, with each event's time and course", async () => {
+		const dayKey = localDateOf(longEvent.startAt);
+		await page.goto(`/calendar?month=${dayKey.slice(0, 7)}`);
+		await page.locator(`a[href="#day-${dayKey}"]`).click();
+
+		const day = page.locator(`#day-${dayKey}`);
+		await expect(day).toBeInViewport();
+		await expect(day).toContainText(longTitle);
+		await expect(day).toContainText(courseC.discipline.name);
+		await expect(day).toContainText(/\d{2}:\d{2}/);
+	});
+
+	await test.step("a cancelled meeting stays in the list, marked as cancelled", async () => {
+		const slot = await persistedTimeSlotFactory.create({
+			course: courseA.id,
+			day: futureDate(4).day,
+		});
+		const cancelled = await persistedCalendarEventFactory.create({
+			course: courseA.id,
+			timeSlot: slot.id,
+			week: 1,
+			kind: "CANCELLED",
+			title: "Lab moved online",
+		});
+		const dayKey = localDateOf(cancelled.startAt);
+		await page.goto(`/calendar?month=${dayKey.slice(0, 7)}`);
+
+		const day = page.locator(`#day-${dayKey}`);
+		await expect(day).toContainText("Lab moved online");
+		await expect(day).toContainText("Cancelled");
+	});
+
 	const currentMonth = monthOfNow();
 
 	await test.step("browsing another month offers a way back to today", async () => {
@@ -460,7 +492,11 @@ test("student: open the calendar on the next event", async ({ page }) => {
 	await test.step("with nothing left, it opens on the last event's month", async () => {
 		await page.goto("/calendar");
 		await expect(page.getByText(monthOf(last.startAt))).toBeVisible();
-		await expect(page.getByText("Old lab")).toBeVisible();
+		await expect(
+			page
+				.getByRole("region", { name: `Events in ${monthOf(last.startAt)}` })
+				.getByText("Old lab"),
+		).toBeVisible();
 	});
 
 	// A term starting now, whose only event is months away.

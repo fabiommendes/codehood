@@ -1,8 +1,9 @@
 ---
 // The viewer's own schedule, aggregated across every course they take or
-// teach (FR-CAL-021). A real month grid, navigated with ?month=YYYY-MM,
-// defaulting to the month of the next event (or of the last one) in the server
-// zone.
+// teach (FR-CAL-021): what comes up next, then a month grid navigated with
+// ?month=YYYY-MM and the month's events listed by day, so a phone, which only
+// has room for dots in the grid, still reads every title. The month defaults
+// to the next event's (or the last one's) in the server zone.
 import type { Actor } from "@/auth/actor";
 import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
@@ -83,7 +84,8 @@ const monthEnd = toInstant(
 	0,
 );
 
-const currentMonth = localDateOf(now).slice(0, 7);
+const today = localDateOf(now);
+const currentMonth = today.slice(0, 7);
 const shownMonth = `${year}-${String(month).padStart(2, "0")}`;
 const todayHref = `/calendar?month=${currentMonth}`;
 
@@ -122,6 +124,28 @@ const eventsByDay = new Map<string, typeof monthEvents>();
 for (const event of monthEvents) {
 	const day = localDateOf(event.startAt);
 	eventsByDay.set(day, [...(eventsByDay.get(day) ?? []), event]);
+}
+
+/// A day's heading in the month's list, e.g. "Mon, Jan 12".
+function dayLabel(instant: Date): string {
+	return formatDateTime(instant, { hour: undefined, minute: undefined });
+}
+
+/// An event's start on the 24-hour clock, e.g. "14:00".
+function startTime(instant: Date): string {
+	return formatDateTime(instant, {
+		weekday: undefined,
+		month: undefined,
+		day: undefined,
+	});
+}
+
+/// Where an event's course lists it.
+function scheduleHref(
+	courseId: (typeof courses)[number]["id"],
+): string | undefined {
+	const href = courseHrefs.get(courseId);
+	return href ? `${href}/schedule` : undefined;
 }
 
 const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -168,7 +192,37 @@ const upcoming =
       )
     }
 
-    <div class="mt-8 rounded-box border border-base-300 bg-base-100 p-5">
+    <section class="mt-8">
+      <SectionHeader title="Upcoming" />
+      {
+        upcoming.length === 0 ? (
+          <p class="mt-4 text-sm text-base-content/60">Nothing coming up.</p>
+        ) : (
+          <div class="mt-4 flex flex-col gap-3">
+            {upcoming.map((event) => (
+              <ListRow href={scheduleHref(event.courseId)}>
+                <span
+                  slot="leading"
+                  class:list={[
+                    "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
+                    courseColor.get(event.courseId),
+                  ]}
+                />
+                <p class="font-medium">{event.title}</p>
+                <p class="text-sm text-base-content/60">
+                  {courseNames.get(event.courseId)}
+                </p>
+                <span slot="trailing" class="text-sm text-base-content/60">
+                  {formatDateTime(event.startAt)}
+                </span>
+              </ListRow>
+            ))}
+          </div>
+        )
+      }
+    </section>
+
+    <div class="mt-10 rounded-box border border-base-300 bg-base-100 p-3 sm:p-5">
       <div class="flex items-center justify-between">
         {
           hasPrev ? (
@@ -182,10 +236,10 @@ const upcoming =
           )
         }
         <div class="flex items-center gap-3">
-          <p class="font-display text-lg font-semibold">{monthLabel}</p>
+          <h2 class="font-display text-lg font-semibold">{monthLabel}</h2>
           {
             shownMonth !== currentMonth && (
-              <a href={todayHref} class="btn btn-ghost btn-xs">
+              <a href={todayHref} class="btn btn-outline btn-xs">
                 Today
               </a>
             )
@@ -212,33 +266,51 @@ const upcoming =
       <div class="grid grid-cols-7 gap-1">
         {
           cells.map((day) => {
-            const dayKey = day
-              ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-              : null;
-            const dayEvents = dayKey ? (eventsByDay.get(dayKey) ?? []) : [];
+            if (!day) return <div />;
+            const dayKey = `${shownMonth}-${String(day).padStart(2, "0")}`;
+            const dayEvents = eventsByDay.get(dayKey) ?? [];
+            const isToday = dayKey === today;
+            const isPast = dayKey < today;
+            const Cell = dayEvents.length > 0 ? "a" : "div";
             return (
-              <div
+              <Cell
+                href={dayEvents.length > 0 ? `#day-${dayKey}` : undefined}
+                aria-current={isToday ? "date" : undefined}
                 class:list={[
-                  "flex h-16 flex-col items-center gap-1 rounded-field p-1 text-sm",
-                  day && "border border-base-300",
-                  dayEvents.length > 0 && "border-primary/40 bg-primary/5",
+                  "flex h-14 flex-col items-center gap-1 rounded-field border p-1 text-sm sm:h-16",
+                  dayEvents.length > 0
+                    ? "border-primary/40 bg-primary/5 transition-colors hover:border-primary"
+                    : "border-base-300",
+                  isToday && "border-primary ring-1 ring-primary",
                 ]}
               >
-                {day && (
-                  <span
-                    class={
-                      dayEvents.length > 0
+                <span
+                  class:list={[
+                    isToday
+                      ? "rounded-full bg-primary px-1.5 font-semibold text-primary-content"
+                      : dayEvents.length > 0
                         ? "font-semibold"
-                        : "text-base-content/70"
-                    }
-                  >
-                    {day}
-                  </span>
-                )}
+                        : "text-base-content/70",
+                    isPast && !isToday && "opacity-50",
+                  ]}
+                >
+                  {day}
+                </span>
+                {/* Phones get one dot per event; the titles are in the list below. */}
+                <span class="flex gap-0.5 sm:hidden">
+                  {dayEvents.slice(0, 3).map((event) => (
+                    <span
+                      class:list={[
+                        "inline-block h-1.5 w-1.5 rounded-full",
+                        courseColor.get(event.courseId),
+                      ]}
+                    />
+                  ))}
+                </span>
                 {dayEvents.slice(0, 2).map((event) => (
                   <span
                     title={event.title}
-                    class="flex w-full min-w-0 items-center gap-1 text-[10px] text-base-content/60"
+                    class="hidden w-full min-w-0 items-center gap-1 text-[10px] text-base-content/60 sm:flex"
                   >
                     <span
                       class:list={[
@@ -250,11 +322,11 @@ const upcoming =
                   </span>
                 ))}
                 {dayEvents.length > 2 && (
-                  <span class="text-[10px] text-base-content/40">
+                  <span class="hidden text-[10px] text-base-content/40 sm:inline">
                     +{dayEvents.length - 2} more
                   </span>
                 )}
-              </div>
+              </Cell>
             );
           })
         }
@@ -269,40 +341,64 @@ const upcoming =
       }
     </div>
 
-    <section class="mt-10">
-      <SectionHeader title="Upcoming" />
-      {
-        upcoming.length === 0 ? (
-          <p class="mt-4 text-sm text-base-content/60">Nothing coming up.</p>
-        ) : (
-          <div class="mt-4 flex flex-col gap-3">
-            {upcoming.map((event) => (
-              <ListRow
-                href={
-                  courseHrefs.get(event.courseId)
-                    ? `${courseHrefs.get(event.courseId)}/schedule`
-                    : undefined
-                }
-              >
-                <span
-                  slot="leading"
+    {
+      monthEvents.length > 0 && (
+        <section class="mt-6" aria-label={`Events in ${monthLabel}`}>
+          <ol class="flex flex-col gap-4">
+            {[...eventsByDay].map(([dayKey, dayEvents]) => (
+              <li id={`day-${dayKey}`} class="group scroll-mt-20">
+                <h3
                   class:list={[
-                    "inline-block h-2.5 w-2.5 shrink-0 rounded-full",
-                    courseColor.get(event.courseId),
+                    "text-sm font-semibold group-target:text-primary",
+                    dayKey < today && "text-base-content/50",
                   ]}
-                />
-                <p class="font-medium">{event.title}</p>
-                <p class="text-sm text-base-content/60">
-                  {courseNames.get(event.courseId)}
-                </p>
-                <span slot="trailing" class="text-sm text-base-content/60">
-                  {formatDateTime(event.startAt)}
-                </span>
-              </ListRow>
+                >
+                  {dayLabel(dayEvents[0]!.startAt)}
+                  {dayKey === today && <span class="badge badge-primary badge-sm ml-2">Today</span>}
+                </h3>
+                <ul class="mt-2 divide-y divide-base-300 rounded-box border border-base-300 bg-base-100 group-target:border-primary">
+                  {dayEvents.map((event) => (
+                    <li>
+                      <a
+                        href={scheduleHref(event.courseId)}
+                        class="flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-base-200"
+                      >
+                        <span class="w-12 shrink-0 tabular-nums text-base-content/60">
+                          {startTime(event.startAt)}
+                        </span>
+                        <span
+                          class:list={[
+                            "inline-block h-2 w-2 shrink-0 self-center rounded-full",
+                            courseColor.get(event.courseId),
+                          ]}
+                        />
+                        <span class="min-w-0 flex-1">
+                          <span
+                            class:list={[
+                              "font-medium",
+                              event.kind === "CANCELLED" && "line-through opacity-60",
+                            ]}
+                          >
+                            {event.title}
+                          </span>
+                          {event.kind !== "REGULAR" && (
+                            <span class="badge badge-ghost badge-sm ml-2">
+                              {event.kind === "HOLIDAY" ? "Holiday" : "Cancelled"}
+                            </span>
+                          )}
+                          <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
+                            {courseNames.get(event.courseId)}
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </li>
             ))}
-          </div>
-        )
-      }
-    </section>
+          </ol>
+        </section>
+      )
+    }
   </main>
 </AppLayout>

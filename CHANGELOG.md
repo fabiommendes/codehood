@@ -4,6 +4,12 @@
 
 ### Added
 
+- The calendar lists the shown month's events by day under the grid, with
+  the time, the course and the full title; a day with events in the grid
+  leads to its entries. Today is marked, past days are dimmed, and phones
+  show dots in the grid instead of cut-off titles. Upcoming events come
+  first. Holidays and cancelled meetings are labelled, a cancelled one
+  struck through.
 - Taking an exam keeps a bar in view under the top bar: the time left,
   orange in the last five minutes and red in the last one, how many
   questions are answered, whether every answer is saved, the submit button,
