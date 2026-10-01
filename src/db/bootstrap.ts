@@ -1007,7 +1007,7 @@ async function seedGradedExam(
 	await db.feedback.create(
 		{
 			submission: { publicId: liskov["explain-recursion"] ?? "" },
-			ref: "manual-1",
+			ref: "wng-manual-1",
 			score: "0",
 			feedback: "Submitted empty.",
 		},

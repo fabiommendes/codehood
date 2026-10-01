@@ -26,8 +26,13 @@ export interface GradingPass {
 	grader: string | null;
 	/// The bot that graded, or `null` when a user did.
 	bot: string | null;
+	/// Whether the pass marked the answer will-not-grade, rather than scoring it.
+	willNotGrade: boolean;
 	updatedAt: Date;
 }
+
+/// The prefix of the `ref` of a pass that marks an answer will-not-grade.
+export const WILL_NOT_GRADE_REF = "wng-";
 
 /// The newest submission a student made to one question within a closed attempt.
 export interface CountingAnswer {
@@ -65,7 +70,8 @@ export type GradingAttempt = Pick<
 export type GradingFeedback = Pick<
 	Feedback,
 	"submission" | "score" | "feedback" | "grader" | "bot" | "updatedAt"
->;
+> &
+	Partial<Pick<Feedback, "ref">>;
 
 /**
  * The counting answers of every closed attempt at `exam`, in submission order.
@@ -171,6 +177,7 @@ function toGradingPass(pass: GradingFeedback): GradingPass {
 		comment: pass.feedback?.trim() ? pass.feedback : null,
 		grader: pass.grader,
 		bot: pass.bot,
+		willNotGrade: pass.ref?.startsWith(WILL_NOT_GRADE_REF) ?? false,
 		updatedAt: pass.updatedAt,
 	};
 }

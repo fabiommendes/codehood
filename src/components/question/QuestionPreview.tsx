@@ -29,6 +29,8 @@ export interface QuestionPreviewProps {
 	 * Omit it to keep the standalone behavior (own signal, own tab bar).
 	 */
 	tab?: Accessor<PreviewTab>;
+	/** Leaves the score badge out of the key tab, where it only restates that the key is right. */
+	hideScore?: boolean;
 }
 
 /** Which of the two ways an instructor can look at the question is on screen. */
@@ -87,42 +89,49 @@ export default function QuestionPreview(
 					<EssayPreview
 						question={question() as Question<schema.Essay>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 				<Match when={question().type === "numeric"}>
 					<NumericPreview
 						question={question() as Question<schema.Numeric>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 				<Match when={question().type === "short-answer"}>
 					<ShortAnswerPreview
 						question={question() as Question<schema.ShortAnswer>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 				<Match when={question().type === "multiple-choice"}>
 					<MultipleChoicePreview
 						question={question() as Question<schema.MultipleChoice>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 				<Match when={question().type === "multiple-selection"}>
 					<MultipleSelectionPreview
 						question={question() as Question<schema.MultipleSelection>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 				<Match when={question().type === "true-false"}>
 					<TrueFalsePreview
 						question={question() as Question<schema.TrueFalse>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 				<Match when={question().type === "fill-in"}>
 					<FillInPreview
 						question={question() as Question<schema.FillIn>}
 						tab={tab}
+						hideScore={props.hideScore}
 					/>
 				</Match>
 			</Switch>
@@ -179,6 +188,7 @@ function SimulateControls(props: SimulateControlsProps): JSX.Element {
 interface TypePreviewProps<Q extends schema.Question> {
 	question: Question<Q>;
 	tab: Accessor<PreviewTab>;
+	hideScore?: boolean;
 }
 
 function EssayPreview(props: TypePreviewProps<schema.Essay>): JSX.Element {
@@ -223,6 +233,7 @@ function EssayPreview(props: TypePreviewProps<schema.Essay>): JSX.Element {
 				<EssayView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={key()}
 					result={keyResult()}
 				/>
@@ -273,6 +284,7 @@ function NumericPreview(props: TypePreviewProps<schema.Numeric>): JSX.Element {
 				<NumericView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={key()}
 					result={keyResult()}
 				/>
@@ -328,6 +340,7 @@ function ShortAnswerPreview(
 				<ShortAnswerView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={keyValue()}
 					result={keyResult()}
 				/>
@@ -387,6 +400,7 @@ function MultipleChoicePreview(
 				<MultipleChoiceView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={keyChoice() ?? null}
 					result={keyResult()}
 				/>
@@ -443,6 +457,7 @@ function MultipleSelectionPreview(
 				<MultipleSelectionView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={key()}
 					result={keyResult()}
 				/>
@@ -500,6 +515,7 @@ function TrueFalsePreview(
 				<TrueFalseView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={key()}
 					result={keyResult()}
 				/>
@@ -560,6 +576,7 @@ function FillInPreview(props: TypePreviewProps<schema.FillIn>): JSX.Element {
 				<FillInView
 					question={publicQ()}
 					mode="review"
+					hideScore={props.hideScore}
 					value={keyValue()}
 					result={keyResult()}
 				/>

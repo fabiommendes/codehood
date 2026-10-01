@@ -12,15 +12,8 @@ Found by walking every page as a student, an instructor and an admin, at
 
 ## Grading
 
-- The answer key on the grading page shows a "Score 1.00" badge. It comes from
-  `QuestionPreview`, whose key tab scores the key itself, and says nothing to
-  a grader.
 - A choice question repeats its statement and options in every answer, below
   the answer key that already shows them.
-- The grading history shows the pass that carries a will-not-grade comment as
-  "0%", under a verdict that reads "Not graded".
-- `grading.willNotGrade` writes the comment's pass and the status in two
-  service calls, not one transaction.
 - `withServiceErrors` in `src/actions/helpers.ts` turns `NotFound` into
   `BAD_REQUEST`, for every action.
 - "Submitted" on the attempt page is the response's `updatedAt`; attempts

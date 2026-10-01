@@ -20,6 +20,8 @@ export interface MultipleChoiceViewProps {
 	value?: string | null;
 	onChange?: (choiceId: string) => void;
 	mode?: QuestionMode;
+	/// Leaves out the score badge in `review` mode; the marking of the answer stays.
+	hideScore?: boolean;
 	result?: QuestionResult<"multiple-choice">;
 }
 
@@ -78,7 +80,7 @@ export default function MultipleChoiceView(
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={mode() === "review" && props.result}>
+			<Show when={!props.hideScore && mode() === "review" && props.result}>
 				{(result) => (
 					<div class="flex justify-end">
 						<Badge {...scoreBadge(result().score)}>

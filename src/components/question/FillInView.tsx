@@ -17,6 +17,8 @@ export interface FillInViewProps {
 	value?: Record<string, string>;
 	onChange?: (next: Record<string, string>) => void;
 	mode?: QuestionMode;
+	/// Leaves out the score badge in `review` mode; the marking of the answer stays.
+	hideScore?: boolean;
 	result?: QuestionResult<"fill-in">;
 }
 
@@ -68,7 +70,7 @@ export default function FillInView(props: FillInViewProps): JSX.Element {
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={graded() && props.result}>
+			<Show when={!props.hideScore && graded() && props.result}>
 				{(result) => (
 					<div class="flex justify-end">
 						<Badge {...scoreBadge(result().score)}>

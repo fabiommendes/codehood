@@ -457,6 +457,16 @@ test("a graded answer can be marked will-not-grade, and its earlier passes stay"
 	const passes = await passesOn(submissions[0] ?? "");
 	const first = passes.find((p) => p.feedback === "First look");
 	expect(first?.score).toBe("1");
+
+	// The history tells the pass that carries the comment from a grade of zero.
+	const entries = history(article);
+	await expect(
+		entries.filter({ hasText: "Copied from a classmate" }),
+	).toContainText("Not graded");
+	await expect(
+		entries.filter({ hasText: "Copied from a classmate" }),
+	).not.toContainText("0%");
+	await expect(entries.filter({ hasText: "First look" })).toContainText("100%");
 });
 
 test("a will-not-grade answer has no Will not grade button, and Change grade makes it graded again", async ({

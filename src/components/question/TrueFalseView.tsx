@@ -20,6 +20,8 @@ export interface TrueFalseViewProps {
 	value?: ReadonlyMap<string, boolean>;
 	onChange?: (answers: Map<string, boolean>) => void;
 	mode?: QuestionMode;
+	/// Leaves out the score badge in `review` mode; the marking of the answer stays.
+	hideScore?: boolean;
 	result?: QuestionResult<"true-false">;
 }
 
@@ -147,7 +149,7 @@ export default function TrueFalseView(props: TrueFalseViewProps): JSX.Element {
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={mode() === "review" && props.result}>
+			<Show when={!props.hideScore && mode() === "review" && props.result}>
 				{(result) => (
 					<div class="flex justify-end">
 						<Badge {...scoreBadge(result().score)}>

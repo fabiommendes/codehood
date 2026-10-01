@@ -15,6 +15,8 @@ export interface NumericViewProps {
 	value?: number | null;
 	onChange?: (value: number | null) => void;
 	mode?: QuestionMode;
+	/// Leaves out the score badge in `review` mode; the marking of the answer stays.
+	hideScore?: boolean;
 	result?: QuestionResult<"numeric">;
 }
 
@@ -38,7 +40,7 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={graded() && props.result}>
+			<Show when={!props.hideScore && graded() && props.result}>
 				{(result) => (
 					<div class="flex justify-end">
 						<Badge {...scoreBadge(result().score)}>

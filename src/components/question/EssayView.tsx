@@ -28,6 +28,8 @@ export interface EssayViewProps {
 	value?: string;
 	onChange?: (text: string) => void;
 	mode?: QuestionMode;
+	/// Leaves out the score badge in `review` mode; the marking of the answer stays.
+	hideScore?: boolean;
 	result?: QuestionResult<"essay">;
 }
 
@@ -72,7 +74,7 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={mode() === "review" && props.result}>
+			<Show when={!props.hideScore && mode() === "review" && props.result}>
 				{(result) => (
 					<div class="flex justify-end">
 						<Show

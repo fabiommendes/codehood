@@ -9,5 +9,5 @@ export interface AnswerKeyProps {
 
 /** A question with its correct answer marked, without the student/key toggle. */
 export default function AnswerKey(props: AnswerKeyProps): JSX.Element {
-	return <QuestionPreview data={props.question} tab={() => "key"} />;
+	return <QuestionPreview data={props.question} tab={() => "key"} hideScore />;
 }

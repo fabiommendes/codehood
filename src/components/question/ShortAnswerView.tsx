@@ -26,6 +26,8 @@ export interface ShortAnswerViewProps {
 	value?: string;
 	onChange?: (text: string) => void;
 	mode?: QuestionMode;
+	/// Leaves out the score badge in `review` mode; the marking of the answer stays.
+	hideScore?: boolean;
 	result?: QuestionResult<"short-answer">;
 }
 
@@ -72,7 +74,7 @@ export default function ShortAnswerView(
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={graded()}>
+			<Show when={!props.hideScore && graded()}>
 				<div class="flex justify-end">
 					<Show
 						when={settled()}

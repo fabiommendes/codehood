@@ -140,7 +140,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                       {answer.passes.map((pass) => (
                         <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
                           <p>
-                            <span class="font-medium">{pass.score === null ? "No score" : formatScore(pass.score)}</span>
+                            <span class="font-medium">{pass.willNotGrade ? "Not graded" : pass.score === null ? "No score" : formatScore(pass.score)}</span>
                             <span class="text-base-content/60"> · {graderName(pass)}</span>
                           </p>
                           {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}

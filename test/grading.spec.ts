@@ -443,6 +443,7 @@ test("countingAnswers: passes list newest first and carry grader, bot and time",
 			comment: null,
 			grader: null,
 			bot: "auto-grader",
+			willNotGrade: false,
 			updatedAt: at(30),
 		},
 		{
@@ -450,6 +451,7 @@ test("countingAnswers: passes list newest first and carry grader, bot and time",
 			comment: null,
 			grader: "assistant",
 			bot: null,
+			willNotGrade: false,
 			updatedAt: at(20),
 		},
 		{
@@ -457,6 +459,7 @@ test("countingAnswers: passes list newest first and carry grader, bot and time",
 			comment: null,
 			grader: "teacher",
 			bot: null,
+			willNotGrade: false,
 			updatedAt: at(10),
 		},
 	]);
@@ -748,4 +751,16 @@ test("parsePercentScore: integers above 100 are refused", () => {
 			expect(parsePercentScore(String(n))).toBeNull();
 		}),
 	);
+});
+
+test("countingAnswers: a pass whose ref starts with wng- marked the answer will-not-grade", () => {
+	const answers = answersOf(
+		[submission("s1", "q1", 5)],
+		[
+			pass("s1", "1", 10, { ref: "web-1" }),
+			pass("s1", "0", 20, { ref: "wng-1" }),
+		],
+	);
+
+	expect(answers[0]?.passes.map((p) => p.willNotGrade)).toEqual([true, false]);
 });

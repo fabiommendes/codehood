@@ -117,6 +117,10 @@
 
 ### Fixed
 
+- The answer key on the grading page no longer carries a "Score 1.00" badge.
+- Marking an answer will-not-grade writes its comment and the status in one
+  transaction, and the grading history reads that pass as "Not graded"
+  instead of "0%".
 - A student who filtered a course's exams by status got drafts and archived
   exams back; the status filter now only narrows what they may see.
 - The calendar's month paging stops at the first and the last event (and

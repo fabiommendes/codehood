@@ -5,7 +5,12 @@ import type { UserActor } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
 import { NotFound } from "@/core/error";
 import { db } from "@/db";
-import { parsePercentScore, SCORE_ERROR } from "@/services/grading";
+import { type PrismaTx, prisma } from "@/db/client";
+import {
+	parsePercentScore,
+	SCORE_ERROR,
+	WILL_NOT_GRADE_REF,
+} from "@/services/grading";
 import { type CourseNaturalKey, parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
@@ -54,14 +59,27 @@ export const grading = {
 			const actor = requireUser(context);
 			const course = await checkedAnswer(input, actor);
 
-			if (input.comment?.trim()) {
-				await recordPass(input.submission, course, "0", input.comment, actor);
-			}
-			await db.submission.update(
-				{ publicId: input.submission, course },
-				{ status: "WILL_NOT_GRADE" },
-				{ actor },
-			);
+			// One transaction: the comment's pass and the status land together.
+			await prisma.$transaction(async (tx) => {
+				if (input.comment?.trim()) {
+					await recordPass(
+						input.submission,
+						course,
+						"0",
+						input.comment,
+						actor,
+						{
+							ref: `${WILL_NOT_GRADE_REF}${randomUUID()}`,
+							tx,
+						},
+					);
+				}
+				await db.submission.update(
+					{ publicId: input.submission, course },
+					{ status: "WILL_NOT_GRADE" },
+					{ actor, tx },
+				);
+			});
 		}),
 	}),
 };
@@ -95,15 +113,16 @@ async function recordPass(
 	score: string,
 	comment: string | undefined,
 	actor: UserActor,
+	options: { ref?: string; tx?: PrismaTx } = {},
 ): Promise<void> {
 	const text = comment?.trim();
 	await db.feedback.create(
 		{
 			submission: { publicId: submission, course },
-			ref: `web-${randomUUID()}`,
+			ref: options.ref ?? `web-${randomUUID()}`,
 			score,
 			feedback: text ? text : null,
 		},
-		{ actor },
+		{ actor, tx: options.tx },
 	);
 }

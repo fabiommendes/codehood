@@ -444,6 +444,8 @@ test("question page: a correct answer is shown under a Correct answer heading, f
 				exact: true,
 			}),
 		).toBeVisible();
+		// The key tab's score badge says only that the key is right.
+		await expect(page.getByText(/^Score \d/)).toHaveCount(0);
 	}
 });
 
