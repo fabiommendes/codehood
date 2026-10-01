@@ -1,6 +1,7 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
 import { type Course, db, type User } from "@/db";
+import { localDateOf, toInstant } from "@/utils/schedule-time";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -735,6 +736,27 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedReleasedQuiz(cs101.id, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedOpenQuiz(cs101.id);
+
+	// A quiz two weeks from the day the seed runs, so the calendar's upcoming
+	// list always has an exam in it.
+	await db.exam.create(
+		{
+			course: cs101.id,
+			slug: "quiz-03",
+			type: "QUIZ",
+			status: "SCHEDULED",
+			title: "Quiz 3: data structures",
+			description: "Lists, stacks and queues.",
+			scheduledAt: toInstant(
+				localDateOf(new Date(Date.now() + 14 * 24 * 3600 * 1000)),
+				14 * 60,
+			),
+			duration: { minutes: 30 },
+			tags: ["data-structures"],
+			questions: [{ slug: "recursion-basics", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
 
 	console.log(
 		`[dev] created demo courses cs101/${ada.username}_2026-1 and cs201/${alan.username}_2026-1.`,
