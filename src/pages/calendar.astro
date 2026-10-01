@@ -432,7 +432,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                   {dayLabel(dayEntries[0]!.startAt)}
                   {dayKey === today && <span class="badge badge-primary badge-sm ml-2">Today</span>}
                 </h3>
-                <ul class="mt-2 divide-y divide-base-300 rounded-box border border-base-300 bg-base-100 group-target:border-primary">
+                <ul class="mt-2 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50 group-target:border-primary">
                   {dayEntries.map((entry) => (
                     <li>
                       <a

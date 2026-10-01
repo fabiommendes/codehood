@@ -14,7 +14,9 @@ interface Props {
 const { href, openDialog, muted = false, class: className } = Astro.props;
 
 const cardClass = [
-	"card card-border bg-base-100",
+	// A visible rule and a faint tint set the row apart from the page, which
+	// is base-100 itself, in both themes.
+	"card border border-base-content/15 bg-base-200/50",
 	(href || openDialog) && "transition-colors hover:border-primary",
 	openDialog && "w-full text-left",
 	muted && "opacity-70",
