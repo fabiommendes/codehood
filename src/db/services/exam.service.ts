@@ -202,9 +202,13 @@ export class ExamService extends CrudBase<{
 		const rows = await tx.exam.findMany({
 			where: {
 				courseId: course.id,
-				...(full ? {} : { status: { notIn: ["DRAFT", "ARCHIVED"] } }),
+				// Both conditions hold together: a status filter narrows what the
+				// actor may see, it never widens it to drafts.
+				AND: [
+					full ? {} : { status: { notIn: ["DRAFT", "ARCHIVED"] } },
+					filter.statuses ? { status: { in: filter.statuses } } : {},
+				],
 				...(filter.exams ? { slug: { in: filter.exams } } : {}),
-				...(filter.statuses ? { status: { in: filter.statuses } } : {}),
 				...(filter.types ? { type: { in: filter.types } } : {}),
 				...(filter.tags
 					? { examTags: { some: { tag: { in: filter.tags } } } }

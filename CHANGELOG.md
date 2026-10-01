@@ -116,6 +116,8 @@
 
 ### Fixed
 
+- A student who filtered a course's exams by status got drafts and archived
+  exams back; the status filter now only narrows what they may see.
 - The calendar's month paging stops at the first and the last event (and
   today), instead of walking through empty months in both directions.
 - An answer that failed to save because the connection dropped stopped
