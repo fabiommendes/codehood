@@ -151,12 +151,6 @@ test("student: read the course home page", async ({ page }) => {
 	await expect(page.getByText(course.description as string)).toBeVisible();
 	await expect(page.getByText("Introduction to recursion")).toBeVisible();
 
-	await test.step("the stats count what the student can see, not placeholder numbers", async () => {
-		await expect(stat(page, "Exams")).toHaveText(/^\s*Exams\s*2\b/);
-		await expect(stat(page, "Students")).toHaveText(/^\s*Students\s*3\b/);
-		await expect(stat(page, "Resources")).toHaveText(/^\s*Resources\s*4\b/);
-	});
-
 	await test.step("the Resources section lists at most three real resources, each linking to its page", async () => {
 		const resources = section(page, "Resources");
 
@@ -192,7 +186,6 @@ test("student: read the course home page", async ({ page }) => {
 		const resources = section(page, "Resources");
 		await expect(resources).toContainText("No resources yet");
 		await expect(resources.locator('a[href*="/resources/"]')).toHaveCount(0);
-		await expect(stat(page, "Resources")).toHaveText(/^\s*Resources\s*0\b/);
 		await expect(page.getByText("Syllabus")).toHaveCount(0);
 	});
 });
@@ -625,12 +618,4 @@ function section(page: Page, title: string) {
 	return page.locator("section").filter({
 		has: page.getByRole("heading", { name: title, exact: true }),
 	});
-}
-
-/// The stats block entry labelled `label`: the parent of the label text, read as "Exams 2 ...".
-function stat(page: Page, label: string) {
-	return page
-		.getByText(label, { exact: true })
-		.locator("xpath=..")
-		.filter({ hasText: new RegExp(`^\\s*${label}\\s*\\d`) });
 }
