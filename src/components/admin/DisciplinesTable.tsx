@@ -91,7 +91,8 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 							<form method="dialog">
 								<button
 									class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
-									type="button"
+									type="submit"
+									aria-label="Close"
 								>
 									✕
 								</button>

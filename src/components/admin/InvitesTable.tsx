@@ -63,7 +63,8 @@ export default function InvitesTable(props: Props): JSX.Element {
 							<form method="dialog">
 								<button
 									class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
-									type="button"
+									type="submit"
+									aria-label="Close"
 								>
 									✕
 								</button>
@@ -87,7 +88,7 @@ export default function InvitesTable(props: Props): JSX.Element {
 							</form>
 						</div>
 						<form method="dialog" class="modal-backdrop">
-							<button type="button">close</button>
+							<button type="submit">close</button>
 						</form>
 					</dialog>
 				</>

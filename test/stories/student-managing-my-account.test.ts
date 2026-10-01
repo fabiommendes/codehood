@@ -122,6 +122,14 @@ test("student: leave a course", async ({ page }) => {
 	await logInAs(page, student);
 	await page.goto(href);
 
+	await test.step("the confirmation can be closed without leaving", async () => {
+		const dialog = page.locator("#leave-course-dialog");
+		await page.getByRole("button", { name: "Leave course" }).click();
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole("button", { name: "Close", exact: true }).click();
+		await expect(dialog).toBeHidden();
+	});
+
 	await test.step("the student leaves the course themselves", async () => {
 		await page.getByRole("button", { name: "Leave course" }).click();
 		await page
