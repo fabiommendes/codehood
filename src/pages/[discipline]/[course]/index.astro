@@ -88,6 +88,10 @@ const examPreview = courseHomeExams(
 // the Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
 const resources = await db.resource.findMany({ course: course.id }, { actor });
+/// The last three resources added, newest first; the Resources tab lists them all by title.
+const newestResources = resources
+	.toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+	.slice(0, 3);
 
 /// Where a resource's row leads: the file's download, the link itself, or the resource's own page.
 function resourceHref(resource: (typeof resources)[number]): string {
@@ -159,7 +163,7 @@ const nextEvents = await db.calendarEvent.findMany(
           </p>
         ) : (
           <div class="mt-4 flex flex-col gap-3">
-            {resources.slice(0, 3).map((resource) => (
+            {newestResources.map((resource) => (
               <ListRow
                 href={resourceHref(resource)}
                 download={

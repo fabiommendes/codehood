@@ -198,6 +198,8 @@
 
 ### Changed
 
+- A course's home page previews the three resources added last, newest
+  first, instead of the first three by title.
 - A course's schedule shows each meeting's date next to its weekday and time,
   without the heading that repeated the course tab. A meeting on the course
   home or the calendar leads to its own row on the schedule, highlighted.
