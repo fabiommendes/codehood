@@ -100,3 +100,36 @@ test("the calendar opens on the next exam and pages up to it", async ({
 		).toBeVisible();
 	});
 });
+
+test("past the first two, upcoming entries fold behind a toggle", async ({
+	page,
+}) => {
+	const student = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create();
+	await db.enrollment.create(
+		{ course: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	for (const [index, title] of ["First", "Second", "Third"].entries()) {
+		await persistedExamFactory.create({
+			course: course.id,
+			slug: `soon-${index}`,
+			title: `${title} quiz`,
+			type: "QUIZ",
+			scheduledAt: new Date(Date.now() + (index + 1) * DAY),
+		});
+	}
+
+	await logInAs(page, student);
+	await page.goto("/calendar");
+	const upcoming = page.getByRole("region", { name: "Upcoming" });
+
+	await expect(upcoming.getByText("Second quiz")).toBeVisible();
+	await expect(upcoming.getByText("Third quiz")).toBeHidden();
+
+	await upcoming.getByText("Show 1 more").click();
+	await expect(upcoming.getByText("Third quiz")).toBeVisible();
+
+	await upcoming.getByText("Show fewer").click();
+	await expect(upcoming.getByText("Third quiz")).toBeHidden();
+});

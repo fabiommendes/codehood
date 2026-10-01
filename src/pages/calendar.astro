@@ -127,6 +127,8 @@ for (const entry of monthEntries) {
 }
 
 const upcoming = entries.filter((entry) => entry.endAt >= now).slice(0, 5);
+/// How many upcoming entries show before the rest fold away, so the grid stays near the top.
+const UPCOMING_SHOWN = 2;
 
 /// A day's heading in the month's list, e.g. "Mon, Jan 12".
 function dayLabel(instant: Date): string {
@@ -217,8 +219,15 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
           <p class="mt-4 text-sm text-base-content/60">Nothing coming up.</p>
         ) : (
           <div class="mt-4 flex flex-col gap-3">
-            {upcoming.map((entry) => (
-              <ListRow href={entryHref(entry)} muted={isDraft(entry)}>
+            {/* A checkbox the labels below toggle: no script, and the rows
+                past the first few are siblings it can reveal. */}
+            <input type="checkbox" id="upcoming-more" class="peer sr-only" />
+            {upcoming.map((entry, index) => (
+              <ListRow
+                href={entryHref(entry)}
+                muted={isDraft(entry)}
+                class={index >= UPCOMING_SHOWN ? "hidden peer-checked:flex" : undefined}
+              >
                 <span
                   slot="leading"
                   class:list={[
@@ -249,6 +258,16 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                 </span>
               </ListRow>
             ))}
+            {upcoming.length > UPCOMING_SHOWN && (
+              <>
+                <label for="upcoming-more" class="btn btn-ghost btn-sm self-start peer-checked:hidden">
+                  Show {upcoming.length - UPCOMING_SHOWN} more
+                </label>
+                <label for="upcoming-more" class="btn btn-ghost btn-sm hidden self-start peer-checked:inline-flex">
+                  Show fewer
+                </label>
+              </>
+            )}
           </div>
         )
       }
