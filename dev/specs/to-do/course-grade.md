@@ -167,7 +167,8 @@ Acceptance criteria:
 
 `create`, `upsert` and `update` take `values` as the column's complete set:
 students absent from the list lose their value. `update` without `values`
-leaves them alone. All of it runs in one transaction. `releasedAt` is not
+leaves them alone, and is refused when it changes `kind`, since the stored
+values would no longer fit. All of it runs in one transaction. `releasedAt` is not
 writable through any of them, so a pushed change to a released column
 reaches students at once and a new column starts hidden.
 
@@ -187,12 +188,14 @@ Acceptance criteria:
   `releasedAt` is unchanged.
 - Given a `PUT` or `PATCH` whose body carries `releasedAt`, then the column's
   `releasedAt` is unchanged.
+- Given a `NUMBER` column with values, when it is updated to `kind: LABEL`
+  with no `values`, then the update is refused and the column is unchanged.
 
 ### R3: Who reads and writes a column
 
 - The course's instructor, and a CLI or bot key acting as them, reads every
   column with every value, and writes.
-- A student enrolled in the course reads released columns only, each with
+- A student with an active enrollment reads released columns only, each with
   `values` holding their own value or nothing. A hidden column does not
   exist for them: `findOne` answers as for a slug that is not there.
 - Anyone else is refused.
@@ -270,7 +273,8 @@ The table shows the course's grade columns after the exams, ordered by
 - "Release" asks for confirmation with the column's title and how many
   students have a value, then calls the action of R4.
 - Pushed columns have no mean and no attempt count.
-- A course with no grade column shows the table as it is today.
+- A course with no grade column shows the table as it is today. "No exams
+  yet" shows only when the course has neither an exam nor a grade column.
 
 Acceptance criteria:
 - Given columns `assignments` (position 0) and `final` (position 1), then
