@@ -320,6 +320,31 @@ Acceptance criteria:
 student: a released `NUMBER` column, a hidden `LABEL` column, and one active
 student with no value in either.
 
+## UI contract
+
+What tests and pages agree on. Roles and accessible names, not markup.
+
+Grades tab (`<course>/grades`), inside the table labelled "Grades":
+
+- Each grade column is a column header whose text starts with the column's
+  title, after the exam headers.
+- A hidden column's header holds the text "Hidden" and a button named
+  "Release <title>". A released column's header holds neither.
+- The button opens a dialog headed "Release <title>?" that states how many
+  students have a value, as "<n> students will see their grade." (or
+  "1 student will see their grade."), and that it cannot be undone. Its
+  buttons are "Cancel" and "Release".
+- After "Release" succeeds the page reloads. A failure shows in an element
+  with role `alert`.
+- A student's cell in a grade column holds the formatted value, or is empty.
+
+Student's course home (`<course>`):
+
+- A region headed by a level 2 heading "Grades", holding a list labelled
+  "Grades" with one item per released column, in table order.
+- An item reads the column's title followed by the student's value, or by
+  "No grade".
+
 ## Out of scope
 
 - Computing a grade on the server, in any form.
