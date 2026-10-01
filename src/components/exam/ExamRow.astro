@@ -10,6 +10,7 @@ import {
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
+import { plural } from "@/utils/plural";
 import { formatDateTime } from "@/utils/schedule-time";
 
 interface Props {
@@ -20,9 +21,11 @@ interface Props {
 	score?: string;
 	/** The viewer's own attempt state, which replaces the phase badge once they have submitted. */
 	state?: AttemptState;
+	/** Answers still waiting for a grade, shown to whoever teaches the course. */
+	pending?: number;
 }
 
-const { exam, href, score, state } = Astro.props;
+const { exam, href, score, state, pending = 0 } = Astro.props;
 
 const phase = examPhase(exam, new Date());
 const badge = examBadge(phase, state);
@@ -41,9 +44,16 @@ const detail = [
 	.join(" · ");
 ---
 
-<ListRow href={`${href}/exams/${exam.slug}`}>
+<ListRow href={`${href}/exams/${exam.slug}`} muted={phase === "draft"}>
   <p class="font-medium">{exam.title}</p>
-  <p class="text-sm text-base-content/60">{detail}</p>
+  <p class="text-sm text-base-content/60">
+    {detail}
+    {pending > 0 && (
+      <span class="font-medium text-base-content/80">
+        {` · ${plural(pending, "answer", "answers")} to grade`}
+      </span>
+    )}
+  </p>
   <span slot="trailing" class="flex items-center gap-3">
     {score && <span class="text-lg font-semibold">{score}</span>}
     <span class:list={["badge badge-sm", badge.className]}>{badge.label}</span>

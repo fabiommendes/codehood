@@ -109,6 +109,16 @@ test("instructor: see what needs my attention", async ({ page }) => {
 		data: { status: "COMPLETED" },
 	});
 
+	// A dated draft, which only the instructor's course home shows.
+	await persistedExamFactory.create({
+		course: algebra.id,
+		slug: "unfinished",
+		title: "Unfinished quiz",
+		type: "QUIZ",
+		status: "DRAFT",
+		scheduledAt: new Date(Date.now() + 7 * 24 * 60 * MINUTE),
+	});
+
 	// Question problems: one question of the compilers course fails validation.
 	await brokenQuestion(compilers, "broken-blanks");
 
@@ -210,6 +220,33 @@ test("instructor: see what needs my attention", async ({ page }) => {
 				.getByRole("link")
 				.filter({ hasText: compilers.discipline.slug }),
 		).toHaveAttribute("href", `${hrefOf(compilers)}/questions`);
+	});
+
+	await test.step("a course home shows the instructor its answers to grade and its dated drafts", async () => {
+		await page.goto(hrefOf(algebra));
+		const exams = section(page, "Exams");
+
+		await expect(exams.getByRole("link", { name: /Midterm/ })).toContainText(
+			"3 answers to grade",
+		);
+		await expect(
+			exams.getByRole("link", { name: /Written exam/ }),
+		).toContainText("2 answers to grade");
+		await expect(
+			exams.getByRole("link", { name: /Unfinished quiz/ }),
+		).toContainText("Draft");
+	});
+
+	await test.step("a student of the course sees neither", async () => {
+		await page.context().clearCookies();
+		// biome-ignore lint/style/noNonNullAssertion: five students were enrolled above.
+		await logInAs(page, algebraStudents[0]!);
+		await page.goto(hrefOf(algebra));
+		const exams = section(page, "Exams");
+
+		await expect(exams).toContainText("Midterm");
+		await expect(exams).not.toContainText("to grade");
+		await expect(exams).not.toContainText("Unfinished quiz");
 	});
 
 	await test.step("a student never sees the release button", async () => {

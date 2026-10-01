@@ -1,5 +1,5 @@
 import type { UserActor } from "@/auth/actor";
-import { db } from "@/db";
+import { type Course, db } from "@/db";
 import { Question } from "@/mdq/question";
 import { examResult } from "@/services/exam-result";
 import {
@@ -14,14 +14,20 @@ import { courseHref } from "@/urls";
  * Loads the courses `actor` teaches and builds their home page sections at `now`.
  *
  * Each course costs one query per kind of data, never one per exam or student.
+ *
+ * @param only Builds the sections for this course alone, which the caller
+ *   has already checked `actor` may manage.
  */
 export async function loadInstructorHome(
 	actor: UserActor,
 	now: Date,
+	only?: Course,
 ): Promise<InstructorHome> {
-	const courses = (await db.course.findMany({}, { actor })).filter(
-		(course) => course.instructor.username === actor.username,
-	);
+	const courses = only
+		? [only]
+		: (await db.course.findMany({}, { actor })).filter(
+				(course) => course.instructor.username === actor.username,
+			);
 
 	const loaded = await Promise.all(
 		courses.map(async (course) => {

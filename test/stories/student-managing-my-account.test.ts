@@ -124,14 +124,14 @@ test("student: leave a course", async ({ page }) => {
 
 	await test.step("the confirmation can be closed without leaving", async () => {
 		const dialog = page.locator("#leave-course-dialog");
-		await page.getByRole("button", { name: "Leave course" }).click();
+		await page.getByRole("button", { name: "Leave this course" }).click();
 		await expect(dialog).toBeVisible();
 		await dialog.getByRole("button", { name: "Close", exact: true }).click();
 		await expect(dialog).toBeHidden();
 	});
 
 	await test.step("the student leaves the course themselves", async () => {
-		await page.getByRole("button", { name: "Leave course" }).click();
+		await page.getByRole("button", { name: "Leave this course" }).click();
 		await page
 			.locator("#leave-course-dialog")
 			.getByRole("button", { name: "Leave course" })

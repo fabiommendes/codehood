@@ -6,11 +6,13 @@ import ExamRow from "@/components/exam/ExamRow.astro";
 import ListRow from "@/components/ListRow.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
-import { db, groupExamsForStudent } from "@/db";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { courseHomeExams } from "@/services/course-home";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
+import { loadInstructorHome } from "@/utils/load-instructor-home";
 import { resourceKind } from "@/utils/resource-kind";
 import {
 	durationToMinutes,
@@ -67,17 +69,19 @@ const WEEKDAY_LABEL: Record<string, string> = {
 	SATURDAY: "Sat",
 };
 
-// Same call and grouping the exam list page uses. The "Exams" section previews
-// the `open` and `upcoming` groups, falling back to `practice` when both are
-// empty.
+// Whoever teaches the course also sees their dated drafts and how many answers
+// each exam still has to grade.
+const now = new Date();
 const exams = await db.exam.findMany({ course: course.id }, { actor });
-const examGroups = groupExamsForStudent(exams);
-const groupExams = (key: string) =>
-	examGroups.find((g) => g.key === key)?.exams ?? [];
-const currentExams = [...groupExams("open"), ...groupExams("upcoming")];
-const previewExams =
-	currentExams.length > 0 ? currentExams : groupExams("practice");
-const previewTitle = currentExams.length > 0 ? "Exams" : "Practice";
+const teaching = canWrite
+	? await loadInstructorHome(actor, now, course)
+	: undefined;
+const examPreview = courseHomeExams(
+	exams,
+	new Map(teaching?.toGrade.map(({ exam, pending }) => [exam.slug, pending])),
+	now,
+	{ withDrafts: canWrite },
+);
 
 // The syllabus line and the next few meetings. Both come from the same source
 // the Schedule tab reads; this section is a preview of it, not a copy.
@@ -119,31 +123,14 @@ const nextEvents = await db.calendarEvent.findMany(
       )
     }
 
-    <div
-      class="stats stats-horizontal mt-8 w-full sm:w-auto border border-base-300 bg-base-100"
-    >
-      <div class="stat">
-        <div class="stat-title">Exams</div>
-        <div class="stat-value text-2xl">{exams.length}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-title">Students</div>
-        <div class="stat-value text-2xl">{course.enrollmentCount}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-title">Resources</div>
-        <div class="stat-value text-2xl">{resources.length}</div>
-      </div>
-    </div>
-
     {
-      previewExams.length > 0 && (
+      examPreview.exams.length > 0 && (
         <section class="mt-10">
-          <SectionHeader title={previewTitle} href={`${href}/exams`} />
+          <SectionHeader title={examPreview.title} href={`${href}/exams`} />
 
           <div class="mt-4 flex flex-col gap-3">
-            {previewExams.map((exam) => (
-              <ExamRow exam={exam} href={href} />
+            {examPreview.exams.map(({ exam, pending }) => (
+              <ExamRow exam={exam} href={href} pending={pending} />
             ))}
           </div>
         </section>
@@ -229,23 +216,16 @@ const nextEvents = await db.calendarEvent.findMany(
 
     {
       isEnrolled && (
-        <section class="mt-10 rounded-box border border-base-300 bg-base-100 p-5">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p class="font-medium">You're enrolled in this course</p>
-              <p class="mt-1 text-sm text-base-content/60">
-                Joined {formatDate(course.joinedAt)}
-              </p>
-            </div>
-            <button
-              type="button"
-              class="btn btn-outline btn-error btn-sm"
-              data-open-dialog="leave-course-dialog"
-            >
-              Leave course
-            </button>
-          </div>
-        </section>
+        <p class="mt-12 border-t border-base-content/10 pt-4 text-sm text-base-content/60">
+          Enrolled since {formatDate(course.joinedAt)}.{" "}
+          <button
+            type="button"
+            class="link link-hover text-error"
+            data-open-dialog="leave-course-dialog"
+          >
+            Leave this course
+          </button>
+        </p>
       )
     }
   </main>

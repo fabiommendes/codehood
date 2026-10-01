@@ -4,6 +4,9 @@
 
 ### Added
 
+- A course's home page shows whoever teaches it how many answers each exam
+  still has to grade, closed exams with answers to grade included, and their
+  dated drafts, faded and marked "Draft".
 - Exams and quizzes with a date show on the calendar for every course the
   viewer takes or teaches: in the grid with their type next to the title and
   a square marker, and in Upcoming and the day list in time order with the
@@ -117,6 +120,9 @@
 
 ### Fixed
 
+- An open exam shows on its course's home page, before the upcoming ones.
+  An exam opened or closed by hand no longer reads "Not scheduled".
+- The close button and the backdrop of a dialog close it again.
 - On phones the grades table fits two exam columns beside the student's
   name: long names are cut with an ellipsis and exam titles wrap.
 - The answer key on the grading page no longer carries a "Score 1.00" badge.
@@ -190,6 +196,8 @@
 
 ### Changed
 
+- A course's home page drops its row of counts, and leaving the course is a
+  link at the bottom instead of a card.
 - Date-times use a 24-hour clock everywhere, as in "Mon, Sep 28, 22:03".
 - Event kinds and question statuses read as words ("Holiday", "Published")
   instead of stored enum values, and a regular meeting carries no kind badge.
