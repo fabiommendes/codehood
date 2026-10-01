@@ -161,6 +161,15 @@ or EXAM. Its status moves DRAFT → SCHEDULED → ONGOING → COMPLETED
 a [Question version](#question-version) so the paper does not change while
 students are taking it.
 
+## Grade column
+
+Type: domain
+
+A column of a course's grades table that the instructor computed locally and
+pushed with the [CLI](#cli), holding at most one number or label per
+[Student](#student). Hidden from students until the instructor releases it on
+the web.
+
 ## Grading bot
 
 Also: bot 
@@ -329,8 +338,9 @@ are thin wrappers over [Services](#service).
 Type: platform
 
 Optional revision marker the [CLI](#cli) writes on the entities it syncs
-([Course](#course), [Event](#event), [Exam](#exam), [Question](#question),
-[Resource](#resource)). Opaque to the server. The CLI compares it with its local
+([Course](#course), [Event](#event), [Exam](#exam),
+[Grade column](#grade-column), [Question](#question), [Resource](#resource)).
+Opaque to the server. The CLI compares it with its local
 copy to detect changes and conflicts. Not an identifier.
 
 ## Role
