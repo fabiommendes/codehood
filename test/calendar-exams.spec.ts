@@ -20,7 +20,7 @@ function monthLabel(date: Date): string {
 	}).format(date);
 }
 
-test("an instructor sees the scheduled exams of the course they teach", async ({
+test("an instructor sees the scheduled exams of the course they teach, drafts marked as such", async ({
 	page,
 }) => {
 	const instructor = await seedUser({ role: "INSTRUCTOR" });
@@ -57,7 +57,12 @@ test("an instructor sees the scheduled exams of the course they teach", async ({
 		.getByRole("link", { name: /Teaching midterm/ });
 	await expect(row).toContainText("Exam");
 	await expect(row).toHaveAttribute("href", `${href}/exams/teach-midterm`);
-	await expect(page.getByText("Half-written final")).toHaveCount(0);
+
+	const draft = page
+		.locator(`#day-${dayKey}`)
+		.getByRole("link", { name: /Half-written final/ });
+	await expect(draft).toContainText("Draft");
+	await expect(draft).toHaveAttribute("href", `${href}/exams/teach-draft`);
 });
 
 test("the calendar opens on the next exam and pages up to it", async ({

@@ -8,7 +8,8 @@
   viewer takes or teaches: in the grid with their type next to the title and
   a square marker, and in Upcoming and the day list in time order with the
   meetings, with a type badge, the course and the duration, linking to the
-  exam. Drafts and archived exams stay off. The month the calendar opens on
+  exam. Archived exams stay off. Instructors also see their dated drafts,
+  faded and marked "Draft"; students never do. The month the calendar opens on
   and how far it pages count exam dates too.
 - The calendar lists the shown month's events by day under the grid, with
   the time, the course and the full title; a day with events in the grid

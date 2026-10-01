@@ -156,6 +156,11 @@ function entryTitle(entry: CalendarEntry): string {
 	return entry.kind === "exam" ? entry.exam.title : entry.event.title;
 }
 
+/// Whether an entry is an exam still being written, which only its course's staff ever get.
+function isDraft(entry: CalendarEntry): boolean {
+	return entry.kind === "exam" && entry.exam.status === "DRAFT";
+}
+
 /// The marker shape before an entry, a dot for a meeting and a square for an exam.
 function markerShape(entry: CalendarEntry): string {
 	return entry.kind === "exam" ? "rounded-[2px]" : "rounded-full";
@@ -213,7 +218,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
         ) : (
           <div class="mt-4 flex flex-col gap-3">
             {upcoming.map((entry) => (
-              <ListRow href={entryHref(entry)}>
+              <ListRow href={entryHref(entry)} muted={isDraft(entry)}>
                 <span
                   slot="leading"
                   class:list={[
@@ -228,6 +233,9 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                     <span class="badge badge-secondary badge-sm ml-2">
                       {examTypeLabels[entry.exam.type]}
                     </span>
+                  )}
+                  {isDraft(entry) && (
+                    <span class="badge badge-ghost badge-sm ml-1">Draft</span>
                   )}
                 </p>
                 <p class="text-sm text-base-content/60">
@@ -328,6 +336,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                         "inline-block h-1.5 w-1.5",
                         markerShape(entry),
                         courseColor.get(entry.courseId),
+                        isDraft(entry) && "opacity-40",
                       ]}
                     />
                   ))}
@@ -335,8 +344,11 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                 {cellEntries(dayEntries, 2).map((entry) =>
                   entry.kind === "exam" ? (
                     <span
-                      title={entry.exam.title}
-                      class="hidden w-full min-w-0 items-center gap-1 rounded-sm bg-secondary/15 px-0.5 text-[10px] text-base-content sm:flex"
+                      title={isDraft(entry) ? `${entry.exam.title} (draft)` : entry.exam.title}
+                      class:list={[
+                        "hidden w-full min-w-0 items-center gap-1 rounded-sm bg-secondary/15 px-0.5 text-[10px] text-base-content sm:flex",
+                        isDraft(entry) && "opacity-50",
+                      ]}
                     >
                       <span
                         class:list={[
@@ -406,7 +418,10 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                     <li>
                       <a
                         href={entryHref(entry)}
-                        class="flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-base-200"
+                        class:list={[
+                          "flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-base-200",
+                          isDraft(entry) && "opacity-60",
+                        ]}
                       >
                         <span class="w-12 shrink-0 tabular-nums text-base-content/60">
                           {startTime(entry.startAt)}
@@ -424,6 +439,9 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                             <span class="badge badge-secondary badge-sm ml-2">
                               {examTypeLabels[entry.exam.type]}
                             </span>
+                            {isDraft(entry) && (
+                              <span class="badge badge-ghost badge-sm ml-1">Draft</span>
+                            )}
                             <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
                               {courseNames.get(entry.courseId)}
                               {entry.exam.duration && (

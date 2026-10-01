@@ -136,7 +136,7 @@ test("an exam without a date has no place on the calendar", () => {
 	expect(titles(entries)).toEqual(["lab"]);
 });
 
-test("draft and archived exams stay off the calendar even with a date", () => {
+test("archived exams stay off the calendar even with a date; drafts stay on, for whoever may see them", () => {
 	const entries = calendarEntries(
 		[],
 		[
@@ -159,7 +159,7 @@ test("draft and archived exams stay off the calendar even with a date", () => {
 		],
 	);
 
-	expect(titles(entries)).toEqual(["ongoing", "done"]);
+	expect(titles(entries)).toEqual(["draft", "ongoing", "done"]);
 });
 
 test("each entry keeps its own kind, record and course", () => {

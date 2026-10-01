@@ -2,7 +2,9 @@
  * A viewer's calendar as one timeline: course meetings and dated exams.
  *
  * Pure: the caller fetches the events and the exams it may see, and this
- * decides which of them belong on the calendar and in what order.
+ * decides which of them belong on the calendar and in what order. Who sees a
+ * draft is the caller's query to decide: the exam service never hands one to
+ * a student.
  */
 
 import type { CalendarEvent } from "@/db/services/calendar-event.service";
@@ -26,16 +28,10 @@ export type CalendarEntry = {
 	endAt: Date;
 } & ({ kind: "event"; event: CalendarEvent } | { kind: "exam"; exam: Exam });
 
-/// Exam statuses that never reach the calendar, whoever is looking.
-const HIDDEN_STATUSES: ReadonlySet<Exam["status"]> = new Set([
-	"DRAFT",
-	"ARCHIVED",
-]);
-
 /**
  * Merges `events` and `exams` into one list ordered by start time.
  *
- * Exams without a date, drafts and archived exams are left out. At the same
+ * Exams without a date and archived exams are left out. At the same
  * instant an exam comes before an event; entries of one kind keep their input
  * order.
  */
@@ -45,7 +41,7 @@ export function calendarEntries(
 ): CalendarEntry[] {
 	const examEntries: CalendarEntry[] = [];
 	for (const { courseId, exam } of exams) {
-		if (!exam.scheduledAt || HIDDEN_STATUSES.has(exam.status)) continue;
+		if (!exam.scheduledAt || exam.status === "ARCHIVED") continue;
 		examEntries.push({
 			kind: "exam",
 			exam,
