@@ -31,7 +31,7 @@ Astro.response.headers.set("Referrer-Policy", "no-referrer");
 
 const ICONS = {
 	FILE: "M6 3.5h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z M14 3.5V8h4",
-	LINK: "M9.5 14.5 14.5 9.5 M11 8h1.5A3.5 3.5 0 0 1 16 11.5v0A3.5 3.5 0 0 1 12.5 15H11 M13 16h-1.5A3.5 3.5 0 0 1 8 12.5v0A3.5 3.5 0 0 1 11.5 9H13",
+	LINK: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
 	MD: "M6 3.5h9l3 3V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z M8 12h8M8 15.5h8M8 8.5h4",
 	CODE: "m9 8-4 4 4 4M15 8l4 4-4 4M13.5 6.5l-3 11",
 } as const;
@@ -57,23 +57,17 @@ function rowHref(resource: (typeof resources)[number]): string {
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />
 
-    <h2 class="text-xl font-semibold">Resources</h2>
-    <p class="mt-1 text-sm text-base-content/60">
-      {course.discipline.name} · {course.edition.slug}
-    </p>
-
     {
       resources.length === 0 && canWrite && (
         <Alert variant="info" class="mt-4">
           <span>
-            Nothing pushed yet. Run{" "}
-            <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">
-              manage import-resources {course.discipline.slug}{" "}
-              {course.instructor.username} {course.edition.slug}{" "}
-              ./resources.yaml
-            </code>{" "}
-            from the CLI. Every file it uploads gets a permanent,
-            unauthenticated URL, so nothing whose disclosure matters belongs here.{" "}
+            Nothing pushed yet. Put files, links, notes and snippets in the
+            course repository's{" "}
+            <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">resources/</code>{" "}
+            folder and run{" "}
+            <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code>.
+            Every file it uploads gets a permanent, unauthenticated URL, so
+            nothing whose disclosure matters belongs here.{" "}
             <CliSetupLink />
           </span>
         </Alert>
