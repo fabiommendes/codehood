@@ -1,7 +1,8 @@
 ---
 // The course's own term calendar (FR-CAL-020), grouped by week.
-// Read-only: the only way schedule data gets in is `manage import-calendar`
-// and the demo seed.
+// Read-only: schedule data comes from `codehood push`, `manage import-calendar`
+// and the demo seed. Each event carries an `event-<id>` anchor for links from
+// the course home and the calendar.
 import { hasPerm } from "@/auth/permissions";
 import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
@@ -16,6 +17,7 @@ import {
 	durationToMinutes,
 	endOf,
 	formatClock,
+	formatDateTime,
 	formatTime,
 	SERVER_TZ,
 	toMinutes,
@@ -69,8 +71,18 @@ function timeRange(event: CalendarEvent): string {
 	return `${start}–${end}`;
 }
 
+/// An event's day of the month, e.g. "Jan 5".
+function dayOfMonth(event: CalendarEvent): string {
+	return formatDateTime(event.startAt, {
+		weekday: undefined,
+		hour: undefined,
+		minute: undefined,
+	});
+}
+
+const now = new Date();
 const meetingsHeld = events.filter(
-	(e) => isMeeting(e.kind) && e.kind !== "CANCELLED",
+	(e) => isMeeting(e.kind) && e.kind !== "CANCELLED" && e.startAt <= now,
 ).length;
 ---
 
@@ -79,14 +91,6 @@ const meetingsHeld = events.filter(
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="schedule" />
-
-    <h2 class="text-xl font-semibold">Schedule</h2>
-    <p class="mt-1 text-sm text-base-content/60">
-      {course.discipline.name} · {course.edition.slug}
-    </p>
-    <p class="text-sm text-base-content/60">
-      The term, week by week.
-    </p>
 
     {
       slots.length === 0 ? (
@@ -134,17 +138,21 @@ const meetingsHeld = events.filter(
                       const dayLabel = WEEKDAY_LABEL[event.timeSlot.day] ?? "";
                       return (
                         <div
+                          id={`event-${event.id}`}
                           class:list={[
-                            "card card-border bg-base-100",
+                            "card card-border scroll-mt-6 bg-base-100 target:ring-2 target:ring-primary",
                             !meeting && "opacity-60",
                           ]}
                         >
                           <div class="card-body flex-row gap-4 py-4">
-                            <div class="flex w-16 shrink-0 flex-col items-center rounded-field border border-base-300 py-1.5 text-center">
+                            <div class="flex w-20 shrink-0 flex-col items-center gap-0.5 rounded-field border border-base-300 py-1.5 text-center">
                               <span class="text-[11px] font-medium text-base-content/50">
                                 {dayLabel}
                               </span>
                               <span class="font-display text-sm leading-none font-semibold">
+                                {dayOfMonth(event)}
+                              </span>
+                              <span class="text-[11px] text-base-content/60">
                                 {timeRange(event)}
                               </span>
                             </div>

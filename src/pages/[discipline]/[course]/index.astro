@@ -209,7 +209,7 @@ const nextEvents = await db.calendarEvent.findMany(
                 </p>
               ) : (
                 nextEvents.map((event) => (
-                  <ListRow href={`${href}/schedule`}>
+                  <ListRow href={`${href}/schedule#event-${event.id}`}>
                     <p class="font-medium">{event.title}</p>
                     {eventKindLabel(event.kind) && (
                       <p class="text-sm text-base-content/60">

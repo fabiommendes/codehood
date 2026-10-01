@@ -120,6 +120,8 @@
 
 ### Fixed
 
+- A course's schedule counted the meetings still ahead among those "held so
+  far".
 - An open exam shows on its course's home page, before the upcoming ones.
   An exam opened or closed by hand no longer reads "Not scheduled".
 - The close button and the backdrop of a dialog close it again.
@@ -196,6 +198,9 @@
 
 ### Changed
 
+- A course's schedule shows each meeting's date next to its weekday and time,
+  without the heading that repeated the course tab. A meeting on the course
+  home or the calendar leads to its own row on the schedule, highlighted.
 - A resource's whole row acts on it: a file downloads, a link opens its
   site in another tab without a confirmation dialog. The line under the
   title shows the resource's description, or else a link's site, a file's

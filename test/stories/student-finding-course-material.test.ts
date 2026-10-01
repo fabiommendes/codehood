@@ -299,11 +299,6 @@ test("student: follow the course schedule", async ({ page }) => {
 	await logInAs(page, student);
 	await page.goto(`${hrefOf(course)}/schedule`);
 
-	await test.step("the intro reads as plain copy", async () => {
-		await expect(page.getByText("The term, week by week.")).toBeVisible();
-		await expect(page.getByText("authored week")).toHaveCount(0);
-	});
-
 	await test.step("weekly meetings and every dated occurrence are listed", async () => {
 		await expect(page.getByText("Week 1")).toBeVisible();
 		await expect(page.getByText("Week 2")).toBeVisible();
@@ -311,6 +306,14 @@ test("student: follow the course schedule", async ({ page }) => {
 		await expect(
 			page.getByText("Course overview and expectations."),
 		).toBeVisible();
+	});
+
+	await test.step("an upcoming meeting on the course home leads to its row on the schedule", async () => {
+		await page.goto(hrefOf(course));
+		await page.getByRole("link", { name: /Kickoff/ }).click();
+
+		await expect(page).toHaveURL(/\/schedule#event-\d+$/);
+		await expect(page.locator(":target")).toContainText("Kickoff");
 	});
 
 	await test.step("a meeting the instructor cancelled stays on the list, visibly cancelled", async () => {
@@ -347,6 +350,13 @@ test("student: follow the course schedule", async ({ page }) => {
 					title: `Past meeting ${week}`,
 				});
 			}
+			// A meeting still ahead is on the schedule but not yet held.
+			await persistedCalendarEventFactory.create({
+				course: past.id,
+				timeSlot: pastSlot.id,
+				week: 15,
+				title: "Future meeting",
+			});
 
 			await page.goto(`${hrefOf(past)}/schedule`);
 			await expect(

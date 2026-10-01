@@ -144,13 +144,13 @@ function startTime(instant: Date): string {
 	});
 }
 
-/// Where an entry leads: a meeting to its course's schedule, an exam to its own page.
+/// Where an entry leads: a meeting to its row on its course's schedule, an exam to its own page.
 function entryHref(entry: CalendarEntry): string | undefined {
 	const href = courseHrefs.get(entry.courseId);
 	if (!href) return undefined;
 	return entry.kind === "exam"
 		? `${href}/exams/${entry.exam.slug}`
-		: `${href}/schedule`;
+		: `${href}/schedule#event-${entry.event.id}`;
 }
 
 /// An entry's title as its course wrote it.
