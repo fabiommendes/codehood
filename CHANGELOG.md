@@ -117,6 +117,8 @@
 
 ### Fixed
 
+- On phones the grades table fits two exam columns beside the student's
+  name: long names are cut with an ellipsis and exam titles wrap.
 - The answer key on the grading page no longer carries a "Score 1.00" badge.
 - Marking an answer will-not-grade writes its comment and the status in one
   transaction, and the grading history reads that pass as "Not graded"

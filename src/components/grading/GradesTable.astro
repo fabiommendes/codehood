@@ -37,15 +37,17 @@ const hasAttempt = (cell: GradeCell): boolean =>
   <table aria-label="Grades" class="table min-w-max">
     <thead>
       <tr>
-        <th scope="col" class="sticky left-0 z-10 bg-base-100">Student</th>
+        <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">Student</th>
         {
           table.columns.map((column) => (
-            <th scope="col" class="align-top">
-              <a href={`${href}/exams/${column.exam.slug}`} class="link">
-                {column.exam.title}
-              </a>
-              <div class="mt-1 text-xs font-normal text-base-content/60">
-                {column.mean === null ? "no average" : `avg ${formatScore(column.mean)}`} · {column.attempted} of {column.students}
+            <th scope="col" class="align-top max-sm:px-2">
+              <div class="max-sm:w-24 max-sm:whitespace-normal">
+                <a href={`${href}/exams/${column.exam.slug}`} class="link">
+                  {column.exam.title}
+                </a>
+                <div class="mt-1 text-xs font-normal text-base-content/60">
+                  {column.mean === null ? "no average" : `avg ${formatScore(column.mean)}`} · {column.attempted} of {column.students}
+                </div>
               </div>
             </th>
           ))
@@ -56,11 +58,11 @@ const hasAttempt = (cell: GradeCell): boolean =>
       {
         table.rows.map((row) => (
           <tr>
-            <th scope="row" class="sticky left-0 z-10 bg-base-100 font-medium">
-              {row.name}
+            <th scope="row" class="sticky left-0 z-10 bg-base-100 font-medium max-sm:px-2">
+              <span class="block max-sm:w-24 max-sm:truncate" title={row.name}>{row.name}</span>
             </th>
             {row.cells.map((cell, index) => (
-              <td>
+              <td class="max-sm:px-2">
                 {hasAttempt(cell) ? (
                   <a href={`${href}/exams/${table.columns[index]?.exam.slug}/attempts/${row.username}`} class="link">
                     {label(cell)}

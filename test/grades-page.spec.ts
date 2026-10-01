@@ -570,3 +570,40 @@ test("grades: a course with no exams offers no CSV", async ({ page }) => {
 		0,
 	);
 });
+
+test("grades: on a 390 px screen two exam columns fit beside the student column", async ({
+	page,
+}) => {
+	const { teacher, course, href } = await setup("gr11");
+	const ana = await enrolledStudent(
+		course,
+		"gr11-ana",
+		"Ana Carolina Prado de Albuquerque",
+	);
+	await makeExam(
+		course,
+		"quiz-one",
+		"Quiz 1: recursion",
+		{ kind: "closed", scheduledAt: new Date(Date.now() - 20 * DAY) },
+		[{ student: ana, score: "0.5" }],
+	);
+	await makeExam(
+		course,
+		"midterm",
+		"Midterm exam",
+		{ kind: "closed", scheduledAt: new Date(Date.now() - 10 * DAY) },
+		[{ student: ana, score: "0.8" }],
+	);
+	await page.setViewportSize({ width: 390, height: 800 });
+	await logInAs(page, teacher);
+
+	await openGrades(page, href);
+
+	await expect(headerOf(page, "Quiz 1: recursion")).toBeInViewport({
+		ratio: 1,
+	});
+	await expect(headerOf(page, "Midterm exam")).toBeInViewport({ ratio: 1 });
+	await expect(
+		rowOf(page, "Ana Carolina Prado de Albuquerque").getByRole("cell").nth(1),
+	).toBeInViewport({ ratio: 1 });
+});

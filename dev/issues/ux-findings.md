@@ -22,8 +22,6 @@ Found by walking every page as a student, an instructor and an admin, at
   questions.
 - The grades table heads a column nobody attempted with "no average · 0 of 4"
   and fills it with "Missed" (P2: the column holds nothing to act on).
-- On a 390 px screen the fixed student column of the grades table takes about
-  150 px of 360, so one exam column fits beside it.
 - `db.enrollment.findMany` filters one status per call, so `loadStudents`
   makes two queries.
 
