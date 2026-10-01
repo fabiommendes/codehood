@@ -46,6 +46,18 @@ test("admin: invite an instructor", async ({ page }) => {
 		).toBeVisible();
 	});
 
+	await test.step("an instructor may leave the GitHub username and school id blank", async () => {
+		const field = (name: string) =>
+			page.getByRole("group", { name, exact: true }).locator("input");
+		await field("Name").fill("New Instructor");
+		await field("Username").fill("newinstructor");
+		await field("Password").fill("correcthorse");
+		await field("Confirm password").fill("correcthorse");
+		await page.getByRole("button", { name: "Create account" }).click();
+
+		await expect(page).not.toHaveURL(/\/invite\//);
+	});
+
 	// Issued for the address the admin typed, and for an instructor — the role
 	// is fixed by the page rather than chosen, so it is worth pinning.
 	const invites = await db.invite.findMany({ kind: "PERSONAL" }, FULL_ACCESS);

@@ -140,6 +140,49 @@ test("student: redeem a classroom invite link", async ({ page }) => {
 	await expect(
 		page.getByRole("heading", { name: course.discipline.name }),
 	).toBeVisible();
+
+	// A later course hands out its own link; the account they have is enough.
+	const next = await persistedCourseFactory.create();
+	const nextInvite = await persistedInviteFactory.create({
+		kind: "CLASSROOM",
+		invitedRole: "STUDENT",
+		email: null,
+		course: next.id,
+		maxUses: 5,
+		createdBy: next.instructor,
+	});
+
+	await test.step("logged in, another course's link joins it with one click", async () => {
+		await page.goto(`/invite/${nextInvite.token}`);
+		await expect(page.getByText("You're logged in as")).toBeVisible();
+		await page.getByRole("button", { name: "Join the course" }).click();
+
+		await expect(page).toHaveURL(/\?joined$/);
+		await expect(
+			page.getByText(`You joined ${next.discipline.name}.`),
+		).toBeVisible();
+	});
+
+	await test.step("the same link again just leads to the course", async () => {
+		await page.goto(`/invite/${nextInvite.token}`);
+		await expect(
+			page.getByText("You're already in this course."),
+		).toBeVisible();
+		await expect(
+			page.getByRole("link", { name: "Open the course" }),
+		).toBeVisible();
+	});
+
+	await test.step("logged out, the link offers to log in instead of a new account", async () => {
+		await page.context().clearCookies();
+		await page.goto(`/invite/${nextInvite.token}`);
+		await expect(
+			page.getByRole("link", { name: "Log in to join" }),
+		).toHaveAttribute(
+			"href",
+			`/login?next=${encodeURIComponent(`/invite/${nextInvite.token}`)}`,
+		);
+	});
 });
 
 test("student: log in", async ({ page }) => {

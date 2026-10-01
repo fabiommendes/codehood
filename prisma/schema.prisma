@@ -63,7 +63,7 @@ model User {
 
   apiKeys          ApiKey[]
   invitesSent      Invite[]          @relation("InviteCreatedBy")
-  redemption       InviteRedemption?
+  redemptions      InviteRedemption[]
   sessions         Session[]
   groupMemberships GroupMembership[]
   courses          Course[]
@@ -157,9 +157,14 @@ model InviteRedemption {
 
   /// User who redeemed the invite.
   user     User   @relation(fields: [username], references: [username])
-  username String @unique
+  username String
 
   redeemedAt DateTime @default(now())
+
+  /// One redemption per invite and user; the same user may redeem invites to
+  /// several courses over the years.
+  @@unique([inviteId, username])
+  @@index([username])
 }
 
 // =============================================================================

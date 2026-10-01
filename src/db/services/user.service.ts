@@ -63,11 +63,12 @@ export class UserService extends CrudBase<{
 	): Promise<User> {
 		ensurePerm(opts.actor, "user.create");
 
-		const isAdmin = input.role === "ADMIN";
-		if (!input.githubId && !isAdmin)
-			throw new Error("githubId is required for non-admin users");
-		if (!input.schoolId && !isAdmin)
-			throw new Error("schoolId is required for non-admin users");
+		// Grades and pushed grade files match students by these; staff may skip them.
+		const isStudent = input.role === "STUDENT";
+		if (!input.githubId && isStudent)
+			throw new Error("githubId is required for students");
+		if (!input.schoolId && isStudent)
+			throw new Error("schoolId is required for students");
 
 		const githubId = input.githubId ?? nullSentinel(input.username);
 		const schoolId = input.schoolId ?? nullSentinel(input.username);

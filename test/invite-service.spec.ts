@@ -155,6 +155,36 @@ test("classroom invite: redeemable up to maxUses, then exhausted", async () => {
 	});
 });
 
+test("one student redeems invites to two courses, but each only once", async () => {
+	const admin = await makeAdmin("inviter-twice@codehood.test");
+	const owner = await makeInstructor("inviter-twice-owner");
+	const student = await makeStudent("twice@codehood.test", "twice");
+	const tokens: string[] = [];
+	for (const slug of ["inv-disc-first", "inv-disc-second"]) {
+		const course = await makeCourse(owner.username, slug);
+		const { token } = await db.invite.create(
+			{
+				kind: "CLASSROOM",
+				invitedRole: "STUDENT",
+				email: null,
+				course: course.id,
+				maxUses: 10,
+			},
+			{ actor: admin },
+		);
+		// biome-ignore lint/style/noNonNullAssertion: create() always sets a token
+		tokens.push(token!);
+	}
+
+	for (const token of tokens) {
+		await db.invite.redeem(token, student.username, student.email, FULL_ACCESS);
+	}
+	await expect(
+		// biome-ignore lint/style/noNonNullAssertion: two tokens were pushed
+		db.invite.redeem(tokens[0]!, student.username, student.email, FULL_ACCESS),
+	).rejects.toMatchObject({ code: "already_redeemed" });
+});
+
 test("expired invite is rejected before redemption", async () => {
 	const admin = await makeAdmin("inviter3@codehood.test");
 	const { token } = await db.invite.create(

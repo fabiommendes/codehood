@@ -300,8 +300,7 @@ export class InviteService extends CrudBase<{
 					data: { inviteId: invite.id, username: username },
 				});
 			} catch {
-				// InviteRedemption.username is unique: this user already redeemed
-				// a (possibly different) invite.
+				// (inviteId, username) is unique: this user already redeemed this invite.
 				throw new InviteError("already_redeemed");
 			}
 

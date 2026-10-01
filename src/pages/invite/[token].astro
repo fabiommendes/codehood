@@ -5,29 +5,63 @@ import { actions } from "astro:actions";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
+import { courseHref } from "@/urls";
 
 const { token } = Astro.params;
-const result = Astro.getActionResult(actions.auth.acceptInvite);
-if (result && !result.error) {
-	return Astro.redirect("/");
-}
+const viewer = Astro.locals.actor;
 
 const invite = token ? await db.invite.findOne({ token }, FULL_ACCESS) : null;
 const isExpired = invite ? invite.expiresAt < new Date() : false;
 const isExhausted =
 	invite?.maxUses != null ? invite.redemptions >= invite.maxUses : false;
 const isValid = Boolean(invite) && !isExpired && !isExhausted;
-const course =
-	isValid && invite?.courseId
-		? await db.course.findOne({ id: invite.courseId }, FULL_ACCESS)
+const course = invite?.courseId
+	? await db.course.findOne({ id: invite.courseId }, FULL_ACCESS)
+	: null;
+const href = course
+	? courseHref({
+			discipline: course.discipline.slug,
+			instructor: course.instructor.username,
+			edition: course.edition.slug,
+		})
+	: null;
+
+const result = Astro.getActionResult(actions.auth.acceptInvite);
+if (result && !result.error) {
+	return Astro.redirect("/");
+}
+const joined = Astro.getActionResult(actions.auth.joinWithInvite);
+if (joined && !joined.error && href) {
+	return Astro.redirect(`${href}?joined`);
+}
+const error = result?.error ?? joined?.error;
+
+const isStudentInvite = invite?.invitedRole === "STUDENT";
+// Someone logged in joins with the account they have; only a student invite
+// to a course can be used that way.
+const canJoin =
+	viewer !== undefined &&
+	isStudentInvite &&
+	course !== null &&
+	viewer.role === "STUDENT";
+const enrollment =
+	canJoin && course
+		? await db.enrollment.findOne(
+				{ course: course.id, username: viewer.username },
+				FULL_ACCESS,
+			)
 		: null;
+const alreadyIn = enrollment?.status === "ACTIVE";
 const role = invite?.invitedRole.toLowerCase();
 
 // A rejected submission renders this page again; refill what was typed,
 // passwords aside.
 const submitted =
 	result?.error && Astro.request.method === "POST"
-		? await Astro.request.formData().catch(() => null)
+		? await Astro.request
+				.clone()
+				.formData()
+				.catch(() => null)
 		: null;
 /// The value typed into `field` before a rejected submission, or empty.
 function typed(field: string): string {
@@ -36,9 +70,9 @@ function typed(field: string): string {
 }
 ---
 
-<CenteredLayout title="Accept invite">
+<CenteredLayout title={canJoin ? "Join course" : "Accept invite"}>
   {
-    !isValid && (
+    !isValid && !alreadyIn && (
       <div role="alert" class="alert alert-error">
         <span>
           {!invite && "This invite link is invalid."}
@@ -50,34 +84,101 @@ function typed(field: string): string {
   }
 
   {
-    isValid && invite && (
-      <>
-        {result?.error && (
-          <div role="alert" class="alert alert-error">
-            <span>{result.error.message}</span>
-          </div>
-        )}
+    error && (
+      <div role="alert" class="alert alert-error">
+        <span>{error.message}</span>
+      </div>
+    )
+  }
 
-        <p class="text-sm text-base-content/70">
-          {invite.createdBy.name} invited you to{" "}
-          {course ? (
-            <strong>
-              {course.discipline.name} ({course.edition.slug})
-            </strong>
-          ) : (
-            "Codehood"
-          )}{" "}
-          as {role === "instructor" || role === "admin" ? "an" : "a"}{" "}
-          <strong>{role}</strong>.
-          Create your account to accept.
+  {
+    invite && (isValid || alreadyIn) && (
+      <p class="text-sm text-base-content/70">
+        {invite.createdBy.name} invited you to{" "}
+        {course ? (
+          <strong>
+            {course.discipline.name} ({course.edition.slug})
+          </strong>
+        ) : (
+          "Codehood"
+        )}{" "}
+        as {role === "instructor" || role === "admin" ? "an" : "a"}{" "}
+        <strong>{role}</strong>.
+      </p>
+    )
+  }
+
+  {
+    alreadyIn && href && (
+      <>
+        <p class="text-sm">You're already in this course.</p>
+        <a href={href} class="btn btn-primary btn-block rounded-full">
+          Open the course
+        </a>
+      </>
+    )
+  }
+
+  {
+    isValid && canJoin && !alreadyIn && viewer && (
+      <form method="POST" action={actions.auth.joinWithInvite} class="flex flex-col gap-4">
+        <input type="hidden" name="token" value={token} />
+        <p class="text-sm">
+          You're logged in as <strong>{viewer.name}</strong> ({viewer.username}).
         </p>
+        <button type="submit" class="btn btn-primary btn-block rounded-full">
+          Join the course
+        </button>
+      </form>
+    )
+  }
+
+  {
+    isValid && viewer && !canJoin && (
+      <>
+        <p class="text-sm">
+          You're logged in as <strong>{viewer.name}</strong>. This invite is
+          for creating a new account, so it has nothing to add to yours.
+        </p>
+        <a href="/" class="btn btn-block rounded-full">Go to your home</a>
+      </>
+    )
+  }
+
+  {
+    isValid && invite && !viewer && (
+      <>
+        {course && isStudentInvite && (
+          <p class="text-sm text-base-content/70">
+            Already have an account?{" "}
+            <a
+              class="link link-primary"
+              href={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}
+            >
+              Log in to join
+            </a>
+            .
+          </p>
+        )}
 
         <form
           method="POST"
           action={actions.auth.acceptInvite}
-          class="flex flex-col gap-4"
+          class="flex flex-col gap-1"
         >
           <input type="hidden" name="token" value={token} />
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Name</legend>
+            <input
+              type="text"
+              name="name"
+              required
+              autocomplete="name"
+              class="input w-full"
+              value={typed("name")}
+            />
+          </fieldset>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">Email</legend>
@@ -97,60 +198,85 @@ function typed(field: string): string {
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">Username</legend>
-            <input type="text" name="username" required autocomplete="username" class="input w-full" value={typed("username")} />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input type="text" name="name" required autocomplete="name" class="input w-full" value={typed("name")} />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">GitHub username</legend>
-            <input type="text" name="githubId" required class="input w-full" value={typed("githubId")} />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">School id</legend>
-            <input type="text" name="schoolId" required class="input w-full" value={typed("schoolId")} />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Password</legend>
             <input
-              type="password"
-              name="password"
-              id="password"
+              type="text"
+              name="username"
               required
-              minlength="8"
-              autocomplete="new-password"
+              autocomplete="username"
               class="input w-full"
+              value={typed("username")}
             />
           </fieldset>
 
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Confirm password</legend>
-            <input
-              type="password"
-              id="passwordConfirm"
-              required
-              minlength="8"
-              autocomplete="new-password"
-              class="input w-full"
-            />
-            <p class="label whitespace-normal" id="passwordMismatch" hidden>
-              Passwords do not match.
-            </p>
-          </fieldset>
+          <div class="grid gap-x-3 sm:grid-cols-2">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Password</legend>
+              <input
+                type="password"
+                name="password"
+                id="password"
+                required
+                minlength="8"
+                autocomplete="new-password"
+                class="input w-full"
+              />
+            </fieldset>
 
-          <div class="card-actions">
-            <button
-              type="submit"
-              class="btn btn-primary btn-block rounded-full"
-            >
-              Create account
-            </button>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Confirm password</legend>
+              <input
+                type="password"
+                id="passwordConfirm"
+                required
+                minlength="8"
+                autocomplete="new-password"
+                class="input w-full"
+              />
+            </fieldset>
           </div>
+          <p class="label whitespace-normal text-error" id="passwordMismatch" hidden>
+            Passwords do not match.
+          </p>
+
+          <div class="grid gap-x-3 sm:grid-cols-2">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">
+                GitHub username{!isStudentInvite && " (optional)"}
+              </legend>
+              <input
+                type="text"
+                name="githubId"
+                required={isStudentInvite}
+                class="input w-full"
+                value={typed("githubId")}
+              />
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">
+                School id{!isStudentInvite && " (optional)"}
+              </legend>
+              <input
+                type="text"
+                name="schoolId"
+                required={isStudentInvite}
+                class="input w-full"
+                value={typed("schoolId")}
+              />
+            </fieldset>
+          </div>
+          {isStudentInvite && (
+            <p class="label whitespace-normal">
+              Your instructors use these to tell whose work is whose.
+            </p>
+          )}
+
+          <button
+            type="submit"
+            class="btn btn-primary btn-block mt-4 rounded-full"
+          >
+            Create account
+          </button>
         </form>
       </>
     )

@@ -4,6 +4,10 @@
 
 ### Added
 
+- A student who already has an account joins a course from its invite link
+  with one click, and a logged-out visitor gets a link to log in and come
+  back instead of only the sign-up form. The same student may redeem invites
+  to any number of courses, each once.
 - A course's home page shows whoever teaches it how many answers each exam
   still has to grade, closed exams with answers to grade included, and their
   dated drafts, faded and marked "Draft".
@@ -201,6 +205,9 @@
 
 ### Changed
 
+- The invite form asks for name, email, username and password first, with
+  the two passwords side by side, then the GitHub username and school id,
+  which only students must fill in.
 - The invite page says who sent the invite and, for a course invite, which
   course it joins. A personal invite's pinned email looks read-only.
 - A course's home page previews the three resources added last, newest

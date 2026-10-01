@@ -15,6 +15,13 @@ import {
 
 export type PublicUser = Omit<User, "passwordHash" | "createdAt">;
 
+/// A text input that may be left empty (Astro sends `null`), read as absent when it is.
+const optionalField = z
+	.string()
+	.trim()
+	.nullish()
+	.transform((value) => value || undefined);
+
 export const auth = {
 	login: defineAction({
 		accept: "form",
@@ -59,8 +66,9 @@ export const auth = {
 			username: z.string().regex(USERNAME_RE, "Invalid username."),
 			name: z.string().min(1),
 			password: z.string().min(8),
-			githubId: z.string().min(1),
-			schoolId: z.string().min(1),
+			// Required of students only; an empty field means none.
+			githubId: optionalField,
+			schoolId: optionalField,
 		}),
 		handler: async (input, context) => {
 			const invite = await db.invite.findOne(
@@ -72,6 +80,15 @@ export const auth = {
 					code: "NOT_FOUND",
 					message: "Invite not found or expired.",
 				});
+			if (
+				invite.invitedRole === "STUDENT" &&
+				(!input.githubId || !input.schoolId)
+			) {
+				throw new ActionError({
+					code: "BAD_REQUEST",
+					message: "Students need a GitHub username and a school id.",
+				});
+			}
 			const precheckError = db.invite.checkRedeemable(invite, input.email);
 			if (precheckError) {
 				throw new ActionError({
@@ -132,6 +149,83 @@ export const auth = {
 				expires: session.expiresAt,
 			});
 			return { role: user.role };
+		},
+	}),
+
+	/**
+	 * Enrolls the logged-in user in the course a classroom or personal invite
+	 * carries, redeeming the invite, instead of creating a new account.
+	 *
+	 * Only a student invite bound to a course can be used this way; an invite
+	 * without a course exists to create an account. Already being enrolled is
+	 * not an error.
+	 */
+	joinWithInvite: defineAction({
+		accept: "form",
+		input: z.object({ token: z.string() }),
+		handler: async (input, context) => {
+			const actor = requireUser(context);
+			const user = await db.user.findOne(
+				{ username: actor.username },
+				FULL_ACCESS,
+			);
+			const invite = await db.invite.findOne(
+				{ token: input.token },
+				FULL_ACCESS,
+			);
+			if (!invite || !user)
+				throw new ActionError({
+					code: "NOT_FOUND",
+					message: "Invite not found or expired.",
+				});
+			if (!invite.courseId || invite.invitedRole !== "STUDENT") {
+				throw new ActionError({
+					code: "BAD_REQUEST",
+					message:
+						"This invite creates a new account, and you already have one.",
+				});
+			}
+			if (user.role !== "STUDENT") {
+				throw new ActionError({
+					code: "BAD_REQUEST",
+					message: `${user.name} is not a student account.`,
+				});
+			}
+			const courseId = invite.courseId;
+			const enrolled = await db.enrollment.findOne(
+				{ course: courseId, username: user.username },
+				{ actor },
+			);
+			if (enrolled?.status !== "ACTIVE") {
+				const precheckError = db.invite.checkRedeemable(invite, user.email);
+				if (precheckError) {
+					throw new ActionError({
+						code: "BAD_REQUEST",
+						message: inviteErrorMessage(precheckError),
+					});
+				}
+				try {
+					await prisma.$transaction(async (tx) => {
+						await db.invite.redeem(input.token, user.username, user.email, {
+							...FULL_ACCESS,
+							tx,
+						});
+						await db.enrollment.create(
+							{ course: courseId, username: user.username },
+							{ ...FULL_ACCESS, tx },
+						);
+					});
+				} catch (error) {
+					if (error instanceof InviteError) {
+						throw new ActionError({
+							code: "BAD_REQUEST",
+							message: inviteErrorMessage(error.code),
+						});
+					}
+					throw error;
+				}
+			}
+			return { courseId };
 		},
 	}),
 
@@ -231,7 +325,7 @@ function inviteErrorMessage(code: InviteError["code"]): string {
 		case "exhausted":
 			return "This invite has reached its maximum number of uses.";
 		case "already_redeemed":
-			return "You already have an account.";
+			return "You already used this invite.";
 	}
 }
 
