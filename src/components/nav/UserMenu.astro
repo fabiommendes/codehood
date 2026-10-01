@@ -6,6 +6,7 @@ import { actions } from "astro:actions";
 import type { UserActor } from "@/auth/actor";
 import Avatar from "@/components/Avatar.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
+import { roleLabels } from "@/utils/roles";
 
 interface Props {
 	user: UserActor;
@@ -14,13 +15,6 @@ interface Props {
 }
 
 const { user, open = false } = Astro.props;
-
-/// Human labels for the role shown in the menu.
-const ROLE_LABEL = {
-	STUDENT: "Student",
-	INSTRUCTOR: "Instructor",
-	ADMIN: "Admin",
-} as const;
 ---
 
 <details class="dropdown dropdown-end" open={open}>
@@ -28,7 +22,7 @@ const ROLE_LABEL = {
     <Avatar username={user.username} size={32} />
     <span class="hidden text-left leading-tight whitespace-nowrap lg:grid">
       <span class="font-semibold">{user.name}</span>
-      <span class="text-xs text-base-content/70">{ROLE_LABEL[user.role]}</span>
+      <span class="text-xs text-base-content/70">{roleLabels[user.role]}</span>
     </span>
     <svg class="hidden lg:block" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />

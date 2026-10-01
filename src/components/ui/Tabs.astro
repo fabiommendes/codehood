@@ -65,11 +65,13 @@ const panelCss = name
 						class="tab h-auto border-b-2 px-0 pb-3 text-sm border-transparent font-medium text-base-content/60 checked:border-primary checked:font-bold checked:text-primary"
 						checked={item.key === active}
 					/>
-					<div data-tab-panel={item.key} class="tab-content">
-						<slot name={item.key} />
-					</div>
 				))}
 			</div>
+			{items.map((item) => (
+				<div data-tab-panel={item.key} class="hidden">
+					<slot name={item.key} />
+				</div>
+			))}
 			<style set:html={panelCss} />
 		</div>
 	) : (

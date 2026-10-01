@@ -6,6 +6,7 @@ import PageKicker from "@/components/PageKicker.astro";
 import Tabs from "@/components/ui/Tabs.astro";
 import { type ApiKey, db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { roleLabels } from "@/utils/roles";
 
 const logoutEverywhereResult = Astro.getActionResult(
 	actions.profile.logoutEverywhere,
@@ -68,14 +69,12 @@ const profileTabs = [
 
     <Tabs items={profileTabs} active={activeTab} name="profile-tabs">
       <Fragment slot="details">
-        <div class="flex flex-col gap-8 pt-6">
+        <div class="flex flex-col gap-8">
           <div class="card card-border">
             <div class="card-body">
               <div class="flex items-center justify-between">
                 <h2 class="card-title">Your details</h2>
-                <span class="badge badge-neutral"
-                  >{user.role.toLowerCase()}</span
-                >
+                <span class="badge badge-neutral">{roleLabels[user.role]}</span>
               </div>
 
               {
@@ -128,7 +127,7 @@ const profileTabs = [
                     class="input w-full"
                     disabled
                   />
-                  <p class="label">
+                  <p class="label whitespace-normal">
                     Usernames can't be changed because they're part of your course
                     URLs.
                   </p>
@@ -168,7 +167,7 @@ const profileTabs = [
       </Fragment>
 
       <Fragment slot="account">
-        <div class="flex flex-col gap-8 pt-6">
+        <div class="flex flex-col gap-8">
           <div class="card card-border">
             <div class="card-body">
               <h2 class="card-title">Change password</h2>
@@ -228,7 +227,7 @@ const profileTabs = [
                     minlength="8"
                     class="input w-full"
                   />
-                  <p class="label" id="passwordMismatch" hidden>
+                  <p class="label whitespace-normal" id="passwordMismatch" hidden>
                     Passwords do not match.
                   </p>
                 </fieldset>
@@ -263,7 +262,7 @@ const profileTabs = [
       </Fragment>
 
       <Fragment slot="apikeys">
-        <div class="pt-6">
+        <div>
           <div class="card card-border">
             <div class="card-body">
               <h2 class="card-title">API keys</h2>
