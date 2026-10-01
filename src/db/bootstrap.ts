@@ -447,6 +447,29 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		);
 	}
 
+	// A few meetings in the coming weeks, counted from the day the seed runs,
+	// so the calendar's upcoming list and "today" always have something near.
+	const weeksSoFar = Math.floor(
+		(Date.now() - (cs101.startAt?.getTime() ?? Date.now())) /
+			(7 * 24 * 3600 * 1000),
+	);
+	for (const event of [
+		{ slot: cs101Mon, week: weeksSoFar + 1, title: "Review: recursion" },
+		{ slot: cs101Wed, week: weeksSoFar + 1, title: "Project clinic" },
+		{ slot: cs101Mon, week: weeksSoFar + 2, title: "Review: data structures" },
+	]) {
+		await db.calendarEvent.create(
+			{
+				course: cs101.id,
+				timeSlot: event.slot.id,
+				week: event.week,
+				title: event.title,
+				rev: `demo-upcoming-${event.week}-${event.slot.slug}-v1`,
+			},
+			FULL_ACCESS,
+		);
+	}
+
 	const cs201Mon = await db.timeSlot.create(
 		{
 			course: cs201.id,
