@@ -38,7 +38,7 @@ that meeting on the schedule and stays off the Resources tab.
 
 ## CLI
 
-- **R7.** Format to settle with the CLI's calendar spec. Proposal: a
+- **R7.** A
   markdown link inside a lesson of `calendar.md` to a file under
   `resources/` attaches that resource to the lesson's event, e.g.
   `[Slides](resources/w03/recursion.pdf)`. The CLI sends the event key with
@@ -69,7 +69,7 @@ that meeting on the schedule and stays off the Resources tab.
 - Deleting the event leaves the resource on the Resources tab.
 - A student of another course cannot read an event resource by id or slug.
 
-## Open questions
+## Order of work
 
-- R7's link syntax versus a `resources:` list under each lesson.
-- A glossary entry for "Event resource".
+Implement after the grade-column migration lands, so the two schema changes do
+not conflict.

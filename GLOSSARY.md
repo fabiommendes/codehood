@@ -151,6 +151,13 @@ review, seminar, project, self-study, holiday, recess, or cancelled).
 May carry a derived link to an [Exam](#exam) whose window overlaps it. This is
 what the calendar renders.
 
+## Event resource
+
+Type: domain
+
+A [Resource](#resource) that belongs to one [Event](#event). It shows under
+that meeting on the schedule instead of on the Resources tab.
+
 ## Exam
 
 Type: domain
