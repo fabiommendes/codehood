@@ -201,6 +201,11 @@
 - A course's schedule shows each meeting's date next to its weekday and time,
   without the heading that repeated the course tab. A meeting on the course
   home or the calendar leads to its own row on the schedule, highlighted.
+- A course's schedule groups each week in one card, folds the weeks already
+  held under one line, marks the next meeting and lists dated exams in their
+  week, linking to the exam. Instructors also see their dated drafts, faded.
+  Lesson plans in a meeting's description read as compact lists, and phones
+  show the date above the title instead of in a column.
 - A resource's whole row acts on it: a file downloads, a link opens its
   site in another tab without a confirmation dialog. The line under the
   title shows the resource's description, or else a link's site, a file's

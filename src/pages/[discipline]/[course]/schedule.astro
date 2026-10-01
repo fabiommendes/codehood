@@ -1,25 +1,23 @@
 ---
-// The course's own term calendar (FR-CAL-020), grouped by week.
-// Read-only: schedule data comes from `codehood push`, `manage import-calendar`
-// and the demo seed. Each event carries an `event-<id>` anchor for links from
-// the course home and the calendar.
+// The course's own term calendar (FR-CAL-020): its meetings and dated exams,
+// grouped by week, with the weeks already over folded away. Read-only:
+// schedule data comes from `codehood push`, `manage import-calendar` and the
+// demo seed.
 import { hasPerm } from "@/auth/permissions";
 import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
+import ScheduleWeek from "@/components/schedule/ScheduleWeek.astro";
 import Alert from "@/components/ui/Alert";
-import { type CalendarEvent, db, isMeeting } from "@/db";
+import { db, isMeeting } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { calendarEntries } from "@/services/calendar-entries";
+import { courseSchedule } from "@/services/course-schedule";
 import { breadcrumbs } from "@/utils/breadcrumbs";
-import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
-import { renderMarkdown } from "@/utils/markdown";
 import {
 	durationToMinutes,
-	endOf,
 	formatClock,
-	formatDateTime,
 	formatTime,
-	SERVER_TZ,
 	toMinutes,
 } from "@/utils/schedule-time";
 
@@ -28,7 +26,7 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course } = result;
+const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
@@ -44,46 +42,32 @@ const WEEKDAY_LABEL: Record<string, string> = {
 	SATURDAY: "Sat",
 };
 
+const now = new Date();
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
-
 const events = await db.calendarEvent.findMany(
 	{ courseIds: [course.id] },
 	{ actor },
 );
+// The exam service already keeps drafts from students.
+const exams = await db.exam.findMany({ course: course.id }, { actor });
+const entries = calendarEntries(
+	events,
+	exams.map((exam) => ({ courseId: course.id, exam })),
+);
+const { past, ahead, next } = courseSchedule(entries, course.startAt, now);
+// Folding every week away would leave an empty page once the term is over.
+const foldPast = past.length > 0 && ahead.length > 0;
 
-const weeks = new Map<number, CalendarEvent[]>();
-for (const event of events) {
-	weeks.set(event.week, [...(weeks.get(event.week) ?? []), event]);
-}
-const orderedWeeks = [...weeks.entries()].sort(([a], [b]) => a - b);
-
-const timeFmt = new Intl.DateTimeFormat("en-US", {
-	timeZone: SERVER_TZ,
-	hour: "2-digit",
-	minute: "2-digit",
-	hourCycle: "h23",
-});
-function timeRange(event: CalendarEvent): string {
-	const start = timeFmt.format(event.startAt);
-	const end = timeFmt.format(
-		endOf(event.startAt, durationToMinutes(event.timeSlot.duration)),
-	);
-	return `${start}–${end}`;
-}
-
-/// An event's day of the month, e.g. "Jan 5".
-function dayOfMonth(event: CalendarEvent): string {
-	return formatDateTime(event.startAt, {
-		weekday: undefined,
-		hour: undefined,
-		minute: undefined,
-	});
-}
-
-const now = new Date();
 const meetingsHeld = events.filter(
 	(e) => isMeeting(e.kind) && e.kind !== "CANCELLED" && e.startAt <= now,
 ).length;
+
+/// "Weeks 1–4", or "Week 1" for a single one.
+function weekSpan(weeks: { week: number }[]): string {
+	const first = weeks[0]?.week;
+	const last = weeks.at(-1)?.week;
+	return first === last ? `Week ${first}` : `Weeks ${first}–${last}`;
+}
 ---
 
 <AppLayout title={`Schedule · ${course.discipline.name}`}
@@ -107,89 +91,38 @@ const meetingsHeld = events.filter(
         </Alert>
       ) : (
         <>
-          <div class="mt-6 flex flex-wrap gap-2">
-            {slots.map((slot) => (
-              <span class="badge badge-outline gap-1.5">
-                {slot.title ?? "Meeting"} · {WEEKDAY_LABEL[slot.day]}{" "}
-                {formatClock(slot.start)}–
-                {formatTime(toMinutes(slot.start) + durationToMinutes(slot.duration))}
-              </span>
-            ))}
-          </div>
-          <p class="mt-3 text-xs text-base-content/50">
+          <p class="mt-6 text-sm text-base-content/70">
+            {slots
+              .map(
+                (slot) =>
+                  `${slot.title ?? "Meeting"} · ${WEEKDAY_LABEL[slot.day]} ${formatClock(slot.start)}–${formatTime(toMinutes(slot.start) + durationToMinutes(slot.duration))}`,
+              )
+              .join(", ")}
+          </p>
+          <p class="mt-1 text-xs text-base-content/50">
             {meetingsHeld} {meetingsHeld === 1 ? "meeting" : "meetings"} held so far.
           </p>
 
-          {events.length === 0 ? (
+          {entries.length === 0 ? (
             <p class="mt-8 text-sm text-base-content/60">
               No events on the calendar yet.
             </p>
           ) : (
-            <div class="mt-6 flex flex-col gap-8">
-              {orderedWeeks.map(([week, weekEvents]) => (
-                <div>
-                  <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">
-                    Week {week}
-                  </h3>
-                  <div class="mt-3 flex flex-col gap-3">
-                    {weekEvents.map((event) => {
-                      const meeting = isMeeting(event.kind);
-                      const cancelled = event.kind === "CANCELLED";
-                      const dayLabel = WEEKDAY_LABEL[event.timeSlot.day] ?? "";
-                      return (
-                        <div
-                          id={`event-${event.id}`}
-                          class:list={[
-                            "card card-border scroll-mt-6 bg-base-100 target:ring-2 target:ring-primary",
-                            !meeting && "opacity-60",
-                          ]}
-                        >
-                          <div class="card-body flex-row gap-4 py-4">
-                            <div class="flex w-20 shrink-0 flex-col items-center gap-0.5 rounded-field border border-base-300 py-1.5 text-center">
-                              <span class="text-[11px] font-medium text-base-content/50">
-                                {dayLabel}
-                              </span>
-                              <span class="font-display text-sm leading-none font-semibold">
-                                {dayOfMonth(event)}
-                              </span>
-                              <span class="text-[11px] text-base-content/60">
-                                {timeRange(event)}
-                              </span>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <p
-                                  class:list={[
-                                    "font-medium",
-                                    cancelled && "line-through",
-                                  ]}
-                                >
-                                  {event.title}
-                                </p>
-                                {eventKindLabel(event.kind) && (
-                                  <span
-                                    class:list={[
-                                      "badge badge-sm",
-                                      meeting ? "badge-outline" : "badge-ghost",
-                                    ]}
-                                  >
-                                    {eventKindLabel(event.kind)}
-                                  </span>
-                                )}
-                              </div>
-                              {event.description && (
-                                <div
-                                  class="prose prose-sm mt-1 max-w-none text-base-content/70 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
-                                  set:html={renderMarkdown(event.description)}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+            <div class="mt-8 flex flex-col gap-8">
+              {foldPast && (
+                <details id="past-weeks">
+                  <summary class="cursor-pointer text-sm font-medium text-base-content/60 hover:text-base-content">
+                    {weekSpan(past)}, already held
+                  </summary>
+                  <div class="mt-6 flex flex-col gap-8">
+                    {past.map(({ week, entries }) => (
+                      <ScheduleWeek week={week} entries={entries} next={next} href={href} />
+                    ))}
                   </div>
-                </div>
+                </details>
+              )}
+              {(foldPast ? ahead : [...past, ...ahead]).map(({ week, entries }) => (
+                <ScheduleWeek week={week} entries={entries} next={next} href={href} />
               ))}
             </div>
           )}
@@ -198,3 +131,18 @@ const meetingsHeld = events.filter(
     }
   </main>
 </AppLayout>
+
+<script>
+  // A link to a meeting in a past week has to unfold the weeks first.
+  function revealTarget() {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    const folded = target?.closest("details");
+    if (target && folded && !folded.open) {
+      folded.open = true;
+      target.scrollIntoView();
+    }
+  }
+  revealTarget();
+  window.addEventListener("hashchange", revealTarget);
+</script>

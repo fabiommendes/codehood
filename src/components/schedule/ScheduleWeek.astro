@@ -1,0 +1,144 @@
+---
+// One week of a course's schedule: a heading and a card with a row per
+// meeting or exam. Each row carries an anchor (`event-<id>`, `exam-<slug>`)
+// that the course home and the calendar link to.
+import type { CalendarEntry } from "@/services/calendar-entries";
+import { eventKindLabel } from "@/utils/calendar-event-display";
+import { examTypeLabels, formatDuration } from "@/utils/exam-display";
+import { renderMarkdown } from "@/utils/markdown";
+import { formatDateTime } from "@/utils/schedule-time";
+
+interface Props {
+	week: number;
+	entries: CalendarEntry[];
+	/// The entry marked "Next", if it is in this week.
+	next: CalendarEntry | undefined;
+	/// The course's own URL, which exam links hang from.
+	href: string;
+}
+
+const { week, entries, next, href } = Astro.props;
+
+/// A row's anchor, the fragment links to this entry use.
+function anchor(entry: CalendarEntry): string {
+	return entry.kind === "event"
+		? `event-${entry.event.id}`
+		: `exam-${entry.exam.slug}`;
+}
+
+/// "14:00–16:00", or just the start for an untimed exam.
+function timeRange(entry: CalendarEntry): string {
+	const clock = (instant: Date) =>
+		formatDateTime(instant, {
+			weekday: undefined,
+			month: undefined,
+			day: undefined,
+		});
+	const start = clock(entry.startAt);
+	return entry.endAt > entry.startAt ? `${start}–${clock(entry.endAt)}` : start;
+}
+
+/// Whether an entry shows faded: a holiday, a cancelled meeting or a draft.
+function faded(entry: CalendarEntry): boolean {
+	return entry.kind === "event"
+		? entry.event.kind !== "REGULAR"
+		: entry.exam.status === "DRAFT";
+}
+---
+
+<section>
+  <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">
+    Week {week}
+  </h3>
+  <ol class="mt-3 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50">
+    {
+      entries.map((entry) => (
+        <li
+          id={anchor(entry)}
+          class="flex scroll-mt-6 gap-4 px-4 py-4 first:rounded-t-box last:rounded-b-box target:bg-primary/10"
+        >
+          <div
+            class:list={[
+              "hidden w-20 shrink-0 flex-col items-center gap-0.5 self-start rounded-field border border-base-300 bg-base-100 py-1.5 text-center sm:flex",
+              faded(entry) && "opacity-60",
+            ]}
+          >
+            <span class="text-[11px] font-medium text-base-content/50">
+              {formatDateTime(entry.startAt, {
+                month: undefined,
+                day: undefined,
+                hour: undefined,
+                minute: undefined,
+              })}
+            </span>
+            <span class="font-display text-sm leading-none font-semibold">
+              {formatDateTime(entry.startAt, {
+                weekday: undefined,
+                hour: undefined,
+                minute: undefined,
+              })}
+            </span>
+            <span class="text-[11px] text-base-content/60">{timeRange(entry)}</span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="mb-1 text-xs text-base-content/60 sm:hidden">
+              {formatDateTime(entry.startAt, { hour: undefined, minute: undefined })}
+              {` · ${timeRange(entry)}`}
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+              {entry.kind === "event" ? (
+                <p
+                  class:list={[
+                    "font-medium",
+                    entry.event.kind === "CANCELLED" && "line-through",
+                    faded(entry) && "text-base-content/60",
+                  ]}
+                >
+                  {entry.event.title}
+                </p>
+              ) : (
+                <a
+                  href={`${href}/exams/${entry.exam.slug}`}
+                  class:list={[
+                    "link link-hover font-medium",
+                    faded(entry) && "text-base-content/60",
+                  ]}
+                >
+                  {entry.exam.title}
+                </a>
+              )}
+              {entry === next && <span class="badge badge-primary badge-sm">Next</span>}
+              {entry.kind === "exam" && (
+                <span class="badge badge-secondary badge-sm">
+                  {examTypeLabels[entry.exam.type]}
+                </span>
+              )}
+              {entry.kind === "exam" && entry.exam.status === "DRAFT" && (
+                <span class="badge badge-ghost badge-sm">Draft</span>
+              )}
+              {entry.kind === "event" && eventKindLabel(entry.event.kind) && (
+                <span class="badge badge-ghost badge-sm">
+                  {eventKindLabel(entry.event.kind)}
+                </span>
+              )}
+            </div>
+            {entry.kind === "exam" && (
+              <p class="mt-1 text-sm text-base-content/60">
+                {formatDuration(entry.exam.duration)}
+              </p>
+            )}
+            {entry.kind === "event" && entry.event.description && (
+              <div
+                class:list={[
+                  "prose prose-sm mt-1 max-w-none text-base-content/70 prose-p:my-1 prose-ol:my-1 prose-ul:my-1 prose-li:my-0 prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+                  faded(entry) && "opacity-70",
+                ]}
+                set:html={renderMarkdown(entry.event.description)}
+              />
+            )}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</section>
