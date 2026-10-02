@@ -1,7 +1,21 @@
 import { z } from "zod";
 import { attachmentSchema } from "./attachment";
-import { buffer, courseId, resourceId, rev, slug } from "./base";
+import {
+	buffer,
+	calendarEventId,
+	courseId,
+	resourceId,
+	rev,
+	slug,
+} from "./base";
 import { courseRef } from "./course";
+
+/// A calendar event of the resource's course, by the natural key the CLI
+/// writes: the week, counted from 0, and the time slot's slug.
+export const resourceEventKey = z.object({
+	week: z.number().int().min(0),
+	timeSlot: slug,
+});
 
 export const resourceSchema = z.object({
 	id: resourceId,
@@ -15,6 +29,8 @@ export const resourceSchema = z.object({
 		z.lazy(() => resourceCodeData),
 		z.lazy(() => resourceMdData),
 	]),
+	/// The meeting the resource belongs to, or null for a general resource.
+	event: resourceEventKey.extend({ id: calendarEventId }).nullable(),
 	rev: rev.nullable(),
 	createdAt: z.date(),
 	updatedAt: z.date(),
@@ -69,10 +85,14 @@ export const resourceCreate = resourceSchema
 		updatedAt: true,
 		description: true,
 		data: true,
+		event: true,
 	})
 	.extend({
 		course: courseRef,
 		description: resourceSchema.shape.description.nullish(),
+		/// Omitted means a general resource on create and upsert, and
+		/// unchanged on update.
+		event: resourceEventKey.nullish(),
 		rev: rev.nullish(),
 		data: z.union([
 			resourceLinkData,
@@ -96,4 +116,8 @@ export const resourceFilterBase = z.object({
 	slugs: z.array(z.string()).optional(),
 });
 
-export const resourceFilter = resourceFilterBase.extend({ course: courseRef });
+export const resourceFilter = resourceFilterBase.extend({
+	course: courseRef,
+	/// An id lists that event's resources, null the general ones only.
+	event: calendarEventId.nullable().optional(),
+});

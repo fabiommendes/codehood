@@ -267,3 +267,117 @@ test("PUT creates on the first call and updates the same resource on the next, t
 	const list = await (await request.get(url, { headers })).json();
 	expect(list).toHaveLength(1);
 });
+
+/// A fresh course (see `makeCourse`) with a MONDAY slot "mon" and one event
+/// at week 2, seeded through the service.
+async function makeCourseWithEvent() {
+	const ctx = await makeCourse();
+	await db.timeSlot.create(
+		{
+			course: ctx.course.id,
+			slug: "mon",
+			day: "MONDAY",
+			start: { hour: 14, minute: 0 },
+			duration: { hours: 2 },
+		},
+		{ actor: ctx.instructor },
+	);
+	const calendarEvent = await db.calendarEvent.create(
+		{
+			course: ctx.course.id,
+			timeSlot: "mon",
+			week: 2,
+			title: "Week 2",
+			rev: tag("h"),
+		},
+		{ actor: ctx.instructor },
+	);
+	return { ...ctx, calendarEvent };
+}
+
+test("POST and PUT with an event key attach the resource, GET returns the event, and PUT without event detaches it", async ({
+	request,
+}) => {
+	const { instructor, url, calendarEvent } = await makeCourseWithEvent();
+	const headers = await tokenFor(request, instructor.username);
+	const key = { week: 2, timeSlot: "mon" };
+	const expected = { id: calendarEvent.id, ...key };
+
+	const created = await request.post(url, {
+		headers,
+		data: { slug: "slides", ...link("Slides"), event: key },
+	});
+	expect(created.status()).toBe(200);
+	expect((await created.json()).event).toEqual(expected);
+
+	const read = await request.get(`${url}/slides`, { headers });
+	expect(read.status()).toBe(200);
+	expect((await read.json()).event).toEqual(expected);
+
+	const listed = await request.get(url, { headers });
+	expect((await listed.json())[0].event).toEqual(expected);
+
+	const put = await request.put(url, {
+		headers,
+		data: { slug: "notes", ...link("Notes"), event: key },
+	});
+	expect(put.status()).toBe(200);
+	expect((await put.json()).event).toEqual(expected);
+
+	const detached = await request.put(url, {
+		headers,
+		data: { slug: "notes", ...link("Notes") },
+	});
+	expect(detached.status()).toBe(200);
+	expect((await detached.json()).event).toBeNull();
+	const reread = await request.get(`${url}/notes`, { headers });
+	expect((await reread.json()).event).toBeNull();
+
+	const patched = await request.patch(`${url}/slides`, {
+		headers,
+		data: { event: null },
+	});
+	expect(patched.status()).toBe(200);
+	expect((await patched.json()).event).toBeNull();
+});
+
+test("an unknown event key answers 404 on POST, PUT and PATCH and writes nothing", async ({
+	request,
+}) => {
+	const { instructor, url } = await makeCourseWithEvent();
+	const headers = await tokenFor(request, instructor.username);
+
+	for (const event of [
+		{ week: 9, timeSlot: "mon" },
+		{ week: 2, timeSlot: "nope" },
+	]) {
+		const post = await request.post(url, {
+			headers,
+			data: { slug: "ghost-post", ...link(), event },
+		});
+		expect(post.status()).toBe(404);
+		const put = await request.put(url, {
+			headers,
+			data: { slug: "ghost-put", ...link(), event },
+		});
+		expect(put.status()).toBe(404);
+	}
+	expect((await request.get(`${url}/ghost-post`, { headers })).status()).toBe(
+		404,
+	);
+	expect((await request.get(`${url}/ghost-put`, { headers })).status()).toBe(
+		404,
+	);
+
+	await request.post(url, {
+		headers,
+		data: { slug: "real", ...link("Real") },
+	});
+	const patch = await request.patch(`${url}/real`, {
+		headers,
+		data: { title: "Changed", event: { week: 9, timeSlot: "mon" } },
+	});
+	expect(patch.status()).toBe(404);
+	const after = await request.get(`${url}/real`, { headers });
+	expect((await after.json()).title).toBe("Real");
+});

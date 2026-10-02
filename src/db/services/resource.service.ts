@@ -65,6 +65,9 @@ const resourceInclude = {
 			mimeType: true,
 		},
 	},
+	event: {
+		select: { id: true, week: true, timeSlot: { select: { slug: true } } },
+	},
 } satisfies Prisma.ResourceInclude;
 
 export class ResourceService
@@ -106,9 +109,11 @@ export class ResourceService
 				tx,
 			});
 
+			const eventId = await self.eventId(course.id, input.event, tx);
 			const row = await tx.resource.create({
 				data: {
 					courseId: course.id,
+					eventId,
 					slug: input.slug,
 					type: input.data.type,
 					title: input.title,
@@ -155,7 +160,7 @@ export class ResourceService
 			return row && fromDb(row);
 		}
 
-		return opts.tx ? run(opts.tx) : run(this.prisma);
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
 	}
 
 	/**
@@ -265,6 +270,7 @@ export class ResourceService
 							: { course: courseContentsWhere(opts.actor) },
 						filter.types ? { type: { in: filter.types } } : {},
 						filter.slugs ? { slug: { in: filter.slugs } } : {},
+						filter.event === undefined ? {} : { eventId: filter.event },
 					],
 				},
 				include: resourceInclude,
@@ -337,9 +343,11 @@ export class ResourceService
 				};
 			}
 
+			const eventId = await self.eventId(target.courseId, fields.event, tx);
 			const row = await tx.resource.update({
 				where: { id: target.id },
 				data: {
+					eventId,
 					type: fields.data?.type,
 					title: fields.title,
 					description: fields.description,
@@ -375,6 +383,7 @@ export class ResourceService
 		return upsert(this, input, {
 			...opts,
 			action: "resource.create",
+			update: (input) => ({ ...input, event: input.event ?? null }),
 			pk({ slug, course }) {
 				return { slug, course } satisfies ResourcePK;
 			},
@@ -506,6 +515,30 @@ export class ResourceService
 		return valueOrNotAllowed(action, course, pred);
 	}
 
+	/**
+	 * Resolves an event key within a course to the event id.
+	 *
+	 * Returns `undefined` when the key is omitted (leave unchanged) and `null`
+	 * when it is null (no event). Throws `NotFound` if the course has no such event.
+	 */
+	private async eventId(
+		courseId: CourseId,
+		key: ResourceCreate["event"],
+		tx: PrismaTx,
+	): Promise<number | null | undefined> {
+		if (key === undefined || key === null) return key;
+
+		const event = await tx.calendarEvent.findFirst({
+			where: {
+				courseId,
+				week: key.week,
+				timeSlot: { slug: key.timeSlot, courseId },
+			},
+			select: { id: true },
+		});
+		return valueOrNotFound("calendar event", event).id;
+	}
+
 	private async courseId(ref: CourseRef, tx: PrismaTx): Promise<CourseId> {
 		if (typeof ref === "number") return ref;
 
@@ -540,6 +573,11 @@ function fromDb<T = Record<string, unknown>>(
 		updatedAt: row.updatedAt,
 
 		data: fillData(row),
+		event: row.event && {
+			id: row.event.id,
+			week: row.event.week,
+			timeSlot: row.event.timeSlot.slug,
+		},
 
 		...extra,
 	};

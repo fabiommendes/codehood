@@ -388,6 +388,8 @@ model CalendarEvent {
   /// Revision marker supplied by the writer, opaque to the server.
   rev String?
 
+  resources Resource[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -450,6 +452,11 @@ model Resource {
   attachmentId Int?
   attachment   Attachment? @relation(fields: [attachmentId], references: [id])
 
+  /// The meeting this resource belongs to, in the same course. Null for a
+  /// general resource, listed on the course's Resources tab.
+  eventId Int?
+  event   CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
   /// Revision marker supplied by the writer, opaque to the server.
   rev String?
 
@@ -458,6 +465,7 @@ model Resource {
 
   @@unique([courseId, slug])
   @@index([courseId, type])
+  @@index([eventId])
 }
 
 // =============================================================================
