@@ -168,7 +168,10 @@ run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 
 The dev database (`dev.db`) is disposable. Nothing in it is worth keeping: run
 `pnpm run db:reset` whenever a schema change or a new seed calls for it,
-without asking first.
+without asking first. The reset deletes the file, so a dev server that is
+running keeps the old one open and fails every write with "attempt to write a
+readonly database" until it is restarted. Say so when the server is not yours
+to restart.
 
 ### Test output
 
