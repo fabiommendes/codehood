@@ -166,6 +166,10 @@ run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 | `pnpm run db:seed`  | Seed the dev database                         |
 | `pnpm run db:reset` | Reset and re-seed the dev database            |
 
+The dev database (`dev.db`) is disposable. Nothing in it is worth keeping: run
+`pnpm run db:reset` whenever a schema change or a new seed calls for it,
+without asking first.
+
 ### Test output
 
 `test/run.ts` wipes the test database and pushes the schema before Playwright
