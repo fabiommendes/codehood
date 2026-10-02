@@ -193,7 +193,10 @@ export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	plural: "Resources",
 	keySegment: "/[slug]",
 
-	entity: schema.resourceSchema.omit({ id: true, courseId: true }),
+	// Over the API an event is the `(week, time slot)` it occupies, never its id.
+	entity: schema.resourceSchema
+		.omit({ id: true, courseId: true })
+		.extend({ event: schema.resourceEventKey.nullable() }),
 	create: schema.resourceCreate.omit({ course: true }),
 	update: schema.resourceUpdate,
 	filter: schema.resourceFilterBase,

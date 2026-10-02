@@ -298,10 +298,11 @@ async function makeCourseWithEvent() {
 test("POST and PUT with an event key attach the resource, GET returns the event, and PUT without event detaches it", async ({
 	request,
 }) => {
-	const { instructor, url, calendarEvent } = await makeCourseWithEvent();
+	const { instructor, url } = await makeCourseWithEvent();
 	const headers = await tokenFor(request, instructor.username);
 	const key = { week: 2, timeSlot: "mon" };
-	const expected = { id: calendarEvent.id, ...key };
+	// The API returns the event by its key alone: no raw id leaves `/api/`.
+	const expected = key;
 
 	const created = await request.post(url, {
 		headers,
