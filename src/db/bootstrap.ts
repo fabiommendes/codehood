@@ -532,6 +532,89 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		);
 	}
 
+	// Material attached to meetings: every type under a past lecture, and a
+	// file and a link under one ahead, so the schedule shows both and the
+	// Resources tab shows they are kept off it.
+	const recursion = { week: 4, timeSlot: cs101Mon.slug };
+	const dataStructures = { week: weeksSoFar + 2, timeSlot: cs101Mon.slug };
+	for (const resource of [
+		{
+			slug: "w04-recursion-slides",
+			title: "Slides: functions and recursion",
+			event: recursion,
+			data: {
+				type: "FILE" as const,
+				buffer: Buffer.from(
+					"Functions and recursion\n\n1. Parameters and return values\n2. Scope\n3. The call stack\n4. Recursion\n",
+				),
+				filename: "recursion-slides.txt",
+			},
+		},
+		{
+			slug: "w04-recursion-notes",
+			title: "Lecture notes: recursion",
+			event: recursion,
+			data: {
+				type: "MD" as const,
+				content: [
+					"# Recursion",
+					"",
+					"A recursive function has a **base case** that answers directly and a",
+					"**recursive step** that calls itself on a smaller input.",
+					"",
+					"Tracing `fib(5)` by hand makes 15 calls; the memoized version makes 9.",
+				].join("\n"),
+			},
+		},
+		{
+			slug: "w04-fib",
+			title: "fib.py",
+			event: recursion,
+			data: {
+				type: "CODE" as const,
+				language: "python",
+				content: [
+					"def fib(n: int) -> int:",
+					"    if n < 2:",
+					"        return n",
+					"    return fib(n - 1) + fib(n - 2)",
+				].join("\n"),
+			},
+		},
+		{
+			slug: "w04-visualizer",
+			title: "Python Tutor: watch the call stack",
+			event: recursion,
+			data: { type: "LINK" as const, url: "https://pythontutor.com/" },
+		},
+		{
+			slug: "review-ds-cheat-sheet",
+			title: "Complexity cheat sheet",
+			event: dataStructures,
+			data: {
+				type: "LINK" as const,
+				url: "https://wiki.python.org/moin/TimeComplexity",
+			},
+		},
+		{
+			slug: "review-ds-practice",
+			title: "Practice set: data structures",
+			event: dataStructures,
+			data: {
+				type: "FILE" as const,
+				buffer: Buffer.from(
+					"1. Remove duplicates from a list, keeping the order.\n2. Count words with a dictionary.\n3. Intersect two lists with sets.\n",
+				),
+				filename: "ds-practice.txt",
+			},
+		},
+	]) {
+		await db.resource.create(
+			{ course: cs101.id, ...resource, rev: `demo-${resource.slug}-v1` },
+			FULL_ACCESS,
+		);
+	}
+
 	const cs201Mon = await db.timeSlot.create(
 		{
 			course: cs201.id,
