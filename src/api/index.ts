@@ -164,7 +164,7 @@ export const gradeColumnApi = CRUD(
 );
 
 export const gradesApi = GET("/api/course/[discipline]/[course]/grades", {
-	out: schema.courseGradesSchema.openapi("CourseGrades"),
+	out: schema.courseGradesSchema,
 	summary: "View the exam results of every student",
 	description:
 		"Lists the exams of the course's grades table and, for every enrolled student, dropped ones included, what each exam reads: a total, or why there is none. Only the course's instructor may read it.",
