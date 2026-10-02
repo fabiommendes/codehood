@@ -9,12 +9,13 @@ import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHomeExams } from "@/services/course-home";
+import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
 import { resourceDetail } from "@/utils/resource-kind";
-import { fileDownloadName } from "@/utils/resource-url";
+import { fileDownloadName, resourceHref } from "@/utils/resource-url";
 import {
 	durationToMinutes,
 	formatClock,
@@ -87,23 +88,16 @@ const examPreview = courseHomeExams(
 // The syllabus line and the next few meetings. Both come from the same source
 // the Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
-const resources = await db.resource.findMany({ course: course.id }, { actor });
-/// The last three resources added, newest first; the Resources tab lists them all by title.
+const allResources = await db.resource.findMany(
+	{ course: course.id },
+	{ actor },
+);
+const { general: resources, byEvent: eventResources } =
+	splitByEvent(allResources);
+/// The last three general resources added, newest first; the Resources tab lists them all by title.
 const newestResources = resources
 	.toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 	.slice(0, 3);
-
-/// Where a resource's row leads: the file's download, the link itself, or the resource's own page.
-function resourceHref(resource: (typeof resources)[number]): string {
-	switch (resource.data.type) {
-		case "FILE":
-			return resource.data.link;
-		case "LINK":
-			return resource.data.url;
-		default:
-			return `${href}/resources/${resource.slug}`;
-	}
-}
 
 const justJoined = Astro.url.searchParams.has("joined");
 
@@ -153,7 +147,12 @@ const nextEvents = await db.calendarEvent.findMany(
       {
         resources.length === 0 ? (
           <p class="mt-4 text-sm text-base-content/60">
-            {canWrite ? (
+            {eventResources.size > 0 ? (
+              <>
+                Material for each meeting is on the{" "}
+                <a href={`${href}/schedule`} class="link">schedule</a>.
+              </>
+            ) : canWrite ? (
               <>
                 No resources pushed yet. <CliSetupLink />
               </>
@@ -165,7 +164,7 @@ const nextEvents = await db.calendarEvent.findMany(
           <div class="mt-4 flex flex-col gap-3">
             {newestResources.map((resource) => (
               <ListRow
-                href={resourceHref(resource)}
+                href={resourceHref(resource, href)}
                 download={
                   resource.data.type === "FILE"
                     ? fileDownloadName(resource, resource.data)

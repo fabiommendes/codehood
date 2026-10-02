@@ -2,22 +2,27 @@
 // One week of a course's schedule: a heading and a card with a row per
 // meeting or exam. Each row carries an anchor (`event-<id>`, `exam-<slug>`)
 // that the course home and the calendar link to.
+import type { CalendarEventId } from "@/core/schemas";
+import type { Resource } from "@/db";
 import type { CalendarEntry } from "@/services/calendar-entries";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { renderMarkdown } from "@/utils/markdown";
 import { formatDateTime } from "@/utils/schedule-time";
+import EventResources from "./EventResources.astro";
 
 interface Props {
 	week: number;
 	entries: CalendarEntry[];
 	/// The entry marked "Next", if it is in this week.
 	next: CalendarEntry | undefined;
-	/// The course's own URL, which exam links hang from.
+	/// The course's own URL, which exam and resource links hang from.
 	href: string;
+	/// Each meeting's resources; a meeting with none is absent.
+	resources: ReadonlyMap<CalendarEventId, Resource[]>;
 }
 
-const { week, entries, next, href } = Astro.props;
+const { week, entries, next, href, resources } = Astro.props;
 
 /// A row's anchor, the fragment links to this entry use.
 function anchor(entry: CalendarEntry): string {
@@ -134,6 +139,12 @@ function faded(entry: CalendarEntry): boolean {
                   faded(entry) && "opacity-70",
                 ]}
                 set:html={renderMarkdown(entry.event.description)}
+              />
+            )}
+            {entry.kind === "event" && resources.has(entry.event.id) && (
+              <EventResources
+                resources={resources.get(entry.event.id) ?? []}
+                href={href}
               />
             )}
           </div>

@@ -4,6 +4,13 @@
 
 ### Added
 
+- A resource may belong to one meeting of its course. It is listed under
+  that meeting on the schedule, where a file downloads, a link opens in
+  another tab and a note or snippet opens its page, which leads back to the
+  meeting. The Resources tab and the course home list general resources
+  only, and the tab says when there is material on the schedule. The REST
+  API takes the meeting by week and slot slug and answers 404 for one that
+  does not exist; deleting a meeting turns its resources into general ones.
 - A student who already has an account joins a course from its invite link
   with one click, and a logged-out visitor gets a link to log in and come
   back instead of only the sign-up form. The same student may redeem invites

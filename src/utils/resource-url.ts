@@ -30,3 +30,29 @@ export function blobHref(
 		? `/files/${file.slugHash}/${downloadName}`
 		: `/files/${file.slugHash}`;
 }
+
+/**
+ * Where a resource's row leads: the file's download, the link itself, or the
+ * resource's own page under `courseHref`.
+ */
+export function resourceHref(
+	resource: {
+		slug: string;
+		data:
+			| { type: "FILE"; link: string }
+			| { type: "LINK"; url: string }
+			| {
+					type: "MD" | "CODE";
+			  };
+	},
+	courseHref: string,
+): string {
+	switch (resource.data.type) {
+		case "FILE":
+			return resource.data.link;
+		case "LINK":
+			return resource.data.url;
+		default:
+			return `${courseHref}/resources/${resource.slug}`;
+	}
+}

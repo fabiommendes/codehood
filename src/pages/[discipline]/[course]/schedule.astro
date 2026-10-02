@@ -12,6 +12,7 @@ import { db, isMeeting } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { calendarEntries } from "@/services/calendar-entries";
 import { courseSchedule } from "@/services/course-schedule";
+import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 import {
@@ -50,6 +51,9 @@ const events = await db.calendarEvent.findMany(
 );
 // The exam service already keeps drafts from students.
 const exams = await db.exam.findMany({ course: course.id }, { actor });
+const { byEvent: eventResources } = splitByEvent(
+	await db.resource.findMany({ course: course.id }, { actor }),
+);
 const entries = calendarEntries(
 	events,
 	exams.map((exam) => ({ courseId: course.id, exam })),
@@ -116,13 +120,25 @@ function weekSpan(weeks: { week: number }[]): string {
                   </summary>
                   <div class="mt-6 flex flex-col gap-8">
                     {past.map(({ week, entries }) => (
-                      <ScheduleWeek week={week} entries={entries} next={next} href={href} />
+                      <ScheduleWeek
+                        week={week}
+                        entries={entries}
+                        next={next}
+                        href={href}
+                        resources={eventResources}
+                      />
                     ))}
                   </div>
                 </details>
               )}
               {(foldPast ? ahead : [...past, ...ahead]).map(({ week, entries }) => (
-                <ScheduleWeek week={week} entries={entries} next={next} href={href} />
+                <ScheduleWeek
+                        week={week}
+                        entries={entries}
+                        next={next}
+                        href={href}
+                        resources={eventResources}
+                      />
               ))}
             </div>
           )}
