@@ -1,11 +1,11 @@
 import { ActionError } from "astro:actions";
-import { NotAllowed } from "@/core/error";
+import { NotAllowed, NotFound } from "@/core/error";
 
 /**
- * Wraps an Astro Action handler, translating a `NotAllowed` thrown by a
- * service (framework-agnostic, see `src/db/base-service.ts`) into the
- * `ActionError({ code: "FORBIDDEN" })` Astro expects. Any other thrown value
- * passes through unchanged.
+ * Wraps an Astro Action handler, translating a `NotAllowed` or a `NotFound`
+ * thrown by a service (framework-agnostic, see `src/db/base-service.ts`) into
+ * the `ActionError` Astro expects, `FORBIDDEN` or `NOT_FOUND`. Any other
+ * thrown value passes through unchanged.
  */
 export function withActionErrors<Args extends unknown[], R>(
 	handler: (...args: Args) => Promise<R>,
@@ -16,6 +16,9 @@ export function withActionErrors<Args extends unknown[], R>(
 		} catch (error) {
 			if (error instanceof NotAllowed) {
 				throw new ActionError({ code: "FORBIDDEN", message: error.message });
+			}
+			if (error instanceof NotFound) {
+				throw new ActionError({ code: "NOT_FOUND", message: error.message });
 			}
 			throw error;
 		}
@@ -38,6 +41,9 @@ export function withServiceErrors<Args extends unknown[], R>(
 		} catch (error) {
 			if (error instanceof NotAllowed) {
 				throw new ActionError({ code: "FORBIDDEN", message: error.message });
+			}
+			if (error instanceof NotFound) {
+				throw new ActionError({ code: "NOT_FOUND", message: error.message });
 			}
 			if (error instanceof Error) {
 				throw new ActionError({ code: "BAD_REQUEST", message: error.message });

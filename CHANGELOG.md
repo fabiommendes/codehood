@@ -131,6 +131,8 @@
 
 ### Fixed
 
+- An action on something that does not exist, or that the actor may not see,
+  answers 404 instead of 400.
 - Accepting an invite with a username, email, GitHub username or school id
   already in use says which one in plain words instead of showing a database
   error, and the form keeps what was typed.

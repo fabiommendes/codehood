@@ -14,8 +14,6 @@ Found by walking every page as a student, an instructor and an admin, at
 
 - A choice question repeats its statement and options in every answer, below
   the answer key that already shows them.
-- `withServiceErrors` in `src/actions/helpers.ts` turns `NotFound` into
-  `BAD_REQUEST`, for every action.
 - "Submitted" on the attempt page is the response's `updatedAt`; attempts
   store no submit time.
 - The grades table shows "Pending" for a closed attempt at an exam with no
