@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: implemented
 tags: [grading, course-grade, grade-column, cli, instructor]
 relatedTo: [web-grading, grades-table, exam-result, codehood-toml, push-grades]
 ---

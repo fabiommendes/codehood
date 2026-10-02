@@ -31,6 +31,9 @@ export type ExamId = z.infer<typeof examId>;
 export const feedbackId = z.number().int().brand("FeedbackId");
 export type FeedbackId = z.infer<typeof feedbackId>;
 
+export const gradeColumnId = z.number().int().brand("GradeColumnId");
+export type GradeColumnId = z.infer<typeof gradeColumnId>;
+
 export const inviteId = z.number().int().brand("InviteId");
 export type InviteId = z.infer<typeof inviteId>;
 

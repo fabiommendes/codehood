@@ -11,6 +11,7 @@ import { NotFound } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
+import { loadCourseGrades } from "@/utils/course-grades";
 import { CRUD, GET, PATCH, POST } from "./registry";
 import { parseWeekParam } from "./utils";
 
@@ -133,6 +134,44 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	},
 	parseScopeParams(params) {
 		return { course: parseCourseParams(params) };
+	},
+});
+
+export const gradeColumnApi = CRUD(
+	"/api/course/[discipline]/[course]/grade-column",
+	{
+		name: "Grade Column",
+		plural: "Grade Columns",
+		keySegment: "/[slug]",
+
+		entity: schema.gradeColumnSchema.omit({ id: true, courseId: true }),
+		create: schema.gradeColumnCreate.omit({ course: true }),
+		update: schema.gradeColumnUpdate,
+		filter: schema.gradeColumnFilterBase,
+		scope: courseScope,
+		key: schema.gradeColumnPK,
+
+		tags: ["Grades"],
+		service: db.gradeColumn,
+
+		parseKeyParams(params) {
+			return { course: parseCourseParams(params), slug: params.slug as string };
+		},
+		parseScopeParams(params) {
+			return { course: parseCourseParams(params) };
+		},
+	},
+);
+
+export const gradesApi = GET("/api/course/[discipline]/[course]/grades", {
+	out: schema.courseGradesSchema.openapi("CourseGrades"),
+	summary: "View the exam results of every student",
+	description:
+		"Lists the exams of the course's grades table and, for every enrolled student, dropped ones included, what each exam reads: a total, or why there is none. Only the course's instructor may read it.",
+	operationId: "courseGrades",
+	tags: ["Grades"],
+	handler: async ({ actor, params }) => {
+		return loadCourseGrades(parseCourseParams(params), actor, new Date());
 	},
 });
 

@@ -1,17 +1,33 @@
 ---
 /**
- * Every active student against every exam, with the totals the instructor has graded so far.
+ * Every active student against every exam and every pushed grade column.
+ *
+ * An exam cell reads the total the instructor has graded so far. A hidden
+ * pushed column carries the control that releases it to the students.
  */
+import ReleaseGradeColumn from "@/components/grading/ReleaseGradeColumn";
 import { formatScore } from "@/services/exam-result";
-import type { GradeCell, GradesTable } from "@/services/grades-table";
+import {
+	formatGradeValue,
+	type GradeCell,
+	type GradesTable,
+	type PushedGrades,
+} from "@/services/grades-table";
 
 interface Props {
 	/// The course's URL prefix.
 	href: string;
 	table: GradesTable;
+	/// The pushed grade columns, lined up with the rows of `table`.
+	pushed: PushedGrades;
 }
 
-const { href, table } = Astro.props;
+const { href, table, pushed } = Astro.props;
+const segments = href.split("/").filter(Boolean);
+const params = {
+	discipline: segments[0] ?? "",
+	course: segments[1] ?? "",
+};
 
 const label = (cell: GradeCell): string => {
 	switch (cell.kind) {
@@ -52,11 +68,34 @@ const hasAttempt = (cell: GradeCell): boolean =>
             </th>
           ))
         }
+        {
+          pushed.columns.map((column) => (
+            <th scope="col" class="align-top max-sm:px-2">
+              <div class="max-sm:w-24 max-sm:whitespace-normal">
+                <span>{column.title}</span>
+                {column.releasedAt === null && (
+                  <>
+                    {" "}
+                    <span class="badge badge-ghost badge-sm">Hidden</span>
+                    <ReleaseGradeColumn
+                      client:load
+                      discipline={params.discipline}
+                      course={params.course}
+                      slug={column.slug}
+                      title={column.title}
+                      valued={column.valued}
+                    />
+                  </>
+                )}
+              </div>
+            </th>
+          ))
+        }
       </tr>
     </thead>
     <tbody>
       {
-        table.rows.map((row) => (
+        table.rows.map((row, rowIndex) => (
           <tr>
             <th scope="row" class="sticky left-0 z-10 bg-base-100 font-medium max-sm:px-2">
               <span class="block max-sm:w-24 max-sm:truncate" title={row.name}>{row.name}</span>
@@ -70,6 +109,11 @@ const hasAttempt = (cell: GradeCell): boolean =>
                 ) : (
                   label(cell)
                 )}
+              </td>
+            ))}
+            {(pushed.values[rowIndex] ?? []).map((value) => (
+              <td class="max-sm:px-2">
+                {value === null ? "" : formatGradeValue(value)}
               </td>
             ))}
           </tr>

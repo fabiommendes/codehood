@@ -1,0 +1,30 @@
+info:
+  name: Upsert
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/grade-column
+  body:
+    type: json
+    data: |-
+      {
+          "slug": "project",
+          "title": "Final project",
+          "kind": "NUMBER",
+          "position": 2,
+          "rev": "example-rev",
+          "values": [
+              { "username": "hopper", "value": 90 },
+              { "username": "liskov", "value": 72.5 }
+          ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

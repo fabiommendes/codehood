@@ -540,3 +540,99 @@ const planetChoice = {
 		{ id: "venus", text: "Venus", score: 0 },
 	],
 };
+
+test("student: see my course grades", async ({ page }) => {
+	const teacher = await seedUser({
+		role: "INSTRUCTOR",
+		username: "grades-prof",
+	});
+	const student = await seedUser({ role: "STUDENT", username: "grades-mine" });
+	const other = await seedUser({ role: "STUDENT", username: "grades-other" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	for (const who of [student, other]) {
+		await db.enrollment.create(
+			{ course: course.id, username: who.username },
+			FULL_ACCESS,
+		);
+	}
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	const opts = { actor: teacher };
+	await db.gradeColumn.create(
+		{
+			course: course.id,
+			slug: "assignments",
+			title: "Assignments",
+			kind: "NUMBER",
+			position: 0,
+			values: [
+				{ username: student.username, value: 87.456 },
+				{ username: other.username, value: 12 },
+			],
+		},
+		opts,
+	);
+	await db.gradeColumn.create(
+		{
+			course: course.id,
+			slug: "final",
+			title: "Final grade",
+			kind: "LABEL",
+			position: 1,
+			values: [{ username: other.username, value: "SS" }],
+		},
+		opts,
+	);
+	await db.gradeColumn.create(
+		{
+			course: course.id,
+			slug: "bonus",
+			title: "Extra credit",
+			kind: "NUMBER",
+			position: 2,
+			values: [{ username: student.username, value: 5 }],
+		},
+		opts,
+	);
+	for (const slug of ["assignments", "final"]) {
+		await db.gradeColumn.release({ course: course.id, slug }, opts);
+	}
+	await logInAs(page, student);
+
+	const list = page.getByRole("list", { name: "Grades", exact: true });
+
+	await test.step("the course home lists the released grades with my own values", async () => {
+		await page.goto(href);
+
+		await expect(
+			page.getByRole("heading", { level: 2, name: "Grades", exact: true }),
+		).toBeVisible();
+		await expect(list.getByRole("listitem")).toHaveCount(2);
+		await expect(list.getByRole("listitem").nth(0)).toContainText(
+			"Assignments",
+		);
+		await expect(list.getByRole("listitem").nth(0)).toContainText("87.46");
+		await expect(list.getByRole("listitem").nth(1)).toContainText(
+			"Final grade",
+		);
+		await expect(list.getByRole("listitem").nth(1)).toContainText("No grade");
+		await expect(list).not.toContainText("12");
+		await expect(page.getByText("Extra credit")).toHaveCount(0);
+	});
+
+	await test.step("a grade released later shows up with my value", async () => {
+		await db.gradeColumn.release({ course: course.id, slug: "bonus" }, opts);
+		await page.reload();
+
+		await expect(list.getByRole("listitem")).toHaveCount(3);
+		await expect(list.getByRole("listitem").nth(2)).toContainText(
+			"Extra credit",
+		);
+		await expect(list.getByRole("listitem").nth(2)).toContainText("5");
+	});
+});

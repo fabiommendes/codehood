@@ -396,3 +396,155 @@ test("instructor: see the whole class's results", async ({ page }) => {
 		).toBeVisible();
 	});
 });
+
+test("instructor: publish the course's final grades", async ({ page }) => {
+	const teacher = await seedUser({ role: "INSTRUCTOR", username: "publisher" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	const ana = await seedUser({
+		role: "STUDENT",
+		username: "pub-ana",
+		name: "Ana Prado",
+	});
+	const bia = await seedUser({
+		role: "STUDENT",
+		username: "pub-bia",
+		name: "Bia Lima",
+	});
+	for (const person of [ana, bia]) {
+		await db.enrollment.create(
+			{ course: course.id, username: person.username },
+			FULL_ACCESS,
+		);
+	}
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "midterm",
+		title: "Midterm exam",
+		type: "EXAM",
+		status: "COMPLETED",
+		scheduledAt: new Date(Date.now() - 30 * 24 * 60 * MINUTE),
+	});
+	const opts = { actor: teacher };
+	// Created out of position order, so the table has to sort them.
+	await db.gradeColumn.create(
+		{
+			course: course.id,
+			slug: "final",
+			title: "Final grade",
+			kind: "LABEL",
+			position: 1,
+			values: [
+				{ username: ana.username, value: "MS" },
+				{ username: bia.username, value: "SS" },
+			],
+		},
+		opts,
+	);
+	await db.gradeColumn.create(
+		{
+			course: course.id,
+			slug: "assignments",
+			title: "Assignments",
+			kind: "NUMBER",
+			position: 0,
+			values: [{ username: ana.username, value: 87.456 }],
+		},
+		opts,
+	);
+	const released = async (slug: string) =>
+		(await db.gradeColumn.findOne({ course: course.id, slug }, opts))
+			?.releasedAt;
+	await logInAs(page, teacher);
+
+	const table = page.getByRole("table", { name: "Grades", exact: true });
+	const header = (title: string) =>
+		table.getByRole("columnheader").filter({ hasText: title });
+	const releaseButton = (title: string) =>
+		page.getByRole("button", { name: `Release ${title}`, exact: true });
+	const dialog = (title: string) =>
+		page.getByRole("dialog").filter({
+			has: page.getByRole("heading", { name: `Release ${title}?` }),
+		});
+
+	await test.step("the pushed columns follow the exams, hidden, with their values", async () => {
+		await page.goto(`${href}/grades`);
+
+		await expect(table.getByRole("columnheader")).toContainText([
+			"Student",
+			"Midterm exam",
+			"Assignments",
+			"Final grade",
+		]);
+		for (const title of ["Assignments", "Final grade"]) {
+			await expect(header(title)).toContainText("Hidden");
+			await expect(releaseButton(title)).toBeVisible();
+		}
+		await expect(header("Midterm exam")).not.toContainText("Hidden");
+
+		const row = (name: string) =>
+			page.getByRole("row").filter({
+				has: page.getByRole("rowheader", { name, exact: true }),
+			});
+		await expect(row("Ana Prado").getByRole("cell").nth(1)).toHaveText("87.46");
+		await expect(row("Ana Prado").getByRole("cell").nth(2)).toHaveText("MS");
+		await expect(row("Bia Lima").getByRole("cell").nth(1)).toHaveText("");
+		await expect(row("Bia Lima").getByRole("cell").nth(2)).toHaveText("SS");
+	});
+
+	await test.step("the confirmation counts the students who will see a grade, and Cancel releases nothing", async () => {
+		await releaseButton("Final grade").click();
+		await expect(dialog("Final grade")).toContainText(
+			"2 students will see their grade.",
+		);
+		await dialog("Final grade")
+			.getByRole("button", { name: "Cancel", exact: true })
+			.click();
+		await expect(dialog("Final grade")).toHaveCount(0);
+
+		await releaseButton("Assignments").click();
+		await expect(dialog("Assignments")).toContainText(
+			"1 student will see their grade.",
+		);
+		await dialog("Assignments")
+			.getByRole("button", { name: "Cancel", exact: true })
+			.click();
+		await expect(dialog("Assignments")).toHaveCount(0);
+
+		await expect(header("Assignments")).toContainText("Hidden");
+		expect(await released("assignments")).toBeNull();
+		expect(await released("final")).toBeNull();
+	});
+
+	await test.step("Release publishes that column and leaves the other hidden", async () => {
+		await releaseButton("Assignments").click();
+		await dialog("Assignments")
+			.getByRole("button", { name: "Release", exact: true })
+			.click();
+
+		await expect(releaseButton("Assignments")).toHaveCount(0);
+		await expect(header("Assignments")).not.toContainText("Hidden");
+		await expect(header("Final grade")).toContainText("Hidden");
+		await expect(releaseButton("Final grade")).toBeVisible();
+		expect(await released("assignments")).toBeInstanceOf(Date);
+		expect(await released("final")).toBeNull();
+	});
+
+	await test.step("the student's course home lists the released grade only", async () => {
+		await page.context().clearCookies();
+		await logInAs(page, ana);
+		await page.goto(href);
+
+		const list = page.getByRole("list", { name: "Grades", exact: true });
+		await expect(list.getByRole("listitem")).toHaveCount(1);
+		await expect(list).toContainText("Assignments");
+		await expect(list).toContainText("87.46");
+		await expect(page.getByText("Final grade")).toHaveCount(0);
+	});
+});

@@ -72,6 +72,7 @@ model User {
   responses        Response[]
   exams            Exam[]
   feedbacks        Feedback[]
+  gradeValues      GradeValue[]
 }
 
 model Group {
@@ -281,6 +282,7 @@ model Course {
   enrollments        Enrollment[]
   resources          Resource[]
   invites            Invite[]
+  gradeColumns       GradeColumn[]
 
   @@unique([disciplineSlug, instructorId, editionSlug])
 }
@@ -325,6 +327,61 @@ model Enrollment {
   createdAt DateTime @default(now())
 
   @@unique([username, courseId])
+}
+
+enum GradeColumnKind {
+  NUMBER
+  LABEL
+}
+
+/// A column of a course's grades table that the instructor computed outside
+/// the server and pushed, with at most one value per student.
+model GradeColumn {
+  id   Int             @id @default(autoincrement())
+  kind GradeColumnKind
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  /// Natural key within the course.
+  slug  String
+  title String
+
+  /// Order among the course's grade columns, supplied by the writer.
+  position Int
+
+  /// When students started seeing the column. Null while it is hidden.
+  releasedAt DateTime?
+
+  /// Revision marker supplied by the writer, opaque to the server.
+  rev String?
+
+  values GradeValue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, slug])
+}
+
+/// One student's value in a grade column. A student with no value has no row.
+model GradeValue {
+  id Int @id @default(autoincrement())
+
+  columnId Int
+  column   GradeColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  username String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  /// Set on a NUMBER column.
+  number Float?
+
+  /// Set on a LABEL column.
+  label String?
+
+  @@unique([columnId, username])
+  @@index([username])
 }
 
 model Passphrase {

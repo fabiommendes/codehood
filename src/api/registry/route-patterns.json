@@ -74,6 +74,28 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/grade-column",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/grade-column/[slug]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/grades",
+		"methods": [
+			"get"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/question",
 		"methods": [
 			"get",

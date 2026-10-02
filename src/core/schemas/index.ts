@@ -16,6 +16,7 @@ export {
 	duration,
 	type ExamId,
 	type FeedbackId,
+	type GradeColumnId,
 	type InviteId,
 	type MimeType,
 	mimeType,
@@ -43,6 +44,7 @@ export * from "./edition";
 export * from "./enrollment";
 export * from "./exam";
 export * from "./feedback";
+export * from "./grade-column";
 export * from "./invite";
 export * from "./passphrase";
 export * from "./question";

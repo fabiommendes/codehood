@@ -887,6 +887,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedReleasedQuiz(cs101.id, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedOpenQuiz(cs101.id);
+	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 
 	// A quiz two weeks from the day the seed runs, so the calendar's upcoming
 	// list always has an exam in it.
@@ -911,6 +912,45 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	console.log(
 		`[dev] created demo courses cs101/${ada.username}_2026-1 and cs201/${alan.username}_2026-1.`,
+	);
+}
+
+/// A released number column and a hidden label column; `bob` has no value in either, and the dropped `dijkstra` only one.
+async function seedGradeColumns(
+	course: Course["id"],
+	students: Record<"hopper" | "hamilton" | "liskov" | "dijkstra", User>,
+): Promise<void> {
+	await db.gradeColumn.upsert(
+		{
+			course,
+			slug: "assignments",
+			title: "Assignments",
+			kind: "NUMBER",
+			position: 0,
+			values: [
+				{ username: students.hopper.username, value: 87.456 },
+				{ username: students.hamilton.username, value: 92 },
+				{ username: students.liskov.username, value: 71.5 },
+				{ username: students.dijkstra.username, value: 60 },
+			],
+		},
+		FULL_ACCESS,
+	);
+	await db.gradeColumn.release({ course, slug: "assignments" }, FULL_ACCESS);
+	await db.gradeColumn.upsert(
+		{
+			course,
+			slug: "final",
+			title: "Final grade",
+			kind: "LABEL",
+			position: 1,
+			values: [
+				{ username: students.hopper.username, value: "MS" },
+				{ username: students.hamilton.username, value: "SS" },
+				{ username: students.liskov.username, value: "MM" },
+			],
+		},
+		FULL_ACCESS,
 	);
 }
 

@@ -10,6 +10,7 @@ import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHomeExams } from "@/services/course-home";
 import { splitByEvent } from "@/services/event-resources";
+import { formatGradeValue } from "@/services/grades-table";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
@@ -85,6 +86,13 @@ const examPreview = courseHomeExams(
 	{ withDrafts: canWrite },
 );
 
+// A student's own grades: the service already narrows a student's read to the
+// released columns and their own value.
+const gradeColumns =
+	isEnrolled && !canWrite
+		? await db.gradeColumn.findMany({ course: course.id }, { actor })
+		: [];
+
 // The syllabus line and the next few meetings. Both come from the same source
 // the Schedule tab reads; this section is a preview of it, not a copy.
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
@@ -137,6 +145,28 @@ const nextEvents = await db.calendarEvent.findMany(
               <ExamRow exam={exam} href={href} pending={pending} />
             ))}
           </div>
+        </section>
+      )
+    }
+
+    {
+      gradeColumns.length > 0 && (
+        <section class="mt-10" aria-label="Grades">
+          <SectionHeader title="Grades" />
+
+          <ul aria-label="Grades" class="mt-4 flex flex-col gap-3">
+            {gradeColumns.map((column) => {
+              const value = column.values[0]?.value;
+              return (
+                <li class="flex items-baseline justify-between gap-4 rounded-box border border-base-300 bg-base-100 px-4 py-3">
+                  <span class="font-medium">{column.title}</span>
+                  <span class={value === undefined ? "text-sm text-base-content/60" : "font-medium"}>
+                    {value === undefined ? "No grade" : formatGradeValue(value)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )
     }

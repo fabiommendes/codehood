@@ -11,6 +11,8 @@ import {
 	type GradesTable,
 	gradesCsvRows,
 	gradesTable,
+	type PushedGrades,
+	pushedGrades,
 } from "@/services/grades-table";
 import {
 	type CountingAnswer,
@@ -109,6 +111,8 @@ export async function loadStudents(
 export interface CourseGrades {
 	/// The active students against every exam.
 	table: GradesTable;
+	/// The pushed grade columns, lined up with the rows of `table`.
+	pushed: PushedGrades;
 	/// The rows of the CSV file, which lists the dropped students too.
 	csvRows: (string | number)[][];
 }
@@ -123,18 +127,20 @@ export async function loadGrades(
 	actor: UserActor,
 	now: Date,
 ): Promise<CourseGrades> {
-	const [exams, students, attempts, feedback] = await Promise.all([
+	const [exams, students, attempts, feedback, columns] = await Promise.all([
 		db.exam.findMany({ course }, { actor }),
 		loadStudents(course, actor),
 		db.response.findMany({ course, practice: false }, { actor }),
 		db.feedback.findMany({ course }, { actor }),
+		db.gradeColumn.findMany({ course }, { actor }),
 	]);
+	const table = gradesTable(exams, students, attempts, feedback, now);
+	const csvTable = gradesTable(exams, students, attempts, feedback, now, {
+		withDropped: true,
+	});
 	return {
-		table: gradesTable(exams, students, attempts, feedback, now),
-		csvRows: gradesCsvRows(
-			gradesTable(exams, students, attempts, feedback, now, {
-				withDropped: true,
-			}),
-		),
+		table,
+		pushed: pushedGrades(table, columns),
+		csvRows: gradesCsvRows(csvTable, pushedGrades(csvTable, columns)),
 	};
 }

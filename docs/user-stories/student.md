@@ -205,6 +205,17 @@ question, the total, and whatever written feedback the instructor or grading bot
 left. A submission still waiting to be graded says so rather than showing a zero.
 
 
+### See my course grades
+
+    status: implemented
+
+Student wants to know where they stand in the course, beyond each exam. The
+course home lists the grades the instructor released, such as the assignments
+score and the final grade, each with the student's own value. A grade the
+instructor has not released yet is not mentioned, and one with no value for
+the student reads "No grade".
+
+
 ## Managing my account
 
 ### Update my profile

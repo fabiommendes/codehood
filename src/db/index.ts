@@ -15,6 +15,7 @@ import { EditionService } from "./services/edition.service";
 import { EnrollmentService } from "./services/enrollment.service";
 import { ExamService } from "./services/exam.service";
 import { FeedbackService } from "./services/feedback.service";
+import { GradeColumnService } from "./services/grade-column.service";
 import { InviteService } from "./services/invite.service";
 import { PassphraseService } from "./services/passphrase.service";
 import { QuestionService } from "./services/question.service";
@@ -110,6 +111,13 @@ export type {
 	FeedbackUpdate,
 } from "./services/feedback.service";
 export type {
+	GradeColumn,
+	GradeColumnCreate,
+	GradeColumnFilter,
+	GradeColumnPK,
+	GradeColumnUpdate,
+} from "./services/grade-column.service";
+export type {
 	Invite,
 	InviteCreate,
 	InviteErrorCode,
@@ -204,6 +212,7 @@ export const db = {
 	enrollment: new EnrollmentService(),
 	exam: new ExamService(),
 	feedback: new FeedbackService(),
+	gradeColumn: new GradeColumnService(),
 	invite: new InviteService(),
 	passphrase: new PassphraseService(),
 	question: new QuestionService(),

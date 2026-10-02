@@ -289,3 +289,14 @@ is visible as a column rather than something they have to piece together.
 "Download CSV" saves the table as a file for a spreadsheet: one row per
 student, the ones who dropped included and marked, and one column per exam
 with totals as numbers from 0 to 100. A cell with no total yet is empty.
+
+
+### Publish the course's final grades
+
+    status: web
+
+Instructor computes the final grade on their own machine and pushes it with the
+CLI as grade columns. The Grades tab shows the pushed columns after the exams,
+each marked "Hidden" until they release it. "Release" asks for confirmation and
+cannot be undone. From then on every student sees their own value, and a later
+push of the column reaches them at once.

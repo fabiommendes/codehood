@@ -33,6 +33,10 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "submissionId", from: "number", to: "SubmissionId" },
 	],
 	ExamTags: [{ field: "id", from: "number", to: "ExamTagsId" }],
+	GradeColumn: [
+		{ field: "id", from: "number", to: "GradeColumnId" },
+		{ field: "courseId", from: "number", to: "CourseId" },
+	],
 	// Group: [{ field: "id", from: "number" , to: "GroupId"}],
 	// GroupMembership: [{ field: "id", from: "number" , to: "GroupMembershipId"}],
 	Invite: [

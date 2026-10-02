@@ -49,6 +49,16 @@
   per exam headed by the exam's slug. Totals are numbers from 0 to 100 and a
   cell with no total is empty. Students who dropped are in the file, marked
   `dropped`, though the table on the page leaves them out.
+- The Grades tab shows grade columns the instructor pushed, after the exams:
+  numbers or labels computed outside Codehood, such as an assignments score or
+  the final letter grade. A column is hidden from students until the
+  instructor confirms "Release" on its header, which cannot be undone; from
+  then on each student sees their own value in a "Grades" block on the course
+  home, and a later push reaches them at once. The CSV download carries the
+  pushed columns too. The REST API takes a column whole at
+  `/api/course/{discipline}/{course}/grade-column`, and
+  `GET .../grades` returns every student's result at every exam for the CLI
+  to compute from.
 - The top bar says where you are once the page header scrolls away: a
   breadcrumb such as `cs201 · 2026-1 › Exams › Midterm › Grading`, aligned
   with the page column, on every course, admin and signed-in page. The logo
