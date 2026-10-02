@@ -20,7 +20,7 @@ the exams, and shows each student their own value once the instructor
 releases a column.
 
 This spec covers the server. The CLI's half, with the contract of the
-instructor's function, is `cli/dev/specs/to-do/push-grades.md`.
+instructor's function, is `cli/dev/specs/to-review/push-grades.md`.
 
 ## Reference case
 

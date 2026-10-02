@@ -293,7 +293,7 @@ with totals as numbers from 0 to 100. A cell with no total yet is empty.
 
 ### Publish the course's final grades
 
-    status: web
+    status: implemented
 
 Instructor computes the final grade on their own machine and pushes it with the
 CLI as grade columns. The Grades tab shows the pushed columns after the exams,
