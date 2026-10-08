@@ -1084,7 +1084,7 @@ async function seedOpenQuiz(course: Course["id"]): Promise<void> {
 			type: "QUIZ",
 			status: "ONGOING",
 			title: "Quiz 2: recursion in practice",
-			description: "Open now. You have 45 minutes from the moment you start.",
+			description: "Recursion on lists and trees, written by hand.",
 			preamble: "Answers are saved as you go. Submit when you are done.",
 			duration: { minutes: 45 },
 			tags: ["recursion"],
