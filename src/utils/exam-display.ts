@@ -36,7 +36,7 @@ export function examPhaseBadgeClass(phase: ExamPhase): string {
 		case "open":
 			return "badge-warning";
 		case "closed":
-			return "badge-success";
+			return "badge-ghost";
 	}
 }
 

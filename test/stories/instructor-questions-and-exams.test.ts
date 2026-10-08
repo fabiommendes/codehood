@@ -152,6 +152,16 @@ test("instructor: browse the exam list", async ({ page }) => {
 		},
 		FULL_ACCESS,
 	);
+	await db.exam.create(
+		{
+			course: course.id,
+			slug: "middle-quiz",
+			title: "Middle quiz",
+			type: "QUIZ",
+			status: "ONGOING",
+		},
+		FULL_ACCESS,
+	);
 
 	await logInAs(page, course.instructor);
 
@@ -167,7 +177,13 @@ test("instructor: browse the exam list", async ({ page }) => {
 
 	const titleCells = page.locator("table tbody tr td:first-child");
 
-	await test.step("exams list title-ascending by default", async () => {
+	await test.step("an open exam comes before the drafts by default", async () => {
+		await expect(titleCells.first()).toHaveText("Middle quiz");
+	});
+
+	await test.step("clicking Title sorts the exams by title", async () => {
+		await page.getByRole("button", { name: "Title" }).click();
+
 		await expect(titleCells.first()).toHaveText("Alpha quiz");
 		await expect(titleCells.last()).toHaveText("Zulu final");
 	});

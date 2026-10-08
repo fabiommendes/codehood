@@ -23,12 +23,24 @@ interface Props {
 	state?: AttemptState;
 	/** Answers still waiting for a grade, shown to whoever teaches the course. */
 	pending?: number;
+	/** Whether the badge may repeat the exam's phase, false under a heading that already says it. */
+	phaseBadge?: boolean;
 }
 
-const { exam, href, score, state, pending = 0 } = Astro.props;
+const {
+	exam,
+	href,
+	score,
+	state,
+	pending = 0,
+	phaseBadge = true,
+} = Astro.props;
 
 const phase = examPhase(exam, new Date());
 const badge = examBadge(phase, state);
+/// A score already says the exam is graded, and a heading may already say its phase.
+const showBadge =
+	!score && (phaseBadge || badge.label !== examBadge(phase).label);
 /// The date, or "Not scheduled" while that is still news; an exam opened or closed by hand has no date worth showing.
 const schedule = exam.scheduledAt
 	? formatDateTime(exam.scheduledAt)
@@ -56,6 +68,8 @@ const detail = [
   </p>
   <span slot="trailing" class="flex items-center gap-3">
     {score && <span class="text-lg font-semibold">{score}</span>}
-    <span class:list={["badge badge-sm", badge.className]}>{badge.label}</span>
+    {showBadge && (
+      <span class:list={["badge badge-sm", badge.className]}>{badge.label}</span>
+    )}
   </span>
 </ListRow>

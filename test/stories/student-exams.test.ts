@@ -90,14 +90,14 @@ test("student: take an exam", async ({ page }) => {
 		await expect(page.getByText(upcoming.title)).toBeVisible();
 		await expect(page.getByText(closed.title)).toBeVisible();
 
-		await expect(page.getByText("Open now", { exact: true })).toBeVisible();
 		// A closed exam the student never attempted is "Missed" to them.
 		await expect(page.getByText("Missed", { exact: true })).toBeVisible();
 		await expect(page.getByText("Closed", { exact: true })).toHaveCount(0);
-		// Once as the section heading, once as the exam's badge.
+		// The section headings already say open and upcoming; no badge repeats them.
+		await expect(page.getByText("Open now", { exact: true })).toHaveCount(0);
 		await expect(
 			section(page, "Upcoming").getByText("Upcoming", { exact: true }),
-		).toHaveCount(2);
+		).toHaveCount(1);
 
 		for (const raw of ["SCHEDULED", "ONGOING", "COMPLETED"]) {
 			await expect(page.getByText(raw, { exact: true })).toHaveCount(0);
@@ -468,10 +468,10 @@ test("student: see my grades and feedback", async ({ page }) => {
 		// Only the two released exams show a percentage; the final shows none.
 		await expect(past.getByText(/\d+%/)).toHaveCount(2);
 		await expect(page.getByText("75%")).toHaveCount(0);
-		// Each row carries the student's own state: graded or still awaiting it.
+		// A score says the exam is graded; a row without one says why.
 		await expect(
 			past.getByRole("link").filter({ hasText: "Midterm" }),
-		).toContainText("Graded");
+		).not.toContainText("Graded");
 		await expect(
 			past.getByRole("link").filter({ hasText: "Final" }),
 		).toContainText("Awaiting grading");

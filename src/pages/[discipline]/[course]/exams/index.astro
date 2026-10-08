@@ -104,6 +104,7 @@ if (!canWrite) {
                     href={href}
                     score={scores.get(exam.slug)}
                     state={states.get(exam.slug)}
+                    phaseBadge={group.key === "past"}
                   />
                 ))}
               </div>

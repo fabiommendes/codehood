@@ -19,7 +19,11 @@ import {
 	toggleSortState,
 } from "@/components/ui/table-sort";
 import type { Exam } from "@/db";
-import { examPhase, examPhaseLabels } from "@/services/exam-state";
+import {
+	type ExamPhase,
+	examPhase,
+	examPhaseLabels,
+} from "@/services/exam-state";
 import {
 	examPhaseBadgeClass,
 	examTypeLabels,
@@ -48,7 +52,25 @@ const SORT_FIELDS = [
 ] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 
-const DEFAULT_SORT: SortState<SortField> = { field: "title", direction: "asc" };
+/// Open exams first, then what is coming, drafts, and what is over; the
+/// date breaks ties inside each phase.
+const DEFAULT_SORT: SortState<SortField> = {
+	field: "status",
+	direction: "asc",
+};
+
+/// The order `status` sorts by: the exams that need attention first.
+const PHASE_RANK: Record<ExamPhase, number> = {
+	open: 0,
+	upcoming: 1,
+	draft: 2,
+	closed: 3,
+	archived: 4,
+};
+
+/// Every cell but the title drops its padding on phones, where a row wraps
+/// as a card: the title on its own line, the rest after it.
+const CARD_CELL = "max-sm:p-0";
 
 function sortFromUrl(): SortState<SortField> {
 	const params = new URLSearchParams(window.location.search);
@@ -123,8 +145,14 @@ export default function ExamsTable(props: Props): JSX.Element {
 				case "type":
 					return examTypeLabels[a.type].localeCompare(examTypeLabels[b.type]);
 				case "status":
-					return examPhaseLabels[examPhase(a, now)].localeCompare(
-						examPhaseLabels[examPhase(b, now)],
+					return (
+						PHASE_RANK[examPhase(a, now)] - PHASE_RANK[examPhase(b, now)] ||
+						compareNullsLast(
+							a.scheduledAt,
+							b.scheduledAt,
+							"asc",
+							(x, y) => x.getTime() - y.getTime(),
+						)
 					);
 				default:
 					return a.title.localeCompare(b.title);
@@ -136,7 +164,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<ExamRow>[] = [
 		{
 			title: "Title",
-			class: "font-medium",
+			class: "font-medium max-sm:basis-full max-sm:p-0",
 			sortKey: "title" satisfies SortField,
 			render: (exam) => (
 				<a href={`${props.href}/exams/${exam.slug}`} class="link link-hover">
@@ -146,12 +174,13 @@ export default function ExamsTable(props: Props): JSX.Element {
 		},
 		{
 			title: "Type",
-			class: "text-base-content/60",
+			class: `text-base-content/60 ${CARD_CELL}`,
 			sortKey: "type" satisfies SortField,
 			render: (exam) => examTypeLabels[exam.type],
 		},
 		{
 			title: "Status",
+			class: CARD_CELL,
 			sortKey: "status" satisfies SortField,
 			render: (exam) => {
 				const phase = examPhase(exam, new Date());
@@ -164,19 +193,20 @@ export default function ExamsTable(props: Props): JSX.Element {
 		},
 		{
 			title: "Scheduled",
-			class: "text-base-content/60",
+			class: `text-base-content/60 ${CARD_CELL}`,
 			sortKey: "scheduled" satisfies SortField,
 			render: (exam) =>
 				exam.scheduledAt ? formatDateTime(exam.scheduledAt) : "Not scheduled",
 		},
 		{
 			title: "Duration",
-			class: "text-base-content/60",
+			class: `text-base-content/60 ${CARD_CELL}`,
 			sortKey: "duration" satisfies SortField,
 			render: (exam) => formatDuration(exam.duration),
 		},
 		{
 			title: "Tags",
+			class: "max-sm:hidden",
 			sortKey: "tags" satisfies SortField,
 			render: (exam) => (
 				<div class="flex flex-wrap gap-1">
@@ -199,6 +229,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 
 	return (
 		<Table
+			class="max-sm:[&_tbody_tr]:flex max-sm:[&_tbody_tr]:flex-wrap max-sm:[&_tbody_tr]:items-center max-sm:[&_tbody_tr]:gap-x-3 max-sm:[&_tbody_tr]:gap-y-1 max-sm:[&_tbody_tr]:px-4 max-sm:[&_tbody_tr]:py-3 max-sm:[&_thead]:sr-only max-sm:[&_td]:border-0 max-sm:[&_tbody_tr:not(:last-child)]:border-b max-sm:[&_tbody_tr]:border-base-300"
 			columns={columns}
 			data={sorted()}
 			sort={tableSort()}
