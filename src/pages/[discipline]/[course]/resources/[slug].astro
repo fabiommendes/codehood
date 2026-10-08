@@ -82,10 +82,12 @@ const bodyHtml =
     {
       data.type === "MD" ? (
         <div class="card card-border mt-6 bg-base-200">
-          <div
-            class="card-body prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
-            set:html={bodyHtml}
-          />
+          <div class="card-body">
+            <div
+              class="prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline [&>:first-child]:mt-0 [&>:last-child]:mb-0"
+              set:html={bodyHtml}
+            />
+          </div>
         </div>
       ) : (
         <div
