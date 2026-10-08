@@ -11,6 +11,12 @@
   only, and the tab says when there is material on the schedule. The REST
   API takes the meeting by week and slot slug and answers 404 for one that
   does not exist; deleting a meeting turns its resources into general ones.
+  In the CLI, a link from a lesson of `calendar.md` to a file under
+  `resources/` attaches that resource to the lesson's meeting, and the
+  pushed description links to the resource's page. A resource linked from
+  two lessons, or a link to a missing resource, stops the push before any
+  request. The page of a file or link resource redirects to its download or
+  its URL.
 - A student who already has an account joins a course from its invite link
   with one click, and a logged-out visitor gets a link to log in and come
   back instead of only the sign-up form. The same student may redeem invites

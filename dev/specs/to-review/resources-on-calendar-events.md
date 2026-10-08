@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [resources, calendar, schedule, cli, api]
 relatedTo: [resource-service, calendar-event-service, course-schedule]
 ---

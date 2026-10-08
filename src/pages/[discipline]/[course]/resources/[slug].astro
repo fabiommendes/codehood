@@ -26,13 +26,16 @@ const resource = await db.resource.findOne(
 	{ course: course.id, slug },
 	{ actor },
 );
-// LINK and FILE resources act from their row on the list page — they have no
-// page of their own here.
-if (
-	!resource ||
-	(resource.data.type !== "MD" && resource.data.type !== "CODE")
-) {
+if (!resource) {
 	return Astro.rewrite("/404");
+}
+// LINK and FILE resources have no page of their own: the address sends the
+// reader to the link or the download, so a lesson can link it by a stable URL.
+if (resource.data.type === "FILE") {
+	return Astro.redirect(resource.data.link, 302);
+}
+if (resource.data.type === "LINK") {
+	return Astro.redirect(resource.data.url, 302);
 }
 const data = resource.data;
 
