@@ -87,7 +87,11 @@ test("a LINK resource's page redirects to its url", async ({ request }) => {
 });
 
 for (const [kind, data, text] of [
-	["MD", { type: "MD" as const, content: "# Hello note" }, "Hello note"],
+	[
+		"MD",
+		{ type: "MD" as const, content: "# Title\n\nHello note" },
+		"Hello note",
+	],
 	[
 		"CODE",
 		{ type: "CODE" as const, language: "python", content: "print(12345)" },

@@ -6,7 +6,7 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
-import { renderMarkdown } from "@/utils/markdown";
+import { renderMarkdownBody } from "@/utils/markdown";
 
 export const prerender = false;
 
@@ -42,7 +42,7 @@ const data = resource.data;
 // The CODE branch never interprets its text, only highlights it.
 const bodyHtml =
 	data.type === "MD"
-		? renderMarkdown(data.content)
+		? renderMarkdownBody(data.content)
 		: await highlightCode(data.content, data.language);
 ---
 

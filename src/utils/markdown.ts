@@ -14,6 +14,22 @@ export function renderMarkdown(text: string): string {
 	return md.render(text);
 }
 
+/**
+ * Renders a Markdown document whose title the page already shows, dropping
+ * a level-one heading that opens it.
+ */
+export function renderMarkdownBody(text: string): string {
+	const env = {};
+	const tokens = md.parse(text, env);
+	const opensWithTitle =
+		tokens[0]?.type === "heading_open" && tokens[0].tag === "h1";
+	return md.renderer.render(
+		opensWithTitle ? tokens.slice(3) : tokens,
+		md.options,
+		env,
+	);
+}
+
 /** Renders a Markdown string as a single inline fragment, with no wrapping `<p>`. */
 export function renderMarkdownInline(text: string): string {
 	return md.renderInline(text);
