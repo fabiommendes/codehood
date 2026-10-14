@@ -101,6 +101,31 @@ Cada tarefa com lógica segue TDD, em três papéis:
 Tarefas mecânicas sem regra de negócio (schema já aprovado, seed, glossário)
 pulam o projetista e vão direto ao implementador.
 
+### Histórias de usuário e e2e
+
+Toda funcionalidade com tela ganha uma tarefa própria de histórias, feita por
+um escritor de testes (`sonnet`) antes dos implementadores das telas. Ele lê
+`test/stories/README.md` e `docs/user-stories/README.md` e:
+
+1. Escreve as histórias novas nos catálogos `docs/user-stories/<papel>.md`.
+2. Escreve um teste e2e por história em `test/stories/<papel>-<categoria>.test.ts`,
+   com o título da história, e confirma que ele falha porque a tela ainda não
+   existe.
+
+O objetivo do e2e é provar que a funcionalidade funciona de ponta a ponta com
+o menor número possível de histórias, não localizar um erro com precisão (isso
+é papel dos testes de service). Por isso:
+
+- Uma história não precisa ser atômica. Ela percorre um fluxo inteiro do
+  usuário: primeiro os caminhos errados e as validações (código expirado,
+  campo vazio, acesso negado), cada um num `test.step`, e por fim o caminho
+  feliz.
+- Prefira poucas histórias longas a muitas curtas. Junte numa só tudo o que o
+  mesmo usuário faz em sequência.
+- Arrume o cenário pelos services, aja pela interface, como manda o README.
+
+Os implementadores das telas recebem essas histórias como critério de pronto.
+
 ### Modelos
 
 Escolha do modelo por tarefa:

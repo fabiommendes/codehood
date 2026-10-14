@@ -323,10 +323,11 @@ editar `prisma/schema.prisma` e rodar `pnpm run db:generate` e
 | T1     | haiku  | -          | R11        |
 | T2     | sonnet | T1         | R3, R4     |
 | T3     | sonnet | T1         | R12 a R21, R24 |
-| T4     | sonnet | T2, T3     | R5 a R10, R26 (check-in) |
+| T12    | sonnet | T3         | R25, R26 (histórias e e2e) |
+| T4     | sonnet | T2, T3, T12 | R5 a R10, R26 (check-in) |
 | T5     | sonnet | T3         | R22, R23   |
-| T6     | sonnet | T2, T3     | R25 (gestão, projeção), R29 |
-| T7     | sonnet | T3         | R19, R20, R25 (notas, frequência), R27, R28 |
+| T6     | sonnet | T2, T3, T12 | R25 (gestão, projeção), R29 |
+| T7     | sonnet | T3, T12    | R19, R20, R25 (notas, frequência), R27, R28 |
 | T8     | sonnet | T4, T6, T7 | R25 e R26 (agenda e página inicial) |
 | T9     | haiku  | T3         | R34, R35   |
 | T10    | sonnet | T5         | R30 a R33  |
@@ -371,6 +372,17 @@ editar `prisma/schema.prisma` e rodar `pnpm run db:generate` e
   `WarnEventHasRollCall`, `DeleteRollCall`, `--drop-roll-calls` e
   `codehood attendance`. Segue `cli/CLAUDE.md`. Pronto com `uv run pytest`
   em `cli/`.
+- **T12. Histórias e e2e.** Escritor de testes `sonnet`, conforme a seção
+  "Histórias de usuário e e2e" da skill `new-feature`. Histórias novas nos
+  catálogos `docs/user-stories/instructor.md` e `student.md` (em inglês,
+  como o resto do catálogo, porque o título vira o nome do teste), com
+  `status: todo`, e um e2e por história em `test/stories/`. Poucas
+  histórias longas: os caminhos errados em `test.step` e o caminho feliz no
+  fim. Sugestão de partida: o professor abre, projeta, corrige e exporta; o
+  aluno faz check-in pelo QR e pelo código e confere a própria frequência;
+  um aluno sem conta entra pela chamada que vale como convite. T4, T6, T7 e
+  T8 só ficam prontas quando as histórias que tocam passam, e mudam o
+  `status` delas para `implemented`.
 - **T11. Fechamento.** `pnpm exec biome check --write .`, `pnpm run lint`,
   suíte completa, screenshots das telas com o seed, spec movido para
   `dev/specs/to-review/`, entrada no `CHANGELOG.md`.
