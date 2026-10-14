@@ -10,6 +10,8 @@ export interface OpenRollCallDialogProps {
 	timeSlot: string;
 	/// The course's base URL; the roll call page is `<href>/roll-call/<week>/<timeSlot>`.
 	href: string;
+	/// The opening button's text; "Roll call" by default.
+	label?: string;
 }
 
 /**
@@ -51,7 +53,7 @@ export default function OpenRollCallDialog(
 				class="btn btn-outline btn-sm"
 				onClick={() => dialog?.showModal()}
 			>
-				Roll call
+				{props.label ?? "Roll call"}
 			</button>
 			<dialog ref={dialog} class="modal">
 				<div class="modal-box">

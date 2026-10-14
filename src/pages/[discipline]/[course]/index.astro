@@ -1,9 +1,11 @@
 ---
 import { hasPerm } from "@/auth/permissions";
+import AttendanceSummary from "@/components/attendance/AttendanceSummary.astro";
 import CliSetupLink from "@/components/CliSetupLink.astro";
 import CourseHeader from "@/components/CourseHeader.astro";
 import ExamRow from "@/components/exam/ExamRow.astro";
 import ListRow from "@/components/ListRow.astro";
+import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
@@ -107,6 +109,40 @@ const newestResources = resources
 	.toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 	.slice(0, 3);
 
+// Roll calls: one query for the course. A student gets a shortcut while one is
+// open and their attendance summary; the instructor gets a shortcut for the
+// meeting happening now.
+const rollCalls = await db.rollCall.findMany({ course: course.id }, { actor });
+const openRollCall = rollCalls.some((r) => r.closesAt > now);
+const attendanceStudent =
+	isEnrolled && !canWrite && rollCalls.length > 0
+		? (await db.rollCall.courseAttendance(course.id, { actor })).students[0]
+		: undefined;
+const meetingNow = canWrite
+	? (
+			await db.calendarEvent.findMany(
+				{
+					courseIds: [course.id],
+					from: new Date(now.getTime() - 24 * 60 * 60_000),
+					limit: 10,
+				},
+				{ actor },
+			)
+		).find(
+			(e) =>
+				e.kind === "REGULAR" &&
+				e.startAt <= now &&
+				now.getTime() <
+					e.startAt.getTime() + durationToMinutes(e.timeSlot.duration) * 60_000,
+		)
+	: undefined;
+const meetingNowRollCall = meetingNow
+	? rollCalls.find(
+			(r) =>
+				r.week === meetingNow.week && r.timeSlot === meetingNow.timeSlot.slug,
+		)
+	: undefined;
+
 const justJoined = Astro.url.searchParams.has("joined");
 
 const nextEvents = await db.calendarEvent.findMany(
@@ -132,6 +168,46 @@ const nextEvents = await db.calendarEvent.findMany(
     {
       course.description && (
         <p class="mt-6 max-w-2xl text-base-content/70">{course.description}</p>
+      )
+    }
+
+    {
+      meetingNow && (
+        <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3">
+          <span class="font-medium">{meetingNow.title}</span>
+          <span class="text-sm text-base-content/60">is happening now</span>
+          {meetingNowRollCall ? (
+            <a
+              href={`${href}/roll-call/${meetingNow.week}/${meetingNow.timeSlot.slug}`}
+              class="btn btn-primary btn-sm ml-auto"
+            >
+              View roll call
+            </a>
+          ) : (
+            <OpenRollCallDialog
+              client:load
+              label="Open roll call"
+              discipline={courseParams.discipline}
+              course={courseParams.course}
+              week={meetingNow.week}
+              timeSlot={meetingNow.timeSlot.slug}
+              href={href}
+            />
+          )}
+        </div>
+      )
+    }
+
+    {
+      isEnrolled && !canWrite && (openRollCall || attendanceStudent) && (
+        <div class="mt-6 flex flex-wrap items-center gap-4">
+          {openRollCall && (
+            <a href="/check-in" class="btn btn-primary btn-sm">Check in</a>
+          )}
+          {attendanceStudent && (
+            <AttendanceSummary href={href} student={attendanceStudent} />
+          )}
+        </div>
       )
     }
 

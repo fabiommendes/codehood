@@ -256,7 +256,7 @@ instructor who re-enrolls them restores access to it.
 
 ### Check in to class
 
-    status: todo
+    status: implemented
     url: /check-in
 
 Student is in the lecture and the instructor projects a QR code. They scan it
@@ -272,7 +272,7 @@ attendance page shows only their own row.
 
 ### Join the class through the roll call
 
-    status: todo
+    status: implemented
     url: /c/[rollCallId]/[code]
 
 Instructor opened the roll call as an invite, so the code on the projector also

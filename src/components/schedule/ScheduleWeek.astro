@@ -1,4 +1,5 @@
 ---
+import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 // One week of a course's schedule: a heading and a card with a row per
 // meeting or exam. Each row carries an anchor (`event-<id>`, `exam-<slug>`)
 // that the course home and the calendar link to.
@@ -20,9 +21,29 @@ interface Props {
 	href: string;
 	/// Each meeting's resources; a meeting with none is absent.
 	resources: ReadonlyMap<CalendarEventId, Resource[]>;
+	/// Set only for those who run the course's roll calls: the course's URL segments.
+	rollCallManager?: { discipline: string; course: string };
+	/// Meetings that already have a roll call, as `<week>/<timeSlot>`.
+	rollCallKeys?: ReadonlySet<string>;
+	/// A student's own result in the past meetings with a roll call, by `<week>/<timeSlot>`.
+	attendance?: ReadonlyMap<string, "present" | "absent">;
 }
 
-const { week, entries, next, href, resources } = Astro.props;
+const {
+	week,
+	entries,
+	next,
+	href,
+	resources,
+	rollCallManager,
+	rollCallKeys = new Set<string>(),
+	attendance = new Map<string, "present" | "absent">(),
+} = Astro.props;
+
+/// The key a meeting's roll call is known by.
+function rollCallKey(event: { week: number; timeSlot: { slug: string } }) {
+	return `${event.week}/${event.timeSlot.slug}`;
+}
 
 /// A row's anchor, the fragment links to this entry use.
 function anchor(entry: CalendarEntry): string {
@@ -113,6 +134,31 @@ function faded(entry: CalendarEntry): boolean {
                 </a>
               )}
               {entry === next && <span class="badge badge-primary badge-sm">Next</span>}
+              {entry.kind === "event" && attendance.get(rollCallKey(entry.event)) === "present" && (
+                <span class="badge badge-success badge-sm">Present</span>
+              )}
+              {entry.kind === "event" && attendance.get(rollCallKey(entry.event)) === "absent" && (
+                <span class="badge badge-error badge-sm">Absent</span>
+              )}
+              {entry.kind === "event" && rollCallManager && entry.event.kind === "REGULAR" && (
+                rollCallKeys.has(rollCallKey(entry.event)) ? (
+                  <a
+                    href={`${href}/roll-call/${entry.event.week}/${entry.event.timeSlot.slug}`}
+                    class="btn btn-outline btn-sm"
+                  >
+                    Roll call
+                  </a>
+                ) : (
+                  <OpenRollCallDialog
+                    client:load
+                    discipline={rollCallManager.discipline}
+                    course={rollCallManager.course}
+                    week={entry.event.week}
+                    timeSlot={entry.event.timeSlot.slug}
+                    href={href}
+                  />
+                )
+              )}
               {entry.kind === "exam" && (
                 <span class="badge badge-secondary badge-sm">
                   {examTypeLabels[entry.exam.type]}

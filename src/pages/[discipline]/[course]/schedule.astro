@@ -62,6 +62,24 @@ const { past, ahead, next } = courseSchedule(entries, course.startAt, now);
 // Folding every week away would leave an empty page once the term is over.
 const foldPast = past.length > 0 && ahead.length > 0;
 
+// One query for the whole page. Whoever manages the course sees which
+// meetings have a roll call; a student sees their own result on the past ones.
+const rollCalls = await db.rollCall.findMany({ course: course.id }, { actor });
+const rollCallKeys = new Set(rollCalls.map((r) => `${r.week}/${r.timeSlot}`));
+const attendance = new Map<string, "present" | "absent">();
+if (!canWrite && rollCallKeys.size > 0) {
+	const report = await db.rollCall.courseAttendance(course.id, { actor });
+	for (const [key, cell] of Object.entries(report.students[0]?.cells ?? {})) {
+		if (cell === "present" || cell === "absent") attendance.set(key, cell);
+	}
+}
+const rollCallManager = canWrite
+	? {
+			discipline: course.discipline.slug,
+			course: `${course.instructor.username}_${course.edition.slug}`,
+		}
+	: undefined;
+
 const meetingsHeld = events.filter(
 	(e) => isMeeting(e.kind) && e.kind !== "CANCELLED" && e.startAt <= now,
 ).length;
@@ -126,6 +144,9 @@ function weekSpan(weeks: { week: number }[]): string {
                         next={next}
                         href={href}
                         resources={eventResources}
+                        rollCallManager={rollCallManager}
+                        rollCallKeys={rollCallKeys}
+                        attendance={attendance}
                       />
                     ))}
                   </div>
@@ -138,6 +159,9 @@ function weekSpan(weeks: { week: number }[]): string {
                         next={next}
                         href={href}
                         resources={eventResources}
+                        rollCallManager={rollCallManager}
+                        rollCallKeys={rollCallKeys}
+                        attendance={attendance}
                       />
               ))}
             </div>

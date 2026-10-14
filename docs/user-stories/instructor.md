@@ -306,7 +306,7 @@ push of the column reaches them at once.
 
 ### Take the roll call in class
 
-    status: todo
+    status: implemented
     url: /[discipline]/[course]/schedule
 
 Instructor is in the middle of a lecture and wants the class marked present
@@ -324,7 +324,7 @@ check-in, and reopening it gives the class another 15 minutes.
 
 ### Read the course's attendance
 
-    status: todo
+    status: implemented
     url: /[discipline]/[course]/attendance
 
 Instructor wants to know who has been showing up. The Grades tab shows each
