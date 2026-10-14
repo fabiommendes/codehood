@@ -1,0 +1,50 @@
+---
+// Full screen projection of a roll call for the classroom screen.
+import RollCallProjector from "@/components/roll-call/RollCallProjector";
+import { db } from "@/db";
+import Layout from "@/layouts/Layout.astro";
+import { checkInQrSvg } from "@/services/roll-call-qr";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, week, timeSlot } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+
+const weekNumber = Number(week);
+if (!Number.isInteger(weekNumber) || !timeSlot) {
+	return Astro.rewrite("/404");
+}
+const pk = { course: course.id, week: weekNumber, timeSlot };
+const rollCall = await db.rollCall.findOne(pk, { actor });
+const event = await db.calendarEvent.findOne(pk, { actor });
+if (!rollCall || !event) return Astro.rewrite("/404");
+
+const { code } = await db.rollCall.currentCode(pk, { actor });
+---
+
+<Layout title={`${event.title} · Roll call`}>
+  <RollCallProjector
+    discipline={course.discipline.slug}
+    course={`${course.instructor.username}_${course.edition.slug}`}
+    week={weekNumber}
+    timeSlot={timeSlot}
+    title={event.title}
+    manageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
+    initial={{
+      code,
+      qr: checkInQrSvg(Astro.url.origin, rollCall.id, code),
+      present: Object.keys(rollCall.attendances).length,
+      closesAt: rollCall.closesAt,
+    }}
+    now={Date.now()}
+    client:load
+  />
+</Layout>

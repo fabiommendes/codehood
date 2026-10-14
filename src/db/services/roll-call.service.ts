@@ -5,13 +5,14 @@
  * Writes, `open`, `close` and `currentCode` need the `roll-call.manage`
  * permission. Whoever holds it reads every attendance; a student who may read
  * the course's contents reads their own entry only. `secret` and `deviceHash`
- * never leave the service.
+ * leave the service only through `claimTarget` and `claimInfo`, which serve the
+ * signed pending check-in cookie.
  */
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { Actor } from "@/auth/actor";
+import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
-import { CheckInError, InvalidData, NotFound } from "@/core/error";
+import { CheckInError, InvalidData, NotAllowed, NotFound } from "@/core/error";
 import {
 	type CourseId,
 	type CourseRef,
@@ -28,6 +29,7 @@ import {
 	rollCallSchema,
 	rollCallUpdate,
 } from "@/core/schemas";
+import { rollCallId } from "@/core/schemas/base";
 import {
 	CrudBase,
 	type ServiceOpts,
@@ -62,6 +64,15 @@ const EXPIRY_LOOKBACK_MS = OPEN_MS;
 
 /// Step between the instants tried when looking for an expired code.
 const EXPIRY_STEP_MS = 15_000;
+
+/// What `claimTarget` takes.
+const claimTargetInput = z.object({ rollCallId, code: z.string() });
+
+/// What `claimTarget` returns.
+const claimTargetSchema = z.object({
+	secret: z.string(),
+	actsAsInvite: z.boolean(),
+});
 
 /// What `currentCode` returns.
 const currentCodeSchema = z.object({
@@ -529,6 +540,62 @@ export class RollCallService extends CrudBase<{
 		});
 	}
 
+	/**
+	 * Verifies a scanned code for a roll call and returns what the pending-claim cookie needs.
+	 *
+	 * Meant for server code that holds no student session yet; the returned
+	 * `secret` must never reach the client.
+	 *
+	 * @throws {@link NotAllowed} Unless the actor is `SYSTEM`.
+	 * @throws {@link CheckInError} If the roll call is closed or the code is not accepted now.
+	 */
+	@Validate({
+		service: true,
+		returns: claimTargetSchema,
+		args: [claimTargetInput],
+	})
+	claimTarget<Opt extends ServiceOpts>(
+		input: z.input<typeof claimTargetInput>,
+		opts: Opt,
+	): Promise<z.infer<typeof claimTargetSchema>> {
+		requireSystem(opts.actor);
+		return this.$transaction(opts, async (tx) => {
+			const target = await verifyRollCall(
+				tx,
+				input.rollCallId,
+				input.code,
+				new Date(),
+			);
+			return { secret: target.secret, actsAsInvite: target.actsAsInvite };
+		});
+	}
+
+	/**
+	 * Returns what signs and gates the pending claims of a roll call, or `null` when it does not exist.
+	 *
+	 * The secret must never reach the client.
+	 *
+	 * @throws {@link NotAllowed} Unless the actor is `SYSTEM`.
+	 */
+	@Validate({
+		service: true,
+		returns: claimTargetSchema.nullable(),
+		args: [z.object({ rollCallId })],
+	})
+	claimInfo<Opt extends ServiceOpts>(
+		input: { rollCallId: RollCallId },
+		opts: Opt,
+	): Promise<z.infer<typeof claimTargetSchema> | null> {
+		requireSystem(opts.actor);
+		return this.$transaction(opts, async (tx) => {
+			const row = await tx.rollCall.findUnique({
+				where: { id: input.rollCallId },
+				select: { secret: true, actsAsInvite: true },
+			});
+			return row ?? null;
+		});
+	}
+
 	// Private utilities ---------------------------------------------------------
 
 	/// Sets `closesAt` to the instant `when` returns.
@@ -821,4 +888,9 @@ function fromDb(row: DbRollCall, actor: Actor): RollCall {
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 	};
+}
+
+/// Refuses every actor but `SYSTEM`: the caller is about to receive a secret.
+function requireSystem(actor: Actor): void {
+	if (actor !== SYSTEM) throw new NotAllowed("roll-call.manage");
 }

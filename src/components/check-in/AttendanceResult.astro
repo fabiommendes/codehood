@@ -1,0 +1,17 @@
+---
+import type { AttendanceView } from "@/actions/check-in";
+
+interface Props {
+	view: AttendanceView;
+}
+
+const { view } = Astro.props;
+const date = view.startAt.toLocaleDateString("en-US", { dateStyle: "long" });
+---
+
+<div role="status" class="alert alert-success alert-soft flex-col items-start">
+  <p class="font-semibold">Attendance recorded for {view.title}</p>
+  <p class="text-sm">{date}</p>
+  {view.joinedCourse && <p class="text-sm">You joined {view.joinedCourse}.</p>}
+</div>
+<a href="/courses" class="btn btn-block rounded-full">Go to your courses</a>

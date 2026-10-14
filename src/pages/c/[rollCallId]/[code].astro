@@ -1,0 +1,110 @@
+---
+export const prerender = false;
+
+import { actions } from "astro:actions";
+import {
+	type AttendanceView,
+	checkInMessage,
+	clientIp,
+	completeClaim,
+	register,
+	startClaim,
+} from "@/actions/check-in";
+import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
+import SignUpForm from "@/components/check-in/SignUpForm.astro";
+import type { RollCallId } from "@/core/schemas";
+import CenteredLayout from "@/layouts/CenteredLayout.astro";
+
+const { rollCallId: rawId = "", code = "" } = Astro.params;
+const rollCallId = /^[1-9]\d*$/.test(rawId)
+	? (Number(rawId) as RollCallId)
+	: null;
+const actor = Astro.locals.actor;
+
+const signUp = Astro.getActionResult(actions.checkIn.signUp);
+if (signUp && !signUp.error) {
+	return Astro.redirect(Astro.url.pathname);
+}
+
+let view: AttendanceView | null = null;
+let error: string | null =
+	rollCallId === null ? "That code is not valid." : null;
+let wantsSignUp = false;
+
+if (rollCallId !== null) {
+	try {
+		if (actor) {
+			const attempt = { actor, cookies: Astro.cookies, ip: clientIp(Astro) };
+			view =
+				(await completeClaim({ ...attempt, rollCallId })) ??
+				(await register({ ...attempt, rollCallId, code }));
+		} else {
+			const claim = await startClaim({
+				cookies: Astro.cookies,
+				ip: clientIp(Astro),
+				rollCallId,
+				code,
+			});
+			if (!claim.actsAsInvite) {
+				return Astro.redirect(
+					`/login?next=${encodeURIComponent(Astro.url.pathname)}`,
+				);
+			}
+			wantsSignUp = true;
+		}
+	} catch (e) {
+		error = checkInMessage(e);
+		if (error === null) throw e;
+	}
+}
+
+// A rejected sign-up renders the page again; refill what was typed.
+const submitted =
+	signUp?.error && Astro.request.method === "POST"
+		? await Astro.request
+				.clone()
+				.formData()
+				.catch(() => null)
+		: null;
+const values: Record<string, string> = {};
+for (const field of ["name", "email", "username", "githubId", "schoolId"]) {
+	const value = submitted?.get(field);
+	if (typeof value === "string") values[field] = value;
+}
+const formError = signUp?.error?.message ?? null;
+---
+
+<CenteredLayout title={wantsSignUp ? "Join the class" : "Check in"}>
+  {
+    (error ?? formError) && (
+      <div role="alert" class="alert alert-error">
+        <span>{error ?? formError}</span>
+      </div>
+    )
+  }
+  {view && <AttendanceResult view={view} />}
+  {
+    wantsSignUp && rollCallId !== null && (
+      <>
+        <p class="text-sm text-base-content/70">
+          Create your account to register your attendance and join this class.
+          Already have an account?{" "}
+          <a
+            class="link link-primary"
+            href={`/login?next=${encodeURIComponent(Astro.url.pathname)}`}
+          >
+            Log in to check in
+          </a>
+          .
+        </p>
+        <SignUpForm rollCallId={rollCallId} values={values} />
+      </>
+    )
+  }
+  {
+    error && !actor && (
+      <a href="/" class="btn btn-block rounded-full">Back to the start</a>
+    )
+  }
+  {error && actor && <a href="/check-in" class="btn btn-block rounded-full">Type the code instead</a>}
+</CenteredLayout>

@@ -58,6 +58,7 @@
 		"solid-js": "^1.9.15",
 		"swagger-ui-dist": "^5.32.14",
 		"temporal-polyfill": "^1.0.5",
+		"uqr": "^0.1.3",
 		"wildleek": "^2.0.0",
 		"yaml": "^2.9.0",
 		"zod": "^4.4.3"

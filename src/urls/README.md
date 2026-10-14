@@ -109,6 +109,8 @@ the same commit**, and checking that no existing discipline already claims it.
 | `/`                      | public | landing page                                          |
 | `/login`                 | public | sign in                                               |
 | `/invite/[token]`        | public | redeem an invite, set a password                      |
+| `/c/[rollCallId]/[code]` | public | roll call check-in link (the QR); logs in or signs up |
+| `/check-in`              | user   | type a roll call code                                 |
 | `/getting-started`       | public | onboarding notes                                      |
 | `/courses`               | user   | every course you take or teach                        |
 | `/calendar`              | user   | schedule across all your courses                      |

@@ -1,0 +1,137 @@
+---
+import { actions } from "astro:actions";
+
+interface Props {
+	rollCallId: number;
+	/// What was typed before a rejected submission, passwords aside.
+	values?: Record<string, string>;
+}
+
+const { rollCallId, values = {} } = Astro.props;
+---
+
+<form
+  method="POST"
+  action={actions.checkIn.signUp}
+  class="flex flex-col gap-1"
+  id="check-in-sign-up"
+>
+  <input type="hidden" name="rollCallId" value={rollCallId} />
+
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Name</legend>
+    <input
+      type="text"
+      name="name"
+      required
+      autocomplete="name"
+      class="input w-full"
+      value={values.name ?? ""}
+    />
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Email</legend>
+    <input
+      type="email"
+      name="email"
+      required
+      autocomplete="email"
+      class="input w-full"
+      value={values.email ?? ""}
+    />
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Username</legend>
+    <input
+      type="text"
+      name="username"
+      required
+      autocomplete="username"
+      class="input w-full"
+      value={values.username ?? ""}
+    />
+  </fieldset>
+
+  <div class="grid gap-x-3 sm:grid-cols-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">Password</legend>
+      <input
+        type="password"
+        name="password"
+        id="password"
+        required
+        minlength="8"
+        autocomplete="new-password"
+        class="input w-full"
+      />
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">Confirm password</legend>
+      <input
+        type="password"
+        id="passwordConfirm"
+        required
+        minlength="8"
+        autocomplete="new-password"
+        class="input w-full"
+      />
+    </fieldset>
+  </div>
+  <p class="label whitespace-normal text-error" id="passwordMismatch" hidden>
+    Passwords do not match.
+  </p>
+
+  <div class="grid gap-x-3 sm:grid-cols-2">
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">GitHub username</legend>
+      <input
+        type="text"
+        name="githubId"
+        required
+        class="input w-full"
+        value={values.githubId ?? ""}
+      />
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">School id</legend>
+      <input
+        type="text"
+        name="schoolId"
+        required
+        class="input w-full"
+        value={values.schoolId ?? ""}
+      />
+    </fieldset>
+  </div>
+  <p class="label whitespace-normal">
+    Your instructors use these to tell whose work is whose.
+  </p>
+
+  <button type="submit" class="btn btn-primary btn-block mt-4 rounded-full">
+    Create account
+  </button>
+</form>
+
+<script>
+  const form = document.getElementById("check-in-sign-up");
+  const password = document.getElementById(
+    "password",
+  ) as HTMLInputElement | null;
+  const confirm = document.getElementById(
+    "passwordConfirm",
+  ) as HTMLInputElement | null;
+  const mismatch = document.getElementById("passwordMismatch");
+
+  form?.addEventListener("submit", (event) => {
+    if (password && confirm && password.value !== confirm.value) {
+      event.preventDefault();
+      mismatch?.removeAttribute("hidden");
+    } else {
+      mismatch?.setAttribute("hidden", "");
+    }
+  });
+</script>

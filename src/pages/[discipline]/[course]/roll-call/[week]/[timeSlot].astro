@@ -1,0 +1,64 @@
+---
+// The instructor's page for one roll call: its state, and every enrolled
+// student with a presence checkbox.
+import CourseHeader from "@/components/CourseHeader.astro";
+import RollCallManager from "@/components/roll-call/RollCallManager";
+import { db } from "@/db";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { loadCourse } from "@/utils/load-course";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, week, timeSlot } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+
+const weekNumber = Number(week);
+if (!Number.isInteger(weekNumber) || !timeSlot) {
+	return Astro.rewrite("/404");
+}
+const pk = { course: course.id, week: weekNumber, timeSlot };
+const rollCall = await db.rollCall.findOne(pk, { actor });
+const event = await db.calendarEvent.findOne(pk, { actor });
+if (!rollCall || !event) return Astro.rewrite("/404");
+
+const report = await db.rollCall.courseAttendance(course.id, { actor });
+const students = report.students.map((s) => ({
+	username: s.username,
+	name: s.name,
+	dropped: s.status === "DROPPED",
+}));
+
+const courseParams = {
+	discipline: course.discipline.slug,
+	course: `${course.instructor.username}_${course.edition.slug}`,
+};
+---
+
+<AppLayout title={`${event.title} · Roll call`} trail={breadcrumbs(Astro.url, { course })}>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="schedule" />
+    <h2 class="mt-8 mb-4 text-2xl font-semibold">{event.title}</h2>
+    <RollCallManager
+      {...courseParams}
+      week={weekNumber}
+      timeSlot={timeSlot}
+      pageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
+      scheduleHref={`${href}/schedule`}
+      students={students}
+      initial={{
+        closesAt: rollCall.closesAt,
+        attendances: rollCall.attendances,
+      }}
+      now={Date.now()}
+      client:load
+    />
+  </main>
+</AppLayout>
