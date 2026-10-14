@@ -92,3 +92,29 @@ export const courseAttendanceSchema = z.object({
 			}),
 	),
 });
+
+/// A check-in with a code typed or scanned now.
+export const checkInInput = z.object({
+	code: z.string(),
+	/// Absent when the student typed the code without choosing a roll call.
+	rollCallId: rollCallId.optional(),
+	/// Raw value of the per-browser device cookie.
+	deviceId: z.string().min(1),
+});
+
+/// A check-in whose code was verified earlier, completed after login or signup.
+export const checkInClaimInput = z.object({
+	rollCallId: rollCallId,
+	/// The instant the code was verified.
+	claimedAt: z.date(),
+	deviceId: z.string().min(1),
+	accountCreated: z.boolean(),
+});
+
+export const checkInResultSchema = z.object({
+	rollCall: rollCallPK,
+	title: z.string(),
+	startAt: z.date(),
+	/// Set when this check-in created the enrollment or the account.
+	joined: attendanceSchema.shape.joined,
+});

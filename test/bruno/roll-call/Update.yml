@@ -1,0 +1,25 @@
+info:
+  name: Update
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/course/cs101/ada_2026-1/roll-call/1/mon
+  body:
+    type: json
+    data: |-
+      {
+          "attendances": {
+              "ada": { "note": "Arrived late" },
+              "grace": null
+          }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

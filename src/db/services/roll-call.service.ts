@@ -7,14 +7,18 @@
  * the course's contents reads their own entry only. `secret` and `deviceHash`
  * never leave the service.
  */
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Actor } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
-import { InvalidData, NotFound } from "@/core/error";
+import { CheckInError, InvalidData, NotFound } from "@/core/error";
 import {
 	type CourseId,
 	type CourseRef,
 	type calendarEventPK,
+	checkInClaimInput,
+	checkInInput,
+	checkInResultSchema,
 	courseAttendanceSchema,
 	courseRef,
 	type RollCallId,
@@ -29,7 +33,8 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
-import { codeAt, generateSecret } from "@/services/roll-call-code";
+import { codeAt, generateSecret, isCodeValid } from "@/services/roll-call-code";
+import { CLAIM_TTL_MS } from "@/utils/pending-check-in";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
@@ -45,9 +50,18 @@ export type RollCallFilter = z.infer<typeof rollCallFilter>;
 export type RollCallPK = z.infer<typeof rollCallPK>;
 export type RollCallUpdate = z.infer<typeof rollCallUpdate>;
 export type CourseAttendance = z.infer<typeof courseAttendanceSchema>;
+export type CheckInInput = z.input<typeof checkInInput>;
+export type CheckInClaimInput = z.input<typeof checkInClaimInput>;
+export type CheckInResult = z.infer<typeof checkInResultSchema>;
 
 /// How long a roll call stays open after it is created or reopened.
 const OPEN_MS = 15 * 60_000;
+
+/// How far back an old code is still recognized, to tell "expired" from "wrong".
+const EXPIRY_LOOKBACK_MS = OPEN_MS;
+
+/// Step between the instants tried when looking for an expired code.
+const EXPIRY_STEP_MS = 15_000;
 
 /// What `currentCode` returns.
 const currentCodeSchema = z.object({
@@ -447,12 +461,72 @@ export class RollCallService extends CrudBase<{
 		});
 	}
 
-	/** Marks the acting student present. */
-	async checkIn(
-		_input: { code: string; rollCallId?: RollCallId },
-		_opts: ServiceOpts,
-	): Promise<RollCall> {
-		throw new Error("not implemented");
+	/**
+	 * Marks the acting student present with a code typed or scanned now.
+	 *
+	 * Without `rollCallId`, the code is matched against every open roll call,
+	 * preferring a course the student is enrolled in. A repeat check-in changes
+	 * nothing.
+	 *
+	 * @throws {@link CheckInError} If the check-in is refused.
+	 */
+	@Validate({
+		service: true,
+		returns: checkInResultSchema,
+		args: [checkInInput],
+	})
+	checkIn<Opt extends ServiceOpts>(
+		input: CheckInInput,
+		opts: Opt,
+	): Promise<CheckInResult> {
+		return this.$transaction(opts, async (tx, scoped) => {
+			const student = studentOf(scoped.actor);
+			const now = new Date();
+			const target =
+				input.rollCallId === undefined
+					? await matchOpenRollCall(tx, student, input.code, now)
+					: await verifyRollCall(tx, input.rollCallId, input.code, now);
+			return markPresent(tx, student, target, input.deviceId, false);
+		});
+	}
+
+	/**
+	 * Completes a check-in whose code was verified at `claimedAt`, after login or signup.
+	 *
+	 * The code and the window are not checked again; the claim itself lasts 10 min.
+	 *
+	 * @throws {@link CheckInError} If the check-in is refused.
+	 * @throws {@link NotFound} If the roll call does not exist.
+	 */
+	@Validate({
+		service: true,
+		returns: checkInResultSchema,
+		args: [checkInClaimInput],
+	})
+	checkInClaim<Opt extends ServiceOpts>(
+		input: CheckInClaimInput,
+		opts: Opt,
+	): Promise<CheckInResult> {
+		return this.$transaction(opts, async (tx, scoped) => {
+			const student = studentOf(scoped.actor);
+			if (Date.now() - input.claimedAt.getTime() >= CLAIM_TTL_MS) {
+				throw new CheckInError("claim-expired");
+			}
+			const target = valueOrNotFound(
+				"roll-call",
+				await tx.rollCall.findFirst({
+					where: { id: input.rollCallId },
+					select: checkInSelect,
+				}),
+			);
+			return markPresent(
+				tx,
+				student,
+				target,
+				input.deviceId,
+				input.accountCreated,
+			);
+		});
 	}
 
 	// Private utilities ---------------------------------------------------------
@@ -577,6 +651,130 @@ async function checkEnrolled(
 			message: `"${name}" is not enrolled in the course.`,
 		})),
 	});
+}
+
+/// What a check-in needs to know about a roll call.
+const checkInSelect = {
+	id: true,
+	secret: true,
+	actsAsInvite: true,
+	closesAt: true,
+	event: {
+		select: { courseId: true, title: true, startAt: true },
+	},
+} satisfies Prisma.RollCallSelect;
+
+type CheckInTarget = Prisma.RollCallGetPayload<{
+	select: typeof checkInSelect;
+}>;
+
+/// The username of a student actor.
+function studentOf(actor: Actor): string {
+	if (typeof actor === "symbol" || actor.role !== "STUDENT") {
+		throw new CheckInError("not-student", "Only students can check in.");
+	}
+	return actor.username;
+}
+
+/// Finds the roll call `id` and checks it is open and `code` is accepted now.
+async function verifyRollCall(
+	tx: PrismaTx,
+	id: number,
+	code: string,
+	now: Date,
+): Promise<CheckInTarget> {
+	const target = await tx.rollCall.findFirst({
+		where: { id },
+		select: checkInSelect,
+	});
+	if (!target) throw new CheckInError("invalid-code");
+	if (target.closesAt <= now) throw new CheckInError("closed");
+	if (isCodeValid(target.secret, code, now)) return target;
+
+	for (
+		let back = EXPIRY_STEP_MS;
+		back <= EXPIRY_LOOKBACK_MS;
+		back += EXPIRY_STEP_MS
+	) {
+		if (isCodeValid(target.secret, code, new Date(now.getTime() - back))) {
+			throw new CheckInError("expired");
+		}
+	}
+	throw new CheckInError("invalid-code");
+}
+
+/// Finds the open roll call that accepts `code`, preferring the student's courses.
+async function matchOpenRollCall(
+	tx: PrismaTx,
+	username: string,
+	code: string,
+	now: Date,
+): Promise<CheckInTarget> {
+	const open = await tx.rollCall.findMany({
+		where: { closesAt: { gt: now } },
+		select: checkInSelect,
+	});
+	const matches = open.filter((r) => isCodeValid(r.secret, code, now));
+	const [first] = matches;
+	if (!first) throw new CheckInError("invalid-code");
+	if (matches.length === 1) return first;
+
+	const enrolled = await tx.enrollment.findMany({
+		where: {
+			username,
+			courseId: { in: matches.map((r) => r.event.courseId) },
+		},
+		select: { courseId: true },
+	});
+	const courses = new Set(enrolled.map((e) => e.courseId));
+	return matches.find((r) => courses.has(r.event.courseId)) ?? first;
+}
+
+/// Records the attendance of `username`, enrolling them first when the roll call invites.
+async function markPresent(
+	tx: PrismaTx,
+	username: string,
+	target: CheckInTarget,
+	deviceId: string,
+	accountCreated: boolean,
+): Promise<CheckInResult> {
+	const courseId = target.event.courseId;
+	const enrollment = await tx.enrollment.findUnique({
+		where: { username_courseId: { username, courseId } },
+		select: { status: true },
+	});
+	if (enrollment?.status === "DROPPED") {
+		throw new CheckInError("dropped", "The student dropped this course.");
+	}
+
+	let joined: "ENROLLMENT" | "ACCOUNT" | null = null;
+	if (!enrollment) {
+		if (!target.actsAsInvite) throw new CheckInError("not-enrolled");
+		await tx.enrollment.create({ data: { username, courseId } });
+		joined = accountCreated ? "ACCOUNT" : "ENROLLMENT";
+	}
+
+	const existing = await tx.attendance.findUnique({
+		where: { rollCallId_username: { rollCallId: target.id, username } },
+		select: { joined: true },
+	});
+	if (!existing) {
+		await tx.attendance.create({
+			data: {
+				rollCallId: target.id,
+				username,
+				source: "CODE",
+				deviceHash: createHash("sha256").update(deviceId).digest("hex"),
+				joined,
+			},
+		});
+	}
+	return {
+		rollCall: { id: target.id as RollCallId },
+		title: target.event.title,
+		startAt: target.event.startAt,
+		joined: existing ? existing.joined : joined,
+	};
 }
 
 /// The username of a user actor, or an empty string for SYSTEM.

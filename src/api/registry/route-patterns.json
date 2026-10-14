@@ -42,6 +42,12 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/attendance",
+		"methods": [
+			"get"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/calendar-event",
 		"methods": [
 			"get",
@@ -137,6 +143,20 @@
 	},
 	{
 		"pattern": "/api/course/[discipline]/[course]/response/[publicId]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/roll-call",
+		"methods": [
+			"get"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/roll-call/[week]/[timeSlot]",
 		"methods": [
 			"delete",
 			"get",

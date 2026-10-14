@@ -1,0 +1,7 @@
+info:
+  name: roll-call
+  type: folder
+  seq: 16
+
+request:
+  auth: inherit

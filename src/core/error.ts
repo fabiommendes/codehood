@@ -448,3 +448,23 @@ function summarizeErrors(errors: {
 	}
 	return summaries.length > 0 ? summaries.join("; ") : "Validation Error";
 }
+
+/**
+ * Thrown when a roll call check-in is refused.
+ */
+export class CheckInError extends Error {
+	constructor(
+		readonly code:
+			| "invalid-code"
+			| "expired"
+			| "closed"
+			| "not-enrolled"
+			| "dropped"
+			| "not-student"
+			| "claim-expired",
+		message: string = `Check-in refused: ${code}.`,
+	) {
+		super(message);
+		this.name = "CheckInError";
+	}
+}

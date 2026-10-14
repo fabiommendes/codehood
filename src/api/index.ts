@@ -175,6 +175,55 @@ export const gradesApi = GET("/api/course/[discipline]/[course]/grades", {
 	},
 });
 
+export const rollCallApi = CRUD("/api/course/[discipline]/[course]/roll-call", {
+	name: "Roll Call",
+	plural: "Roll Calls",
+	keySegment: "/[week]/[timeSlot]",
+
+	// A roll call is the event `(week, time slot)` it belongs to. Opening,
+	// closing and checking in are not exposed: the web app owns them.
+	entity: schema.rollCallSchema.omit({ id: true, courseId: true }),
+	create: null,
+	upsert: false,
+	update: schema.rollCallUpdate,
+	filter: schema.rollCallFilter.omit({ course: true }),
+	scope: courseScope,
+	key: schema.rollCallPK,
+
+	tags: ["Roll Calls"],
+	// `create` and `upsert` are withheld, and the service's `create` takes an
+	// event rather than the scope the registry would hand it.
+	service: db.rollCall as never,
+
+	parseKeyParams(params) {
+		return {
+			course: parseCourseParams(params),
+			week: parseWeekParam(params.week as string),
+			timeSlot: params.timeSlot as string,
+		};
+	},
+	parseScopeParams(params) {
+		return { course: parseCourseParams(params) };
+	},
+});
+
+export const attendanceApi = GET(
+	"/api/course/[discipline]/[course]/attendance",
+	{
+		out: schema.courseAttendanceSchema,
+		summary: "View the attendance of every student",
+		description:
+			"Lists the events that had a roll call and, for every enrolled student, dropped ones included, whether they were present at each. An instructor reads every student; a student reads only their own row.",
+		operationId: "courseAttendance",
+		tags: ["Roll Calls"],
+		handler: async ({ actor, params }) => {
+			return db.rollCall.courseAttendance(parseCourseParams(params), {
+				actor,
+			});
+		},
+	},
+);
+
 export const inviteApi = CRUD("/api/invite", {
 	name: "Invite",
 	plural: "Invites",
