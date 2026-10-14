@@ -13,6 +13,7 @@ import {
 	type GradesTable,
 	type PushedGrades,
 } from "@/services/grades-table";
+import { formatAttendancePercent } from "@/utils/course-grades";
 
 interface Props {
 	/// The course's URL prefix.
@@ -20,9 +21,11 @@ interface Props {
 	table: GradesTable;
 	/// The pushed grade columns, lined up with the rows of `table`.
 	pushed: PushedGrades;
+	/// Roll calls attended and held by username; the Attendance column shows only when given.
+	attendance?: ReadonlyMap<string, { present: number; total: number }>;
 }
 
-const { href, table, pushed } = Astro.props;
+const { href, table, pushed, attendance } = Astro.props;
 const segments = href.split("/").filter(Boolean);
 const params = {
 	discipline: segments[0] ?? "",
@@ -91,6 +94,13 @@ const hasAttempt = (cell: GradeCell): boolean =>
             </th>
           ))
         }
+        {
+          attendance && (
+            <th scope="col" class="align-top max-sm:px-2">
+              <a href={`${href}/attendance`} class="link">Attendance</a>
+            </th>
+          )
+        }
       </tr>
     </thead>
     <tbody>
@@ -116,6 +126,14 @@ const hasAttempt = (cell: GradeCell): boolean =>
                 {value === null ? "" : formatGradeValue(value)}
               </td>
             ))}
+            {attendance && (
+              <td class="max-sm:px-2">
+                {formatAttendancePercent(
+                  attendance.get(row.username)?.present ?? 0,
+                  attendance.get(row.username)?.total ?? 0,
+                )}
+              </td>
+            )}
           </tr>
         ))
       }

@@ -1,0 +1,63 @@
+---
+/**
+ * Students against the course's roll calls: present, absent, or `-` before enrollment.
+ *
+ * A dropped student is dimmed and labelled.
+ */
+import type { CourseAttendance } from "@/db/services/roll-call.service";
+import { formatAttendancePercent } from "@/utils/course-grades";
+
+interface Props {
+	report: CourseAttendance;
+}
+
+const { report } = Astro.props;
+
+const CELL_LABEL = {
+	present: "Present",
+	absent: "Absent",
+	"before-enrollment": "-",
+} as const;
+---
+
+<div class="mt-6 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+  <table aria-label="Attendance" class="table min-w-max">
+    <thead>
+      <tr>
+        <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">Student</th>
+        {
+          report.events.map((event) => (
+            <th scope="col" class="max-sm:px-2" title={event.startAt.toLocaleDateString("en-CA")}>
+              {event.title}
+            </th>
+          ))
+        }
+        <th scope="col" class="max-sm:px-2">Present</th>
+        <th scope="col" class="max-sm:px-2">Total</th>
+        <th scope="col" class="max-sm:px-2">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        report.students.map((student) => (
+          <tr class:list={[student.status === "DROPPED" && "opacity-60"]}>
+            <td class="sticky left-0 z-10 bg-base-100 font-medium max-sm:px-2">
+              {student.name ?? student.username}
+              {student.status === "DROPPED" && (
+                <span class="badge badge-ghost badge-sm ml-1">Dropped</span>
+              )}
+            </td>
+            {report.events.map((event) => (
+              <td class="max-sm:px-2">
+                {CELL_LABEL[student.cells[`${event.week}/${event.timeSlot}`] ?? "absent"]}
+              </td>
+            ))}
+            <td class="max-sm:px-2">{student.present}</td>
+            <td class="max-sm:px-2">{student.total}</td>
+            <td class="max-sm:px-2">{formatAttendancePercent(student.present, student.total)}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

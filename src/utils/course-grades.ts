@@ -3,6 +3,7 @@ import { hasPerm } from "@/auth/permissions";
 import { NotAllowed, NotFound } from "@/core/error";
 import type { CourseRef } from "@/core/schemas";
 import { db } from "@/db";
+import { attendancePercent } from "@/services/attendance-table";
 import {
 	type CourseGradesReport,
 	courseGradesReport,
@@ -47,4 +48,19 @@ export async function loadCourseGrades(
 		withDropped: true,
 	});
 	return courseGradesReport(table, [...active, ...dropped]);
+}
+
+/**
+ * Writes an attendance percentage as a whole number with a `%` sign, or `-` when there are no roll calls.
+ *
+ * @example
+ * formatAttendancePercent(2, 3); // "67%"
+ * formatAttendancePercent(0, 0); // "-"
+ */
+export function formatAttendancePercent(
+	present: number,
+	total: number,
+): string {
+	const percent = attendancePercent(present, total);
+	return percent === null ? "-" : `${Math.round(percent)}%`;
 }

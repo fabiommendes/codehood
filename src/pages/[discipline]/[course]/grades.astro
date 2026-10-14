@@ -2,6 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
 import GradesTable from "@/components/grading/GradesTable.astro";
+import { db } from "@/db";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
@@ -23,6 +24,11 @@ const { table, pushed, csvRows } = await loadGrades(
 	actor,
 	new Date(),
 );
+const report = await db.rollCall.courseAttendance(course.id, { actor });
+const attendance =
+	report.events.length > 0
+		? new Map(report.students.map((s) => [s.username, s]))
+		: undefined;
 // The file lists students the table leaves out, so it can have rows when the table has none.
 const hasGrades =
 	(table.columns.length > 0 || pushed.columns.length > 0) && csvRows.length > 1;
@@ -53,7 +59,7 @@ const csvFilename = `grades-${course.discipline.slug}-${course.edition.slug}.csv
           <a href={`${href}/roster`} class="link mt-2 inline-block">Students</a>
         </div>
       ) : (
-        <GradesTable href={href} table={table} pushed={pushed} />
+        <GradesTable href={href} table={table} pushed={pushed} attendance={attendance} />
       )
     }
   </main>

@@ -1,0 +1,25 @@
+---
+/**
+ * A link reading "Attendance: 2 of 3 (67%)" to the course's attendance page.
+ *
+ * Renders nothing when the course has held no roll call.
+ */
+import { formatAttendancePercent } from "@/utils/course-grades";
+
+interface Props {
+	/// The course's URL prefix.
+	href: string;
+	/// The student's row of the course attendance report.
+	student: { present: number; total: number };
+}
+
+const { href, student } = Astro.props;
+---
+
+{
+  student.total > 0 && (
+    <a href={`${href}/attendance`} class="link">
+      Attendance: {student.present} of {student.total} ({formatAttendancePercent(student.present, student.total)})
+    </a>
+  )
+}

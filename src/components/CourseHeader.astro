@@ -10,7 +10,8 @@ import Tabs from "./ui/Tabs.astro";
 
 interface Props {
 	course: Course;
-	active: CourseTabKey;
+	/// Absent on a page that has no tab of its own.
+	active?: CourseTabKey;
 }
 
 const { course, active } = Astro.props;
@@ -41,5 +42,5 @@ const tabs = courseTabs(
 </div>
 
 <div class="mt-6">
-	<Tabs items={tabs} active={active} />
+	<Tabs items={tabs} active={active ?? ""} />
 </div>
