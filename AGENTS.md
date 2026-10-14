@@ -55,9 +55,13 @@ it works on entities: domain rules (grading, exam results) go to
 
 ## Workflow
 
-If human asks for some coding/implementation task, sStart by planning the
+If human asks for some coding/implementation task, start by planning the
 requested feature. It can be planned in a conversation or already documented in
-a spec file. 
+a spec file. To design a new feature from scratch, use the `new-feature` skill.
+
+New technical documents (specs, issues, skills) are written in Portuguese. Code,
+identifiers and code comments stay in English. Existing English documents are
+not translated.
 
 Analyse the requirements and be explicit about design decisions. Pick what you
 think is the best approach and document it. Ask human only if the decision produces 
