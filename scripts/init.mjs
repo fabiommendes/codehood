@@ -58,7 +58,9 @@ run("Branding generated types", "pnpm", [
 	"tsx",
 	"scripts/brand-generated-types.ts",
 ]);
-run("Applying migrations", "pnpm", ["exec", "prisma", "migrate", "deploy"]);
+// Development tracks the schema with `db push`; migrations are only written
+// when a release is cut (`pnpm run release`), so they lag behind the schema.
+run("Pushing the schema", "pnpm", ["exec", "prisma", "db", "push"]);
 run("Seeding the database", "pnpm", ["exec", "prisma", "db", "seed"]);
 
 // 4. Code generators. `generate` writes the route patterns and the OpenAPI

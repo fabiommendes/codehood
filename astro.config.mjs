@@ -5,9 +5,29 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
 
+/// Public address of a deployed instance, read at build time. Behind a reverse
+/// proxy the server only sees plain HTTP from 127.0.0.1, so it must trust the
+/// proxy's `X-Forwarded-*` headers for this host; otherwise form posts fail
+/// the origin check (`https://` page, `http://` request) and every client
+/// shares the proxy's IP, which breaks the per-IP rate limits.
+const publicUrl = process.env.PUBLIC_URL
+	? new URL(process.env.PUBLIC_URL)
+	: null;
+
 // https://astro.build/config
 export default defineConfig({
 	output: "server",
+	site: publicUrl?.origin,
+	security: {
+		allowedDomains: publicUrl
+			? [
+					{
+						protocol: publicUrl.protocol.slice(0, -1),
+						hostname: publicUrl.hostname,
+					},
+				]
+			: [],
+	},
 	adapter: node({ mode: "standalone" }),
 	integrations: [solidJs(), dynamicRouterHook()],
 	vite: {

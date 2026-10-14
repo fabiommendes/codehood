@@ -86,6 +86,14 @@ update the changelog. If you find any bugs, create a new issue in `dev/issues/`.
 If the bug is simple, create a regression test and fix it. If it is complex, ask
 the human for help.
 
+## Releases and migrations
+
+The schema evolves with `prisma db push` during development. Never write
+migrations by hand or with `prisma migrate dev`: `pnpm run release` writes
+one per release, checks it for data loss and runs the gate before tagging.
+See "Deploying" in `README.md`. Instance-specific deployment lives in
+`deploy/`, a separate repository that git ignores here.
+
 ## Linting
 
 Never hand-fix what Biome can fix itself. Auto-fix first, then run the linter as

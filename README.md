@@ -70,6 +70,7 @@ Then use one of the following, depending on what you want to do:
 | `DEBUG`                  | no       | `false`              | Verbose error output.                                          |
 | `LOG_ENV`                | no       | `false`              | Echo the resolved environment at startup. Set by `pnpm run dev`. |
 | `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in (FR-NFR-020).            |
+| `PUBLIC_URL`             | no       | none                 | Build time. Address of a deployed instance, see [Deploying](#deploying). |
 
 `ENVIRONMENT` deliberately has no default, and an empty value counts as
 unset. It decides two things a deployment cannot afford to get wrong by
@@ -103,6 +104,42 @@ resource blobs — leaving only what git tracks. It keeps `.env` unless you pass
 `--all`, and `--dry-run` lists what it would delete. `pnpm run init` brings the
 project back afterwards.
 
+
+## Deploying
+
+A release is a git tag cut from `main`, built on any machine into a tarball
+that a server runs with Node and a production `pnpm install`. Nothing is
+built on the server, so a small one (1 vCPU, 1 GB) is enough.
+
+```
+pnpm run release minor                         # migrations, gate, bump, tag
+git push origin main v0.2.0
+PUBLIC_URL=https://codehood.example.org \
+  pnpm run package v0.2.0 --out build/ [--rehearse prod-copy.db]
+```
+
+- `pnpm run release <patch|minor|major|x.y.z>` writes the migration for the
+  schema changes since the last release (`pnpm run db:migrate`), runs the
+  gate (`pnpm run lint`, `pnpm test`), bumps `package.json`, dates the
+  changelog's "Unreleased" section, then commits and tags `vX.Y.Z`. It stops
+  when a migration drops tables or columns; edit the migration to keep the
+  data, or pass `--allow-data-loss`.
+- `pnpm run package <tag>` builds the tag from a clean export. `--rehearse`
+  applies the migrations to a copy of a database first, so a migration that
+  breaks on real data fails here instead of on the server.
+- On the server: unpack, `pnpm install --prod --frozen-lockfile`,
+  `pnpm exec prisma migrate deploy`, then run `node dist/server/entry.mjs`
+  (`HOST`/`PORT` pick the address) behind an HTTPS reverse proxy that sets
+  `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`. Management
+  commands run as `node dist/manage.mjs <command>`.
+
+`PUBLIC_URL` is read at build time. The server trusts the proxy's
+`X-Forwarded-*` headers only for that host; without it, form posts fail
+Astro's origin check and every client has the proxy's IP.
+
+Migrations are written only at release time. Development keeps using
+`prisma db push`, so the history holds one migration per release instead of
+one per schema edit.
 
 ## Architecture and Tech Stack
 

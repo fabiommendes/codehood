@@ -54,3 +54,6 @@ prompt/
 # Base
 .base-ast
 .base-ast-cache
+
+# Instance deployment, a separate (private) repository
+/deploy/
