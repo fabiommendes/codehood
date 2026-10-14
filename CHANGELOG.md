@@ -4,6 +4,26 @@
 
 ### Added
 
+- Roll call. During class the instructor opens the roll call of a meeting
+  from the schedule, or from the course home while the meeting is on, and
+  projects a QR code with a code that changes every 15 s and is accepted
+  for 30 s after it leaves the screen. The roll call stays open 15 min and
+  can be closed early and reopened. A student scans the QR, or types the
+  code at `/check-in`, and is marked present, logging in first when needed;
+  a roll call marked as an invite also enrolls the student, or creates the
+  account. Wrong codes are rate limited per user and per IP. The
+  instructor's page lists every student, flags two students checked in from
+  the same browser and those who joined in this class, and takes manual
+  corrections with a note. The course's attendance page, linked from the
+  grades table's new Attendance column and from the student's course home,
+  counts meetings held before a student enrolled as absences shown as `-`,
+  and downloads as CSV. Students see Present or Absent on past meetings in
+  the schedule. The REST API reads roll calls and attendance, updates them
+  by merge and deletes them; deleting a meeting that has a roll call answers
+  409. On push, the CLI keeps a meeting with a roll call that left the local
+  calendar and warns, unless `--drop-roll-calls` is given, and
+  `codehood attendance` prints the attendance or writes the CSV.
+
 - A resource may belong to one meeting of its course. It is listed under
   that meeting on the schedule, where a file downloads, a link opens in
   another tab and a note or snippet opens its page, which leads back to the

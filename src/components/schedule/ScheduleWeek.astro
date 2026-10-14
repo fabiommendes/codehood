@@ -40,6 +40,14 @@ const {
 	attendance = new Map<string, "present" | "absent">(),
 } = Astro.props;
 
+/// How long before a meeting starts its roll call may be opened.
+const ROLL_CALL_LEAD_MS = 60 * 60 * 1000;
+
+/// Whether a meeting is near or past enough to open its roll call.
+function rollCallOpenable(entry: CalendarEntry): boolean {
+	return entry.startAt.getTime() <= Date.now() + ROLL_CALL_LEAD_MS;
+}
+
 /// The key a meeting's roll call is known by.
 function rollCallKey(event: { week: number; timeSlot: { slug: string } }) {
 	return `${event.week}/${event.timeSlot.slug}`;
@@ -148,7 +156,7 @@ function faded(entry: CalendarEntry): boolean {
                   >
                     Roll call
                   </a>
-                ) : (
+                ) : rollCallOpenable(entry) && (
                   <OpenRollCallDialog
                     client:load
                     discipline={rollCallManager.discipline}

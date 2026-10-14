@@ -50,7 +50,7 @@ import {
  *
  * Attendance page (`<course>/attendance`)
  *   - Table with column headers "Student", one per meeting titled with the
- *     meeting title (date order), "Present", "Total", "%". First cell: the
+ *     "Present", "Total", "%", then one per meeting title (date order). First cell: the
  *     name. Meeting cells read "Present", "Absent" or "-". The last three
  *     read like "2", "3", "67%". A student sees only their own row.
  *
@@ -148,22 +148,22 @@ test("student: Check in to class", async ({ page }) => {
 
 		await expect(page.getByRole("columnheader")).toHaveText([
 			"Student",
-			"sa-Arrays",
-			"sa-Sorting",
-			"sa-Hashing",
 			"Present",
 			"Total",
 			"%",
+			"sa-Arrays",
+			"sa-Sorting",
+			"sa-Hashing",
 		]);
 		const own = page.getByRole("row").filter({ hasText: "Ana Prado" });
 		const cells = own.getByRole("cell");
 		for (const [i, text] of [
-			"Present",
-			"Present",
-			"Absent",
 			"2",
 			"3",
 			"67%",
+			"Present",
+			"Present",
+			"Absent",
 		].entries()) {
 			await expect(cells.nth(i + 1)).toHaveText(text);
 		}

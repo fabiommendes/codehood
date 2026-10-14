@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [attendance, roll-call, testing]
 relatedTo: [roll-call]
 ---

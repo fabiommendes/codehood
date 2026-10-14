@@ -55,7 +55,7 @@ import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
  *     attendance page and whose cells read like "100%". There is no
  *     "Attendance" tab.
  *   - A table with column headers: "Student", one per meeting titled with the
- *     meeting title (date order), "Present", "Total", "%". Rows are in
+ *     "Present", "Total", "%", then one per meeting title (date order). Rows are in
  *     username order. First cell: the student's name, plus the text "Dropped"
  *     for a dropped student. Meeting cells read "Present", "Absent" or "-".
  *     The last three cells read like "3", "3", "100%".
@@ -339,48 +339,48 @@ test("instructor: Read the course's attendance", async ({ page }) => {
 	await test.step("the table has a cell for every student and meeting, `-` before enrollment", async () => {
 		await expect(page.getByRole("columnheader")).toHaveText([
 			"Student",
-			"ra-Intro",
-			"ra-Loops",
-			"ra-Recursion",
 			"Present",
 			"Total",
 			"%",
+			"ra-Intro",
+			"ra-Loops",
+			"ra-Recursion",
 		]);
 		await expectRow(page, "Ana Prado", [
-			"Present",
-			"Present",
-			"Present",
 			"3",
 			"3",
 			"100%",
+			"Present",
+			"Present",
+			"Present",
 		]);
 		await expectRow(page, "Bia Lima", [
-			"Absent",
-			"Present",
-			"Present",
 			"2",
 			"3",
 			"67%",
+			"Absent",
+			"Present",
+			"Present",
 		]);
 		// Held before Lia enrolled: shown as `-`, still counted in the total.
 		await expectRow(page, "Lia Late", [
-			"-",
-			"Present",
-			"Absent",
 			"1",
 			"3",
 			"33%",
+			"-",
+			"Present",
+			"Absent",
 		]);
 	});
 
 	await test.step("a student who dropped stays, marked, with the attendance they had", async () => {
 		await expectRow(page, "Gus Gone", [
-			"Present",
-			"Absent",
-			"Absent",
 			"1",
 			"3",
 			"33%",
+			"Present",
+			"Absent",
+			"Absent",
 		]);
 		await expect(
 			page.getByRole("row").filter({ hasText: "Gus Gone" }),
@@ -417,7 +417,7 @@ function studentRow(page: Page, name: string): Locator {
 	return page.getByRole("row").filter({ hasText: name });
 }
 
-/// Asserts the meeting, present, total and percent cells of `name`'s row.
+/// Asserts the present, total, percent and meeting cells of `name`'s row.
 async function expectRow(page: Page, name: string, cells: string[]) {
 	const row = page.getByRole("row").filter({ hasText: name });
 	const all = row.getByRole("cell");

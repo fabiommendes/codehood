@@ -2,7 +2,8 @@
 /**
  * Students against the course's roll calls: present, absent, or `-` before enrollment.
  *
- * A dropped student is dimmed and labelled.
+ * The totals come right after the name, so they stay in view however many
+ * meetings scroll by. A dropped student is dimmed and labelled.
  */
 import type { CourseAttendance } from "@/db/services/roll-call.service";
 import { formatAttendancePercent } from "@/utils/course-grades";
@@ -25,6 +26,9 @@ const CELL_LABEL = {
     <thead>
       <tr>
         <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">Student</th>
+        <th scope="col" class="max-sm:px-2">Present</th>
+        <th scope="col" class="max-sm:px-2">Total</th>
+        <th scope="col" class="max-sm:px-2">%</th>
         {
           report.events.map((event) => (
             <th scope="col" class="max-sm:px-2" title={event.startAt.toLocaleDateString("en-CA")}>
@@ -32,9 +36,6 @@ const CELL_LABEL = {
             </th>
           ))
         }
-        <th scope="col" class="max-sm:px-2">Present</th>
-        <th scope="col" class="max-sm:px-2">Total</th>
-        <th scope="col" class="max-sm:px-2">%</th>
       </tr>
     </thead>
     <tbody>
@@ -47,14 +48,14 @@ const CELL_LABEL = {
                 <span class="badge badge-ghost badge-sm ml-1">Dropped</span>
               )}
             </td>
+            <td class="max-sm:px-2">{student.present}</td>
+            <td class="max-sm:px-2">{student.total}</td>
+            <td class="max-sm:px-2">{formatAttendancePercent(student.present, student.total)}</td>
             {report.events.map((event) => (
               <td class="max-sm:px-2">
                 {CELL_LABEL[student.cells[`${event.week}/${event.timeSlot}`] ?? "absent"]}
               </td>
             ))}
-            <td class="max-sm:px-2">{student.present}</td>
-            <td class="max-sm:px-2">{student.total}</td>
-            <td class="max-sm:px-2">{formatAttendancePercent(student.present, student.total)}</td>
           </tr>
         ))
       }
