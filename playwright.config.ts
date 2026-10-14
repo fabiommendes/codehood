@@ -2,6 +2,7 @@ import { defineConfig } from "@playwright/test";
 import {
 	TEST_BASE_URL,
 	TEST_DATABASE_URL,
+	TEST_DIST_DIR,
 	TEST_PORT,
 	TEST_RESOURCE_ROOT,
 } from "./test/env";
@@ -23,7 +24,8 @@ export default defineConfig({
 		// `astro dev` refuses a second concurrent instance for the project (see AGENTS.md:
 		// agents run one in the background), so tests build once and run the standalone
 		// Node adapter server on its own port instead.
-		command: "node_modules/.bin/astro build && node dist/server/entry.mjs",
+		// Each run builds into its own directory under `test/.tmp/<port>/`.
+		command: `node_modules/.bin/astro build --outDir ${TEST_DIST_DIR} && node ${TEST_DIST_DIR}/server/entry.mjs`,
 		url: TEST_BASE_URL,
 		reuseExistingServer: false,
 		timeout: 60_000,

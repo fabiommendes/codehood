@@ -147,6 +147,9 @@
 
 ### Fixed
 
+- Two test runs at once no longer break each other's page tests: each run
+  builds the server into its own `test/.tmp/<port>/dist`.
+
 - An action on something that does not exist, or that the actor may not see,
   answers 404 instead of 400.
 - Accepting an invite with a username, email, GitHub username or school id

@@ -3,10 +3,10 @@ import { fileURLToPath } from "node:url";
 import { DEFAULT_TEST_PORT } from "./default-port";
 
 /**
- * Everything one test run must not share with another: its port, its database
- * and its blob directory.
+ * Everything one test run must not share with another: its port, its database,
+ * its blob directory and its server build.
  *
- * All three are derived from `TEST_PORT`, so two runs on two ports never touch
+ * All of them are derived from `TEST_PORT`, so two runs on two ports never touch
  * each other's files. `test/run.ts` picks a free port and exports it before
  * launching Playwright; `playwright.config.ts` and the worker processes read
  * the same value back out of the environment.
@@ -24,6 +24,10 @@ const TEST_TMP_DIR = path.resolve(
 	".tmp",
 	String(TEST_PORT),
 );
+
+/// Where the server under test is built, so a second run's build does not
+/// replace the chunks the first run's server is loading.
+export const TEST_DIST_DIR = path.join(TEST_TMP_DIR, "dist");
 
 export const TEST_DB_PATH = path.join(TEST_TMP_DIR, "test.db");
 export const TEST_DATABASE_URL = `file:${TEST_DB_PATH}`;
