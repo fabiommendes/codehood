@@ -303,6 +303,8 @@ export class CalendarEventService extends CrudBase<{
 	 * Removes the row outright — events are never archived (FR-CAL-014).
 	 *
 	 * A subsequent `findOne` returns `null`.
+	 *
+	 * @throws {@link NotAllowed} With status 409 if the event has a roll call.
 	 */
 	@Validate({ service: true, args: [undefined, calendarEventPK] })
 	protected async deleteTx(
@@ -316,6 +318,12 @@ export class CalendarEventService extends CrudBase<{
 			opts.actor,
 			"calendar-event.delete",
 		);
+		if ((await tx.rollCall.count({ where: { eventId: current.id } })) > 0) {
+			throw new NotAllowed("calendar-event.delete", {
+				status: 409,
+				message: "The event has a roll call; delete the roll call first",
+			});
+		}
 		await tx.calendarEvent.delete({ where: { id: current.id } });
 	}
 }

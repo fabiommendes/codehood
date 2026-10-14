@@ -21,6 +21,7 @@ import { PassphraseService } from "./services/passphrase.service";
 import { QuestionService } from "./services/question.service";
 import { ResourceService } from "./services/resource.service";
 import { ResponseService } from "./services/response.service";
+import { RollCallService } from "./services/roll-call.service";
 import { SessionService } from "./services/session.service";
 import { SubmissionService } from "./services/submission.service";
 import { TimeSlotService } from "./services/time-slot.service";
@@ -164,6 +165,14 @@ export type {
 } from "./services/response.service";
 export { PRACTICE_SESSION_WINDOW_MS } from "./services/response.service";
 export type {
+	CourseAttendance,
+	RollCall,
+	RollCallCreate,
+	RollCallFilter,
+	RollCallPK,
+	RollCallUpdate,
+} from "./services/roll-call.service";
+export type {
 	Session,
 	SessionCreate,
 	SessionCreateResult,
@@ -218,6 +227,7 @@ export const db = {
 	question: new QuestionService(),
 	resource: new ResourceService(attachmentService),
 	response: new ResponseService(),
+	rollCall: new RollCallService(),
 	session: new SessionService(),
 	submission: new SubmissionService(),
 	timeSlot: new TimeSlotService(),

@@ -27,6 +27,7 @@ export {
 	type QuestionRefId,
 	type ResourceId,
 	type ResponseId,
+	type RollCallId,
 	type SessionId,
 	type Slug,
 	type SlugHash,
@@ -50,6 +51,7 @@ export * from "./passphrase";
 export * from "./question";
 export * from "./resource";
 export * from "./response";
+export * from "./roll-call";
 export * from "./session";
 export * from "./submission";
 export * from "./time-slot";

@@ -143,3 +143,149 @@ matriculado depois do `startAt` da 3 e presente na 3)
 **Cortados**: R14 (não observável), R16 (garantido pelo whitelist de
 saída), R17 (removido pelo Zod), busca por chave natural (mesmo resolver de
 `calendarEvent`), curso sem chamadas (trivial).
+
+## T4: check-in
+
+Assinatura (adotada):
+
+```ts
+/** Marks the actor present with a code typed or scanned now. */
+checkIn(input: { code: string; rollCallId?: RollCallId; deviceId: string },
+        opts: ServiceOpts): Promise<CheckInResult>;
+/** Completes a check-in whose code was verified at `claimedAt`, after login or signup. */
+checkInClaim(input: { rollCallId: RollCallId; claimedAt: Date; deviceId: string;
+                      accountCreated: boolean }, opts: ServiceOpts): Promise<CheckInResult>;
+type CheckInResult = { rollCall: RollCallPK; title: string; startAt: Date; joined: AttendanceJoin | null };
+class CheckInError extends Error {
+  code: "invalid-code" | "expired" | "closed" | "not-enrolled" | "dropped" | "not-student" | "claim-expired"
+}
+// src/utils/pending-check-in.ts
+signClaim(claim: { rollCallId; claimedAt: Date }, key: string): string;
+readClaim(cookie: string, key: string, now: Date): Claim | null;
+// src/utils/rate-limit.ts
+createLimiter({ max, windowMs }): { blocked(key, now): boolean; fail(key, now): void };
+```
+
+- `deviceId` é o valor cru do cookie; o hash é feito no service.
+- O cookie pendente vale 10 min a partir do scan, mesmo que a chamada tenha
+  fechado nesse meio-tempo.
+- Limite: 10 erros por 10 min por chave (`user:<u>` e `ip:<ip>`). Chave
+  bloqueada recusa até o código certo.
+
+`test/roll-call-check-in.spec.ts` (prefixo `rci-`). Cenário: chamada aberta,
+segredo lido via prisma, `code = codeAt(secret, new Date())`.
+
+- **T4-01.** R3. Matriculado, `checkIn({code, rollCallId})`: linha CODE,
+  `joined: null`; resultado com `title` e `startAt` do evento.
+- **T4-02.** R3. Código de `now-60s`: `expired`, nenhuma linha.
+- **T4-03.** R2. `closesAt = now-5s` e código atual: `closed` (fechada vence
+  a tolerância).
+- **T4-04.** R4. Código digitado sem `rollCallId`, duas chamadas abertas de
+  cursos diferentes: presença na certa. Com a chamada fechada:
+  `invalid-code`.
+- **T4-05.** R4. Duas chamadas abertas com o mesmo `secret`, aluno só em B:
+  presença em B, não `not-enrolled` vindo de A.
+- **T4-06.** R8. DROPPED, mesmo com `actsAsInvite`: `dropped`; matrícula
+  continua DROPPED.
+- **T4-07.** R24. Sem matrícula, `actsAsInvite` desligado: `not-enrolled`,
+  sem linha nem matrícula.
+- **T4-08.** R24. Professor do curso e admin: `not-student`.
+- **T4-09.** R7. `actsAsInvite`, usuário existente sem matrícula: matrícula
+  ACTIVE, `joined: ENROLLMENT`.
+- **T4-10.** R7. Já matriculado com `actsAsInvite`: `joined: null`.
+- **T4-11.** R7. `checkInClaim` com `accountCreated: true`: matriculado,
+  `joined: ACCOUNT`. Com `actsAsInvite` desligado: `not-enrolled`.
+- **T4-12.** Segundo `checkIn` do mesmo aluno, outro `deviceId`: sem erro, 1
+  linha, `createdAt` e `deviceHash` do primeiro.
+- **T4-13.** Aluno com MANUAL e nota faz `checkIn`: continua MANUAL com a
+  nota.
+- **T4-14.** Aluno com `joined: ENROLLMENT` repete: `joined` mantido.
+- **T4-15.** R9. A e B com o mesmo `deviceId`: `deviceHash` ≠ `deviceId` e
+  igual nos dois; professor vê um no `sharedWith` do outro.
+
+`test/pending-check-in.spec.ts` (puro):
+
+- **T4-16.** R6. `readClaim(signClaim(c), key, at + 9:59)` = `c`; `at +
+  10:00` = `null`.
+- **T4-17.** R6. Byte alterado ou outra chave: `null`.
+- **T4-18.** R6. `checkInClaim` com `claimedAt = now-9min`, código expirado
+  e chamada fechada: presença criada. `now-11min`: `claim-expired`.
+
+`test/rate-limit.spec.ts` (puro):
+
+- **T4-19.** R5. 10 `fail` deixam livre; o 11º bloqueia; libera em
+  `primeiro fail + windowMs`.
+- **T4-20.** R5. Bloquear `user:a` não bloqueia `ip:x` nem `user:b`.
+
+Ficam para as histórias de T12: redirecionamento ao login ou cadastro e
+volta, cookies no navegador, mensagens de erro, `/c/...` e `/check-in`,
+texto de confirmação, limite ligado na Action, atalho na página do curso.
+
+## T5: REST → `test/api-roll-call.spec.ts`
+
+Arranjo pelos services, ação por `request` com `tokenFor`, estilo de
+`test/api-grade-column.spec.ts`.
+
+- **T5-01.** R22. GET da coleção (professor): itens com `week`, `timeSlot` e
+  `attendances` por username (contrato da CLI, R30).
+- **T5-02.** R15. PATCH `{attendances: {B: {}, A: null}}` com C presente: B
+  MANUAL, A apagado, C intacto.
+- **T5-03.** R18. PATCH com username sem matrícula: 400 `invalid-data`, nada
+  gravado.
+- **T5-04.** R13. DELETE `calendar-event/5/mon` com chamada: 409, evento
+  continua. DELETE `roll-call/5/mon` e depois do evento: 2xx.
+- **T5-05.** R24. Aluno: GETs trazem só a própria chave ou linha; PATCH e
+  DELETE dão 403.
+- **T5-06.** R24. Usuário sem relação: `/attendance` 403; curso inexistente
+  404.
+- **T5-07.** R23. `openapi.json` só tem GET, PATCH e DELETE sob `roll-call`,
+  nada de open, close, code ou check-in; POST na coleção dá 404 ou 405.
+
+A REST não expõe `id` nem `courseId`; `test/api-no-raw-ids.spec.ts` já
+cobre.
+
+## T7: CSV → `test/attendance-csv.spec.ts` (puro)
+
+Funções puras no molde de `gradesCsvRows` (`src/services/grades-table.ts`):
+`attendanceCsvRows(report)` e `attendancePercent(present, total)`, usadas
+pela página, pelo CSV e pela coluna de `/grades`.
+
+- **T7-01.** R28. Cabeçalho `username, name, schoolId, status`, uma coluna
+  `${week}/${timeSlot}` por evento na ordem de `report.events`, depois
+  `present, total, %`.
+- **T7-02.** R20, R28. `present`/`absent`/`before-enrollment` saem `1`/`0`/`-`;
+  DROPPED sai `dropped`.
+- **T7-03.** R20. 1 de 3 com um `-` dá 33.33; `total: 0` dá célula vazia, sem
+  `NaN`.
+
+## T10: CLI (pytest)
+
+`ServerEvent` ganha `attendances: int | None`, preenchido pelo preflight a
+partir de `GET .../roll-call`.
+
+`cli/tests/test_push_plan.py`:
+
+- **T10-01.** R31. Servidor com `(5, mon)` e 32 presenças, local sem a aula:
+  nenhum `DeleteCalendarEvent`, e `WarnEventHasRollCall(5, "mon", 32)`.
+- **T10-02.** R31. Mesmo com 0 presenças: avisa.
+- **T10-03.** R31. Local sem o slot `mon`: nenhum `DeleteTimeSlot("mon")`.
+- **T10-04.** R32. `drop_roll_calls=True`: `DeleteRollCall` antes de
+  `DeleteCalendarEvent`, ambos antes de `DeleteTimeSlot`; sem aviso.
+- **T10-05.** R31. Aula com chamada ainda local, conteúdo mudado:
+  `UpsertCalendarEvent`, sem aviso.
+
+`cli/tests/test_cli_push.py` (FakeServer):
+
+- **T10-06.** R30, R31. Sem flag: saída com "5/mon", "32" e
+  `--drop-roll-calls`; nenhum DELETE; exit 0.
+- **T10-07.** R32. Com flag: DELETE `roll-call/5/mon` antes do de
+  `calendar-event/5/mon`.
+- **T10-08.** R32. `--drop-roll-calls --no-prune`: os dois deletes pulados
+  (`DeleteRollCall` em `PRUNE_OPS`).
+
+`cli/tests/test_cli_attendance.py`, no molde de `cli/tests/test_cli_grades.py`:
+
+- **T10-09.** R33. Sem `--csv`: tabela com DROPPED e `-`, sem arquivo.
+- **T10-10.** R28, R33. `--csv out.csv`: igual byte a byte ao fixture de
+  T7-01 a T7-03.
+- **T10-11.** R33. Curso sem chamadas: mensagem clara, exit 0.

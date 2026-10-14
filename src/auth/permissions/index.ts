@@ -47,6 +47,7 @@ type ExtraPerms =
 	| "course.update-contents"
 	| "question.read-public"
 	| "response.submit"
+	| "roll-call.manage"
 	| "api-key.manage"
 	| "session.manage"
 	| "enrollment.manage"
@@ -313,6 +314,17 @@ const PERMISSIONS = {
 		other: (actor, target) => isCourseOwner(actor, target),
 		audit: auditCourse,
 	} satisfies PermDef<CourseWithEnrollment>,
+
+	// ROLL CALL -----------------------------------------------------------------
+	// Rule: SYSTEM, any admin, or the course's own instructor opens, closes,
+	// edits, deletes and projects a roll call. Unlike `course.update-contents`,
+	// an admin who does not teach the course holds this right too. A student
+	// only reads their own attendance, which `course.read-contents` covers.
+	"roll-call.manage": {
+		admin: true,
+		other: (actor, target) => isCourseOwner(actor, target),
+		audit: auditCourse,
+	} satisfies PermDef<CourseTarget>,
 
 	// QUESTION ------------------------------------------------------------------
 	// Rule: the whole document goes to whoever may write it — identical to
