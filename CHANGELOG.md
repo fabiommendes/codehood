@@ -4,6 +4,15 @@
 
 ### Added
 
+- Releases and deployment. `pnpm run release` writes the release's migration
+  and checks it for dropped tables and columns, runs lint and tests, bumps the
+  version and tags it. `pnpm run package` builds a tag into a tarball that a
+  server runs after a production `pnpm install`, optionally rehearsing the
+  migrations on a copy of the production database first. Migrations are now
+  written once per release; development keeps using `db push`. The management
+  CLI also ships bundled as `dist/manage.mjs`. A build-time `PUBLIC_URL` makes
+  the server trust its reverse proxy's `X-Forwarded-*` headers, without which
+  form posts failed the origin check behind HTTPS.
 - Roll call. During class the instructor opens the roll call of a meeting
   from the schedule, or from the course home while the meeting is on, and
   projects a QR code with a code that changes every 15 s and is accepted
