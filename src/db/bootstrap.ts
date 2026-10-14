@@ -1,6 +1,7 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
-import { type Course, db, type User } from "@/db";
+import { type CalendarEvent, type Course, db, type User } from "@/db";
+import { prisma } from "@/db/client";
 import { localDateOf, toInstant } from "@/utils/schedule-time";
 
 const DEV_ADMIN_USERNAME = "admin";
@@ -131,6 +132,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		name: "Edsger Dijkstra",
 		role: "STUDENT",
 		password: "dijkstra",
+	});
+	const wirth = await demoUser({
+		email: "wirth@codehood.local",
+		username: "wirth",
+		name: "Niklaus Wirth",
+		role: "STUDENT",
+		password: "wirth",
 	});
 
 	for (const discipline of [
@@ -888,6 +896,14 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedOpenQuiz(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
+	await seedRollCalls(cs101.id, {
+		hopper,
+		hamilton,
+		liskov,
+		bob,
+		dijkstra,
+		wirth,
+	});
 
 	// A quiz two weeks from the day the seed runs, so the calendar's upcoming
 	// list always has an exam in it.
@@ -914,6 +930,185 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		`[dev] created demo courses cs101/${ada.username}_2026-1 and cs201/${alan.username}_2026-1.`,
 	);
 }
+
+/// Roll calls on three past cs101 meetings, covering the attendance states the grid shows.
+///
+/// Enrollment dates and attendance sources are set directly, because the services
+/// only create enrollments at the current time and only record manual entries.
+async function seedRollCalls(
+	course: Course["id"],
+	students: Record<
+		"hopper" | "hamilton" | "liskov" | "bob" | "dijkstra" | "wirth",
+		User
+	>,
+): Promise<void> {
+	const existing = await db.rollCall.findMany({ course }, FULL_ACCESS);
+	if (existing.length > 0) return;
+
+	const DAY_MS = 24 * 3600 * 1000;
+	const first = await eventAt(course, 1, "mon");
+	const second = await eventAt(course, 2, "mon");
+	const third = await eventAt(course, 3, "wed");
+
+	// Enrolled before the course starts, so the first meeting counts for them.
+	for (const student of [
+		students.hopper,
+		students.hamilton,
+		students.liskov,
+		students.dijkstra,
+	]) {
+		await setEnrollmentDate(
+			course,
+			student.username,
+			new Date(first.startAt.getTime() - DAY_MS),
+		);
+	}
+
+	// Bob enrolls through the second meeting's check-in, after the first one.
+	await setEnrollmentDate(
+		course,
+		students.bob.username,
+		new Date(second.startAt.getTime() + 60_000),
+	);
+
+	// Wirth creates an account and enrolls at the third meeting.
+	await db.enrollment.create(
+		{ course, username: students.wirth.username },
+		FULL_ACCESS,
+	);
+	await setEnrollmentDate(
+		course,
+		students.wirth.username,
+		new Date(third.startAt.getTime() + 60_000),
+	);
+
+	// The first meeting is the only one with a check-in from the dropped student.
+	await seedClosedRollCall(first, {
+		checks: [
+			{ username: "hopper", deviceHash: "device-hopper", minutes: 3 },
+			{ username: "hamilton", deviceHash: "device-hamilton", minutes: 4 },
+			{ username: "liskov", deviceHash: "device-liskov", minutes: 5 },
+			{ username: "dijkstra", deviceHash: "device-dijkstra", minutes: 6 },
+		],
+	});
+
+	// Two students share a device; bob joins through this check-in.
+	await seedClosedRollCall(second, {
+		actsAsInvite: true,
+		checks: [
+			{ username: "hopper", deviceHash: "device-shared", minutes: 2 },
+			{ username: "liskov", deviceHash: "device-shared", minutes: 4 },
+			{ username: "hamilton", deviceHash: "device-hamilton", minutes: 3 },
+			{
+				username: "bob",
+				deviceHash: "device-bob",
+				joined: "ENROLLMENT",
+				minutes: 5,
+			},
+		],
+	});
+
+	// Wirth joins through this check-in and gets an account; hamilton's absence is covered by a manual entry.
+	await seedClosedRollCall(third, {
+		actsAsInvite: true,
+		checks: [
+			{ username: "hopper", deviceHash: "device-hopper", minutes: 2 },
+			{ username: "bob", deviceHash: "device-bob", minutes: 3 },
+			{
+				username: "wirth",
+				deviceHash: "device-wirth",
+				joined: "ACCOUNT",
+				minutes: 4,
+			},
+		],
+		manual: { username: "hamilton", note: "atestado" },
+	});
+}
+
+/// Finds the cs101 event in a week and slot, or fails loudly when the demo calendar lacks it.
+async function eventAt(
+	course: Course["id"],
+	week: number,
+	slot: string,
+): Promise<CalendarEvent> {
+	const event = await db.calendarEvent.findOne(
+		{ course, week, timeSlot: slot },
+		FULL_ACCESS,
+	);
+	if (!event) {
+		throw new Error(
+			`[seed] no event in course ${course}, week ${week}, ${slot}`,
+		);
+	}
+	return event;
+}
+
+/// Sets when an enrollment was created, which decides whether a meeting counts as before it.
+async function setEnrollmentDate(
+	course: Course["id"],
+	username: string,
+	createdAt: Date,
+): Promise<void> {
+	await prisma.enrollment.update({
+		where: { username_courseId: { username, courseId: course } },
+		data: { createdAt },
+	});
+}
+
+/// Opens a roll call on a past event, then sets its window to close 15 minutes after the meeting starts.
+///
+/// Check-ins are stored as code-sourced attendances, and an optional manual entry is added through the service.
+async function seedClosedRollCall(
+	event: CalendarEvent,
+	options: {
+		actsAsInvite?: boolean;
+		checks?: CodeCheck[];
+		manual?: { username: string; note: string };
+	},
+): Promise<void> {
+	const { id } = await db.rollCall.create(
+		{ event: { id: event.id }, actsAsInvite: options.actsAsInvite ?? false },
+		FULL_ACCESS,
+	);
+	const at = (minutes: number) =>
+		new Date(event.startAt.getTime() + minutes * 60_000);
+
+	await prisma.rollCall.update({
+		where: { id },
+		data: { closesAt: at(15) },
+	});
+	for (const check of options.checks ?? []) {
+		await prisma.attendance.create({
+			data: {
+				rollCallId: id,
+				username: check.username,
+				source: "CODE",
+				deviceHash: check.deviceHash,
+				joined: check.joined ?? null,
+				createdAt: at(check.minutes),
+			},
+		});
+	}
+	if (options.manual) {
+		await db.rollCall.update(
+			{ id },
+			{
+				attendances: {
+					[options.manual.username]: { note: options.manual.note },
+				},
+			},
+			FULL_ACCESS,
+		);
+	}
+}
+
+/// A code check-in seeded into a roll call; `minutes` is the offset from the meeting start.
+type CodeCheck = {
+	username: string;
+	deviceHash: string;
+	joined?: "ENROLLMENT" | "ACCOUNT";
+	minutes: number;
+};
 
 /// A released number column and a hidden label column; `bob` has no value in either, and the dropped `dijkstra` only one.
 async function seedGradeColumns(
