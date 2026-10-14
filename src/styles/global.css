@@ -168,7 +168,9 @@ h6 {
 }
 
 [data-theme="codehood-dark"]
-	.brand-logo:not(:where([data-theme="codehood-dark"] [data-theme="codehood"] *)) {
+	.brand-logo:not(
+		:where([data-theme="codehood-dark"] [data-theme="codehood"] *)
+	) {
 	--lp-c: #3d7fe6;
 	--lp-o1: #e2603f;
 	--lp-d1: #f2b800;
@@ -185,7 +187,9 @@ h6 {
 }
 
 [data-theme="codehood-dark"]
-	.brand-logo.is-small:not(:where([data-theme="codehood-dark"] [data-theme="codehood"] *)) {
+	.brand-logo.is-small:not(
+		:where([data-theme="codehood-dark"] [data-theme="codehood"] *)
+	) {
 	--lp-c: #5a95f0;
 	--lp-o1: #e8704f;
 	--lp-e: #5cbf4b;
