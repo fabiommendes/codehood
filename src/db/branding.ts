@@ -60,6 +60,7 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "id", from: "number", to: "ResponseId" },
 		{ field: "examId", from: "number", to: "ExamId" },
 	],
+	RollCall: [{ field: "id", from: "number", to: "RollCallId" }],
 	Session: [{ field: "id", from: "number", to: "SessionId" }],
 	Submission: [
 		{ field: "id", from: "number", to: "SubmissionId" },

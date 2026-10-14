@@ -22,7 +22,7 @@ Termos novos para o glossário: **Roll call** (a chamada de uma aula) e
 ### Mecanismo
 
 - **R1.** Uma chamada por `CalendarEvent`, aberta pelo professor. Não abre em
-  eventos dos tipos holiday, recess ou cancelled.
+  eventos dos tipos HOLIDAY ou CANCELLED.
 - **R2.** A chamada fica aberta 15 min a partir da abertura. O professor pode
   fechar antes e reabrir quantas vezes quiser; cada reabertura dá mais 15 min
   a partir de agora. Continua sendo o mesmo registro.

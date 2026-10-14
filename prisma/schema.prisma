@@ -73,6 +73,7 @@ model User {
   exams            Exam[]
   feedbacks        Feedback[]
   gradeValues      GradeValue[]
+  attendances      Attendance[]
 }
 
 model Group {
@@ -446,12 +447,73 @@ model CalendarEvent {
   rev String?
 
   resources Resource[]
+  rollCall  RollCall?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([courseId, week, timeSlotId])
   @@index([courseId, startAt])
+}
+
+/// The roll call of one calendar event, opened by the instructor during class.
+model RollCall {
+  id Int @id @default(autoincrement())
+
+  eventId Int           @unique
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// Random key the rotating codes are derived from. Never leaves the server.
+  secret String
+
+  /// Whether a check-in also enrolls the student, or creates the account.
+  actsAsInvite Boolean @default(false)
+
+  /// End of the current window. Closing early sets it to now; reopening
+  /// pushes it 15 min ahead.
+  closesAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendances Attendance[]
+}
+
+/// One student marked present in a roll call. Absence is the lack of a row.
+model Attendance {
+  id Int @id @default(autoincrement())
+
+  rollCallId Int
+  rollCall   RollCall @relation(fields: [rollCallId], references: [id], onDelete: Cascade)
+
+  username String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  source AttendanceSource
+
+  /// Hash of the per-browser device cookie. Null for manual entries.
+  deviceHash String?
+
+  /// Set when this check-in created the enrollment or the account.
+  joined AttendanceJoin?
+
+  /// Free text from a manual entry, e.g. "atestado".
+  note String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([rollCallId, username])
+  @@index([rollCallId, deviceHash])
+}
+
+enum AttendanceSource {
+  CODE
+  MANUAL
+}
+
+enum AttendanceJoin {
+  ENROLLMENT
+  ACCOUNT
 }
 
 enum ResourceType {

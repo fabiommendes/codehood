@@ -55,6 +55,9 @@ export type SubmissionId = z.infer<typeof submissionId>;
 export const resourceId = z.number().int().brand("ResourceId");
 export type ResourceId = z.infer<typeof resourceId>;
 
+export const rollCallId = z.number().int().brand("RollCallId");
+export type RollCallId = z.infer<typeof rollCallId>;
+
 export const sessionId = z.number().int().brand("SessionId");
 export type SessionId = z.infer<typeof sessionId>;
 

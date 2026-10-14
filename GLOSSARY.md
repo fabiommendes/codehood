@@ -53,6 +53,12 @@ under, and the [User](#user) charged for the bytes. The owner is polymorphic,
 so a new kind of owner needs no change to blob storage. The last attachment
 leaving a blob makes it collectable.
 
+## Attendance
+
+Type: domain
+
+One student's presence in a [Roll call](#roll-call). Absence is the lack of one.
+
 ## Blob
 
 Also: file, bytes
@@ -357,6 +363,13 @@ Type: domain
 The account-wide permission level — [Admin](#admin), [Instructor](#instructor),
 or [Student](#student) — fixed by the [Invite](#invite) that created the
 account. Per-course authority is decided by ownership and [Enrollment](#enrollment).
+
+## Roll call
+
+Type: domain
+
+The attendance check of one [Event](#event), opened by the instructor during
+class, with a rotating code students enter to be marked present.
 
 ## RPC API
 
