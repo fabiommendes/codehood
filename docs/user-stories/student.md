@@ -250,3 +250,34 @@ Student enrolled in the wrong course, or dropped it for real. They leave it
 themselves and it disappears from their course list. They cannot drop anyone
 else, and leaving does not destroy the work they already submitted, so an
 instructor who re-enrolls them restores access to it.
+
+
+## Attendance
+
+### Check in to class
+
+    status: todo
+    url: /check-in
+
+Student is in the lecture and the instructor projects a QR code. They scan it
+and are marked present. If they are logged out, they log in first and come back
+to the confirmation. A code that is mistyped or that has already rotated away
+is refused with a message that says which.
+
+Another meeting's code can be typed at the check-in page instead. Afterwards
+the course home shows how many of the roll calls they attended, and the
+Schedule tab marks each past meeting that had one as present or absent. The
+attendance page shows only their own row.
+
+
+### Join the class through the roll call
+
+    status: todo
+    url: /c/[rollCallId]/[code]
+
+Instructor opened the roll call as an invite, so the code on the projector also
+works as the class's join link. A student with an account but no enrollment is
+enrolled and marked present by scanning it. A student with no account fills in
+the sign-up form on the same page and ends up with an account, an enrollment
+and the attendance. A roll call that is not an invite refuses someone who is not
+in the course. The instructor sees the newcomers flagged as new in this class.

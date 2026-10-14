@@ -300,3 +300,39 @@ CLI as grade columns. The Grades tab shows the pushed columns after the exams,
 each marked "Hidden" until they release it. "Release" asks for confirmation and
 cannot be undone. From then on every student sees their own value, and a later
 push of the column reaches them at once.
+
+
+## Attendance
+
+### Take the roll call in class
+
+    status: todo
+    url: /[discipline]/[course]/schedule
+
+Instructor is in the middle of a lecture and wants the class marked present
+without a quiz. From the Schedule tab they open the roll call of that meeting; a
+holiday offers no such button. They put the projection on the screen, a large QR
+code with a code in text that keeps changing, and watch students appear on the
+roll call page as they check in.
+
+Students who cannot check in, because of a dead phone or a doctor's note, are
+marked present by hand with a note. When two students checked in from the same
+browser, both rows say so; nothing is blocked, and the instructor removes the
+one who was not really there. Closing the roll call refuses any further
+check-in, and reopening it gives the class another 15 minutes.
+
+
+### Read the course's attendance
+
+    status: todo
+    url: /[discipline]/[course]/attendance
+
+Instructor wants to know who has been showing up. The Grades tab shows each
+student's attendance percentage, and its header leads to the attendance page: a
+table of students against the meetings that had a roll call, with present,
+absent, and `-` for a meeting held before the student enrolled. That meeting
+still counts as an absence in the total. A student who dropped the course stays
+on the table, dimmed, with the attendance they had.
+
+"Download CSV" saves the same table for a spreadsheet, with `1`, `0` and `-` in
+the meeting columns.
