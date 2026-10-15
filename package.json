@@ -1,7 +1,7 @@
 {
 	"name": "codehood-server",
 	"type": "module",
-	"version": "0.0.2",
+	"version": "0.1.0",
 	"private": true,
 	"license": "AGPL-3.0-or-later",
 	"description": "Server for Codehood, an LMS for geeky types.",
