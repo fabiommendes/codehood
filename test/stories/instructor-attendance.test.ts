@@ -19,6 +19,7 @@ import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
  *     the meeting title.
  *   - Eligible meetings (not holiday, not cancelled) hold a button "Roll call"
  *     when they have no roll call yet, and a link "Roll call" when they do.
+ *     The button shows only on the meeting's day, until the meeting ends.
  *   - The button opens a dialog with a checkbox "Counts as an invite"
  *     (unchecked) and a button "Open roll call". Submitting lands on the
  *     management page.
@@ -88,9 +89,14 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	const slot = await persistedTimeSlotFactory.create({
 		course: course.id,
 		day: futureDate(0).day,
+		// All day long, so today's meeting is running whenever the test runs.
+		start: { hour: 0, minute: 0 },
+		duration: { hours: 23, minutes: 59 },
 	});
-	await calendarEvent(course.id, slot.id, 0, "ia-Pointers");
-	await calendarEvent(course.id, slot.id, 1, "ia-Spring break", "HOLIDAY");
+	// The course started four weeks ago, so week 4 meets today.
+	await calendarEvent(course.id, slot.id, 3, "ia-Arrays");
+	await calendarEvent(course.id, slot.id, 4, "ia-Pointers");
+	await calendarEvent(course.id, slot.id, 5, "ia-Spring break", "HOLIDAY");
 
 	const ana = await enrolledStudent(course.id, "ia-ana", "Ana Prado");
 	const bia = await enrolledStudent(course.id, "ia-bia", "Bia Lima");
@@ -111,6 +117,14 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 		);
 	});
 
+	await test.step("a past meeting offers no roll call", async () => {
+		const past = meeting(page, "ia-Arrays");
+		await expect(past).toBeAttached();
+		await expect(past.getByRole("button", { name: "Roll call" })).toHaveCount(
+			0,
+		);
+	});
+
 	await test.step("opening the roll call of a meeting lands on its page", async () => {
 		await meeting(page, "ia-Pointers")
 			.getByRole("button", { name: "Roll call" })
@@ -121,7 +135,7 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 		).not.toBeChecked();
 		await dialog.getByRole("button", { name: "Open roll call" }).click();
 
-		await expect(page).toHaveURL(`${href}/roll-call/0/${slot.slug}`);
+		await expect(page).toHaveURL(`${href}/roll-call/4/${slot.slug}`);
 		await expect(
 			page.getByRole("heading", { name: "ia-Pointers" }),
 		).toBeVisible();

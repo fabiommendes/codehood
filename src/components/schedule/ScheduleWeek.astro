@@ -6,6 +6,7 @@ import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import type { CalendarEventId } from "@/core/schemas";
 import type { Resource } from "@/db";
 import type { CalendarEntry } from "@/services/calendar-entries";
+import { rollCallOpenable } from "@/services/roll-call-window";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { renderMarkdown } from "@/utils/markdown";
@@ -40,13 +41,8 @@ const {
 	attendance = new Map<string, "present" | "absent">(),
 } = Astro.props;
 
-/// How long before a meeting starts its roll call may be opened.
-const ROLL_CALL_LEAD_MS = 60 * 60 * 1000;
-
-/// Whether a meeting is near or past enough to open its roll call.
-function rollCallOpenable(entry: CalendarEntry): boolean {
-	return entry.startAt.getTime() <= Date.now() + ROLL_CALL_LEAD_MS;
-}
+/// The instant the page is rendered, which decides the meetings offering a roll call.
+const now = new Date();
 
 /// The key a meeting's roll call is known by.
 function rollCallKey(event: { week: number; timeSlot: { slug: string } }) {
@@ -156,7 +152,7 @@ function faded(entry: CalendarEntry): boolean {
                   >
                     Roll call
                   </a>
-                ) : rollCallOpenable(entry) && (
+                ) : rollCallOpenable(entry, now) && (
                   <OpenRollCallDialog
                     client:load
                     discipline={rollCallManager.discipline}

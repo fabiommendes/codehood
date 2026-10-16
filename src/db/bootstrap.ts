@@ -2,7 +2,12 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
 import { prisma } from "@/db/client";
-import { localDateOf, toInstant } from "@/utils/schedule-time";
+import {
+	localDateOf,
+	slotInstant,
+	toInstant,
+	weekdayOf,
+} from "@/utils/schedule-time";
 
 const DEV_ADMIN_USERNAME = "admin";
 const DEV_ADMIN_EMAIL = "admin@codehood.local";
@@ -535,6 +540,39 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				title: event.title,
 				description: event.description,
 				rev: `demo-upcoming-${event.week}-${event.slot.slug}-v1`,
+			},
+			FULL_ACCESS,
+		);
+	}
+
+	// A meeting on the day the seed runs, late enough to still be ahead, so
+	// the schedule offers to open its roll call.
+	const cs101Today = await db.timeSlot.create(
+		{
+			course: cs101.id,
+			slug: "office-hours",
+			title: "Office hours",
+			day: weekdayOf(new Date()),
+			start: { hour: 22, minute: 0 },
+			duration: { hours: 1, minutes: 59 },
+		},
+		FULL_ACCESS,
+	);
+	const todayWeek = [weeksSoFar - 1, weeksSoFar, weeksSoFar + 1].find(
+		(week) =>
+			week >= 0 &&
+			cs101.startAt &&
+			localDateOf(slotInstant(cs101.startAt, cs101Today.day, week, 22 * 60)) ===
+				localDateOf(new Date()),
+	);
+	if (todayWeek !== undefined) {
+		await db.calendarEvent.create(
+			{
+				course: cs101.id,
+				timeSlot: cs101Today.id,
+				week: todayWeek,
+				title: "Office hours",
+				rev: "demo-office-hours-v1",
 			},
 			FULL_ACCESS,
 		);

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- The schedule offered to open the roll call of past meetings, and of today's
+  only one hour before it started, so in the morning the only button sat on
+  an earlier meeting of the week. The button now shows on the meeting's own
+  day, from midnight until the meeting ends.
+
 ## 0.1.0 (2026-10-15)
 
 ### Added
