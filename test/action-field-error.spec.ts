@@ -55,22 +55,66 @@ test("JS path: a duplicate slug (FieldError from the service) is an input error 
 	]);
 });
 
-test("no-JS path: the page re-render receives an input error for the slug", async ({
-	page,
-}) => {
-	const admin = await seedUser({ role: "ADMIN" });
-	const existing = await persistedDisciplineFactory.create();
-	await logInAs(page, admin);
+/// A browser stops a form with an empty `required` field before it posts, so
+/// the tests that need the server's answer switch the native check off.
+async function submitCreateDiscipline(
+	page: import("@playwright/test").Page,
+	slug: string,
+	name: string,
+) {
 	await page.goto("/admin/disciplines");
-	await fillField(page, "Slug", existing.slug);
-	await fillField(page, "Name", "Another name");
+	await fillField(page, "Slug", slug);
+	await fillField(page, "Name", name);
+	await page
+		.locator("form")
+		.filter({ has: page.getByRole("button", { name: "New discipline" }) })
+		.evaluate((form: HTMLFormElement) => {
+			form.noValidate = true;
+		});
 	await page.getByRole("button", { name: "New discipline" }).click();
+}
 
-	// Until the page renders field errors, the only observable trace is the
-	// message Astro builds for an input error (a JSON dump of the issues),
-	// which a plain ActionError never has.
-	const alert = page.getByRole("alert").first();
-	await expect(alert).toContainText("Failed to validate");
-	await expect(alert).toContainText("is already taken.");
-	await expect(alert).toContainText('"slug"');
+test.describe("no-JS path: the page re-render shows the error in the field", () => {
+	test.use({ javaScriptEnabled: false });
+
+	test("a duplicate slug from the service", async ({ page }) => {
+		const admin = await seedUser({ role: "ADMIN" });
+		const existing = await persistedDisciplineFactory.create();
+		await logInAs(page, admin);
+		await submitCreateDiscipline(page, existing.slug, "Another name");
+
+		const slug = page.getByRole("group", { name: "Slug", exact: true });
+		await expect(slug).toContainText(
+			`Slug "${existing.slug}" is already taken.`,
+		);
+		await expect(slug.locator("input")).toHaveAttribute("aria-invalid", "true");
+		await expect(slug.locator("input")).toHaveValue(existing.slug);
+		await expect(
+			page.getByRole("group", { name: "Name", exact: true }).locator("input"),
+		).toHaveValue("Another name");
+		await expect(page.getByText("Failed to validate")).toHaveCount(0);
+	});
+
+	test("an invalid slug from the schema", async ({ page }) => {
+		const admin = await seedUser({ role: "ADMIN" });
+		await logInAs(page, admin);
+		await submitCreateDiscipline(page, "Not Valid!", "Whatever");
+
+		const slug = page.getByRole("group", { name: "Slug", exact: true });
+		await expect(slug).toContainText(
+			"Use lowercase letters, digits and hyphens",
+		);
+		await expect(page.getByText("Failed to validate")).toHaveCount(0);
+	});
+
+	test("an empty slug reads Required, not a type error", async ({ page }) => {
+		const admin = await seedUser({ role: "ADMIN" });
+		await logInAs(page, admin);
+		await submitCreateDiscipline(page, "", "Whatever");
+
+		const slug = page.getByRole("group", { name: "Slug", exact: true });
+		await expect(slug).toContainText("Required");
+		await expect(page.getByText("expected string")).toHaveCount(0);
+		await expect(page.getByText("Failed to validate")).toHaveCount(0);
+	});
 });

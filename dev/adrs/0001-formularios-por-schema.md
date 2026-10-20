@@ -59,7 +59,8 @@ ordem: override do formulário, `form.label`, `title`, nome do campo com a
 inicial maiúscula. A dica segue a mesma ordem com `form.hint` e `description`.
 Ponha em `meta` só o que vale para todo formulário que usa o campo. O que muda
 de um formulário para outro vai no override (seção 3). A chave `form` é
-removida do JSON Schema; não precisa de cuidado no OpenAPI.
+removida do OpenRPC e do OpenAPI. Encadeie `.meta()` depois de `.openapi()`:
+o segundo clona o schema e o clone perde o meta.
 
 ### 3. Página `.astro`, sem JS
 
@@ -73,6 +74,7 @@ const result = Astro.getActionResult(actions.admin.createDiscipline);
   schema={disciplineCreate}
   action={actions.admin.createDiscipline}
   result={result}
+  values={await submittedValues(Astro.request)}
   submitLabel="Create"
   fields={{ slug: { label: "Permanent slug" } }}
 />
@@ -83,7 +85,10 @@ Layout próprio, campos gerados:
 ```astro
 ---
 const result = Astro.getActionResult(actions.admin.createDiscipline);
-const form = formState(disciplineCreate, result);
+const form = formState(disciplineCreate, result, {
+  id: "create-discipline", // prefixo dos ids; um por formulário da página
+  values: await submittedValues(Astro.request), // repõe o que foi digitado
+});
 ---
 <form method="POST" action={actions.admin.createDiscipline} class="flex flex-wrap items-end gap-4">
   <FormAlert error={form.error} />
@@ -94,8 +99,11 @@ const form = formState(disciplineCreate, result);
 ```
 
 `form.field(name)` devolve tudo que `<Field>` precisa: o `FieldSpec` derivado
-do schema, o valor enviado e os erros desse campo. `form.error` é o erro que
+do schema, o valor enviado e os erros desse campo. `form.error` é uma `string` com o erro que
 não pertence a nenhum campo (`FORBIDDEN`, `NOT_FOUND`, falha genérica).
+
+`class` em `<Field>` vai para o controle (`input`, `select`...), não para o
+`fieldset`; largura e posição ficam num `div` ao redor.
 
 ### 4. Ilha Solid
 
@@ -140,7 +148,7 @@ lança erro para tipos zod que não reconhece; use `widget` ou escreva o campo.
 ### 7. Aparência
 
 `<Field>` segue `src/pages/design/forms.astro`. Para outra aparência, passe
-`theme`, um mapa de `kind` para componente, em `<Field>` ou em `<SchemaForm>`.
+`theme`, um mapa de `kind` (ou `radio`/`toggle`) para componente, em `<Field>` ou em `<SchemaForm>`.
 
 ## Consequences
 

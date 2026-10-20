@@ -6,6 +6,7 @@ import {
 	humanize,
 } from "@/forms/describe-field";
 import "@/forms/meta";
+import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import {
 	buildOpenRpcDocument,
 	jsonSchemaOf,
@@ -165,4 +166,9 @@ test("the form meta key never reaches generated JSON Schema or OpenRPC", () => {
 	expect(JSON.stringify(json)).not.toContain('"form"');
 	expect(JSON.stringify(json)).toContain('"description":"d"');
 	expect(JSON.stringify(buildOpenRpcDocument())).not.toContain('"form"');
+});
+
+test("the form meta key never reaches the OpenAPI document", () => {
+	const document = buildOpenApiDocument();
+	expect(JSON.stringify(document)).not.toContain('"form"');
 });

@@ -6,7 +6,11 @@ import AdminHeader from "@/components/AdminHeader.astro";
 import DisciplinesTable, {
 	type DisciplineRow,
 } from "@/components/admin/DisciplinesTable";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import { disciplineCreate } from "@/core/schemas";
 import { db } from "@/db";
+import { formState, submittedValues } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -18,6 +22,11 @@ const actor = Astro.locals.actor;
 const createResult = Astro.getActionResult(actions.admin.createDiscipline);
 const updateResult = Astro.getActionResult(actions.admin.updateDiscipline);
 const deleteResult = Astro.getActionResult(actions.admin.deleteDiscipline);
+
+const createForm = formState(disciplineCreate, createResult, {
+	id: "create-discipline",
+	values: await submittedValues(Astro.request),
+});
 
 const disciplines = await db.discipline.findMany({});
 const courses = await db.course.findMany({}, { actor });
@@ -46,13 +55,6 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
     </p>
 
     {
-      createResult?.error && (
-        <div role="alert" class="alert alert-error mt-6">
-          <span>{createResult.error.message}</span>
-        </div>
-      )
-    }
-    {
       createResult && !createResult.error && (
         <div role="alert" class="alert alert-success mt-6">
           <span>Discipline "{createResult.data.slug}" created.</span>
@@ -66,33 +68,15 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
         <form
           method="POST"
           action={actions.admin.createDiscipline}
-          class="mt-2 flex flex-wrap items-end gap-4"
+          class="mt-2 flex flex-wrap items-start gap-4"
         >
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Slug</legend>
-            <input
-              type="text"
-              name="slug"
-              required
-              placeholder="cs102"
-              class="input font-mono"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input
-              type="text"
-              name="name"
-              required
-              placeholder="Computer Science"
-              class="input"
-            />
-          </fieldset>
+          <FormAlert error={createForm.error} class="w-full" />
+          <div class="w-64"><Field {...createForm.field("slug")} class="font-mono" /></div>
+          <div class="w-64"><Field {...createForm.field("name")} /></div>
 
           <button
             type="submit"
-            class="btn btn-square btn-primary"
+            class="btn btn-square btn-primary mt-7"
             aria-label="New discipline"
             title="New discipline"
           >

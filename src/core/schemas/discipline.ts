@@ -4,7 +4,10 @@ import "./base";
 
 export const disciplineSchema = z.object({
 	slug: z.string().min(1),
-	name: z.string().min(1),
+	name: z
+		.string()
+		.min(1)
+		.meta({ form: { placeholder: "Computer Science" } }),
 	createdAt: z.date(),
 });
 
@@ -21,7 +24,11 @@ export const disciplineCreate = disciplineSchema
 				"Use lowercase letters, digits and hyphens, starting with a letter (3 to 32 characters).",
 			)
 			.refine((slug) => !RESERVED_SLUGS.has(slug), "This slug is reserved.")
-			.openapi({ example: "calculus-1" }),
+			.openapi({ example: "calculus-1" })
+			// After `.openapi()`: it clones the schema and the clone would lose the meta.
+			.meta({
+				form: { placeholder: "cs102" },
+			}),
 	});
 
 export const disciplineUpdate = disciplineSchema

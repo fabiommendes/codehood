@@ -243,11 +243,17 @@ A tabela de layout em `AGENTS.md` ganha a linha de `src/forms/`.
 
 ## Questões em aberto
 
-- **Q1. Valores após erro sem JS.** Quando o POST falha, a página renderiza
-  com `getActionResult`, mas o Astro não devolve os valores enviados e os
-  campos voltam vazios. Ler `Astro.request.formData()` na página resolve se o
-  corpo ainda não tiver sido consumido pela action. A T5 investiga e resolve;
-  `formState` aceita os valores enviados quando houver como obtê-los.
+- **Q1. Valores após erro sem JS.** Resolvida. A action lê o corpo em
+  `request.clone()` (`astro/dist/actions/runtime/server.js`), então a página
+  ainda lê `Astro.request.formData()` ao renderizar o POST falho.
+  `submittedValues(Astro.request)` (`src/forms/form-state.ts`) devolve os
+  campos string e `formState(schema, result, { values })` os repõe, só quando o
+  resultado daquela action é um erro e nunca em campo `password`. Coberto por
+  `test/action-field-error.spec.ts`.
+- **Q3. `z.coerce.date()` obrigatório.** Um campo vazio vira `null`, que o
+  coerce transforma em 1970-01-01 sem erro. Nenhum formulário migrado até aqui
+  tem data. Antes de migrar `createEdition`, trocar `startAt` e `endAt` por um
+  schema de data que não coage (`z.iso.date()` mais `transform`).
 - **Q2. Idioma das mensagens.** A UI hoje está em inglês. O mapa de erros
   segue o inglês até existir i18n.
 
