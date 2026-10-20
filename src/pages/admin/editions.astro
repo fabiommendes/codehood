@@ -10,6 +10,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { editionForm } from "@/core/schemas";
 import { db, isEditionOpen } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import { actionForm, submittedValues } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -115,7 +116,7 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
         </div>
       )
     }
-    <FormAlert error={deleteResult?.error?.message} class="mt-6" />
+    <FormAlert error={deleteResult?.error && errorMessage(deleteResult.error)} class="mt-6" />
     {
       deleteResult && !deleteResult.error && (
         <div role="alert" class="alert alert-success mt-6">

@@ -7,6 +7,7 @@ import { actions } from "astro:actions";
 import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
 import { db } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 if (!Astro.locals.actor) return Astro.redirect("/login");
@@ -77,7 +78,7 @@ const hasKey = apiKeys.length > 0;
             manage keys any time from your profile.
           </p>
 
-          <FormAlert error={createApiKeyResult?.error?.message} />
+          <FormAlert error={createApiKeyResult?.error && errorMessage(createApiKeyResult.error)} />
           {
             createApiKeyResult && !createApiKeyResult.error && (
               <div

@@ -1,6 +1,7 @@
 import { actions } from "astro:actions";
 import { createSignal, type JSX, Show } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
+import { errorMessage } from "@/forms/field-errors";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 
@@ -41,7 +42,7 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 		setBusy(false);
 		dialog?.close();
 		if (error) {
-			setFailure(error.message);
+			setFailure(errorMessage(error));
 			return;
 		}
 		setReference(new Date());

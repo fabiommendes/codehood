@@ -1,6 +1,7 @@
 import { actions } from "astro:actions";
 import { createSignal, type JSX } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
+import { errorMessage } from "@/forms/field-errors";
 
 export interface ReleaseGradeColumnProps {
 	/// The course's URL segments and the column slug, as the action takes them.
@@ -36,7 +37,7 @@ export default function ReleaseGradeColumn(
 		setBusy(false);
 		dialog?.close();
 		if (error) {
-			setFailure(error.message);
+			setFailure(errorMessage(error));
 			return;
 		}
 		window.location.reload();

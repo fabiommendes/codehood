@@ -1,4 +1,4 @@
-import { actions } from "astro:actions";
+import { type ActionError, actions } from "astro:actions";
 import {
 	createSignal,
 	For,
@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import FormAlert from "@/components/form/FormAlert";
+import { errorMessage } from "@/forms/field-errors";
 import { createNow, formatCountdown } from "./countdown";
 
 /// One attendance as the roll call actions return it.
@@ -111,7 +112,7 @@ export default function RollCallManager(
 	async function run(
 		call: () => Promise<{
 			data?: Snapshot | undefined;
-			error?: { message: string } | undefined;
+			error?: ActionError | undefined;
 		}>,
 		saved?: string,
 	): Promise<void> {
@@ -120,7 +121,7 @@ export default function RollCallManager(
 		const { data, error } = await call();
 		setBusy(false);
 		if (error) {
-			setFailure(error.message);
+			setFailure(errorMessage(error));
 			return;
 		}
 		if (data) adopt(data, saved);
@@ -145,7 +146,7 @@ export default function RollCallManager(
 		if (error) {
 			setBusy(false);
 			confirmDelete?.close();
-			setFailure(error.message);
+			setFailure(errorMessage(error));
 			return;
 		}
 		window.location.href = props.scheduleHref;

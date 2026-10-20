@@ -8,6 +8,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { userCreateForm } from "@/core/schemas";
 import { db, type User } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -119,7 +120,7 @@ const counts = {
       </div>
     </div>
 
-    <FormAlert error={forceLogoutResult?.error?.message} class="mt-6" />
+    <FormAlert error={forceLogoutResult?.error && errorMessage(forceLogoutResult.error)} class="mt-6" />
     {
       forceLogoutResult && !forceLogoutResult.error && (
         <div role="alert" class="alert alert-success mt-6">

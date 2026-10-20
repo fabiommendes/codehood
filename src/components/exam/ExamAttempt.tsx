@@ -19,6 +19,7 @@ import NumericView from "@/components/question/NumericView";
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
 import type { QuestionPublic } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -172,7 +173,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			const message = await actions.exam
 				.answer({ ...target, question: slug, payload })
 				.then(
-					({ error }) => error?.message ?? null,
+					({ error }) => (error ? errorMessage(error) : null),
 					() => "the connection failed",
 				);
 			if (message === null) {
@@ -216,7 +217,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		setFailure(null);
 		const { error } = await actions.exam.start(target);
 		if (error) {
-			setFailure(error.message);
+			setFailure(errorMessage(error));
 			setBusy(false);
 			return;
 		}
@@ -233,7 +234,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			);
 		} else {
 			const { error } = await actions.exam.finish(target);
-			if (error) setFailure(error.message);
+			if (error) setFailure(errorMessage(error));
 			// The server decides what follows: awaiting grading, or the results.
 			else window.location.reload();
 		}

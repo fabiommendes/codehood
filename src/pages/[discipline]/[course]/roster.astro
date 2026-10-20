@@ -12,6 +12,7 @@ import {
 	passphraseGenerate,
 } from "@/core/schemas";
 import { db } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import { actionForm, formState } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -64,7 +65,7 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 
 	if (error) {
 		inviteError =
-			error.message ||
+			errorMessage(error) ||
 			"You need to be logged in as an instructor to create an invite.";
 	} else {
 		inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
@@ -149,7 +150,7 @@ const csvRows = [
       </p>
 
       <FormAlert error={inviteError ?? undefined} class="mt-4" />
-      <FormAlert error={revokeResult?.error?.message} class="mt-4" />
+      <FormAlert error={revokeResult?.error && errorMessage(revokeResult.error)} class="mt-4" />
       {
         revokeResult && !revokeResult.error && (
           <Alert variant="success" class="mt-4">
@@ -157,7 +158,7 @@ const csvRows = [
           </Alert>
         )
       }
-      <FormAlert error={passphraseResult?.error?.message} class="mt-4" />
+      <FormAlert error={passphraseResult?.error && errorMessage(passphraseResult.error)} class="mt-4" />
 
       <div class="mt-4 flex flex-wrap gap-2">
         <button
@@ -535,6 +536,7 @@ const csvRows = [
 
 <script>
   import { actions } from "astro:actions";
+  import { errorMessage } from "@/forms/field-errors";
 
   const discipline = (
     document.getElementById("course-discipline") as HTMLInputElement
@@ -603,7 +605,7 @@ const csvRows = [
     );
     if (error) {
       if (addStudentError)
-        showError(addStudentError, error.message || "Something went wrong.");
+        showError(addStudentError, errorMessage(error) || "Something went wrong.");
       return;
     }
     if (data.kind === "enrolled") {
@@ -640,7 +642,7 @@ const csvRows = [
       new FormData(passphraseForm),
     );
     if (error) {
-      if (passphraseError) showError(passphraseError, error.message);
+      if (passphraseError) showError(passphraseError, errorMessage(error));
       return;
     }
     if (passphraseValue) {
@@ -676,7 +678,7 @@ const csvRows = [
     });
     if (error) {
       if (inviteError)
-        showError(inviteError, error.message || "Something went wrong.");
+        showError(inviteError, errorMessage(error) || "Something went wrong.");
       return;
     }
     if (inviteUrlInput)
@@ -709,7 +711,7 @@ const csvRows = [
     if (revokeError) revokeError.hidden = true;
     const { error } = await actions.admin.revokeInvite(new FormData(form));
     if (error) {
-      if (revokeError) showError(revokeError, error.message);
+      if (revokeError) showError(revokeError, errorMessage(error));
       return;
     }
     form.closest("[data-invite-id]")?.remove();
