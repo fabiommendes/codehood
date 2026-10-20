@@ -138,9 +138,8 @@ primeiro erro, revalida a cada digitação só os campos que têm erro.
   `accept: "form"`.
 - `busy()` fica `true` após o sucesso: `onSuccess` deve navegar.
 - `control` em `<Field>` passa atributos ao elemento (`inputmode`, `data-*`).
-- Uma ilha não importa o barrel `@/core/schemas`: ele puxa `process` e `Buffer`
-  para o navegador. O schema da ilha vive num módulo que importa só `zod`
-  (`src/core/schemas/answer.ts`) e a ilha o importa direto.
+- Uma ilha pode importar `@/core/schemas`; `test/schemas-browser-safe.spec.ts`
+  garante que o barrel carrega sem `process` nem `Buffer`.
 
 ### 5. Erro que só o servidor detecta
 

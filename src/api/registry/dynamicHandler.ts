@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
-import { NotFound, responseFromException } from "@/core/error";
+import { NotFound } from "@/core/error";
+import { responseFromException } from "@/core/error-server";
 import { type HttpMethods, readPattern } from "./route";
 
 // We must force the imports here to ensure that all routes are registered

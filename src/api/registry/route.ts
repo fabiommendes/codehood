@@ -2,7 +2,8 @@ import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import type { APIContext, AstroCookies } from "astro";
 import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
-import { InvalidData, NotAllowed, responseFromException } from "@/core/error";
+import { InvalidData, NotAllowed } from "@/core/error";
+import { responseFromException } from "@/core/error-server";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
 import { segmentNames, toOpenApiPath } from "./util";
 

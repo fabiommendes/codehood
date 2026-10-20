@@ -1,7 +1,8 @@
 import { type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
-import { InvalidData, NotAllowed, responseFromException } from "@/core/error";
+import { InvalidData, NotAllowed } from "@/core/error";
 import type { ErrorResponse } from "@/core/error-response";
+import { responseFromException } from "@/core/error-server";
 
 /// Actor = User? or User depending if the method is public or not.
 type MaybeActor<IsPublic> = IsPublic extends false

@@ -3,7 +3,7 @@ import { type JSX, Show } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { answerGrade } from "@/core/schemas/answer";
+import { answerGrade } from "@/core/schemas";
 import { FOCUS_KEY } from "./focus";
 
 export interface GradeFormProps {

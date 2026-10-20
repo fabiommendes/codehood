@@ -114,7 +114,7 @@ export const editionSlug = z
 export type EditionSlug = z.infer<typeof editionSlug>;
 
 export const buffer = z
-	.instanceof(Buffer)
+	.custom<Buffer>((v) => Buffer.isBuffer(v), "Expected a Buffer")
 	.openapi({ type: "string", format: "binary" });
 
 /// A wall clock reading, hour and minute, both zero-indexed. Not an instant

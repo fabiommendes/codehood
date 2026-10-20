@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { isPercentScore, SCORE_ERROR } from "../score";
 
-// Imports only zod and `../score`, never `./base`: the grading island loads
-// this file in the browser, where the rest of the schemas do not run.
-
 /// Addresses one answer the way the grading pages do: the course's URL segments, the exam slug and the submission's `publicId`.
 export const answerRef = z.object({
 	discipline: z.string().min(1),

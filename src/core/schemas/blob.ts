@@ -21,7 +21,7 @@ export const blobHash = blobSchema.shape.hash;
 
 export const blobCreate = z.object({
 	bytes: z
-		.instanceof(Buffer)
+		.custom<Buffer>((v) => Buffer.isBuffer(v), "Expected a Buffer")
 		.openapi("Buffer", { type: "string", format: "binary" }),
 });
 
