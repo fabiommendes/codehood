@@ -108,26 +108,37 @@ não pertence a nenhum campo (`FORBIDDEN`, `NOT_FOUND`, falha genérica).
 ### 4. Ilha Solid
 
 ```tsx
-const form = createSchemaForm(gradeInput, {
+const form = createSchemaForm(answerGrade, {
 	action: actions.grading.grade,
-	fields: { comment: { widget: "textarea" } },
+	hidden: { discipline, course, exam, submission },
 	onSuccess: () => window.location.reload(),
 });
 
 return (
 	<form onSubmit={form.submit} noValidate>
 		<FormAlert error={form.error()} />
-		<Field {...form.field("score")} />
+		<Field {...form.field("score")} control={{ inputmode: "numeric" }} />
 		<Field {...form.field("comment")} />
 		<button class="btn btn-primary" disabled={form.busy()}>Save</button>
 	</form>
 );
 ```
 
-`form.field` tem a mesma forma do caso `.astro`, só que reativa. Valida com o
-schema no envio e, depois do primeiro erro, a cada digitação nos campos com
-erro. Campos que não estão no formulário (ids de rota, por exemplo) entram por
-`createSchemaForm(schema, { hidden: { discipline, course } })`.
+`form.field` tem a mesma forma do caso `.astro` (mais `onInput`), só que reativa:
+`value` e `errors` são getters. Valida com o schema no envio, com a mesma
+conversão de FormData do servidor, e foca o primeiro campo inválido. Depois do
+primeiro erro, revalida a cada digitação só os campos que têm erro.
+
+- `hidden` entra no FormData e vence um controle de mesmo nome. Erro de um campo
+  sem controle no formulário vai para `form.error()`.
+- `accept` (`"json"` por padrão) diz o que a action espera. `"json"` envia o
+  objeto de `formToInput`; `"form"` envia o `FormData`, para actions com
+  `accept: "form"`.
+- `busy()` fica `true` após o sucesso: `onSuccess` deve navegar.
+- `control` em `<Field>` passa atributos ao elemento (`inputmode`, `data-*`).
+- Uma ilha não importa o barrel `@/core/schemas`: ele puxa `process` e `Buffer`
+  para o navegador. O schema da ilha vive num módulo que importa só `zod`
+  (`src/core/schemas/answer.ts`) e a ilha o importa direto.
 
 ### 5. Erro que só o servidor detecta
 

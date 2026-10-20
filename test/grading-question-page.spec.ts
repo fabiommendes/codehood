@@ -589,6 +589,57 @@ for (const [label, typed] of [
 	});
 }
 
+test("an invalid score is refused on the client, under the score field, without calling the server", async ({
+	page,
+}) => {
+	const { teacher, course, href } = await setup("sg3");
+	await closedSitting("sg3", course, ["Alpha reply"]);
+	await logInAs(page, teacher);
+	await page.goto(`${href}/exams/midterm/grading/q-short`);
+	const article = answerArticle(page, 1);
+	const calls: string[] = [];
+	await page.route(/\/_actions\/grading\.grade/, (route) => {
+		calls.push(route.request().url());
+		return route.continue();
+	});
+
+	await saveGrade(article, "101");
+
+	const score = article.getByLabel("Score (%)", { exact: true });
+	await expect(score).toHaveAttribute("aria-invalid", "true");
+	await expect(score).toBeFocused();
+	await expect(article.getByRole("alert")).toHaveText(INVALID_SCORE);
+	expect(calls).toHaveLength(0);
+
+	await score.fill("80");
+	await expect(article.getByRole("alert")).toHaveCount(0);
+	await expect(score).not.toHaveAttribute("aria-invalid", "true");
+});
+
+test("a score that only the server refuses is shown under the score field", async ({
+	page,
+}) => {
+	const { teacher, course, href } = await setup("sg4");
+	const { submissions } = await closedSitting("sg4", course, ["Alpha reply"]);
+	await logInAs(page, teacher);
+	await page.goto(`${href}/exams/midterm/grading/q-short`);
+	const article = answerArticle(page, 1);
+	await page.route(/\/_actions\/grading\.grade/, (route) => {
+		const body = JSON.parse(route.request().postData() ?? "{}");
+		return route.continue({
+			postData: JSON.stringify({ ...body, score: "101" }),
+		});
+	});
+
+	await saveGrade(article, "50");
+
+	const score = article.getByLabel("Score (%)", { exact: true });
+	await expect(score).toHaveAttribute("aria-invalid", "true");
+	await expect(score).toBeFocused();
+	await expect(article.getByRole("alert")).toHaveText(INVALID_SCORE);
+	expect(await passesOn(submissions[0] ?? "")).toHaveLength(0);
+});
+
 test("a comment of only spaces saves a pass with no feedback", async ({
 	page,
 }) => {

@@ -1,8 +1,15 @@
 import { For, type JSX, Show } from "solid-js";
 import type { FieldView } from "@/forms/form-state";
 
-/// Props of a theme component: the field view plus the caller's extra classes.
-export type ControlProps = FieldView & { class?: string };
+/// Extra attributes and handlers for the control element itself.
+export type ControlAttrs = JSX.InputHTMLAttributes<HTMLInputElement> &
+	Record<`data-${string}`, string | undefined>;
+
+/// Props of a theme component: the field view plus the caller's extra classes and control attributes.
+export type ControlProps = FieldView & {
+	class?: string;
+	control?: ControlAttrs;
+};
 
 /// Keys of a theme: the field `kind`, or the `widget` that replaces the
 /// default control (`radio` for an enum, `toggle` for a boolean).
@@ -36,7 +43,11 @@ function Messages(props: ControlProps): JSX.Element {
 				</p>
 			</Show>
 			<Show when={props.errors.length > 0}>
-				<p id={errorId(props)} class="label whitespace-normal text-error">
+				<p
+					id={errorId(props)}
+					role="alert"
+					class="label whitespace-normal text-error"
+				>
 					{props.errors.join(" ")}
 				</p>
 			</Show>
@@ -87,6 +98,7 @@ function InputField(props: ControlProps): JSX.Element {
 				pattern={props.attrs.pattern}
 				aria-invalid={props.errors.length > 0 ? "true" : undefined}
 				aria-describedby={describedBy(props)}
+				{...(props.control as JSX.InputHTMLAttributes<HTMLInputElement>)}
 			/>
 			<Messages {...props} />
 		</fieldset>
@@ -113,6 +125,7 @@ function TextareaField(props: ControlProps): JSX.Element {
 				maxlength={props.attrs.maxlength}
 				aria-invalid={props.errors.length > 0 ? "true" : undefined}
 				aria-describedby={describedBy(props)}
+				{...(props.control as JSX.TextareaHTMLAttributes<HTMLTextAreaElement>)}
 			>
 				{props.value}
 			</textarea>
@@ -138,6 +151,7 @@ function SelectField(props: ControlProps): JSX.Element {
 				required={props.required}
 				aria-invalid={props.errors.length > 0 ? "true" : undefined}
 				aria-describedby={describedBy(props)}
+				{...(props.control as JSX.SelectHTMLAttributes<HTMLSelectElement>)}
 			>
 				<option value="" disabled={props.required} selected={!props.value}>
 					{props.placeholder ?? `Pick ${props.label.toLowerCase()}`}
@@ -182,6 +196,7 @@ function RadioField(props: ControlProps): JSX.Element {
 								.join(" ")}
 							checked={option.value === props.value}
 							required={props.required}
+							{...(props.control as JSX.InputHTMLAttributes<HTMLInputElement>)}
 						/>
 						{option.label}
 					</label>
@@ -192,8 +207,10 @@ function RadioField(props: ControlProps): JSX.Element {
 	);
 }
 
-/// A checkbox or toggle; `control` is the daisyUI class of the input.
-function SwitchField(props: ControlProps & { control: string }): JSX.Element {
+/// A checkbox or toggle; `controlClass` is the daisyUI class of the input.
+function SwitchField(
+	props: ControlProps & { controlClass: string },
+): JSX.Element {
 	return (
 		<fieldset class="fieldset">
 			<label class="label cursor-pointer gap-2 text-base-content">
@@ -203,8 +220,9 @@ function SwitchField(props: ControlProps & { control: string }): JSX.Element {
 					name={props.name}
 					value="true"
 					class={[
-						props.control,
-						props.errors.length > 0 && `${props.control.split(" ")[0]}-error`,
+						props.controlClass,
+						props.errors.length > 0 &&
+							`${props.controlClass.split(" ")[0]}-error`,
 						props.class,
 					]
 						.filter(Boolean)
@@ -212,6 +230,7 @@ function SwitchField(props: ControlProps & { control: string }): JSX.Element {
 					checked={props.value === "true" || props.value === "on"}
 					aria-invalid={props.errors.length > 0 ? "true" : undefined}
 					aria-describedby={describedBy(props)}
+					{...(props.control as JSX.InputHTMLAttributes<HTMLInputElement>)}
 				/>
 				{props.label}
 			</label>
@@ -232,7 +251,9 @@ export const defaultTheme: Required<FieldTheme> = {
 	enum: SelectField,
 	radio: RadioField,
 	boolean: (props) => (
-		<SwitchField {...props} control="checkbox checkbox-primary" />
+		<SwitchField {...props} controlClass="checkbox checkbox-primary" />
 	),
-	toggle: (props) => <SwitchField {...props} control="toggle toggle-primary" />,
+	toggle: (props) => (
+		<SwitchField {...props} controlClass="toggle toggle-primary" />
+	),
 };

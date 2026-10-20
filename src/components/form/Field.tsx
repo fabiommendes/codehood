@@ -2,11 +2,21 @@ import { type JSX, splitProps } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { FieldSpec } from "@/forms/describe-field";
 import type { FieldView } from "@/forms/form-state";
-import { type ControlKind, defaultTheme, type FieldTheme } from "./theme";
+import {
+	type ControlAttrs,
+	type ControlKind,
+	type ControlProps,
+	defaultTheme,
+	type FieldTheme,
+} from "./theme";
 
 export type FieldProps = FieldSpec &
 	Partial<Pick<FieldView, "id" | "value" | "errors">> & {
 		class?: string;
+		/// Attributes and handlers for the control element (`inputmode`, `data-*`...).
+		control?: ControlAttrs;
+		/// Called on every `input` event of the control; `createSchemaForm` uses it to revalidate.
+		onInput?: (event: InputEvent) => void;
 		/// Replaces the default control of some kinds, for this field only.
 		theme?: FieldTheme;
 	};
@@ -25,17 +35,22 @@ function controlKind(spec: FieldSpec): ControlKind {
 export default function Field(props: FieldProps): JSX.Element {
 	const [own, spec] = splitProps(props, [
 		"class",
+		"control",
+		"onInput",
 		"theme",
 		"id",
 		"value",
 		"errors",
 	]);
-	const view = (): FieldView & { class?: string } => ({
+	const view = (): ControlProps => ({
 		...(spec as FieldSpec),
 		id: own.id ?? `field-${spec.name}`,
 		value: own.value ?? "",
 		errors: own.errors ?? [],
 		class: own.class,
+		control: own.onInput
+			? { ...own.control, onInput: own.onInput }
+			: own.control,
 	});
 	const control = () => {
 		const kind = controlKind(spec as FieldSpec);

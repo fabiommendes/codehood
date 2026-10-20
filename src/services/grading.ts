@@ -293,9 +293,6 @@ export function parsePercentScore(text: string): string | null {
 	return `0.${hundredths.replace(/0$/, "")}`;
 }
 
-/// What the grading form shows when the typed score is refused.
-export const SCORE_ERROR = "Score must be a whole number between 0 and 100.";
-
 /// A student of the course, as the results list shows them.
 export interface GradedStudent {
 	username: string;

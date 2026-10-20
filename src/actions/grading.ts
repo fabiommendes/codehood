@@ -4,23 +4,13 @@ import { z } from "astro/zod";
 import type { UserActor } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
 import { NotFound } from "@/core/error";
+import { answerGrade, answerRef } from "@/core/schemas";
+import { SCORE_ERROR } from "@/core/score";
 import { db } from "@/db";
 import { type PrismaTx, prisma } from "@/db/client";
-import {
-	parsePercentScore,
-	SCORE_ERROR,
-	WILL_NOT_GRADE_REF,
-} from "@/services/grading";
+import { parsePercentScore, WILL_NOT_GRADE_REF } from "@/services/grading";
 import { type CourseNaturalKey, parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
-
-/// The answer every grading action addresses: the page's URL segments and the submission's `publicId`.
-const answerParams = z.object({
-	discipline: z.string().min(1),
-	course: z.string().min(1),
-	exam: z.string().min(1),
-	submission: z.string().min(1),
-});
 
 export const grading = {
 	/**
@@ -31,10 +21,7 @@ export const grading = {
 	 * another course or exam is not found.
 	 */
 	grade: defineAction({
-		input: answerParams.extend({
-			score: z.string(),
-			comment: z.string().optional(),
-		}),
+		input: answerGrade,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const score = parsePercentScore(input.score);
@@ -54,7 +41,7 @@ export const grading = {
 	 * another course or exam is not found.
 	 */
 	willNotGrade: defineAction({
-		input: answerParams.extend({ comment: z.string().optional() }),
+		input: answerRef.extend({ comment: z.string().optional() }),
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course = await checkedAnswer(input, actor);
@@ -86,7 +73,7 @@ export const grading = {
 
 /// The parsed course of `input`, once its submission is known to belong to the exam it names.
 async function checkedAnswer(
-	input: z.infer<typeof answerParams>,
+	input: z.infer<typeof answerRef>,
 	actor: UserActor,
 ): Promise<CourseNaturalKey> {
 	const course = parseCourseParams(input);

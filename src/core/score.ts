@@ -17,3 +17,12 @@ export function scoreValue(text: string): number | null {
 
 	return negative ? -magnitude : magnitude;
 }
+
+/// What the grading form shows when the typed percentage is refused.
+export const SCORE_ERROR = "Score must be a whole number between 0 and 100.";
+
+/** Whether `text` is a whole percentage from 0 to 100, surrounding whitespace aside. */
+export function isPercentScore(text: string): boolean {
+	const digits = text.trim();
+	return /^[0-9]+$/.test(digits) && Number(digits) <= 100;
+}
