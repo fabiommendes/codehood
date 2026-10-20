@@ -1,5 +1,6 @@
 import { actions } from "astro:actions";
 import { createSignal, type JSX, Show } from "solid-js";
+import FormAlert from "@/components/form/FormAlert";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 
@@ -49,13 +50,7 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 
 	return (
 		<div class="flex flex-col gap-2">
-			<Show when={failure()}>
-				{(message) => (
-					<div role="alert" class="alert alert-error">
-						{message()}
-					</div>
-				)}
-			</Show>
+			<FormAlert error={failure() ?? undefined} />
 
 			<Show
 				when={releasedAt()}

@@ -1,16 +1,9 @@
 import { defineAction } from "astro:actions";
-import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
+import { examAnswer, examParams } from "@/core/schemas";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
-
-/// The course and exam every exam action addresses, as the page's URL segments.
-const examParams = z.object({
-	discipline: z.string().min(1),
-	course: z.string().min(1),
-	exam: z.string().min(1),
-});
 
 export const exam = {
 	/** Opens the actor's attempt at an exam that is open now. */
@@ -27,10 +20,7 @@ export const exam = {
 
 	/** Records the actor's answer to one question of their open attempt. */
 	answer: defineAction({
-		input: examParams.extend({
-			question: z.string().min(1),
-			payload: z.record(z.string(), z.unknown()),
-		}),
+		input: examAnswer,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const { payload, question, ...rest } = input;

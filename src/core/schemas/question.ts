@@ -76,3 +76,11 @@ true satisfies AssertEqual<
 	QuestionType,
 	z.infer<typeof mdqQuestionSchema>["type"]
 >;
+
+/// The question bank's status control: a question by URL segments and the status to move it to.
+export const questionStatusUpdate = z.object({
+	discipline: z.string().min(1),
+	course: z.string().min(1),
+	slug: z.string().min(1),
+	status: questionStatus,
+});

@@ -20,3 +20,13 @@ export const answerGrade = answerRef.extend({
 		.optional()
 		.meta({ form: { widget: "textarea" } }),
 });
+
+/// What the will-not-grade dialog sends: the answer and an optional comment for the student.
+export const answerWillNotGrade = answerRef.extend({
+	comment: z
+		.string()
+		.optional()
+		.meta({
+			form: { label: "Comment for the student", widget: "textarea" },
+		}),
+});

@@ -1,6 +1,6 @@
 import { ActionError, defineAction } from "astro:actions";
-import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
+import { questionStatusUpdate } from "@/core/schemas";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
@@ -16,12 +16,7 @@ export const question = {
 	 * existing and a not-yet-existing account.
 	 */
 	updateStatus: defineAction({
-		input: z.object({
-			discipline: z.string().min(1),
-			course: z.string().min(1),
-			slug: z.string().min(1),
-			status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
-		}),
+		input: questionStatusUpdate,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course = parseCourseParams(input);

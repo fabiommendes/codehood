@@ -10,6 +10,7 @@ import {
 	Show,
 	Switch,
 } from "solid-js";
+import FormAlert from "@/components/form/FormAlert";
 import EssayView from "@/components/question/EssayView";
 import FillInView from "@/components/question/FillInView";
 import MultipleChoiceView from "@/components/question/MultipleChoiceView";
@@ -258,13 +259,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 	return (
 		<div class="flex flex-col gap-6">
-			<Show when={failure()}>
-				{(message) => (
-					<div role="alert" class="alert alert-error">
-						{message()}
-					</div>
-				)}
-			</Show>
+			<FormAlert error={failure() ?? undefined} />
 
 			<Switch>
 				<Match when={kind() === "not-open"}>

@@ -1,5 +1,9 @@
 import { actions } from "astro:actions";
 import { createSignal, type JSX, Show } from "solid-js";
+import { createSchemaForm } from "@/components/form/create-schema-form";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import { answerWillNotGrade } from "@/core/schemas";
 import { FOCUS_KEY } from "./focus";
 import GradeForm from "./GradeForm";
 
@@ -26,36 +30,13 @@ export default function AnswerControls(
 	props: AnswerControlsProps,
 ): JSX.Element {
 	const [changing, setChanging] = createSignal(false);
-	const [busy, setBusy] = createSignal(false);
-	const [failure, setFailure] = createSignal<string | null>(null);
+	const [dialogOpen, setDialogOpen] = createSignal(false);
 	const titleId = `wng-title-${props.submission}`;
-	const commentId = `wng-comment-${props.submission}`;
 	let dialog: HTMLDialogElement | undefined;
-	let comment: HTMLTextAreaElement | undefined;
 
-	function cancelDialog(): void {
-		setFailure(null);
-		if (comment) comment.value = "";
-		dialog?.close();
-	}
-
-	async function markNotGraded(): Promise<void> {
-		setBusy(true);
-		setFailure(null);
-		const { error } = await actions.grading.willNotGrade({
-			discipline: props.discipline,
-			course: props.course,
-			exam: props.exam,
-			submission: props.submission,
-			comment: comment?.value ?? "",
-		});
-		if (error) {
-			setFailure(error.message);
-			setBusy(false);
-			return;
-		}
-		sessionStorage.setItem(FOCUS_KEY, window.location.pathname);
-		window.location.reload();
+	function openDialog(): void {
+		setDialogOpen(true);
+		dialog?.showModal();
 	}
 
 	return (
@@ -86,14 +67,19 @@ export default function AnswerControls(
 					<button
 						type="button"
 						class="btn btn-ghost btn-sm"
-						onClick={() => dialog?.showModal()}
+						onClick={openDialog}
 					>
 						Will not grade
 					</button>
 				</Show>
 			</div>
 
-			<dialog ref={dialog} class="modal" aria-labelledby={titleId}>
+			<dialog
+				ref={dialog}
+				class="modal"
+				aria-labelledby={titleId}
+				onClose={() => setDialogOpen(false)}
+			>
 				<div class="modal-box">
 					<h3 id={titleId} class="text-lg font-bold">
 						Will not grade this answer?
@@ -103,47 +89,63 @@ export default function AnswerControls(
 						graded". Earlier grades are kept, and you can grade the answer later
 						with "Change grade".
 					</p>
-					<div class="mt-4 flex flex-col gap-1">
-						<label for={commentId} class="text-sm font-medium">
-							Comment for the student
-						</label>
-						<textarea
-							ref={comment}
-							id={commentId}
-							rows="3"
-							class="textarea textarea-bordered w-full"
+					<Show when={dialogOpen()}>
+						<WillNotGradeForm
+							discipline={props.discipline}
+							course={props.course}
+							exam={props.exam}
+							submission={props.submission}
+							onCancel={() => dialog?.close()}
 						/>
-					</div>
-					<Show when={failure()}>
-						{(message) => (
-							<p role="alert" class="mt-2 text-sm text-error">
-								{message()}
-							</p>
-						)}
 					</Show>
-					<div class="modal-action">
-						<button
-							type="button"
-							class="btn btn-ghost"
-							disabled={busy()}
-							onClick={cancelDialog}
-						>
-							Cancel
-						</button>
-						<button
-							type="button"
-							class="btn btn-primary"
-							disabled={busy()}
-							onClick={markNotGraded}
-						>
-							Mark as not graded
-						</button>
-					</div>
 				</div>
 				<form method="dialog" class="modal-backdrop">
 					<button type="submit">close</button>
 				</form>
 			</dialog>
 		</div>
+	);
+}
+
+/// The dialog's form: a comment for the student and the buttons that mark the answer or cancel.
+function WillNotGradeForm(
+	props: Pick<
+		AnswerControlsProps,
+		"discipline" | "course" | "exam" | "submission"
+	> & { onCancel: () => void },
+): JSX.Element {
+	const form = createSchemaForm(answerWillNotGrade, {
+		id: `wng-${props.submission}`,
+		action: actions.grading.willNotGrade,
+		hidden: {
+			discipline: props.discipline,
+			course: props.course,
+			exam: props.exam,
+			submission: props.submission,
+		},
+		onSuccess: () => {
+			sessionStorage.setItem(FOCUS_KEY, window.location.pathname);
+			window.location.reload();
+		},
+	});
+
+	return (
+		<form noValidate class="mt-4 flex flex-col gap-3" onSubmit={form.submit}>
+			<Field {...form.field("comment")} />
+			<FormAlert error={form.error()} />
+			<div class="modal-action">
+				<button
+					type="button"
+					class="btn btn-ghost"
+					disabled={form.busy()}
+					onClick={props.onCancel}
+				>
+					Cancel
+				</button>
+				<button type="submit" class="btn btn-primary" disabled={form.busy()}>
+					Mark as not graded
+				</button>
+			</div>
+		</form>
 	);
 }

@@ -1,5 +1,6 @@
 import { actions } from "astro:actions";
-import { createSignal, type JSX, Show } from "solid-js";
+import { createSignal, type JSX } from "solid-js";
+import FormAlert from "@/components/form/FormAlert";
 
 export interface ReleaseGradeColumnProps {
 	/// The course's URL segments and the column slug, as the action takes them.
@@ -43,13 +44,7 @@ export default function ReleaseGradeColumn(
 
 	return (
 		<div class="mt-1 flex flex-col gap-1">
-			<Show when={failure()}>
-				{(message) => (
-					<div role="alert" class="alert alert-error text-xs font-normal">
-						{message()}
-					</div>
-				)}
-			</Show>
+			<FormAlert error={failure() ?? undefined} class="text-xs font-normal" />
 
 			<button
 				type="button"

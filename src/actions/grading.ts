@@ -1,10 +1,14 @@
 import { defineAction } from "astro:actions";
 import { randomUUID } from "node:crypto";
-import { z } from "astro/zod";
+import type { z } from "astro/zod";
 import type { UserActor } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
 import { NotFound } from "@/core/error";
-import { answerGrade, answerRef } from "@/core/schemas";
+import {
+	answerGrade,
+	type answerRef,
+	answerWillNotGrade,
+} from "@/core/schemas";
 import { SCORE_ERROR } from "@/core/score";
 import { db } from "@/db";
 import { type PrismaTx, prisma } from "@/db/client";
@@ -41,7 +45,7 @@ export const grading = {
 	 * another course or exam is not found.
 	 */
 	willNotGrade: defineAction({
-		input: answerRef.extend({ comment: z.string().optional() }),
+		input: answerWillNotGrade,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course = await checkedAnswer(input, actor);

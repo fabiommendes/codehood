@@ -114,3 +114,10 @@ export const courseGradesSchema = z.object({
 			}),
 	),
 });
+
+/// The grade column the release action addresses, as the page's URL segments.
+export const gradeColumnRelease = z.object({
+	discipline: z.string().min(1),
+	course: z.string().min(1),
+	slug: z.string().min(1),
+});

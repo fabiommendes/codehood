@@ -107,3 +107,16 @@ export const examFilterBase = z.object({
 });
 
 export const examFilter = examFilterBase.extend({ course: courseRef });
+
+/// The course and exam the exam actions address, as the page's URL segments.
+export const examParams = z.object({
+	discipline: z.string().min(1),
+	course: z.string().min(1),
+	exam: z.string().min(1),
+});
+
+/// One answer to one question of the actor's open attempt, addressed by URL segments.
+export const examAnswer = examParams.extend({
+	question: z.string().min(1),
+	payload: z.record(z.string(), z.unknown()),
+});
