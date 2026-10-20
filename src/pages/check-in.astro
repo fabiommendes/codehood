@@ -3,6 +3,10 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import { checkInCode } from "@/core/schemas";
+import { actionForm } from "@/forms/form-state";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 if (!Astro.locals.actor) {
@@ -10,16 +14,12 @@ if (!Astro.locals.actor) {
 }
 
 const result = Astro.getActionResult(actions.checkIn.register);
+const form = await actionForm(Astro, actions.checkIn.register, checkInCode, {
+	id: "check-in",
+});
 ---
 
 <CenteredLayout title="Check in">
-  {
-    result?.error && (
-      <div role="alert" class="alert alert-error">
-        <span>{result.error.message}</span>
-      </div>
-    )
-  }
   {result?.data && <AttendanceResult view={result.data} />}
 
   <form
@@ -27,19 +27,17 @@ const result = Astro.getActionResult(actions.checkIn.register);
     action={actions.checkIn.register}
     class="flex flex-col gap-4"
   >
-    <fieldset class="fieldset">
-      <legend class="fieldset-legend">Code</legend>
-      <input
-        type="text"
-        name="code"
-        required
-        minlength="6"
-        maxlength="6"
-        autocomplete="off"
-        autocapitalize="characters"
-        class="input w-full font-mono uppercase"
-      />
-    </fieldset>
+    <FormAlert error={form.error} />
+    <Field
+      {...form.field("code")}
+      class="font-mono uppercase"
+      control={{
+        minlength: 6,
+        maxlength: 6,
+        autocomplete: "off",
+        autocapitalize: "characters",
+      }}
+    />
     <div class="card-actions">
       <button type="submit" class="btn btn-primary btn-block rounded-full">Register</button>
     </div>

@@ -4,7 +4,15 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import AdminHeader from "@/components/AdminHeader.astro";
 import InvitesTable from "@/components/admin/InvitesTable";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import {
+	disciplineCreate,
+	editionForm,
+	inviteInstructor,
+} from "@/core/schemas";
 import { db, type Invite, isEditionOpen } from "@/db";
+import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { plural } from "@/utils/plural";
 
@@ -18,31 +26,29 @@ const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
 const disciplineResult = Astro.getActionResult(actions.admin.createDiscipline);
 const editionResult = Astro.getActionResult(actions.admin.createEdition);
 
-// createPersonalInvite has no `accept: "form"` — it's called as a JSON action
-// elsewhere, so a plain <form action={...}> here
-// would send a body Astro can't parse against that shape. Handling this one
-// POST manually (formData in, Astro.callAction out) is the same workaround
-// invite.astro already uses for createClassroomInvite.
-let inviteUrl: string | null = null;
-let inviteError: string | null = null;
-if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
-	const formData = await Astro.request.formData();
-	const email = formData.get("email");
-	if (typeof email === "string") {
-		const { data, error } = await Astro.callAction(
-			actions.auth.createPersonalInvite,
-			{
-				email,
-				role: "INSTRUCTOR",
-			},
-		);
-		if (error) {
-			inviteError = error.message || "Could not create the invite.";
-		} else {
-			inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
-		}
-	}
-}
+const inviteResult = Astro.getActionResult(actions.admin.inviteInstructor);
+const inviteUrl = inviteResult?.data
+	? new URL(`/invite/${inviteResult.data.token}`, Astro.url).toString()
+	: null;
+
+const inviteForm = await actionForm(
+	Astro,
+	actions.admin.inviteInstructor,
+	inviteInstructor,
+	{ id: "invite-instructor" },
+);
+const disciplineForm = await actionForm(
+	Astro,
+	actions.admin.createDiscipline,
+	disciplineCreate,
+	{ id: "new-discipline" },
+);
+const editionFormState = await actionForm(
+	Astro,
+	actions.admin.createEdition,
+	editionForm,
+	{ id: "new-edition" },
+);
 
 const [users, courses, disciplines, editions, invites] = await Promise.all([
 	db.user.findMany({}, { actor }),
@@ -241,13 +247,6 @@ const pendingInvites: Invite[] = invites.filter(
       </p>
 
       {
-        inviteError && (
-          <div role="alert" class="alert alert-error mt-4">
-            <span>{inviteError}</span>
-          </div>
-        )
-      }
-      {
         inviteUrl && (
           <>
             <div role="alert" class="alert alert-success mt-4">
@@ -291,24 +290,11 @@ const pendingInvites: Invite[] = invites.filter(
           </>
         )
       }
-      {
-        revokeResult?.error && (
-          <div role="alert" class="alert alert-error mt-4">
-            <span>{revokeResult.error.message}</span>
-          </div>
-        )
-      }
+      <FormAlert error={revokeResult?.error?.message} class="mt-4" />
       {
         revokeResult && !revokeResult.error && (
           <div role="alert" class="alert alert-success mt-4">
             <span>Invite revoked.</span>
-          </div>
-        )
-      }
-      {
-        disciplineResult?.error && (
-          <div role="alert" class="alert alert-error mt-4">
-            <span>{disciplineResult.error.message}</span>
           </div>
         )
       }
@@ -322,13 +308,6 @@ const pendingInvites: Invite[] = invites.filter(
               </a>
               .
             </span>
-          </div>
-        )
-      }
-      {
-        editionResult?.error && (
-          <div role="alert" class="alert alert-error mt-4">
-            <span>{editionResult.error.message}</span>
           </div>
         )
       }
@@ -373,7 +352,11 @@ const pendingInvites: Invite[] = invites.filter(
       </div>
     </div>
 
-    <dialog id="invite-instructor-dialog" class="modal">
+    <dialog
+      id="invite-instructor-dialog"
+      class="modal"
+      data-reopen={inviteResult?.error ? "" : undefined}
+    >
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
@@ -385,17 +368,13 @@ const pendingInvites: Invite[] = invites.filter(
           They redeem this link to create their own account. Password, GitHub
           handle, and school id are theirs to supply.
         </p>
-        <form method="POST" class="mt-4 flex flex-col gap-4">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Email</legend>
-            <input
-              type="email"
-              name="email"
-              required
-              class="input w-full"
-              placeholder="instructor@example.edu"
-            />
-          </fieldset>
+        <form
+          method="POST"
+          action={actions.admin.inviteInstructor}
+          class="mt-4 flex flex-col gap-4"
+        >
+          <FormAlert error={inviteForm.error} />
+          <Field {...inviteForm.field("email")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
               Generate invite link
@@ -408,7 +387,11 @@ const pendingInvites: Invite[] = invites.filter(
       </form>
     </dialog>
 
-    <dialog id="new-discipline-dialog" class="modal">
+    <dialog
+      id="new-discipline-dialog"
+      class="modal"
+      data-reopen={disciplineResult?.error ? "" : undefined}
+    >
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
@@ -421,26 +404,9 @@ const pendingInvites: Invite[] = invites.filter(
           action={actions.admin.createDiscipline}
           class="mt-4 flex flex-col gap-4"
         >
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Slug</legend>
-            <input
-              type="text"
-              name="slug"
-              required
-              placeholder="cs102"
-              class="input w-full font-mono"
-            />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input
-              type="text"
-              name="name"
-              required
-              placeholder="Computer Science"
-              class="input w-full"
-            />
-          </fieldset>
+          <FormAlert error={disciplineForm.error} />
+          <Field {...disciplineForm.field("slug")} class="font-mono" />
+          <Field {...disciplineForm.field("name")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
               Create discipline
@@ -453,7 +419,11 @@ const pendingInvites: Invite[] = invites.filter(
       </form>
     </dialog>
 
-    <dialog id="new-edition-dialog" class="modal">
+    <dialog
+      id="new-edition-dialog"
+      class="modal"
+      data-reopen={editionResult?.error ? "" : undefined}
+    >
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
@@ -466,34 +436,11 @@ const pendingInvites: Invite[] = invites.filter(
           action={actions.admin.createEdition}
           class="mt-4 flex flex-col gap-4"
         >
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Slug</legend>
-            <input
-              type="text"
-              name="slug"
-              required
-              placeholder="2026-2"
-              class="input w-full font-mono"
-            />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input
-              type="text"
-              name="name"
-              required
-              placeholder="Second term"
-              class="input w-full"
-            />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Starts</legend>
-            <input type="date" name="startAt" required class="input w-full" />
-          </fieldset>
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Ends</legend>
-            <input type="date" name="endAt" required class="input w-full" />
-          </fieldset>
+          <FormAlert error={editionFormState.error} />
+          <Field {...editionFormState.field("slug")} class="font-mono" />
+          <Field {...editionFormState.field("name")} />
+          <Field {...editionFormState.field("startAt")} />
+          <Field {...editionFormState.field("endAt")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
               Create edition
@@ -509,6 +456,8 @@ const pendingInvites: Invite[] = invites.filter(
 </AppLayout>
 
 <script>
+  import "@/components/admin/reopen-dialogs";
+
   const button = document.getElementById("copy-invite-url");
   const input = document.getElementById(
     "invite-url",

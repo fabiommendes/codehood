@@ -1,6 +1,10 @@
 import { actions } from "astro:actions";
-import type { JSX } from "solid-js";
+import { type JSX, Show } from "solid-js";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
+import type { disciplineEdit } from "@/core/schemas";
+import type { FormState } from "@/forms/form-state";
 import { plural } from "@/utils/plural";
 
 /**
@@ -17,9 +21,26 @@ export interface DisciplineRow {
 
 interface Props {
 	disciplines: DisciplineRow[];
+	/// State of the edit form, as read from the action result of the page.
+	editForm: FormState<typeof disciplineEdit>;
+	/// The slug whose edit failed, so only that row shows the errors and the typed value.
+	failedSlug?: string;
 }
 
 export default function DisciplinesTable(props: Props): JSX.Element {
+	/// The name field of `row`'s dialog: the stored name, or what was typed
+	/// when that row's submit failed.
+	const nameField = (row: DisciplineRow) => {
+		const view = props.editForm.field("name");
+		const failed = props.failedSlug === row.slug;
+		return {
+			...view,
+			id: `edit-discipline-${row.slug}-name`,
+			value: failed ? view.value : row.name,
+			errors: failed ? view.errors : [],
+		};
+	};
+
 	const columns: ColumnConfig<DisciplineRow>[] = [
 		{
 			title: "Slug",
@@ -86,7 +107,11 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 						</button>
 					</form>
 
-					<dialog id={`edit-discipline-${row.slug}`} class="modal">
+					<dialog
+						id={`edit-discipline-${row.slug}`}
+						class="modal"
+						data-reopen={props.failedSlug === row.slug ? "" : undefined}
+					>
 						<div class="modal-box">
 							<form method="dialog">
 								<button
@@ -106,16 +131,10 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 								class="mt-4 flex flex-col gap-4"
 							>
 								<input type="hidden" name="slug" value={row.slug} />
-								<fieldset class="fieldset">
-									<legend class="fieldset-legend">Name</legend>
-									<input
-										type="text"
-										name="name"
-										required
-										value={row.name}
-										class="input w-full"
-									/>
-								</fieldset>
+								<Show when={props.failedSlug === row.slug}>
+									<FormAlert error={props.editForm.error} />
+								</Show>
+								<Field {...nameField(row)} />
 								<div class="modal-action">
 									<button type="submit" class="btn btn-primary">
 										Save

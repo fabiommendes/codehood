@@ -4,24 +4,25 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
-import { sessionLogin } from "@/core/schemas";
+import { FieldError } from "@/core/error";
+import {
+	apiKeyForm,
+	apiKeyRevoke,
+	inviteAccept,
+	inviteClassroom,
+	inviteJoin,
+	sessionLogin,
+} from "@/core/schemas";
 import { db, InviteError, type User } from "@/db";
 import { prisma } from "@/db/client";
-import { parseCourseParams, USERNAME_RE } from "@/urls";
+import { parseCourseParams } from "@/urls";
 import {
-	uniqueConstraintMessage,
+	uniqueConstraintError,
 	withActionErrors,
 	withServiceErrors,
 } from "./helpers";
 
 export type PublicUser = Omit<User, "passwordHash" | "createdAt">;
-
-/// A text input that may be left empty (Astro sends `null`), read as absent when it is.
-const optionalField = z
-	.string()
-	.trim()
-	.nullish()
-	.transform((value) => value || undefined);
 
 export const auth = {
 	login: defineAction({
@@ -58,17 +59,8 @@ export const auth = {
 
 	acceptInvite: defineAction({
 		accept: "form",
-		input: z.object({
-			token: z.string(),
-			email: z.email(),
-			username: z.string().regex(USERNAME_RE, "Invalid username."),
-			name: z.string().min(1),
-			password: z.string().min(8),
-			// Required of students only; an empty field means none.
-			githubId: optionalField,
-			schoolId: optionalField,
-		}),
-		handler: async (input, context) => {
+		input: inviteAccept,
+		handler: withActionErrors(async (input, context) => {
 			const invite = await db.invite.findOne(
 				{ token: input.token },
 				FULL_ACCESS,
@@ -78,22 +70,16 @@ export const auth = {
 					code: "NOT_FOUND",
 					message: "Invite not found or expired.",
 				});
-			if (
-				invite.invitedRole === "STUDENT" &&
-				(!input.githubId || !input.schoolId)
-			) {
-				throw new ActionError({
-					code: "BAD_REQUEST",
-					message: "Students need a GitHub username and a school id.",
-				});
+			if (invite.invitedRole === "STUDENT") {
+				if (!input.githubId) {
+					throw new FieldError("githubId", "Required for students.");
+				}
+				if (!input.schoolId) {
+					throw new FieldError("schoolId", "Required for students.");
+				}
 			}
 			const precheckError = db.invite.checkRedeemable(invite, input.email);
-			if (precheckError) {
-				throw new ActionError({
-					code: "BAD_REQUEST",
-					message: inviteErrorMessage(precheckError),
-				});
-			}
+			if (precheckError) throw inviteRefusal(precheckError);
 
 			// One transaction: a redemption failure (race on maxUses, etc.) must not
 			// leave behind a User row with no invite and no course to show for it.
@@ -107,8 +93,8 @@ export const auth = {
 							name: input.name,
 							role: invite.invitedRole,
 							password: input.password,
-							githubId: input.githubId,
-							schoolId: input.schoolId,
+							githubId: input.githubId || undefined,
+							schoolId: input.schoolId || undefined,
 						},
 						{ ...FULL_ACCESS, tx },
 					);
@@ -127,15 +113,8 @@ export const auth = {
 					return createdUser;
 				});
 			} catch (error) {
-				if (error instanceof InviteError) {
-					throw new ActionError({
-						code: "BAD_REQUEST",
-						message: inviteErrorMessage(error.code),
-					});
-				}
-				const taken = uniqueConstraintMessage(error);
-				if (taken) throw new ActionError({ code: "CONFLICT", message: taken });
-				throw error;
+				if (error instanceof InviteError) throw inviteRefusal(error.code);
+				throw uniqueConstraintError(error) ?? error;
 			}
 
 			const { token: sessionToken, session } = await db.session.create(
@@ -147,7 +126,7 @@ export const auth = {
 				expires: session.expiresAt,
 			});
 			return { role: user.role };
-		},
+		}),
 	}),
 
 	/**
@@ -160,8 +139,8 @@ export const auth = {
 	 */
 	joinWithInvite: defineAction({
 		accept: "form",
-		input: z.object({ token: z.string() }),
-		handler: async (input, context) => {
+		input: inviteJoin,
+		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const user = await db.user.findOne(
 				{ username: actor.username },
@@ -224,7 +203,7 @@ export const auth = {
 				}
 			}
 			return { courseId };
-		},
+		}),
 	}),
 
 	createPersonalInvite: defineAction({
@@ -260,11 +239,7 @@ export const auth = {
 	}),
 
 	createClassroomInvite: defineAction({
-		input: z.object({
-			discipline: z.string().min(1),
-			course: z.string().min(1),
-			maxUses: z.number().int().positive().optional(),
-		}),
+		input: inviteClassroom,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course = parseCourseParams({
@@ -287,7 +262,7 @@ export const auth = {
 
 	createApiKey: defineAction({
 		accept: "form",
-		input: z.object({ name: z.string().min(1), kind: z.enum(["CLI", "BOT"]) }),
+		input: apiKeyForm,
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const { token } = await db.apiKey.create(
@@ -304,13 +279,21 @@ export const auth = {
 
 	revokeApiKey: defineAction({
 		accept: "form",
-		input: z.object({ publicId: z.string().min(1) }),
+		input: apiKeyRevoke,
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.apiKey.delete({ publicId: input.publicId }, { actor });
 		}),
 	}),
 };
+
+/// The error an invite refusal shows: on the email field when the address is wrong, else on the form.
+function inviteRefusal(code: InviteError["code"]): FieldError | ActionError {
+	const message = inviteErrorMessage(code);
+	return code === "email_mismatch"
+		? new FieldError("email", message)
+		: new ActionError({ code: "BAD_REQUEST", message });
+}
 
 function inviteErrorMessage(code: InviteError["code"]): string {
 	switch (code) {

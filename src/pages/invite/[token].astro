@@ -3,7 +3,12 @@ export const prerender = false;
 
 import { actions } from "astro:actions";
 import { FULL_ACCESS } from "@/auth/actor";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import PasswordConfirm from "@/components/PasswordConfirm.astro";
+import { inviteAccept } from "@/core/schemas";
 import { db } from "@/db";
+import { actionForm } from "@/forms/form-state";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 import { courseHref } from "@/urls";
 
@@ -34,7 +39,7 @@ const joined = Astro.getActionResult(actions.auth.joinWithInvite);
 if (joined && !joined.error && href) {
 	return Astro.redirect(`${href}?joined`);
 }
-const error = result?.error ?? joined?.error;
+const joinError = joined?.error;
 
 const isStudentInvite = invite?.invitedRole === "STUDENT";
 // Someone logged in joins with the account they have; only a student invite
@@ -54,20 +59,16 @@ const enrollment =
 const alreadyIn = enrollment?.status === "ACTIVE";
 const role = invite?.invitedRole.toLowerCase();
 
-// A rejected submission renders this page again; refill what was typed,
-// passwords aside.
-const submitted =
-	result?.error && Astro.request.method === "POST"
-		? await Astro.request
-				.clone()
-				.formData()
-				.catch(() => null)
-		: null;
-/// The value typed into `field` before a rejected submission, or empty.
-function typed(field: string): string {
-	const value = submitted?.get(field);
-	return typeof value === "string" ? value : "";
-}
+// GitHub and school id are optional for roles other than student.
+const optional = isStudentInvite ? "" : " (optional)";
+const form = await actionForm(Astro, actions.auth.acceptInvite, inviteAccept, {
+	id: "accept-invite",
+	fields: {
+		githubId: { label: `GitHub username${optional}` },
+		schoolId: { label: `School id${optional}` },
+	},
+});
+const email = form.field("email");
 ---
 
 <CenteredLayout title={canJoin ? "Join course" : "Accept invite"}>
@@ -84,9 +85,9 @@ function typed(field: string): string {
   }
 
   {
-    error && (
+    joinError && (
       <div role="alert" class="alert alert-error">
-        <span>{error.message}</span>
+        <span>{joinError.message}</span>
       </div>
     )
   }
@@ -167,103 +168,31 @@ function typed(field: string): string {
           class="flex flex-col gap-1"
         >
           <input type="hidden" name="token" value={token} />
+          <FormAlert error={form.error} class="mb-2" />
 
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input
-              type="text"
-              name="name"
-              required
-              autocomplete="name"
-              class="input w-full"
-              value={typed("name")}
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Email</legend>
-            <input
-              type="email"
-              name="email"
-              required
-              autocomplete="email"
-              class:list={[
-                "input w-full",
-                invite.kind === "PERSONAL" && "bg-base-200 text-base-content/70",
-              ]}
-              value={invite.email ?? typed("email")}
-              readonly={invite.kind === "PERSONAL"}
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Username</legend>
-            <input
-              type="text"
-              name="username"
-              required
-              autocomplete="username"
-              class="input w-full"
-              value={typed("username")}
-            />
-          </fieldset>
+          <Field {...form.field("name")} control={{ autocomplete: "name" }} />
+          {
+            invite.kind === "PERSONAL" ? (
+              <Field
+                {...email}
+                value={invite.email ?? ""}
+                class="bg-base-200 text-base-content/70"
+                control={{ autocomplete: "email", readonly: true }}
+              />
+            ) : (
+              <Field {...email} control={{ autocomplete: "email" }} />
+            )
+          }
+          <Field {...form.field("username")} control={{ autocomplete: "username" }} />
 
           <div class="grid gap-x-3 sm:grid-cols-2">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Password</legend>
-              <input
-                type="password"
-                name="password"
-                id="password"
-                required
-                minlength="8"
-                autocomplete="new-password"
-                class="input w-full"
-              />
-            </fieldset>
-
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Confirm password</legend>
-              <input
-                type="password"
-                id="passwordConfirm"
-                required
-                minlength="8"
-                autocomplete="new-password"
-                class="input w-full"
-              />
-            </fieldset>
+            <Field {...form.field("password")} control={{ autocomplete: "new-password" }} />
+            <PasswordConfirm id="accept-invite-passwordConfirm" />
           </div>
-          <p class="label whitespace-normal text-error" id="passwordMismatch" hidden>
-            Passwords do not match.
-          </p>
 
           <div class="grid gap-x-3 sm:grid-cols-2">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">
-                GitHub username{!isStudentInvite && " (optional)"}
-              </legend>
-              <input
-                type="text"
-                name="githubId"
-                required={isStudentInvite}
-                class="input w-full"
-                value={typed("githubId")}
-              />
-            </fieldset>
-
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">
-                School id{!isStudentInvite && " (optional)"}
-              </legend>
-              <input
-                type="text"
-                name="schoolId"
-                required={isStudentInvite}
-                class="input w-full"
-                value={typed("schoolId")}
-              />
-            </fieldset>
+            <Field {...form.field("githubId")} required={isStudentInvite} />
+            <Field {...form.field("schoolId")} required={isStudentInvite} />
           </div>
           {isStudentInvite && (
             <p class="label whitespace-normal">
@@ -282,23 +211,3 @@ function typed(field: string): string {
     )
   }
 </CenteredLayout>
-
-<script>
-  const form = document.querySelector("form");
-  const password = document.getElementById(
-    "password",
-  ) as HTMLInputElement | null;
-  const confirm = document.getElementById(
-    "passwordConfirm",
-  ) as HTMLInputElement | null;
-  const mismatch = document.getElementById("passwordMismatch");
-
-  form?.addEventListener("submit", (event) => {
-    if (password && confirm && password.value !== confirm.value) {
-      event.preventDefault();
-      mismatch?.removeAttribute("hidden");
-    } else {
-      mismatch?.setAttribute("hidden", "");
-    }
-  });
-</script>

@@ -109,9 +109,23 @@ export type MimeType = z.infer<typeof mimeType>;
 /// The edition slug identifier
 export const editionSlug = z
 	.string()
-	.regex(EDITION_RE)
+	.regex(
+		EDITION_RE,
+		"Use a year, optionally followed by a dash and a term number, like 2026-1.",
+	)
 	.openapi({ example: "2026-1" });
 export type EditionSlug = z.infer<typeof editionSlug>;
+
+/**
+ * A calendar date as `<input type="date">` submits it ("2026-08-01"), read as
+ * UTC midnight.
+ *
+ * Unlike `z.coerce.date()`, an empty field is rejected: Astro hands a blank
+ * input to the schema as `null`, which the coercion would turn into 1970-01-01.
+ */
+export const dateInput = z.iso
+	.date()
+	.transform((value) => new Date(`${value}T00:00:00Z`));
 
 export const buffer = z
 	.custom<Buffer>((v) => Buffer.isBuffer(v), "Expected a Buffer")

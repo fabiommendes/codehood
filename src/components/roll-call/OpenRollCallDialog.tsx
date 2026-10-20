@@ -1,5 +1,9 @@
 import { actions } from "astro:actions";
-import { createSignal, type JSX, Show } from "solid-js";
+import type { JSX } from "solid-js";
+import { createSchemaForm } from "@/components/form/create-schema-form";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import { rollCallOpen } from "@/core/schemas";
 
 export interface OpenRollCallDialogProps {
 	/// The course's URL segments, as the roll call actions take them.
@@ -23,28 +27,20 @@ export interface OpenRollCallDialogProps {
 export default function OpenRollCallDialog(
 	props: OpenRollCallDialogProps,
 ): JSX.Element {
-	const [asInvite, setAsInvite] = createSignal(false);
-	const [busy, setBusy] = createSignal(false);
-	const [failure, setFailure] = createSignal<string | null>(null);
 	let dialog: HTMLDialogElement | undefined;
-
-	async function open(): Promise<void> {
-		setBusy(true);
-		setFailure(null);
-		const { error } = await actions.rollCall.open({
+	const form = createSchemaForm(rollCallOpen, {
+		id: `open-roll-call-${props.week}-${props.timeSlot}`,
+		action: actions.rollCall.open,
+		hidden: {
 			discipline: props.discipline,
 			course: props.course,
-			week: props.week,
+			week: String(props.week),
 			timeSlot: props.timeSlot,
-			actsAsInvite: asInvite(),
-		});
-		if (error) {
-			setBusy(false);
-			setFailure(error.message);
-			return;
-		}
-		window.location.href = `${props.href}/roll-call/${props.week}/${props.timeSlot}`;
-	}
+		},
+		onSuccess: () => {
+			window.location.href = `${props.href}/roll-call/${props.week}/${props.timeSlot}`;
+		},
+	});
 
 	return (
 		<>
@@ -62,44 +58,31 @@ export default function OpenRollCallDialog(
 						Students check in for 15 minutes with the code on the projected
 						screen.
 					</p>
-					<Show when={failure()}>
-						{(message) => (
-							<div role="alert" class="alert alert-error mt-4">
-								{message()}
-							</div>
-						)}
-					</Show>
-					<label class="label mt-4 cursor-pointer justify-start gap-3">
-						<input
-							type="checkbox"
-							class="checkbox"
-							checked={asInvite()}
-							onChange={(e) => setAsInvite(e.currentTarget.checked)}
-						/>
-						<span>Counts as an invite</span>
-					</label>
-					<p class="text-xs text-base-content/60">
-						Anyone who checks in is enrolled, and gets an account if they have
-						none.
-					</p>
-					<div class="modal-action">
-						<button
-							type="button"
-							class="btn btn-ghost"
-							disabled={busy()}
-							onClick={() => dialog?.close()}
-						>
-							Cancel
-						</button>
-						<button
-							type="button"
-							class="btn btn-primary"
-							disabled={busy()}
-							onClick={open}
-						>
-							Open roll call
-						</button>
-					</div>
+					<form
+						noValidate
+						class="mt-4 flex flex-col gap-3"
+						onSubmit={form.submit}
+					>
+						<FormAlert error={form.error()} />
+						<Field {...form.field("actsAsInvite")} />
+						<div class="modal-action">
+							<button
+								type="button"
+								class="btn btn-ghost"
+								disabled={form.busy()}
+								onClick={() => dialog?.close()}
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								class="btn btn-primary"
+								disabled={form.busy()}
+							>
+								Open roll call
+							</button>
+						</div>
+					</form>
 				</div>
 				<form method="dialog" class="modal-backdrop">
 					<button type="submit">close</button>

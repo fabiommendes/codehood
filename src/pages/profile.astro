@@ -2,9 +2,14 @@
 export const prerender = false;
 
 import { actions } from "astro:actions";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
+import PasswordConfirm from "@/components/PasswordConfirm.astro";
 import Tabs from "@/components/ui/Tabs.astro";
+import { apiKeyForm, passwordChange, profileUpdate } from "@/core/schemas";
 import { type ApiKey, db } from "@/db";
+import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { roleLabels } from "@/utils/roles";
 
@@ -34,6 +39,31 @@ const updateResult = Astro.getActionResult(actions.profile.update);
 const passwordResult = Astro.getActionResult(actions.profile.changePassword);
 const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
 const revokeApiKeyResult = Astro.getActionResult(actions.auth.revokeApiKey);
+
+const updateForm = await actionForm(
+	Astro,
+	actions.profile.update,
+	profileUpdate,
+	{ id: "profile" },
+);
+const passwordForm = await actionForm(
+	Astro,
+	actions.profile.changePassword,
+	passwordChange,
+	{ id: "password-change" },
+);
+const apiKeyCreateForm = await actionForm(
+	Astro,
+	actions.auth.createApiKey,
+	apiKeyForm,
+	{ id: "api-key" },
+);
+
+/// The profile field `name`: the stored value, or what was typed when the save was refused.
+function profileField(name: "name" | "email" | "githubId" | "schoolId") {
+	const field = updateForm.field(name);
+	return updateResult?.error ? field : { ...field, value: user?.[name] ?? "" };
+}
 
 function formatDate(date: Date | null): string {
 	if (!date) return "never";
@@ -78,13 +108,6 @@ const profileTabs = [
               </div>
 
               {
-                updateResult?.error && (
-                  <div role="alert" class="alert alert-error">
-                    <span>{updateResult.error.message}</span>
-                  </div>
-                )
-              }
-              {
                 updateResult && !updateResult.error && (
                   <div role="alert" class="alert alert-success">
                     <span>Profile updated.</span>
@@ -97,27 +120,9 @@ const profileTabs = [
                 action={actions.profile.update}
                 class="flex flex-col gap-4"
               >
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Name</legend>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    value={user.name}
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Email</legend>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={user.email}
-                    class="input w-full"
-                  />
-                </fieldset>
+                <FormAlert error={updateForm.error} />
+                <Field {...profileField("name")} />
+                <Field {...profileField("email")} />
 
                 <fieldset class="fieldset">
                   <legend class="fieldset-legend">Username</legend>
@@ -133,27 +138,8 @@ const profileTabs = [
                   </p>
                 </fieldset>
 
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">GitHub username</legend>
-                  <input
-                    type="text"
-                    name="githubId"
-                    required
-                    value={user.githubId}
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">School id</legend>
-                  <input
-                    type="text"
-                    name="schoolId"
-                    required
-                    value={user.schoolId}
-                    class="input w-full"
-                  />
-                </fieldset>
+                <Field {...profileField("githubId")} />
+                <Field {...profileField("schoolId")} />
 
                 <div class="card-actions">
                   <button type="submit" class="btn btn-primary"
@@ -177,13 +163,6 @@ const profileTabs = [
               </p>
 
               {
-                passwordResult?.error && (
-                  <div role="alert" class="alert alert-error">
-                    <span>{passwordResult.error.message}</span>
-                  </div>
-                )
-              }
-              {
                 passwordResult && !passwordResult.error && (
                   <div role="alert" class="alert alert-success">
                     <span>Password changed.</span>
@@ -196,41 +175,10 @@ const profileTabs = [
                 action={actions.profile.changePassword}
                 class="flex flex-col gap-4"
               >
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Current password</legend>
-                  <input
-                    type="password"
-                    name="currentPassword"
-                    required
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">New password</legend>
-                  <input
-                    type="password"
-                    name="newPassword"
-                    id="newPassword"
-                    required
-                    minlength="8"
-                    class="input w-full"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Confirm new password</legend>
-                  <input
-                    type="password"
-                    id="newPasswordConfirm"
-                    required
-                    minlength="8"
-                    class="input w-full"
-                  />
-                  <p class="label whitespace-normal" id="passwordMismatch" hidden>
-                    Passwords do not match.
-                  </p>
-                </fieldset>
+                <FormAlert error={passwordForm.error} />
+                <Field {...passwordForm.field("currentPassword")} control={{ autocomplete: "current-password" }} />
+                <Field {...passwordForm.field("newPassword")} control={{ autocomplete: "new-password" }} />
+                <PasswordConfirm id="password-change-confirm" matches="newPassword" />
 
                 <div class="card-actions">
                   <button type="submit" class="btn btn-primary"
@@ -247,6 +195,7 @@ const profileTabs = [
               <p class="text-sm text-base-content/60">
                 Sign out of every device and browser where you're logged in.
               </p>
+              <FormAlert error={logoutEverywhereResult?.error?.message} />
               <form
                 method="POST"
                 action={actions.profile.logoutEverywhere}
@@ -276,13 +225,6 @@ const profileTabs = [
               >
 
               {
-                createApiKeyResult?.error && (
-                  <div role="alert" class="alert alert-error">
-                    <span>{createApiKeyResult.error.message}</span>
-                  </div>
-                )
-              }
-              {
                 createApiKeyResult && !createApiKeyResult.error && (
                   <div
                     role="alert"
@@ -298,13 +240,7 @@ const profileTabs = [
                   </div>
                 )
               }
-              {
-                revokeApiKeyResult?.error && (
-                  <div role="alert" class="alert alert-error">
-                    <span>{revokeApiKeyResult.error.message}</span>
-                  </div>
-                )
-              }
+              <FormAlert error={revokeApiKeyResult?.error?.message} />
 
               {
                 apiKeys.length > 0 && (
@@ -344,20 +280,11 @@ const profileTabs = [
                 action={actions.auth.createApiKey}
                 class="flex flex-wrap items-end gap-4"
               >
+                <FormAlert error={apiKeyCreateForm.error} class="w-full" />
+                <Field {...apiKeyCreateForm.field("name")} />
                 <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Key name</legend>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    placeholder="e.g. my laptop"
-                    class="input"
-                  />
-                </fieldset>
-
-                <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Kind</legend>
-                  <select name="kind" class="select">
+                  <legend class="fieldset-legend"><label for="api-key-kind">Kind</label></legend>
+                  <select name="kind" id="api-key-kind" class="select">
                     <option value="CLI">CLI</option>
                     <option value="BOT">Bot</option>
                   </select>
@@ -372,23 +299,3 @@ const profileTabs = [
     </Tabs>
   </main>
 </AppLayout>
-
-<script>
-  const passwordForm = document.getElementById("newPassword")?.closest("form");
-  const password = document.getElementById(
-    "newPassword",
-  ) as HTMLInputElement | null;
-  const confirm = document.getElementById(
-    "newPasswordConfirm",
-  ) as HTMLInputElement | null;
-  const mismatch = document.getElementById("passwordMismatch");
-
-  passwordForm?.addEventListener("submit", (event) => {
-    if (password && confirm && password.value !== confirm.value) {
-      event.preventDefault();
-      mismatch?.removeAttribute("hidden");
-    } else {
-      mismatch?.setAttribute("hidden", "");
-    }
-  });
-</script>

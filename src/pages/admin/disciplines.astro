@@ -8,9 +8,9 @@ import DisciplinesTable, {
 } from "@/components/admin/DisciplinesTable";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { disciplineCreate } from "@/core/schemas";
+import { disciplineCreate, disciplineEdit } from "@/core/schemas";
 import { db } from "@/db";
-import { actionForm } from "@/forms/form-state";
+import { actionForm, submittedValues } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -29,6 +29,16 @@ const createForm = await actionForm(
 	disciplineCreate,
 	{ id: "create-discipline" },
 );
+
+const editForm = await actionForm(
+	Astro,
+	actions.admin.updateDiscipline,
+	disciplineEdit,
+	{ id: "edit-discipline" },
+);
+const failedSlug = updateResult?.error
+	? (await submittedValues(Astro.request)).slug
+	: undefined;
 
 const disciplines = await db.discipline.findMany({});
 const courses = await db.course.findMany({}, { actor });
@@ -95,26 +105,13 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
     </div>
 
     {
-      updateResult?.error && (
-        <div role="alert" class="alert alert-error mt-6">
-          <span>{updateResult.error.message}</span>
-        </div>
-      )
-    }
-    {
       updateResult && !updateResult.error && (
         <div role="alert" class="alert alert-success mt-6">
           <span>Discipline updated.</span>
         </div>
       )
     }
-    {
-      deleteResult?.error && (
-        <div role="alert" class="alert alert-error mt-6">
-          <span>{deleteResult.error.message}</span>
-        </div>
-      )
-    }
+    <FormAlert error={deleteResult?.error?.message} class="mt-6" />
     {
       deleteResult && !deleteResult.error && (
         <div role="alert" class="alert alert-success mt-6">
@@ -123,6 +120,14 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
       )
     }
 
-    <DisciplinesTable disciplines={disciplineRows} />
+    <DisciplinesTable
+      disciplines={disciplineRows}
+      editForm={editForm}
+      failedSlug={failedSlug}
+    />
   </main>
 </AppLayout>
+
+<script>
+  import "@/components/admin/reopen-dialogs";
+</script>

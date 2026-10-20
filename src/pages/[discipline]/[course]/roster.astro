@@ -2,9 +2,17 @@
 import { actions } from "astro:actions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
 import StudentsTable from "@/components/StudentsTable";
 import Alert from "@/components/ui/Alert";
+import {
+	enrollmentAdd,
+	inviteClassroom,
+	passphraseGenerate,
+} from "@/core/schemas";
 import { db } from "@/db";
+import { actionForm, formState } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
@@ -62,6 +70,22 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 		inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
 	}
 }
+
+const addStudentForm = formState(enrollmentAdd, undefined, {
+	id: "add-student",
+});
+const passphraseForm = await actionForm(
+	Astro,
+	actions.course.generatePassphrase,
+	passphraseGenerate,
+	{ id: "custom-passphrase" },
+);
+const inviteForm = formState(inviteClassroom, undefined, {
+	id: "invite",
+	fields: {
+		maxUses: { label: "Limit to N uses (optional)", placeholder: "Unlimited" },
+	},
+});
 
 const students = await db.enrollment.findMany({ course: course.id }, { actor });
 const invites = await db.invite.findMany(
@@ -124,20 +148,8 @@ const csvRows = [
         shareable link, or read a passphrase out in class.
       </p>
 
-      {
-        inviteError && (
-          <Alert variant="error" class="mt-4">
-            <span>{inviteError}</span>
-          </Alert>
-        )
-      }
-      {
-        revokeResult?.error && (
-          <Alert variant="error" class="mt-4">
-            <span>{revokeResult.error.message}</span>
-          </Alert>
-        )
-      }
+      <FormAlert error={inviteError ?? undefined} class="mt-4" />
+      <FormAlert error={revokeResult?.error?.message} class="mt-4" />
       {
         revokeResult && !revokeResult.error && (
           <Alert variant="success" class="mt-4">
@@ -145,13 +157,7 @@ const csvRows = [
           </Alert>
         )
       }
-      {
-        passphraseResult?.error && (
-          <Alert variant="error" class="mt-4">
-            <span>{passphraseResult.error.message}</span>
-          </Alert>
-        )
-      }
+      <FormAlert error={passphraseResult?.error?.message} class="mt-4" />
 
       <div class="mt-4 flex flex-wrap gap-2">
         <button
@@ -278,16 +284,7 @@ const csvRows = [
     <form id="add-student-form" class="mt-4">
       <input type="hidden" name="discipline" value={courseParams.discipline} />
       <input type="hidden" name="course" value={courseParams.course} />
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend">Email or username</legend>
-        <input
-          type="text"
-          name="login"
-          required
-          placeholder="student@example.com"
-          class="input w-full"
-        />
-      </fieldset>
+      <Field {...addStudentForm.field("login")} />
     </form>
 
     <div class="modal-action">
@@ -354,16 +351,7 @@ const csvRows = [
           >Advanced options</summary
         >
         <div class="collapse-content px-0">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Custom passphrase</legend>
-            <input
-              type="text"
-              name="value"
-              placeholder="Auto-generated"
-              class="input w-full font-mono uppercase"
-            />
-            <p class="label whitespace-normal">Leave blank for a random 6-character code.</p>
-          </fieldset>
+          <Field {...passphraseForm.field("value")} class="font-mono uppercase" />
         </div>
       </details>
     </form>
@@ -450,16 +438,7 @@ const csvRows = [
       id="invite-form"
       class="mt-4"
     >
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend">Limit to N uses (optional)</legend>
-        <input
-          type="number"
-          name="maxUses"
-          min="1"
-          placeholder="Unlimited"
-          class="input w-full"
-        />
-      </fieldset>
+      <Field {...inviteForm.field("maxUses")} />
     </form>
 
     <div class="modal-action">

@@ -1,25 +1,25 @@
 import { defineAction } from "astro:actions";
-import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
-import { disciplineCreate } from "@/core/schemas";
+import { FieldError } from "@/core/error";
+import {
+	disciplineCreate,
+	disciplineEdit,
+	disciplinePK,
+	editionForm,
+	editionPK,
+	inviteInstructor,
+	inviteRevoke,
+	userByUsername,
+	userCreateForm,
+} from "@/core/schemas";
 import { db } from "@/db";
-import { USERNAME_RE } from "@/urls";
 import { publicUser } from "./auth";
 import { withServiceErrors } from "./helpers";
 
 export const admin = {
 	createEdition: defineAction({
 		accept: "form",
-		input: z.object({
-			// Format is validated by db.edition.create itself, which throws a
-			// clean, form-facing message ("... is not a valid edition slug ...");
-			// duplicating the regex here would instead surface Astro's raw
-			// input-validation error, a JSON dump of the failing Zod issue.
-			slug: z.string().min(1),
-			name: z.string().min(1),
-			startAt: z.coerce.date(),
-			endAt: z.coerce.date(),
-		}),
+		input: editionForm,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return db.edition.create(input, { actor });
@@ -28,12 +28,7 @@ export const admin = {
 
 	updateEdition: defineAction({
 		accept: "form",
-		input: z.object({
-			slug: z.string(),
-			name: z.string().min(1),
-			startAt: z.coerce.date(),
-			endAt: z.coerce.date(),
-		}),
+		input: editionForm,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const { slug, ...fields } = input;
@@ -43,7 +38,7 @@ export const admin = {
 
 	deleteEdition: defineAction({
 		accept: "form",
-		input: z.object({ slug: z.string() }),
+		input: editionPK,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.edition.delete({ slug: input.slug }, { actor });
@@ -52,7 +47,7 @@ export const admin = {
 
 	forceLogout: defineAction({
 		accept: "form",
-		input: z.object({ username: z.string() }),
+		input: userByUsername,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.session.delete({ username: input.username }, { actor });
@@ -70,7 +65,7 @@ export const admin = {
 
 	updateDiscipline: defineAction({
 		accept: "form",
-		input: z.object({ slug: z.string(), name: z.string().min(1) }),
+		input: disciplineEdit,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return db.discipline.update(
@@ -83,7 +78,7 @@ export const admin = {
 
 	deleteDiscipline: defineAction({
 		accept: "form",
-		input: z.object({ slug: z.string() }),
+		input: disciplinePK,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.discipline.delete({ slug: input.slug }, { actor });
@@ -92,26 +87,34 @@ export const admin = {
 
 	revokeInvite: defineAction({
 		accept: "form",
-		input: z.object({ publicId: z.string().min(1) }),
+		input: inviteRevoke,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.invite.delete({ publicId: input.publicId }, { actor });
 		}),
 	}),
 
+	inviteInstructor: defineAction({
+		accept: "form",
+		input: inviteInstructor,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			const { token } = await db.invite.create(
+				{
+					email: input.email,
+					invitedRole: "INSTRUCTOR",
+					kind: "PERSONAL",
+					maxUses: 1,
+				},
+				{ actor },
+			);
+			return { token };
+		}),
+	}),
+
 	createUser: defineAction({
 		accept: "form",
-		input: z.object({
-			name: z.string().min(1),
-			email: z.email(),
-			username: z.string().regex(USERNAME_RE, "Invalid username."),
-			role: z.enum(["ADMIN", "INSTRUCTOR", "STUDENT"]),
-			password: z.string().min(8),
-			// Required for non-admins, optional for admins — db.user.create
-			// enforces that and throws its own clean message, so this stays loose.
-			githubId: z.string().optional(),
-			schoolId: z.string().optional(),
-		}),
+		input: userCreateForm,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			// db.user.create has no uniqueness pre-check of its own (see
@@ -119,10 +122,14 @@ export const admin = {
 			// — without it, a collision surfaces as a raw Prisma constraint error
 			// instead of a message naming the field that collided.
 			if (await db.user.findOne({ email: input.email }, { actor })) {
-				throw new Error(`A user with email ${input.email} already exists.`);
+				throw new FieldError(
+					"email",
+					`A user with email ${input.email} already exists.`,
+				);
 			}
 			if (await db.user.findOne({ username: input.username }, { actor })) {
-				throw new Error(
+				throw new FieldError(
+					"username",
 					`A user with username ${input.username} already exists.`,
 				);
 			}

@@ -2,6 +2,13 @@ import { ActionError, defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
+import { FieldError } from "@/core/error";
+import {
+	enrollmentAdd,
+	enrollmentDrop,
+	passphraseGenerate,
+	passphraseRedeem,
+} from "@/core/schemas";
 import {
 	db,
 	PassphraseError,
@@ -10,7 +17,7 @@ import {
 	type schema,
 } from "@/db";
 import { parseCourseParams } from "@/urls";
-import { withServiceErrors } from "./helpers";
+import { withActionErrors, withServiceErrors } from "./helpers";
 
 /** Outcome of {@link course.addStudent}: an enrolment, or an invite to accept first. */
 export type AddStudentResult =
@@ -30,11 +37,7 @@ export const course = {
 	 */
 	addStudent: defineAction({
 		accept: "form",
-		input: z.object({
-			discipline: z.string().min(1),
-			course: z.string().min(1),
-			login: z.string().trim().min(1),
-		}),
+		input: enrollmentAdd,
 		handler: withServiceErrors(
 			async (input, context): Promise<AddStudentResult> => {
 				const actor = requireUser(context);
@@ -47,10 +50,10 @@ export const course = {
 
 				if (user) {
 					if (user.role !== "STUDENT") {
-						throw new ActionError({
-							code: "BAD_REQUEST",
-							message: `${user.name} is not a student account.`,
-						});
+						throw new FieldError(
+							"login",
+							`${user.name} is not a student account.`,
+						);
 					}
 					await db.enrollment.create(
 						{ course, username: user.username as schema.UserId },
@@ -60,10 +63,10 @@ export const course = {
 				}
 
 				if (!z.string().email().safeParse(input.login).success) {
-					throw new ActionError({
-						code: "BAD_REQUEST",
-						message: `No account matches "${input.login}". Use an email address to invite someone who has not signed up yet.`,
-					});
+					throw new FieldError(
+						"login",
+						`No account matches "${input.login}". Use an email address to invite someone who has not signed up yet.`,
+					);
 				}
 
 				const { token } = await db.invite.create(
@@ -90,11 +93,7 @@ export const course = {
 	 */
 	dropEnrollment: defineAction({
 		accept: "form",
-		input: z.object({
-			discipline: z.string().min(1),
-			course: z.string().min(1),
-			username: z.string().optional(),
-		}),
+		input: enrollmentDrop,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course = parseCourseParams(input);
@@ -122,30 +121,30 @@ export const course = {
 	 */
 	joinCourse: defineAction({
 		accept: "form",
-		input: z.object({ value: z.string().trim().min(1) }),
-		handler: async (input, context): Promise<PassphraseRedemption> => {
-			const actor = requireUser(context);
-			try {
-				return await db.passphrase.redeem(input.value, { actor });
-			} catch (error) {
-				if (error instanceof PassphraseError) {
-					throw new ActionError({
-						code: "BAD_REQUEST",
-						message: passphraseErrorMessage(error.code, input.value),
-					});
+		input: passphraseRedeem,
+		handler: withActionErrors(
+			async (input, context): Promise<PassphraseRedemption> => {
+				const actor = requireUser(context);
+				try {
+					return await db.passphrase.redeem(input.value, { actor });
+				} catch (error) {
+					if (error instanceof PassphraseError) {
+						const message = passphraseErrorMessage(error.code, input.value);
+						// A wrong or stale code is about the field; being the instructor is not.
+						if (error.code === "own_course") {
+							throw new ActionError({ code: "BAD_REQUEST", message });
+						}
+						throw new FieldError("value", message);
+					}
+					throw error;
 				}
-				throw error;
-			}
-		},
+			},
+		),
 	}),
 
 	generatePassphrase: defineAction({
 		accept: "form",
-		input: z.object({
-			discipline: z.string().min(1),
-			course: z.string().min(1),
-			value: z.string().trim().min(1).optional(),
-		}),
+		input: passphraseGenerate,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course = parseCourseParams(input);

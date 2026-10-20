@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { courseId, username } from "./base";
-import { courseRef } from "./course";
+import { courseParams, courseRef } from "./course";
 import { userSchema } from "./user";
 
 export const enrollmentStatus = z.enum(["ACTIVE", "DROPPED"]);
@@ -37,4 +37,20 @@ export const enrollmentFilterBase = z.object({
 
 export const enrollmentFilter = enrollmentFilterBase.extend({
 	course: courseRef,
+});
+
+/// Adds a student to a course by email or username.
+export const enrollmentAdd = courseParams.extend({
+	login: z
+		.string()
+		.trim()
+		.min(1)
+		.meta({
+			form: { label: "Email or username", placeholder: "student@example.com" },
+		}),
+});
+
+/// Drops a student from a course; `username` defaults to the caller.
+export const enrollmentDrop = courseParams.extend({
+	username: z.string().optional(),
 });

@@ -32,6 +32,34 @@ export const userCreate = userSchema
 	});
 
 /**
+ * The form an admin uses to add an account: {@link userCreate} with the
+ * password rule and texts a form needs.
+ */
+export const userCreateForm = userCreate.extend({
+	name: userSchema.shape.name.meta({ form: { placeholder: "Ada Lovelace" } }),
+	email: userSchema.shape.email.meta({
+		form: { placeholder: "ada@example.edu" },
+	}),
+	username: username.meta({ form: { placeholder: "ada" } }),
+	githubId: z
+		.string()
+		.optional()
+		.meta({
+			form: { label: "GitHub id", placeholder: "required unless Admin" },
+		}),
+	schoolId: z
+		.string()
+		.optional()
+		.meta({
+			form: { label: "School id", placeholder: "required unless Admin" },
+		}),
+	password: z
+		.string()
+		.min(8)
+		.meta({ form: { widget: "password" } }),
+});
+
+/**
  * Editable profile fields.
  *
  * `password` is deliberately absent: a password is changed through
@@ -51,8 +79,43 @@ export const userUpdate = userSchema
 
 /// Proof of the current password plus the one replacing it.
 export const passwordChange = z.object({
-	currentPassword: z.string().min(1),
-	newPassword: z.string().min(8),
+	currentPassword: z
+		.string()
+		.min(1)
+		.meta({ form: { label: "Current password", widget: "password" } }),
+	newPassword: z
+		.string()
+		.min(8)
+		.meta({ form: { label: "New password", widget: "password" } }),
+});
+
+/// What a person types to create their own account.
+export const userSignUp = z.object({
+	name: userSchema.shape.name.meta({ form: { label: "Name" } }),
+	email: userSchema.shape.email,
+	username: username.meta({ form: { label: "Username" } }),
+	password: z
+		.string()
+		.min(8)
+		.meta({ form: { widget: "password" } }),
+	githubId: z
+		.string()
+		.trim()
+		.min(1)
+		.meta({ form: { label: "GitHub username" } }),
+	schoolId: z
+		.string()
+		.trim()
+		.min(1)
+		.meta({ form: { label: "School id" } }),
+});
+
+/// The details a user edits on their own profile page.
+export const profileUpdate = userSignUp.pick({
+	name: true,
+	email: true,
+	githubId: true,
+	schoolId: true,
 });
 
 export const userPK = z.union([
@@ -62,6 +125,9 @@ export const userPK = z.union([
 	z.object({ schoolId: z.string() }),
 	z.object({ login: z.string() }), // email or username
 ]);
+
+/// An account addressed by its username alone.
+export const userByUsername = userSchema.pick({ username: true });
 
 export const userFilter = z.object({
 	usernames: z.array(z.string()).optional(),

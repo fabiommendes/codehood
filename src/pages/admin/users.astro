@@ -4,7 +4,11 @@ export const prerender = false;
 import { actions } from "astro:actions";
 import AdminHeader from "@/components/AdminHeader.astro";
 import UsersTable from "@/components/admin/UsersTable";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
+import { userCreateForm } from "@/core/schemas";
 import { db, type User } from "@/db";
+import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -14,6 +18,15 @@ if (!Astro.locals.actor) return Astro.redirect("/login");
 
 const forceLogoutResult = Astro.getActionResult(actions.admin.forceLogout);
 const createUserResult = Astro.getActionResult(actions.admin.createUser);
+
+const createForm = await actionForm(
+	Astro,
+	actions.admin.createUser,
+	userCreateForm,
+	{ id: "create-user" },
+);
+
+const role = createForm.field("role");
 
 const users = (await db.user.findMany(
 	{},
@@ -45,13 +58,6 @@ const counts = {
     </div>
 
     {
-      createUserResult?.error && (
-        <div role="alert" class="alert alert-error mt-6">
-          <span>{createUserResult.error.message}</span>
-        </div>
-      )
-    }
-    {
       createUserResult && !createUserResult.error && (
         <div role="alert" class="alert alert-success mt-6">
           <span>
@@ -62,7 +68,11 @@ const counts = {
       )
     }
 
-    <dialog id="add-user-dialog" class="modal">
+    <dialog
+      id="add-user-dialog"
+      class="modal"
+      data-reopen={createUserResult?.error ? "" : undefined}
+    >
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
@@ -75,78 +85,14 @@ const counts = {
           action={actions.admin.createUser}
           class="mt-4 flex flex-col gap-4"
         >
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Name</legend>
-            <input
-              type="text"
-              name="name"
-              required
-              placeholder="Ada Lovelace"
-              class="input w-full"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Email</legend>
-            <input
-              type="email"
-              name="email"
-              required
-              placeholder="ada@example.edu"
-              class="input w-full"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Username</legend>
-            <input
-              type="text"
-              name="username"
-              required
-              placeholder="ada"
-              class="input w-full font-mono"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Role</legend>
-            <select name="role" class="select w-full">
-              <option value="STUDENT">Student</option>
-              <option value="INSTRUCTOR">Instructor</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">GitHub id</legend>
-            <input
-              type="text"
-              name="githubId"
-              placeholder="required unless Admin"
-              class="input w-full"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">School id</legend>
-            <input
-              type="text"
-              name="schoolId"
-              placeholder="required unless Admin"
-              class="input w-full"
-            />
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Password</legend>
-            <input
-              type="password"
-              name="password"
-              required
-              minlength="8"
-              class="input w-full"
-            />
-          </fieldset>
+          <FormAlert error={createForm.error} />
+          <Field {...createForm.field("name")} />
+          <Field {...createForm.field("email")} />
+          <Field {...createForm.field("username")} class="font-mono" />
+          <Field {...role} value={role.value || "STUDENT"} />
+          <Field {...createForm.field("githubId")} />
+          <Field {...createForm.field("schoolId")} />
+          <Field {...createForm.field("password")} />
 
           <div class="modal-action">
             <button type="submit" class="btn btn-primary"> Add user </button>
@@ -173,13 +119,7 @@ const counts = {
       </div>
     </div>
 
-    {
-      forceLogoutResult?.error && (
-        <div role="alert" class="alert alert-error mt-6">
-          <span>{forceLogoutResult.error.message}</span>
-        </div>
-      )
-    }
+    <FormAlert error={forceLogoutResult?.error?.message} class="mt-6" />
     {
       forceLogoutResult && !forceLogoutResult.error && (
         <div role="alert" class="alert alert-success mt-6">
@@ -191,3 +131,7 @@ const counts = {
     <UsersTable users={users} />
   </main>
 </AppLayout>
+
+<script>
+  import "@/components/admin/reopen-dialogs";
+</script>

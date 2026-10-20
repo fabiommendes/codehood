@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { courseId, inviteId, publicId, username } from "./base";
-import { courseNaturalKey, courseRef } from "./course";
-import { userInfo, userRole } from "./user";
+import { courseNaturalKey, courseParams, courseRef } from "./course";
+import { userInfo, userRole, userSignUp } from "./user";
 
 export const inviteSchema = z.object({
 	id: inviteId,
@@ -59,4 +59,27 @@ export const inviteFilter = z.object({
 export const inviteUpdate = z.object({
 	expiresAt: z.date().optional(),
 	maxUses: z.number().nullable().optional(),
+});
+
+/// The form that invites an instructor to the instance by email.
+export const inviteInstructor = z.object({
+	email: z.email().meta({ form: { placeholder: "instructor@example.edu" } }),
+});
+
+/// The invite to revoke, by its public id.
+export const inviteRevoke = inviteSchema.pick({ publicId: true });
+
+/// The form that turns an invite into an account. GitHub and school id are optional here; the service requires them of students.
+export const inviteAccept = userSignUp.extend({
+	token: z.string().min(1),
+	githubId: userSignUp.shape.githubId.optional(),
+	schoolId: userSignUp.shape.schoolId.optional(),
+});
+
+/// Enrolls the signed-in user in the course an invite carries.
+export const inviteJoin = inviteAccept.pick({ token: true });
+
+/// A shareable invite link to a course, optionally limited to `maxUses` redemptions.
+export const inviteClassroom = courseParams.extend({
+	maxUses: z.number().int().positive().optional(),
 });

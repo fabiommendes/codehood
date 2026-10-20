@@ -1,6 +1,6 @@
 import { z } from "zod";
 import "./base";
-import { editionSlug } from "./base";
+import { dateInput, editionSlug } from "./base";
 
 export const editionSchema = z.object({
 	slug: editionSlug,
@@ -16,6 +16,25 @@ export const editionCreate = editionSchema.pick({
 	startAt: true,
 	endAt: true,
 });
+
+/**
+ * The edition form: the fields of {@link editionCreate} as the browser submits
+ * them. It both creates an edition and edits one (the slug then rides along as
+ * the key and is not editable).
+ */
+export const editionForm = editionCreate
+	.extend({
+		slug: editionSlug.meta({ form: { placeholder: "2026-2" } }),
+		name: editionSchema.shape.name.meta({
+			form: { placeholder: "Second term" },
+		}),
+		startAt: dateInput.meta({ form: { label: "Starts" } }),
+		endAt: dateInput.meta({ form: { label: "Ends" } }),
+	})
+	.refine((edition) => edition.endAt > edition.startAt, {
+		path: ["endAt"],
+		message: "Must be after the start date.",
+	});
 
 export const editionUpdate = editionSchema
 	.pick({

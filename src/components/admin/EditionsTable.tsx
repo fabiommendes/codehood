@@ -1,7 +1,11 @@
 import { actions } from "astro:actions";
-import type { JSX } from "solid-js";
+import { type JSX, Show } from "solid-js";
+import Field from "@/components/form/Field";
+import FormAlert from "@/components/form/FormAlert";
 import Badge from "@/components/ui/Badge";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
+import type { editionForm } from "@/core/schemas";
+import type { FormState } from "@/forms/form-state";
 import { plural } from "@/utils/plural";
 
 /**
@@ -21,6 +25,10 @@ export interface EditionRow {
 
 interface Props {
 	editions: EditionRow[];
+	/// State of the edit form, as read from the action result of the page.
+	editForm: FormState<typeof editionForm>;
+	/// The slug whose edit failed, so only that row shows the errors and the typed values.
+	failedSlug?: string;
 }
 
 // startAt/endAt are calendar dates with no meaningful time-of-day but are
@@ -46,6 +54,23 @@ function toDateInputValue(date: Date): string {
 }
 
 export default function EditionsTable(props: Props): JSX.Element {
+	/// A field of `row`'s dialog: the stored value, or what was typed when
+	/// that row's submit failed.
+	const editField = (row: EditionRow, name: "name" | "startAt" | "endAt") => {
+		const view = props.editForm.field(name);
+		const failed = props.failedSlug === row.slug;
+		const stored =
+			name === "name"
+				? row.name
+				: toDateInputValue(name === "startAt" ? row.startAt : row.endAt);
+		return {
+			...view,
+			id: `edit-edition-${row.slug}-${name}`,
+			value: failed ? view.value : stored,
+			errors: failed ? view.errors : [],
+		};
+	};
+
 	const columns: ColumnConfig<EditionRow>[] = [
 		{
 			title: "Slug",
@@ -130,7 +155,11 @@ export default function EditionsTable(props: Props): JSX.Element {
 						</button>
 					</form>
 
-					<dialog id={`edit-edition-${row.slug}`} class="modal">
+					<dialog
+						id={`edit-edition-${row.slug}`}
+						class="modal"
+						data-reopen={props.failedSlug === row.slug ? "" : undefined}
+					>
 						<div class="modal-box">
 							<form method="dialog">
 								<button
@@ -150,36 +179,12 @@ export default function EditionsTable(props: Props): JSX.Element {
 								class="mt-4 flex flex-col gap-4"
 							>
 								<input type="hidden" name="slug" value={row.slug} />
-								<fieldset class="fieldset">
-									<legend class="fieldset-legend">Name</legend>
-									<input
-										type="text"
-										name="name"
-										required
-										value={row.name}
-										class="input w-full"
-									/>
-								</fieldset>
-								<fieldset class="fieldset">
-									<legend class="fieldset-legend">Starts</legend>
-									<input
-										type="date"
-										name="startAt"
-										required
-										value={toDateInputValue(row.startAt)}
-										class="input w-full"
-									/>
-								</fieldset>
-								<fieldset class="fieldset">
-									<legend class="fieldset-legend">Ends</legend>
-									<input
-										type="date"
-										name="endAt"
-										required
-										value={toDateInputValue(row.endAt)}
-										class="input w-full"
-									/>
-								</fieldset>
+								<Show when={props.failedSlug === row.slug}>
+									<FormAlert error={props.editForm.error} />
+								</Show>
+								<Field {...editField(row, "name")} />
+								<Field {...editField(row, "startAt")} />
+								<Field {...editField(row, "endAt")} />
 								<div class="modal-action">
 									<button type="submit" class="btn btn-primary">
 										Save

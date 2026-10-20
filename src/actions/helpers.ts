@@ -85,10 +85,8 @@ const FIELD_LABELS: Record<string, string> = {
 	schoolId: "school id",
 };
 
-/**
- * Turns a Prisma unique-constraint violation into a message naming the conflicting field.
- */
-export function uniqueConstraintMessage(error: unknown): string | null {
+/// The columns a Prisma unique-constraint violation names, or `null` when `error` is not one.
+function uniqueConstraintFields(error: unknown): string[] | null {
 	if (
 		typeof error !== "object" ||
 		error === null ||
@@ -105,13 +103,38 @@ export function uniqueConstraintMessage(error: unknown): string | null {
 			| undefined
 	)?.cause?.constraint?.fields;
 	const target = meta.target ?? adapterFields;
-	const fields = Array.isArray(target)
+	return Array.isArray(target)
 		? target
 		: typeof target === "string"
 			? [target]
 			: [];
+}
+
+/**
+ * Turns a Prisma unique-constraint violation into a message naming the conflicting field.
+ */
+export function uniqueConstraintMessage(error: unknown): string | null {
+	const fields = uniqueConstraintFields(error);
+	if (!fields) return null;
 	const field = fields.map((f) => FIELD_LABELS[f]).find(Boolean);
 	return field
 		? `That ${field} is already in use.`
 		: "One of those values is already in use.";
+}
+
+/**
+ * Turns a Prisma unique-constraint violation into the error that shows on the conflicting form field.
+ *
+ * A violation on a column with no form field becomes a plain `ActionError`.
+ * Throw the result from a handler wrapped by {@link withActionErrors} or {@link withServiceErrors}.
+ */
+export function uniqueConstraintError(
+	error: unknown,
+): FieldError | ActionError | null {
+	const message = uniqueConstraintMessage(error);
+	if (!message) return null;
+	const field = uniqueConstraintFields(error)?.find((f) => FIELD_LABELS[f]);
+	return field
+		? new FieldError(field, message)
+		: new ActionError({ code: "CONFLICT", message });
 }

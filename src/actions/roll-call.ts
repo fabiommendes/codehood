@@ -1,21 +1,19 @@
 import { defineAction } from "astro:actions";
-import { z } from "astro/zod";
+import type { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
+import {
+	rollCallAttendances,
+	rollCallOpen,
+	rollCallTarget,
+} from "@/core/schemas";
 import { db } from "@/db";
 import type { RollCall, RollCallPK } from "@/db/services/roll-call.service";
 import { checkInQrSvg } from "@/services/roll-call-qr";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
-/// Identifies a roll call by the course's URL segments, week and time slot.
-const target = z.object({
-	discipline: z.string().min(1),
-	course: z.string().min(1),
-	week: z.number().int(),
-	timeSlot: z.string().min(1),
-});
-
-type Target = z.infer<typeof target>;
+/// The target of every roll call action.
+type Target = z.infer<typeof rollCallTarget>;
 
 /// The service key of the roll call `input` points at.
 function pkOf(input: Target): RollCallPK {
@@ -42,7 +40,7 @@ function snapshot(rollCall: RollCall) {
 export const rollCall = {
 	/** Opens the roll call of a meeting, creating it on first use and reopening it afterwards. */
 	open: defineAction({
-		input: target.extend({ actsAsInvite: z.boolean().optional() }),
+		input: rollCallOpen,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const pk = pkOf(input);
@@ -62,7 +60,7 @@ export const rollCall = {
 
 	/** Closes the roll call now. */
 	close: defineAction({
-		input: target,
+		input: rollCallTarget,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return snapshot(await db.rollCall.close(pkOf(input), { actor }));
@@ -71,7 +69,7 @@ export const rollCall = {
 
 	/** Deletes the roll call and its attendances. */
 	delete: defineAction({
-		input: target,
+		input: rollCallTarget,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.rollCall.delete(pkOf(input), { actor });
@@ -80,7 +78,7 @@ export const rollCall = {
 
 	/** Reads the roll call's current state, for the management page to poll. */
 	get: defineAction({
-		input: target,
+		input: rollCallTarget,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const found = await db.rollCall.findOne(pkOf(input), { actor });
@@ -96,12 +94,7 @@ export const rollCall = {
 	 * (or changes the note), `null` removes the student.
 	 */
 	update: defineAction({
-		input: target.extend({
-			attendances: z.record(
-				z.string().min(1),
-				z.object({ note: z.string().trim().max(200).nullish() }).nullable(),
-			),
-		}),
+		input: rollCallAttendances,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const updated = await db.rollCall.update(
@@ -118,7 +111,7 @@ export const rollCall = {
 	 * how many students are present and the QR code of the check-in link.
 	 */
 	currentCode: defineAction({
-		input: target,
+		input: rollCallTarget,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const pk = pkOf(input);

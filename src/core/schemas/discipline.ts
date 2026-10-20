@@ -31,6 +31,12 @@ export const disciplineCreate = disciplineSchema
 			}),
 	});
 
+/// The edit form: the discipline's name, keyed by the (read-only) slug.
+export const disciplineEdit = disciplineSchema.pick({
+	slug: true,
+	name: true,
+});
+
 export const disciplineUpdate = disciplineSchema
 	.pick({
 		name: true,

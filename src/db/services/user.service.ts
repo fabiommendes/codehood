@@ -6,7 +6,7 @@ import {
 	verifyPassword,
 } from "@/auth/password";
 import { ensurePerm } from "@/auth/permissions";
-import { NotAllowed } from "@/core/error";
+import { FieldError, NotAllowed } from "@/core/error";
 import {
 	passwordChange,
 	userCreate,
@@ -66,9 +66,9 @@ export class UserService extends CrudBase<{
 		// Grades and pushed grade files match students by these; staff may skip them.
 		const isStudent = input.role === "STUDENT";
 		if (!input.githubId && isStudent)
-			throw new Error("githubId is required for students");
+			throw new FieldError("githubId", "Required for students.");
 		if (!input.schoolId && isStudent)
-			throw new Error("schoolId is required for students");
+			throw new FieldError("schoolId", "Required for students.");
 
 		const githubId = input.githubId ?? nullSentinel(input.username);
 		const schoolId = input.schoolId ?? nullSentinel(input.username);

@@ -96,3 +96,9 @@ export const courseFilter = z
 		edition: slug,
 	})
 	.partial();
+
+/// The URL segments that identify a course in a form or action: the discipline slug and `<instructor>_<edition>`.
+export const courseParams = z.object({
+	discipline: z.string().min(1),
+	course: z.string().min(1),
+});

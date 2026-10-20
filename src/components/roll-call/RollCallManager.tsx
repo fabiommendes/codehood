@@ -8,6 +8,7 @@ import {
 	Show,
 } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
+import FormAlert from "@/components/form/FormAlert";
 import { createNow, formatCountdown } from "./countdown";
 
 /// One attendance as the roll call actions return it.
@@ -152,13 +153,7 @@ export default function RollCallManager(
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={failure()}>
-				{(message) => (
-					<div role="alert" class="alert alert-error">
-						{message()}
-					</div>
-				)}
-			</Show>
+			<FormAlert error={failure() ?? undefined} />
 
 			<div class="flex flex-wrap items-center gap-3">
 				<span

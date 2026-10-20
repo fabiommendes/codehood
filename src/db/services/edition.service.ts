@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { ensurePerm } from "@/auth/permissions";
-import { InvalidData } from "@/core/error";
+import { FieldError, InvalidData } from "@/core/error";
 import {
 	editionCreate,
 	editionFilter,
@@ -11,7 +11,6 @@ import {
 import type { Crud, ServiceOpts } from "@/db/base-service";
 import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
-import { invalidIfExists } from "../utils";
 
 //
 // Type definitions
@@ -58,14 +57,21 @@ export class EditionService
 		ensurePerm(opts.actor, "edition.create");
 		assertWindow(input.startAt, input.endAt);
 
-		return invalidIfExists(client.edition.create, {
-			data: {
-				slug: input.slug,
-				name: input.name,
-				startAt: input.startAt,
-				endAt: input.endAt,
-			},
-		});
+		try {
+			return await client.edition.create({
+				data: {
+					slug: input.slug,
+					name: input.name,
+					startAt: input.startAt,
+					endAt: input.endAt,
+				},
+			});
+		} catch (error) {
+			if ((error as { code?: string }).code === "P2002") {
+				throw new FieldError("slug", `Slug "${input.slug}" is already taken.`);
+			}
+			throw error;
+		}
 	}
 
 	/**

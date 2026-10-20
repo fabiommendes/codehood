@@ -57,28 +57,13 @@ if (rollCallId !== null) {
 		if (error === null) throw e;
 	}
 }
-
-// A rejected sign-up renders the page again; refill what was typed.
-const submitted =
-	signUp?.error && Astro.request.method === "POST"
-		? await Astro.request
-				.clone()
-				.formData()
-				.catch(() => null)
-		: null;
-const values: Record<string, string> = {};
-for (const field of ["name", "email", "username", "githubId", "schoolId"]) {
-	const value = submitted?.get(field);
-	if (typeof value === "string") values[field] = value;
-}
-const formError = signUp?.error?.message ?? null;
 ---
 
 <CenteredLayout title={wantsSignUp ? "Join the class" : "Check in"}>
   {
-    (error ?? formError) && (
+    error && (
       <div role="alert" class="alert alert-error">
-        <span>{error ?? formError}</span>
+        <span>{error}</span>
       </div>
     )
   }
@@ -97,7 +82,7 @@ const formError = signUp?.error?.message ?? null;
           </a>
           .
         </p>
-        <SignUpForm rollCallId={rollCallId} values={values} />
+        <SignUpForm rollCallId={rollCallId} />
       </>
     )
   }

@@ -1,18 +1,16 @@
 import { ActionError, defineAction } from "astro:actions";
 import { randomBytes } from "node:crypto";
 import type { AstroCookies } from "astro";
-import { z } from "astro/zod";
 import { FULL_ACCESS, type UserActor } from "@/auth/actor";
 import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
-import { CheckInError, NotFound } from "@/core/error";
-import type { RollCallId } from "@/core/schemas";
+import { CheckInError, FieldError, NotFound } from "@/core/error";
+import { checkInCode, checkInSignUp, type RollCallId } from "@/core/schemas";
 import { db } from "@/db";
 import type { CheckInResult } from "@/db/services/roll-call.service";
-import { USERNAME_RE } from "@/urls";
 import { CLAIM_TTL_MS, readClaim, signClaim } from "@/utils/pending-check-in";
 import { createLimiter } from "@/utils/rate-limit";
-import { uniqueConstraintMessage } from "./helpers";
+import { uniqueConstraintError, withActionErrors } from "./helpers";
 
 /// Name of the cookie that identifies one browser across students.
 const DEVICE_COOKIE = "device";
@@ -212,15 +210,23 @@ export async function completeClaim(
 	return viewOf(result);
 }
 
-/// A text input that may be left empty, read as absent when it is.
-const requiredField = z.string().trim().min(1);
+/// Refusals that are about the code the student typed, not about the student.
+const CODE_REFUSALS: ReadonlySet<string> = new Set(["invalid-code", "expired"]);
+
+/// Whether `error` is a refusal that belongs on the code field.
+function isCodeRefusal(error: unknown): boolean {
+	return (
+		error instanceof NotFound ||
+		(error instanceof CheckInError && CODE_REFUSALS.has(error.code))
+	);
+}
 
 export const checkIn = {
 	/** Marks the logged-in student present with a typed code. */
 	register: defineAction({
 		accept: "form",
-		input: z.object({ code: z.string() }),
-		handler: async (input, context) => {
+		input: checkInCode,
+		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
 			try {
 				return await register({
@@ -231,10 +237,13 @@ export const checkIn = {
 				});
 			} catch (error) {
 				const message = checkInMessage(error);
+				if (message && isCodeRefusal(error)) {
+					throw new FieldError("code", message);
+				}
 				if (message) throw new ActionError({ code: "BAD_REQUEST", message });
 				throw error;
 			}
-		},
+		}),
 	}),
 
 	/**
@@ -245,16 +254,8 @@ export const checkIn = {
 	 */
 	signUp: defineAction({
 		accept: "form",
-		input: z.object({
-			rollCallId: z.coerce.number().int().positive(),
-			email: z.email(),
-			username: z.string().regex(USERNAME_RE, "Invalid username."),
-			name: requiredField,
-			password: z.string().min(8),
-			githubId: requiredField,
-			schoolId: requiredField,
-		}),
-		handler: async (input, context) => {
+		input: checkInSignUp,
+		handler: withActionErrors(async (input, context) => {
 			const pending = await pendingClaim(
 				context.cookies,
 				input.rollCallId as RollCallId,
@@ -287,9 +288,7 @@ export const checkIn = {
 				);
 				username = user.username;
 			} catch (error) {
-				const taken = uniqueConstraintMessage(error);
-				if (taken) throw new ActionError({ code: "CONFLICT", message: taken });
-				throw error;
+				throw uniqueConstraintError(error) ?? error;
 			}
 			const { token, session } = await db.session.create(
 				{ username },
@@ -299,6 +298,6 @@ export const checkIn = {
 				...SESSION_COOKIE_OPTIONS,
 				expires: session.expiresAt,
 			});
-		},
+		}),
 	}),
 };

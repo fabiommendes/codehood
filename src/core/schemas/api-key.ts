@@ -25,3 +25,16 @@ export const apiKeyPK = z.union([
 	z.object({ publicId: publicId }),
 ]);
 export const apiKeyFilter = z.object({ createdBy: username });
+
+/// What the form that creates an API key sends.
+export const apiKeyForm = z.object({
+	name: z
+		.string()
+		.trim()
+		.min(1)
+		.meta({ form: { label: "Key name", placeholder: "e.g. my laptop" } }),
+	kind: apiKeySchema.shape.kind,
+});
+
+/// Revokes the API key with this public id.
+export const apiKeyRevoke = z.object({ publicId: z.string().min(1) });

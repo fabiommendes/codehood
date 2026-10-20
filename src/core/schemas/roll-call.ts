@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { courseId, rollCallId, slug, username } from "./base";
 import { calendarEventPK, calendarEventSchema } from "./calendar-event";
-import { courseRef } from "./course";
+import { courseParams, courseRef } from "./course";
 import { enrollmentSchema } from "./enrollment";
+import { userSignUp } from "./user";
 
 export const rollCallSchema = z.object({
 	id: rollCallId,
@@ -117,4 +118,46 @@ export const checkInResultSchema = z.object({
 	startAt: z.date(),
 	/// Set when this check-in created the enrollment or the account.
 	joined: attendanceSchema.shape.joined,
+});
+
+/// Identifies a roll call by the course's URL segments, week and time slot.
+export const rollCallTarget = courseParams.extend({
+	week: z.number().int(),
+	timeSlot: z.string().min(1),
+});
+
+/// Opens a roll call, creating it on first use.
+export const rollCallOpen = rollCallTarget.extend({
+	actsAsInvite: z
+		.boolean()
+		.optional()
+		.meta({
+			form: {
+				label: "Counts as an invite",
+				hint: "Anyone who checks in is enrolled, and gets an account if they have none.",
+				widget: "toggle",
+			},
+		}),
+});
+
+/// Merges attendances into a roll call: an object marks a student present, `null` removes them.
+export const rollCallAttendances = rollCallTarget.extend({
+	attendances: z.record(
+		z.string().min(1),
+		z.object({ note: z.string().trim().max(200).nullish() }).nullable(),
+	),
+});
+
+/// What a student types to check in to the roll call on screen.
+export const checkInCode = z.object({
+	code: z
+		.string()
+		.trim()
+		.min(1)
+		.meta({ form: { label: "Code" } }),
+});
+
+/// Creates the account of a student who scanned a roll call that acts as an invite.
+export const checkInSignUp = userSignUp.extend({
+	rollCallId: z.coerce.number().int().positive(),
 });
