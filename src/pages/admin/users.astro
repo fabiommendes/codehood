@@ -10,6 +10,7 @@ import { userCreateForm } from "@/core/schemas";
 import { db, type User } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
+import { m, SLOT, splitAtSlot } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -39,22 +40,27 @@ const counts = {
 	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
 	STUDENT: users.filter((u) => u.role === "STUDENT").length,
 };
+
+// The account-created message split around the username, which is rendered apart.
+const [createdBefore, createdAfter] = splitAtSlot(
+	m.admin_users_created({ username: SLOT }),
+);
 ---
 
-<AppLayout title="Admin · Users">
+<AppLayout title={m.admin_users_page_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <AdminHeader active="users" />
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="text-base-content/60">
-        Every account on this Codehood instance: {users.length} in total.
+        {m.admin_users_total({ count: users.length })}
       </p>
       <button
         type="button"
         class="btn btn-primary btn-sm"
         data-open-dialog="add-user-dialog"
       >
-        Add new user
+        {m.admin_users_add()}
       </button>
     </div>
 
@@ -62,8 +68,9 @@ const counts = {
       createUserResult && !createUserResult.error && (
         <div role="alert" class="alert alert-success mt-6">
           <span>
-            Account created for{" "}
-            <span class="font-mono">@{createUserResult.data.username}</span>.
+            {createdBefore}<span class="font-mono"
+              >@{createUserResult.data.username}</span
+            >{createdAfter}
           </span>
         </div>
       )
@@ -80,7 +87,7 @@ const counts = {
             >✕</button
           >
         </form>
-        <h3 class="text-lg font-bold">Add new user</h3>
+        <h3 class="text-lg font-bold">{m.admin_users_add()}</h3>
         <form
           method="POST"
           action={actions.admin.createUser}
@@ -96,26 +103,28 @@ const counts = {
           <Field {...createForm.field("password")} />
 
           <div class="modal-action">
-            <button type="submit" class="btn btn-primary"> Add user </button>
+            <button type="submit" class="btn btn-primary">
+              {m.admin_users_add_submit()}
+            </button>
           </div>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button>{m.admin_close_backdrop()}</button>
       </form>
     </dialog>
 
     <div class="stats mt-8 max-w-md border border-base-300 bg-base-100">
       <div class="stat">
-        <div class="stat-title">Admins</div>
+        <div class="stat-title">{m.admin_users_stat_admins()}</div>
         <div class="stat-value text-2xl">{counts.ADMIN}</div>
       </div>
       <div class="stat">
-        <div class="stat-title">Instructors</div>
+        <div class="stat-title">{m.admin_users_stat_instructors()}</div>
         <div class="stat-value text-2xl">{counts.INSTRUCTOR}</div>
       </div>
       <div class="stat">
-        <div class="stat-title">Students</div>
+        <div class="stat-title">{m.admin_users_stat_students()}</div>
         <div class="stat-value text-2xl">{counts.STUDENT}</div>
       </div>
     </div>
@@ -124,7 +133,7 @@ const counts = {
     {
       forceLogoutResult && !forceLogoutResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Every session for that account has been logged out.</span>
+          <span>{m.admin_force_logout_done()}</span>
         </div>
       )
     }
@@ -132,7 +141,3 @@ const counts = {
     <UsersTable users={users} />
   </main>
 </AppLayout>
-
-<script>
-  import "@/components/admin/reopen-dialogs";
-</script>

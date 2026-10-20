@@ -26,6 +26,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import type { PublicQuestion } from "@/mdq/public";
 import { Question as MdqQuestion } from "@/mdq/question";
 import { mergeQuestion, splitQuestion } from "@/mdq/split";
@@ -322,7 +323,7 @@ export class QuestionService extends CrudBase<{
 		if ((fields.question === undefined) !== (fields.version === undefined)) {
 			throw new InvalidData({
 				[fields.question ? "version" : "question"]: [
-					{ code: "missing", message: "`question` and `version` go together" },
+					{ code: "missing", message: m.errors_question_version_together() },
 				],
 			});
 		}
@@ -332,7 +333,7 @@ export class QuestionService extends CrudBase<{
 		if (ref.status === "ARCHIVED") {
 			throw new NotAllowed("question.update", {
 				status: 409,
-				message: `Question "${ref.slug}" is archived and cannot be written to`,
+				message: m.errors_question_archived({ slug: ref.slug }),
 			});
 		}
 
@@ -624,7 +625,10 @@ async function writeVersion(
 
 		throw new NotAllowed("question.update", {
 			status: 409,
-			message: `Version "${input.version}" of "${ref.slug}" already holds different content`,
+			message: m.errors_question_version_conflict({
+				version: input.version,
+				slug: ref.slug,
+			}),
 		});
 	}
 

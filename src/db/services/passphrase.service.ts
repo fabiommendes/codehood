@@ -14,6 +14,7 @@ import {
 	passphraseUpdate,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
+import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
@@ -121,9 +122,7 @@ export class PassphraseService
 			if (
 				await client.passphrase.findUnique({ where: { value: input.value } })
 			) {
-				throw new Error(
-					`Passphrase "${input.value}" is already in use. Try another.`,
-				);
+				throw new Error(m.errors_passphrase_in_use({ value: input.value }));
 			}
 			return toPassphrase(
 				await client.passphrase.create({
@@ -141,7 +140,7 @@ export class PassphraseService
 				}),
 			);
 		}
-		throw new Error("Could not generate a unique passphrase. Try again.");
+		throw new Error(m.errors_passphrase_generate_failed());
 	}
 
 	/**

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { courseId, gradeColumnId, rev, slug, username } from "./base";
 import { courseRef } from "./course";
 import { enrollmentSchema } from "./enrollment";
@@ -57,7 +58,7 @@ export const gradeColumnCreate = gradeColumnSchema
 			.refine(
 				(values) =>
 					new Set(values.map((entry) => entry.username)).size === values.length,
-				"A student has at most one value in a column.",
+				m.forms_schema_grade_one_value(),
 			),
 	});
 

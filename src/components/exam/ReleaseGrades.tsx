@@ -2,6 +2,7 @@ import { actions } from "astro:actions";
 import { createSignal, type JSX, Show } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
 import { errorMessage } from "@/forms/field-errors";
+import { m } from "@/i18n";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 
@@ -63,7 +64,7 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 								class="btn btn-primary"
 								onClick={() => dialog?.showModal()}
 							>
-								Release results
+								{m.exams_release_button()}
 							</button>
 						</div>
 					</Show>
@@ -72,7 +73,9 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 				{(date) => (
 					<p class="text-sm text-base-content/70">
 						<span title={formatDateTime(date(), { year: "numeric" })}>
-							Released {formatRelative(date(), reference())}
+							{m.exams_release_released({
+								when: formatRelative(date(), reference()),
+							})}
 						</span>
 					</p>
 				)}
@@ -80,11 +83,9 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 
 			<dialog ref={dialog} class="modal">
 				<div class="modal-box">
-					<h3 class="text-lg font-bold">Release results?</h3>
+					<h3 class="text-lg font-bold">{m.exams_release_title()}</h3>
 					<p class="mt-2 text-sm text-base-content/70">
-						All students will see their grades and your comments now. You can't
-						take them back once released. Answers still waiting for a grade
-						block the release.
+						{m.exams_release_body()}
 					</p>
 					<div class="modal-action">
 						<button
@@ -93,7 +94,7 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 							disabled={busy()}
 							onClick={() => dialog?.close()}
 						>
-							Cancel
+							{m.exams_cancel()}
 						</button>
 						<button
 							type="button"
@@ -101,12 +102,12 @@ export default function ReleaseGrades(props: ReleaseGradesProps): JSX.Element {
 							disabled={busy()}
 							onClick={release}
 						>
-							Release results
+							{m.exams_release_button()}
 						</button>
 					</div>
 				</div>
 				<form method="dialog" class="modal-backdrop">
-					<button type="submit">close</button>
+					<button type="submit">{m.exams_close_backdrop()}</button>
 				</form>
 			</dialog>
 		</div>

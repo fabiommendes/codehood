@@ -1,5 +1,6 @@
 import { actions } from "astro:actions";
 import { createSignal, type JSX, onCleanup, onMount, Show } from "solid-js";
+import { m } from "@/i18n";
 import { createNow, formatCountdown } from "./countdown";
 
 export interface RollCallProjectorProps {
@@ -53,28 +54,35 @@ export default function RollCallProjector(
 	return (
 		<main class="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-100 p-6 text-center">
 			<h1 class="text-3xl font-bold">{props.title}</h1>
-			<Show when={isOpen()} fallback={<p class="text-2xl">Roll call closed</p>}>
+			<Show
+				when={isOpen()}
+				fallback={<p class="text-2xl">{m.attendance_manager_closed()}</p>}
+			>
 				<div
 					role="img"
-					aria-label="QR code to check in"
+					aria-label={m.attendance_projector_qr()}
 					class="aspect-square w-[min(70vh,90vw)] rounded-box bg-white p-4 [&>svg]:h-full [&>svg]:w-full"
 					innerHTML={shown().qr}
 				/>
 				<p
 					role="status"
 					aria-live="off"
-					aria-label="Check-in code"
+					aria-label={m.attendance_projector_code()}
 					class="font-mono text-6xl font-bold tracking-[0.3em]"
 				>
 					{shown().code}
 				</p>
 				<p class="font-mono text-xl">
-					Closes in {formatCountdown(shown().closesAt.getTime() - now())}
+					{m.attendance_closes_in({
+						time: formatCountdown(shown().closesAt.getTime() - now()),
+					})}
 				</p>
 			</Show>
-			<p class="text-2xl">{shown().present} present</p>
+			<p class="text-2xl">
+				{m.attendance_projector_present({ count: shown().present })}
+			</p>
 			<a class="btn btn-ghost btn-sm" href={props.manageHref}>
-				Back to the roll call
+				{m.attendance_projector_back()}
 			</a>
 		</main>
 	);

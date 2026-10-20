@@ -8,6 +8,7 @@ import { CheckInError, FieldError, NotFound } from "@/core/error";
 import { checkInCode, checkInSignUp, type RollCallId } from "@/core/schemas";
 import { db } from "@/db";
 import type { CheckInResult } from "@/db/services/roll-call.service";
+import { m } from "@/i18n";
 import { CLAIM_TTL_MS, readClaim, signClaim } from "@/utils/pending-check-in";
 import { createLimiter } from "@/utils/rate-limit";
 import { uniqueConstraintError, withActionErrors } from "./helpers";
@@ -22,15 +23,14 @@ const CLAIM_COOKIE = "check-in-claim";
 const wrongCodes = createLimiter({ max: 10, windowMs: 10 * 60_000 });
 
 /// How each refusal reads to the student.
-const MESSAGES: Record<CheckInError["code"], string> = {
-	"invalid-code": "That code is not valid.",
-	expired: "That code has expired.",
-	closed: "This roll call is closed.",
-	"not-enrolled": "You are not enrolled in this course.",
-	dropped: "You dropped this course, so you cannot check in here.",
-	"not-student": "Only students can check in.",
-	"claim-expired":
-		"Your check-in expired before you finished. Scan the code again.",
+const MESSAGES: Record<CheckInError["code"], () => string> = {
+	"invalid-code": m.errors_check_in_invalid_code,
+	expired: m.errors_check_in_expired,
+	closed: m.errors_check_in_closed,
+	"not-enrolled": m.errors_check_in_not_enrolled,
+	dropped: m.errors_check_in_dropped_course,
+	"not-student": m.errors_check_in_students_only,
+	"claim-expired": m.errors_check_in_claim_expired,
 };
 
 /// Attendance as shown on the result page.
@@ -44,7 +44,7 @@ export interface AttendanceView {
 /// Thrown when a user or an IP made too many wrong attempts.
 export class CheckInBlocked extends Error {
 	constructor() {
-		super("Too many wrong codes. Try again in a few minutes.");
+		super(m.errors_check_in_blocked());
 		this.name = "CheckInBlocked";
 	}
 }
@@ -53,8 +53,8 @@ export class CheckInBlocked extends Error {
  * The text to show for an error thrown while checking in, or `null` if it is not one of ours.
  */
 export function checkInMessage(error: unknown): string | null {
-	if (error instanceof CheckInError) return MESSAGES[error.code];
-	if (error instanceof NotFound) return MESSAGES["invalid-code"];
+	if (error instanceof CheckInError) return MESSAGES[error.code]();
+	if (error instanceof NotFound) return MESSAGES["invalid-code"]();
 	if (error instanceof CheckInBlocked) return error.message;
 	return null;
 }
@@ -263,13 +263,13 @@ export const checkIn = {
 			if (!pending) {
 				throw new ActionError({
 					code: "BAD_REQUEST",
-					message: MESSAGES["claim-expired"],
+					message: MESSAGES["claim-expired"](),
 				});
 			}
 			if (!pending.info.actsAsInvite) {
 				throw new ActionError({
 					code: "FORBIDDEN",
-					message: "This roll call does not create accounts.",
+					message: m.errors_check_in_no_accounts(),
 				});
 			}
 			let username: string;

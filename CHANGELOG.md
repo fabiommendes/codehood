@@ -4,6 +4,12 @@
 
 ### Added
 
+- Translations (Paraglide JS, ADR 0002) and a pt-BR translation. Each
+  installation picks its language at build time with `CODEHOOD_LOCALE`
+  (default `en`). Pages, islands, form labels and validation, error messages
+  (REST and RPC included) and dates follow it. `pnpm run lint` fails when a
+  locale misses a message or its parameters, and a form field without a
+  label now fails instead of showing its field name.
 - Forms are derived from the zod schema that validates the action
   (`src/forms/`, `src/components/form/`, ADR 0001). Each field shows its own
   error, `required`/`minlength`/`max` attributes come from the schema, and the

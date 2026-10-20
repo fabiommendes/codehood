@@ -1,4 +1,5 @@
 import { type ActionError, isInputError } from "astro:actions";
+import { m } from "@/i18n";
 
 /** Errors of a failed action, split into per-field and general messages. */
 export type FieldErrors = {
@@ -27,7 +28,9 @@ export function fieldErrors(error: ActionError): FieldErrors {
 export function errorMessage(error: ActionError): string {
 	if (isInputError(error)) {
 		const messages = Object.values(error.fields).flat();
-		return messages.length > 0 ? messages.join(" ") : "Invalid input.";
+		return messages.length > 0
+			? messages.join(" ")
+			: m.forms_error_invalid_input();
 	}
 	return error.message;
 }

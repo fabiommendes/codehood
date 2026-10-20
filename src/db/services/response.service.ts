@@ -27,6 +27,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
@@ -566,7 +567,9 @@ function resolveAuthorId(author: string | undefined, actor: Actor): string {
 	if (author) return author;
 	if (actor === SYSTEM) {
 		throw new InvalidData({
-			author: [{ code: "missing", message: "`author` is required for SYSTEM" }],
+			author: [
+				{ code: "missing", message: m.errors_response_author_required() },
+			],
 		});
 	}
 	return actor.username;
@@ -632,7 +635,7 @@ async function prepareAttempt(
 			author: [
 				{
 					code: "invalid",
-					message: `"${authorId}" does not hold an active enrollment in this course`,
+					message: m.errors_author_not_enrolled({ username: authorId }),
 				},
 			],
 		});
@@ -643,7 +646,7 @@ async function prepareAttempt(
 			practiceSession: [
 				{
 					code: "invalid",
-					message: "A practice session cannot be named on a graded exam",
+					message: m.errors_practice_session_on_graded(),
 				},
 			],
 		});

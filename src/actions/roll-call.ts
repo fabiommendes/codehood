@@ -8,6 +8,7 @@ import {
 } from "@/core/schemas";
 import { db } from "@/db";
 import type { RollCall, RollCallPK } from "@/db/services/roll-call.service";
+import { m } from "@/i18n";
 import { checkInQrSvg } from "@/services/roll-call-qr";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
@@ -83,7 +84,7 @@ export const rollCall = {
 			const actor = requireUser(context);
 			const found = await db.rollCall.findOne(pkOf(input), { actor });
 			if (!found) {
-				throw new Error("This meeting has no roll call.");
+				throw new Error(m.errors_meeting_no_roll_call());
 			}
 			return snapshot(found);
 		}),
@@ -120,7 +121,7 @@ export const rollCall = {
 			});
 			const found = await db.rollCall.findOne(pk, { actor });
 			if (!found) {
-				throw new Error("This meeting has no roll call.");
+				throw new Error(m.errors_meeting_no_roll_call());
 			}
 			return {
 				code,

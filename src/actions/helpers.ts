@@ -1,5 +1,6 @@
 import { ActionError } from "astro:actions";
 import { FieldError, NotAllowed, NotFound } from "@/core/error";
+import { m } from "@/i18n";
 
 /// Maps the framework-agnostic service errors to the `ActionError` Astro
 /// expects, and returns any other value unchanged.
@@ -77,12 +78,12 @@ export function withServiceErrors<Args extends unknown[], R>(
 	};
 }
 
-/// How a unique user field reads in a form error.
-const FIELD_LABELS: Record<string, string> = {
-	username: "username",
-	email: "email",
-	githubId: "GitHub username",
-	schoolId: "school id",
+/// What a unique-constraint violation on a user field says.
+const UNIQUE_MESSAGES: Record<string, () => string> = {
+	username: m.errors_unique_username_in_use,
+	email: m.errors_unique_email_in_use,
+	githubId: m.errors_unique_github_id_in_use,
+	schoolId: m.errors_unique_school_id_in_use,
 };
 
 /// The columns a Prisma unique-constraint violation names, or `null` when `error` is not one.
@@ -116,10 +117,10 @@ function uniqueConstraintFields(error: unknown): string[] | null {
 export function uniqueConstraintMessage(error: unknown): string | null {
 	const fields = uniqueConstraintFields(error);
 	if (!fields) return null;
-	const field = fields.map((f) => FIELD_LABELS[f]).find(Boolean);
-	return field
-		? `That ${field} is already in use.`
-		: "One of those values is already in use.";
+	const field = fields.find((f) => f in UNIQUE_MESSAGES);
+	return (
+		(field && UNIQUE_MESSAGES[field]?.()) || m.errors_unique_value_in_use()
+	);
 }
 
 /**
@@ -133,7 +134,9 @@ export function uniqueConstraintError(
 ): FieldError | ActionError | null {
 	const message = uniqueConstraintMessage(error);
 	if (!message) return null;
-	const field = uniqueConstraintFields(error)?.find((f) => FIELD_LABELS[f]);
+	const field = uniqueConstraintFields(error)?.find(
+		(f) => f in UNIQUE_MESSAGES,
+	);
 	return field
 		? new FieldError(field, message)
 		: new ActionError({ code: "CONFLICT", message });

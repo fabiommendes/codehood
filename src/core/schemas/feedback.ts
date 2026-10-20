@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { scoreValue } from "../score";
 import { feedbackId, publicId, slug, submissionId, username } from "./base";
 import { courseRef } from "./course";
@@ -20,11 +21,11 @@ const SCORE_RE = /^-?(\d+(\.\d+)?|\d+\/\d+)$/;
  */
 export const score = z
 	.string()
-	.regex(SCORE_RE, "Expected a decimal or an 'n/d' fraction.")
+	.regex(SCORE_RE, m.forms_schema_score_format())
 	.refine((text) => {
 		const value = scoreValue(text);
 		return value !== null && value >= -1 && value <= 1;
-	}, "Score must be a number between -1 and 1.")
+	}, m.forms_schema_score_range())
 	.openapi({ example: "3/4" });
 
 export const feedbackSchema = z.object({

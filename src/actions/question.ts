@@ -2,6 +2,7 @@ import { ActionError, defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
 import { questionStatusUpdate } from "@/core/schemas";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
@@ -28,7 +29,7 @@ export const question = {
 			if (!existing) {
 				throw new ActionError({
 					code: "NOT_FOUND",
-					message: `Question "${input.slug}" not found.`,
+					message: m.errors_question_not_found({ slug: input.slug }),
 				});
 			}
 

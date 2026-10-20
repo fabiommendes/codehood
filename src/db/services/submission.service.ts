@@ -20,6 +20,7 @@ import {
 	submissionUpdate,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import { m } from "@/i18n";
 import {
 	attemptDeadline,
 	type ExamTiming,
@@ -452,7 +453,7 @@ export function assertExamOpen(
 ): void {
 	if (examPhase(examTimingFromDb(exam), now) !== "open") {
 		throw new InvalidData({
-			exam: [{ code: "invalid", message: "This exam is not currently open" }],
+			exam: [{ code: "invalid", message: m.errors_exam_not_open() }],
 		});
 	}
 }
@@ -476,7 +477,7 @@ export function assertAcceptingSubmissions(
 			response: [
 				{
 					code: "invalid",
-					message: "This response is not accepting new submissions",
+					message: m.errors_response_closed(),
 				},
 			],
 		});
@@ -489,7 +490,7 @@ export function assertAcceptingSubmissions(
 			response: [
 				{
 					code: "invalid",
-					message: "The time to answer this exam has run out",
+					message: m.errors_response_time_out(),
 				},
 			],
 		});
@@ -528,7 +529,7 @@ export async function resolveExamQuestion(
 			question: [
 				{
 					code: "not-exists",
-					message: `"${question.slug}" is not one of this exam's questions`,
+					message: m.errors_question_not_in_exam({ slug: question.slug }),
 				},
 			],
 		});

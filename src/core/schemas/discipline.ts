@@ -1,13 +1,19 @@
 import { z } from "zod";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls/constants";
 import "./base";
+import { m } from "@/i18n";
 
 export const disciplineSchema = z.object({
 	slug: z.string().min(1),
 	name: z
 		.string()
 		.min(1)
-		.meta({ form: { placeholder: "Computer Science" } }),
+		.meta({
+			form: {
+				label: m.forms_label_name(),
+				placeholder: m.forms_placeholder_discipline_name(),
+			},
+		}),
 	createdAt: z.date(),
 });
 
@@ -19,15 +25,15 @@ export const disciplineCreate = disciplineSchema
 	.extend({
 		slug: z
 			.string()
-			.regex(
-				DISCIPLINE_SLUG_RE,
-				"Use lowercase letters, digits and hyphens, starting with a letter (3 to 32 characters).",
+			.regex(DISCIPLINE_SLUG_RE, m.forms_schema_discipline_slug_invalid())
+			.refine(
+				(slug) => !RESERVED_SLUGS.has(slug),
+				m.forms_schema_slug_reserved(),
 			)
-			.refine((slug) => !RESERVED_SLUGS.has(slug), "This slug is reserved.")
 			.openapi({ example: "calculus-1" })
 			// After `.openapi()`: it clones the schema and the clone would lose the meta.
 			.meta({
-				form: { placeholder: "cs102" },
+				form: { label: m.forms_label_slug(), placeholder: "cs102" },
 			}),
 	});
 

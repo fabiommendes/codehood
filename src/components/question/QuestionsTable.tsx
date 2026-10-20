@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table-sort";
 import type { QuestionType } from "@/core/schemas";
 import type { Question } from "@/db/services/question.service";
+import { locale, m } from "@/i18n";
 import {
 	questionStatusLabels,
 	questionTypeLabels,
@@ -85,9 +86,13 @@ const STATUS_ACTION: Record<
 	Question["status"],
 	{ label: string; Icon: () => JSX.Element; tone?: string }
 > = {
-	PUBLISHED: { label: "Publish", Icon: PublishIcon, tone: "text-success" },
-	ARCHIVED: { label: "Archive", Icon: ArchiveIcon },
-	DRAFT: { label: "Move to draft", Icon: DraftIcon },
+	PUBLISHED: {
+		label: m.questions_action_publish(),
+		Icon: PublishIcon,
+		tone: "text-success",
+	},
+	ARCHIVED: { label: m.questions_action_archive(), Icon: ArchiveIcon },
+	DRAFT: { label: m.questions_action_draft(), Icon: DraftIcon },
 };
 
 const SORT_FIELDS = ["title", "type", "status", "tags", "updated"] as const;
@@ -389,7 +394,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 
 	const columns: ColumnConfig<QuestionRow>[] = [
 		{
-			title: "Title",
+			title: m.questions_table_col_title(),
 			class: "font-medium",
 			sortKey: "title" satisfies SortField,
 			render: (question) => (
@@ -402,13 +407,13 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			),
 		},
 		{
-			title: "Type",
+			title: m.questions_table_col_type(),
 			class: "text-base-content/60",
 			sortKey: "type" satisfies SortField,
 			render: (question) => questionTypeLabels[question.question.type],
 		},
 		{
-			title: "Status",
+			title: m.questions_table_col_status(),
 			sortKey: "status" satisfies SortField,
 			render: (question) => (
 				<span class={`badge badge-sm ${statusBadgeClass(question.status)}`}>
@@ -417,7 +422,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			),
 		},
 		{
-			title: "Tags",
+			title: m.questions_table_col_tags(),
 			sortKey: "tags" satisfies SortField,
 			render: (question) => (
 				<div class="flex flex-wrap gap-1">
@@ -432,17 +437,17 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			),
 		},
 		{
-			title: "Updated",
+			title: m.questions_table_col_updated(),
 			class: "text-base-content/60",
 			sortKey: "updated" satisfies SortField,
 			render: (question) =>
-				question.updatedAt.toLocaleDateString("en-US", {
+				question.updatedAt.toLocaleDateString(locale, {
 					month: "short",
 					day: "numeric",
 				}),
 		},
 		{
-			title: "Actions",
+			title: m.questions_table_col_actions(),
 			class: "text-right",
 			headerClass: "text-right",
 			render: (question) => {
@@ -463,8 +468,8 @@ export default function QuestionsTable(props: Props): JSX.Element {
 						<a
 							href={`${props.href}/questions/${question.slug}`}
 							class="btn btn-ghost btn-square btn-sm"
-							aria-label={`Open ${titleOf(question)}`}
-							title="Open question"
+							aria-label={m.questions_open_named({ title: titleOf(question) })}
+							title={m.questions_open_title()}
 						>
 							<GoIcon />
 						</a>
@@ -506,7 +511,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 						class="btn btn-sm"
 						onClick={() => setTypeMenuOpen((open) => !open)}
 					>
-						Type
+						{m.questions_table_col_type()}
 						<Show when={types().size > 0}>
 							<span class="badge badge-sm">{types().size}</span>
 						</Show>
@@ -532,7 +537,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 									class="btn btn-ghost btn-xs self-end"
 									onClick={() => setTypes(new Set())}
 								>
-									Clear
+									{m.questions_filter_clear()}
 								</button>
 							</Show>
 						</div>
@@ -549,7 +554,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 							class="btn btn-sm"
 							onClick={() => setTagMenuOpen((open) => !open)}
 						>
-							Tags
+							{m.questions_table_col_tags()}
 							<Show when={tags().size > 0}>
 								<span class="badge badge-sm">{tags().size}</span>
 							</Show>
@@ -575,7 +580,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 										class="btn btn-ghost btn-xs self-end"
 										onClick={() => setTags(new Set())}
 									>
-										Clear
+										{m.questions_filter_clear()}
 									</button>
 								</Show>
 							</div>
@@ -584,8 +589,10 @@ export default function QuestionsTable(props: Props): JSX.Element {
 				</Show>
 
 				<span class="text-sm text-base-content/60">
-					{sorted().length} of {props.questions.length} question
-					{props.questions.length === 1 ? "" : "s"}
+					{m.questions_table_count({
+						shown: sorted().length,
+						total: props.questions.length,
+					})}
 				</span>
 
 				<Show when={hasActiveFilters()}>
@@ -594,22 +601,26 @@ export default function QuestionsTable(props: Props): JSX.Element {
 						class="btn btn-ghost btn-sm"
 						onClick={clearFilters}
 					>
-						Clear filters
+						{m.questions_filter_clear_all()}
 					</button>
 				</Show>
 			</div>
 
 			<Show
 				when={props.questions.length > 0}
-				fallback={<p class="text-sm text-base-content/60">No questions yet.</p>}
+				fallback={
+					<p class="text-sm text-base-content/60">
+						{m.questions_table_empty()}
+					</p>
+				}
 			>
 				<Show
 					when={sorted().length > 0}
 					fallback={
 						<p class="text-sm text-base-content/60">
-							No questions match these filters.{" "}
+							{m.questions_table_no_match()}{" "}
 							<button type="button" class="link" onClick={clearFilters}>
-								Clear filters
+								{m.questions_filter_clear_all()}
 							</button>
 						</p>
 					}

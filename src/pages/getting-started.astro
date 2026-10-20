@@ -8,6 +8,7 @@ import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
 import { db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 if (!Astro.locals.actor) return Astro.redirect("/login");
@@ -18,16 +19,18 @@ const apiKeys = await db.apiKey.findMany(
 	{ actor: Astro.locals.actor },
 );
 const hasKey = apiKeys.length > 0;
+const codeTag = (text: string) =>
+	`<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">${text}</code>`;
+const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}</a>`;
 ---
 
-<AppLayout title="Getting started with the CLI">
+<AppLayout title={m.auth_gs_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <div class="max-w-2xl">
-    <PageKicker text="CLI" squares />
-    <h1 class="text-3xl font-bold">Getting started</h1>
+    <PageKicker text={m.auth_gs_kicker()} squares />
+    <h1 class="text-3xl font-bold">{m.auth_gs_heading()}</h1>
     <p class="mt-2 max-w-xl text-base-content/70">
-      Codehood courses are written locally and synced with a CLI tool. Four
-      steps to your first push.
+      {m.auth_gs_intro()}
     </p>
 
     <ol class="mt-8 flex flex-col gap-6">
@@ -38,7 +41,7 @@ const hasKey = apiKeys.length > 0;
               class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
               >1</span
             >
-            <p class="font-medium">Scaffold a course</p>
+            <p class="font-medium">{m.auth_gs_step1()}</p>
           </div>
           <pre
             class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood init
@@ -53,14 +56,9 @@ const hasKey = apiKeys.length > 0;
               class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
               >2</span
             >
-            <p class="font-medium">Write your content</p>
+            <p class="font-medium">{m.auth_gs_step2()}</p>
           </div>
-          <p class="text-sm text-base-content/60">
-            Questions, exams, and resources live as plain text files under <code
-              class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs"
-              >content/</code
-            > and edit them in whatever editor you already use.
-          </p>
+          <p class="text-sm text-base-content/60" set:html={m.auth_gs_step2_body({ code: codeTag("content/") })} />
         </div>
       </li>
 
@@ -71,12 +69,9 @@ const hasKey = apiKeys.length > 0;
               class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
               >3</span
             >
-            <p class="font-medium">Create a CLI API key</p>
+            <p class="font-medium">{m.auth_gs_step3()}</p>
           </div>
-          <p class="text-sm text-base-content/60">
-            The CLI authenticates as you with a key. Generate one below, or
-            manage keys any time from your profile.
-          </p>
+          <p class="text-sm text-base-content/60">{m.auth_gs_step3_body()}</p>
 
           <FormAlert error={createApiKeyResult?.error && errorMessage(createApiKeyResult.error)} />
           {
@@ -85,7 +80,7 @@ const hasKey = apiKeys.length > 0;
                 role="alert"
                 class="alert alert-success flex-col items-start"
               >
-                <span>Key created. Copy it now, it won't be shown again.</span>
+                <span>{m.auth_gs_key_created()}</span>
                 <code class="w-full break-all rounded bg-base-300 px-2 py-1 text-xs">
                   {createApiKeyResult.data.token}
                 </code>
@@ -96,13 +91,7 @@ const hasKey = apiKeys.length > 0;
           {
             hasKey && !createApiKeyResult ? (
               <div role="alert" class="alert alert-info">
-                <span>
-                  You already have a CLI key. Manage it from your{" "}
-                  <a href="/profile" class="link">
-                    profile
-                  </a>
-                  .
-                </span>
+                <span set:html={m.auth_gs_have_key({ link: profileLink })} />
               </div>
             ) : (
               <form
@@ -113,7 +102,7 @@ const hasKey = apiKeys.length > 0;
                 <input type="hidden" name="name" value="cli" />
                 <input type="hidden" name="kind" value="CLI" />
                 <button type="submit" class="btn btn-primary btn-sm">
-                  Generate CLI key
+                  {m.auth_gs_generate_key()}
                 </button>
               </form>
             )
@@ -128,7 +117,7 @@ const hasKey = apiKeys.length > 0;
               class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
               >4</span
             >
-            <p class="font-medium">Push, and it's live</p>
+            <p class="font-medium">{m.auth_gs_step4()}</p>
           </div>
           <pre
             class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push

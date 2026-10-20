@@ -4,6 +4,7 @@ import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { FieldError, NotAllowed } from "@/core/error";
 import { profileUpdate } from "@/core/schemas";
 import { db, schema } from "@/db";
+import { m } from "@/i18n";
 import { uniqueConstraintError, withActionErrors } from "./helpers";
 
 export const profile = {
@@ -14,10 +15,10 @@ export const profile = {
 			const actor = requireUser(context);
 			if (actor.role === "STUDENT") {
 				if (!input.githubId) {
-					throw new FieldError("githubId", "Required for students.");
+					throw new FieldError("githubId", m.errors_required_for_students());
 				}
 				if (!input.schoolId) {
-					throw new FieldError("schoolId", "Required for students.");
+					throw new FieldError("schoolId", m.errors_required_for_students());
 				}
 			}
 			try {
@@ -42,7 +43,7 @@ export const profile = {
 			if (!user) {
 				throw new ActionError({
 					code: "UNAUTHORIZED",
-					message: "Current password is incorrect.",
+					message: m.errors_current_password_incorrect(),
 				});
 			}
 

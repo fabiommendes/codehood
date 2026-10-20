@@ -17,5 +17,162 @@
 			}
 		}
 	],
-	"admin_courses_open": "Open course"
+	"admin_courses_open": "Open course",
+	"admin_close": "Close",
+	"admin_close_backdrop": "close",
+	"admin_save": "Save",
+	"admin_edit": "Edit",
+	"admin_edit_slug": "Edit {slug}",
+	"admin_delete": "Delete",
+	"admin_delete_slug": "Delete {slug}",
+	"admin_col_slug": "Slug",
+	"admin_col_name": "Name",
+	"admin_col_courses": "Courses",
+	"admin_col_actions": "Actions",
+	"admin_col_interval": "Interval",
+	"admin_col_status": "Status",
+	"admin_col_email": "Email",
+	"admin_col_created_by": "Created by",
+	"admin_col_created": "Created",
+	"admin_col_expires": "Expires",
+	"admin_col_uses": "Uses",
+	"admin_col_username": "Username",
+	"admin_col_role": "Role",
+	"admin_col_joined": "Joined",
+	"admin_courses_count": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} course",
+				"countPlural=other": "{count} courses"
+			}
+		}
+	],
+	"admin_discipline_in_use": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} course still uses this discipline",
+				"countPlural=other": "{count} courses still use this discipline"
+			}
+		}
+	],
+	"admin_edition_in_use": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} course still uses this edition",
+				"countPlural=other": "{count} courses still use this edition"
+			}
+		}
+	],
+	"admin_edition_live": "live",
+	"admin_edition_closed": "closed",
+	"admin_invite_revoke": "Revoke",
+	"admin_invite_revoke_title": "Revoke the invite for {email}?",
+	"admin_invite_revoke_text": "Its link stops working immediately. To invite them again, issue a new one.",
+	"admin_role_admin": "admin",
+	"admin_role_instructor": "instructor",
+	"admin_role_student": "student",
+	"admin_force_logout": "Force logout",
+	"admin_force_logout_user": "Force logout {name}",
+	"admin_force_logout_title": "Force logout {name}?",
+	"admin_force_logout_text": "Every active session ends immediately; the account itself is not disabled.",
+	"admin_force_logout_submit": "Log out",
+	"admin_force_logout_done": "Every session for that account has been logged out.",
+	"admin_disciplines_page_title": "Admin · Disciplines",
+	"admin_disciplines_intro": "One of two catalogs admins own outright. The slug is permanent once created: it is the first segment of every course URL underneath it.",
+	"admin_discipline_created": "Discipline \"{slug}\" created.",
+	"admin_discipline_updated": "Discipline updated.",
+	"admin_discipline_deleted": "Discipline deleted.",
+	"admin_new_discipline": "New discipline",
+	"admin_editions_page_title": "Admin · Editions",
+	"admin_editions_intro": "Terms and their active windows. Instructors can only create courses inside a window; admins and the system account can create in any edition.",
+	"admin_edition_created": "Edition \"{slug}\" created.",
+	"admin_edition_updated": "Edition updated.",
+	"admin_edition_deleted": "Edition deleted.",
+	"admin_new_edition": "New edition",
+	"admin_users_page_title": "Admin · Users",
+	"admin_users_total": "Every account on this Codehood instance: {count} in total.",
+	"admin_users_add": "Add new user",
+	"admin_users_add_submit": "Add user",
+	"admin_users_created": "Account created for {username}.",
+	"admin_users_stat_admins": "Admins",
+	"admin_users_stat_instructors": "Instructors",
+	"admin_users_stat_students": "Students",
+	"admin_overview_page_title": "Admin · Overview",
+	"admin_overview_stat_users": "Users",
+	"admin_overview_stat_courses": "Courses",
+	"admin_overview_stat_disciplines": "Disciplines",
+	"admin_overview_stat_editions": "Editions",
+	"admin_overview_admins": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} admin",
+				"countPlural=other": "{count} admins"
+			}
+		}
+	],
+	"admin_overview_instructors": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} instructor",
+				"countPlural=other": "{count} instructors"
+			}
+		}
+	],
+	"admin_overview_students": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} student",
+				"countPlural=other": "{count} students"
+			}
+		}
+	],
+	"admin_overview_across_disciplines": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "across {count} discipline",
+				"countPlural=other": "across {count} disciplines"
+			}
+		}
+	],
+	"admin_overview_none_yet": "none yet",
+	"admin_overview_disciplines_more": "{list} & {count} more",
+	"admin_overview_live_now": "{count} live now",
+	"admin_overview_actions_title": "Actions",
+	"admin_overview_actions_intro": "Available system-wide. Destructive ones ask you to confirm before anything happens.",
+	"admin_overview_invite_title": "Invite an instructor",
+	"admin_overview_invite_text": "Generate a one-time signup link. They set their own password and details.",
+	"admin_overview_invite_button": "Invite instructor",
+	"admin_overview_discipline_text": "Add a new subject catalog, e.g. {example}.",
+	"admin_overview_edition_text": "Add a term with its active window, e.g. {example}.",
+	"admin_overview_pending_title": "Pending invites",
+	"admin_overview_pending_intro": "Revoke one to invalidate its link. Force-logout lives on each row in the Users tab.",
+	"admin_overview_invite_created": "Invite created. It expires in 7 days.",
+	"admin_overview_copy_aria": "Copy invite link",
+	"admin_overview_copy_title": "Copy",
+	"admin_overview_copied": "Copied",
+	"admin_overview_discipline_created": "Discipline \"{slug}\" created. {link}.",
+	"admin_overview_discipline_link": "See it on the Disciplines tab",
+	"admin_overview_edition_created": "Edition \"{slug}\" created. {link}.",
+	"admin_overview_edition_link": "See it on the Editions tab",
+	"admin_overview_invite_revoked": "Invite revoked.",
+	"admin_overview_no_pending": "No pending instructor invites.",
+	"admin_overview_link_once": "A link is only ever shown once. If someone loses it, revoke the invite here and issue a new one.",
+	"admin_overview_invite_dialog_text": "They redeem this link to create their own account. Password, GitHub handle, and school id are theirs to supply.",
+	"admin_overview_invite_submit": "Generate invite link",
+	"admin_overview_create_discipline": "Create discipline",
+	"admin_overview_create_edition": "Create edition"
 }

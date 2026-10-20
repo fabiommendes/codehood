@@ -9,6 +9,7 @@ import PasswordConfirm from "@/components/PasswordConfirm.astro";
 import { inviteAccept } from "@/core/schemas";
 import { db } from "@/db";
 import { actionForm } from "@/forms/form-state";
+import { escapeHtml, m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 import { courseHref } from "@/urls";
 
@@ -57,28 +58,51 @@ const enrollment =
 			)
 		: null;
 const alreadyIn = enrollment?.status === "ACTIVE";
-const role = invite?.invitedRole.toLowerCase();
+const roleHtml = {
+	STUDENT: m.auth_invite_role_student(),
+	INSTRUCTOR: m.auth_invite_role_instructor(),
+	ADMIN: m.auth_invite_role_admin(),
+};
+
+const invitedHtml = invite
+	? m.auth_invite_invited({
+			name: escapeHtml(invite.createdBy.name),
+			target: course
+				? `<strong>${escapeHtml(course.discipline.name)} (${escapeHtml(course.edition.slug)})</strong>`
+				: "Codehood",
+			role: roleHtml[invite.invitedRole],
+		})
+	: "";
+const logInHref = `/login?next=${encodeURIComponent(`/invite/${token}`)}`;
+const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">${escapeHtml(m.auth_invite_log_in_to_join())}</a>`;
 
 // GitHub and school id are optional for roles other than student.
-const optional = isStudentInvite ? "" : " (optional)";
 const form = await actionForm(Astro, actions.auth.acceptInvite, inviteAccept, {
 	id: "accept-invite",
 	fields: {
-		githubId: { label: `GitHub username${optional}` },
-		schoolId: { label: `School id${optional}` },
+		githubId: {
+			label: isStudentInvite
+				? m.forms_label_github_username()
+				: m.forms_label_github_username_optional(),
+		},
+		schoolId: {
+			label: isStudentInvite
+				? m.forms_label_school_id()
+				: m.forms_label_school_id_optional(),
+		},
 	},
 });
 const email = form.field("email");
 ---
 
-<CenteredLayout title={canJoin ? "Join course" : "Accept invite"}>
+<CenteredLayout title={canJoin ? m.auth_invite_title_join() : m.auth_invite_title_accept()}>
   {
     !isValid && !alreadyIn && (
       <div role="alert" class="alert alert-error">
         <span>
-          {!invite && "This invite link is invalid."}
-          {invite && isExpired && "This invite has expired."}
-          {invite && isExhausted && "This invite has already been fully used."}
+          {!invite && m.auth_invite_invalid()}
+          {invite && isExpired && m.auth_invite_expired()}
+          {invite && isExhausted && m.auth_invite_exhausted()}
         </span>
       </div>
     )
@@ -94,27 +118,16 @@ const email = form.field("email");
 
   {
     invite && (isValid || alreadyIn) && (
-      <p class="text-sm text-base-content/70">
-        {invite.createdBy.name} invited you to{" "}
-        {course ? (
-          <strong>
-            {course.discipline.name} ({course.edition.slug})
-          </strong>
-        ) : (
-          "Codehood"
-        )}{" "}
-        as {role === "instructor" || role === "admin" ? "an" : "a"}{" "}
-        <strong>{role}</strong>.
-      </p>
+      <p class="text-sm text-base-content/70" set:html={invitedHtml} />
     )
   }
 
   {
     alreadyIn && href && (
       <>
-        <p class="text-sm">You're already in this course.</p>
+        <p class="text-sm">{m.auth_invite_already_in()}</p>
         <a href={href} class="btn btn-primary btn-block rounded-full">
-          Open the course
+          {m.auth_invite_open_course()}
         </a>
       </>
     )
@@ -124,11 +137,12 @@ const email = form.field("email");
     isValid && canJoin && !alreadyIn && viewer && (
       <form method="POST" action={actions.auth.joinWithInvite} class="flex flex-col gap-4">
         <input type="hidden" name="token" value={token} />
-        <p class="text-sm">
-          You're logged in as <strong>{viewer.name}</strong> ({viewer.username}).
-        </p>
+        <p
+          class="text-sm"
+          set:html={m.auth_invite_logged_in_as({ name: escapeHtml(viewer.name), username: escapeHtml(viewer.username) })}
+        />
         <button type="submit" class="btn btn-primary btn-block rounded-full">
-          Join the course
+          {m.auth_invite_join_course()}
         </button>
       </form>
     )
@@ -137,11 +151,11 @@ const email = form.field("email");
   {
     isValid && viewer && !canJoin && (
       <>
-        <p class="text-sm">
-          You're logged in as <strong>{viewer.name}</strong>. This invite is
-          for creating a new account, so it has nothing to add to yours.
-        </p>
-        <a href="/" class="btn btn-block rounded-full">Go to your home</a>
+        <p
+          class="text-sm"
+          set:html={m.auth_invite_logged_in_nothing_to_add({ name: escapeHtml(viewer.name) })}
+        />
+        <a href="/" class="btn btn-block rounded-full">{m.auth_invite_go_home()}</a>
       </>
     )
   }
@@ -150,16 +164,7 @@ const email = form.field("email");
     isValid && invite && !viewer && (
       <>
         {course && isStudentInvite && (
-          <p class="text-sm text-base-content/70">
-            Already have an account?{" "}
-            <a
-              class="link link-primary"
-              href={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}
-            >
-              Log in to join
-            </a>
-            .
-          </p>
+          <p class="text-sm text-base-content/70" set:html={m.auth_invite_have_account({ link: logInLink })} />
         )}
 
         <form
@@ -196,7 +201,7 @@ const email = form.field("email");
           </div>
           {isStudentInvite && (
             <p class="label whitespace-normal">
-              Your instructors use these to tell whose work is whose.
+              {m.auth_identify_note()}
             </p>
           )}
 
@@ -204,7 +209,7 @@ const email = form.field("email");
             type="submit"
             class="btn btn-primary btn-block mt-4 rounded-full"
           >
-            Create account
+            {m.auth_create_account()}
           </button>
         </form>
       </>

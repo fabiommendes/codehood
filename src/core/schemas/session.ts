@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { sessionId, username } from "./base";
 
 export const sessionSchema = z.object({
@@ -18,11 +19,11 @@ export const sessionLogin = z.object({
 	login: z
 		.string()
 		.min(1)
-		.meta({ form: { label: "Email or username" } }),
+		.meta({ form: { label: m.forms_label_email_or_username() } }),
 	password: z
 		.string()
 		.min(1)
-		.meta({ form: { widget: "password" } }),
+		.meta({ form: { label: m.forms_label_password(), widget: "password" } }),
 });
 
 export const sessionCreateResult = z.object({

@@ -14,5 +14,38 @@
 	"attendance_page_heading": "Attendance",
 	"attendance_page_no_roll_calls": "No roll calls yet.",
 	"attendance_page_no_students": "No students enrolled yet.",
-	"attendance_roll_call_page_title": "{event} · Roll call"
+	"attendance_roll_call_page_title": "{event} · Roll call",
+	"attendance_roll_call": "Roll call",
+	"attendance_open_title": "Open the roll call",
+	"attendance_open_body": "Students check in for 15 minutes with the code on the projected screen.",
+	"attendance_cancel": "Cancel",
+	"attendance_open_submit": "Open roll call",
+	"attendance_close_backdrop": "close",
+	"attendance_manager_open": "Roll call open",
+	"attendance_manager_closed": "Roll call closed",
+	"attendance_closes_in": "Closes in {time}",
+	"attendance_manager_project": "Project",
+	"attendance_manager_reopen": "Reopen roll call",
+	"attendance_manager_close": "Close roll call",
+	"attendance_manager_delete": "Delete",
+	"attendance_manager_col_note": "Note",
+	"attendance_manager_new_in_class": "New in this class",
+	"attendance_manager_same_device": "Same device as {other}",
+	"attendance_manager_save": "Save",
+	"attendance_manager_delete_title": "Delete this roll call?",
+	"attendance_manager_delete_body": "Every attendance recorded in it is lost. This cannot be undone.",
+	"attendance_manager_delete_confirm": "Delete roll call",
+	"attendance_projector_qr": "QR code to check in",
+	"attendance_projector_code": "Check-in code",
+	"attendance_projector_present": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} present",
+				"countPlural=other": "{count} present"
+			}
+		}
+	],
+	"attendance_projector_back": "Back to the roll call"
 }

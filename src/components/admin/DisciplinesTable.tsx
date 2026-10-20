@@ -5,7 +5,7 @@ import FormAlert from "@/components/form/FormAlert";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { disciplineEdit } from "@/core/schemas";
 import type { FormState } from "@/forms/form-state";
-import { plural } from "@/utils/plural";
+import { m, SLOT, splitAtSlot } from "@/i18n";
 
 /**
  * One row's worth of pre-computed display data — free of `Discipline` and
@@ -27,6 +27,11 @@ interface Props {
 	failedSlug?: string;
 }
 
+/// The heading of the edit dialog split around the slug, which is rendered apart.
+const [EDIT_BEFORE, EDIT_AFTER] = splitAtSlot(
+	m.admin_edit_slug({ slug: SLOT }),
+);
+
 export default function DisciplinesTable(props: Props): JSX.Element {
 	/// The name field of `row`'s dialog: the stored name, or what was typed
 	/// when that row's submit failed.
@@ -43,18 +48,18 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 
 	const columns: ColumnConfig<DisciplineRow>[] = [
 		{
-			title: "Slug",
+			title: m.admin_col_slug(),
 			class: "font-mono font-medium",
 			render: (row) => row.slug,
 		},
-		{ title: "Name", render: (row) => row.name },
+		{ title: m.admin_col_name(), render: (row) => row.name },
 		{
-			title: "Courses",
+			title: m.admin_col_courses(),
 			class: "text-base-content/60",
-			render: (row) => plural(row.courseCount, "course"),
+			render: (row) => m.admin_courses_count({ count: row.courseCount }),
 		},
 		{
-			title: "Actions",
+			title: m.admin_col_actions(),
 			class: "text-right",
 			headerClass: "text-right",
 			render: (row) => (
@@ -62,12 +67,12 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 					<button
 						type="button"
 						class="btn btn-square btn-ghost btn-sm"
-						aria-label={`Edit ${row.slug}`}
-						title="Edit"
+						aria-label={m.admin_edit_slug({ slug: row.slug })}
+						title={m.admin_edit()}
 						data-open-dialog={`edit-discipline-${row.slug}`}
 					>
 						<svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-							<title>Edit</title>
+							<title>{m.admin_edit()}</title>
 							<path
 								d="M16.5 4.5 19.5 7.5 8 19H5v-3Z"
 								stroke="currentColor"
@@ -87,15 +92,15 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 							type="submit"
 							class={`btn btn-square btn-ghost btn-sm ${row.courseCount > 0 ? "text-base-content/30" : "text-error"}`}
 							disabled={row.courseCount > 0}
-							aria-label={`Delete ${row.slug}`}
+							aria-label={m.admin_delete_slug({ slug: row.slug })}
 							title={
 								row.courseCount > 0
-									? `${plural(row.courseCount, "course")} still use${row.courseCount === 1 ? "s" : ""} this discipline`
-									: "Delete"
+									? m.admin_discipline_in_use({ count: row.courseCount })
+									: m.admin_delete()
 							}
 						>
 							<svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-								<title>Delete</title>
+								<title>{m.admin_delete()}</title>
 								<path
 									d="M5 7h14M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7M7 7l1 12.5A1.5 1.5 0 0 0 9.5 21h5a1.5 1.5 0 0 0 1.5-1.5L17 7"
 									stroke="currentColor"
@@ -117,13 +122,15 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 								<button
 									class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
 									type="submit"
-									aria-label="Close"
+									aria-label={m.admin_close()}
 								>
 									✕
 								</button>
 							</form>
 							<h3 class="text-lg font-bold">
-								Edit <span class="font-mono">{row.slug}</span>
+								{EDIT_BEFORE}
+								<span class="font-mono">{row.slug}</span>
+								{EDIT_AFTER}
 							</h3>
 							<form
 								method="post"
@@ -137,13 +144,13 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 								<Field {...nameField(row)} />
 								<div class="modal-action">
 									<button type="submit" class="btn btn-primary">
-										Save
+										{m.admin_save()}
 									</button>
 								</div>
 							</form>
 						</div>
 						<form method="dialog" class="modal-backdrop">
-							<button type="submit">close</button>
+							<button type="submit">{m.admin_close_backdrop()}</button>
 						</form>
 					</dialog>
 				</>

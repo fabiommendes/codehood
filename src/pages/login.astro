@@ -6,6 +6,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { sessionLogin } from "@/core/schemas";
 import { actionForm } from "@/forms/form-state";
+import { m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 /// Where to go after logging in. Only paths on this site are accepted, so the
@@ -30,7 +31,7 @@ const form = await actionForm(Astro, actions.auth.login, sessionLogin, {
 });
 ---
 
-<CenteredLayout title="Log in">
+<CenteredLayout title={m.auth_login_action()}>
   <form method="POST" action={actions.auth.login} class="flex flex-col gap-4">
     <input type="hidden" name="next" value={next} />
     <FormAlert error={form.error} />
@@ -38,7 +39,7 @@ const form = await actionForm(Astro, actions.auth.login, sessionLogin, {
     <Field {...form.field("password")} />
 
     <div class="card-actions">
-      <button type="submit" class="btn btn-primary btn-block rounded-full">Log in</button>
+      <button type="submit" class="btn btn-primary btn-block rounded-full">{m.auth_login_action()}</button>
     </div>
   </form>
 </CenteredLayout>

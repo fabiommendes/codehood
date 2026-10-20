@@ -10,8 +10,8 @@ import { disciplineCreate, editionForm, invitePersonal } from "@/core/schemas";
 import { db, type Invite, isEditionOpen } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
+import { m, SLOT, splitAtSlot } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { plural } from "@/utils/plural";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
@@ -63,19 +63,46 @@ const userCounts = {
 
 const liveEditions = editions.filter((e) => isEditionOpen(e)).length;
 
+const sampleList = disciplines
+	.slice(0, 3)
+	.map((d) => d.slug)
+	.join(", ");
 const disciplineSample =
-	disciplines
-		.slice(0, 3)
-		.map((d) => d.slug)
-		.join(", ") +
-	(disciplines.length > 3 ? ` & ${disciplines.length - 3} more` : "");
+	disciplines.length > 3
+		? m.admin_overview_disciplines_more({
+				list: sampleList,
+				count: disciplines.length - 3,
+			})
+		: sampleList;
 
 const pendingInvites: Invite[] = invites.filter(
 	(invite) => invite.invitedRole === "INSTRUCTOR",
 );
+const [disciplineExampleBefore, disciplineExampleAfter] = splitAtSlot(
+	m.admin_overview_discipline_text({ example: SLOT }),
+);
+const [editionExampleBefore, editionExampleAfter] = splitAtSlot(
+	m.admin_overview_edition_text({ example: SLOT }),
+);
+const disciplineCreatedParts = disciplineResult?.data
+	? splitAtSlot(
+			m.admin_overview_discipline_created({
+				slug: disciplineResult.data.slug,
+				link: SLOT,
+			}),
+		)
+	: [];
+const editionCreatedParts = editionResult?.data
+	? splitAtSlot(
+			m.admin_overview_edition_created({
+				slug: editionResult.data.slug,
+				link: SLOT,
+			}),
+		)
+	: [];
 ---
 
-<AppLayout title="Admin · Overview">
+<AppLayout title={m.admin_overview_page_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <AdminHeader active="overview" />
 
@@ -83,36 +110,35 @@ const pendingInvites: Invite[] = invites.filter(
       class="stats stats-vertical sm:stats-horizontal border border-base-300 bg-base-100"
     >
       <div class="stat">
-        <div class="stat-title">Users</div>
+        <div class="stat-title">{m.admin_overview_stat_users()}</div>
         <div class="stat-value text-2xl">{users.length}</div>
         <div class="stat-desc">
-          {plural(userCounts.ADMIN, "admin")} · {
-            plural(userCounts.INSTRUCTOR, "instructor")
-          } · {plural(userCounts.STUDENT, "student")}
+          {m.admin_overview_admins({ count: userCounts.ADMIN })} · {
+            m.admin_overview_instructors({ count: userCounts.INSTRUCTOR })
+          } · {m.admin_overview_students({ count: userCounts.STUDENT })}
         </div>
       </div>
       <div class="stat">
-        <div class="stat-title">Courses</div>
+        <div class="stat-title">{m.admin_overview_stat_courses()}</div>
         <div class="stat-value text-2xl">{courses.length}</div>
-        <div class="stat-desc">across {plural(disciplines.length, "discipline")}</div>
+        <div class="stat-desc">{m.admin_overview_across_disciplines({ count: disciplines.length })}</div>
       </div>
       <div class="stat">
-        <div class="stat-title">Disciplines</div>
+        <div class="stat-title">{m.admin_overview_stat_disciplines()}</div>
         <div class="stat-value text-2xl">{disciplines.length}</div>
-        <div class="stat-desc">{disciplineSample || "none yet"}</div>
+        <div class="stat-desc">{disciplineSample || m.admin_overview_none_yet()}</div>
       </div>
       <div class="stat">
-        <div class="stat-title">Editions</div>
+        <div class="stat-title">{m.admin_overview_stat_editions()}</div>
         <div class="stat-value text-2xl">{editions.length}</div>
-        <div class="stat-desc">{liveEditions} live now</div>
+        <div class="stat-desc">{m.admin_overview_live_now({ count: liveEditions })}</div>
       </div>
     </div>
 
     <div class="mt-10">
-      <h2 class="text-lg font-semibold">Actions</h2>
+      <h2 class="text-lg font-semibold">{m.admin_overview_actions_title()}</h2>
       <p class="mt-1 text-sm text-base-content/60">
-        Available system-wide. Destructive ones ask you to confirm before
-        anything happens.
+        {m.admin_overview_actions_intro()}
       </p>
 
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -136,10 +162,9 @@ const pendingInvites: Invite[] = invites.filter(
                 </svg>
               </span>
               <div>
-                <h3 class="text-sm font-semibold">Invite an instructor</h3>
+                <h3 class="text-sm font-semibold">{m.admin_overview_invite_title()}</h3>
                 <p class="mt-1 text-sm text-base-content/60">
-                  Generate a one-time signup link. They set their own password
-                  and details.
+                  {m.admin_overview_invite_text()}
                 </p>
               </div>
             </div>
@@ -149,7 +174,7 @@ const pendingInvites: Invite[] = invites.filter(
                 class="btn btn-primary btn-sm"
                 data-open-dialog="invite-instructor-dialog"
               >
-                Invite instructor
+                {m.admin_overview_invite_button()}
               </button>
             </div>
           </div>
@@ -180,11 +205,9 @@ const pendingInvites: Invite[] = invites.filter(
                 </svg>
               </span>
               <div>
-                <h3 class="text-sm font-semibold">New discipline</h3>
+                <h3 class="text-sm font-semibold">{m.admin_new_discipline()}</h3>
                 <p class="mt-1 text-sm text-base-content/60">
-                  Add a new subject catalog, e.g. <span class="font-mono"
-                    >cs102</span
-                  >.
+                  {disciplineExampleBefore}<span class="font-mono">cs102</span>{disciplineExampleAfter}
                 </p>
               </div>
             </div>
@@ -194,7 +217,7 @@ const pendingInvites: Invite[] = invites.filter(
                 class="btn btn-outline btn-sm"
                 data-open-dialog="new-discipline-dialog"
               >
-                New discipline
+                {m.admin_new_discipline()}
               </button>
             </div>
           </div>
@@ -214,11 +237,9 @@ const pendingInvites: Invite[] = invites.filter(
                 </svg>
               </span>
               <div>
-                <h3 class="text-sm font-semibold">New edition</h3>
+                <h3 class="text-sm font-semibold">{m.admin_new_edition()}</h3>
                 <p class="mt-1 text-sm text-base-content/60">
-                  Add a term with its active window, e.g. <span
-                    class="font-mono">2026-1</span
-                  >.
+                  {editionExampleBefore}<span class="font-mono">2026-1</span>{editionExampleAfter}
                 </p>
               </div>
             </div>
@@ -228,7 +249,7 @@ const pendingInvites: Invite[] = invites.filter(
                 class="btn btn-outline btn-sm"
                 data-open-dialog="new-edition-dialog"
               >
-                New edition
+                {m.admin_new_edition()}
               </button>
             </div>
           </div>
@@ -237,17 +258,16 @@ const pendingInvites: Invite[] = invites.filter(
     </div>
 
     <div class="mt-10">
-      <h2 class="text-lg font-semibold">Pending invites</h2>
+      <h2 class="text-lg font-semibold">{m.admin_overview_pending_title()}</h2>
       <p class="mt-1 text-sm text-base-content/60">
-        Revoke one to invalidate its link. Force-logout lives on each row in the
-        Users tab.
+        {m.admin_overview_pending_intro()}
       </p>
 
       {
         inviteUrl && (
           <>
             <div role="alert" class="alert alert-success mt-4">
-              <span>Invite created. It expires in 7 days.</span>
+              <span>{m.admin_overview_invite_created()}</span>
             </div>
             <div class="join mt-3 w-full">
               <input
@@ -261,8 +281,8 @@ const pendingInvites: Invite[] = invites.filter(
                 type="button"
                 class="btn btn-square btn-primary join-item"
                 id="copy-invite-url"
-                aria-label="Copy invite link"
-                title="Copy"
+                aria-label={m.admin_overview_copy_aria()}
+                title={m.admin_overview_copy_title()}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <rect
@@ -291,7 +311,7 @@ const pendingInvites: Invite[] = invites.filter(
       {
         revokeResult && !revokeResult.error && (
           <div role="alert" class="alert alert-success mt-4">
-            <span>Invite revoked.</span>
+            <span>{m.admin_overview_invite_revoked()}</span>
           </div>
         )
       }
@@ -299,11 +319,7 @@ const pendingInvites: Invite[] = invites.filter(
         disciplineResult && !disciplineResult.error && (
           <div role="alert" class="alert alert-success mt-4">
             <span>
-              Discipline "{disciplineResult.data.slug}" created.{" "}
-              <a href="/admin/disciplines" class="underline">
-                See it on the Disciplines tab
-              </a>
-              .
+              {disciplineCreatedParts[0]}<a href="/admin/disciplines" class="underline">{m.admin_overview_discipline_link()}</a>{disciplineCreatedParts[1]}
             </span>
           </div>
         )
@@ -312,11 +328,7 @@ const pendingInvites: Invite[] = invites.filter(
         editionResult && !editionResult.error && (
           <div role="alert" class="alert alert-success mt-4">
             <span>
-              Edition "{editionResult.data.slug}" created.{" "}
-              <a href="/admin/editions" class="underline">
-                See it on the Editions tab
-              </a>
-              .
+              {editionCreatedParts[0]}<a href="/admin/editions" class="underline">{m.admin_overview_edition_link()}</a>{editionCreatedParts[1]}
             </span>
           </div>
         )
@@ -327,7 +339,7 @@ const pendingInvites: Invite[] = invites.filter(
           <InvitesTable invites={pendingInvites} />
         ) : (
           <p class="mt-4 text-sm text-base-content/50">
-            No pending instructor invites.
+            {m.admin_overview_no_pending()}
           </p>
         )
       }
@@ -342,10 +354,7 @@ const pendingInvites: Invite[] = invites.filter(
             stroke-width="1.8"
             stroke-linecap="round"></path>
         </svg>
-        <span
-          >A link is only ever shown once. If someone loses it, revoke the
-          invite here and issue a new one.</span
-        >
+        <span>{m.admin_overview_link_once()}</span>
       </div>
     </div>
 
@@ -360,10 +369,9 @@ const pendingInvites: Invite[] = invites.filter(
             >✕</button
           >
         </form>
-        <h3 class="text-lg font-bold">Invite an instructor</h3>
+        <h3 class="text-lg font-bold">{m.admin_overview_invite_title()}</h3>
         <p class="mt-2 text-sm text-base-content/70">
-          They redeem this link to create their own account. Password, GitHub
-          handle, and school id are theirs to supply.
+          {m.admin_overview_invite_dialog_text()}
         </p>
         <form
           method="POST"
@@ -374,13 +382,13 @@ const pendingInvites: Invite[] = invites.filter(
           <Field {...inviteForm.field("email")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
-              Generate invite link
+              {m.admin_overview_invite_submit()}
             </button>
           </div>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button>{m.admin_close_backdrop()}</button>
       </form>
     </dialog>
 
@@ -395,7 +403,7 @@ const pendingInvites: Invite[] = invites.filter(
             >✕</button
           >
         </form>
-        <h3 class="text-lg font-bold">New discipline</h3>
+        <h3 class="text-lg font-bold">{m.admin_new_discipline()}</h3>
         <form
           method="POST"
           action={actions.admin.createDiscipline}
@@ -406,13 +414,13 @@ const pendingInvites: Invite[] = invites.filter(
           <Field {...disciplineForm.field("name")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
-              Create discipline
+              {m.admin_overview_create_discipline()}
             </button>
           </div>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button>{m.admin_close_backdrop()}</button>
       </form>
     </dialog>
 
@@ -427,7 +435,7 @@ const pendingInvites: Invite[] = invites.filter(
             >✕</button
           >
         </form>
-        <h3 class="text-lg font-bold">New edition</h3>
+        <h3 class="text-lg font-bold">{m.admin_new_edition()}</h3>
         <form
           method="POST"
           action={actions.admin.createEdition}
@@ -440,20 +448,20 @@ const pendingInvites: Invite[] = invites.filter(
           <Field {...editionFormState.field("endAt")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
-              Create edition
+              {m.admin_overview_create_edition()}
             </button>
           </div>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button>{m.admin_close_backdrop()}</button>
       </form>
     </dialog>
   </main>
 </AppLayout>
 
 <script>
-  import "@/components/admin/reopen-dialogs";
+  import { m, SLOT, splitAtSlot } from "@/i18n";
 
   const button = document.getElementById("copy-invite-url");
   const input = document.getElementById(
@@ -466,10 +474,10 @@ const pendingInvites: Invite[] = invites.filter(
     if (!input) return;
     await navigator.clipboard.writeText(input.value);
     button.innerHTML = checkIcon;
-    button.setAttribute("aria-label", "Copied");
+    button.setAttribute("aria-label", m.admin_overview_copied());
     setTimeout(() => {
       button.innerHTML = copyIcon;
-      button.setAttribute("aria-label", "Copy invite link");
+      button.setAttribute("aria-label", m.admin_overview_copy_aria());
     }, 1500);
   });
 </script>

@@ -9,6 +9,7 @@ import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
+import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHomeExams } from "@/services/course-home";
 import { splitByEvent } from "@/services/event-resources";
@@ -65,13 +66,13 @@ function formatDate(date: Date): string {
 }
 
 const WEEKDAY_LABEL: Record<string, string> = {
-	SUNDAY: "Sun",
-	MONDAY: "Mon",
-	TUESDAY: "Tue",
-	WEDNESDAY: "Wed",
-	THURSDAY: "Thu",
-	FRIDAY: "Fri",
-	SATURDAY: "Sat",
+	SUNDAY: m.schedule_weekday_sun(),
+	MONDAY: m.schedule_weekday_mon(),
+	TUESDAY: m.schedule_weekday_tue(),
+	WEDNESDAY: m.schedule_weekday_wed(),
+	THURSDAY: m.schedule_weekday_thu(),
+	FRIDAY: m.schedule_weekday_fri(),
+	SATURDAY: m.schedule_weekday_sat(),
 };
 
 // Whoever teaches the course also sees their dated drafts and how many answers
@@ -158,7 +159,7 @@ const nextEvents = await db.calendarEvent.findMany(
     {
       justJoined && (
         <Alert variant="success" class="mb-6">
-          <span>You joined {course.discipline.name}.</span>
+          <span>{m.attendance_result_joined({ course: course.discipline.name })}</span>
         </Alert>
       )
     }
@@ -175,18 +176,18 @@ const nextEvents = await db.calendarEvent.findMany(
       meetingNow && (
         <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3">
           <span class="font-medium">{meetingNow.title}</span>
-          <span class="text-sm text-base-content/60">is happening now</span>
+          <span class="text-sm text-base-content/60">{m.courses_home_happening_now()}</span>
           {meetingNowRollCall ? (
             <a
               href={`${href}/roll-call/${meetingNow.week}/${meetingNow.timeSlot.slug}`}
               class="btn btn-primary btn-sm ml-auto"
             >
-              View roll call
+              {m.courses_home_view_roll_call()}
             </a>
           ) : (
             <OpenRollCallDialog
               client:load
-              label="Open roll call"
+              label={m.courses_home_open_roll_call()}
               discipline={courseParams.discipline}
               course={courseParams.course}
               week={meetingNow.week}
@@ -202,7 +203,7 @@ const nextEvents = await db.calendarEvent.findMany(
       isEnrolled && !canWrite && (openRollCall || attendanceStudent) && (
         <div class="mt-6 flex flex-wrap items-center gap-4">
           {openRollCall && (
-            <a href="/check-in" class="btn btn-primary btn-sm">Check in</a>
+            <a href="/check-in" class="btn btn-primary btn-sm">{m.courses_home_check_in()}</a>
           )}
           {attendanceStudent && (
             <AttendanceSummary href={href} student={attendanceStudent} />
@@ -227,17 +228,17 @@ const nextEvents = await db.calendarEvent.findMany(
 
     {
       gradeColumns.length > 0 && (
-        <section class="mt-10" aria-label="Grades">
-          <SectionHeader title="Grades" />
+        <section class="mt-10" aria-label={m.nav_course_tab_grades()}>
+          <SectionHeader title={m.nav_course_tab_grades()} />
 
-          <ul aria-label="Grades" class="mt-4 flex flex-col gap-3">
+          <ul aria-label={m.nav_course_tab_grades()} class="mt-4 flex flex-col gap-3">
             {gradeColumns.map((column) => {
               const value = column.values[0]?.value;
               return (
                 <li class="flex items-baseline justify-between gap-4 rounded-box border border-base-300 bg-base-100 px-4 py-3">
                   <span class="font-medium">{column.title}</span>
                   <span class={value === undefined ? "text-sm text-base-content/60" : "font-medium"}>
-                    {value === undefined ? "No grade" : formatGradeValue(value)}
+                    {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}
                   </span>
                 </li>
               );
@@ -248,22 +249,23 @@ const nextEvents = await db.calendarEvent.findMany(
     }
 
     <section class="mt-10">
-      <SectionHeader title="Resources" href={`${href}/resources`} />
+      <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
 
       {
         resources.length === 0 ? (
           <p class="mt-4 text-sm text-base-content/60">
             {eventResources.size > 0 ? (
-              <>
-                Material for each meeting is on the{" "}
-                <a href={`${href}/schedule`} class="link">schedule</a>.
-              </>
+              <span
+                set:html={m.courses_resources_on_schedule({
+                  schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+                })}
+              />
             ) : canWrite ? (
               <>
-                No resources pushed yet. <CliSetupLink />
+                {m.courses_home_no_resources_instructor()} <CliSetupLink />
               </>
             ) : (
-              "No resources yet. The instructor publishes them with the CLI."
+              m.courses_home_no_resources_student()
             )}
           </p>
         ) : (
@@ -288,17 +290,17 @@ const nextEvents = await db.calendarEvent.findMany(
     </section>
 
     <section class="mt-10">
-      <SectionHeader title="Schedule" href={`${href}/schedule`} />
+      <SectionHeader title={m.nav_course_tab_schedule()} href={`${href}/schedule`} />
 
       {
         slots.length === 0 ? (
           <p class="mt-4 text-sm text-base-content/60">
             {canWrite ? (
               <>
-                No schedule pushed yet. <CliSetupLink />
+                {m.schedule_none_instructor()} <CliSetupLink />
               </>
             ) : (
-              "No schedule published yet. The instructor pushes it with the CLI."
+              m.schedule_none_student()
             )}
           </p>
         ) : (
@@ -307,14 +309,21 @@ const nextEvents = await db.calendarEvent.findMany(
               {slots
                 .map(
                   (slot) =>
-                    `${slot.title ?? "Meeting"} · ${WEEKDAY_LABEL[slot.day]} ${formatClock(slot.start)}–${formatTime(toMinutes(slot.start) + durationToMinutes(slot.duration))}`,
+                    m.schedule_slot_summary({
+                      title: slot.title ?? m.schedule_slot_default_title(),
+                      day: WEEKDAY_LABEL[slot.day] ?? slot.day,
+                      start: formatClock(slot.start),
+                      end: formatTime(
+                        toMinutes(slot.start) + durationToMinutes(slot.duration),
+                      ),
+                    }),
                 )
                 .join(", ")}
             </p>
             <div class="mt-4 flex flex-col gap-3">
               {nextEvents.length === 0 ? (
                 <p class="text-sm text-base-content/60">
-                  Nothing left on the calendar.
+                  {m.courses_home_nothing_on_calendar()}
                 </p>
               ) : (
                 nextEvents.map((event) => (
@@ -340,13 +349,13 @@ const nextEvents = await db.calendarEvent.findMany(
     {
       isEnrolled && (
         <p class="mt-12 border-t border-base-content/10 pt-4 text-sm text-base-content/60">
-          Enrolled since {formatDate(course.joinedAt)}.{" "}
+          {m.courses_home_enrolled_since({ date: formatDate(course.joinedAt) })}{" "}
           <button
             type="button"
             class="link link-hover text-error"
             data-open-dialog="leave-course-dialog"
           >
-            Leave this course
+            {m.courses_home_leave_link()}
           </button>
         </p>
       )
@@ -362,38 +371,36 @@ const nextEvents = await db.calendarEvent.findMany(
           <button
             class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
             type="submit"
-            aria-label="Close"
+            aria-label={m.courses_students_close()}
           >
             ✕
           </button>
         </form>
-        <h3 class="text-lg font-bold">Leave {course.discipline.name}?</h3>
+        <h3 class="text-lg font-bold">{m.courses_leave_title({ discipline: course.discipline.name })}</h3>
         <ul class="mt-3 flex flex-col gap-2 pl-5 text-sm text-base-content/70 list-disc">
           <li>
-            Your access to everything in this course ends immediately, including your own past submissions.
+            {m.courses_leave_access()}
           </li>
           <li>
-            Nothing is deleted. Your submissions stay on record, and your
-            instructor still sees them.
+            {m.courses_leave_kept()}
           </li>
           <li>
-            Rejoining needs a new classroom invite or a live passphrase. You
-            can't undo this yourself.
+            {m.courses_leave_rejoin()}
           </li>
         </ul>
         <div id="leave-course-error" class="alert alert-error mt-4" hidden>
-          <span>Something went wrong. Try again.</span>
+          <span>{m.courses_leave_error()}</span>
         </div>
         <form id="leave-course-form" class="modal-action">
           <input type="hidden" name="discipline" value={courseParams.discipline} />
           <input type="hidden" name="course" value={courseParams.course} />
           <button type="submit" class="btn btn-error">
-            Leave course
+            {m.courses_leave_submit()}
           </button>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button type="submit">close</button>
+        <button type="submit">{m.courses_close_backdrop()}</button>
       </form>
     </dialog>
   )

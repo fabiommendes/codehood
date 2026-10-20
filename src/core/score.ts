@@ -1,4 +1,6 @@
-/// Kept free of imports so browser code can read a score without pulling in the schemas.
+/// Kept free of the schemas so browser code can read a score without pulling them in.
+
+import { m } from "@/i18n";
 
 /** The numeric value of a score string, or `null` when the denominator is zero. */
 export function scoreValue(text: string): number | null {
@@ -19,7 +21,7 @@ export function scoreValue(text: string): number | null {
 }
 
 /// What the grading form shows when the typed percentage is refused.
-export const SCORE_ERROR = "Score must be a whole number between 0 and 100.";
+export const SCORE_ERROR = m.errors_score_whole_percent();
 
 /** Whether `text` is a whole percentage from 0 to 100, surrounding whitespace aside. */
 export function isPercentScore(text: string): boolean {

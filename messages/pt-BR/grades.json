@@ -94,5 +94,26 @@
 	"grades_page_heading": "Notas",
 	"grades_page_no_exams": "Nenhuma avaliação ainda.",
 	"grades_page_no_students": "Nenhum estudante matriculado ainda.",
-	"grades_page_students_link": "Estudantes"
+	"grades_page_students_link": "Estudantes",
+	"grades_cancel": "Cancelar",
+	"grades_close_backdrop": "fechar",
+	"grades_controls_change": "Alterar nota",
+	"grades_controls_will_not_grade": "Não corrigir",
+	"grades_controls_wng_title": "Não corrigir esta resposta?",
+	"grades_controls_wng_body": "A resposta conta como zero no total, e o estudante lê \"Sem correção\". As notas anteriores são mantidas, e você pode corrigir a resposta depois com \"Alterar nota\".",
+	"grades_controls_wng_submit": "Marcar como sem correção",
+	"grades_form_save": "Salvar nota",
+	"grades_release_column_button": "Liberar",
+	"grades_release_column_button_named": "Liberar {title}",
+	"grades_release_column_title": "Liberar {title}?",
+	"grades_release_column_body": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} estudante verá a sua nota. Depois de liberada, não dá para desfazer.",
+				"countPlural=other": "{count} estudantes verão a sua nota. Depois de liberada, não dá para desfazer."
+			}
+		}
+	]
 }

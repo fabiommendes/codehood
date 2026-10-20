@@ -19,6 +19,7 @@ import {
 	type TimeSlotId,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import { m } from "@/i18n";
 import {
 	endOf,
 	slotInstant,
@@ -99,7 +100,10 @@ export class CalendarEventService extends CrudBase<{
 
 		if (!slot || slot.courseId !== course.id) {
 			throw new Error(
-				`Time slot ${input.timeSlot} does not belong to course ${course.id}.`,
+				m.errors_time_slot_wrong_course({
+					slot: String(input.timeSlot),
+					course: course.id,
+				}),
 			);
 		}
 
@@ -270,7 +274,10 @@ export class CalendarEventService extends CrudBase<{
 		});
 		if (!slot || slot.courseId !== course.id) {
 			throw new Error(
-				`Time slot ${input.timeSlot} does not belong to course ${course.id}.`,
+				m.errors_time_slot_wrong_course({
+					slot: String(input.timeSlot),
+					course: course.id,
+				}),
 			);
 		}
 
@@ -321,7 +328,7 @@ export class CalendarEventService extends CrudBase<{
 		if ((await tx.rollCall.count({ where: { eventId: current.id } })) > 0) {
 			throw new NotAllowed("calendar-event.delete", {
 				status: 409,
-				message: "The event has a roll call; delete the roll call first",
+				message: m.errors_event_has_roll_call(),
 			});
 		}
 		await tx.calendarEvent.delete({ where: { id: current.id } });

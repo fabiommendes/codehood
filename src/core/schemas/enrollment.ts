@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { courseId, username } from "./base";
 import { courseParams, courseRef } from "./course";
 import { userSchema } from "./user";
@@ -46,7 +47,10 @@ export const enrollmentAdd = courseParams.extend({
 		.trim()
 		.min(1)
 		.meta({
-			form: { label: "Email or username", placeholder: "student@example.com" },
+			form: {
+				label: m.forms_label_email_or_username(),
+				placeholder: "student@example.com",
+			},
 		}),
 });
 

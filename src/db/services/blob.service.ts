@@ -29,6 +29,7 @@ import {
 	blobSchema,
 } from "@/core/schemas";
 import type { ServiceOpts } from "@/db";
+import { m } from "@/i18n";
 import { blobSecurityHeaders, contentDisposition } from "@/utils/blob-response";
 import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
@@ -324,8 +325,12 @@ export class BlobService {
 		// directory.
 		if (path.dirname(resolved) !== path.resolve(dir)) {
 			throw new InvalidData(
-				{ filename: [{ code: "invalid", message: "Not a basename." }] },
-				{ message: `"${filename}" escapes the blob directory.` },
+				{
+					filename: [
+						{ code: "invalid", message: m.errors_blob_not_basename() },
+					],
+				},
+				{ message: m.errors_blob_escapes_directory({ filename }) },
 			);
 		}
 		return resolved;
@@ -356,7 +361,7 @@ function safeFilename(name: string): string | null {
 }
 
 function notFoundResponse(): Response {
-	return new Response("Not found.", {
+	return new Response(m.errors_not_found_plain(), {
 		status: 404,
 		headers: { "Content-Type": "text/plain", ...blobSecurityHeaders() },
 	});
@@ -365,10 +370,10 @@ function notFoundResponse(): Response {
 function tombstoneResponse(): Response {
 	const body = `<!doctype html>
 <html>
-<head><meta charset="utf-8"><title>File removed</title></head>
+<head><meta charset="utf-8"><title>${m.errors_blob_removed_title()}</title></head>
 <body style="font: 16px system-ui; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">
-<h1>This file was removed</h1>
-<p>The instructor removed this file from the course.</p>
+<h1>${m.errors_blob_removed_heading()}</h1>
+<p>${m.errors_blob_removed_body()}</p>
 </body>
 </html>`;
 	return new Response(body, {

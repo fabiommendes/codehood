@@ -14,6 +14,7 @@ import {
 import { db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm, formState } from "@/forms/form-state";
+import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
@@ -65,8 +66,7 @@ if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
 
 	if (error) {
 		inviteError =
-			errorMessage(error) ||
-			"You need to be logged in as an instructor to create an invite.";
+			errorMessage(error) || m.courses_roster_invite_login_required();
 	} else {
 		inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
 	}
@@ -81,12 +81,7 @@ const passphraseForm = await actionForm(
 	passphraseGenerate,
 	{ id: "custom-passphrase" },
 );
-const inviteForm = formState(inviteClassroom, undefined, {
-	id: "invite",
-	fields: {
-		maxUses: { label: "Limit to N uses (optional)", placeholder: "Unlimited" },
-	},
-});
+const inviteForm = formState(inviteClassroom, undefined, { id: "invite" });
 
 const students = await db.enrollment.findMany({ course: course.id }, { actor });
 const invites = await db.invite.findMany(
@@ -100,7 +95,7 @@ const activePassphrases = await db.passphrase.findMany(
 const currentPassphrase = activePassphrases[0] ?? null;
 
 function formatDate(date: Date): string {
-	return date.toLocaleDateString("en-US", {
+	return date.toLocaleDateString(locale, {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
@@ -108,7 +103,7 @@ function formatDate(date: Date): string {
 }
 
 function formatTime(date: Date | string): string {
-	return new Date(date).toLocaleTimeString("en-US", {
+	return new Date(date).toLocaleTimeString(locale, {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit",
@@ -124,7 +119,14 @@ const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
 
 const csvFilename = `roster-${course.discipline.slug}-${course.edition.slug}.csv`;
 const csvRows = [
-	["Name", "Username", "Email", "GitHub", "School ID", "Enrolled"],
+	[
+		m.courses_students_col_name(),
+		m.courses_students_col_username(),
+		m.courses_students_col_email(),
+		m.courses_students_col_github(),
+		m.courses_students_col_school_id(),
+		m.courses_students_col_enrolled(),
+	],
 	...students.map((s) => [
 		s.name,
 		s.username,
@@ -136,17 +138,16 @@ const csvRows = [
 ];
 ---
 
-<AppLayout title={`Students · ${course.discipline.name}`}
+<AppLayout title={m.courses_roster_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="students" />
 
     <section class="mt-4">
-      <h2 class="text-xl font-semibold">Add students</h2>
+      <h2 class="text-xl font-semibold">{m.courses_roster_add_heading()}</h2>
       <p class="mt-1 text-sm text-base-content/60">
-        Three ways for a student to join: add them by name, hand out a
-        shareable link, or read a passphrase out in class.
+        {m.courses_roster_add_intro()}
       </p>
 
       <FormAlert error={inviteError ?? undefined} class="mt-4" />
@@ -154,7 +155,7 @@ const csvRows = [
       {
         revokeResult && !revokeResult.error && (
           <Alert variant="success" class="mt-4">
-            <span>Invite revoked.</span>
+            <span>{m.courses_roster_invite_revoked()}</span>
           </Alert>
         )
       }
@@ -166,28 +167,28 @@ const csvRows = [
           class="btn btn-outline btn-sm"
           data-open-dialog="add-student-dialog"
         >
-          Add student
+          {m.courses_roster_add_student()}
         </button>
         <button
           type="button"
           class="btn btn-outline btn-sm"
           data-open-dialog="passphrase-dialog"
         >
-          Passphrase
+          {m.courses_roster_passphrase()}
         </button>
         <button
           type="button"
           class="btn btn-outline btn-sm"
           data-open-dialog="invite-link-dialog"
         >
-          Invite link
+          {m.courses_roster_invite_link()}
         </button>
         <button
           type="button"
           class="btn btn-outline btn-sm"
           data-open-dialog="revoke-invites-dialog"
         >
-          Revoke invites
+          {m.courses_roster_revoke_invites()}
         </button>
       </div>
     </section>
@@ -195,7 +196,7 @@ const csvRows = [
     <div class="divider mt-8"></div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-xl font-semibold">Students</h2>
+      <h2 class="text-xl font-semibold">{m.courses_roster_students_heading()}</h2>
       <CsvDownload
         id="roster-csv"
         filename={csvFilename}
@@ -204,13 +205,16 @@ const csvRows = [
       />
     </div>
     <p class="mt-1 text-base-content/60">
-      {course.discipline.name} · {students.length} enrolled
+      {m.courses_roster_enrolled_count({
+        discipline: course.discipline.name,
+        count: students.length,
+      })}
     </p>
 
     {
       students.length === 0 ? (
         <p class="mt-8 text-center text-base-content/50">
-          No students enrolled yet.
+          {m.courses_roster_empty()}
         </p>
       ) : (
         <StudentsTable
@@ -231,11 +235,9 @@ const csvRows = [
         ✕
       </button>
     </form>
-    <h3 class="text-lg font-bold">Add student</h3>
+    <h3 class="text-lg font-bold">{m.courses_roster_add_student()}</h3>
     <p class="mt-1 text-sm text-base-content/60">
-      Someone who already has an account is enrolled right away. For an email
-      with no account yet, you get a single-use invite link that creates the
-      account and enrolls it.
+      {m.courses_roster_add_body()}
     </p>
 
     <div id="add-student-error" class="alert alert-error mt-4" hidden>
@@ -243,10 +245,12 @@ const csvRows = [
     </div>
 
     <div id="add-student-invited" class="mt-4" hidden>
-      <p class="text-sm">
-        No account yet. Send <span id="add-student-email" class="font-medium"
-        ></span> this link:
-      </p>
+      <p
+        class="text-sm"
+        set:html={m.courses_roster_no_account({
+          email: '<span id="add-student-email" class="font-medium"></span>',
+        })}
+      />
       <div class="join mt-2 w-full">
         <input
           type="text"
@@ -259,8 +263,8 @@ const csvRows = [
           type="button"
           class="btn btn-primary join-item"
           id="copy-personal-invite-url"
-          aria-label="Copy invite link"
-          title="Copy"
+          aria-label={m.courses_roster_copy_invite()}
+          title={m.courses_roster_copy()}
         >
           <svg
             id="copy-personal-invite-url-icon"
@@ -290,15 +294,15 @@ const csvRows = [
 
     <div class="modal-action">
       <form method="dialog">
-        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-ghost">{m.courses_roster_cancel()}</button>
       </form>
       <button type="submit" form="add-student-form" class="btn btn-primary">
-        Add
+        {m.courses_roster_add()}
       </button>
     </div>
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>close</button>
+    <button>{m.courses_close_backdrop()}</button>
   </form>
 </dialog>
 
@@ -309,9 +313,9 @@ const csvRows = [
         ✕
       </button>
     </form>
-    <h3 class="text-lg font-bold">Passphrase</h3>
+    <h3 class="text-lg font-bold">{m.courses_roster_passphrase()}</h3>
     <p class="mt-1 text-sm text-base-content/60">
-      Read this out in class. Live for 5 minutes, then it's gone.
+      {m.courses_roster_passphrase_body()}
     </p>
 
     <div id="passphrase-error" class="alert alert-error mt-4" hidden>
@@ -333,8 +337,10 @@ const csvRows = [
       <p id="passphrase-meta" class="text-xs text-base-content/50">
         {
           currentPassphrase
-            ? `live until ${formatTime(currentPassphrase.expiresAt)}`
-            : "No active passphrase. Generate one below."
+            ? m.courses_roster_passphrase_live_until({
+                time: formatTime(currentPassphrase.expiresAt),
+              })
+            : m.courses_roster_passphrase_none()
         }
       </p>
     </div>
@@ -349,7 +355,7 @@ const csvRows = [
       <input type="hidden" name="course" value={courseParams.course} />
       <details class="collapse collapse-arrow">
         <summary class="collapse-title min-h-0 px-0 py-2 text-sm font-medium"
-          >Advanced options</summary
+          >{m.courses_roster_advanced()}</summary
         >
         <div class="collapse-content px-0">
           <Field {...passphraseForm.field("value")} class="font-mono uppercase" />
@@ -359,14 +365,14 @@ const csvRows = [
 
     <div class="modal-action">
       <form method="dialog">
-        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-ghost">{m.courses_roster_cancel()}</button>
       </form>
       <button
         type="submit"
         form="passphrase-form"
         class="btn btn-primary btn-square"
-        aria-label="Renew passphrase"
-        title="Renew"
+        aria-label={m.courses_roster_renew_label()}
+        title={m.courses_roster_renew()}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path
@@ -380,7 +386,7 @@ const csvRows = [
     </div>
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>close</button>
+    <button>{m.courses_close_backdrop()}</button>
   </form>
 </dialog>
 
@@ -391,10 +397,9 @@ const csvRows = [
         ✕
       </button>
     </form>
-    <h3 class="text-lg font-bold">Classroom invite link</h3>
+    <h3 class="text-lg font-bold">{m.courses_roster_invite_title()}</h3>
     <p class="mt-1 text-sm text-base-content/60">
-      Anyone who opens it can create a student account and enroll, with no
-      per-student email required.
+      {m.courses_roster_invite_body()}
     </p>
 
     <div id="invite-error" class="alert alert-error mt-4" hidden>
@@ -413,8 +418,8 @@ const csvRows = [
         type="button"
         class="btn btn-primary join-item"
         id="copy-invite-url"
-        aria-label="Copy invite link"
-        title="Copy"
+        aria-label={m.courses_roster_copy_invite()}
+        title={m.courses_roster_copy()}
       >
         <svg
           id="copy-invite-url-icon"
@@ -444,15 +449,15 @@ const csvRows = [
 
     <div class="modal-action">
       <form method="dialog">
-        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-ghost">{m.courses_roster_cancel()}</button>
       </form>
       <button type="submit" form="invite-form" class="btn btn-primary">
-        Generate link
+        {m.courses_roster_generate()}
       </button>
     </div>
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>close</button>
+    <button>{m.courses_close_backdrop()}</button>
   </form>
 </dialog>
 
@@ -463,10 +468,9 @@ const csvRows = [
         ✕
       </button>
     </form>
-    <h3 class="text-lg font-bold">Classroom invites</h3>
+    <h3 class="text-lg font-bold">{m.courses_roster_revoke_title()}</h3>
     <p class="mt-1 text-sm text-base-content/60">
-      Revoking stops a link working immediately. Students who already joined
-      through it stay enrolled.
+      {m.courses_roster_revoke_body()}
     </p>
 
     <div id="revoke-error" class="alert alert-error mt-4" hidden>
@@ -476,7 +480,7 @@ const csvRows = [
     <div id="revoke-invites-list" class="mt-4 flex flex-col gap-3">
       {
         invites.length === 0 ? (
-          <p class="text-sm text-base-content/50">No classroom invites yet.</p>
+          <p class="text-sm text-base-content/50">{m.courses_roster_no_invites()}</p>
         ) : (
           invites.map((invite) => {
             const expired = invite.expiresAt < new Date();
@@ -491,11 +495,16 @@ const csvRows = [
                       {formatDate(invite.createdAt)}
                     </p>
                     <p class="text-xs text-base-content/60">
-                      {invite.redemptions} / {invite.maxUses ?? "∞"} used ·{" "}
+                      {m.courses_roster_invite_used({
+                        used: invite.redemptions,
+                        max: invite.maxUses ?? "∞",
+                      })}{" · "}
                       <span class={expired ? "text-error" : ""}>
                         {expired
-                          ? "expired"
-                          : `expires ${formatDate(invite.expiresAt)}`}
+                          ? m.courses_roster_invite_expired()
+                          : m.courses_roster_invite_expires({
+                              date: formatDate(invite.expiresAt),
+                            })}
                       </span>
                     </p>
                   </div>
@@ -509,7 +518,7 @@ const csvRows = [
                       type="submit"
                       class="btn btn-outline btn-error btn-sm"
                     >
-                      Revoke
+                      {m.courses_roster_revoke()}
                     </button>
                   </form>
                 </div>
@@ -522,12 +531,12 @@ const csvRows = [
 
     <div class="modal-action">
       <form method="dialog">
-        <button class="btn btn-ghost">Close</button>
+        <button class="btn btn-ghost">{m.courses_roster_close()}</button>
       </form>
     </div>
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>close</button>
+    <button>{m.courses_close_backdrop()}</button>
   </form>
 </dialog>
 
@@ -537,6 +546,7 @@ const csvRows = [
 <script>
   import { actions } from "astro:actions";
   import { errorMessage } from "@/forms/field-errors";
+  import { locale, m } from "@/i18n";
 
   const discipline = (
     document.getElementById("course-discipline") as HTMLInputElement
@@ -553,7 +563,7 @@ const csvRows = [
   const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
 
   function formatTime(iso: string | Date): string {
-    return new Date(iso).toLocaleTimeString("en-US", {
+    return new Date(iso).toLocaleTimeString(locale, {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
@@ -578,12 +588,12 @@ const csvRows = [
     button.addEventListener("click", async () => {
       await navigator.clipboard.writeText(input.value);
       iconPath.setAttribute("d", CHECK_ICON);
-      button.setAttribute("aria-label", "Copied");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("aria-label", m.courses_roster_copied_label());
+      button.setAttribute("title", m.courses_roster_copied());
       setTimeout(() => {
         iconPath.setAttribute("d", COPY_ICON);
-        button.setAttribute("aria-label", "Copy invite link");
-        button.setAttribute("title", "Copy");
+        button.setAttribute("aria-label", m.courses_roster_copy_invite());
+        button.setAttribute("title", m.courses_roster_copy());
       }, 1500);
     });
   }
@@ -605,7 +615,10 @@ const csvRows = [
     );
     if (error) {
       if (addStudentError)
-        showError(addStudentError, errorMessage(error) || "Something went wrong.");
+        showError(
+          addStudentError,
+          errorMessage(error) || m.courses_roster_something_wrong(),
+        );
       return;
     }
     if (data.kind === "enrolled") {
@@ -651,7 +664,9 @@ const csvRows = [
       passphraseValue.classList.add("text-primary");
     }
     if (passphraseMeta)
-      passphraseMeta.textContent = `live until ${formatTime(data.expiresAt)}`;
+      passphraseMeta.textContent = m.courses_roster_passphrase_live_until({
+        time: formatTime(data.expiresAt),
+      });
     passphraseForm.reset();
   });
 
@@ -678,7 +693,10 @@ const csvRows = [
     });
     if (error) {
       if (inviteError)
-        showError(inviteError, errorMessage(error) || "Something went wrong.");
+        showError(
+          inviteError,
+          errorMessage(error) || m.courses_roster_something_wrong(),
+        );
       return;
     }
     if (inviteUrlInput)

@@ -7,6 +7,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { checkInCode } from "@/core/schemas";
 import { actionForm } from "@/forms/form-state";
+import { m } from "@/i18n";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 if (!Astro.locals.actor) {
@@ -19,7 +20,7 @@ const form = await actionForm(Astro, actions.checkIn.register, checkInCode, {
 });
 ---
 
-<CenteredLayout title="Check in">
+<CenteredLayout title={m.auth_check_in_title()}>
   {result?.data && <AttendanceResult view={result.data} />}
 
   <form
@@ -39,7 +40,7 @@ const form = await actionForm(Astro, actions.checkIn.register, checkInCode, {
       }}
     />
     <div class="card-actions">
-      <button type="submit" class="btn btn-primary btn-block rounded-full">Register</button>
+      <button type="submit" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_register()}</button>
     </div>
   </form>
 </CenteredLayout>

@@ -63,6 +63,26 @@ throw new FieldError("slug", m.errors_slug_taken({ slug }));
 <span>{m.grades_released_on({ date: formatDate(releasedAt) })}</span>
 ```
 
+Um texto que depende de um enum seleciona a variante pelo valor, em vez de
+interpolar um substantivo já traduzido. Cada idioma escreve a frase inteira (e
+resolve a concordância), e o Paraglide tipa o parâmetro como a união dos valores:
+
+```json
+"exams_attempt_missed": [{
+  "declarations": ["input type"],
+  "selectors": ["type"],
+  "match": {
+    "type=PRACTICE": "You did not take this practice exam.",
+    "type=QUIZ": "You did not take this quiz.",
+    "type=EXAM": "You did not take this exam."
+  }
+}]
+```
+
+Uma frase com marcação no meio (link, `<code>`, `<strong>`) é uma mensagem só,
+com placeholders, renderizada com `set:html`. O texto do catálogo é confiável;
+cada valor passado a ela passa por `escapeHtml` de `@/i18n`.
+
 Toda string visível ao usuário passa por `m.*`, inclusive as mensagens de erro
 da API REST. Um mesmo `code` de erro pode ter mensagens diferentes, então a
 mensagem é escolhida onde o erro é lançado.

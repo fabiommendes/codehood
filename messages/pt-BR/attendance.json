@@ -14,5 +14,38 @@
 	"attendance_page_heading": "Presença",
 	"attendance_page_no_roll_calls": "Nenhuma chamada ainda.",
 	"attendance_page_no_students": "Nenhum estudante matriculado ainda.",
-	"attendance_roll_call_page_title": "{event} · Chamada"
+	"attendance_roll_call_page_title": "{event} · Chamada",
+	"attendance_roll_call": "Chamada",
+	"attendance_open_title": "Abrir a chamada",
+	"attendance_open_body": "Estudantes registram presença por 15 minutos com o código da tela projetada.",
+	"attendance_cancel": "Cancelar",
+	"attendance_open_submit": "Abrir chamada",
+	"attendance_close_backdrop": "fechar",
+	"attendance_manager_open": "Chamada aberta",
+	"attendance_manager_closed": "Chamada encerrada",
+	"attendance_closes_in": "Encerra em {time}",
+	"attendance_manager_project": "Projetar",
+	"attendance_manager_reopen": "Reabrir chamada",
+	"attendance_manager_close": "Encerrar chamada",
+	"attendance_manager_delete": "Excluir",
+	"attendance_manager_col_note": "Observação",
+	"attendance_manager_new_in_class": "Novo na turma",
+	"attendance_manager_same_device": "Mesmo dispositivo que {other}",
+	"attendance_manager_save": "Salvar",
+	"attendance_manager_delete_title": "Excluir esta chamada?",
+	"attendance_manager_delete_body": "Todas as presenças registradas nela serão perdidas. Esta ação não pode ser desfeita.",
+	"attendance_manager_delete_confirm": "Excluir chamada",
+	"attendance_projector_qr": "QR code para registrar presença",
+	"attendance_projector_code": "Código de presença",
+	"attendance_projector_present": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} presente",
+				"countPlural=other": "{count} presentes"
+			}
+		}
+	],
+	"attendance_projector_back": "Voltar à chamada"
 }

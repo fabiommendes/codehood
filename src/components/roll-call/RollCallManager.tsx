@@ -10,6 +10,7 @@ import {
 import { createStore, reconcile } from "solid-js/store";
 import FormAlert from "@/components/form/FormAlert";
 import { errorMessage } from "@/forms/field-errors";
+import { m } from "@/i18n";
 import { createNow, formatCountdown } from "./countdown";
 
 /// One attendance as the roll call actions return it.
@@ -161,16 +162,20 @@ export default function RollCallManager(
 					class="badge badge-lg"
 					classList={{ "badge-success": isOpen(), "badge-neutral": !isOpen() }}
 				>
-					{isOpen() ? "Roll call open" : "Roll call closed"}
+					{isOpen()
+						? m.attendance_manager_open()
+						: m.attendance_manager_closed()}
 				</span>
 				<Show when={isOpen()}>
 					<span class="font-mono text-sm">
-						Closes in {formatCountdown(server().closesAt.getTime() - now())}
+						{m.attendance_closes_in({
+							time: formatCountdown(server().closesAt.getTime() - now()),
+						})}
 					</span>
 				</Show>
 				<span class="flex-1" />
 				<a class="btn btn-primary btn-sm" href={`${props.pageHref}/project`}>
-					Project
+					{m.attendance_manager_project()}
 				</a>
 				<Show
 					when={isOpen()}
@@ -181,7 +186,7 @@ export default function RollCallManager(
 							disabled={busy()}
 							onClick={() => run(() => actions.rollCall.open(target))}
 						>
-							Reopen roll call
+							{m.attendance_manager_reopen()}
 						</button>
 					}
 				>
@@ -191,7 +196,7 @@ export default function RollCallManager(
 						disabled={busy()}
 						onClick={() => run(() => actions.rollCall.close(target))}
 					>
-						Close roll call
+						{m.attendance_manager_close()}
 					</button>
 				</Show>
 				<button
@@ -200,7 +205,7 @@ export default function RollCallManager(
 					disabled={busy()}
 					onClick={() => confirmDelete?.showModal()}
 				>
-					Delete
+					{m.attendance_manager_delete()}
 				</button>
 			</div>
 
@@ -208,9 +213,9 @@ export default function RollCallManager(
 				<table class="table">
 					<thead>
 						<tr>
-							<th>Student</th>
-							<th>Present</th>
-							<th>Note</th>
+							<th>{m.attendance_table_col_student()}</th>
+							<th>{m.attendance_table_col_present()}</th>
+							<th>{m.attendance_manager_col_note()}</th>
 							<th />
 						</tr>
 					</thead>
@@ -226,18 +231,18 @@ export default function RollCallManager(
 											<div class="flex flex-wrap gap-1">
 												<Show when={student.dropped}>
 													<span class="badge badge-ghost badge-sm">
-														Dropped
+														{m.attendance_table_dropped()}
 													</span>
 												</Show>
 												<Show when={entry()?.joined}>
 													<span class="badge badge-info badge-sm">
-														New in this class
+														{m.attendance_manager_new_in_class()}
 													</span>
 												</Show>
 												<For each={entry()?.sharedWith ?? []}>
 													{(other) => (
 														<span class="badge badge-warning badge-sm">
-															Same device as {other}
+															{m.attendance_manager_same_device({ other })}
 														</span>
 													)}
 												</For>
@@ -247,7 +252,7 @@ export default function RollCallManager(
 											<input
 												type="checkbox"
 												class="checkbox"
-												aria-label="Present"
+												aria-label={m.attendance_table_col_present()}
 												checked={draft()?.present ?? false}
 												onChange={(e) =>
 													setDrafts(student.username, {
@@ -261,7 +266,7 @@ export default function RollCallManager(
 											<input
 												type="text"
 												class="input input-sm w-full"
-												aria-label="Note"
+												aria-label={m.attendance_manager_col_note()}
 												maxLength={200}
 												value={draft()?.note ?? ""}
 												onInput={(e) =>
@@ -280,7 +285,7 @@ export default function RollCallManager(
 												disabled={busy()}
 												onClick={() => save(student.username)}
 											>
-												Save
+												{m.attendance_manager_save()}
 											</button>
 										</td>
 									</tr>
@@ -293,9 +298,11 @@ export default function RollCallManager(
 
 			<dialog ref={confirmDelete} class="modal">
 				<div class="modal-box">
-					<h3 class="text-lg font-bold">Delete this roll call?</h3>
+					<h3 class="text-lg font-bold">
+						{m.attendance_manager_delete_title()}
+					</h3>
 					<p class="mt-2 text-sm text-base-content/70">
-						Every attendance recorded in it is lost. This cannot be undone.
+						{m.attendance_manager_delete_body()}
 					</p>
 					<div class="modal-action">
 						<button
@@ -303,7 +310,7 @@ export default function RollCallManager(
 							class="btn btn-ghost"
 							onClick={() => confirmDelete?.close()}
 						>
-							Cancel
+							{m.attendance_cancel()}
 						</button>
 						<button
 							type="button"
@@ -311,12 +318,12 @@ export default function RollCallManager(
 							disabled={busy()}
 							onClick={remove}
 						>
-							Delete roll call
+							{m.attendance_manager_delete_confirm()}
 						</button>
 					</div>
 				</div>
 				<form method="dialog" class="modal-backdrop">
-					<button type="submit">close</button>
+					<button type="submit">{m.attendance_close_backdrop()}</button>
 				</form>
 			</dialog>
 		</div>

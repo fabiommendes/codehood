@@ -51,13 +51,6 @@ if (!slug) return Astro.rewrite("/404");
 const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
 if (!exam) return Astro.rewrite("/404");
 
-/// What the exam is called in a sentence.
-const examNouns = {
-	PRACTICE: m.exams_noun_practice(),
-	QUIZ: m.exams_noun_quiz(),
-	EXAM: m.exams_noun_exam(),
-} as const;
-
 const now = new Date();
 const phase = examPhase(exam, now);
 
@@ -290,7 +283,7 @@ for (const submission of attempt?.submissions ?? []) {
             discipline={discipline!}
             course={courseSegment!}
             exam={slug}
-            noun={examNouns[exam.type]}
+            type={exam.type}
             state={state}
             now={now}
             questions={showQuestions ? attemptQuestions : []}

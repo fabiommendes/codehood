@@ -15,6 +15,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
@@ -107,7 +108,7 @@ export class InviteService extends CrudBase<{
 				createdBy: [
 					{
 						code: "missing",
-						message: "A SYSTEM call must supply createdBy explicitly.",
+						message: m.errors_invite_created_by_required(),
 					},
 				],
 			});

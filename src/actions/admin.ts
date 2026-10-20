@@ -12,6 +12,7 @@ import {
 	userCreateForm,
 } from "@/core/schemas";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import { publicUser } from "./auth";
 import { withServiceErrors } from "./helpers";
 
@@ -105,13 +106,13 @@ export const admin = {
 			if (await db.user.findOne({ email: input.email }, { actor })) {
 				throw new FieldError(
 					"email",
-					`A user with email ${input.email} already exists.`,
+					m.errors_user_email_exists({ email: input.email }),
 				);
 			}
 			if (await db.user.findOne({ username: input.username }, { actor })) {
 				throw new FieldError(
 					"username",
-					`A user with username ${input.username} already exists.`,
+					m.errors_user_username_exists({ username: input.username }),
 				);
 			}
 			const user = await db.user.create(input, { actor });

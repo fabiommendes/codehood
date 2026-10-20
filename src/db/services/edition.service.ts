@@ -9,6 +9,7 @@ import {
 	editionUpdate,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
+import { m } from "@/i18n";
 import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
 
@@ -68,7 +69,7 @@ export class EditionService
 			});
 		} catch (error) {
 			if ((error as { code?: string }).code === "P2002") {
-				throw new FieldError("slug", `Slug "${input.slug}" is already taken.`);
+				throw new FieldError("slug", m.errors_slug_taken({ slug: input.slug }));
 			}
 			throw error;
 		}
@@ -131,7 +132,7 @@ export class EditionService
 			where: { slug: filter.slug },
 		});
 		if (!current) {
-			throw new Error(`No edition with slug "${filter.slug}".`);
+			throw new Error(m.errors_edition_not_found({ slug: filter.slug }));
 		}
 		assertWindow(
 			fields.startAt ?? current.startAt,
@@ -193,7 +194,7 @@ export class EditionService
 		});
 		if (courses > 0) {
 			throw new Error(
-				`Edition "${filter.slug}" still has ${courses} course(s) and cannot be deleted.`,
+				m.errors_edition_has_courses({ slug: filter.slug, count: courses }),
 			);
 		}
 		await client.edition.deleteMany({ where: { slug: filter.slug } });
@@ -206,7 +207,7 @@ function assertWindow(startAt: Date, endAt: Date): void {
 			endAt: [
 				{
 					code: "invalid",
-					message: "An edition's endAt must be after its startAt.",
+					message: m.errors_edition_window(),
 				},
 			],
 		});

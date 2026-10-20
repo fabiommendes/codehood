@@ -4,6 +4,7 @@ import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
+import { m } from "@/i18n";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
 import { segmentNames, toOpenApiPath } from "./util";
 
@@ -183,7 +184,7 @@ export function route<In, Out, IsPublic extends boolean = false>(
 			// the 401 the client needs to distinguish "log in" from "we're broken".
 			if (!options.isPublic && !user) {
 				throw new NotAllowed("auth.authenticated", {
-					message: "Authentication required",
+					message: m.errors_authentication_required(),
 					status: 401,
 				});
 			}

@@ -5,6 +5,7 @@ import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
 import { passphraseRedeem } from "@/core/schemas";
 import { actionForm } from "@/forms/form-state";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHref } from "@/urls";
 
@@ -34,11 +35,11 @@ const code = result?.error
 	: (Astro.url.searchParams.get("code") ?? "");
 ---
 
-<AppLayout title="Join a course">
+<AppLayout title={m.auth_join_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <div class="max-w-md">
-    <PageKicker text="Enrollment" squares />
-    <h1 class="text-3xl font-bold">Join a course</h1>
+    <PageKicker text={m.auth_join_kicker()} squares />
+    <h1 class="text-3xl font-bold">{m.auth_join_title()}</h1>
 
     <form
       method="POST"
@@ -60,7 +61,7 @@ const code = result?.error
 
       <div class="card-actions">
         <button type="submit" class="btn btn-primary btn-block rounded-full">
-          Join
+          {m.auth_join_submit()}
         </button>
       </div>
     </form>

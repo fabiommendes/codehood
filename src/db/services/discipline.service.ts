@@ -10,6 +10,7 @@ import {
 	disciplineUpdate,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
+import { m } from "@/i18n";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
 import { Validate } from "@/utils/validate";
 import { type PrismaClient, prisma } from "../client";
@@ -71,7 +72,7 @@ export class DisciplineService
 			});
 		} catch (error) {
 			if ((error as { code?: string }).code === "P2002") {
-				throw new FieldError("slug", `Slug "${input.slug}" is already taken.`);
+				throw new FieldError("slug", m.errors_slug_taken({ slug: input.slug }));
 			}
 			throw error;
 		}
@@ -134,7 +135,7 @@ export class DisciplineService
 			where: { slug: filter.slug },
 		});
 		if (!current) {
-			throw new Error(`No discipline with slug "${filter.slug}".`);
+			throw new Error(m.errors_discipline_not_found({ slug: filter.slug }));
 		}
 		return client.discipline.update({
 			where: { slug: filter.slug },
@@ -182,7 +183,7 @@ export class DisciplineService
 		});
 		if (courses > 0) {
 			throw new Error(
-				`Discipline "${filter.slug}" still has ${courses} course(s) and cannot be deleted.`,
+				m.errors_discipline_has_courses({ slug: filter.slug, count: courses }),
 			);
 		}
 		await client.discipline.deleteMany({ where: { slug: filter.slug } });
@@ -210,7 +211,10 @@ function assertCanWriteDiscipline(
 	if (!DISCIPLINE_SLUG_RE.test(slug) || RESERVED_SLUGS.has(slug)) {
 		throw new FieldError(
 			"slug",
-			`"${slug}" is not a valid discipline slug: it must match ${DISCIPLINE_SLUG_RE} and not be a reserved name.`,
+			m.errors_discipline_slug_invalid({
+				slug,
+				pattern: String(DISCIPLINE_SLUG_RE),
+			}),
 		);
 	}
 }

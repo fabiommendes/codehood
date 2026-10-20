@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { duration, examId, questionRefId, rev, slug } from "./base";
 import { courseRef } from "./course";
 
@@ -17,7 +18,7 @@ export const textFormat = z.enum(["PLAINTEXT", "MARKDOWN", "HTML"]);
 /// How long an exam runs. A zero length is refused: an untimed exam has none.
 export const examDuration = duration.refine(
 	(d) => (d.hours ?? 0) + (d.minutes ?? 0) > 0,
-	{ message: "Duration must be longer than zero" },
+	{ message: m.forms_schema_duration_positive() },
 );
 
 /// A question in an exam, pinned to the version the exam was assembled with.

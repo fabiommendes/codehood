@@ -1,5 +1,6 @@
 import { z } from "zod";
 import "./base";
+import { m } from "@/i18n";
 import { dateInput, editionSlug } from "./base";
 
 export const editionSchema = z.object({
@@ -24,16 +25,23 @@ export const editionCreate = editionSchema.pick({
  */
 export const editionForm = editionCreate
 	.extend({
-		slug: editionSlug.meta({ form: { placeholder: "2026-2" } }),
-		name: editionSchema.shape.name.meta({
-			form: { placeholder: "Second term" },
+		slug: editionSlug.meta({
+			form: { label: m.forms_label_slug(), placeholder: "2026-2" },
 		}),
-		startAt: dateInput.meta({ form: { label: "Starts" } }),
-		endAt: dateInput.meta({ form: { label: "Ends" } }),
+		name: editionSchema.shape.name.meta({
+			form: {
+				label: m.forms_label_name(),
+				placeholder: m.forms_placeholder_edition_name(),
+			},
+		}),
+		startAt: dateInput.meta({
+			form: { label: m.forms_label_edition_starts() },
+		}),
+		endAt: dateInput.meta({ form: { label: m.forms_label_edition_ends() } }),
 	})
 	.refine((edition) => edition.endAt > edition.startAt, {
 		path: ["endAt"],
-		message: "Must be after the start date.",
+		message: m.forms_schema_edition_end_after_start(),
 	});
 
 export const editionUpdate = editionSchema

@@ -30,9 +30,6 @@
 	"exams_list_empty_student": "Nenhuma avaliação ainda.",
 	"exams_detail_page_title": "{title} · Avaliações",
 	"exams_detail_back": "← Avaliações",
-	"exams_noun_practice": "exercício",
-	"exams_noun_quiz": "quiz",
-	"exams_noun_exam": "prova",
 	"exams_detail_duration_extra": "{duration} (+{extra} de tempo extra)",
 	"exams_detail_updated": "atualizada em {date}",
 	"exams_detail_question_count": [
@@ -76,5 +73,89 @@
 	"exams_duration_minutes": "{minutes} min",
 	"exams_badge_awaiting_grading": "Aguardando correção",
 	"exams_badge_graded": "Corrigida",
-	"exams_badge_missed": "Perdida"
+	"exams_badge_missed": "Perdida",
+	"exams_cancel": "Cancelar",
+	"exams_close_backdrop": "fechar",
+	"exams_release_button": "Liberar resultados",
+	"exams_release_released": "Liberado {when}",
+	"exams_release_title": "Liberar resultados?",
+	"exams_release_body": "Todos os estudantes verão agora as notas e os seus comentários. Depois de liberados, não dá para desfazer. Respostas ainda sem nota impedem a liberação.",
+	"exams_attempt_seconds_left": "faltam {seconds} s",
+	"exams_attempt_minutes_left": "faltam {minutes} min",
+	"exams_attempt_connection_failed": "a conexão falhou",
+	"exams_attempt_save_failed": "Algumas respostas não puderam ser salvas. Corrija os erros e tente de novo.",
+	"exams_attempt_not_open_yet": "Ainda não está aberta",
+	"exams_attempt_opens": "Abre {when}",
+	"exams_attempt_start": [
+		{
+			"declarations": ["input type"],
+			"selectors": ["type"],
+			"match": {
+				"type=PRACTICE": "Iniciar exercício",
+				"type=QUIZ": "Iniciar quiz",
+				"type=EXAM": "Iniciar prova"
+			}
+		}
+	],
+	"exams_attempt_missed": [
+		{
+			"declarations": ["input type"],
+			"selectors": ["type"],
+			"match": {
+				"type=PRACTICE": "Você não fez este exercício.",
+				"type=QUIZ": "Você não fez este quiz.",
+				"type=EXAM": "Você não fez esta prova."
+			}
+		}
+	],
+	"exams_attempt_submitted_waiting": "Enviado. Os resultados ainda não foram liberados.",
+	"exams_attempt_question_of": "Questão {number} de {total}",
+	"exams_attempt_save_error": "Não foi possível salvar esta resposta: {message}. Será tentado de novo quando você a alterar ou enviar.",
+	"exams_attempt_submit_title": [
+		{
+			"declarations": ["input type"],
+			"selectors": ["type"],
+			"match": {
+				"type=PRACTICE": "Enviar este exercício?",
+				"type=QUIZ": "Enviar este quiz?",
+				"type=EXAM": "Enviar esta prova?"
+			}
+		}
+	],
+	"exams_attempt_submit_body": "Não será possível alterar as respostas depois do envio. Questões deixadas em branco continuam em branco.",
+	"exams_attempt_submit": [
+		{
+			"declarations": ["input type"],
+			"selectors": ["type"],
+			"match": {
+				"type=PRACTICE": "Enviar exercício",
+				"type=QUIZ": "Enviar quiz",
+				"type=EXAM": "Enviar prova"
+			}
+		}
+	],
+	"exams_attempt_answers_not_saved": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} resposta não salva",
+				"countPlural=other": "{count} respostas não salvas"
+			}
+		}
+	],
+	"exams_attempt_saving": "Salvando…",
+	"exams_attempt_all_saved": "✓ Todas as respostas salvas",
+	"exams_attempt_no_time_limit": "Sem limite de tempo",
+	"exams_attempt_progress": "{answered} de {total} respondidas",
+	"exams_attempt_nav_label": "Questões",
+	"exams_attempt_question_answered": "Questão {number}, respondida",
+	"exams_attempt_not_saved": "Não salva",
+	"exams_attempt_saved": "Salva",
+	"exams_attempt_score_label": "Nota",
+	"exams_attempt_unsupported": "Ainda não é possível responder questões do tipo \"{type}\".",
+	"exams_group_open": "Abertas",
+	"exams_group_practice": "Exercícios",
+	"exams_group_upcoming": "Próximas",
+	"exams_group_past": "Avaliações passadas e notas"
 }

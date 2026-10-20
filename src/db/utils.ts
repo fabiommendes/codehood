@@ -9,6 +9,7 @@ import {
 } from "@/core/error";
 import type { InvalidDataCode } from "@/core/error-response";
 import type { CourseRef } from "@/core/schemas";
+import { m } from "@/i18n";
 
 /**
  * The unique-key `where` for a course given by id or by natural key.
@@ -150,7 +151,7 @@ function convertPrismaError(error: PrismaClientKnownRequestError): InvalidData {
 	// to infer the field this way
 	const cause = (error.meta?.driverAdapterError as WithCause)?.cause;
 	const errors: InvalidDataErrors = {};
-	let message = "An error occurred";
+	let message = m.errors_db_generic();
 
 	switch (error.code) {
 		// Trying to create a resource in a PK that already exists
@@ -159,9 +160,12 @@ function convertPrismaError(error: PrismaClientKnownRequestError): InvalidData {
 			const displayFields = fields.map(removeIdSuffix).join(", ");
 			const error = {
 				code: "not-unique" satisfies InvalidDataCode,
-				message: `A ${modelName} exists with this primary key: ${displayFields}.`,
+				message: m.errors_db_pk_exists({
+					model: modelName,
+					fields: displayFields,
+				}),
 			} as const;
-			message = `${modelName} already exists in the database`;
+			message = m.errors_db_already_exists({ model: modelName });
 
 			errors.pk = [error];
 
@@ -174,12 +178,12 @@ function convertPrismaError(error: PrismaClientKnownRequestError): InvalidData {
 		// Foreign Key violation
 		case "P2003": {
 			// TODO: inspect prisma's foreign key relations for the model and report?
-			message = `${modelName} is trying to access a parent resource that do not exist`;
+			message = m.errors_db_parent_missing({ model: modelName });
 			break;
 		}
 
 		default: {
-			message = `A unknown error ocurred: ${error.code}`;
+			message = m.errors_db_unknown({ code: error.code });
 		}
 	}
 

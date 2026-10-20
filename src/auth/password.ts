@@ -1,4 +1,5 @@
 import { hash, verify } from "@node-rs/argon2";
+import { m } from "@/i18n";
 import COMMON_PASSWORDS from "./common-passwords.json" with { type: "json" };
 
 export type PasswordErrorCode = "too-short" | "too-common" | "compromised";
@@ -33,21 +34,21 @@ export async function passwordStrengthIssues(
 	if (password.length < PASSWORD_MINIMUM_LENGTH) {
 		errors.push({
 			code: "too-short",
-			message: `Password must be at least ${PASSWORD_MINIMUM_LENGTH} characters long`,
+			message: m.errors_password_too_short({ min: PASSWORD_MINIMUM_LENGTH }),
 		});
 	}
 
 	if (PASSWORD_COMMON_WORDS.has(password)) {
 		errors.push({
 			code: "too-common",
-			message: `Password is too common`,
+			message: m.errors_password_too_common(),
 		});
 	}
 
 	if (await passwordInTheWild(password)) {
 		errors.push({
 			code: "compromised",
-			message: `Password has been compromised in a data breach`,
+			message: m.errors_password_compromised(),
 		});
 	}
 

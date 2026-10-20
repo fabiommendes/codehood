@@ -17,5 +17,162 @@
 			}
 		}
 	],
-	"admin_courses_open": "Abrir turma"
+	"admin_courses_open": "Abrir turma",
+	"admin_close": "Fechar",
+	"admin_close_backdrop": "fechar",
+	"admin_save": "Salvar",
+	"admin_edit": "Editar",
+	"admin_edit_slug": "Editar {slug}",
+	"admin_delete": "Excluir",
+	"admin_delete_slug": "Excluir {slug}",
+	"admin_col_slug": "Slug",
+	"admin_col_name": "Nome",
+	"admin_col_courses": "Turmas",
+	"admin_col_actions": "Ações",
+	"admin_col_interval": "Intervalo",
+	"admin_col_status": "Situação",
+	"admin_col_email": "E-mail",
+	"admin_col_created_by": "Criado por",
+	"admin_col_created": "Criado em",
+	"admin_col_expires": "Expira em",
+	"admin_col_uses": "Usos",
+	"admin_col_username": "Nome de usuário",
+	"admin_col_role": "Perfil",
+	"admin_col_joined": "Entrou em",
+	"admin_courses_count": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} turma",
+				"countPlural=other": "{count} turmas"
+			}
+		}
+	],
+	"admin_discipline_in_use": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} turma ainda usa esta disciplina",
+				"countPlural=other": "{count} turmas ainda usam esta disciplina"
+			}
+		}
+	],
+	"admin_edition_in_use": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} turma ainda usa este período letivo",
+				"countPlural=other": "{count} turmas ainda usam este período letivo"
+			}
+		}
+	],
+	"admin_edition_live": "em andamento",
+	"admin_edition_closed": "encerrado",
+	"admin_invite_revoke": "Revogar",
+	"admin_invite_revoke_title": "Revogar o convite de {email}?",
+	"admin_invite_revoke_text": "O link deixa de funcionar imediatamente. Para convidar a pessoa de novo, gere um novo.",
+	"admin_role_admin": "administrador",
+	"admin_role_instructor": "docente",
+	"admin_role_student": "estudante",
+	"admin_force_logout": "Forçar saída",
+	"admin_force_logout_user": "Forçar saída de {name}",
+	"admin_force_logout_title": "Forçar saída de {name}?",
+	"admin_force_logout_text": "Todas as sessões ativas terminam imediatamente; a conta em si não é desativada.",
+	"admin_force_logout_submit": "Sair",
+	"admin_force_logout_done": "Todas as sessões dessa conta foram encerradas.",
+	"admin_disciplines_page_title": "Administração · Disciplinas",
+	"admin_disciplines_intro": "Um dos dois catálogos que pertencem só aos administradores. O slug é permanente depois de criado: é o primeiro trecho da URL de todas as turmas abaixo dele.",
+	"admin_discipline_created": "Disciplina \"{slug}\" criada.",
+	"admin_discipline_updated": "Disciplina atualizada.",
+	"admin_discipline_deleted": "Disciplina excluída.",
+	"admin_new_discipline": "Nova disciplina",
+	"admin_editions_page_title": "Administração · Períodos letivos",
+	"admin_editions_intro": "Períodos e suas janelas de atividade. Docentes só podem criar turmas dentro de uma janela; administradores e a conta do sistema podem criar em qualquer período letivo.",
+	"admin_edition_created": "Período letivo \"{slug}\" criado.",
+	"admin_edition_updated": "Período letivo atualizado.",
+	"admin_edition_deleted": "Período letivo excluído.",
+	"admin_new_edition": "Novo período letivo",
+	"admin_users_page_title": "Administração · Usuários",
+	"admin_users_total": "Todas as contas desta instância do Codehood: {count} no total.",
+	"admin_users_add": "Adicionar usuário",
+	"admin_users_add_submit": "Adicionar",
+	"admin_users_created": "Conta criada para {username}.",
+	"admin_users_stat_admins": "Administradores",
+	"admin_users_stat_instructors": "Docentes",
+	"admin_users_stat_students": "Estudantes",
+	"admin_overview_page_title": "Administração · Visão geral",
+	"admin_overview_stat_users": "Usuários",
+	"admin_overview_stat_courses": "Turmas",
+	"admin_overview_stat_disciplines": "Disciplinas",
+	"admin_overview_stat_editions": "Períodos letivos",
+	"admin_overview_admins": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} administrador",
+				"countPlural=other": "{count} administradores"
+			}
+		}
+	],
+	"admin_overview_instructors": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} docente",
+				"countPlural=other": "{count} docentes"
+			}
+		}
+	],
+	"admin_overview_students": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} estudante",
+				"countPlural=other": "{count} estudantes"
+			}
+		}
+	],
+	"admin_overview_across_disciplines": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "em {count} disciplina",
+				"countPlural=other": "em {count} disciplinas"
+			}
+		}
+	],
+	"admin_overview_none_yet": "nenhuma ainda",
+	"admin_overview_disciplines_more": "{list} e mais {count}",
+	"admin_overview_live_now": "{count} em andamento",
+	"admin_overview_actions_title": "Ações",
+	"admin_overview_actions_intro": "Disponíveis em todo o sistema. As destrutivas pedem confirmação antes de qualquer alteração.",
+	"admin_overview_invite_title": "Convidar docente",
+	"admin_overview_invite_text": "Gere um link de cadastro de uso único. A pessoa define a própria senha e os próprios dados.",
+	"admin_overview_invite_button": "Convidar docente",
+	"admin_overview_discipline_text": "Adicione um novo catálogo de disciplina, por exemplo {example}.",
+	"admin_overview_edition_text": "Adicione um período com sua janela de atividade, por exemplo {example}.",
+	"admin_overview_pending_title": "Convites pendentes",
+	"admin_overview_pending_intro": "Revogue um convite para invalidar o link. A saída forçada fica em cada linha da aba Usuários.",
+	"admin_overview_invite_created": "Convite criado. Expira em 7 dias.",
+	"admin_overview_copy_aria": "Copiar link do convite",
+	"admin_overview_copy_title": "Copiar",
+	"admin_overview_copied": "Copiado",
+	"admin_overview_discipline_created": "Disciplina \"{slug}\" criada. {link}.",
+	"admin_overview_discipline_link": "Veja na aba Disciplinas",
+	"admin_overview_edition_created": "Período letivo \"{slug}\" criado. {link}.",
+	"admin_overview_edition_link": "Veja na aba Períodos letivos",
+	"admin_overview_invite_revoked": "Convite revogado.",
+	"admin_overview_no_pending": "Nenhum convite de docente pendente.",
+	"admin_overview_link_once": "O link é exibido uma única vez. Se alguém o perder, revogue o convite aqui e gere um novo.",
+	"admin_overview_invite_dialog_text": "A pessoa usa este link para criar a própria conta. Senha, usuário do GitHub e matrícula escolar são informados por ela.",
+	"admin_overview_invite_submit": "Gerar link do convite",
+	"admin_overview_create_discipline": "Criar disciplina",
+	"admin_overview_create_edition": "Criar período letivo"
 }

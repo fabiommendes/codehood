@@ -4,6 +4,7 @@ import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { answerGrade } from "@/core/schemas";
+import { m } from "@/i18n";
 import { FOCUS_KEY } from "./focus";
 
 export interface GradeFormProps {
@@ -55,12 +56,12 @@ export default function GradeForm(props: GradeFormProps): JSX.Element {
 			<Field {...form.field("comment")} />
 			<div class="flex gap-2">
 				<button type="submit" class="btn btn-primary" disabled={form.busy()}>
-					Save grade
+					{m.grades_form_save()}
 				</button>
 				<Show when={props.onCancel}>
 					{(cancel) => (
 						<button type="button" class="btn btn-ghost" onClick={cancel()}>
-							Cancel
+							{m.grades_cancel()}
 						</button>
 					)}
 				</Show>

@@ -12,6 +12,7 @@ import { disciplineCreate, disciplineEdit } from "@/core/schemas";
 import { db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm, submittedValues } from "@/forms/form-state";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -58,26 +59,25 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
 }));
 ---
 
-<AppLayout title="Admin · Disciplines">
+<AppLayout title={m.admin_disciplines_page_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <AdminHeader active="disciplines" />
 
     <p class="max-w-xl text-base-content/60">
-      One of two catalogs admins own outright. The slug is permanent once
-      created: it is the first segment of every course URL underneath it.
+      {m.admin_disciplines_intro()}
     </p>
 
     {
       createResult && !createResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Discipline "{createResult.data.slug}" created.</span>
+          <span>{m.admin_discipline_created({ slug: createResult.data.slug })}</span>
         </div>
       )
     }
 
     <div class="card card-border mt-6 bg-base-100">
       <div class="card-body">
-        <h2 class="card-title">New discipline</h2>
+        <h2 class="card-title">{m.admin_new_discipline()}</h2>
         <form
           method="POST"
           action={actions.admin.createDiscipline}
@@ -90,8 +90,8 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
           <button
             type="submit"
             class="btn btn-square btn-primary mt-7"
-            aria-label="New discipline"
-            title="New discipline"
+            aria-label={m.admin_new_discipline()}
+            title={m.admin_new_discipline()}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
@@ -108,7 +108,7 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
     {
       updateResult && !updateResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Discipline updated.</span>
+          <span>{m.admin_discipline_updated()}</span>
         </div>
       )
     }
@@ -116,7 +116,7 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
     {
       deleteResult && !deleteResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Discipline deleted.</span>
+          <span>{m.admin_discipline_deleted()}</span>
         </div>
       )
     }
@@ -128,7 +128,3 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
     />
   </main>
 </AppLayout>
-
-<script>
-  import "@/components/admin/reopen-dialogs";
-</script>

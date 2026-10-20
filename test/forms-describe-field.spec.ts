@@ -1,10 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
-import {
-	describeField,
-	describeFields,
-	humanize,
-} from "@/forms/describe-field";
+import { describeField, describeFields } from "@/forms/describe-field";
 import "@/forms/meta";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import {
@@ -12,14 +8,15 @@ import {
 	jsonSchemaOf,
 } from "@/rpc/registry/openrpc-document";
 
-test("humanize splits camelCase and snake_case", () => {
-	expect(humanize("slug")).toBe("Slug");
-	expect(humanize("firstName")).toBe("First name");
-	expect(humanize("start_date")).toBe("Start date");
-});
+/// `describeField` with a label supplied, for tests about anything but labels.
+const field = (
+	name: string,
+	schema: Parameters<typeof describeField>[1],
+	override: Parameters<typeof describeField>[2] = {},
+) => describeField(name, schema, { label: name, ...override });
 
 test("string checks become attributes", () => {
-	const spec = describeField(
+	const spec = field(
 		"slug",
 		z
 			.string()
@@ -30,52 +27,51 @@ test("string checks become attributes", () => {
 	expect(spec).toMatchObject({
 		kind: "text",
 		required: true,
-		label: "Slug",
+		label: "slug",
 		attrs: { minlength: 2, maxlength: 8, pattern: "[a-z]+" },
 	});
 });
 
 test("pattern is omitted when HTML would read it differently", () => {
 	for (const regex of [/[a-z]+/, /^[a-z]+$/i, /^(?<a>x)\k<a>$/u, /^a\$/]) {
-		expect(
-			describeField("x", z.string().regex(regex)).attrs.pattern,
-		).toBeUndefined();
+		expect(field("x", z.string().regex(regex)).attrs.pattern).toBeUndefined();
 	}
 });
 
 test("string formats pick the kind", () => {
-	expect(describeField("x", z.email()).kind).toBe("email");
-	expect(describeField("x", z.url()).kind).toBe("url");
-	expect(describeField("x", z.iso.date()).kind).toBe("date");
-	expect(describeField("x", z.iso.datetime()).kind).toBe("datetime");
+	expect(field("x", z.email()).kind).toBe("email");
+	expect(field("x", z.url()).kind).toBe("url");
+	expect(field("x", z.iso.date()).kind).toBe("date");
+	expect(field("x", z.iso.datetime()).kind).toBe("datetime");
 	expect(
-		describeField("x", z.string().meta({ form: { widget: "textarea" } })).kind,
+		field("x", z.string().meta({ form: { widget: "textarea" } })).kind,
 	).toBe("textarea");
 	expect(
-		describeField("x", z.string().meta({ form: { widget: "password" } })).attrs
-			.type,
+		field("x", z.string().meta({ form: { widget: "password" } })).attrs.type,
 	).toBe("password");
 });
 
 test("numbers carry min, max and step", () => {
-	expect(describeField("n", z.number().int().min(1).max(10)).attrs).toEqual({
+	expect(field("n", z.number().int().min(1).max(10)).attrs).toEqual({
 		min: 1,
 		max: 10,
 		step: 1,
 	});
-	expect(describeField("n", z.number()).attrs).toEqual({});
-	expect(describeField("n", z.number().multipleOf(0.5)).attrs.step).toBe(0.5);
+	expect(field("n", z.number()).attrs).toEqual({});
+	expect(field("n", z.number().multipleOf(0.5)).attrs.step).toBe(0.5);
 });
 
 test("dates, booleans and enums", () => {
-	const date = describeField(
+	const date = field(
 		"d",
 		z.coerce.date().min(new Date("2026-01-02T10:00:00Z")),
 	);
 	expect(date).toMatchObject({ kind: "date", attrs: { min: "2026-01-02" } });
-	expect(describeField("b", z.boolean()).kind).toBe("boolean");
+	expect(field("b", z.boolean()).kind).toBe("boolean");
 	expect(
-		describeField("role", z.enum(["admin", "student_user"])),
+		field("role", z.enum(["admin", "student_user"]), {
+			options: { admin: "Admin", student_user: "Student user" },
+		}),
 	).toMatchObject({
 		kind: "enum",
 		options: [
@@ -86,18 +82,18 @@ test("dates, booleans and enums", () => {
 });
 
 test("wrappers unwrap and decide required", () => {
-	expect(describeField("x", z.string()).required).toBe(true);
-	expect(describeField("x", z.string().optional()).required).toBe(false);
-	expect(describeField("x", z.string().nullable()).required).toBe(false);
-	expect(describeField("x", z.number().default(3)).required).toBe(false);
+	expect(field("x", z.string()).required).toBe(true);
+	expect(field("x", z.string().optional()).required).toBe(false);
+	expect(field("x", z.string().nullable()).required).toBe(false);
+	expect(field("x", z.number().default(3)).required).toBe(false);
 	expect(
-		describeField(
+		field(
 			"x",
 			z.string().transform((s) => s.length),
 		).kind,
 	).toBe("text");
 	expect(
-		describeField("x", z.string().max(3).optional().nullable()).attrs.maxlength,
+		field("x", z.string().max(3).optional().nullable()).attrs.maxlength,
 	).toBe(3);
 });
 
@@ -110,8 +106,8 @@ test("meta is found through wrappers, inner or outer", () => {
 		.string()
 		.optional()
 		.meta({ form: { placeholder: "cs102" } });
-	expect(describeField("x", inner).placeholder).toBe("cs102");
-	expect(describeField("x", outer).placeholder).toBe("cs102");
+	expect(field("x", inner).placeholder).toBe("cs102");
+	expect(field("x", outer).placeholder).toBe("cs102");
 });
 
 test("label and hint precedence", () => {
@@ -135,25 +131,33 @@ test("label and hint precedence", () => {
 		label: "Title",
 		hint: "Description",
 	});
-	expect(describeField("fooBar", z.string())).toMatchObject({
-		label: "Foo bar",
-	});
-	expect(describeField("fooBar", z.string()).hint).toBeUndefined();
+	expect(describeField("x", z.string(), { label: "L" }).hint).toBeUndefined();
+});
+
+test("a field with no label throws, naming the field", () => {
+	expect(() => describeField("fooBar", z.string())).toThrow(/"fooBar".*label/);
+});
+
+test("an enum value with no option label throws", () => {
+	expect(() => describeField("role", z.enum(["a"]), { label: "R" })).toThrow(
+		/"role".*"a"/,
+	);
 });
 
 test("unsupported types throw", () => {
-	expect(() => describeField("x", z.array(z.string()))).toThrow(/array/);
-	expect(() => describeField("x", z.object({}))).toThrow(
-		/Write the field by hand/,
-	);
-	expect(() => describeField("x", z.union([z.string(), z.number()]))).toThrow();
+	expect(() => field("x", z.array(z.string()))).toThrow(/array/);
+	expect(() => field("x", z.object({}))).toThrow(/Write the field by hand/);
+	expect(() => field("x", z.union([z.string(), z.number()]))).toThrow();
 });
 
 test("describeFields follows shape order and applies overrides", () => {
 	const schema = z.object({ b: z.string(), a: z.number() });
-	const specs = describeFields(schema, { a: { label: "Alpha" } });
+	const specs = describeFields(schema, {
+		a: { label: "Alpha" },
+		b: { label: "b" },
+	});
 	expect(specs.map((s) => [s.name, s.label])).toEqual([
-		["b", "B"],
+		["b", "b"],
 		["a", "Alpha"],
 	]);
 });

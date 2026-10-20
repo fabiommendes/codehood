@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { courseId, inviteId, publicId, username } from "./base";
 import { courseNaturalKey, courseParams, courseRef } from "./course";
 import { userInfo, userRole, userSignUp } from "./user";
@@ -70,14 +71,30 @@ export const inviteUpdate = z.object({
  */
 export const invitePersonal = z
 	.object({
-		email: z.email().meta({ form: { placeholder: "person@example.edu" } }),
-		role: z.enum(["INSTRUCTOR", "STUDENT"]).default("INSTRUCTOR"),
+		email: z.email().meta({
+			form: {
+				label: m.forms_label_email(),
+				placeholder: "person@example.edu",
+			},
+		}),
+		role: z
+			.enum(["INSTRUCTOR", "STUDENT"])
+			.default("INSTRUCTOR")
+			.meta({
+				form: {
+					label: m.forms_label_role(),
+					options: {
+						STUDENT: m.forms_role_student(),
+						INSTRUCTOR: m.forms_role_instructor(),
+					},
+				},
+			}),
 		discipline: z.string().min(1).optional(),
 		course: z.string().min(1).optional(),
 	})
 	.refine((input) => !input.discipline === !input.course, {
 		path: ["course"],
-		message: "Give the discipline and the course together.",
+		message: m.forms_schema_invite_course_together(),
 	});
 
 /// The invite to revoke, by its public id.
@@ -95,5 +112,15 @@ export const inviteJoin = inviteAccept.pick({ token: true });
 
 /// A shareable invite link to a course, optionally limited to `maxUses` redemptions.
 export const inviteClassroom = courseParams.extend({
-	maxUses: z.number().int().positive().optional(),
+	maxUses: z
+		.number()
+		.int()
+		.positive()
+		.optional()
+		.meta({
+			form: {
+				label: m.forms_label_invite_max_uses(),
+				placeholder: m.forms_placeholder_invite_max_uses(),
+			},
+		}),
 });

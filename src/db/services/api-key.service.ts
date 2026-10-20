@@ -10,6 +10,7 @@ import {
 	apiKeySchema,
 } from "@/core/schemas";
 import type { Crud, ServiceOpts } from "@/db/base-service";
+import { m } from "@/i18n";
 import { Validate } from "@/utils/validate";
 import { type Prisma, type PrismaClient, prisma } from "../client";
 
@@ -162,7 +163,7 @@ export class ApiKeyService
 	 */
 	update(_filter: ApiKeyPK, _data: never, _opts: ServiceOpts): Promise<ApiKey> {
 		throw new RuleViolation({
-			message: "Update method not implemented for API keys",
+			message: m.errors_api_key_update_unsupported(),
 		});
 	}
 

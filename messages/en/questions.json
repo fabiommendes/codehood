@@ -53,5 +53,34 @@
 	"questions_type_fill_in": "Fill in the blank",
 	"questions_status_draft": "Draft",
 	"questions_status_published": "Published",
-	"questions_status_archived": "Archived"
+	"questions_status_archived": "Archived",
+	"questions_table_col_title": "Title",
+	"questions_table_col_type": "Type",
+	"questions_table_col_status": "Status",
+	"questions_table_col_tags": "Tags",
+	"questions_table_col_updated": "Updated",
+	"questions_table_col_actions": "Actions",
+	"questions_action_publish": "Publish",
+	"questions_action_archive": "Archive",
+	"questions_action_draft": "Move to draft",
+	"questions_open_named": "Open {title}",
+	"questions_open_title": "Open question",
+	"questions_filter_clear": "Clear",
+	"questions_filter_clear_all": "Clear filters",
+	"questions_table_count": [
+		{
+			"declarations": [
+				"input shown",
+				"input total",
+				"local totalPlural = total: plural"
+			],
+			"selectors": ["totalPlural"],
+			"match": {
+				"totalPlural=one": "{shown} of {total} question",
+				"totalPlural=other": "{shown} of {total} questions"
+			}
+		}
+	],
+	"questions_table_empty": "No questions yet.",
+	"questions_table_no_match": "No questions match these filters."
 }

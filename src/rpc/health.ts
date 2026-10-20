@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Unavailable } from "@/core/error";
 import { prisma } from "@/db/client";
+import { m } from "@/i18n";
 import { METHOD } from "./registry";
 
 /**
@@ -27,7 +28,7 @@ export const check = METHOD("health.check", {
 		try {
 			await prisma.$queryRaw`SELECT 1`;
 		} catch {
-			throw new Unavailable("The database is unreachable.");
+			throw new Unavailable(m.errors_database_unreachable());
 		}
 		return { status: "ok", database: "ok" } as const;
 	},

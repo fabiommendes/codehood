@@ -18,6 +18,7 @@ import {
 	timeSlotUpdate,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import { m } from "@/i18n";
 import {
 	durationToMinutes,
 	toClockTime,
@@ -282,7 +283,10 @@ export class TimeSlotService extends CrudBase<{
 		});
 		if (eventCount > 0) {
 			throw new Error(
-				`Slot "${current.slug}" still has ${eventCount} event(s) and cannot be deleted.`,
+				m.errors_time_slot_has_events({
+					slug: current.slug,
+					count: eventCount,
+				}),
 			);
 		}
 		await tx.timeSlot.delete({ where: { id: current.id } });
@@ -377,10 +381,10 @@ async function writableSlot(
 /** A slot lasts at least a minute and does not run past midnight. */
 function validateWindow(startMin: number, durationMin: number): void {
 	if (durationMin <= 0) {
-		throw new Error("A time slot's duration must be greater than zero.");
+		throw new Error(m.errors_time_slot_duration_positive());
 	}
 	if (startMin + durationMin > 1440) {
-		throw new Error("A time slot cannot run past midnight.");
+		throw new Error(m.errors_time_slot_past_midnight());
 	}
 }
 
@@ -418,7 +422,7 @@ async function assertNoOverlap(
 		minutesOverlap(startMin, durationMin, s.startMin, s.durationMin),
 	);
 	if (collision) {
-		throw new Error(`This slot overlaps slot "${collision.slug}" on ${day}.`);
+		throw new Error(m.errors_time_slot_overlap({ slug: collision.slug, day }));
 	}
 }
 

@@ -12,6 +12,7 @@ import { editionForm } from "@/core/schemas";
 import { db, isEditionOpen } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm, submittedValues } from "@/forms/form-state";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -60,26 +61,25 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
 }));
 ---
 
-<AppLayout title="Admin · Editions">
+<AppLayout title={m.admin_editions_page_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <AdminHeader active="editions" />
 
     <p class="max-w-xl text-base-content/60">
-      Terms and their active windows. Instructors can only create courses inside
-      a window; admins and the system account can create in any edition.
+      {m.admin_editions_intro()}
     </p>
 
     {
       createResult && !createResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Edition "{createResult.data.slug}" created.</span>
+          <span>{m.admin_edition_created({ slug: createResult.data.slug })}</span>
         </div>
       )
     }
 
     <div class="card card-border mt-6 bg-base-100">
       <div class="card-body">
-        <h2 class="card-title">New edition</h2>
+        <h2 class="card-title">{m.admin_new_edition()}</h2>
         <form
           method="POST"
           action={actions.admin.createEdition}
@@ -94,8 +94,8 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
           <button
             type="submit"
             class="btn btn-square btn-primary mt-7"
-            aria-label="New edition"
-            title="New edition"
+            aria-label={m.admin_new_edition()}
+            title={m.admin_new_edition()}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
@@ -112,7 +112,7 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
     {
       updateResult && !updateResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Edition updated.</span>
+          <span>{m.admin_edition_updated()}</span>
         </div>
       )
     }
@@ -120,7 +120,7 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
     {
       deleteResult && !deleteResult.error && (
         <div role="alert" class="alert alert-success mt-6">
-          <span>Edition deleted.</span>
+          <span>{m.admin_edition_deleted()}</span>
         </div>
       )
     }
@@ -132,7 +132,3 @@ const editionRows: EditionRow[] = editions.map((edition) => ({
     />
   </main>
 </AppLayout>
-
-<script>
-  import "@/components/admin/reopen-dialogs";
-</script>

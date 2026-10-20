@@ -2,6 +2,7 @@
  * Core Codehood exceptions
  */
 import type { z } from "zod";
+import { m } from "@/i18n";
 import {
 	type BaseErrorResponse,
 	type InternalErrorResponse,
@@ -224,7 +225,11 @@ export class NotFound extends BaseSerializableError<NotFoundResponse> {
 			args = {};
 		}
 
-		const { message = "Resource not found", id = "unknown", context } = args;
+		const {
+			message = m.errors_resource_not_found(),
+			id = "unknown",
+			context,
+		} = args;
 		super(message, "not-found", 404);
 		this.resource = resource;
 		this.id = id;
@@ -262,7 +267,11 @@ export class NotAllowed extends BaseSerializableError<NotAllowedResponse> {
 			target?: unknown;
 		},
 	) {
-		const { message = "Permission denied", status = 403, target } = args ?? {};
+		const {
+			message = m.errors_permission_denied(),
+			status = 403,
+			target,
+		} = args ?? {};
 		super(message, "not-allowed", status);
 		this.action = action;
 		this.target = toJsonValueOrNothing(target);
@@ -310,7 +319,7 @@ export class RuleViolation extends BaseSerializableError<RuleViolationResponse> 
 		target?: JSONValue;
 		info?: JSONValue;
 	}) {
-		const { message = "Rule violation", actor, target, info } = args;
+		const { message = m.errors_rule_violation(), actor, target, info } = args;
 		super(message, "rule-violation", 500);
 		this.actor = actor;
 		this.target = target;
@@ -335,7 +344,7 @@ export class RuleViolation extends BaseSerializableError<RuleViolationResponse> 
 			type: "error",
 			code: "internal-error",
 			status: 500,
-			message: `Rule violation: ${message}`,
+			message: m.errors_rule_violation_internal({ message }),
 			timestamp: new Date(),
 		};
 	}
@@ -351,7 +360,7 @@ export class Unavailable extends BaseSerializableError<InternalErrorResponse> {
 	readonly code = "internal-error";
 	readonly status: 503 = 503;
 
-	constructor(message: string = "Service unavailable") {
+	constructor(message: string = m.errors_service_unavailable()) {
 		super(message, "internal-error", 503);
 	}
 
@@ -400,7 +409,7 @@ function validationErrorCodeFromZodIssue(
 
 /// Renders field errors as `field: message; field: message`, mirroring the
 /// summary `InvalidData.fromZodError` builds, so a hand-built error is not
-/// reduced to a bare "Validation Error".
+/// reduced to a bare m.errors_validation().
 function summarizeErrors(errors: {
 	[key: string]: InvalidDataResponse["errors"][string] | undefined | null;
 }): string {
@@ -411,7 +420,7 @@ function summarizeErrors(errors: {
 			summaries.push(key === "$" ? issue.message : `${key}: ${issue.message}`);
 		}
 	}
-	return summaries.length > 0 ? summaries.join("; ") : "Validation Error";
+	return summaries.length > 0 ? summaries.join("; ") : m.errors_validation();
 }
 
 /**
@@ -443,7 +452,7 @@ export class CheckInError extends Error {
 			| "dropped"
 			| "not-student"
 			| "claim-expired",
-		message: string = `Check-in refused: ${code}.`,
+		message: string = m.errors_check_in_refused({ code }),
 	) {
 		super(message);
 		this.name = "CheckInError";

@@ -4,6 +4,7 @@ import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { rollCallOpen } from "@/core/schemas";
+import { m } from "@/i18n";
 
 export interface OpenRollCallDialogProps {
 	/// The course's URL segments, as the roll call actions take them.
@@ -49,14 +50,13 @@ export default function OpenRollCallDialog(
 				class="btn btn-outline btn-sm"
 				onClick={() => dialog?.showModal()}
 			>
-				{props.label ?? "Roll call"}
+				{props.label ?? m.attendance_roll_call()}
 			</button>
 			<dialog ref={dialog} class="modal">
 				<div class="modal-box">
-					<h3 class="text-lg font-bold">Open the roll call</h3>
+					<h3 class="text-lg font-bold">{m.attendance_open_title()}</h3>
 					<p class="mt-2 text-sm text-base-content/70">
-						Students check in for 15 minutes with the code on the projected
-						screen.
+						{m.attendance_open_body()}
 					</p>
 					<form
 						noValidate
@@ -72,20 +72,20 @@ export default function OpenRollCallDialog(
 								disabled={form.busy()}
 								onClick={() => dialog?.close()}
 							>
-								Cancel
+								{m.attendance_cancel()}
 							</button>
 							<button
 								type="submit"
 								class="btn btn-primary"
 								disabled={form.busy()}
 							>
-								Open roll call
+								{m.attendance_open_submit()}
 							</button>
 						</div>
 					</form>
 				</div>
 				<form method="dialog" class="modal-backdrop">
-					<button type="submit">close</button>
+					<button type="submit">{m.attendance_close_backdrop()}</button>
 				</form>
 			</dialog>
 		</>

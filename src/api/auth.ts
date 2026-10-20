@@ -5,6 +5,7 @@ import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
 import { usernameOrEmail } from "@/core/schemas";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import { POST } from "./registry";
 
 const invalidCredentials = z
@@ -72,7 +73,7 @@ export const login = POST("/api/auth/login", {
 		const user = await db.user.findOne({ login }, FULL_ACCESS);
 		if (!user || !(await verifyPassword(user.passwordHash, password))) {
 			throw new NotAllowed("session.create", {
-				message: "Invalid login or password.",
+				message: m.errors_invalid_login(),
 				status: 401,
 			});
 		}

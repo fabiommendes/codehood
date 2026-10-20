@@ -3,6 +3,7 @@ import type { JSX } from "solid-js";
 import type { z } from "zod";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { enrollmentSchema } from "@/core/schemas";
+import { locale, m } from "@/i18n";
 
 /// The columns this table renders — the full `enrollmentSchema` row minus the
 /// course's raw database id, which never reaches the browser.
@@ -16,7 +17,7 @@ interface Props {
 }
 
 function formatDate(date: Date): string {
-	return date.toLocaleDateString("en-US", {
+	return date.toLocaleDateString(locale, {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
@@ -31,34 +32,38 @@ function formatDate(date: Date): string {
  */
 export default function StudentsTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<EnrolledUser>[] = [
-		{ title: "Name", class: "font-medium", render: (user) => user.name },
 		{
-			title: "Username",
+			title: m.courses_students_col_name(),
+			class: "font-medium",
+			render: (user) => user.name,
+		},
+		{
+			title: m.courses_students_col_username(),
 			class: "font-mono text-sm text-base-content/60",
 			render: (user) => `@${user.username}`,
 		},
 		{
-			title: "Email",
+			title: m.courses_students_col_email(),
 			class: "text-base-content/60",
 			render: (user) => user.email,
 		},
 		{
-			title: "GitHub",
+			title: m.courses_students_col_github(),
 			class: "font-mono text-sm text-base-content/60",
 			render: (user) => user.githubId,
 		},
 		{
-			title: "School ID",
+			title: m.courses_students_col_school_id(),
 			class: "font-mono text-sm text-base-content/60",
 			render: (user) => user.schoolId,
 		},
 		{
-			title: "Enrolled",
+			title: m.courses_students_col_enrolled(),
 			class: "text-base-content/60",
 			render: (user) => formatDate(user.enrolledAt),
 		},
 		{
-			title: "Actions",
+			title: m.courses_students_col_actions(),
 			class: "text-right",
 			headerClass: "text-right",
 			render: (user) => (
@@ -68,7 +73,7 @@ export default function StudentsTable(props: Props): JSX.Element {
 						class="btn btn-outline btn-error btn-sm"
 						data-open-dialog={`drop-student-${user.username}`}
 					>
-						Drop
+						{m.courses_students_drop()}
 					</button>
 
 					<dialog id={`drop-student-${user.username}`} class="modal">
@@ -77,18 +82,16 @@ export default function StudentsTable(props: Props): JSX.Element {
 								<button
 									class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
 									type="submit"
-									aria-label="Close"
+									aria-label={m.courses_students_close()}
 								>
 									✕
 								</button>
 							</form>
 							<h3 class="text-lg font-bold">
-								Drop {user.name} from this course?
+								{m.courses_students_drop_title({ name: user.name })}
 							</h3>
 							<p class="mt-2 text-sm text-base-content/70">
-								Their access ends immediately. Nothing is deleted. Their
-								submissions stay in the gradebook, and re-enrolling restores
-								access.
+								{m.courses_students_drop_body()}
 							</p>
 							<form
 								method="post"
@@ -105,15 +108,15 @@ export default function StudentsTable(props: Props): JSX.Element {
 								{/* formmethod="dialog" overrides the form's post just for this button, so
 								    Cancel closes the dialog without submitting the drop. */}
 								<button type="submit" formmethod="dialog" class="btn btn-ghost">
-									Cancel
+									{m.courses_cancel()}
 								</button>
 								<button type="submit" class="btn btn-error">
-									Drop
+									{m.courses_students_drop()}
 								</button>
 							</form>
 						</div>
 						<form method="dialog" class="modal-backdrop">
-							<button type="submit">close</button>
+							<button type="submit">{m.courses_close_backdrop()}</button>
 						</form>
 					</dialog>
 				</>

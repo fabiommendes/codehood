@@ -15,6 +15,7 @@ import type {
 	Update,
 	Upsert,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import { coerceForSchema } from "@/utils/query-coerce";
 import { slugify } from "@/utils/slugify";
 import { DELETE, GET, PATCH, POST, PUT } from "./route";
@@ -439,14 +440,14 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 		const { actor, params } = args;
 		const key = this.parseKey(params);
 		let deleted = true;
-		let message = `${this.name} deleted successfully`;
+		let message = m.errors_deleted_successfully({ name: this.name });
 
 		try {
 			await this.service.delete(key, { actor });
 		} catch (error) {
 			if (error instanceof NotFound) {
 				deleted = false;
-				message = `${this.name} was not present in the database`;
+				message = m.errors_not_present({ name: this.name });
 			} else throw error;
 		}
 

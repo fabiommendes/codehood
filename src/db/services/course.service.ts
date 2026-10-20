@@ -18,6 +18,7 @@ import {
 	courseUpdate,
 } from "@/core/schemas";
 import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
+import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
@@ -336,7 +337,9 @@ async function assertCanCreateCourse(
 	});
 	if (!edition) {
 		throw new InvalidData({
-			edition: [{ code: "not-exists", message: "Given edition do not exist" }],
+			edition: [
+				{ code: "not-exists", message: m.errors_course_edition_missing() },
+			],
 		});
 	}
 	if (
@@ -346,7 +349,7 @@ async function assertCanCreateCourse(
 	) {
 		throw new InvalidData({
 			edition: [
-				{ code: "not-allowed", message: "Edition not accepting new courses" },
+				{ code: "not-allowed", message: m.errors_course_edition_closed() },
 			],
 		});
 	}
@@ -360,7 +363,9 @@ async function assertCanCreateCourse(
 	});
 	if (!instructorUser) {
 		throw new InvalidData({
-			instructor: [{ code: "not-exists", message: "Invalid instructor" }],
+			instructor: [
+				{ code: "not-exists", message: m.errors_course_invalid_instructor() },
+			],
 		});
 	}
 

@@ -18,8 +18,9 @@ import MultipleSelectionView from "@/components/question/MultipleSelectionView";
 import NumericView from "@/components/question/NumericView";
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
-import type { QuestionPublic } from "@/db";
+import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
+import { m } from "@/i18n";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -57,8 +58,8 @@ export interface ExamAttemptProps {
 	discipline: string;
 	course: string;
 	exam: string;
-	/// What to call the exam in a sentence and on its buttons: "quiz", "exam".
-	noun: string;
+	/// The exam type, which picks how sentences and buttons refer to the exam.
+	type: Exam["type"];
 	/// Where the viewing student stands, computed on the server at `now`.
 	state: AttemptState;
 	/// Server time when the page rendered, so the countdown ignores client clock skew.
@@ -84,8 +85,8 @@ function secondsLeft(deadline: Date, now: Date): number {
 
 /// The time left as "42 min left", or seconds in the last minute.
 function timeLeft(seconds: number): string {
-	if (seconds < 60) return `${seconds} s left`;
-	return `${Math.ceil(seconds / 60)} min left`;
+	if (seconds < 60) return m.exams_attempt_seconds_left({ seconds });
+	return m.exams_attempt_minutes_left({ minutes: Math.ceil(seconds / 60) });
 }
 
 /// The colour of the time left: warning in the last five minutes, error in the last one.
@@ -101,10 +102,10 @@ const QUESTION_SCROLL_MARGIN = "scroll-mt-48";
 /**
  * A student's side of an exam page: the one action their state allows, and the questions.
  *
- * `not-open` shows when the exam opens; `can-start` offers "Start <noun>";
+ * `not-open` shows when the exam opens; `can-start` offers "Start <type>";
  * `in-progress` renders the questions in answer mode, saves each answer as it
  * changes, and keeps a bar in view with the time left, the questions
- * answered, whether everything is saved, and "Submit <noun>" behind a
+ * answered, whether everything is saved, and "Submit <type>" behind a
  * confirmation; `submitted` shows the saved answers read-only; `results`
  * adds the score and comments on each answer; `missed` says the student did
  * not take it.
@@ -174,7 +175,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				.answer({ ...target, question: slug, payload })
 				.then(
 					({ error }) => (error ? errorMessage(error) : null),
-					() => "the connection failed",
+					() => m.exams_attempt_connection_failed(),
 				);
 			if (message === null) {
 				setSaveError(slug, null);
@@ -229,9 +230,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		setFailure(null);
 		const saved = await flush();
 		if (!saved) {
-			setFailure(
-				"Some answers could not be saved. Fix the errors and try again.",
-			);
+			setFailure(m.exams_attempt_save_failed());
 		} else {
 			const { error } = await actions.exam.finish(target);
 			if (error) setFailure(errorMessage(error));
@@ -265,15 +264,16 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			<Switch>
 				<Match when={kind() === "not-open"}>
 					<p role="status" class={NOTICE}>
-						<Show when={opensAt()} fallback="Not open yet">
+						<Show when={opensAt()} fallback={m.exams_attempt_not_open_yet()}>
 							{(date) => (
 								<>
-									Opens{" "}
 									<time
 										datetime={date().toISOString()}
 										title={formatDateTime(date(), { year: "numeric" })}
 									>
-										{formatRelative(date(), now())}
+										{m.exams_attempt_opens({
+											when: formatRelative(date(), now()),
+										})}
 									</time>
 								</>
 							)}
@@ -289,14 +289,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							disabled={busy()}
 							onClick={start}
 						>
-							Start {props.noun}
+							{m.exams_attempt_start({ type: props.type })}
 						</button>
 					</div>
 				</Match>
 
 				<Match when={kind() === "missed"}>
 					<p role="status" class={NOTICE}>
-						You did not take this {props.noun}.
+						{m.exams_attempt_missed({ type: props.type })}
 					</p>
 				</Match>
 
@@ -313,13 +313,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						fallback={
 							<Show when={kind() === "submitted"}>
 								<p role="status" class={NOTICE}>
-									Submitted. Results are not out yet.
+									{m.exams_attempt_submitted_waiting()}
 								</p>
 							</Show>
 						}
 					>
 						<AttemptBar
-							noun={props.noun}
+							type={props.type}
 							seconds={(() => {
 								const limit = deadline();
 								return limit ? secondsLeft(limit, now()) : null;
@@ -345,7 +345,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 								<div class="card-body" onFocusOut={() => saveNow(entry.slug)}>
 									<div class="flex items-baseline justify-between gap-3">
 										<span class="kicker">
-											Question {index() + 1} of {props.questions.length}
+											{m.exams_attempt_question_of({
+												number: index() + 1,
+												total: props.questions.length,
+											})}
 										</span>
 										<Show when={kind() === "in-progress"}>
 											<SaveState
@@ -375,8 +378,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									<Show when={saveErrors()[entry.slug]}>
 										{(message) => (
 											<p role="alert" class="text-sm text-error">
-												Could not save this answer: {message()}. It will be
-												retried when you change it or submit.
+												{m.exams_attempt_save_error({ message: message() })}
 											</p>
 										)}
 									</Show>
@@ -387,10 +389,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 					<dialog ref={dialog} class="modal">
 						<div class="modal-box">
-							<h3 class="text-lg font-bold">Submit this {props.noun}?</h3>
+							<h3 class="text-lg font-bold">
+								{m.exams_attempt_submit_title({ type: props.type })}
+							</h3>
 							<p class="mt-2 text-sm text-base-content/70">
-								Your answers can't be changed after you submit. Questions you
-								left blank stay blank.
+								{m.exams_attempt_submit_body()}
 							</p>
 							<div class="modal-action">
 								<button
@@ -399,7 +402,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									disabled={busy()}
 									onClick={() => dialog?.close()}
 								>
-									Cancel
+									{m.exams_cancel()}
 								</button>
 								<button
 									type="button"
@@ -407,12 +410,12 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									disabled={busy()}
 									onClick={submit}
 								>
-									Submit {props.noun}
+									{m.exams_attempt_submit({ type: props.type })}
 								</button>
 							</div>
 						</div>
 						<form method="dialog" class="modal-backdrop">
-							<button type="submit">close</button>
+							<button type="submit">{m.exams_close_backdrop()}</button>
 						</form>
 					</dialog>
 				</Match>
@@ -422,7 +425,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 }
 
 interface AttemptBarProps {
-	noun: string;
+	type: Exam["type"];
 	/// Seconds until the deadline, or `null` when the attempt has none.
 	seconds: number | null;
 	questions: { number: number; answered: boolean; failed: boolean }[];
@@ -441,16 +444,14 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 		<Switch>
 			<Match when={failed() > 0}>
 				<span class="text-error">
-					{failed() === 1
-						? "1 answer not saved"
-						: `${failed()} answers not saved`}
+					{m.exams_attempt_answers_not_saved({ count: failed() })}
 				</span>
 			</Match>
 			<Match when={props.saving}>
-				<span class="text-base-content/60">Saving…</span>
+				<span class="text-base-content/60">{m.exams_attempt_saving()}</span>
 			</Match>
 			<Match when={answered() > 0}>
-				<span class="text-base-content/60">✓ All answers saved</span>
+				<span class="text-base-content/60">{m.exams_attempt_all_saved()}</span>
 			</Match>
 		</Switch>
 	);
@@ -461,7 +462,11 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 				<div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
 					<Show
 						when={props.seconds !== null}
-						fallback={<span class="font-semibold">No time limit</span>}
+						fallback={
+							<span class="font-semibold">
+								{m.exams_attempt_no_time_limit()}
+							</span>
+						}
 					>
 						<span
 							class={`font-semibold tabular-nums ${timeClass(props.seconds ?? 0)}`}
@@ -470,7 +475,10 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 						</span>
 					</Show>
 					<span class="text-base-content/60">
-						{answered()} of {props.questions.length} answered
+						{m.exams_attempt_progress({
+							answered: answered(),
+							total: props.questions.length,
+						})}
 					</span>
 					<span class="hidden sm:inline">{saveStatus()}</span>
 				</div>
@@ -480,15 +488,24 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 					disabled={props.busy}
 					onClick={props.onSubmit}
 				>
-					Submit {props.noun}
+					{m.exams_attempt_submit({ type: props.type })}
 				</button>
 			</div>
-			<nav aria-label="Questions" class="mt-2 flex flex-wrap gap-1.5">
+			<nav
+				aria-label={m.exams_attempt_nav_label()}
+				class="mt-2 flex flex-wrap gap-1.5"
+			>
 				<For each={props.questions}>
 					{(question) => (
 						<a
 							href={`#question-${question.number}`}
-							aria-label={`Question ${question.number}${question.answered ? ", answered" : ""}`}
+							aria-label={
+								question.answered
+									? m.exams_attempt_question_answered({
+											number: question.number,
+										})
+									: m.exams_attempt_question_label({ number: question.number })
+							}
 							class={`btn btn-xs btn-square ${
 								question.failed
 									? "btn-error"
@@ -516,13 +533,17 @@ function SaveState(props: {
 	return (
 		<Switch>
 			<Match when={props.failed}>
-				<span class="text-xs text-error">Not saved</span>
+				<span class="text-xs text-error">{m.exams_attempt_not_saved()}</span>
 			</Match>
 			<Match when={props.saving}>
-				<span class="text-xs text-base-content/50">Saving…</span>
+				<span class="text-xs text-base-content/50">
+					{m.exams_attempt_saving()}
+				</span>
 			</Match>
 			<Match when={props.answered}>
-				<span class="text-xs text-base-content/50">Saved</span>
+				<span class="text-xs text-base-content/50">
+					{m.exams_attempt_saved()}
+				</span>
 			</Match>
 		</Switch>
 	);
@@ -537,16 +558,20 @@ function Outcome(props: { outcome: QuestionOutcome | undefined }): JSX.Element {
 					<p class="font-semibold">
 						<Switch>
 							<Match when={outcome().status === "graded"}>
-								<span class="font-normal text-base-content/60">Score</span>{" "}
+								<span class="font-normal text-base-content/60">
+									{m.exams_attempt_score_label()}
+								</span>{" "}
 								{formatScore(outcome().score ?? 0)}
 							</Match>
 							<Match when={outcome().status === "pending"}>
-								Waiting to be graded
+								{m.exams_attempt_waiting()}
 							</Match>
 							<Match when={outcome().status === "unanswered"}>
-								Not answered
+								{m.exams_attempt_not_answered()}
 							</Match>
-							<Match when={outcome().status === "not-graded"}>Not graded</Match>
+							<Match when={outcome().status === "not-graded"}>
+								{m.exams_attempt_not_graded()}
+							</Match>
 						</Switch>
 					</p>
 					<For each={outcome().comments}>
@@ -576,7 +601,7 @@ function AnswerField(props: AnswerFieldProps): JSX.Element {
 		<Switch
 			fallback={
 				<p class="text-sm text-base-content/60">
-					Answering "{props.question.type}" questions is not supported yet.
+					{m.exams_attempt_unsupported({ type: props.question.type })}
 				</p>
 			}
 		>

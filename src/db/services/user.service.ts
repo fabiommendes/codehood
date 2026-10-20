@@ -21,6 +21,7 @@ import {
 	type ServiceOptsWithoutTx,
 	upsert,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
 import { Validate } from "@/utils/validate";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
@@ -66,9 +67,9 @@ export class UserService extends CrudBase<{
 		// Grades and pushed grade files match students by these; staff may skip them.
 		const isStudent = input.role === "STUDENT";
 		if (!input.githubId && isStudent)
-			throw new FieldError("githubId", "Required for students.");
+			throw new FieldError("githubId", m.errors_required_for_students());
 		if (!input.schoolId && isStudent)
-			throw new FieldError("schoolId", "Required for students.");
+			throw new FieldError("schoolId", m.errors_required_for_students());
 
 		const githubId = input.githubId ?? nullSentinel(input.username);
 		const schoolId = input.schoolId ?? nullSentinel(input.username);
@@ -281,9 +282,9 @@ export class UserService extends CrudBase<{
 			// If the actor is not SYSTEM, we throw an error if the password is weak.
 			// TODO: pick a better error class
 			throw new Error(
-				`Password does not meet strength requirements: ${issues
-					.map((issue) => issue.message)
-					.join(", ")}`,
+				m.errors_password_too_weak({
+					issues: issues.map((issue) => issue.message).join(", "),
+				}),
 			);
 		}
 
@@ -321,7 +322,7 @@ export class UserService extends CrudBase<{
 
 		if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
 			throw new NotAllowed("user.update", {
-				message: "Current password is incorrect.",
+				message: m.errors_current_password_incorrect(),
 				status: 401,
 			});
 		}

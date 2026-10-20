@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { username } from "./base";
 
 export const userSchema = z.object({
@@ -36,27 +37,47 @@ export const userCreate = userSchema
  * password rule and texts a form needs.
  */
 export const userCreateForm = userCreate.extend({
-	name: userSchema.shape.name.meta({ form: { placeholder: "Ada Lovelace" } }),
-	email: userSchema.shape.email.meta({
-		form: { placeholder: "ada@example.edu" },
+	name: userSchema.shape.name.meta({
+		form: { label: m.forms_label_name(), placeholder: "Ada Lovelace" },
 	}),
-	username: username.meta({ form: { placeholder: "ada" } }),
+	email: userSchema.shape.email.meta({
+		form: { label: m.forms_label_email(), placeholder: "ada@example.edu" },
+	}),
+	username: username.meta({
+		form: { label: m.forms_label_username(), placeholder: "ada" },
+	}),
+	role: userSchema.shape.role.meta({
+		form: {
+			label: m.forms_label_role(),
+			options: {
+				STUDENT: m.forms_role_student(),
+				INSTRUCTOR: m.forms_role_instructor(),
+				ADMIN: m.forms_role_admin(),
+			},
+		},
+	}),
 	githubId: z
 		.string()
 		.optional()
 		.meta({
-			form: { label: "GitHub id", placeholder: "required unless Admin" },
+			form: {
+				label: m.forms_label_github_id(),
+				placeholder: m.forms_placeholder_required_unless_admin(),
+			},
 		}),
 	schoolId: z
 		.string()
 		.optional()
 		.meta({
-			form: { label: "School id", placeholder: "required unless Admin" },
+			form: {
+				label: m.forms_label_school_id(),
+				placeholder: m.forms_placeholder_required_unless_admin(),
+			},
 		}),
 	password: z
 		.string()
 		.min(8)
-		.meta({ form: { widget: "password" } }),
+		.meta({ form: { label: m.forms_label_password(), widget: "password" } }),
 });
 
 /**
@@ -82,32 +103,38 @@ export const passwordChange = z.object({
 	currentPassword: z
 		.string()
 		.min(1)
-		.meta({ form: { label: "Current password", widget: "password" } }),
+		.meta({
+			form: { label: m.forms_label_current_password(), widget: "password" },
+		}),
 	newPassword: z
 		.string()
 		.min(8)
-		.meta({ form: { label: "New password", widget: "password" } }),
+		.meta({
+			form: { label: m.forms_label_new_password(), widget: "password" },
+		}),
 });
 
 /// What a person types to create their own account.
 export const userSignUp = z.object({
-	name: userSchema.shape.name.meta({ form: { label: "Name" } }),
-	email: userSchema.shape.email,
-	username: username.meta({ form: { label: "Username" } }),
+	name: userSchema.shape.name.meta({ form: { label: m.forms_label_name() } }),
+	email: userSchema.shape.email.meta({
+		form: { label: m.forms_label_email() },
+	}),
+	username: username.meta({ form: { label: m.forms_label_username() } }),
 	password: z
 		.string()
 		.min(8)
-		.meta({ form: { widget: "password" } }),
+		.meta({ form: { label: m.forms_label_password(), widget: "password" } }),
 	githubId: z
 		.string()
 		.trim()
 		.min(1)
-		.meta({ form: { label: "GitHub username" } }),
+		.meta({ form: { label: m.forms_label_github_username() } }),
 	schoolId: z
 		.string()
 		.trim()
 		.min(1)
-		.meta({ form: { label: "School id" } }),
+		.meta({ form: { label: m.forms_label_school_id() } }),
 });
 
 /// The details a user edits on their own profile page. GitHub and school id are optional here; the action requires them of students.

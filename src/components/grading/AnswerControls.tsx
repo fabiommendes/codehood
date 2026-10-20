@@ -4,6 +4,7 @@ import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { answerWillNotGrade } from "@/core/schemas";
+import { m } from "@/i18n";
 import { FOCUS_KEY } from "./focus";
 import GradeForm from "./GradeForm";
 
@@ -60,7 +61,7 @@ export default function AnswerControls(
 						class="btn btn-outline btn-sm"
 						onClick={() => setChanging(true)}
 					>
-						Change grade
+						{m.grades_controls_change()}
 					</button>
 				</Show>
 				<Show when={props.state !== "not-graded"}>
@@ -69,7 +70,7 @@ export default function AnswerControls(
 						class="btn btn-ghost btn-sm"
 						onClick={openDialog}
 					>
-						Will not grade
+						{m.grades_controls_will_not_grade()}
 					</button>
 				</Show>
 			</div>
@@ -82,12 +83,10 @@ export default function AnswerControls(
 			>
 				<div class="modal-box">
 					<h3 id={titleId} class="text-lg font-bold">
-						Will not grade this answer?
+						{m.grades_controls_wng_title()}
 					</h3>
 					<p class="mt-2 text-sm text-base-content/70">
-						The answer counts as zero in the total, and the student reads "Not
-						graded". Earlier grades are kept, and you can grade the answer later
-						with "Change grade".
+						{m.grades_controls_wng_body()}
 					</p>
 					<Show when={dialogOpen()}>
 						<WillNotGradeForm
@@ -100,7 +99,7 @@ export default function AnswerControls(
 					</Show>
 				</div>
 				<form method="dialog" class="modal-backdrop">
-					<button type="submit">close</button>
+					<button type="submit">{m.grades_close_backdrop()}</button>
 				</form>
 			</dialog>
 		</div>
@@ -140,10 +139,10 @@ function WillNotGradeForm(
 					disabled={form.busy()}
 					onClick={props.onCancel}
 				>
-					Cancel
+					{m.grades_cancel()}
 				</button>
 				<button type="submit" class="btn btn-primary" disabled={form.busy()}>
-					Mark as not graded
+					{m.grades_controls_wng_submit()}
 				</button>
 			</div>
 		</form>

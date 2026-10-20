@@ -3,6 +3,7 @@ import type { UserActor } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import type { ErrorResponse } from "@/core/error-response";
 import { responseFromException } from "@/core/error-server";
+import { m } from "@/i18n";
 
 /// Actor = User? or User depending if the method is public or not.
 type MaybeActor<IsPublic> = IsPublic extends false
@@ -139,7 +140,7 @@ export async function dispatch(
 			id,
 			error: {
 				code: RPC_ERROR.invalidRequest,
-				message: "Not a JSON-RPC 2.0 request object.",
+				message: m.errors_rpc_not_a_request(),
 				data: InvalidData.fromZodError(request.error, payload).toJSON(),
 			},
 		};
@@ -157,7 +158,7 @@ export async function dispatch(
 		return respond({
 			error: {
 				code: RPC_ERROR.methodNotFound,
-				message: `No such method: "${request.data.method}".`,
+				message: m.errors_rpc_no_such_method({ method: request.data.method }),
 			},
 		});
 
@@ -169,7 +170,7 @@ export async function dispatch(
 			error: errorObject(
 				new NotAllowed(`${method.name}.run`, {
 					status: 401,
-					message: "This method requires authentication.",
+					message: m.errors_rpc_requires_authentication(),
 				}),
 			),
 		});
@@ -196,11 +197,11 @@ async function run(
 				$: [
 					{
 						code: "type-mismatch",
-						message: "Positional params are not supported; use an object.",
+						message: m.errors_rpc_positional_params(),
 					},
 				],
 			},
-			{ message: "Positional params are not supported; use an object." },
+			{ message: m.errors_rpc_positional_params() },
 		);
 
 	if (!method.in) return method.handler({ actor, body: undefined });

@@ -15,6 +15,7 @@ import {
 } from "@/core/schemas";
 import { db, InviteError, type User } from "@/db";
 import { prisma } from "@/db/client";
+import { m } from "@/i18n";
 import { parseCourseParams } from "@/urls";
 import {
 	uniqueConstraintError,
@@ -33,7 +34,7 @@ export const auth = {
 			if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
 				throw new ActionError({
 					code: "UNAUTHORIZED",
-					message: "Invalid email/username or password.",
+					message: m.errors_invalid_credentials(),
 				});
 			}
 			const { token, session } = await db.session.create(
@@ -68,14 +69,14 @@ export const auth = {
 			if (!invite)
 				throw new ActionError({
 					code: "NOT_FOUND",
-					message: "Invite not found or expired.",
+					message: m.errors_invite_not_found_or_expired(),
 				});
 			if (invite.invitedRole === "STUDENT") {
 				if (!input.githubId) {
-					throw new FieldError("githubId", "Required for students.");
+					throw new FieldError("githubId", m.errors_required_for_students());
 				}
 				if (!input.schoolId) {
-					throw new FieldError("schoolId", "Required for students.");
+					throw new FieldError("schoolId", m.errors_required_for_students());
 				}
 			}
 			const precheckError = db.invite.checkRedeemable(invite, input.email);
@@ -153,19 +154,18 @@ export const auth = {
 			if (!invite || !user)
 				throw new ActionError({
 					code: "NOT_FOUND",
-					message: "Invite not found or expired.",
+					message: m.errors_invite_not_found_or_expired(),
 				});
 			if (!invite.courseId || invite.invitedRole !== "STUDENT") {
 				throw new ActionError({
 					code: "BAD_REQUEST",
-					message:
-						"This invite creates a new account, and you already have one.",
+					message: m.errors_invite_creates_account(),
 				});
 			}
 			if (user.role !== "STUDENT") {
 				throw new ActionError({
 					code: "BAD_REQUEST",
-					message: `${user.name} is not a student account.`,
+					message: m.errors_not_student_account({ name: user.name }),
 				});
 			}
 			const courseId = invite.courseId;
@@ -292,15 +292,15 @@ function inviteRefusal(code: InviteError["code"]): FieldError | ActionError {
 function inviteErrorMessage(code: InviteError["code"]): string {
 	switch (code) {
 		case "not_found":
-			return "Invite not found.";
+			return m.errors_invite_not_found();
 		case "expired":
-			return "This invite has expired.";
+			return m.errors_invite_expired();
 		case "email_mismatch":
-			return "This invite was issued for a different email address.";
+			return m.errors_invite_email_mismatch();
 		case "exhausted":
-			return "This invite has reached its maximum number of uses.";
+			return m.errors_invite_exhausted();
 		case "already_redeemed":
-			return "You already used this invite.";
+			return m.errors_invite_already_redeemed();
 	}
 }
 

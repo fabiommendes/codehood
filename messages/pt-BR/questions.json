@@ -53,5 +53,34 @@
 	"questions_type_fill_in": "Preencher lacunas",
 	"questions_status_draft": "Rascunho",
 	"questions_status_published": "Publicada",
-	"questions_status_archived": "Arquivada"
+	"questions_status_archived": "Arquivada",
+	"questions_table_col_title": "Título",
+	"questions_table_col_type": "Tipo",
+	"questions_table_col_status": "Situação",
+	"questions_table_col_tags": "Etiquetas",
+	"questions_table_col_updated": "Atualizada",
+	"questions_table_col_actions": "Ações",
+	"questions_action_publish": "Publicar",
+	"questions_action_archive": "Arquivar",
+	"questions_action_draft": "Mover para rascunho",
+	"questions_open_named": "Abrir {title}",
+	"questions_open_title": "Abrir questão",
+	"questions_filter_clear": "Limpar",
+	"questions_filter_clear_all": "Limpar filtros",
+	"questions_table_count": [
+		{
+			"declarations": [
+				"input shown",
+				"input total",
+				"local totalPlural = total: plural"
+			],
+			"selectors": ["totalPlural"],
+			"match": {
+				"totalPlural=one": "{shown} de {total} questão",
+				"totalPlural=other": "{shown} de {total} questões"
+			}
+		}
+	],
+	"questions_table_empty": "Nenhuma questão ainda.",
+	"questions_table_no_match": "Nenhuma questão corresponde a estes filtros."
 }

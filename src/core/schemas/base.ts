@@ -1,5 +1,6 @@
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
+import { m } from "@/i18n";
 import { EDITION_RE, USERNAME_RE } from "@/urls";
 
 // Must run before any schema calls .openapi(...) — every schema module imports
@@ -68,7 +69,7 @@ export type TimeSlotId = z.infer<typeof timeSlotId>;
 // due to both its type (not an int) and name (not id).
 export const username = z
 	.string()
-	.regex(USERNAME_RE, "Invalid username.")
+	.regex(USERNAME_RE, m.forms_schema_username_invalid())
 	.openapi({ example: "ada" });
 export type UserId = z.infer<typeof username>;
 
@@ -80,17 +81,14 @@ export type UserId = z.infer<typeof username>;
 /// repository paths into this form; the server still refuses anything else.
 export const slug = z
 	.string()
-	.regex(
-		/^[a-z0-9][a-z0-9._-]*$/,
-		"Lowercase letters, digits, '.', '_' and '-', starting with a letter or digit.",
-	)
+	.regex(/^[a-z0-9][a-z0-9._-]*$/, m.forms_schema_slug_invalid())
 	.openapi({ example: "intro-to-recursion" });
 export type Slug = z.infer<typeof slug>;
 
 /// An opaque random identifier, safe to place in a URL or hand to a client.
 export const publicId = z
 	.string()
-	.regex(/^[A-Za-z0-9_-]+$/, "Invalid public id.")
+	.regex(/^[A-Za-z0-9_-]+$/, m.forms_schema_public_id_invalid())
 	.openapi({ example: "k3Vx9QpL2a" });
 export type PublicId = z.infer<typeof publicId>;
 
@@ -109,10 +107,7 @@ export type MimeType = z.infer<typeof mimeType>;
 /// The edition slug identifier
 export const editionSlug = z
 	.string()
-	.regex(
-		EDITION_RE,
-		"Use a year, optionally followed by a dash and a term number, like 2026-1.",
-	)
+	.regex(EDITION_RE, m.forms_schema_edition_slug_invalid())
 	.openapi({ example: "2026-1" });
 export type EditionSlug = z.infer<typeof editionSlug>;
 

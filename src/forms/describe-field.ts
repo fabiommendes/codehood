@@ -41,16 +41,6 @@ type Bag = {
 	format?: string;
 };
 
-/** Turns `firstName` or `first_name` into `First name`. */
-export function humanize(name: string): string {
-	const words = name
-		.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-		.replace(/[_-]+/g, " ")
-		.trim()
-		.toLowerCase();
-	return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 /// Wrappers that describe the same field as their inner type.
 function innerOf(schema: core.$ZodType): core.$ZodType | undefined {
 	if (
@@ -160,6 +150,7 @@ function describeBase(
 	name: string,
 	base: core.$ZodType,
 	widget: FieldMeta["widget"],
+	optionLabels: FieldMeta["options"],
 ): Pick<FieldSpec, "kind" | "attrs" | "options"> {
 	if (base instanceof core.$ZodString) return describeString(base, widget);
 	if (base instanceof core.$ZodNumber) {
@@ -199,10 +190,15 @@ function describeBase(
 		return {
 			kind: "enum",
 			attrs: {},
-			options: [...new Set(values)].map((value) => ({
-				value,
-				label: humanize(value),
-			})),
+			options: [...new Set(values)].map((value) => {
+				const label = optionLabels?.[value];
+				if (label === undefined) {
+					throw new Error(
+						`Field "${name}": enum value "${value}" has no label. Add it to \`form.options\` in the schema's meta.`,
+					);
+				}
+				return { value, label };
+			}),
 		};
 	}
 	throw new Error(
@@ -213,11 +209,11 @@ function describeBase(
 /**
  * Describes a schema field as the control that edits it.
  *
- * Label resolves from `override`, `form.label`, `title`, then the humanized
- * name; the hint from `override`, `form.hint`, then `description`.
+ * Label resolves from `override`, `form.label`, then `title`; the hint from `override`, `form.hint`, then `description`.
  *
  * @throws If the schema (after unwrapping optional, nullable, default and pipe)
- * is not a string, number, date, boolean or enum.
+ * is not a string, number, date, boolean or enum, or if the field has no label
+ * (or, for an enum, a value has no option label).
  */
 export function describeField(
 	name: string,
@@ -226,13 +222,24 @@ export function describeField(
 ): FieldSpec {
 	const { base, required, meta } = unwrap(schema);
 	const widget = override.widget ?? meta.form?.widget;
-	const described = describeBase(name, base, widget);
+	const described = describeBase(
+		name,
+		base,
+		widget,
+		override.options ?? meta.form?.options,
+	);
+	const label = override.label ?? meta.form?.label ?? meta.title;
+	if (label === undefined) {
+		throw new Error(
+			`Field "${name}": no label. Set \`form.label\` in the schema's meta or in the form's \`fields\` override.`,
+		);
+	}
 	const hint = override.hint ?? meta.form?.hint ?? meta.description;
 	const placeholder = override.placeholder ?? meta.form?.placeholder;
 	return {
 		name,
 		required,
-		label: override.label ?? meta.form?.label ?? meta.title ?? humanize(name),
+		label,
 		...(hint !== undefined && { hint }),
 		...(placeholder !== undefined && { placeholder }),
 		...(widget !== undefined && { widget }),

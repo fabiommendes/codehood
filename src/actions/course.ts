@@ -16,6 +16,7 @@ import {
 	type PassphraseRedemption,
 	type schema,
 } from "@/db";
+import { m } from "@/i18n";
 import { parseCourseParams } from "@/urls";
 import { withActionErrors, withServiceErrors } from "./helpers";
 
@@ -52,7 +53,7 @@ export const course = {
 					if (user.role !== "STUDENT") {
 						throw new FieldError(
 							"login",
-							`${user.name} is not a student account.`,
+							m.errors_not_student_account({ name: user.name }),
 						);
 					}
 					await db.enrollment.create(
@@ -65,7 +66,7 @@ export const course = {
 				if (!z.string().email().safeParse(input.login).success) {
 					throw new FieldError(
 						"login",
-						`No account matches "${input.login}". Use an email address to invite someone who has not signed up yet.`,
+						m.errors_no_account_matches({ login: input.login }),
 					);
 				}
 
@@ -164,10 +165,10 @@ function passphraseErrorMessage(
 ): string {
 	switch (code) {
 		case "unknown":
-			return `No course uses the code "${value}". Check it for typos.`;
+			return m.errors_passphrase_unknown({ value });
 		case "expired":
-			return `The code "${value}" has expired. Ask your instructor for a new one.`;
+			return m.errors_passphrase_expired({ value });
 		case "own_course":
-			return "You teach this course, so you can't join it as a student.";
+			return m.errors_passphrase_own_course();
 	}
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { apiKeyId, publicId, username } from "./base";
 import { userInfo } from "./user";
 
@@ -32,7 +33,12 @@ export const apiKeyForm = z.object({
 		.string()
 		.trim()
 		.min(1)
-		.meta({ form: { label: "Key name", placeholder: "e.g. my laptop" } }),
+		.meta({
+			form: {
+				label: m.forms_label_key_name(),
+				placeholder: m.forms_placeholder_key_name(),
+			},
+		}),
 	kind: apiKeySchema.shape.kind,
 });
 

@@ -1,4 +1,5 @@
 import { InvalidData } from "@/core/error";
+import { m } from "@/i18n";
 
 /**
  * Throw a 404 error if the entity is null, otherwise return the entity.
@@ -32,11 +33,11 @@ export function parseWeekParam(raw: string): number {
 				week: [
 					{
 						code: "type-mismatch",
-						message: "Expected a non-negative integer.",
+						message: m.errors_expected_non_negative_integer(),
 					},
 				],
 			},
-			{ message: `"${raw}" is not a week number.` },
+			{ message: m.errors_not_a_week_number({ value: raw }) },
 		);
 	}
 	return week;

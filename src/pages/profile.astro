@@ -11,6 +11,7 @@ import { apiKeyForm, passwordChange, profileUpdate } from "@/core/schemas";
 import { type ApiKey, db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
+import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { roleLabels } from "@/utils/roles";
 
@@ -74,8 +75,8 @@ function profileField(name: "name" | "email" | "githubId" | "schoolId") {
 }
 
 function formatDate(date: Date | null): string {
-	if (!date) return "never";
-	return date.toLocaleDateString("en-US", {
+	if (!date) return m.profile_never();
+	return date.toLocaleDateString(locale, {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
@@ -92,17 +93,17 @@ const activeTab: "details" | "account" | "apikeys" =
 			: "details";
 
 const profileTabs = [
-	{ key: "details", label: "Details" },
-	{ key: "account", label: "Account" },
-	{ key: "apikeys", label: "API keys" },
+	{ key: "details", label: m.profile_tab_details() },
+	{ key: "account", label: m.profile_tab_account() },
+	{ key: "apikeys", label: m.profile_tab_api_keys() },
 ];
 ---
 
-<AppLayout title="Profile">
+<AppLayout title={m.profile_title()}>
   <main class="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10">
     <div>
-      <PageKicker text="Account" />
-      <h1 class="text-2xl font-bold">Profile</h1>
+      <PageKicker text={m.profile_kicker()} />
+      <h1 class="text-2xl font-bold">{m.profile_title()}</h1>
     </div>
 
     <Tabs items={profileTabs} active={activeTab} name="profile-tabs">
@@ -111,14 +112,14 @@ const profileTabs = [
           <div class="card card-border">
             <div class="card-body">
               <div class="flex items-center justify-between">
-                <h2 class="card-title">Your details</h2>
+                <h2 class="card-title">{m.profile_details_heading()}</h2>
                 <span class="badge badge-neutral">{roleLabels[user.role]}</span>
               </div>
 
               {
                 updateResult && !updateResult.error && (
                   <div role="alert" class="alert alert-success">
-                    <span>Profile updated.</span>
+                    <span>{m.profile_updated()}</span>
                   </div>
                 )
               }
@@ -133,7 +134,7 @@ const profileTabs = [
                 <Field {...profileField("email")} />
 
                 <fieldset class="fieldset">
-                  <legend class="fieldset-legend">Username</legend>
+                  <legend class="fieldset-legend">{m.profile_username_label()}</legend>
                   <input
                     type="text"
                     value={user.username}
@@ -141,8 +142,7 @@ const profileTabs = [
                     disabled
                   />
                   <p class="label whitespace-normal">
-                    Usernames can't be changed because they're part of your course
-                    URLs.
+                    {m.profile_username_note()}
                   </p>
                 </fieldset>
 
@@ -151,7 +151,7 @@ const profileTabs = [
 
                 <div class="card-actions">
                   <button type="submit" class="btn btn-primary"
-                    >Save changes</button
+                    >{m.profile_save()}</button
                   >
                 </div>
               </form>
@@ -164,16 +164,15 @@ const profileTabs = [
         <div class="flex flex-col gap-8">
           <div class="card card-border">
             <div class="card-body">
-              <h2 class="card-title">Change password</h2>
+              <h2 class="card-title">{m.profile_password_heading()}</h2>
               <p class="text-sm text-base-content/60">
-                Changing it signs out every other browser you are logged in on.
-                API keys keep working; revoke those on the API keys tab.
+                {m.profile_password_note()}
               </p>
 
               {
                 passwordResult && !passwordResult.error && (
                   <div role="alert" class="alert alert-success">
-                    <span>Password changed.</span>
+                    <span>{m.profile_password_changed()}</span>
                   </div>
                 )
               }
@@ -190,7 +189,7 @@ const profileTabs = [
 
                 <div class="card-actions">
                   <button type="submit" class="btn btn-primary"
-                    >Change password</button
+                    >{m.profile_password_heading()}</button
                   >
                 </div>
               </form>
@@ -199,9 +198,9 @@ const profileTabs = [
 
           <div class="card card-border">
             <div class="card-body">
-              <h2 class="card-title">Security</h2>
+              <h2 class="card-title">{m.profile_security_heading()}</h2>
               <p class="text-sm text-base-content/60">
-                Sign out of every device and browser where you're logged in.
+                {m.profile_security_note()}
               </p>
               <FormAlert error={logoutEverywhereResult?.error && errorMessage(logoutEverywhereResult.error)} />
               <form
@@ -210,7 +209,7 @@ const profileTabs = [
                 class="card-actions"
               >
                 <button type="submit" class="btn btn-outline btn-error"
-                  >Log out everywhere</button
+                  >{m.profile_logout_everywhere()}</button
                 >
               </form>
             </div>
@@ -222,14 +221,14 @@ const profileTabs = [
         <div>
           <div class="card card-border">
             <div class="card-body">
-              <h2 class="card-title">API keys</h2>
+              <h2 class="card-title">{m.profile_api_keys_heading()}</h2>
               <p class="text-sm text-base-content/60">
-                Used by the CLI and grading bots to authenticate as you.
+                {m.profile_api_keys_note()}
               </p>
               <a
                 href="/getting-started"
                 class="text-sm text-primary hover:underline"
-                >New to the CLI? See the getting started guide →</a
+                >{m.profile_api_keys_guide()}</a
               >
 
               {
@@ -238,10 +237,7 @@ const profileTabs = [
                     role="alert"
                     class="alert alert-success flex-col items-start"
                   >
-                    <span>
-                      New key created. Copy it now. It won't be shown
-                      again.
-                    </span>
+                    <span>{m.profile_api_key_created()}</span>
                     <code class="w-full break-all rounded bg-base-300 px-2 py-1 text-xs">
                       {createApiKeyResult.data.token}
                     </code>
@@ -258,8 +254,10 @@ const profileTabs = [
                         <div>
                           <div class="font-medium">{key.name}</div>
                           <div class="text-xs text-base-content/60">
-                            created {formatDate(key.createdAt)} &middot; last
-                            used {formatDate(key.lastUsedAt)}
+                            {m.profile_api_key_dates({
+                              created: formatDate(key.createdAt),
+                              lastUsed: formatDate(key.lastUsedAt),
+                            })}
                           </div>
                         </div>
                         <span class="badge badge-outline">
@@ -272,7 +270,7 @@ const profileTabs = [
                             value={key.publicId}
                           />
                           <button type="submit" class="btn btn-sm btn-ghost">
-                            Revoke
+                            {m.profile_api_key_revoke()}
                           </button>
                         </form>
                       </li>
@@ -291,14 +289,14 @@ const profileTabs = [
                 <FormAlert error={apiKeyCreateForm.error} class="w-full" />
                 <Field {...apiKeyCreateForm.field("name")} />
                 <fieldset class="fieldset">
-                  <legend class="fieldset-legend"><label for="api-key-kind">Kind</label></legend>
+                  <legend class="fieldset-legend"><label for="api-key-kind">{m.profile_api_key_kind()}</label></legend>
                   <select name="kind" id="api-key-kind" class="select">
                     <option value="CLI">CLI</option>
-                    <option value="BOT">Bot</option>
+                    <option value="BOT">{m.profile_api_key_kind_bot()}</option>
                   </select>
                 </fieldset>
 
-                <button type="submit" class="btn">Create key</button>
+                <button type="submit" class="btn">{m.profile_api_key_create()}</button>
               </form>
             </div>
           </div>

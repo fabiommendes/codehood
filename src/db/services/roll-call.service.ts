@@ -35,6 +35,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import { codeAt, generateSecret, isCodeValid } from "@/services/roll-call-code";
 import { CLAIM_TTL_MS } from "@/utils/pending-check-in";
 import { Validate } from "@/utils/validate";
@@ -160,7 +161,10 @@ export class RollCallService extends CrudBase<{
 				event: [
 					{
 						code: "invalid",
-						message: `A ${event.kind.toLowerCase()} event has no roll call.`,
+						message:
+							event.kind === "HOLIDAY"
+								? m.errors_holiday_has_no_roll_call()
+								: m.errors_cancelled_has_no_roll_call(),
 					},
 				],
 			});
@@ -715,7 +719,7 @@ async function checkEnrolled(
 	throw new InvalidData({
 		attendances: unknown.map((name) => ({
 			code: "not-exists" as const,
-			message: `"${name}" is not enrolled in the course.`,
+			message: m.errors_not_enrolled_in_course({ username: name }),
 		})),
 	});
 }
@@ -738,7 +742,7 @@ type CheckInTarget = Prisma.RollCallGetPayload<{
 /// The username of a student actor.
 function studentOf(actor: Actor): string {
 	if (typeof actor === "symbol" || actor.role !== "STUDENT") {
-		throw new CheckInError("not-student", "Only students can check in.");
+		throw new CheckInError("not-student", m.errors_check_in_students_only());
 	}
 	return actor.username;
 }
@@ -811,7 +815,7 @@ async function markPresent(
 		select: { status: true },
 	});
 	if (enrollment?.status === "DROPPED") {
-		throw new CheckInError("dropped", "The student dropped this course.");
+		throw new CheckInError("dropped", m.errors_check_in_dropped());
 	}
 
 	let joined: "ENROLLMENT" | "ACCOUNT" | null = null;

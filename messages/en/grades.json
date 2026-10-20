@@ -94,5 +94,26 @@
 	"grades_page_heading": "Grades",
 	"grades_page_no_exams": "No exams yet.",
 	"grades_page_no_students": "No students enrolled yet.",
-	"grades_page_students_link": "Students"
+	"grades_page_students_link": "Students",
+	"grades_cancel": "Cancel",
+	"grades_close_backdrop": "close",
+	"grades_controls_change": "Change grade",
+	"grades_controls_will_not_grade": "Will not grade",
+	"grades_controls_wng_title": "Will not grade this answer?",
+	"grades_controls_wng_body": "The answer counts as zero in the total, and the student reads \"Not graded\". Earlier grades are kept, and you can grade the answer later with \"Change grade\".",
+	"grades_controls_wng_submit": "Mark as not graded",
+	"grades_form_save": "Save grade",
+	"grades_release_column_button": "Release",
+	"grades_release_column_button_named": "Release {title}",
+	"grades_release_column_title": "Release {title}?",
+	"grades_release_column_body": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} student will see their grade. You can't undo this once it is released.",
+				"countPlural=other": "{count} students will see their grade. You can't undo this once it is released."
+			}
+		}
+	]
 }

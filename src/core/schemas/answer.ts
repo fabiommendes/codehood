@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { isPercentScore, SCORE_ERROR } from "../score";
 
 /// Addresses one answer the way the grading pages do: the course's URL segments, the exam slug and the submission's `publicId`.
@@ -14,11 +15,11 @@ export const answerGrade = answerRef.extend({
 	score: z
 		.string({ error: SCORE_ERROR })
 		.refine(isPercentScore, SCORE_ERROR)
-		.meta({ form: { label: "Score (%)" } }),
+		.meta({ form: { label: m.forms_label_score_percent() } }),
 	comment: z
 		.string()
 		.optional()
-		.meta({ form: { widget: "textarea" } }),
+		.meta({ form: { label: m.forms_label_comment(), widget: "textarea" } }),
 });
 
 /// What the will-not-grade dialog sends: the answer and an optional comment for the student.
@@ -27,6 +28,6 @@ export const answerWillNotGrade = answerRef.extend({
 		.string()
 		.optional()
 		.meta({
-			form: { label: "Comment for the student", widget: "textarea" },
+			form: { label: m.forms_label_student_comment(), widget: "textarea" },
 		}),
 });

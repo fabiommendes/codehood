@@ -5,7 +5,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
 import { db, groupResourcesByType } from "@/db";
-import { m } from "@/i18n";
+import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -33,15 +33,6 @@ const groups = groupResourcesByType(resources);
 // Blob URLs carry no auth check of their own (FR-NFR-030); this page's referrer
 // still shouldn't leak into every link it hands out.
 Astro.response.headers.set("Referrer-Policy", "no-referrer");
-
-/// `text` safe to place inside the HTML of a translated message.
-function escapeHtml(text: string): string {
-	return text
-		.replaceAll("&", "&amp;")
-		.replaceAll("<", "&lt;")
-		.replaceAll(">", "&gt;")
-		.replaceAll('"', "&quot;");
-}
 
 /// Inline code markup, for the messages that quote a folder or a command.
 function code(text: string): string {

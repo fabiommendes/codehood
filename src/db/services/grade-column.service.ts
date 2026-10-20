@@ -28,6 +28,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
@@ -250,7 +251,7 @@ export class GradeColumnService extends CrudBase<{
 				kind: [
 					{
 						code: "invalid",
-						message: "Changing the kind of a column needs its values.",
+						message: m.errors_grade_column_kind_needs_values(),
 					},
 				],
 			});
@@ -471,8 +472,8 @@ function checkValuesFit(
 				code: "type-mismatch",
 				message:
 					kind === "NUMBER"
-						? `"${entry.username}" needs a finite number.`
-						: `"${entry.username}" needs a label of 1 to 32 characters.`,
+						? m.errors_grade_column_needs_number({ username: entry.username })
+						: m.errors_grade_column_needs_label({ username: entry.username }),
 			},
 		];
 	});
@@ -500,7 +501,7 @@ async function checkEnrolled(
 	throw new InvalidData({
 		values: unknown.map((entry) => ({
 			code: "not-exists" as const,
-			message: `"${entry.username}" is not enrolled in the course.`,
+			message: m.errors_not_enrolled_in_course({ username: entry.username }),
 		})),
 	});
 }

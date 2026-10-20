@@ -22,6 +22,7 @@ import {
 	feedbackUpdate,
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import { m } from "@/i18n";
 import { resultsReleased } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
@@ -572,7 +573,7 @@ function resolveGrader(
 	if (actor !== SYSTEM) {
 		if (graderId !== null && graderId !== actor.username) {
 			throw new NotAllowed("feedback.create", {
-				message: "Only SYSTEM may name a different grader",
+				message: m.errors_feedback_grader_system_only(),
 			});
 		}
 		if (graderId === null && botId === null) graderId = actor.username;
@@ -583,7 +584,7 @@ function resolveGrader(
 			grader: [
 				{
 					code: "invalid",
-					message: "Exactly one of `grader` or `bot` is required",
+					message: m.errors_feedback_grader_xor_bot(),
 				},
 			],
 		});
@@ -591,7 +592,7 @@ function resolveGrader(
 
 	if (actor !== SYSTEM && botId !== null) {
 		throw new NotAllowed("feedback.create", {
-			message: "Only SYSTEM may record a bot's grading pass",
+			message: m.errors_feedback_bot_system_only(),
 		});
 	}
 

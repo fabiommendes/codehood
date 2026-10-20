@@ -2,13 +2,14 @@ import { actions } from "astro:actions";
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { Invite } from "@/db";
+import { locale, m } from "@/i18n";
 
 interface Props {
 	invites: Invite[];
 }
 
 function formatDate(date: Date): string {
-	return date.toLocaleDateString("en-US", {
+	return date.toLocaleDateString(locale, {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
@@ -17,19 +18,19 @@ function formatDate(date: Date): string {
 
 export default function InvitesTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<Invite>[] = [
-		{ title: "Email", render: (row) => row.email },
+		{ title: m.admin_col_email(), render: (row) => row.email },
 		{
-			title: "Created by",
+			title: m.admin_col_created_by(),
 			class: "text-base-content/60",
 			render: (row) => row.createdBy.name,
 		},
 		{
-			title: "Created",
+			title: m.admin_col_created(),
 			class: "text-base-content/60",
 			render: (row) => formatDate(row.createdAt),
 		},
 		{
-			title: "Expires",
+			title: m.admin_col_expires(),
 			render: (row) => {
 				const expired = row.expiresAt < new Date();
 				return (
@@ -40,12 +41,12 @@ export default function InvitesTable(props: Props): JSX.Element {
 			},
 		},
 		{
-			title: "Uses",
+			title: m.admin_col_uses(),
 			class: "text-base-content/60",
 			render: (row) => `${row.redemptions} / ${row.maxUses ?? "—"}`,
 		},
 		{
-			title: "Actions",
+			title: m.admin_col_actions(),
 			class: "text-right",
 			headerClass: "text-right",
 			render: (row) => (
@@ -55,7 +56,7 @@ export default function InvitesTable(props: Props): JSX.Element {
 						class="btn btn-outline btn-error btn-sm"
 						data-open-dialog={`revoke-invite-${row.publicId}`}
 					>
-						Revoke
+						{m.admin_invite_revoke()}
 					</button>
 
 					<dialog id={`revoke-invite-${row.publicId}`} class="modal">
@@ -64,17 +65,16 @@ export default function InvitesTable(props: Props): JSX.Element {
 								<button
 									class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
 									type="submit"
-									aria-label="Close"
+									aria-label={m.admin_close()}
 								>
 									✕
 								</button>
 							</form>
 							<h3 class="text-lg font-bold">
-								Revoke the invite for {row.email}?
+								{m.admin_invite_revoke_title({ email: row.email ?? "" })}
 							</h3>
 							<p class="mt-2 text-sm text-base-content/70">
-								Its link stops working immediately. To invite them again, issue
-								a new one.
+								{m.admin_invite_revoke_text()}
 							</p>
 							<form
 								method="post"
@@ -83,12 +83,12 @@ export default function InvitesTable(props: Props): JSX.Element {
 							>
 								<input type="hidden" name="publicId" value={row.publicId} />
 								<button type="submit" class="btn btn-error">
-									Revoke
+									{m.admin_invite_revoke()}
 								</button>
 							</form>
 						</div>
 						<form method="dialog" class="modal-backdrop">
-							<button type="submit">close</button>
+							<button type="submit">{m.admin_close_backdrop()}</button>
 						</form>
 					</dialog>
 				</>

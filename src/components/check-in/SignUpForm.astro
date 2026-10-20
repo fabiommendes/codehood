@@ -5,6 +5,7 @@ import FormAlert from "@/components/form/FormAlert";
 import PasswordConfirm from "@/components/PasswordConfirm.astro";
 import { checkInSignUp } from "@/core/schemas";
 import { actionForm } from "@/forms/form-state";
+import { m } from "@/i18n";
 
 interface Props {
 	rollCallId: number;
@@ -39,10 +40,10 @@ const form = await actionForm(Astro, actions.checkIn.signUp, checkInSignUp, {
     <Field {...form.field("schoolId")} />
   </div>
   <p class="label whitespace-normal">
-    Your instructors use these to tell whose work is whose.
+    {m.auth_identify_note()}
   </p>
 
   <button type="submit" class="btn btn-primary btn-block mt-4 rounded-full">
-    Create account
+    {m.auth_create_account()}
   </button>
 </form>

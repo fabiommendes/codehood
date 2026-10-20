@@ -13,6 +13,7 @@ import {
 } from "@/core/schemas";
 import { db } from "@/db";
 import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
+import { m } from "@/i18n";
 import type { FillUndefineds, Pretty } from "@/typing";
 import { Validate } from "@/utils/validate";
 import {
@@ -627,10 +628,10 @@ export interface ResourceGroup {
 
 /** Display order and label for each `ResourceType` — never authored, see the spec. */
 const GROUP_ORDER: { type: Resource["data"]["type"]; label: string }[] = [
-	{ type: "FILE", label: "Files" },
-	{ type: "LINK", label: "Links" },
-	{ type: "MD", label: "Notes" },
-	{ type: "CODE", label: "Snippets" },
+	{ type: "FILE", label: m.courses_resource_group_files() },
+	{ type: "LINK", label: m.courses_resource_group_links() },
+	{ type: "MD", label: m.courses_resource_group_notes() },
+	{ type: "CODE", label: m.courses_resource_group_snippets() },
 ];
 
 /**

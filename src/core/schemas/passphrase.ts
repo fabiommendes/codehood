@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { courseId, passphraseId } from "./base";
 import { courseParams, courseRef } from "./course";
 
@@ -39,8 +40,8 @@ export const passphraseRedeem = z.object({
 		.min(1)
 		.meta({
 			form: {
-				label: "Course code",
-				hint: "Your instructor shows the code in class.",
+				label: m.forms_label_course_code(),
+				hint: m.forms_hint_course_code(),
 			},
 		}),
 });
@@ -54,9 +55,9 @@ export const passphraseGenerate = courseParams.extend({
 		.optional()
 		.meta({
 			form: {
-				label: "Custom passphrase",
-				hint: "Leave blank for a random 6-character code.",
-				placeholder: "Auto-generated",
+				label: m.forms_label_custom_passphrase(),
+				hint: m.forms_hint_custom_passphrase(),
+				placeholder: m.forms_placeholder_custom_passphrase(),
 			},
 		}),
 });

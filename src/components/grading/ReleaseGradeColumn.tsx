@@ -2,6 +2,7 @@ import { actions } from "astro:actions";
 import { createSignal, type JSX } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
 import { errorMessage } from "@/forms/field-errors";
+import { m } from "@/i18n";
 
 export interface ReleaseGradeColumnProps {
 	/// The course's URL segments and the column slug, as the action takes them.
@@ -50,19 +51,21 @@ export default function ReleaseGradeColumn(
 			<button
 				type="button"
 				class="btn btn-xs btn-outline self-start"
+				aria-label={m.grades_release_column_button_named({
+					title: props.title,
+				})}
 				onClick={() => dialog?.showModal()}
 			>
-				Release<span class="sr-only"> {props.title}</span>
+				{m.grades_release_column_button()}
 			</button>
 
 			<dialog ref={dialog} class="modal">
 				<div class="modal-box whitespace-normal text-left font-normal text-base-content">
-					<h3 class="text-lg font-bold">Release {props.title}?</h3>
+					<h3 class="text-lg font-bold">
+						{m.grades_release_column_title({ title: props.title })}
+					</h3>
 					<p class="mt-2 text-sm text-base-content/70">
-						{props.valued === 1
-							? "1 student will see their grade."
-							: `${props.valued} students will see their grade.`}{" "}
-						You can't undo this once it is released.
+						{m.grades_release_column_body({ count: props.valued })}
 					</p>
 					<div class="modal-action">
 						<button
@@ -71,7 +74,7 @@ export default function ReleaseGradeColumn(
 							disabled={busy()}
 							onClick={() => dialog?.close()}
 						>
-							Cancel
+							{m.grades_cancel()}
 						</button>
 						<button
 							type="button"
@@ -79,12 +82,12 @@ export default function ReleaseGradeColumn(
 							disabled={busy()}
 							onClick={release}
 						>
-							Release
+							{m.grades_release_column_button()}
 						</button>
 					</div>
 				</div>
 				<form method="dialog" class="modal-backdrop">
-					<button type="submit">close</button>
+					<button type="submit">{m.grades_close_backdrop()}</button>
 				</form>
 			</dialog>
 		</div>

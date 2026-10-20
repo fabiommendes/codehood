@@ -54,9 +54,11 @@ slug: z.string().min(1).meta({
 }),
 ```
 
-`FieldMeta` tem `label`, `hint`, `placeholder` e `widget`. O label resolve na
-ordem: override do formulário, `form.label`, `title`, nome do campo com a
-inicial maiúscula. A dica segue a mesma ordem com `form.hint` e `description`.
+`FieldMeta` tem `label`, `hint`, `placeholder`, `widget` e `options` (rótulo de
+cada valor de um enum). O label resolve na ordem: override do formulário,
+`form.label`, `title`. Um campo sem label, ou um valor de enum sem rótulo, faz
+`describeField` lançar erro: o texto vem de `m.forms_*()` (ADR 0002), nunca do
+nome do campo. A dica segue a mesma ordem com `form.hint` e `description`.
 Ponha em `meta` só o que vale para todo formulário que usa o campo. O que muda
 de um formulário para outro vai no override (seção 3). A chave `form` é
 removida do OpenRPC e do OpenAPI. Encadeie `.meta()` depois de `.openapi()`:

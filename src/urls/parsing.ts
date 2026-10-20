@@ -3,6 +3,7 @@
  */
 
 import { InvalidData } from "@/core/error";
+import { m } from "@/i18n";
 import { EDITION_RE, RESERVED_USERNAMES, USERNAME_RE } from "./constants";
 
 export interface CourseNaturalKey {
@@ -64,18 +65,24 @@ export function parseCourseParams(
 	if (!segment) {
 		const error = {
 			code: "pattern-mismatch",
-			message: "Expected course as <instructor>_<edition>.",
+			message: m.errors_course_segment_expected(),
 		} as const;
 		throw new InvalidData(
 			{ course: [error] },
-			{ message: `"${params.course}" is not a course segment.` },
+			{
+				message: m.errors_not_a_course_segment({ value: params.course ?? "" }),
+			},
 		);
 	}
 
 	if (!params.discipline) {
 		throw new InvalidData(
-			{ discipline: [{ code: "missing", message: "Discipline is required." }] },
-			{ message: "Missing discipline segment." },
+			{
+				discipline: [
+					{ code: "missing", message: m.errors_discipline_required() },
+				],
+			},
+			{ message: m.errors_discipline_segment_missing() },
 		);
 	}
 

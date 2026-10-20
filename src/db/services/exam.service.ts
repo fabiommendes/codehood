@@ -22,6 +22,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { m } from "@/i18n";
 import { type ExamResult, examResult } from "@/services/exam-result";
 import {
 	examPhase,
@@ -350,7 +351,7 @@ export class ExamService extends CrudBase<{
 			if (blocker === "released") return exam;
 			if (blocker) {
 				throw new InvalidData({
-					exam: [{ code: "invalid", message: releaseRefusals[blocker] }],
+					exam: [{ code: "invalid", message: releaseRefusals[blocker]() }],
 				});
 			}
 
@@ -392,11 +393,11 @@ export class ExamService extends CrudBase<{
 /// Why {@link ExamService.releaseGrades} refuses, for each blocker it reports.
 const releaseRefusals: Record<
 	Exclude<GradeReleaseBlocker, "released">,
-	string
+	() => string
 > = {
-	"not-an-exam": "Only an EXAM has its grades released by hand",
-	"not-closed": "Only a closed exam can have its grades released",
-	pending: "Answers still waiting for a grade block the release",
+	"not-an-exam": m.errors_release_not_an_exam,
+	"not-closed": m.errors_release_not_closed,
+	pending: m.errors_release_pending,
 };
 
 /// The result of every attempt at `exam`, with all feedback as the instructor sees it.
@@ -506,7 +507,7 @@ async function resolveQuestions(
 		throw new InvalidData({
 			questions: missing.map((slug) => ({
 				code: "not-exists",
-				message: `No question "${slug}" in this course`,
+				message: m.errors_exam_question_missing({ slug }),
 			})),
 		});
 	}
@@ -558,10 +559,10 @@ function sortGroup(key: ExamGroup["key"], exams: Exam[]): Exam[] {
 
 /** Display order and label for each `ExamGroup` key — never authored, see the spec. */
 const GROUP_ORDER: { key: ExamGroup["key"]; label: string }[] = [
-	{ key: "open", label: "Open" },
-	{ key: "practice", label: "Practice" },
-	{ key: "upcoming", label: "Upcoming" },
-	{ key: "past", label: "Past exams and grades" },
+	{ key: "open", label: m.exams_group_open() },
+	{ key: "practice", label: m.exams_group_practice() },
+	{ key: "upcoming", label: m.exams_group_upcoming() },
+	{ key: "past", label: m.exams_group_past() },
 ];
 
 /**

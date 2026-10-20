@@ -131,4 +131,12 @@ const courses = user
         if (dialog instanceof HTMLDialogElement) dialog.showModal();
       });
     });
+
+  // A form inside a dialog that failed to submit comes back with its errors,
+  // and they are only seen if the dialog is open.
+  document
+    .querySelectorAll<HTMLDialogElement>("dialog[data-reopen]")
+    .forEach((dialog) => {
+      dialog.showModal();
+    });
 </script>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { m } from "@/i18n";
 import { courseId, rollCallId, slug, username } from "./base";
 import { calendarEventPK, calendarEventSchema } from "./calendar-event";
 import { courseParams, courseRef } from "./course";
@@ -133,8 +134,8 @@ export const rollCallOpen = rollCallTarget.extend({
 		.optional()
 		.meta({
 			form: {
-				label: "Counts as an invite",
-				hint: "Anyone who checks in is enrolled, and gets an account if they have none.",
+				label: m.forms_label_counts_as_invite(),
+				hint: m.forms_hint_counts_as_invite(),
 				widget: "toggle",
 			},
 		}),
@@ -154,7 +155,7 @@ export const checkInCode = z.object({
 		.string()
 		.trim()
 		.min(1)
-		.meta({ form: { label: "Code" } }),
+		.meta({ form: { label: m.forms_label_code() } }),
 });
 
 /// Creates the account of a student who scanned a roll call that acts as an invite.

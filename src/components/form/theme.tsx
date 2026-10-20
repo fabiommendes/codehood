@@ -1,5 +1,6 @@
 import { For, type JSX, Show } from "solid-js";
 import type { FieldView } from "@/forms/form-state";
+import { m } from "@/i18n";
 
 /// Extra attributes and handlers for the control element itself.
 export type ControlAttrs = JSX.InputHTMLAttributes<HTMLInputElement> &
@@ -154,7 +155,8 @@ function SelectField(props: ControlProps): JSX.Element {
 				{...(props.control as JSX.SelectHTMLAttributes<HTMLSelectElement>)}
 			>
 				<option value="" disabled={props.required} selected={!props.value}>
-					{props.placeholder ?? `Pick ${props.label.toLowerCase()}`}
+					{props.placeholder ??
+						m.forms_pick({ label: props.label.toLowerCase() })}
 				</option>
 				<For each={props.options}>
 					{(option) => (
