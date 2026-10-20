@@ -6,6 +6,7 @@
  * pushed column carries the control that releases it to the students.
  */
 import ReleaseGradeColumn from "@/components/grading/ReleaseGradeColumn";
+import { m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
 import {
 	formatGradeValue,
@@ -37,11 +38,11 @@ const label = (cell: GradeCell): string => {
 		case "total":
 			return formatScore(cell.total);
 		case "pending":
-			return "Pending";
+			return m.grades_table_cell_pending();
 		case "in-progress":
-			return "In progress";
+			return m.grades_table_cell_in_progress();
 		case "missed":
-			return "Missed";
+			return m.grades_table_cell_missed();
 		case "empty":
 			return "";
 	}
@@ -53,10 +54,10 @@ const hasAttempt = (cell: GradeCell): boolean =>
 ---
 
 <div class="mt-6 overflow-x-auto rounded-box border border-base-300 bg-base-100">
-  <table aria-label="Grades" class="table min-w-max">
+  <table aria-label={m.grades_table_label()} class="table min-w-max">
     <thead>
       <tr>
-        <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">Student</th>
+        <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">{m.grades_table_col_student()}</th>
         {
           table.columns.map((column) => (
             <th scope="col" class="align-top max-sm:px-2">
@@ -65,7 +66,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
                   {column.exam.title}
                 </a>
                 <div class="mt-1 text-xs font-normal text-base-content/60">
-                  {column.mean === null ? "no average" : `avg ${formatScore(column.mean)}`} · {column.attempted} of {column.students}
+                  {column.mean === null ? m.grades_table_no_average() : m.grades_table_average({ score: formatScore(column.mean) })} · {m.grades_table_attempted({ attempted: column.attempted, students: column.students })}
                 </div>
               </div>
             </th>
@@ -79,7 +80,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
                 {column.releasedAt === null && (
                   <>
                     {" "}
-                    <span class="badge badge-ghost badge-sm">Hidden</span>
+                    <span class="badge badge-ghost badge-sm">{m.grades_table_hidden()}</span>
                     <ReleaseGradeColumn
                       client:load
                       discipline={params.discipline}
@@ -97,7 +98,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
         {
           attendance && (
             <th scope="col" class="align-top max-sm:px-2">
-              <a href={`${href}/attendance`} class="link">Attendance</a>
+              <a href={`${href}/attendance`} class="link">{m.grades_table_col_attendance()}</a>
             </th>
           )
         }

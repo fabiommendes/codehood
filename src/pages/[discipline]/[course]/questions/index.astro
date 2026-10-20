@@ -2,6 +2,7 @@
 import CourseHeader from "@/components/CourseHeader.astro";
 import QuestionsTable from "@/components/question/QuestionsTable";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
@@ -31,13 +32,13 @@ const courseParams = {
 };
 ---
 
-<AppLayout title={`Questions · ${course.discipline.name}`}
+<AppLayout title={m.questions_list_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="questions" />
 
-    <h2 class="mt-6 text-xl font-semibold">Questions</h2>
+    <h2 class="mt-6 text-xl font-semibold">{m.questions_title()}</h2>
     <p class="mt-1 text-sm text-base-content/60">{course.discipline.name}</p>
 
     <QuestionsTable

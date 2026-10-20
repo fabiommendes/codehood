@@ -5,6 +5,7 @@
  */
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import type { QuestionPublic } from "@/db";
+import { m } from "@/i18n";
 import AnswerView from "./AnswerView";
 import { displayAnswer } from "./answer-text";
 
@@ -18,7 +19,7 @@ const { question, payload } = Astro.props;
 const shown = displayAnswer(question.type, payload);
 ---
 
-{shown.kind === "empty" && <p class="text-base-content/60">No answer written.</p>}
+{shown.kind === "empty" && <p class="text-base-content/60">{m.grades_answer_none()}</p>}
 {
   shown.kind === "text" && (
     <p class:list={["text-base-content", shown.multiline && "whitespace-pre-wrap"]}>{shown.text}</p>

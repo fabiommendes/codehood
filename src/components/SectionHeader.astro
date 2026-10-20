@@ -1,11 +1,13 @@
 ---
+import { m } from "@/i18n";
+
 interface Props {
 	title: string;
 	href?: string;
 	linkText?: string;
 }
 
-const { title, href, linkText = "View all →" } = Astro.props;
+const { title, href, linkText = m.common_view_all() } = Astro.props;
 ---
 
 <div class="flex items-baseline justify-between">

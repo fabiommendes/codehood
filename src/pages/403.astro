@@ -4,6 +4,7 @@
 // visitor isn't enrolled in or doesn't teach ends up here with `?course=` set
 // to the segment they asked for, which tells the message this was a course
 // page. The segment itself is never printed.
+import { m } from "@/i18n";
 import ErrorLayout from "@/layouts/ErrorLayout.astro";
 
 export const prerender = false;
@@ -12,17 +13,9 @@ Astro.response.status = 403;
 const course = Astro.url.searchParams.get("course");
 ---
 
-<ErrorLayout code="403" title="Access denied" scene="lockedHouse">
-  {
-    course ? (
-      <>
-        You don't have permission to view this course. If you think this is a mistake, contact your instructor or admin.
-      </>
-    ) : (
-      "You don't have permission to view this page. If you think this is a mistake, contact your instructor or admin."
-    )
-  }
+<ErrorLayout code="403" title={m.nav_403_title()} scene="lockedHouse">
+  {course ? m.nav_403_course() : m.nav_403_page()}
   <div slot="actions">
-    <a href="/courses" class="btn btn-primary rounded-full">← Back to my courses</a>
+    <a href="/courses" class="btn btn-primary rounded-full">{m.nav_back_to_my_courses()}</a>
   </div>
 </ErrorLayout>

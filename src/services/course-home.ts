@@ -7,6 +7,7 @@
 
 import type { Exam } from "@/db";
 import { groupExamsForStudent } from "@/db/services/exam.service";
+import { m } from "@/i18n";
 import { examPhase } from "./exam-state";
 
 /// One previewed exam, with the answers still waiting for a grade (0 for a student).
@@ -16,7 +17,7 @@ export interface CourseHomeExam {
 }
 
 export interface CourseHomeExams {
-	/// "Exams", or "Practice" when only practice exams are left to show.
+	/// The "Exams" heading, or "Practice" when only practice exams are left to show.
 	title: string;
 	exams: CourseHomeExam[];
 }
@@ -56,7 +57,8 @@ export function courseHomeExams(
 	const current = [...group("open"), ...toGrade, ...upcoming];
 	const shown = current.length > 0 ? current : group("practice");
 	return {
-		title: current.length > 0 ? "Exams" : "Practice",
+		title:
+			current.length > 0 ? m.courses_home_exams() : m.courses_home_practice(),
 		exams: shown.map((exam) => ({
 			exam,
 			pending: pending.get(exam.slug) ?? 0,

@@ -4,6 +4,7 @@
  * so it is unit-testable (`test/breadcrumbs.spec.ts`).
  */
 
+import { m } from "@/i18n";
 import { ADMIN_TABS } from "./admin-tabs";
 import { gradingHref, wantsNames } from "./grading-urls";
 
@@ -29,12 +30,12 @@ export interface CrumbLabels {
 
 /// Course tab labels by URL segment; shared with the tab strip.
 export const COURSE_TAB_LABELS = {
-	exams: "Exams",
-	resources: "Resources",
-	schedule: "Schedule",
-	questions: "Questions",
-	roster: "Students",
-	grades: "Grades",
+	exams: m.nav_course_tab_exams(),
+	resources: m.nav_course_tab_resources(),
+	schedule: m.nav_course_tab_schedule(),
+	questions: m.nav_course_tab_questions(),
+	roster: m.nav_course_tab_students(),
+	grades: m.nav_course_tab_grades(),
 } as const;
 
 /// A step of the trail before links are assigned; `label` is unknown when
@@ -108,7 +109,7 @@ function examSteps(
 		const path = `${examPath}/grading`;
 		const steps: Step[] = [
 			{
-				label: "Grading",
+				label: m.nav_crumb_grading(),
 				path,
 				href: gradingHref(path, { names: wantsNames(url) }),
 			},
@@ -127,7 +128,7 @@ function examSteps(
 /// Steps of an admin URL: the section root, then its tab.
 function adminSteps(segments: string[]): Step[] {
 	const root = ADMIN_TABS[0];
-	const steps: Step[] = [{ label: "Admin", path: root.href }];
+	const steps: Step[] = [{ label: m.nav_admin(), path: root.href }];
 	const tab = ADMIN_TABS.find((t) => t.href === `/admin/${segments[1]}`);
 	if (tab) steps.push({ label: tab.label, path: tab.href });
 	return steps;

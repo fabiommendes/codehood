@@ -2,6 +2,7 @@
 /**
  * The instructor's per-question view of an exam: how many answered, how they scored, and what still waits for a grade.
  */
+import { m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
 import type { QuestionStats } from "@/services/grading";
 
@@ -19,19 +20,19 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
 ---
 
 <section class="mt-8">
-  <h2 class="text-lg font-semibold">Question statistics</h2>
+  <h2 class="text-lg font-semibold">{m.grades_stats_title()}</h2>
 
   {
     anyAnswer ? (
       <div class="mt-3 overflow-x-auto rounded-box border border-base-300 bg-base-100">
-        <table aria-label="Question statistics" class="table">
+        <table aria-label={m.grades_stats_title()} class="table">
           <thead>
             <tr>
-              <th>Question</th>
-              <th class="text-right">Answered</th>
-              <th class="text-right">Average</th>
-              <th class="text-right">Correct</th>
-              <th class="text-right">To grade</th>
+              <th>{m.grades_stats_col_question()}</th>
+              <th class="text-right">{m.grades_stats_col_answered()}</th>
+              <th class="text-right">{m.grades_stats_col_average()}</th>
+              <th class="text-right">{m.grades_stats_col_correct()}</th>
+              <th class="text-right">{m.grades_stats_col_to_grade()}</th>
             </tr>
           </thead>
           <tbody>
@@ -58,7 +59,7 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
         </table>
       </div>
     ) : (
-      <p class="mt-3 text-sm text-base-content/60">No answers yet.</p>
+      <p class="mt-3 text-sm text-base-content/60">{m.grades_stats_empty()}</p>
     )
   }
 </section>

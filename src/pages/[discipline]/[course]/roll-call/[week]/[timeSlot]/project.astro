@@ -2,6 +2,7 @@
 // Full screen projection of a roll call for the classroom screen.
 import RollCallProjector from "@/components/roll-call/RollCallProjector";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import Layout from "@/layouts/Layout.astro";
 import { checkInQrSvg } from "@/services/roll-call-qr";
 import { loadCourse } from "@/utils/load-course";
@@ -30,7 +31,7 @@ if (!rollCall || !event) return Astro.rewrite("/404");
 const { code } = await db.rollCall.currentCode(pk, { actor });
 ---
 
-<Layout title={`${event.title} · Roll call`}>
+<Layout title={m.attendance_roll_call_page_title({ event: event.title })}>
   <RollCallProjector
     discipline={course.discipline.slug}
     course={`${course.instructor.username}_${course.edition.slug}`}

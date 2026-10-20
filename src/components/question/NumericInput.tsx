@@ -1,4 +1,5 @@
 import { createEffect, createSignal, type JSX, Show } from "solid-js";
+import { m } from "@/i18n";
 import {
 	formatNumericInput as format,
 	parseNumericInput as parse,
@@ -90,7 +91,8 @@ export default function NumericInput(props: NumericInputProps): JSX.Element {
 				inputmode={isFraction() ? "text" : "decimal"}
 				class="grow disabled:text-base-content"
 				placeholder={
-					props.placeholder ?? (isFraction() ? "a/b" : "Your answer")
+					props.placeholder ??
+					(isFraction() ? "a/b" : m.questions_your_answer())
 				}
 				disabled={props.disabled}
 				value={text()}

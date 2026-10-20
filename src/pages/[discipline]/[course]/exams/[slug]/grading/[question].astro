@@ -6,6 +6,7 @@ import AnswerControls from "@/components/grading/AnswerControls";
 import AnswerKey from "@/components/grading/AnswerKey";
 import type { QuestionPublic } from "@/db";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { formatScore } from "@/services/exam-result";
@@ -67,7 +68,7 @@ const studentNames = new Map(
 const instructor = course.instructor;
 const graderName = (pass: { grader: string | null }): string =>
 	pass.grader === null
-		? "Graded automatically"
+		? m.grades_question_auto()
 		: pass.grader === instructor.username
 			? instructor.name
 			: pass.grader;
@@ -75,52 +76,52 @@ const graderName = (pass: { grader: string | null }): string =>
 const { pending, resolved } = answersTo(questionSlug, answers);
 const shown = [...pending, ...resolved].map((answer, index) => ({
 	answer,
-	label: `Answer ${index + 1}`,
+	label: m.grades_question_answer_n({ n: index + 1 }),
 	isPending: answer.state === "pending",
 }));
 ---
 
-<AppLayout title={`${title} · Grading · ${exam.title}`}
+<AppLayout title={m.grades_question_title({ question: title, exam: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, question: title })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 
-    <a href={gradingHref(queueHref, { names })} class="text-sm text-base-content/60 hover:text-primary">← Grading</a>
+    <a href={gradingHref(queueHref, { names })} class="text-sm text-base-content/60 hover:text-primary">← {m.grades_question_back()}</a>
 
     <h2 class="mt-2 text-2xl font-bold">{title}</h2>
 
     <nav class="mt-3 flex gap-4 text-sm">
-      {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names })} class="link">Previous question</a>}
-      {next && <a href={gradingHref(`${queueHref}/${next}`, { names })} class="link">Next question</a>}
-      <a href={gradingHref(here, { names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">Show names</a>
+      {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names })} class="link">{m.grades_question_previous()}</a>}
+      {next && <a href={gradingHref(`${queueHref}/${next}`, { names })} class="link">{m.grades_question_next()}</a>}
+      <a href={gradingHref(here, { names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
     </nav>
 
     {
       hasKey ? (
         <section class="mt-6">
-          <h3 class="text-lg font-semibold">Correct answer</h3>
+          <h3 class="text-lg font-semibold">{m.grades_question_correct_answer()}</h3>
           <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
             <AnswerKey client:load question={doc} />
           </div>
         </section>
       ) : (
         <section
-          aria-label="Question"
+          aria-label={m.grades_question_statement()}
           class="prose prose-sm mt-6 max-w-none rounded-box border border-base-300 bg-base-100 p-6"
           set:html={statementHtml}
         />
       )
     }
 
-    {shown.length === 0 && <p class="mt-8 text-base-content/70">No answers to grade.</p>}
+    {shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
 
     <div class="mt-8 flex flex-col gap-6">
       {
         shown.map(({ answer, label, isPending }, index) => (
           <>
             {!isPending && (index === 0 || shown[index - 1]?.isPending) && (
-              <h3 class="text-lg font-semibold">Graded</h3>
+              <h3 class="text-lg font-semibold">{m.grades_question_graded()}</h3>
             )}
             <article id={`answer-${answer.submission}`} aria-label={label} class="card card-border bg-base-100">
               <div class="card-body">
@@ -133,14 +134,14 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                     <p class="mt-4 text-lg font-semibold">
                       {answer.state === "graded" && answer.verdict !== null
                         ? formatScore(answer.verdict)
-                        : "Not graded"}
+                        : m.grades_question_not_graded()}
                     </p>
                     {answer.passes.length > 0 && (
-                    <ul aria-label="Grading history" class="mt-2 flex flex-col gap-2">
+                    <ul aria-label={m.grades_question_history()} class="mt-2 flex flex-col gap-2">
                       {answer.passes.map((pass) => (
                         <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
                           <p>
-                            <span class="font-medium">{pass.willNotGrade ? "Not graded" : pass.score === null ? "No score" : formatScore(pass.score)}</span>
+                            <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
                             <span class="text-base-content/60"> · {graderName(pass)}</span>
                           </p>
                           {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}

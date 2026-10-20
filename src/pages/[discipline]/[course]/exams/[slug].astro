@@ -10,6 +10,7 @@ import QuestionStatsTable from "@/components/grading/QuestionStats.astro";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { examResult } from "@/services/exam-result";
 import {
@@ -33,7 +34,6 @@ import {
 import { loadCourse } from "@/utils/load-course";
 import { loadStudents } from "@/utils/load-grading";
 import { renderMarkdown } from "@/utils/markdown";
-import { plural } from "@/utils/plural";
 import { formatDateTime } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -53,9 +53,9 @@ if (!exam) return Astro.rewrite("/404");
 
 /// What the exam is called in a sentence.
 const examNouns = {
-	PRACTICE: "practice exam",
-	QUIZ: "quiz",
-	EXAM: "exam",
+	PRACTICE: m.exams_noun_practice(),
+	QUIZ: m.exams_noun_quiz(),
+	EXAM: m.exams_noun_exam(),
 } as const;
 
 const now = new Date();
@@ -151,16 +151,23 @@ const pendingAnswers = resultRows.reduce((sum, row) => sum + row.pending, 0);
 const meta = [
 	examTypeLabels[exam.type],
 	exam.extraTime
-		? `${formatDuration(exam.duration)} (+${formatDuration(exam.extraTime)} extra time)`
+		? m.exams_detail_duration_extra({
+				duration: formatDuration(exam.duration),
+				extra: formatDuration(exam.extraTime),
+			})
 		: formatDuration(exam.duration),
 	exam.scheduledAt
 		? formatDateTime(exam.scheduledAt)
 		: canManage
-			? "Not scheduled"
+			? m.exams_not_scheduled()
 			: null,
-	canManage ? plural(exam.questions.length, "question") : null,
+	canManage
+		? m.exams_detail_question_count({ count: exam.questions.length })
+		: null,
 	exam.tags.length > 0 ? exam.tags.join(", ") : null,
-	canManage ? `updated ${formatDateTime(exam.updatedAt)}` : null,
+	canManage
+		? m.exams_detail_updated({ date: formatDateTime(exam.updatedAt) })
+		: null,
 ].filter((part): part is string => part !== null);
 
 // Feedback reaches a student only once released, and only on their own work;
@@ -193,13 +200,13 @@ for (const submission of attempt?.submissions ?? []) {
 }
 ---
 
-<AppLayout title={`${exam.title} · Exams`}
+<AppLayout title={m.exams_detail_page_title({ title: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 
-    <a href={`${href}/exams`} class="text-sm text-base-content/60 hover:text-primary">← Exams</a>
+    <a href={`${href}/exams`} class="text-sm text-base-content/60 hover:text-primary">{m.exams_detail_back()}</a>
 
     <div class="mt-2 flex items-start justify-between gap-4">
       <div>
@@ -220,7 +227,7 @@ for (const submission of attempt?.submissions ?? []) {
     {
       exam.preamble && (
         <section class="mt-6">
-          <h2 class="text-lg font-semibold">Instructions</h2>
+          <h2 class="text-lg font-semibold">{m.exams_detail_instructions()}</h2>
           <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
             {preambleHtml ? (
               <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
@@ -239,13 +246,13 @@ for (const submission of attempt?.submissions ?? []) {
           class="mt-6 flex items-center justify-between gap-4 rounded-box border border-base-300 bg-base-200 p-4 text-sm"
         >
           <span>
-            {examPhaseLabels[phase]}.{" "}
-            {pendingAnswers === 1
-              ? "1 answer waits for a grade."
-              : `${pendingAnswers} answers wait for a grade.`}
+            {m.exams_detail_pending_banner({
+              phase: examPhaseLabels[phase],
+              count: pendingAnswers,
+            })}
           </span>
           <a href={`${href}/exams/${exam.slug}/grading`} class="btn btn-primary btn-sm">
-            Grade answers
+            {m.exams_detail_grade_answers()}
           </a>
         </div>
       )
@@ -313,13 +320,13 @@ for (const submission of attempt?.submissions ?? []) {
     {
       canManage && (
         <section class="mt-8">
-          <h2 class="text-lg font-semibold">Questions</h2>
+          <h2 class="text-lg font-semibold">{m.exams_detail_questions_heading()}</h2>
           {pinnedQuestions.length > 0 ? (
             <div class="mt-3">
               <ExamQuestionsList questions={pinnedQuestions} canManage={canManage} client:load />
             </div>
           ) : (
-            <p class="mt-3 text-sm text-base-content/60">No questions pinned yet.</p>
+            <p class="mt-3 text-sm text-base-content/60">{m.exams_detail_no_questions()}</p>
           )}
         </section>
       )

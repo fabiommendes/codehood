@@ -1,6 +1,7 @@
 import { createSignal, For, type JSX, Show } from "solid-js";
 import type { PreviewTab } from "@/components/question/QuestionPreview";
 import type { Question, QuestionPublic } from "@/db";
+import { m } from "@/i18n";
 import ExamQuestion from "./ExamQuestion";
 
 /// A pinned question as this island renders it — minus the raw database id,
@@ -14,8 +15,8 @@ export interface ExamQuestionsListProps {
 }
 
 const TABS: { id: PreviewTab; label: string }[] = [
-	{ id: "student", label: "Student view" },
-	{ id: "key", label: "Correct answer" },
+	{ id: "student", label: m.exams_tab_student_view() },
+	{ id: "key", label: m.exams_tab_correct_answer() },
 ];
 
 /**

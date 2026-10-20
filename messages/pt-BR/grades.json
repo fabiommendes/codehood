@@ -1,1 +1,98 @@
-{}
+{
+	"grades_answer_none": "Nenhuma resposta escrita.",
+	"grades_results_title": "Resultados",
+	"grades_results_review": "Revisar notas",
+	"grades_results_empty": "Nenhuma tentativa ainda.",
+	"grades_results_col_student": "Estudante",
+	"grades_results_col_attempt": "Tentativa",
+	"grades_results_col_answered": "Respondidas",
+	"grades_results_col_to_grade": "A corrigir",
+	"grades_results_col_total": "Total",
+	"grades_results_dropped": "desistente",
+	"grades_results_submitted": "Enviada",
+	"grades_results_in_progress": "Em andamento",
+	"grades_results_answered_of": "{answered} de {questions} respondidas",
+	"grades_results_pending": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} pendente",
+				"countPlural=other": "{count} pendentes"
+			}
+		}
+	],
+	"grades_table_label": "Notas",
+	"grades_table_col_student": "Estudante",
+	"grades_table_cell_pending": "Pendente",
+	"grades_table_cell_in_progress": "Em andamento",
+	"grades_table_cell_missed": "Faltou",
+	"grades_table_no_average": "sem média",
+	"grades_table_average": "média {score}",
+	"grades_table_attempted": "{attempted} de {students}",
+	"grades_table_hidden": "Oculta",
+	"grades_table_col_attendance": "Presença",
+	"grades_stats_title": "Estatísticas das questões",
+	"grades_stats_col_question": "Questão",
+	"grades_stats_col_answered": "Respondidas",
+	"grades_stats_col_average": "Média",
+	"grades_stats_col_correct": "Acertos",
+	"grades_stats_col_to_grade": "A corrigir",
+	"grades_stats_empty": "Nenhuma resposta ainda.",
+	"grades_released_score_label": "Sua nota",
+	"grades_released_on": "Divulgada em {date}",
+	"grades_queue_title": "Correção · {exam}",
+	"grades_queue_heading": "Correção",
+	"grades_queue_pending": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} pendente",
+				"countPlural=other": "{count} pendentes"
+			}
+		}
+	],
+	"grades_queue_graded": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} corrigida",
+				"countPlural=other": "{count} corrigidas"
+			}
+		}
+	],
+	"grades_queue_not_graded": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} sem correção",
+				"countPlural=other": "{count} sem correção"
+			}
+		}
+	],
+	"grades_queue_no_answers": "Sem respostas",
+	"grades_queue_done": "Nada mais a corrigir.",
+	"grades_queue_questions": "Questões",
+	"grades_question_title": "{question} · Correção · {exam}",
+	"grades_question_auto": "Corrigida automaticamente",
+	"grades_question_answer_n": "Resposta {n}",
+	"grades_question_back": "Correção",
+	"grades_question_previous": "Questão anterior",
+	"grades_question_next": "Próxima questão",
+	"grades_question_show_names": "Mostrar nomes",
+	"grades_question_correct_answer": "Resposta correta",
+	"grades_question_statement": "Questão",
+	"grades_question_no_answers": "Nenhuma resposta a corrigir.",
+	"grades_question_graded": "Corrigidas",
+	"grades_question_not_graded": "Sem correção",
+	"grades_question_history": "Histórico de correção",
+	"grades_question_no_score": "Sem nota",
+	"grades_page_title": "Notas · {discipline}",
+	"grades_page_heading": "Notas",
+	"grades_page_no_exams": "Nenhuma avaliação ainda.",
+	"grades_page_no_students": "Nenhum estudante matriculado ainda.",
+	"grades_page_students_link": "Estudantes"
+}

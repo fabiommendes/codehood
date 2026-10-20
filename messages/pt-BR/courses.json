@@ -1,1 +1,90 @@
-{}
+{
+	"courses_home_title": "Início",
+	"courses_home_kicker": "Seu período",
+	"courses_term_overview": "Visão do período",
+	"courses_home_in_progress": "Em andamento",
+	"courses_home_closes": "Fecha {when}",
+	"courses_home_submitted": "{submitted} de {enrolled} enviaram",
+	"courses_home_to_grade": "Para corrigir",
+	"courses_home_answers_to_grade": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} resposta para corrigir",
+				"countPlural=other": "{count} respostas para corrigir"
+			}
+		}
+	],
+	"courses_home_ready_to_release": "Prontas para liberar",
+	"courses_home_attempts_graded": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} tentativa corrigida",
+				"countPlural=other": "{count} tentativas corrigidas"
+			}
+		}
+	],
+	"courses_home_question_problems": "Problemas nas questões",
+	"courses_home_questions_with_problems": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} questão com problemas",
+				"countPlural=other": "{count} questões com problemas"
+			}
+		}
+	],
+	"courses_home_open_now": "Abertas agora",
+	"courses_home_status_in_progress": "Em andamento",
+	"courses_home_start": "Iniciar",
+	"courses_home_coming_up": "Em breve",
+	"courses_home_opens": "Abre {when}",
+	"courses_home_today": "Hoje",
+	"courses_home_new_results": "Novos resultados",
+	"courses_home_released": "Liberado {when}",
+	"courses_home_waiting_for_grades": "Aguardando notas",
+	"courses_home_idle_title": "Nada precisa de você agora",
+	"courses_home_next": "A seguir:",
+	"courses_home_nothing_ahead": "Não há nada agendado nas suas turmas.",
+	"courses_home_exams": "Avaliações",
+	"courses_home_practice": "Exercícios",
+	"courses_list_all_title": "Todas as turmas",
+	"courses_list_my_title": "Minhas turmas",
+	"courses_list_all_subtitle": "Todas as turmas desta instância.",
+	"courses_list_my_subtitle": "Turmas em que você estuda ou leciona.",
+	"courses_list_join": "Entrar em uma turma",
+	"courses_list_left": "Você saiu da turma. Nada foi apagado. Seus envios continuam registrados.",
+	"courses_list_empty_title": "Nenhuma turma ainda",
+	"courses_list_empty_body": "As turmas em que você estuda ou leciona aparecem aqui. Digite o código que o docente mostra em aula para entrar em uma.",
+	"courses_list_teaching": "Você é docente",
+	"courses_list_enrolled": [
+		{
+			"declarations": [
+				"input edition",
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{edition} · {count} matriculado",
+				"countPlural=other": "{edition} · {count} matriculados"
+			}
+		}
+	],
+	"courses_resources_page_title": "{discipline} · Materiais",
+	"courses_resources_on_schedule": "O material de cada aula está no {schedule}.",
+	"courses_resources_schedule_link": "cronograma",
+	"courses_resources_empty_instructor": "Nada enviado ainda. Coloque arquivos, links, notas e trechos de código na pasta {folder} do repositório da turma e rode {command}. Todo arquivo enviado recebe uma URL permanente e sem autenticação, então nada cuja divulgação importe deve ficar aqui.",
+	"courses_resources_empty_student": "Nenhum material ainda.",
+	"courses_resource_page_title": "{resource} · {discipline}",
+	"courses_resource_back_schedule": "← Cronograma",
+	"courses_resource_back_resources": "← Materiais",
+	"courses_resource_kind_file": "Arquivo",
+	"courses_resource_kind_file_ext": "Arquivo {extension}",
+	"courses_resource_kind_link": "Link",
+	"courses_resource_kind_note": "Nota"
+}

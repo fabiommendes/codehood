@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
+import { m } from "@/i18n";
 import type { PublicTrueFalse } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
 import { CheckIcon, XIcon } from "./icons";
@@ -137,7 +138,7 @@ export default function TrueFalseView(props: TrueFalseViewProps): JSX.Element {
 		marked: boolean | undefined;
 	}): JSX.Element {
 		const { answer, marked } = props;
-		const label = answer ? "True" : "False";
+		const label = answer ? m.questions_true() : m.questions_false();
 		const opacity = marked === undefined ? 40 : marked === answer ? 80 : 40;
 		const weight = marked === answer ? "font-bold" : "font-bold";
 		return (
@@ -209,7 +210,9 @@ export default function TrueFalseView(props: TrueFalseViewProps): JSX.Element {
 										role="checkbox"
 										aria-checked={ariaChecked(judged())}
 										class={`toggle ${toggleClass(judged())}`}
-										aria-label={`True or false: ${choice.text}`}
+										aria-label={m.questions_true_or_false({
+											statement: choice.text,
+										})}
 										disabled={mode() !== "answer"}
 										onClick={cycle}
 										aria-describedby={
@@ -244,7 +247,9 @@ export default function TrueFalseView(props: TrueFalseViewProps): JSX.Element {
 			</fieldset>
 
 			<Show when={mode() === "readonly" && judgements().size === 0}>
-				<p class="text-sm italic text-base-content/50">No answer submitted.</p>
+				<p class="text-sm italic text-base-content/50">
+					{m.questions_no_answer_submitted()}
+				</p>
 			</Show>
 
 			<Show when={props.question.epilogue}>

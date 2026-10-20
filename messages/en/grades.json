@@ -1,1 +1,98 @@
-{}
+{
+	"grades_answer_none": "No answer written.",
+	"grades_results_title": "Results",
+	"grades_results_review": "Review grades",
+	"grades_results_empty": "No attempts yet.",
+	"grades_results_col_student": "Student",
+	"grades_results_col_attempt": "Attempt",
+	"grades_results_col_answered": "Answered",
+	"grades_results_col_to_grade": "To grade",
+	"grades_results_col_total": "Total",
+	"grades_results_dropped": "dropped",
+	"grades_results_submitted": "Submitted",
+	"grades_results_in_progress": "In progress",
+	"grades_results_answered_of": "{answered} of {questions} answered",
+	"grades_results_pending": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} pending",
+				"countPlural=other": "{count} pending"
+			}
+		}
+	],
+	"grades_table_label": "Grades",
+	"grades_table_col_student": "Student",
+	"grades_table_cell_pending": "Pending",
+	"grades_table_cell_in_progress": "In progress",
+	"grades_table_cell_missed": "Missed",
+	"grades_table_no_average": "no average",
+	"grades_table_average": "avg {score}",
+	"grades_table_attempted": "{attempted} of {students}",
+	"grades_table_hidden": "Hidden",
+	"grades_table_col_attendance": "Attendance",
+	"grades_stats_title": "Question statistics",
+	"grades_stats_col_question": "Question",
+	"grades_stats_col_answered": "Answered",
+	"grades_stats_col_average": "Average",
+	"grades_stats_col_correct": "Correct",
+	"grades_stats_col_to_grade": "To grade",
+	"grades_stats_empty": "No answers yet.",
+	"grades_released_score_label": "Your score",
+	"grades_released_on": "Released {date}",
+	"grades_queue_title": "Grading · {exam}",
+	"grades_queue_heading": "Grading",
+	"grades_queue_pending": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} pending",
+				"countPlural=other": "{count} pending"
+			}
+		}
+	],
+	"grades_queue_graded": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} graded",
+				"countPlural=other": "{count} graded"
+			}
+		}
+	],
+	"grades_queue_not_graded": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} not graded",
+				"countPlural=other": "{count} not graded"
+			}
+		}
+	],
+	"grades_queue_no_answers": "No answers",
+	"grades_queue_done": "Nothing left to grade.",
+	"grades_queue_questions": "Questions",
+	"grades_question_title": "{question} · Grading · {exam}",
+	"grades_question_auto": "Graded automatically",
+	"grades_question_answer_n": "Answer {n}",
+	"grades_question_back": "Grading",
+	"grades_question_previous": "Previous question",
+	"grades_question_next": "Next question",
+	"grades_question_show_names": "Show names",
+	"grades_question_correct_answer": "Correct answer",
+	"grades_question_statement": "Question",
+	"grades_question_no_answers": "No answers to grade.",
+	"grades_question_graded": "Graded",
+	"grades_question_not_graded": "Not graded",
+	"grades_question_history": "Grading history",
+	"grades_question_no_score": "No score",
+	"grades_page_title": "Grades · {discipline}",
+	"grades_page_heading": "Grades",
+	"grades_page_no_exams": "No exams yet.",
+	"grades_page_no_students": "No students enrolled yet.",
+	"grades_page_students_link": "Students"
+}

@@ -1,8 +1,9 @@
 /// Relative dates for anything scheduled, so the reader never does date arithmetic.
 
+import { locale, m } from "@/i18n";
 import { formatDateTime } from "./schedule-time";
 
-const RELATIVE = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
+const RELATIVE = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
 
 /**
  * `date` as "in 3 days" or "2 hours ago" when it is within a week of `now`, and as a full date otherwise.
@@ -26,9 +27,10 @@ export function formatTimeLeft(deadline: Date, now: Date): string {
 		0,
 		Math.ceil((deadline.getTime() - now.getTime()) / 1000),
 	);
-	if (seconds < 60) return `${seconds} s left`;
+	if (seconds < 60) return m.time_left_seconds({ count: seconds });
 	const minutes = Math.ceil(seconds / 60);
-	if (minutes < 180) return `${minutes} min left`;
-	if (minutes < 72 * 60) return `${Math.floor(minutes / 60)} h left`;
-	return `${Math.floor(minutes / (24 * 60))} days left`;
+	if (minutes < 180) return m.time_left_minutes({ count: minutes });
+	if (minutes < 72 * 60)
+		return m.time_left_hours({ count: Math.floor(minutes / 60) });
+	return m.time_left_days({ count: Math.floor(minutes / (24 * 60)) });
 }

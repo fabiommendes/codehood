@@ -3,6 +3,7 @@
 // schedule. A file downloads, a link opens in another tab, a note or snippet
 // opens its page.
 import type { Resource } from "@/db";
+import { m } from "@/i18n";
 import { RESOURCE_ICONS } from "@/utils/resource-icons";
 import { fileDownloadName, resourceHref } from "@/utils/resource-url";
 
@@ -17,7 +18,7 @@ const { resources, href } = Astro.props;
 
 {
   resources.length > 0 && (
-    <ul aria-label="Resources" class="mt-2 flex flex-col text-sm">
+    <ul aria-label={m.schedule_resources_label()} class="mt-2 flex flex-col text-sm">
       {resources.map((resource) => {
         const file = resource.data.type === "FILE" ? resource.data : undefined;
         const external = resource.data.type === "LINK";

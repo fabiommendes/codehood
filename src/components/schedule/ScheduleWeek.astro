@@ -5,6 +5,7 @@ import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 // that the course home and the calendar link to.
 import type { CalendarEventId } from "@/core/schemas";
 import type { Resource } from "@/db";
+import { m } from "@/i18n";
 import type { CalendarEntry } from "@/services/calendar-entries";
 import { rollCallOpenable } from "@/services/roll-call-window";
 import { eventKindLabel } from "@/utils/calendar-event-display";
@@ -78,7 +79,7 @@ function faded(entry: CalendarEntry): boolean {
 
 <section>
   <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">
-    Week {week}
+    {m.schedule_week({ week })}
   </h3>
   <ol class="mt-3 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50">
     {
@@ -137,12 +138,12 @@ function faded(entry: CalendarEntry): boolean {
                   {entry.exam.title}
                 </a>
               )}
-              {entry === next && <span class="badge badge-primary badge-sm">Next</span>}
+              {entry === next && <span class="badge badge-primary badge-sm">{m.schedule_badge_next()}</span>}
               {entry.kind === "event" && attendance.get(rollCallKey(entry.event)) === "present" && (
-                <span class="badge badge-success badge-sm">Present</span>
+                <span class="badge badge-success badge-sm">{m.schedule_badge_present()}</span>
               )}
               {entry.kind === "event" && attendance.get(rollCallKey(entry.event)) === "absent" && (
-                <span class="badge badge-error badge-sm">Absent</span>
+                <span class="badge badge-error badge-sm">{m.schedule_badge_absent()}</span>
               )}
               {entry.kind === "event" && rollCallManager && entry.event.kind === "REGULAR" && (
                 rollCallKeys.has(rollCallKey(entry.event)) ? (
@@ -150,7 +151,7 @@ function faded(entry: CalendarEntry): boolean {
                     href={`${href}/roll-call/${entry.event.week}/${entry.event.timeSlot.slug}`}
                     class="btn btn-outline btn-sm"
                   >
-                    Roll call
+                    {m.schedule_roll_call()}
                   </a>
                 ) : rollCallOpenable(entry, now) && (
                   <OpenRollCallDialog
@@ -169,7 +170,7 @@ function faded(entry: CalendarEntry): boolean {
                 </span>
               )}
               {entry.kind === "exam" && entry.exam.status === "DRAFT" && (
-                <span class="badge badge-ghost badge-sm">Draft</span>
+                <span class="badge badge-ghost badge-sm">{m.schedule_draft()}</span>
               )}
               {entry.kind === "event" && eventKindLabel(entry.event.kind) && (
                 <span class="badge badge-ghost badge-sm">

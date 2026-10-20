@@ -1,7 +1,9 @@
+import { m } from "@/i18n";
+
 /** How a score badge should read and look, shared by every review-mode view. */
 export function scoreLabel(score: number): string {
 	const magnitude = Math.abs(score).toFixed(2);
-	return score < 0 ? `Score −${magnitude}` : `Score ${magnitude}`;
+	return m.questions_score({ score: score < 0 ? `−${magnitude}` : magnitude });
 }
 
 /** The `<Badge>` props a score renders with. */
@@ -20,9 +22,6 @@ export function feedbackVariant(score: number): "success" | "error" | "info" {
 	if (score < 0) return "error";
 	return "info";
 }
-
-/** What an ungraded answer's badge reads. */
-export const PENDING_LABEL = "Awaiting grading";
 
 /** The `<Badge>` props an ungraded answer renders with. */
 export function pendingBadge(): { variant: "warning"; style: "soft" } {

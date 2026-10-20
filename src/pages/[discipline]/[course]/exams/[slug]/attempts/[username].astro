@@ -4,6 +4,7 @@ import type { AnswerPayload } from "@/components/exam/answer-payload";
 import Answer from "@/components/grading/Answer.astro";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { examResult, formatScore } from "@/services/exam-result";
@@ -51,7 +52,7 @@ const rows = outcomes.questions.map((outcome, index) => {
 			null,
 		);
 	return {
-		label: `Question ${index + 1}`,
+		label: m.exams_attempt_question_label({ number: index + 1 }),
 		outcome,
 		title: doc?.title ?? outcome.question,
 		asked: doc ? new Question(doc).toPublic() : null,
@@ -60,9 +61,9 @@ const rows = outcomes.questions.map((outcome, index) => {
 });
 
 const stateLabel = (status: string, score: number | null): string => {
-	if (status === "not-graded") return "Not graded";
+	if (status === "not-graded") return m.exams_attempt_not_graded();
 	if (status === "graded" && score !== null) return formatScore(score);
-	return "Waiting to be graded";
+	return m.exams_attempt_waiting();
 };
 ---
 
@@ -76,22 +77,22 @@ const stateLabel = (status: string, score: number | null): string => {
 
     <h2 class="mt-2 text-2xl font-bold">
       {row.name}
-      {row.dropped && <span class="badge badge-outline badge-sm ml-2">dropped</span>}
+      {row.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
     </h2>
 
     <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-3">
       <div>
-        <dt class="text-sm text-base-content/50">Started</dt>
+        <dt class="text-sm text-base-content/50">{m.exams_attempt_started()}</dt>
         <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>
       </div>
       <div>
-        <dt class="text-sm text-base-content/50">Submitted</dt>
+        <dt class="text-sm text-base-content/50">{m.exams_attempt_submitted()}</dt>
         <dd class="mt-0.5 font-medium">
-          {closed ? formatDateTime(attempt.updatedAt, { year: "numeric" }) : "In progress"}
+          {closed ? formatDateTime(attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-base-content/50">Total</dt>
+        <dt class="text-sm text-base-content/50">{m.exams_attempt_total()}</dt>
         <dd class="mt-0.5 font-medium">{attemptTotalLabel(row.total, row.state)}</dd>
       </div>
     </dl>
@@ -118,13 +119,13 @@ const stateLabel = (status: string, score: number | null): string => {
                           anchor: `answer-${counting.publicId}`,
                         })}
                       >
-                        Grade this answer
+                        {m.exams_attempt_grade_this()}
                       </a>
                     </p>
                   )}
                 </>
               ) : (
-                <p class="text-base-content/60">Not answered</p>
+                <p class="text-base-content/60">{m.exams_attempt_not_answered()}</p>
               )}
             </div>
           </article>

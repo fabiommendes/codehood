@@ -11,6 +11,7 @@ import QuestionPreview, {
 import ShortAnswerView from "@/components/question/ShortAnswerView";
 import TrueFalseView from "@/components/question/TrueFalseView";
 import type { QuestionPublic } from "@/db";
+import { m } from "@/i18n";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -84,7 +85,7 @@ function PublicQuestionView(props: PublicQuestionViewProps): JSX.Element {
 		<Switch
 			fallback={
 				<p class="text-sm text-base-content/60">
-					Preview for "{props.question.type}" questions is not implemented yet.
+					{m.exams_question_preview_unavailable({ type: props.question.type })}
 				</p>
 			}
 		>

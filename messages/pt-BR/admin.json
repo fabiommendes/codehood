@@ -1,1 +1,21 @@
-{}
+{
+	"admin_courses_page_title": "Administração · Turmas",
+	"admin_courses_intro": "Todas as turmas de todas as disciplinas, somente leitura. Cada docente é dono do registro; administradores o veem e, quando as turmas puderem ser arquivadas, o encerram.",
+	"admin_courses_col_discipline": "Disciplina",
+	"admin_courses_col_edition": "Período letivo",
+	"admin_courses_col_instructor": "Docente",
+	"admin_courses_col_students": "Estudantes",
+	"admin_courses_col_term": "Período",
+	"admin_courses_col_actions": "Ações",
+	"admin_courses_students": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} estudante",
+				"countPlural=other": "{count} estudantes"
+			}
+		}
+	],
+	"admin_courses_open": "Abrir turma"
+}

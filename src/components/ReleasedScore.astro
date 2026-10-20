@@ -4,6 +4,7 @@
  * two bouquets of yellow ipê.
  */
 import { cluster, IPES } from "@/components/brand/ipe";
+import { locale, m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
 
 interface Props {
@@ -35,12 +36,12 @@ const bouquet = (mirror: boolean) =>
       {bouquet(false).map((p) => <path d={p.d} fill={p.fill} />)}
     </svg>
     <div class="text-center">
-      <p class="font-mono text-xs tracking-widest whitespace-nowrap text-primary uppercase">Your score</p>
+      <p class="font-mono text-xs tracking-widest whitespace-nowrap text-primary uppercase">{m.grades_released_score_label()}</p>
       <p class="font-display text-5xl font-bold">{formatScore(score)}</p>
       {
         releasedAt && (
           <p class="text-sm text-base-content/70">
-            Released {releasedAt.toLocaleDateString("en", { day: "numeric", month: "short" })}
+            {m.grades_released_on({ date: releasedAt.toLocaleDateString(locale, { day: "numeric", month: "short" }) })}
           </p>
         )
       }

@@ -4,6 +4,7 @@ import type { SceneName } from "@/components/brand/scenes";
 import TileWall from "@/components/brand/TileWall.astro";
 import Logo from "@/components/Logo.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
+import { m } from "@/i18n";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -16,18 +17,18 @@ interface Props {
 const { code, title, scene } = Astro.props;
 ---
 
-<Layout title={`${code} — ${title} — Codehood`}>
+<Layout title={m.nav_error_page_title({ code, title })}>
   <main class="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-base-200 p-4 py-12">
     <TileWall seed={13} class="-z-10" />
     <ThemeToggle class="absolute top-4 right-4 z-10" />
     <div class="card card-border tape w-full max-w-lg bg-base-100 shadow-xl">
       <div class="card-body items-center gap-5 text-center">
-        <a href="/" aria-label="Codehood home">
+        <a href="/" aria-label={m.nav_error_home_label()}>
           <Logo height={34} />
         </a>
         <Scene name={scene} />
         <div>
-          <p class="font-mono text-xs tracking-widest text-primary uppercase">Error {code}</p>
+          <p class="font-mono text-xs tracking-widest text-primary uppercase">{m.nav_error_kicker({ code })}</p>
           <h1 class="mt-1 text-2xl font-bold">{title}</h1>
           <p class="mx-auto mt-2 max-w-sm text-base-content/70">
             <slot />

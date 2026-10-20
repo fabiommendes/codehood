@@ -5,6 +5,7 @@
  * The file is built in the browser from rows embedded in the page, so a page
  * that already shows the data needs no download route of its own.
  */
+import { m } from "@/i18n";
 import type { CsvValue } from "@/utils/csv";
 import { jsonScriptPayload } from "@/utils/json-script";
 
@@ -29,7 +30,7 @@ const { id, filename, rows, disabled = false } = Astro.props;
   data-csv-filename={filename}
   disabled={disabled}
 >
-  Download CSV
+  {m.common_download_csv()}
 </button>
 {/* `jsonScriptPayload`, not `JSON.stringify`: the cells are user-supplied and
     `set:html` writes them raw, so a bare stringify lets a name containing

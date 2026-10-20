@@ -4,13 +4,13 @@
 // the course home page's exam preview.
 import ListRow from "@/components/ListRow.astro";
 import type { Exam } from "@/db";
+import { m } from "@/i18n";
 import { type AttemptState, examPhase } from "@/services/exam-state";
 import {
 	examBadge,
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
-import { plural } from "@/utils/plural";
 import { formatDateTime } from "@/utils/schedule-time";
 
 interface Props {
@@ -41,7 +41,7 @@ const badge = examBadge(phase, state);
 /// A score already says the exam is graded, and a heading may already say its phase.
 const showBadge =
 	!score && (phaseBadge || badge.label !== examBadge(phase).label);
-/// The date, or "Not scheduled" while that is still news; an exam opened or closed by hand has no date worth showing.
+/// The date, or m.exams_not_scheduled() while that is still news; an exam opened or closed by hand has no date worth showing.
 const schedule = exam.scheduledAt
 	? formatDateTime(exam.scheduledAt)
 	: phase === "upcoming"
@@ -62,7 +62,7 @@ const detail = [
     {detail}
     {pending > 0 && (
       <span class="font-medium text-base-content/80">
-        {` · ${plural(pending, "answer", "answers")} to grade`}
+        {` · ${m.exams_row_answers_to_grade({ count: pending })}`}
       </span>
     )}
   </p>

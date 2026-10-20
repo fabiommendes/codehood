@@ -3,6 +3,7 @@
 // page header has scrolled under the bar, but stays in the layout and in the
 // accessibility tree while faded out, so nothing shifts and keyboard users can
 // still tab into it.
+import { m } from "@/i18n";
 import type { Crumb } from "@/utils/breadcrumbs";
 
 interface Props {
@@ -17,7 +18,7 @@ const { trail, static: isStatic = false } = Astro.props;
 {
   trail.length > 0 && (
     <nav
-      aria-label="Breadcrumb"
+      aria-label={m.nav_breadcrumb()}
       data-breadcrumbs
       data-static={isStatic || undefined}
       data-shown={isStatic || undefined}

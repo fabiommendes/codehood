@@ -1,1 +1,63 @@
-{}
+{
+	"schedule_page_title": "Schedule · {discipline}",
+	"schedule_weekday_sun": "Sun",
+	"schedule_weekday_mon": "Mon",
+	"schedule_weekday_tue": "Tue",
+	"schedule_weekday_wed": "Wed",
+	"schedule_weekday_thu": "Thu",
+	"schedule_weekday_fri": "Fri",
+	"schedule_weekday_sat": "Sat",
+	"schedule_slot_default_title": "Meeting",
+	"schedule_slot_summary": "{title} · {day} {start}–{end}",
+	"schedule_meetings_held": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} meeting held so far.",
+				"countPlural=other": "{count} meetings held so far."
+			}
+		}
+	],
+	"schedule_none_instructor": "No schedule pushed yet.",
+	"schedule_none_student": "No schedule published yet. The instructor pushes it with the CLI.",
+	"schedule_no_events": "No events on the calendar yet.",
+	"schedule_week": "Week {week}",
+	"schedule_weeks_range": "Weeks {first}–{last}",
+	"schedule_past_weeks": [
+		{
+			"declarations": [
+				"input span",
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{span}, already held",
+				"countPlural=other": "{span}, already held"
+			}
+		}
+	],
+	"schedule_event_holiday": "Holiday",
+	"schedule_event_cancelled": "Cancelled",
+	"schedule_badge_next": "Next",
+	"schedule_badge_present": "Present",
+	"schedule_badge_absent": "Absent",
+	"schedule_roll_call": "Roll call",
+	"schedule_draft": "Draft",
+	"schedule_resources_label": "Resources",
+	"schedule_calendar_title": "Calendar",
+	"schedule_calendar_subtitle": "Your schedule across every course you take or teach.",
+	"schedule_calendar_no_courses": "You're not enrolled in or teaching any courses yet.",
+	"schedule_calendar_upcoming": "Upcoming",
+	"schedule_calendar_nothing_upcoming": "Nothing coming up.",
+	"schedule_calendar_show_more": "Show {count} more",
+	"schedule_calendar_show_fewer": "Show fewer",
+	"schedule_calendar_prev_month": "Previous month",
+	"schedule_calendar_next_month": "Next month",
+	"schedule_calendar_today": "Today",
+	"schedule_calendar_draft_title": "{title} (draft)",
+	"schedule_calendar_more": "+{count} more",
+	"schedule_calendar_nothing_month": "Nothing scheduled this month.",
+	"schedule_calendar_events_in": "Events in {month}"
+}

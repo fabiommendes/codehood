@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
 import GradesTable from "@/components/grading/GradesTable.astro";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
@@ -35,14 +36,14 @@ const hasGrades =
 const csvFilename = `grades-${course.discipline.slug}-${course.edition.slug}.csv`;
 ---
 
-<AppLayout title={`Grades · ${course.discipline.name}`}
+<AppLayout title={m.grades_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="grades" />
 
     <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-2xl font-bold">Grades</h2>
+      <h2 class="text-2xl font-bold">{m.grades_page_heading()}</h2>
       {
         hasGrades && (
           <CsvDownload id="grades-csv" filename={csvFilename} rows={csvRows} />
@@ -52,11 +53,11 @@ const csvFilename = `grades-${course.discipline.slug}-${course.edition.slug}.csv
 
     {
       table.columns.length === 0 && pushed.columns.length === 0 ? (
-        <p class="mt-4 text-base-content/60">No exams yet.</p>
+        <p class="mt-4 text-base-content/60">{m.grades_page_no_exams()}</p>
       ) : table.rows.length === 0 ? (
         <div class="mt-4">
-          <p class="text-base-content/60">No students enrolled yet.</p>
-          <a href={`${href}/roster`} class="link mt-2 inline-block">Students</a>
+          <p class="text-base-content/60">{m.grades_page_no_students()}</p>
+          <a href={`${href}/roster`} class="link mt-2 inline-block">{m.grades_page_students_link()}</a>
         </div>
       ) : (
         <GradesTable href={href} table={table} pushed={pushed} attendance={attendance} />

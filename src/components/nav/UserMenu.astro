@@ -6,6 +6,7 @@ import { actions } from "astro:actions";
 import type { UserActor } from "@/auth/actor";
 import Avatar from "@/components/Avatar.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
+import { m } from "@/i18n";
 import { roleLabels } from "@/utils/roles";
 
 interface Props {
@@ -37,17 +38,17 @@ const { user, open = false } = Astro.props;
       </span>
     </li>
     <li>
-      <a href="/profile" class="cut">Profile</a>
+      <a href="/profile" class="cut">{m.nav_profile()}</a>
     </li>
     <li>
-      <a href="/getting-started" class="cut">Set up the CLI</a>
+      <a href="/getting-started" class="cut">{m.nav_set_up_cli()}</a>
     </li>
     <li class="lg:hidden">
       <ThemeToggle variant="menu" class="cut" />
     </li>
     <li>
       <form method="POST" action={actions.auth.logout} class="cut p-0">
-        <button type="submit" class="w-full px-3 py-1.5 text-left">Log out</button>
+        <button type="submit" class="w-full px-3 py-1.5 text-left">{m.nav_log_out()}</button>
       </form>
     </li>
   </ul>

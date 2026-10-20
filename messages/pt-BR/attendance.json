@@ -1,1 +1,18 @@
-{}
+{
+	"attendance_summary_link": "Presença: {present} de {total} ({percent})",
+	"attendance_table_label": "Presença",
+	"attendance_table_cell_present": "Presente",
+	"attendance_table_cell_absent": "Ausente",
+	"attendance_table_col_student": "Estudante",
+	"attendance_table_col_present": "Presenças",
+	"attendance_table_col_total": "Total",
+	"attendance_table_dropped": "Desistente",
+	"attendance_result_recorded": "Presença registrada em {title}",
+	"attendance_result_joined": "Você entrou na turma {course}.",
+	"attendance_result_go_to_courses": "Ir para suas turmas",
+	"attendance_page_title": "Presença · {discipline}",
+	"attendance_page_heading": "Presença",
+	"attendance_page_no_roll_calls": "Nenhuma chamada ainda.",
+	"attendance_page_no_students": "Nenhum estudante matriculado ainda.",
+	"attendance_roll_call_page_title": "{event} · Chamada"
+}

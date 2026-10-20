@@ -6,6 +6,7 @@
 
 import type { Actor } from "@/auth/actor";
 import { type CourseTarget, hasPerm } from "@/auth/permissions";
+import { m } from "@/i18n";
 import { type CourseNaturalKey, courseHref } from "@/urls";
 import { COURSE_TAB_LABELS } from "./breadcrumbs";
 
@@ -39,7 +40,7 @@ export function courseTabs(
 ): readonly CourseTab[] {
 	const href = courseHref(ref);
 	const tabs: CourseTab[] = [
-		{ key: "home", label: "Home", href },
+		{ key: "home", label: m.nav_course_tab_home(), href },
 		{ key: "exams", label: COURSE_TAB_LABELS.exams, href: `${href}/exams` },
 		{
 			key: "resources",

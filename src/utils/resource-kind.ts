@@ -1,3 +1,4 @@
+import { m } from "@/i18n";
 import { extensionForMime } from "./mime";
 
 /// The part of a resource's data that says what kind of thing it is.
@@ -19,12 +20,16 @@ export function resourceKind(data: ResourceKindData): string {
 	switch (data.type) {
 		case "FILE": {
 			const extension = extensionForMime(data.mimeType);
-			return extension ? `${extension.toUpperCase()} file` : "File";
+			return extension
+				? m.courses_resource_kind_file_ext({
+						extension: extension.toUpperCase(),
+					})
+				: m.courses_resource_kind_file();
 		}
 		case "LINK":
-			return "Link";
+			return m.courses_resource_kind_link();
 		case "MD":
-			return "Note";
+			return m.courses_resource_kind_note();
 		case "CODE":
 			return data.language;
 	}
@@ -51,7 +56,7 @@ export function resourceDetail(resource: ResourceDetailData): string {
 		try {
 			return new URL(data.url).hostname.replace(/^www\./, "");
 		} catch {
-			return "Link";
+			return m.courses_resource_kind_link();
 		}
 	}
 	return resourceKind(data);

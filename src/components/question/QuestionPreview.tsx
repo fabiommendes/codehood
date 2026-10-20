@@ -7,6 +7,7 @@ import {
 	Show,
 	Switch,
 } from "solid-js";
+import { m } from "@/i18n";
 import { Question } from "@/mdq/question";
 import type * as schema from "@/mdq/schemas-generated";
 import type { QuestionResult } from "@/mdq/scoring";
@@ -36,9 +37,9 @@ export interface QuestionPreviewProps {
 /** Which of the two ways an instructor can look at the question is on screen. */
 export type PreviewTab = "student" | "key";
 
-const TABS: { id: PreviewTab; label: string }[] = [
-	{ id: "student", label: "Student view" },
-	{ id: "key", label: "Correct answer" },
+const TABS: { id: PreviewTab; label: () => string }[] = [
+	{ id: "student", label: m.questions_tab_student_view },
+	{ id: "key", label: m.questions_tab_correct_answer },
 ];
 
 /**
@@ -72,7 +73,7 @@ export default function QuestionPreview(
 							aria-selected={tab() === entry.id}
 							onClick={() => setInternalTab(entry.id)}
 						>
-							{entry.label}
+							{entry.label()}
 						</button>
 					))}
 				</div>
@@ -81,7 +82,7 @@ export default function QuestionPreview(
 			<Switch
 				fallback={
 					<p class="text-sm text-base-content/60">
-						Preview for "{question().type}" questions is not implemented yet.
+						{m.questions_preview_not_implemented({ type: question().type })}
 					</p>
 				}
 			>
@@ -162,8 +163,8 @@ function SimulateControls(props: SimulateControlsProps): JSX.Element {
 					<button
 						type="button"
 						class="btn btn-circle btn-lg"
-						aria-label="Reset"
-						title="Reset"
+						aria-label={m.questions_reset()}
+						title={m.questions_reset()}
 						onClick={props.onReset}
 					>
 						<ResetIcon />
@@ -173,8 +174,8 @@ function SimulateControls(props: SimulateControlsProps): JSX.Element {
 				<button
 					type="button"
 					class="btn btn-circle btn-lg btn-primary"
-					aria-label="Submit"
-					title="Submit"
+					aria-label={m.questions_submit()}
+					title={m.questions_submit()}
 					disabled={props.disabled}
 					onClick={props.onCheck}
 				>

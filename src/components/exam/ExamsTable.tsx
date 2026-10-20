@@ -19,6 +19,7 @@ import {
 	toggleSortState,
 } from "@/components/ui/table-sort";
 import type { Exam } from "@/db";
+import { m } from "@/i18n";
 import {
 	type ExamPhase,
 	examPhase,
@@ -163,7 +164,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 
 	const columns: ColumnConfig<ExamRow>[] = [
 		{
-			title: "Title",
+			title: m.exams_table_col_title(),
 			class: "font-medium max-sm:basis-full max-sm:p-0",
 			sortKey: "title" satisfies SortField,
 			render: (exam) => (
@@ -173,13 +174,13 @@ export default function ExamsTable(props: Props): JSX.Element {
 			),
 		},
 		{
-			title: "Type",
+			title: m.exams_table_col_type(),
 			class: `text-base-content/60 ${CARD_CELL}`,
 			sortKey: "type" satisfies SortField,
 			render: (exam) => examTypeLabels[exam.type],
 		},
 		{
-			title: "Status",
+			title: m.exams_table_col_status(),
 			class: CARD_CELL,
 			sortKey: "status" satisfies SortField,
 			render: (exam) => {
@@ -192,20 +193,22 @@ export default function ExamsTable(props: Props): JSX.Element {
 			},
 		},
 		{
-			title: "Scheduled",
+			title: m.exams_table_col_scheduled(),
 			class: `text-base-content/60 ${CARD_CELL}`,
 			sortKey: "scheduled" satisfies SortField,
 			render: (exam) =>
-				exam.scheduledAt ? formatDateTime(exam.scheduledAt) : "Not scheduled",
+				exam.scheduledAt
+					? formatDateTime(exam.scheduledAt)
+					: m.exams_not_scheduled(),
 		},
 		{
-			title: "Duration",
+			title: m.exams_table_col_duration(),
 			class: `text-base-content/60 ${CARD_CELL}`,
 			sortKey: "duration" satisfies SortField,
 			render: (exam) => formatDuration(exam.duration),
 		},
 		{
-			title: "Tags",
+			title: m.exams_table_col_tags(),
 			class: "max-sm:hidden",
 			sortKey: "tags" satisfies SortField,
 			render: (exam) => (

@@ -3,24 +3,25 @@
 
 import type { QuestionType } from "@/core/schemas";
 import type { Question } from "@/db/services/question.service";
+import { m } from "@/i18n";
 
 type QuestionStatus = Question["status"];
 
 export const questionTypeLabels: Record<QuestionType, string> = {
-	"multiple-choice": "Multiple choice",
-	"multiple-selection": "Multiple selection",
-	"true-false": "True / false",
-	essay: "Essay",
-	numeric: "Numeric",
-	"short-answer": "Short answer",
-	"fill-in": "Fill in the blank",
+	"multiple-choice": m.questions_type_multiple_choice(),
+	"multiple-selection": m.questions_type_multiple_selection(),
+	"true-false": m.questions_type_true_false(),
+	essay: m.questions_type_essay(),
+	numeric: m.questions_type_numeric(),
+	"short-answer": m.questions_type_short_answer(),
+	"fill-in": m.questions_type_fill_in(),
 };
 
 /** Sentence-case label for each question status. */
 export const questionStatusLabels: Record<QuestionStatus, string> = {
-	DRAFT: "Draft",
-	PUBLISHED: "Published",
-	ARCHIVED: "Archived",
+	DRAFT: m.questions_status_draft(),
+	PUBLISHED: m.questions_status_published(),
+	ARCHIVED: m.questions_status_archived(),
 };
 
 /** The DaisyUI badge class matching a question's status. */

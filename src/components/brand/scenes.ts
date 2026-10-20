@@ -1,3 +1,4 @@
+import { m } from "@/i18n";
 import {
 	arch,
 	band,
@@ -273,24 +274,24 @@ const lockedHouse = (() => {
 export const SCENES = {
 	binaryTree: {
 		parts: tree(),
-		caption: "A binary tree: inner nodes in paper, the leaves lit.",
+		caption: m.nav_scene_binary_tree(),
 	},
-	lateNight: { parts: desk(CODE), caption: "Coding late at night." },
+	lateNight: { parts: desk(CODE), caption: m.nav_scene_late_night() },
 	constellation: {
 		parts: constellation,
-		caption: "A graph of stars over the neighborhood.",
+		caption: m.nav_scene_constellation(),
 	},
 	missingLeaf: {
 		parts: tree(6),
-		caption: "A binary tree with one leaf missing.",
+		caption: m.nav_scene_missing_leaf(),
 	},
 	lockedHouse: {
 		parts: lockedHouse,
-		caption: "A house on the hill with a padlock on its door.",
+		caption: m.nav_scene_locked_house(),
 	},
 	crash: {
 		parts: desk(CRASH),
-		caption: "A program stopped on a red line, late at night.",
+		caption: m.nav_scene_crash(),
 	},
 } satisfies Record<string, { parts: Part[]; caption: string }>;
 

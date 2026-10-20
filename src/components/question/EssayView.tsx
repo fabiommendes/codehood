@@ -11,12 +11,12 @@ import {
 } from "solid-js";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
+import { m } from "@/i18n";
 import type { PublicEssay } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
 import Markdown from "./Markdown";
 import {
 	feedbackVariant,
-	PENDING_LABEL,
 	pendingBadge,
 	scoreBadge,
 	scoreLabel,
@@ -79,7 +79,11 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 					<div class="flex justify-end">
 						<Show
 							when={graded()}
-							fallback={<Badge {...pendingBadge()}>{PENDING_LABEL}</Badge>}
+							fallback={
+								<Badge {...pendingBadge()}>
+									{m.questions_awaiting_grading()}
+								</Badge>
+							}
 						>
 							<Badge {...scoreBadge(result().score)}>
 								{scoreLabel(result().score)}
@@ -105,7 +109,7 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 					<Show
 						when={mode() === "readonly"}
 						fallback={
-							<Panel label="Your answer">
+							<Panel label={m.questions_your_answer()}>
 								<AnswerText input={input()} text={text()} />
 							</Panel>
 						}
@@ -113,7 +117,7 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 						<Show when={props.value !== undefined}>
 							<div>
 								<p class="text-xs font-medium text-base-content/60">
-									Your answer
+									{m.questions_your_answer()}
 								</p>
 								<div class="mt-1 border-l-2 border-base-300 pl-4 text-sm">
 									<AnswerText input={input()} text={text()} />
@@ -154,8 +158,8 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 						spellcheck={input() !== "code"}
 						placeholder={
 							input() === "code"
-								? "Write your code here…"
-								: "Write your answer here…"
+								? m.questions_write_code_placeholder()
+								: m.questions_write_answer_placeholder()
 						}
 						onInput={(event) => edit(event.currentTarget.value)}
 						aria-describedby={props.result?.feedback ? feedbackId : undefined}
@@ -163,7 +167,9 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 						{text()}
 					</textarea>
 					<Show when={input() === "text"}>
-						<p class="text-xs text-base-content/60">Markdown is supported.</p>
+						<p class="text-xs text-base-content/60">
+							{m.questions_markdown_supported()}
+						</p>
 					</Show>
 				</div>
 			</Show>
@@ -176,7 +182,7 @@ export default function EssayView(props: EssayViewProps): JSX.Element {
 
 			<Show when={mode() === "review" && modelAnswer()}>
 				{(answer) => (
-					<Panel label="Model answer" tone="info">
+					<Panel label={m.questions_model_answer()} tone="info">
 						<AnswerText input={input()} text={answer()} />
 					</Panel>
 				)}
@@ -237,7 +243,9 @@ function AnswerText(props: { input: string; text: string }): JSX.Element {
 	return (
 		<Switch
 			fallback={
-				<p class="text-sm italic text-base-content/50">No answer submitted.</p>
+				<p class="text-sm italic text-base-content/50">
+					{m.questions_no_answer_submitted()}
+				</p>
 			}
 		>
 			<Match when={props.text.trim() && props.input === "code"}>

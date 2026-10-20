@@ -7,6 +7,7 @@ import PencilFilter from "@/components/nav/PencilFilter.astro";
 import UserMenu from "@/components/nav/UserMenu.astro";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import { courseHref } from "@/urls";
 import { breadcrumbs, type Crumb } from "@/utils/breadcrumbs";
 import Layout from "./Layout.astro";
@@ -36,7 +37,7 @@ const courses = user
 	: [];
 ---
 
-<Layout title={title ? `${title} — Codehood` : undefined}>
+<Layout title={title ? m.nav_page_title({ title }) : undefined}>
   <PencilFilter />
   <div class="flex min-h-screen flex-col">
     <div
@@ -47,7 +48,7 @@ const courses = user
       >
         <label
           for="app-drawer"
-          aria-label="Open sidebar"
+          aria-label={m.nav_open_sidebar()}
           class="btn btn-square btn-ghost btn-sm lg:hidden"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -74,7 +75,7 @@ const courses = user
               <UserMenu user={user} />
             ) : (
               <a href="/login" class="btn btn-primary btn-sm rounded-full">
-                Log in
+                {m.nav_log_in()}
               </a>
             )
           }
@@ -104,7 +105,7 @@ const courses = user
       <div class="drawer-side top-16 z-20 h-[calc(100vh-4rem)] overflow-hidden">
         <label
           for="app-drawer"
-          aria-label="Close sidebar"
+          aria-label={m.nav_close_sidebar()}
           class="drawer-overlay"></label>
         <AppSidebar
           courses={courses}

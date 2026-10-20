@@ -1,0 +1,15 @@
+{
+	"time_left_seconds": "{count} s left",
+	"time_left_minutes": "{count} min left",
+	"time_left_hours": "{count} h left",
+	"time_left_days": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} day left",
+				"countPlural=other": "{count} days left"
+			}
+		}
+	]
+}

@@ -1,1 +1,8 @@
-{}
+{
+	"common_view_all": "Ver tudo →",
+	"common_download_csv": "Baixar CSV",
+	"common_set_up_cli": "Configurar a CLI",
+	"common_toggle_dark_mode": "Alternar modo escuro",
+	"common_dark_theme": "Tema escuro",
+	"common_light_theme": "Tema claro"
+}

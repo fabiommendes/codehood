@@ -1,4 +1,5 @@
 import { createSignal, type JSX } from "solid-js";
+import { m } from "@/i18n";
 
 export interface TextInputProps {
 	value?: string;
@@ -36,7 +37,7 @@ export default function TextInput(props: TextInputProps): JSX.Element {
 			id={props.id}
 			type="text"
 			class={`input disabled:text-base-content ${props.class ?? ""}`}
-			placeholder={props.placeholder ?? "Your answer"}
+			placeholder={props.placeholder ?? m.questions_your_answer()}
 			disabled={props.disabled}
 			value={text()}
 			onInput={(event) => edit(event.currentTarget.value)}

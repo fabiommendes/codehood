@@ -4,6 +4,7 @@
 // in pencil.
 import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
 import CourseTile from "@/components/CourseTile.astro";
+import { m } from "@/i18n";
 
 export interface SidebarCourse {
 	code: string;
@@ -22,24 +23,24 @@ const { courses, currentPath, admin = false } = Astro.props;
 
 const nav = [
 	{
-		label: "Home",
+		label: m.nav_home(),
 		href: "/",
 		icon: "M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9",
 	},
 	{
-		label: "My courses",
+		label: m.nav_my_courses(),
 		href: "/courses",
 		icon: "M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM4 17.5A2.5 2.5 0 0 1 6.5 15H20",
 	},
 	{
-		label: "Calendar",
+		label: m.nav_calendar(),
 		href: "/calendar",
 		icon: "M7 3.5v3M17 3.5v3M4 9h16M5.5 6h13A1.5 1.5 0 0 1 20 7.5v12A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-12A1.5 1.5 0 0 1 5.5 6Z",
 	},
 	...(admin
 		? [
 				{
-					label: "Admin",
+					label: m.nav_admin(),
 					href: "/admin",
 					icon: "M12 3.5 4.5 6.5v5c0 5 3.2 8.5 7.5 9.5 4.3-1 7.5-4.5 7.5-9.5v-5L12 3.5Z",
 				},
@@ -105,7 +106,7 @@ function sketch(): { art: SketchArt; seed?: string } {
       ))
     }
 
-    {courses.length > 0 && <li class="menu-title mt-4">Courses</li>}
+    {courses.length > 0 && <li class="menu-title mt-4">{m.nav_courses()}</li>}
     {
       courses.map((course) => (
         <li>
@@ -122,7 +123,7 @@ function sketch(): { art: SketchArt; seed?: string } {
               <span class="font-mono">{course.code}</span>
               <span class="text-base-content/60"> · {course.edition}</span>
             </span>
-            {course.teaching && <span class="badge badge-ghost badge-xs">teaching</span>}
+            {course.teaching && <span class="badge badge-ghost badge-xs">{m.nav_teaching()}</span>}
           </a>
         </li>
       ))

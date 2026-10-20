@@ -1,1 +1,57 @@
-{}
+{
+	"questions_score": "Nota {score}",
+	"questions_awaiting_grading": "Aguardando correção",
+	"questions_your_answer": "Sua resposta",
+	"questions_your_answer_label": "Sua resposta:",
+	"questions_model_answer": "Resposta modelo",
+	"questions_no_answer_submitted": "Nenhuma resposta enviada.",
+	"questions_write_code_placeholder": "Escreva seu código aqui…",
+	"questions_write_answer_placeholder": "Escreva sua resposta aqui…",
+	"questions_markdown_supported": "Há suporte a Markdown.",
+	"questions_expected": "Esperado",
+	"questions_expected_value": "Esperado {value}",
+	"questions_blank_not_shown": "Não exibido para esta lacuna",
+	"questions_accepted_answers": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Resposta aceita",
+				"countPlural=other": "Respostas aceitas"
+			}
+		}
+	],
+	"questions_graded_by_hand": "Esta questão é corrigida manualmente.",
+	"questions_short_answer_mismatch": "Isto não parece o tipo de resposta que esta questão espera.",
+	"questions_true": "Verdadeiro",
+	"questions_false": "Falso",
+	"questions_true_or_false": "Verdadeiro ou falso: {statement}",
+	"questions_icon_correct": "Correta",
+	"questions_icon_incorrect": "Incorreta",
+	"questions_submit": "Enviar",
+	"questions_reset": "Limpar",
+	"questions_tab_student_view": "Visão do estudante",
+	"questions_tab_correct_answer": "Resposta correta",
+	"questions_preview_not_implemented": "A pré-visualização de questões \"{type}\" ainda não foi implementada.",
+	"questions_render_not_implemented": "A exibição de questões \"{type}\" ainda não foi implementada.",
+	"questions_title": "Questões",
+	"questions_list_page_title": "Questões · {discipline}",
+	"questions_detail_page_title": "{title} · Questões",
+	"questions_back_to_list": "← Questões",
+	"questions_problems_heading": "Esta questão tem problemas que o mdq.spec não permite:",
+	"questions_details": "Detalhes",
+	"questions_field_type": "Tipo",
+	"questions_field_status": "Situação",
+	"questions_field_version": "Versão",
+	"questions_field_last_updated": "Última atualização",
+	"questions_type_multiple_choice": "Múltipla escolha",
+	"questions_type_multiple_selection": "Múltipla seleção",
+	"questions_type_true_false": "Verdadeiro / falso",
+	"questions_type_essay": "Dissertativa",
+	"questions_type_numeric": "Numérica",
+	"questions_type_short_answer": "Resposta curta",
+	"questions_type_fill_in": "Preencher lacunas",
+	"questions_status_draft": "Rascunho",
+	"questions_status_published": "Publicada",
+	"questions_status_archived": "Arquivada"
+}

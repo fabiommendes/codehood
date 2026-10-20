@@ -1,0 +1,15 @@
+{
+	"time_left_seconds": "faltam {count} s",
+	"time_left_minutes": "faltam {count} min",
+	"time_left_hours": "faltam {count} h",
+	"time_left_days": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "falta {count} dia",
+				"countPlural=other": "faltam {count} dias"
+			}
+		}
+	]
+}

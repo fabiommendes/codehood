@@ -1,4 +1,6 @@
 ---
+import { m } from "@/i18n";
+
 interface Props {
 	class?: string;
 	/// `menu` renders a labeled menu item that names the theme it switches to,
@@ -12,11 +14,11 @@ const { class: className, variant = "icon" } = Astro.props;
 {
   variant === "menu" ? (
     <button type="button" class={className} data-theme-toggle>
-      <span class="theme-only-light">Dark theme</span>
-      <span class="theme-only-dark">Light theme</span>
+      <span class="theme-only-light">{m.common_dark_theme()}</span>
+      <span class="theme-only-dark">{m.common_light_theme()}</span>
     </button>
   ) : (
-<button type="button" class:list={["btn btn-square btn-ghost", className]} aria-label="Toggle dark mode" data-theme-toggle>
+<button type="button" class:list={["btn btn-square btn-ghost", className]} aria-label={m.common_toggle_dark_mode()} data-theme-toggle>
   <svg class="theme-icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6" />
     <path

@@ -1,1 +1,63 @@
-{}
+{
+	"schedule_page_title": "Cronograma · {discipline}",
+	"schedule_weekday_sun": "Dom",
+	"schedule_weekday_mon": "Seg",
+	"schedule_weekday_tue": "Ter",
+	"schedule_weekday_wed": "Qua",
+	"schedule_weekday_thu": "Qui",
+	"schedule_weekday_fri": "Sex",
+	"schedule_weekday_sat": "Sáb",
+	"schedule_slot_default_title": "Aula",
+	"schedule_slot_summary": "{title} · {day} {start}–{end}",
+	"schedule_meetings_held": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} aula realizada até agora.",
+				"countPlural=other": "{count} aulas realizadas até agora."
+			}
+		}
+	],
+	"schedule_none_instructor": "Nenhum cronograma enviado ainda.",
+	"schedule_none_student": "Nenhum cronograma publicado ainda. O docente o envia pela CLI.",
+	"schedule_no_events": "Nenhuma aula no calendário ainda.",
+	"schedule_week": "Semana {week}",
+	"schedule_weeks_range": "Semanas {first}–{last}",
+	"schedule_past_weeks": [
+		{
+			"declarations": [
+				"input span",
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{span}, já realizada",
+				"countPlural=other": "{span}, já realizadas"
+			}
+		}
+	],
+	"schedule_event_holiday": "Feriado",
+	"schedule_event_cancelled": "Cancelada",
+	"schedule_badge_next": "Próxima",
+	"schedule_badge_present": "Presente",
+	"schedule_badge_absent": "Ausente",
+	"schedule_roll_call": "Chamada",
+	"schedule_draft": "Rascunho",
+	"schedule_resources_label": "Materiais",
+	"schedule_calendar_title": "Calendário",
+	"schedule_calendar_subtitle": "Sua agenda em todas as turmas em que você estuda ou leciona.",
+	"schedule_calendar_no_courses": "Você ainda não está matriculado nem leciona em nenhuma turma.",
+	"schedule_calendar_upcoming": "Próximas",
+	"schedule_calendar_nothing_upcoming": "Nada por vir.",
+	"schedule_calendar_show_more": "Mostrar mais {count}",
+	"schedule_calendar_show_fewer": "Mostrar menos",
+	"schedule_calendar_prev_month": "Mês anterior",
+	"schedule_calendar_next_month": "Próximo mês",
+	"schedule_calendar_today": "Hoje",
+	"schedule_calendar_draft_title": "{title} (rascunho)",
+	"schedule_calendar_more": "+{count} mais",
+	"schedule_calendar_nothing_month": "Nada agendado neste mês.",
+	"schedule_calendar_events_in": "Agenda de {month}"
+}

@@ -6,6 +6,7 @@
  * meetings scroll by. A dropped student is dimmed and labelled.
  */
 import type { CourseAttendance } from "@/db/services/roll-call.service";
+import { m } from "@/i18n";
 import { formatAttendancePercent } from "@/utils/course-grades";
 
 interface Props {
@@ -15,19 +16,19 @@ interface Props {
 const { report } = Astro.props;
 
 const CELL_LABEL = {
-	present: "Present",
-	absent: "Absent",
-	"before-enrollment": "-",
+	present: m.attendance_table_cell_present,
+	absent: m.attendance_table_cell_absent,
+	"before-enrollment": () => "-",
 } as const;
 ---
 
 <div class="mt-6 overflow-x-auto rounded-box border border-base-300 bg-base-100">
-  <table aria-label="Attendance" class="table min-w-max">
+  <table aria-label={m.attendance_table_label()} class="table min-w-max">
     <thead>
       <tr>
-        <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">Student</th>
-        <th scope="col" class="max-sm:px-2">Present</th>
-        <th scope="col" class="max-sm:px-2">Total</th>
+        <th scope="col" class="sticky left-0 z-10 bg-base-100 max-sm:px-2">{m.attendance_table_col_student()}</th>
+        <th scope="col" class="max-sm:px-2">{m.attendance_table_col_present()}</th>
+        <th scope="col" class="max-sm:px-2">{m.attendance_table_col_total()}</th>
         <th scope="col" class="max-sm:px-2">%</th>
         {
           report.events.map((event) => (
@@ -45,7 +46,7 @@ const CELL_LABEL = {
             <td class="sticky left-0 z-10 bg-base-100 font-medium max-sm:px-2">
               {student.name ?? student.username}
               {student.status === "DROPPED" && (
-                <span class="badge badge-ghost badge-sm ml-1">Dropped</span>
+                <span class="badge badge-ghost badge-sm ml-1">{m.attendance_table_dropped()}</span>
               )}
             </td>
             <td class="max-sm:px-2">{student.present}</td>
@@ -53,7 +54,7 @@ const CELL_LABEL = {
             <td class="max-sm:px-2">{formatAttendancePercent(student.present, student.total)}</td>
             {report.events.map((event) => (
               <td class="max-sm:px-2">
-                {CELL_LABEL[student.cells[`${event.week}/${event.timeSlot}`] ?? "absent"]}
+                {CELL_LABEL[student.cells[`${event.week}/${event.timeSlot}`] ?? "absent"]()}
               </td>
             ))}
           </tr>

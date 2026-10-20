@@ -15,6 +15,7 @@
 import { SERVER_TZ as ENV_SERVER_TZ } from "astro:env/client";
 import type { ClockTime, Duration } from "@/core/schemas";
 import type { Weekday } from "@/db/";
+import { locale } from "@/i18n";
 
 // This module is reachable from hydrated islands (e.g. `ExamsTable`), so it
 // runs in the browser too, where a plain `process.env` read would throw —
@@ -128,7 +129,7 @@ export function formatDateTime(
 	instant: Date,
 	opts?: Intl.DateTimeFormatOptions,
 ): string {
-	return new Intl.DateTimeFormat("en-US", {
+	return new Intl.DateTimeFormat(locale, {
 		timeZone: SERVER_TZ,
 		weekday: "short",
 		month: "short",

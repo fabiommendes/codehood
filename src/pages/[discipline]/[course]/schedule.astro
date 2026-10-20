@@ -9,6 +9,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ScheduleWeek from "@/components/schedule/ScheduleWeek.astro";
 import Alert from "@/components/ui/Alert";
 import { db, isMeeting } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { calendarEntries } from "@/services/calendar-entries";
 import { courseSchedule } from "@/services/course-schedule";
@@ -33,14 +34,14 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 const canWrite = hasPerm(actor, "course.update-contents", course);
 
-const WEEKDAY_LABEL: Record<string, string> = {
-	SUNDAY: "Sun",
-	MONDAY: "Mon",
-	TUESDAY: "Tue",
-	WEDNESDAY: "Wed",
-	THURSDAY: "Thu",
-	FRIDAY: "Fri",
-	SATURDAY: "Sat",
+const WEEKDAY_LABEL: Record<string, () => string> = {
+	SUNDAY: m.schedule_weekday_sun,
+	MONDAY: m.schedule_weekday_mon,
+	TUESDAY: m.schedule_weekday_tue,
+	WEDNESDAY: m.schedule_weekday_wed,
+	THURSDAY: m.schedule_weekday_thu,
+	FRIDAY: m.schedule_weekday_fri,
+	SATURDAY: m.schedule_weekday_sat,
 };
 
 const now = new Date();
@@ -86,13 +87,15 @@ const meetingsHeld = events.filter(
 
 /// "Weeks 1–4", or "Week 1" for a single one.
 function weekSpan(weeks: { week: number }[]): string {
-	const first = weeks[0]?.week;
-	const last = weeks.at(-1)?.week;
-	return first === last ? `Week ${first}` : `Weeks ${first}–${last}`;
+	const first = weeks[0]?.week ?? 0;
+	const last = weeks.at(-1)?.week ?? 0;
+	return first === last
+		? m.schedule_week({ week: first })
+		: m.schedule_weeks_range({ first, last });
 }
 ---
 
-<AppLayout title={`Schedule · ${course.discipline.name}`}
+<AppLayout title={m.schedule_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
@@ -104,10 +107,10 @@ function weekSpan(weeks: { week: number }[]): string {
           <span>
             {canWrite ? (
               <>
-                No schedule pushed yet. <CliSetupLink />
+                {m.schedule_none_instructor()} <CliSetupLink />
               </>
             ) : (
-              "No schedule published yet. The instructor pushes it with the CLI."
+              m.schedule_none_student()
             )}
           </span>
         </Alert>
@@ -117,24 +120,31 @@ function weekSpan(weeks: { week: number }[]): string {
             {slots
               .map(
                 (slot) =>
-                  `${slot.title ?? "Meeting"} · ${WEEKDAY_LABEL[slot.day]} ${formatClock(slot.start)}–${formatTime(toMinutes(slot.start) + durationToMinutes(slot.duration))}`,
+                  m.schedule_slot_summary({
+                    title: slot.title ?? m.schedule_slot_default_title(),
+                    day: WEEKDAY_LABEL[slot.day]?.() ?? slot.day,
+                    start: formatClock(slot.start),
+                    end: formatTime(
+                      toMinutes(slot.start) + durationToMinutes(slot.duration),
+                    ),
+                  }),
               )
               .join(", ")}
           </p>
           <p class="mt-1 text-xs text-base-content/50">
-            {meetingsHeld} {meetingsHeld === 1 ? "meeting" : "meetings"} held so far.
+            {m.schedule_meetings_held({ count: meetingsHeld })}
           </p>
 
           {entries.length === 0 ? (
             <p class="mt-8 text-sm text-base-content/60">
-              No events on the calendar yet.
+              {m.schedule_no_events()}
             </p>
           ) : (
             <div class="mt-8 flex flex-col gap-8">
               {foldPast && (
                 <details id="past-weeks">
                   <summary class="cursor-pointer text-sm font-medium text-base-content/60 hover:text-base-content">
-                    {weekSpan(past)}, already held
+                    {m.schedule_past_weeks({ span: weekSpan(past), count: past.length })}
                   </summary>
                   <div class="mt-6 flex flex-col gap-8">
                     {past.map(({ week, entries }) => (

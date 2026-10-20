@@ -7,17 +7,13 @@ import {
 } from "solid-js";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
+import { m } from "@/i18n";
 import type { PublicShortAnswer } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
 import { validateShortAnswer } from "@/mdq/short-answer";
 import { CheckIcon, XIcon } from "./icons";
 import Markdown from "./Markdown";
-import {
-	PENDING_LABEL,
-	pendingBadge,
-	scoreBadge,
-	scoreLabel,
-} from "./scoreDisplay";
+import { pendingBadge, scoreBadge, scoreLabel } from "./scoreDisplay";
 import TextInput from "./TextInput";
 import type { QuestionMode } from "./types";
 
@@ -78,7 +74,11 @@ export default function ShortAnswerView(
 				<div class="flex justify-end">
 					<Show
 						when={settled()}
-						fallback={<Badge {...pendingBadge()}>{PENDING_LABEL}</Badge>}
+						fallback={
+							<Badge {...pendingBadge()}>
+								{m.questions_awaiting_grading()}
+							</Badge>
+						}
 					>
 						<Badge {...scoreBadge(props.result?.score ?? 0)}>
 							{scoreLabel(props.result?.score ?? 0)}
@@ -105,12 +105,14 @@ export default function ShortAnswerView(
 							when={props.value?.trim()}
 							fallback={
 								<p class="text-sm italic text-base-content/50">
-									No answer submitted.
+									{m.questions_no_answer_submitted()}
 								</p>
 							}
 						>
 							<p class="text-sm">
-								<span class="text-base-content/60">Your answer:</span>{" "}
+								<span class="text-base-content/60">
+									{m.questions_your_answer_label()}
+								</span>{" "}
 								<span class="font-mono font-medium">{props.value}</span>
 							</p>
 						</Show>
@@ -125,7 +127,7 @@ export default function ShortAnswerView(
 							value={text()}
 							onChange={edit}
 							disabled={mode() !== "answer"}
-							ariaLabel="Your answer"
+							ariaLabel={m.questions_your_answer()}
 							ariaDescribedBy={
 								warning()
 									? warningId
@@ -144,15 +146,14 @@ export default function ShortAnswerView(
 					<Show when={warning()}>
 						{(flagged) => (
 							<p id={warningId} class="text-sm text-warning">
-								{flagged().feedback ??
-									"That does not look like the kind of answer this question expects."}
+								{flagged().feedback ?? m.questions_short_answer_mismatch()}
 							</p>
 						)}
 					</Show>
 
 					<Show when={props.question.openEnded && mode() === "answer"}>
 						<p class="text-xs text-base-content/60">
-							This question is graded by hand.
+							{m.questions_graded_by_hand()}
 						</p>
 					</Show>
 				</div>
@@ -167,9 +168,9 @@ export default function ShortAnswerView(
 			<Show when={graded() && props.result?.correct?.length}>
 				<div class="rounded-box border border-info/40 bg-info/5 p-4">
 					<h4 class="mb-2 text-sm font-semibold text-info">
-						{props.result?.correct?.length === 1
-							? "Accepted answer"
-							: "Accepted answers"}
+						{m.questions_accepted_answers({
+							count: props.result?.correct?.length ?? 0,
+						})}
 					</h4>
 					<ul class="flex flex-wrap gap-2">
 						{props.result?.correct?.map((answer) => (

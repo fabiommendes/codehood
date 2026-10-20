@@ -1,5 +1,6 @@
 import { createSignal, For, type JSX, Match, Show, Switch } from "solid-js";
 import Badge from "@/components/ui/Badge";
+import { m } from "@/i18n";
 import { parseFillInStem } from "@/mdq/fill-in";
 import type { PublicFillIn, PublicFillInBlank } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
@@ -143,7 +144,9 @@ export default function FillInView(props: FillInViewProps): JSX.Element {
 					Object.values(answers()).every((answer) => answer === "")
 				}
 			>
-				<p class="text-sm italic text-base-content/50">No answer submitted.</p>
+				<p class="text-sm italic text-base-content/50">
+					{m.questions_no_answer_submitted()}
+				</p>
 			</Show>
 
 			<Show when={props.question.epilogue}>
@@ -169,7 +172,9 @@ export default function FillInView(props: FillInViewProps): JSX.Element {
 
 			<Show when={graded() && props.result?.correct !== undefined}>
 				<div class="rounded-box border border-info/40 bg-info/5 p-4">
-					<h4 class="mb-2 text-sm font-semibold text-info">Expected</h4>
+					<h4 class="mb-2 text-sm font-semibold text-info">
+						{m.questions_expected()}
+					</h4>
 					<dl class="flex flex-col gap-1 text-sm">
 						<For each={props.question.blanks}>
 							{(blank) => (
@@ -182,7 +187,7 @@ export default function FillInView(props: FillInViewProps): JSX.Element {
 											each={props.result?.correct?.[blank.id] ?? []}
 											fallback={
 												<span class="text-base-content/50">
-													Not shown for this blank
+													{m.questions_blank_not_shown()}
 												</span>
 											}
 										>

@@ -3,6 +3,7 @@
 // covers, and the tab strip. Same shape as CourseHeader, so the tabs stay in
 // place while moving between pages and each page starts with its content.
 import Tabs from "@/components/ui/Tabs.astro";
+import { m } from "@/i18n";
 import { ADMIN_TABS } from "@/utils/admin-tabs";
 
 interface Props {
@@ -15,9 +16,9 @@ const items = ADMIN_TABS;
 ---
 
 <div data-page-header>
-	<h1 class="text-3xl font-bold">Admin</h1>
+	<h1 class="text-3xl font-bold">{m.nav_admin()}</h1>
 	<p class="mt-1 text-base-content/60">
-		Accounts, catalogs and every course on this instance.
+		{m.nav_admin_intro()}
 	</p>
 </div>
 

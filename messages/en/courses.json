@@ -1,1 +1,90 @@
-{}
+{
+	"courses_home_title": "Home",
+	"courses_home_kicker": "Your term",
+	"courses_term_overview": "Term overview",
+	"courses_home_in_progress": "In progress",
+	"courses_home_closes": "Closes {when}",
+	"courses_home_submitted": "{submitted} of {enrolled} submitted",
+	"courses_home_to_grade": "To grade",
+	"courses_home_answers_to_grade": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} answer to grade",
+				"countPlural=other": "{count} answers to grade"
+			}
+		}
+	],
+	"courses_home_ready_to_release": "Ready to release",
+	"courses_home_attempts_graded": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} attempt graded",
+				"countPlural=other": "{count} attempts graded"
+			}
+		}
+	],
+	"courses_home_question_problems": "Question problems",
+	"courses_home_questions_with_problems": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} question with problems",
+				"countPlural=other": "{count} questions with problems"
+			}
+		}
+	],
+	"courses_home_open_now": "Open now",
+	"courses_home_status_in_progress": "In progress",
+	"courses_home_start": "Start",
+	"courses_home_coming_up": "Coming up",
+	"courses_home_opens": "Opens {when}",
+	"courses_home_today": "Today",
+	"courses_home_new_results": "New results",
+	"courses_home_released": "Released {when}",
+	"courses_home_waiting_for_grades": "Waiting for grades",
+	"courses_home_idle_title": "Nothing needs you right now",
+	"courses_home_next": "Next:",
+	"courses_home_nothing_ahead": "Nothing is scheduled ahead in your courses.",
+	"courses_home_exams": "Exams",
+	"courses_home_practice": "Practice",
+	"courses_list_all_title": "All courses",
+	"courses_list_my_title": "My courses",
+	"courses_list_all_subtitle": "Every course on this instance.",
+	"courses_list_my_subtitle": "Courses you take or teach.",
+	"courses_list_join": "Join a course",
+	"courses_list_left": "You've left the course. Nothing was deleted. Your submissions stay on record.",
+	"courses_list_empty_title": "No courses yet",
+	"courses_list_empty_body": "Courses you take or teach show up here. Enter the code your instructor shows in class to join one.",
+	"courses_list_teaching": "You're teaching",
+	"courses_list_enrolled": [
+		{
+			"declarations": [
+				"input edition",
+				"input count",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{edition} · {count} enrolled",
+				"countPlural=other": "{edition} · {count} enrolled"
+			}
+		}
+	],
+	"courses_resources_page_title": "{discipline} · Resources",
+	"courses_resources_on_schedule": "Material for each meeting is on the {schedule}.",
+	"courses_resources_schedule_link": "schedule",
+	"courses_resources_empty_instructor": "Nothing pushed yet. Put files, links, notes and snippets in the course repository's {folder} folder and run {command}. Every file it uploads gets a permanent, unauthenticated URL, so nothing whose disclosure matters belongs here.",
+	"courses_resources_empty_student": "No resources yet.",
+	"courses_resource_page_title": "{resource} · {discipline}",
+	"courses_resource_back_schedule": "← Schedule",
+	"courses_resource_back_resources": "← Resources",
+	"courses_resource_kind_file": "File",
+	"courses_resource_kind_file_ext": "{extension} file",
+	"courses_resource_kind_link": "Link",
+	"courses_resource_kind_note": "Note"
+}

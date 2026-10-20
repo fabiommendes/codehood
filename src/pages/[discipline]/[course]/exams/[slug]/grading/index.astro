@@ -1,6 +1,7 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { gradingQueue } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -29,15 +30,17 @@ const queue = gradingQueue(questions, answers);
 const rows = queue.map((entry) => {
 	const doc = bySlug.get(entry.question);
 	const counts = [
-		entry.pending > 0 && `${entry.pending} pending`,
-		entry.graded > 0 && `${entry.graded} graded`,
-		entry.notGraded > 0 && `${entry.notGraded} not graded`,
+		entry.pending > 0 && m.grades_queue_pending({ count: entry.pending }),
+		entry.graded > 0 && m.grades_queue_graded({ count: entry.graded }),
+		entry.notGraded > 0 &&
+			m.grades_queue_not_graded({ count: entry.notGraded }),
 	].filter(Boolean);
 	return {
 		slug: entry.question,
 		title: doc?.title ?? entry.question,
 		type: doc ? questionTypeLabels[doc.type] : null,
-		counts: counts.length > 0 ? counts.join(" · ") : "No answers",
+		counts:
+			counts.length > 0 ? counts.join(" · ") : m.grades_queue_no_answers(),
 	};
 });
 
@@ -45,7 +48,7 @@ const nothingLeft =
 	answers.length > 0 && !answers.some((answer) => answer.state === "pending");
 ---
 
-<AppLayout title={`Grading · ${exam.title}`}
+<AppLayout title={m.grades_queue_title({ exam: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
@@ -53,11 +56,11 @@ const nothingLeft =
 
     <a href={`${href}/exams/${exam.slug}`} class="text-sm text-base-content/60 hover:text-primary">← {exam.title}</a>
 
-    <h2 class="mt-2 text-2xl font-bold">Grading</h2>
+    <h2 class="mt-2 text-2xl font-bold">{m.grades_queue_heading()}</h2>
 
-    {nothingLeft && <p class="mt-4 text-base-content/70">Nothing left to grade.</p>}
+    {nothingLeft && <p class="mt-4 text-base-content/70">{m.grades_queue_done()}</p>}
 
-    <ul aria-label="Questions" class="mt-6 flex flex-col gap-3">
+    <ul aria-label={m.grades_queue_questions()} class="mt-6 flex flex-col gap-3">
       {
         rows.map((row) => (
           <li class="card card-border bg-base-100 transition-colors hover:border-primary">

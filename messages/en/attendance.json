@@ -1,1 +1,18 @@
-{}
+{
+	"attendance_summary_link": "Attendance: {present} of {total} ({percent})",
+	"attendance_table_label": "Attendance",
+	"attendance_table_cell_present": "Present",
+	"attendance_table_cell_absent": "Absent",
+	"attendance_table_col_student": "Student",
+	"attendance_table_col_present": "Present",
+	"attendance_table_col_total": "Total",
+	"attendance_table_dropped": "Dropped",
+	"attendance_result_recorded": "Attendance recorded for {title}",
+	"attendance_result_joined": "You joined {course}.",
+	"attendance_result_go_to_courses": "Go to your courses",
+	"attendance_page_title": "Attendance · {discipline}",
+	"attendance_page_heading": "Attendance",
+	"attendance_page_no_roll_calls": "No roll calls yet.",
+	"attendance_page_no_students": "No students enrolled yet.",
+	"attendance_roll_call_page_title": "{event} · Roll call"
+}

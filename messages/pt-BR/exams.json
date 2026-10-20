@@ -1,1 +1,80 @@
-{}
+{
+	"exams_phase_draft": "Rascunho",
+	"exams_phase_upcoming": "Em breve",
+	"exams_phase_open": "Aberta agora",
+	"exams_phase_closed": "Encerrada",
+	"exams_phase_archived": "Arquivada",
+	"exams_tab_student_view": "Visão do estudante",
+	"exams_tab_correct_answer": "Resposta correta",
+	"exams_question_preview_unavailable": "A pré-visualização de questões \"{type}\" ainda não foi implementada.",
+	"exams_not_scheduled": "Sem data marcada",
+	"exams_row_answers_to_grade": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} resposta para corrigir",
+				"countPlural=other": "{count} respostas para corrigir"
+			}
+		}
+	],
+	"exams_table_col_title": "Título",
+	"exams_table_col_type": "Tipo",
+	"exams_table_col_status": "Situação",
+	"exams_table_col_scheduled": "Data",
+	"exams_table_col_duration": "Duração",
+	"exams_table_col_tags": "Tags",
+	"exams_list_page_title": "Avaliações · {discipline}",
+	"exams_list_heading": "Avaliações",
+	"exams_list_empty_teacher": "Nenhuma avaliação enviada ainda.",
+	"exams_list_empty_student": "Nenhuma avaliação ainda.",
+	"exams_detail_page_title": "{title} · Avaliações",
+	"exams_detail_back": "← Avaliações",
+	"exams_noun_practice": "exercício",
+	"exams_noun_quiz": "quiz",
+	"exams_noun_exam": "prova",
+	"exams_detail_duration_extra": "{duration} (+{extra} de tempo extra)",
+	"exams_detail_updated": "atualizada em {date}",
+	"exams_detail_question_count": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} questão",
+				"countPlural=other": "{count} questões"
+			}
+		}
+	],
+	"exams_detail_instructions": "Instruções",
+	"exams_detail_pending_banner": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{phase}. {count} resposta aguarda correção.",
+				"countPlural=other": "{phase}. {count} respostas aguardam correção."
+			}
+		}
+	],
+	"exams_detail_grade_answers": "Corrigir respostas",
+	"exams_detail_questions_heading": "Questões",
+	"exams_detail_no_questions": "Nenhuma questão fixada ainda.",
+	"exams_attempt_dropped": "desistente",
+	"exams_attempt_started": "Início",
+	"exams_attempt_submitted": "Envio",
+	"exams_attempt_in_progress": "Em andamento",
+	"exams_attempt_total": "Total",
+	"exams_attempt_question_label": "Questão {number}",
+	"exams_attempt_not_graded": "Sem correção",
+	"exams_attempt_waiting": "Aguardando correção",
+	"exams_attempt_grade_this": "Corrigir esta resposta",
+	"exams_attempt_not_answered": "Sem resposta",
+	"exams_type_practice": "Exercício",
+	"exams_type_quiz": "Quiz",
+	"exams_type_exam": "Prova",
+	"exams_duration_untimed": "Sem limite de tempo",
+	"exams_duration_minutes": "{minutes} min",
+	"exams_badge_awaiting_grading": "Aguardando correção",
+	"exams_badge_graded": "Corrigida",
+	"exams_badge_missed": "Perdida"
+}

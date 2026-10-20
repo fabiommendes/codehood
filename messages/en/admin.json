@@ -1,1 +1,21 @@
-{}
+{
+	"admin_courses_page_title": "Admin · Courses",
+	"admin_courses_intro": "Every course across every discipline, read-only. Instructors own the record; admins see it and, once courses can be archived, retire it.",
+	"admin_courses_col_discipline": "Discipline",
+	"admin_courses_col_edition": "Edition",
+	"admin_courses_col_instructor": "Instructor",
+	"admin_courses_col_students": "Students",
+	"admin_courses_col_term": "Term",
+	"admin_courses_col_actions": "Actions",
+	"admin_courses_students": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} student",
+				"countPlural=other": "{count} students"
+			}
+		}
+	],
+	"admin_courses_open": "Open course"
+}

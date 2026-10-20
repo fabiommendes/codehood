@@ -4,6 +4,7 @@ export const prerender = false;
 import AdminHeader from "@/components/AdminHeader.astro";
 import CoursesTable from "@/components/admin/CoursesTable";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -14,14 +15,12 @@ const actor = Astro.locals.actor;
 const courses = await db.course.findMany({}, { actor });
 ---
 
-<AppLayout title="Admin · Courses">
+<AppLayout title={m.admin_courses_page_title()}>
 	<main class="mx-auto max-w-4xl px-4 py-10">
 		<AdminHeader active="courses" />
 
 		<p class="max-w-xl text-base-content/60">
-			Every course across every discipline, read-only. Instructors own
-			the record; admins see it and, once courses can be archived, retire
-			it.
+			{m.admin_courses_intro()}
 		</p>
 
 		<CoursesTable courses={courses} />

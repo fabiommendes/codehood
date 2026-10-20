@@ -10,6 +10,7 @@ import PageKicker from "@/components/PageKicker.astro";
 import SectionHeader from "@/components/SectionHeader.astro";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
+import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import {
 	type CalendarEntry,
@@ -182,41 +183,49 @@ const cells: (number | null)[] = [
 	...Array(startWeekday).fill(null),
 	...Array.from({ length: daysInMonth }, (_, i) => i + 1),
 ];
-const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekdayLabels = [
+	m.schedule_weekday_sun(),
+	m.schedule_weekday_mon(),
+	m.schedule_weekday_tue(),
+	m.schedule_weekday_wed(),
+	m.schedule_weekday_thu(),
+	m.schedule_weekday_fri(),
+	m.schedule_weekday_sat(),
+];
 // timeZone: "UTC" is deliberate and correct here, not a violation of "always
 // render in SERVER_TZ": the Date above is a pure calendar-math placeholder
 // built with Date.UTC from already-resolved year/month integers, not an
 // authored instant, so formatting it in any other zone could shift the
 // calendar date it represents (the exact "Jan 31 for Feb 1st" bug the
 // SERVER_TZ rule exists to prevent — see src/utils/schedule-time.ts).
-const monthLabel = new Intl.DateTimeFormat("en-US", {
+const monthLabel = new Intl.DateTimeFormat(locale, {
 	month: "long",
 	year: "numeric",
 	timeZone: "UTC",
 }).format(new Date(Date.UTC(year, month - 1, 1)));
 ---
 
-<AppLayout title="Calendar">
+<AppLayout title={m.schedule_calendar_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <PageKicker text="Term overview" squares />
-    <h1 class="text-3xl font-bold">Calendar</h1>
+    <PageKicker text={m.courses_term_overview()} squares />
+    <h1 class="text-3xl font-bold">{m.schedule_calendar_title()}</h1>
     <p class="mt-2 text-base-content/70">
-      Your schedule across every course you take or teach.
+      {m.schedule_calendar_subtitle()}
     </p>
 
     {
       courses.length === 0 && (
         <Alert variant="info" class="mt-6">
-          <span>You're not enrolled in or teaching any courses yet.</span>
+          <span>{m.schedule_calendar_no_courses()}</span>
         </Alert>
       )
     }
 
-    <section class="mt-8" aria-label="Upcoming">
-      <SectionHeader title="Upcoming" />
+    <section class="mt-8" aria-label={m.schedule_calendar_upcoming()}>
+      <SectionHeader title={m.schedule_calendar_upcoming()} />
       {
         upcoming.length === 0 ? (
-          <p class="mt-4 text-sm text-base-content/60">Nothing coming up.</p>
+          <p class="mt-4 text-sm text-base-content/60">{m.schedule_calendar_nothing_upcoming()}</p>
         ) : (
           <div class="mt-4 flex flex-col gap-3">
             {/* A checkbox the labels below toggle: no script, and the rows
@@ -244,7 +253,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                     </span>
                   )}
                   {isDraft(entry) && (
-                    <span class="badge badge-ghost badge-sm ml-1">Draft</span>
+                    <span class="badge badge-ghost badge-sm ml-1">{m.schedule_draft()}</span>
                   )}
                 </p>
                 <p class="text-sm text-base-content/60">
@@ -261,10 +270,10 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
             {upcoming.length > UPCOMING_SHOWN && (
               <>
                 <label for="upcoming-more" class="btn btn-ghost btn-sm self-start peer-checked:hidden">
-                  Show {upcoming.length - UPCOMING_SHOWN} more
+                  {m.schedule_calendar_show_more({ count: upcoming.length - UPCOMING_SHOWN })}
                 </label>
                 <label for="upcoming-more" class="btn btn-ghost btn-sm hidden self-start peer-checked:inline-flex">
-                  Show fewer
+                  {m.schedule_calendar_show_fewer()}
                 </label>
               </>
             )}
@@ -277,7 +286,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
       <div class="flex items-center justify-between">
         {
           hasPrev ? (
-            <a href={prevHref} class="btn btn-ghost btn-sm" aria-label="Previous month">
+            <a href={prevHref} class="btn btn-ghost btn-sm" aria-label={m.schedule_calendar_prev_month()}>
               ←
             </a>
           ) : (
@@ -291,14 +300,14 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
           {
             shownMonth !== currentMonth && (
               <a href={todayHref} class="btn btn-outline btn-xs">
-                Today
+                {m.schedule_calendar_today()}
               </a>
             )
           }
         </div>
         {
           hasNext ? (
-            <a href={nextHref} class="btn btn-ghost btn-sm" aria-label="Next month">
+            <a href={nextHref} class="btn btn-ghost btn-sm" aria-label={m.schedule_calendar_next_month()}>
               →
             </a>
           ) : (
@@ -363,7 +372,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                 {cellEntries(dayEntries, 2).map((entry) =>
                   entry.kind === "exam" ? (
                     <span
-                      title={isDraft(entry) ? `${entry.exam.title} (draft)` : entry.exam.title}
+                      title={isDraft(entry) ? m.schedule_calendar_draft_title({ title: entry.exam.title }) : entry.exam.title}
                       class:list={[
                         "hidden w-full min-w-0 items-center gap-1 rounded-sm bg-secondary/15 px-0.5 text-[10px] text-base-content sm:flex",
                         isDraft(entry) && "opacity-50",
@@ -399,7 +408,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                 )}
                 {dayEntries.length > 2 && (
                   <span class="hidden text-[10px] text-base-content/40 sm:inline">
-                    +{dayEntries.length - 2} more
+                    {m.schedule_calendar_more({ count: dayEntries.length - 2 })}
                   </span>
                 )}
               </Cell>
@@ -411,7 +420,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
       {
         monthEntries.length === 0 && courses.length > 0 && (
           <p class="mt-4 text-center text-sm text-base-content/50">
-            Nothing scheduled this month.
+            {m.schedule_calendar_nothing_month()}
           </p>
         )
       }
@@ -419,7 +428,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
 
     {
       monthEntries.length > 0 && (
-        <section class="mt-6" aria-label={`Events in ${monthLabel}`}>
+        <section class="mt-6" aria-label={m.schedule_calendar_events_in({ month: monthLabel })}>
           <ol class="flex flex-col gap-4">
             {[...entriesByDay].map(([dayKey, dayEntries]) => (
               <li id={`day-${dayKey}`} class="group scroll-mt-20">
@@ -430,7 +439,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                   ]}
                 >
                   {dayLabel(dayEntries[0]!.startAt)}
-                  {dayKey === today && <span class="badge badge-primary badge-sm ml-2">Today</span>}
+                  {dayKey === today && <span class="badge badge-primary badge-sm ml-2">{m.schedule_calendar_today()}</span>}
                 </h3>
                 <ul class="mt-2 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50 group-target:border-primary">
                   {dayEntries.map((entry) => (
@@ -459,7 +468,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                               {examTypeLabels[entry.exam.type]}
                             </span>
                             {isDraft(entry) && (
-                              <span class="badge badge-ghost badge-sm ml-1">Draft</span>
+                              <span class="badge badge-ghost badge-sm ml-1">{m.schedule_draft()}</span>
                             )}
                             <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
                               {courseNames.get(entry.courseId)}
@@ -480,7 +489,7 @@ const monthLabel = new Intl.DateTimeFormat("en-US", {
                             </span>
                             {entry.event.kind !== "REGULAR" && (
                               <span class="badge badge-ghost badge-sm ml-2">
-                                {entry.event.kind === "HOLIDAY" ? "Holiday" : "Cancelled"}
+                                {entry.event.kind === "HOLIDAY" ? m.schedule_event_holiday() : m.schedule_event_cancelled()}
                               </span>
                             )}
                             <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">

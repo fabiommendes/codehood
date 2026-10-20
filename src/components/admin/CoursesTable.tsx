@@ -1,8 +1,8 @@
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { Course } from "@/db";
+import { locale, m } from "@/i18n";
 import { courseHref } from "@/urls";
-import { plural } from "@/utils/plural";
 
 interface Props {
 	courses: Course[];
@@ -17,8 +17,8 @@ function formatTerm(row: Pick<Course, "startAt" | "endAt">): string {
 		day: "numeric",
 		timeZone: "UTC",
 	};
-	const start = row.startAt.toLocaleDateString("en-US", short);
-	const end = row.endAt.toLocaleDateString("en-US", {
+	const start = row.startAt.toLocaleDateString(locale, short);
+	const end = row.endAt.toLocaleDateString(locale, {
 		...short,
 		year: "numeric",
 	});
@@ -28,7 +28,7 @@ function formatTerm(row: Pick<Course, "startAt" | "endAt">): string {
 export default function CoursesTable(props: Props): JSX.Element {
 	const columns: ColumnConfig<Course>[] = [
 		{
-			title: "Discipline",
+			title: m.admin_courses_col_discipline(),
 			render: (course) => (
 				<>
 					<div class="font-mono font-medium">{course.discipline.slug}</div>
@@ -39,26 +39,29 @@ export default function CoursesTable(props: Props): JSX.Element {
 			),
 		},
 		{
-			title: "Edition",
+			title: m.admin_courses_col_edition(),
 			class: "font-mono text-base-content/60",
 			render: (row) => row.edition.slug,
 		},
-		{ title: "Instructor", render: (row) => row.instructor.name },
 		{
-			title: "Students",
+			title: m.admin_courses_col_instructor(),
+			render: (row) => row.instructor.name,
+		},
+		{
+			title: m.admin_courses_col_students(),
 			class: "text-base-content/60",
 			render: (row) => {
 				const count = row.enrollmentCount;
-				return plural(count, "student");
+				return m.admin_courses_students({ count });
 			},
 		},
 		{
-			title: "Term",
+			title: m.admin_courses_col_term(),
 			class: "text-base-content/60",
 			render: (row) => formatTerm(row),
 		},
 		{
-			title: "Actions",
+			title: m.admin_courses_col_actions(),
 			class: "text-right",
 			headerClass: "text-right",
 			render: (row) => (
@@ -69,11 +72,11 @@ export default function CoursesTable(props: Props): JSX.Element {
 						edition: row.edition.slug,
 					})}
 					class="btn btn-square btn-ghost btn-sm"
-					aria-label="Open course"
-					title="Open course"
+					aria-label={m.admin_courses_open()}
+					title={m.admin_courses_open()}
 				>
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-						<title>Open course</title>
+						<title>{m.admin_courses_open()}</title>
 						<path
 							d="M9 6h9v9M18 6 6 18"
 							stroke="currentColor"

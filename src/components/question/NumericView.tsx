@@ -1,6 +1,7 @@
 import { createUniqueId, type JSX, Show } from "solid-js";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
+import { m } from "@/i18n";
 import { formatNumericInput as format } from "@/mdq/numeric";
 import type { PublicNumeric } from "@/mdq/public";
 import type { QuestionResult } from "@/mdq/scoring";
@@ -68,12 +69,14 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 							when={props.value !== null}
 							fallback={
 								<p class="text-sm italic text-base-content/50">
-									No answer submitted.
+									{m.questions_no_answer_submitted()}
 								</p>
 							}
 						>
 							<p class="text-sm">
-								<span class="text-base-content/60">Your answer:</span>{" "}
+								<span class="text-base-content/60">
+									{m.questions_your_answer_label()}
+								</span>{" "}
 								<span class="font-mono font-medium">
 									{format(props.value ?? null)}
 									{props.question.unit ? ` ${props.question.unit}` : ""}
@@ -93,7 +96,7 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 						value={props.value}
 						onChange={(next) => props.onChange?.(next)}
 						disabled={mode() !== "answer"}
-						ariaLabel="Your answer"
+						ariaLabel={m.questions_your_answer()}
 						ariaDescribedBy={props.result?.feedback ? feedbackId : undefined}
 					/>
 
@@ -110,8 +113,9 @@ export default function NumericView(props: NumericViewProps): JSX.Element {
 					 */}
 					<Show when={graded() && props.result?.correct !== undefined}>
 						<span class="text-sm text-base-content/60">
-							Expected {format(props.result?.correct ?? null)}
-							{props.question.unit ? ` ${props.question.unit}` : ""}
+							{m.questions_expected_value({
+								value: `${format(props.result?.correct ?? null)}${props.question.unit ? ` ${props.question.unit}` : ""}`,
+							})}
 						</span>
 					</Show>
 				</div>

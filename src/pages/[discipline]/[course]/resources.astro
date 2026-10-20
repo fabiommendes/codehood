@@ -5,6 +5,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import ListRow from "@/components/ListRow.astro";
 import Alert from "@/components/ui/Alert";
 import { db, groupResourcesByType } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -32,29 +33,39 @@ const groups = groupResourcesByType(resources);
 // Blob URLs carry no auth check of their own (FR-NFR-030); this page's referrer
 // still shouldn't leak into every link it hands out.
 Astro.response.headers.set("Referrer-Policy", "no-referrer");
+
+/// `text` safe to place inside the HTML of a translated message.
+function escapeHtml(text: string): string {
+	return text
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;");
+}
+
+/// Inline code markup, for the messages that quote a folder or a command.
+function code(text: string): string {
+	return `<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">${escapeHtml(text)}</code>`;
+}
 ---
 
-<AppLayout title={`${course.discipline.name} · Resources`}
+<AppLayout title={m.courses_resources_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />
 
-    {hasEventResources && <p class="mt-4 text-sm text-base-content/60">
-          Material for each meeting is on the{" "}
-          <a href={`${href}/schedule`} class="link">schedule</a>.
-        </p>}
+    {hasEventResources && <p class="mt-4 text-sm text-base-content/60" set:html={m.courses_resources_on_schedule({
+      schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+    })} />}
     {
       all.length === 0 && canWrite && (
         <Alert variant="info" class="mt-4">
           <span>
-            Nothing pushed yet. Put files, links, notes and snippets in the
-            course repository's{" "}
-            <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">resources/</code>{" "}
-            folder and run{" "}
-            <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">codehood push</code>.
-            Every file it uploads gets a permanent, unauthenticated URL, so
-            nothing whose disclosure matters belongs here.{" "}
+            <span set:html={m.courses_resources_empty_instructor({
+              folder: code("resources/"),
+              command: code("codehood push"),
+            })} />{" "}
             <CliSetupLink />
           </span>
         </Alert>
@@ -63,7 +74,7 @@ Astro.response.headers.set("Referrer-Policy", "no-referrer");
     {
       all.length === 0 && !canWrite && (
         <Alert variant="info" class="mt-4">
-          <span>No resources yet.</span>
+          <span>{m.courses_resources_empty_student()}</span>
         </Alert>
       )
     }

@@ -3,6 +3,7 @@ import EmptyState from "@/components/EmptyState.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
 import { db } from "@/db";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHref } from "@/urls";
 
@@ -20,22 +21,22 @@ const justLeft = Astro.url.searchParams.has("left");
 const courses = await db.course.findMany({}, { actor });
 ---
 
-<AppLayout title={isAdmin ? "All courses" : "My courses"}>
+<AppLayout title={isAdmin ? m.courses_list_all_title() : m.courses_list_my_title()}>
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <PageKicker text="Term overview" squares />
+    <PageKicker text={m.courses_term_overview()} squares />
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold">
-          {isAdmin ? "All courses" : "My courses"}
+          {isAdmin ? m.courses_list_all_title() : m.courses_list_my_title()}
         </h1>
         <p class="mt-2 text-base-content/70">
-          {isAdmin ? "Every course on this instance." : "Courses you take or teach."}
+          {isAdmin ? m.courses_list_all_subtitle() : m.courses_list_my_subtitle()}
         </p>
       </div>
       {
         courses.length > 0 && (
           <a href="/courses/join" class="btn btn-primary rounded-full">
-            Join a course
+            {m.courses_list_join()}
           </a>
         )
       }
@@ -44,21 +45,17 @@ const courses = await db.course.findMany({}, { actor });
     {
       justLeft && (
         <Alert variant="success" class="mt-6">
-          <span>
-            You've left the course. Nothing was deleted. Your submissions stay
-            on record.
-          </span>
+          <span>{m.courses_list_left()}</span>
         </Alert>
       )
     }
 
     {
       courses.length === 0 ? (
-        <EmptyState scene="constellation" title="No courses yet" class="mt-10">
-          Courses you take or teach show up here. Enter the code your instructor
-          shows in class to join one.
+        <EmptyState scene="constellation" title={m.courses_list_empty_title()} class="mt-10">
+          {m.courses_list_empty_body()}
           <a slot="actions" href="/courses/join" class="btn btn-primary rounded-full">
-            Join a course
+            {m.courses_list_join()}
           </a>
         </EmptyState>
       ) : (
@@ -86,10 +83,10 @@ const courses = await db.course.findMany({}, { actor });
                   </span>
                   <h2 class="card-title mt-1">{course.discipline.name}</h2>
                   <p class="text-sm text-base-content/60">
-                    {isInstructor ? "You're teaching" : course.instructor.name}
+                    {isInstructor ? m.courses_list_teaching() : course.instructor.name}
                   </p>
                   <p class="mt-3 text-xs text-base-content/50">
-                    {course.edition.slug} · {course.enrollmentCount} enrolled
+                    {m.courses_list_enrolled({ edition: course.edition.slug, count: course.enrollmentCount })}
                   </p>
                 </div>
               </a>

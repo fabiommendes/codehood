@@ -1,1 +1,80 @@
-{}
+{
+	"exams_phase_draft": "Draft",
+	"exams_phase_upcoming": "Upcoming",
+	"exams_phase_open": "Open now",
+	"exams_phase_closed": "Closed",
+	"exams_phase_archived": "Archived",
+	"exams_tab_student_view": "Student view",
+	"exams_tab_correct_answer": "Correct answer",
+	"exams_question_preview_unavailable": "Preview for \"{type}\" questions is not implemented yet.",
+	"exams_not_scheduled": "Not scheduled",
+	"exams_row_answers_to_grade": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} answer to grade",
+				"countPlural=other": "{count} answers to grade"
+			}
+		}
+	],
+	"exams_table_col_title": "Title",
+	"exams_table_col_type": "Type",
+	"exams_table_col_status": "Status",
+	"exams_table_col_scheduled": "Scheduled",
+	"exams_table_col_duration": "Duration",
+	"exams_table_col_tags": "Tags",
+	"exams_list_page_title": "Exams · {discipline}",
+	"exams_list_heading": "Exams",
+	"exams_list_empty_teacher": "No exams pushed yet.",
+	"exams_list_empty_student": "No exams yet.",
+	"exams_detail_page_title": "{title} · Exams",
+	"exams_detail_back": "← Exams",
+	"exams_noun_practice": "practice exam",
+	"exams_noun_quiz": "quiz",
+	"exams_noun_exam": "exam",
+	"exams_detail_duration_extra": "{duration} (+{extra} extra time)",
+	"exams_detail_updated": "updated {date}",
+	"exams_detail_question_count": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} question",
+				"countPlural=other": "{count} questions"
+			}
+		}
+	],
+	"exams_detail_instructions": "Instructions",
+	"exams_detail_pending_banner": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{phase}. {count} answer waits for a grade.",
+				"countPlural=other": "{phase}. {count} answers wait for a grade."
+			}
+		}
+	],
+	"exams_detail_grade_answers": "Grade answers",
+	"exams_detail_questions_heading": "Questions",
+	"exams_detail_no_questions": "No questions pinned yet.",
+	"exams_attempt_dropped": "dropped",
+	"exams_attempt_started": "Started",
+	"exams_attempt_submitted": "Submitted",
+	"exams_attempt_in_progress": "In progress",
+	"exams_attempt_total": "Total",
+	"exams_attempt_question_label": "Question {number}",
+	"exams_attempt_not_graded": "Not graded",
+	"exams_attempt_waiting": "Waiting to be graded",
+	"exams_attempt_grade_this": "Grade this answer",
+	"exams_attempt_not_answered": "Not answered",
+	"exams_type_practice": "Practice",
+	"exams_type_quiz": "Quiz",
+	"exams_type_exam": "Exam",
+	"exams_duration_untimed": "Untimed",
+	"exams_duration_minutes": "{minutes} min",
+	"exams_badge_awaiting_grading": "Awaiting grading",
+	"exams_badge_graded": "Graded",
+	"exams_badge_missed": "Missed"
+}

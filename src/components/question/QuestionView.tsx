@@ -1,6 +1,7 @@
 import type { JSX } from "solid-js";
 import { Match, Switch } from "solid-js";
 import Alert from "@/components/ui/Alert";
+import { m } from "@/i18n";
 import type {
 	PublicEssay,
 	PublicFillIn,
@@ -73,8 +74,7 @@ export default function QuestionView(props: QuestionViewProps): JSX.Element {
 		<Switch
 			fallback={
 				<Alert variant="warning">
-					Rendering for "{props.question.type}" questions is not implemented
-					yet.
+					{m.questions_render_not_implemented({ type: props.question.type })}
 				</Alert>
 			}
 		>

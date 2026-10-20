@@ -2,13 +2,14 @@
 
 import type { z } from "zod";
 import type { eventKindSchema } from "@/core/schemas/calendar-event";
+import { m } from "@/i18n";
 
 type EventKind = z.infer<typeof eventKindSchema>;
 
 const LABELS: Record<EventKind, string | null> = {
 	REGULAR: null,
-	HOLIDAY: "Holiday",
-	CANCELLED: "Cancelled",
+	HOLIDAY: m.schedule_event_holiday(),
+	CANCELLED: m.schedule_event_cancelled(),
 };
 
 /**

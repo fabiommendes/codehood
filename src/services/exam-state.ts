@@ -9,6 +9,7 @@
  */
 
 import type { Exam } from "@/db/services/exam.service";
+import { m } from "@/i18n";
 import { durationToMinutes } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 
@@ -29,11 +30,11 @@ export type ExamPhase = "draft" | "upcoming" | "open" | "closed" | "archived";
 
 /** Human labels for {@link ExamPhase}, as shown on badges and list headings. */
 export const examPhaseLabels: Record<ExamPhase, string> = {
-	draft: "Draft",
-	upcoming: "Upcoming",
-	open: "Open now",
-	closed: "Closed",
-	archived: "Archived",
+	draft: m.exams_phase_draft(),
+	upcoming: m.exams_phase_upcoming(),
+	open: m.exams_phase_open(),
+	closed: m.exams_phase_closed(),
+	archived: m.exams_phase_archived(),
 };
 
 /// What one student may do with one exam right now.
