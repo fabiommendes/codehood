@@ -484,6 +484,7 @@ are not translated.
 | Resource          | material                  |
 | Response          | resposta                  |
 | Role              | perfil                    |
+| School id         | matrícula                 |
 | Roll call         | chamada                   |
 | Session           | sessão                    |
 | Student           | estudante                 |

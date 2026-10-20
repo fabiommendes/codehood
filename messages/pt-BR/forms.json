@@ -49,7 +49,7 @@
 	"forms_label_email": "E-mail",
 	"forms_label_password": "Senha",
 	"forms_label_slug": "Slug",
-	"forms_label_role": "Papel",
+	"forms_label_role": "Perfil",
 	"forms_label_comment": "Comentário",
 	"forms_role_student": "Estudante",
 	"forms_role_instructor": "Docente",
