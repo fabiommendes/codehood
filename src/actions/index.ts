@@ -1,3 +1,4 @@
+import { installErrorMap } from "@/forms/error-map";
 import { admin } from "./admin";
 import { auth } from "./auth";
 import { checkIn } from "./check-in";
@@ -8,6 +9,8 @@ import { grading } from "./grading";
 import { profile } from "./profile";
 import { question } from "./question";
 import { rollCall } from "./roll-call";
+
+installErrorMap();
 
 export const server = {
 	auth,

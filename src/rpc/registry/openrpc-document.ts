@@ -6,13 +6,20 @@ import { getMethods, type RpcMethod } from ".";
 // to document. Same trick as `openapi-document.ts` on the REST side.
 import "@/rpc";
 
-/** JSON Schema for a Zod type, as the input side of the schema. */
+/**
+ * JSON Schema for a Zod type, as the input or output side of the schema.
+ *
+ * Drops the `form` meta key, which only drives the form UI.
+ */
 export function jsonSchemaOf(schema: z.ZodType, io: "input" | "output") {
 	return z.toJSONSchema(schema, {
 		io,
 		unrepresentable: "any",
 		cycles: "ref",
 		reused: "inline",
+		override: (ctx) => {
+			delete ctx.jsonSchema.form;
+		},
 	});
 }
 

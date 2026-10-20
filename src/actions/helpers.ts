@@ -1,11 +1,46 @@
 import { ActionError } from "astro:actions";
-import { NotAllowed, NotFound } from "@/core/error";
+import { FieldError, NotAllowed, NotFound } from "@/core/error";
+
+/// Maps the framework-agnostic service errors to the `ActionError` Astro
+/// expects, and returns any other value unchanged.
+function translateServiceError(error: unknown): unknown {
+	if (error instanceof NotAllowed) {
+		return new ActionError({ code: "FORBIDDEN", message: error.message });
+	}
+	if (error instanceof NotFound) {
+		return new ActionError({ code: "NOT_FOUND", message: error.message });
+	}
+	if (error instanceof FieldError) {
+		return fieldActionError(error);
+	}
+	return error;
+}
+
+/// Builds an `ActionError` that serializes as Astro's input error. Astro does
+/// not export `ActionInputError`, but `serializeActionResult` spreads the
+/// error's own properties and `ActionError.fromJson` rebuilds an
+/// `ActionInputError` from `type` and `issues`, so the client gets `fields`
+/// as if the schema had failed.
+function fieldActionError(error: FieldError): ActionError {
+	const issues = [
+		{ code: "custom", path: [error.field], message: error.message },
+	];
+	return Object.assign(
+		new ActionError({ code: "BAD_REQUEST", message: error.message }),
+		{
+			type: "AstroActionInputError",
+			issues,
+			fields: { [error.field]: [error.message] },
+		},
+	);
+}
 
 /**
  * Wraps an Astro Action handler, translating a `NotAllowed` or a `NotFound`
  * thrown by a service (framework-agnostic, see `src/db/base-service.ts`) into
- * the `ActionError` Astro expects, `FORBIDDEN` or `NOT_FOUND`. Any other
- * thrown value passes through unchanged.
+ * the `ActionError` Astro expects, `FORBIDDEN` or `NOT_FOUND`, and a
+ * `FieldError` into an input error on its field. Any other thrown value
+ * passes through unchanged.
  */
 export function withActionErrors<Args extends unknown[], R>(
 	handler: (...args: Args) => Promise<R>,
@@ -14,13 +49,7 @@ export function withActionErrors<Args extends unknown[], R>(
 		try {
 			return await handler(...args);
 		} catch (error) {
-			if (error instanceof NotAllowed) {
-				throw new ActionError({ code: "FORBIDDEN", message: error.message });
-			}
-			if (error instanceof NotFound) {
-				throw new ActionError({ code: "NOT_FOUND", message: error.message });
-			}
-			throw error;
+			throw translateServiceError(error);
 		}
 	};
 }
@@ -39,16 +68,11 @@ export function withServiceErrors<Args extends unknown[], R>(
 		try {
 			return await handler(...args);
 		} catch (error) {
-			if (error instanceof NotAllowed) {
-				throw new ActionError({ code: "FORBIDDEN", message: error.message });
-			}
-			if (error instanceof NotFound) {
-				throw new ActionError({ code: "NOT_FOUND", message: error.message });
-			}
-			if (error instanceof Error) {
+			const translated = translateServiceError(error);
+			if (translated === error && error instanceof Error) {
 				throw new ActionError({ code: "BAD_REQUEST", message: error.message });
 			}
-			throw error;
+			throw translated;
 		}
 	};
 }

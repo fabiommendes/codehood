@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls/constants";
 import "./base";
 
 export const disciplineSchema = z.object({
@@ -7,10 +8,21 @@ export const disciplineSchema = z.object({
 	createdAt: z.date(),
 });
 
-export const disciplineCreate = disciplineSchema.pick({
-	slug: true,
-	name: true,
-});
+export const disciplineCreate = disciplineSchema
+	.pick({
+		slug: true,
+		name: true,
+	})
+	.extend({
+		slug: z
+			.string()
+			.regex(
+				DISCIPLINE_SLUG_RE,
+				"Use lowercase letters, digits and hyphens, starting with a letter (3 to 32 characters).",
+			)
+			.refine((slug) => !RESERVED_SLUGS.has(slug), "This slug is reserved.")
+			.openapi({ example: "calculus-1" }),
+	});
 
 export const disciplineUpdate = disciplineSchema
 	.pick({

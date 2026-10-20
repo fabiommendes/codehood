@@ -450,6 +450,22 @@ function summarizeErrors(errors: {
 }
 
 /**
+ * Thrown when a service rejects the value of one form field.
+ *
+ * For rules only the server can check (a taken slug), so the message reaches
+ * the field instead of the top of the form.
+ */
+export class FieldError extends Error {
+	constructor(
+		readonly field: string,
+		message: string,
+	) {
+		super(message);
+		this.name = "FieldError";
+	}
+}
+
+/**
  * Thrown when a roll call check-in is refused.
  */
 export class CheckInError extends Error {

@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { Actor } from "@/auth/actor";
 import { ensurePerm } from "@/auth/permissions";
+import { FieldError } from "@/core/error";
 import {
 	disciplineCreate,
 	disciplineFilter,
@@ -64,9 +65,16 @@ export class DisciplineService
 	): Promise<Discipline> {
 		assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
 		const client = opts.tx ?? this.prisma;
-		return client.discipline.create({
-			data: { slug: input.slug, name: input.name },
-		});
+		try {
+			return await client.discipline.create({
+				data: { slug: input.slug, name: input.name },
+			});
+		} catch (error) {
+			if ((error as { code?: string }).code === "P2002") {
+				throw new FieldError("slug", `Slug "${input.slug}" is already taken.`);
+			}
+			throw error;
+		}
 	}
 
 	/**
@@ -200,7 +208,8 @@ function assertCanWriteDiscipline(
 ): void {
 	ensurePerm(actor, action);
 	if (!DISCIPLINE_SLUG_RE.test(slug) || RESERVED_SLUGS.has(slug)) {
-		throw new Error(
+		throw new FieldError(
+			"slug",
 			`"${slug}" is not a valid discipline slug: it must match ${DISCIPLINE_SLUG_RE} and not be a reserved name.`,
 		);
 	}

@@ -1,6 +1,7 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { requireUser } from "@/auth/require-user";
+import { disciplineCreate } from "@/core/schemas";
 import { db } from "@/db";
 import { USERNAME_RE } from "@/urls";
 import { publicUser } from "./auth";
@@ -60,13 +61,7 @@ export const admin = {
 
 	createDiscipline: defineAction({
 		accept: "form",
-		input: z.object({
-			// Format (and the reserved-slug check) is validated by
-			// db.discipline.create itself — see the note on createEdition's
-			// slug for why that isn't duplicated here.
-			slug: z.string().min(1),
-			name: z.string().min(1),
-		}),
+		input: disciplineCreate,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return db.discipline.create(input, { actor });

@@ -27,6 +27,7 @@ Here are some files and folders agents might be interested in:
 | `dev/specs/to-do/*.md`     | Detailed guidelines for implementation of specific features.                          |
 | `dev/specs/to-review/*.md` | Specs that are ready for review before implementation.                                |
 | `dev/issues/*.md`          | Store issues and bugs. Once fixed, register in the changelog and delete the file.     |
+| `dev/adrs/*.md`            | Short architecture decisions; how to use a cross-cutting API (e.g. forms).            |
 | `src/api/`                 | Implements controllers for the REST API.                                              |
 | `src/actions/`             | Implements Astro Actions.                                                             |
 | `src/auth/`                | Authentication and authorization. Permission rules.                                   |
@@ -35,6 +36,7 @@ Here are some files and folders agents might be interested in:
 | `src/core/`                | Core schemas (Zod validators), error types, and constants.                            |
 | `src/db/`                  | Database schema (Prisma) and service classes for data access.                         |
 | `src/fixtures/`            | Test data factories.                                                                  |
+| `src/forms/`               | Form logic derived from zod schemas: field specs, FormData coercion, error map.       |
 | `src/generated/`           | Generated code from scripts (do not edit).                                            |
 | `src/layouts/`             | Astro layouts.                                                                        |
 | `src/mdq/`                 | Question data models and scoring logic.                                               |
