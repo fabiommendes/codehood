@@ -9,9 +9,14 @@
   error, `required`/`minlength`/`max` attributes come from the schema, and the
   same `<Field>` renders on `.astro` pages (works without JS, keeps what was
   typed, never echoes a password) and in Solid islands (`createSchemaForm`).
-  A service can attach a message to a field with `FieldError`. Migrated: admin
-  disciplines create, the grade form and the login (`sessionLogin`; wrong
-  credentials still show one general alert).
+  A service can attach a message to a field with `FieldError`. Every form
+  uses it, except the script-driven roster dialogs, the exam answers and the
+  button-only forms: login, sign-up and invite acceptance, profile, admin
+  (disciplines, editions, users, invites), check-in, roll call, grading. No
+  action declares an inline schema any more: `admin.inviteInstructor` and
+  `auth.createPersonalInvite` became one form action, and `profile.update` asks
+  for GitHub and school id only of students (an instructor or admin without
+  them could not save the profile before).
 
 ### Fixed
 

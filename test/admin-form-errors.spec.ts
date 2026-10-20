@@ -231,7 +231,7 @@ test("invite form: a bad email is refused on the email field", async ({
 	await group(dialog, "Email").locator("input").fill("nope");
 	await submit(
 		page,
-		dialog.locator("form[action*='inviteInstructor']"),
+		dialog.locator("form[action*='createPersonalInvite']"),
 		dialog.getByRole("button", { name: "Generate invite link" }),
 	);
 

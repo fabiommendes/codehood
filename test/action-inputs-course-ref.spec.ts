@@ -212,7 +212,7 @@ test("auth.createPersonalInvite binds the invite to the discipline/course it nam
 
 	const res = await request.post("/_actions/auth.createPersonalInvite", {
 		headers,
-		data: { discipline, course: courseSegment, email, role: "STUDENT" },
+		form: { discipline, course: courseSegment, email, role: "STUDENT" },
 	});
 	expect(res.ok(), await res.text()).toBe(true);
 

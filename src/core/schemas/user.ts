@@ -110,13 +110,18 @@ export const userSignUp = z.object({
 		.meta({ form: { label: "School id" } }),
 });
 
-/// The details a user edits on their own profile page.
-export const profileUpdate = userSignUp.pick({
-	name: true,
-	email: true,
-	githubId: true,
-	schoolId: true,
-});
+/// The details a user edits on their own profile page. GitHub and school id are optional here; the action requires them of students.
+export const profileUpdate = userSignUp
+	.pick({
+		name: true,
+		email: true,
+		githubId: true,
+		schoolId: true,
+	})
+	.extend({
+		githubId: userSignUp.shape.githubId.optional(),
+		schoolId: userSignUp.shape.schoolId.optional(),
+	});
 
 export const userPK = z.union([
 	z.object({ email: z.email() }),

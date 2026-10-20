@@ -7,7 +7,6 @@ import {
 	disciplinePK,
 	editionForm,
 	editionPK,
-	inviteInstructor,
 	inviteRevoke,
 	userByUsername,
 	userCreateForm,
@@ -91,24 +90,6 @@ export const admin = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.invite.delete({ publicId: input.publicId }, { actor });
-		}),
-	}),
-
-	inviteInstructor: defineAction({
-		accept: "form",
-		input: inviteInstructor,
-		handler: withServiceErrors(async (input, context) => {
-			const actor = requireUser(context);
-			const { token } = await db.invite.create(
-				{
-					email: input.email,
-					invitedRole: "INSTRUCTOR",
-					kind: "PERSONAL",
-					maxUses: 1,
-				},
-				{ actor },
-			);
-			return { token };
 		}),
 	}),
 

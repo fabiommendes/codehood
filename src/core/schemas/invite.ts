@@ -61,10 +61,24 @@ export const inviteUpdate = z.object({
 	maxUses: z.number().nullable().optional(),
 });
 
-/// The form that invites an instructor to the instance by email.
-export const inviteInstructor = z.object({
-	email: z.email().meta({ form: { placeholder: "instructor@example.edu" } }),
-});
+/**
+ * A single-use invite sent to an email.
+ *
+ * `discipline` and `course` are the course's URL segments and come together;
+ * both absent makes an invite not bound to a course, e.g. an admin inviting an
+ * instructor to the instance.
+ */
+export const invitePersonal = z
+	.object({
+		email: z.email().meta({ form: { placeholder: "person@example.edu" } }),
+		role: z.enum(["INSTRUCTOR", "STUDENT"]).default("INSTRUCTOR"),
+		discipline: z.string().min(1).optional(),
+		course: z.string().min(1).optional(),
+	})
+	.refine((input) => !input.discipline === !input.course, {
+		path: ["course"],
+		message: "Give the discipline and the course together.",
+	});
 
 /// The invite to revoke, by its public id.
 export const inviteRevoke = inviteSchema.pick({ publicId: true });

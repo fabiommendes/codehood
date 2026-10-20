@@ -17,7 +17,7 @@ adotar uma biblioteca de formulários.
 A API que os formulários usam está em
 [`dev/adrs/0001-formularios-por-schema.md`](../../adrs/0001-formularios-por-schema.md),
 e este spec segue os nomes de lá (`formState`, `createSchemaForm`, `Field`,
-`SchemaForm`, `FormAlert`, `FieldError`).
+`FormAlert`, `FieldError`).
 
 ## Problemas atuais
 
@@ -211,24 +211,19 @@ implementação:
 Sem biblioteca de formulários: o que o Modular Forms fornecia ao protótipo cabe
 em uma store Solid de poucas dezenas de linhas.
 
-### `<Field>` é o primitivo, `<SchemaForm>` é um loop
+### `<Field>` é o primitivo
 
 O formulário inteiro gerado só serve para formulários simples. O de disciplina
 já é `flex-wrap` em linha, e o de nota tem campos com `data-*` e foco
-controlado. Então:
-
-- `<Field name="slug" />` dentro de um formulário escrito à mão é o uso
-  principal;
-- `<SchemaForm schema action submitLabel fields>` itera os campos na ordem do
-  `shape` e serve aos CRUDs de admin;
-- qualquer campo pode ser escrito à mão ao lado dos gerados, e continua
-  recebendo seu erro pelo nome.
+controlado. Então `<Field name="slug" />` dentro de um formulário escrito à mão
+é o uso. Qualquer campo pode ser escrito à mão ao lado dos gerados, e continua
+recebendo seu erro pelo nome.
 
 ### Onde fica o código
 
 - `src/forms/`: lógica pura (`describeField`, `formToInput`, mapa de erros,
   tipos de `FieldMeta`, augmentation). Sem JSX.
-- `src/components/form/`: `Field`, `SchemaForm`, `createSchemaForm` e o tema
+- `src/components/form/`: `Field`, `createSchemaForm` e o tema
   daisyUI.
 
 A tabela de layout em `AGENTS.md` ganha a linha de `src/forms/`.
@@ -265,7 +260,7 @@ A tabela de layout em `AGENTS.md` ganha a linha de `src/forms/`.
 | T2     | sonnet | -          | `formToInput` e teste de contrato contra o Astro |
 | T3     | sonnet | -          | mapa de erros central, carregado no servidor e no cliente |
 | T4     | sonnet | -          | `FieldError` e tradução em `withServiceErrors`, com e2e dos dois caminhos |
-| T5     | sonnet | T1, T3     | `Field`, tema daisyUI, `SchemaForm`; resolve Q1 |
+| T5     | sonnet | T1, T3     | `Field`, tema daisyUI; resolve Q1 |
 | T6     | sonnet | T2, T4, T5 | `createSchemaForm` para ilhas |
 | T7     | sonnet | T5, T4     | migra `src/pages/admin/disciplines.astro` (sem JS) |
 | T8     | sonnet | T6         | migra `src/components/grading/GradeForm.tsx` (ilha) |
@@ -292,3 +287,30 @@ T5 e T7; T6 e T8; T9.
 - A página de disciplinas funciona com JS desligado, com erro por campo.
 - Os campos renderizados seguem o markup de `src/pages/design/forms.astro`.
 - `pnpm run lint` e `pnpm test` saem 0.
+
+## Estado final
+
+Migrados: login, cadastro e aceite de convite, perfil (dados, senha, chave de
+API), formulários de admin (disciplina, edição, usuário, convite), check-in,
+entrada por convite, abertura de chamada, nota e "não vou corrigir". Todos usam
+schemas de `src/core/schemas`; nenhuma action tem `z.object` inline.
+`admin.inviteInstructor` foi unificada em `auth.createPersonalInvite`
+(`invitePersonal`, `accept: "form"`).
+
+Ficaram manuais, de propósito:
+
+- Diálogos do roster (`roster.astro`): dirigidos por script, só usam `formState`.
+- Respostas de `ExamAttempt`: campos dinâmicos por questão, sem schema fixo.
+- Formulário GET da landing: não chama action.
+- Formulários só com botão (revogar, sair, forçar logout): sem campo a validar.
+- Lista de notas do `RollCallManager`: itens repetidos, não um formulário.
+
+Limites conhecidos:
+
+- `FieldError` carrega um campo só.
+- Diálogos reabrem após erro por `src/components/admin/reopen-dialogs.ts`;
+  deve ir para o layout depois.
+- Regras que dependem do papel (GitHub e id escolar de aluno) ficam na action,
+  não no schema, e portanto só aparecem como erro de campo após o envio.
+- `errorMessage` (`src/forms/field-errors.ts`) troca o "Failed to validate" de
+  um erro de entrada pelas mensagens dos campos, onde não há campo para exibi-las.

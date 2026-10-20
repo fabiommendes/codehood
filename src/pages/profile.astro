@@ -9,6 +9,7 @@ import PasswordConfirm from "@/components/PasswordConfirm.astro";
 import Tabs from "@/components/ui/Tabs.astro";
 import { apiKeyForm, passwordChange, profileUpdate } from "@/core/schemas";
 import { type ApiKey, db } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { roleLabels } from "@/utils/roles";
@@ -59,10 +60,17 @@ const apiKeyCreateForm = await actionForm(
 	{ id: "api-key" },
 );
 
-/// The profile field `name`: the stored value, or what was typed when the save was refused.
+/// The profile field `name`: the stored value, or what was typed when the save was refused. GitHub and school id are required of students only.
 function profileField(name: "name" | "email" | "githubId" | "schoolId") {
 	const field = updateForm.field(name);
-	return updateResult?.error ? field : { ...field, value: user?.[name] ?? "" };
+	const required =
+		name === "githubId" || name === "schoolId"
+			? user?.role === "STUDENT"
+			: field.required;
+	const shown = updateResult?.error
+		? field
+		: { ...field, value: user?.[name] ?? "" };
+	return { ...shown, required };
 }
 
 function formatDate(date: Date | null): string {
@@ -195,7 +203,7 @@ const profileTabs = [
               <p class="text-sm text-base-content/60">
                 Sign out of every device and browser where you're logged in.
               </p>
-              <FormAlert error={logoutEverywhereResult?.error?.message} />
+              <FormAlert error={logoutEverywhereResult?.error && errorMessage(logoutEverywhereResult.error)} />
               <form
                 method="POST"
                 action={actions.profile.logoutEverywhere}
@@ -240,7 +248,7 @@ const profileTabs = [
                   </div>
                 )
               }
-              <FormAlert error={revokeApiKeyResult?.error?.message} />
+              <FormAlert error={revokeApiKeyResult?.error && errorMessage(revokeApiKeyResult.error)} />
 
               {
                 apiKeys.length > 0 && (

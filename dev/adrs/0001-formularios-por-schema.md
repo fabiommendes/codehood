@@ -64,22 +64,6 @@ o segundo clona o schema e o clone perde o meta.
 
 ### 3. Página `.astro`, sem JS
 
-Formulário de CRUD comum, gerado inteiro:
-
-```astro
----
-const result = Astro.getActionResult(actions.admin.createDiscipline);
----
-<SchemaForm
-  schema={disciplineCreate}
-  action={actions.admin.createDiscipline}
-  result={result}
-  values={await submittedValues(Astro.request)}
-  submitLabel="Create"
-  fields={{ slug: { label: "Permanent slug" } }}
-/>
-```
-
 Layout próprio, campos gerados:
 
 ```astro
@@ -160,7 +144,7 @@ lança erro para tipos zod que não reconhece; use `widget` ou escreva o campo.
 ### 7. Aparência
 
 `<Field>` segue `src/pages/design/forms.astro`. Para outra aparência, passe
-`theme`, um mapa de `kind` (ou `radio`/`toggle`) para componente, em `<Field>` ou em `<SchemaForm>`.
+`theme`, um mapa de `kind` (ou `radio`/`toggle`) para componente, em `<Field>`.
 
 ## Consequences
 

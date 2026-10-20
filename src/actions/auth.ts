@@ -1,5 +1,4 @@
 import { ActionError, defineAction } from "astro:actions";
-import { z } from "astro/zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
@@ -11,6 +10,7 @@ import {
 	inviteAccept,
 	inviteClassroom,
 	inviteJoin,
+	invitePersonal,
 	sessionLogin,
 } from "@/core/schemas";
 import { db, InviteError, type User } from "@/db";
@@ -207,14 +207,8 @@ export const auth = {
 	}),
 
 	createPersonalInvite: defineAction({
-		input: z.object({
-			email: z.email(),
-			role: z.enum(["INSTRUCTOR", "STUDENT"]),
-			// Absent for an invite not bound to a course (e.g. an admin inviting
-			// an instructor); both segments are required together otherwise.
-			discipline: z.string().min(1).optional(),
-			course: z.string().min(1).optional(),
-		}),
+		accept: "form",
+		input: invitePersonal,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const course =

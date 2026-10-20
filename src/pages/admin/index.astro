@@ -6,12 +6,9 @@ import AdminHeader from "@/components/AdminHeader.astro";
 import InvitesTable from "@/components/admin/InvitesTable";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import {
-	disciplineCreate,
-	editionForm,
-	inviteInstructor,
-} from "@/core/schemas";
+import { disciplineCreate, editionForm, invitePersonal } from "@/core/schemas";
 import { db, type Invite, isEditionOpen } from "@/db";
+import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { plural } from "@/utils/plural";
@@ -26,15 +23,15 @@ const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
 const disciplineResult = Astro.getActionResult(actions.admin.createDiscipline);
 const editionResult = Astro.getActionResult(actions.admin.createEdition);
 
-const inviteResult = Astro.getActionResult(actions.admin.inviteInstructor);
+const inviteResult = Astro.getActionResult(actions.auth.createPersonalInvite);
 const inviteUrl = inviteResult?.data
 	? new URL(`/invite/${inviteResult.data.token}`, Astro.url).toString()
 	: null;
 
 const inviteForm = await actionForm(
 	Astro,
-	actions.admin.inviteInstructor,
-	inviteInstructor,
+	actions.auth.createPersonalInvite,
+	invitePersonal,
 	{ id: "invite-instructor" },
 );
 const disciplineForm = await actionForm(
@@ -290,7 +287,7 @@ const pendingInvites: Invite[] = invites.filter(
           </>
         )
       }
-      <FormAlert error={revokeResult?.error?.message} class="mt-4" />
+      <FormAlert error={revokeResult?.error && errorMessage(revokeResult.error)} class="mt-4" />
       {
         revokeResult && !revokeResult.error && (
           <div role="alert" class="alert alert-success mt-4">
@@ -370,7 +367,7 @@ const pendingInvites: Invite[] = invites.filter(
         </p>
         <form
           method="POST"
-          action={actions.admin.inviteInstructor}
+          action={actions.auth.createPersonalInvite}
           class="mt-4 flex flex-col gap-4"
         >
           <FormAlert error={inviteForm.error} />

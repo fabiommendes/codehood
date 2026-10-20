@@ -12,6 +12,14 @@ export const profile = {
 		input: profileUpdate,
 		handler: withActionErrors(async (input, context) => {
 			const actor = requireUser(context);
+			if (actor.role === "STUDENT") {
+				if (!input.githubId) {
+					throw new FieldError("githubId", "Required for students.");
+				}
+				if (!input.schoolId) {
+					throw new FieldError("schoolId", "Required for students.");
+				}
+			}
 			try {
 				await db.user.update({ username: actor.username }, input, {
 					actor,
