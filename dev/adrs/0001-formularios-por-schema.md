@@ -84,10 +84,8 @@ Layout próprio, campos gerados:
 
 ```astro
 ---
-const result = Astro.getActionResult(actions.admin.createDiscipline);
-const form = formState(disciplineCreate, result, {
+const form = await actionForm(Astro, actions.admin.createDiscipline, disciplineCreate, {
   id: "create-discipline", // prefixo dos ids; um por formulário da página
-  values: await submittedValues(Astro.request), // repõe o que foi digitado
 });
 ---
 <form method="POST" action={actions.admin.createDiscipline} class="flex flex-wrap items-end gap-4">
@@ -97,6 +95,10 @@ const form = formState(disciplineCreate, result, {
   <button class="btn btn-primary">Create</button>
 </form>
 ```
+
+`actionForm` lê o resultado da action e, só quando ele é um erro dessa action,
+repõe os valores enviados (sem `submittedValues` à mão; vários formulários na
+mesma página não se misturam). `formState` é a função pura por baixo.
 
 `form.field(name)` devolve tudo que `<Field>` precisa: o `FieldSpec` derivado
 do schema, o valor enviado e os erros desse campo. `form.error` é uma `string` com o erro que

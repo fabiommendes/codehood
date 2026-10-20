@@ -5,7 +5,7 @@ import { actions } from "astro:actions";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { sessionLogin } from "@/core/schemas";
-import { formState, submittedValues } from "@/forms/form-state";
+import { actionForm } from "@/forms/form-state";
 import CenteredLayout from "@/layouts/CenteredLayout.astro";
 
 /// Where to go after logging in. Only paths on this site are accepted, so the
@@ -25,9 +25,8 @@ if (result && !result.error) {
 	return Astro.redirect(next);
 }
 
-const form = formState(sessionLogin, result, {
+const form = await actionForm(Astro, actions.auth.login, sessionLogin, {
 	id: "login",
-	values: await submittedValues(Astro.request),
 });
 ---
 

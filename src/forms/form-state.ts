@@ -45,8 +45,7 @@ type FormStateOptions<S extends core.$ZodObject> = {
  * Astro runs the action on a clone, so the page can still read the body.
  * Returns `{}` for a request that carries no form (a plain GET, a JSON call).
  *
- * @example
- * const form = formState(schema, result, { values: await submittedValues(Astro.request) });
+ * Prefer {@link actionForm} on pages; this is for callers that hold the result.
  */
 export async function submittedValues(
 	request: Request,
@@ -105,4 +104,28 @@ export function formState<S extends core.$ZodObject>(
 			};
 		},
 	};
+}
+
+/**
+ * Builds the {@link FormState} of the form that posts to `action`, restoring typed values after a failed no-JS submit.
+ *
+ * Values come back only when the result for THAT action is an error, so several forms on one page do not leak into each other.
+ *
+ * @example
+ * const form = await actionForm(Astro, actions.admin.createDiscipline, disciplineCreate, { id: "create-discipline" });
+ */
+export async function actionForm<S extends core.$ZodObject>(
+	context: {
+		// biome-ignore lint/suspicious/noExplicitAny: mirrors Astro's own signature
+		getActionResult(action: (input: any) => any): ActionResult;
+		request: Request;
+	},
+	// biome-ignore lint/suspicious/noExplicitAny: mirrors Astro's own signature
+	action: (input: any) => any,
+	schema: S,
+	options: Omit<FormStateOptions<S>, "values"> = {},
+): Promise<FormState<S>> {
+	const result = context.getActionResult(action);
+	const values = result?.error ? await submittedValues(context.request) : {};
+	return formState(schema, result, { ...options, values });
 }

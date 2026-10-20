@@ -10,7 +10,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { disciplineCreate } from "@/core/schemas";
 import { db } from "@/db";
-import { formState, submittedValues } from "@/forms/form-state";
+import { actionForm } from "@/forms/form-state";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
@@ -23,10 +23,12 @@ const createResult = Astro.getActionResult(actions.admin.createDiscipline);
 const updateResult = Astro.getActionResult(actions.admin.updateDiscipline);
 const deleteResult = Astro.getActionResult(actions.admin.deleteDiscipline);
 
-const createForm = formState(disciplineCreate, createResult, {
-	id: "create-discipline",
-	values: await submittedValues(Astro.request),
-});
+const createForm = await actionForm(
+	Astro,
+	actions.admin.createDiscipline,
+	disciplineCreate,
+	{ id: "create-discipline" },
+);
 
 const disciplines = await db.discipline.findMany({});
 const courses = await db.course.findMany({}, { actor });
