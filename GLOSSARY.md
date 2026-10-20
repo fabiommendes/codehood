@@ -443,3 +443,50 @@ An account, holding a [Role](#role), a unique username, and external handles
 (github id, school id) collected at invite acceptance. The username is immutable
 because it is the foreign key courses reference for the instructor and a path
 segment of every [Course URL](#course-url) that instructor owns.
+
+---
+
+# Translations
+
+Terms the UI shows, one table per locale. Platform terms (Action, Rev, Spec...)
+are not translated.
+
+### pt-BR
+
+| Term              | pt-BR                     |
+| :---------------- | :------------------------ |
+| Admin             | administrador             |
+| API key           | chave de API              |
+| Attachment        | anexo                     |
+| Attendance        | presença                  |
+| Classroom invite  | convite da turma          |
+| Course            | turma                     |
+| Discipline        | disciplina                |
+| Edition           | período letivo            |
+| Enrollment        | matrícula                 |
+| Event             | aula                      |
+| Event resource    | material da aula          |
+| Exam              | avaliação                 |
+| Exam (type EXAM)  | prova                     |
+| Exam (type PRACTICE) | exercício              |
+| Exam (type QUIZ)  | quiz                      |
+| Grade column      | coluna de notas           |
+| Grading bot       | corretor automático       |
+| Group             | grupo                     |
+| Instructions      | instruções                |
+| Instructor        | docente                   |
+| Invite            | convite                   |
+| Passphrase        | frase-senha               |
+| Personal invite   | convite individual        |
+| Practice session  | sessão de exercício       |
+| Question          | questão                   |
+| Question version  | versão da questão         |
+| Resource          | material                  |
+| Response          | resposta                  |
+| Role              | perfil                    |
+| Roll call         | chamada                   |
+| Session           | sessão                    |
+| Student           | estudante                 |
+| Submission        | envio                     |
+| Time slot         | horário                   |
+| User              | usuário                   |

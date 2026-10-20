@@ -1,9 +1,15 @@
 // @ts-check
+
+import { fileURLToPath } from "node:url";
 import node from "@astrojs/node";
 import solidJs from "@astrojs/solid-js";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
+import { localeDefine, paraglideOptions } from "./scripts/lib/paraglide";
+
+const root = fileURLToPath(new URL(".", import.meta.url));
 
 /// Public address of a deployed instance, read at build time. Behind a reverse
 /// proxy the server only sees plain HTTP from 127.0.0.1, so it must trust the
@@ -31,7 +37,9 @@ export default defineConfig({
 	adapter: node({ mode: "standalone" }),
 	integrations: [solidJs(), dynamicRouterHook()],
 	vite: {
-		plugins: [tailwindcss()],
+		plugins: [tailwindcss(), paraglideVitePlugin(paraglideOptions(root))],
+		// Fixes the locale the build compiles for (`CODEHOOD_LOCALE`).
+		define: localeDefine(root, process.env),
 		// Sourcemaps let `pnpm coverage` (c8, run against the built webServer process)
 		// map V8 coverage on the bundled output back to the original src/*.ts files.
 		build: { sourcemap: !!process.env.COVERAGE },

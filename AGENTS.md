@@ -69,9 +69,8 @@ Analyse the requirements and be explicit about design decisions. Pick what you
 think is the best approach and document it. Ask human only if the decision produces 
 irreversible consequences (e.g., database migrations, breaking external tools).
 
-If the implementation is not trivial, it is probably better to use the `ttdd`
-skill (note: not `tdd`). This is a `disable-model-invocation` skill, so you may need
-to ask human to invoke it explicitly. Confirm with the human before writing code. 
+If the implementation is not trivial, it is probably better to use the `tdd`
+skill in full mode. Confirm with the human before writing code.
 
 Once the spec is ready, implement the feature and the corresponding tests.
 Design the tests so it can provide some proof that the implementation is

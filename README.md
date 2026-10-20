@@ -71,6 +71,7 @@ Then use one of the following, depending on what you want to do:
 | `LOG_ENV`                | no       | `false`              | Echo the resolved environment at startup. Set by `pnpm run dev`. |
 | `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in (FR-NFR-020).            |
 | `PUBLIC_URL`             | no       | none                 | Build time. Address of a deployed instance, see [Deploying](#deploying). |
+| `CODEHOOD_LOCALE`        | no       | base locale (`en`)   | Build time. Locale the build compiles for; must be one of `project.inlang/settings.json` `locales`. |
 
 `ENVIRONMENT` deliberately has no default, and an empty value counts as
 unset. It decides two things a deployment cannot afford to get wrong by

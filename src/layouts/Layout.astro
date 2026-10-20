@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import { locale } from "@/i18n";
 
 interface Props {
 	title?: string;
@@ -9,7 +10,7 @@ const { title = "Codehood" } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale}>
 	<head>
 		<script is:inline>
 			// Runs before first paint to avoid a flash of the wrong theme. Mirrors the
