@@ -4,6 +4,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
+import { sessionLogin } from "@/core/schemas";
 import { db, InviteError, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { parseCourseParams, USERNAME_RE } from "@/urls";
@@ -25,10 +26,7 @@ const optionalField = z
 export const auth = {
 	login: defineAction({
 		accept: "form",
-		input: z.object({
-			login: z.string().min(1),
-			password: z.string().min(1),
-		}),
+		input: sessionLogin,
 		handler: async (input, context) => {
 			const user = await db.user.findOne({ login: input.login }, FULL_ACCESS);
 			if (!user || !(await verifyPassword(user.passwordHash, input.password))) {

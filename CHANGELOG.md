@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Forms are derived from the zod schema that validates the action
+  (`src/forms/`, `src/components/form/`, ADR 0001). Each field shows its own
+  error, `required`/`minlength`/`max` attributes come from the schema, and the
+  same `<Field>` renders on `.astro` pages (works without JS, keeps what was
+  typed, never echoes a password) and in Solid islands (`createSchemaForm`).
+  A service can attach a message to a field with `FieldError`. Migrated: admin
+  disciplines create, the grade form and the login (`sessionLogin`; wrong
+  credentials still show one general alert).
+
 ### Fixed
 
 - The schedule offered to open the roll call of past meetings, and of today's

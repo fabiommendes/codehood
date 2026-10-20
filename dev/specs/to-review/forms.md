@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [forms, ui, actions, zod]
 relatedTo: [design-forms]
 ---

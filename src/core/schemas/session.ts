@@ -13,6 +13,18 @@ export const sessionCreate = z.object({
 	username: username,
 });
 
+/// What the login form sends. `login` is not checked for format: the credentials either match a user or they do not.
+export const sessionLogin = z.object({
+	login: z
+		.string()
+		.min(1)
+		.meta({ form: { label: "Email or username" } }),
+	password: z
+		.string()
+		.min(1)
+		.meta({ form: { widget: "password" } }),
+});
+
 export const sessionCreateResult = z.object({
 	token: z.string(),
 	session: sessionSchema,
