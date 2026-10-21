@@ -294,13 +294,13 @@ const clock = (date: Date) =>
         <section class="mt-8">
           <h2 class="text-xl font-semibold">{m.grades_regrade_home_resolved()}</h2>
           <div class="mt-3 flex flex-col gap-3">
-            {home.regrades.map(({ course, exam, request }) => (
+            {home.regrades.map(({ course, exam, request, questionTitle }) => (
               <a href={`${course.href}/exams/${exam.slug}`} class={card}>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
                     <p class="text-sm text-base-content/60">
-                      <span class="font-mono">{course.code}</span> · {request.question}
+                      <span class="font-mono">{course.code}</span> · {questionTitle ?? request.question}
                     </p>
                   </div>
                   <span class:list={["badge", request.status === "ACCEPTED" ? "badge-success" : "badge-error"]}>

@@ -901,6 +901,30 @@ test("instructor: answer regrade requests", async ({ page }) => {
 	const regrades = `${world.examUrl}/regrades`;
 	await logInAs(page, world.teacher);
 
+	await test.step("the home page lists the exam with open requests and opens them", async () => {
+		await page.goto("/");
+
+		const queue = page.locator("section").filter({
+			has: page.getByRole("heading", { name: "Regrade requests", exact: true }),
+		});
+		const item = queue.getByRole("link").filter({ hasText: "Regrade exam" });
+		await expect(item).toContainText("2 open requests");
+		await item.click();
+
+		await expect(page).toHaveURL(regrades);
+	});
+
+	await test.step("a student's attempt page marks the open request and links to its card", async () => {
+		await page.goto(`${world.examUrl}/attempts/${first.username}`);
+
+		await page.getByRole("link", { name: "Regrade requested" }).click();
+
+		await expect(page).toHaveURL(new RegExp(`${regrades}(#.*)?$`));
+		await expect(
+			page.getByRole("article").filter({ hasText: first.username }),
+		).toBeVisible();
+	});
+
 	await test.step("the exam page announces the open requests and links to them", async () => {
 		await page.goto(world.examUrl);
 

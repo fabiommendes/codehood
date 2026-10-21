@@ -16,6 +16,7 @@ import {
 	type RegradeBlocker,
 	type RegradeContext,
 	regradeBlocker,
+	regradeBlockerMessage,
 	regradeDeadline,
 } from "@/services/regrade";
 
@@ -459,7 +460,14 @@ test("RegradeRequestService.create refuses a second request for the same answer 
 
 	await expect(second).rejects.toBeInstanceOf(InvalidData);
 	await expect(second).rejects.toMatchObject({
-		errors: { submission: [expect.objectContaining({ code: "not-unique" })] },
+		errors: {
+			submission: [
+				{
+					code: "not-unique",
+					message: regradeBlockerMessage("exists"),
+				},
+			],
+		},
 	});
 	expect(
 		await db.regradeRequest.findMany({ course: course.id }, opts),

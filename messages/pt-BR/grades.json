@@ -144,7 +144,6 @@
 	"grades_regrade_requested": "Revisão pedida",
 	"grades_regrade_accepted": "Revisão aceita",
 	"grades_regrade_rejected": "Revisão recusada",
-	"grades_regrade_your_justification": "Sua justificativa",
 	"grades_regrade_justification": "Justificativa",
 	"grades_regrade_instructor_reply": "Resposta do professor:",
 	"grades_regrade_banner": [
@@ -164,7 +163,6 @@
 	"grades_regrade_current_score": "Nota atual",
 	"grades_regrade_accept": "Aceitar",
 	"grades_regrade_reject": "Recusar",
-	"grades_regrade_resolved_by": "Resolvido por {name}",
 	"grades_regrade_home_queue": "Pedidos de revisão",
 	"grades_regrade_home_open": [
 		{

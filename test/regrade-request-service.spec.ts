@@ -10,6 +10,7 @@ import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import { examResult, type QuestionOutcome } from "@/services/exam-result";
+import { type RegradeBlocker, regradeBlockerMessage } from "@/services/regrade";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -37,6 +38,20 @@ async function ensureEdition(slug = "2095-2"): Promise<string> {
 	return slug;
 }
 
+/// What `create` throws for `blocker`: the specific localized message under `submission`, never just the code.
+function refusal(blocker: RegradeBlocker) {
+	return {
+		errors: {
+			submission: [
+				{
+					code: blocker === "exists" ? "not-unique" : "invalid",
+					message: regradeBlockerMessage(blocker),
+				},
+			],
+		},
+	};
+}
+
 //
 // Setup: a course, exams answered by enrolled students, then released
 //
@@ -62,7 +77,10 @@ async function enroll(course: Course): Promise<User> {
 }
 
 /// An `ONGOING` `EXAM` with one question, still open for answers.
-async function makeOpenExam(course: Course) {
+async function makeOpenExam(
+	course: Course,
+	type: "EXAM" | "QUIZ" | "PRACTICE" = "EXAM",
+) {
 	const question = await persistedQuestionFactory.create({
 		course: course.id,
 		slug: tag("q-"),
@@ -70,7 +88,7 @@ async function makeOpenExam(course: Course) {
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: tag("exam-"),
-		type: "EXAM",
+		type,
 		status: "ONGOING",
 		questions: [{ slug: question.slug }],
 	});
@@ -191,7 +209,7 @@ test("create is refused as invalid on submission while the grades are not releas
 
 	await expect(attempt).rejects.toBeInstanceOf(InvalidData);
 	await expect(attempt).rejects.toMatchObject({
-		errors: { submission: [expect.objectContaining({ code: "invalid" })] },
+		...refusal("not-released"),
 	});
 });
 
@@ -216,7 +234,7 @@ test("create is refused when an older submission is contested while a newer one 
 
 	await expect(attempt).rejects.toBeInstanceOf(InvalidData);
 	await expect(attempt).rejects.toMatchObject({
-		errors: { submission: [expect.objectContaining({ code: "invalid" })] },
+		...refusal("not-counting"),
 	});
 });
 
@@ -227,7 +245,7 @@ test("create is refused once 14 days passed since the release, and allowed just 
 		data: { gradesReleasedAt: new Date(Date.now() - 15 * DAY) },
 	});
 	await expect(openRequest(expired)).rejects.toMatchObject({
-		errors: { submission: [expect.objectContaining({ code: "invalid" })] },
+		...refusal("expired"),
 	});
 
 	const inside = await makeScenario();
@@ -236,6 +254,102 @@ test("create is refused once 14 days passed since the release, and allowed just 
 		data: { gradesReleasedAt: new Date(Date.now() - 13 * DAY) },
 	});
 	await expect(openRequest(inside)).resolves.toMatchObject({ status: "OPEN" });
+});
+
+test("create refuses a pending answer as not-gradable", async () => {
+	const { course } = await makeCourse();
+	const student = await enroll(course);
+	const open = await makeOpenExam(course);
+	const { submission } = await answer(course, open, student);
+	await release(open);
+
+	await expect(
+		db.regradeRequest.create(
+			{ course: course.id, submission: submission.publicId, message: MESSAGE },
+			{ actor: student },
+		),
+	).rejects.toMatchObject(refusal("not-gradable"));
+});
+
+test("create refuses an answer to a practice exam as practice", async () => {
+	const { course, instructor } = await makeCourse();
+	const student = await enroll(course);
+	const open = await makeOpenExam(course, "PRACTICE");
+	const { submission } = await answer(course, open, student, {
+		score: "0",
+		grader: instructor.username,
+	});
+
+	await expect(
+		db.regradeRequest.create(
+			{ course: course.id, submission: submission.publicId, message: MESSAGE },
+			{ actor: student },
+		),
+	).rejects.toMatchObject(refusal("practice"));
+});
+
+/// A graded answer to a `QUIZ` held three hours ago, with a classmate whose makeup is still to come.
+async function makeQuizWithPendingMakeup() {
+	const { course, instructor } = await makeCourse();
+	const student = await enroll(course);
+	const classmate = await enroll(course);
+	const open = await makeOpenExam(course, "QUIZ");
+	const { submission } = await answer(course, open, student, {
+		score: "0",
+		grader: instructor.username,
+	});
+	// A makeup date needs an exam that has a duration.
+	await prisma.exam.update({
+		where: { id: open.exam.id },
+		data: { durationMs: 60 * MINUTE },
+	});
+	await db.examException.create(
+		{
+			course: course.id,
+			exam: open.exam.slug,
+			username: classmate.username,
+			extraTime: null,
+			scheduledAt: new Date(Date.now() + DAY),
+		},
+		FULL_ACCESS,
+	);
+	await prisma.exam.update({
+		where: { id: open.exam.id },
+		data: {
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() - 3 * 60 * MINUTE),
+			durationMs: 60 * MINUTE,
+		},
+	});
+	const ask = () =>
+		db.regradeRequest.create(
+			{ course: course.id, submission: submission.publicId, message: MESSAGE },
+			{ actor: student },
+		);
+	return { course, classmate, open, ask };
+}
+
+test("create on a QUIZ is refused while an active classmate's makeup is pending, and allowed once it has closed", async () => {
+	const { open, ask } = await makeQuizWithPendingMakeup();
+
+	await expect(ask()).rejects.toMatchObject(refusal("not-released"));
+
+	await prisma.examException.updateMany({
+		where: { examId: open.exam.id },
+		data: { scheduledAt: new Date(Date.now() - 2 * 60 * MINUTE) },
+	});
+
+	await expect(ask()).resolves.toMatchObject({ status: "OPEN" });
+});
+
+test("create on a QUIZ is not held back by the pending makeup of a student who dropped the course", async () => {
+	const { course, classmate, ask } = await makeQuizWithPendingMakeup();
+	await db.enrollment.delete(
+		{ course: course.id, username: classmate.username },
+		FULL_ACCESS,
+	);
+
+	await expect(ask()).resolves.toMatchObject({ status: "OPEN" });
 });
 
 //

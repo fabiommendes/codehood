@@ -562,6 +562,18 @@ test("student: ask for a regrade", async ({ page }) => {
 		).toHaveCount(0);
 		await expect(page.getByRole("button", { name: "Withdraw" })).toHaveCount(0);
 	});
+
+	await test.step("the home page lists the answered request with the question's title", async () => {
+		await page.goto("/");
+
+		const answers = page.locator("section").filter({
+			has: page.getByRole("heading", { name: "Regrade answers", exact: true }),
+		});
+		const item = answers.getByRole("link").filter({ hasText: "Regrade exam" });
+		await expect(item).toContainText("Typed capital");
+		await expect(item).not.toContainText("q-short");
+		await expect(item).toContainText("Regrade rejected");
+	});
 });
 
 //

@@ -199,6 +199,8 @@ function nextThing(
 export interface HomeRegrade {
 	course: HomeCourse;
 	exam: Exam;
+	/// The title of the contested question, when it has one.
+	questionTitle?: string;
 	request: Pick<
 		RegradeRequest,
 		"publicId" | "question" | "status" | "reply" | "resolvedAt"

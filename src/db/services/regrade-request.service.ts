@@ -84,13 +84,7 @@ const requestInclude = {
 						select: {
 							slug: true,
 							course: {
-								select: {
-									instructor: { select: { username: true } },
-									enrollments: {
-										where: { status: "ACTIVE" as const },
-										select: { username: true },
-									},
-								},
+								select: { instructor: { select: { username: true } } },
 							},
 						},
 					},
@@ -125,12 +119,12 @@ function fromDb(row: DbRegradeRequest): RegradeRequest {
 	};
 }
 
-/// The `regrade.*` permission target of a request row.
+/// The `regrade.*` permission target of a request row; those rules read only the instructor and the author, never the enrollments.
 function targetOf(row: DbRegradeRequest): ResponseWithCourse {
 	const { response } = row.submission;
 	return {
 		author: { username: response.authorId },
-		course: response.exam.course,
+		course: { ...response.exam.course, enrollments: [] },
 	};
 }
 
@@ -215,6 +209,32 @@ const contestedSelect = {
 	},
 } satisfies Prisma.SubmissionSelect;
 
+/// Moves the request `id` out of `OPEN` with `data`, refusing when someone else resolved it first.
+async function resolve(
+	tx: PrismaTx,
+	id: RegradeRequestId,
+	data: Prisma.RegradeRequestUncheckedUpdateManyInput,
+): Promise<RegradeRequest> {
+	const { count } = await tx.regradeRequest.updateMany({
+		where: { id, status: "OPEN" },
+		data,
+	});
+	if (count === 0) throw resolvedError();
+	return fromDb(
+		await tx.regradeRequest.findFirstOrThrow({
+			where: { id },
+			include: requestInclude,
+		}),
+	);
+}
+
+/// The refusal for a request that is no longer `OPEN`.
+function resolvedError(): InvalidData {
+	return new InvalidData({
+		status: [{ code: "invalid", message: m.errors_regrade_resolved() }],
+	});
+}
+
 /// The username to record for `actor`, or `null` for SYSTEM.
 function userOf(actor: Actor): string | null {
 	return actor === SYSTEM ? null : actor.username;
@@ -236,9 +256,7 @@ async function openRequest(
 	}
 	ensurePerm(actor, perm, targetOf(row));
 	if (row.status !== "OPEN") {
-		throw new InvalidData({
-			status: [{ code: "invalid", message: m.errors_regrade_resolved() }],
-		});
+		throw resolvedError();
 	}
 	return row;
 }
@@ -592,19 +610,13 @@ export class RegradeRequestService extends CrudBase<{
 			},
 			{ ...opts, tx },
 		);
-		return fromDb(
-			await tx.regradeRequest.update({
-				where: { id: row.id },
-				data: {
-					status: "ACCEPTED",
-					reply: input.reply,
-					feedbackId: pass.id,
-					resolvedById: userOf(opts.actor),
-					resolvedAt: new Date(),
-				},
-				include: requestInclude,
-			}),
-		);
+		return resolve(tx, row.id, {
+			status: "ACCEPTED",
+			reply: input.reply,
+			feedbackId: pass.id,
+			resolvedById: userOf(opts.actor),
+			resolvedAt: new Date(),
+		});
 	}
 
 	/// See {@link reject}.
@@ -620,17 +632,11 @@ export class RegradeRequestService extends CrudBase<{
 		opts: ServiceOptsWithoutTx,
 	): Promise<RegradeRequest> {
 		const row = await openRequest(tx, filter, opts.actor, "regrade.resolve");
-		return fromDb(
-			await tx.regradeRequest.update({
-				where: { id: row.id },
-				data: {
-					status: "REJECTED",
-					reply: input.reply,
-					resolvedById: userOf(opts.actor),
-					resolvedAt: new Date(),
-				},
-				include: requestInclude,
-			}),
-		);
+		return resolve(tx, row.id, {
+			status: "REJECTED",
+			reply: input.reply,
+			resolvedById: userOf(opts.actor),
+			resolvedAt: new Date(),
+		});
 	}
 }

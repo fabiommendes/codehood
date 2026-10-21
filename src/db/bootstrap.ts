@@ -1939,9 +1939,9 @@ async function seedQuestionStatsExam(
 /**
  * Seeds an exam whose grades were just released, with a regrade request in each state.
  *
- * The dev student has an open request on a wrong answer and can still ask
- * for a regrade of the other. Hopper's was accepted with a new score and
- * Hamilton's rejected.
+ * The dev student has an open request on one wrong answer, an accepted one
+ * on another, and can still ask for a regrade of the right one. Hopper's was
+ * accepted with a new score and Hamilton's rejected.
  */
 async function seedRegradeExam(
 	course: Course["id"],
@@ -1967,6 +1967,7 @@ async function seedRegradeExam(
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
 				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "fastest-sort", version: "v1" },
 			],
 		},
 		FULL_ACCESS,
@@ -1974,9 +1975,11 @@ async function seedRegradeExam(
 	const own = await answerExam(course, exam, student, {
 		"recursion-basics": { choice: "tail-call" },
 		"factorial-of-five": { value: 120 },
+		"fastest-sort": { choice: "bubble" },
 	});
 	await botGrade(own["recursion-basics"], "0");
 	await botGrade(own["factorial-of-five"], "1");
+	await botGrade(own["fastest-sort"], "0");
 	const hopper = await answerExam(course, exam, students.hopper, {
 		"recursion-basics": { choice: "tail-call" },
 		"factorial-of-five": { value: 120 },
@@ -2010,6 +2013,20 @@ async function seedRegradeExam(
 		student,
 		own["recursion-basics"],
 		"I picked tail call because the function returns right away, please check.",
+	);
+	const ownAccepted = await ask(
+		student,
+		own["fastest-sort"],
+		"Bubble sort is O(n log n) with an early exit on sorted input, I think.",
+	);
+	await db.regradeRequest.accept(
+		{ publicId: ownAccepted.publicId },
+		{
+			score: "0.5",
+			reply:
+				"Partial credit: the early exit is real, but the worst case is not.",
+		},
+		{ actor: instructor },
 	);
 	const accepted = await ask(
 		students.hopper,

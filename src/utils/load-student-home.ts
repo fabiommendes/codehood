@@ -77,9 +77,36 @@ export async function loadStudentHome(
 						: null,
 				};
 			});
-			const regrades: HomeRegrade[] = requests.flatMap((request) => {
+			const resolved = requests.filter((request) => request.status !== "OPEN");
+			const titles = new Map(
+				await Promise.all(
+					[...new Set(resolved.map((request) => request.question))].map(
+						async (slug) =>
+							[
+								slug,
+								(
+									await db.question.findOne(
+										{ course: course.id, slug, public: true },
+										{ actor },
+									)
+								)?.question.title,
+							] as const,
+					),
+				),
+			);
+			const regrades: HomeRegrade[] = resolved.flatMap((request) => {
 				const exam = exams.find((entry) => entry.slug === request.exam);
-				return exam ? [{ course: home, exam, request }] : [];
+				const questionTitle = titles.get(request.question);
+				return exam
+					? [
+							{
+								course: home,
+								exam,
+								request,
+								...(questionTitle ? { questionTitle } : {}),
+							},
+						]
+					: [];
 			});
 			return { course, home, homeExams, regrades };
 		}),
