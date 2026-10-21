@@ -4,6 +4,7 @@ import { describeField, describeFields } from "@/forms/describe-field";
 import "@/forms/meta";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { userSignUp } from "@/core/schemas";
+import { publicId, slug } from "@/core/schemas/base";
 import {
 	buildOpenRpcDocument,
 	jsonSchemaOf,
@@ -39,6 +40,13 @@ test("sign-up fields restricted by a regex carry it as an HTML pattern", () => {
 		expect(pattern, name).toBeDefined();
 		expect(() => new RegExp(`^(?:${pattern})$`, "v"), name).not.toThrow();
 	}
+});
+
+test("slug and publicId are bounded in length", () => {
+	expect(slug.safeParse("a".repeat(200)).success).toBe(true);
+	expect(slug.safeParse("a".repeat(201)).success).toBe(false);
+	expect(publicId.safeParse("a".repeat(64)).success).toBe(true);
+	expect(publicId.safeParse("a".repeat(65)).success).toBe(false);
 });
 
 test("pattern is omitted when HTML would read it differently", () => {

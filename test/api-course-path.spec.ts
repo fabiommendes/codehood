@@ -50,9 +50,7 @@ async function tokenFor(request: APIRequestContext, username: string) {
 /// Two courses taught by one instructor; the graded work lives in `home`.
 async function makeTwoCourses(request: APIRequestContext) {
 	const instructor = await makeUser("INSTRUCTOR");
-	const edition = await persistedEditionFactory.create({
-		slug: `2100-${Math.floor(Math.random() * 900) + 100}`,
-	});
+	const edition = await persistedEditionFactory.create();
 	const [home, other] = await Promise.all([
 		persistedCourseFactory.create({
 			instructor: instructor.username,

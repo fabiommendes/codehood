@@ -24,14 +24,6 @@ function tag(prefix: string): string {
 	return `${prefix}${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/// `persistedEditionFactory`'s own default cycles through only 20 slugs by
-/// sequence, which collides across the several courses this file creates (and
-/// with the seeded demo editions) — see `api-public-refs.spec.ts`'s
-/// `uniqueEditionSlug` for the same fix.
-function uniqueEditionSlug(): string {
-	return `2100-${Math.floor(Math.random() * 1_000_000) + 1}`;
-}
-
 async function tokenFor(request: APIRequestContext, username: string) {
 	const login = await request.post("/api/auth/login", {
 		data: { login: username, password: PASSWORD },
@@ -65,9 +57,7 @@ async function makeInstructor() {
 /// course }` segment pair every case under test sends as input.
 async function courseFixture(request: APIRequestContext) {
 	const instructor = await makeInstructor();
-	const edition = await persistedEditionFactory.create({
-		slug: uniqueEditionSlug(),
-	});
+	const edition = await persistedEditionFactory.create();
 	const course = await persistedCourseFactory.create({
 		instructor: instructor.username,
 		edition: edition.slug,

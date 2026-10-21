@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- An edition's term has at most two digits (`2026-1` to `2026-99`), slugs at
+  most 200 characters and public ids at most 64.
+
 ## 0.2.0 (2026-10-21)
 
 ### Added

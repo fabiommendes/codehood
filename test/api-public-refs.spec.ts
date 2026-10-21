@@ -31,14 +31,6 @@ function tag(prefix: string): string {
 	return `${prefix}${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/// `persistedEditionFactory`'s own default cycles through only 20 slugs by
-/// sequence, which collides with the seeded demo editions (`2026-1`, ...) —
-/// so `makeChain()` provisions its own edition with a slug far outside that
-/// range instead of relying on the factory's default.
-function uniqueEditionSlug(): string {
-	return `2100-${Math.floor(Math.random() * 900) + 100}`;
-}
-
 async function makeUser(role: "INSTRUCTOR" | "STUDENT") {
 	const username = tag(role.toLowerCase());
 	return db.user.create(
@@ -84,9 +76,7 @@ async function adminHeaders(request: APIRequestContext) {
  */
 async function makeChain(request: APIRequestContext) {
 	const instructor = await makeUser("INSTRUCTOR");
-	const edition = await persistedEditionFactory.create({
-		slug: uniqueEditionSlug(),
-	});
+	const edition = await persistedEditionFactory.create();
 	// `persistedCourseFactory` provisions a fresh discipline too, unlike a bare
 	// `db.course.create`, which needs it to already exist.
 	const course = await persistedCourseFactory.create({

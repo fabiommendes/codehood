@@ -50,6 +50,8 @@ test("EDITION_RE matches a year alone or a year-term pair", () => {
 	expect(EDITION_RE.test("2026-2")).toBe(true);
 	expect(EDITION_RE.test("2026-0")).toBe(true);
 	expect(EDITION_RE.test("2026-01")).toBe(false);
+	expect(EDITION_RE.test("2026-99")).toBe(true);
+	expect(EDITION_RE.test("2026-100")).toBe(false);
 	expect(EDITION_RE.test("26")).toBe(false);
 });
 

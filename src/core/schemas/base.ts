@@ -90,6 +90,7 @@ export const newUsername = username.refine(
 /// repository paths into this form; the server still refuses anything else.
 export const slug = z
 	.string()
+	.max(200)
 	.regex(/^[a-z0-9][a-z0-9._\-]*$/, m.forms_schema_slug_invalid())
 	.openapi({ example: "intro-to-recursion" });
 export type Slug = z.infer<typeof slug>;
@@ -97,6 +98,7 @@ export type Slug = z.infer<typeof slug>;
 /// An opaque random identifier, safe to place in a URL or hand to a client.
 export const publicId = z
 	.string()
+	.max(64)
 	.regex(/^[A-Za-z0-9_\-]+$/, m.forms_schema_public_id_invalid())
 	.openapi({ example: "k3Vx9QpL2a" });
 export type PublicId = z.infer<typeof publicId>;

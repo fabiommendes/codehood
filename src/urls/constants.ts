@@ -7,8 +7,8 @@ export const USERNAME_RE = /^[a-z0-9][a-z0-9_\-]{1,30}$/;
 /** {@link USERNAME_RE} with uppercase letters too: what a person may type before it is lowercased. */
 export const USERNAME_INPUT_RE = /^[A-Za-z0-9][A-Za-z0-9_\-]{1,30}$/;
 
-/** Usually a YYYY-NN, where the last part after the dash is optional. */
-export const EDITION_RE = /^[0-9]{4}(-([1-9][0-9]*|0))?$/;
+/** A YYYY or YYYY-N, where the term N has at most two digits and no leading zero. */
+export const EDITION_RE = /^[0-9]{4}(-([1-9][0-9]?|0))?$/;
 
 /**
  * Top-level names a discipline slug must not equal, because the root
