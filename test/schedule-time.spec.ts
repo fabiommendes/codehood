@@ -4,8 +4,10 @@ import {
 	formatDateTime,
 	formatTime,
 	localDateOf,
+	parseLocalDateTime,
 	slotInstant,
 	toInstant,
+	toLocalDateTimeInput,
 	weekdayOf,
 	weekdayOnOrAfter,
 } from "@/utils/schedule-time";
@@ -145,4 +147,32 @@ test("slotInstant reads the course start's weekday in the zone, not in UTC", () 
 
 	const monday = slotInstant(courseStart, "MONDAY", 0, 8 * 60, zone);
 	expect(localDateOf(monday, zone)).toBe("2026-01-05");
+});
+
+test("parseLocalDateTime reads a datetime-local value as wall time in SERVER_TZ, not in the process's zone", () => {
+	expect(parseLocalDateTime("2026-06-15T14:30")).toEqual(
+		toInstant("2026-06-15", 14 * 60 + 30),
+	);
+	expect(parseLocalDateTime("2026-12-01T00:00")).toEqual(
+		toInstant("2026-12-01", 0),
+	);
+});
+
+test("toLocalDateTimeInput renders an instant as the datetime-local value of its SERVER_TZ wall time", () => {
+	expect(toLocalDateTimeInput(toInstant("2026-06-15", 14 * 60 + 30))).toBe(
+		"2026-06-15T14:30",
+	);
+	expect(toLocalDateTimeInput(toInstant("2026-01-02", 5))).toBe(
+		"2026-01-02T00:05",
+	);
+});
+
+test("a datetime-local value survives the trip through parseLocalDateTime and back", () => {
+	for (const value of [
+		"2026-03-08T12:30",
+		"2026-07-01T23:59",
+		"2027-01-01T00:00",
+	]) {
+		expect(toLocalDateTimeInput(parseLocalDateTime(value))).toBe(value);
+	}
 });

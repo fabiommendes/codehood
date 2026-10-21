@@ -9,7 +9,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { examResult, formatScore } from "@/services/exam-result";
-import { examPhase, personalTiming } from "@/services/exam-state";
+import { canReopenAttempt } from "@/services/exam-state";
 import { attemptRows } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
@@ -50,7 +50,6 @@ if (!row) return Astro.rewrite("/404");
 const closed = row.state === "submitted";
 // The student's exception, if any, and whether their personal window still lets the attempt reopen.
 const exception = exceptions.get(row.author) ?? null;
-const personal = personalTiming(exam, exception);
 const exceptionExtra = exception?.extraTime
 	? m.exams_exceptions_extra({
 			minutes: durationToMinutes(exception.extraTime),
@@ -62,7 +61,7 @@ const exceptionDate = exception?.scheduledAt
 const canReopen =
 	closed &&
 	!attempt.acceptingSubmissions &&
-	examPhase(personal, now) !== "closed";
+	canReopenAttempt(exam, exception, attempt, now);
 const outcomes = examResult(questions, attempt.submissions, feedback);
 
 const rows = outcomes.questions.map((outcome, index) => {

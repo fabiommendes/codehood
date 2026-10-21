@@ -42,7 +42,12 @@ import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadStudents } from "@/utils/load-grading";
 import { renderMarkdown } from "@/utils/markdown";
-import { durationToMinutes, formatDateTime } from "@/utils/schedule-time";
+import {
+	durationToMinutes,
+	formatDateTime,
+	toDuration,
+	toLocalDateTimeInput,
+} from "@/utils/schedule-time";
 
 export const prerender = false;
 
@@ -58,12 +63,6 @@ const canManage = hasPerm(actor, "enrollment.manage", course);
 if (!slug) return Astro.rewrite("/404");
 const exam = await db.exam.findOne({ course: course.id, slug }, { actor });
 if (!exam) return Astro.rewrite("/404");
-
-/// A date as a `datetime-local` value in the server's time zone.
-const toLocalInput = (date: Date): string => {
-	const pad = (n: number) => String(n).padStart(2, "0");
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
 
 const now = new Date();
 // The exceptions never reach the client: they only shift the student's own
@@ -182,8 +181,13 @@ if (canManage && exam.type !== "PRACTICE") {
 }
 
 // The exceptions table, with the dialog's starting values and the personal window each one gives.
+// A dropped student stays listed only while they hold an exception, so editing it still shows who it is for.
 const exceptionStudents = students
-	.filter((student) => !student.dropped)
+	.filter(
+		(student) =>
+			!student.dropped ||
+			storedExceptions.some((entry) => entry.username === student.username),
+	)
 	.map(({ username, name }) => ({ username, name }));
 const exceptionRows: ExceptionRow[] = storedExceptions
 	.map((exception) => {
@@ -211,7 +215,7 @@ const exceptionRows: ExceptionRow[] = storedExceptions
 			note: "note" in exception ? exception.note : null,
 			extraMinutes: extraMinutes > 0 ? extraMinutes : null,
 			scheduledLocal: exception.scheduledAt
-				? toLocalInput(exception.scheduledAt)
+				? toLocalDateTimeInput(exception.scheduledAt)
 				: null,
 		};
 	})
@@ -227,7 +231,15 @@ const meta = [
 	examTypeLabels[exam.type],
 	personalExtra
 		? m.exams_detail_duration_personal({
-				duration: formatDuration(exam.duration),
+				// The class's own extra time is part of the duration the student's extra comes on top of.
+				duration: formatDuration(
+					exam.duration && exam.extraTime
+						? toDuration(
+								durationToMinutes(exam.duration) +
+									durationToMinutes(exam.extraTime),
+							)
+						: exam.duration,
+				),
 				extra: formatDuration(personalExtra),
 			})
 		: exam.extraTime

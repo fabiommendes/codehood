@@ -28,16 +28,19 @@ import {
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
 import { m } from "@/i18n";
+import { resultsReleased } from "@/services/exam-state";
 import { durationToMinutes } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefWhere,
+	exceptionTimings,
 	fromMs,
 	invalidIfExists,
 	toMs,
 	valueOrNotFound,
 } from "../utils";
+import { examTimingFromDb, examTimingSelect } from "./submission.service";
 
 export type { ExamExceptionId };
 
@@ -81,7 +84,7 @@ function fromDb(row: DbExamException): ExamException {
 async function checkRules(
 	tx: PrismaTx,
 	courseId: number,
-	exam: { type: string; durationMs: number | null },
+	exam: { type: string; durationMs: number | null; released: boolean },
 	input: {
 		username: string;
 		extraTime?: Duration | null;
@@ -91,6 +94,11 @@ async function checkRules(
 	if (exam.type === "PRACTICE") {
 		throw new InvalidData({
 			exam: [{ code: "invalid", message: m.errors_exam_exception_practice() }],
+		});
+	}
+	if (exam.released) {
+		throw new InvalidData({
+			exam: [{ code: "invalid", message: m.errors_exam_exception_released() }],
 		});
 	}
 	const hasExtra = !!input.extraTime && durationToMinutes(input.extraTime) > 0;
@@ -188,7 +196,7 @@ export class ExamExceptionService extends CrudBase<{
 	): Promise<ExamException> {
 		const { course, exam } = await this.load(tx, input);
 		ensurePerm(opts.actor, "exam.manage-exceptions", course);
-		await checkRules(tx, course.id, exam, input);
+		await checkRules(tx, course.id, await withRelease(tx, exam, course), input);
 		return fromDb(await createRow(tx, exam.id, input));
 	}
 
@@ -310,7 +318,7 @@ export class ExamExceptionService extends CrudBase<{
 		);
 
 		const merged = mergeFields(existing, fields);
-		await checkRules(tx, course.id, exam, {
+		await checkRules(tx, course.id, await withRelease(tx, exam, course), {
 			username: filter.username,
 			...merged,
 		});
@@ -348,7 +356,7 @@ export class ExamExceptionService extends CrudBase<{
 		});
 
 		const merged = existing ? mergeFields(existing, input) : input;
-		await checkRules(tx, course.id, exam, {
+		await checkRules(tx, course.id, await withRelease(tx, exam, course), {
 			username: input.username,
 			...merged,
 		});
@@ -395,11 +403,44 @@ export class ExamExceptionService extends CrudBase<{
 			"exam",
 			await tx.exam.findUnique({
 				where: { courseId_slug: { courseId: course.id, slug: filter.exam } },
-				select: { id: true, type: true, durationMs: true },
+				select: {
+					id: true,
+					...examTimingSelect,
+					gradesReleasedAt: true,
+					durationMs: true,
+				},
 			}),
 		);
 		return { course, exam };
 	}
+}
+
+/// `exam` plus whether its results are already released, which freezes its exceptions.
+async function withRelease<
+	E extends Prisma.ExamGetPayload<{
+		select: typeof examTimingSelect & { gradesReleasedAt: true };
+	}>,
+>(
+	tx: PrismaTx,
+	exam: E & { id: number },
+	course: { enrollments: { username: string }[] },
+): Promise<E & { released: boolean }> {
+	const rows =
+		exam.type === "QUIZ"
+			? await tx.examException.findMany({
+					where: { examId: exam.id as ExamId },
+					select: { username: true, extraTimeMs: true, scheduledAt: true },
+				})
+			: [];
+	const released = resultsReleased(
+		{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
+		new Date(),
+		exceptionTimings(
+			rows,
+			course.enrollments.map((entry) => entry.username),
+		),
+	);
+	return { ...exam, released };
 }
 
 /// The course as the permission predicates need it: its instructor and active enrollments.
@@ -430,7 +471,8 @@ function toView(row: DbExamException, full: boolean): ExamExceptionView {
 	const entity = fromDb(row);
 	if (full) return entity;
 	const { note: _note, ...publicPart } = entity;
-	return publicPart;
+	// Strict, so a field added to the row but not to the public schema fails here instead of leaking.
+	return examExceptionPublicSchema.strict().parse(publicPart);
 }
 
 /// `fields` over the stored row, where a field left `undefined` keeps its stored value.

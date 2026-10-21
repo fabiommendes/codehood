@@ -1599,8 +1599,9 @@ async function seedGradedExam(
  *
  * The dev student has 30 extra minutes on the upcoming quiz 3. Test 2 ended
  * and Bob, who missed it, has a makeup in two days, so its grades cannot be
- * released yet. Quiz 4's window ended half an hour ago, but Liskov has extra
- * time, so her closed attempt can still be reopened.
+ * released yet. Test 3's window ended half an hour ago, but Liskov has extra
+ * time, so her closed attempt can still be reopened. It is an `EXAM`: a `QUIZ`
+ * releases when it closes, and a released exam takes no new exception.
  */
 async function seedExamExceptions(
 	course: Course["id"],
@@ -1661,28 +1662,28 @@ async function seedExamExceptions(
 	await db.exam.create(
 		{
 			course,
-			slug: "quiz-04",
-			type: "QUIZ",
+			slug: "test-03",
+			type: "EXAM",
 			status: "ONGOING",
-			title: "Quiz 4: recursion trees",
+			title: "Test 3: recursion trees",
 			description: "Drawing call trees by hand.",
 			tags: ["recursion"],
 			questions: [{ slug: "recursion-basics", version: "v1" }],
 		},
 		FULL_ACCESS,
 	);
-	await answerExam(course, "quiz-04", students.liskov, {
+	await answerExam(course, "test-03", students.liskov, {
 		"recursion-basics": { choice: "base-case" },
 	});
 	await db.exam.update(
-		{ course, slug: "quiz-04" },
+		{ course, slug: "test-03" },
 		{ scheduledAt: minutes(-90), duration: { hours: 1 } },
 		FULL_ACCESS,
 	);
 	await db.examException.create(
 		{
 			course,
-			exam: "quiz-04",
+			exam: "test-03",
 			username: students.liskov.username,
 			extraTime: { hours: 6 },
 			note: "Connection dropped",

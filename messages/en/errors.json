@@ -120,5 +120,7 @@
 	"errors_meeting_no_roll_call": "This meeting has no roll call.",
 	"errors_course_edition_missing": "Given edition do not exist",
 	"errors_course_edition_closed": "Edition not accepting new courses",
-	"errors_course_invalid_instructor": "Invalid instructor"
+	"errors_course_invalid_instructor": "Invalid instructor",
+	"errors_exam_duration_needed_by_exceptions": "A student has a new date on this exam, so it needs a duration; remove that exception first",
+	"errors_exam_exception_released": "This exam's results are already released, so its exceptions can no longer change"
 }

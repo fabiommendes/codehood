@@ -120,5 +120,7 @@
 	"errors_meeting_no_roll_call": "Esta aula não tem chamada.",
 	"errors_course_edition_missing": "O período letivo informado não existe",
 	"errors_course_edition_closed": "O período letivo não aceita novas turmas",
-	"errors_course_invalid_instructor": "Docente inválido"
+	"errors_course_invalid_instructor": "Docente inválido",
+	"errors_exam_duration_needed_by_exceptions": "Um aluno tem nova data nesta prova, então ela precisa de duração; remova essa exceção antes",
+	"errors_exam_exception_released": "Os resultados desta prova já foram liberados, então suas exceções não podem mais mudar"
 }

@@ -28,7 +28,7 @@ import {
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
 import { m } from "@/i18n";
-import { examPhase, personalTiming } from "@/services/exam-state";
+import { canReopenAttempt } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
@@ -290,17 +290,7 @@ export class ResponseService extends CrudBase<{
 		);
 
 		if (fields.acceptingSubmissions === true) {
-			const timing = personalTiming(
-				examTimingFromDb(response.exam),
-				await loadExceptionTiming(tx, response.examId, response.authorId),
-			);
-			if (examPhase(timing, new Date()) === "closed") {
-				throw new InvalidData({
-					response: [
-						{ code: "invalid", message: m.errors_response_window_closed() },
-					],
-				});
-			}
+			await assertReopenable(tx, response);
 		}
 
 		const row = await tx.response.update({
@@ -342,6 +332,14 @@ export class ResponseService extends CrudBase<{
 		);
 
 		if (input.acceptingSubmissions === undefined) return fromDb(row);
+
+		// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
+		if (input.acceptingSubmissions && !row.acceptingSubmissions) {
+			if (!isCourseOwner(opts.actor, row.exam.course)) {
+				throw new NotAllowed("response.update");
+			}
+			await assertReopenable(tx, row);
+		}
 
 		const updated = await tx.response.update({
 			where: { id: row.id },
@@ -523,6 +521,32 @@ function responseWhere(filter: ResponsePK): Prisma.ResponseWhereInput {
 			exam: { course: courseRefMatch(filter.course) },
 		}),
 	};
+}
+
+/// Refuses to reopen `response` when its author's personal window closed or its deadline passed.
+async function assertReopenable(
+	tx: PrismaTx,
+	response: DbResponse,
+): Promise<void> {
+	const exception = await loadExceptionTiming(
+		tx,
+		response.examId,
+		response.authorId,
+	);
+	if (
+		!canReopenAttempt(
+			examTimingFromDb(response.exam),
+			exception,
+			response,
+			new Date(),
+		)
+	) {
+		throw new InvalidData({
+			response: [
+				{ code: "invalid", message: m.errors_response_window_closed() },
+			],
+		});
+	}
 }
 
 /// Whether `actor` teaches the course the attempt belongs to, or is SYSTEM.

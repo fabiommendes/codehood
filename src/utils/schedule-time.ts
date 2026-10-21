@@ -124,6 +124,25 @@ export function toInstant(
 	return new Date(naiveUtcMs - secondOffset);
 }
 
+/**
+ * Reads a `datetime-local` value ("2026-10-23T14:00", seconds optional) as a wall clock in `SERVER_TZ`.
+ *
+ * @example
+ * parseLocalDateTime("2026-10-23T14:00"); // 14:00 on that day in SERVER_TZ
+ */
+export function parseLocalDateTime(value: string): Date {
+	const [date = "", time = "0:0"] = value.split("T");
+	const [hour = 0, minute = 0] = time.split(":").map(Number);
+	return toInstant(date, hour * 60 + minute);
+}
+
+/** Writes `instant` as the `datetime-local` value ("2026-10-23T14:00") of its wall clock in `SERVER_TZ`. */
+export function toLocalDateTimeInput(instant: Date): string {
+	const p = partsOf(instant, SERVER_TZ);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+}
+
 /** Renders `instant` in `SERVER_TZ` on a zero-padded 24-hour clock, e.g. "Mon, Sep 28, 22:03". */
 export function formatDateTime(
 	instant: Date,

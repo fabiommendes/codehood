@@ -25,6 +25,8 @@ export type ExamTiming = Pick<
 export interface ExceptionTiming {
 	extraTime: Duration | null;
 	scheduledAt: Date | null;
+	/// Whether the student dropped the course: the exception still shapes their own timing, but never holds back the class's release.
+	dropped?: boolean;
 }
 
 /// The part of a response its state depends on.
@@ -137,7 +139,8 @@ export function personalTiming<T extends ExamTiming>(
  * The latest end among the window of `exam` and the personal windows of `exceptions`, or `null` when any of them has no end.
  *
  * Each personal window is {@link windowEnd} of {@link personalTiming}. With no
- * exceptions it equals `windowEnd(exam)`.
+ * exceptions it equals `windowEnd(exam)`. An exception of a `dropped` student
+ * is left out.
  */
 export function lastWindowEnd(
 	exam: ExamTiming,
@@ -145,11 +148,30 @@ export function lastWindowEnd(
 ): Date | null {
 	let last = windowEnd(exam);
 	for (const exception of exceptions) {
+		if (exception.dropped) continue;
 		const end = windowEnd(personalTiming(exam, exception));
 		if (!last || !end) return null;
 		if (end > last) last = end;
 	}
 	return last;
+}
+
+/**
+ * Whether the attempt of the student holding `exception` can still be reopened at `now`.
+ *
+ * It can unless the student's personal window has closed or the attempt's own
+ * deadline has passed, since reopening it then would not let them answer.
+ */
+export function canReopenAttempt(
+	exam: ExamTiming,
+	exception: ExceptionTiming | null,
+	attempt: AttemptTiming,
+	now: Date,
+): boolean {
+	const personal = personalTiming(exam, exception);
+	if (examPhase(personal, now) === "closed") return false;
+	const deadline = attemptDeadline(personal, attempt);
+	return !deadline || now <= deadline;
 }
 
 /// Whether `now` is strictly after the end of the exam's window.
@@ -291,13 +313,14 @@ export function releaseMoment(
 	}
 }
 
-/// Whether some exception's personal phase is still `upcoming` or `open` at `now`.
+/// Whether some exception's personal phase is still `upcoming` or `open` at `now`, those of dropped students aside.
 function hasOpenException(
 	exam: ExamTiming,
 	now: Date,
 	exceptions: readonly ExceptionTiming[],
 ): boolean {
 	return exceptions.some((exception) => {
+		if (exception.dropped) return false;
 		const phase = examPhase(personalTiming(exam, exception), now);
 		return phase === "upcoming" || phase === "open";
 	});

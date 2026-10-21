@@ -102,6 +102,9 @@ não tem fim.
   funções recebem a lista de exceções da prova como parâmetro novo
   (opcional, com padrão `[]`).
 - `releaseMoment` de um `QUIZ` usa `lastWindowEnd` em vez de `windowEnd`.
+- A exceção de um aluno que trancou o curso vale para a janela dele, mas não
+  segura a liberação da turma: `lastWindowEnd`, `resultsReleased` e
+  `gradeReleaseBlocker` ignoram as exceções marcadas `dropped`.
 
 **R6.** Restrições de uma exceção, validadas no service:
 
@@ -113,6 +116,16 @@ não tem fim.
   de quem trancou não incomoda ninguém).
 - Uma exceção sem efeito (`extraTimeMs = 0` e `scheduledAt` nulo) é recusada.
   Para tirar a exceção, apaga-se a linha.
+- Criar ou alterar uma exceção numa prova cujos resultados já foram liberados
+  é recusado. Num `EXAM`, é quando `gradesReleasedAt` está definido. Num
+  `QUIZ`, a liberação acontece sozinha quando ele fecha (e nenhuma janela
+  pessoal está aberta), então o professor precisa conceder a exceção antes do
+  encerramento; depois disso ela vazaria o gabarito.
+- Tirar a duração de uma prova é recusado enquanto existir exceção com
+  `scheduledAt` nela.
+- Reabrir uma tentativa (`ResponseService.update` ou `upsert`, só o dono do
+  curso) é recusado quando a janela pessoal do aluno fechou ou o prazo da
+  tentativa já passou.
 
 ### Onde a regra é aplicada
 

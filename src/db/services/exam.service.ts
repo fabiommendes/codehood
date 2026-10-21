@@ -38,6 +38,7 @@ import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefWhere,
+	exceptionTimings,
 	fromMs,
 	invalidIfExists,
 	toMs,
@@ -307,6 +308,23 @@ export class ExamService extends CrudBase<{
 			? await resolveQuestions(tx, exam.courseId, fields.questions)
 			: undefined;
 
+		// A new date only makes sense in a window, so the duration stays while one exists.
+		if (fields.duration === null) {
+			const makeups = await tx.examException.count({
+				where: { examId: exam.id, scheduledAt: { not: null } },
+			});
+			if (makeups > 0) {
+				throw new InvalidData({
+					duration: [
+						{
+							code: "invalid",
+							message: m.errors_exam_duration_needed_by_exceptions(),
+						},
+					],
+				});
+			}
+		}
+
 		const row = await tx.exam.update({
 			where: { id: exam.id },
 			data: {
@@ -408,15 +426,13 @@ export class ExamService extends CrudBase<{
 
 			const exam = fromDb(row);
 			const now = new Date();
-			const exceptions = (
+			const exceptions = exceptionTimings(
 				await tx.examException.findMany({
 					where: { examId: row.id },
-					select: { extraTimeMs: true, scheduledAt: true },
-				})
-			).map((e) => ({
-				extraTime: fromMs(e.extraTimeMs),
-				scheduledAt: e.scheduledAt,
-			}));
+					select: { username: true, extraTimeMs: true, scheduledAt: true },
+				}),
+				row.course.enrollments.map((enrollment) => enrollment.username),
+			);
 			const blocker =
 				gradeReleaseBlocker(exam, [], now, exceptions) ??
 				gradeReleaseBlocker(

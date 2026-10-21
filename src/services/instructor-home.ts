@@ -176,6 +176,7 @@ function isPersonallyOpen(
 	exception: ExceptionTiming,
 	now: Date,
 ): boolean {
+	if (exception.dropped) return false;
 	const phase = examPhase(personalTiming(exam, exception), now);
 	return phase === "upcoming" || phase === "open";
 }

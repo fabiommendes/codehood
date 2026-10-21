@@ -28,12 +28,12 @@ import {
 	examPhase,
 	personalTiming,
 } from "@/services/exam-state";
-import { toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefMatch,
 	courseRefWhere,
+	fromMs,
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
@@ -59,11 +59,6 @@ export const examTimingSelect = {
 	extraTimeMs: true,
 } satisfies Prisma.ExamSelect;
 
-/// Stored milliseconds as a {@link Duration}, a missing or zero length read as `null`.
-function msToDuration(ms: number | null): ExamTiming["duration"] {
-	return ms ? toDuration(Math.round(ms / 60_000)) : null;
-}
-
 /** The {@link ExamTiming} of an exam row selected with {@link examTimingSelect}. */
 export function examTimingFromDb(
 	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>,
@@ -72,8 +67,8 @@ export function examTimingFromDb(
 		type: exam.type,
 		status: exam.status,
 		scheduledAt: exam.scheduledAt,
-		duration: msToDuration(exam.durationMs),
-		extraTime: msToDuration(exam.extraTimeMs),
+		duration: fromMs(exam.durationMs),
+		extraTime: fromMs(exam.extraTimeMs),
 	};
 }
 
@@ -89,7 +84,7 @@ export async function loadExceptionTiming(
 	});
 	if (!row) return null;
 	return {
-		extraTime: msToDuration(row.extraTimeMs),
+		extraTime: fromMs(row.extraTimeMs),
 		scheduledAt: row.scheduledAt,
 	};
 }

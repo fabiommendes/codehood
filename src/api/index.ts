@@ -163,7 +163,7 @@ export const examExceptionApi = CRUD(
 		key: schema.examExceptionPK,
 
 		tags: ["Exams"],
-		service: db.examException as never,
+		service: db.examException,
 
 		parseKeyParams(params) {
 			return {

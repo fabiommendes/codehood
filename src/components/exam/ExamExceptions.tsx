@@ -46,6 +46,9 @@ export default function ExamExceptions(
 	let formElement: HTMLFormElement | undefined;
 	let removeDialog: HTMLDialogElement | undefined;
 	const [editing, setEditing] = createSignal(false);
+	/// The student whose exception the dialog edits; a disabled select cannot submit it, so a hidden field does.
+	const [editedUser, setEditedUser] = createSignal("");
+	let studentSelect: HTMLSelectElement | undefined;
 	const [removing, setRemoving] = createSignal<ExceptionRow | null>(null);
 	const [busy, setBusy] = createSignal(false);
 	const [failure, setFailure] = createSignal<string | null>(null);
@@ -70,6 +73,7 @@ export default function ExamExceptions(
 			if (control instanceof HTMLInputElement) control.value = value;
 			if (control instanceof HTMLSelectElement) control.value = value;
 		}
+		if (studentSelect) studentSelect.value = values.username ?? "";
 		formElement.elements
 			.item(0)
 			?.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -77,12 +81,14 @@ export default function ExamExceptions(
 
 	function openAdd(): void {
 		setEditing(false);
+		setEditedUser("");
 		fill({});
 		dialog?.showModal();
 	}
 
 	function openEdit(row: ExceptionRow): void {
 		setEditing(true);
+		setEditedUser(row.username);
 		fill({
 			username: row.username,
 			extraMinutes: row.extraMinutes ? String(row.extraMinutes) : "",
@@ -197,11 +203,16 @@ export default function ExamExceptions(
 							<legend class="fieldset-legend">
 								<label for={student().id}>{student().label}</label>
 							</legend>
+							<Show when={editing()}>
+								<input type="hidden" name="username" value={editedUser()} />
+							</Show>
 							<select
+								ref={studentSelect}
 								id={student().id}
-								name="username"
+								name={editing() ? undefined : "username"}
 								class="select w-full"
 								required
+								disabled={editing()}
 								onInput={student().onInput}
 							>
 								<option value="">{m.exams_exceptions_select_student()}</option>

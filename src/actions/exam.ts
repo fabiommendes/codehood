@@ -10,7 +10,7 @@ import {
 } from "@/core/schemas";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
-import { toDuration } from "@/utils/schedule-time";
+import { parseLocalDateTime, toDuration } from "@/utils/schedule-time";
 import { withServiceErrors } from "./helpers";
 
 export const exam = {
@@ -119,7 +119,9 @@ export const exam = {
 						extraTime: input.extraMinutes
 							? toDuration(input.extraMinutes)
 							: null,
-						scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+						scheduledAt: input.scheduledAt
+							? parseLocalDateTime(input.scheduledAt)
+							: null,
 						note: input.note || null,
 					},
 					{ actor },

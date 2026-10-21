@@ -29,6 +29,7 @@ import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefMatch,
 	courseRefWhere,
+	exceptionTimings,
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
@@ -52,6 +53,9 @@ function examReleaseSelect() {
 		...examTimingSelect,
 		gradesReleasedAt: true,
 		courseId: true,
+		exceptions: {
+			select: { username: true, extraTimeMs: true, scheduledAt: true },
+		},
 		course: {
 			select: {
 				instructor: { select: { username: true } },
@@ -407,6 +411,10 @@ function releasedToStudents(exam: ExamRelease, now: Date): boolean {
 	return resultsReleased(
 		{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
 		now,
+		exceptionTimings(
+			exam.exceptions,
+			exam.course.enrollments.map((enrollment) => enrollment.username),
+		),
 	);
 }
 

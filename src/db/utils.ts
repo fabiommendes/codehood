@@ -10,6 +10,7 @@ import {
 import type { InvalidDataCode } from "@/core/error-response";
 import type { CourseRef, Duration } from "@/core/schemas";
 import { m } from "@/i18n";
+import type { ExceptionTiming } from "@/services/exam-state";
 import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 
 /**
@@ -228,4 +229,25 @@ export function toMs<T extends null | undefined>(
 export function fromMs(ms: number | null): Duration | null {
 	if (!ms) return null;
 	return toDuration(Math.round(ms / 60_000));
+}
+
+/**
+ * The timing of stored exam exceptions, flagging those of students who are not actively enrolled.
+ *
+ * @params rows Exception rows with the columns timing needs.
+ * @params activeUsernames The usernames holding an `ACTIVE` enrollment in the exam's course.
+ */
+export function exceptionTimings(
+	rows: readonly {
+		username: string;
+		extraTimeMs: number;
+		scheduledAt: Date | null;
+	}[],
+	activeUsernames: readonly string[],
+): ExceptionTiming[] {
+	return rows.map((row) => ({
+		extraTime: fromMs(row.extraTimeMs),
+		scheduledAt: row.scheduledAt,
+		dropped: !activeUsernames.includes(row.username),
+	}));
 }
