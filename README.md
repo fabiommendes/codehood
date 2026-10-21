@@ -134,8 +134,10 @@ PUBLIC_URL=https://codehood.example.org \
   `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`. Management
   commands run as `node dist/manage.mjs <command>`.
 
-`PUBLIC_URL` is read at build time. The server trusts the proxy's
-`X-Forwarded-*` headers only for that host; without it, form posts fail
+`PUBLIC_URL`, `CODEHOOD_LOCALE` and `SERVER_TZ` are read at build time, from the
+environment or from `.env`. `pnpm run package` checks `CODEHOOD_LOCALE` before
+building and records it in `RELEASE`. The server trusts the proxy's
+`X-Forwarded-*` headers only for the `PUBLIC_URL` host; without it, form posts fail
 Astro's origin check and every client has the proxy's IP.
 
 Migrations are written only at release time. Development keeps using

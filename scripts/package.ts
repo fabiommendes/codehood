@@ -6,8 +6,8 @@
  *
  * The tag is exported from git into a scratch directory and built there, so
  * uncommitted work never ships. The build bakes in the build environment:
- * `PUBLIC_URL` (required, the address the instance is served at) and
- * `SERVER_TZ` (optional).
+ * `PUBLIC_URL` (required, the address the instance is served at),
+ * `CODEHOOD_LOCALE` and `SERVER_TZ` (optional).
  *
  * `--rehearse <db>` applies the release's migrations to a copy of `<db>`,
  * typically a fresh copy of the production database, and aborts if they fail.
@@ -20,6 +20,7 @@
 import { execSync, spawnSync } from "node:child_process";
 import {
 	copyFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	rmSync,
@@ -28,6 +29,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { loadCatalog, resolveBuildLocale } from "./lib/i18n-catalog";
 
 const SHIPPED = [
 	"dist",
@@ -86,6 +88,22 @@ try {
 	console.log(`▶ Exporting ${tag} to ${work}`);
 	execSync(`git archive ${tag} -- . ':(exclude)cli' | tar -x -C ${work}`);
 
+	// Checked against the tag's own catalogue, before the slow install. Tags
+	// older than the translations have no catalogue and build in English.
+	let locale = "en";
+	if (existsSync(join(work, "project.inlang"))) {
+		try {
+			locale = resolveBuildLocale(
+				process.env.CODEHOOD_LOCALE,
+				loadCatalog(work),
+			);
+		} catch (error) {
+			fail(error instanceof Error ? error.message : String(error));
+		}
+	} else if (process.env.CODEHOOD_LOCALE) {
+		fail(`${tag} predates translations; unset CODEHOOD_LOCALE.`);
+	}
+
 	// The build's own .env would otherwise be read by prisma.config.ts.
 	const env = {
 		...process.env,
@@ -131,6 +149,7 @@ try {
 			`commit=${commit.stdout.trim()}`,
 			`public_url=${process.env.PUBLIC_URL}`,
 			`server_tz=${process.env.SERVER_TZ ?? ""}`,
+			`locale=${locale}`,
 			`built_at=${new Date().toISOString()}`,
 			"",
 		].join("\n"),

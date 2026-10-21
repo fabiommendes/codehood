@@ -1,5 +1,8 @@
 // @ts-check
 
+// Build-time settings (`PUBLIC_URL`, `CODEHOOD_LOCALE`) may live in `.env`; a
+// variable already set in the environment wins.
+import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import node from "@astrojs/node";
 import solidJs from "@astrojs/solid-js";
