@@ -29,6 +29,9 @@ export type CourseId = z.infer<typeof courseId>;
 export const examId = z.number().int().brand("ExamId");
 export type ExamId = z.infer<typeof examId>;
 
+export const examExceptionId = z.number().int().brand("ExamExceptionId");
+export type ExamExceptionId = z.infer<typeof examExceptionId>;
+
 export const feedbackId = z.number().int().brand("FeedbackId");
 export type FeedbackId = z.infer<typeof feedbackId>;
 

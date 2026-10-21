@@ -80,6 +80,22 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/exception",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/exception/[username]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/grade-column",
 		"methods": [
 			"get",

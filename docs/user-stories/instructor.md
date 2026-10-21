@@ -266,6 +266,26 @@ the deadline they mark will-not-grade, which is distinct from a zero and from
 still being pending.
 
 
+### Give a student extra time or a makeup exam
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>
+
+Instructor adjusts one student's timing on an exam: extra time for a student
+with special accommodations, a new date for one who missed the exam with a
+medical note, or both. They add the exception from the exam page, which lists
+every exception of the exam with the personal window it produces. An exception
+that grants nothing is refused, and the form says so. The student's window is
+the only thing that changes: the rest of the class stays closed out.
+
+While any personal window is still ahead or running, the class's grades cannot
+be released, and the page says why rather than offering the button, so nobody
+sees the answer key before the makeup. When a student dropped the connection,
+the instructor opens that student's attempt and reopens it, as long as the
+student's window is still open, and the student continues where they stopped.
+Removing an exception takes the student back to the exam's own timing.
+
+
 ### Let a bot grade for me
 
     status: implemented

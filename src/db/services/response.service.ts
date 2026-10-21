@@ -28,6 +28,7 @@ import {
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
 import { m } from "@/i18n";
+import { examPhase, personalTiming } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
@@ -39,7 +40,9 @@ import {
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
+	examTimingFromDb,
 	examTimingSelect,
+	loadExceptionTiming,
 	resolveExamQuestion,
 	fromDb as submissionFromDb,
 } from "./submission.service";
@@ -135,7 +138,11 @@ export class ResponseService extends CrudBase<{
 			opts.actor,
 			"response.create",
 		);
-		assertExamOpen(exam, new Date());
+		assertExamOpen(
+			exam,
+			new Date(),
+			await loadExceptionTiming(tx, exam.id, authorId),
+		);
 
 		const slotKey =
 			exam.type === "PRACTICE"
@@ -254,6 +261,15 @@ export class ResponseService extends CrudBase<{
 	 * If no attempt matches `filter`, or the actor may not read the one that
 	 * does.
 	 * @throws {@link NotAllowed} If `actor` may read the attempt but not write it.
+	 * Setting `acceptingSubmissions: true` on a graded attempt is refused once
+	 * the author's personal window (the exam's timing with the author's exam
+	 * exception applied) has closed: the instructor grants extra time or a new
+	 * date first. Closing an attempt is always allowed. REST `PATCH` and the
+	 * `exam.reopenAttempt` action both go through here.
+	 *
+	 * @throws {@link InvalidData}
+	 * If reopening an attempt whose personal window has closed, keyed on
+	 * `response` with `errors_response_window_closed`.
 	 */
 	@Validate({
 		service: true,
@@ -272,6 +288,20 @@ export class ResponseService extends CrudBase<{
 			opts.actor,
 			"response.update",
 		);
+
+		if (fields.acceptingSubmissions === true) {
+			const timing = personalTiming(
+				examTimingFromDb(response.exam),
+				await loadExceptionTiming(tx, response.examId, response.authorId),
+			);
+			if (examPhase(timing, new Date()) === "closed") {
+				throw new InvalidData({
+					response: [
+						{ code: "invalid", message: m.errors_response_window_closed() },
+					],
+				});
+			}
+		}
 
 		const row = await tx.response.update({
 			where: { id: response.id },
@@ -447,7 +477,11 @@ export class ResponseService extends CrudBase<{
 				"response.submit",
 			);
 
-			assertAcceptingSubmissions(row, new Date());
+			assertAcceptingSubmissions(
+				row,
+				new Date(),
+				await loadExceptionTiming(tx, row.examId, row.authorId),
+			);
 			const question = await resolveExamQuestion(
 				tx,
 				row.exam.courseId,
@@ -675,7 +709,11 @@ async function resolveOrCreateAttempt(
 		perm,
 	);
 	if (!hasPerm(actor, "course.update-contents", course)) {
-		assertExamOpen(exam, new Date());
+		assertExamOpen(
+			exam,
+			new Date(),
+			await loadExceptionTiming(tx, exam.id, authorId),
+		);
 	}
 
 	if (exam.type !== "PRACTICE") {

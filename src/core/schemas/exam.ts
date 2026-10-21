@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { m } from "@/i18n";
-import { courseId, duration, examId, questionRefId, rev, slug } from "./base";
+import {
+	courseId,
+	duration,
+	examId,
+	questionRefId,
+	rev,
+	slug,
+	username,
+} from "./base";
 import { courseRef } from "./course";
 
 export const examStatus = z.enum([
@@ -132,3 +140,6 @@ export const examAnswer = examParams.extend({
 	question: z.string().min(1),
 	payload: z.record(z.string(), z.unknown()),
 });
+
+/// Reopens one student's attempt at an exam, addressed by URL segments.
+export const examReopenAttempt = examParams.extend({ username: username });

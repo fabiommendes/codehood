@@ -6,9 +6,10 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalShortAnswer } from "@/mdq/fixtures";
-import type { ExamTiming } from "@/services/exam-state";
+import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
 import {
 	attemptRows,
+	countingAnswers,
 	type GradedStudent,
 	type GradingAttempt,
 	type GradingFeedback,
@@ -708,4 +709,96 @@ test("results: a student never sees the section, and a practice exam has none fo
 		await expect(resultsHeading(page)).toHaveCount(0);
 		await expect(page.getByRole("table")).toHaveCount(0);
 	});
+});
+
+//
+// Personal timing
+//
+
+/// Closed 40 minutes before `NOW` by the clock: scheduled 100 minutes before it, 60 minutes long.
+function justClosedExam(overrides: Partial<ExamTiming> = {}): ExamTiming {
+	return openExam({
+		status: "SCHEDULED",
+		scheduledAt: at(10_000 - 100),
+		duration: { minutes: 60 },
+		...overrides,
+	});
+}
+
+const extraMinutes = (minutes: number): ExceptionTiming => ({
+	extraTime: { minutes },
+	scheduledAt: null,
+});
+
+/// An attempt its owner never closed, so only the clock can close it.
+const unclosed = (author: string) =>
+	attempt(author, [submission(`${author}-1`, "q1", 5)], {
+		acceptingSubmissions: true,
+	});
+
+test("attemptRows: a student whose extra time is still running is in progress while a classmate is submitted", () => {
+	// The exam's window ended 40 minutes ago; ana has 45 more minutes.
+	const rows = attemptRows(
+		justClosedExam(),
+		QUESTIONS,
+		[unclosed("ana"), unclosed("bob")],
+		[],
+		[student("ana", "Ana"), student("bob", "Bob")],
+		NOW,
+		new Map([["ana", extraMinutes(45)]]),
+	);
+
+	expect(rows.map((r) => [r.author, r.state, r.pending, r.total])).toEqual([
+		["ana", "in-progress", 0, null],
+		["bob", "submitted", 1, null],
+	]);
+});
+
+test("attemptRows: extra time that has run out leaves the attempt submitted", () => {
+	const rows = attemptRows(
+		justClosedExam(),
+		QUESTIONS,
+		[unclosed("ana")],
+		[],
+		[student("ana", "Ana")],
+		NOW,
+		new Map([["ana", extraMinutes(30)]]),
+	);
+
+	expect(rows[0]?.state).toBe("submitted");
+});
+
+test("attemptRows: a makeup in progress keeps the attempt open on an exam completed by hand", () => {
+	const completed = justClosedExam({ status: "COMPLETED" });
+	const makeup: ExceptionTiming = {
+		extraTime: null,
+		scheduledAt: at(10_000 - 10),
+	};
+	const [row] = attemptRows(
+		completed,
+		QUESTIONS,
+		[unclosed("ana")],
+		[],
+		[student("ana", "Ana")],
+		NOW,
+		new Map([["ana", makeup]]),
+	);
+
+	expect(row?.state).toBe("in-progress");
+});
+
+test("countingAnswers: an answer waits until its author's extra time is over", () => {
+	const attempts = [unclosed("ana"), unclosed("bob")];
+	const counted = (extra: number) =>
+		countingAnswers(
+			justClosedExam(),
+			QUESTIONS,
+			attempts,
+			[],
+			NOW,
+			new Map([["ana", extraMinutes(extra)]]),
+		).map((a) => a.author);
+
+	expect(counted(45)).toEqual(["bob"]);
+	expect(counted(30).sort()).toEqual(["ana", "bob"]);
 });

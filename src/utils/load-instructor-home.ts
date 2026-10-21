@@ -9,6 +9,7 @@ import {
 	type TaughtExam,
 } from "@/services/instructor-home";
 import { courseHref } from "@/urls";
+import { loadCourseExceptions } from "./load-exam-exceptions";
 
 /**
  * Loads the courses `actor` teaches and builds their home page sections at `now`.
@@ -40,17 +41,23 @@ export async function loadInstructorHome(
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};
-			const [exams, attempts, feedback, questions] = await Promise.all([
-				db.exam.findMany({ course: course.id }, { actor }),
-				db.response.findMany({ course: course.id, practice: false }, { actor }),
-				db.feedback.findMany({ course: course.id }, { actor }),
-				db.question.findMany({ course: course.id, public: false }, { actor }),
-			]);
+			const [exams, attempts, feedback, questions, exceptions] =
+				await Promise.all([
+					db.exam.findMany({ course: course.id }, { actor }),
+					db.response.findMany(
+						{ course: course.id, practice: false },
+						{ actor },
+					),
+					db.feedback.findMany({ course: course.id }, { actor }),
+					db.question.findMany({ course: course.id, public: false }, { actor }),
+					loadCourseExceptions(course.id),
+				]);
 
 			const taughtExams: TaughtExam[] = exams.map((exam) => ({
 				course: home,
 				exam,
 				enrolled: course.enrollmentCount,
+				exceptions: exceptions.get(exam.slug),
 				attempts: attempts
 					.filter((attempt) => attempt.exam === exam.slug)
 					.map((attempt) => ({

@@ -1,6 +1,6 @@
 ---
 type: spec
-status: todo
+status: implemented
 tags: [exams, deadlines, instructor, accommodations]
 relatedTo: [exam-state, response-service, submission-service, web-grading, calendar-feed]
 ---

@@ -28,6 +28,10 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "courseId", from: "number", to: "CourseId" },
 	],
 	Exam: [{ field: "id", from: "number", to: "ExamId" }],
+	ExamException: [
+		{ field: "id", from: "number", to: "ExamExceptionId" },
+		{ field: "examId", from: "number", to: "ExamId" },
+	],
 	Feedback: [
 		{ field: "id", from: "number", to: "FeedbackId" },
 		{ field: "submissionId", from: "number", to: "SubmissionId" },

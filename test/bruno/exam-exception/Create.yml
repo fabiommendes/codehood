@@ -1,0 +1,24 @@
+info:
+  name: Create
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/quiz-01/exception
+  body:
+    type: json
+    data: |-
+      {
+          "username": "student",
+          "extraTime": { "minutes": 30 },
+          "note": "atestado"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

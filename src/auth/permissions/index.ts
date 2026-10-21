@@ -48,6 +48,7 @@ type ExtraPerms =
 	| "question.read-public"
 	| "response.submit"
 	| "roll-call.manage"
+	| "exam.manage-exceptions"
 	| "api-key.manage"
 	| "calendar-feed.manage"
 	| "session.manage"
@@ -322,6 +323,17 @@ const PERMISSIONS = {
 	// an admin who does not teach the course holds this right too. A student
 	// only reads their own attendance, which `course.read-contents` covers.
 	"roll-call.manage": {
+		admin: true,
+		other: (actor, target) => isCourseOwner(actor, target),
+		audit: auditCourse,
+	} satisfies PermDef<CourseTarget>,
+
+	// EXAM EXCEPTION ------------------------------------------------------------
+	// Rule: SYSTEM, any admin, or the course's own instructor grants, edits and
+	// removes a student's exam exception, and reads every exception of the
+	// course. A student reads only their own, without the instructor's note,
+	// which the service decides from the row's username, not from here.
+	"exam.manage-exceptions": {
 		admin: true,
 		other: (actor, target) => isCourseOwner(actor, target),
 		audit: auditCourse,

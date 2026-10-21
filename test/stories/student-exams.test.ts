@@ -636,3 +636,82 @@ test("student: see my course grades", async ({ page }) => {
 		await expect(list.getByRole("listitem").nth(2)).toContainText("5");
 	});
 });
+
+test("student: Answer an exam with the extra time I was granted", async ({
+	page,
+}) => {
+	const student = await seedUser({ role: "STUDENT", username: "extra-time" });
+	const classmate = await seedUser({ role: "STUDENT", username: "no-extra" });
+	const course = await persistedCourseFactory.create();
+	for (const who of [student, classmate]) {
+		await db.enrollment.create(
+			{ course: course.id, username: who.username },
+			FULL_ACCESS,
+		);
+	}
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	const question = await db.question.create(
+		{
+			status: "PUBLISHED",
+			version: "1",
+			course: course.id,
+			slug: "capital-choice",
+			question: capitalChoice,
+		},
+		FULL_ACCESS,
+	);
+	// The class's window closed 20 minutes ago; 30 extra minutes leave 10.
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "late-midterm",
+		title: "Late midterm",
+		type: "EXAM",
+		status: "SCHEDULED",
+		scheduledAt: new Date(Date.now() - 80 * MINUTE),
+		duration: { hours: 1 },
+		questions: [{ slug: "capital-choice" }],
+	});
+	await db.examException.create(
+		{
+			course: course.id,
+			exam: exam.slug,
+			username: student.username,
+			extraTime: { minutes: 30 },
+		},
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, student);
+	await page.goto(`${href}/exams/${exam.slug}`);
+
+	await test.step("the exam page shows the student's own extra time", async () => {
+		await expect(page.getByText(/30 min for you/)).toBeVisible();
+		await expect(page.getByText("Open now", { exact: true })).toBeVisible();
+	});
+
+	await test.step("the exam is open for them: they start it and the answer is accepted after the class's deadline", async () => {
+		await page.getByRole("button", { name: "Start exam" }).click();
+		await page.getByRole("radio", { name: "Brasília" }).check();
+
+		await expect
+			.poll(() => latestAnswer(student.username, exam.id, question.id))
+			.toEqual({ choice: "brasilia" });
+		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
+	});
+
+	await test.step("a classmate with no exception sees the same exam closed and cannot start it", async () => {
+		await page.context().clearCookies();
+		await logInAs(page, classmate);
+		await page.goto(`${href}/exams/${exam.slug}`);
+
+		await expect(page.getByText("Missed", { exact: true })).toBeVisible();
+		await expect(page.getByText(/for you/)).toHaveCount(0);
+		await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(
+			0,
+		);
+	});
+});

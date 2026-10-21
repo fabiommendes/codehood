@@ -17,6 +17,7 @@
 	"forms_schema_public_id_invalid": "Identificador público inválido.",
 	"forms_schema_edition_slug_invalid": "Use um ano, opcionalmente seguido de hífen e do número do período, como 2026-1.",
 	"forms_schema_duration_positive": "A duração deve ser maior que zero",
+	"forms_schema_extra_time_max": "O tempo extra é de no máximo 24 horas",
 	"forms_schema_score_format": "Informe um decimal ou uma fração 'n/d'.",
 	"forms_schema_score_range": "A nota deve ser um número entre -1 e 1.",
 	"forms_schema_grade_one_value": "Cada estudante tem no máximo um valor por coluna.",
@@ -60,5 +61,9 @@
 	"forms_label_github_username_optional": "Usuário do GitHub (opcional)",
 	"forms_label_school_id_optional": "Matrícula (opcional)",
 	"forms_label_invite_max_uses": "Limitar a N usos (opcional)",
-	"forms_placeholder_invite_max_uses": "Ilimitado"
+	"forms_placeholder_invite_max_uses": "Ilimitado",
+	"forms_label_exception_student": "Aluno",
+	"forms_label_exception_extra_minutes": "Tempo extra (minutos)",
+	"forms_label_exception_scheduled_at": "Nova data e hora",
+	"forms_label_exception_note": "Observação"
 }

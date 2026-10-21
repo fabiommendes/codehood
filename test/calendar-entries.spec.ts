@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { CalendarEvent, Exam } from "@/db";
 import { calendarEntries } from "@/services/calendar-entries";
+import type { ExceptionTiming } from "@/services/exam-state";
 
 const MINUTE = 60_000;
 
@@ -207,4 +208,63 @@ test("an entry ends after its meeting length or its answering window", () => {
 
 test("nothing in, nothing out", () => {
 	expect(calendarEntries([], [])).toEqual([]);
+});
+
+//
+// Personal timing
+//
+
+test("a makeup moves the viewer's entry to the personal window", () => {
+	const midterm = exam("midterm", {
+		scheduledAt: at(0),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(1000) };
+
+	const [entry] = calendarEntries(
+		[],
+		[{ courseId: COURSE_A, exam: midterm, exception: makeup }],
+	);
+	const [classmate] = calendarEntries(
+		[],
+		[{ courseId: COURSE_A, exam: midterm }],
+	);
+
+	expect([entry?.startAt, entry?.endAt]).toEqual([at(1000), at(1060)]);
+	expect(entry?.kind === "exam" && entry.exam).toBe(midterm);
+	expect([classmate?.startAt, classmate?.endAt]).toEqual([at(0), at(60)]);
+});
+
+test("extra time lengthens the viewer's entry and keeps its start", () => {
+	const midterm = exam("midterm", {
+		scheduledAt: at(0),
+		duration: { minutes: 60 },
+		extraTime: { minutes: 10 },
+	});
+	const extra: ExceptionTiming = {
+		extraTime: { minutes: 30 },
+		scheduledAt: null,
+	};
+
+	const [entry] = calendarEntries(
+		[],
+		[{ courseId: COURSE_A, exam: midterm, exception: extra }],
+	);
+
+	expect([entry?.startAt, entry?.endAt]).toEqual([at(0), at(100)]);
+});
+
+test("a makeup reorders the viewer's calendar", () => {
+	const midterm = exam("midterm", {
+		scheduledAt: at(0),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(1000) };
+
+	const entries = calendarEntries(
+		[event("lab", at(500))],
+		[{ courseId: COURSE_A, exam: midterm, exception: makeup }],
+	);
+
+	expect(titles(entries)).toEqual(["lab", "midterm"]);
 });

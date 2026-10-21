@@ -11,7 +11,12 @@ import type { Feedback } from "@/db/services/feedback.service";
 import type { Response } from "@/db/services/response.service";
 import type { Submission } from "@/db/services/submission.service";
 import { examResult } from "./exam-result";
-import { attemptState, type ExamTiming } from "./exam-state";
+import {
+	attemptState,
+	type ExamTiming,
+	type ExceptionTiming,
+	personalTiming,
+} from "./exam-state";
 
 /// Where a counting answer stands: waiting for a grade, graded, or marked will-not-grade.
 export type AnswerState = "pending" | "graded" | "not-graded";
@@ -85,8 +90,13 @@ export type GradingFeedback = Pick<
  * Otherwise it is `graded` when its newest pass has a score, and `pending`
  * when it has none.
  *
+ * An attempt is judged against its author's personal timing,
+ * `personalTiming(exam, exceptions.get(author) ?? null)`, so an attempt
+ * whose author still has time left is not counted yet.
+ *
  * @params questions The exam's question slugs.
  * @params feedback Every grading pass on the exam, released or not.
+ * @params exceptions The exam's exceptions, by username.
  */
 export function countingAnswers(
 	exam: ExamTiming,
@@ -94,6 +104,7 @@ export function countingAnswers(
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
 	now: Date,
+	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): CountingAnswer[] {
 	const passesBySubmission = new Map<string, GradingFeedback[]>();
 	for (const pass of feedback) {
@@ -104,7 +115,11 @@ export function countingAnswers(
 
 	const answers: { answer: CountingAnswer; id: number }[] = [];
 	for (const attempt of attempts) {
-		const { kind } = attemptState(exam, attempt, now);
+		const { kind } = attemptState(
+			personalTiming(exam, exceptions.get(attempt.author) ?? null),
+			attempt,
+			now,
+		);
 		if (kind !== "submitted" && kind !== "results") continue;
 
 		const newest = new Map<string, GradingAttempt["submissions"][number]>();
@@ -225,6 +240,7 @@ export interface QuestionStats extends QueueEntry {
  *
  * @params questions The exam's question slugs, in exam order.
  * @params feedback Every grading pass on the exam, released or not.
+ * @params exceptions The exam's exceptions, by username, as in {@link countingAnswers}.
  */
 export function questionStats(
 	exam: ExamTiming,
@@ -232,8 +248,16 @@ export function questionStats(
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
 	now: Date,
+	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): QuestionStats[] {
-	const answers = countingAnswers(exam, questions, attempts, feedback, now);
+	const answers = countingAnswers(
+		exam,
+		questions,
+		attempts,
+		feedback,
+		now,
+		exceptions,
+	);
 	return gradingQueue(questions, answers).map((entry) => {
 		const verdicts = answers
 			.filter((answer) => answer.question === entry.question)
@@ -332,6 +356,7 @@ export interface AttemptRow {
  * @params questions The exam's question slugs.
  * @params feedback Every grading pass on the exam, released or not.
  * @params students The course's students, dropped ones included.
+ * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
  */
 export function attemptRows(
 	exam: ExamTiming,
@@ -340,6 +365,7 @@ export function attemptRows(
 	feedback: GradingFeedback[],
 	students: GradedStudent[],
 	now: Date,
+	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): AttemptRow[] {
 	const studentsByUsername = new Map(
 		students.map((student) => [student.username, student]),
@@ -351,6 +377,7 @@ export function attemptRows(
 		attempts,
 		feedback,
 		now,
+		exceptions,
 	)) {
 		if (answer.state !== "pending") continue;
 		pendingByAuthor.set(
@@ -360,7 +387,11 @@ export function attemptRows(
 	}
 
 	const rows = attempts.map((attempt): AttemptRow => {
-		const { kind } = attemptState(exam, attempt, now);
+		const { kind } = attemptState(
+			personalTiming(exam, exceptions.get(attempt.author) ?? null),
+			attempt,
+			now,
+		);
 		const closed = kind === "submitted" || kind === "results";
 		const student = studentsByUsername.get(attempt.author);
 		const answered = new Set(

@@ -10,6 +10,7 @@
 import type { CalendarEvent } from "@/db/services/calendar-event.service";
 import type { Exam } from "@/db/services/exam.service";
 import { durationToMinutes, endOf } from "@/utils/schedule-time";
+import { type ExceptionTiming, personalTiming, windowEnd } from "./exam-state";
 
 type CourseId = CalendarEvent["courseId"];
 
@@ -17,6 +18,12 @@ type CourseId = CalendarEvent["courseId"];
 export interface CourseExam {
 	courseId: CourseId;
 	exam: Exam;
+	/**
+	 * The viewer's own exception on this exam, absent for none or for an
+	 * instructor. The entry then starts and ends with the viewer's personal
+	 * window, `personalTiming(exam, exception)` through `windowEnd`.
+	 */
+	exception?: ExceptionTiming | null;
 }
 
 /// One dated item on the calendar, either a course meeting or an exam.
@@ -40,14 +47,15 @@ export function calendarEntries(
 	exams: readonly CourseExam[],
 ): CalendarEntry[] {
 	const examEntries: CalendarEntry[] = [];
-	for (const { courseId, exam } of exams) {
-		if (!exam.scheduledAt || exam.status === "ARCHIVED") continue;
+	for (const { courseId, exam, exception } of exams) {
+		const personal = personalTiming(exam, exception ?? null);
+		if (!personal.scheduledAt || exam.status === "ARCHIVED") continue;
 		examEntries.push({
 			kind: "exam",
 			exam,
 			courseId,
-			startAt: exam.scheduledAt,
-			endAt: endOf(exam.scheduledAt, windowMinutes(exam)),
+			startAt: personal.scheduledAt,
+			endAt: windowEnd(personal) ?? personal.scheduledAt,
 		});
 	}
 	const eventEntries: CalendarEntry[] = events.map((event) => ({
@@ -62,11 +70,4 @@ export function calendarEntries(
 	return [...examEntries, ...eventEntries].sort(
 		(a, b) => a.startAt.getTime() - b.startAt.getTime(),
 	);
-}
-
-/// An exam's answering window in minutes, `duration + extraTime`, zero when untimed.
-function windowMinutes(exam: Exam): number {
-	if (!exam.duration) return 0;
-	const extra = exam.extraTime ? durationToMinutes(exam.extraTime) : 0;
-	return durationToMinutes(exam.duration) + extra;
 }

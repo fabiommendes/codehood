@@ -9,6 +9,7 @@ import {
 	courseGradesReport,
 	gradesTable,
 } from "@/services/grades-table";
+import { loadCourseExceptions } from "./load-exam-exceptions";
 
 /**
  * Loads a course's exam results for every enrolled student at `now`.
@@ -33,19 +34,22 @@ export async function loadCourseGrades(
 	}
 
 	const opts: { actor: Actor } = { actor };
-	const [exams, active, dropped, attempts, feedback] = await Promise.all([
-		db.exam.findMany({ course: found.id }, opts),
-		db.enrollment.findMany({ course: found.id, status: "ACTIVE" }, opts),
-		db.enrollment.findMany({ course: found.id, status: "DROPPED" }, opts),
-		db.response.findMany({ course: found.id, practice: false }, opts),
-		db.feedback.findMany({ course: found.id }, opts),
-	]);
+	const [exams, active, dropped, attempts, feedback, exceptions] =
+		await Promise.all([
+			db.exam.findMany({ course: found.id }, opts),
+			db.enrollment.findMany({ course: found.id, status: "ACTIVE" }, opts),
+			db.enrollment.findMany({ course: found.id, status: "DROPPED" }, opts),
+			db.response.findMany({ course: found.id, practice: false }, opts),
+			db.feedback.findMany({ course: found.id }, opts),
+			loadCourseExceptions(found.id),
+		]);
 	const students = [
 		...active.map(({ username, name }) => ({ username, name, dropped: false })),
 		...dropped.map(({ username, name }) => ({ username, name, dropped: true })),
 	];
 	const table = gradesTable(exams, students, attempts, feedback, now, {
 		withDropped: true,
+		exceptions,
 	});
 	return courseGradesReport(table, [...active, ...dropped]);
 }

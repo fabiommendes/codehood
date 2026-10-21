@@ -17,6 +17,7 @@
 	"forms_schema_public_id_invalid": "Invalid public id.",
 	"forms_schema_edition_slug_invalid": "Use a year, optionally followed by a dash and a term number, like 2026-1.",
 	"forms_schema_duration_positive": "Duration must be longer than zero",
+	"forms_schema_extra_time_max": "Extra time is at most 24 hours",
 	"forms_schema_score_format": "Expected a decimal or an 'n/d' fraction.",
 	"forms_schema_score_range": "Score must be a number between -1 and 1.",
 	"forms_schema_grade_one_value": "A student has at most one value in a column.",
@@ -60,5 +61,9 @@
 	"forms_label_github_username_optional": "GitHub username (optional)",
 	"forms_label_school_id_optional": "School id (optional)",
 	"forms_label_invite_max_uses": "Limit to N uses (optional)",
-	"forms_placeholder_invite_max_uses": "Unlimited"
+	"forms_placeholder_invite_max_uses": "Unlimited",
+	"forms_label_exception_student": "Student",
+	"forms_label_exception_extra_minutes": "Extra time (minutes)",
+	"forms_label_exception_scheduled_at": "New date and time",
+	"forms_label_exception_note": "Note"
 }

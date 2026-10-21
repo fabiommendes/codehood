@@ -10,6 +10,7 @@ import {
 	studentHome,
 } from "@/services/student-home";
 import { courseHref } from "@/urls";
+import { loadCourseExceptions } from "./load-exam-exceptions";
 import { localDateOf, toInstant } from "./schedule-time";
 
 /**
@@ -37,7 +38,7 @@ export async function loadStudentHome(
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};
-			const [exams, attempts, feedback] = await Promise.all([
+			const [exams, attempts, feedback, exceptions] = await Promise.all([
 				db.exam.findMany({ course: course.id }, { actor }),
 				db.response.findMany(
 					{ course: course.id, author: actor.username, practice: false },
@@ -47,15 +48,19 @@ export async function loadStudentHome(
 					{ course: course.id, author: actor.username },
 					{ actor },
 				),
+				loadCourseExceptions(course.id),
 			]);
 
 			const homeExams: HomeExam[] = exams.map((exam) => {
 				const attempt = attempts.find((entry) => entry.exam === exam.slug);
-				const released = attempt && resultsReleased(exam, now);
+				const all = [...(exceptions.get(exam.slug)?.values() ?? [])];
+				const released = attempt && resultsReleased(exam, now, all);
 				return {
 					course: home,
 					exam,
 					attempt: attempt ?? null,
+					exception: exceptions.get(exam.slug)?.get(actor.username) ?? null,
+					exceptions: all,
 					result: released
 						? examResult(
 								exam.questions.map((question) => question.slug),

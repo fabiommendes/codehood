@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
 import {
 	fillField,
+	futureDate,
 	logInAs,
 	openTab,
 	resetDatabase,
@@ -12,6 +15,8 @@ import {
 } from "./helpers";
 
 test.beforeEach(resetDatabase);
+
+const MINUTE = 60_000;
 
 test("instructor: browse the question bank", async ({ page }) => {
 	const course = await persistedCourseFactory.create();
@@ -236,5 +241,180 @@ test("instructor: Let a bot grade for me", async ({ page, request }) => {
 			headers: { Authorization: "Bearer not-a-real-key" },
 		});
 		expect(res.ok()).toBe(false);
+	});
+});
+
+test("instructor: Give a student extra time or a makeup exam", async ({
+	page,
+}) => {
+	const course = await persistedCourseFactory.create();
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	const ana = await seedUser({
+		role: "STUDENT",
+		username: "exc-ana",
+		name: "Ana Accommodated",
+	});
+	const bia = await seedUser({
+		role: "STUDENT",
+		username: "exc-bia",
+		name: "Bia Absent",
+	});
+	for (const student of [ana, bia]) {
+		await db.enrollment.create(
+			{ course: course.id, username: student.username },
+			FULL_ACCESS,
+		);
+	}
+
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "exc-midterm",
+		title: "Exception midterm",
+		type: "EXAM",
+		status: "ONGOING",
+	});
+	// Ana's attempt is closed with nothing to grade, so only timing can block the release.
+	const attempt = await db.response.create(
+		{ course: course.id, exam: exam.slug, author: ana.username },
+		FULL_ACCESS,
+	);
+	await db.response.update(
+		{ publicId: attempt.publicId },
+		{ acceptingSubmissions: false },
+		FULL_ACCESS,
+	);
+	// Closed for the class an hour ago: scheduled two hours back, 60 minutes long.
+	await prisma.exam.update({
+		where: { id: exam.id },
+		data: {
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() - 120 * MINUTE),
+			durationMs: 60 * MINUTE,
+		},
+	});
+
+	await logInAs(page, course.instructor);
+	const examUrl = `${href}/exams/${exam.slug}`;
+	const exceptions = page.locator("section").filter({
+		has: page.getByRole("heading", { name: "Exceptions", exact: true }),
+	});
+	const dialog = page.getByRole("dialog");
+	const releaseButton = page.getByRole("button", { name: "Release results" });
+
+	const exceptionOf = (username: string) =>
+		db.examException.findOne(
+			{ course: course.id, exam: exam.slug, username },
+			FULL_ACCESS,
+		);
+
+	async function pickStudent(username: string) {
+		await dialog
+			.getByRole("group", { name: "Student", exact: true })
+			.getByRole("combobox")
+			.selectOption(username);
+	}
+
+	await test.step("with no exceptions, the closed exam can be released", async () => {
+		await page.goto(examUrl);
+		await expect(releaseButton).toBeVisible();
+		await expect(
+			exceptions.getByRole("button", { name: "Add exception" }),
+		).toBeVisible();
+	});
+
+	await test.step("saving an exception that grants nothing is refused and stores nothing", async () => {
+		await exceptions.getByRole("button", { name: "Add exception" }).click();
+		await expect(dialog).toBeVisible();
+		await pickStudent(ana.username);
+		await dialog.getByRole("button", { name: "Save" }).click();
+
+		await expect(dialog.getByRole("alert")).toBeVisible();
+		await expect(dialog).toBeVisible();
+		expect(await exceptionOf(ana.username)).toBeNull();
+	});
+
+	await test.step("extra time is added to one student and shown in the exam's exception list", async () => {
+		await fillField(page, "Extra time (minutes)", "90");
+		await fillField(page, "Note", "special accommodation");
+		await dialog.getByRole("button", { name: "Save" }).click();
+		await expect(dialog).toBeHidden();
+
+		const row = exceptions
+			.getByRole("row")
+			.filter({ hasText: "Ana Accommodated" });
+		await expect(row).toContainText("+90 min");
+		expect(await exceptionOf(ana.username)).toMatchObject({
+			note: "special accommodation",
+		});
+	});
+
+	await test.step("a makeup date is added to another student", async () => {
+		await exceptions.getByRole("button", { name: "Add exception" }).click();
+		await pickStudent(bia.username);
+		await fillField(page, "New date and time", `${futureDate(2).date}T14:00`);
+		await dialog.getByRole("button", { name: "Save" }).click();
+		await expect(dialog).toBeHidden();
+
+		await expect(
+			exceptions.getByRole("row").filter({ hasText: "Bia Absent" }),
+		).toBeVisible();
+		const stored = await exceptionOf(bia.username);
+		expect(stored?.scheduledAt?.getTime()).toBeGreaterThan(
+			Date.now() + 24 * 60 * MINUTE,
+		);
+	});
+
+	await test.step("while personal windows are pending, the release is blocked and the page says why", async () => {
+		await page.reload();
+		await expect(
+			page.getByText("A student with an exception can still answer this exam"),
+		).toBeVisible();
+		await expect(releaseButton).toHaveCount(0);
+	});
+
+	await test.step("the attempt page shows the exception and reopens a closed attempt inside the personal window", async () => {
+		await page.goto(`${examUrl}/attempts/${ana.username}`);
+		await expect(page.getByText("+90 min")).toBeVisible();
+		await expect(
+			page.getByRole("link", { name: "Edit exception" }),
+		).toBeVisible();
+
+		await page.getByRole("button", { name: "Reopen attempt" }).click();
+
+		await expect(
+			page.getByRole("button", { name: "Reopen attempt" }),
+		).toHaveCount(0);
+		await expect(page.getByText("In progress").first()).toBeVisible();
+		await expect(
+			prisma.response.findUniqueOrThrow({ where: { id: attempt.id } }),
+		).resolves.toMatchObject({ acceptingSubmissions: true });
+	});
+
+	await test.step("removing an exception asks for confirmation and takes the student back to the exam's timing", async () => {
+		await page.goto(examUrl);
+		for (const name of ["Ana Accommodated", "Bia Absent"]) {
+			await exceptions
+				.getByRole("row")
+				.filter({ hasText: name })
+				.getByRole("button", { name: "Remove" })
+				.click();
+			await expect(
+				dialog.getByRole("heading", { name: "Remove exception?" }),
+			).toBeVisible();
+			await dialog.getByRole("button", { name: "Remove" }).click();
+			await expect(dialog).toBeHidden();
+			await expect(
+				exceptions.getByRole("row").filter({ hasText: name }),
+			).toHaveCount(0);
+		}
+		expect(await exceptionOf(ana.username)).toBeNull();
+		expect(await exceptionOf(bia.username)).toBeNull();
+
+		await page.reload();
+		await expect(releaseButton).toBeVisible();
 	});
 });

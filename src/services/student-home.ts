@@ -11,7 +11,9 @@ import type { ExamResult } from "./exam-result";
 import {
 	type AttemptTiming,
 	attemptState,
+	type ExceptionTiming,
 	examPhase,
+	personalTiming,
 	releaseMoment,
 	windowEnd,
 } from "./exam-state";
@@ -35,6 +37,15 @@ export interface HomeExam {
 	attempt: AttemptTiming | null;
 	/// The student's graded result, or `null` when the exam has not released results.
 	result: ExamResult | null;
+	/// The student's own exception on this exam. Absent means none.
+	exception?: ExceptionTiming | null;
+	/**
+	 * Every exception of the exam, used only to decide whether and when
+	 * results are released ({@link resultsReleased}, {@link releaseMoment}).
+	 * Loaded by a trusted actor, since a student cannot read other students'
+	 * exceptions; never shown. Absent means none.
+	 */
+	exceptions?: readonly ExceptionTiming[];
 }
 
 /// One calendar event of a course the student takes.
@@ -77,22 +88,35 @@ export interface StudentHome {
  * `PRACTICE` exams never appear: they are always open and would crowd out
  * what has a deadline. An exam counts as a recent result by its
  * {@link releaseMoment}, so one released with no known moment never does.
+ *
+ * Each exam is placed by the student's personal timing (`openNow`,
+ * `upcoming`, `next` and their dates, from `personalTiming(exam, exception)`),
+ * while release is decided on the exam's own timing and `exceptions`. The
+ * returned `exam` is always the exam itself, not the personal timing.
  */
 export function studentHome(
 	exams: HomeExam[],
 	events: HomeEvent[],
 	now: Date,
 ): StudentHome {
-	const graded = exams.filter(({ exam }) => exam.type !== "PRACTICE");
-	const visible = graded.filter(
-		({ exam }) => !["draft", "archived"].includes(examPhase(exam, now)),
-	);
+	const visible = exams
+		.filter(({ exam }) => exam.type !== "PRACTICE")
+		.map((entry) => ({
+			...entry,
+			personal: personalTiming(entry.exam, entry.exception ?? null),
+		}))
+		.filter(
+			({ personal }) =>
+				!["draft", "archived"].includes(examPhase(personal, now)),
+		);
 
 	const openNow = visible
-		.flatMap(({ course, exam, attempt }) => {
-			const state = attemptState(exam, attempt, now);
+		.flatMap(({ course, exam, personal, attempt }) => {
+			const state = attemptState(personal, attempt, now);
 			if (state.kind === "can-start") {
-				return [{ course, exam, deadline: windowEnd(exam), started: false }];
+				return [
+					{ course, exam, deadline: windowEnd(personal), started: false },
+				];
 			}
 			if (state.kind === "in-progress") {
 				return [{ course, exam, deadline: state.deadline, started: true }];
@@ -103,12 +127,12 @@ export function studentHome(
 
 	const horizon = now.getTime() + HOME_HORIZON_MS;
 	const upcoming = visible
-		.filter(({ exam }) => examPhase(exam, now) === "upcoming")
-		.flatMap(({ course, exam }) =>
-			exam.scheduledAt &&
-			exam.scheduledAt >= now &&
-			exam.scheduledAt.getTime() <= horizon
-				? [{ course, exam, opensAt: exam.scheduledAt }]
+		.filter(({ personal }) => examPhase(personal, now) === "upcoming")
+		.flatMap(({ course, exam, personal }) =>
+			personal.scheduledAt &&
+			personal.scheduledAt >= now &&
+			personal.scheduledAt.getTime() <= horizon
+				? [{ course, exam, opensAt: personal.scheduledAt }]
 				: [],
 		)
 		.sort((a, b) => a.opensAt.getTime() - b.opensAt.getTime());
@@ -119,8 +143,8 @@ export function studentHome(
 
 	const since = now.getTime() - HOME_HORIZON_MS;
 	const results = visible
-		.flatMap(({ course, exam, attempt, result }) => {
-			const releasedAt = releaseMoment(exam, now);
+		.flatMap(({ course, exam, attempt, result, exceptions = [] }) => {
+			const releasedAt = releaseMoment(exam, now, exceptions);
 			if (!attempt || !result || !releasedAt) return [];
 			const at = releasedAt.getTime();
 			if (at < since || at > now.getTime()) return [];
@@ -148,7 +172,7 @@ function compareNullsLast(a: Date | null, b: Date | null): number {
 
 /// The earliest event or exam start after `now`, however far ahead.
 function nextThing(
-	exams: HomeExam[],
+	exams: { course: HomeCourse; exam: Exam; personal: Exam }[],
 	events: HomeEvent[],
 	now: Date,
 ): StudentHome["next"] {
@@ -161,9 +185,9 @@ function nextThing(
 				event,
 				at: event.startAt,
 			})),
-		...exams.flatMap(({ course, exam }) =>
-			exam.scheduledAt && exam.scheduledAt > now
-				? [{ kind: "exam" as const, course, exam, at: exam.scheduledAt }]
+		...exams.flatMap(({ course, exam, personal }) =>
+			personal.scheduledAt && personal.scheduledAt > now
+				? [{ kind: "exam" as const, course, exam, at: personal.scheduledAt }]
 				: [],
 		),
 	];

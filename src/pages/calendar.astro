@@ -18,6 +18,7 @@ import {
 } from "@/services/calendar-entries";
 import { courseHref } from "@/urls";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
+import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { formatDateTime, localDateOf, toInstant } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -63,11 +64,17 @@ const events =
 		: [];
 const exams = (
 	await Promise.all(
-		courses.map(async (course) =>
-			(
-				await db.exam.findMany({ course: course.id }, { actor })
-			).map((exam) => ({ courseId: course.id, exam })),
-		),
+		courses.map(async (course) => {
+			const [courseExams, exceptions] = await Promise.all([
+				db.exam.findMany({ course: course.id }, { actor }),
+				loadCourseExceptions(course.id),
+			]);
+			return courseExams.map((exam) => ({
+				courseId: course.id,
+				exam,
+				exception: exceptions.get(exam.slug)?.get(actor.username) ?? null,
+			}));
+		}),
 	)
 ).flat();
 const entries = calendarEntries(events, exams);

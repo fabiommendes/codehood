@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import type { Exam } from "@/db";
+import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradeCell,
 	gradesCsvRows,
@@ -591,4 +592,71 @@ test("gradesCsvRows: a total is rounded to two decimals", () => {
 	);
 
 	expect(rows[1]).toEqual(["ana", "Ana", "active", 50, 33.33]);
+});
+
+//
+// Personal timing
+//
+
+const bob = student("bob", "Bob");
+
+/// Scheduled 100 minutes before `NOW`, 60 minutes long: its window closed 40 minutes before `NOW`.
+const justClosed = () =>
+	single("e", {
+		status: "SCHEDULED",
+		scheduledAt: at(10_000 - 100),
+		duration: { minutes: 60 },
+	});
+
+const withExtra = (minutes: number) =>
+	new Map<string, ReadonlyMap<string, ExceptionTiming>>([
+		[
+			"e",
+			new Map([
+				[
+					"ana",
+					{ extraTime: { minutes }, scheduledAt: null } as ExceptionTiming,
+				],
+			]),
+		],
+	]);
+
+function personalCells(
+	exceptions: ReturnType<typeof withExtra>,
+	now: Date,
+	sittings: ReturnType<typeof sat>[] = [],
+) {
+	const table = gradesTable(
+		[justClosed()],
+		[ana, bob],
+		sittings.map((s) => s.attempt),
+		sittings.flatMap((s) => s.feedback),
+		now,
+		{ exceptions },
+	);
+	return table.rows.map((row) => [row.username, row.cells[0]?.kind]);
+}
+
+test("gradesTable: a student with extra time left is not missed, a classmate without an attempt is", () => {
+	expect(personalCells(withExtra(45), NOW)).toEqual([
+		["ana", "empty"],
+		["bob", "missed"],
+	]);
+});
+
+test("gradesTable: the student is missed once their own window has closed", () => {
+	expect(personalCells(withExtra(45), at(10_006))).toEqual([
+		["ana", "missed"],
+		["bob", "missed"],
+	]);
+});
+
+test("gradesTable: an unclosed attempt inside the personal window is in progress, not pending", () => {
+	const ongoing = sat("e", "ana", { q1: null }, { open: true });
+	const unrelated = sat("e", "bob", { q1: null }, { open: true });
+
+	expect(personalCells(withExtra(45), NOW, [ongoing, unrelated])).toEqual([
+		["ana", "in-progress"],
+		["bob", "pending"],
+	]);
 });

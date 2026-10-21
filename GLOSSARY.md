@@ -183,6 +183,15 @@ or EXAM. Its status moves DRAFT → SCHEDULED → ONGOING → COMPLETED
 a [Question version](#question-version) so the paper does not change while
 students are taking it.
 
+## Exam exception
+
+Type: domain
+
+One student's adjustment to an [Exam](#exam)'s timing: extra time, a makeup
+start date, or both. Every "may this student answer now?" check uses the
+student's personal window, the exam's window with the exception applied. Grades
+of an exam are not released while a personal window is still open or upcoming.
+
 ## Grade column
 
 Type: domain

@@ -11,10 +11,13 @@ import { examResult, formatScore } from "@/services/exam-result";
 import {
 	type AttemptState,
 	attemptState,
+	type ExceptionTiming,
+	personalTiming,
 	resultsReleased,
 } from "@/services/exam-state";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
+import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 
 export const prerender = false;
 
@@ -32,7 +35,15 @@ const canWrite = hasPerm(actor, "course.update-contents", course);
 // contents, so this list is exactly what `actor` may see.
 const exams = await db.exam.findMany({ course: course.id }, { actor });
 const now = new Date();
-const groups = canWrite ? [] : groupExamsForStudent(exams, now);
+// Never sent to the client: the student's own entries shift their windows and
+// the whole set decides whether grades are released.
+const exceptions = canWrite ? new Map() : await loadCourseExceptions(course.id);
+const ownExceptions = new Map<string, ExceptionTiming>();
+for (const [slug, byUser] of exceptions) {
+	const own = byUser.get(actor.username);
+	if (own) ownExceptions.set(slug, own);
+}
+const groups = canWrite ? [] : groupExamsForStudent(exams, now, ownExceptions);
 
 // A student's attempt state and released total per exam slug, from one
 // attempts query and one feedback query for the whole course. Pending or
@@ -52,8 +63,18 @@ if (!canWrite) {
 	]);
 	for (const exam of exams) {
 		const attempt = attempts.find((entry) => entry.exam === exam.slug);
-		states.set(exam.slug, attemptState(exam, attempt ?? null, now));
-		if (!attempt || !resultsReleased(exam, now)) continue;
+		const everyone = [...(exceptions.get(exam.slug)?.values() ?? [])];
+		const released = resultsReleased(exam, now, everyone);
+		states.set(
+			exam.slug,
+			attemptState(
+				personalTiming(exam, ownExceptions.get(exam.slug) ?? null),
+				attempt ?? null,
+				now,
+				{ released },
+			),
+		);
+		if (!attempt || !released) continue;
 		const { total } = examResult(
 			exam.questions.map((question) => question.slug),
 			attempt.submissions,
@@ -105,6 +126,7 @@ if (!canWrite) {
                     href={href}
                     score={scores.get(exam.slug)}
                     state={states.get(exam.slug)}
+                    exception={ownExceptions.get(exam.slug)}
                     phaseBadge={group.key === "past"}
                   />
                 ))}

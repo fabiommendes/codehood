@@ -7,6 +7,7 @@ import {
 	type Exam,
 	type Feedback,
 } from "@/db";
+import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradesTable,
 	gradesCsvRows,
@@ -20,6 +21,7 @@ import {
 	type GradedStudent,
 } from "@/services/grading";
 import { loadCourse } from "./load-course";
+import { loadCourseExceptions } from "./load-exam-exceptions";
 
 export type LoadGradingResult =
 	| {
@@ -35,6 +37,8 @@ export type LoadGradingResult =
 			attempts: Attempt[];
 			/// Every grading pass on the exam, released or not.
 			feedback: Feedback[];
+			/// The exam's exceptions, by username.
+			exceptions: Map<string, ExceptionTiming>;
 	  }
 	| { redirect: Response };
 
@@ -67,13 +71,15 @@ export async function loadGrading(
 		return { redirect: await Astro.rewrite("/404") };
 	}
 
-	const [attempts, feedback] = await Promise.all([
+	const [attempts, feedback, courseExceptions] = await Promise.all([
 		db.response.findMany(
 			{ course: course.id, exam: exam.slug, practice: false },
 			{ actor },
 		),
 		db.feedback.findMany({ course: course.id, exam: exam.slug }, { actor }),
+		loadCourseExceptions(course.id),
 	]);
+	const exceptions = courseExceptions.get(exam.slug) ?? new Map();
 	const questions = exam.questions.map((question) => question.slug);
 
 	return {
@@ -81,9 +87,17 @@ export async function loadGrading(
 		href,
 		exam,
 		questions,
-		answers: countingAnswers(exam, questions, attempts, feedback, new Date()),
+		answers: countingAnswers(
+			exam,
+			questions,
+			attempts,
+			feedback,
+			new Date(),
+			exceptions,
+		),
 		attempts,
 		feedback,
+		exceptions,
 	};
 }
 
@@ -127,16 +141,21 @@ export async function loadGrades(
 	actor: UserActor,
 	now: Date,
 ): Promise<CourseGrades> {
-	const [exams, students, attempts, feedback, columns] = await Promise.all([
-		db.exam.findMany({ course }, { actor }),
-		loadStudents(course, actor),
-		db.response.findMany({ course, practice: false }, { actor }),
-		db.feedback.findMany({ course }, { actor }),
-		db.gradeColumn.findMany({ course }, { actor }),
-	]);
-	const table = gradesTable(exams, students, attempts, feedback, now);
+	const [exams, students, attempts, feedback, columns, exceptions] =
+		await Promise.all([
+			db.exam.findMany({ course }, { actor }),
+			loadStudents(course, actor),
+			db.response.findMany({ course, practice: false }, { actor }),
+			db.feedback.findMany({ course }, { actor }),
+			db.gradeColumn.findMany({ course }, { actor }),
+			loadCourseExceptions(course),
+		]);
+	const table = gradesTable(exams, students, attempts, feedback, now, {
+		exceptions,
+	});
 	const csvTable = gradesTable(exams, students, attempts, feedback, now, {
 		withDropped: true,
+		exceptions,
 	});
 	return {
 		table,

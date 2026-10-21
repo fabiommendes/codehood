@@ -9,7 +9,7 @@ import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { CourseId, Duration, ExamId } from "@/core/schemas";
+import type { CourseId, ExamId } from "@/core/schemas";
 import {
 	courseExamSchema,
 	examCreate,
@@ -28,14 +28,21 @@ import { courseContentsWhere } from "@/db/services/course.service";
 import { m } from "@/i18n";
 import { type ExamResult, examResult } from "@/services/exam-result";
 import {
+	type ExceptionTiming,
 	examPhase,
 	type GradeReleaseBlocker,
 	gradeReleaseBlocker,
+	personalTiming,
 } from "@/services/exam-state";
-import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
-import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
+import {
+	courseRefWhere,
+	fromMs,
+	invalidIfExists,
+	toMs,
+	valueOrNotFound,
+} from "../utils";
 
 export { examStatus, examType, textFormat } from "@/core/schemas";
 export type { ExamId };
@@ -401,9 +408,23 @@ export class ExamService extends CrudBase<{
 
 			const exam = fromDb(row);
 			const now = new Date();
+			const exceptions = (
+				await tx.examException.findMany({
+					where: { examId: row.id },
+					select: { extraTimeMs: true, scheduledAt: true },
+				})
+			).map((e) => ({
+				extraTime: fromMs(e.extraTimeMs),
+				scheduledAt: e.scheduledAt,
+			}));
 			const blocker =
-				gradeReleaseBlocker(exam, [], now) ??
-				gradeReleaseBlocker(exam, await attemptResults(tx, row), now);
+				gradeReleaseBlocker(exam, [], now, exceptions) ??
+				gradeReleaseBlocker(
+					exam,
+					await attemptResults(tx, row),
+					now,
+					exceptions,
+				);
 			if (blocker === "released") return exam;
 			if (blocker) {
 				throw new InvalidData({
@@ -453,6 +474,7 @@ const releaseRefusals: Record<
 > = {
 	"not-an-exam": m.errors_release_not_an_exam,
 	"not-closed": m.errors_release_not_closed,
+	"exception-open": m.errors_release_exception_open,
 	pending: m.errors_release_pending,
 };
 
@@ -598,18 +620,24 @@ function belongsTo(key: ExamGroup["key"], exam: Exam, now: Date): boolean {
 	}
 }
 
-/** Orders exams within a group, unscheduled exams sorted last. */
-function sortGroup(key: ExamGroup["key"], exams: Exam[]): Exam[] {
+/** Orders entries within a group by their personal timing, unscheduled exams sorted last. */
+function sortGroup<T extends { personal: Exam }>(
+	key: ExamGroup["key"],
+	entries: T[],
+): T[] {
 	if (key === "practice") {
-		return [...exams].sort((a, b) => a.title.localeCompare(b.title));
+		return [...entries].sort((a, b) =>
+			a.personal.title.localeCompare(b.personal.title),
+		);
 	}
 
 	const dirMul = key === "past" ? -1 : 1;
-	return [...exams].sort((a, b) => {
-		if (a.scheduledAt === null && b.scheduledAt === null) return 0;
-		if (a.scheduledAt === null) return 1;
-		if (b.scheduledAt === null) return -1;
-		return dirMul * (a.scheduledAt.getTime() - b.scheduledAt.getTime());
+	return [...entries].sort((a, b) => {
+		const [x, y] = [a.personal.scheduledAt, b.personal.scheduledAt];
+		if (x === null && y === null) return 0;
+		if (x === null) return 1;
+		if (y === null) return -1;
+		return dirMul * (x.getTime() - y.getTime());
 	});
 }
 
@@ -634,38 +662,34 @@ const GROUP_ORDER: { key: ExamGroup["key"]; label: string }[] = [
  * Membership follows {@link examPhase} at `now`, not the stored status alone:
  * a `SCHEDULED` exam whose window has passed is in "Past", one inside its
  * window is in "Open".
+ *
+ * With `exceptions` (the viewing student's own, by exam slug), membership and
+ * order follow `personalTiming(exam, exception)`, while the groups still hold
+ * the exams themselves.
  */
 export function groupExamsForStudent(
 	exams: Exam[],
 	now: Date = new Date(),
+	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): ExamGroup[] {
-	const visible = exams.filter(
-		(exam) => exam.status !== "DRAFT" && exam.status !== "ARCHIVED",
-	);
+	const visible = exams
+		.filter((exam) => exam.status !== "DRAFT" && exam.status !== "ARCHIVED")
+		.map((exam) => ({
+			exam,
+			personal: personalTiming(exam, exceptions.get(exam.slug) ?? null),
+		}));
 
 	const groups: ExamGroup[] = [];
 	for (const { key, label } of GROUP_ORDER) {
 		const inGroup = sortGroup(
 			key,
-			visible.filter((exam) => belongsTo(key, exam, now)),
+			visible.filter(({ personal }) => belongsTo(key, personal, now)),
 		);
 		if (inGroup.length > 0) {
-			groups.push({ key, label, exams: inGroup });
+			groups.push({ key, label, exams: inGroup.map(({ exam }) => exam) });
 		}
 	}
 	return groups;
-}
-
-/** A {@link Duration} as the milliseconds the database stores, passing `null` and `undefined` through. */
-function toMs<T extends null | undefined>(length: Duration | T): number | T {
-	if (length === null || length === undefined) return length;
-	return durationToMinutes(length) * 60_000;
-}
-
-/** Stored milliseconds as a {@link Duration}, a missing or zero length read as `null`. */
-function fromMs(ms: number | null): Duration | null {
-	if (!ms) return null;
-	return toDuration(Math.round(ms / 60_000));
 }
 
 /** Converts a database row into the exam entity. */

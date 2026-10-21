@@ -8,7 +8,7 @@
 import type { Exam } from "@/db";
 import { groupExamsForStudent } from "@/db/services/exam.service";
 import { m } from "@/i18n";
-import { examPhase } from "./exam-state";
+import { type ExceptionTiming, examPhase, personalTiming } from "./exam-state";
 
 /// One previewed exam, with the answers still waiting for a grade (0 for a student).
 export interface CourseHomeExam {
@@ -31,14 +31,21 @@ export interface CourseHomeExams {
  * for whoever teaches the course.
  *
  * @param pending Answers left to grade, by exam slug. Empty for a student.
+ * @param exceptions The viewing student's own exceptions, by exam slug, forwarded to {@link groupExamsForStudent}.
  */
 export function courseHomeExams(
 	exams: Exam[],
 	pending: ReadonlyMap<string, number>,
 	now: Date,
-	{ withDrafts = false }: { withDrafts?: boolean } = {},
+	{
+		withDrafts = false,
+		exceptions = new Map(),
+	}: {
+		withDrafts?: boolean;
+		exceptions?: ReadonlyMap<string, ExceptionTiming>;
+	} = {},
 ): CourseHomeExams {
-	const groups = groupExamsForStudent(exams, now);
+	const groups = groupExamsForStudent(exams, now, exceptions);
 	const group = (key: string) => groups.find((g) => g.key === key)?.exams ?? [];
 
 	const toGrade = group("past").filter(
@@ -52,7 +59,12 @@ export function courseHomeExams(
 					exam.scheduledAt !== null,
 			)
 		: [];
-	const upcoming = [...group("upcoming"), ...drafts].sort(byDate);
+	const upcoming = [...group("upcoming"), ...drafts].sort((a, b) =>
+		byDate(
+			personalTiming(a, exceptions.get(a.slug) ?? null),
+			personalTiming(b, exceptions.get(b.slug) ?? null),
+		),
+	);
 
 	const current = [...group("open"), ...toGrade, ...upcoming];
 	const shown = current.length > 0 ? current : group("practice");

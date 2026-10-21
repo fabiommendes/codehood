@@ -16,6 +16,7 @@ import { courseSchedule } from "@/services/course-schedule";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
+import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import {
 	durationToMinutes,
 	formatClock,
@@ -55,9 +56,15 @@ const exams = await db.exam.findMany({ course: course.id }, { actor });
 const { byEvent: eventResources } = splitByEvent(
 	await db.resource.findMany({ course: course.id }, { actor }),
 );
+// Only the viewer's own exceptions: they move the dates of the student's exams.
+const exceptions = canWrite ? new Map() : await loadCourseExceptions(course.id);
 const entries = calendarEntries(
 	events,
-	exams.map((exam) => ({ courseId: course.id, exam })),
+	exams.map((exam) => ({
+		courseId: course.id,
+		exam,
+		exception: exceptions.get(exam.slug)?.get(actor.username) ?? null,
+	})),
 );
 const { past, ahead, next } = courseSchedule(entries, course.startAt, now);
 // Folding every week away would leave an empty page once the term is over.

@@ -11,7 +11,7 @@ import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
 import { ensurePerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { CourseRef, SubmissionId } from "@/core/schemas";
+import type { CourseRef, ExamId, SubmissionId } from "@/core/schemas";
 import {
 	submissionCreate,
 	submissionFilter,
@@ -24,7 +24,9 @@ import { m } from "@/i18n";
 import {
 	attemptDeadline,
 	type ExamTiming,
+	type ExceptionTiming,
 	examPhase,
+	personalTiming,
 } from "@/services/exam-state";
 import { toDuration } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
@@ -72,6 +74,23 @@ export function examTimingFromDb(
 		scheduledAt: exam.scheduledAt,
 		duration: msToDuration(exam.durationMs),
 		extraTime: msToDuration(exam.extraTimeMs),
+	};
+}
+
+/** The exception of `username` on the exam `examId` as far as timing goes, or `null` when there is none. */
+export async function loadExceptionTiming(
+	tx: PrismaTx,
+	examId: number,
+	username: string,
+): Promise<ExceptionTiming | null> {
+	const row = await tx.examException.findUnique({
+		where: { examId_username: { examId: examId as ExamId, username } },
+		select: { extraTimeMs: true, scheduledAt: true },
+	});
+	if (!row) return null;
+	return {
+		extraTime: msToDuration(row.extraTimeMs),
+		scheduledAt: row.scheduledAt,
 	};
 }
 
@@ -167,7 +186,11 @@ export class SubmissionService extends CrudBase<{
 			course: response.exam.course,
 		});
 
-		assertAcceptingSubmissions(response, new Date());
+		assertAcceptingSubmissions(
+			response,
+			new Date(),
+			await loadExceptionTiming(tx, response.examId, response.authorId),
+		);
 		const question = await resolveExamQuestion(
 			tx,
 			response.exam.courseId,
@@ -443,15 +466,17 @@ async function writableSubmission(
 }
 
 /**
- * Refuses a write against an exam that is not open at `now`.
+ * Refuses a write against an exam that is not open at `now`, for the student holding `exception`.
  *
  * @throws {@link InvalidData} Unless the exam's phase is `open`.
  */
 export function assertExamOpen(
 	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>,
 	now: Date,
+	exception: ExceptionTiming | null = null,
 ): void {
-	if (examPhase(examTimingFromDb(exam), now) !== "open") {
+	const timing = personalTiming(examTimingFromDb(exam), exception);
+	if (examPhase(timing, now) !== "open") {
 		throw new InvalidData({
 			exam: [{ code: "invalid", message: m.errors_exam_not_open() }],
 		});
@@ -471,6 +496,7 @@ export function assertAcceptingSubmissions(
 		exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>;
 	},
 	now: Date,
+	exception: ExceptionTiming | null = null,
 ): void {
 	if (!response.acceptingSubmissions) {
 		throw new InvalidData({
@@ -482,9 +508,12 @@ export function assertAcceptingSubmissions(
 			],
 		});
 	}
-	assertExamOpen(response.exam, now);
+	assertExamOpen(response.exam, now, exception);
 
-	const deadline = attemptDeadline(examTimingFromDb(response.exam), response);
+	const deadline = attemptDeadline(
+		personalTiming(examTimingFromDb(response.exam), exception),
+		response,
+	);
 	if (deadline && now > deadline) {
 		throw new InvalidData({
 			response: [

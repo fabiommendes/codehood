@@ -15,6 +15,7 @@ export {
 	clockTime,
 	type Duration,
 	duration,
+	type ExamExceptionId,
 	type ExamId,
 	type FeedbackId,
 	type GradeColumnId,
@@ -46,6 +47,7 @@ export * from "./discipline";
 export * from "./edition";
 export * from "./enrollment";
 export * from "./exam";
+export * from "./exam-exception";
 export * from "./feedback";
 export * from "./grade-column";
 export * from "./invite";

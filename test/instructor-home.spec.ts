@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Exam } from "@/db";
 import type { ExamResult, QuestionOutcome } from "@/services/exam-result";
+import type { ExceptionTiming } from "@/services/exam-state";
 import { instructorHome, type TaughtExam } from "@/services/instructor-home";
 import type { HomeCourse } from "@/services/student-home";
 
@@ -461,4 +462,71 @@ test("draft and archived exams appear in no section", () => {
 	expect(home.inProgress).toEqual([]);
 	expect(home.toGrade).toEqual([]);
 	expect(home.toRelease).toEqual([]);
+});
+
+//
+// Personal timing
+//
+
+const extraMinutes = (minutes: number): ExceptionTiming => ({
+	extraTime: { minutes },
+	scheduledAt: null,
+});
+
+test("an exam whose window ended stays in progress while a student's extra time runs, and its answers are not grading work yet", () => {
+	// Window closed 60 minutes ago; ana's extra 90 minutes end 30 minutes from now.
+	const midterm = exam({
+		title: "Midterm",
+		scheduledAt: at(-120 * MINUTE),
+		duration: { minutes: 60 },
+	});
+	const ana = {
+		attempt: {
+			author: "ana",
+			createdAt: at(-90 * MINUTE),
+			acceptingSubmissions: true,
+		},
+		result: result(1),
+	};
+
+	const home = instructorHome(
+		[
+			taught(midterm, [ana], {
+				exceptions: new Map([["ana", extraMinutes(90)]]),
+			}),
+		],
+		[],
+		NOW,
+	);
+
+	expect(home.inProgress.map((i) => [i.exam.title, i.closesAt])).toEqual([
+		["Midterm", at(30 * MINUTE)],
+	]);
+	expect(home.inProgress[0]?.started).toBe(1);
+	expect(home.toGrade).toEqual([]);
+	expect(home.toRelease).toEqual([]);
+});
+
+test("a pending makeup keeps a completed exam in progress until its window ends, and out of toRelease", () => {
+	const finalExam = closedExam({
+		title: "Final",
+		scheduledAt: at(-3 * DAY),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(DAY) };
+	const attempts = [done()];
+
+	const without = instructorHome([taught(finalExam, attempts)], [], NOW);
+	expect(without.inProgress).toEqual([]);
+	expect(titles(without.toRelease)).toEqual(["Final"]);
+
+	const withMakeup = instructorHome(
+		[taught(finalExam, attempts, { exceptions: new Map([["ana", makeup]]) })],
+		[],
+		NOW,
+	);
+	expect(withMakeup.inProgress.map((i) => [i.exam.title, i.closesAt])).toEqual([
+		["Final", at(DAY + HOUR)],
+	]);
+	expect(withMakeup.toRelease).toEqual([]);
 });

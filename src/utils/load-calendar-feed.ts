@@ -5,6 +5,7 @@ import {
 	type CalendarEntry,
 	calendarEntries,
 } from "@/services/calendar-entries";
+import { loadCourseExceptions } from "./load-exam-exceptions";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -44,12 +45,25 @@ export async function loadCalendarFeed(
 	if (courses.length === 0) return { entries: [], courses: [] };
 
 	const courseIds = courses.map((course) => course.id);
-	const [events, exams] = await Promise.all([
+	const [events, exams, exceptions] = await Promise.all([
 		db.calendarEvent.findMany({ courseIds }, { actor: owner }),
 		db.exam.findManyInCourses(
 			{ courseIds, statuses: ["SCHEDULED", "ONGOING", "COMPLETED"] },
 			{ actor: owner },
 		),
+		Promise.all(
+			courseIds.map(
+				async (id) => [id, await loadCourseExceptions(id)] as const,
+			),
+		).then((entries) => new Map(entries)),
 	]);
-	return { entries: calendarEntries(events, exams), courses };
+	const courseExams = exams.map((entry) => ({
+		...entry,
+		exception:
+			exceptions
+				.get(entry.courseId)
+				?.get(entry.exam.slug)
+				?.get(owner.username) ?? null,
+	}));
+	return { entries: calendarEntries(events, courseExams), courses };
 }

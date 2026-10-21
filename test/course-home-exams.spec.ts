@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Exam } from "@/db";
 import { courseHomeExams } from "@/services/course-home";
+import type { ExceptionTiming } from "@/services/exam-state";
 
 const DAY = 86_400_000;
 
@@ -89,4 +90,44 @@ test("with nothing open, upcoming or to grade, practice exams stand in", () => {
 
 test("a course with no exams previews none", () => {
 	expect(courseHomeExams([], NONE, NOW).exams).toEqual([]);
+});
+
+//
+// Personal timing
+//
+
+test("a student's extra time reopens an exam closed for the class in the preview", () => {
+	// Closed an hour ago; the student's 90 extra minutes end in 30.
+	const extra = exam("extra", {
+		scheduledAt: new Date(NOW.getTime() - 2 * 3_600_000),
+		duration: { minutes: 60 },
+	});
+	const personal: ExceptionTiming = {
+		extraTime: { minutes: 90 },
+		scheduledAt: null,
+	};
+
+	expect(slugs(courseHomeExams([soon, extra], NONE, NOW))).toEqual(["soon"]);
+	expect(
+		slugs(
+			courseHomeExams([soon, extra], NONE, NOW, {
+				exceptions: new Map([["extra", personal]]),
+			}),
+		),
+	).toEqual(["extra", "soon"]);
+});
+
+test("a makeup moves a past exam into the student's upcoming ones, by the personal date", () => {
+	const missed = exam("missed", {
+		status: "COMPLETED",
+		scheduledAt: inDays(-30),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: inDays(5) };
+
+	const preview = courseHomeExams([later, missed, soon], NONE, NOW, {
+		exceptions: new Map([["missed", makeup]]),
+	});
+
+	expect(slugs(preview)).toEqual(["soon", "missed", "later"]);
 });

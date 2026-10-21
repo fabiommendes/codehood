@@ -1011,6 +1011,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	await seedExamExceptions(cs101.id, { hamilton, bob, liskov });
+
 	// An ended course in the past edition, so admin views keep an expired one.
 	const ended = await db.course.create(
 		{
@@ -1588,6 +1590,103 @@ async function seedGradedExam(
 	await db.exam.update(
 		{ course, slug: exam },
 		{ status: "COMPLETED" },
+		FULL_ACCESS,
+	);
+}
+
+/**
+ * Seeds the three states an exam exception can leave an exam in.
+ *
+ * The dev student has 30 extra minutes on the upcoming quiz 3. Test 2 ended
+ * and Bob, who missed it, has a makeup in two days, so its grades cannot be
+ * released yet. Quiz 4's window ended half an hour ago, but Liskov has extra
+ * time, so her closed attempt can still be reopened.
+ */
+async function seedExamExceptions(
+	course: Course["id"],
+	students: { hamilton: User; bob: User; liskov: User },
+): Promise<void> {
+	const now = Date.now();
+	const minutes = (count: number) => new Date(now + count * 60_000);
+
+	await db.examException.create(
+		{
+			course,
+			exam: "quiz-03",
+			username: DEV_STUDENT_USERNAME,
+			extraTime: { minutes: 30 },
+			note: "Accommodation on file",
+		},
+		FULL_ACCESS,
+	);
+
+	// Answered while open, then moved into the past: an exam cannot be answered once its window is over.
+	await db.exam.create(
+		{
+			course,
+			slug: "test-02",
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 2: lists and stacks",
+			description: "Linked lists, stacks and queues.",
+			tags: ["data-structures"],
+			questions: [{ slug: "recursion-basics", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	const hamilton = await answerExam(course, "test-02", students.hamilton, {
+		"recursion-basics": { choice: "base-case" },
+	});
+	await botGrade(hamilton["recursion-basics"], "1");
+	await db.exam.update(
+		{ course, slug: "test-02" },
+		{
+			status: "COMPLETED",
+			scheduledAt: minutes(-5 * 24 * 60),
+			duration: { hours: 1 },
+		},
+		FULL_ACCESS,
+	);
+	await db.examException.create(
+		{
+			course,
+			exam: "test-02",
+			username: students.bob.username,
+			scheduledAt: minutes(2 * 24 * 60),
+			note: "Missed the exam, medical note",
+		},
+		FULL_ACCESS,
+	);
+
+	await db.exam.create(
+		{
+			course,
+			slug: "quiz-04",
+			type: "QUIZ",
+			status: "ONGOING",
+			title: "Quiz 4: recursion trees",
+			description: "Drawing call trees by hand.",
+			tags: ["recursion"],
+			questions: [{ slug: "recursion-basics", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	await answerExam(course, "quiz-04", students.liskov, {
+		"recursion-basics": { choice: "base-case" },
+	});
+	await db.exam.update(
+		{ course, slug: "quiz-04" },
+		{ scheduledAt: minutes(-90), duration: { hours: 1 } },
+		FULL_ACCESS,
+	);
+	await db.examException.create(
+		{
+			course,
+			exam: "quiz-04",
+			username: students.liskov.username,
+			extraTime: { hours: 6 },
+			note: "Connection dropped",
+		},
 		FULL_ACCESS,
 	);
 }

@@ -13,10 +13,12 @@ import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHomeExams } from "@/services/course-home";
 import { splitByEvent } from "@/services/event-resources";
+import type { ExceptionTiming } from "@/services/exam-state";
 import { formatGradeValue } from "@/services/grades-table";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
 import { loadCourse } from "@/utils/load-course";
+import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
 import { resourceDetail } from "@/utils/resource-kind";
 import { fileDownloadName, resourceHref } from "@/utils/resource-url";
@@ -82,11 +84,19 @@ const exams = await db.exam.findMany({ course: course.id }, { actor });
 const teaching = canWrite
 	? await loadInstructorHome(actor, now, course)
 	: undefined;
+// A student's own exceptions move their exam dates; the others stay on the server.
+const ownExceptions = new Map<string, ExceptionTiming>();
+if (!canWrite) {
+	for (const [slug, byUser] of await loadCourseExceptions(course.id)) {
+		const own = byUser.get(actor.username);
+		if (own) ownExceptions.set(slug, own);
+	}
+}
 const examPreview = courseHomeExams(
 	exams,
 	new Map(teaching?.toGrade.map(({ exam, pending }) => [exam.slug, pending])),
 	now,
-	{ withDrafts: canWrite },
+	{ withDrafts: canWrite, exceptions: ownExceptions },
 );
 
 // A student's own grades: the service already narrows a student's read to the
@@ -219,7 +229,7 @@ const nextEvents = await db.calendarEvent.findMany(
 
           <div class="mt-4 flex flex-col gap-3">
             {examPreview.exams.map(({ exam, pending }) => (
-              <ExamRow exam={exam} href={href} pending={pending} />
+              <ExamRow exam={exam} href={href} pending={pending} exception={ownExceptions.get(exam.slug)} />
             ))}
           </div>
         </section>

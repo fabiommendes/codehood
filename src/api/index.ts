@@ -137,6 +137,50 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	},
 });
 
+/// A JSON body carries dates as ISO strings.
+const isoDate = z.coerce.date().nullish();
+
+export const examExceptionApi = CRUD(
+	"/api/course/[discipline]/[course]/exam/[slug]/exception",
+	{
+		name: "Exam Exception",
+		plural: "Exam Exceptions",
+		keySegment: "/[username]",
+
+		// A student reads their own exception without the instructor's `note`.
+		entity: schema.examExceptionSchema
+			.omit({ id: true, examId: true, note: true })
+			.extend({ note: z.string().nullable().optional() }),
+		create: schema.examExceptionCreate
+			.omit({ course: true, exam: true })
+			.extend({ scheduledAt: isoDate }),
+		update: schema.examExceptionUpdate.extend({ scheduledAt: isoDate }),
+		filter: schema.examExceptionFilterBase.omit({ exam: true }),
+		scope: z.object({
+			course: schema.courseRef,
+			exam: schema.examExceptionPK.shape.exam,
+		}),
+		key: schema.examExceptionPK,
+
+		tags: ["Exams"],
+		service: db.examException as never,
+
+		parseKeyParams(params) {
+			return {
+				course: parseCourseParams(params),
+				exam: params.slug as string,
+				username: params.username as string,
+			};
+		},
+		parseScopeParams(params) {
+			return {
+				course: parseCourseParams(params),
+				exam: params.slug as string,
+			};
+		},
+	},
+);
+
 export const gradeColumnApi = CRUD(
 	"/api/course/[discipline]/[course]/grade-column",
 	{

@@ -75,6 +75,7 @@ model User {
   gradeValues      GradeValue[]
   attendances      Attendance[]
   calendarFeed     CalendarFeed?
+  exceptions       ExamException[]
 }
 
 model Group {
@@ -907,8 +908,37 @@ model Exam {
   examTags          ExamTags[]
   questionsForExams QuestionsForExam[]
   responses         Response[]
+  exceptions        ExamException[]
 
   @@unique([courseId, slug])
+}
+
+/// One student's adjustment to an exam's timing: extra time, a makeup start,
+/// or both. At most one per student and exam.
+model ExamException {
+  id Int @id @default(autoincrement())
+
+  examId Int
+  exam   Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  username String
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  /// Added to the exam's duration + extraTime for this student only.
+  extraTimeMs Int @default(0)
+
+  /// Replaces the exam's scheduledAt for this student (makeup exam). Null
+  /// keeps the exam's own date.
+  scheduledAt DateTime?
+
+  /// Free text for the instructor, e.g. "atestado". Never shown to students.
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([examId, username])
+  @@index([username])
 }
 
 /// A M2M relation table linking Exams to their Questions (QuestionRefs).

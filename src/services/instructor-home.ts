@@ -11,9 +11,11 @@ import type { ExamResult } from "./exam-result";
 import {
 	type AttemptTiming,
 	attemptState,
+	type ExceptionTiming,
 	examPhase,
 	gradeReleaseBlocker,
-	windowEnd,
+	lastWindowEnd,
+	personalTiming,
 } from "./exam-state";
 import type { HomeCourse } from "./student-home";
 
@@ -24,7 +26,13 @@ export interface TaughtExam {
 	/// Students actively enrolled in the course.
 	enrolled: number;
 	/// Every student's graded attempt, each with its result as the instructor sees it (all feedback, released or not).
-	attempts: { attempt: AttemptTiming; result: ExamResult }[];
+	/// `author` picks the student's exception; an attempt without one is judged by the exam's own timing.
+	attempts: {
+		attempt: AttemptTiming & { author?: string };
+		result: ExamResult;
+	}[];
+	/// The exam's exceptions, by username. Absent means none.
+	exceptions?: ReadonlyMap<string, ExceptionTiming>;
 }
 
 /// One course the instructor teaches, with the state of its question bank.
@@ -61,6 +69,12 @@ export interface InstructorHome {
  * An answer counts as pending only once its attempt is closed to answers; an
  * attempt still in progress is not grading work yet. `DRAFT` and `ARCHIVED`
  * exams never appear.
+ *
+ * With exceptions, each attempt is judged by its author's personal timing.
+ * An exam stays in `inProgress` while any personal window is `open` or
+ * `upcoming`, with `closesAt` at {@link lastWindowEnd}; `toRelease` asks
+ * {@link gradeReleaseBlocker} with the exceptions, so a pending makeup keeps
+ * the exam out of it.
  */
 export function instructorHome(
 	exams: TaughtExam[],
@@ -75,10 +89,21 @@ export function instructorHome(
 	});
 
 	const inProgress = shown
-		.filter(({ exam }) => examPhase(exam, now) === "open")
-		.map(({ course, exam, enrolled, attempts }) => {
+		.filter(
+			({ exam, exceptions }) =>
+				examPhase(exam, now) === "open" ||
+				[...(exceptions?.values() ?? [])].some((exception) =>
+					isPersonallyOpen(exam, exception, now),
+				),
+		)
+		.map(({ course, exam, enrolled, attempts, exceptions }) => {
 			const kinds = attempts.map(
-				({ attempt }) => attemptState(exam, attempt, now).kind,
+				({ attempt }) =>
+					attemptState(
+						personalTiming(exam, exceptions?.get(attempt.author ?? "") ?? null),
+						attempt,
+						now,
+					).kind,
 			);
 			return {
 				course,
@@ -86,7 +111,7 @@ export function instructorHome(
 				started: kinds.filter((kind) => kind === "in-progress").length,
 				submitted: kinds.filter(isClosed).length,
 				enrolled,
-				closesAt: windowEnd(exam),
+				closesAt: lastWindowEnd(exam, [...(exceptions?.values() ?? [])]),
 			};
 		})
 		.sort((a, b) => {
@@ -97,12 +122,21 @@ export function instructorHome(
 		});
 
 	const toGrade = shown
-		.map(({ course, exam, attempts }) => ({
+		.map(({ course, exam, attempts, exceptions }) => ({
 			course,
 			exam,
 			pending: attempts
 				.filter(({ attempt }) =>
-					isClosed(attemptState(exam, attempt, now).kind),
+					isClosed(
+						attemptState(
+							personalTiming(
+								exam,
+								exceptions?.get(attempt.author ?? "") ?? null,
+							),
+							attempt,
+							now,
+						).kind,
+					),
 				)
 				.reduce((sum, { result }) => sum + pendingIn(result), 0),
 		}))
@@ -111,12 +145,13 @@ export function instructorHome(
 
 	const toRelease = shown
 		.filter(
-			({ exam, attempts }) =>
+			({ exam, attempts, exceptions }) =>
 				attempts.length > 0 &&
 				gradeReleaseBlocker(
 					exam,
 					attempts.map(({ result }) => result),
 					now,
+					[...(exceptions?.values() ?? [])],
 				) === null,
 		)
 		.map(({ course, exam, attempts }) => ({
@@ -133,6 +168,16 @@ export function instructorHome(
 		}));
 
 	return { inProgress, toGrade, toRelease, problems };
+}
+
+/// Whether the personal window of `exception` is still upcoming or open at `now`.
+function isPersonallyOpen(
+	exam: Exam,
+	exception: ExceptionTiming,
+	now: Date,
+): boolean {
+	const phase = examPhase(personalTiming(exam, exception), now);
+	return phase === "upcoming" || phase === "open";
 }
 
 /// Whether an attempt state means the student can no longer answer.

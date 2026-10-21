@@ -1,0 +1,22 @@
+info:
+  name: Update
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/quiz-01/exception/student
+  body:
+    type: json
+    data: |-
+      {
+          "extraTime": { "hours": 1 }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

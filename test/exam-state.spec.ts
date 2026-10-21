@@ -7,11 +7,15 @@ import {
 	attemptState,
 	type ExamPhase,
 	type ExamTiming,
+	type ExceptionTiming,
 	examPhase,
 	examPhaseLabels,
 	gradeReleaseBlocker,
+	lastWindowEnd,
+	personalTiming,
 	releaseMoment,
 	resultsReleased,
+	windowEnd,
 } from "@/services/exam-state";
 
 const MINUTE = 60_000;
@@ -639,4 +643,358 @@ test("gradeReleaseBlocker: one answer waiting for a grade blocks the release", (
 			at(10_000),
 		),
 	).toBe("pending");
+});
+
+// ---------------------------------------------------------------------------
+// personalTiming: extra time
+// ---------------------------------------------------------------------------
+
+/// An exception granting `minutes` of extra time and no new date.
+function extra(minutes: number): ExceptionTiming {
+	return { extraTime: { minutes }, scheduledAt: null };
+}
+
+test("personalTiming: the student's extra time adds to the exam's own", () => {
+	// Window of timed(): 90 + 30 minutes. With 45 more it ends at 10:00 + 165.
+	const own = personalTiming(timed(), extra(45));
+	expect(windowEnd(own)).toEqual(at(165));
+});
+
+test("personalTiming: extra time adds to an exam that has none of its own", () => {
+	const own = personalTiming(timed({ extraTime: null }), extra(45));
+	expect(windowEnd(own)).toEqual(at(135));
+});
+
+test("personalTiming: extra time moves the deadline of a scheduled exam", () => {
+	const own = personalTiming(timed(), extra(45));
+	expect(attemptDeadline(own, attempt())).toEqual(at(165));
+	expect(attemptDeadline(timed(), attempt())).toEqual(at(120));
+});
+
+test("personalTiming: extra time moves the deadline counted from the attempt start", () => {
+	const unscheduled = timed({ status: "ONGOING", scheduledAt: null });
+	const own = personalTiming(unscheduled, extra(45));
+	// Attempt started at 10:15; 90 + 30 + 45 minutes later.
+	expect(attemptDeadline(own, attempt({ createdAt: at(15) }))).toEqual(
+		at(15 + 165),
+	);
+});
+
+test("personalTiming: the student with extra time is still in progress after the general deadline", () => {
+	const own = personalTiming(timed(), extra(45));
+	expect(attemptState(own, attempt(), at(150))).toEqual({
+		kind: "in-progress",
+		deadline: at(165),
+	});
+});
+
+test("personalTiming: without an exception the exam comes back unchanged", () => {
+	const exam = timed();
+	expect(personalTiming(exam, null)).toEqual(exam);
+});
+
+test("personalTiming: leaves the exam it was given untouched", () => {
+	const exam = timed();
+	personalTiming(exam, extra(45));
+	expect(exam).toEqual(timed());
+});
+
+test("personalTiming: a PRACTICE exam ignores the exception", () => {
+	const practice = timed({ type: "PRACTICE" });
+	expect(personalTiming(practice, extra(45))).toEqual(practice);
+});
+
+// ---------------------------------------------------------------------------
+// personalTiming: makeup date
+// ---------------------------------------------------------------------------
+
+/// A makeup starting `minutes` after `START`, with no extra time.
+function makeup(minutes: number): ExceptionTiming {
+	return { extraTime: null, scheduledAt: at(minutes) };
+}
+
+test("personalTiming: a makeup on a COMPLETED exam is upcoming, then open, then closed", () => {
+	// Makeup window: [START + 2000, START + 2120), the exam's own 90 + 30 minutes.
+	const personal = personalTiming(timed({ status: "COMPLETED" }), makeup(2000));
+	expect(examPhase(personal, at(1999))).toBe("upcoming");
+	expect(examPhase(personal, at(2000))).toBe("open");
+	expect(examPhase(personal, at(2120))).toBe("open");
+	expect(examPhase(personal, at(2121))).toBe("closed");
+});
+
+test("personalTiming: a makeup leaves the COMPLETED exam closed for everyone else", () => {
+	const base = timed({ status: "COMPLETED" });
+	personalTiming(base, makeup(2000));
+	expect(examPhase(base, at(2060))).toBe("closed");
+});
+
+test("personalTiming: a makeup reopens an ONGOING exam whose window passed", () => {
+	const personal = personalTiming(timed({ status: "ONGOING" }), makeup(2000));
+	expect(examPhase(personal, at(1000))).toBe("upcoming");
+	expect(examPhase(personal, at(2060))).toBe("open");
+});
+
+test("personalTiming: a makeup keeps the exam's own extra time and adds the student's", () => {
+	const personal = personalTiming(timed({ status: "COMPLETED" }), {
+		extraTime: { minutes: 45 },
+		scheduledAt: at(2000),
+	});
+	expect(windowEnd(personal)).toEqual(at(2000 + 165));
+});
+
+test("personalTiming: the makeup opens the state of a student who missed the exam", () => {
+	const personal = personalTiming(timed({ status: "COMPLETED" }), makeup(2000));
+	expect(attemptState(personal, null, at(1000))).toEqual({
+		kind: "not-open",
+		opensAt: at(2000),
+	});
+	expect(attemptState(personal, null, at(2060))).toEqual({ kind: "can-start" });
+});
+
+test("personalTiming: extra time alone does not reopen a COMPLETED exam", () => {
+	const personal = personalTiming(timed({ status: "COMPLETED" }), extra(45));
+	expect(examPhase(personal, at(30))).toBe("closed");
+});
+
+for (const status of ["DRAFT", "ARCHIVED"] as const) {
+	test(`personalTiming: a makeup does not change a ${status} exam`, () => {
+		const personal = personalTiming(timed({ status }), makeup(2000));
+		expect(personal.status).toBe(status);
+		expect(examPhase(personal, at(2060))).toBe(status.toLowerCase());
+	});
+}
+
+// ---------------------------------------------------------------------------
+// lastWindowEnd
+// ---------------------------------------------------------------------------
+
+test("lastWindowEnd: without exceptions it is the end of the exam's window", () => {
+	expect(lastWindowEnd(timed(), [])).toEqual(at(120));
+});
+
+test("lastWindowEnd: a makeup after the exam is the latest end", () => {
+	expect(lastWindowEnd(timed(), [makeup(2000)])).toEqual(at(2120));
+});
+
+test("lastWindowEnd: extra time pushes the end past the exam's own", () => {
+	expect(lastWindowEnd(timed(), [extra(45)])).toEqual(at(165));
+});
+
+test("lastWindowEnd: picks the latest among several personal windows", () => {
+	const exceptions = [extra(45), makeup(500), makeup(300), extra(10)];
+	expect(lastWindowEnd(timed(), exceptions)).toEqual(at(620));
+});
+
+test("lastWindowEnd: a makeup before the exam does not pull the end back", () => {
+	expect(lastWindowEnd(timed(), [makeup(-1000)])).toEqual(at(120));
+});
+
+test("lastWindowEnd: an exam without duration has no end, exceptions or not", () => {
+	expect(lastWindowEnd(untimed(), [])).toBeNull();
+	expect(lastWindowEnd(untimed(), [extra(45)])).toBeNull();
+});
+
+test("lastWindowEnd: an exam without a date has no end even with a makeup on it", () => {
+	const unscheduled = timed({ status: "ONGOING", scheduledAt: null });
+	expect(lastWindowEnd(unscheduled, [makeup(2000)])).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Releasing grades with exceptions pending
+// ---------------------------------------------------------------------------
+
+/// One millisecond after `date`, the first instant its window is over.
+function justAfter(date: Date): Date {
+	return new Date(date.getTime() + 1);
+}
+
+/// A window [START, START + 120) closed by hand or by the clock, with grades to release.
+const closedExam = () => timed({ status: "COMPLETED" });
+
+test("gradeReleaseBlocker: a student's extra time still running blocks the release", () => {
+	// The exam's window ended at +120; the student's runs until +165.
+	expect(gradeReleaseBlocker(timed(), [], at(130), [extra(45)])).toBe(
+		"exception-open",
+	);
+});
+
+test("gradeReleaseBlocker: the release is blocked through the last instant of the personal window", () => {
+	expect(gradeReleaseBlocker(timed(), [], at(165), [extra(45)])).toBe(
+		"exception-open",
+	);
+	expect(
+		gradeReleaseBlocker(timed(), [], justAfter(at(165)), [extra(45)]),
+	).toBe(null);
+});
+
+test("gradeReleaseBlocker: a makeup not yet started blocks the release", () => {
+	expect(gradeReleaseBlocker(closedExam(), [], at(130), [makeup(2000)])).toBe(
+		"exception-open",
+	);
+});
+
+test("gradeReleaseBlocker: a makeup in progress blocks the release", () => {
+	expect(gradeReleaseBlocker(closedExam(), [], at(2060), [makeup(2000)])).toBe(
+		"exception-open",
+	);
+});
+
+test("gradeReleaseBlocker: a makeup that is over no longer blocks the release", () => {
+	expect(
+		gradeReleaseBlocker(closedExam(), [], justAfter(at(2120)), [makeup(2000)]),
+	).toBe(null);
+});
+
+test("gradeReleaseBlocker: one open window among closed ones blocks the release", () => {
+	const exceptions = [makeup(200), extra(10), makeup(2000)];
+	expect(gradeReleaseBlocker(closedExam(), [], at(2060), exceptions)).toBe(
+		"exception-open",
+	);
+});
+
+test("gradeReleaseBlocker: extra time alone does not reopen an exam completed by hand", () => {
+	expect(gradeReleaseBlocker(closedExam(), [], at(130), [extra(45)])).toBe(
+		null,
+	);
+});
+
+test("gradeReleaseBlocker: not-closed comes before exception-open", () => {
+	expect(gradeReleaseBlocker(timed(), [], at(30), [extra(45)])).toBe(
+		"not-closed",
+	);
+});
+
+test("gradeReleaseBlocker: released comes before exception-open", () => {
+	const exam = closedExam();
+	exam.gradesReleasedAt = at(130);
+	expect(gradeReleaseBlocker(exam, [], at(200), [makeup(2000)])).toBe(
+		"released",
+	);
+});
+
+test("gradeReleaseBlocker: exception-open comes before pending", () => {
+	expect(
+		gradeReleaseBlocker(closedExam(), [result("pending")], at(130), [
+			makeup(2000),
+		]),
+	).toBe("exception-open");
+});
+
+test("gradeReleaseBlocker: pending is reported once every personal window is over", () => {
+	expect(
+		gradeReleaseBlocker(
+			closedExam(),
+			[result("pending")],
+			justAfter(at(2120)),
+			[makeup(2000)],
+		),
+	).toBe("pending");
+});
+
+// ---------------------------------------------------------------------------
+// QUIZ results with exceptions pending
+// ---------------------------------------------------------------------------
+
+const quiz = (overrides: Partial<ExamTiming> = {}) =>
+	timed({ type: "QUIZ", ...overrides });
+
+test("resultsReleased: a QUIZ is held back while a student's extra time runs", () => {
+	expect(resultsReleased(quiz(), at(130), [extra(45)])).toBe(false);
+	expect(resultsReleased(quiz(), at(165), [extra(45)])).toBe(false);
+});
+
+test("resultsReleased: a QUIZ is released right after the last personal window ends", () => {
+	expect(resultsReleased(quiz(), justAfter(at(165)), [extra(45)])).toBe(true);
+});
+
+test("resultsReleased: a QUIZ waits for a makeup that has not started", () => {
+	expect(resultsReleased(quiz(), at(130), [makeup(2000)])).toBe(false);
+});
+
+test("resultsReleased: a QUIZ waits for a makeup in progress, then releases", () => {
+	expect(resultsReleased(quiz(), at(2060), [makeup(2000)])).toBe(false);
+	expect(resultsReleased(quiz(), justAfter(at(2120)), [makeup(2000)])).toBe(
+		true,
+	);
+});
+
+test("resultsReleased: a QUIZ completed by hand still waits for a makeup", () => {
+	expect(
+		resultsReleased(quiz({ status: "COMPLETED" }), at(130), [makeup(2000)]),
+	).toBe(false);
+});
+
+test("resultsReleased: a QUIZ completed by hand ignores extra time alone", () => {
+	expect(
+		resultsReleased(quiz({ status: "COMPLETED" }), at(130), [extra(45)]),
+	).toBe(true);
+});
+
+test("resultsReleased: a QUIZ whose window is still open stays unreleased whatever the exceptions", () => {
+	expect(resultsReleased(quiz(), at(30), [extra(45)])).toBe(false);
+});
+
+test("resultsReleased: exceptions do not hold back an EXAM whose grades were released", () => {
+	const released = timed({ gradesReleasedAt: at(130) });
+	expect(resultsReleased(released, at(200), [makeup(2000)])).toBe(true);
+});
+
+test("resultsReleased: exceptions do not hold back a PRACTICE exam", () => {
+	expect(
+		resultsReleased(timed({ type: "PRACTICE" }), at(30), [makeup(2000)]),
+	).toBe(true);
+});
+
+test("releaseMoment: a QUIZ is released when the last personal window ends", () => {
+	expect(releaseMoment(quiz(), at(200), [extra(45)])).toEqual(at(165));
+	expect(releaseMoment(quiz(), at(2200), [makeup(2000), extra(10)])).toEqual(
+		at(2120),
+	);
+});
+
+test("releaseMoment: a QUIZ has no release moment while a personal window is pending", () => {
+	expect(releaseMoment(quiz(), at(130), [extra(45)])).toBeNull();
+	expect(releaseMoment(quiz(), at(130), [makeup(2000)])).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// attemptState with a pending makeup
+// ---------------------------------------------------------------------------
+
+test("attemptState: a closed QUIZ attempt stays submitted while another student's makeup is pending", () => {
+	const exam = quiz();
+	const now = at(130);
+	const released = resultsReleased(exam, now, [makeup(2000)]);
+	expect(attemptState(exam, attempt(), now, { released })).toEqual({
+		kind: "submitted",
+	});
+});
+
+test("attemptState: released replaces the exam's own release rule in both directions", () => {
+	const exam = quiz();
+	const now = at(130);
+	expect(attemptState(exam, attempt(), now, { released: false })).toEqual({
+		kind: "submitted",
+	});
+	expect(attemptState(exam, attempt(), now, { released: true })).toEqual({
+		kind: "results",
+	});
+	const unreleased = timed({ gradesReleasedAt: null });
+	expect(attemptState(unreleased, attempt(), now, { released: true })).toEqual({
+		kind: "results",
+	});
+});
+
+test("attemptState: the makeup student waits for their own window whatever released says", () => {
+	const personal = personalTiming(quiz(), makeup(2000));
+	expect(attemptState(personal, null, at(130), { released: false })).toEqual({
+		kind: "not-open",
+		opensAt: at(2000),
+	});
+});
+
+test("attemptState: a missed attempt stays missed although released is true", () => {
+	expect(attemptState(quiz(), null, at(130), { released: true })).toEqual({
+		kind: "missed",
+	});
 });

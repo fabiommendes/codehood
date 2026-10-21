@@ -8,8 +8,9 @@ import {
 	NotFound,
 } from "@/core/error";
 import type { InvalidDataCode } from "@/core/error-response";
-import type { CourseRef } from "@/core/schemas";
+import type { CourseRef, Duration } from "@/core/schemas";
 import { m } from "@/i18n";
+import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 
 /**
  * The unique-key `where` for a course given by id or by natural key.
@@ -213,4 +214,18 @@ function removeIdSuffix(src: string) {
 		: src.endsWith("Slug")
 			? src.slice(0, src.length - 4)
 			: src;
+}
+
+/** A {@link Duration} as the milliseconds the database stores, passing `null` and `undefined` through. */
+export function toMs<T extends null | undefined>(
+	length: Duration | T,
+): number | T {
+	if (length === null || length === undefined) return length;
+	return durationToMinutes(length) * 60_000;
+}
+
+/** Stored milliseconds as a {@link Duration}, a missing or zero length read as `null`. */
+export function fromMs(ms: number | null): Duration | null {
+	if (!ms) return null;
+	return toDuration(Math.round(ms / 60_000));
 }

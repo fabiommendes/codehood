@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Exam } from "@/db";
 import type { ExamResult } from "@/services/exam-result";
+import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	HOME_HORIZON_MS,
 	type HomeCourse,
@@ -640,4 +641,105 @@ test("next: is null when nothing lies ahead", () => {
 	const home = studentHome([homeExam(missed)], [past], NOW);
 
 	expect(home.next).toBeNull();
+});
+
+//
+// Personal timing
+//
+
+const extraMinutes = (minutes: number): ExceptionTiming => ({
+	extraTime: { minutes },
+	scheduledAt: null,
+});
+
+test("openNow: a student with extra time sees an exam closed for the class as open, with the personal deadline", () => {
+	// Closed 60 minutes ago for everyone; the student's 90 extra minutes end in 30.
+	const closed = exam({
+		title: "Midterm",
+		scheduledAt: at(-120 * MINUTE),
+		duration: { minutes: 60 },
+	});
+
+	const mine = studentHome(
+		[homeExam(closed, { exception: extraMinutes(90) })],
+		[],
+		NOW,
+	);
+	expect(mine.openNow).toEqual([
+		{
+			course: algebra,
+			exam: closed,
+			deadline: at(30 * MINUTE),
+			started: false,
+		},
+	]);
+
+	expect(studentHome([homeExam(closed)], [], NOW).openNow).toEqual([]);
+});
+
+test("a makeup date puts a completed exam in upcoming for that student, with the personal date", () => {
+	const completed = exam({
+		status: "COMPLETED",
+		title: "Final",
+		scheduledAt: at(-3 * DAY),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(2 * DAY) };
+
+	const home = studentHome(
+		[homeExam(completed, { exception: makeup })],
+		[],
+		NOW,
+	);
+
+	expect(home.openNow).toEqual([]);
+	expect(home.upcoming).toEqual([
+		{ course: algebra, exam: completed, opensAt: at(2 * DAY) },
+	]);
+});
+
+test("a makeup in progress is open now until the personal window ends", () => {
+	const completed = exam({
+		status: "COMPLETED",
+		title: "Final",
+		scheduledAt: at(-3 * DAY),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = {
+		extraTime: null,
+		scheduledAt: at(-10 * MINUTE),
+	};
+
+	const home = studentHome(
+		[homeExam(completed, { exception: makeup })],
+		[],
+		NOW,
+	);
+
+	expect(home.openNow.map((i) => [i.exam, i.deadline])).toEqual([
+		[completed, at(50 * MINUTE)],
+	]);
+});
+
+test("a quiz result is not announced while a classmate's makeup is pending", () => {
+	const quiz = exam({
+		type: "QUIZ",
+		status: "COMPLETED",
+		title: "Quiz",
+		scheduledAt: at(-HOUR - 30 * MINUTE),
+		duration: { minutes: 30 },
+	});
+	const attempt = { createdAt: at(-90 * MINUTE), acceptingSubmissions: false };
+	const mine = { attempt, result: result(0.8) };
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(DAY) };
+
+	const released = studentHome([homeExam(quiz, mine)], [], NOW);
+	expect(released.results).toHaveLength(1);
+
+	const held = studentHome(
+		[homeExam(quiz, { ...mine, exceptions: [makeup] })],
+		[],
+		NOW,
+	);
+	expect(held.results).toEqual([]);
 });

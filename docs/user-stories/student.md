@@ -185,6 +185,19 @@ counting from where it actually is rather than restarting. Once the exam is no
 longer ongoing it stops accepting submissions.
 
 
+### Answer an exam with the extra time I was granted
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>
+
+Student with extra time or a makeup date opens the exam and sees their own
+timing: "30 min for you" beside the duration, or the new date when they were
+given a second chance. The exam is open for them when their personal window is,
+even after it closed for the rest of the class, and they answer it like any
+other exam, with the countdown running to their own deadline. A classmate with
+no exception sees the same exam closed.
+
+
 ### Practice questions outside an exam
 
     status: todo

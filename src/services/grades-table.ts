@@ -12,7 +12,7 @@ import type { courseGradesSchema } from "@/core/schemas";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { Exam } from "@/db/services/exam.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";
-import { examPhase } from "./exam-state";
+import { type ExceptionTiming, examPhase, personalTiming } from "./exam-state";
 import {
 	attemptRows,
 	compareStudents,
@@ -90,6 +90,14 @@ export type TableAttempt = GradingAttempt & { exam: string };
 export interface GradesTableOptions {
 	/// Lists the students who dropped the course along with the active ones.
 	withDropped?: boolean;
+	/**
+	 * The course's exam exceptions, by exam slug and then username.
+	 *
+	 * A cell follows its student's personal timing: an attempt still inside
+	 * the student's window is `in-progress`, and a student without an attempt
+	 * is `missed` only once their own window has closed.
+	 */
+	exceptions?: ReadonlyMap<string, ReadonlyMap<string, ExceptionTiming>>;
 }
 
 /**
@@ -126,6 +134,7 @@ export function gradesTable(
 		.sort(compareExams);
 
 	const cellsByExam = shown.map((exam) => {
+		const exceptions = options.exceptions?.get(exam.slug) ?? new Map();
 		const rows = attemptRows(
 			exam,
 			exam.questions.map((question) => question.slug),
@@ -136,12 +145,18 @@ export function gradesTable(
 			feedback,
 			listed,
 			now,
+			exceptions,
 		);
 		const byAuthor = new Map(rows.map((row) => [row.author, row]));
-		const closed = examPhase(exam, now) === "closed";
 		return listed.map((student): GradeCell => {
 			const row = byAuthor.get(student.username);
-			if (!row) return { kind: closed ? "missed" : "empty" };
+			if (!row) {
+				const own = personalTiming(
+					exam,
+					exceptions.get(student.username) ?? null,
+				);
+				return { kind: examPhase(own, now) === "closed" ? "missed" : "empty" };
+			}
 			if (row.state === "in-progress") return { kind: "in-progress" };
 			return row.pending === 0 && row.total !== null
 				? { kind: "total", total: row.total }

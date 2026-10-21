@@ -15,6 +15,7 @@ import { DisciplineService } from "./services/discipline.service";
 import { EditionService } from "./services/edition.service";
 import { EnrollmentService } from "./services/enrollment.service";
 import { ExamService } from "./services/exam.service";
+import { ExamExceptionService } from "./services/exam-exception.service";
 import { FeedbackService } from "./services/feedback.service";
 import { GradeColumnService } from "./services/grade-column.service";
 import { InviteService } from "./services/invite.service";
@@ -111,6 +112,15 @@ export type {
 	ExamUpdate,
 } from "./services/exam.service";
 export { groupExamsForStudent } from "./services/exam.service";
+export type {
+	ExamException,
+	ExamExceptionCreate,
+	ExamExceptionFilter,
+	ExamExceptionPK,
+	ExamExceptionPublic,
+	ExamExceptionUpdate,
+	ExamExceptionView,
+} from "./services/exam-exception.service";
 export type {
 	Feedback,
 	FeedbackCreate,
@@ -228,6 +238,7 @@ export const db = {
 	edition: new EditionService(),
 	enrollment: new EnrollmentService(),
 	exam: new ExamService(),
+	examException: new ExamExceptionService(),
 	feedback: new FeedbackService(),
 	gradeColumn: new GradeColumnService(),
 	invite: new InviteService(),

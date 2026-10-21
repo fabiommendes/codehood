@@ -4,6 +4,12 @@
 
 ### Added
 
+- Exam exceptions: the instructor grants one student extra time or a makeup
+  date on a quiz or exam, from the exam page or the REST API
+  (`.../exam/<slug>/exception/<username>`), and may reopen a closed attempt
+  while the student's personal window is open. The server, grading queue,
+  homes and calendar follow the personal window, and grades are not released
+  while a personal window is still open or upcoming.
 - Calendar feed: each user may create a secret `/calendar/<token>.ics` URL,
   from the new Calendar tab of the profile, that calendar apps subscribe to.
   It lists the meetings and published exams of the user's courses (cancelled
