@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: http://localhost:4321/api/course/cs101/ada_2026-1/calendar-event/1/mon
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/calendar-event/1/mon
   body:
     type: json
     data: |-

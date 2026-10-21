@@ -5,7 +5,7 @@ info:
 
 http:
   method: PUT
-  url: http://localhost:4321/api/course/cs101/ada_2026-1/resource
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/resource
   body:
     type: json
     data: |-

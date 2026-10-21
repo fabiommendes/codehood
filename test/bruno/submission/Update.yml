@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: http://localhost:4321/api/course/cs101/ada_2026-1/submission/sub_example
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/submission/sub_example
   body:
     type: json
     data: |-

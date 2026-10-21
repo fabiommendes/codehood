@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: http://localhost:4321/api/course/cs101/ada_2026-1/time-slot
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/time-slot
   body:
     type: json
     data: |-

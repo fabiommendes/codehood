@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/edition/2026-2
+  url: http://localhost:4321/api/edition/{{edition}}
   auth: inherit
 
 settings:

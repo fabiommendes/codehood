@@ -155,31 +155,36 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		await db.discipline.create(discipline, FULL_ACCESS);
 	}
 
-	// Two terms: 2026-1 is the one the demo courses run in, fixed safely in the
-	// past so it always reads as expired. The second is computed around seed
-	// time rather than a fixed date, so it always reads as the live one — a
-	// hardcoded window would only look alive until its own end date passed,
-	// then quietly leave the admin UI with two closed editions to show.
+	// Every date is derived from the seed time, so the dev database always has
+	// a past (expired) edition and a live one holding today, whenever it is
+	// seeded. Terms follow the slug rule: 1 for January to June, 2 for July to
+	// December, taken from the edition's start date.
 	const now = new Date();
-	const liveStart = new Date(now);
-	liveStart.setMonth(liveStart.getMonth() - 1);
-	const liveEnd = new Date(now);
-	liveEnd.setMonth(liveEnd.getMonth() + 4);
+	const liveStart = mondayOfWeek(now, -6);
+	const liveEnd = mondayOfWeek(now, 10);
+	const pastEnd = new Date(now);
+	pastEnd.setMonth(pastEnd.getMonth() - 5);
+	const pastStart = new Date(pastEnd);
+	pastStart.setMonth(pastStart.getMonth() - 4);
 
-	for (const edition of [
-		{
-			slug: "2026-1",
-			name: "2026 · first term",
-			startAt: new Date("2026-01-05"),
-			endAt: new Date("2026-05-15"),
-		},
-		{
-			slug: `${now.getFullYear()}-2`,
-			name: `${now.getFullYear()} · second term`,
-			startAt: liveStart,
-			endAt: liveEnd,
-		},
-	]) {
+	const live = {
+		slug: editionSlugOf(liveStart),
+		name: editionNameOf(liveStart),
+		startAt: liveStart,
+		endAt: liveEnd,
+	};
+	const past = {
+		slug: editionSlugOf(pastStart),
+		name: editionNameOf(pastStart),
+		startAt: pastStart,
+		endAt: pastEnd,
+	};
+	if (live.slug === past.slug) {
+		throw new Error(
+			`[seed] past and live editions share the slug ${live.slug}`,
+		);
+	}
+	for (const edition of [past, live]) {
 		await db.edition.create(edition, FULL_ACCESS);
 	}
 
@@ -187,11 +192,11 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		{
 			discipline: "cs101",
 			instructor: ada.username,
-			edition: "2026-1",
+			edition: live.slug,
 			description:
 				"A first course in programming: variables, control flow, functions, and enough data structures to get dangerous.",
-			startAt: new Date("2026-01-05"),
-			endAt: new Date("2026-05-15"),
+			startAt: live.startAt,
+			endAt: live.endAt,
 		},
 		FULL_ACCESS,
 	);
@@ -199,11 +204,11 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		{
 			discipline: "cs201",
 			instructor: alan.username,
-			edition: "2026-1",
+			edition: live.slug,
 			description:
 				"Arrays, linked lists, trees, and graphs, with an eye toward complexity.",
-			startAt: new Date("2026-01-05"),
-			endAt: new Date("2026-05-15"),
+			startAt: live.startAt,
+			endAt: live.endAt,
 		},
 		FULL_ACCESS,
 	);
@@ -451,7 +456,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			slot: cs101Mon,
 			week: 3,
 			kind: "HOLIDAY" as const,
-			title: "Martin Luther King Jr. Day",
+			title: "University holiday",
 			description: "No class (university holiday).",
 		},
 		{
@@ -588,6 +593,32 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			},
 			FULL_ACCESS,
 		);
+	}
+
+	// Every other week of the term gets a plain lecture and lab, so the schedule
+	// has a meeting in each slot from the first week to the last.
+	const totalWeeks = Math.round(
+		((cs101.endAt?.getTime() ?? 0) - (cs101.startAt?.getTime() ?? 0)) /
+			(7 * 24 * 3600 * 1000),
+	);
+	for (let week = 0; week < totalWeeks; week++) {
+		for (const slot of [cs101Mon, cs101Wed]) {
+			const taken = await db.calendarEvent.findOne(
+				{ course: cs101.id, week, timeSlot: slot.slug },
+				FULL_ACCESS,
+			);
+			if (taken) continue;
+			await db.calendarEvent.create(
+				{
+					course: cs101.id,
+					timeSlot: slot.id,
+					week,
+					title: `${slot.title} ${week + 1}`,
+					rev: `demo-w${week}-${slot.slug}-v1`,
+				},
+				FULL_ACCESS,
+			);
+		}
 	}
 
 	// Material attached to meetings: every type under a past lecture, and a
@@ -892,7 +923,11 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			status: "SCHEDULED",
 			title: "Midterm exam",
 			description: "Everything from weeks 1 to 7.",
-			scheduledAt: new Date("2026-03-09T14:00:00"),
+			// A week ahead: a scheduled exam waiting to start.
+			scheduledAt: toInstant(
+				localDateOf(new Date(Date.now() + 7 * 24 * 3600 * 1000)),
+				14 * 60,
+			),
 			duration: { hours: 2 },
 			tags: ["midterm"],
 			questions: [
@@ -942,7 +977,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
-	await seedReleasedQuiz(cs101.id, { hopper, hamilton });
+	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedOpenQuiz(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
@@ -976,9 +1011,56 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
-	console.log(
-		`[dev] created demo courses cs101/${ada.username}_2026-1 and cs201/${alan.username}_2026-1.`,
+	// An ended course in the past edition, so admin views keep an expired one.
+	const ended = await db.course.create(
+		{
+			discipline: "cs101",
+			instructor: ada.username,
+			edition: past.slug,
+			description: "Last term's run of the course, already over.",
+			startAt: past.startAt,
+			endAt: past.endAt,
+		},
+		FULL_ACCESS,
 	);
+	await db.enrollment.create(
+		{ course: ended.id, username: hopper.username },
+		FULL_ACCESS,
+	);
+
+	console.log(
+		`[dev] created demo courses cs101/${ada.username}_${live.slug} and cs201/${alan.username}_${live.slug}, plus the ended cs101/${ada.username}_${past.slug}.`,
+	);
+}
+
+/// The `YYYY-N` edition slug of the term `start` falls in: 1 up to June, 2 after.
+function editionSlugOf(start: Date): string {
+	const [year, month] = localDateOf(start).split("-").map(Number) as [
+		number,
+		number,
+	];
+	return `${year}-${month <= 6 ? 1 : 2}`;
+}
+
+/// The edition display name matching {@link editionSlugOf}.
+function editionNameOf(start: Date): string {
+	const slug = editionSlugOf(start);
+	return `${slug.slice(0, 4)} · ${slug.endsWith("1") ? "first" : "second"} term`;
+}
+
+/// Midnight (server time zone) of the Monday `weeks` weeks away from the one of `date`'s week.
+function mondayOfWeek(date: Date, weeks: number): Date {
+	const [year, month, day] = localDateOf(date).split("-").map(Number) as [
+		number,
+		number,
+		number,
+	];
+	const sinceMonday =
+		(new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+	const monday = new Date(
+		Date.UTC(year, month - 1, day - sinceMonday + weeks * 7),
+	);
+	return toInstant(monday.toISOString().slice(0, 10), 0);
 }
 
 /// Roll calls on three past cs101 meetings, covering the attendance states the grid shows.
@@ -996,11 +1078,12 @@ async function seedRollCalls(
 	if (existing.length > 0) return;
 
 	const DAY_MS = 24 * 3600 * 1000;
+	const opening = await eventAt(course, 0, "mon");
 	const first = await eventAt(course, 1, "mon");
 	const second = await eventAt(course, 2, "mon");
 	const third = await eventAt(course, 3, "wed");
 
-	// Enrolled before the course starts, so the first meeting counts for them.
+	// Enrolled before the course starts, so every meeting counts for them.
 	for (const student of [
 		students.hopper,
 		students.hamilton,
@@ -1010,7 +1093,7 @@ async function seedRollCalls(
 		await setEnrollmentDate(
 			course,
 			student.username,
-			new Date(first.startAt.getTime() - DAY_MS),
+			new Date(opening.startAt.getTime() - DAY_MS),
 		);
 	}
 
@@ -1073,6 +1156,42 @@ async function seedRollCalls(
 		],
 		manual: { username: "hamilton", note: "atestado" },
 	});
+
+	// The remaining past meetings that actually took place get a closed roll
+	// call with a varying crowd: hopper never misses, the others now and then,
+	// and only students already enrolled at the time can check in.
+	const special = new Set([first.id, second.id, third.id]);
+	const meetings = await db.calendarEvent.findMany({ course }, FULL_ACCESS);
+	const enrolledSince: Record<string, Date | undefined> = {
+		hopper: opening.startAt,
+		hamilton: opening.startAt,
+		liskov: opening.startAt,
+		bob: second.startAt,
+		wirth: third.startAt,
+	};
+	const ordered = meetings
+		.filter(
+			(event) =>
+				event.kind === "REGULAR" &&
+				event.startAt.getTime() < Date.now() &&
+				!special.has(event.id),
+		)
+		.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+	for (const [index, event] of ordered.entries()) {
+		const present = Object.entries(enrolledSince).filter(
+			([username, since], i) =>
+				since !== undefined &&
+				since.getTime() < event.startAt.getTime() &&
+				(username === "hopper" || (index + i) % 3 !== 0),
+		);
+		await seedClosedRollCall(event, {
+			checks: present.map(([username], i) => ({
+				username,
+				deviceHash: `device-${username}`,
+				minutes: 2 + i,
+			})),
+		});
+	}
 }
 
 /// Finds the cs101 event in a week and slot, or fails loudly when the demo calendar lacks it.
@@ -1245,9 +1364,10 @@ async function botGrade(
  * answers while open, so it gets its date after the answers are in.
  */
 async function seedReleasedQuiz(
-	course: Course["id"],
+	cs101: Course,
 	students: { hopper: User; hamilton: User },
 ): Promise<void> {
+	const course = cs101.id;
 	const exam = "quiz-01";
 
 	const hopper = await answerExam(course, exam, students.hopper, {
@@ -1266,7 +1386,16 @@ async function seedReleasedQuiz(
 
 	await db.exam.update(
 		{ course, slug: exam },
-		{ status: "COMPLETED", scheduledAt: new Date("2026-01-26T14:00:00") },
+		{
+			status: "COMPLETED",
+			// The Monday lecture of the course's fourth week, long over by now.
+			scheduledAt: slotInstant(
+				cs101.startAt ?? new Date(),
+				"MONDAY",
+				3,
+				14 * 60,
+			),
+		},
 		FULL_ACCESS,
 	);
 }

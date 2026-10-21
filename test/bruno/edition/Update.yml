@@ -5,14 +5,12 @@ info:
 
 http:
   method: PATCH
-  url: http://localhost:4321/api/edition/2026-2
+  url: http://localhost:4321/api/edition/{{edition}}
   body:
     type: json
     data: |-
       {
-        "name": "2026 · second term",
-        "startAt": "2026-08-15T20:09:44.092Z",
-        "endAt": "2027-01-15T20:09:44.092Z"
+        "name": "Current term"
       }
   auth: inherit
 

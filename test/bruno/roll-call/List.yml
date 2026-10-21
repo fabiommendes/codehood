@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: http://localhost:4321/api/course/cs101/ada_2026-1/roll-call
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/roll-call
   auth: inherit
 
 settings:

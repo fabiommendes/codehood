@@ -8,3 +8,13 @@ extensions:
     ignore:
       - node_modules
       - .git
+
+# `edition` is the slug of the edition the dev seed (`pnpm run db:seed`) runs
+# the demo courses in, as in `cs101/ada_{{edition}}`. The seed derives it from
+# the day it ran (`YYYY-1` from January to June, `YYYY-2` from July to
+# December, by the edition's start date), so set it to the slug printed by the
+# seed (`[dev] created demo courses ...`) or shown on /admin/editions.
+request:
+  variables:
+    - name: edition
+      value: 2026-2
