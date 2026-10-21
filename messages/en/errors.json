@@ -16,6 +16,7 @@
 	"errors_unique_email_in_use": "That email is already in use.",
 	"errors_unique_github_id_in_use": "That GitHub username is already in use.",
 	"errors_unique_school_id_in_use": "That school id is already in use.",
+	"errors_school_id_format": "That school id does not match this institution's format.",
 	"errors_unique_value_in_use": "One of those values is already in use.",
 	"errors_not_student_account": "{name} is not a student account.",
 	"errors_no_account_matches": "No account matches \"{login}\". Use an email address to invite someone who has not signed up yet.",

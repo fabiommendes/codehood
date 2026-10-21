@@ -16,6 +16,7 @@
 	"errors_unique_email_in_use": "Este e-mail já está em uso.",
 	"errors_unique_github_id_in_use": "Este usuário do GitHub já está em uso.",
 	"errors_unique_school_id_in_use": "Esta matrícula já está em uso.",
+	"errors_school_id_format": "Esta matrícula não segue o formato da instituição.",
 	"errors_unique_value_in_use": "Um desses valores já está em uso.",
 	"errors_not_student_account": "{name} não é uma conta de estudante.",
 	"errors_no_account_matches": "Nenhuma conta corresponde a \"{login}\". Use um endereço de e-mail para convidar quem ainda não se cadastrou.",

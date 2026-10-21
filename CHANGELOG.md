@@ -4,12 +4,6 @@
 
 ### Added
 
-- Translations (Paraglide JS, ADR 0002) and a pt-BR translation. Each
-  installation picks its language at build time with `CODEHOOD_LOCALE`
-  (default `en`). Pages, islands, form labels and validation, error messages
-  (REST and RPC included) and dates follow it. `pnpm run lint` fails when a
-  locale misses a message or its parameters, and a form field without a
-  label now fails instead of showing its field name.
 - Forms are derived from the zod schema that validates the action
   (`src/forms/`, `src/components/form/`, ADR 0001). Each field shows its own
   error, `required`/`minlength`/`max` attributes come from the schema, and the
@@ -26,6 +20,13 @@
 
 ### Fixed
 
+- GitHub usernames and school ids were checked only for being non-empty, so
+  one could take the `!<username>` value stored for an account without them
+  and block that account from being created. GitHub usernames now follow
+  GitHub's rule and are stored lowercase without a leading `@`; school ids
+  take letters, digits, `.`, `_` and `-`, narrowed per instance by
+  `SCHOOL_ID_PATTERN`. Usernames may be typed in uppercase and are stored
+  lowercase, and a new account cannot take a reserved name such as `me`.
 - The schedule offered to open the roll call of past meetings, and of today's
   only one hour before it started, so in the morning the only button sat on
   an earlier meeting of the week. The button now shows on the meeting's own

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { describeField, describeFields } from "@/forms/describe-field";
 import "@/forms/meta";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
+import { userSignUp } from "@/core/schemas";
 import {
 	buildOpenRpcDocument,
 	jsonSchemaOf,
@@ -30,6 +31,14 @@ test("string checks become attributes", () => {
 		label: "slug",
 		attrs: { minlength: 2, maxlength: 8, pattern: "[a-z]+" },
 	});
+});
+
+test("sign-up fields restricted by a regex carry it as an HTML pattern", () => {
+	for (const name of ["username", "githubId", "schoolId"] as const) {
+		const pattern = field(name, userSignUp.shape[name]).attrs.pattern;
+		expect(pattern, name).toBeDefined();
+		expect(() => new RegExp(`^(?:${pattern})$`, "v"), name).not.toThrow();
+	}
 });
 
 test("pattern is omitted when HTML would read it differently", () => {

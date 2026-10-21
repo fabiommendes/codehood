@@ -4,7 +4,7 @@
 
 import { InvalidData } from "@/core/error";
 import { m } from "@/i18n";
-import { EDITION_RE, RESERVED_USERNAMES, USERNAME_RE } from "./constants";
+import { EDITION_RE, USERNAME_RE } from "./constants";
 
 export interface CourseNaturalKey {
 	discipline: string;
@@ -34,9 +34,7 @@ export function parseCourseSegment(
  * Validate an username string.
  */
 export function parseUsername(username: string): string | null {
-	if (USERNAME_RE.test(username) && !RESERVED_USERNAMES.has(username))
-		return username;
-	return null;
+	return USERNAME_RE.test(username) ? username : null;
 }
 
 /**

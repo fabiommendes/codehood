@@ -17,7 +17,7 @@ test("admin without githubId/schoolId has them null, not the sentinel", async ()
 	const user = await db.user.create(
 		{
 			email: "root@codehood.test",
-			username: "root",
+			username: "sysop",
 			name: "Root",
 			role: "ADMIN",
 			password: "x",
@@ -271,4 +271,89 @@ test("upsert never touches an existing user's password: that goes through passwo
 	expect(afterUpdate?.name).toBe("Pw2");
 	expect(afterUpdate?.passwordHash).toBe(hashAfterCreate);
 	expect(await verifyPassword(hashAfterCreate, "first-password")).toBe(true);
+});
+
+/// A student account to create, with the given overrides.
+function student(username: string, extra: Record<string, unknown> = {}) {
+	return {
+		email: `${username}@codehood.test`,
+		username,
+		name: username,
+		role: "STUDENT" as const,
+		password: "x",
+		githubId: username,
+		schoolId: username,
+		...extra,
+	};
+}
+
+test("a GitHub or school id shaped like the missing-value sentinel is refused on create and update", async () => {
+	for (const field of ["githubId", "schoolId"]) {
+		await expect(
+			db.user.create(
+				student(`sentinel-${field.toLowerCase()}`, { [field]: "!bob" }),
+				FULL_ACCESS,
+			),
+		).rejects.toThrow();
+	}
+
+	const user = await db.user.create(student("sentinel-update"), FULL_ACCESS);
+	for (const field of ["githubId", "schoolId"]) {
+		await expect(
+			db.user.update(
+				{ username: user.username },
+				{ [field]: "!bob" },
+				FULL_ACCESS,
+			),
+		).rejects.toThrow();
+	}
+});
+
+test("githubId follows GitHub's rule and is stored lowercase, without a leading @", async () => {
+	const user = await db.user.create(
+		student("gh-normalized", { githubId: " @Ana-Dev " }),
+		FULL_ACCESS,
+	);
+	expect(user.githubId).toBe("ana-dev");
+
+	for (const bad of ["-ana", "ana-", "a--b", "ana_b", "", "a".repeat(40)]) {
+		await expect(
+			db.user.create(
+				student(`gh-bad-${bad.length}-${bad.charCodeAt(0) || 0}`, {
+					githubId: bad,
+				}),
+				FULL_ACCESS,
+			),
+			bad,
+		).rejects.toThrow();
+	}
+});
+
+test("a school id with spaces or other symbols is refused", async () => {
+	for (const bad of ["12 345", "12/345", "", "1".repeat(33)]) {
+		await expect(
+			db.user.create(
+				student(`school-bad-${bad.length}`, { schoolId: bad }),
+				FULL_ACCESS,
+			),
+			bad,
+		).rejects.toThrow();
+	}
+});
+
+test("a username typed with uppercase is stored lowercase, and the account logs in with either", async () => {
+	const user = await db.user.create(student("Mixed-Case"), FULL_ACCESS);
+	expect(user.username).toBe("mixed-case");
+	expect(
+		await db.user.findOne({ login: "MIXED-case" }, FULL_ACCESS),
+	).not.toBeNull();
+});
+
+test("reserved usernames are refused for new accounts, in any case", async () => {
+	for (const reserved of ["staff", "Me", "SYSTEM"]) {
+		await expect(
+			db.user.create(student(reserved), FULL_ACCESS),
+			reserved,
+		).rejects.toThrow();
+	}
 });

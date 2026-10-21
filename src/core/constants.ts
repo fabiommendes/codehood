@@ -64,6 +64,15 @@ function assertIn<T extends E[], E extends string>(
 }
 
 /**
+ * Compiles `source` into a regex that must match a whole string, or `null` when it is empty.
+ *
+ * @throws {SyntaxError} When `source` is not a valid regex.
+ */
+function wholeMatch(source: string): RegExp | null {
+	return source ? new RegExp(`^(?:${source})$`) : null;
+}
+
+/**
  * Normalize a validated `ENVIRONMENT` value to the short form the rest of the
  * codebase compares against.
  */
@@ -112,6 +121,15 @@ export const SESSION_COOKIE_OPTIONS = {
 	sameSite: "lax" as const,
 	path: "/",
 };
+
+// =============================================================================
+//  							USERS
+// =============================================================================
+
+/// The format this institution gives school ids, as a regex matched against the
+/// whole id (e.g. `[0-9]{9}`). Unset accepts any id the schema allows. An
+/// invalid regex fails the boot.
+export const SCHOOL_ID_PATTERN = wholeMatch(readEnv("SCHOOL_ID_PATTERN", ""));
 
 // =============================================================================
 //  							RESOURCES
@@ -185,4 +203,5 @@ logEnvVariables([
 	["ATTACHMENT_LINK_MODE", ATTACHMENT_LINK_MODE],
 	["BLOB_QUOTA_INSTRUCTOR", BLOB_QUOTA_BY_ROLE.INSTRUCTOR],
 	["BLOB_QUOTA_STUDENT", BLOB_QUOTA_BY_ROLE.STUDENT],
+	["SCHOOL_ID_PATTERN", SCHOOL_ID_PATTERN],
 ]);

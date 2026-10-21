@@ -4,6 +4,8 @@ export {
 	DISCIPLINE_SLUG_RE,
 	EDITION_RE,
 	RESERVED_SLUGS,
+	RESERVED_USERNAMES,
+	USERNAME_INPUT_RE,
 	USERNAME_RE,
 } from "./constants";
 export type { CourseNaturalKey as CourseRef } from "./parsing";

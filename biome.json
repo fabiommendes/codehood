@@ -26,6 +26,11 @@
 		"enabled": true,
 		"domains": {
 			"solid": "recommended"
+		},
+		"rules": {
+			"complexity": {
+				"noUselessEscapeInRegex": "off"
+			}
 		}
 	},
 	"css": {

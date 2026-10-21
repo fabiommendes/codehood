@@ -25,7 +25,7 @@ function buildUser(sequence: number, params: Partial<UserCreate>): UserCreate {
 		role: "STUDENT",
 		password: faker.internet.password({ length: 12 }),
 		// Required for non-admin roles; harmless when overridden to "ADMIN".
-		githubId: username,
+		githubId: username.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, ""),
 		schoolId: username,
 	};
 }

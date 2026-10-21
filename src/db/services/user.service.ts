@@ -6,6 +6,7 @@ import {
 	verifyPassword,
 } from "@/auth/password";
 import { ensurePerm } from "@/auth/permissions";
+import { SCHOOL_ID_PATTERN } from "@/core/constants";
 import { FieldError, NotAllowed } from "@/core/error";
 import {
 	passwordChange,
@@ -70,6 +71,7 @@ export class UserService extends CrudBase<{
 			throw new FieldError("githubId", m.errors_required_for_students());
 		if (!input.schoolId && isStudent)
 			throw new FieldError("schoolId", m.errors_required_for_students());
+		assertSchoolIdFormat(input.schoolId);
 
 		const githubId = input.githubId ?? nullSentinel(input.username);
 		const schoolId = input.schoolId ?? nullSentinel(input.username);
@@ -126,7 +128,12 @@ export class UserService extends CrudBase<{
 			});
 		} else if (by.login) {
 			user = await tx.user.findFirst({
-				where: { OR: [{ email: by.login }, { username: by.login }] },
+				where: {
+					OR: [
+						{ email: by.login },
+						{ username: by.login.trim().toLowerCase() },
+					],
+				},
 			});
 		}
 
@@ -182,6 +189,7 @@ export class UserService extends CrudBase<{
 		ensurePerm(opts.actor, "user.update", target);
 
 		const { githubId, schoolId, ...rest } = payload;
+		assertSchoolIdFormat(schoolId);
 
 		return toUser(
 			await tx.user.update({
@@ -217,6 +225,7 @@ export class UserService extends CrudBase<{
 		opts: ServiceOptsWithoutTx,
 	): Promise<User> {
 		const scoped: ServiceOpts = { ...opts, tx };
+		assertSchoolIdFormat(input.schoolId);
 
 		const user = await upsert(this, input, {
 			...scoped,
@@ -340,6 +349,16 @@ export class UserService extends CrudBase<{
 export function userWhere(actor: Actor): Prisma.UserWhereInput {
 	if (actor === SYSTEM || actor.role === "ADMIN") return {};
 	return { username: actor.username };
+}
+
+/**
+ * Rejects a school id outside the instance's `SCHOOL_ID_PATTERN`.
+ *
+ * @throws {FieldError} When the id is present and does not match.
+ */
+function assertSchoolIdFormat(schoolId: string | null | undefined): void {
+	if (schoolId && SCHOOL_ID_PATTERN && !SCHOOL_ID_PATTERN.test(schoolId))
+		throw new FieldError("schoolId", m.errors_school_id_format());
 }
 
 // The `schoolId`/`githubId` columns are NOT NULL @unique, so an account with

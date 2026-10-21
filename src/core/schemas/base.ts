@@ -1,7 +1,7 @@
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { m } from "@/i18n";
-import { EDITION_RE, USERNAME_RE } from "@/urls";
+import { EDITION_RE, RESERVED_USERNAMES, USERNAME_INPUT_RE } from "@/urls";
 
 // Must run before any schema calls .openapi(...) — every schema module imports
 // this one first, so this is the one place that needs to call it.
@@ -67,11 +67,20 @@ export type TimeSlotId = z.infer<typeof timeSlotId>;
 
 // We do not brand since it is not likely to be confused with other numeric IDs.
 // due to both its type (not an int) and name (not id).
+/// Accepts uppercase and yields lowercase, so `Ada` and `ada` are one account.
 export const username = z
 	.string()
-	.regex(USERNAME_RE, m.forms_schema_username_invalid())
+	.trim()
+	.regex(USERNAME_INPUT_RE, m.forms_schema_username_invalid())
+	.toLowerCase()
 	.openapi({ example: "ada" });
 export type UserId = z.infer<typeof username>;
+
+/// A username for a new account: {@link username} minus the reserved names.
+export const newUsername = username.refine(
+	(name) => !RESERVED_USERNAMES.has(name),
+	m.forms_schema_username_reserved(),
+);
 
 // =============================================================================
 //                          Generic Primitives
@@ -81,14 +90,14 @@ export type UserId = z.infer<typeof username>;
 /// repository paths into this form; the server still refuses anything else.
 export const slug = z
 	.string()
-	.regex(/^[a-z0-9][a-z0-9._-]*$/, m.forms_schema_slug_invalid())
+	.regex(/^[a-z0-9][a-z0-9._\-]*$/, m.forms_schema_slug_invalid())
 	.openapi({ example: "intro-to-recursion" });
 export type Slug = z.infer<typeof slug>;
 
 /// An opaque random identifier, safe to place in a URL or hand to a client.
 export const publicId = z
 	.string()
-	.regex(/^[A-Za-z0-9_-]+$/, m.forms_schema_public_id_invalid())
+	.regex(/^[A-Za-z0-9_\-]+$/, m.forms_schema_public_id_invalid())
 	.openapi({ example: "k3Vx9QpL2a" });
 export type PublicId = z.infer<typeof publicId>;
 
