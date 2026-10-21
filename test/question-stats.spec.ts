@@ -380,6 +380,46 @@ test("questionStats: blank and will-not-grade answers score zero in the discrimi
 	expect(stats[1]).toMatchObject({ blank: 1, notGraded: 1 });
 });
 
+test("questionStats: an attempt whose author still has personal time is left out of every count until the window closes", () => {
+	// The exam runs from at(0) to at(60); the slow student has 30 extra minutes,
+	// so their unfinished attempt is still open until at(90).
+	const timed: ExamTiming = {
+		type: "EXAM",
+		status: "ONGOING",
+		scheduledAt: at(0),
+		duration: { minutes: 60 },
+		extraTime: null,
+	};
+	const extra = new Map([
+		["student-5", { extraTime: { minutes: 30 }, scheduledAt: null }],
+	]);
+	const { attempts, feedback } = cohort([
+		["1", "1"],
+		["1", "1"],
+		["1", "0"],
+		["0", "0"],
+		["0", "0"],
+		["1", null],
+	]);
+	const slow = attempts[5];
+	if (!slow) throw new Error("the cohort lost its sixth attempt");
+	attempts[5] = { ...slow, acceptingSubmissions: true };
+	const statsAt = (now: Date) =>
+		questionStats(timed, QUESTIONS, attempts, feedback, now, extra);
+
+	// The other five read q1 = [1,1,1,0,0], q2 = [1,1,0,0,0]: r = 2/3.
+	const during = statsAt(at(70));
+	expect(during[0]).toMatchObject({ answered: 5, blank: 0 });
+	expect(during[1]).toMatchObject({ answered: 5, blank: 0 });
+	expect(during[0]?.discrimination).toBeCloseTo(2 / 3, 10);
+
+	// Counted, the slow attempt adds q1 = 1 and a blank q2 (zero): r = 1/2.
+	const after = statsAt(at(100));
+	expect(after[0]).toMatchObject({ answered: 6, blank: 0 });
+	expect(after[1]).toMatchObject({ answered: 5, blank: 1 });
+	expect(after[0]?.discrimination).toBeCloseTo(1 / 2, 10);
+});
+
 test("questionStats: an exam of one question has no discrimination", () => {
 	const stats = cohortStats([["1"], ["1"], ["0"], ["0"], ["1"]], ["q1"]);
 
@@ -709,6 +749,43 @@ test("answerDistribution: true-false counts true, false and abstained per statem
 	});
 });
 
+test("answerDistribution: a true-false payload whose answers is an array abstains on every statement and adds no removed row", () => {
+	const statements = trueFalse({
+		id: "array-answers",
+		stem: "Judge each one.",
+		choices: [
+			{ id: "s1", text: "First", correct: true },
+			{ id: "s2", text: "Second", correct: false },
+		],
+	});
+
+	const result = answerDistribution(
+		statements,
+		payloads({ answers: ["s1"] } as unknown as Payload),
+	);
+
+	expect(result?.rows).toEqual([
+		{
+			kind: "statement",
+			id: "s1",
+			text: "First",
+			correct: true,
+			true: 0,
+			false: 0,
+			abstained: 1,
+		},
+		{
+			kind: "statement",
+			id: "s2",
+			text: "Second",
+			correct: false,
+			true: 0,
+			false: 0,
+			abstained: 1,
+		},
+	]);
+});
+
 for (const question of [
 	idempotenceEssay,
 	waterNumeric,
@@ -904,7 +981,7 @@ test("question statistics: the instructor reads each question's numbers, a stude
 			"0",
 			"75%",
 			"50%",
-			"—",
+			/^—/,
 			"1",
 		]);
 		await expect(cells("Title two")).toHaveText([
@@ -913,7 +990,7 @@ test("question statistics: the instructor reads each question's numbers, a stude
 			"1",
 			"25%",
 			"0%",
-			"—",
+			/^—/,
 			"1",
 		]);
 		await expect(cells("Title three")).toHaveText([
@@ -922,7 +999,7 @@ test("question statistics: the instructor reads each question's numbers, a stude
 			"2",
 			"",
 			"",
-			"—",
+			/^—/,
 			"",
 		]);
 		await expect(

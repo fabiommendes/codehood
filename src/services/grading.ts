@@ -10,7 +10,11 @@ import { scoreValue } from "@/core/score";
 import type { Feedback } from "@/db/services/feedback.service";
 import type { Response } from "@/db/services/response.service";
 import type { Submission } from "@/db/services/submission.service";
-import { examResult } from "./exam-result";
+import {
+	examResult,
+	isNewerSubmission,
+	newestPassesFirst,
+} from "./exam-result";
 import {
 	attemptState,
 	type ExamTiming,
@@ -126,20 +130,15 @@ export function countingAnswers(
 		for (const submission of attempt.submissions) {
 			if (!questions.includes(submission.question)) continue;
 			const current = newest.get(submission.question);
-			if (!current || isNewer(submission, current)) {
+			if (!current || isNewerSubmission(submission, current)) {
 				newest.set(submission.question, submission);
 			}
 		}
 
 		for (const submission of newest.values()) {
-			const passes = (passesBySubmission.get(submission.publicId) ?? [])
-				.map((pass, index) => ({ pass, index }))
-				.sort(
-					(a, b) =>
-						b.pass.updatedAt.getTime() - a.pass.updatedAt.getTime() ||
-						b.index - a.index,
-				)
-				.map(({ pass }) => pass);
+			const passes = newestPassesFirst(
+				passesBySubmission.get(submission.publicId) ?? [],
+			);
 			const newestPass = passes[0];
 			const verdict =
 				submission.status === "WILL_NOT_GRADE" || !newestPass
@@ -174,15 +173,6 @@ export function countingAnswers(
 				a.id - b.id,
 		)
 		.map(({ answer }) => answer);
-}
-
-/// Whether `a` was submitted after `b`, the id breaking a tie in the timestamp.
-function isNewer(
-	a: { createdAt: Date; id: number },
-	b: { createdAt: Date; id: number },
-): boolean {
-	const diff = a.createdAt.getTime() - b.createdAt.getTime();
-	return diff > 0 || (diff === 0 && a.id > b.id);
 }
 
 /// The grading page's view of one stored pass.

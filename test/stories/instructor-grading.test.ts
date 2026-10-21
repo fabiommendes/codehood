@@ -756,8 +756,8 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 				table().getByRole("columnheader", { name: header, exact: true }),
 			).toBeVisible();
 		}
-		await expect(cells("Best fruit").nth(5)).toHaveText("—");
-		await expect(cells("Protocols").nth(5)).toHaveText("—");
+		await expect(cells("Best fruit").nth(5)).toHaveText(/^—/);
+		await expect(cells("Protocols").nth(5)).toHaveText(/^—/);
 		await expect(
 			page.getByTitle("Fewer than 5 graded attempts").first(),
 		).toBeVisible();

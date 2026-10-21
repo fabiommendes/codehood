@@ -1719,9 +1719,10 @@ async function seedExamExceptions(
 /**
  * Seeds a closed, graded exam with released grades, answered by eight students, for the question statistics.
  *
- * The students come in descending order of total. It has a multiple choice with a popular
- * distractor and a choice nobody picks, a multiple selection, a true-false, a
- * question the best students miss (negative discrimination) and a numeric.
+ * It has a multiple choice with a popular distractor and a choice nobody
+ * picks, a multiple selection, a true-false, a question the best students on
+ * the rest of the exam miss (negative discrimination), a numeric, and one
+ * everybody gets right (no variance).
  */
 async function seedQuestionStatsExam(
 	course: Course["id"],
@@ -1783,6 +1784,15 @@ async function seedQuestionStatsExam(
 			{ id: "linearithmic", text: "O(n log n)" },
 		],
 	});
+	await question("stack-top", {
+		type: "multiple-choice",
+		title: "Stack access",
+		stem: "Which end of a stack does `pop` remove from?",
+		choices: [
+			{ id: "top", text: "The top", score: 1 },
+			{ id: "bottom", text: "The bottom" },
+		],
+	});
 	await db.exam.create(
 		{
 			course,
@@ -1798,6 +1808,7 @@ async function seedQuestionStatsExam(
 				{ slug: "stack-facts", version: "v1" },
 				{ slug: "pivot-trap", version: "v1" },
 				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "stack-top", version: "v1" },
 			],
 		},
 		FULL_ACCESS,
@@ -1815,6 +1826,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "linearithmic" }, "0"],
 			["factorial-of-five", { value: 120 }, "1"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "merge" }, "1"],
@@ -1826,6 +1838,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "linearithmic" }, "0"],
 			["factorial-of-five", { value: 120 }, "1"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "merge" }, "1"],
@@ -1837,6 +1850,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "linearithmic" }, "0"],
 			["factorial-of-five", { value: 120 }, "1"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "insertion" }, "0"],
@@ -1844,6 +1858,7 @@ async function seedQuestionStatsExam(
 			["stack-facts", { answers: { lifo: true, fifo: false } }, "0.67"],
 			["pivot-trap", { choice: "linearithmic" }, "0"],
 			["factorial-of-five", { value: 120 }, "1"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "merge" }, "1"],
@@ -1855,6 +1870,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "quadratic" }, "1"],
 			["factorial-of-five", { value: 120 }, "1"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "bubble" }, "0"],
@@ -1866,6 +1882,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "quadratic" }, "1"],
 			["factorial-of-five", { value: 100 }, "0"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "bubble" }, "0"],
@@ -1877,6 +1894,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "quadratic" }, "1"],
 			["factorial-of-five", { value: 100 }, "0"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 		[
 			["fastest-sort", { choice: "bubble" }, "0"],
@@ -1888,6 +1906,7 @@ async function seedQuestionStatsExam(
 			],
 			["pivot-trap", { choice: "quadratic" }, "1"],
 			["factorial-of-five", { value: 24 }, "0"],
+			["stack-top", { choice: "top" }, "1"],
 		],
 	];
 	for (const [index, student] of students.entries()) {

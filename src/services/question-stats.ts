@@ -393,7 +393,9 @@ export function answerDistribution(
 					answers.map((answer) => {
 						const verdicts = (answer.payload as { answers?: unknown } | null)
 							?.answers;
-						return verdicts && typeof verdicts === "object"
+						return verdicts &&
+							typeof verdicts === "object" &&
+							!Array.isArray(verdicts)
 							? (verdicts as Record<string, unknown>)
 							: {};
 					}),

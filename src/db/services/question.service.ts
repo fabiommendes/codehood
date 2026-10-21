@@ -95,6 +95,40 @@ type DbQuestionPublic = Prisma.QuestionRefGetPayload<{
 	include: ReturnType<typeof questionInclude<false>>;
 }>;
 
+/// The stored version of a question with this hash, or `null` when none is asked for or it never existed.
+function findPinnedVersion(
+	tx: PrismaTx,
+	refId: number,
+	versionHash: string | null | undefined,
+	includePrivate: true,
+): Promise<{
+	versionHash: string;
+	publicPayload: Prisma.JsonValue;
+	privatePayload: Prisma.JsonValue;
+} | null>;
+function findPinnedVersion(
+	tx: PrismaTx,
+	refId: number,
+	versionHash: string | null | undefined,
+	includePrivate: false,
+): Promise<{ versionHash: string; publicPayload: Prisma.JsonValue } | null>;
+async function findPinnedVersion(
+	tx: PrismaTx,
+	refId: number,
+	versionHash: string | null | undefined,
+	includePrivate: boolean,
+) {
+	if (!versionHash) return null;
+	return tx.questionData.findUnique({
+		where: { refId_versionHash: { refId, versionHash } },
+		select: {
+			versionHash: true,
+			publicPayload: true,
+			privatePayload: includePrivate,
+		},
+	});
+}
+
 const questionView = questionSchema.or(questionPublicSchema);
 
 export class QuestionService extends CrudBase<{
@@ -225,14 +259,7 @@ export class QuestionService extends CrudBase<{
 			throw new NotAllowed("question.read");
 		}
 		if (filter.public || !full) {
-			const pinned = filter.version
-				? await tx.questionData.findUnique({
-						where: {
-							refId_versionHash: { refId: row.id, versionHash: filter.version },
-						},
-						select: { versionHash: true, publicPayload: true },
-					})
-				: null;
+			const pinned = await findPinnedVersion(tx, row.id, filter.version, false);
 			return fromDbPublic(
 				pinned ? ({ ...row, latest: pinned } as typeof row) : row,
 			);
@@ -240,26 +267,19 @@ export class QuestionService extends CrudBase<{
 
 		// Only now, with the full view granted, does the query touching
 		// `privatePayload` get sent.
+		const pinned = await findPinnedVersion(tx, row.id, filter.version, true);
 		const fullRow = valueOrNotFound(
 			"question",
 			await tx.questionRef.findUnique({
 				where: { id: row.id },
-				include: questionInclude(true),
+				include: pinned
+					? { ...questionInclude(true), latest: false }
+					: questionInclude(true),
 			}),
 		);
-		const pinned = filter.version
-			? await tx.questionData.findUnique({
-					where: {
-						refId_versionHash: { refId: row.id, versionHash: filter.version },
-					},
-					select: {
-						versionHash: true,
-						publicPayload: true,
-						privatePayload: true,
-					},
-				})
-			: null;
-		return fromDb(pinned ? { ...fullRow, latest: pinned } : fullRow);
+		return fromDb(
+			pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
+		);
 	}
 
 	/**

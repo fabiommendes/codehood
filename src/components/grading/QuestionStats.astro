@@ -2,7 +2,7 @@
 /**
  * The instructor's per-question view of an exam: how many answered, how they scored, and what still waits for a grade.
  */
-import { m } from "@/i18n";
+import { locale, m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
 import {
 	type DiscriminationGap,
@@ -25,6 +25,10 @@ const gapReasons: Record<DiscriminationGap, string> = {
 	"single-question": m.grades_stats_gap_single_question(),
 	"no-variance": m.grades_stats_gap_no_variance(),
 };
+const twoDecimals = new Intl.NumberFormat(locale, {
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2,
+});
 const anyAnswer = stats.some((entry) => entry.answered > 0);
 ---
 
@@ -65,7 +69,10 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
                 </td>
                 <td class="text-right tabular-nums">
                   {entry.discrimination === null ? (
-                    <span title={entry.discriminationGap ? gapReasons[entry.discriminationGap] : undefined}>—</span>
+                    <span title={entry.discriminationGap ? gapReasons[entry.discriminationGap] : undefined}>
+                      <span aria-hidden="true">—</span>
+                      {entry.discriminationGap && <span class="sr-only">{gapReasons[entry.discriminationGap]}</span>}
+                    </span>
                   ) : (
                     <>
                       {discriminationFlag(entry.discrimination) && (
@@ -73,7 +80,7 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
                           {m.grades_stats_review()}
                         </span>
                       )}
-                      {entry.discrimination.toFixed(2)}
+                      {twoDecimals.format(entry.discrimination)}
                     </>
                   )}
                 </td>

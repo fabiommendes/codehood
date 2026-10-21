@@ -21,7 +21,39 @@ export type ResultSubmission = Pick<
 	Submission,
 	"publicId" | "question" | "createdAt"
 > &
-	Partial<Pick<Submission, "status">>;
+	Partial<Pick<Submission, "status" | "id">>;
+
+/**
+ * Whether submission `a` counts over `b`: the newer one, the higher id breaking a tie in the timestamp.
+ *
+ * The single rule that picks the counting submission of a question, shared by
+ * the exam result and the grading queue.
+ */
+export function isNewerSubmission(
+	a: { createdAt: Date; id?: number },
+	b: { createdAt: Date; id?: number },
+): boolean {
+	const diff = a.createdAt.getTime() - b.createdAt.getTime();
+	return diff > 0 || (diff === 0 && (a.id ?? 0) > (b.id ?? 0));
+}
+
+/**
+ * The grading passes newest first by `updatedAt`, the one listed later breaking a tie.
+ *
+ * The first one is the current verdict; shared by the exam result and the grading queue.
+ */
+export function newestPassesFirst<T extends { updatedAt: Date }>(
+	passes: readonly T[],
+): T[] {
+	return passes
+		.map((pass, index) => ({ pass, index }))
+		.sort(
+			(a, b) =>
+				b.pass.updatedAt.getTime() - a.pass.updatedAt.getTime() ||
+				b.index - a.index,
+		)
+		.map(({ pass }) => pass);
+}
 
 /** How one question of the exam went. */
 export interface QuestionOutcome {
@@ -79,18 +111,16 @@ function outcomeOf(
 		.filter((submission) => submission.question === slug)
 		.reduce<(typeof submissions)[number] | null>(
 			(newest, submission) =>
-				!newest || submission.createdAt > newest.createdAt
-					? submission
-					: newest,
+				!newest || isNewerSubmission(submission, newest) ? submission : newest,
 			null,
 		);
 	if (!counting) {
 		return { question: slug, status: "unanswered", score: null, comments: [] };
 	}
 
-	const passes = feedback
-		.filter((entry) => entry.submission === counting.publicId)
-		.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+	const passes = newestPassesFirst(
+		feedback.filter((entry) => entry.submission === counting.publicId),
+	);
 	const comments = passes
 		.map((entry) => entry.feedback)
 		.filter((text): text is string => !!text?.trim());

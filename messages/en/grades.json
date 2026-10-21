@@ -49,6 +49,7 @@
 	"grades_dist_title": "Answer distribution",
 	"grades_dist_correct": "Correct choice",
 	"grades_dist_blank": "Blank",
+	"grades_dist_none_selected": "None selected",
 	"grades_dist_removed": "Removed choice ({id})",
 	"grades_dist_removed_statement": "Removed statement ({id})",
 	"grades_dist_count": "{count} · {percent}%",
