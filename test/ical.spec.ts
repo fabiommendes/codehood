@@ -179,12 +179,11 @@ test("renderIcal writes a full event with properties in the documented order, te
 	);
 });
 
-test("renderIcal omits DESCRIPTION when empty or absent, and URL and STATUS when absent", () => {
+test("renderIcal omits DTEND when the event has no end, and DESCRIPTION, URL and STATUS when absent", () => {
 	const bare: IcalEvent = {
 		uid: "exam-3@codehood.example",
 		stamp: EVENT.stamp,
 		start: EVENT.start,
-		end: EVENT.start,
 		summary: "cs101 · Prova: P1",
 	};
 
@@ -196,9 +195,9 @@ test("renderIcal omits DESCRIPTION when empty or absent, and URL and STATUS when
 		],
 	});
 
-	expect(output).not.toMatch(/DESCRIPTION|URL:|STATUS/);
+	expect(output).not.toMatch(/DTEND|DESCRIPTION|URL:|STATUS/);
 	expect(output).toContain(
-		"DTSTART:20260302T140000Z\r\nDTEND:20260302T140000Z\r\n",
+		"DTSTART:20260302T140000Z\r\nSUMMARY:cs101 · Prova: P1\r\n",
 	);
 });
 

@@ -394,7 +394,13 @@ const profileTabs = [
     button.addEventListener("click", async () => {
       const input = document.getElementById(button.dataset.copyFrom ?? "");
       if (!(input instanceof HTMLInputElement)) return;
-      await navigator.clipboard.writeText(input.value);
+      input.select();
+      try {
+        // Missing on insecure origins, where the text stays selected for a manual copy.
+        await navigator.clipboard.writeText(input.value);
+      } catch {
+        if (!document.execCommand("copy")) return;
+      }
       const label = button.textContent;
       button.textContent = button.dataset.copied ?? label;
       setTimeout(() => {

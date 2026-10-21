@@ -272,7 +272,7 @@ test("a regular meeting has no STATUS line", () => {
 	expect(lines.some((l) => l.startsWith("STATUS"))).toBe(false);
 });
 
-test("an untimed exam is a zero-length event: DTEND equals DTSTART", () => {
+test("an untimed exam has a DTSTART and no DTEND, which calendar apps read as a zero-length event", () => {
 	const entry: CalendarEntry = {
 		...examEntry({ duration: null }),
 		endAt: START,
@@ -281,7 +281,11 @@ test("an untimed exam is a zero-length event: DTEND equals DTSTART", () => {
 	const lines = veventLines(entry);
 
 	expect(lines).toContain("DTSTART:20260310T130000Z");
-	expect(lines).toContain("DTEND:20260310T130000Z");
+	expect(lines.some((l) => l.startsWith("DTEND"))).toBe(false);
+});
+
+test("a timed exam keeps its DTEND", () => {
+	expect(veventLines(examEntry())).toContain("DTEND:20260310T143000Z");
 });
 
 for (const status of ["DRAFT", "ARCHIVED"] as const) {

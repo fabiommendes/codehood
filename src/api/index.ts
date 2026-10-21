@@ -80,7 +80,7 @@ export const courseApi = CRUD("/api/course", {
 	entity: schema.courseSchema.omit({ id: true }),
 	create: schema.courseCreate,
 	update: schema.courseUpdate,
-	filter: schema.courseFilter,
+	filter: schema.courseFilter.omit({ member: true }),
 	key: schema.courseNaturalKey,
 	tags: ["Courses"],
 	service: db.course,

@@ -156,18 +156,17 @@ export class CalendarFeedService {
 	): Promise<UserActor | null> {
 		if (!calendarFeedToken.safeParse(token).success) return null;
 		const client = opts.tx ?? this.prisma;
-		const feed = await client.calendarFeed.findUnique({
+		// Stamp by token first: a feed removed or rotated since the caller
+		// built the URL matches no row and resolves to null.
+		const stamped = await client.calendarFeed.updateMany({
 			where: { token },
-			select: {
-				username: true,
-				user: { select: { username: true, name: true, role: true } },
-			},
-		});
-		if (!feed) return null;
-		await client.calendarFeed.update({
-			where: { username: feed.username },
 			data: { lastUsedAt: new Date() },
 		});
-		return feed.user;
+		if (stamped.count === 0) return null;
+		const feed = await client.calendarFeed.findUnique({
+			where: { token },
+			select: { user: { select: { username: true, name: true, role: true } } },
+		});
+		return feed?.user ?? null;
 	}
 }

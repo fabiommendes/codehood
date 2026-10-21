@@ -157,7 +157,11 @@ test("student: leave a course", async ({ page }) => {
 	expect(enrollment?.status).toBe("DROPPED");
 });
 
-test("student: subscribe to my calendar in another app", async ({ page }) => {
+test("student: subscribe to my calendar in another app", async ({
+	page,
+	playwright,
+	baseURL,
+}) => {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create();
 	await db.enrollment.create(
@@ -224,7 +228,9 @@ test("student: subscribe to my calendar in another app", async ({ page }) => {
 	});
 
 	await test.step("the address serves the course's meeting and published exam, not the draft", async () => {
-		const response = await page.request.get(firstUrl);
+		// A calendar app has no session: fetch from a context without the cookie.
+		const app = await playwright.request.newContext({ baseURL });
+		const response = await app.get(firstUrl);
 		expect(response.status()).toBe(200);
 		expect(response.headers()["content-type"]).toContain("text/calendar");
 		const body = (await response.text()).replaceAll("\r\n ", "");
@@ -232,6 +238,14 @@ test("student: subscribe to my calendar in another app", async ({ page }) => {
 		expect(body).toContain("Sub-Lab");
 		expect(body).toContain("Sub-Midterm");
 		expect(body).not.toContain("Sub-Draft");
+		await app.dispose();
+	});
+
+	await test.step("the profile then shows when the link was last used", async () => {
+		await page.goto("/profile");
+		await openTab(page, "Calendar");
+		await expect(page.getByText("Never used")).toHaveCount(0);
+		await expect(page.getByText(/Last used:/)).toBeVisible();
 	});
 
 	let secondUrl = "";

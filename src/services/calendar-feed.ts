@@ -49,7 +49,7 @@ export interface CalendarFeedOptions {
  *
  * An exam (`kind: "exam"`) becomes:
  * - `UID:exam-<exam.id>@<host>`, `DTSTAMP`: `exam.updatedAt`;
- * - `DTSTART`/`DTEND`: the entry's `startAt`/`endAt`, equal for an untimed exam;
+ * - `DTSTART`/`DTEND`: the entry's `startAt`/`endAt`, with no `DTEND` for an untimed exam;
  * - `SUMMARY:<label> · <type label>: <exam.title>`, the type label from
  *   `examTypeLabels`;
  * - `URL:<course>/exams/<exam.slug>`, no `DESCRIPTION`, no `STATUS`.
@@ -83,7 +83,15 @@ export function renderCalendar(
 				instructor: course.instructor.username,
 				edition: course.edition.slug,
 			});
-		const base = { start: entry.startAt, end: entry.endAt };
+		// A zero-length entry has no DTEND: RFC 5545 gives an event with only a
+		// DTSTART no duration, which is what an untimed exam is.
+		const base = {
+			start: entry.startAt,
+			end:
+				entry.endAt.getTime() === entry.startAt.getTime()
+					? undefined
+					: entry.endAt,
+		};
 		if (entry.kind === "event") {
 			const { event } = entry;
 			events.push({

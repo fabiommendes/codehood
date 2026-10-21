@@ -51,14 +51,17 @@ export type CourseExam = z.infer<typeof courseExamSchema>;
 export type ExamPK = z.infer<typeof examPK>;
 export type ExamUpdate = z.infer<typeof examUpdate>;
 
-/// The course shape the permission predicates need, plus the exam's own relations.
-function examInclude() {
+/// The course shape the permission predicates need, plus the exam's own relations. With `enrolledUser`, only that user's enrollment is loaded: all the checks ask about the actor.
+function examInclude(enrolledUser?: string) {
 	return {
 		course: {
 			select: {
 				instructor: { select: { username: true } },
 				enrollments: {
-					where: { status: "ACTIVE" as const },
+					where: {
+						status: "ACTIVE" as const,
+						...(enrolledUser === undefined ? {} : { username: enrolledUser }),
+					},
 					select: { username: true },
 				},
 			},
@@ -258,7 +261,8 @@ export class ExamService extends CrudBase<{
 					? { examTags: { some: { tag: { in: filter.tags } } } }
 					: {}),
 			},
-			include: examInclude(),
+			// SYSTEM passes every check without enrollments, so it loads none.
+			include: examInclude(opts.actor === SYSTEM ? "" : opts.actor.username),
 			orderBy: [{ courseId: "asc" }, { slug: "asc" }],
 		});
 

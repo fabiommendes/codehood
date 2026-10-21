@@ -138,3 +138,15 @@ test("a session cookie alone, without a token, opens no feed", async ({
 	expect(await response.text()).toBe("");
 	await signedIn.dispose();
 });
+
+test("the feed token is not an API credential: as a Bearer it is refused by the REST API", async ({
+	request,
+}) => {
+	const { token } = await studentWithFeed("Lab Epsilon");
+
+	const response = await request.get("/api/user/me", {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+
+	expect(response.status()).toBe(401);
+});

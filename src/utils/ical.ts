@@ -17,7 +17,7 @@ export type IcalEventStatus = "TENTATIVE" | "CONFIRMED" | "CANCELLED";
 /**
  * One `VEVENT`. Text fields hold plain text and are escaped on output.
  *
- * Properties are written in this order, optional ones only when present:
+ * Properties are written in this order, optional ones only when present (`DTEND`, `DESCRIPTION`, `URL`, `STATUS`):
  * `UID`, `DTSTAMP`, `DTSTART`, `DTEND`, `SUMMARY`, `DESCRIPTION`, `URL`,
  * `STATUS`.
  */
@@ -27,7 +27,8 @@ export interface IcalEvent {
 	/// When this version of the event was last changed.
 	stamp: Date;
 	start: Date;
-	end: Date;
+	/// Omitted from the output when absent, which makes the event instantaneous.
+	end?: Date;
 	summary: string;
 	/// Omitted from the output when absent or empty.
 	description?: string;
@@ -133,9 +134,9 @@ function eventLines(event: IcalEvent): string[] {
 		`UID:${event.uid}`,
 		`DTSTAMP:${formatUtcDateTime(event.stamp)}`,
 		`DTSTART:${formatUtcDateTime(event.start)}`,
-		`DTEND:${formatUtcDateTime(event.end)}`,
 		`SUMMARY:${escapeText(event.summary)}`,
 	];
+	if (event.end) lines.splice(4, 0, `DTEND:${formatUtcDateTime(event.end)}`);
 	if (event.description) {
 		lines.push(`DESCRIPTION:${escapeText(event.description)}`);
 	}
