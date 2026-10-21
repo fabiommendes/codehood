@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalShortAnswer } from "@/mdq/fixtures";
+import { capitalShortAnswer, multipleChoice, trueFalse } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 
@@ -546,5 +546,347 @@ test("instructor: publish the course's final grades", async ({ page }) => {
 		await expect(list).toContainText("Assignments");
 		await expect(list).toContainText("87.46");
 		await expect(page.getByText("Final grade")).toHaveCount(0);
+	});
+});
+
+test("instructor: find the questions that need rework", async ({ page }) => {
+	const teacher = await seedUser({
+		role: "INSTRUCTOR",
+		username: "ds-teacher",
+	});
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+
+	const fruit = multipleChoice({
+		id: "fruit",
+		title: "Best fruit",
+		stem: "Pick the best fruit.",
+		choices: [
+			{ id: "pear", text: "Pear", score: 1 },
+			{ id: "apple", text: "Apple", score: 0 },
+			{ id: "fig", text: "Fig", score: 0 },
+			{ id: "kiwi", text: "Kiwi", score: 0 },
+		],
+	});
+	const protocols = trueFalse({
+		id: "protocols",
+		title: "Protocols",
+		stem: "Judge each statement.",
+		choices: [
+			{ id: "s1", text: "First statement", correct: true },
+			{ id: "s2", text: "Second statement", correct: false },
+		],
+	});
+	for (const [slug, question] of [
+		["fruit", fruit],
+		["protocols", protocols],
+		["trick", { ...capitalShortAnswer, id: "trick", title: "Trick question" }],
+	] as const) {
+		await db.question.create(
+			{
+				course: course.id,
+				slug,
+				status: "PUBLISHED",
+				version: "1",
+				question,
+			},
+			FULL_ACCESS,
+		);
+	}
+
+	const students: Awaited<ReturnType<typeof seedUser>>[] = [];
+	for (let i = 0; i < 8; i++) {
+		const student = await seedUser({
+			role: "STUDENT",
+			username: `ds-student-${i}`,
+		});
+		await db.enrollment.create(
+			{ course: course.id, username: student.username },
+			FULL_ACCESS,
+		);
+		students.push(student);
+	}
+
+	type Payload = Parameters<typeof db.response.submit>[0]["payload"];
+
+	/// A student answers each `[question, payload, score]`, the teacher grades it, and the attempt is closed.
+	async function sit(
+		exam: string,
+		student: (typeof students)[number],
+		rows: Array<[string, Payload, string]>,
+	) {
+		for (const [question, payload, score] of rows) {
+			const response = await db.response.submit(
+				{ course: course.id, exam, question, payload },
+				{ actor: student },
+			);
+			await db.feedback.create(
+				{
+					submission: {
+						publicId:
+							response.submissions.filter((s) => s.question === question).at(-1)
+								?.publicId ?? "",
+					},
+					ref: "pass-1",
+					score,
+					grader: teacher.username,
+				},
+				FULL_ACCESS,
+			);
+		}
+		await db.response.finish({ course: course.id, exam }, { actor: student });
+	}
+
+	async function closedExam(slug: string, title: string, questions: string[]) {
+		return persistedExamFactory.create({
+			course: course.id,
+			slug,
+			title,
+			type: "EXAM",
+			status: "ONGOING",
+			questions: questions.map((question) => ({
+				slug: question,
+				// The exam pins the first version of the multiple-choice question.
+				version: question === "fruit" ? "1" : undefined,
+			})),
+		});
+	}
+
+	// A small exam: four graded attempts, too few for a discrimination index.
+	const small = await closedExam("pop-quiz", "Pop quiz", [
+		"fruit",
+		"protocols",
+	]);
+	for (const [i, student] of students.slice(0, 4).entries()) {
+		await sit("pop-quiz", student, [
+			["fruit", { choice: i < 2 ? "pear" : "apple" }, i < 2 ? "1" : "0"],
+			["protocols", { answers: { s1: true, s2: false } }, "1"],
+		]);
+	}
+	await prisma.exam.update({
+		where: { id: small.id },
+		data: { status: "COMPLETED" },
+	});
+
+	// A large exam: eight attempts. With m = fruit = protocols = [1,1,1,1,0,0,0,0]
+	// and b = trick = [0,0,0,1,1,1,1,0], both series have mean 0.5 and sum of
+	// squared deviations 2, and sum(dm*db) = -1. So trick against the mean of the
+	// other two (= m) correlates at -1/2, while fruit against (protocols + trick)/2
+	// has covariance (2 - 1)/2 = .5 and variance .5, giving .5/sqrt(2 * .5) = +0.5.
+	const final = await closedExam("final", "Final exam", [
+		"fruit",
+		"protocols",
+		"trick",
+	]);
+	const fruitChoice = [
+		"pear",
+		"pear",
+		"pear",
+		"pear",
+		"apple",
+		"apple",
+		"kiwi",
+		"kiwi",
+	];
+	const protocolAnswers: Record<string, boolean>[] = [
+		{ s1: true, s2: false },
+		{ s1: true, s2: false },
+		{ s1: true, s2: false },
+		{ s1: true, s2: false },
+		{ s1: false, s2: false },
+		{ s1: true, s2: true },
+		{ s1: false },
+		{ s1: false, s2: true },
+	];
+	const trickScore = ["0", "0", "0", "1", "1", "1", "1", "0"];
+	for (const [i, student] of students.entries()) {
+		const strong = i < 4 ? "1" : "0";
+		await sit("final", student, [
+			["fruit", { choice: fruitChoice[i] ?? "" }, strong],
+			["protocols", { answers: protocolAnswers[i] ?? {} }, strong],
+			["trick", { text: `guess ${i}` }, trickScore[i] ?? "0"],
+		]);
+	}
+	await prisma.exam.update({
+		where: { id: final.id },
+		data: { status: "COMPLETED" },
+	});
+
+	// A practice exam over the same questions: its answers pick the fig that
+	// nobody picked on the real exam, and must not leak into the real counts.
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "drill",
+		title: "Practice drill",
+		type: "PRACTICE",
+		status: "ONGOING",
+		questions: [{ slug: "fruit" }, { slug: "trick" }],
+	});
+	for (const student of students.slice(0, 5)) {
+		await db.response.submit(
+			{
+				course: course.id,
+				exam: "drill",
+				question: "fruit",
+				payload: { choice: "fig" },
+			},
+			{ actor: student },
+		);
+	}
+	await logInAs(page, teacher);
+
+	const table = () =>
+		page.getByRole("table", { name: "Question statistics", exact: true });
+	const cells = (title: string) =>
+		table().getByRole("row").filter({ hasText: title }).locator("td");
+	const distribution = () =>
+		page.getByRole("region", { name: "Answer distribution", exact: true });
+
+	await test.step("on the small exam the discrimination is a dash that says why", async () => {
+		await page.goto(`${href}/exams/pop-quiz`);
+
+		for (const header of ["Blank", "Discrimination"]) {
+			await expect(
+				table().getByRole("columnheader", { name: header, exact: true }),
+			).toBeVisible();
+		}
+		await expect(cells("Best fruit").nth(5)).toHaveText("—");
+		await expect(cells("Protocols").nth(5)).toHaveText("—");
+		await expect(
+			page.getByTitle("Fewer than 5 graded attempts").first(),
+		).toBeVisible();
+		await expect(table().getByText("review")).toHaveCount(0);
+	});
+
+	await test.step("on the large exam only the question the strong students miss is marked for review", async () => {
+		await page.goto(`${href}/exams/final`);
+
+		// Question, Answered, Blank, Average, Correct, Discrimination, To grade.
+		await expect(cells("Best fruit")).toHaveText([
+			"Best fruit",
+			"8",
+			"0",
+			"50%",
+			"50%",
+			"0.50",
+			"",
+		]);
+		await expect(cells("Protocols").nth(5)).toHaveText("0.50");
+		await expect(cells("Trick question").nth(5)).toContainText("-0.50");
+		await expect(cells("Trick question").nth(5)).toContainText("review");
+		await expect(table().getByText("review")).toHaveCount(1);
+		await expect(
+			page.getByText("Discrimination tells how well a question separates", {
+				exact: false,
+			}),
+		).toBeVisible();
+	});
+
+	await test.step("the question title opens its grading page, with the answer distribution and the correct choice marked", async () => {
+		await table()
+			.getByRole("link", { name: "Best fruit", exact: true })
+			.click();
+
+		await expect(page).toHaveURL(`${href}/exams/final/grading/fruit`);
+		await expect(
+			distribution().getByRole("heading", { name: "Answer distribution" }),
+		).toBeVisible();
+		const rows = distribution().getByRole("listitem");
+		await expect(rows).toHaveText([/Pear/, /Apple/, /Fig/, /Kiwi/, /Blank/]);
+		await expect(rows.nth(0)).toContainText(/4\D+50%/);
+		await expect(rows.nth(1)).toContainText(/2\D+25%/);
+		await expect(rows.nth(2)).toContainText(/0\D+0%/);
+		await expect(rows.nth(3)).toContainText(/2\D+25%/);
+		await expect(rows.nth(4)).toContainText(/0\D+0%/);
+		await expect(distribution().getByText("Correct choice")).toHaveCount(1);
+		await expect(rows.nth(0).getByText("Correct choice")).toBeVisible();
+	});
+
+	await test.step("the true-false question shows true, false and abstained per statement", async () => {
+		await page.goto(`${href}/exams/final/grading/protocols`);
+
+		const rows = distribution().getByRole("listitem");
+		await expect(rows).toHaveCount(2);
+		await expect(rows.nth(0)).toContainText("First statement");
+		await expect(rows.nth(0)).toContainText(/True\D*5/);
+		await expect(rows.nth(0)).toContainText(/False\D*3/);
+		await expect(rows.nth(0)).toContainText(/Abstained\D*0/);
+		await expect(rows.nth(0).getByText("Correct answer: True")).toBeVisible();
+		await expect(rows.nth(1)).toContainText("Second statement");
+		await expect(rows.nth(1)).toContainText(/True\D*2/);
+		await expect(rows.nth(1)).toContainText(/False\D*5/);
+		await expect(rows.nth(1)).toContainText(/Abstained\D*1/);
+		await expect(rows.nth(1).getByText("Correct answer: False")).toBeVisible();
+	});
+
+	await test.step("a question without a distribution shows none", async () => {
+		await page.goto(`${href}/exams/final/grading/trick`);
+
+		await expect(
+			page.getByRole("heading", { level: 2, name: "Trick question" }),
+		).toBeVisible();
+		await expect(distribution()).toHaveCount(0);
+	});
+
+	await test.step("after the question gets a new version the exam still grades against the pinned one", async () => {
+		await db.question.update(
+			{ course: course.id, slug: "fruit" },
+			{
+				version: "2",
+				question: {
+					...fruit,
+					stem: "Pick the fruit that grows on trees.",
+					choices: [
+						{ id: "pear", text: "Pear", score: 0 },
+						{ id: "apple", text: "Apple", score: 1 },
+						{ id: "fig", text: "Fig", score: 0 },
+						{ id: "kiwi", text: "Kiwi", score: 0 },
+					],
+				},
+			},
+			FULL_ACCESS,
+		);
+
+		await page.goto(`${href}/exams/final/grading/fruit`);
+
+		await expect(page.getByText("Pick the best fruit.").first()).toBeVisible();
+		await expect(
+			page.getByText("Pick the fruit that grows on trees."),
+		).toHaveCount(0);
+		await expect(distribution().getByText("Correct choice")).toHaveCount(1);
+		await expect(
+			distribution().getByRole("listitem").nth(0).getByText("Correct choice"),
+		).toBeVisible();
+		await expect(page.getByRole("alert")).toHaveCount(0);
+	});
+
+	await test.step("a pinned version the question never had warns and falls back to the latest", async () => {
+		const ref = await prisma.questionRef.findFirstOrThrow({
+			where: { courseId: course.id, slug: "fruit" },
+		});
+		await prisma.questionsForExam.update({
+			where: {
+				examId_questionRefId: { examId: final.id, questionRefId: ref.id },
+			},
+			data: { version: "ghost" },
+		});
+
+		await page.goto(`${href}/exams/final/grading/fruit`);
+
+		await expect(page.getByRole("alert")).toContainText(
+			'This exam pins version "ghost", which this question does not have. Showing the latest version instead.',
+		);
+		await expect(
+			page.getByText("Pick the fruit that grows on trees.").first(),
+		).toBeVisible();
+		await expect(
+			distribution().getByRole("listitem").nth(1).getByText("Correct choice"),
+		).toBeVisible();
 	});
 });

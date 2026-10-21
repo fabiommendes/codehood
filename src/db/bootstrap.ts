@@ -147,6 +147,23 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		role: "STUDENT",
 		password: "wirth",
 	});
+	const cohort: User[] = [];
+	for (const [username, name] of [
+		["knuth", "Donald Knuth"],
+		["ritchie", "Dennis Ritchie"],
+		["thompson", "Ken Thompson"],
+		["backus", "John Backus"],
+	] as const) {
+		cohort.push(
+			await demoUser({
+				email: `${username}@codehood.local`,
+				username,
+				name,
+				role: "STUDENT",
+				password: username,
+			}),
+		);
+	}
 
 	for (const discipline of [
 		{ slug: "cs101", name: "Introduction to Programming" },
@@ -213,7 +230,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
-	for (const student of [hopper, hamilton, liskov, bob]) {
+	for (const student of [hopper, hamilton, liskov, bob, ...cohort]) {
 		await db.enrollment.create(
 			{ course: cs101.id, username: student.username },
 			FULL_ACCESS,
@@ -1012,6 +1029,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 
 	await seedExamExceptions(cs101.id, { hamilton, bob, liskov });
+	await seedQuestionStatsExam(cs101.id, [
+		hopper,
+		hamilton,
+		...cohort,
+		liskov,
+		bob,
+	]);
 
 	// An ended course in the past edition, so admin views keep an expired one.
 	const ended = await db.course.create(
@@ -1690,6 +1714,205 @@ async function seedExamExceptions(
 		},
 		FULL_ACCESS,
 	);
+}
+
+/**
+ * Seeds a closed, graded exam with released grades, answered by eight students, for the question statistics.
+ *
+ * The students come in descending order of total. It has a multiple choice with a popular
+ * distractor and a choice nobody picks, a multiple selection, a true-false, a
+ * question the best students miss (negative discrimination) and a numeric.
+ */
+async function seedQuestionStatsExam(
+	course: Course["id"],
+	students: User[],
+): Promise<void> {
+	const exam = "test-04";
+	const question = (
+		slug: string,
+		body: Record<string, unknown>,
+	): Promise<unknown> =>
+		db.question.create(
+			{
+				course,
+				slug,
+				status: "PUBLISHED",
+				version: "v1",
+				question: { tags: ["algorithms"], ...body } as never,
+			},
+			FULL_ACCESS,
+		);
+	await question("fastest-sort", {
+		type: "multiple-choice",
+		title: "Fastest general sort",
+		stem: "Which sort has an O(n log n) worst case?",
+		choices: [
+			{ id: "merge", text: "Merge sort", score: 1 },
+			{ id: "bubble", text: "Bubble sort" },
+			{ id: "insertion", text: "Insertion sort" },
+			{ id: "bogo", text: "Bogosort" },
+		],
+	});
+	await question("n-log-n", {
+		type: "multiple-selection",
+		title: "O(n log n) algorithms",
+		stem: "Select every algorithm that runs in O(n log n) on average.",
+		choices: [
+			{ id: "merge", text: "Merge sort", correct: true },
+			{ id: "quick", text: "Quicksort", correct: true },
+			{ id: "bubble", text: "Bubble sort", correct: false },
+			{ id: "binary-search", text: "Binary search", correct: false },
+		],
+	});
+	await question("stack-facts", {
+		type: "true-false",
+		title: "Stack facts",
+		stem: "Judge each statement about stacks.",
+		choices: [
+			{ id: "lifo", text: "A stack is last in, first out.", correct: true },
+			{ id: "fifo", text: "A stack is first in, first out.", correct: false },
+			{ id: "push", text: "Push adds to the top.", correct: true },
+		],
+	});
+	await question("pivot-trap", {
+		type: "multiple-choice",
+		title: "Worst case of quicksort",
+		stem: "What is the worst-case time of quicksort with a fixed pivot?",
+		choices: [
+			{ id: "quadratic", text: "O(n^2)", score: 1 },
+			{ id: "linearithmic", text: "O(n log n)" },
+		],
+	});
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 4: algorithms",
+			description: "Sorting and stacks, with a question that needs rework.",
+			tags: ["algorithms"],
+			questions: [
+				{ slug: "fastest-sort", version: "v1" },
+				{ slug: "n-log-n", version: "v1" },
+				{ slug: "stack-facts", version: "v1" },
+				{ slug: "pivot-trap", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+
+	/// Each row: the answer and its score to every question, by student in `students` order.
+	const rows: [string, Record<string, unknown>, string][][] = [
+		[
+			["fastest-sort", { choice: "merge" }, "1"],
+			["n-log-n", { choices: ["merge", "quick"] }, "1"],
+			[
+				"stack-facts",
+				{ answers: { lifo: true, fifo: false, push: true } },
+				"1",
+			],
+			["pivot-trap", { choice: "linearithmic" }, "0"],
+			["factorial-of-five", { value: 120 }, "1"],
+		],
+		[
+			["fastest-sort", { choice: "merge" }, "1"],
+			["n-log-n", { choices: ["merge", "quick"] }, "1"],
+			[
+				"stack-facts",
+				{ answers: { lifo: true, fifo: false, push: true } },
+				"1",
+			],
+			["pivot-trap", { choice: "linearithmic" }, "0"],
+			["factorial-of-five", { value: 120 }, "1"],
+		],
+		[
+			["fastest-sort", { choice: "merge" }, "1"],
+			["n-log-n", { choices: ["merge", "quick"] }, "1"],
+			[
+				"stack-facts",
+				{ answers: { lifo: true, fifo: false, push: true } },
+				"1",
+			],
+			["pivot-trap", { choice: "linearithmic" }, "0"],
+			["factorial-of-five", { value: 120 }, "1"],
+		],
+		[
+			["fastest-sort", { choice: "insertion" }, "0"],
+			["n-log-n", { choices: ["merge"] }, "0.5"],
+			["stack-facts", { answers: { lifo: true, fifo: false } }, "0.67"],
+			["pivot-trap", { choice: "linearithmic" }, "0"],
+			["factorial-of-five", { value: 120 }, "1"],
+		],
+		[
+			["fastest-sort", { choice: "merge" }, "1"],
+			["n-log-n", { choices: ["merge", "quick", "bubble"] }, "0.5"],
+			[
+				"stack-facts",
+				{ answers: { lifo: true, fifo: true, push: true } },
+				"0.33",
+			],
+			["pivot-trap", { choice: "quadratic" }, "1"],
+			["factorial-of-five", { value: 120 }, "1"],
+		],
+		[
+			["fastest-sort", { choice: "bubble" }, "0"],
+			["n-log-n", { choices: ["merge"] }, "0.5"],
+			[
+				"stack-facts",
+				{ answers: { lifo: true, fifo: false, push: true } },
+				"1",
+			],
+			["pivot-trap", { choice: "quadratic" }, "1"],
+			["factorial-of-five", { value: 100 }, "0"],
+		],
+		[
+			["fastest-sort", { choice: "bubble" }, "0"],
+			["n-log-n", { choices: [] }, "0"],
+			[
+				"stack-facts",
+				{ answers: { lifo: false, fifo: true, push: false } },
+				"0",
+			],
+			["pivot-trap", { choice: "quadratic" }, "1"],
+			["factorial-of-five", { value: 100 }, "0"],
+		],
+		[
+			["fastest-sort", { choice: "bubble" }, "0"],
+			["n-log-n", { choices: ["bubble"] }, "0"],
+			[
+				"stack-facts",
+				{ answers: { lifo: false, fifo: true, push: false } },
+				"0",
+			],
+			["pivot-trap", { choice: "quadratic" }, "1"],
+			["factorial-of-five", { value: 24 }, "0"],
+		],
+	];
+	for (const [index, student] of students.entries()) {
+		const row = rows[index] ?? [];
+		const submissions = await answerExam(
+			course,
+			exam,
+			student,
+			Object.fromEntries(row.map(([slug, payload]) => [slug, payload])),
+		);
+		for (const [slug, , score] of row) {
+			await botGrade(submissions[slug], score);
+		}
+	}
+
+	await db.exam.update(
+		{ course, slug: exam },
+		{
+			status: "COMPLETED",
+			scheduledAt: new Date(Date.now() - 6 * 24 * 3600 * 1000),
+			duration: { hours: 2 },
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
 }
 
 //

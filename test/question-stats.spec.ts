@@ -4,13 +4,23 @@ import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalShortAnswer } from "@/mdq/fixtures";
-import type { ExamTiming } from "@/services/exam-state";
 import {
-	type GradingAttempt,
-	type GradingFeedback,
+	brasiliaFillIn,
+	capitalShortAnswer,
+	idempotenceEssay,
+	multipleChoice,
+	multipleSelection,
+	trueFalse,
+	waterNumeric,
+} from "@/mdq/fixtures";
+import type { ExamTiming } from "@/services/exam-state";
+import type { GradingAttempt, GradingFeedback } from "@/services/grading";
+import {
+	answerDistribution,
+	discrimination,
+	discriminationFlag,
 	questionStats,
-} from "@/services/grading";
+} from "@/services/question-stats";
 import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
@@ -114,6 +124,9 @@ test("questionStats: zero attempts yields one empty entry per question, in exam 
 			notGraded: 0,
 			average: null,
 			correct: null,
+			blank: 0,
+			discrimination: null,
+			discriminationGap: "few-attempts",
 		},
 		{
 			question: "q2",
@@ -123,6 +136,9 @@ test("questionStats: zero attempts yields one empty entry per question, in exam 
 			notGraded: 0,
 			average: null,
 			correct: null,
+			blank: 0,
+			discrimination: null,
+			discriminationGap: "few-attempts",
 		},
 	]);
 });
@@ -266,6 +282,443 @@ test("questionStats: a negative score lowers the average", () => {
 	expect(stats[0]?.average).toBeCloseTo(0.25, 10);
 	expect(stats[0]?.correct).toBeCloseTo(0.5, 10);
 });
+
+/// One cell of a cohort row: a score, `null` for no answer, or a marker for an answer that waits or is will-not-grade.
+type Cell = string | null | "pending" | "wng";
+
+/// Closed attempts, one per row of `cells`, each cell the answer to the question of that column.
+function cohort(cells: Cell[][], questions: string[] = QUESTIONS) {
+	const attempts: GradingAttempt[] = [];
+	const feedback: GradingFeedback[] = [];
+	cells.forEach((row, index) => {
+		const author = `student-${index}`;
+		const submissions: SubmissionRow[] = [];
+		row.forEach((cell, column) => {
+			if (cell === null) return;
+			const id = `${author}-${column}`;
+			submissions.push(
+				submission(id, questions[column] ?? "", 5, {
+					status: cell === "wng" ? "WILL_NOT_GRADE" : "PENDING_GRADE",
+				}),
+			);
+			if (cell === "wng") feedback.push(pass(id, "1", 20));
+			else if (cell !== "pending") feedback.push(pass(id, cell, 20));
+		});
+		attempts.push(attempt(author, submissions));
+	});
+	return { attempts, feedback };
+}
+
+function cohortStats(cells: Cell[][], questions: string[] = QUESTIONS) {
+	const { attempts, feedback } = cohort(cells, questions);
+	return questionStats(EXAM, questions, attempts, feedback, NOW);
+}
+
+test("questionStats: blank counts the closed attempts with no answer to the question, and ignores attempts in progress", () => {
+	const { attempts, feedback } = cohort([
+		["1", "1"],
+		["1", null],
+		[null, null],
+	]);
+	const inProgress = attempt("dora", [], { acceptingSubmissions: true });
+
+	const stats = statsOf([...attempts, inProgress], feedback);
+
+	expect(stats[0]).toMatchObject({ answered: 2, blank: 1 });
+	expect(stats[1]).toMatchObject({ answered: 1, blank: 2 });
+});
+
+test("questionStats: an attempt with a pending answer leaves the discrimination population of every question, not only of the pending one", () => {
+	// The five complete attempts read q1 = [1,1,1,0,0], q2 = [1,1,0,0,0]:
+	// means .6 and .4, sum(dx*dy) = .8, both sums of squares 1.2, so r = 2/3.
+	// The sixth, pending on q1 (zero) and 1 on q2, would change it.
+	const stats = cohortStats([
+		["1", "1"],
+		["1", "1"],
+		["1", "0"],
+		["0", "0"],
+		["0", "0"],
+		["pending", "1"],
+	]);
+
+	expect(stats[0]).toMatchObject({ answered: 6, pending: 1 });
+	expect(stats[0]?.discriminationGap).toBeNull();
+	expect(stats[0]?.discrimination).toBeCloseTo(2 / 3, 10);
+	expect(stats[1]?.discrimination).toBeCloseTo(2 / 3, 10);
+});
+
+test("questionStats: a pending answer that drops the population below five makes every question few-attempts", () => {
+	const stats = cohortStats([
+		["1", "1"],
+		["1", "1"],
+		["1", "0"],
+		["0", "0"],
+		["pending", "1"],
+	]);
+
+	for (const entry of stats) {
+		expect(entry).toMatchObject({
+			discrimination: null,
+			discriminationGap: "few-attempts",
+		});
+	}
+});
+
+test("questionStats: blank and will-not-grade answers score zero in the discrimination", () => {
+	// q2 reads [1, 1, 0 (will not grade, despite its pass of 1), 0 (blank), 0],
+	// q1 reads [1, 1, 1, 0, 0]: the same series as the pending case, r = 2/3.
+	const stats = cohortStats([
+		["1", "1"],
+		["1", "1"],
+		["1", "wng"],
+		["0", null],
+		["0", "0"],
+	]);
+
+	expect(stats[0]?.discrimination).toBeCloseTo(2 / 3, 10);
+	expect(stats[1]?.discrimination).toBeCloseTo(2 / 3, 10);
+	expect(stats[1]).toMatchObject({ blank: 1, notGraded: 1 });
+});
+
+test("questionStats: an exam of one question has no discrimination", () => {
+	const stats = cohortStats([["1"], ["1"], ["0"], ["0"], ["1"]], ["q1"]);
+
+	expect(stats[0]).toMatchObject({
+		discrimination: null,
+		discriminationGap: "single-question",
+	});
+});
+
+test("questionStats: when everyone scored the same the discrimination is no-variance", () => {
+	const stats = cohortStats(Array.from({ length: 5 }, () => ["1", "1"]));
+
+	for (const entry of stats) {
+		expect(entry).toMatchObject({
+			discrimination: null,
+			discriminationGap: "no-variance",
+		});
+	}
+});
+
+//
+// discrimination: pure
+//
+
+test("discrimination: the corrected item-total correlation matches a hand computation", () => {
+	// Rows are attempts, columns q1..q3. For q1 (position 0):
+	//   x    = [1, 1, 0, 0, 1]                  mean 0.6
+	//   rest = [1, .5, .5, 0, .5]               mean 0.5 (mean of q2 and q3)
+	//   dx   = [.4, .4, -.6, -.6, .4]
+	//   dy   = [.5, 0, 0, -.5, 0]
+	//   sum(dx*dy) = .2 + .3 = .5
+	//   sum(dx^2)  = 3*.16 + 2*.36 = 1.2
+	//   sum(dy^2)  = .25 + .25 = .5
+	//   r = .5 / sqrt(1.2 * .5) = sqrt(5/12) = 0.6455
+	// Correlating with the total that includes q1 would give 0.8807.
+	const scores = [
+		[1, 1, 1],
+		[1, 1, 0],
+		[0, 1, 0],
+		[0, 0, 0],
+		[1, 0, 1],
+	];
+
+	const result = discrimination(scores, 0);
+
+	expect(result.gap).toBeNull();
+	expect(result.value).toBeCloseTo(Math.sqrt(5 / 12), 10);
+});
+
+test("discrimination: a question that perfectly tracks the rest scores 1, and one that opposes it scores -1", () => {
+	const together = [
+		[1, 1],
+		[1, 1],
+		[1, 1],
+		[0, 0],
+		[0, 0],
+	];
+	const apart = [
+		[1, 0],
+		[1, 0],
+		[1, 0],
+		[0, 1],
+		[0, 1],
+	];
+
+	expect(discrimination(together, 0).value).toBeCloseTo(1, 10);
+	expect(discrimination(apart, 0).value).toBeCloseTo(-1, 10);
+});
+
+test("discrimination: negative scores take part in the correlation", () => {
+	// q1 = [1, 0, -1, 0, 1], rest = q2: same ordering, so r = 1.
+	const scores = [
+		[1, 1],
+		[0, 0],
+		[-1, -1],
+		[0, 0],
+		[1, 1],
+	];
+
+	expect(discrimination(scores, 0).value).toBeCloseTo(1, 10);
+});
+
+test("discrimination: four attempts are too few and five are enough", () => {
+	const rows = [
+		[1, 1],
+		[1, 1],
+		[0, 0],
+		[0, 1],
+		[1, 0],
+	];
+
+	expect(discrimination(rows.slice(0, 4), 0)).toEqual({
+		value: null,
+		gap: "few-attempts",
+	});
+	expect(discrimination(rows, 0).gap).toBeNull();
+});
+
+test("discrimination: few attempts wins over a single question", () => {
+	expect(discrimination([[1], [0]], 0)).toEqual({
+		value: null,
+		gap: "few-attempts",
+	});
+});
+
+test("discrimination: rows of one score have no rest of the exam", () => {
+	expect(discrimination([[1], [0], [1], [0], [1]], 0)).toEqual({
+		value: null,
+		gap: "single-question",
+	});
+});
+
+test("discrimination: no variance in the question, or none in the rest, is a gap", () => {
+	const flatQuestion = [
+		[1, 1],
+		[1, 0],
+		[1, 1],
+		[1, 0],
+		[1, 1],
+	];
+	const flatRest = [
+		[1, 1],
+		[0, 1],
+		[1, 1],
+		[0, 1],
+		[1, 1],
+	];
+
+	expect(discrimination(flatQuestion, 0)).toEqual({
+		value: null,
+		gap: "no-variance",
+	});
+	expect(discrimination(flatRest, 0)).toEqual({
+		value: null,
+		gap: "no-variance",
+	});
+});
+
+test("discrimination: a position outside the rows throws a RangeError", () => {
+	const rows = [
+		[1, 1],
+		[1, 0],
+		[0, 1],
+		[0, 0],
+		[1, 1],
+	];
+
+	expect(() => discrimination(rows, 2)).toThrow(RangeError);
+	expect(() => discrimination(rows, -1)).toThrow(RangeError);
+});
+
+//
+// discriminationFlag
+//
+
+for (const [value, flag] of [
+	[null, null],
+	[-1, "error"],
+	[-0.01, "error"],
+	[0, "warning"],
+	[0.19, "warning"],
+	[0.2, null],
+	[1, null],
+] as const) {
+	test(`discriminationFlag: ${value} earns ${flag}`, () => {
+		expect(discriminationFlag(value)).toBe(flag);
+	});
+}
+
+//
+// answerDistribution
+//
+
+type Payload = Parameters<typeof answerDistribution>[1][number]["payload"];
+
+function payloads(...list: Payload[]) {
+	return list.map((payload) => ({ payload }));
+}
+
+/// Choices in an order that is neither alphabetical nor by frequency.
+const FRUIT = multipleChoice({
+	id: "fruit",
+	stem: "Pick the best fruit.",
+	choices: [
+		{ id: "pear", text: "Pear", score: 1 },
+		{ id: "apple", text: "Apple", score: 0.5 },
+		{ id: "fig", text: "Fig", score: 0 },
+		{ id: "kiwi", text: "Kiwi", score: -0.5 },
+	],
+});
+
+test("answerDistribution: multiple choice lists each choice in statement order, then removed choices by id, then the empty row", () => {
+	const answers = payloads(
+		{ choice: "apple" },
+		{ choice: "apple" },
+		{ choice: "pear" },
+		{ choice: "pear" },
+		{ choice: "pear" },
+		{ choice: "kiwi" },
+		{ choice: "zz-old" },
+		{ choice: "aa-old" },
+		{ choice: "aa-old" },
+		{ choice: "" },
+		{ text: "wrong shape" },
+	);
+
+	expect(answerDistribution(FRUIT, answers)).toEqual({
+		type: "multiple-choice",
+		answers: 11,
+		rows: [
+			{ kind: "choice", id: "pear", text: "Pear", correct: true, count: 3 },
+			{ kind: "choice", id: "apple", text: "Apple", correct: false, count: 2 },
+			{ kind: "choice", id: "fig", text: "Fig", correct: false, count: 0 },
+			{ kind: "choice", id: "kiwi", text: "Kiwi", correct: false, count: 1 },
+			{ kind: "removed", id: "aa-old", count: 2 },
+			{ kind: "removed", id: "zz-old", count: 1 },
+			{ kind: "empty", count: 2 },
+		],
+	});
+});
+
+test("answerDistribution: multiple choice with no answers has every row at zero, the empty row included", () => {
+	expect(answerDistribution(FRUIT, [])).toEqual({
+		type: "multiple-choice",
+		answers: 0,
+		rows: [
+			{ kind: "choice", id: "pear", text: "Pear", correct: true, count: 0 },
+			{ kind: "choice", id: "apple", text: "Apple", correct: false, count: 0 },
+			{ kind: "choice", id: "fig", text: "Fig", correct: false, count: 0 },
+			{ kind: "choice", id: "kiwi", text: "Kiwi", correct: false, count: 0 },
+			{ kind: "empty", count: 0 },
+		],
+	});
+});
+
+test("answerDistribution: multiple choice with no positive score marks no choice correct", () => {
+	const nobodyScores = multipleChoice({
+		id: "nobody",
+		stem: "No key.",
+		choices: [
+			{ id: "a", text: "A", score: 0 },
+			{ id: "b", text: "B", score: -1 },
+		],
+	});
+
+	const result = answerDistribution(nobodyScores, payloads({ choice: "a" }));
+
+	expect(
+		result?.rows.map((row) => row.kind === "choice" && row.correct),
+	).toEqual([false, false, false]);
+});
+
+test("answerDistribution: multiple selection counts each ticked choice, with removed choices and a none-selected row", () => {
+	const letters = multipleSelection({
+		id: "letters",
+		stem: "Tick the vowels.",
+		choices: [
+			{ id: "x", text: "X", correct: true },
+			{ id: "y", text: "Y" },
+			{ id: "z", text: "Z", correct: true },
+		],
+	});
+	const answers = payloads(
+		{ choices: ["x", "z"] },
+		{ choices: ["x"] },
+		{ choices: ["x"] },
+		{ choices: ["y", "gone"] },
+		{ choices: [] },
+		{ text: "wrong shape" },
+	);
+
+	expect(answerDistribution(letters, answers)).toEqual({
+		type: "multiple-selection",
+		answers: 6,
+		rows: [
+			{ kind: "choice", id: "x", text: "X", correct: true, count: 3 },
+			{ kind: "choice", id: "y", text: "Y", correct: false, count: 1 },
+			{ kind: "choice", id: "z", text: "Z", correct: true, count: 1 },
+			{ kind: "removed", id: "gone", count: 1 },
+			{ kind: "empty", count: 2 },
+		],
+	});
+});
+
+test("answerDistribution: true-false counts true, false and abstained per statement, and a removed statement abstains on every other answer", () => {
+	const statements = trueFalse({
+		id: "statements",
+		stem: "Judge each one.",
+		choices: [
+			{ id: "s1", text: "First", correct: true },
+			{ id: "s2", text: "Second", correct: false },
+		],
+	});
+	const answers = payloads(
+		{ answers: { s1: true, s2: false } },
+		{ answers: { s1: true, s2: true } },
+		{ answers: { s1: false } },
+		{ answers: {} },
+		{ text: "wrong shape" },
+		{ answers: { s1: true, old: true } },
+	);
+
+	expect(answerDistribution(statements, answers)).toEqual({
+		type: "true-false",
+		answers: 6,
+		rows: [
+			{
+				kind: "statement",
+				id: "s1",
+				text: "First",
+				correct: true,
+				true: 3,
+				false: 1,
+				abstained: 2,
+			},
+			{
+				kind: "statement",
+				id: "s2",
+				text: "Second",
+				correct: false,
+				true: 1,
+				false: 1,
+				abstained: 4,
+			},
+			{ kind: "removed", id: "old", true: 1, false: 0, abstained: 5 },
+		],
+	});
+});
+
+for (const question of [
+	idempotenceEssay,
+	waterNumeric,
+	capitalShortAnswer,
+	brasiliaFillIn,
+]) {
+	test(`answerDistribution: a ${question.type} question has no distribution`, () => {
+		expect(answerDistribution(question, [])).toBeNull();
+	});
+}
 
 //
 // The statistics section of the instructor's exam page
@@ -425,8 +878,10 @@ test("question statistics: the instructor reads each question's numbers, a stude
 		for (const header of [
 			"Question",
 			"Answered",
+			"Blank",
 			"Average",
 			"Correct",
+			"Discrimination",
 			"To grade",
 		]) {
 			await expect(
@@ -446,22 +901,28 @@ test("question statistics: the instructor reads each question's numbers, a stude
 		await expect(cells("Title one")).toHaveText([
 			"Title one",
 			"3",
+			"0",
 			"75%",
 			"50%",
+			"—",
 			"1",
 		]);
 		await expect(cells("Title two")).toHaveText([
 			"Title two",
 			"2",
+			"1",
 			"25%",
 			"0%",
+			"—",
 			"1",
 		]);
 		await expect(cells("Title three")).toHaveText([
 			"Title three",
 			"1",
+			"2",
 			"",
 			"",
+			"—",
 			"",
 		]);
 		await expect(

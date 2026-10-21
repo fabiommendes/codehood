@@ -1038,6 +1038,81 @@ test("asking for the whole document without the right to it is refused", async (
 	).not.toBeNull();
 });
 
+/// A second version of `multipleChoice` whose answer key points at the other choice.
+const rekeyed: Doc = {
+	...multipleChoice,
+	choices: [
+		{ id: "base-case", text: "A base case" },
+		{ id: "tail-call", text: "A tail call", score: 1 },
+	],
+};
+
+/// The id of the choice that scores in a multiple-choice document.
+function keyedChoice(doc: Doc): string | undefined {
+	if (doc.type !== "multiple-choice") return undefined;
+	return doc.choices.find((choice) => (choice.score ?? 0) > 0)?.id;
+}
+
+async function seedTwoVersions() {
+	const ctx = await seedQuestion();
+	await db.question.update(
+		ctx.pk,
+		{ version: "v2", question: rekeyed },
+		ctx.opts,
+	);
+	return ctx;
+}
+
+test("findOne() with a pinned version returns that version's answer key after the question got a newer one", async () => {
+	const { pk, opts } = await seedTwoVersions();
+
+	const pinned = await db.question.findOne(
+		{ ...pk, public: false, version: "v1" },
+		opts,
+	);
+
+	expect(pinned?.version).toBe("v1");
+	expect(keyedChoice(pinned?.question as Doc)).toBe("base-case");
+});
+
+test("findOne() with the latest version pinned returns the latest answer key", async () => {
+	const { pk, opts } = await seedTwoVersions();
+
+	const pinned = await db.question.findOne(
+		{ ...pk, public: false, version: "v2" },
+		opts,
+	);
+
+	expect(pinned?.version).toBe("v2");
+	expect(keyedChoice(pinned?.question as Doc)).toBe("tail-call");
+});
+
+test("findOne() without a version returns the latest, as does a null one", async () => {
+	const { pk, opts } = await seedTwoVersions();
+
+	for (const version of [undefined, null]) {
+		const found = await db.question.findOne(
+			{ ...pk, public: false, version },
+			opts,
+		);
+
+		expect(found?.version).toBe("v2");
+		expect(keyedChoice(found?.question as Doc)).toBe("tail-call");
+	}
+});
+
+test("findOne() with a version the question never had falls back to the latest", async () => {
+	const { pk, opts } = await seedTwoVersions();
+
+	const found = await db.question.findOne(
+		{ ...pk, public: false, version: "never-existed" },
+		opts,
+	);
+
+	expect(found?.version).toBe("v2");
+	expect(keyedChoice(found?.question as Doc)).toBe("tail-call");
+});
+
 /** Narrows away the `undefined` a `find()` may return, failing the test instead. */
 function valueOrFail<T>(value: T | undefined): T {
 	expect(value).toBeDefined();

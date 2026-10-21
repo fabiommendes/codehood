@@ -50,6 +50,36 @@ export const questionPK = z.union([
 	z.object({ course: courseRef, slug: slug, ...questionPKPublicFlag }),
 ]);
 
+/// Which stored version a read returns: the one whose `versionHash` is `version`, or the latest when absent or `null`.
+const questionPKVersion = {
+	version: z.string().min(1).nullish(),
+};
+
+/**
+ * A primary key, plus the version a service read should return.
+ *
+ * Service-only: the REST key stays `questionPK`, so the API never reads an
+ * older version.
+ */
+export const questionFindOneFilter = z.union([
+	z.object({
+		id: questionRefId,
+		...questionPKPublicFlag,
+		...questionPKVersion,
+	}),
+	z.object({
+		publicId: z.string().min(1),
+		...questionPKPublicFlag,
+		...questionPKVersion,
+	}),
+	z.object({
+		course: courseRef,
+		slug: slug,
+		...questionPKPublicFlag,
+		...questionPKVersion,
+	}),
+]);
+
 export const questionFilterBase = z.object({
 	slugs: z.array(slug).optional(),
 	statuses: z.array(z.lazy(() => questionStatus)).optional(),

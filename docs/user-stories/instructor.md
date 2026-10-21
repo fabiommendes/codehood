@@ -311,6 +311,27 @@ student, the ones who dropped included and marked, and one column per exam
 with totals as numbers from 0 to 100. A cell with no total yet is empty.
 
 
+### Find the questions that need rework
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>
+
+Instructor wants to know which questions of an exam are badly written, not only
+which were hard. The exam page lists, for every question, how many left it blank
+and its discrimination: how well it separates the students who did well on the
+rest of the exam from the ones who did not. A question the best students miss
+and the weakest get right is marked "review", and an exam with too few graded
+attempts, or a question everybody scored the same on, shows a dash and says why.
+Practice attempts never count.
+
+The question title opens its grading page, which shows how the answers spread
+over the choices: one bar per choice with its count and share, the correct one
+marked, and the choices nobody picked at zero. A true-false question shows true,
+false and abstained per statement. The page grades against the version of the
+question the exam pins, even after the question got a newer one, and warns when
+the pinned version does not exist.
+
+
 ### Publish the course's final grades
 
     status: implemented

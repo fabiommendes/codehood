@@ -139,6 +139,15 @@ The stable subject a course teaches, identified by a slug such as `cs101`.
 A discipline outlives the [Courses](#course) that instantiate it and owns the
 [Question](#question) bank shared across them.
 
+## Discrimination
+
+Type: domain
+
+How well a [Question](#question) separates students: the correlation between
+their score on it and their mean on the rest of the [Exam](#exam). Near 1 it
+separates well; near 0 or negative the question needs rework. Shown only with
+at least 5 fully graded attempts.
+
 ## Edition
 
 Type: domain

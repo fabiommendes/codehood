@@ -16,6 +16,7 @@ import type { QuestionRefId } from "@/core/schemas";
 import {
 	questionCreate,
 	questionFilter,
+	questionFindOneFilter,
 	questionPK,
 	questionPublicSchema,
 	questionSchema,
@@ -47,6 +48,8 @@ export type QuestionPublic = z.infer<typeof questionPublicSchema>;
 export type QuestionCreate = z.infer<typeof questionCreate>;
 export type QuestionFilter = z.infer<typeof questionFilter>;
 export type QuestionPK = z.infer<typeof questionPK>;
+/// A primary key plus the stored version to read, as `findOne` takes it.
+export type QuestionFindOneFilter = z.infer<typeof questionFindOneFilter>;
 export type QuestionUpdate = z.infer<typeof questionUpdate>;
 
 /** What a read returns: the authored document, or the student-safe half. */
@@ -104,19 +107,19 @@ export class QuestionService extends CrudBase<{
 	// Overloads only narrow the return type on `filter.public`; the logic and
 	// its docs live in `findOneTx`/`findManyTx`.
 	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionPK & { public: true },
+		filter: QuestionFindOneFilter & { public: true },
 		opts: Opt,
 	): Promise<QuestionPublic | null>;
 	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionPK & { public: false },
+		filter: QuestionFindOneFilter & { public: false },
 		opts: Opt,
 	): Promise<Question | null>;
 	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionPK,
+		filter: QuestionFindOneFilter,
 		opts: Opt,
 	): Promise<QuestionView | null>;
 	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionPK,
+		filter: QuestionFindOneFilter,
 		opts: Opt,
 	): Promise<QuestionView | null> {
 		return super.findOne(filter, opts);
@@ -182,15 +185,21 @@ export class QuestionService extends CrudBase<{
 	 * `filter.public` picks the view (see `questionFindOneQuery`); asking for
 	 * the whole document without the right to see it throws `NotAllowed`, and
 	 * a draft or archived question is `null` for anyone but its author.
+	 *
+	 * `filter.version` picks the stored version by its `versionHash`, as an
+	 * exam pins it; left out or `null`, the read returns the latest. Every
+	 * field of the result but `question` and `version` describes the
+	 * question as it is now (status, rev, timestamps). A version the question
+	 * never had falls back to the latest.
 	 */
 	@Validate({
 		service: true,
 		returns: questionView.nullable(),
-		args: [undefined, questionPK],
+		args: [undefined, questionFindOneFilter],
 	})
 	protected async findOneTx(
 		tx: PrismaTx,
-		filter: QuestionPK,
+		filter: QuestionFindOneFilter,
 		opts: ServiceOptsWithoutTx,
 	): Promise<QuestionView | null> {
 		// Resolved with the public-safe include: at this point `actor` hasn't
@@ -215,19 +224,42 @@ export class QuestionService extends CrudBase<{
 		if (filter.public === false && !full) {
 			throw new NotAllowed("question.read");
 		}
-		if (filter.public || !full) return fromDbPublic(row);
+		if (filter.public || !full) {
+			const pinned = filter.version
+				? await tx.questionData.findUnique({
+						where: {
+							refId_versionHash: { refId: row.id, versionHash: filter.version },
+						},
+						select: { versionHash: true, publicPayload: true },
+					})
+				: null;
+			return fromDbPublic(
+				pinned ? ({ ...row, latest: pinned } as typeof row) : row,
+			);
+		}
 
 		// Only now, with the full view granted, does the query touching
 		// `privatePayload` get sent.
-		return fromDb(
-			valueOrNotFound(
-				"question",
-				await tx.questionRef.findUnique({
-					where: { id: row.id },
-					include: questionInclude(true),
-				}),
-			),
+		const fullRow = valueOrNotFound(
+			"question",
+			await tx.questionRef.findUnique({
+				where: { id: row.id },
+				include: questionInclude(true),
+			}),
 		);
+		const pinned = filter.version
+			? await tx.questionData.findUnique({
+					where: {
+						refId_versionHash: { refId: row.id, versionHash: filter.version },
+					},
+					select: {
+						versionHash: true,
+						publicPayload: true,
+						privatePayload: true,
+					},
+				})
+			: null;
+		return fromDb(pinned ? { ...fullRow, latest: pinned } : fullRow);
 	}
 
 	/**

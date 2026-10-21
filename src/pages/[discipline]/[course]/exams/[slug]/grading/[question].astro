@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import Answer from "@/components/grading/Answer.astro";
 import AnswerControls from "@/components/grading/AnswerControls";
+import AnswerDistributionSection from "@/components/grading/AnswerDistribution.astro";
 import AnswerKey from "@/components/grading/AnswerKey";
 import type { QuestionPublic } from "@/db";
 import { db } from "@/db";
@@ -11,6 +12,7 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { Question } from "@/mdq/question";
 import { formatScore } from "@/services/exam-result";
 import { answersTo } from "@/services/grading";
+import { answerDistribution } from "@/services/question-stats";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
@@ -33,12 +35,20 @@ if (!questionSlug || position < 0) return Astro.rewrite("/404");
 
 // biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
+const pinnedVersion = exam.questions[position]?.version ?? null;
 const stored = await db.question.findOne(
-	{ course: course.id, slug: questionSlug, public: false },
+	{
+		course: course.id,
+		slug: questionSlug,
+		public: false,
+		version: pinnedVersion,
+	},
 	{ actor },
 );
 if (!stored) return Astro.rewrite("/404");
 
+const versionMissing =
+	pinnedVersion !== null && stored.version !== pinnedVersion;
 const doc = stored.question;
 const title = doc.title ?? stored.slug;
 const asked = new Question(doc).toPublic() as QuestionPublic["question"];
@@ -74,6 +84,10 @@ const graderName = (pass: { grader: string | null }): string =>
 			: pass.grader;
 
 const { pending, resolved } = answersTo(questionSlug, answers);
+const distribution = answerDistribution(
+	doc,
+	answers.filter((answer) => answer.question === questionSlug),
+);
 const shown = [...pending, ...resolved].map((answer, index) => ({
 	answer,
 	label: m.grades_question_answer_n({ n: index + 1 }),
@@ -97,6 +111,12 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
       <a href={gradingHref(here, { names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
     </nav>
 
+    {versionMissing && (
+      <div role="alert" class="alert alert-warning mt-4">
+        <span>{m.grades_question_version_missing({ version: pinnedVersion })}</span>
+      </div>
+    )}
+
     {
       hasKey ? (
         <section class="mt-6">
@@ -113,6 +133,8 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
         />
       )
     }
+
+    {distribution && <AnswerDistributionSection distribution={distribution} />}
 
     {shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
 

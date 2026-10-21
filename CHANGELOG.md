@@ -4,6 +4,11 @@
 
 ### Added
 
+- Question statistics: the exam's statistics table gains blank counts and
+  each question's discrimination (corrected item-total correlation), flagged
+  "review" below 0.2. The grading page of an objective question shows the
+  answer distribution per choice or statement, and now loads the question
+  version pinned by the exam (falling back to the latest, with a warning).
 - Exam exceptions: the instructor grants one student extra time or a makeup
   date on a quiz or exam, from the exam page or the REST API
   (`.../exam/<slug>/exception/<username>`), and may reopen a closed attempt

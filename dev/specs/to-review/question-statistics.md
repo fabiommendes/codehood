@@ -1,6 +1,6 @@
 ---
 type: spec
-status: todo
+status: implemented
 tags: [exams, grading, instructor, statistics]
 relatedTo: [web-grading, exam-result, grading]
 ---

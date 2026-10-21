@@ -4,7 +4,11 @@
  */
 import { m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
-import type { QuestionStats } from "@/services/grading";
+import {
+	type DiscriminationGap,
+	discriminationFlag,
+	type QuestionStats,
+} from "@/services/question-stats";
 
 interface Props {
 	/// The exam page's URL.
@@ -16,6 +20,11 @@ interface Props {
 }
 
 const { href, stats, titles } = Astro.props;
+const gapReasons: Record<DiscriminationGap, string> = {
+	"few-attempts": m.grades_stats_gap_few_attempts(),
+	"single-question": m.grades_stats_gap_single_question(),
+	"no-variance": m.grades_stats_gap_no_variance(),
+};
 const anyAnswer = stats.some((entry) => entry.answered > 0);
 ---
 
@@ -24,27 +33,49 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
 
   {
     anyAnswer ? (
+      <>
       <div class="mt-3 overflow-x-auto rounded-box border border-base-300 bg-base-100">
         <table aria-label={m.grades_stats_title()} class="table">
           <thead>
             <tr>
               <th>{m.grades_stats_col_question()}</th>
               <th class="text-right">{m.grades_stats_col_answered()}</th>
+              <th class="text-right">{m.grades_stats_col_blank()}</th>
               <th class="text-right">{m.grades_stats_col_average()}</th>
               <th class="text-right">{m.grades_stats_col_correct()}</th>
+              <th class="text-right">{m.grades_stats_col_discrimination()}</th>
               <th class="text-right">{m.grades_stats_col_to_grade()}</th>
             </tr>
           </thead>
           <tbody>
             {stats.map((entry) => (
               <tr>
-                <td>{titles.get(entry.question) ?? entry.question}</td>
+                <td>
+                  <a href={`${href}/grading/${entry.question}`} class="link">
+                    {titles.get(entry.question) ?? entry.question}
+                  </a>
+                </td>
                 <td class="text-right tabular-nums">{entry.answered}</td>
+                <td class="text-right tabular-nums">{entry.blank}</td>
                 <td class="text-right tabular-nums">
                   {entry.average === null ? "" : formatScore(entry.average)}
                 </td>
                 <td class="text-right tabular-nums">
                   {entry.correct === null ? "" : formatScore(entry.correct)}
+                </td>
+                <td class="text-right tabular-nums">
+                  {entry.discrimination === null ? (
+                    <span title={entry.discriminationGap ? gapReasons[entry.discriminationGap] : undefined}>—</span>
+                  ) : (
+                    <>
+                      {discriminationFlag(entry.discrimination) && (
+                        <span class:list={["badge badge-sm mr-2", discriminationFlag(entry.discrimination) === "error" ? "badge-error" : "badge-warning"]}>
+                          {m.grades_stats_review()}
+                        </span>
+                      )}
+                      {entry.discrimination.toFixed(2)}
+                    </>
+                  )}
                 </td>
                 <td class="text-right tabular-nums">
                   {entry.pending > 0 && (
@@ -58,6 +89,8 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
           </tbody>
         </table>
       </div>
+      <p class="mt-2 text-sm text-base-content/60">{m.grades_stats_help()}</p>
+      </>
     ) : (
       <p class="mt-3 text-sm text-base-content/60">{m.grades_stats_empty()}</p>
     )
