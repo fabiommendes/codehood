@@ -6,6 +6,8 @@ import {
 	type HomeCourse,
 	type HomeEvent,
 	type HomeExam,
+	type HomeRegrade,
+	recentRegrades,
 	type StudentHome,
 	studentHome,
 } from "@/services/student-home";
@@ -22,7 +24,7 @@ import { localDateOf, toInstant } from "./schedule-time";
 export async function loadStudentHome(
 	actor: UserActor,
 	now: Date,
-): Promise<StudentHome> {
+): Promise<StudentHome & { regrades: HomeRegrade[] }> {
 	const courses = (await db.course.findMany({}, { actor })).filter(
 		(course) => course.instructor.username !== actor.username,
 	);
@@ -38,18 +40,23 @@ export async function loadStudentHome(
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};
-			const [exams, attempts, feedback, exceptions] = await Promise.all([
-				db.exam.findMany({ course: course.id }, { actor }),
-				db.response.findMany(
-					{ course: course.id, author: actor.username, practice: false },
-					{ actor },
-				),
-				db.feedback.findMany(
-					{ course: course.id, author: actor.username },
-					{ actor },
-				),
-				loadCourseExceptions(course.id),
-			]);
+			const [exams, attempts, feedback, exceptions, requests] =
+				await Promise.all([
+					db.exam.findMany({ course: course.id }, { actor }),
+					db.response.findMany(
+						{ course: course.id, author: actor.username, practice: false },
+						{ actor },
+					),
+					db.feedback.findMany(
+						{ course: course.id, author: actor.username },
+						{ actor },
+					),
+					loadCourseExceptions(course.id),
+					db.regradeRequest.findMany(
+						{ course: course.id, author: actor.username },
+						{ actor },
+					),
+				]);
 
 			const homeExams: HomeExam[] = exams.map((exam) => {
 				const attempt = attempts.find((entry) => entry.exam === exam.slug);
@@ -70,7 +77,11 @@ export async function loadStudentHome(
 						: null,
 				};
 			});
-			return { course, home, homeExams };
+			const regrades: HomeRegrade[] = requests.flatMap((request) => {
+				const exam = exams.find((entry) => entry.slug === request.exam);
+				return exam ? [{ course: home, exam, request }] : [];
+			});
+			return { course, home, homeExams, regrades };
 		}),
 	);
 
@@ -95,9 +106,15 @@ export async function loadStudentHome(
 		];
 	});
 
-	return studentHome(
-		perCourse.flatMap(({ homeExams }) => homeExams),
-		homeEvents,
-		now,
-	);
+	return {
+		...studentHome(
+			perCourse.flatMap(({ homeExams }) => homeExams),
+			homeEvents,
+			now,
+		),
+		regrades: recentRegrades(
+			perCourse.flatMap(({ regrades }) => regrades),
+			now,
+		),
+	};
 }

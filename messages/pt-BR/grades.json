@@ -135,5 +135,46 @@
 				"countPlural=other": "{count} estudantes verão a sua nota. Depois de liberada, não dá para desfazer."
 			}
 		}
-	]
+	],
+	"grades_regrade_request": "Pedir revisão",
+	"grades_regrade_dialog_title": "Pedir revisão da nota",
+	"grades_regrade_send": "Enviar",
+	"grades_regrade_cancel": "Cancelar",
+	"grades_regrade_withdraw": "Retirar",
+	"grades_regrade_requested": "Revisão pedida",
+	"grades_regrade_accepted": "Revisão aceita",
+	"grades_regrade_rejected": "Revisão recusada",
+	"grades_regrade_your_justification": "Sua justificativa",
+	"grades_regrade_justification": "Justificativa",
+	"grades_regrade_instructor_reply": "Resposta do professor:",
+	"grades_regrade_banner": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} pedido de revisão aberto",
+				"countPlural=other": "{count} pedidos de revisão abertos"
+			}
+		}
+	],
+	"grades_regrade_page_title": "Pedidos de revisão",
+	"grades_regrade_back": "Voltar para a prova",
+	"grades_regrade_empty": "Nenhum pedido de revisão.",
+	"grades_regrade_question": "Questão: {title}",
+	"grades_regrade_current_score": "Nota atual",
+	"grades_regrade_accept": "Aceitar",
+	"grades_regrade_reject": "Recusar",
+	"grades_regrade_resolved_by": "Resolvido por {name}",
+	"grades_regrade_home_queue": "Pedidos de revisão",
+	"grades_regrade_home_open": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} pedido aberto",
+				"countPlural=other": "{count} pedidos abertos"
+			}
+		}
+	],
+	"grades_regrade_home_resolved": "Respostas a pedidos de revisão"
 }

@@ -3,8 +3,11 @@ import { type Course, db } from "@/db";
 import { Question } from "@/mdq/question";
 import { examResult } from "@/services/exam-result";
 import {
+	type ExamRegrades,
 	type InstructorHome,
 	instructorHome,
+	type RegradeQueueItem,
+	regradeQueue,
 	type TaughtCourse,
 	type TaughtExam,
 } from "@/services/instructor-home";
@@ -23,7 +26,7 @@ export async function loadInstructorHome(
 	actor: UserActor,
 	now: Date,
 	only?: Course,
-): Promise<InstructorHome> {
+): Promise<InstructorHome & { regrades: RegradeQueueItem[] }> {
 	const courses = only
 		? [only]
 		: (await db.course.findMany({}, { actor })).filter(
@@ -41,7 +44,7 @@ export async function loadInstructorHome(
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};
-			const [exams, attempts, feedback, questions, exceptions] =
+			const [exams, attempts, feedback, questions, exceptions, open] =
 				await Promise.all([
 					db.exam.findMany({ course: course.id }, { actor }),
 					db.response.findMany(
@@ -51,6 +54,10 @@ export async function loadInstructorHome(
 					db.feedback.findMany({ course: course.id }, { actor }),
 					db.question.findMany({ course: course.id, public: false }, { actor }),
 					loadCourseExceptions(course.id),
+					db.regradeRequest.findMany(
+						{ course: course.id, status: "OPEN" },
+						{ actor },
+					),
 				]);
 
 			const taughtExams: TaughtExam[] = exams.map((exam) => ({
@@ -75,13 +82,21 @@ export async function loadInstructorHome(
 					({ question }) => new Question(question).validate().length > 0,
 				).length,
 			};
-			return { taughtExams, taughtCourse };
+			const regrades: ExamRegrades[] = exams.map((exam) => ({
+				course: home,
+				exam,
+				requests: open.filter((request) => request.exam === exam.slug),
+			}));
+			return { taughtExams, taughtCourse, regrades };
 		}),
 	);
 
-	return instructorHome(
-		loaded.flatMap(({ taughtExams }) => taughtExams),
-		loaded.map(({ taughtCourse }) => taughtCourse),
-		now,
-	);
+	return {
+		...instructorHome(
+			loaded.flatMap(({ taughtExams }) => taughtExams),
+			loaded.map(({ taughtCourse }) => taughtCourse),
+			now,
+		),
+		regrades: regradeQueue(loaded.flatMap(({ regrades }) => regrades)),
+	};
 }

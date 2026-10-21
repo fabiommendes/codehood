@@ -1037,6 +1037,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		bob,
 	]);
 
+	await seedRegradeExam(cs101.id, ada, { hopper, hamilton });
+
 	// An ended course in the past edition, so admin views keep an expired one.
 	const ended = await db.course.create(
 		{
@@ -1932,6 +1934,106 @@ async function seedQuestionStatsExam(
 		FULL_ACCESS,
 	);
 	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
+}
+
+/**
+ * Seeds an exam whose grades were just released, with a regrade request in each state.
+ *
+ * The dev student has an open request on a wrong answer and can still ask
+ * for a regrade of the other. Hopper's was accepted with a new score and
+ * Hamilton's rejected.
+ */
+async function seedRegradeExam(
+	course: Course["id"],
+	instructor: User,
+	students: { hopper: User; hamilton: User },
+): Promise<void> {
+	const exam = "test-05";
+	const student = await db.user.findOne(
+		{ username: DEV_STUDENT_USERNAME },
+		FULL_ACCESS,
+	);
+	if (!student) throw new Error("The dev student account is missing.");
+
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 5: regrades",
+			description: "Grades out, with regrade requests to look at.",
+			tags: ["recursion"],
+			questions: [
+				{ slug: "recursion-basics", version: "v1" },
+				{ slug: "factorial-of-five", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+	const own = await answerExam(course, exam, student, {
+		"recursion-basics": { choice: "tail-call" },
+		"factorial-of-five": { value: 120 },
+	});
+	await botGrade(own["recursion-basics"], "0");
+	await botGrade(own["factorial-of-five"], "1");
+	const hopper = await answerExam(course, exam, students.hopper, {
+		"recursion-basics": { choice: "tail-call" },
+		"factorial-of-five": { value: 120 },
+	});
+	await botGrade(hopper["recursion-basics"], "0");
+	await botGrade(hopper["factorial-of-five"], "1");
+	const hamilton = await answerExam(course, exam, students.hamilton, {
+		"recursion-basics": { choice: "base-case" },
+		"factorial-of-five": { value: 25 },
+	});
+	await botGrade(hamilton["recursion-basics"], "1");
+	await botGrade(hamilton["factorial-of-five"], "0");
+
+	await db.exam.update(
+		{ course, slug: exam },
+		{
+			status: "COMPLETED",
+			scheduledAt: new Date(Date.now() - 3 * 24 * 3600 * 1000),
+			duration: { hours: 1 },
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
+
+	const ask = (author: User, submission: string | undefined, message: string) =>
+		db.regradeRequest.create(
+			{ course, submission: submission ?? "", message },
+			{ actor: author },
+		);
+	await ask(
+		student,
+		own["recursion-basics"],
+		"I picked tail call because the function returns right away, please check.",
+	);
+	const accepted = await ask(
+		students.hopper,
+		hopper["recursion-basics"],
+		"A tail call is a recursive call, so my answer should count.",
+	);
+	await db.regradeRequest.accept(
+		{ publicId: accepted.publicId },
+		{
+			score: "1",
+			reply: "You are right, the wording of the question was loose.",
+		},
+		{ actor: instructor },
+	);
+	const rejected = await ask(
+		students.hamilton,
+		hamilton["factorial-of-five"],
+		"I computed the factorial of four by mistake, can I get partial credit?",
+	);
+	await db.regradeRequest.reject(
+		{ publicId: rejected.publicId },
+		{ reply: "The question asks for five, so there is no partial credit." },
+		{ actor: instructor },
+	);
 }
 
 //

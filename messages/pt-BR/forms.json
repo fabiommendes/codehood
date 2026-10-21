@@ -65,5 +65,12 @@
 	"forms_label_exception_student": "Aluno",
 	"forms_label_exception_extra_minutes": "Tempo extra (minutos)",
 	"forms_label_exception_scheduled_at": "Nova data e hora",
-	"forms_label_exception_note": "Observação"
+	"forms_label_exception_note": "Observação",
+	"forms_schema_regrade_message_min": "A justificativa deve ter pelo menos {min} caracteres.",
+	"forms_schema_regrade_message_max": "A justificativa deve ter no máximo {max} caracteres.",
+	"forms_schema_regrade_reply_required": "A resposta é obrigatória.",
+	"forms_schema_regrade_reply_max": "A resposta deve ter no máximo {max} caracteres.",
+	"forms_label_regrade_message": "Justificativa",
+	"forms_label_regrade_reply": "Resposta",
+	"forms_label_regrade_score": "Nova nota (%)"
 }

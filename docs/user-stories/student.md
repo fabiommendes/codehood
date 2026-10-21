@@ -218,6 +218,20 @@ question, the total, and whatever written feedback the instructor or grading bot
 left. A submission still waiting to be graded says so rather than showing a zero.
 
 
+### Ask for a regrade
+
+    status: implemented
+    url: /exams
+
+Student disagrees with the grade of one question of an exam whose grades are
+out. They ask for a regrade with a short justification, which the instructor
+sees; a justification that is too short is refused. Until the instructor
+answers they can withdraw the request and ask again. Once answered, the
+request shows as accepted, with the new grade, or rejected, with the
+instructor's reply, and each answer can be contested only once, within two
+weeks of the release.
+
+
 ### See my course grades
 
     status: implemented

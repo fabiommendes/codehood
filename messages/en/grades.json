@@ -135,5 +135,46 @@
 				"countPlural=other": "{count} students will see their grade. You can't undo this once it is released."
 			}
 		}
-	]
+	],
+	"grades_regrade_request": "Request regrade",
+	"grades_regrade_dialog_title": "Request a regrade",
+	"grades_regrade_send": "Send",
+	"grades_regrade_cancel": "Cancel",
+	"grades_regrade_withdraw": "Withdraw",
+	"grades_regrade_requested": "Regrade requested",
+	"grades_regrade_accepted": "Regrade accepted",
+	"grades_regrade_rejected": "Regrade rejected",
+	"grades_regrade_your_justification": "Your justification",
+	"grades_regrade_justification": "Justification",
+	"grades_regrade_instructor_reply": "Instructor's reply:",
+	"grades_regrade_banner": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} open regrade request",
+				"countPlural=other": "{count} open regrade requests"
+			}
+		}
+	],
+	"grades_regrade_page_title": "Regrade requests",
+	"grades_regrade_back": "Back to the exam",
+	"grades_regrade_empty": "No regrade requests.",
+	"grades_regrade_question": "Question: {title}",
+	"grades_regrade_current_score": "Current score",
+	"grades_regrade_accept": "Accept",
+	"grades_regrade_reject": "Reject",
+	"grades_regrade_resolved_by": "Resolved by {name}",
+	"grades_regrade_home_queue": "Regrade requests",
+	"grades_regrade_home_open": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} open request",
+				"countPlural=other": "{count} open requests"
+			}
+		}
+	],
+	"grades_regrade_home_resolved": "Regrade answers"
 }

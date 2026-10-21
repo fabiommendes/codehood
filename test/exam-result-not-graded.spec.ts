@@ -63,7 +63,13 @@ test("examResult: a will-not-grade submission with no pass is not-graded with a 
 	);
 
 	expect(result.questions).toEqual([
-		{ question: "q1", status: "not-graded", score: null, comments: [] },
+		{
+			question: "q1",
+			submission: "s1",
+			status: "not-graded",
+			score: null,
+			comments: [],
+		},
 	]);
 });
 
@@ -82,6 +88,7 @@ test("examResult: a will-not-grade submission stays not-graded with passes on it
 	expect(result.questions).toEqual([
 		{
 			question: "q1",
+			submission: "s1",
 			status: "not-graded",
 			score: null,
 			comments: ["Submitted empty", "First look"],
@@ -206,7 +213,13 @@ for (const status of otherStatuses) {
 		const result = examResult(["q1"], [submission("s1", "q1", 0, status)], []);
 
 		expect(result.questions).toEqual([
-			{ question: "q1", status: "pending", score: null, comments: [] },
+			{
+				question: "q1",
+				submission: "s1",
+				status: "pending",
+				score: null,
+				comments: [],
+			},
 		]);
 	});
 
@@ -218,7 +231,13 @@ for (const status of otherStatuses) {
 		);
 
 		expect(result.questions).toEqual([
-			{ question: "q1", status: "graded", score: 0.75, comments: ["Good"] },
+			{
+				question: "q1",
+				submission: "s1",
+				status: "graded",
+				score: 0.75,
+				comments: ["Good"],
+			},
 		]);
 	});
 }

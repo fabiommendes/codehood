@@ -83,6 +83,17 @@ const graderName = (pass: { grader: string | null }): string =>
 			? instructor.name
 			: pass.grader;
 
+// Open regrade requests, by the submission they contest.
+const openRegrades = new Map(
+	(
+		await db.regradeRequest.findMany(
+			{ course: course.id, exam: exam.slug, status: "OPEN" },
+			{ actor },
+		)
+	).map((request) => [request.submission, request.publicId]),
+);
+const regradesHref = `${href}/exams/${exam.slug}/regrades`;
+
 const { pending, resolved } = answersTo(questionSlug, answers);
 const distribution = answerDistribution(
 	doc,
@@ -148,6 +159,9 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
             <article id={`answer-${answer.submission}`} aria-label={label} class="card card-border bg-base-100">
               <div class="card-body">
                 <p class="text-sm font-semibold text-base-content/60">{label}</p>
+                {openRegrades.has(answer.submission) && (
+                  <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+                )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
                 <Answer question={asked} payload={answer.payload as AnswerPayload} />
 

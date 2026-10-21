@@ -59,6 +59,8 @@ export function newestPassesFirst<T extends { updatedAt: Date }>(
 export interface QuestionOutcome {
 	/// The question's slug.
 	question: string;
+	/// The `publicId` of the submission that counts for the question; absent when `unanswered`.
+	submission?: string;
 	status: QuestionOutcomeStatus;
 	/// The current verdict as a number in `[-1, 1]`, or `null` unless `graded`.
 	score: number | null;
@@ -126,14 +128,32 @@ function outcomeOf(
 		.filter((text): text is string => !!text?.trim());
 
 	if (counting.status === "WILL_NOT_GRADE") {
-		return { question: slug, status: "not-graded", score: null, comments };
+		return {
+			question: slug,
+			submission: counting.publicId,
+			status: "not-graded",
+			score: null,
+			comments,
+		};
 	}
 
 	const verdict = passes[0] ? scoreValue(passes[0].score) : null;
 	if (verdict === null) {
-		return { question: slug, status: "pending", score: null, comments };
+		return {
+			question: slug,
+			submission: counting.publicId,
+			status: "pending",
+			score: null,
+			comments,
+		};
 	}
-	return { question: slug, status: "graded", score: verdict, comments };
+	return {
+		question: slug,
+		submission: counting.publicId,
+		status: "graded",
+		score: verdict,
+		comments,
+	};
 }
 
 /// The mean score, unanswered and not-graded counting as zero; `null` with no questions or any pending.

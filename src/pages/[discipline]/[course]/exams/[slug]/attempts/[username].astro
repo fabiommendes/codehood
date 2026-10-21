@@ -62,6 +62,20 @@ const canReopen =
 	closed &&
 	!attempt.acceptingSubmissions &&
 	canReopenAttempt(exam, exception, attempt, now);
+// Open regrade requests of this student, by the submission they contest.
+const openRegrades = new Map(
+	(
+		await db.regradeRequest.findMany(
+			{
+				course: course.id,
+				exam: exam.slug,
+				status: "OPEN",
+				author: attempt.author,
+			},
+			{ actor },
+		)
+	).map((request) => [request.submission, request.publicId]),
+);
 const outcomes = examResult(questions, attempt.submissions, feedback);
 
 const rows = outcomes.questions.map((outcome, index) => {
@@ -152,6 +166,9 @@ const stateLabel = (status: string, score: number | null): string => {
           <article aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <h3 class="text-lg font-semibold">{title}</h3>
+              {counting && openRegrades.has(counting.publicId) && (
+                <a href={`${href}/exams/${exam.slug}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+              )}
               {counting && asked ? (
                 <>
                   <Answer question={asked} payload={counting.payload as AnswerPayload} />

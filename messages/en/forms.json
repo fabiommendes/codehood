@@ -65,5 +65,12 @@
 	"forms_label_exception_student": "Student",
 	"forms_label_exception_extra_minutes": "Extra time (minutes)",
 	"forms_label_exception_scheduled_at": "New date and time",
-	"forms_label_exception_note": "Note"
+	"forms_label_exception_note": "Note",
+	"forms_schema_regrade_message_min": "The justification must have at least {min} characters.",
+	"forms_schema_regrade_message_max": "The justification must have at most {max} characters.",
+	"forms_schema_regrade_reply_required": "A reply is required.",
+	"forms_schema_regrade_reply_max": "The reply must have at most {max} characters.",
+	"forms_label_regrade_message": "Justification",
+	"forms_label_regrade_reply": "Reply",
+	"forms_label_regrade_score": "New score (%)"
 }

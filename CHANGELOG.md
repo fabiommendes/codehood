@@ -4,6 +4,11 @@
 
 ### Added
 
+- Regrade requests: after grades are released, a student contests the grade
+  of one answer with a justification, within 14 days. The instructor answers
+  from the exam's new Regrades page, accepting with a new score (a new grading
+  pass) or rejecting with a reply; open requests show on the exam, grading and
+  home pages, and resolved ones on the student's home.
 - Question statistics: the exam's statistics table gains blank counts and
   each question's discrimination (corrected item-total correlation), flagged
   "review" below 0.2. The grading page of an objective question shows the

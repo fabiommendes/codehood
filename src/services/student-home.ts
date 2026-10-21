@@ -5,7 +5,7 @@
  * and calendar events, and this picks what needs their attention at `now`.
  */
 
-import type { Exam } from "@/db";
+import type { Exam, RegradeRequest } from "@/db";
 import { localDateOf } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 import {
@@ -193,4 +193,42 @@ function nextThing(
 	];
 	candidates.sort((a, b) => a.at.getTime() - b.at.getTime());
 	return candidates[0] ?? null;
+}
+
+/// One of the student's regrade requests, with the course and exam it belongs to.
+export interface HomeRegrade {
+	course: HomeCourse;
+	exam: Exam;
+	request: Pick<
+		RegradeRequest,
+		"publicId" | "question" | "status" | "reply" | "resolvedAt"
+	>;
+}
+
+/**
+ * The student's requests resolved within the last {@link HOME_HORIZON_MS}, newest resolution first, shown next to `results`.
+ *
+ * A request counts when its status is `ACCEPTED` or `REJECTED` and its
+ * `resolvedAt` is neither before `now - HOME_HORIZON_MS` nor after `now`.
+ */
+export function recentRegrades(
+	regrades: readonly HomeRegrade[],
+	now: Date,
+): HomeRegrade[] {
+	const since = now.getTime() - HOME_HORIZON_MS;
+	const resolvedAt = (entry: HomeRegrade) => entry.request.resolvedAt;
+	return regrades
+		.filter(({ request }) => {
+			const at = request.resolvedAt?.getTime();
+			return (
+				request.status !== "OPEN" &&
+				at !== undefined &&
+				at >= since &&
+				at <= now.getTime()
+			);
+		})
+		.sort(
+			(a, b) =>
+				(resolvedAt(b)?.getTime() ?? 0) - (resolvedAt(a)?.getTime() ?? 0),
+		);
 }

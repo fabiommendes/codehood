@@ -328,6 +328,14 @@ One immutable revision of a question's content — title, stem, and a
 type-specific JSON payload — identified by a hash. Editing appends a version;
 exams and courses may pin an older one.
 
+## Regrade request
+
+Type: domain
+
+A student's challenge to the grade of one answer in a released exam, with a
+justification. The course's instructor accepts it, writing a new grading pass,
+or rejects it with a reply. One per answer, open for 14 days after release.
+
 ## Reserved slug
 
 Type: platform

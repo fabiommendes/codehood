@@ -7,6 +7,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalChoice, capitalShortAnswer } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
+import { REGRADE_MESSAGE, releasedExam } from "./regrade-setup";
 
 test.beforeEach(resetDatabase);
 
@@ -485,6 +486,81 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await expect(page.getByText("You did not take this exam")).toBeVisible();
 		await expect(page.getByText(/\d+%/)).toHaveCount(0);
 		await expect(page.getByText("Well argued")).toHaveCount(0);
+	});
+});
+
+test("student: ask for a regrade", async ({ page }) => {
+	const world = await releasedExam("rg-student", 1);
+	const [student] = world.students;
+	if (!student) throw new Error("no student");
+	await logInAs(page, student);
+	await page.goto(world.examUrl);
+
+	await test.step("a justification that is too short is refused", async () => {
+		await page.getByRole("button", { name: "Request regrade" }).click();
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Justification").fill("Too short");
+		await dialog.getByRole("button", { name: "Send" }).click();
+
+		await expect(
+			dialog.getByText("The justification must have at least 10 characters."),
+		).toBeVisible();
+		await expect(page.getByText("Regrade requested")).toHaveCount(0);
+	});
+
+	await test.step("a real justification opens the request, which can be withdrawn", async () => {
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Justification").fill(REGRADE_MESSAGE);
+		await dialog.getByRole("button", { name: "Send" }).click();
+
+		await expect(dialog).toBeHidden();
+		await expect(page.getByText("Regrade requested")).toBeVisible();
+		await expect(page.getByText(REGRADE_MESSAGE)).toBeVisible();
+		await expect(
+			page.getByRole("button", { name: "Request regrade" }),
+		).toHaveCount(0);
+
+		await page.getByRole("button", { name: "Withdraw" }).click();
+
+		await expect(page.getByText("Regrade requested")).toHaveCount(0);
+		await expect(
+			page.getByRole("button", { name: "Request regrade" }),
+		).toBeVisible();
+	});
+
+	await test.step("the instructor's refusal shows with the reply, and nothing more can be asked", async () => {
+		await page.getByRole("button", { name: "Request regrade" }).click();
+		await page
+			.getByRole("dialog")
+			.getByLabel("Justification")
+			.fill(REGRADE_MESSAGE);
+		await page
+			.getByRole("dialog")
+			.getByRole("button", { name: "Send" })
+			.click();
+		await expect(page.getByText("Regrade requested")).toBeVisible();
+
+		const request = await db.regradeRequest.findMany(
+			{ course: world.course.id },
+			FULL_ACCESS,
+		);
+		expect(request).toHaveLength(1);
+		await db.regradeRequest.reject(
+			{ publicId: request[0]?.publicId ?? "" },
+			{ reply: "The accepted spelling is in the answer key." },
+			{ actor: world.teacher },
+		);
+		await page.reload();
+
+		await expect(page.getByText("Regrade rejected")).toBeVisible();
+		await expect(
+			page.getByText("The accepted spelling is in the answer key."),
+		).toBeVisible();
+		await expect(page.getByText("Regrade requested")).toHaveCount(0);
+		await expect(
+			page.getByRole("button", { name: "Request regrade" }),
+		).toHaveCount(0);
+		await expect(page.getByRole("button", { name: "Withdraw" })).toHaveCount(0);
 	});
 });
 

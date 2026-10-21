@@ -52,6 +52,7 @@ import {
 	numberOf,
 	textOf,
 } from "./answer-payload";
+import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 
 export interface ExamAttemptProps {
 	/// The course's URL segments and the exam slug, as the exam actions take them.
@@ -70,6 +71,8 @@ export interface ExamAttemptProps {
 	answers: Record<string, AnswerPayload>;
 	/// The graded outcome per question, present once the grades are released.
 	result?: ExamResult;
+	/// What the student may do about the regrade of each question's answer, by question slug.
+	regrades?: Record<string, QuestionRegrade>;
 }
 
 /// The box every state sentence of an attempt sits in.
@@ -372,6 +375,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 												outcome={result().questions.find(
 													(outcome) => outcome.question === entry.slug,
 												)}
+												regrade={props.regrades?.[entry.slug]}
+												target={target}
 											/>
 										)}
 									</Show>
@@ -550,7 +555,11 @@ function SaveState(props: {
 }
 
 /// The verdict on one question: its score or why it has none, and the comments.
-function Outcome(props: { outcome: QuestionOutcome | undefined }): JSX.Element {
+function Outcome(props: {
+	outcome: QuestionOutcome | undefined;
+	regrade: QuestionRegrade | undefined;
+	target: { discipline: string; course: string; exam: string };
+}): JSX.Element {
 	return (
 		<Show when={props.outcome}>
 			{(outcome) => (
@@ -581,6 +590,17 @@ function Outcome(props: { outcome: QuestionOutcome | undefined }): JSX.Element {
 							</p>
 						)}
 					</For>
+					<Show
+						when={
+							props.regrade &&
+							(props.regrade.canRequest || props.regrade.request)
+						}
+					>
+						<RegradeControls
+							{...props.target}
+							regrade={props.regrade as QuestionRegrade}
+						/>
+					</Show>
 				</div>
 			)}
 		</Show>

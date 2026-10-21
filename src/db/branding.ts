@@ -55,6 +55,11 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 	QuestionRef: [{ field: "id", from: "number", to: "QuestionRefId" }],
 	// QuestionForExam: [{ field: "id", from: "number" , to: "QuestionForExamId"}],
 	// QuestionTags: [{ field: "id", from: "number" , to: "QuestionTagsId"}],
+	RegradeRequest: [
+		{ field: "id", from: "number", to: "RegradeRequestId" },
+		{ field: "submissionId", from: "number", to: "SubmissionId" },
+		{ field: "feedbackId", from: "number", to: "FeedbackId" },
+	],
 	Resource: [
 		{ field: "id", from: "number", to: "ResourceId" },
 		{ field: "courseId", from: "number", to: "CourseId" },

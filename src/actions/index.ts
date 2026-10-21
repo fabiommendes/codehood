@@ -8,6 +8,7 @@ import { gradeColumn } from "./grade-column";
 import { grading } from "./grading";
 import { profile } from "./profile";
 import { question } from "./question";
+import { regrade } from "./regrade";
 import { rollCall } from "./roll-call";
 
 installErrorMap();
@@ -21,6 +22,7 @@ export const server = {
 	gradeColumn,
 	grading,
 	question,
+	regrade,
 	rollCall,
 	checkIn,
 };

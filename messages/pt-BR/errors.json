@@ -122,5 +122,12 @@
 	"errors_course_edition_closed": "O período letivo não aceita novas turmas",
 	"errors_course_invalid_instructor": "Docente inválido",
 	"errors_exam_duration_needed_by_exceptions": "Um aluno tem nova data nesta prova, então ela precisa de duração; remova essa exceção antes",
-	"errors_exam_exception_released": "Os resultados desta prova já foram liberados, então suas exceções não podem mais mudar"
+	"errors_exam_exception_released": "Os resultados desta prova já foram liberados, então suas exceções não podem mais mudar",
+	"errors_regrade_practice": "Provas de prática não têm nota a contestar",
+	"errors_regrade_not_released": "Os resultados desta prova ainda não estão visíveis para você",
+	"errors_regrade_not_counting": "Só a resposta que vale para a questão pode ser contestada",
+	"errors_regrade_not_gradable": "Esta resposta não tem nota a contestar",
+	"errors_regrade_exists": "Já existe um pedido de revisão para esta resposta",
+	"errors_regrade_expired": "O prazo para pedir revisão já acabou",
+	"errors_regrade_resolved": "Este pedido já foi resolvido"
 }

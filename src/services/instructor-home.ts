@@ -6,7 +6,7 @@
  * needs the instructor at `now`.
  */
 
-import type { Exam } from "@/db";
+import type { Exam, RegradeRequest } from "@/db";
 import type { ExamResult } from "./exam-result";
 import {
 	type AttemptTiming,
@@ -190,4 +190,43 @@ function isClosed(kind: string): boolean {
 function pendingIn(result: ExamResult): number {
 	return result.questions.filter((outcome) => outcome.status === "pending")
 		.length;
+}
+
+/// The regrade requests of one exam of a course the instructor teaches, any status.
+export interface ExamRegrades {
+	course: HomeCourse;
+	exam: Exam;
+	requests: readonly Pick<RegradeRequest, "status" | "createdAt">[];
+}
+
+/// One exam waiting on the instructor to resolve regrade requests.
+export interface RegradeQueueItem {
+	course: HomeCourse;
+	exam: Exam;
+	/// How many of its requests are `OPEN`, at least one.
+	open: number;
+	/// When the oldest `OPEN` request was made.
+	oldest: Date;
+}
+
+/**
+ * The exams with `OPEN` regrade requests, the home page's `regrades` list, shown next to `toGrade`.
+ *
+ * Exams with no open request are left out. Most open requests first; a tie
+ * goes to the exam whose oldest open request is older.
+ */
+export function regradeQueue(
+	exams: readonly ExamRegrades[],
+): RegradeQueueItem[] {
+	const items = exams.flatMap(({ course, exam, requests }) => {
+		const open = requests.filter((request) => request.status === "OPEN");
+		const oldest = open.reduce<Date | null>(
+			(min, { createdAt }) => (!min || createdAt < min ? createdAt : min),
+			null,
+		);
+		return oldest ? [{ course, exam, open: open.length, oldest }] : [];
+	});
+	return items.sort(
+		(a, b) => b.open - a.open || a.oldest.getTime() - b.oldest.getTime(),
+	);
 }

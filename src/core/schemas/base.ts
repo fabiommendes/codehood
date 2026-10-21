@@ -50,6 +50,9 @@ export type QuestionRefId = z.infer<typeof questionRefId>;
 export const questionDataId = z.number().int().brand("QuestionDataId");
 export type QuestionDataId = z.infer<typeof questionDataId>;
 
+export const regradeRequestId = z.number().int().brand("RegradeRequestId");
+export type RegradeRequestId = z.infer<typeof regradeRequestId>;
+
 export const responseId = z.number().int().brand("ResponseId");
 export type ResponseId = z.infer<typeof responseId>;
 

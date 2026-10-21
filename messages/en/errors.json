@@ -122,5 +122,12 @@
 	"errors_course_edition_closed": "Edition not accepting new courses",
 	"errors_course_invalid_instructor": "Invalid instructor",
 	"errors_exam_duration_needed_by_exceptions": "A student has a new date on this exam, so it needs a duration; remove that exception first",
-	"errors_exam_exception_released": "This exam's results are already released, so its exceptions can no longer change"
+	"errors_exam_exception_released": "This exam's results are already released, so its exceptions can no longer change",
+	"errors_regrade_practice": "Practice exams have no grades to contest",
+	"errors_regrade_not_released": "The results of this exam are not visible to you yet",
+	"errors_regrade_not_counting": "Only the answer that counts for a question can be contested",
+	"errors_regrade_not_gradable": "This answer has no grade to contest",
+	"errors_regrade_exists": "A regrade was already requested for this answer",
+	"errors_regrade_expired": "The period to request a regrade is over",
+	"errors_regrade_resolved": "This request was already resolved"
 }

@@ -37,6 +37,7 @@ export type RoleEntity =
 	| "response"
 	| "submission"
 	| "feedback"
+	| "regrade"
 	| "api-key"
 	| "session";
 
@@ -47,6 +48,8 @@ type ExtraPerms =
 	| "course.update-contents"
 	| "question.read-public"
 	| "response.submit"
+	| "regrade.request"
+	| "regrade.resolve"
 	| "roll-call.manage"
 	| "exam.manage-exceptions"
 	| "api-key.manage"
@@ -405,6 +408,33 @@ const PERMISSIONS = {
 			(target.author.username === actor.username && target.released),
 		audit: auditResponse,
 	} satisfies PermDef<FeedbackTarget>,
+
+	// REGRADE --------------------------------------------------------------------
+	// Rule: the author of the attempt asks for a regrade of their own answer
+	// and withdraws it. No owner branch: an instructor regrades directly. The
+	// conditions on the exam, the answer and the deadline belong to
+	// `RegradeRequestService`, not to this rule.
+	"regrade.request": {
+		other: (actor, target) => target.author.username === actor.username,
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// Rule: the course's instructor alone accepts or rejects a request. No
+	// admin branch, matching `feedback.create`: grading belongs to whoever
+	// teaches the course.
+	"regrade.resolve": {
+		other: (actor, target) => isCourseOwner(actor, target.course),
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// Rule: the author reads their own requests, the instructor every request
+	// of the course. Nobody else, admins included.
+	"regrade.read": {
+		other: (actor, target) =>
+			isCourseOwner(actor, target.course) ||
+			target.author.username === actor.username,
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
 
 	// API KEY / SESSION ----------------------------------------------------------
 	// Rule: the owner, any admin, or SYSTEM.

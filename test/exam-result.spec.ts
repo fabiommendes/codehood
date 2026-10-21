@@ -45,7 +45,13 @@ test("examResult: a question with feedback on its answer is graded with that sco
 	);
 
 	expect(result.questions).toEqual([
-		{ question: "q1", status: "graded", score: 1, comments: [] },
+		{
+			question: "q1",
+			submission: "s1",
+			status: "graded",
+			score: 1,
+			comments: [],
+		},
 	]);
 });
 
@@ -76,7 +82,13 @@ test("examResult: an answered question without feedback is pending, with a null 
 	const result = examResult(["q1"], [submission("s1", "q1", 0)], []);
 
 	expect(result.questions).toEqual([
-		{ question: "q1", status: "pending", score: null, comments: [] },
+		{
+			question: "q1",
+			submission: "s1",
+			status: "pending",
+			score: null,
+			comments: [],
+		},
 	]);
 });
 
@@ -101,6 +113,24 @@ test("examResult: feedback on a submission to another question does not grade th
 //
 // The submission that counts, and the verdict on it
 //
+
+test("examResult: each outcome names the counting submission, the newest of its question, and none when unanswered", () => {
+	const result = examResult(
+		["q1", "q2", "q3"],
+		[
+			submission("old", "q1", 0),
+			submission("new", "q1", 10),
+			submission("only", "q2", 5),
+		],
+		[feedback("old", "1", 20)],
+	);
+
+	expect(result.questions.map((q) => q.submission)).toEqual([
+		"new",
+		"only",
+		undefined,
+	]);
+});
 
 test("examResult: the newest submission of a question is the one that counts", () => {
 	const result = examResult(
@@ -130,7 +160,13 @@ test("examResult: feedback on an older submission is ignored, leaving the newer 
 	);
 
 	expect(result.questions).toEqual([
-		{ question: "q1", status: "pending", score: null, comments: [] },
+		{
+			question: "q1",
+			submission: "new",
+			status: "pending",
+			score: null,
+			comments: [],
+		},
 	]);
 });
 

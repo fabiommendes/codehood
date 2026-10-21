@@ -266,6 +266,18 @@ the deadline they mark will-not-grade, which is distinct from a zero and from
 still being pending.
 
 
+### Answer regrade requests
+
+    status: implemented
+
+Instructor learns from the exam page that students contested their grades. They
+open the list of requests, read each justification next to the student's
+answer, and either accept it with a new score or reject it. Both need a reply
+for the student, and a reply left empty is refused. An answer with an open
+request is marked on the grading page, and once accepted the student's grade
+is the new one.
+
+
 ### Give a student extra time or a makeup exam
 
     status: implemented

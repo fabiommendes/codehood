@@ -62,7 +62,7 @@ model User {
   createdAt DateTime @default(now())
 
   apiKeys          ApiKey[]
-  invitesSent      Invite[]          @relation("InviteCreatedBy")
+  invitesSent      Invite[]           @relation("InviteCreatedBy")
   redemptions      InviteRedemption[]
   sessions         Session[]
   groupMemberships GroupMembership[]
@@ -76,6 +76,7 @@ model User {
   attendances      Attendance[]
   calendarFeed     CalendarFeed?
   exceptions       ExamException[]
+  regradesResolved RegradeRequest[]
 }
 
 model Group {
@@ -781,7 +782,8 @@ model Submission {
   startedAt DateTime?
   createdAt DateTime  @default(now())
 
-  feedbacks Feedback[]
+  feedbacks      Feedback[]
+  regradeRequest RegradeRequest?
 }
 
 /// Feedback provided for a submission, either by a human grader or an 
@@ -816,7 +818,46 @@ model Feedback {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// The regrade request this pass answered, when it was written to accept one.
+  regradeRequest RegradeRequest?
+
   @@unique([submissionId, ref])
+}
+
+enum RegradeStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+}
+
+/// A student's request to review the grade of one answer, and the
+/// instructor's answer to it.
+model RegradeRequest {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
+
+  /// The counting answer being contested. At most one request per answer.
+  submissionId Int        @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /// The student's justification.
+  message String
+
+  status RegradeStatus @default(OPEN)
+
+  /// The instructor's answer. Required to resolve the request.
+  reply String?
+
+  /// The grading pass written when the request was accepted.
+  feedbackId Int?      @unique
+  feedback   Feedback? @relation(fields: [feedbackId], references: [id], onDelete: SetNull)
+
+  resolvedById String?
+  resolvedBy   User?     @relation(fields: [resolvedById], references: [username])
+  resolvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // =============================================================================

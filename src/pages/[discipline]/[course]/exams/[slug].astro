@@ -7,6 +7,7 @@ import ExamExceptions, {
 	type ExceptionRow,
 } from "@/components/exam/ExamExceptions";
 import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
+import type { QuestionRegrade } from "@/components/exam/RegradeControls";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
 import QuestionStatsTable from "@/components/grading/QuestionStats.astro";
@@ -31,6 +32,7 @@ import {
 	type GradedStudent,
 } from "@/services/grading";
 import { type QuestionStats, questionStats } from "@/services/question-stats";
+import { regradeBlocker } from "@/services/regrade";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import {
 	examBadge,
@@ -279,6 +281,54 @@ const examOutcome =
 			)
 		: undefined;
 
+// What the student may do about each answer's grade, decided by the same rule the service enforces.
+const requests =
+	examOutcome && attempt
+		? await db.regradeRequest.findMany(
+				{ course: course.id, exam: slug, author: actor.username },
+				{ actor },
+			)
+		: [];
+const questionRegrades: Record<string, QuestionRegrade> = {};
+for (const outcome of examOutcome?.questions ?? []) {
+	if (!outcome.submission || !attempt) continue;
+	const request =
+		requests.find((entry) => entry.submission === outcome.submission) ?? null;
+	questionRegrades[outcome.question] = {
+		submission: outcome.submission,
+		canRequest:
+			regradeBlocker(
+				{
+					exam,
+					exceptions: [...exceptions.values()],
+					exception: ownException,
+					attempt,
+					outcome,
+					submission: outcome.submission,
+					requested: request !== null,
+				},
+				now,
+			) === null,
+		request: request && {
+			publicId: request.publicId,
+			status: request.status,
+			message: request.message,
+			reply: request.reply,
+		},
+	};
+}
+
+// Regrade requests the instructor has yet to answer.
+const openRegrades =
+	canManage && exam.type !== "PRACTICE"
+		? (
+				await db.regradeRequest.findMany(
+					{ course: course.id, exam: slug, status: "OPEN" },
+					{ actor },
+				)
+			).length
+		: 0;
+
 // Fetched with `public: true` above, so a student's copy never held an answer key.
 const attemptQuestions = pinnedQuestions.map(({ slug, question }) => ({
 	slug,
@@ -354,6 +404,16 @@ for (const submission of attempt?.submissions ?? []) {
     }
 
     {
+      canManage && openRegrades > 0 && (
+        <p role="status" class="mt-6 rounded-box border border-base-300 bg-base-200 p-4 text-sm">
+          <a href={`${href}/exams/${exam.slug}/regrades`} class="link font-medium">
+            {m.grades_regrade_banner({ count: openRegrades })}
+          </a>
+        </p>
+      )
+    }
+
+    {
       canManage && releaseBlocker === "exception-open" && (
         <p role="status" class="mt-6 text-sm text-base-content/70">
           {m.errors_release_exception_open()}
@@ -399,6 +459,7 @@ for (const submission of attempt?.submissions ?? []) {
             questions={showQuestions ? attemptQuestions : []}
             answers={latestAnswers}
             result={examOutcome}
+            regrades={questionRegrades}
           />
         </section>
       )

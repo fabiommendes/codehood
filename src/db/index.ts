@@ -21,6 +21,7 @@ import { GradeColumnService } from "./services/grade-column.service";
 import { InviteService } from "./services/invite.service";
 import { PassphraseService } from "./services/passphrase.service";
 import { QuestionService } from "./services/question.service";
+import { RegradeRequestService } from "./services/regrade-request.service";
 import { ResourceService } from "./services/resource.service";
 import { ResponseService } from "./services/response.service";
 import { RollCallService } from "./services/roll-call.service";
@@ -34,6 +35,7 @@ export type {
 	EnrollmentStatus,
 	ExamStatus,
 	InviteKind,
+	RegradeStatus,
 	ResourceType,
 	Role,
 	SubmissionStatus,
@@ -164,6 +166,14 @@ export type {
 	QuestionView,
 } from "./services/question.service";
 export type {
+	RegradeAccept,
+	RegradeReject,
+	RegradeRequest,
+	RegradeRequestCreate,
+	RegradeRequestFilter,
+	RegradeRequestPK,
+} from "./services/regrade-request.service";
+export type {
 	Resource,
 	ResourceCreate,
 	ResourceFilter,
@@ -221,6 +231,7 @@ export type {
 // Instantiate dependencies.
 const blobService = new BlobService();
 const attachmentService = new AttachmentService(blobService);
+const feedbackService = new FeedbackService();
 
 /**
  * This is the main entry point for the database layer.
@@ -239,11 +250,12 @@ export const db = {
 	enrollment: new EnrollmentService(),
 	exam: new ExamService(),
 	examException: new ExamExceptionService(),
-	feedback: new FeedbackService(),
+	feedback: feedbackService,
 	gradeColumn: new GradeColumnService(),
 	invite: new InviteService(),
 	passphrase: new PassphraseService(),
 	question: new QuestionService(),
+	regradeRequest: new RegradeRequestService(feedbackService),
 	resource: new ResourceService(attachmentService),
 	response: new ResponseService(),
 	rollCall: new RollCallService(),

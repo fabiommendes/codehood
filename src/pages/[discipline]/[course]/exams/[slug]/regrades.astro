@@ -1,0 +1,151 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import Answer from "@/components/grading/Answer.astro";
+import RegradeResolve from "@/components/grading/RegradeResolve";
+import { db } from "@/db";
+import { m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { Question } from "@/mdq/question";
+import { formatScore } from "@/services/exam-result";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { loadGrading, loadStudents } from "@/utils/load-grading";
+import { formatDateTime } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadGrading(Astro, discipline, courseSegment, slug);
+if ("redirect" in result) return result.redirect;
+const { course, href, exam, answers, attempts } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadGrading already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+const [requests, students, stored] = await Promise.all([
+	db.regradeRequest.findMany({ course: course.id, exam: exam.slug }, { actor }),
+	loadStudents(course.id, actor),
+	db.question.findMany({ course: course.id, public: false }, { actor }),
+]);
+const names = new Map(
+	students.map((student) => [student.username, student.name]),
+);
+const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
+const submissions = new Map(
+	attempts.flatMap((attempt) =>
+		attempt.submissions.map(
+			(submission) => [submission.publicId, submission] as const,
+		),
+	),
+);
+const counting = new Map(answers.map((answer) => [answer.submission, answer]));
+
+const instructor = course.instructor;
+const graderName = (pass: { grader: string | null }): string =>
+	pass.grader === null
+		? m.grades_question_auto()
+		: pass.grader === instructor.username
+			? instructor.name
+			: pass.grader;
+
+const cards = requests.map((request) => {
+	const doc = docs.get(request.question);
+	const submission = submissions.get(request.submission);
+	return {
+		request,
+		title: doc?.title ?? request.question,
+		asked: doc ? new Question(doc).toPublic() : null,
+		payload: submission?.payload as AnswerPayload | undefined,
+		answer: counting.get(request.submission),
+		student: names.get(request.author) ?? request.author,
+	};
+});
+const badges = {
+	OPEN: ["badge-warning", m.grades_regrade_requested()],
+	ACCEPTED: ["badge-success", m.grades_regrade_accepted()],
+	REJECTED: ["badge-error", m.grades_regrade_rejected()],
+} as const;
+---
+
+<AppLayout title={`${m.grades_regrade_page_title()} · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.grades_regrade_page_title() })}
+>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-base-content/60 hover:text-primary">← {m.grades_regrade_back()}</a>
+
+    <h2 class="mt-2 text-2xl font-bold">{m.grades_regrade_page_title()}</h2>
+
+    {cards.length === 0 && <p class="mt-6 text-base-content/70">{m.grades_regrade_empty()}</p>}
+
+    <div class="mt-6 flex flex-col gap-6">
+      {
+        cards.map(({ request, title, asked, payload, answer, student }) => (
+          <article id={`regrade-${request.publicId}`} aria-label={`${student} · ${title}`} class="card card-border bg-base-100">
+            <div class="card-body">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">{student} <span class="font-mono text-sm font-normal text-base-content/60">{request.author}</span></h3>
+                  <p class="text-sm text-base-content/70">{m.grades_regrade_question({ title })}</p>
+                </div>
+                <span class:list={["badge badge-sm shrink-0", badges[request.status][0]]}>{badges[request.status][1]}</span>
+              </div>
+
+              {asked && payload !== undefined && <Answer question={asked} payload={payload} />}
+
+              {
+                answer && (
+                  <>
+                    <p class="mt-2 font-semibold">
+                      <span class="font-normal text-base-content/60">{m.grades_regrade_current_score()}:</span>{" "}
+                      {answer.state === "graded" && answer.verdict !== null ? formatScore(answer.verdict) : m.grades_question_not_graded()}
+                    </p>
+                    {answer.passes.length > 0 && (
+                      <ul aria-label={m.grades_question_history()} class="flex flex-col gap-2">
+                        {answer.passes.map((pass) => (
+                          <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
+                            <p>
+                              <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
+                              <span class="text-base-content/60"> · {graderName(pass)}</span>
+                            </p>
+                            {pass.comment && !(request.status === "ACCEPTED" && pass.comment === request.reply) && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )
+              }
+
+              <div class="mt-2 rounded-box bg-base-200/50 p-3 text-sm">
+                <p class="font-medium">{m.grades_regrade_justification()}</p>
+                <p class="mt-1 whitespace-pre-wrap">{request.message}</p>
+              </div>
+
+              {
+                request.status === "OPEN" ? (
+                  <RegradeResolve
+                    client:load
+                    discipline={discipline!}
+                    course={courseSegment!}
+                    exam={exam.slug}
+                    request={request.publicId}
+                  />
+                ) : (
+                  <div class="mt-2 text-sm">
+                    <p class="whitespace-pre-wrap">
+                      <span class="font-medium">{m.grades_regrade_instructor_reply()}</span> {request.reply}
+                    </p>
+                    {request.resolvedAt && (
+                      <p class="mt-1 text-base-content/60">{formatDateTime(request.resolvedAt, { year: "numeric" })}</p>
+                    )}
+                  </div>
+                )
+              }
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </main>
+</AppLayout>

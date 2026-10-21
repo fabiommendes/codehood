@@ -7,6 +7,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalShortAnswer, multipleChoice, trueFalse } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
+import { releasedExam, requestRegrade } from "./regrade-setup";
 
 test.beforeEach(resetDatabase);
 
@@ -888,5 +889,80 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 		await expect(
 			distribution().getByRole("listitem").nth(1).getByText("Correct choice"),
 		).toBeVisible();
+	});
+});
+
+test("instructor: answer regrade requests", async ({ page }) => {
+	const world = await releasedExam("rg-prof", 2);
+	const [first, second] = world.students;
+	if (!first || !second) throw new Error("no students");
+	await requestRegrade(world.course, first, first.submission);
+	await requestRegrade(world.course, second, second.submission);
+	const regrades = `${world.examUrl}/regrades`;
+	await logInAs(page, world.teacher);
+
+	await test.step("the exam page announces the open requests and links to them", async () => {
+		await page.goto(world.examUrl);
+
+		await page.getByRole("link", { name: "2 open regrade requests" }).click();
+
+		await expect(page).toHaveURL(regrades);
+		await expect(
+			page.getByRole("heading", {
+				level: 2,
+				name: "Regrade requests",
+				exact: true,
+			}),
+		).toBeVisible();
+		await expect(page.getByRole("article")).toHaveCount(2);
+	});
+
+	await test.step("a refusal without a reply is rejected and the request stays open", async () => {
+		const card = page.getByRole("article").filter({ hasText: first.username });
+		await card.getByRole("button", { name: "Reject" }).click();
+
+		await expect(card.getByText("A reply is required.")).toBeVisible();
+		await expect(card.getByText("Regrade requested")).toBeVisible();
+	});
+
+	await test.step("accepting with a new score and a reply resolves it", async () => {
+		const card = page.getByRole("article").filter({ hasText: first.username });
+		await card.getByLabel("New score (%)").fill("90");
+		await card
+			.getByLabel("Reply")
+			.fill("You are right, the capital is accepted.");
+		await card.getByRole("button", { name: "Accept" }).click();
+
+		await expect(card.getByText("Regrade accepted")).toBeVisible();
+		await expect(
+			card.getByText("You are right, the capital is accepted."),
+		).toBeVisible();
+		await expect(card.getByRole("button", { name: "Accept" })).toHaveCount(0);
+	});
+
+	await test.step("the grading page marks only the answer whose request is still open", async () => {
+		await page.goto(`${world.href}/exams/${world.exam.slug}/grading/q-short`);
+
+		await expect(page.getByText("Regrade requested")).toHaveCount(1);
+		await expect(
+			page.getByRole("article").filter({ hasText: "Reply number 2" }),
+		).toContainText("Regrade requested");
+		await expect(
+			page.getByRole("article").filter({ hasText: "Reply number 1" }),
+		).not.toContainText("Regrade requested");
+	});
+
+	await test.step("the exam page now announces one open request, and the student sees the new score", async () => {
+		await page.goto(world.examUrl);
+		await expect(
+			page.getByRole("link", { name: "1 open regrade request", exact: true }),
+		).toBeVisible();
+
+		await page.context().clearCookies();
+		await logInAs(page, first);
+		await page.goto(world.examUrl);
+
+		await expect(page.getByText("90%", { exact: true }).first()).toBeVisible();
+		await expect(page.getByText("Regrade accepted")).toBeVisible();
 	});
 });
