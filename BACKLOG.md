@@ -9,9 +9,6 @@ Backlog items are categorized in sections, not on priority.
 
 ## Small issues
 
-* [ ] **Lowercase the stored GitHub usernames at the next release** — new
-  values are lowercased; old rows are not. See
-  `dev/issues/github-id-lowercase-data.md`.
 * [ ] **Schema hygiene in `src/core/schemas/`** — create/update schemas
   retyped instead of derived from `xSchema`, and `.optional()` used where the
   column is nullable (so the field can never be cleared). See
