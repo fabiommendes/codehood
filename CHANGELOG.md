@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 (2026-10-21)
+
 ### Added
 
 - Forms are derived from the zod schema that validates the action
