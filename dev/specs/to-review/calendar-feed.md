@@ -1,6 +1,6 @@
 ---
 type: spec
-status: todo
+status: implemented
 tags: [calendar, ical, profile, auth]
 relatedTo: [calendar-entries, roll-call, exam-state]
 ---
@@ -108,8 +108,9 @@ do usuário>" localizado. Horários em UTC (`...Z`), sem `VTIMEZONE`.
 - Provas `DRAFT` e `ARCHIVED` ficam fora para todos, inclusive para o professor
   (no `/calendar` o professor vê rascunhos; no feed, que vai para fora do site,
   não).
-- Para um aluno com [exceção](per-student-exceptions.md), início e fim são
-  os da janela pessoal dele (`personalTiming`).
+- A janela é a geral da prova. Quando [exceções por
+  aluno](per-student-exceptions.md) entrar, o R8 daquele spec troca pela
+  janela pessoal em `calendar-entries.ts`, e o feed herda isso.
 
 **R10.** Quais cursos entram: os que o dono vê em `/calendar` (`db.course.findMany`
 com o actor do dono), menos os que terminaram (`endAt`) há mais de 60 dias.

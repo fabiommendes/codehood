@@ -24,5 +24,17 @@
 	"profile_api_key_revoke": "Revoke",
 	"profile_api_key_kind": "Kind",
 	"profile_api_key_kind_bot": "Bot",
-	"profile_api_key_create": "Create key"
+	"profile_api_key_create": "Create key",
+	"profile_tab_calendar": "Calendar",
+	"profile_calendar_heading": "Calendar feed",
+	"profile_calendar_note": "A private link that your calendar app (Google Calendar, Thunderbird, your phone) subscribes to. It lists the meetings and published exams of your courses and keeps itself up to date.",
+	"profile_calendar_create": "Create link",
+	"profile_calendar_link": "Calendar link",
+	"profile_calendar_copy": "Copy",
+	"profile_calendar_copied": "Copied",
+	"profile_calendar_last_used": "Last used: {date}",
+	"profile_calendar_never_used": "Never used",
+	"profile_calendar_warning": "Anyone with this link can read your calendar. Generating a new link means the previous link stops working at once.",
+	"profile_calendar_rotate": "Generate new link",
+	"profile_calendar_remove": "Deactivate"
 }

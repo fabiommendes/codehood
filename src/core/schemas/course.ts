@@ -94,6 +94,9 @@ export const courseFilter = z
 		instructor: username,
 		discipline: slug,
 		edition: slug,
+		/// Courses this user teaches or holds an `ACTIVE` enrollment in. Narrows
+		/// what the actor may see, never widens it.
+		member: username,
 	})
 	.partial();
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { m } from "@/i18n";
-import { duration, examId, questionRefId, rev, slug } from "./base";
+import { courseId, duration, examId, questionRefId, rev, slug } from "./base";
 import { courseRef } from "./course";
 
 export const examStatus = z.enum([
@@ -108,6 +108,17 @@ export const examFilterBase = z.object({
 });
 
 export const examFilter = examFilterBase.extend({ course: courseRef });
+
+/// Exams of several courses at once, for views that span all of a user's courses.
+export const examFilterByCourses = examFilterBase.extend({
+	courseIds: z.array(courseId),
+});
+
+/// An exam paired with the id of the course it belongs to, which `examSchema` does not carry.
+export const courseExamSchema = z.object({
+	courseId: courseId,
+	exam: examSchema,
+});
 
 /// The course and exam the exam actions address, as the page's URL segments.
 export const examParams = z.object({

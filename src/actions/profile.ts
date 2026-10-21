@@ -1,3 +1,4 @@
+import type { ActionAPIContext } from "astro:actions";
 import { ActionError, defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
@@ -68,6 +69,38 @@ export const profile = {
 				expires: session.expiresAt,
 			});
 		}),
+	}),
+
+	/**
+	 * Gives the signed-in user a new calendar feed URL, creating the feed when there is none.
+	 *
+	 * The previous URL, if any, stops working at once. Returns nothing; the
+	 * profile page reads the feed again. Refuses a visitor with no session the
+	 * way `requireUser` does.
+	 */
+	rotateCalendarFeed: defineAction({
+		accept: "form",
+		handler: withActionErrors(
+			async (_input: unknown, context: ActionAPIContext) => {
+				const actor = requireUser(context);
+				await db.calendarFeed.rotate(actor.username, { actor });
+			},
+		),
+	}),
+
+	/**
+	 * Turns off the signed-in user's calendar feed; does nothing when there is none.
+	 *
+	 * Refuses a visitor with no session the way `requireUser` does.
+	 */
+	removeCalendarFeed: defineAction({
+		accept: "form",
+		handler: withActionErrors(
+			async (_input: unknown, context: ActionAPIContext) => {
+				const actor = requireUser(context);
+				await db.calendarFeed.remove(actor.username, { actor });
+			},
+		),
 	}),
 
 	logoutEverywhere: defineAction({

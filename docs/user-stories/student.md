@@ -252,6 +252,19 @@ else, and leaving does not destroy the work they already submitted, so an
 instructor who re-enrolls them restores access to it.
 
 
+### Subscribe to my calendar in another app
+
+    status: implemented
+    url: /profile
+
+Student lives in their phone's or laptop's calendar app, not on the site. In
+the Calendar tab of their profile they create a private link and paste it into
+the app, which then lists their course's meetings and published exams, never an
+exam still in draft. The link is a secret: generating a new one makes the old
+address stop working at once, and deactivating it removes the feed until they
+create another. The Calendar page points them to the tab.
+
+
 ## Attendance
 
 ### Check in to class

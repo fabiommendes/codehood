@@ -24,5 +24,17 @@
 	"profile_api_key_revoke": "Revogar",
 	"profile_api_key_kind": "Tipo",
 	"profile_api_key_kind_bot": "Corretor",
-	"profile_api_key_create": "Criar chave"
+	"profile_api_key_create": "Criar chave",
+	"profile_tab_calendar": "Calendário",
+	"profile_calendar_heading": "Feed do calendário",
+	"profile_calendar_note": "Um link privado que o seu aplicativo de calendário (Google Agenda, Thunderbird, o celular) assina. Ele lista as aulas e as provas publicadas dos seus cursos e se atualiza sozinho.",
+	"profile_calendar_create": "Criar link",
+	"profile_calendar_link": "Link do calendário",
+	"profile_calendar_copy": "Copiar",
+	"profile_calendar_copied": "Copiado",
+	"profile_calendar_last_used": "Último acesso: {date}",
+	"profile_calendar_never_used": "Nunca usado",
+	"profile_calendar_warning": "Quem tiver este link pode ler o seu calendário. Ao gerar um novo link, o link anterior para de funcionar na hora.",
+	"profile_calendar_rotate": "Gerar novo link",
+	"profile_calendar_remove": "Desativar"
 }

@@ -37,6 +37,17 @@ const apiKeys = await db.apiKey.findMany(
 	{ actor },
 );
 
+const calendarFeed = await db.calendarFeed.get(user.username, { actor });
+const rotateFeedResult = Astro.getActionResult(
+	actions.profile.rotateCalendarFeed,
+);
+const removeFeedResult = Astro.getActionResult(
+	actions.profile.removeCalendarFeed,
+);
+const feedUrl = calendarFeed
+	? `${Astro.url.origin}/calendar/${calendarFeed.token}.ics`
+	: null;
+
 const updateResult = Astro.getActionResult(actions.profile.update);
 const passwordResult = Astro.getActionResult(actions.profile.changePassword);
 const createApiKeyResult = Astro.getActionResult(actions.auth.createApiKey);
@@ -85,17 +96,22 @@ function formatDate(date: Date | null): string {
 
 // Land on whichever tab the just-submitted form lives on, so a validation
 // error (or a fresh success message) doesn't get hidden behind "Details".
-const activeTab: "details" | "account" | "apikeys" =
+const activeTab: "details" | "account" | "apikeys" | "calendar" =
 	createApiKeyResult || revokeApiKeyResult
 		? "apikeys"
 		: passwordResult || logoutEverywhereResult
 			? "account"
-			: "details";
+			: rotateFeedResult ||
+					removeFeedResult ||
+					Astro.url.searchParams.get("tab") === "calendar"
+				? "calendar"
+				: "details";
 
 const profileTabs = [
 	{ key: "details", label: m.profile_tab_details() },
 	{ key: "account", label: m.profile_tab_account() },
 	{ key: "apikeys", label: m.profile_tab_api_keys() },
+	{ key: "calendar", label: m.profile_tab_calendar() },
 ];
 ---
 
@@ -302,6 +318,88 @@ const profileTabs = [
           </div>
         </div>
       </Fragment>
+
+      <Fragment slot="calendar">
+        <div class="card card-border">
+          <div class="card-body">
+            <h2 class="card-title">{m.profile_calendar_heading()}</h2>
+            <p class="text-sm text-base-content/60">
+              {m.profile_calendar_note()}
+            </p>
+            <FormAlert
+              error={(rotateFeedResult?.error && errorMessage(rotateFeedResult.error)) ||
+                (removeFeedResult?.error && errorMessage(removeFeedResult.error))}
+            />
+
+            {
+              feedUrl && calendarFeed ? (
+                <>
+                  <fieldset class="fieldset">
+                    <legend class="fieldset-legend">
+                      <label for="calendar-feed-url">{m.profile_calendar_link()}</label>
+                    </legend>
+                    <div class="join w-full">
+                      <input
+                        id="calendar-feed-url"
+                        type="text"
+                        readonly
+                        value={feedUrl}
+                        class="input join-item w-full"
+                      />
+                      <button
+                        type="button"
+                        class="btn join-item"
+                        data-copy-from="calendar-feed-url"
+                        data-copied={m.profile_calendar_copied()}
+                      >
+                        {m.profile_calendar_copy()}
+                      </button>
+                    </div>
+                  </fieldset>
+                  <p class="text-xs text-base-content/60">
+                    {calendarFeed.lastUsedAt
+                      ? m.profile_calendar_last_used({ date: formatDate(calendarFeed.lastUsedAt) })
+                      : m.profile_calendar_never_used()}
+                  </p>
+                  <div role="alert" class="alert alert-warning">
+                    <span>{m.profile_calendar_warning()}</span>
+                  </div>
+                  <div class="card-actions">
+                    <form method="POST" action={actions.profile.rotateCalendarFeed}>
+                      <button type="submit" class="btn">{m.profile_calendar_rotate()}</button>
+                    </form>
+                    <form method="POST" action={actions.profile.removeCalendarFeed}>
+                      <button type="submit" class="btn btn-outline btn-error"
+                        >{m.profile_calendar_remove()}</button
+                      >
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <form method="POST" action={actions.profile.rotateCalendarFeed} class="card-actions">
+                  <button type="submit" class="btn btn-primary">{m.profile_calendar_create()}</button>
+                </form>
+              )
+            }
+          </div>
+        </div>
+      </Fragment>
     </Tabs>
   </main>
 </AppLayout>
+
+<script>
+  // Copies the value of the input a button points to, and flashes its label.
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy-from]")) {
+    button.addEventListener("click", async () => {
+      const input = document.getElementById(button.dataset.copyFrom ?? "");
+      if (!(input instanceof HTMLInputElement)) return;
+      await navigator.clipboard.writeText(input.value);
+      const label = button.textContent;
+      button.textContent = button.dataset.copied ?? label;
+      setTimeout(() => {
+        button.textContent = label;
+      }, 1500);
+    });
+  }
+</script>

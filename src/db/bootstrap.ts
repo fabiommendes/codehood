@@ -15,6 +15,8 @@ const DEV_INSTRUCTOR_USERNAME = "instructor";
 const DEV_INSTRUCTOR_EMAIL = "instructor@codehood.local";
 const DEV_STUDENT_USERNAME = "student";
 const DEV_STUDENT_EMAIL = "student@codehood.local";
+/// Fixed so the dev student's calendar URL works right after a reset.
+const DEV_STUDENT_FEED_TOKEN = "dev-student-calendar";
 
 let devAdminPromise: Promise<void> | null = null;
 
@@ -229,6 +231,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			FULL_ACCESS,
 		);
 	}
+
+	// The default dev student takes cs101 and has a calendar feed; the dev
+	// instructor has none, which is the profile's "no feed" state.
+	await db.enrollment.create(
+		{ course: cs101.id, username: DEV_STUDENT_USERNAME },
+		FULL_ACCESS,
+	);
+	await prisma.calendarFeed.create({
+		data: { username: DEV_STUDENT_USERNAME, token: DEV_STUDENT_FEED_TOKEN },
+	});
 
 	// One resource of each type, so /resources has something real to show.
 	const syllabusFileBuffer = Buffer.from(

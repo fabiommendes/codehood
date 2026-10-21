@@ -71,6 +71,15 @@ carries no filename or MIME type, since those belong to each
 [Attachment](#attachment). Served with no authentication check on the
 understanding that knowing the hash grants access.
 
+## Calendar feed
+
+Type: domain
+
+A secret, read-only URL (`/calendar/<token>.ics`) that serves in iCal the
+meetings and exams its owner sees on `/calendar`, for calendar apps to
+subscribe to. One per user; regenerating it kills the previous URL. Not an
+[API key](#api-key): it opens the feed and nothing else.
+
 ## Classroom invite
 
 Type: domain

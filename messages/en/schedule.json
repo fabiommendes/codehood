@@ -59,5 +59,7 @@
 	"schedule_calendar_draft_title": "{title} (draft)",
 	"schedule_calendar_more": "+{count} more",
 	"schedule_calendar_nothing_month": "Nothing scheduled this month.",
-	"schedule_calendar_events_in": "Events in {month}"
+	"schedule_calendar_events_in": "Events in {month}",
+	"schedule_feed_name": "Codehood — {name}",
+	"schedule_calendar_subscribe": "Subscribe in your calendar"
 }

@@ -201,6 +201,18 @@ export class CourseService
 					filter.instructor ? { instructorId: filter.instructor } : {},
 					filter.discipline ? { disciplineSlug: filter.discipline } : {},
 					filter.edition ? { editionSlug: filter.edition } : {},
+					filter.member
+						? {
+								OR: [
+									{ instructorId: filter.member },
+									{
+										enrollments: {
+											some: { username: filter.member, status: "ACTIVE" },
+										},
+									},
+								],
+							}
+						: {},
 					courseWhere(opts.actor),
 				],
 			},

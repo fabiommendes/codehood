@@ -9,10 +9,12 @@ import type { z } from "zod";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { Duration, ExamId } from "@/core/schemas";
+import type { CourseId, Duration, ExamId } from "@/core/schemas";
 import {
+	courseExamSchema,
 	examCreate,
 	examFilter,
+	examFilterByCourses,
 	examPK,
 	examSchema,
 	examUpdate,
@@ -22,6 +24,7 @@ import {
 	type ServiceOpts,
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
+import { courseContentsWhere } from "@/db/services/course.service";
 import { m } from "@/i18n";
 import { type ExamResult, examResult } from "@/services/exam-result";
 import {
@@ -43,6 +46,8 @@ export type { ExamId };
 export type Exam = z.infer<typeof examSchema>;
 export type ExamCreate = z.infer<typeof examCreate>;
 export type ExamFilter = z.infer<typeof examFilter>;
+export type ExamFilterByCourses = z.infer<typeof examFilterByCourses>;
+export type CourseExam = z.infer<typeof courseExamSchema>;
 export type ExamPK = z.infer<typeof examPK>;
 export type ExamUpdate = z.infer<typeof examUpdate>;
 
@@ -220,6 +225,53 @@ export class ExamService extends CrudBase<{
 		});
 
 		return rows.map(fromDb);
+	}
+
+	/**
+	 * Lists the exams of several courses in one query, each paired with its course id and narrowed to what `actor` may see.
+	 *
+	 * Visibility is decided per course, as in `findMany`: drafts and archived
+	 * exams only for whoever may write that course's contents. A course whose
+	 * contents the actor may not read contributes no exams; it is not an error.
+	 * An empty `courseIds` returns an empty list without querying.
+	 */
+	@Validate({
+		service: true,
+		returns: courseExamSchema.array(),
+		args: [examFilterByCourses],
+	})
+	async findManyInCourses(
+		filter: ExamFilterByCourses,
+		opts: ServiceOpts,
+	): Promise<CourseExam[]> {
+		if (filter.courseIds.length === 0) return [];
+		const client = opts.tx ?? this.prisma;
+		const rows = await client.exam.findMany({
+			where: {
+				courseId: { in: filter.courseIds },
+				// Prunes courses the actor cannot read; the loop below enforces it again.
+				course: courseContentsWhere(opts.actor),
+				...(filter.statuses ? { status: { in: filter.statuses } } : {}),
+				...(filter.exams ? { slug: { in: filter.exams } } : {}),
+				...(filter.types ? { type: { in: filter.types } } : {}),
+				...(filter.tags
+					? { examTags: { some: { tag: { in: filter.tags } } } }
+					: {}),
+			},
+			include: examInclude(),
+			orderBy: [{ courseId: "asc" }, { slug: "asc" }],
+		});
+
+		const result: CourseExam[] = [];
+		for (const row of rows) {
+			if (!hasPerm(opts.actor, "course.read-contents", row.course)) continue;
+			const full = hasPerm(opts.actor, "course.update-contents", row.course);
+			if (!full && (row.status === "DRAFT" || row.status === "ARCHIVED")) {
+				continue;
+			}
+			result.push({ courseId: row.courseId as CourseId, exam: fromDb(row) });
+		}
+		return result;
 	}
 
 	/**

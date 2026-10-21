@@ -40,6 +40,7 @@ export {
 } from "./base";
 export * from "./blob";
 export * from "./calendar-event";
+export * from "./calendar-feed";
 export * from "./course";
 export * from "./discipline";
 export * from "./edition";

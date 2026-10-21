@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Calendar feed: each user may create a secret `/calendar/<token>.ics` URL,
+  from the new Calendar tab of the profile, that calendar apps subscribe to.
+  It lists the meetings and published exams of the user's courses (cancelled
+  meetings as `STATUS:CANCELLED`), skipping courses ended more than 60 days
+  ago. The token is not an API key and opens nothing else.
+
 ### Changed
 
 - An edition's term has at most two digits (`2026-1` to `2026-99`), slugs at

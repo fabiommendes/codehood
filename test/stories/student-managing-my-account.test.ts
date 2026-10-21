@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { persistedExamFactory } from "@/fixtures/exam.factory";
+import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { courseHref } from "@/urls";
 import {
 	fillField,
@@ -152,4 +155,103 @@ test("student: leave a course", async ({ page }) => {
 		FULL_ACCESS,
 	);
 	expect(enrollment?.status).toBe("DROPPED");
+});
+
+test("student: subscribe to my calendar in another app", async ({ page }) => {
+	const student = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create();
+	await db.enrollment.create(
+		{ course: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	const slot = await persistedTimeSlotFactory.create({ course: course.id });
+	await persistedCalendarEventFactory.create({
+		course: course.id,
+		timeSlot: slot.id,
+		week: 1,
+		title: "Sub-Lab",
+	});
+	const scheduledAt = new Date(Date.now() + 5 * 86_400_000);
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "sub-midterm",
+		title: "Sub-Midterm",
+		scheduledAt,
+	});
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "sub-draft",
+		title: "Sub-Draft",
+		status: "DRAFT",
+		scheduledAt,
+	});
+
+	const linkField = page.getByRole("textbox", { name: "Calendar link" });
+	const createLink = page.getByRole("button", { name: "Create link" });
+
+	/// The feed address the profile shows, read back from the field.
+	async function shownUrl(): Promise<string> {
+		const value = await linkField.inputValue();
+		expect(value).toMatch(/^https?:\/\/.+\.ics$/);
+		return value;
+	}
+
+	await logInAs(page, student);
+
+	await test.step("the Calendar page points to the profile tab", async () => {
+		await page.goto("/calendar");
+		await page
+			.getByRole("link", { name: "Subscribe in your calendar" })
+			.click();
+		await expect(page).toHaveURL(/\/profile/);
+		await expect(
+			page.getByRole("radio", { name: "Calendar", exact: true }),
+		).toBeChecked();
+	});
+
+	await test.step("a student with no link yet is offered to create one", async () => {
+		await expect(createLink).toBeVisible();
+		await expect(linkField).toHaveCount(0);
+	});
+
+	let firstUrl = "";
+	await test.step("creating the link shows an absolute .ics address that was never used", async () => {
+		await createLink.click();
+		await expect(linkField).toBeVisible();
+		firstUrl = await shownUrl();
+		await expect(page.getByText("Never used")).toBeVisible();
+		await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
+	});
+
+	await test.step("the address serves the course's meeting and published exam, not the draft", async () => {
+		const response = await page.request.get(firstUrl);
+		expect(response.status()).toBe(200);
+		expect(response.headers()["content-type"]).toContain("text/calendar");
+		const body = (await response.text()).replaceAll("\r\n ", "");
+		expect(body).toContain("BEGIN:VCALENDAR");
+		expect(body).toContain("Sub-Lab");
+		expect(body).toContain("Sub-Midterm");
+		expect(body).not.toContain("Sub-Draft");
+	});
+
+	let secondUrl = "";
+	await test.step("a new link replaces the old address at once", async () => {
+		await expect(
+			page.getByText(/previous link (stops|will stop) working/i),
+		).toBeVisible();
+		await page.getByRole("button", { name: "Generate new link" }).click();
+		await expect(linkField).not.toHaveValue(firstUrl);
+		secondUrl = await shownUrl();
+		expect((await page.request.get(firstUrl)).status()).toBe(404);
+		expect((await page.request.get(secondUrl)).status()).toBe(200);
+	});
+
+	await test.step("deactivating removes the feed and its address", async () => {
+		await page.getByRole("button", { name: "Deactivate" }).click();
+		await expect(createLink).toBeVisible();
+		await expect(linkField).toHaveCount(0);
+		const gone = await page.request.get(secondUrl);
+		expect(gone.status()).toBe(404);
+		expect(await gone.text()).toBe("");
+	});
 });

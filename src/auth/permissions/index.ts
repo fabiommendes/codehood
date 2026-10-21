@@ -49,6 +49,7 @@ type ExtraPerms =
 	| "response.submit"
 	| "roll-call.manage"
 	| "api-key.manage"
+	| "calendar-feed.manage"
 	| "session.manage"
 	| "enrollment.manage"
 	| "system.manage";
@@ -397,6 +398,14 @@ const PERMISSIONS = {
 	// Rule: the owner, any admin, or SYSTEM.
 	"api-key.manage | session.manage": {
 		admin: true,
+		other: (actor, owner) => actor.username === owner,
+		audit: (owner) => ({ owner }),
+	} satisfies PermDef<UserId>,
+
+	// CALENDAR FEED --------------------------------------------------------------
+	// Rule: the owner alone, or SYSTEM. No admin branch: an admin removes a
+	// user's feed by removing the user, never by reading or rotating it.
+	"calendar-feed.manage": {
 		other: (actor, owner) => actor.username === owner,
 		audit: (owner) => ({ owner }),
 	} satisfies PermDef<UserId>,

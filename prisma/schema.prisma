@@ -74,6 +74,7 @@ model User {
   feedbacks        Feedback[]
   gradeValues      GradeValue[]
   attendances      Attendance[]
+  calendarFeed     CalendarFeed?
 }
 
 model Group {
@@ -108,6 +109,21 @@ model Session {
 
   username String
   user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+}
+
+/// The secret behind a user's calendar feed URL. Grants read-only access to
+/// what the user sees on /calendar and nothing else.
+model CalendarFeed {
+  username String @id
+  user     User   @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  /// Random, URL-safe. Stored readable so the profile can show the URL again.
+  token String @unique
+
+  /// Last time a calendar app fetched the feed. Null if never.
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
 }
 
 model ApiKey {

@@ -212,6 +212,9 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
     <p class="mt-2 text-base-content/70">
       {m.schedule_calendar_subtitle()}
     </p>
+    <a href="/profile?tab=calendar" class="mt-1 inline-block text-sm text-primary hover:underline"
+      >{m.schedule_calendar_subscribe()}</a
+    >
 
     {
       courses.length === 0 && (

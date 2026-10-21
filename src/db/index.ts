@@ -9,6 +9,7 @@ import { ApiKeyService } from "./services/api-key.service";
 import { AttachmentService } from "./services/attachment.service";
 import { BlobService } from "./services/blob.service";
 import { CalendarEventService } from "./services/calendar-event.service";
+import { CalendarFeedService } from "./services/calendar-feed.service";
 import { CourseService } from "./services/course.service";
 import { DisciplineService } from "./services/discipline.service";
 import { EditionService } from "./services/edition.service";
@@ -67,6 +68,10 @@ export type {
 } from "./services/calendar-event.service";
 export { isMeeting } from "./services/calendar-event.service";
 export type {
+	CalendarFeed,
+	CalendarFeedPK,
+} from "./services/calendar-feed.service";
+export type {
 	Course,
 	CourseCreate,
 	CourseFilter,
@@ -96,9 +101,11 @@ export type {
 	EnrollmentPK,
 } from "./services/enrollment.service";
 export type {
+	CourseExam,
 	Exam,
 	ExamCreate,
 	ExamFilter,
+	ExamFilterByCourses,
 	ExamGroup,
 	ExamPK,
 	ExamUpdate,
@@ -215,6 +222,7 @@ export const db = {
 	attachment: attachmentService,
 	blob: blobService,
 	calendarEvent: new CalendarEventService(),
+	calendarFeed: new CalendarFeedService(),
 	course: new CourseService(),
 	discipline: new DisciplineService(),
 	edition: new EditionService(),
