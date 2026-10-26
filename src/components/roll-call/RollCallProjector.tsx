@@ -97,13 +97,24 @@ export default function RollCallProjector(
 	});
 
 	return (
-		<main class="flex min-h-screen flex-col items-center justify-center gap-6 bg-base-100 p-6 text-center">
-			<h1 class="text-3xl font-bold">{props.title}</h1>
+		<main class="flex h-screen max-h-screen flex-col gap-4 overflow-hidden bg-base-100 p-6 text-center">
+			<header class="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+				<a
+					class="btn btn-ghost btn-sm justify-self-start"
+					href={props.manageHref}
+				>
+					{m.attendance_projector_back()}
+				</a>
+				<h1 class="text-3xl font-bold">{props.title}</h1>
+				<p class="justify-self-end text-2xl">
+					{m.attendance_projector_present({ count: shown().present })}
+				</p>
+			</header>
 			<FormAlert error={failure() ?? undefined} />
 			<Show
 				when={isOpen()}
 				fallback={
-					<>
+					<div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-6">
 						<p class="text-2xl">{m.attendance_manager_closed()}</p>
 						<button
 							type="button"
@@ -114,41 +125,40 @@ export default function RollCallProjector(
 							<RefreshIcon />
 							{m.attendance_manager_reopen()}
 						</button>
-					</>
+					</div>
 				}
 			>
-				<div
-					role="img"
-					aria-label={m.attendance_projector_qr()}
-					class="aspect-square w-[min(70vh,90vw)] rounded-box bg-white p-4 [&>svg]:h-full [&>svg]:w-full"
-					innerHTML={shown().qr}
-				/>
-				<p
-					role="status"
-					aria-live="off"
-					aria-label={m.attendance_projector_code()}
-					class="font-mono text-6xl font-bold tracking-[0.3em]"
-				>
-					{shown().code}
-				</p>
-				<progress
-					class="progress progress-primary h-3 w-[min(70vh,90vw)] [&::-moz-progress-bar]:transition-all [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-1000 [&::-webkit-progress-value]:ease-linear"
-					aria-label={m.attendance_projector_code_left()}
-					max={1000}
-					value={Math.round(codeLeft() * 1000)}
-				/>
-				<p class="font-mono text-xl">
-					{m.attendance_closes_in({
-						time: formatCountdown(shown().closesAt.getTime() - now()),
-					})}
-				</p>
+				{/* Sized by the free space's shorter side, so the page never scrolls. */}
+				<div class="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
+					<div
+						role="img"
+						aria-label={m.attendance_projector_qr()}
+						class="size-[min(100cqw,100cqh)] rounded-box bg-white p-4 [&>svg]:h-full [&>svg]:w-full"
+						innerHTML={shown().qr}
+					/>
+				</div>
+				<div class="flex flex-col items-center gap-3">
+					<p
+						role="status"
+						aria-live="off"
+						aria-label={m.attendance_projector_code()}
+						class="font-mono text-6xl font-bold tracking-[0.3em]"
+					>
+						{shown().code}
+					</p>
+					<progress
+						class="progress progress-primary h-3 w-full max-w-2xl [&::-moz-progress-bar]:transition-all [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-1000 [&::-webkit-progress-value]:ease-linear"
+						aria-label={m.attendance_projector_code_left()}
+						max={1000}
+						value={Math.round(codeLeft() * 1000)}
+					/>
+					<p class="font-mono text-xl">
+						{m.attendance_closes_in({
+							time: formatCountdown(shown().closesAt.getTime() - now()),
+						})}
+					</p>
+				</div>
 			</Show>
-			<p class="text-2xl">
-				{m.attendance_projector_present({ count: shown().present })}
-			</p>
-			<a class="btn btn-ghost btn-sm" href={props.manageHref}>
-				{m.attendance_projector_back()}
-			</a>
 		</main>
 	);
 }
