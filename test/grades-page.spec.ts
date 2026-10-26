@@ -481,7 +481,7 @@ test("grades: on a narrow screen the table scrolls inside its wrapper, the page 
 // Tabs
 //
 
-test("grades: the instructor's tabs end with Grades, which is the current one; a student does not get it", async ({
+test("grades: the instructor's tabs have Grades before Reports, Grades the current one; a student does not get it", async ({
 	page,
 }) => {
 	const { teacher, course, href } = await setup("gr9");
@@ -498,6 +498,7 @@ test("grades: the instructor's tabs end with Grades, which is the current one; a
 		"Questions",
 		"Students",
 		"Grades",
+		"Reports",
 	]);
 	await expect(
 		page.getByRole("tab", { name: "Grades", selected: true }),

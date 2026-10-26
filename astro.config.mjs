@@ -28,6 +28,8 @@ export default defineConfig({
 	output: "server",
 	site: publicUrl?.origin,
 	security: {
+		// A report carries up to 3 images of 2 MiB each, plus room for the multipart framing.
+		actionBodySizeLimit: 8 * 1024 * 1024,
 		allowedDomains: publicUrl
 			? [
 					{

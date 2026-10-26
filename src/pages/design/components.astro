@@ -18,6 +18,8 @@ import AnswerDistribution from "@/components/grading/AnswerDistribution.astro";
 import QuestionStats from "@/components/grading/QuestionStats.astro";
 import RegradeResolve from "@/components/grading/RegradeResolve";
 import ReleasedScore from "@/components/ReleasedScore.astro";
+import ReportDialog from "@/components/report/ReportDialog";
+import ReportQueue from "@/components/report/ReportQueue";
 import RollCallManager, {
 	type RollCallManagerProps,
 } from "@/components/roll-call/RollCallManager";
@@ -32,6 +34,7 @@ import type {
 	QuestionStats as Stats,
 } from "@/services/question-stats";
 import { checkInQrSvg } from "@/services/roll-call-qr";
+import type { ReportRow } from "@/utils/report-row";
 import { formatDateTime, toLocalDateTimeInput } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -516,6 +519,31 @@ const sectionLinks = [
 	{ id: "regrades", label: "Regrades" },
 	{ id: "statistics", label: "Statistics" },
 ] as const;
+
+const pixel =
+	"data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+const openReport: ReportRow = {
+	publicId: "report-open",
+	kind: "CONTENT",
+	status: "OPEN",
+	message: "The second option of question 3 is also correct.",
+	note: null,
+	url: "https://codehood.example/cs101/ada_2026-2/exams/midterm",
+	viewport: "1280x720",
+	author: "student",
+	course: "cs101 · ada_2026-2",
+	attachments: [{ filename: "screenshot.webp", url: pixel }],
+	createdAt: new Date(now).toISOString(),
+};
+const triagedReport: ReportRow = {
+	...openReport,
+	publicId: "report-triaged",
+	kind: "BUG",
+	status: "TRIAGED",
+	message: "The roster table scrolls sideways on a phone.",
+	note: "Reproduced. Fix scheduled.",
+	attachments: [],
+};
 ---
 
 <DesignLayout title="Components" active="components">
@@ -741,6 +769,28 @@ const sectionLinks = [
             </figure>
           ))
         }
+      </section>
+
+      <section id="reports" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Reports</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          <code class="font-mono">ReportDialog</code>, the "Report a problem" dialog, and{" "}
+          <code class="font-mono">ReportQueue</code>, the triage queue of the admin and of a course's instructor.
+        </p>
+        <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
+          {
+            (["empty", "capture", "sending", "error"] as const).map((state) => (
+              <figure class="flex flex-col gap-2">
+                <figcaption class="font-semibold">Dialog: {state}</figcaption>
+                <ReportDialog course={{ discipline: "cs101", course: "ada_2026-2" }} contentPage preview={state} />
+              </figure>
+            ))
+          }
+        </div>
+        <h3 class="mt-10 mb-3 text-xl font-semibold">Queue</h3>
+        <ReportQueue reports={[openReport, triagedReport]} status={null} kind={null} />
+        <h3 class="mt-10 mb-3 text-xl font-semibold">Empty queue</h3>
+        <ReportQueue reports={[]} status="OPEN" kind={null} />
       </section>
     </div>
   </div>

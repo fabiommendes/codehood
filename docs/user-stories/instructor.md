@@ -389,3 +389,18 @@ on the table, dimmed, with the attendance they had.
 
 "Download CSV" saves the same table for a spreadsheet, with `1`, `0` and `-` in
 the meeting columns.
+
+
+## Reports
+
+### Triage the content reports of my course
+
+    status: implemented
+    url: /[discipline]/[course]/reports
+
+Instructor sees on the course's "Reports" tab how many reports about the
+course's material are still open. Each shows the message, the page it was sent
+from, the attachments and the author. They mark one as triaged with a note to
+themselves, and reclassify another that is really a bug in Codehood: it goes to
+the admin and leaves their queue. Reports that are not about the course's
+content never reach them.

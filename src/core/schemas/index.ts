@@ -28,6 +28,7 @@ export {
 	type QuestionDataId,
 	type QuestionRefId,
 	type RegradeRequestId,
+	type ReportId,
 	type ResourceId,
 	type ResponseId,
 	type RollCallId,
@@ -55,6 +56,7 @@ export * from "./invite";
 export * from "./passphrase";
 export * from "./question";
 export * from "./regrade-request";
+export * from "./report";
 export * from "./resource";
 export * from "./response";
 export * from "./roll-call";

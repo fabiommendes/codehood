@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { SYSTEM, type UserActor } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
 import { NotAllowed, NotFound } from "@/core/error";
+import type { ReportId } from "@/core/schemas";
 import {
 	attachmentCreate,
 	attachmentFilter,
@@ -404,10 +405,8 @@ export class AttachmentService {
 				continue;
 			}
 
-			// If the attachment is not associated with a resource, we skip it for now.
-			throw new Error(
-				`Attachment with ID ${r.id} is not associated with a known resource`,
-			);
+			// Any other owner is resolved one by one (and a missing resource throws).
+			results.push(this.fromDb(r, await this.attachmentSource(r, tx)));
 		}
 		return results;
 	}
@@ -433,6 +432,16 @@ export class AttachmentService {
 			}
 			case "QUESTION": {
 				throw new Error("Question support is not yet implemented");
+			}
+			case "REPORT": {
+				const report = await tx.report.findUnique({
+					where: { id: raw.attachedToId as ReportId },
+					select: { id: true, publicId: true },
+				});
+				if (!report) {
+					throw new Error(`Report with ID ${raw.attachedToId} not found`);
+				}
+				return { ...report, type: "REPORT" };
 			}
 		}
 	}

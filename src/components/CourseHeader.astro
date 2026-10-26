@@ -4,7 +4,10 @@
 // back-link and no "Instructor view" badge; the strip is the whole of the
 // page's navigation, and an instructor's extra tabs are the only thing that
 // marks them as one.
-import type { Course } from "@/db";
+import { hasPerm } from "@/auth/permissions";
+import { type Course, db } from "@/db";
+import { m } from "@/i18n";
+import { courseHref } from "@/urls";
 import { type CourseTabKey, courseTabs } from "@/utils/course-tabs";
 import Tabs from "./ui/Tabs.astro";
 
@@ -20,15 +23,24 @@ const actor = Astro.locals.actor!;
 
 // courseTabs only needs `id`/`instructor` (see its `enrollment.manage` check),
 // both of which the public Course already carries — no enrollment data needed.
-const tabs = courseTabs(
-	course,
-	{
-		discipline: course.discipline.slug,
-		instructor: course.instructor.username,
-		edition: course.edition.slug,
-	},
-	actor,
-);
+const ref = {
+	discipline: course.discipline.slug,
+	instructor: course.instructor.username,
+	edition: course.edition.slug,
+};
+const tabs = [...courseTabs(course, ref, actor)];
+// The instructor's reports tab counts what is still `OPEN`.
+if (hasPerm(actor, "enrollment.manage", course)) {
+	const open = await db.report.countOpen(course.id, { actor });
+	tabs.push({
+		key: "reports",
+		label:
+			open > 0
+				? `${m.nav_course_tab_reports()} ${open}`
+				: m.nav_course_tab_reports(),
+		href: `${courseHref(ref)}/reports`,
+	});
+}
 ---
 
 <div data-page-header>

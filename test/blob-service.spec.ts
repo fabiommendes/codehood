@@ -16,6 +16,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import type { AttachmentLinkMode } from "@/core/constants";
 import { prisma } from "@/db/client";
 import { BlobService } from "@/db/services/blob.service";
+import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { hashBytes, isBlobHash } from "@/utils/content-hash";
 import { TEST_RESOURCE_ROOT } from "./env";
 
@@ -177,13 +178,16 @@ test("collectGarbage tombstones every unattached blob older than the cutoff, ret
 		{ bytes: Buffer.from(`gc-spare-me ${tag("bytes")}`) },
 		FULL_ACCESS,
 	);
+	// A real owner: an attachment whose resource is gone is an orphan, and
+	// the GC takes it too.
+	const owner = await persistedResourceFactory.create();
 	await prisma.attachment.create({
 		data: {
 			hash: attached.hash,
 			filename: "spared.txt",
 			mimeType: "text/plain",
 			attachedToType: "RESOURCE",
-			attachedToId: 1,
+			attachedToId: owner.id,
 		},
 	});
 

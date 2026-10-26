@@ -51,5 +51,7 @@
 	"nav_scene_constellation": "Um grafo de estrelas sobre a vizinhança.",
 	"nav_scene_missing_leaf": "Uma árvore binária com uma folha faltando.",
 	"nav_scene_locked_house": "Uma casa na colina com um cadeado na porta.",
-	"nav_scene_crash": "Um programa parado em uma linha vermelha, de madrugada."
+	"nav_scene_crash": "Um programa parado em uma linha vermelha, de madrugada.",
+	"nav_admin_tab_reports": "Relatos",
+	"nav_course_tab_reports": "Relatos"
 }

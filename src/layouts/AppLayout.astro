@@ -5,6 +5,7 @@ import AppSidebar from "@/components/nav/AppSidebar.astro";
 import Breadcrumbs from "@/components/nav/Breadcrumbs.astro";
 import PencilFilter from "@/components/nav/PencilFilter.astro";
 import UserMenu from "@/components/nav/UserMenu.astro";
+import ReportDialog from "@/components/report/ReportDialog";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
@@ -23,8 +24,9 @@ const { title, trail } = Astro.props;
 const crumbs = trail ?? breadcrumbs(Astro.url, { page: title });
 const user = Astro.locals.actor;
 
+const userCourses = user ? await db.course.findMany({}, { actor: user }) : [];
 const courses = user
-	? (await db.course.findMany({}, { actor: user })).map((course) => ({
+	? userCourses.map((course) => ({
 			code: course.discipline.slug,
 			edition: course.edition.slug,
 			teaching: course.instructor.username === user.username,
@@ -35,6 +37,40 @@ const courses = user
 			}),
 		}))
 	: [];
+
+// The course the page belongs to, for the report dialog, and whether the page
+// is about the course's material (the tabs whose content a report may be about).
+const CONTENT_TABS = new Set(["questions", "exams", "resources"]);
+const reportCourse = user
+	? (userCourses.find((course) => {
+			const href = courseHref({
+				discipline: course.discipline.slug,
+				instructor: course.instructor.username,
+				edition: course.edition.slug,
+			});
+			return (
+				Astro.url.pathname === href || Astro.url.pathname.startsWith(`${href}/`)
+			);
+		}) ?? null)
+	: null;
+const reportCourseHref = reportCourse
+	? courseHref({
+			discipline: reportCourse.discipline.slug,
+			instructor: reportCourse.instructor.username,
+			edition: reportCourse.edition.slug,
+		})
+	: null;
+const reportContext = reportCourse
+	? {
+			discipline: reportCourse.discipline.slug,
+			course: `${reportCourse.instructor.username}_${reportCourse.edition.slug}`,
+		}
+	: null;
+const reportContentPage =
+	reportCourseHref !== null &&
+	CONTENT_TABS.has(
+		Astro.url.pathname.slice(reportCourseHref.length).split("/")[1] ?? "",
+	);
 ---
 
 <Layout title={title ? m.nav_page_title({ title }) : undefined}>
@@ -99,7 +135,7 @@ const courses = user
         <div class="relative z-10 flex-1">
           <slot />
         </div>
-        <AppFooter class="relative z-10 px-6" />
+        <AppFooter class="relative z-10 px-6" reportable={!!user} />
       </div>
 
       <div class="drawer-side top-16 z-20 h-[calc(100vh-4rem)] overflow-hidden">
@@ -115,6 +151,7 @@ const courses = user
       </div>
     </div>
   </div>
+  {user && <ReportDialog client:load course={reportContext} contentPage={reportContentPage} />}
 </Layout>
 
 <script>

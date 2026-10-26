@@ -22,6 +22,16 @@ import { InviteService } from "./services/invite.service";
 import { PassphraseService } from "./services/passphrase.service";
 import { QuestionService } from "./services/question.service";
 import { RegradeRequestService } from "./services/regrade-request.service";
+
+export type {
+	Report,
+	ReportCreate,
+	ReportFilter,
+	ReportPK,
+	ReportUpdate,
+} from "./services/report.service";
+
+import { ReportService } from "./services/report.service";
 import { ResourceService } from "./services/resource.service";
 import { ResponseService } from "./services/response.service";
 import { RollCallService } from "./services/roll-call.service";
@@ -36,6 +46,8 @@ export type {
 	ExamStatus,
 	InviteKind,
 	RegradeStatus,
+	ReportKind,
+	ReportStatus,
 	ResourceType,
 	Role,
 	SubmissionStatus,
@@ -256,6 +268,7 @@ export const db = {
 	passphrase: new PassphraseService(),
 	question: new QuestionService(),
 	regradeRequest: new RegradeRequestService(feedbackService),
+	report: new ReportService(attachmentService, blobService),
 	resource: new ResourceService(attachmentService),
 	response: new ResponseService(),
 	rollCall: new RollCallService(),

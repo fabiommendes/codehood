@@ -36,6 +36,7 @@ export const COURSE_TAB_LABELS = {
 	questions: m.nav_course_tab_questions(),
 	roster: m.nav_course_tab_students(),
 	grades: m.nav_course_tab_grades(),
+	reports: m.nav_course_tab_reports(),
 } as const;
 
 /// A step of the trail before links are assigned; `label` is unknown when

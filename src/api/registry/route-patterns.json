@@ -285,6 +285,21 @@
 		]
 	},
 	{
+		"pattern": "/api/report",
+		"methods": [
+			"get",
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/report/[publicId]",
+		"methods": [
+			"delete",
+			"get",
+			"patch"
+		]
+	},
+	{
 		"pattern": "/api/user",
 		"methods": [
 			"get",

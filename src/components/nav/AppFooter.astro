@@ -7,9 +7,11 @@ import { homepage, version } from "../../../package.json";
 
 interface Props {
 	class?: string;
+	/// Shows the "Report a problem" button; the page must mount `ReportDialog`.
+	reportable?: boolean;
 }
 
-const { class: className } = Astro.props;
+const { class: className, reportable = false } = Astro.props;
 ---
 
 <footer
@@ -20,6 +22,13 @@ const { class: className } = Astro.props;
 >
   <Logo height={22} />
   <a href={homepage} class="hover:text-primary">{m.nav_source_code()}</a>
+  {
+    reportable && (
+      <button type="button" data-report-open class="hover:text-primary">
+        {m.report_open()}
+      </button>
+    )
+  }
   {
     import.meta.env.DEV && (
       <a href="/design" class="hover:text-primary">

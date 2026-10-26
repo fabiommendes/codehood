@@ -1,5 +1,10 @@
 import { ActionError } from "astro:actions";
-import { FieldError, NotAllowed, NotFound } from "@/core/error";
+import {
+	FieldError,
+	NotAllowed,
+	NotFound,
+	TooManyRequests,
+} from "@/core/error";
 import { m } from "@/i18n";
 
 /// Maps the framework-agnostic service errors to the `ActionError` Astro
@@ -10,6 +15,12 @@ function translateServiceError(error: unknown): unknown {
 	}
 	if (error instanceof NotFound) {
 		return new ActionError({ code: "NOT_FOUND", message: error.message });
+	}
+	if (error instanceof TooManyRequests) {
+		return new ActionError({
+			code: "TOO_MANY_REQUESTS",
+			message: error.message,
+		});
 	}
 	if (error instanceof FieldError) {
 		return fieldActionError(error);

@@ -1,0 +1,42 @@
+---
+export const prerender = false;
+
+import AdminHeader from "@/components/AdminHeader.astro";
+import ReportFilters from "@/components/report/ReportFilters.astro";
+import ReportQueue from "@/components/report/ReportQueue";
+import { db } from "@/db";
+import { m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { parseReportFilters } from "@/utils/report-filters";
+import { toReportRow } from "@/utils/report-row";
+
+// adminMiddleware already turns away anyone who is not an admin; the check is
+// here to narrow `Astro.locals.actor`.
+if (!Astro.locals.actor) return Astro.redirect("/login");
+const actor = Astro.locals.actor;
+
+const filters = parseReportFilters(Astro.url.searchParams);
+const reports = await db.report.findMany(
+	{
+		status: filters.status ? [filters.status] : undefined,
+		kind: filters.kind ? [filters.kind] : undefined,
+	},
+	{ actor },
+);
+---
+
+<AppLayout title={m.report_admin_title()}>
+	<main class="mx-auto max-w-4xl px-4 py-10">
+		<AdminHeader active="reports" />
+
+		<p class="mb-6 max-w-xl text-base-content/60">{m.report_admin_intro()}</p>
+
+		<ReportFilters filters={filters} />
+		<ReportQueue
+			client:load
+			reports={reports.map(toReportRow)}
+			status={filters.status}
+			kind={filters.kind}
+		/>
+	</main>
+</AppLayout>

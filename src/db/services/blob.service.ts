@@ -34,7 +34,7 @@ import { blobSecurityHeaders, contentDisposition } from "@/utils/blob-response";
 import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
 import { Validate } from "@/utils/validate";
-import { type PrismaClient, prisma } from "../client";
+import { type PrismaClient, type PrismaTx, prisma } from "../client";
 
 //
 // Type definitions
@@ -161,6 +161,10 @@ export class BlobService {
 	/**
 	 * Remove all blobs no attachment points at.
 	 *
+	 * First deletes the attachments of `REPORT` and `RESOURCE` owners that no
+	 * longer exist (database cascades cannot reach the polymorphic owner), so
+	 * their blobs are collected in the same pass.
+	 *
 	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
 	 */
 	async collectGarbage(
@@ -169,6 +173,8 @@ export class BlobService {
 		assertSystem(opts, "blob.run");
 		const client = opts.tx ?? this.prisma;
 		const olderThan = opts.olderThan ?? new Date(Date.now() - BLOB_GC_GRACE_MS);
+
+		await this.deleteOrphanAttachments(client);
 
 		const candidates = await client.blob.findMany({
 			where: {
@@ -188,6 +194,38 @@ export class BlobService {
 			collected.push(blob.hash);
 		}
 		return collected;
+	}
+
+	/// Deletes the attachments whose `REPORT` or `RESOURCE` owner row is gone, unlinking names no sibling uses.
+	private async deleteOrphanAttachments(
+		client: PrismaClient | PrismaTx,
+	): Promise<void> {
+		const owners = {
+			REPORT: (await client.report.findMany({ select: { id: true } })).map(
+				(r) => r.id,
+			),
+			RESOURCE: (await client.resource.findMany({ select: { id: true } })).map(
+				(r) => r.id,
+			),
+		};
+		for (const [type, ids] of Object.entries(owners) as [
+			keyof typeof owners,
+			number[],
+		][]) {
+			const orphans = await client.attachment.findMany({
+				where: { attachedToType: type, attachedToId: { notIn: ids } },
+			});
+			if (orphans.length === 0) continue;
+			await client.attachment.deleteMany({
+				where: { id: { in: orphans.map((o) => o.id) } },
+			});
+			for (const row of orphans) {
+				const siblings = await client.attachment.count({
+					where: { hash: row.hash, filename: row.filename },
+				});
+				if (siblings === 0) await this.unlink(row.hash, row.filename);
+			}
+		}
 	}
 
 	/**

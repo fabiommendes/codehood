@@ -12,7 +12,8 @@ export type ErrorResponse =
 	| NotFoundResponse
 	| RuleViolationResponse
 	| InternalErrorResponse
-	| BadRequestResponse;
+	| BadRequestResponse
+	| TooManyRequestsResponse;
 
 export interface BaseErrorResponse {
 	type: "error";
@@ -82,6 +83,14 @@ export type NotAllowedAction =
 export interface BadRequestResponse extends BaseErrorResponse {
 	code: "bad-request";
 	status: 400 | 405 | 406 | 408;
+}
+
+/**
+ * The caller exceeded a rate limit and may try again later.
+ */
+export interface TooManyRequestsResponse extends BaseErrorResponse {
+	code: "too-many-requests";
+	status: 429;
 }
 
 /**

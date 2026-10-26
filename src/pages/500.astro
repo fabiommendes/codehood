@@ -6,6 +6,7 @@ import { m } from "@/i18n";
 import ErrorLayout from "@/layouts/ErrorLayout.astro";
 
 const error = Astro.props.error as Error | undefined;
+const user = Astro.locals?.actor;
 ---
 
 <ErrorLayout code="500" title={m.nav_500_title()} scene="crash">
@@ -16,6 +17,19 @@ const error = Astro.props.error as Error | undefined;
         {m.nav_try_again()}
       </button>
       <a href="/courses" class="btn btn-ghost">{m.nav_back_to_my_courses()}</a>
+      {
+        user && (
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-report-open
+            data-report-kind="BUG"
+            data-report-url={Astro.url.href}
+          >
+            {m.report_this_error()}
+          </button>
+        )
+      }
     </div>
     {
       import.meta.env.DEV && error && (

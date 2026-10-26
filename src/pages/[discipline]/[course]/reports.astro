@@ -1,0 +1,49 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import ReportFilters from "@/components/report/ReportFilters.astro";
+import ReportQueue from "@/components/report/ReportQueue";
+import { db } from "@/db";
+import { m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { loadCourse } from "@/utils/load-course";
+import { parseReportFilters } from "@/utils/report-filters";
+import { toReportRow } from "@/utils/report-row";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment, {
+	manage: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.actor.
+const actor = Astro.locals.actor!;
+
+const filters = parseReportFilters(Astro.url.searchParams);
+const reports = await db.report.findMany(
+	{
+		course: course.id,
+		kind: ["CONTENT"],
+		status: filters.status ? [filters.status] : undefined,
+	},
+	{ actor },
+);
+---
+
+<AppLayout title={m.report_course_title()}>
+	<main class="mx-auto max-w-4xl px-4 py-10">
+		<CourseHeader course={course} active="reports" />
+
+		<p class="mb-6 max-w-xl text-base-content/60">{m.report_course_intro()}</p>
+
+		<ReportFilters filters={filters} hideKind />
+		<ReportQueue
+			client:load
+			reports={reports.map(toReportRow)}
+			status={filters.status}
+			kind="CONTENT"
+		/>
+	</main>
+</AppLayout>

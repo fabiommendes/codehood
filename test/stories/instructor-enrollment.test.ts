@@ -31,6 +31,7 @@ test("instructor: see who is enrolled", async ({ page }) => {
 			"Questions",
 			"Students",
 			"Grades",
+			"Reports",
 		]);
 		await expect(
 			page.getByRole("tab", { name: "Students", exact: true }),

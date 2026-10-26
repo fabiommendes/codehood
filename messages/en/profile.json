@@ -36,5 +36,6 @@
 	"profile_calendar_never_used": "Never used",
 	"profile_calendar_warning": "Anyone with this link can read your calendar. Generating a new link means the previous link stops working at once.",
 	"profile_calendar_rotate": "Generate new link",
-	"profile_calendar_remove": "Deactivate"
+	"profile_calendar_remove": "Deactivate",
+	"profile_tab_reports": "Reports"
 }

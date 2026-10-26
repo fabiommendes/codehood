@@ -186,3 +186,17 @@ work.
 Sysadmin needs a copy of the database and the resource blobs that can be restored
 onto a fresh instance. Content is reproducible from the instructors'
 repositories, but enrollments, submissions and grades are not.
+
+
+## Reports
+
+### Triage the reports queue
+
+    status: implemented
+    url: /admin/reports
+
+Admin opens the reports queue, which starts on the open reports of every kind
+and every course. They narrow it by status and type, open a report with a
+screenshot, look at the image and mark the report as resolved, which takes it
+off the open queue. The same queue is available over the REST API for triaging
+locally, with the status on the server as the checkpoint.

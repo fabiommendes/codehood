@@ -36,5 +36,6 @@
 	"profile_calendar_never_used": "Nunca usado",
 	"profile_calendar_warning": "Quem tiver este link pode ler o seu calendário. Ao gerar um novo link, o link anterior para de funcionar na hora.",
 	"profile_calendar_rotate": "Gerar novo link",
-	"profile_calendar_remove": "Desativar"
+	"profile_calendar_remove": "Desativar",
+	"profile_tab_reports": "Relatos"
 }

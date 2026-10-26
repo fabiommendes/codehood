@@ -43,6 +43,9 @@ const { user, open = false } = Astro.props;
     <li>
       <a href="/getting-started" class="cut">{m.nav_set_up_cli()}</a>
     </li>
+    <li>
+      <button type="button" data-report-open class="cut">{m.report_open()}</button>
+    </li>
     <li class="lg:hidden">
       <ThemeToggle variant="menu" class="cut" />
     </li>

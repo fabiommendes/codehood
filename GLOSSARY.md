@@ -336,6 +336,14 @@ A student's challenge to the grade of one answer in a released exam, with a
 justification. The course's instructor accepts it, writing a new grading pass,
 or rejects it with a reply. One per answer, open for 14 days after release.
 
+## Report
+
+Type: domain
+
+A user's message about a problem with Codehood or with a course's material,
+with optional images. No replies: the author sees only its status. The admin
+triages every report, a course's instructor only its `CONTENT` reports.
+
 ## Reserved slug
 
 Type: platform

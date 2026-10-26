@@ -38,6 +38,7 @@ export type RoleEntity =
 	| "submission"
 	| "feedback"
 	| "regrade"
+	| "report"
 	| "api-key"
 	| "session";
 
@@ -50,6 +51,7 @@ type ExtraPerms =
 	| "response.submit"
 	| "regrade.request"
 	| "regrade.resolve"
+	| "report.triage"
 	| "roll-call.manage"
 	| "exam.manage-exceptions"
 	| "api-key.manage"
@@ -171,6 +173,20 @@ export interface ResponseWithCourse {
  * `gradesReleasedAt`, never authored on the feedback itself.
  */
 export type FeedbackTarget = ResponseWithCourse & { released: boolean };
+
+/**
+ * The shape the `report.*` permissions need from a loaded report row: its
+ * kind, its status, who wrote it and the course it was sent from, if any.
+ *
+ * `id` is only used for auditing.
+ */
+export interface ReportTarget {
+	id?: number;
+	kind: "BUG" | "SUGGESTION" | "CONTENT" | "OTHER";
+	status: "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED";
+	author: UserTarget;
+	course: CourseTarget | null;
+}
 
 /// Permissions are declared in a single object so hasPerm can statically verify
 /// the target types at compile time.
@@ -436,6 +452,39 @@ const PERMISSIONS = {
 		audit: auditResponse,
 	} satisfies PermDef<ResponseWithCourse>,
 
+	// REPORT ---------------------------------------------------------------------
+	// Rule: any signed-in user sends a report.
+	"report.create": { other: true },
+
+	// Rule: SYSTEM and any admin read every report; the author reads their own
+	// (the service hides the triage note from them); a course's instructor
+	// reads the `CONTENT` reports of that course only. A report of another
+	// kind from an instructor is read as its author, never as the instructor.
+	"report.read": {
+		admin: true,
+		other: (actor, target) =>
+			target.author.username === actor.username ||
+			isContentOfOwnCourse(actor, target),
+		audit: auditReport,
+	} satisfies PermDef<ReportTarget>,
+
+	// Rule: SYSTEM and any admin triage every report; a course's instructor
+	// triages the `CONTENT` reports of that course only. The author never does.
+	"report.triage": {
+		admin: true,
+		other: (actor, target) => isContentOfOwnCourse(actor, target),
+		audit: auditReport,
+	} satisfies PermDef<ReportTarget>,
+
+	// Rule: SYSTEM and any admin delete any report; the author withdraws their
+	// own while it is still `OPEN`. The instructor never deletes.
+	"report.delete": {
+		admin: true,
+		other: (actor, target) =>
+			target.author.username === actor.username && target.status === "OPEN",
+		audit: auditReport,
+	} satisfies PermDef<ReportTarget>,
+
 	// API KEY / SESSION ----------------------------------------------------------
 	// Rule: the owner, any admin, or SYSTEM.
 	"api-key.manage | session.manage": {
@@ -459,6 +508,15 @@ function isCourseOwner(
 	course: { instructor: { username: string } },
 ): boolean {
 	return course.instructor.username === actor.username;
+}
+
+/// Whether `report` is a `CONTENT` report of a course `actor` teaches.
+function isContentOfOwnCourse(actor: UserActor, report: ReportTarget): boolean {
+	return (
+		report.kind === "CONTENT" &&
+		report.course !== null &&
+		isCourseOwner(actor, report.course)
+	);
 }
 
 /// Whether `actor` holds an `ACTIVE` enrollment in `course`.
@@ -511,6 +569,17 @@ function auditResponse(target: ResponseWithCourse): JSONObject {
 		...(target.id !== undefined && { id: target.id }),
 		author: target.author.username,
 		course: auditCourse(target.course),
+	};
+}
+
+/// Audit record of a report target: its `id`, if carried, its kind, status and author, and its course's audit record, if any.
+function auditReport(target: ReportTarget): JSONObject {
+	return {
+		...(target.id !== undefined && { id: target.id }),
+		kind: target.kind,
+		status: target.status,
+		author: target.author.username,
+		...(target.course && { course: auditCourse(target.course) }),
 	};
 }
 

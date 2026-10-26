@@ -276,6 +276,24 @@ export const inviteApi = CRUD("/api/invite", {
 	service: db.invite,
 });
 
+export const reportApi = CRUD("/api/report", {
+	name: "Report",
+	plural: "Reports",
+	keySegment: "/[publicId]",
+	// The raw id never leaves the server. Attachments are read through
+	// `/api/report/[publicId]/attachment/[filename]`, never by blob hash.
+	entity: schema.reportSchema.omit({ id: true }),
+	// A buffer has no OpenAPI representation, so attachments are not sent here.
+	create: schema.reportCreateWithoutAttachments,
+	upsert: false,
+	update: schema.reportUpdate,
+	// The course filter is a service option only: a natural key does not fit a query string.
+	filter: schema.reportFilter.omit({ course: true }),
+	key: schema.reportPK,
+	tags: ["Reports"],
+	service: db.report,
+});
+
 export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	name: "Resource",
 	plural: "Resources",

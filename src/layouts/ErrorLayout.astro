@@ -3,6 +3,7 @@ import Scene from "@/components/brand/Scene.astro";
 import type { SceneName } from "@/components/brand/scenes";
 import TileWall from "@/components/brand/TileWall.astro";
 import Logo from "@/components/Logo.astro";
+import ReportDialog from "@/components/report/ReportDialog";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { m } from "@/i18n";
 import Layout from "./Layout.astro";
@@ -15,6 +16,7 @@ interface Props {
 }
 
 const { code, title, scene } = Astro.props;
+const user = Astro.locals?.actor;
 ---
 
 <Layout title={m.nav_error_page_title({ code, title })}>
@@ -40,4 +42,5 @@ const { code, title, scene } = Astro.props;
       </div>
     </div>
   </main>
+  {user && <ReportDialog client:load course={null} contentPage={false} />}
 </Layout>

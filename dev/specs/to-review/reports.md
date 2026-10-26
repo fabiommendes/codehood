@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [reports, feedback, triage, admin, instructor, api]
 relatedTo: [attachment-service, blob-service, regrade-requests]
 ---
@@ -86,7 +86,10 @@ model Report {
 ```
 
 **R2.** `AttachmentOwner` ganha `REPORT`. O relato não tem tabela própria de
-anexos: usa `Attachment`, com quota e deduplicação por hash.
+anexos: usa `Attachment`, com quota e deduplicação por hash. O `attachedTo` de
+`src/core/schemas/attachment.ts` ganha a variante `REPORT` (`id` e
+`publicId`), e `AttachmentService.attachmentSource` passa a resolvê-la; hoje
+ele lança erro para qualquer dono que não seja `RESOURCE`.
 
 **R3.** Cascatas:
 - apagar o autor apaga os relatos dele (são dados pessoais);
@@ -98,13 +101,15 @@ dono polimórfico de `Attachment` não cascateia sozinho. As cascatas de
 `User` e `Course` passam pelo banco e não chegam ao service: deixam linhas de
 `Attachment` com `attachedToType: REPORT` apontando para um relato que não
 existe mais. O GC de blobs só recolhe blobs sem nenhum anexo, então ganha um
-passo antes: apagar os anexos `REPORT` órfãos.
+passo antes: apagar os anexos órfãos de `REPORT` e de `RESOURCE` (o mesmo
+buraco, descrito em `dev/issues/orphan-attachments-on-cascade.md`). `QUESTION`
+fica de fora: nada grava anexos com esse dono ainda.
 
 ### Entidades
 
 **R4.** `src/core/schemas/report.ts` com as constantes
 `REPORT_MESSAGE_MIN = 10`, `REPORT_MESSAGE_MAX = 4000`,
-`REPORT_MAX_ATTACHMENTS = 3`, `REPORT_MAX_ATTACHMENT_BYTES = 5 MiB` e
+`REPORT_MAX_ATTACHMENTS = 3`, `REPORT_MAX_ATTACHMENT_BYTES = 2 MiB` e
 `REPORT_DAILY_LIMIT = 10`, e com os schemas:
 
 - `reportSchema` (saída): `publicId`, `kind`, `message`, `status`, `note`
@@ -117,8 +122,9 @@ passo antes: apagar os anexos `REPORT` órfãos.
   - `kind` e `message` (com trim, de 10 a 4000 caracteres);
   - `url`, `userAgent` e `viewport`, todos `.nullish()` e com tamanho máximo;
   - `course` (`courseRef.nullish()`);
-  - `attachments`: `filename`, `mimeType` (só `image/png`, `image/jpeg` ou
-    `image/webp`) e `bytes` (`buffer`), no máximo 3.
+    - `attachments`: `filename` e `bytes` (`buffer`), no máximo 3. Não há
+    `mimeType` no input: `AttachmentService` deriva o tipo da extensão
+    (`mimeFor`), e só `.png`, `.jpg`, `.jpeg` e `.webp` são aceitos.
 
   Um refine recusa `CONTENT` sem `course`.
 - `reportUpdate` (triagem): `status`, `kind` e `note` (`.nullish()`), todos
@@ -134,9 +140,13 @@ permissão de `attachment` é a mesma de ler o relato.
 **R6.** `create`:
 - o autor é o ator;
 - recusa com `TooManyRequests` (429) o 11º relato do mesmo autor em 24 h;
-- cada anexo acima de 5 MiB é recusado com `InvalidData`;
+- cada anexo acima de 2 MiB, ou com extensão fora da lista, é recusado com
+  `InvalidData`;
 - grava os anexos como `Attachment` com `attachedToType: REPORT`, e o
-  uploader é o autor.
+  uploader é o autor;
+- dois anexos com o mesmo nome depois de sanitizado (colar duas imagens dá
+  dois `image.png`) recebem sufixos (`image-2.png`): o nome identifica o anexo
+  na rota de R12 e na chave única de `Attachment`.
 
 **R7.** `update`:
 - quando o status sai de `OPEN`, grava `triagedBy` (o ator) e `triagedAt`;
@@ -149,7 +159,9 @@ permissão de `attachment` é a mesma de ler o relato.
 permissão de cada linha e ordena por `createdAt` crescente.
 
 **R9.** Novo erro `TooManyRequests` em `src/core/error.ts`, com status 429 e
-`code: "too-many-requests"`, seguindo os outros erros serializáveis.
+`code: "too-many-requests"`, seguindo os outros erros serializáveis, com o
+tipo de resposta em `src/core/error-response.ts`. `src/actions/helpers.ts` o
+traduz para `ActionError` com `TOO_MANY_REQUESTS`.
 
 ### REST e permissões
 
@@ -168,15 +180,22 @@ Um professor que é autor de um relato que não é `CONTENT` só o vê como auto
 
 | Método | Rota | Corpo / query |
 | :-- | :-- | :-- |
-| `POST` | `/api/report` | JSON: `kind`, `message`, `url?`, `course?`. Sem anexos |
-| `GET` | `/api/report` | `?status=&kind=&course=&author=` |
+| `POST` | `/api/report` | JSON: `kind`, `message`, `url?`, `course?`. Sem anexos[^rest-create] |
+| `GET` | `/api/report` | `?status=&kind=&author=`. Sem `course`: o professor já só recebe o `CONTENT` dos seus cursos |
 | `GET` | `/api/report/[publicId]` | |
 | `PATCH` | `/api/report/[publicId]` | `status?`, `kind?`, `note?` |
 | `DELETE` | `/api/report/[publicId]` | |
 
+[^rest-create]: O `create` da declaração é `reportCreate.omit({ attachments:
+    true })`: um `buffer` não tem representação no OpenAPI.
+
 **R12.** `GET /api/report/[publicId]/attachment/[filename]` devolve os bytes
 com o `Content-Type` do anexo e responde 404 para quem não pode ler o relato.
-A API nunca expõe o hash do blob.
+A API nunca expõe o hash do blob. Isso importa: `/files/[hash]` serve
+qualquer blob sem autenticação, e o segredo do hash é a única proteção da
+captura fora desta rota. É uma rota de página
+(`src/pages/api/report/[publicId]/attachment/[filename].ts`), porque o
+registro da REST só responde JSON.
 
 **R13.** A triagem local é `GET /api/report?status=OPEN`, uma decisão por
 relato e um `PATCH` com o status. Não há rota de lote.
@@ -185,9 +204,12 @@ relato e um `PATCH` com o status. Não há rota de lote.
 
 **R14.** O dialog "Reportar problema" (S1) é uma ilha Solid no `AppLayout`.
 Ele abre pelo `UserMenu` e por um link no `AppFooter`.
-- No clique, a página é rasterizada com `modern-screenshot` (carregado só
-  nesse momento) e só depois o dialog abre, para que ele não apareça na
-  captura.
+- No clique, a página é rasterizada com `modern-screenshot` (carregado só nesse momento), em WebP, e só depois o dialog abre, para que
+  ele não apareça na captura.
+- O cliente recusa, antes do envio, uma imagem acima de 2 MiB.
+- As Actions recusam corpos acima de 1 MiB por padrão. `astro.config.mjs`
+  passa `security.actionBodySizeLimit` para 8 MiB (3 × 2 MiB e folga para o
+  multipart). O limite vale para todas as Actions.
 - Campos: o tipo e o texto. O tipo vem pré-selecionado: `CONTENT` nas páginas
   de questão, prova ou material, e `BUG` nas outras. `CONTENT` só aparece em
   páginas de curso.
@@ -201,7 +223,9 @@ Ele abre pelo `UserMenu` e por um link no `AppFooter`.
   o envio.
 
 **R15.** `src/pages/500.astro` tem o link "Reportar este erro", que abre o S1
-com o tipo `BUG` e a URL da página que falhou.
+com o tipo `BUG` e a URL da página que falhou. A página usa `ErrorLayout`, não
+`AppLayout`, então o S1 também entra no `ErrorLayout`. O link só aparece para
+quem está logado.
 
 **R16.** `/profile` ganha a seção "Meus relatos" (S3): tipo, data, status e o
 começo do texto. Abrir um relato mostra o texto inteiro e os anexos. Há um
@@ -221,6 +245,33 @@ aparece só para o professor e mostra quantos relatos estão `OPEN`.
 
 **R19.** O S1 e o `ReportQueue` entram em `/design/components` com os estados:
 vazio, com captura, enviando, erro, fila vazia e relato triado.
+
+**R19a.** Contrato de acessibilidade das telas, que os e2e usam (textos em
+`en`; o `pt-BR` traduz). Campos seguem o padrão do projeto: `<fieldset>` com
+`<legend>` envolvendo o controle.
+- Abridores: botão "Report a problem" no `AppFooter` (dentro do `<footer>`) e
+  item de mesmo nome no `UserMenu`.
+- S1: `role="dialog"` com nome "Report a problem"; captura como `<img
+  alt="Screenshot of the page">` e botão "Remove screenshot"; campos "Type"
+  (`<select>`: "Bug", "Suggestion", "Course content", "Other"), "Message"
+  (`<textarea>`) e "Images" (`<input type="file" multiple>`); cada imagem
+  adicionada aparece como `<img>` com `alt` igual ao nome do arquivo; botão
+  "Send report"; o erro de campo aparece dentro do dialog; toast "Report
+  sent.".
+- S3: aba "Reports" em `/profile`; cada relato é um `<article>` com o status
+  ("Open", "Triaged", "Resolved", "Dismissed") e um botão cujo nome é o começo
+  do texto, que expande o texto inteiro e as imagens (`alt` = nome do
+  arquivo); botão "Delete" enquanto `OPEN`, sem `confirm()` do navegador.
+- S4/S5 (`ReportQueue`): cada relato é um `<article>` com texto, URL,
+  viewport, autor (username), curso e imagens (`alt` = nome do arquivo,
+  servidas pela rota de R12); formulário de triagem com "Status", "Type",
+  "Note" e botão "Save"; toast "Report updated."; o relato que sai do filtro
+  some da lista.
+- S4: aba "Reports" no `AdminHeader`; filtros "Filter by status" (padrão
+  "Open") e "Filter by type" (padrão "All"), enviados pelo botão "Filter"
+  como query string.
+- S5: aba do `CourseHeader` com o texto "Reports" seguido da contagem de
+  `OPEN` (`countOpen`), visível só para o professor.
 
 ### Dados de dev
 
@@ -247,25 +298,28 @@ vazio, com captura, enviando, erro, fila vazia e relato triado.
 
 ## Plano de ação
 
-TDD em modo full nas tarefas com regra (T2, T3). Um único projetista de
-testes (`opus`) para T2 e T3.
+TDD em modo default nas tarefas com regra (T2, T3) e nos e2e (T4): o agente
+principal projeta os stubs e escreve os testes; um único `implementer`
+(`sonnet`), que nunca lê os testes, implementa T1, T2, T3 e T5.
 
 **T1. Banco, schemas, erro, permissões.** `prisma/schema.prisma`,
 `src/db/branding.ts`, `src/core/schemas/report.ts`,
-`src/core/schemas/index.ts`, `src/core/error.ts`,
+`src/core/schemas/attachment.ts`, `src/core/schemas/index.ts`,
+`src/core/error.ts`, `src/core/error-response.ts`, `src/actions/helpers.ts`,
 `src/auth/permissions/index.ts` e `src/fixtures/report.factory.ts`. Cobre R1,
 R2, R4, R9 e R10. Sem dependências. Modelo `sonnet`. Pronto quando
 `pnpm exec prisma db push`, `pnpm run typecheck` e `pnpm run db:reset` saem
 0.
 
 **T2. Service.** `src/db/services/report.service.ts`, `src/db/index.ts`,
-o passo de órfãos em `src/db/services/blob.service.ts` e
-`test/report-service.spec.ts`. Cobre R3, R5–R8. Depende de T1. Testes com
-`haiku`, implementação com `sonnet`. Pronto quando o spec do service passa,
+`src/db/services/attachment.service.ts`, o passo de órfãos em
+`src/db/services/blob.service.ts` e `test/report-service.spec.ts`. Cobre R3,
+R5–R8. Depende de T1. Pronto quando o spec do service passa,
 cobrindo:
 - `CONTENT` sem curso é recusado;
 - o 11º relato em 24 h recebe 429;
-- um anexo acima do limite e um mime fora da lista são recusados;
+- um anexo acima do limite e uma extensão fora da lista são recusados;
+- dois anexos com o mesmo nome ficam com nomes distintos;
 - o autor não lê a `note` e não faz a triagem;
 - o professor lê e faz a triagem do `CONTENT` do seu curso, mas não do
   `CONTENT` de outro curso nem de um `BUG`;
@@ -278,8 +332,7 @@ cobrindo:
 - `findMany` não vaza linhas.
 
 **T3. REST e rota de anexo.** `src/api/index.ts`, a rota do anexo em
-`src/pages/api/report/` e `test/api-report.spec.ts`. Cobre R11–R13. Depende
-de T2. Testes com `haiku`, implementação com `sonnet`. Pronto quando:
+`src/pages/api/report/` e `test/api-report.spec.ts`. Cobre R11–R13. Depende de T2. Pronto quando:
 - o fluxo `GET ?status=OPEN` → `PATCH` → `GET ?status=OPEN` vazio passa;
 - o anexo dá 200 a quem pode ler e 404 aos outros;
 - o OpenAPI não expõe `id` nem hash;
@@ -287,7 +340,7 @@ de T2. Testes com `haiku`, implementação com `sonnet`. Pronto quando:
 
 **T4. Histórias.** `docs/user-stories/student.md`,
 `docs/user-stories/instructor.md`, `docs/user-stories/admin.md` e os e2e em
-`test/stories/`. Depende de T1. Modelo `sonnet`. As histórias:
+`test/stories/`, escritos pelo agente principal. Depende de T1. As histórias:
 - Aluno: abre o dialog numa página de curso, tenta enviar um texto curto e
   recebe erro, remove a captura, adiciona uma imagem, envia, vê o relato em
   "Meus relatos" e o apaga.
@@ -301,15 +354,15 @@ Pronto quando os e2e falham porque as telas não existem.
 
 **T5. Telas.** `src/components/report/` (`ReportDialog.tsx` e
 `ReportQueue.tsx`), `src/actions/` (`report.create`, `report.triage` e
-`report.delete`), `src/layouts/AppLayout.astro`,
+`report.delete`), `src/layouts/AppLayout.astro`, `src/layouts/ErrorLayout.astro`,
+`astro.config.mjs`,
 `src/components/nav/UserMenu.astro`, `src/components/nav/AppFooter.astro`,
 `src/pages/500.astro`, `src/pages/profile.astro`,
 `src/pages/admin/reports.astro`, `src/components/AdminHeader.astro`,
 `src/pages/[discipline]/[course]/reports.astro`,
 `src/components/CourseHeader.astro`, `src/pages/design/components.astro` e as
 mensagens de i18n. Inclui adicionar `modern-screenshot` ao `package.json`.
-Cobre R14–R19. Depende de T3 e T4. Modelo `sonnet`. Pronto quando os e2e de
-T4 passam.
+Cobre R14–R19. Depende de T3 e T4. Pronto quando os e2e de T4 passam.
 
 **T6. Seed.** `src/db/bootstrap.ts`. Cobre R20. Depende de T2. Modelo `haiku`.
 Pronto quando `pnpm run db:reset` sai 0 e as três telas mostram cada estado

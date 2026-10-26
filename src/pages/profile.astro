@@ -6,6 +6,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import PageKicker from "@/components/PageKicker.astro";
 import PasswordConfirm from "@/components/PasswordConfirm.astro";
+import MyReports from "@/components/report/MyReports";
 import Tabs from "@/components/ui/Tabs.astro";
 import { apiKeyForm, passwordChange, profileUpdate } from "@/core/schemas";
 import { type ApiKey, db } from "@/db";
@@ -13,6 +14,7 @@ import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { toReportRow } from "@/utils/report-row";
 import { roleLabels } from "@/utils/roles";
 
 const logoutEverywhereResult = Astro.getActionResult(
@@ -36,6 +38,12 @@ const apiKeys = await db.apiKey.findMany(
 	{ createdBy: user.username },
 	{ actor },
 );
+
+const myReports = (
+	await db.report.findMany({ author: user.username }, { actor })
+)
+	.reverse()
+	.map(toReportRow);
 
 const calendarFeed = await db.calendarFeed.get(user.username, { actor });
 const rotateFeedResult = Astro.getActionResult(
@@ -96,7 +104,7 @@ function formatDate(date: Date | null): string {
 
 // Land on whichever tab the just-submitted form lives on, so a validation
 // error (or a fresh success message) doesn't get hidden behind "Details".
-const activeTab: "details" | "account" | "apikeys" | "calendar" =
+const activeTab: "details" | "account" | "apikeys" | "calendar" | "reports" =
 	createApiKeyResult || revokeApiKeyResult
 		? "apikeys"
 		: passwordResult || logoutEverywhereResult
@@ -105,13 +113,16 @@ const activeTab: "details" | "account" | "apikeys" | "calendar" =
 					removeFeedResult ||
 					Astro.url.searchParams.get("tab") === "calendar"
 				? "calendar"
-				: "details";
+				: Astro.url.searchParams.get("tab") === "reports"
+					? "reports"
+					: "details";
 
 const profileTabs = [
 	{ key: "details", label: m.profile_tab_details() },
 	{ key: "account", label: m.profile_tab_account() },
 	{ key: "apikeys", label: m.profile_tab_api_keys() },
 	{ key: "calendar", label: m.profile_tab_calendar() },
+	{ key: "reports", label: m.profile_tab_reports() },
 ];
 ---
 
@@ -382,6 +393,13 @@ const profileTabs = [
               )
             }
           </div>
+        </div>
+      </Fragment>
+
+      <Fragment slot="reports">
+        <div class="flex flex-col gap-4">
+          <p class="text-sm text-base-content/60">{m.report_mine_note()}</p>
+          <MyReports client:load reports={myReports} />
         </div>
       </Fragment>
     </Tabs>

@@ -17,7 +17,8 @@ export type CourseTabKey =
 	| "schedule"
 	| "questions"
 	| "students"
-	| "grades";
+	| "grades"
+	| "reports";
 
 export interface CourseTab {
 	key: CourseTabKey;

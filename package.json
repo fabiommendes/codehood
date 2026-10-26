@@ -57,6 +57,7 @@
 		"commander": "^15.0.0",
 		"dotenv": "^17.4.2",
 		"markdown-it": "^15.0.0",
+		"modern-screenshot": "^4.7.0",
 		"nanoid": "^6.0.1",
 		"prisma": "7.10.0",
 		"reflect-metadata": "^0.2.2",

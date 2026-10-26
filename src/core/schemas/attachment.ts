@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { attachmentId, buffer, mimeType, resourceId, username } from "./base";
+import {
+	attachmentId,
+	buffer,
+	mimeType,
+	publicId,
+	reportId,
+	resourceId,
+	username,
+} from "./base";
 import { blobHash } from "./blob";
 import { userInfo } from "./user";
 
@@ -14,11 +22,12 @@ export const attachmentSchema = z.object({
 	attachedTo: z.union([
 		z.lazy(() => attachedToResource),
 		z.lazy(() => attachedToQuestion),
+		z.lazy(() => attachedToReport),
 	]),
 	createdAt: z.date(),
 });
 
-export const attachmentToType = z.enum(["RESOURCE", "QUESTION"]);
+export const attachmentToType = z.enum(["RESOURCE", "QUESTION", "REPORT"]);
 
 export const attachedToResource = z.object({
 	type: z.literal("RESOURCE"),
@@ -34,6 +43,12 @@ export const attachedToQuestion = z.object({
 	slug: z.string().min(1),
 });
 
+export const attachedToReport = z.object({
+	type: z.literal("REPORT"),
+	id: reportId,
+	publicId: publicId,
+});
+
 export const attachmentCreate = attachmentSchema
 	.pick({ filename: true })
 	.extend({
@@ -44,6 +59,7 @@ export const attachmentCreate = attachmentSchema
 		attachedTo: z.union([
 			attachedToResource.pick({ type: true, id: true }),
 			attachedToQuestion.pick({ type: true, id: true }),
+			attachedToReport.pick({ type: true, id: true }),
 		]),
 	});
 

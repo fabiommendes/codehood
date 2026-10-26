@@ -4,6 +4,15 @@
 
 ### Added
 
+- Reports: any logged-in user sends a report (bug, suggestion, course content,
+  other) from the user menu, the footer or the 500 page, with a screenshot of
+  the page and up to three images. The author follows its status under the
+  profile's Reports tab; the admin triages every report at `/admin/reports`,
+  and the instructor the content reports of their course from its Reports
+  tab. The REST API (`/api/report`) serves the same queue for triaging
+  locally, with the status as the checkpoint.
+- Blob garbage collection first removes the attachments of reports and
+  resources whose owner was deleted by a database cascade.
 - `/design/components`: the components that only show in special flows (check-in
   results, roll call page and projection, exam exceptions, grade release,
   regrades, question statistics) in each of their states, from fixtures.

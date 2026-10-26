@@ -77,6 +77,8 @@ model User {
   calendarFeed     CalendarFeed?
   exceptions       ExamException[]
   regradesResolved RegradeRequest[]
+  reports          Report[]           @relation("ReportAuthor")
+  reportsTriaged   Report[]           @relation("ReportTriagedBy")
 }
 
 model Group {
@@ -214,6 +216,7 @@ model Blob {
 enum AttachmentOwner {
   RESOURCE
   QUESTION
+  REPORT
 }
 
 /// One use of a Blob by one owner, carrying the filename and mime type that
@@ -302,6 +305,7 @@ model Course {
   resources          Resource[]
   invites            Invite[]
   gradeColumns       GradeColumn[]
+  reports            Report[]
 
   @@unique([disciplineSlug, instructorId, editionSlug])
 }
@@ -1007,4 +1011,57 @@ model ExamTags {
   tag String
 
   @@id([examId, tag])
+}
+
+enum ReportKind {
+  BUG
+  SUGGESTION
+  CONTENT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  TRIAGED
+  RESOLVED
+  DISMISSED
+}
+
+/// A user's report of a problem with Codehood or with a course's material.
+/// One message, no replies: the author only sees the status.
+model Report {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique
+
+  kind    ReportKind
+  message String
+
+  /// `OPEN` until someone triages it; `TRIAGED` is accepted as work, not done.
+  status ReportStatus @default(OPEN)
+
+  /// Written by whoever triages it, never shown to the author.
+  note String?
+
+  /// Captured by the page, not typed. Absent when sent through the REST API.
+  url       String?
+  userAgent String?
+  viewport  String?
+
+  authorId String
+  author   User   @relation("ReportAuthor", fields: [authorId], references: [username], onDelete: Cascade)
+
+  /// The course of the page it was sent from. Required for `CONTENT`, which
+  /// the course's instructor triages.
+  courseId Int?
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  triagedById String?
+  triagedBy   User?     @relation("ReportTriagedBy", fields: [triagedById], references: [username], onDelete: SetNull)
+  triagedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([courseId, status])
 }

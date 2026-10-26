@@ -321,3 +321,21 @@ enrolled and marked present by scanning it. A student with no account fills in
 the sign-up form on the same page and ends up with an account, an enrollment
 and the attendance. A roll call that is not an invite refuses someone who is not
 in the course. The instructor sees the newcomers flagged as new in this class.
+
+
+## Reporting problems
+
+### Report a problem
+
+    status: implemented
+    url: any page, from the user menu or the footer
+
+Student hits something broken, or a question that looks wrong, and opens
+"Report a problem". The dialog already holds a screenshot of the page and
+guesses the type: course content on a question, exam or material page, a bug
+anywhere else. A message too short to act on is refused before it is sent. The
+student can drop the screenshot, which may show more than they want to share,
+and add up to three images in total. After sending, the report shows up under
+"My reports" on their profile with its status, and they can delete it while
+nobody has triaged it yet. Nobody answers inside Codehood: the status is all
+the author sees.

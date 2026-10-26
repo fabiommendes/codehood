@@ -14,6 +14,7 @@ import {
 	type NotAllowedResponse,
 	type NotFoundResponse,
 	type RuleViolationResponse,
+	type TooManyRequestsResponse,
 	toJsonValueOrNothing,
 } from "./error-response";
 
@@ -362,6 +363,24 @@ export class Unavailable extends BaseSerializableError<InternalErrorResponse> {
 
 	constructor(message: string = m.errors_service_unavailable()) {
 		super(message, "internal-error", 503);
+	}
+
+	protected _toJsonExtra(): Record<string, never> {
+		return {};
+	}
+}
+
+/**
+ * Thrown when the caller exceeded a rate limit.
+ *
+ * The request was valid; repeating it later may succeed.
+ */
+export class TooManyRequests extends BaseSerializableError<TooManyRequestsResponse> {
+	readonly code = "too-many-requests";
+	readonly status: 429 = 429;
+
+	constructor(message: string = m.errors_too_many_requests()) {
+		super(message, "too-many-requests", 429);
 	}
 
 	protected _toJsonExtra(): Record<string, never> {

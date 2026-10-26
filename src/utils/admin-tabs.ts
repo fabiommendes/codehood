@@ -16,4 +16,9 @@ export const ADMIN_TABS = [
 		label: m.nav_admin_tab_editions(),
 		href: "/admin/editions",
 	},
+	{
+		key: "reports",
+		label: m.nav_admin_tab_reports(),
+		href: "/admin/reports",
+	},
 ] as const;

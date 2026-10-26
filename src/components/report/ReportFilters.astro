@@ -1,0 +1,47 @@
+---
+// The filter form of a report queue: status and type, sent as a query string.
+import { reportKind, reportStatus } from "@/core/schemas";
+import { m } from "@/i18n";
+import { ALL_REPORTS, type ReportFilters } from "@/utils/report-filters";
+import { REPORT_KIND_LABELS, REPORT_STATUS_LABELS } from "@/utils/report-row";
+
+interface Props {
+	filters: ReportFilters;
+	/// Hides the type filter, for a queue that holds a single type.
+	hideKind?: boolean;
+}
+
+const { filters, hideKind = false } = Astro.props;
+---
+
+<form method="GET" class="mb-6 flex flex-wrap items-end gap-4">
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend"><label for="report-filter-status">{m.report_filter_status()}</label></legend>
+    <select name="status" id="report-filter-status" class="select">
+      {
+        reportStatus.options.map((option) => (
+          <option value={option} selected={filters.status === option}>
+            {REPORT_STATUS_LABELS[option]()}
+          </option>
+        ))
+      }
+      <option value={ALL_REPORTS} selected={filters.status === null}>{m.report_filter_all()}</option>
+    </select>
+  </fieldset>
+  {
+    !hideKind && (
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend"><label for="report-filter-kind">{m.report_filter_type()}</label></legend>
+        <select name="kind" id="report-filter-kind" class="select">
+          <option value={ALL_REPORTS} selected={filters.kind === null}>{m.report_filter_all()}</option>
+          {reportKind.options.map((option) => (
+            <option value={option} selected={filters.kind === option}>
+              {REPORT_KIND_LABELS[option]()}
+            </option>
+          ))}
+        </select>
+      </fieldset>
+    )
+  }
+  <button type="submit" class="btn">{m.report_filter_apply()}</button>
+</form>

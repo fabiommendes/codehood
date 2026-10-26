@@ -1,3 +1,4 @@
+import { deflateSync } from "node:zlib";
 import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
@@ -1056,8 +1057,170 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	await seedReports(ada, live.slug);
+
 	console.log(
 		`[dev] created demo courses cs101/${ada.username}_${live.slug} and cs201/${alan.username}_${live.slug}, plus the ended cs101/${ada.username}_${past.slug}.`,
+	);
+}
+
+/// A solid-colour PNG of `width` x `height` pixels, standing in for a screenshot.
+function solidPng(
+	width: number,
+	height: number,
+	rgb: [number, number, number],
+) {
+	const crcTable = Array.from({ length: 256 }, (_, n) => {
+		let c = n;
+		for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+		return c >>> 0;
+	});
+	const crc = (bytes: Buffer) => {
+		let c = 0xffffffff;
+		for (const b of bytes) c = (crcTable[(c ^ b) & 0xff] as number) ^ (c >>> 8);
+		return (c ^ 0xffffffff) >>> 0;
+	};
+	const chunk = (type: string, data: Buffer) => {
+		const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+		const head = Buffer.alloc(4);
+		head.writeUInt32BE(data.length);
+		const tail = Buffer.alloc(4);
+		tail.writeUInt32BE(crc(body));
+		return Buffer.concat([head, body, tail]);
+	};
+	const header = Buffer.alloc(13);
+	header.writeUInt32BE(width, 0);
+	header.writeUInt32BE(height, 4);
+	header[8] = 8; // bit depth
+	header[9] = 2; // RGB
+	const row = Buffer.concat([
+		Buffer.from([0]), // filter: none
+		Buffer.from(Array.from({ length: width }, () => rgb).flat()),
+	]);
+	const pixels = Buffer.concat(Array.from({ length: height }, () => row));
+	return Buffer.concat([
+		Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+		chunk("IHDR", header),
+		chunk("IDAT", deflateSync(pixels)),
+		chunk("IEND", Buffer.alloc(0)),
+	]);
+}
+
+/**
+ * Seeds user reports in every kind and status, for the report screens.
+ *
+ * The student owns most of them; the instructor has one of their own and the
+ * course's instructor gets an open `CONTENT` report in the queue.
+ */
+async function seedReports(instructor: User, edition: string): Promise<void> {
+	const [admin, student, devInstructor] = await Promise.all(
+		[DEV_ADMIN_USERNAME, DEV_STUDENT_USERNAME, DEV_INSTRUCTOR_USERNAME].map(
+			(username) => db.user.findOne({ username }, FULL_ACCESS),
+		),
+	);
+	if (!admin || !student || !devInstructor) {
+		throw new Error(
+			"[seed] the dev accounts are missing; cannot seed reports.",
+		);
+	}
+	const course = {
+		discipline: "cs101",
+		instructor: instructor.username,
+		edition,
+	};
+	const sent = {
+		url: `http://localhost:4321/cs101/ada_${edition}`,
+		userAgent:
+			"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+		viewport: "1280x720",
+	};
+
+	await db.report.create(
+		{
+			kind: "BUG",
+			message:
+				"The calendar page shows last week's classes after I switch to the month view, and only a reload fixes it.",
+			...sent,
+			attachments: [
+				{ filename: "calendar.png", bytes: solidPng(64, 40, [200, 70, 70]) },
+			],
+		},
+		{ actor: student },
+	);
+	const suggestion = await db.report.create(
+		{
+			kind: "SUGGESTION",
+			message:
+				"It would help to filter the exam list by status. Right now I scroll through everything to find the open ones.",
+			url: `http://localhost:4321/cs101/ada_${edition}/exams`,
+			userAgent: sent.userAgent,
+			viewport: "1440x900",
+			attachments: [
+				{ filename: "exams-1.png", bytes: solidPng(64, 40, [60, 120, 200]) },
+				{ filename: "exams-2.png", bytes: solidPng(64, 40, [60, 180, 120]) },
+			],
+		},
+		{ actor: student },
+	);
+	const content = await db.report.create(
+		{
+			kind: "CONTENT",
+			course,
+			message:
+				"The recursion practice set asks for the base case before explaining what a base case is.",
+			url: sent.url,
+		},
+		{ actor: student },
+	);
+	const other = await db.report.create(
+		{
+			kind: "OTHER",
+			message:
+				"My name appears with a typo in the attendance export. Who should I tell?",
+		},
+		{ actor: student },
+	);
+	await db.report.create(
+		{
+			kind: "CONTENT",
+			course,
+			message:
+				"Lecture 4 says lists are immutable, but the example mutates one in place.",
+			url: sent.url,
+			userAgent: sent.userAgent,
+			viewport: sent.viewport,
+		},
+		{ actor: student },
+	);
+	await db.report.create(
+		{
+			kind: "BUG",
+			message:
+				"Saving my profile with an empty bio returns an error page instead of a message.",
+			url: "http://localhost:4321/profile",
+			userAgent: sent.userAgent,
+			viewport: "1280x720",
+		},
+		{ actor: devInstructor },
+	);
+
+	await db.report.update(
+		{ publicId: suggestion.publicId },
+		{ status: "TRIAGED", note: "Planned for the exams page. Tracked locally." },
+		{ actor: admin },
+	);
+	await db.report.update(
+		{ publicId: content.publicId },
+		{ status: "RESOLVED", note: "Reordered the practice set. Fixed in rev 2." },
+		{ actor: instructor },
+	);
+	await db.report.update(
+		{ publicId: other.publicId },
+		{
+			status: "DISMISSED",
+			note: "Not a Codehood problem: the name comes from the school registry.",
+		},
+		{ actor: admin },
 	);
 }
 
