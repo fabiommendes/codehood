@@ -98,17 +98,19 @@ export default function RollCallProjector(
 
 	return (
 		<main class="flex h-screen max-h-screen flex-col gap-4 overflow-hidden bg-base-100 p-6 text-center">
-			<header class="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+			<header class="mx-auto grid w-full max-w-2xl grid-cols-[1fr_auto_1fr] items-center gap-4">
 				<a
-					class="btn btn-ghost btn-sm justify-self-start"
+					class="btn btn-ghost btn-circle justify-self-start"
 					href={props.manageHref}
+					aria-label={m.attendance_projector_back()}
+					title={m.attendance_projector_back()}
 				>
-					{m.attendance_projector_back()}
+					<BackIcon />
 				</a>
 				<h1 class="text-3xl font-bold">{props.title}</h1>
-				<p class="justify-self-end text-2xl">
+				<span class="badge badge-lg badge-neutral justify-self-end">
 					{m.attendance_projector_present({ count: shown().present })}
-				</p>
+				</span>
 			</header>
 			<FormAlert error={failure() ?? undefined} />
 			<Show
@@ -160,6 +162,25 @@ export default function RollCallProjector(
 				</div>
 			</Show>
 		</main>
+	);
+}
+
+/// A left arrow, for the link back to the roll call.
+function BackIcon(): JSX.Element {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			class="h-6 w-6"
+			aria-hidden="true"
+		>
+			<path d="M19 12H5" />
+			<path d="m12 19-7-7 7-7" />
+		</svg>
 	);
 }
 
