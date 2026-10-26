@@ -339,19 +339,36 @@ export default function RollCallManager(
 														{student.username}
 													</span>
 													<Show when={student.dropped}>
-														<span class="badge badge-ghost badge-xs shrink-0">
-															{m.attendance_table_dropped()}
+														<span
+															class="badge badge-ghost badge-xs min-w-0"
+															title={m.attendance_table_dropped()}
+														>
+															<span class="truncate">
+																{m.attendance_table_dropped()}
+															</span>
 														</span>
 													</Show>
 													<Show when={entry()?.joined}>
-														<span class="badge badge-info badge-xs shrink-0">
-															{m.attendance_manager_new_in_class()}
+														<span
+															class="badge badge-info badge-xs min-w-0"
+															title={m.attendance_manager_new_in_class()}
+														>
+															<span class="truncate">
+																{m.attendance_manager_new_in_class()}
+															</span>
 														</span>
 													</Show>
 													<For each={entry()?.sharedWith ?? []}>
 														{(other) => (
-															<span class="badge badge-warning badge-xs shrink-0">
-																{m.attendance_manager_same_device({ other })}
+															<span
+																class="badge badge-warning badge-xs min-w-0"
+																title={m.attendance_manager_same_device({
+																	other,
+																})}
+															>
+																<span class="truncate">
+																	{m.attendance_manager_same_device({ other })}
+																</span>
 															</span>
 														)}
 													</For>
