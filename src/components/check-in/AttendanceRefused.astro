@@ -1,0 +1,24 @@
+---
+import { m } from "@/i18n";
+
+interface Props {
+	/// Why the check-in was refused.
+	message: string;
+}
+
+const { message } = Astro.props;
+---
+
+<section role="alert" class="flex flex-col items-center gap-4 text-center">
+  <svg viewBox="0 0 120 120" class="size-24" aria-hidden="true">
+    <circle cx="60" cy="60" r="52" class="fill-error/15 stroke-error" stroke-width="5" />
+    <path d="M42 42 L78 78 M78 42 L42 78" class="fill-none stroke-error" stroke-width="11" stroke-linecap="round" />
+  </svg>
+  <div class="flex flex-col gap-1">
+    <h3 class="text-2xl font-black tracking-tight text-error">{m.attendance_refused_headline()}</h3>
+    <p class="text-lg font-semibold text-balance">{message}</p>
+  </div>
+  <div class="flex w-full flex-col gap-2">
+    <slot />
+  </div>
+</section>

@@ -1,18 +1,239 @@
 ---
 import type { AttendanceView } from "@/actions/check-in";
-import { locale, m } from "@/i18n";
+import PartyLights from "@/components/brand/PartyLights.astro";
+import { roof, wall } from "@/components/brand/paper";
+import { m } from "@/i18n";
+import { formatDateTime } from "@/utils/schedule-time";
 
 interface Props {
 	view: AttendanceView;
+	/// Offers to type another code, on the page where codes are typed.
+	another?: boolean;
 }
 
-const { view } = Astro.props;
-const date = view.startAt.toLocaleDateString(locale, { dateStyle: "long" });
+const { view, another = false } = Astro.props;
+const meeting = formatDateTime(view.startAt);
+const recordedAt = formatDateTime(view.recordedAt, { second: "2-digit" });
+
+/// Confetti pieces: where each lands relative to the badge center, its turn, color and shape.
+const CONFETTI: [
+	x: number,
+	y: number,
+	turn: number,
+	color: string,
+	shape: string,
+][] = [
+	[-128, -46, 40, "bg-primary", "square"],
+	[-104, 18, -25, "bg-warning", "dot"],
+	[-140, 52, 70, "bg-info", "bar"],
+	[-84, -66, -50, "bg-success", "dot"],
+	[-70, 58, 15, "bg-secondary", "square"],
+	[-52, -78, 85, "bg-accent", "bar"],
+	[-112, -10, 120, "bg-secondary", "bar"],
+	[56, -76, -35, "bg-warning", "square"],
+	[84, 60, 60, "bg-primary", "dot"],
+	[108, -40, -80, "bg-info", "square"],
+	[132, 14, 25, "bg-accent", "dot"],
+	[74, -58, 110, "bg-success", "bar"],
+	[122, 56, -15, "bg-secondary", "square"],
+	[142, -14, 95, "bg-primary", "bar"],
+	[-20, 76, 45, "bg-warning", "bar"],
+	[26, 80, -60, "bg-info", "dot"],
+];
 ---
 
-<div role="status" class="alert alert-success alert-soft flex-col items-start">
-  <p class="font-semibold">{m.attendance_result_recorded({ title: view.title })}</p>
-  <p class="text-sm">{date}</p>
-  {view.joinedCourse && <p class="text-sm">{m.attendance_result_joined({ course: view.joinedCourse })}</p>}
-</div>
-<a href="/courses" class="btn btn-block rounded-full">{m.attendance_result_go_to_courses()}</a>
+<section role="status" class:list={["result flex flex-col items-center gap-4 text-center", { fresh: !view.repeat }]}>
+  {!view.repeat && <PartyLights class="lights -mt-2" />}
+
+  <div class="relative flex h-36 w-full items-center justify-center" aria-hidden="true">
+    {
+      !view.repeat &&
+        CONFETTI.map(([x, y, turn, color, shape], i) => (
+          <span
+            class:list={["confetti", color, shape]}
+            style={`--x:${x}px;--y:${y}px;--turn:${turn}deg;--delay:${300 + (i % 5) * 40}ms`}
+          />
+        ))
+    }
+    <svg viewBox="0 0 120 120" class="seal relative size-32 overflow-visible">
+      {
+        view.repeat ? (
+          <circle cx="60" cy="60" r="52" class="fill-success/15 stroke-success" stroke-width="5" />
+        ) : (
+          <>
+            <circle cx="60" cy="60" r="56" class="ring fill-none stroke-success" stroke-width="4" />
+            <circle cx="60" cy="60" r="56" class="fill-success" />
+          </>
+        )
+      }
+      <path
+        d="M34 62 L52 80 L87 43"
+        pathLength="100"
+        class:list={["check fill-none", view.repeat ? "stroke-success" : "stroke-success-content"]}
+        stroke-width="11"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </div>
+
+  <div class="rise flex flex-col gap-1">
+    <h3 class:list={["text-3xl font-black tracking-tight", view.repeat ? "text-base-content" : "text-success"]}>
+      {view.repeat ? m.attendance_result_repeat_headline() : m.attendance_result_headline()}
+    </h3>
+    <p class="text-lg font-semibold text-balance">
+      {view.repeat ? m.attendance_result_repeat({ title: view.title }) : m.attendance_result_recorded({ title: view.title })}
+    </p>
+    <p class="text-base-content/70">{view.course}</p>
+  </div>
+
+  <dl class="rise grid w-full grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-box bg-base-200 px-4 py-3 text-left text-sm">
+    <dt class="text-base-content/60">{m.attendance_result_meeting()}</dt>
+    <dd class="font-medium">{meeting}</dd>
+    <dt class="text-base-content/60">{m.attendance_result_recorded_at()}</dt>
+    <dd class="font-medium tabular-nums">{recordedAt}</dd>
+  </dl>
+
+  {view.repeat && <p class="text-sm text-base-content/70">{m.attendance_result_repeat_hint()}</p>}
+
+  {
+    view.joined && (
+      <div class="rise flex w-full items-center gap-3 rounded-box border border-primary/30 bg-primary/10 px-4 py-3 text-left">
+        <svg viewBox="0 0 24 24" class="size-8 shrink-0 fill-primary" aria-hidden="true">
+          <path d={wall(4.5, 2.5, 0.62)} />
+          <path d={roof(4.5, 2.5, 0.62)} />
+        </svg>
+        <div>
+          <p class="font-semibold">{m.attendance_result_welcome()}</p>
+          <p class="text-sm">{m.attendance_result_joined({ course: view.course })}</p>
+        </div>
+      </div>
+    )
+  }
+
+  <div class="flex w-full flex-col gap-2">
+    <a href={view.courseHref} class="btn btn-primary btn-block rounded-full">
+      {m.attendance_result_go_to_course({ course: view.course })}
+    </a>
+    {another && <a href="/check-in" class="btn btn-ghost btn-block rounded-full">{m.attendance_result_type_another()}</a>}
+  </div>
+</section>
+
+<style>
+  .confetti {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    transform: translate(var(--x), var(--y)) rotate(var(--turn));
+  }
+
+  .confetti.dot {
+    border-radius: 9999px;
+  }
+
+  .confetti.bar {
+    width: 6px;
+    height: 16px;
+    margin: -8px 0 0 -3px;
+    border-radius: 2px;
+  }
+
+  .confetti.square {
+    border-radius: 2px;
+  }
+
+  .fresh .seal {
+    animation: pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .fresh .check {
+    stroke-dasharray: 100;
+    animation: draw 380ms ease-out 260ms both;
+  }
+
+  .fresh .ring {
+    transform-origin: 60px 60px;
+    opacity: 0;
+    animation: ripple 900ms ease-out 380ms both;
+  }
+
+  .fresh .confetti {
+    animation: burst 900ms cubic-bezier(0.15, 0.8, 0.3, 1) var(--delay) both;
+  }
+
+  .fresh .rise {
+    animation: rise 420ms ease-out 360ms both;
+  }
+
+  .fresh .lights :global(.bulb) {
+    animation: twinkle 1.1s ease-in-out 3;
+  }
+
+  .fresh .lights :global(.bulb:nth-of-type(2n)) {
+    animation-delay: 550ms;
+  }
+
+  @keyframes pop {
+    from {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+  }
+
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 100;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes ripple {
+    from {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    to {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+
+  @keyframes burst {
+    from {
+      transform: translate(0, 0) rotate(0) scale(0.2);
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+  }
+
+  @keyframes twinkle {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fresh .seal,
+    .fresh .check,
+    .fresh .ring,
+    .fresh .confetti,
+    .fresh .rise,
+    .fresh .lights :global(.bulb) {
+      animation: none;
+    }
+  }
+</style>

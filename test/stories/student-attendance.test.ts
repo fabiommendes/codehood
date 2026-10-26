@@ -26,6 +26,8 @@ import {
  *
  * Check-in link (`/c/<rollCallId>/<code>`)
  *   - Success: "Attendance recorded for <meeting title>".
+ *   - Scanning again once present: "Attendance already recorded for <meeting title>".
+ *   - Any refusal also reads "Attendance not recorded".
  *   - Code that rotated away more than 30 s ago: "That code has expired."
  *   - Closed roll call: "This roll call is closed."
  *   - Not in the course and the roll call is not an invite:
@@ -114,6 +116,7 @@ test("student: Check in to class", async ({ page }) => {
 		const stale = codeAt(rollArrays.secret, new Date(Date.now() - 120_000));
 		await page.goto(`/c/${rollArrays.id}/${stale.code}`);
 		await expect(page.getByText("That code has expired.")).toBeVisible();
+		await expect(page.getByText("Attendance not recorded")).toBeVisible();
 		expect(await attended(rollArrays.id, ana.username)).toBe(false);
 	});
 
@@ -130,6 +133,14 @@ test("student: Check in to class", async ({ page }) => {
 			page.getByText("Attendance recorded for sa-Arrays"),
 		).toBeVisible();
 		expect(await attended(rollArrays.id, ana.username)).toBe(true);
+	});
+
+	await test.step("scanning again says the attendance was already recorded", async () => {
+		await page.goto(`/c/${rollArrays.id}/${currentCode(rollArrays)}`);
+		await expect(
+			page.getByText("Attendance already recorded for sa-Arrays"),
+		).toBeVisible();
+		await expect(page.getByText("Attendance recorded for")).toHaveCount(0);
 	});
 
 	await test.step("a code typed at the check-in page registers another meeting", async () => {

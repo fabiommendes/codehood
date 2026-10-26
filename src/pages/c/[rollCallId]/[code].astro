@@ -11,6 +11,7 @@ import {
 	resumeClaim,
 	startClaim,
 } from "@/actions/check-in";
+import AttendanceRefused from "@/components/check-in/AttendanceRefused.astro";
 import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
 import SignUpForm from "@/components/check-in/SignUpForm.astro";
 import type { RollCallId } from "@/core/schemas";
@@ -69,9 +70,13 @@ const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">
 <CenteredLayout title={wantsSignUp ? m.auth_check_in_join_class() : m.auth_check_in_title()}>
   {
     error && (
-      <div role="alert" class="alert alert-error">
-        <span>{error}</span>
-      </div>
+      <AttendanceRefused message={error}>
+        {actor ? (
+          <a href="/check-in" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>
+        ) : (
+          <a href="/" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>
+        )}
+      </AttendanceRefused>
     )
   }
   {view && <AttendanceResult view={view} />}
@@ -83,10 +88,4 @@ const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">
       </>
     )
   }
-  {
-    error && !actor && (
-      <a href="/" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>
-    )
-  }
-  {error && actor && <a href="/check-in" class="btn btn-block rounded-full">{m.auth_check_in_type_code()}</a>}
 </CenteredLayout>

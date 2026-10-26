@@ -9,6 +9,7 @@ import { checkInCode, checkInSignUp, type RollCallId } from "@/core/schemas";
 import { db } from "@/db";
 import type { CheckInResult } from "@/db/services/roll-call.service";
 import { m } from "@/i18n";
+import { courseHref } from "@/urls";
 import { CLAIM_TTL_MS, readClaim, signClaim } from "@/utils/pending-check-in";
 import { createLimiter } from "@/utils/rate-limit";
 import { uniqueConstraintError, withActionErrors } from "./helpers";
@@ -37,8 +38,16 @@ const MESSAGES: Record<CheckInError["code"], () => string> = {
 export interface AttendanceView {
 	title: string;
 	startAt: Date;
-	/// Name of the discipline, when this check-in enrolled the student.
-	joinedCourse: string | null;
+	/// When the attendance was first recorded.
+	recordedAt: Date;
+	/// Whether the student was already present before this check-in.
+	repeat: boolean;
+	/// Name of the discipline of the roll call's course.
+	course: string;
+	/// Link to the course home.
+	courseHref: string;
+	/// Whether this check-in enrolled the student in the course.
+	joined: boolean;
 }
 
 /// Thrown when a user or an IP made too many wrong attempts.
@@ -105,18 +114,21 @@ async function limited<T>(
 
 /// Turns a service result into what the result page shows.
 async function viewOf(result: CheckInResult): Promise<AttendanceView> {
-	let joinedCourse: string | null = null;
-	if (result.joined && "id" in result.rollCall) {
-		const rollCall = await db.rollCall.findOne(
-			{ id: result.rollCall.id },
-			FULL_ACCESS,
-		);
-		const course = rollCall
-			? await db.course.findOne({ id: rollCall.courseId }, FULL_ACCESS)
-			: null;
-		joinedCourse = course?.discipline.name ?? null;
-	}
-	return { title: result.title, startAt: result.startAt, joinedCourse };
+	const course = await db.course.findOne({ id: result.courseId }, FULL_ACCESS);
+	if (!course) throw new Error(`Course ${result.courseId} has vanished`);
+	return {
+		title: result.title,
+		startAt: result.startAt,
+		recordedAt: result.recordedAt,
+		repeat: result.repeat,
+		course: course.discipline.name,
+		courseHref: courseHref({
+			discipline: course.discipline.slug,
+			instructor: course.instructor.username,
+			edition: course.edition.slug,
+		}),
+		joined: result.joined !== null && !result.repeat,
+	};
 }
 
 /// What a check-in attempt needs from the request.

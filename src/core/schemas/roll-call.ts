@@ -115,10 +115,15 @@ export const checkInClaimInput = z.object({
 
 export const checkInResultSchema = z.object({
 	rollCall: rollCallPK,
+	courseId: courseId,
 	title: z.string(),
 	startAt: z.date(),
 	/// Set when this check-in created the enrollment or the account.
 	joined: attendanceSchema.shape.joined,
+	/// When the attendance was first recorded, by this check-in or an earlier one.
+	recordedAt: z.date(),
+	/// Whether the student was already present, so this check-in changed nothing.
+	repeat: z.boolean(),
 });
 
 /// Identifies a roll call by the course's URL segments, week and time slot.

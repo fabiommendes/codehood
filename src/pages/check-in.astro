@@ -21,26 +21,30 @@ const form = await actionForm(Astro, actions.checkIn.register, checkInCode, {
 ---
 
 <CenteredLayout title={m.auth_check_in_title()}>
-  {result?.data && <AttendanceResult view={result.data} />}
-
-  <form
-    method="POST"
-    action={actions.checkIn.register}
-    class="flex flex-col gap-4"
-  >
-    <FormAlert error={form.error} />
-    <Field
-      {...form.field("code")}
-      class="font-mono uppercase"
-      control={{
-        minlength: 6,
-        maxlength: 6,
-        autocomplete: "off",
-        autocapitalize: "characters",
-      }}
-    />
-    <div class="card-actions">
-      <button type="submit" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_register()}</button>
-    </div>
-  </form>
+  {
+    result?.data ? (
+      <AttendanceResult view={result.data} another />
+    ) : (
+      <form
+        method="POST"
+        action={actions.checkIn.register}
+        class="flex flex-col gap-4"
+      >
+        <FormAlert error={form.error} />
+        <Field
+          {...form.field("code")}
+          class="font-mono uppercase"
+          control={{
+            minlength: 6,
+            maxlength: 6,
+            autocomplete: "off",
+            autocapitalize: "characters",
+          }}
+        />
+        <div class="card-actions">
+          <button type="submit" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_register()}</button>
+        </div>
+      </form>
+    )
+  }
 </CenteredLayout>

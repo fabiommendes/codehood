@@ -828,10 +828,11 @@ async function markPresent(
 
 	const existing = await tx.attendance.findUnique({
 		where: { rollCallId_username: { rollCallId: target.id, username } },
-		select: { joined: true },
+		select: { joined: true, createdAt: true },
 	});
-	if (!existing) {
-		await tx.attendance.create({
+	const recorded =
+		existing ??
+		(await tx.attendance.create({
 			data: {
 				rollCallId: target.id,
 				username,
@@ -839,13 +840,16 @@ async function markPresent(
 				deviceHash: createHash("sha256").update(deviceId).digest("hex"),
 				joined,
 			},
-		});
-	}
+			select: { createdAt: true },
+		}));
 	return {
 		rollCall: { id: target.id as RollCallId },
+		courseId,
 		title: target.event.title,
 		startAt: target.event.startAt,
 		joined: existing ? existing.joined : joined,
+		recordedAt: recorded.createdAt,
+		repeat: existing !== null,
 	};
 }
 
