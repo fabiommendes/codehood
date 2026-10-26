@@ -122,6 +122,11 @@ test("POST /api/user/me/change-password refuses a weak new password", async ({
 		data: { currentPassword: user.password, newPassword: "12345678" },
 	});
 
-	expect(refused.ok()).toBe(false);
+	expect(refused.status()).toBe(400);
+	const body = await refused.json();
+	expect(body.code).toBe("invalid-data");
+	expect(body.errors.newPassword).toEqual(
+		expect.arrayContaining([expect.objectContaining({ code: "too-common" })]),
+	);
 	expect(await storedHash(user.username)).toBe(before);
 });

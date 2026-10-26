@@ -3,6 +3,7 @@ import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { hasPerm } from "@/auth/permissions";
+import { WeakPassword } from "@/core/error";
 import type { UserId } from "@/core/schemas";
 import { db } from "@/db";
 
@@ -396,4 +397,30 @@ test("resetPassword: an admin sets a password without the current one and ends e
 		await verifyPassword(stored?.passwordHash ?? "", "brand-new-pass-42"),
 	).toBe(true);
 	expect(await db.session.validate(token)).toBeNull();
+});
+
+test("a weak password is refused with WeakPassword on newPassword, naming each issue", async () => {
+	const owner = await db.user.create(
+		{
+			email: "weak-reset@codehood.test",
+			username: "weakreset",
+			name: "Weak Reset",
+			role: "STUDENT",
+			githubId: "weak-reset",
+			schoolId: "990001",
+			password: "a-decent-password",
+		},
+		FULL_ACCESS,
+	);
+	const error = await db.user
+		.resetPassword(
+			{ username: owner.username, newPassword: "12345678" },
+			{ actor: actorOf("some-admin", "ADMIN") },
+		)
+		.catch((e: unknown) => e);
+
+	expect(error).toBeInstanceOf(WeakPassword);
+	expect((error as WeakPassword).errors.newPassword).toEqual(
+		expect.arrayContaining([expect.objectContaining({ code: "too-common" })]),
+	);
 });

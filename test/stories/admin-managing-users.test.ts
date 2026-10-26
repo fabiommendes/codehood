@@ -181,6 +181,15 @@ test("admin: reset a password for someone locked out", async ({
 		).toContainText("at least 8 characters");
 	});
 
+	await test.step("so is a common one, under the field", async () => {
+		await newPassword.fill("12345678");
+		await dialog.getByRole("button", { name: "Reset password" }).click();
+		await expect(dialog).toBeVisible();
+		await expect(
+			dialog.getByRole("group", { name: "New password", exact: true }),
+		).toContainText("Password is too common");
+	});
+
 	await test.step("admin sets a new password", async () => {
 		await newPassword.fill("fresh-start-2026");
 		await dialog.getByRole("button", { name: "Reset password" }).click();

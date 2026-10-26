@@ -193,6 +193,35 @@ export class InvalidData extends BaseSerializableError<InvalidDataResponse> {
 
 export type InvalidDataErrors = InvalidDataResponse["errors"];
 
+/// One reason a password fails the strength checks.
+export type PasswordIssue = {
+	code: Extract<InvalidDataCode, "too-short" | "too-common" | "compromised">;
+	message: string;
+};
+
+/**
+ * Thrown when a new password fails the strength checks.
+ *
+ * An {@link InvalidData} on one field, `newPassword` unless told otherwise, so
+ * the REST API answers 400 and a form shows each issue under that field.
+ */
+export class WeakPassword extends InvalidData {
+	constructor(
+		readonly issues: PasswordIssue[],
+		readonly field: string = "newPassword",
+	) {
+		super(
+			{ [field]: issues },
+			{
+				message: m.errors_password_too_weak({
+					issues: issues.map((issue) => issue.message).join(", "),
+				}),
+			},
+		);
+		this.name = "WeakPassword";
+	}
+}
+
 /**
  * Thrown when a resource is not found.
  *

@@ -4,6 +4,7 @@ import {
 	NotAllowed,
 	NotFound,
 	TooManyRequests,
+	WeakPassword,
 } from "@/core/error";
 import { m } from "@/i18n";
 
@@ -24,6 +25,10 @@ function translateServiceError(error: unknown): unknown {
 	}
 	if (error instanceof FieldError) {
 		return fieldActionError(error);
+	}
+	if (error instanceof WeakPassword) {
+		const messages = error.issues.map((issue) => issue.message);
+		return fieldActionError(new FieldError(error.field, messages.join(". ")));
 	}
 	return error;
 }

@@ -69,6 +69,17 @@ test("student: change my password and log out everywhere", async ({ page }) => {
 		).toBeVisible();
 	});
 
+	await test.step("a common new password is refused under its field", async () => {
+		await openTab(page, "Account");
+		await fillField(page, "Current password", student.password);
+		await fillField(page, "New password", "12345678");
+		await fillField(page, "Confirm new password", "12345678");
+		await page.getByRole("button", { name: "Change password" }).click();
+		await expect(
+			page.getByRole("group", { name: "New password", exact: true }),
+		).toContainText("Password is too common");
+	});
+
 	// The lab machine of the story: a session the student is not holding.
 	const labMachine = await db.session.create(
 		{ username: student.username },

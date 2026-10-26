@@ -1,12 +1,7 @@
 import { hash, verify } from "@node-rs/argon2";
+import type { PasswordIssue } from "@/core/error";
 import { m } from "@/i18n";
 import COMMON_PASSWORDS from "./common-passwords.json" with { type: "json" };
-
-export type PasswordErrorCode = "too-short" | "too-common" | "compromised";
-export type PasswordError = {
-	message: string;
-	code: PasswordErrorCode;
-};
 
 // OWASP baseline for Argon2id: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
 // `algorithm: 2` is Argon2id (@node-rs/argon2's `Algorithm` is an ambient const enum,
@@ -24,12 +19,12 @@ const PASSWORD_COMMON_WORDS = buildCommonWordsSet(COMMON_PASSWORDS);
 /**
  * Verify if password meets minimum strength requirements.
  *
- * Returns "ok" if it does, or an array of error messages if it doesn't.
+ * Returns `undefined` if it does, or the issues found if it doesn't.
  */
 export async function passwordStrengthIssues(
 	password: string,
-): Promise<PasswordError[] | undefined> {
-	const errors: PasswordError[] = [];
+): Promise<PasswordIssue[] | undefined> {
+	const errors: PasswordIssue[] = [];
 
 	if (password.length < PASSWORD_MINIMUM_LENGTH) {
 		errors.push({

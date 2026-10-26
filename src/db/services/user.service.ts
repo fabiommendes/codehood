@@ -7,7 +7,7 @@ import {
 } from "@/auth/password";
 import { ensurePerm } from "@/auth/permissions";
 import { SCHOOL_ID_PATTERN } from "@/core/constants";
-import { FieldError, NotAllowed, NotFound } from "@/core/error";
+import { FieldError, NotAllowed, NotFound, WeakPassword } from "@/core/error";
 import {
 	passwordChange,
 	passwordReset,
@@ -290,13 +290,7 @@ export class UserService extends CrudBase<{
 				);
 			}
 		} else if (issues) {
-			// If the actor is not SYSTEM, we throw an error if the password is weak.
-			// TODO: pick a better error class
-			throw new Error(
-				m.errors_password_too_weak({
-					issues: issues.map((issue) => issue.message).join(", "),
-				}),
-			);
+			throw new WeakPassword(issues);
 		}
 
 		const client = opts.tx ?? this.prisma;
