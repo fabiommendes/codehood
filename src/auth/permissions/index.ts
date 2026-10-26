@@ -57,6 +57,7 @@ type ExtraPerms =
 	| "api-key.manage"
 	| "calendar-feed.manage"
 	| "session.manage"
+	| "user.reset-password"
 	| "enrollment.manage"
 	| "system.manage";
 
@@ -205,6 +206,9 @@ const PERMISSIONS = {
 	// USER --------------------------------------------------------------------
 	// Rule: only admins can create and remove new users
 	"user.create | user.delete": { admin: true },
+
+	// Rule: only admins set a password without knowing the current one.
+	"user.reset-password": { admin: true },
 
 	// Rule: users can only read or edit their own information.
 	"user.read | user.update": {

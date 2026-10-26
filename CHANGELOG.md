@@ -4,6 +4,10 @@
 
 ### Added
 
+- Admin password reset: each row of `/admin/users` has a button that sets a
+  new password for the account without the current one and ends every session
+  it holds. Backed by `UserService.resetPassword` and the new
+  `user.reset-password` permission, which only admins hold.
 - Reports: any logged-in user sends a report (bug, suggestion, course content,
   other) from the user menu, the footer or the 500 page, with a screenshot of
   the page and up to three images. The author follows its status under the

@@ -357,3 +357,43 @@ test("reserved usernames are refused for new accounts, in any case", async () =>
 		).rejects.toThrow();
 	}
 });
+
+test("resetPassword: an admin sets a password without the current one and ends every session; the owner cannot", async () => {
+	const owner = await db.user.create(
+		{
+			email: "locked-out@codehood.test",
+			username: "lockedout",
+			name: "Locked Out",
+			role: "INSTRUCTOR",
+			password: "forgotten-password",
+		},
+		FULL_ACCESS,
+	);
+	const { token } = await db.session.create(
+		{ username: owner.username },
+		FULL_ACCESS,
+	);
+
+	const self = actorOf(owner.username, "INSTRUCTOR");
+	await expect(
+		db.user.resetPassword(
+			{ username: owner.username, newPassword: "taken-over-123" },
+			{ actor: self },
+		),
+	).rejects.toThrow();
+
+	const admin = actorOf("some-admin", "ADMIN");
+	await db.user.resetPassword(
+		{ username: owner.username, newPassword: "brand-new-pass-42" },
+		{ actor: admin },
+	);
+
+	const stored = await db.user.findOne(
+		{ username: owner.username },
+		FULL_ACCESS,
+	);
+	expect(
+		await verifyPassword(stored?.passwordHash ?? "", "brand-new-pass-42"),
+	).toBe(true);
+	expect(await db.session.validate(token)).toBeNull();
+});

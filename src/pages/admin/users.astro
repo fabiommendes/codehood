@@ -6,10 +6,10 @@ import AdminHeader from "@/components/AdminHeader.astro";
 import UsersTable from "@/components/admin/UsersTable";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import { userCreateForm } from "@/core/schemas";
+import { passwordReset, userCreateForm } from "@/core/schemas";
 import { db, type User } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
-import { actionForm } from "@/forms/form-state";
+import { actionForm, submittedValues } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 
@@ -20,6 +20,7 @@ if (!Astro.locals.actor) return Astro.redirect("/login");
 
 const forceLogoutResult = Astro.getActionResult(actions.admin.forceLogout);
 const createUserResult = Astro.getActionResult(actions.admin.createUser);
+const resetResult = Astro.getActionResult(actions.admin.resetPassword);
 
 const createForm = await actionForm(
 	Astro,
@@ -29,6 +30,16 @@ const createForm = await actionForm(
 );
 
 const role = createForm.field("role");
+
+const resetForm = await actionForm(
+	Astro,
+	actions.admin.resetPassword,
+	passwordReset,
+	{ id: "reset-password" },
+);
+const resetUsername = resetResult
+	? (await submittedValues(Astro.request)).username
+	: undefined;
 
 const users = (await db.user.findMany(
 	{},
@@ -138,6 +149,18 @@ const [createdBefore, createdAfter] = splitAtSlot(
       )
     }
 
-    <UsersTable users={users} />
+    {
+      resetResult && !resetResult.error && (
+        <div role="alert" class="alert alert-success mt-6">
+          <span>{m.admin_reset_password_done({ username: `@${resetUsername}` })}</span>
+        </div>
+      )
+    }
+
+    <UsersTable
+      users={users}
+      resetForm={resetForm}
+      failedUsername={resetResult?.error ? resetUsername : undefined}
+    />
   </main>
 </AppLayout>

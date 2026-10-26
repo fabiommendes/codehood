@@ -1,5 +1,6 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { FieldError } from "@/core/error";
 import {
 	disciplineCreate,
@@ -8,6 +9,7 @@ import {
 	editionForm,
 	editionPK,
 	inviteRevoke,
+	passwordReset,
 	userByUsername,
 	userCreateForm,
 } from "@/core/schemas";
@@ -51,6 +53,28 @@ export const admin = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.session.delete({ username: input.username }, { actor });
+		}),
+	}),
+
+	resetPassword: defineAction({
+		accept: "form",
+		input: passwordReset,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			await db.user.resetPassword(input, { actor });
+
+			// The reset revoked every session of the account. When it is the
+			// admin's own, keep this device signed in, as a password change does.
+			if (input.username === actor.username) {
+				const { token, session } = await db.session.create(
+					{ username: actor.username },
+					{ actor },
+				);
+				context.cookies.set(SESSION_COOKIE, token, {
+					...SESSION_COOKIE_OPTIONS,
+					expires: session.expiresAt,
+				});
+			}
 		}),
 	}),
 

@@ -133,6 +133,12 @@ export const passwordChange = z.object({
 		}),
 });
 
+/// The password an admin sets for an account, without knowing the current one.
+export const passwordReset = z.object({
+	username,
+	newPassword: passwordChange.shape.newPassword,
+});
+
 /// What a person types to create their own account.
 export const userSignUp = z.object({
 	name: userSchema.shape.name.meta({ form: { label: m.forms_label_name() } }),

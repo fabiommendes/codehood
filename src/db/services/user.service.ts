@@ -7,9 +7,10 @@ import {
 } from "@/auth/password";
 import { ensurePerm } from "@/auth/permissions";
 import { SCHOOL_ID_PATTERN } from "@/core/constants";
-import { FieldError, NotAllowed } from "@/core/error";
+import { FieldError, NotAllowed, NotFound } from "@/core/error";
 import {
 	passwordChange,
+	passwordReset,
 	userCreate,
 	type userFilter,
 	userPK,
@@ -39,6 +40,7 @@ export type UserFilter = z.infer<typeof userFilter>;
 export type UserPK = z.infer<typeof userPK>;
 export type UserUpdate = z.infer<typeof userUpdate>;
 export type PasswordChange = z.infer<typeof passwordChange>;
+export type PasswordReset = z.infer<typeof passwordReset>;
 
 /// Session sweep on a password change. Honours `opts.tx` when one is open.
 const sessions = new SessionService();
@@ -335,6 +337,25 @@ export class UserService extends CrudBase<{
 				status: 401,
 			});
 		}
+
+		await this.updatePassword(user, input.newPassword, opts);
+		await sessions.delete({ username: user.username }, opts);
+	}
+
+	// TODO: move to the auth service.
+	/**
+	 * Replaces a user's password without proof of the current one, and revokes every session they hold.
+	 *
+	 * This is how an admin lets a locked-out user back in, so it takes a
+	 * permission no user holds over their own account.
+	 *
+	 * @throws NotFound when no account has `input.username`.
+	 */
+	@Validate({ service: true, args: [passwordReset] })
+	async resetPassword(input: PasswordReset, opts: ServiceOpts): Promise<void> {
+		ensurePerm(opts.actor, "user.reset-password");
+		const user = await this.findOne({ username: input.username }, opts);
+		if (!user) throw new NotFound("user", input.username);
 
 		await this.updatePassword(user, input.newPassword, opts);
 		await sessions.delete({ username: user.username }, opts);

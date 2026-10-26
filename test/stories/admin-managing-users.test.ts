@@ -138,3 +138,66 @@ test("admin: find a user and end their sessions", async ({ page, browser }) => {
 		await logIn(elsewherePage, suspect);
 	});
 });
+
+test("admin: reset a password for someone locked out", async ({
+	page,
+	browser,
+}) => {
+	const admin = await seedUser({ role: "ADMIN", name: "Grace Admin" });
+	const lockedOut = await seedUser({
+		role: "INSTRUCTOR",
+		name: "Forgetful Fred",
+		email: "fred-forgetful@codehood.test",
+	});
+
+	// Background: the old password is still signed in somewhere, maybe in the
+	// hands of someone who should not have it.
+	const elsewhere = await browser.newContext();
+	const elsewherePage = await elsewhere.newPage();
+	await logInAs(elsewherePage, lockedOut);
+
+	await logInAs(page, admin);
+	await page.goto("/admin/users");
+	const row = page.getByRole("row").filter({ hasText: lockedOut.email });
+	const dialog = page.locator(`#reset-password-${lockedOut.username}`);
+	const newPassword = dialog
+		.getByRole("group", { name: "New password", exact: true })
+		.locator("input");
+
+	await test.step("a password that is too short is refused in the dialog", async () => {
+		await row
+			.getByRole("button", { name: `Reset password of ${lockedOut.name}` })
+			.click();
+		await newPassword.fill("short");
+		await dialog
+			.locator("form[action*='resetPassword']")
+			.evaluate((form: HTMLFormElement) => {
+				form.noValidate = true;
+			});
+		await dialog.getByRole("button", { name: "Reset password" }).click();
+		await expect(dialog).toBeVisible();
+		await expect(
+			dialog.getByRole("group", { name: "New password", exact: true }),
+		).toContainText("at least 8 characters");
+	});
+
+	await test.step("admin sets a new password", async () => {
+		await newPassword.fill("fresh-start-2026");
+		await dialog.getByRole("button", { name: "Reset password" }).click();
+		await expect(
+			page.getByText(`Password reset for @${lockedOut.username}.`),
+		).toBeVisible();
+	});
+
+	await test.step("the old session is gone", async () => {
+		await elsewherePage.goto("/profile");
+		await expect(elsewherePage).toHaveURL(/\/login/);
+	});
+
+	await test.step("and the owner logs in with the new password", async () => {
+		await logIn(elsewherePage, {
+			username: lockedOut.username,
+			password: "fresh-start-2026",
+		});
+	});
+});

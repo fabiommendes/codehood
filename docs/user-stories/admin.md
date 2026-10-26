@@ -77,10 +77,13 @@ rather than recovered.
 
 ### Reset a password for someone locked out
 
-    status: cli
+    status: implemented
+    url: /admin/users
 
-An instructor lost their password and this instance has no email delivery
-configured. Sysadmin resets it from the command line and tells them out of band.
+A user lost their password and this instance has no email delivery configured.
+Admin sets a new one from the users page, or sysadmin from the command line, and
+tells them out of band. Every session the account held ends, so whoever had the
+old password is out too.
 
 
 ### Find a user and end their sessions
