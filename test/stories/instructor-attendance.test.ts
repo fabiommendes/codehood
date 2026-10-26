@@ -35,8 +35,8 @@ import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
  *     as it flips: on marks the student present by hand, off removes the
  *     attendance.
  *   - A present student's row has a button "Add note" (or "Edit note" once it
- *     has one) that reveals a textbox "Note" and a button "Save note". A saved
- *     note reads as text in the row.
+ *     has one) that opens a dialog, inside the row's markup, with a textbox
+ *     "Note" and a button "Save note". A saved note reads as text in the row.
  *   - A badge "Same device as <username>" on a row whose attendance shares a
  *     browser with another student's.
  *   - While the roll call is open the page refreshes itself, so a check-in
