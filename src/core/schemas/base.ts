@@ -139,6 +139,21 @@ export const dateInput = z.iso
 	.date()
 	.transform((value) => new Date(`${value}T00:00:00Z`));
 
+/**
+ * A point in time an input schema accepts as a `Date` or as the ISO 8601
+ * string a JSON body carries ("2026-08-01T13:00:00Z").
+ *
+ * The string must declare its offset, since a local reading would depend on
+ * the server's timezone. Unlike `z.coerce.date()`, `null`, numbers and other
+ * date formats are rejected. Output schemas keep `z.date()`.
+ */
+export const instant = z
+	.union([
+		z.date(),
+		z.iso.datetime({ offset: true }).transform((value) => new Date(value)),
+	])
+	.openapi({ type: "string", format: "date-time" });
+
 export const buffer = z
 	.custom<Buffer>((v) => Buffer.isBuffer(v), "Expected a Buffer")
 	.openapi({ type: "string", format: "binary" });

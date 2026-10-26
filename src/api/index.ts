@@ -137,9 +137,6 @@ export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	},
 });
 
-/// A JSON body carries dates as ISO strings.
-const isoDate = z.coerce.date().nullish();
-
 export const examExceptionApi = CRUD(
 	"/api/course/[discipline]/[course]/exam/[slug]/exception",
 	{
@@ -151,10 +148,8 @@ export const examExceptionApi = CRUD(
 		entity: schema.examExceptionSchema
 			.omit({ id: true, examId: true, note: true })
 			.extend({ note: z.string().nullable().optional() }),
-		create: schema.examExceptionCreate
-			.omit({ course: true, exam: true })
-			.extend({ scheduledAt: isoDate }),
-		update: schema.examExceptionUpdate.extend({ scheduledAt: isoDate }),
+		create: schema.examExceptionCreate.omit({ course: true, exam: true }),
+		update: schema.examExceptionUpdate,
 		filter: schema.examExceptionFilterBase.omit({ exam: true }),
 		scope: z.object({
 			course: schema.courseRef,

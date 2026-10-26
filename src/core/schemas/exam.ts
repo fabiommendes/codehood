@@ -4,6 +4,7 @@ import {
 	courseId,
 	duration,
 	examId,
+	instant,
 	questionRefId,
 	rev,
 	slug,
@@ -89,7 +90,7 @@ export const examCreate = examSchema
 
 		description: z.string().nullish(),
 		preamble: z.string().nullish(),
-		scheduledAt: z.date().nullish(),
+		scheduledAt: instant.nullish(),
 		duration: examDuration.nullish(),
 		rev: rev.nullish(),
 

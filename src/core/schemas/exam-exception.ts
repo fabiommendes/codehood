@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { m } from "@/i18n";
-import { duration, examExceptionId, examId, slug, username } from "./base";
+import {
+	duration,
+	examExceptionId,
+	examId,
+	instant,
+	slug,
+	username,
+} from "./base";
 import { courseRef } from "./course";
 import { examParams } from "./exam";
 
@@ -52,7 +59,7 @@ export const examExceptionCreate = examExceptionSchema
 
 		/// Absent or `null` grants no extra time.
 		extraTime: exceptionExtraTime.nullish(),
-		scheduledAt: z.date().nullish(),
+		scheduledAt: instant.nullish(),
 		note: z.string().nullish(),
 	});
 

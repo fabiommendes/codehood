@@ -53,6 +53,12 @@
 - Signing up through a roll call that acts as an invite no longer fails
   with an expired code when the page reloads after the code rotated, as it
   does when the form comes back with an error.
+- Input schemas take a point in time as a `Date` or as an ISO 8601 string with
+  an offset (the new `instant` in `src/core/schemas/base.ts`), so a JSON body
+  can set an exam's `scheduledAt` and the other input dates. Strings without
+  an offset, `null` on a required field and numbers are refused, where the
+  `z.coerce.date()` of the course and edition inputs read them as some other
+  date. The REST API's own coercion for exam exceptions is gone.
 
 ## 0.2.0 (2026-10-21)
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { m } from "@/i18n";
-import { courseId, passphraseId } from "./base";
+import { courseId, instant, passphraseId } from "./base";
 import { courseParams, courseRef } from "./course";
 
 export const passphraseSchema = z.object({
@@ -18,7 +18,7 @@ export const passphraseCreate = z.object({
 });
 
 export const passphraseUpdate = z.object({
-	expiresAt: z.date(),
+	expiresAt: instant,
 });
 
 export const passphrasePK = z.union([

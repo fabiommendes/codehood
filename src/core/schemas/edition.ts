@@ -1,22 +1,19 @@
 import { z } from "zod";
 import "./base";
 import { m } from "@/i18n";
-import { dateInput, editionSlug } from "./base";
+import { dateInput, editionSlug, instant } from "./base";
 
 export const editionSchema = z.object({
 	slug: editionSlug,
 	name: z.string().min(1),
-	startAt: z.coerce.date(),
-	endAt: z.coerce.date(),
-	createdAt: z.coerce.date(),
+	startAt: z.date(),
+	endAt: z.date(),
+	createdAt: z.date(),
 });
 
-export const editionCreate = editionSchema.pick({
-	slug: true,
-	name: true,
-	startAt: true,
-	endAt: true,
-});
+export const editionCreate = editionSchema
+	.pick({ slug: true, name: true })
+	.extend({ startAt: instant, endAt: instant });
 
 /**
  * The edition form: the fields of {@link editionCreate} as the browser submits
@@ -45,11 +42,8 @@ export const editionForm = editionCreate
 	});
 
 export const editionUpdate = editionSchema
-	.pick({
-		name: true,
-		startAt: true,
-		endAt: true,
-	})
+	.pick({ name: true })
+	.extend({ startAt: instant, endAt: instant })
 	.partial();
 
 export const editionPK = editionSchema.pick({

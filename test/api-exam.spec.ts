@@ -107,6 +107,39 @@ test("POST takes a duration as hours and minutes and reads it back normalized", 
 	expect((await read.json()).duration).toEqual({ hours: 2, minutes: 30 });
 });
 
+test("POST and PATCH take scheduledAt as the ISO string of a JSON body", async ({
+	request,
+}) => {
+	const { url, headers } = await makeCourse(request);
+
+	const created = await request.post(url, {
+		headers,
+		data: { slug: "mid", title: "Mid", scheduledAt: "2026-06-01T13:00:00Z" },
+	});
+	expect(created.status()).toBe(200);
+	expect((await created.json()).scheduledAt).toBe("2026-06-01T13:00:00.000Z");
+
+	const patched = await request.patch(`${url}/mid`, {
+		headers,
+		data: { scheduledAt: "2026-06-02T10:00:00-03:00" },
+	});
+	expect(patched.status()).toBe(200);
+	const read = await request.get(`${url}/mid`, { headers });
+	expect((await read.json()).scheduledAt).toBe("2026-06-02T13:00:00.000Z");
+});
+
+test("POST refuses a scheduledAt without a timezone offset", async ({
+	request,
+}) => {
+	const { url, headers } = await makeCourse(request);
+
+	const res = await request.post(url, {
+		headers,
+		data: { slug: "local", title: "Local", scheduledAt: "2026-06-01T13:00" },
+	});
+	expect(res.status()).toBe(400);
+});
+
 test("POST refuses a zero-length duration", async ({ request }) => {
 	const { url, headers } = await makeCourse(request);
 

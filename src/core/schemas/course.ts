@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { courseId, rev, slug, username } from "./base";
+import { courseId, instant, rev, slug, username } from "./base";
 import { disciplineInfo } from "./discipline";
 import { editionInfo } from "./edition";
 import { userInfo } from "./user";
@@ -44,8 +44,8 @@ export const courseCreate = courseSchema
 		edition: z.string().min(1).describe("Edition slug"),
 		description: z.string().nullish(),
 		rev: rev.nullish(),
-		startAt: z.coerce.date(),
-		endAt: z.coerce.date(),
+		startAt: instant,
+		endAt: instant,
 	});
 
 export const courseUpdate = courseSchema
@@ -54,7 +54,7 @@ export const courseUpdate = courseSchema
 		startAt: true,
 		endAt: true,
 	})
-	.extend({ rev: rev.nullish() })
+	.extend({ startAt: instant, endAt: instant, rev: rev.nullish() })
 	.partial();
 
 /**

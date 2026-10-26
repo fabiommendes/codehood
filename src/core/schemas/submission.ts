@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	instant,
 	publicId,
 	questionRefId,
 	responseId,
@@ -74,7 +75,7 @@ export const submissionCreate = submissionSchema
 
 		status: submissionStatus.optional(),
 		automaticallyTriggered: z.boolean().optional(),
-		startedAt: z.date().nullish(),
+		startedAt: instant.nullish(),
 	});
 
 /// Only the grading status moves. An attempt's payload is the record of what the student sent.

@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { calendarEventId, courseId, rev, slug, timeSlotId } from "./base";
+import {
+	calendarEventId,
+	courseId,
+	instant,
+	rev,
+	slug,
+	timeSlotId,
+} from "./base";
 import { courseRef } from "./course";
 import { timeSlotSchema } from "./time-slot";
 
@@ -76,9 +83,9 @@ export const calendarEventPK = z.union([
 
 export const calendarEventFilterBase = z.object({
 	// Inclusive: events whose window ends at or after it.
-	from: z.date().optional(),
+	from: instant.optional(),
 	// Exclusive: events starting before it.
-	to: z.date().optional(),
+	to: instant.optional(),
 	kinds: z.array(eventKindSchema).optional(),
 	weeks: z.array(z.number().int()).optional(),
 	// For "the next three meetings" on the course page.

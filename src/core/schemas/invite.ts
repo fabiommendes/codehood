@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { m } from "@/i18n";
-import { courseId, inviteId, publicId, username } from "./base";
+import { courseId, instant, inviteId, publicId, username } from "./base";
 import { courseNaturalKey, courseParams, courseRef } from "./course";
 import { userInfo, userRole, userSignUp } from "./user";
 
@@ -58,7 +58,7 @@ export const inviteFilter = z.object({
 });
 
 export const inviteUpdate = z.object({
-	expiresAt: z.date().optional(),
+	expiresAt: instant.optional(),
 	maxUses: z.number().nullable().optional(),
 });
 

@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { courseId, examId, publicId, responseId, slug, username } from "./base";
+import {
+	courseId,
+	examId,
+	instant,
+	publicId,
+	responseId,
+	slug,
+	username,
+} from "./base";
 import { courseRef } from "./course";
 import { responseRef, submissionPayload, submissionSchema } from "./submission";
 
@@ -57,7 +65,7 @@ export const responseCreate = responseSchema
 		 * Which attempt at a practice exam this is, defaulting to the session
 		 * open now. Refused on a graded exam, which a student answers once.
 		 */
-		practiceSession: z.date().nullish(),
+		practiceSession: instant.nullish(),
 
 		acceptingSubmissions: z.boolean().optional(),
 	});
@@ -103,6 +111,6 @@ export const responseSubmit = z.object({
 	author: username.optional(),
 
 	payload: submissionPayload,
-	startedAt: z.date().nullish(),
+	startedAt: instant.nullish(),
 	automaticallyTriggered: z.boolean().optional(),
 });
