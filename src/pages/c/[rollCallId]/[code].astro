@@ -7,6 +7,7 @@ import {
 	checkInMessage,
 	clientIp,
 	completeClaim,
+	isCodeRefusal,
 	register,
 	resumeClaim,
 	startClaim,
@@ -33,6 +34,8 @@ let view: AttendanceView | null = null;
 let error: string | null =
 	rollCallId === null ? m.auth_check_in_invalid_code() : null;
 let wantsSignUp = false;
+/// Whether typing the code again might work, as it may after a wrong or expired one.
+let retypeable = true;
 
 if (rollCallId !== null) {
 	try {
@@ -60,6 +63,7 @@ if (rollCallId !== null) {
 	} catch (e) {
 		error = checkInMessage(e);
 		if (error === null) throw e;
+		retypeable = isCodeRefusal(e);
 	}
 }
 
@@ -70,13 +74,7 @@ const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">
 <CenteredLayout title={wantsSignUp ? m.auth_check_in_join_class() : m.auth_check_in_title()}>
   {
     error && (
-      <AttendanceRefused message={error}>
-        {actor ? (
-          <a href="/check-in" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>
-        ) : (
-          <a href="/" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>
-        )}
-      </AttendanceRefused>
+      <AttendanceRefused message={error} next={!actor ? "start" : retypeable ? "retype" : "courses"} />
     )
   }
   {view && <AttendanceResult view={view} />}

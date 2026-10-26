@@ -25,9 +25,11 @@ import {
  *   - Typed code that matches no open roll call: "That code is not valid."
  *
  * Check-in link (`/c/<rollCallId>/<code>`)
- *   - Success: "Attendance recorded for <meeting title>".
+ *   - Success: "<student name>, present!" and "Attendance recorded for <meeting title>".
  *   - Scanning again once present: "Attendance already recorded for <meeting title>".
- *   - Any refusal also reads "Attendance not recorded".
+ *   - Any refusal also reads "Attendance not recorded", with a link "Type the
+ *     code instead" for a wrong or expired code and "Go to my courses" for the
+ *     other refusals of a logged-in student.
  *   - Code that rotated away more than 30 s ago: "That code has expired."
  *   - Closed roll call: "This roll call is closed."
  *   - Not in the course and the roll call is not an invite:
@@ -117,7 +119,21 @@ test("student: Check in to class", async ({ page }) => {
 		await page.goto(`/c/${rollArrays.id}/${stale.code}`);
 		await expect(page.getByText("That code has expired.")).toBeVisible();
 		await expect(page.getByText("Attendance not recorded")).toBeVisible();
+		await expect(
+			page.getByRole("link", { name: "Type the code instead" }),
+		).toBeVisible();
 		expect(await attended(rollArrays.id, ana.username)).toBe(false);
+	});
+
+	await test.step("a closed roll call sends to the courses, since typing the code cannot help", async () => {
+		await page.goto(`/c/${rollHashing.id}/${currentCode(rollHashing)}`);
+		await expect(page.getByText("This roll call is closed.")).toBeVisible();
+		await expect(
+			page.getByRole("link", { name: "Type the code instead" }),
+		).toHaveCount(0);
+		await expect(
+			page.getByRole("link", { name: "Go to my courses" }),
+		).toBeVisible();
 	});
 
 	await test.step("scanning the QR logged out goes through the login and back to the confirmation", async () => {
@@ -129,6 +145,7 @@ test("student: Check in to class", async ({ page }) => {
 		await fillField(page, "Password", ana.password);
 		await page.getByRole("button", { name: "Log in" }).click();
 
+		await expect(page.getByText("Ana Prado, present!")).toBeVisible();
 		await expect(
 			page.getByText("Attendance recorded for sa-Arrays"),
 		).toBeVisible();

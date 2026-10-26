@@ -61,6 +61,7 @@ const recorded: AttendanceView = {
 	course: "Algorithms",
 	courseHref: "#",
 	joined: false,
+	student: "Ada Lovelace",
 };
 
 const results: {
@@ -93,51 +94,65 @@ const results: {
 ];
 
 /// Refusals as the scanned link page shows them, worded by `checkInMessage`.
-const refusals: { label: string; message: string; loggedIn: boolean }[] = [
+const refusals: {
+	label: string;
+	message: string;
+	loggedIn: boolean;
+	next: "retype" | "courses" | "start";
+}[] = [
 	{
 		label: "Wrong code",
 		message: checkInMessage(new CheckInError("invalid-code")) ?? "",
 		loggedIn: true,
+		next: "retype",
 	},
 	{
 		label: "Expired code",
 		message: checkInMessage(new CheckInError("expired")) ?? "",
 		loggedIn: true,
+		next: "retype",
 	},
 	{
 		label: "Closed roll call",
 		message: checkInMessage(new CheckInError("closed")) ?? "",
 		loggedIn: true,
+		next: "courses",
 	},
 	{
 		label: "Not enrolled",
 		message: checkInMessage(new CheckInError("not-enrolled")) ?? "",
 		loggedIn: true,
+		next: "courses",
 	},
 	{
 		label: "Dropped the course",
 		message: checkInMessage(new CheckInError("dropped")) ?? "",
 		loggedIn: true,
+		next: "courses",
 	},
 	{
 		label: "Not a student",
 		message: checkInMessage(new CheckInError("not-student")) ?? "",
 		loggedIn: true,
+		next: "courses",
 	},
 	{
 		label: "Too many wrong codes",
 		message: checkInMessage(new CheckInBlocked()) ?? "",
 		loggedIn: true,
+		next: "courses",
 	},
 	{
 		label: "Sign-up took too long",
 		message: checkInMessage(new CheckInError("claim-expired")) ?? "",
 		loggedIn: false,
+		next: "start",
 	},
 	{
 		label: "Malformed link, logged out",
 		message: m.auth_check_in_invalid_code(),
 		loggedIn: false,
+		next: "start",
 	},
 ];
 
@@ -578,13 +593,7 @@ const sectionLinks = [
                 <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
                   <div class="card-body">
                     <h2 class="card-title">{m.auth_check_in_title()}</h2>
-                    <AttendanceRefused message={state.message}>
-                      {state.loggedIn ? (
-                        <a href="#" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>
-                      ) : (
-                        <a href="#" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>
-                      )}
-                    </AttendanceRefused>
+                    <AttendanceRefused message={state.message} next={state.next} />
                   </div>
                 </div>
               </figure>

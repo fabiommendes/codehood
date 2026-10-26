@@ -48,6 +48,8 @@ export interface AttendanceView {
 	courseHref: string;
 	/// Whether this check-in enrolled the student in the course.
 	joined: boolean;
+	/// The student's name, answering the roll call.
+	student: string;
 }
 
 /// Thrown when a user or an IP made too many wrong attempts.
@@ -113,7 +115,10 @@ async function limited<T>(
 }
 
 /// Turns a service result into what the result page shows.
-async function viewOf(result: CheckInResult): Promise<AttendanceView> {
+async function viewOf(
+	result: CheckInResult,
+	student: UserActor,
+): Promise<AttendanceView> {
 	const course = await db.course.findOne({ id: result.courseId }, FULL_ACCESS);
 	if (!course) throw new Error(`Course ${result.courseId} has vanished`);
 	return {
@@ -128,6 +133,7 @@ async function viewOf(result: CheckInResult): Promise<AttendanceView> {
 			edition: course.edition.slug,
 		}),
 		joined: result.joined !== null && !result.repeat,
+		student: student.name,
 	};
 }
 
@@ -153,7 +159,7 @@ export async function register(
 	const result = await limited(keysOf(ip, actor.username), () =>
 		db.rollCall.checkIn({ code, rollCallId, deviceId: device }, { actor }),
 	);
-	return viewOf(result);
+	return viewOf(result, actor);
 }
 
 /**
@@ -232,14 +238,14 @@ export async function completeClaim(
 		},
 		{ actor },
 	);
-	return viewOf(result);
+	return viewOf(result, actor);
 }
 
 /// Refusals that are about the code the student typed, not about the student.
 const CODE_REFUSALS: ReadonlySet<string> = new Set(["invalid-code", "expired"]);
 
-/// Whether `error` is a refusal that belongs on the code field.
-function isCodeRefusal(error: unknown): boolean {
+/** Whether `error` is about the code itself, so typing it again may succeed. */
+export function isCodeRefusal(error: unknown): boolean {
 	return (
 		error instanceof NotFound ||
 		(error instanceof CheckInError && CODE_REFUSALS.has(error.code))

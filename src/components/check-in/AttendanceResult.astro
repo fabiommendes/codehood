@@ -79,7 +79,7 @@ const CONFETTI: [
 
   <div class="rise flex flex-col gap-1">
     <h3 class:list={["text-3xl font-black tracking-tight", view.repeat ? "text-base-content" : "text-success"]}>
-      {view.repeat ? m.attendance_result_repeat_headline() : m.attendance_result_headline()}
+      {view.repeat ? m.attendance_result_repeat_headline() : m.attendance_result_headline({ name: view.student })}
     </h3>
     <p class="text-lg font-semibold text-balance">
       {view.repeat ? m.attendance_result_repeat({ title: view.title }) : m.attendance_result_recorded({ title: view.title })}

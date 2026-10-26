@@ -4,9 +4,11 @@ import { m } from "@/i18n";
 interface Props {
 	/// Why the check-in was refused.
 	message: string;
+	/// The way out offered: type the code again, the student's courses, or the start page.
+	next: "retype" | "courses" | "start";
 }
 
-const { message } = Astro.props;
+const { message, next } = Astro.props;
 ---
 
 <section role="alert" class="flex flex-col items-center gap-4 text-center">
@@ -19,6 +21,8 @@ const { message } = Astro.props;
     <p class="text-lg font-semibold text-balance">{message}</p>
   </div>
   <div class="flex w-full flex-col gap-2">
-    <slot />
+    {next === "retype" && <a href="/check-in" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>}
+    {next === "courses" && <a href="/courses" class="btn btn-primary btn-block rounded-full">{m.attendance_refused_my_courses()}</a>}
+    {next === "start" && <a href="/" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>}
   </div>
 </section>
