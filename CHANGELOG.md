@@ -4,6 +4,9 @@
 
 ### Added
 
+- `/design/components`: the components that only show in special flows (check-in
+  results, roll call page and projection, exam exceptions, grade release,
+  regrades, question statistics) in each of their states, from fixtures.
 - Regrade requests: after grades are released, a student contests the grade
   of one answer with a justification, within 14 days. The instructor answers
   from the exam's new Regrades page, accepting with a new score (a new grading
@@ -38,6 +41,12 @@
   hides behind an "Add note" button.
 - Roll call projection: a bar under the code drains until it rotates, and a
   closed roll call shows a large button to reopen it.
+- Roll call page: fixed-height rows, the note edited in a dialog, a saving
+  spinner per row, errors in a toast and a present count in the toolbar.
+- Student check-in confirmation: a celebration (check mark, confetti, party
+  lights; static under reduced motion), a calmer "already recorded" state for
+  a repeat scan, a welcome when the scan joins the course, a link to the
+  course, and refusals that read clearly as "not recorded".
 
 ### Fixed
 

@@ -1,0 +1,738 @@
+---
+import {
+	type AttendanceView,
+	CheckInBlocked,
+	checkInMessage,
+} from "@/actions/check-in";
+import AttendanceRefused from "@/components/check-in/AttendanceRefused.astro";
+import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
+import SignUpForm from "@/components/check-in/SignUpForm.astro";
+import ExamExceptions, {
+	type ExceptionRow,
+} from "@/components/exam/ExamExceptions";
+import RegradeControls, {
+	type QuestionRegrade,
+} from "@/components/exam/RegradeControls";
+import ReleaseGrades from "@/components/exam/ReleaseGrades";
+import AnswerDistribution from "@/components/grading/AnswerDistribution.astro";
+import QuestionStats from "@/components/grading/QuestionStats.astro";
+import RegradeResolve from "@/components/grading/RegradeResolve";
+import ReleasedScore from "@/components/ReleasedScore.astro";
+import RollCallManager, {
+	type RollCallManagerProps,
+} from "@/components/roll-call/RollCallManager";
+import RollCallProjector, {
+	type RollCallProjectorProps,
+} from "@/components/roll-call/RollCallProjector";
+import { CheckInError } from "@/core/error";
+import { escapeHtml, m } from "@/i18n";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+import type {
+	AnswerDistribution as Distribution,
+	QuestionStats as Stats,
+} from "@/services/question-stats";
+import { checkInQrSvg } from "@/services/roll-call-qr";
+import { formatDateTime, toLocalDateTimeInput } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+// Every component here renders without a `client:*` directive: Astro runs the
+// Solid islands once on the server and ships their markup with no script, so
+// nothing polls, ticks or calls an action. Buttons and dialogs look real but
+// do nothing, which is the point of a catalogue.
+
+const now = new Date();
+const minutes = (n: number) => new Date(now.getTime() + n * 60_000);
+const seconds = (n: number) => new Date(now.getTime() + n * 1000);
+
+/// The course segments every island takes; none of them is ever sent anywhere.
+const target = { discipline: "algorithms", course: "ada_2026-2" };
+
+//
+// Roll call: student. Fixtures for `AttendanceResult`, `AttendanceRefused` and
+// `SignUpForm`, kept together so a change in `AttendanceView` lands in one place.
+//
+
+const recorded: AttendanceView = {
+	title: "Lecture 12: Graph search",
+	startAt: minutes(-25),
+	recordedAt: minutes(-1),
+	repeat: false,
+	course: "Algorithms",
+	courseHref: "#",
+	joined: false,
+};
+
+const results: {
+	label: string;
+	note: string;
+	view: AttendanceView;
+	another?: boolean;
+}[] = [
+	{
+		label: "Recorded now",
+		note: "Scanned link, first check-in.",
+		view: recorded,
+	},
+	{
+		label: "Joined the course",
+		note: "The roll call acts as an invite and enrolled the student.",
+		view: { ...recorded, joined: true },
+	},
+	{
+		label: "Already recorded",
+		note: "A second scan of the same roll call; no animation.",
+		view: { ...recorded, repeat: true, recordedAt: minutes(-12) },
+	},
+	{
+		label: "Typed code",
+		note: "On /check-in, with the link to type another code.",
+		view: recorded,
+		another: true,
+	},
+];
+
+/// Refusals as the scanned link page shows them, worded by `checkInMessage`.
+const refusals: { label: string; message: string; loggedIn: boolean }[] = [
+	{
+		label: "Wrong code",
+		message: checkInMessage(new CheckInError("invalid-code")) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Expired code",
+		message: checkInMessage(new CheckInError("expired")) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Closed roll call",
+		message: checkInMessage(new CheckInError("closed")) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Not enrolled",
+		message: checkInMessage(new CheckInError("not-enrolled")) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Dropped the course",
+		message: checkInMessage(new CheckInError("dropped")) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Not a student",
+		message: checkInMessage(new CheckInError("not-student")) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Too many wrong codes",
+		message: checkInMessage(new CheckInBlocked()) ?? "",
+		loggedIn: true,
+	},
+	{
+		label: "Sign-up took too long",
+		message: checkInMessage(new CheckInError("claim-expired")) ?? "",
+		loggedIn: false,
+	},
+	{
+		label: "Malformed link, logged out",
+		message: m.auth_check_in_invalid_code(),
+		loggedIn: false,
+	},
+];
+
+const logInLink = `<a class="link link-primary" href="#">${escapeHtml(m.auth_check_in_log_in())}</a>`;
+
+//
+// Roll call: instructor.
+//
+
+const students: RollCallManagerProps["students"] = [
+	{ username: "ana", name: "Ana Beatriz Souza", dropped: false },
+	{ username: "bruno", name: "Bruno Lima", dropped: false },
+	{ username: "carla", name: "Carla Nunes", dropped: false },
+	{ username: "davi", name: "Davi Rocha", dropped: true },
+	{ username: "elisa", name: "Elisa Martins", dropped: false },
+	{ username: "fabio", name: "Fábio Teixeira", dropped: false },
+	{ username: "gabi", name: "Gabriela Alves", dropped: false },
+];
+
+const attendances: RollCallManagerProps["initial"]["attendances"] = {
+	ana: { note: null, joined: null, sharedWith: [] },
+	carla: { note: "Arrived 20 minutes late", joined: null, sharedWith: [] },
+	elisa: { note: null, joined: "ENROLLMENT", sharedWith: [] },
+	fabio: { note: null, joined: null, sharedWith: ["gabi"] },
+	gabi: { note: null, joined: "ACCOUNT", sharedWith: ["fabio"] },
+};
+
+const manager = {
+	...target,
+	week: 6,
+	timeSlot: "mon-a",
+	pageHref: "#",
+	scheduleHref: "#",
+	students,
+	now: now.getTime(),
+} satisfies Omit<RollCallManagerProps, "initial">;
+
+const projectorCode = "K7Q2MX";
+const projector = {
+	...target,
+	week: 6,
+	timeSlot: "mon-a",
+	title: "Lecture 12: Graph search",
+	manageHref: "#",
+	now: now.getTime(),
+} satisfies Omit<RollCallProjectorProps, "initial">;
+const projected: RollCallProjectorProps["initial"] = {
+	code: projectorCode,
+	changedAt: seconds(-12),
+	nextChangeAt: seconds(18),
+	qr: checkInQrSvg(Astro.url.origin, 1, projectorCode),
+	present: 23,
+	closesAt: minutes(7),
+};
+
+//
+// Exams.
+//
+
+const examTarget = { ...target, exam: "midterm" };
+
+const exceptionStudents = [
+	{ username: "ana", name: "Ana Beatriz Souza" },
+	{ username: "bruno", name: "Bruno Lima" },
+	{ username: "carla", name: "Carla Nunes" },
+];
+
+const rescheduled = minutes(60 * 24 * 2);
+const exceptionRows: ExceptionRow[] = [
+	{
+		username: "ana",
+		name: "Ana Beatriz Souza",
+		extra: m.exams_exceptions_extra({ minutes: 30 }),
+		date: null,
+		window: null,
+		note: "Accessibility plan",
+		extraMinutes: 30,
+		scheduledLocal: null,
+	},
+	{
+		username: "bruno",
+		name: "Bruno Lima",
+		extra: null,
+		date: formatDateTime(rescheduled, { year: "numeric" }),
+		window: `${formatDateTime(rescheduled, { year: "numeric" })} – ${formatDateTime(new Date(rescheduled.getTime() + 120 * 60_000), { year: "numeric" })}`,
+		note: "Medical certificate",
+		extraMinutes: null,
+		scheduledLocal: toLocalDateTimeInput(rescheduled),
+	},
+];
+
+const regrades: { label: string; regrade: QuestionRegrade }[] = [
+	{
+		label: "Window open, no request",
+		regrade: { submission: "sub-1", canRequest: true, request: null },
+	},
+	{
+		label: "Requested",
+		regrade: {
+			submission: "sub-2",
+			canRequest: false,
+			request: {
+				publicId: "req-2",
+				status: "OPEN",
+				message:
+					"My answer uses BFS, which also finds the shortest path in an unweighted graph.",
+				reply: null,
+			},
+		},
+	},
+	{
+		label: "Accepted",
+		regrade: {
+			submission: "sub-3",
+			canRequest: false,
+			request: {
+				publicId: "req-3",
+				status: "ACCEPTED",
+				message: "The key marks O(n) but the loop is O(log n).",
+				reply: "You are right, the key was wrong. Fixed for everyone.",
+			},
+		},
+	},
+	{
+		label: "Rejected",
+		regrade: {
+			submission: "sub-4",
+			canRequest: false,
+			request: {
+				publicId: "req-4",
+				status: "REJECTED",
+				message: "I think half credit is too harsh.",
+				reply: "The proof skips the base case, which the rubric requires.",
+			},
+		},
+	},
+];
+
+//
+// Grading statistics.
+//
+
+const statsTitles = new Map([
+	["bfs", "Breadth-first search"],
+	["dijkstra", "Dijkstra's invariant"],
+	["heap", "Heap order"],
+	["warmup", "Warm-up"],
+	["proof", "Proof of correctness"],
+]);
+
+const stats: Stats[] = [
+	{
+		question: "bfs",
+		answered: 40,
+		blank: 2,
+		average: 0.78,
+		correct: 0.7,
+		discrimination: 0.46,
+		discriminationGap: null,
+		pending: 0,
+		graded: 40,
+		notGraded: 0,
+	},
+	{
+		question: "dijkstra",
+		answered: 38,
+		blank: 4,
+		average: 0.55,
+		correct: 0.42,
+		discrimination: 0.12,
+		discriminationGap: null,
+		pending: 0,
+		graded: 38,
+		notGraded: 0,
+	},
+	{
+		question: "heap",
+		answered: 41,
+		blank: 1,
+		average: 0.61,
+		correct: 0.6,
+		discrimination: -0.18,
+		discriminationGap: null,
+		pending: 0,
+		graded: 41,
+		notGraded: 0,
+	},
+	{
+		question: "warmup",
+		answered: 42,
+		blank: 0,
+		average: 1,
+		correct: 1,
+		discrimination: null,
+		discriminationGap: "no-variance",
+		pending: 0,
+		graded: 42,
+		notGraded: 0,
+	},
+	{
+		question: "proof",
+		answered: 36,
+		blank: 6,
+		average: 0.5,
+		correct: 0.25,
+		discrimination: 0.31,
+		discriminationGap: null,
+		pending: 4,
+		graded: 32,
+		notGraded: 0,
+	},
+];
+
+const fewStats: Stats[] = [
+	{
+		question: "bfs",
+		answered: 3,
+		blank: 0,
+		average: 0.67,
+		correct: 0.67,
+		discrimination: null,
+		discriminationGap: "few-attempts",
+		pending: 0,
+		graded: 3,
+		notGraded: 0,
+	},
+	{
+		question: "proof",
+		answered: 2,
+		blank: 1,
+		average: null,
+		correct: null,
+		discrimination: null,
+		discriminationGap: "few-attempts",
+		pending: 2,
+		graded: 0,
+		notGraded: 0,
+	},
+];
+
+const singleStats: Stats[] = [
+	{
+		question: "proof",
+		answered: 12,
+		blank: 0,
+		average: 0.7,
+		correct: 0.5,
+		discrimination: null,
+		discriminationGap: "single-question",
+		pending: 0,
+		graded: 12,
+		notGraded: 0,
+	},
+];
+
+const emptyStats: Stats[] = [
+	{
+		question: "bfs",
+		answered: 0,
+		blank: 0,
+		average: null,
+		correct: null,
+		discrimination: null,
+		discriminationGap: "few-attempts",
+		pending: 0,
+		graded: 0,
+		notGraded: 0,
+	},
+];
+
+const statsStates: { label: string; stats: Stats[] }[] = [
+	{ label: "Mixed flags", stats },
+	{ label: "Too few attempts", stats: fewStats },
+	{ label: "Single-question exam", stats: singleStats },
+	{ label: "No answers yet", stats: emptyStats },
+];
+
+const distributions: { label: string; distribution: Distribution }[] = [
+	{
+		label: "Multiple choice, with a removed choice and blanks",
+		distribution: {
+			type: "multiple-choice",
+			answers: 40,
+			rows: [
+				{
+					kind: "choice",
+					id: "log-n",
+					text: "`O(log n)`",
+					correct: true,
+					count: 26,
+				},
+				{
+					kind: "choice",
+					id: "linear",
+					text: "`O(n)`",
+					correct: false,
+					count: 9,
+				},
+				{
+					kind: "choice",
+					id: "n-log-n",
+					text: "`O(n log n)`",
+					correct: false,
+					count: 2,
+				},
+				{ kind: "removed", id: "constant", count: 1 },
+				{ kind: "empty", count: 2 },
+			],
+		},
+	},
+	{
+		label: "Multiple selection",
+		distribution: {
+			type: "multiple-selection",
+			answers: 30,
+			rows: [
+				{ kind: "choice", id: "two", text: "2", correct: true, count: 27 },
+				{ kind: "choice", id: "three", text: "3", correct: true, count: 25 },
+				{ kind: "choice", id: "four", text: "4", correct: false, count: 4 },
+				{ kind: "choice", id: "nine", text: "9", correct: false, count: 11 },
+				{ kind: "empty", count: 1 },
+			],
+		},
+	},
+	{
+		label: "True / false, with a removed statement",
+		distribution: {
+			type: "true-false",
+			answers: 30,
+			rows: [
+				{
+					kind: "statement",
+					id: "a",
+					text: "BFS visits nodes in order of distance.",
+					correct: true,
+					true: 24,
+					false: 4,
+					abstained: 2,
+				},
+				{
+					kind: "statement",
+					id: "b",
+					text: "DFS needs a priority queue.",
+					correct: false,
+					true: 6,
+					false: 22,
+					abstained: 2,
+				},
+				{ kind: "removed", id: "c", true: 3, false: 1, abstained: 26 },
+			],
+		},
+	},
+];
+
+const sectionLinks = [
+	{ id: "check-in", label: "Check-in" },
+	{ id: "roll-call", label: "Roll call" },
+	{ id: "projection", label: "Projection" },
+	{ id: "exam-exceptions", label: "Exam exceptions" },
+	{ id: "release", label: "Grade release" },
+	{ id: "regrades", label: "Regrades" },
+	{ id: "statistics", label: "Statistics" },
+] as const;
+---
+
+<DesignLayout title="Components" active="components">
+  <div class="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10">
+    <nav aria-label="Components" class="sticky top-6 self-start max-lg:hidden">
+      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-base-content/40">Components</p>
+      <ul class="flex flex-col gap-1 border-l border-base-300">
+        {
+          sectionLinks.map((link) => (
+            <li>
+              <a
+                href={`#${link.id}`}
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-base-content/60 transition-colors hover:border-base-300 hover:text-base-content"
+              >
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class="min-w-0">
+      <section class="mb-14">
+        <h1 class="text-3xl font-bold">Components</h1>
+        <p class="mt-3 max-w-2xl text-base-content/70">
+          Codehood components that only show up in a specific flow: a roll call in progress, a released exam, a
+          regrade, a refused check-in. Each one renders here from fixture props, in every state worth a look. The
+          Solid islands render on the server only, with no <code class="font-mono">client:*</code> directive, so
+          they do not poll, tick or call actions, and their buttons do nothing.
+        </p>
+      </section>
+
+      <section id="check-in" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Check-in</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          What a student sees after scanning a roll call code or typing it on <code class="font-mono">/check-in</code>:{" "}
+          <code class="font-mono">AttendanceResult</code>, <code class="font-mono">AttendanceRefused</code> and{" "}
+          <code class="font-mono">SignUpForm</code>, each in the card the page puts it in.
+        </p>
+
+        <h3 class="mb-3 text-xl font-semibold">Recorded</h3>
+        <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
+          {
+            results.map((state) => (
+              <figure class="flex flex-col gap-2">
+                <figcaption>
+                  <span class="font-semibold">{state.label}</span>
+                  <span class="text-sm text-base-content/60"> {state.note}</span>
+                </figcaption>
+                <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
+                  <div class="card-body">
+                    <h2 class="card-title">{m.auth_check_in_title()}</h2>
+                    <AttendanceResult view={state.view} another={state.another} />
+                  </div>
+                </div>
+              </figure>
+            ))
+          }
+        </div>
+
+        <h3 class="mt-10 mb-3 text-xl font-semibold">Refused</h3>
+        <p class="mb-5 text-sm text-base-content/60">
+          The scanned link page. On <code class="font-mono">/check-in</code> a wrong or expired code shows as an error on
+          the code field instead, and the rest in the form's alert.
+        </p>
+        <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
+          {
+            refusals.map((state) => (
+              <figure class="flex flex-col gap-2">
+                <figcaption>
+                  <span class="font-semibold">{state.label}</span>
+                  <span class="text-sm text-base-content/60"> {state.loggedIn ? "Logged in." : "Logged out."}</span>
+                </figcaption>
+                <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
+                  <div class="card-body">
+                    <h2 class="card-title">{m.auth_check_in_title()}</h2>
+                    <AttendanceRefused message={state.message}>
+                      {state.loggedIn ? (
+                        <a href="#" class="btn btn-primary btn-block rounded-full">{m.auth_check_in_type_code()}</a>
+                      ) : (
+                        <a href="#" class="btn btn-block rounded-full">{m.auth_check_in_back()}</a>
+                      )}
+                    </AttendanceRefused>
+                  </div>
+                </div>
+              </figure>
+            ))
+          }
+        </div>
+
+        <h3 class="mt-10 mb-3 text-xl font-semibold">Sign-up from a roll call invite</h3>
+        <p class="mb-5 text-sm text-base-content/60">
+          A logged-out student who scans the code of a roll call that acts as an invite.
+        </p>
+        <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
+          <div class="card-body">
+            <h2 class="card-title">{m.auth_check_in_join_class()}</h2>
+            <p class="text-sm text-base-content/70" set:html={m.auth_check_in_sign_up_intro({ link: logInLink })} />
+            <SignUpForm rollCallId={1} />
+          </div>
+        </div>
+      </section>
+
+      <section id="roll-call" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Roll call</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          <code class="font-mono">RollCallManager</code>, the instructor's roll call page. The roster covers a student
+          present, absent, with a note, dropped, new in class (enrolled and new account), and two who checked in from
+          the same device. The countdown is frozen at render time.
+        </p>
+        <h3 class="mb-3 text-xl font-semibold">Open</h3>
+        <RollCallManager {...manager} initial={{ closesAt: minutes(7), attendances }} />
+        <h3 class="mt-10 mb-3 text-xl font-semibold">Closed</h3>
+        <RollCallManager {...manager} initial={{ closesAt: minutes(-20), attendances }} />
+      </section>
+
+      <section id="projection" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Projection</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          <code class="font-mono">RollCallProjector</code> fills the classroom screen. Here it runs in a 1280×720 box
+          shown at half size, with its <code class="font-mono">h-screen</code> replaced by the box's height.
+        </p>
+        <div class="grid grid-cols-1 gap-6">
+          {
+            [
+              { label: "Open", initial: projected },
+              { label: "Closed, with the reopen button", initial: { ...projected, closesAt: minutes(-1) } },
+            ].map((state) => (
+              <figure class="flex flex-col gap-2">
+                <figcaption class="font-semibold">{state.label}</figcaption>
+                <div class="overflow-x-auto">
+                  <div class="h-[360px] w-[640px] overflow-hidden rounded-box border border-base-300">
+                    <div class="h-[720px] w-[1280px] origin-top-left scale-50 [&>main]:h-full [&>main]:max-h-full">
+                      <RollCallProjector {...projector} initial={state.initial} />
+                    </div>
+                  </div>
+                </div>
+              </figure>
+            ))
+          }
+        </div>
+      </section>
+
+      <section id="exam-exceptions" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Exam exceptions</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          <code class="font-mono">ExamExceptions</code> on the instructor's exam page: extra time, a new date with its
+          personal window, and the empty table.
+        </p>
+        <h3 class="mb-3 text-xl font-semibold">With exceptions</h3>
+        <ExamExceptions {...examTarget} students={exceptionStudents} rows={exceptionRows} />
+        <h3 class="mt-10 mb-3 text-xl font-semibold">None</h3>
+        <ExamExceptions {...examTarget} students={exceptionStudents} rows={[]} />
+      </section>
+
+      <section id="release" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Grade release</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          <code class="font-mono">ReleaseGrades</code> for the instructor and <code class="font-mono">ReleasedScore</code>{" "}
+          for the student once grades are out.
+        </p>
+        <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
+          <figure class="flex flex-col gap-2">
+            <figcaption class="font-semibold">Ready to release</figcaption>
+            <ReleaseGrades {...examTarget} releasedAt={null} canRelease now={now} />
+          </figure>
+          <figure class="flex flex-col gap-2">
+            <figcaption class="font-semibold">Released two days ago</figcaption>
+            <ReleaseGrades {...examTarget} releasedAt={minutes(-60 * 48)} canRelease={false} now={now} />
+          </figure>
+          <figure class="flex flex-col gap-2">
+            <figcaption class="font-semibold">Student score</figcaption>
+            <ReleasedScore score={0.85} releasedAt={minutes(-60 * 48)} />
+          </figure>
+          <figure class="flex flex-col gap-2">
+            <figcaption class="font-semibold">Negative score</figcaption>
+            <ReleasedScore score={-0.1} releasedAt={minutes(-60 * 48)} />
+          </figure>
+        </div>
+      </section>
+
+      <section id="regrades" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Regrades</h2>
+        <p class="mt-2 mb-6 text-sm text-base-content/60">
+          <code class="font-mono">RegradeControls</code> under a question on the student's exam page, and{" "}
+          <code class="font-mono">RegradeResolve</code>, the instructor's form on an open request.
+        </p>
+        <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
+          {
+            regrades.map((state) => (
+              <figure class="flex flex-col gap-2">
+                <figcaption class="font-semibold">{state.label}</figcaption>
+                <div class="rounded-box border border-base-300 bg-base-100 p-4">
+                  <RegradeControls {...examTarget} regrade={state.regrade} />
+                </div>
+              </figure>
+            ))
+          }
+          <figure class="flex flex-col gap-2">
+            <figcaption class="font-semibold">Instructor resolving a request</figcaption>
+            <div class="rounded-box border border-base-300 bg-base-100 p-4">
+              <RegradeResolve {...examTarget} request="req-2" />
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <section id="statistics" class="mb-14 scroll-mt-6">
+        <h2 class="text-2xl font-bold">Statistics</h2>
+        <p class="mt-2 text-sm text-base-content/60">
+          <code class="font-mono">QuestionStats</code> on the exam's grading page and{" "}
+          <code class="font-mono">AnswerDistribution</code> on a question's. The mixed table has a healthy question, a weak
+          one, a negative discrimination, one with no variance and one still waiting for grades.
+        </p>
+        {
+          statsStates.map((state) => (
+            <figure class="mt-10 flex flex-col [&>section]:mt-1">
+              <figcaption class="font-semibold">{state.label}</figcaption>
+              <QuestionStats href="#" stats={state.stats} titles={statsTitles} />
+            </figure>
+          ))
+        }
+        {
+          distributions.map((state) => (
+            <figure class="mt-10 flex flex-col [&>section]:mt-1">
+              <figcaption class="font-semibold">{state.label}</figcaption>
+              <AnswerDistribution distribution={state.distribution} />
+            </figure>
+          ))
+        }
+      </section>
+    </div>
+  </div>
+</DesignLayout>

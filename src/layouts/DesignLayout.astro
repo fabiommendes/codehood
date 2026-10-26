@@ -15,7 +15,8 @@ interface Props {
 		| "layouts"
 		| "elements"
 		| "questions"
-		| "forms";
+		| "forms"
+		| "components";
 }
 
 const { title, active } = Astro.props;
@@ -31,6 +32,7 @@ const tabs = [
 	{ key: "elements", label: "Elements", href: "/design/elements" },
 	{ key: "questions", label: "Questions", href: "/design/questions" },
 	{ key: "forms", label: "Forms", href: "/design/forms" },
+	{ key: "components", label: "Components", href: "/design/components" },
 ] as const;
 ---
 
