@@ -27,6 +27,7 @@ import {
 	formatClock,
 	formatDateTime,
 	formatTime,
+	startOfLocalDay,
 	toMinutes,
 } from "@/utils/schedule-time";
 
@@ -157,7 +158,7 @@ const meetingNowRollCall = meetingNow
 const justJoined = Astro.url.searchParams.has("joined");
 
 const nextEvents = await db.calendarEvent.findMany(
-	{ courseIds: [course.id], from: new Date(), limit: 3 },
+	{ courseIds: [course.id], from: startOfLocalDay(now), limit: 3 },
 	{ actor },
 );
 ---

@@ -5,7 +5,7 @@
  * Pure: the page builds the entries with `calendarEntries`.
  */
 
-import { localDateOf } from "@/utils/schedule-time";
+import { localDateOf, startOfLocalDay } from "@/utils/schedule-time";
 import type { CalendarEntry } from "./calendar-entries";
 
 const DAY = 86_400_000;
@@ -18,7 +18,7 @@ export interface ScheduleWeek {
 }
 
 export interface CourseSchedule {
-	/// Weeks whose every entry has ended, oldest first.
+	/// Weeks whose every entry ended before today, oldest first.
 	past: ScheduleWeek[];
 	/// The current week and the ones after it.
 	ahead: ScheduleWeek[];
@@ -30,8 +30,9 @@ export interface CourseSchedule {
  * Groups a course's `entries` by week and splits them at `now`.
  *
  * Exams have no week of their own, so they take the one their date falls in,
- * counted in seven-day steps from `courseStart`. Holidays, cancelled meetings
- * and drafts are never `next`.
+ * counted in seven-day steps from `courseStart`. A week stays ahead until the
+ * day of its last entry is over, so a meeting that just ended is still in
+ * view. Holidays, cancelled meetings and drafts are never `next`.
  */
 export function courseSchedule(
 	entries: readonly CalendarEntry[],
@@ -50,8 +51,9 @@ export function courseSchedule(
 		.sort(([a], [b]) => a - b)
 		.map(([week, weekEntries]) => ({ week, entries: weekEntries }));
 
+	const today = startOfLocalDay(now);
 	const firstAhead = weeks.findIndex(({ entries }) =>
-		entries.some((entry) => entry.endAt >= now),
+		entries.some((entry) => entry.endAt >= today),
 	);
 	const split = firstAhead === -1 ? weeks.length : firstAhead;
 	return {

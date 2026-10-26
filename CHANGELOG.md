@@ -30,6 +30,9 @@
 
 - An edition's term has at most two digits (`2026-1` to `2026-99`), slugs at
   most 200 characters and public ids at most 64.
+- A meeting that ended earlier today stays in view until the day turns: its
+  week no longer folds into "already held" on the schedule page, and it still
+  shows in the course home's calendar and in `/calendar`'s upcoming list.
 
 ## 0.2.0 (2026-10-21)
 

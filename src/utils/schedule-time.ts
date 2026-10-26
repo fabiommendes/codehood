@@ -214,6 +214,11 @@ export function localDateOf(instant: Date, zone: string = SERVER_TZ): string {
 	return `${String(p.year).padStart(4, "0")}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
+/** The instant `instant`'s local day starts in `SERVER_TZ`. */
+export function startOfLocalDay(instant: Date): Date {
+	return toInstant(localDateOf(instant), 0);
+}
+
 /**
  * instant's local weekday in zone
  *

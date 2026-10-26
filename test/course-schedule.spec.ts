@@ -122,3 +122,25 @@ test("next skips holidays, cancelled meetings and drafts", () => {
 
 	expect(next?.kind === "event" && next.event.title).toBe("Loops");
 });
+
+test("a week whose last meeting ended earlier today stays ahead until the day turns", () => {
+	const entries = [meeting("Intro", 0), meeting("Loops", 1)];
+
+	// An hour after Intro ended, still Monday.
+	const sameDay = courseSchedule(
+		entries,
+		START,
+		new Date(START.getTime() + 3 * HOUR),
+	);
+	expect(titles(sameDay.past)).toEqual([]);
+	expect(titles(sameDay.ahead)).toEqual([
+		[0, ["Intro"]],
+		[1, ["Loops"]],
+	]);
+	expect(sameDay.next?.kind === "event" && sameDay.next.event.title).toBe(
+		"Loops",
+	);
+
+	const nextDay = courseSchedule(entries, START, day(1));
+	expect(titles(nextDay.past)).toEqual([[0, ["Intro"]]]);
+});

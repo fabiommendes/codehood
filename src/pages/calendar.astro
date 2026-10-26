@@ -19,7 +19,12 @@ import {
 import { courseHref } from "@/urls";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
-import { formatDateTime, localDateOf, toInstant } from "@/utils/schedule-time";
+import {
+	formatDateTime,
+	localDateOf,
+	startOfLocalDay,
+	toInstant,
+} from "@/utils/schedule-time";
 
 export const prerender = false;
 
@@ -57,6 +62,7 @@ const courseHrefs = new Map(
 const courseNames = new Map(courses.map((c) => [c.id, c.discipline.name]));
 
 const now = new Date();
+const startOfToday = startOfLocalDay(now);
 
 const events =
 	courseIds.length > 0
@@ -83,7 +89,7 @@ const monthParam = Astro.url.searchParams.get("month");
 const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
 // Without ?month, open on the next entry's month, else the last one's, else today's.
 const defaultMonthDate =
-	entries.find((entry) => entry.endAt >= now)?.startAt ??
+	entries.find((entry) => entry.endAt >= startOfToday)?.startAt ??
 	entries.at(-1)?.startAt ??
 	now;
 const [year, month] = (
@@ -134,7 +140,10 @@ for (const entry of monthEntries) {
 	entriesByDay.set(day, [...(entriesByDay.get(day) ?? []), entry]);
 }
 
-const upcoming = entries.filter((entry) => entry.endAt >= now).slice(0, 5);
+// Today's entries stay listed after they end, until the day turns.
+const upcoming = entries
+	.filter((entry) => entry.endAt >= startOfToday)
+	.slice(0, 5);
 /// How many upcoming entries show before the rest fold away, so the grid stays near the top.
 const UPCOMING_SHOWN = 2;
 

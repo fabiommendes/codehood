@@ -13,7 +13,7 @@ import {
 } from "@/services/student-home";
 import { courseHref } from "@/urls";
 import { loadCourseExceptions } from "./load-exam-exceptions";
-import { localDateOf, toInstant } from "./schedule-time";
+import { startOfLocalDay } from "./schedule-time";
 
 /**
  * Loads what `actor` takes as a student and builds their home page sections at `now`.
@@ -120,7 +120,7 @@ export async function loadStudentHome(
 			? await db.calendarEvent.findMany(
 					{
 						courseIds: courses.map((course) => course.id),
-						from: toInstant(localDateOf(now), 0),
+						from: startOfLocalDay(now),
 					},
 					{ actor },
 				)
