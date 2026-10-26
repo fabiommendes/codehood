@@ -78,6 +78,7 @@ const claimTargetSchema = z.object({
 /// What `currentCode` returns.
 const currentCodeSchema = z.object({
 	code: z.string(),
+	changedAt: z.date(),
 	nextChangeAt: z.date(),
 });
 
@@ -361,7 +362,7 @@ export class RollCallService extends CrudBase<{
 	}
 
 	/**
-	 * Returns the code on the instructor's screen and the instant it changes.
+	 * Returns the code on the instructor's screen, the instant it came up and the instant it changes.
 	 *
 	 * @throws {@link NotFound} If the roll call does not exist.
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
@@ -374,7 +375,7 @@ export class RollCallService extends CrudBase<{
 	currentCode<Opt extends ServiceOpts>(
 		filter: RollCallPK,
 		opts: Opt,
-	): Promise<{ code: string; nextChangeAt: Date }> {
+	): Promise<z.infer<typeof currentCodeSchema>> {
 		return this.$transaction(opts, async (tx, scoped) => {
 			const current = await manageable(tx, filter, scoped.actor);
 			return codeAt(current.secret, new Date());

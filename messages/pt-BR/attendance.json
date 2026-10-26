@@ -31,12 +31,15 @@
 	"attendance_manager_col_note": "Observação",
 	"attendance_manager_new_in_class": "Novo na turma",
 	"attendance_manager_same_device": "Mesmo dispositivo que {other}",
-	"attendance_manager_save": "Salvar",
+	"attendance_manager_save_note": "Salvar observação",
+	"attendance_manager_add_note": "Adicionar observação",
+	"attendance_manager_edit_note": "Editar observação",
 	"attendance_manager_delete_title": "Excluir esta chamada?",
 	"attendance_manager_delete_body": "Todas as presenças registradas nela serão perdidas. Esta ação não pode ser desfeita.",
 	"attendance_manager_delete_confirm": "Excluir chamada",
 	"attendance_projector_qr": "QR code para registrar presença",
 	"attendance_projector_code": "Código de presença",
+	"attendance_projector_code_left": "Tempo restante deste código",
 	"attendance_projector_present": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],

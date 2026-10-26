@@ -170,6 +170,19 @@ export async function startClaim(attempt: {
 	return { actsAsInvite: target.actsAsInvite };
 }
 
+/**
+ * Reads back the claim an earlier scan of `rollCallId` left in the cookie, so a reload after the code rotated keeps going.
+ *
+ * @returns Whether the roll call also creates accounts, or `null` without a valid claim.
+ */
+export async function resumeClaim(
+	cookies: AstroCookies,
+	rollCallId: RollCallId,
+): Promise<{ actsAsInvite: boolean } | null> {
+	const pending = await pendingClaim(cookies, rollCallId);
+	return pending && { actsAsInvite: pending.info.actsAsInvite };
+}
+
 /// The claim in the cookie when it is valid for `rollCallId`, else `null`.
 async function pendingClaim(cookies: AstroCookies, rollCallId: RollCallId) {
 	const value = cookies.get(CLAIM_COOKIE)?.value;

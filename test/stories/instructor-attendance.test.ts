@@ -30,10 +30,13 @@ import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
  *     matching /Closes in \d+:\d{2}/.
  *   - Link "Project"; buttons "Close roll call" and "Reopen roll call" (only
  *     the one that applies is present).
- *   - One table row per enrolled student, holding the student's name, a
- *     checkbox "Present", a textbox "Note" and a button "Save". "Save" submits
- *     the checkbox and the note together. Checked + Save marks the student
- *     present by hand; unchecked + Save removes the attendance.
+ *   - One table row per enrolled student, in name order, holding the
+ *     student's name and a switch (checkbox role) "Present" that saves as soon
+ *     as it flips: on marks the student present by hand, off removes the
+ *     attendance.
+ *   - A present student's row has a button "Add note" (or "Edit note" once it
+ *     has one) that reveals a textbox "Note" and a button "Save note". A saved
+ *     note reads as text in the row.
  *   - A badge "Same device as <username>" on a row whose attendance shares a
  *     browser with another student's.
  *   - While the roll call is open the page refreshes itself, so a check-in
@@ -45,6 +48,9 @@ import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
  *     text of the 6 characters, spaces allowed.
  *   - Text "<n> present" with the number of attendances.
  *   - Text matching /Closes in \d+:\d{2}/.
+ *   - A progress bar "Time left for this code", draining until the code rotates.
+ *   - A closed roll call shows "Roll call closed" and a large button
+ *     "Reopen roll call" that brings the QR code back.
  *
  * Student side, used here only to make students arrive
  *   - `/c/<rollCallId>/<code>` for a logged in enrolled student shows
@@ -102,6 +108,8 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	const bia = await enrolledStudent(course.id, "ia-bia", "Bia Lima");
 	const caio = await enrolledStudent(course.id, "ia-caio", "Caio Reis");
 	const dia = await enrolledStudent(course.id, "ia-dia", "Dia Sol");
+	// First by name, last by username.
+	await enrolledStudent(course.id, "ia-zeca", "Abel Zeca");
 
 	await logInAs(page, instructor);
 	await page.goto(`${href}/schedule`);
@@ -148,6 +156,17 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	});
 	const manage = page.url();
 
+	await test.step("the students are listed by name", async () => {
+		const names = page.getByRole("row").locator("td:first-child .font-medium");
+		await expect(names).toHaveText([
+			"Abel Zeca",
+			"Ana Prado",
+			"Bia Lima",
+			"Caio Reis",
+			"Dia Sol",
+		]);
+	});
+
 	await test.step("the projection shows the QR code, the current code and who is in", async () => {
 		await page.getByRole("link", { name: "Project" }).click();
 		await expect(page).toHaveURL(`${manage}/project`);
@@ -156,6 +175,9 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 		).toBeVisible();
 		await expect(page.getByText("0 present")).toBeVisible();
 		await expect(page.getByText(/Closes in \d+:\d{2}/)).toBeVisible();
+		await expect(
+			page.getByRole("progressbar", { name: "Time left for this code" }),
+		).toBeVisible();
 
 		const shown = (await page.getByLabel("Check-in code").innerText()).replace(
 			/\s/g,
@@ -199,8 +221,8 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	await test.step("the instructor removes the one who was not there", async () => {
 		const biaRow = studentRow(page, "Bia Lima");
 		await biaRow.getByRole("checkbox", { name: "Present" }).uncheck();
-		await biaRow.getByRole("button", { name: "Save" }).click();
 
+		await expect.poll(() => attendees(rollCall.id)).toEqual([ana.username]);
 		await expect(
 			studentRow(page, "Bia Lima").getByRole("checkbox", { name: "Present" }),
 		).not.toBeChecked();
@@ -210,18 +232,26 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 
 	await test.step("a student without a phone is marked by hand, with a note", async () => {
 		const diaRow = studentRow(page, "Dia Sol");
+		await expect(diaRow.getByRole("button", { name: "Add note" })).toHaveCount(
+			0,
+		);
 		await diaRow.getByRole("checkbox", { name: "Present" }).check();
+		await expect.poll(() => attendees(rollCall.id)).toContain(dia.username);
+		await expect(diaRow.getByRole("textbox", { name: "Note" })).toHaveCount(0);
+		await diaRow.getByRole("button", { name: "Add note" }).click();
 		await diaRow.getByRole("textbox", { name: "Note" }).fill("atestado");
-		await diaRow.getByRole("button", { name: "Save" }).click();
+		await diaRow.getByRole("button", { name: "Save note" }).click();
+		await expect(diaRow.getByText("atestado")).toBeVisible();
 
 		await page.reload();
 		const saved = studentRow(page, "Dia Sol");
 		await expect(
 			saved.getByRole("checkbox", { name: "Present" }),
 		).toBeChecked();
-		await expect(saved.getByRole("textbox", { name: "Note" })).toHaveValue(
-			"atestado",
-		);
+		await expect(saved.getByText("atestado")).toBeVisible();
+		await expect(
+			saved.getByRole("button", { name: "Edit note" }),
+		).toBeVisible();
 		const entry = await prisma.attendance.findFirstOrThrow({
 			where: { rollCallId: rollCall.id, username: dia.username },
 		});
@@ -242,13 +272,22 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 		expect(await attendees(rollCall.id)).not.toContain(caio.username);
 	});
 
-	await test.step("reopening gives the class another round", async () => {
+	await test.step("projecting a closed roll call offers to reopen it, for another round", async () => {
+		await page.goto(`${manage}/project`);
+		await expect(page.getByText("Roll call closed")).toBeVisible();
+		await expect(
+			page.getByRole("img", { name: "QR code to check in" }),
+		).toHaveCount(0);
 		await page.getByRole("button", { name: "Reopen roll call" }).click();
-		await expect(page.getByText("Roll call open")).toBeVisible();
+		await expect(
+			page.getByRole("img", { name: "QR code to check in" }),
+		).toBeVisible();
 		await expect(page.getByText(/Closes in \d+:\d{2}/)).toBeVisible();
 
 		await scan(classmate, rollCall, caio);
 		await expect(classmate.getByText("Attendance recorded for")).toBeVisible();
+		await page.goto(manage);
+		await expect(page.getByText("Roll call open")).toBeVisible();
 		await expect(
 			studentRow(page, "Caio Reis").getByRole("checkbox", { name: "Present" }),
 		).toBeChecked({ timeout: 20_000 });

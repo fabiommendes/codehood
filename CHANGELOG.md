@@ -33,6 +33,17 @@
 - A meeting that ended earlier today stays in view until the day turns: its
   week no longer folds into "already held" on the schedule page, and it still
   shows in the course home's calendar and in `/calendar`'s upcoming list.
+- Roll call page: students in name order, and a presence switch that saves
+  as it flips instead of a checkbox and a Save button per row. The note
+  hides behind an "Add note" button.
+- Roll call projection: a bar under the code drains until it rotates, and a
+  closed roll call shows a large button to reopen it.
+
+### Fixed
+
+- Signing up through a roll call that acts as an invite no longer fails
+  with an expired code when the page reloads after the code rotated, as it
+  does when the form comes back with an error.
 
 ## 0.2.0 (2026-10-21)
 

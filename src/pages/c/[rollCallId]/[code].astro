@@ -8,6 +8,7 @@ import {
 	clientIp,
 	completeClaim,
 	register,
+	resumeClaim,
 	startClaim,
 } from "@/actions/check-in";
 import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
@@ -40,12 +41,14 @@ if (rollCallId !== null) {
 				(await completeClaim({ ...attempt, rollCallId })) ??
 				(await register({ ...attempt, rollCallId, code }));
 		} else {
-			const claim = await startClaim({
-				cookies: Astro.cookies,
-				ip: clientIp(Astro),
-				rollCallId,
-				code,
-			});
+			const claim =
+				(await resumeClaim(Astro.cookies, rollCallId)) ??
+				(await startClaim({
+					cookies: Astro.cookies,
+					ip: clientIp(Astro),
+					rollCallId,
+					code,
+				}));
 			if (!claim.actsAsInvite) {
 				return Astro.redirect(
 					`/login?next=${encodeURIComponent(Astro.url.pathname)}`,

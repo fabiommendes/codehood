@@ -28,7 +28,9 @@ const rollCall = await db.rollCall.findOne(pk, { actor });
 const event = await db.calendarEvent.findOne(pk, { actor });
 if (!rollCall || !event) return Astro.rewrite("/404");
 
-const { code } = await db.rollCall.currentCode(pk, { actor });
+const { code, changedAt, nextChangeAt } = await db.rollCall.currentCode(pk, {
+	actor,
+});
 ---
 
 <Layout title={m.attendance_roll_call_page_title({ event: event.title })}>
@@ -41,6 +43,8 @@ const { code } = await db.rollCall.currentCode(pk, { actor });
     manageHref={`${href}/roll-call/${weekNumber}/${timeSlot}`}
     initial={{
       code,
+      changedAt,
+      nextChangeAt,
       qr: checkInQrSvg(Astro.url.origin, rollCall.id, code),
       present: Object.keys(rollCall.attendances).length,
       closesAt: rollCall.closesAt,

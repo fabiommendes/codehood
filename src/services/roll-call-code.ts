@@ -35,15 +35,16 @@ export function generateSecret(): string {
 }
 
 /**
- * Returns the code shown at `at` and the instant it is replaced.
+ * Returns the code shown at `at`, the instant it came up and the instant it is replaced.
  */
 export function codeAt(
 	secret: string,
 	at: Date,
-): { code: string; nextChangeAt: Date } {
+): { code: string; changedAt: Date; nextChangeAt: Date } {
 	const counter = Math.floor(at.getTime() / WINDOW_MS);
 	return {
 		code: codeForWindow(secret, counter),
+		changedAt: new Date(counter * WINDOW_MS),
 		nextChangeAt: new Date((counter + 1) * WINDOW_MS),
 	};
 }

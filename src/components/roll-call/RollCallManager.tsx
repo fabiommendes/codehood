@@ -45,19 +45,19 @@ export interface RollCallManagerProps {
 /// How often an open roll call asks the server for new check-ins.
 const POLL_MS = 5000;
 
-/// What the instructor is editing in a student's row.
+/// A student's row as shown: the server's state, or what the instructor last set.
 interface Draft {
 	present: boolean;
 	note: string;
-	dirty: boolean;
 }
 
 /**
  * The instructor's view of a roll call: its state, and every enrolled student
- * with a presence checkbox and a note.
+ * with a presence switch that saves as it flips, and a note behind a button.
  *
- * While the roll call is open it polls for check-ins. A row the instructor
- * has edited is left alone until saved.
+ * While the roll call is open it polls for check-ins. A row with a save on the
+ * way, or a note being written, is left alone until it settles. Saves run one
+ * at a time, in the order they were made.
  */
 export default function RollCallManager(
 	props: RollCallManagerProps,
@@ -70,6 +70,12 @@ export default function RollCallManager(
 	};
 	const [server, setServer] = createSignal<Snapshot>(props.initial);
 	const [drafts, setDrafts] = createStore<Record<string, Draft>>({});
+	/// Saves queued or running per row.
+	const [pending, setPending] = createStore<Record<string, number>>({});
+	/// The note text of rows whose note is open for editing.
+	const [editing, setEditing] = createStore<Record<string, string | undefined>>(
+		{},
+	);
 	const [busy, setBusy] = createSignal(false);
 	const [failure, setFailure] = createSignal<string | null>(null);
 	const now = createNow(props.now);
@@ -77,13 +83,17 @@ export default function RollCallManager(
 
 	const isOpen = () => server().closesAt.getTime() > now();
 
-	/// Takes a new server state, keeping the rows being edited.
-	function adopt(next: Snapshot, saved?: string): void {
+	/// Whether the row of `username` has a save on the way or a note open.
+	const unsettled = (username: string) =>
+		(pending[username] ?? 0) > 0 || editing[username] !== undefined;
+
+	/// Takes a new server state, keeping the rows that have not settled.
+	function adopt(next: Snapshot): void {
 		setServer(next);
 		const fresh: Record<string, Draft> = {};
 		for (const student of props.students) {
 			const current = drafts[student.username];
-			if (current?.dirty && student.username !== saved) {
+			if (current && unsettled(student.username)) {
 				fresh[student.username] = { ...current };
 				continue;
 			}
@@ -91,7 +101,6 @@ export default function RollCallManager(
 			fresh[student.username] = {
 				present: entry !== undefined,
 				note: entry?.note ?? "",
-				dirty: false,
 			};
 		}
 		setDrafts(reconcile(fresh));
@@ -115,7 +124,6 @@ export default function RollCallManager(
 			data?: Snapshot | undefined;
 			error?: ActionError | undefined;
 		}>,
-		saved?: string,
 	): Promise<void> {
 		setBusy(true);
 		setFailure(null);
@@ -125,20 +133,34 @@ export default function RollCallManager(
 			setFailure(errorMessage(error));
 			return;
 		}
-		if (data) adopt(data, saved);
+		if (data) adopt(data);
 	}
 
-	function save(username: string): Promise<void> {
-		const draft = drafts[username];
-		const entry = draft?.present ? { note: draft.note.trim() || null } : null;
-		return run(
-			() =>
-				actions.rollCall.update({
-					...target,
-					attendances: { [username]: entry },
-				}),
-			username,
-		);
+	/// The tail of the save queue.
+	let saving: Promise<void> = Promise.resolve();
+
+	/// Shows `draft` in the row of `username` at once and queues saving it.
+	function save(username: string, draft: Draft): void {
+		setDrafts(username, draft);
+		setPending(username, (count) => (count ?? 0) + 1);
+		const entry = draft.present ? { note: draft.note.trim() || null } : null;
+		saving = saving.then(async () => {
+			setFailure(null);
+			const { data, error } = await actions.rollCall.update({
+				...target,
+				attendances: { [username]: entry },
+			});
+			setPending(username, (count) => count - 1);
+			if (error) setFailure(errorMessage(error));
+			// On a failure this puts the row back as the server has it.
+			adopt(data ?? server());
+		});
+	}
+
+	function saveNote(username: string): void {
+		const note = editing[username] ?? "";
+		setEditing(username, undefined);
+		save(username, { present: true, note });
 	}
 
 	async function remove(): Promise<void> {
@@ -215,7 +237,6 @@ export default function RollCallManager(
 						<tr>
 							<th>{m.attendance_table_col_student()}</th>
 							<th>{m.attendance_table_col_present()}</th>
-							<th>{m.attendance_manager_col_note()}</th>
 							<th />
 						</tr>
 					</thead>
@@ -224,6 +245,7 @@ export default function RollCallManager(
 							{(student) => {
 								const entry = () => server().attendances[student.username];
 								const draft = () => drafts[student.username];
+								const note = () => editing[student.username];
 								return (
 									<tr classList={{ "opacity-50": student.dropped }}>
 										<td>
@@ -247,46 +269,85 @@ export default function RollCallManager(
 													)}
 												</For>
 											</div>
+											<Show
+												when={note() !== undefined}
+												fallback={
+													<Show when={draft()?.present && draft()?.note}>
+														<p class="mt-1 text-sm text-base-content/70">
+															{draft()?.note}
+														</p>
+													</Show>
+												}
+											>
+												<form
+													class="mt-2 flex flex-wrap gap-2"
+													onSubmit={(e) => {
+														e.preventDefault();
+														saveNote(student.username);
+													}}
+												>
+													<input
+														type="text"
+														class="input input-sm min-w-0 flex-1"
+														aria-label={m.attendance_manager_col_note()}
+														maxLength={200}
+														value={note() ?? ""}
+														ref={(el) => queueMicrotask(() => el.focus())}
+														onInput={(e) =>
+															setEditing(
+																student.username,
+																e.currentTarget.value,
+															)
+														}
+														onKeyDown={(e) => {
+															if (e.key === "Escape") {
+																setEditing(student.username, undefined);
+															}
+														}}
+													/>
+													<button type="submit" class="btn btn-primary btn-sm">
+														{m.attendance_manager_save_note()}
+													</button>
+													<button
+														type="button"
+														class="btn btn-ghost btn-sm"
+														onClick={() =>
+															setEditing(student.username, undefined)
+														}
+													>
+														{m.attendance_cancel()}
+													</button>
+												</form>
+											</Show>
 										</td>
 										<td>
 											<input
 												type="checkbox"
-												class="checkbox"
+												class="toggle toggle-success"
 												aria-label={m.attendance_table_col_present()}
 												checked={draft()?.present ?? false}
 												onChange={(e) =>
-													setDrafts(student.username, {
+													save(student.username, {
 														present: e.currentTarget.checked,
-														dirty: true,
+														note: draft()?.note ?? "",
 													})
 												}
 											/>
 										</td>
-										<td>
-											<input
-												type="text"
-												class="input input-sm w-full"
-												aria-label={m.attendance_manager_col_note()}
-												maxLength={200}
-												value={draft()?.note ?? ""}
-												onInput={(e) =>
-													setDrafts(student.username, {
-														note: e.currentTarget.value,
-														dirty: true,
-													})
-												}
-											/>
-										</td>
-										<td>
-											<button
-												type="button"
-												class="btn btn-sm"
-												classList={{ "btn-primary": draft()?.dirty }}
-												disabled={busy()}
-												onClick={() => save(student.username)}
-											>
-												{m.attendance_manager_save()}
-											</button>
+										<td class="text-right">
+											<Show when={draft()?.present && note() === undefined}>
+												<button
+													type="button"
+													class="btn btn-ghost btn-xs"
+													onClick={() =>
+														setEditing(student.username, draft()?.note ?? "")
+													}
+												>
+													{draft()?.note
+														? m.attendance_manager_edit_note()
+														: m.attendance_manager_add_note()}
+												</button>
+											</Show>
 										</td>
 									</tr>
 								);

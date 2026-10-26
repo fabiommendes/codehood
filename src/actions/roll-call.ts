@@ -116,15 +116,19 @@ export const rollCall = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const pk = pkOf(input);
-			const { code, nextChangeAt } = await db.rollCall.currentCode(pk, {
-				actor,
-			});
+			const { code, changedAt, nextChangeAt } = await db.rollCall.currentCode(
+				pk,
+				{
+					actor,
+				},
+			);
 			const found = await db.rollCall.findOne(pk, { actor });
 			if (!found) {
 				throw new Error(m.errors_meeting_no_roll_call());
 			}
 			return {
 				code,
+				changedAt,
 				nextChangeAt,
 				closesAt: found.closesAt,
 				present: Object.keys(found.attendances).length,

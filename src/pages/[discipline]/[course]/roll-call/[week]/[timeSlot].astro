@@ -6,6 +6,7 @@ import RollCallManager from "@/components/roll-call/RollCallManager";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { compareStudents } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 
@@ -31,11 +32,13 @@ const event = await db.calendarEvent.findOne(pk, { actor });
 if (!rollCall || !event) return Astro.rewrite("/404");
 
 const report = await db.rollCall.courseAttendance(course.id, { actor });
-const students = report.students.map((s) => ({
-	username: s.username,
-	name: s.name,
-	dropped: s.status === "DROPPED",
-}));
+const students = report.students
+	.map((s) => ({
+		username: s.username,
+		name: s.name,
+		dropped: s.status === "DROPPED",
+	}))
+	.toSorted(compareStudents);
 
 const courseParams = {
 	discipline: course.discipline.slug,

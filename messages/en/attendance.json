@@ -31,12 +31,15 @@
 	"attendance_manager_col_note": "Note",
 	"attendance_manager_new_in_class": "New in this class",
 	"attendance_manager_same_device": "Same device as {other}",
-	"attendance_manager_save": "Save",
+	"attendance_manager_save_note": "Save note",
+	"attendance_manager_add_note": "Add note",
+	"attendance_manager_edit_note": "Edit note",
 	"attendance_manager_delete_title": "Delete this roll call?",
 	"attendance_manager_delete_body": "Every attendance recorded in it is lost. This cannot be undone.",
 	"attendance_manager_delete_confirm": "Delete roll call",
 	"attendance_projector_qr": "QR code to check in",
 	"attendance_projector_code": "Check-in code",
+	"attendance_projector_code_left": "Time left for this code",
 	"attendance_projector_present": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],

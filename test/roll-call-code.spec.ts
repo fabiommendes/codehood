@@ -51,8 +51,9 @@ test("T2-04 the code holds for 15 s and then changes", () => {
 	expect(codeAt(SECRET, plus(WINDOW_MS)).code).not.toBe(before);
 });
 
-test("T2-05 nextChangeAt is the end of the current window", () => {
-	const { nextChangeAt } = codeAt(SECRET, plus(7_000));
+test("T2-05 changedAt and nextChangeAt are the start and end of the current window", () => {
+	const { changedAt, nextChangeAt } = codeAt(SECRET, plus(7_000));
+	expect(changedAt.getTime()).toBe(T0.getTime());
 	expect(nextChangeAt.getTime()).toBe(plus(WINDOW_MS).getTime());
 });
 

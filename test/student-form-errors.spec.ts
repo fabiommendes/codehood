@@ -60,6 +60,7 @@ async function openSignUpPage(page: Page) {
 		where: { id: created.id },
 	});
 	await page.goto(`/c/${created.id}/${codeAt(secret, new Date()).code}`);
+	return { rollCallId: created.id, secret };
 }
 
 /// Fills the sign-up form, defaulting to a valid new account.
@@ -113,6 +114,26 @@ test("check-in sign-up: a taken email shows on the email field", async ({
 		"That email is already in use.",
 	);
 	await expect(group(page, "Username")).not.toContainText("already in use");
+});
+
+test("check-in sign-up: the scan's claim outlives the code, so a page loaded after it rotated still signs up", async ({
+	page,
+}) => {
+	const taken = await seedUser({ role: "STUDENT" });
+	const { rollCallId, secret } = await openSignUpPage(page);
+	// The same link a few minutes later: its code no longer checks in.
+	const stale = codeAt(secret, new Date(Date.now() - 4 * 60_000)).code;
+	await page.goto(`/c/${rollCallId}/${stale}`);
+
+	await signUp(page, { Username: taken.username });
+	await expect(group(page, "Username")).toContainText(
+		"That username is already in use.",
+	);
+
+	await signUp(page, { Username: "fe-nina" });
+	await expect(
+		page.getByText("Attendance recorded for fe-Signup"),
+	).toBeVisible();
 });
 
 test("check-in sign-up: a short password is refused on the password field", async ({
