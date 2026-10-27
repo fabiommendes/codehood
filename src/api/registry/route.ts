@@ -9,6 +9,7 @@ import { InvalidData, NotAllowed } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
 import { m } from "@/i18n";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
+import { readMultipart } from "./multipart";
 import { segmentNames, toOpenApiPath } from "./util";
 
 type ActionAPIContext = APIContext;
@@ -93,11 +94,40 @@ export type Route<In, Out, Actor> = HandlerFunction<In, Out, Actor> & {
  * @throws {Error} If `inMultipart` is set on GET or DELETE, or without `in`.
  */
 export function openApiRequest(
-	_method: keyof HttpMethods,
-	_path: string,
-	_options: Pick<RouteOptions<unknown, unknown, boolean>, "in" | "inMultipart">,
+	method: keyof HttpMethods,
+	path: string,
+	options: Pick<RouteOptions<unknown, unknown, boolean>, "in" | "inMultipart">,
 ): RouteConfig["request"] | undefined {
-	throw new Error("not implemented");
+	const readsQueryString = method === "get" || method === "delete";
+	if (options.inMultipart && (readsQueryString || !options.in)) {
+		throw new Error(
+			"inMultipart needs an `in` schema and a POST, PUT or PATCH route",
+		);
+	}
+
+	// Astro spells a dynamic segment `[id]`; OpenAPI spells it `{id}`. Each
+	// segment also has to be declared as a path parameter or the document
+	// describes an endpoint nobody can call.
+	const pathParams = segmentNames(path);
+	if (!options.in && !pathParams.length) return undefined;
+
+	const contentType = options.inMultipart
+		? "multipart/form-data"
+		: "application/json";
+	return {
+		...(options.in
+			? readsQueryString
+				? { query: options.in as unknown as ZodObject }
+				: { body: { content: { [contentType]: { schema: options.in } } } }
+			: {}),
+		...(pathParams.length
+			? {
+					params: z.object(
+						Object.fromEntries(pathParams.map((name) => [name, z.string()])),
+					),
+				}
+			: {}),
+	};
 }
 
 //
@@ -110,37 +140,9 @@ export function route<In, Out, IsPublic extends boolean = false>(
 ): Route<In, Out, MaybeActor<IsPublic>> {
 	const action = options.handler;
 
-	// GET and DELETE never carry a body, so their input travels as a query
-	// string instead; POST/PUT/PATCH keep documenting a JSON request body.
 	const readsQueryString = method === "get" || method === "delete";
-
-	const inputOpts = options.in
-		? readsQueryString
-			? { query: options.in as unknown as ZodObject }
-			: {
-					body: { content: { "application/json": { schema: options.in } } },
-				}
-		: {};
-
-	// Astro spells a dynamic segment `[id]`; OpenAPI spells it `{id}`. The
-	// registry is keyed by Astro's spelling because that is what
-	// `context.routePattern` hands back, so the translation happens here, at
-	// the one point where a pattern crosses into the document. Each segment
-	// also has to be declared as a path parameter or the document describes an
-	// endpoint nobody can call.
-	const pathParams = segmentNames(path);
-	const paramsOpts = pathParams.length
-		? {
-				params: z.object(
-					Object.fromEntries(pathParams.map((name) => [name, z.string()])),
-				),
-			}
-		: {};
-
-	const requestOpts =
-		options.in || pathParams.length
-			? { request: { ...inputOpts, ...paramsOpts } }
-			: {};
+	const request = openApiRequest(method, path, options);
+	const requestOpts = request ? { request } : {};
 
 	registry.registerPath({
 		method,
@@ -220,7 +222,9 @@ export function route<In, Out, IsPublic extends boolean = false>(
 							options.in,
 							collectSearchParams(new URL(request.url).searchParams),
 						)
-					: await request.json()
+					: options.inMultipart
+						? await readMultipart(request, options.in)
+						: await request.json()
 				: undefined;
 			const validated = options.in?.safeParse(raw);
 			if (validated?.error)
