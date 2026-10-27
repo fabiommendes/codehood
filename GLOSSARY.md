@@ -98,6 +98,14 @@ the server. It is the reason course content is a Git repository of plain text
 rather than something typed into web forms. Sync is one-way — there is no
 `codehood pull`, because the server never modifies content.
 
+## Clone token
+
+Type: domain
+
+Unguessable secret in a [Repository](#repository)'s clone URL. Knowing it
+grants `git clone` and `git pull` without logging in, like a [Blob](#blob)
+hash. One per repository, so it can be rotated alone.
+
 ## Course
 
 Also: course edition 
@@ -343,6 +351,15 @@ Type: domain
 A user's message about a problem with Codehood or with a course's material,
 with optional images. No replies: the author sees only its status. The admin
 triages every report, a course's instructor only its `CONTENT` reports.
+
+## Repository
+
+Type: domain
+
+A versioned file tree a [Course](#course) shares with its students, served as
+a read-only git repository and as a zip. Pushed by the [CLI](#cli) from
+`repositories/`; each push that changes the tree becomes a commit. Lessons
+that link to it list it, and one repository may serve many lessons.
 
 ## Reserved slug
 
