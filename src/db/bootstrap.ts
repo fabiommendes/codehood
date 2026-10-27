@@ -3,6 +3,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
 import { prisma } from "@/db/client";
+import { hashBytes } from "@/utils/content-hash";
 import {
 	localDateOf,
 	slotInstant,
@@ -1039,6 +1040,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	]);
 
 	await seedRegradeExam(cs101.id, ada, { hopper, hamilton });
+	await seedRepositories(cs101.id);
 
 	// An ended course in the past edition, so admin views keep an expired one.
 	const ended = await db.course.create(
@@ -1401,6 +1403,167 @@ async function eventAt(
 		);
 	}
 	return event;
+}
+
+/// A file of a demo repository: its path, its bytes and whether it is executable.
+type DemoFile = { path: string; bytes: Buffer; executable?: boolean };
+
+/// Adds `files` as one commit of a demo repository, sending the whole tree as the CLI does.
+async function commitDemoFiles(
+	repo: { course: Course["id"]; slug: string },
+	files: DemoFile[],
+	message: string,
+): Promise<void> {
+	const payload: Record<string, Buffer> = {};
+	const tree: { path: string; mode: "100644" | "100755"; hash: string }[] =
+		files.map((file) => {
+			const hash = hashBytes(file.bytes);
+			payload[hash] = file.bytes;
+			return {
+				path: file.path,
+				mode: file.executable ? "100755" : "100644",
+				hash,
+			};
+		});
+	await db.repository.addFiles(repo, payload, FULL_ACCESS);
+	await db.repository.commit(repo, { tree, message }, FULL_ACCESS);
+}
+
+/// The files of `lab-calculadora` with `subtracao` as the body of `subtrai`.
+function labCalculadoraFiles(subtracao: string): DemoFile[] {
+	const operacoes = [
+		'"""Basic arithmetic operations."""',
+		"",
+		"",
+		"def soma(a: float, b: float) -> float:",
+		"    return a + b",
+		"",
+		"",
+		"def subtrai(a: float, b: float) -> float:",
+		`    return ${subtracao}`,
+		"",
+	].join("\n");
+	const cli = [
+		'"""Command line: python3 -m calc.cli OPERACAO A B."""',
+		"",
+		"import sys",
+		"",
+		"from calc.operacoes import soma, subtrai",
+		"",
+		'OPERACOES = {"soma": soma, "subtrai": subtrai}',
+		"",
+		"",
+		"def main(argv: list[str]) -> int:",
+		"    operacao, a, b = argv",
+		"    print(OPERACOES[operacao](float(a), float(b)))",
+		"    return 0",
+		"",
+		"",
+		'if __name__ == "__main__":',
+		"    sys.exit(main(sys.argv[1:]))",
+		"",
+	].join("\n");
+	return [
+		{
+			path: "README.md",
+			bytes: Buffer.from(
+				[
+					"# Lab: calculator",
+					"",
+					"Build a small calculator. The operations live in `calc/operacoes.py`",
+					"and the command line in `calc/cli.py`.",
+					"",
+					"Run it with:",
+					"",
+					"    ./run.sh soma 2 3",
+					"    ./run.sh subtrai 7 4",
+					"",
+					"The package notes are in [calc/README.md](calc/README.md).",
+					"",
+				].join("\n"),
+			),
+		},
+		{
+			path: "calc/README.md",
+			bytes: Buffer.from(
+				"# Package calc\n\nArithmetic is in `operacoes.py`, the command line in `cli.py`.\n",
+			),
+		},
+		{
+			path: "calc/__init__.py",
+			bytes: Buffer.from('"""Calculator package."""\n'),
+		},
+		{ path: "calc/operacoes.py", bytes: Buffer.from(operacoes) },
+		{ path: "calc/cli.py", bytes: Buffer.from(cli) },
+		{
+			path: "run.sh",
+			bytes: Buffer.from(
+				'#!/bin/sh\ncd "$(dirname "$0")" && exec python3 -m calc.cli "$@"\n',
+			),
+			executable: true,
+		},
+		{ path: "docs/diagrama.png", bytes: solidPng(16, 16, [90, 160, 90]) },
+		{
+			path: "dados/log-grande.txt",
+			bytes: Buffer.from(
+				Array.from(
+					{ length: 40_000 },
+					(_, i) => `${String(i).padStart(6, "0")} ${"-".repeat(30)}\n`,
+				).join(""),
+			),
+		},
+	];
+}
+
+/// Seeds the demo repositories of cs101 and cites `lab-calculadora` from two of its meetings.
+async function seedRepositories(course: Course["id"]): Promise<void> {
+	const lab = await db.repository.upsert(
+		{ course, slug: "lab-calculadora" },
+		FULL_ACCESS,
+	);
+	const labRef = { course, slug: lab.slug };
+	await commitDemoFiles(
+		labRef,
+		labCalculadoraFiles("a + b  # bug, fixed in the next commit"),
+		"First version of the lab",
+	);
+	await commitDemoFiles(
+		labRef,
+		labCalculadoraFiles("a - b"),
+		"Fix subtraction",
+	);
+	for (const [week, slot] of [
+		[2, "mon"],
+		[2, "wed"],
+	] as const) {
+		const event = await eventAt(course, week, slot);
+		await db.calendarEvent.update(
+			{ id: event.id },
+			{ repositories: [lab.slug] },
+			FULL_ACCESS,
+		);
+	}
+
+	const examples = await db.repository.upsert(
+		{ course, slug: "exemplos-python" },
+		FULL_ACCESS,
+	);
+	await commitDemoFiles(
+		{ course, slug: examples.slug },
+		[
+			{
+				path: "fibonacci.py",
+				bytes: Buffer.from(
+					"def fib(n: int) -> int:\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n",
+				),
+			},
+		],
+		"Examples",
+	);
+
+	await db.repository.upsert({ course, slug: "lab-futuro" }, FULL_ACCESS);
+
+	console.log(`[dev] repository lab-calculadora clones from ${lab.cloneUrl}`);
 }
 
 /// Sets when an enrollment was created, which decides whether a meeting counts as before it.
