@@ -42,9 +42,8 @@ process.env.TEST_PORT = String(
 );
 
 // Read after `TEST_PORT` is set: the module derives every path from it.
-const { TEST_DATABASE_URL, TEST_DB_PATH, TEST_RESOURCE_ROOT } = await import(
-	"./env"
-);
+const { TEST_BASE_URL, TEST_DATABASE_URL, TEST_DB_PATH, TEST_RESOURCE_ROOT } =
+	await import("./env");
 
 // Resets the test SQLite database and pushes the current Prisma schema to it,
 // then runs Playwright with the same DATABASE_URL so both the unit-test worker
@@ -62,6 +61,8 @@ mkdirSync(TEST_RESOURCE_ROOT, { recursive: true });
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 process.env.RESOURCE_ROOT = TEST_RESOURCE_ROOT;
 process.env.NODE_ENV = "test";
+// The server and the test workers must agree on the origin of clone URLs.
+process.env.PUBLIC_URL = TEST_BASE_URL;
 // `ENVIRONMENT` has no default and the test server runs over plain HTTP.
 process.env.ENVIRONMENT = "dev";
 

@@ -28,6 +28,11 @@ export default defineConfig({
 	output: "server",
 	site: publicUrl?.origin,
 	security: {
+		// Off because Astro's check also refuses a form-typed POST that carries no
+		// `Origin` header, which is every multipart upload from the CLI.
+		// `originMiddleware` applies the same rule to everything but requests
+		// authenticated by an API key.
+		checkOrigin: false,
 		// A report carries up to 3 images of 2 MiB each, plus room for the multipart framing.
 		actionBodySizeLimit: 8 * 1024 * 1024,
 		allowedDomains: publicUrl

@@ -26,6 +26,12 @@
 		]
 	},
 	{
+		"pattern": "/api/blob/missing",
+		"methods": [
+			"post"
+		]
+	},
+	{
 		"pattern": "/api/course",
 		"methods": [
 			"get",
@@ -131,6 +137,39 @@
 			"delete",
 			"get",
 			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/repository",
+		"methods": [
+			"get",
+			"post",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/repository/[slug]",
+		"methods": [
+			"delete",
+			"get"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/repository/[slug]/commit",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/repository/[slug]/files",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/repository/[slug]/rotate-token",
+		"methods": [
+			"post"
 		]
 	},
 	{

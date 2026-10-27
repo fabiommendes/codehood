@@ -1,8 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
-	createReadStream,
-	createWriteStream,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -10,8 +8,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { Readable, Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import { expect, test } from "@playwright/test";
 import { writeZip, type ZipFile } from "@/services/git/zip";
 import { TEST_RESOURCE_ROOT } from "./env";
@@ -238,62 +235,49 @@ test.describe("writeZip", () => {
 });
 
 test.describe("writeZip memory", () => {
-	/// How far the resident set may grow while a ~50 MB archive streams out.
-	/// The writer holds a few compression buffers (about 1 MB). Without
-	/// `--expose-gc` the chunks already written stay as garbage for a while, so
-	/// 20 MB proved flaky; 30 MB still fails an implementation that buffers the
-	/// 50 MB archive.
-	const MAX_RSS_GROWTH = 30 * 1024 * 1024;
+	/// How far the sources may run ahead of a stalled consumer. The writer
+	/// holds a few stream and compression buffers; reading the whole 50 MB
+	/// ahead would be the archive held in memory.
+	const MAX_READ_AHEAD = 8 * 1024 * 1024;
 	const FILE_COUNT = 5;
 	const FILE_SIZE = 10 * 1024 * 1024;
+	const CHUNK = 64 * 1024;
 
 	test.setTimeout(180_000);
 
-	test("does not grow the resident set by more than 30 MB for a 50 MB archive", async () => {
-		const dir = mkdtempSync(path.join(workDir, "big-"));
-		const files: ZipFile[] = [];
-		for (let i = 0; i < FILE_COUNT; i++) {
-			const file = path.join(dir, `f${i}.bin`);
-			const out = createWriteStream(file);
-			for (let written = 0; written < FILE_SIZE; written += 1024 * 1024) {
-				out.write(randomBytes(1024 * 1024));
+	test("does not read the sources far ahead of a slow consumer", async () => {
+		let pulled = 0;
+		const files: ZipFile[] = Array.from({ length: FILE_COUNT }, (_, i) => ({
+			path: `f${i}.bin`,
+			mode: "100644",
+			size: FILE_SIZE,
+			open: () => {
+				let left = FILE_SIZE;
+				return new Readable({
+					read() {
+						if (left === 0) return this.push(null);
+						const size = Math.min(CHUNK, left);
+						left -= size;
+						pulled += size;
+						this.push(randomBytes(size));
+					},
+				});
+			},
+		}));
+
+		const zip = writeZip(files, { root: ROOT, date: DATE });
+		let consumed = 0;
+		let worstLead = 0;
+		for await (const chunk of zip) {
+			consumed += (chunk as Buffer).length;
+			if (consumed % (5 * 1024 * 1024) < (chunk as Buffer).length) {
+				// Stall, so any eager reading shows up as a lead over `consumed`.
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				worstLead = Math.max(worstLead, pulled - consumed);
 			}
-			await new Promise<void>((resolve, reject) => {
-				out.on("error", reject);
-				out.end(resolve);
-			});
-			files.push({
-				path: `f${i}.bin`,
-				mode: "100644",
-				size: FILE_SIZE,
-				open: () => createReadStream(file),
-			});
 		}
 
-		// Warm up zlib and the stream machinery so one-off allocations are not
-		// counted as growth.
-		await collect(writeZip(zipFilesOf(SOURCES), { root: ROOT, date: DATE }));
-		globalThis.gc?.();
-		const baseline = process.memoryUsage().rss;
-		let peak = baseline;
-		let total = 0;
-		const target = path.join(dir, "out.zip");
-		const meter = new Transform({
-			transform(chunk: Buffer, _encoding, callback) {
-				total += chunk.length;
-				peak = Math.max(peak, process.memoryUsage().rss);
-				callback(null, chunk);
-			},
-		});
-
-		await pipeline(
-			writeZip(files, { root: ROOT, date: DATE }),
-			meter,
-			createWriteStream(target),
-		);
-
-		expect(total).toBeGreaterThan(FILE_COUNT * FILE_SIZE * 0.95);
-		expect(peak - baseline).toBeLessThan(MAX_RSS_GROWTH);
-		expect(tool("unzip", ["-t", target])).toContain("No errors detected");
+		expect(consumed).toBeGreaterThan(FILE_COUNT * FILE_SIZE * 0.95);
+		expect(worstLead).toBeLessThan(MAX_READ_AHEAD);
 	});
 });

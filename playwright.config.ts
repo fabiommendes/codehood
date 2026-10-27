@@ -36,6 +36,8 @@ export default defineConfig({
 			// Required, no default. The test server is a dev instance: it runs
 			// over plain HTTP, so a Secure session cookie would never come back.
 			ENVIRONMENT: "dev",
+			// Clone URLs are built from it, so a test can `git clone` what the API returns.
+			PUBLIC_URL: TEST_BASE_URL,
 			HOST: "localhost",
 			PORT: String(TEST_PORT),
 		},

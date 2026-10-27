@@ -77,9 +77,42 @@ export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 	return next();
 });
 
+/// Content types an HTML form can send without a CORS preflight.
+const FORM_CONTENT_TYPES = [
+	"application/x-www-form-urlencoded",
+	"multipart/form-data",
+	"text/plain",
+];
+
+/**
+ * Refuses a cross-site form submission: an unsafe request whose `Origin`
+ * differs from the server's and whose content type a browser form can send.
+ *
+ * This is Astro's own `checkOrigin` rule, minus the requests authenticated by
+ * an API key. A page cannot set `Authorization` on a form post, so a bearer
+ * request is not a forged one, and the CLI sends no `Origin` at all.
+ */
+export const originMiddleware = defineMiddleware((context, next) => {
+	const { request } = context;
+	if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return next();
+	if (context.locals.apiKey) return next();
+	if (request.headers.get("origin") === context.url.origin) return next();
+
+	const type = request.headers.get("content-type");
+	const formLike =
+		type === null ||
+		FORM_CONTENT_TYPES.some((t) => type.toLowerCase().startsWith(t));
+	if (!formLike) return next();
+	return new Response(
+		`Cross-site ${request.method} form submissions are forbidden`,
+		{ status: 403 },
+	);
+});
+
 const COMMON_MIDDLEWARES = [
 	sessionMiddleware,
 	apiKeyMiddleware,
+	originMiddleware,
 	adminMiddleware,
 ] as const;
 

@@ -32,6 +32,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
 	"favicon",
 	"files",
 	"getting-started",
+	"git",
 	"home",
 	"img",
 	"invite",

@@ -12,7 +12,7 @@ import * as schema from "@/core/schemas";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { loadCourseGrades } from "@/utils/course-grades";
-import { CRUD, GET, PATCH, POST } from "./registry";
+import { CRUD, DELETE, GET, PATCH, POST, PUT } from "./registry";
 import { parseWeekParam } from "./utils";
 
 export const apiKeyApi = CRUD("/api/api-key", {
@@ -292,6 +292,126 @@ export const reportApi = CRUD("/api/report", {
 	key: schema.reportPK,
 	tags: ["Reports"],
 	service: db.report,
+});
+
+const repositoryEntity = schema.repositorySchema
+	.omit({ id: true, courseId: true })
+	.openapi("Repository");
+const repositoryTags = ["Repositories"];
+const repositoryPath = "/api/course/[discipline]/[course]/repository";
+
+/// The `(course, slug)` a repository path addresses.
+function repositoryKey(params: Record<string, string>) {
+	return { course: parseCourseParams(params), slug: params.slug as string };
+}
+
+export const repositoryApi = {
+	findMany: GET(repositoryPath, {
+		out: repositoryEntity.array(),
+		summary: "Find multiple Repositories.",
+		operationId: "repositoryList",
+		tags: repositoryTags,
+		handler: async ({ actor, params }) =>
+			db.repository.findMany({ course: parseCourseParams(params) }, { actor }),
+	}),
+	findOne: GET(`${repositoryPath}/[slug]`, {
+		out: repositoryEntity,
+		summary: "Find a single Repository.",
+		operationId: "repositoryRead",
+		tags: repositoryTags,
+		handler: async ({ actor, params }) => {
+			const key = repositoryKey(params);
+			const found = await db.repository.findOne(key, { actor });
+			if (!found)
+				throw new NotFound("repository", {
+					context: { ...key, course: { ...key.course } },
+				});
+			return found;
+		},
+	}),
+	create: POST(repositoryPath, {
+		in: schema.repositoryCreate
+			.omit({ course: true })
+			.openapi("RepositoryCreate"),
+		out: repositoryEntity,
+		summary: "Creates a new Repository.",
+		operationId: "repositoryCreate",
+		tags: repositoryTags,
+		handler: async ({ actor, body, params }) =>
+			db.repository.create(
+				{ ...body, course: parseCourseParams(params) },
+				{ actor },
+			),
+	}),
+	upsert: PUT(repositoryPath, {
+		in: schema.repositoryCreate
+			.omit({ course: true })
+			.openapi("RepositoryCreate"),
+		out: repositoryEntity,
+		summary: "Upsert a single Repository.",
+		description:
+			"Creates the repository if the slug is free, or returns the existing one unchanged.",
+		operationId: "repositoryUpsert",
+		tags: repositoryTags,
+		handler: async ({ actor, body, params }) =>
+			db.repository.upsert(
+				{ ...body, course: parseCourseParams(params) },
+				{ actor },
+			),
+	}),
+	delete: DELETE(`${repositoryPath}/[slug]`, {
+		out: z.object({ deleted: z.boolean() }).openapi("RepositoryDeleted"),
+		summary: "Delete a single Repository.",
+		operationId: "repositoryDelete",
+		tags: repositoryTags,
+		handler: async ({ actor, params }) => {
+			await db.repository.delete(repositoryKey(params), { actor });
+			return { deleted: true };
+		},
+	}),
+	addFiles: POST(`${repositoryPath}/[slug]/files`, {
+		in: schema.repositoryFiles.openapi("RepositoryFiles"),
+		inMultipart: true,
+		out: schema.repositoryFilesResult.openapi("RepositoryFilesResult"),
+		summary: "Send the files of a coming commit.",
+		description:
+			"One multipart part per file, each named after the sha-256 of its bytes. A part whose bytes do not match its name is refused.",
+		operationId: "repositoryAddFiles",
+		tags: repositoryTags,
+		handler: async ({ actor, body, params }) =>
+			db.repository.addFiles(repositoryKey(params), body, { actor }),
+	}),
+	commit: POST(`${repositoryPath}/[slug]/commit`, {
+		in: schema.repositoryCommit.openapi("RepositoryCommit"),
+		out: repositoryEntity,
+		summary: "Record a tree as the new head of a Repository.",
+		operationId: "repositoryCommit",
+		tags: repositoryTags,
+		handler: async ({ actor, body, params }) =>
+			db.repository.commit(repositoryKey(params), body, { actor }),
+	}),
+	rotateToken: POST(`${repositoryPath}/[slug]/rotate-token`, {
+		out: repositoryEntity,
+		summary: "Replace the clone token of a Repository.",
+		description: "The previous clone URL stops resolving.",
+		operationId: "repositoryRotateToken",
+		tags: repositoryTags,
+		handler: async ({ actor, params }) =>
+			db.repository.rotateToken(repositoryKey(params), { actor }),
+	}),
+};
+
+export const blobMissingApi = POST("/api/blob/missing", {
+	in: schema.blobMissingInput.openapi("BlobMissingInput"),
+	out: schema.blobMissingResult.openapi("BlobMissingResult"),
+	summary: "List the hashes the server has no blob for.",
+	description:
+		"Lets a client send only the files the server lacks. Open to any authenticated user: knowing a hash already gives access to its bytes.",
+	operationId: "blobMissing",
+	tags: ["Blobs"],
+	handler: async ({ actor, body }) => ({
+		missing: await db.blob.missing(body.hashes, { actor }),
+	}),
 });
 
 export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
