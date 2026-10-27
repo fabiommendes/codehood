@@ -462,7 +462,7 @@ Modelo `sonnet`. Pronto quando:
 - a ordenação git de `a.txt`, `a/`, `a-b` está certa;
 - o zip é byte-idêntico em duas gerações e abre com `unzip -t`, preservando
   `100755`;
-- gerar o zip de 50 MB não aumenta o RSS em mais de 20 MB.
+- gerar o zip de 50 MB não aumenta o RSS em mais de 30 MB (20 MB ficou instável sem `--expose-gc`).
 
 **T4. Services.** `src/db/services/repository.service.ts`, `src/db/index.ts`,
 `src/db/services/blob.service.ts` (`gitSha`, `missing`),
