@@ -155,6 +155,66 @@ Critérios:
 - Lote 5: apagar o repositório remove vínculos e objetos, e o GC recolhe os
   blobs que só ele usava.
 
+## T9. CLI (R25–R32)
+
+Em `cli/` valem `cli/CLAUDE.md` e `cli/README.md`. Testes: `rtk uv run
+pytest` em `cli/`; mypy (`uv run mypy codehood`) tem de ficar limpo. HTTP é
+falsificado com `httpx.MockTransport` (ver `tests/test_push_run.py`) ou com
+um `RepositoryApi` falso. O cliente gerado ainda não tem as rotas de
+repositório; T9 só o regenera depois de T5.
+
+Arquivos de stub (`raise NotImplementedError`):
+- `codehood/push/repository.py`: `RepositoryEntry` (`path`, `mode`, `sha256`,
+  `git_sha`, `size`, `source`), `RepositoryTree` (`slug`, `entries`,
+  `tree_sha`, `size`), `scan_repositories(root, exclude)`, `blob_sha`,
+  `tree_sha`, `file_mode`, `batch_entries`, `MAX_FILE_BYTES`.
+- `codehood/push/errors.py`: `RepositoryError`.
+- `codehood/push/plan.py`: `UpsertRepository(tree, message)`,
+  `WarnRepositoryKept(slug)`, `DeleteRepository(slug)`,
+  `LocalState.repositories`, `ServerState.repositories` (slug -> tree ou
+  `None`), `plan_repositories(...)`. `plan_push` já recebe
+  `drop_repositories` e `message`, mas ainda não chama `plan_repositories`:
+  o implementer liga isso logo depois de `UpsertCourse`.
+- `codehood/push/run.py`: protocolo `RepositoryApi` (`list_trees`, `upsert`,
+  `missing`, `upload`, `commit`, `delete`), `HttpRepositoryApi(client,
+  discipline, course)`, `run_upsert_repository`, `run_warn_repository_kept`,
+  `run_delete_repository`. `run_plan` e `fetch_server_state` aceitam
+  `repositories: RepositoryApi | None`.
+- `codehood/push/links.py`: `RepositoryLink`, `extract_repository_links`,
+  `attach_repositories`, `rewrite_repository_links`.
+- `codehood/push/calendar.py`: `Event.repositories`; o docstring de
+  `Event.ref` traz o contrato novo, o corpo ainda é o antigo.
+- `codehood/cli/push.py`: `--drop-repositories`, `-m/--message` (já
+  repassados a `plan_push`), `describe_repository`, `RepositoryError` tratado.
+  `read_local_state` ainda não escaneia `repositories/` nem liga os links.
+- `codehood/repo/_layout.py`: `REPOSITORIES_DIR`. `write_repo` ainda não cria
+  a pasta; o teste de layout (`tests/test_repo_scaffold.py`,
+  `GOLDEN_PATHS`) muda junto.
+- `pyproject.toml`: `pathspec`. Vetores: `tests/fixtures/git-vectors.json`
+  (cópia de `test/fixtures/git-vectors.json`).
+
+Seams:
+- `scan_repositories` em `tmp_path` (árvores reais no disco, com `chmod` e
+  `os.symlink`); oráculo `git` real (`git init`, `git add -A`,
+  `git write-tree`) para `tree_sha`.
+- `plan_push`/`plan_repositories` com `LocalState`/`ServerState` montados à
+  mão.
+- `run_plan(..., repositories=FakeApi())`, ou `HttpRepositoryApi` sobre
+  `httpx.MockTransport` para checar URLs e corpos.
+- `attach_repositories`/`rewrite_repository_links` com `Event` e
+  `RepositoryTree` montados à mão.
+
+Critérios:
+- Lote 1: o `tree_sha` local bate com o `git` real; `.gitignore` aninhado
+  com `!` é respeitado; `.git` ignorado; symlink e arquivo solto dão erro.
+- Lote 2: árvore igual à do servidor não gera op; pasta apagada gera
+  `WarnRepositoryKept`, e com `--drop-repositories` gera `DeleteRepository`;
+  os lotes respeitam 16 MB.
+- Lote 3: link para `repositories/x/a.py` vincula e reescreve, e um caminho
+  inexistente dá erro; evento sem repositórios mantém o `ref` antigo.
+- Lote 4 (manual, depois de T5): um push real contra o dev server cria o
+  repositório e um `git clone` dele funciona.
+
 ## Decisões fora do spec
 
 - `cloneUrl` é absoluta (`z.url()`), mas o service não tem request. A origem
@@ -173,3 +233,7 @@ Critérios:
 - `findByToken` e `readObject` não recebem ator (o token é a credencial);
   aceitam `{ tx }` opcional.
 - O zip não usa zip64 (falha acima de 4 GiB) e só tem entradas de arquivo.
+- CLI: uma pasta de `repositories/` sem nenhum arquivo publicável é
+  `RepositoryError` (o servidor exige árvore com pelo menos um arquivo).
+- CLI: `RepositoryEntry.source` guarda o caminho local, para o upload reler
+  o arquivo sem manter os bytes na memória.
