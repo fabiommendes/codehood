@@ -4,6 +4,19 @@
 
 ### Added
 
+- Repositories: a course shares versioned file trees, pushed by the CLI from
+  `repositories/`. Students clone them with `git clone` and get corrections
+  with `git pull`, served as a read-only dumb-HTTP git repository built from
+  the database (`/git/<token>/<slug>.git`, the token being the credential and
+  rotatable by the instructor), or download a zip. A new Repositories tab
+  lists them, each with a browsable tree that renders markdown, highlights
+  code and shows images; lessons that link to a repository list it on their
+  schedule card. REST: `/api/course/<course>/repository` and
+  `/api/blob/missing`; blobs gain their git sha1.
+- REST endpoints accept `multipart/form-data` uploads (`inMultipart`), capped
+  at 16 MB. Astro's `checkOrigin` is replaced by an equivalent middleware that
+  exempts requests authenticated by an API key, since the CLI sends no
+  `Origin` header.
 - Admin password reset: each row of `/admin/users` has a button that sets a
   new password for the account without the current one and ends every session
   it holds. Backed by `UserService.resetPassword` and the new

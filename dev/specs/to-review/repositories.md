@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [repositories, git, blobs, attachments, cli, api, calendar]
 relatedTo: [blob-upload-and-gc, resources-on-calendar-events, blob-service, attachment-service, calendar-event-service]
 ---

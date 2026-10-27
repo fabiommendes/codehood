@@ -30,7 +30,11 @@ const uploadOut = z.object({
 	tags: z.array(z.string()),
 });
 
-const definitionsBefore = [...registry.definitions];
+/// `registry.definitions` is a getter that returns a fresh copy, so the
+/// cleanup has to reach the array it copies.
+const definitions = (registry as unknown as { _definitions: unknown[] })
+	._definitions;
+const definitionsBefore = [...definitions];
 
 const upload = POST(TEST_PATH, {
 	isPublic: true,
@@ -48,11 +52,7 @@ const upload = POST(TEST_PATH, {
 });
 
 test.afterAll(() => {
-	registry.definitions.splice(
-		0,
-		registry.definitions.length,
-		...definitionsBefore,
-	);
+	definitions.splice(0, definitions.length, ...definitionsBefore);
 });
 
 function contextFor(request: Request): APIContext {

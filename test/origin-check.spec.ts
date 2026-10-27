@@ -1,4 +1,6 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
+import { FULL_ACCESS } from "@/auth/actor";
+import { db } from "@/db";
 import { TEST_BASE_URL } from "./env";
 
 /// Form-like unsafe requests need the server's own Origin unless an API key
@@ -30,12 +32,32 @@ async function freshContext(
 	});
 }
 
+const PASSWORD = "correct-horse-battery-staple";
+
+/// A user of this file only, so no other test can change its password.
+async function makeUser(): Promise<string> {
+	const username = `origin-${Math.random().toString(36).slice(2, 10)}`;
+	await db.user.create(
+		{
+			email: `${username}@codehood.test`,
+			username,
+			name: username,
+			role: "INSTRUCTOR",
+			password: PASSWORD,
+			githubId: username,
+			schoolId: username,
+		},
+		FULL_ACCESS,
+	);
+	return username;
+}
+
 async function validBearer(
 	playwright: Parameters<Parameters<typeof test>[2]>[0]["playwright"],
 ): Promise<string> {
 	const context = await freshContext(playwright);
 	const login = await context.post("/api/auth/login", {
-		data: { login: "admin", password: "admin" },
+		data: { login: await makeUser(), password: PASSWORD },
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
