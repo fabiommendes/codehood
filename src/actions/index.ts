@@ -10,6 +10,7 @@ import { profile } from "./profile";
 import { question } from "./question";
 import { regrade } from "./regrade";
 import { report } from "./report";
+import { repository } from "./repository";
 import { rollCall } from "./roll-call";
 
 installErrorMap();
@@ -25,6 +26,7 @@ export const server = {
 	question,
 	regrade,
 	report,
+	repository,
 	rollCall,
 	checkIn,
 };

@@ -5,6 +5,7 @@
 // page's navigation, and an instructor's extra tabs are the only thing that
 // marks them as one.
 import { hasPerm } from "@/auth/permissions";
+import { NotAllowed } from "@/core/error";
 import { type Course, db } from "@/db";
 import { m } from "@/i18n";
 import { courseHref } from "@/urls";
@@ -28,7 +29,15 @@ const ref = {
 	instructor: course.instructor.username,
 	edition: course.edition.slug,
 };
-const tabs = [...courseTabs(course, ref, actor)];
+// The service already hides uncommitted repositories from whoever may not write.
+const hasRepositories = await db.repository
+	.findMany({ course: course.id }, { actor })
+	.then((all) => all.length > 0)
+	.catch((error) => {
+		if (error instanceof NotAllowed) return false;
+		throw error;
+	});
+const tabs = [...courseTabs(course, ref, actor, { hasRepositories })];
 // The instructor's reports tab counts what is still `OPEN`.
 if (hasPerm(actor, "enrollment.manage", course)) {
 	const open = await db.report.countOpen(course.id, { actor });

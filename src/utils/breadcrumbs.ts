@@ -33,6 +33,7 @@ export const COURSE_TAB_LABELS = {
 	exams: m.nav_course_tab_exams(),
 	resources: m.nav_course_tab_resources(),
 	schedule: m.nav_course_tab_schedule(),
+	repositories: m.nav_course_tab_repositories(),
 	questions: m.nav_course_tab_questions(),
 	roster: m.nav_course_tab_students(),
 	grades: m.nav_course_tab_grades(),

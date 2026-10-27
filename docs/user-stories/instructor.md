@@ -137,6 +137,21 @@ Instructor already keeps the term's dates somewhere else and imports the calenda
 into the course rather than retyping it.
 
 
+## Course repositories
+
+### Share a repository with the class
+
+    status: todo
+    url: /[discipline]/[course]/repositories/[slug]
+
+Instructor creates a repository with the CLI. Until the first push, its page
+only says it is waiting for the first push and shows the command to run; students
+do not see it yet. After the push they open the page, walk the folders down to a
+file and read it as students do. When a clone URL leaks, they ask for a new one
+and confirm in the form: the page then shows a different URL, and the old one
+stops working.
+
+
 ## Enrollment
 
 ### Invite a student personally

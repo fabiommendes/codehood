@@ -158,6 +158,34 @@ it opens on the month of the last one, so the calendar never starts on a blank
 page while the student has events somewhere.
 
 
+## Course repositories
+
+### Find a course repository
+
+    status: todo
+    url: /[discipline]/[course]/repositories
+
+Student opens a course whose instructor published code alongside the material.
+The Repositories tab appears, after Schedule, and lists each repository with its
+title and the date and message of its latest commit. A course with no
+repository, or whose repositories have not received a first push, shows no such
+tab. On the Schedule, the card of a class lists the repositories tied to it next
+to its resources, and following one leads to its page.
+
+
+### Read and download a course repository
+
+    status: todo
+    url: /[discipline]/[course]/repositories/[slug]
+
+Student opens a repository and finds the `git clone` command with a button to
+copy it, a "Download zip" button for those who do not use git, and the root of
+the files with the README shown below. They open a source file and read it with
+syntax highlighting, and enter a folder whose README is shown under its
+listing. A path that does not exist in the repository answers "not found".
+"Download zip" saves the files of the latest commit as one archive.
+
+
 ## Exams and practice
 
 ### See the exams assigned to me

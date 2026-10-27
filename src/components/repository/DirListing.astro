@@ -1,0 +1,34 @@
+---
+// The entries of one directory of a repository, directories first as the
+// service returns them, each one a link to its page.
+import type { RepositoryDirEntry } from "@/db";
+import { m } from "@/i18n";
+
+interface Props {
+	entries: RepositoryDirEntry[];
+	/// URL of the directory being listed, without a trailing slash.
+	href: string;
+}
+
+const { entries, href } = Astro.props;
+
+/// Human size of a file: "812 B", "3.4 KB", "1.2 MB".
+function formatSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+---
+
+<ul aria-label={m.repositories_files_label()} class="menu w-full rounded-box border border-base-content/15 bg-base-200/50 p-1">
+  {entries.map((entry) => (
+    <li>
+      <a href={`${href}/${encodeURIComponent(entry.name)}`} class="flex items-center gap-3">
+        <span class="flex-1 font-mono text-sm">{entry.type === "dir" ? `${entry.name}/` : entry.name}</span>
+        {entry.size !== null && (
+          <span class="text-xs text-base-content/60">{formatSize(entry.size)}</span>
+        )}
+      </a>
+    </li>
+  ))}
+</ul>

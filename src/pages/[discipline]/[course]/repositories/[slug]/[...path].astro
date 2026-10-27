@@ -1,0 +1,224 @@
+---
+import { actions } from "astro:actions";
+import { readFile } from "node:fs/promises";
+import { hasPerm } from "@/auth/permissions";
+import CourseHeader from "@/components/CourseHeader.astro";
+import CloneBox from "@/components/repository/CloneBox.astro";
+import DirListing from "@/components/repository/DirListing.astro";
+import RotateToken from "@/components/repository/RotateToken.astro";
+import { InvalidData } from "@/core/error";
+import { type Attachment, db, type RepositoryDirEntry } from "@/db";
+import { escapeHtml, m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { highlightCode } from "@/utils/highlight-code";
+import { loadCourse } from "@/utils/load-course";
+import { renderMarkdown, renderMarkdownBody } from "@/utils/markdown";
+import {
+	type FileView,
+	fileView,
+	MAX_RENDERED_BYTES,
+} from "@/utils/repository-view";
+import { formatDateTime } from "@/utils/schedule-time";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug, path: rawPath } = Astro.params;
+const result = await loadCourse(Astro, discipline, courseSegment);
+if ("redirect" in result) return result.redirect;
+const { course, href } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
+const actor = Astro.locals.actor!;
+const canWrite = hasPerm(actor, "course.update-contents", course);
+
+if (!slug) return Astro.rewrite("/404");
+const repository = await db.repository.findOne(
+	{ course: course.id, slug },
+	{ actor },
+);
+if (!repository) return Astro.rewrite("/404");
+
+const path = (rawPath ?? "").replace(/\/+$/, "");
+const repoHref = `${href}/repositories/${slug}`;
+const pk = { id: repository.id };
+const opts = { actor };
+
+// Anything the head tree does not hold, and any path the schema refuses, is a 404.
+let entries: RepositoryDirEntry[] | null = null;
+let file: Attachment | null = null;
+if (repository.head) {
+	try {
+		entries = await db.repository.listDir(pk, path, opts);
+		if (!entries && path) file = await db.repository.readFile(pk, path, opts);
+	} catch (error) {
+		if (!(error instanceof InvalidData)) throw error;
+	}
+}
+if (path && !entries && !file) return Astro.rewrite("/404");
+if (path && !repository.head) return Astro.rewrite("/404");
+
+/// The text of a stored file, read from the blob store.
+async function textOf(attachment: Attachment): Promise<string> {
+	return readFile(db.blob.blobPath(attachment.hash), "utf8");
+}
+
+// A directory shows its README under the listing; the root one loses its
+// title, which is already this page's heading.
+let readmeHtml = "";
+const readme = entries?.find(
+	(e) =>
+		e.type === "file" &&
+		e.name === "README.md" &&
+		(e.size ?? 0) <= MAX_RENDERED_BYTES,
+);
+if (readme) {
+	const attachment = await db.repository.readFile(
+		pk,
+		path ? `${path}/README.md` : "README.md",
+		opts,
+	);
+	if (attachment) {
+		const text = await textOf(attachment);
+		readmeHtml = path ? renderMarkdown(text) : renderMarkdownBody(text);
+	}
+}
+
+// A file shows as markdown, code, an image, or only a download link.
+let view: FileView | null = null;
+let fileHtml = "";
+if (file) {
+	view = fileView(path, file.size);
+	if (view.kind === "markdown") {
+		fileHtml = renderMarkdown(await textOf(file));
+	} else if (view.kind === "code") {
+		fileHtml = await highlightCode(await textOf(file), view.language);
+	}
+}
+const tooLarge =
+	view?.kind === "download" && (file?.size ?? 0) > MAX_RENDERED_BYTES;
+
+const segments = path ? path.split("/") : [];
+const parentHref = `${repoHref}${segments.length > 1 ? `/${segments.slice(0, -1).map(encodeURIComponent).join("/")}` : ""}`;
+
+const rotation = Astro.getActionResult(actions.repository.rotateToken);
+if (rotation && !rotation.error) return Astro.redirect(repoHref);
+const confirming =
+	canWrite &&
+	!path &&
+	(Boolean(rotation?.error) || Astro.url.searchParams.has("rotate"));
+
+// Blob URLs carry no auth check of their own; keep this page out of their referrer.
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+
+/// Inline code markup, for the messages that quote a command.
+function code(text: string): string {
+	return `<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">${escapeHtml(text)}</code>`;
+}
+---
+
+<AppLayout
+  title={m.repositories_repo_page_title({ repository: repository.title, discipline: course.discipline.name })}
+  trail={breadcrumbs(Astro.url, { course, item: repository.title })}
+>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="repositories" />
+
+    <a href={`${href}/repositories`} class="text-sm text-base-content/60 hover:text-primary">{m.repositories_back()}</a>
+
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-xl font-semibold">{repository.title}</h2>
+      {canWrite && !path && (
+        <RotateToken
+          discipline={course.discipline.slug}
+          course={courseSegment ?? ""}
+          slug={slug}
+          confirming={confirming}
+          href={repoHref}
+          error={rotation?.error?.message}
+        />
+      )}
+    </div>
+
+    {!path && (
+      repository.head ? (
+        <div class="mt-4 flex flex-col gap-2">
+          <CloneBox cloneUrl={repository.cloneUrl} zipHref={`${repoHref}.zip`} />
+          <p class="text-sm text-base-content/60">
+            {repository.message}
+            {repository.committedAt && <> · {m.repositories_last_commit({ date: formatDateTime(repository.committedAt) })}</>}
+          </p>
+        </div>
+      ) : (
+        <div class="mt-4 flex flex-col gap-3">
+          <p class="font-medium">{m.repositories_pending()}</p>
+          <p class="text-sm text-base-content/70" set:html={m.repositories_pending_hint({ command: code("ch push") })} />
+          <CloneBox cloneUrl={repository.cloneUrl} />
+        </div>
+      )
+    )}
+
+    {path && (
+      <nav class="mt-4 flex flex-wrap items-center gap-1 font-mono text-sm" aria-label={path}>
+        <a href={repoHref} class="link link-hover">{repository.slug}</a>
+        {segments.map((segment, index) => (
+          <>
+            <span class="text-base-content/40">/</span>
+            {index < segments.length - 1 ? (
+              <a href={`${repoHref}/${segments.slice(0, index + 1).map(encodeURIComponent).join("/")}`} class="link link-hover">{segment}</a>
+            ) : (
+              <span>{segment}</span>
+            )}
+          </>
+        ))}
+      </nav>
+    )}
+
+    {entries && (
+      <div class="mt-6">
+        <DirListing entries={entries} href={path ? `${repoHref}/${segments.map(encodeURIComponent).join("/")}` : repoHref} />
+      </div>
+    )}
+    {readmeHtml && (
+      <div class="card card-border mt-6 bg-base-200">
+        <div class="card-body">
+          <div
+            class="prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline [&>:first-child]:mt-0 [&>:last-child]:mb-0"
+            set:html={readmeHtml}
+          />
+        </div>
+      </div>
+    )}
+
+    {file && view && (
+      <div class="mt-6">
+        {view.kind === "markdown" && (
+          <div class="card card-border bg-base-200">
+            <div class="card-body">
+              <div
+                class="prose prose-sm max-w-none prose-a:text-primary prose-a:no-underline hover:prose-a:underline [&>:first-child]:mt-0 [&>:last-child]:mb-0"
+                set:html={fileHtml}
+              />
+            </div>
+          </div>
+        )}
+        {view.kind === "code" && (
+          <div
+            class="overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+            set:html={fileHtml}
+          />
+        )}
+        {view.kind === "image" && (
+          <img src={file.link} alt={segments.at(-1)} class="max-w-full rounded-box border border-base-content/15" />
+        )}
+        {view.kind === "download" && (
+          <p class="text-sm text-base-content/70">{tooLarge ? m.repositories_too_large() : m.repositories_not_viewable()}</p>
+        )}
+        <a href={file.link} download={segments.at(-1)} class="btn btn-outline btn-sm mt-4">
+          {m.repositories_download_file({ name: segments.at(-1) ?? "" })}
+        </a>
+        <a href={parentHref} class="btn btn-ghost btn-sm mt-4">{m.repositories_up()}</a>
+      </div>
+    )}
+  </main>
+</AppLayout>

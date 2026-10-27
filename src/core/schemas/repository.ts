@@ -2,7 +2,7 @@ import { z } from "zod";
 import { m } from "@/i18n";
 import { buffer, courseId, repositoryId, slug } from "./base";
 import { blobHash } from "./blob";
-import { courseRef } from "./course";
+import { courseParams, courseRef } from "./course";
 
 /// How many files one pushed tree may carry.
 export const MAX_REPOSITORY_FILES = 2000;
@@ -79,6 +79,9 @@ export const repositoryPK = z.union([
 	z.object({ id: repositoryId }),
 	z.object({ course: courseRef, slug: slug }),
 ]);
+
+/// Rotates the clone token of the repository `slug` of the course in the URL.
+export const repositoryRotate = courseParams.extend({ slug: slug });
 
 export const repositoryFilter = z.object({ course: courseRef });
 

@@ -1,0 +1,47 @@
+---
+// "Generate new clone URL": a button that leads to a confirmation form, with no
+// JS dialog in between. The confirmation posts the `repository.rotateToken` action.
+import { actions } from "astro:actions";
+import FormAlert from "@/components/form/FormAlert";
+import { escapeHtml, m } from "@/i18n";
+
+interface Props {
+	discipline: string;
+	course: string;
+	slug: string;
+	/// Whether the confirmation form is showing instead of the button.
+	confirming: boolean;
+	/// Page the button and the cancel link lead to.
+	href: string;
+	error?: string;
+}
+
+const { discipline, course, slug, confirming, href, error } = Astro.props;
+---
+
+{confirming ? (
+  <section class="card card-border border-warning bg-base-200">
+    <form method="POST" action={actions.repository.rotateToken} class="card-body gap-3 p-4">
+      <input type="hidden" name="discipline" value={discipline} />
+      <input type="hidden" name="course" value={course} />
+      <input type="hidden" name="slug" value={slug} />
+      <h3 class="font-semibold">{m.repositories_rotate_title()}</h3>
+      <FormAlert error={error} />
+      <p
+        class="text-sm"
+        set:html={m.repositories_rotate_warning({
+          command: `<code class="rounded bg-base-300 px-1.5 py-0.5 font-mono">${escapeHtml("git remote set-url origin <url>")}</code>`,
+        })}
+      />
+      <div class="card-actions">
+        <button type="submit" class="btn btn-warning btn-sm">{m.repositories_rotate_confirm()}</button>
+        <a href={href} class="btn btn-ghost btn-sm">{m.repositories_rotate_cancel()}</a>
+      </div>
+    </form>
+  </section>
+) : (
+  <form method="GET" action={href}>
+    <input type="hidden" name="rotate" value="1" />
+    <button type="submit" class="btn btn-outline btn-sm">{m.repositories_rotate()}</button>
+  </form>
+)}

@@ -12,6 +12,7 @@ import { eventKindLabel } from "@/utils/calendar-event-display";
 import { examTypeLabels, formatDuration } from "@/utils/exam-display";
 import { renderMarkdown } from "@/utils/markdown";
 import { formatDateTime } from "@/utils/schedule-time";
+import EventRepositories from "./EventRepositories.astro";
 import EventResources from "./EventResources.astro";
 
 interface Props {
@@ -190,6 +191,12 @@ function faded(entry: CalendarEntry): boolean {
                   faded(entry) && "opacity-70",
                 ]}
                 set:html={renderMarkdown(entry.event.description)}
+              />
+            )}
+            {entry.kind === "event" && (
+              <EventRepositories
+                repositories={entry.event.repositories}
+                href={href}
               />
             )}
             {entry.kind === "event" && resources.has(entry.event.id) && (

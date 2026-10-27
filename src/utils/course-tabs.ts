@@ -15,6 +15,7 @@ export type CourseTabKey =
 	| "exams"
 	| "resources"
 	| "schedule"
+	| "repositories"
 	| "questions"
 	| "students"
 	| "grades"
@@ -29,7 +30,8 @@ export interface CourseTab {
 /**
  * Everyone gets `home`/`exams`/`resources`/`schedule`, in that order, so
  * "it's the third tab" means the same thing to a student and an instructor
- * looking at the same course. The instructor's three tabs (`questions`, `students`, `grades`) are appended, never
+ * looking at the same course. `repositories` follows them when `hasRepositories`
+ * (the actor can see at least one repository of the course). The instructor's three tabs (`questions`, `students`, `grades`) are appended, never
  * interleaved, exactly when the actor has `enrollment.manage` — the same
  * predicate `loadCourse({ manage: true })` runs on `/roster` and `/grades`,
  * so a visible tab never 403s.
@@ -38,6 +40,7 @@ export function courseTabs(
 	course: CourseTarget,
 	ref: CourseNaturalKey,
 	actor: Actor,
+	{ hasRepositories = false }: { hasRepositories?: boolean } = {},
 ): readonly CourseTab[] {
 	const href = courseHref(ref);
 	const tabs: CourseTab[] = [
@@ -54,6 +57,13 @@ export function courseTabs(
 			href: `${href}/schedule`,
 		},
 	];
+	if (hasRepositories) {
+		tabs.push({
+			key: "repositories",
+			label: COURSE_TAB_LABELS.repositories,
+			href: `${href}/repositories`,
+		});
+	}
 	if (hasPerm(actor, "enrollment.manage", course)) {
 		tabs.push(
 			{

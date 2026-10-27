@@ -1,0 +1,50 @@
+---
+// The clone command of a repository with a button that copies it, the zip
+// download, and the note on updating a clone that has local commits.
+import { escapeHtml, m } from "@/i18n";
+
+interface Props {
+	cloneUrl: string;
+	/// Absent while the repository has no commit, which leaves nothing to zip.
+	zipHref?: string;
+}
+
+const { cloneUrl, zipHref } = Astro.props;
+const command = `git clone ${cloneUrl}`;
+---
+
+<section aria-label={m.repositories_clone_label()} class="card card-border bg-base-200">
+  <div class="card-body gap-3 p-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <code
+        class="min-w-0 basis-full flex-1 rounded-field bg-base-300 px-3 py-2 font-mono text-sm break-all sm:basis-0"
+        data-clone-command>{command}</code>
+      <button
+        type="button"
+        class="btn btn-sm"
+        data-copy={command}
+        data-copied={m.repositories_copied()}
+      >{m.repositories_copy()}</button>
+      {zipHref && <a href={zipHref} class="btn btn-sm btn-primary">{m.repositories_download_zip()}</a>}
+    </div>
+    <p
+      class="text-sm text-base-content/60"
+      set:html={m.repositories_pull_note({
+        command: `<code class="rounded bg-base-300 px-1.5 py-0.5 font-mono">${escapeHtml("git pull --no-rebase")}</code>`,
+      })}
+    />
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((button) => {
+    const label = button.textContent;
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(button.dataset.copy ?? "");
+      button.textContent = button.dataset.copied ?? label;
+      setTimeout(() => {
+        button.textContent = label;
+      }, 1500);
+    });
+  });
+</script>
