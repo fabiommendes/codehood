@@ -2,7 +2,7 @@ import type { z } from "zod";
 import { SYSTEM, type UserActor } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
 import { NotAllowed, NotFound } from "@/core/error";
-import type { ReportId } from "@/core/schemas";
+import type { ReportId, RepositoryId } from "@/core/schemas";
 import {
 	attachmentAttach,
 	attachmentCreate,
@@ -304,10 +304,52 @@ export class AttachmentService {
 		args: [attachmentAttach],
 	})
 	async attach(
-		_input: AttachmentAttach,
-		_opts: ServiceOpts,
+		input: AttachmentAttach,
+		opts: ServiceOpts,
 	): Promise<Attachment> {
-		throw new Error("not implemented");
+		const run = async (tx: PrismaTx): Promise<Attachment> => {
+			const scoped: ServiceOpts = { ...opts, tx };
+			const blob = await tx.blob.findUnique({ where: { hash: input.hash } });
+			if (!blob || blob.deletedAt) {
+				throw new NotFound("blob", { id: input.hash });
+			}
+
+			const filename = sanitizeFilename(input.filename);
+			const duplicate = await tx.attachment.findFirst({
+				where: {
+					hash: blob.hash,
+					filename,
+					attachedToType: input.attachedTo.type,
+					attachedToId: input.attachedTo.id,
+				},
+				include: attachmentInclude,
+			});
+			if (duplicate) return this.fromDbWithSource(duplicate, tx);
+
+			await this.assertWithinQuota(blob.size, scoped);
+			await this.blob.link(blob.hash, filename);
+			const uploaderId =
+				opts.actor === SYSTEM
+					? (input.uploaderId ?? null)
+					: opts.actor.username;
+
+			return this.fromDbWithSource(
+				await tx.attachment.create({
+					data: {
+						hash: blob.hash,
+						filename,
+						mimeType: mimeFor(filename),
+						uploaderId,
+						attachedToType: input.attachedTo.type,
+						attachedToId: input.attachedTo.id,
+					},
+					include: attachmentInclude,
+				}),
+				tx,
+			);
+		};
+
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction((tx) => run(tx));
 	}
 
 	/**
@@ -470,7 +512,18 @@ export class AttachmentService {
 				return { ...report, type: "REPORT" };
 			}
 			case "REPOSITORY": {
-				throw new Error("not implemented");
+				const repository = await tx.repository.findUnique({
+					where: { id: raw.attachedToId as RepositoryId },
+					select: { id: true, slug: true },
+				});
+				if (!repository) {
+					throw new Error(`Repository with ID ${raw.attachedToId} not found`);
+				}
+				return {
+					type: "REPOSITORY",
+					id: repository.id,
+					slug: repository.slug,
+				};
 			}
 		}
 	}

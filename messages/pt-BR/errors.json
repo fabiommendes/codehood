@@ -136,5 +136,10 @@
 	"errors_upload_too_large": "O corpo da requisição passa de {max}.",
 	"errors_upload_length_required": "Uma requisição multipart precisa declarar o Content-Length.",
 	"errors_upload_not_multipart": "Esperado um corpo multipart/form-data.",
-	"errors_upload_duplicate_part": "A parte \"{name}\" aparece mais de uma vez."
+	"errors_upload_duplicate_part": "A parte \"{name}\" aparece mais de uma vez.",
+	"errors_repository_exists": "Já existe um repositório com este slug no curso.",
+	"errors_repository_hash_unknown": "Nenhum arquivo no servidor tem o hash {hash}.",
+	"errors_repository_file_hash_mismatch": "Os bytes enviados não correspondem ao hash {hash}.",
+	"errors_repository_file_too_large": "O arquivo {hash} passa de {max} bytes.",
+	"errors_repository_event_unknown": "O curso não tem repositório com o slug \"{slug}\"."
 }

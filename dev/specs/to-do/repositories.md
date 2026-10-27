@@ -316,7 +316,9 @@ nunca aparece em HTML nem na API.
 
 O aluno que sai do curso continua clonando com a URL que tem; o professor
 revoga rotacionando o token. Sem permissão nova: reusa `course.read-contents`
-e `course.update-contents`.
+e `course.update-contents`. Por isso a coluna Admin vale para o que essas permissões dão
+a um admin: `course.update-contents` não tem ramo de admin, então um admin que
+não é professor do curso não faz push, não apaga nem rotaciona.
 
 ### Telas
 

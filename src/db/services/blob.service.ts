@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
 import {
 	copyFile,
 	link as fsLink,
@@ -5,6 +7,7 @@ import {
 	mkdir,
 	readFile,
 	readlink,
+	rename,
 	rm,
 	stat,
 	symlink,
@@ -32,6 +35,7 @@ import {
 } from "@/core/schemas";
 import type { ServiceOpts } from "@/db";
 import { m } from "@/i18n";
+import { blobSha } from "@/services/git/objects";
 import { blobSecurityHeaders, contentDisposition } from "@/utils/blob-response";
 import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
@@ -85,9 +89,11 @@ export class BlobService {
 		assertSystem(opts, "blob.create");
 		const hash = hashBytes(input.bytes);
 		const client = opts.tx ?? this.prisma;
+		const gitSha = blobSha(input.bytes);
 		const existing = await client.blob.findUnique({ where: { hash } });
 		if (existing && !existing.deletedAt) {
-			return existing;
+			if (existing.gitSha) return existing;
+			return client.blob.update({ where: { hash }, data: { gitSha } });
 		}
 
 		await this.writeBytes(hash, input.bytes);
@@ -95,11 +101,11 @@ export class BlobService {
 		if (existing) {
 			return client.blob.update({
 				where: { hash },
-				data: { deletedAt: null },
+				data: { deletedAt: null, gitSha },
 			});
 		}
 		return client.blob.create({
-			data: { hash, size: input.bytes.length },
+			data: { hash, size: input.bytes.length, gitSha },
 		});
 	}
 
@@ -173,8 +179,28 @@ export class BlobService {
 	 *
 	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
 	 */
-	async createFromFile(_filePath: string, _opts: ServiceOpts): Promise<Blob> {
-		throw new Error("not implemented");
+	async createFromFile(filePath: string, opts: ServiceOpts): Promise<Blob> {
+		assertSystem(opts, "blob.create");
+		const client = opts.tx ?? this.prisma;
+		const { hash, gitSha, size } = await digestFile(filePath);
+
+		const existing = await client.blob.findUnique({ where: { hash } });
+		if (existing && !existing.deletedAt) {
+			await rm(filePath, { force: true });
+			if (existing.gitSha) return existing;
+			return client.blob.update({ where: { hash }, data: { gitSha } });
+		}
+
+		await mkdir(path.dirname(this.blobPath(hash)), { recursive: true });
+		await rename(filePath, this.blobPath(hash));
+
+		if (existing) {
+			return client.blob.update({
+				where: { hash },
+				data: { deletedAt: null, gitSha },
+			});
+		}
+		return client.blob.create({ data: { hash, size, gitSha } });
 	}
 
 	/**
@@ -184,13 +210,15 @@ export class BlobService {
 	 * Creates the directory, not the file.
 	 */
 	async tempPath(): Promise<string> {
-		throw new Error("not implemented");
+		const dir = path.join(this.root, ".tmp");
+		await mkdir(dir, { recursive: true });
+		return path.join(dir, randomUUID());
 	}
 
 	/**
 	 * Remove all blobs no attachment points at.
 	 *
-	 * First deletes the attachments of `REPORT` and `RESOURCE` owners that no
+	 * First deletes the attachments of `REPORT`, `RESOURCE` and `REPOSITORY` owners that no
 	 * longer exist (database cascades cannot reach the polymorphic owner), so
 	 * their blobs are collected in the same pass.
 	 *
@@ -237,11 +265,17 @@ export class BlobService {
 		returns: blobMissingResult.shape.missing,
 		args: [blobMissingInput.shape.hashes],
 	})
-	async missing(_hashes: string[], _opts: ServiceOpts): Promise<string[]> {
-		throw new Error("not implemented");
+	async missing(hashes: string[], opts: ServiceOpts): Promise<string[]> {
+		const client = opts.tx ?? this.prisma;
+		const live = await client.blob.findMany({
+			where: { hash: { in: hashes }, deletedAt: null },
+			select: { hash: true },
+		});
+		const present = new Set(live.map((row) => row.hash));
+		return [...new Set(hashes)].filter((hash) => !present.has(hash));
 	}
 
-	/// Deletes the attachments whose `REPORT` or `RESOURCE` owner row is gone, unlinking names no sibling uses.
+	/// Deletes the attachments whose `REPORT`, `RESOURCE` or `REPOSITORY` owner row is gone, unlinking names no sibling uses.
 	private async deleteOrphanAttachments(
 		client: PrismaClient | PrismaTx,
 	): Promise<void> {
@@ -252,6 +286,9 @@ export class BlobService {
 			RESOURCE: (await client.resource.findMany({ select: { id: true } })).map(
 				(r) => r.id,
 			),
+			REPOSITORY: (
+				await client.repository.findMany({ select: { id: true } })
+			).map((r) => r.id),
 		};
 		for (const [type, ids] of Object.entries(owners) as [
 			keyof typeof owners,
@@ -430,6 +467,24 @@ export class BlobService {
 		await mkdir(path.dirname(dest), { recursive: true });
 		await writeFile(dest, bytes);
 	}
+}
+
+/// Sha-256 and git sha1 of a file, read once in streaming.
+async function digestFile(
+	filePath: string,
+): Promise<{ hash: string; gitSha: string; size: number }> {
+	const { size } = await stat(filePath);
+	const sha256 = createHash("sha256");
+	const sha1 = createHash("sha1").update(`blob ${size}\0`);
+	let read = 0;
+	for await (const chunk of createReadStream(filePath)) {
+		const buf = chunk as Buffer;
+		read += buf.length;
+		sha256.update(buf);
+		sha1.update(buf);
+	}
+	if (read !== size) throw new Error(`${filePath} changed while hashing`);
+	return { hash: sha256.digest("hex"), gitSha: sha1.digest("hex"), size };
 }
 
 /// Reduces a URL-supplied filename to one safe to put in a response header,

@@ -7,7 +7,7 @@
  */
 import type { z } from "zod";
 import { hasPerm } from "@/auth/permissions";
-import { NotAllowed } from "@/core/error";
+import { InvalidData, NotAllowed } from "@/core/error";
 import {
 	type CalendarEventId,
 	type CourseId,
@@ -132,7 +132,10 @@ export class CalendarEventService extends CrudBase<{
 			},
 			include: EVENT_INCLUDE,
 		});
-		return fromDb(row);
+		if (input.repositories == null) return fromDb(row);
+
+		await setRepositories(tx, row.id, course.id, input.repositories);
+		return fromDb(await reload(tx, row.id));
 	}
 
 	/**
@@ -217,8 +220,13 @@ export class CalendarEventService extends CrudBase<{
 	}
 
 	/**
-	 * Changes `title`/`description`/`kind`/`rev`. The event's time is never
-	 * writable here — it is always derived from the course, week, and slot.
+	 * Changes `title`/`description`/`kind`/`rev`, and replaces the cited
+	 * repositories when `repositories` is given (`[]` clears them, `null` or
+	 * omitted keeps them). The event's time is never writable here — it is
+	 * always derived from the course, week, and slot.
+	 *
+	 * @throws {@link InvalidData} If a slug in `repositories` is not a
+	 * repository of the event's course.
 	 */
 	@Validate({
 		service: true,
@@ -248,7 +256,10 @@ export class CalendarEventService extends CrudBase<{
 			},
 			include: EVENT_INCLUDE,
 		});
-		return fromDb(row);
+		if (fields.repositories == null) return fromDb(row);
+
+		await setRepositories(tx, row.id, current.courseId, fields.repositories);
+		return fromDb(await reload(tx, row.id));
 	}
 
 	/**
@@ -420,6 +431,7 @@ async function writableEvent(
 			where: await eventWhere(tx, filter),
 			select: {
 				id: true,
+				courseId: true,
 				course: { select: { instructor: { select: { username: true } } } },
 			},
 		}),
@@ -429,6 +441,44 @@ async function writableEvent(
 		throw new NotAllowed(action);
 	}
 	return event;
+}
+
+/// Reads an event back with everything `fromDb` needs.
+function reload(tx: PrismaTx, id: CalendarEventId) {
+	return tx.calendarEvent.findUniqueOrThrow({
+		where: { id },
+		include: EVENT_INCLUDE,
+	});
+}
+
+/// Replaces the repositories an event cites with those of `slugs`, all of
+/// which must belong to the event's course.
+async function setRepositories(
+	tx: PrismaTx,
+	eventId: CalendarEventId,
+	courseId: CourseId,
+	slugs: readonly string[],
+): Promise<void> {
+	const unique = [...new Set(slugs)];
+	const found = await tx.repository.findMany({
+		where: { courseId, slug: { in: unique } },
+		select: { id: true, slug: true },
+	});
+	const known = new Set(found.map((r) => r.slug));
+	const unknown = unique.filter((slug) => !known.has(slug));
+	if (unknown.length > 0) {
+		throw new InvalidData({
+			repositories: unknown.map((slug) => ({
+				code: "not-exists" as const,
+				message: m.errors_repository_event_unknown({ slug }),
+			})),
+		});
+	}
+
+	await tx.calendarEventRepository.deleteMany({ where: { eventId } });
+	await tx.calendarEventRepository.createMany({
+		data: found.map((r) => ({ eventId, courseId, repositoryId: r.id })),
+	});
 }
 
 /** Converts a database row into the calendar event entity. */
