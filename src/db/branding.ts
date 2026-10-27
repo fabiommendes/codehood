@@ -64,6 +64,10 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "id", from: "number", to: "ReportId" },
 		{ field: "courseId", from: "number", to: "CourseId" },
 	],
+	Repository: [
+		{ field: "id", from: "number", to: "RepositoryId" },
+		{ field: "courseId", from: "number", to: "CourseId" },
+	],
 	Resource: [
 		{ field: "id", from: "number", to: "ResourceId" },
 		{ field: "courseId", from: "number", to: "CourseId" },

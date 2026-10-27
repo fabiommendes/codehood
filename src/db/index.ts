@@ -32,6 +32,7 @@ export type {
 } from "./services/report.service";
 
 import { ReportService } from "./services/report.service";
+import { RepositoryService } from "./services/repository.service";
 import { ResourceService } from "./services/resource.service";
 import { ResponseService } from "./services/response.service";
 import { RollCallService } from "./services/roll-call.service";
@@ -61,6 +62,7 @@ export type {
 } from "./services/api-key.service";
 export type {
 	Attachment,
+	AttachmentAttach,
 	AttachmentCreate,
 	AttachmentFilter,
 	AttachmentPK,
@@ -186,6 +188,17 @@ export type {
 	RegradeRequestPK,
 } from "./services/regrade-request.service";
 export type {
+	Repository,
+	RepositoryCommit,
+	RepositoryCreate,
+	RepositoryDirEntry,
+	RepositoryFiles,
+	RepositoryFilesResult,
+	RepositoryFilter,
+	RepositoryHandle,
+	RepositoryPK,
+} from "./services/repository.service";
+export type {
 	Resource,
 	ResourceCreate,
 	ResourceFilter,
@@ -269,6 +282,7 @@ export const db = {
 	question: new QuestionService(),
 	regradeRequest: new RegradeRequestService(feedbackService),
 	report: new ReportService(attachmentService, blobService),
+	repository: new RepositoryService(blobService, attachmentService),
 	resource: new ResourceService(attachmentService),
 	response: new ResponseService(),
 	rollCall: new RollCallService(),

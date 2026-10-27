@@ -29,6 +29,7 @@ export {
 	type QuestionRefId,
 	type RegradeRequestId,
 	type ReportId,
+	type RepositoryId,
 	type ResourceId,
 	type ResponseId,
 	type RollCallId,
@@ -57,6 +58,7 @@ export * from "./passphrase";
 export * from "./question";
 export * from "./regrade-request";
 export * from "./report";
+export * from "./repository";
 export * from "./resource";
 export * from "./response";
 export * from "./roll-call";

@@ -40,6 +40,7 @@ function event(
 			start: { hour: 10, minute: 0 },
 		},
 		rev: null,
+		repositories: [],
 		createdAt: T0,
 		updatedAt: T0,
 	};

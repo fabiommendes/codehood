@@ -75,5 +75,10 @@
 	"forms_schema_regrade_reply_max": "The reply must have at most {max} characters.",
 	"forms_label_regrade_message": "Justification",
 	"forms_label_regrade_reply": "Reply",
-	"forms_label_regrade_score": "New score (%)"
+	"forms_label_regrade_score": "New score (%)",
+	"forms_schema_repository_path_invalid": "A relative path with '/' separators, at most 255 characters: no '\\\\', NUL, empty segment, '.', '..' or '.git'.",
+	"forms_schema_repository_path_duplicate": "\"{path}\" appears more than once in the tree.",
+	"forms_schema_repository_path_case": "\"{path}\" differs from \"{other}\" only in letter case.",
+	"forms_schema_repository_path_prefix": "\"{path}\" is a file and also a directory of \"{other}\".",
+	"forms_schema_git_sha_invalid": "Not a git object name: expected 40 lowercase hex digits."
 }

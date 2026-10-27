@@ -5,7 +5,9 @@ import {
 	mimeType,
 	publicId,
 	reportId,
+	repositoryId,
 	resourceId,
+	slug,
 	username,
 } from "./base";
 import { blobHash } from "./blob";
@@ -23,11 +25,17 @@ export const attachmentSchema = z.object({
 		z.lazy(() => attachedToResource),
 		z.lazy(() => attachedToQuestion),
 		z.lazy(() => attachedToReport),
+		z.lazy(() => attachedToRepository),
 	]),
 	createdAt: z.date(),
 });
 
-export const attachmentToType = z.enum(["RESOURCE", "QUESTION", "REPORT"]);
+export const attachmentToType = z.enum([
+	"RESOURCE",
+	"QUESTION",
+	"REPORT",
+	"REPOSITORY",
+]);
 
 export const attachedToResource = z.object({
 	type: z.literal("RESOURCE"),
@@ -49,6 +57,12 @@ export const attachedToReport = z.object({
 	publicId: publicId,
 });
 
+export const attachedToRepository = z.object({
+	type: z.literal("REPOSITORY"),
+	id: repositoryId,
+	slug: slug,
+});
+
 export const attachmentCreate = attachmentSchema
 	.pick({ filename: true })
 	.extend({
@@ -60,8 +74,14 @@ export const attachmentCreate = attachmentSchema
 			attachedToResource.pick({ type: true, id: true }),
 			attachedToQuestion.pick({ type: true, id: true }),
 			attachedToReport.pick({ type: true, id: true }),
+			attachedToRepository.pick({ type: true, id: true }),
 		]),
 	});
+
+/// Attaches a blob already stored on the server, without sending its bytes.
+export const attachmentAttach = attachmentCreate
+	.omit({ buffer: true })
+	.extend({ hash: blobHash });
 
 export const attachmentUpdate = attachmentSchema.pick({ filename: true });
 

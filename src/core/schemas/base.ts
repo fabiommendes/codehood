@@ -62,6 +62,9 @@ export type ResponseId = z.infer<typeof responseId>;
 export const submissionId = z.number().int().brand("SubmissionId");
 export type SubmissionId = z.infer<typeof submissionId>;
 
+export const repositoryId = z.number().int().brand("RepositoryId");
+export type RepositoryId = z.infer<typeof repositoryId>;
+
 export const resourceId = z.number().int().brand("ResourceId");
 export type ResourceId = z.infer<typeof resourceId>;
 

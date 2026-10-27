@@ -4,6 +4,7 @@ import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
 import { NotAllowed, NotFound } from "@/core/error";
 import type { ReportId } from "@/core/schemas";
 import {
+	attachmentAttach,
 	attachmentCreate,
 	attachmentFilter,
 	attachmentPK,
@@ -32,6 +33,7 @@ export type { AttachmentId } from "@/core/schemas";
 //
 export type Attachment = z.infer<typeof attachmentSchema>;
 export type AttachmentCreate = z.infer<typeof attachmentCreate>;
+export type AttachmentAttach = z.infer<typeof attachmentAttach>;
 export type AttachmentFilter = z.infer<typeof attachmentFilter>;
 export type AttachmentPK = z.infer<typeof attachmentPK>;
 export type AttachmentUpdate = z.infer<typeof attachmentUpdate>;
@@ -285,6 +287,30 @@ export class AttachmentService {
 	}
 
 	/**
+	 * Records one more use of a blob already stored, without its bytes.
+	 *
+	 * Sanitises the filename, derives the mime type and links the name beside
+	 * the bytes, like `create`. An attachment with the same hash, filename and
+	 * owner is returned as is. The uploader follows the rules of `create`: a
+	 * `SYSTEM` call without `uploaderId` charges nobody, so its bytes count in
+	 * no quota.
+	 *
+	 * @throws {@link NotFound} If no live blob has `input.hash`.
+	 * @throws {@link NotAllowed} If the bytes would put the actor over quota.
+	 */
+	@Validate({
+		service: true,
+		returns: attachmentSchema,
+		args: [attachmentAttach],
+	})
+	async attach(
+		_input: AttachmentAttach,
+		_opts: ServiceOpts,
+	): Promise<Attachment> {
+		throw new Error("not implemented");
+	}
+
+	/**
 	 * Attachments of a specific resource.
 	 */
 	async allAttachedTo(
@@ -442,6 +468,9 @@ export class AttachmentService {
 					throw new Error(`Report with ID ${raw.attachedToId} not found`);
 				}
 				return { ...report, type: "REPORT" };
+			}
+			case "REPOSITORY": {
+				throw new Error("not implemented");
 			}
 		}
 	}

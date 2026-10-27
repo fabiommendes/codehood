@@ -47,7 +47,7 @@ export type EventKind = CalendarEvent["kind"];
 /** True for the one kind that represents an actual meeting. */
 const MEETING_KINDS: ReadonlySet<EventKind> = new Set(["REGULAR"]);
 
-/** The minimal shape every read loads: the owning course and the slot. */
+/** The minimal shape every read loads: the owning course, the slot and the cited repositories. */
 const EVENT_INCLUDE = {
 	course: {
 		select: {
@@ -59,6 +59,10 @@ const EVENT_INCLUDE = {
 		},
 	},
 	timeSlot: true,
+	repositories: {
+		select: { repository: { select: { slug: true, title: true } } },
+		orderBy: { repository: { slug: "asc" as const } },
+	},
 } satisfies Prisma.CalendarEventInclude;
 
 type DbEvent = Prisma.CalendarEventGetPayload<{
@@ -429,9 +433,10 @@ async function writableEvent(
 
 /** Converts a database row into the calendar event entity. */
 function fromDb(row: DbEvent): CalendarEvent {
-	const { course: _course, timeSlot, ...rest } = row;
+	const { course: _course, timeSlot, repositories, ...rest } = row;
 	return {
 		...rest,
+		repositories: repositories.map((link) => link.repository),
 		id: rest.id as CalendarEventId,
 		courseId: rest.courseId as CourseId,
 		timeSlot: {

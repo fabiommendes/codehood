@@ -1,6 +1,10 @@
 import { z } from "zod";
 import "./base";
 
+/// The largest file, and the largest multipart request body, the REST API
+/// accepts, in bytes.
+export const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
+
 export const blobSchema = z.object({
 	hash: z
 		.string()

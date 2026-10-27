@@ -51,6 +51,7 @@ function eventEntry(overrides: Partial<CalendarEvent> = {}): CalendarEntry {
 			start: { hour: 10, minute: 0 },
 		},
 		rev: null,
+		repositories: [],
 		createdAt: STAMP,
 		updatedAt: STAMP,
 		...overrides,

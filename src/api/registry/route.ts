@@ -1,4 +1,7 @@
-import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
+import {
+	OpenAPIRegistry,
+	type RouteConfig,
+} from "@asteasolutions/zod-to-openapi";
 import type { APIContext, AstroCookies } from "astro";
 import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
@@ -30,6 +33,9 @@ export type RouteOptions<In, Out, IsPublic extends boolean = false> = {
 	isPublic?: IsPublic;
 	operationId?: string;
 	in?: ZodType<In>;
+	/// Reads `in` from a `multipart/form-data` body (see `readMultipart`)
+	/// instead of JSON, and documents it so. Only for POST, PUT and PATCH.
+	inMultipart?: boolean;
 	out: ZodType<Out>;
 	summary?: string;
 	description?: string;
@@ -74,6 +80,25 @@ export type Route<In, Out, Actor> = HandlerFunction<In, Out, Actor> & {
 	action: (input: In, context: ActionAPIContext) => unknown;
 	view: (ctx: APIContext) => Promise<Response>;
 };
+
+/**
+ * The `request` part of a route's OpenAPI entry, or `undefined` when the route
+ * takes no input and has no path parameters.
+ *
+ * GET and DELETE document `in` as query parameters; the other methods as a
+ * body, `multipart/form-data` when `options.inMultipart` is set and
+ * `application/json` otherwise. Every dynamic segment of `path` becomes a
+ * string path parameter.
+ *
+ * @throws {Error} If `inMultipart` is set on GET or DELETE, or without `in`.
+ */
+export function openApiRequest(
+	_method: keyof HttpMethods,
+	_path: string,
+	_options: Pick<RouteOptions<unknown, unknown, boolean>, "in" | "inMultipart">,
+): RouteConfig["request"] | undefined {
+	throw new Error("not implemented");
+}
 
 //
 // Route registration

@@ -132,5 +132,9 @@
 	"errors_regrade_not_gradable": "Esta resposta não tem nota a contestar",
 	"errors_regrade_exists": "Já existe um pedido de revisão para esta resposta",
 	"errors_regrade_expired": "O prazo para pedir revisão já acabou",
-	"errors_regrade_resolved": "Este pedido já foi resolvido"
+	"errors_regrade_resolved": "Este pedido já foi resolvido",
+	"errors_upload_too_large": "O corpo da requisição passa de {max}.",
+	"errors_upload_length_required": "Uma requisição multipart precisa declarar o Content-Length.",
+	"errors_upload_not_multipart": "Esperado um corpo multipart/form-data.",
+	"errors_upload_duplicate_part": "A parte \"{name}\" aparece mais de uma vez."
 }

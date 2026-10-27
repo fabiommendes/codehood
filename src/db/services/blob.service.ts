@@ -25,6 +25,8 @@ import {
 	blobCreate,
 	blobFilter,
 	blobHash,
+	blobMissingInput,
+	blobMissingResult,
 	blobPK,
 	blobSchema,
 } from "@/core/schemas";
@@ -71,8 +73,10 @@ export class BlobService {
 	/**
 	 * Hashes `bytes`, writes the blob and dedupes on the hash.
 	 *
-	 * Identical bytes already on file return the existing row untouched, and a
-	 * re-push of bytes whose blob was tombstoned resurrects it.
+	 * Identical bytes already on file return the existing row, and a re-push
+	 * of bytes whose blob was tombstoned resurrects it. Every write stores the
+	 * git sha1 of the bytes in `gitSha`, and a hit on an existing row whose
+	 * `gitSha` is null fills it in.
 	 *
 	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
 	 */
@@ -159,6 +163,31 @@ export class BlobService {
 	}
 
 	/**
+	 * Moves a file already on disk into the store as a blob, hashing it in
+	 * streaming so its size does not reach memory.
+	 *
+	 * Behaves like `create` for the same bytes, including `gitSha`. The file
+	 * at `filePath` is consumed: renamed into place for new bytes, removed
+	 * when the bytes were already stored. It must live on the same filesystem
+	 * as the store, e.g. under {@link BlobService.tempPath}.
+	 *
+	 * @throws {@link NotAllowed} If the actor is not SYSTEM.
+	 */
+	async createFromFile(_filePath: string, _opts: ServiceOpts): Promise<Blob> {
+		throw new Error("not implemented");
+	}
+
+	/**
+	 * A fresh path in the store's scratch directory, on the same filesystem
+	 * as the blobs, for a file {@link BlobService.createFromFile} will adopt.
+	 *
+	 * Creates the directory, not the file.
+	 */
+	async tempPath(): Promise<string> {
+		throw new Error("not implemented");
+	}
+
+	/**
 	 * Remove all blobs no attachment points at.
 	 *
 	 * First deletes the attachments of `REPORT` and `RESOURCE` owners that no
@@ -194,6 +223,22 @@ export class BlobService {
 			collected.push(blob.hash);
 		}
 		return collected;
+	}
+
+	/**
+	 * The hashes in `hashes` that have no live blob, in input order and
+	 * without repeats.
+	 *
+	 * Any authenticated actor may ask: knowing a hash already gives access to
+	 * its bytes at `/files/<hash>`, so the answer discloses nothing new.
+	 */
+	@Validate({
+		service: true,
+		returns: blobMissingResult.shape.missing,
+		args: [blobMissingInput.shape.hashes],
+	})
+	async missing(_hashes: string[], _opts: ServiceOpts): Promise<string[]> {
+		throw new Error("not implemented");
 	}
 
 	/// Deletes the attachments whose `REPORT` or `RESOURCE` owner row is gone, unlinking names no sibling uses.

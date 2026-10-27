@@ -8,6 +8,7 @@ import {
 	timeSlotId,
 } from "./base";
 import { courseRef } from "./course";
+import { repositoryInfo } from "./repository";
 import { timeSlotSchema } from "./time-slot";
 
 export const eventKindSchema = z.enum(["REGULAR", "HOLIDAY", "CANCELLED"]);
@@ -37,6 +38,9 @@ export const calendarEventSchema = z.object({
 
 	rev: rev.nullable(),
 
+	/// Repositories the lesson cites, ordered by slug.
+	repositories: z.array(repositoryInfo),
+
 	createdAt: z.date(),
 	updatedAt: z.date(),
 });
@@ -57,6 +61,9 @@ export const calendarEventCreate = calendarEventSchema
 		timeSlot: z.union([timeSlotId, slug]),
 		description: z.string().nullable().optional(),
 		rev: rev.nullish(),
+		/// Slugs of repositories of the same course. Replaces the whole set;
+		/// omitted or `null` keeps it on update, `[]` clears it.
+		repositories: z.array(slug).nullish(),
 	});
 
 // `week`, `course`, and `timeSlot` are deliberately absent: moving an

@@ -105,6 +105,13 @@ export const ENVIRONMENT = normalizeEnvironment(
 export const DEVELOPMENT = ENVIRONMENT === "dev";
 export const PRODUCTION = ENVIRONMENT === "prod";
 
+/// Public address of this instance, the origin of absolute URLs the server
+/// hands out of a request context, such as a repository's clone URL. Also
+/// read at build time by `astro.config.mjs`.
+export const PUBLIC_URL = new URL(
+	readEnv("PUBLIC_URL", "http://localhost:4321"),
+).origin;
+
 // =============================================================================
 //  						    SESSION
 // =============================================================================
@@ -199,6 +206,7 @@ function logEnvVariables(vars: [string, unknown][]): void {
 logEnvVariables([
 	["DEBUG", DEBUG],
 	["ENVIRONMENT", ENVIRONMENT],
+	["PUBLIC_URL", PUBLIC_URL],
 	["RESOURCE_ROOT", RESOURCE_ROOT],
 	["ATTACHMENT_LINK_MODE", ATTACHMENT_LINK_MODE],
 	["BLOB_QUOTA_INSTRUCTOR", BLOB_QUOTA_BY_ROLE.INSTRUCTOR],

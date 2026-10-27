@@ -209,14 +209,22 @@ model Blob {
   /// FR-SYNC-015).
   deletedAt DateTime?
 
+  /// Lowercase-hex sha1 of `"blob <size>\0" + bytes`, as git names the file.
+  /// Null for blobs stored before it was computed. Not unique: sha1 has
+  /// practical collisions, so a forged blob must not block the legitimate one.
+  gitSha String?
+
   createdAt   DateTime     @default(now())
   attachments Attachment[]
+
+  @@index([gitSha])
 }
 
 enum AttachmentOwner {
   RESOURCE
   QUESTION
   REPORT
+  REPOSITORY
 }
 
 /// One use of a Blob by one owner, carrying the filename and mime type that
@@ -306,6 +314,7 @@ model Course {
   invites            Invite[]
   gradeColumns       GradeColumn[]
   reports            Report[]
+  repositories       Repository[]
 
   @@unique([disciplineSlug, instructorId, editionSlug])
 }
@@ -468,13 +477,15 @@ model CalendarEvent {
   /// Revision marker supplied by the writer, opaque to the server.
   rev String?
 
-  resources Resource[]
-  rollCall  RollCall?
+  resources    Resource[]
+  rollCall     RollCall?
+  repositories CalendarEventRepository[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([courseId, week, timeSlotId])
+  @@unique([id, courseId])
   @@index([courseId, startAt])
 }
 
@@ -607,6 +618,82 @@ model Resource {
   @@unique([courseId, slug])
   @@index([courseId, type])
   @@index([eventId])
+}
+
+// =============================================================================
+// Repository Models
+// =============================================================================
+
+/// A versioned file tree a course shares with its students, served as a
+/// read-only git repository and as a zip.
+model Repository {
+  id Int @id @default(autoincrement())
+
+  courseId Int
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  /// Natural key: the folder name under `repositories/`.
+  slug String
+
+  /// H1 of the root README.md of the head tree, or the slug when there is none.
+  title String
+
+  /// Sha1 of the current commit, the target of refs/heads/main. Null until
+  /// the first commit: such a repository is invisible to students.
+  head String?
+
+  /// Unguessable secret in the clone URL. Knowing it grants read access,
+  /// like a blob hash.
+  token String @unique
+
+  /// Blob of the cached zip of the head tree, built on the first download
+  /// and cleared on every commit.
+  zipHash String?
+
+  objects GitObject[]
+  events  CalendarEventRepository[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, slug])
+  @@unique([id, courseId])
+}
+
+enum GitObjectType {
+  COMMIT
+  TREE
+}
+
+/// A git commit or tree of one repository, stored raw. File contents are
+/// not here: they are Blobs, found by Blob.gitSha.
+model GitObject {
+  repositoryId Int
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  /// Sha1 of the object, header included, as git computes it.
+  sha  String
+  type GitObjectType
+
+  /// Uncompressed body, without the `<type> <size>\0` header.
+  content Bytes
+
+  @@id([repositoryId, sha])
+}
+
+/// A repository cited by a lesson. Rebuilt from the lesson's text on every
+/// upsert of the event.
+model CalendarEventRepository {
+  courseId Int
+
+  eventId Int
+  event   CalendarEvent @relation(fields: [eventId, courseId], references: [id, courseId], onDelete: Cascade)
+
+  repositoryId Int
+  repository   Repository @relation(fields: [repositoryId, courseId], references: [id, courseId], onDelete: Cascade)
+
+  @@id([eventId, repositoryId])
+  @@index([repositoryId])
 }
 
 // =============================================================================
