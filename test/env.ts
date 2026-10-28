@@ -18,7 +18,7 @@ export const TEST_PORT: number = Number(
 
 export const TEST_BASE_URL = `http://localhost:${TEST_PORT}`;
 
-/// One directory per port, wiped by `test/run.ts` at the start of each run.
+/// One directory per port, wiped by `test/run.ts` before and after each run.
 const TEST_TMP_DIR = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
 	".tmp",

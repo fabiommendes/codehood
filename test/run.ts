@@ -121,4 +121,8 @@ const result = spawnSync(
 	},
 );
 
+// The build alone is ~7 MB per run and every port gets its own, so without
+// this the directory grows with each run on a new port.
+rmSync(path.dirname(TEST_DB_PATH), { recursive: true, force: true });
+
 process.exit(result.status ?? 1);
