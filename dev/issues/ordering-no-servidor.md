@@ -15,5 +15,13 @@ bloqueia o envio (`cli/codehood/push/run.py`).
 Fix: adicionar `ORDERING` ao enum (vai numa migração de release), incluir
 `OrderingQuestion` em `questionDocument` e `publicOrderingSchema` em
 `src/mdq/public-schema.ts`, semear uma questão em `src/db/bootstrap.ts` e
-tirar o bloqueio do CLI. O componente de `mdq/solid` já renderiza o tipo;
-falta decidir como a ordem inicial (`pool`) é enviada quando o aluno não mexe.
+tirar o bloqueio do CLI. O componente de `mdq/solid` já renderiza o tipo.
+
+Decidido no mdq (commits 7fefba8, 0990a55, 4753bbb do mdq-spec):
+
+- A forma pública ganha `maxLevel?` (só com `indentation` lenient ou strict).
+- Enquanto o aluno não responde, o componente mostra o `pool` com um aviso e
+  um botão "Keep this order", que envia a ordem intacta por `onChange`.
+  `value={null}` controlado significa "ainda sem resposta".
+- Lado do host: se o aluno entrega a prova com a questão ainda sem resposta,
+  o codehood pergunta num diálogo se ela deve ser pulada.
