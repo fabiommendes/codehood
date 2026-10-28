@@ -155,5 +155,5 @@ test("an answer lost to a network failure says so, and later answers still save"
 			});
 			return response?.submissions[0]?.payload ?? null;
 		})
-		.toEqual({ choice: "brasilia" });
+		.toEqual("brasilia");
 });

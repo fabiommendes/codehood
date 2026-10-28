@@ -1,10 +1,10 @@
 import type { JSX } from "solid-js";
 import QuestionPreview from "@/components/question/QuestionPreview";
-import type * as schema from "@/mdq/schemas-generated";
+import type { QuestionDocument } from "@/mdq";
 
 export interface AnswerKeyProps {
 	/// The full authored question, answer key included.
-	question: schema.Question;
+	question: QuestionDocument;
 }
 
 /** A question with its correct answer marked, without the student/key toggle. */

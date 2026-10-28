@@ -166,10 +166,10 @@ test("student: take an exam", async ({ page }) => {
 		// The latest submission per question holds the answer the student left.
 		await expect
 			.poll(() => latestAnswer(student.username, open.id, choiceQuestion.id))
-			.toEqual({ choice: "brasilia" });
+			.toEqual("brasilia");
 		await expect
 			.poll(() => latestAnswer(student.username, open.id, typedQuestion.id))
-			.toEqual({ text: "Brasília" });
+			.toEqual("Brasília");
 
 		await page.reload();
 
@@ -338,9 +338,9 @@ test("student: see my grades and feedback", async ({ page }) => {
 	// The midterm: one answer the instructor graded, one a bot graded and the
 	// instructor revised, one nobody has graded yet.
 	const midterm = await sitExam("midterm", "Midterm", [
-		["q-capital", { choice: "brasilia" }],
-		["q-planet", { choice: "mercury" }],
-		["q-typed", { text: "Brasilia" }],
+		["q-capital", "brasilia"],
+		["q-planet", "mercury"],
+		["q-typed", "Brasilia"],
 	]);
 	await grade(
 		midterm.submissions["q-capital"] ?? "",
@@ -369,9 +369,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 
 	// A recap that is fully graded and released, and a final whose grades exist
 	// but are not released.
-	const recap = await sitExam("recap", "Recap", [
-		["q-capital", { choice: "brasilia" }],
-	]);
+	const recap = await sitExam("recap", "Recap", [["q-capital", "brasilia"]]);
 	await grade(
 		recap.submissions["q-capital"] ?? "",
 		"pass-1",
@@ -382,9 +380,7 @@ test("student: see my grades and feedback", async ({ page }) => {
 	);
 	await release(recap.exam.id);
 
-	const final = await sitExam("final", "Final", [
-		["q-capital", { choice: "rio" }],
-	]);
+	const final = await sitExam("final", "Final", [["q-capital", "rio"]]);
 	await grade(
 		final.submissions["q-capital"] ?? "",
 		"pass-1",
@@ -787,7 +783,7 @@ test("student: Answer an exam with the extra time I was granted", async ({
 
 		await expect
 			.poll(() => latestAnswer(student.username, exam.id, question.id))
-			.toEqual({ choice: "brasilia" });
+			.toEqual("brasilia");
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
 	});
 

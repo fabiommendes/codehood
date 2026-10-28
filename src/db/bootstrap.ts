@@ -3,6 +3,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { DEVELOPMENT } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
 import { prisma } from "@/db/client";
+import type { QuestionResponse } from "@/mdq";
 import { hashBytes } from "@/utils/content-hash";
 import {
 	localDateOf,
@@ -828,7 +829,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				title: "Linked list invariants",
 				stem: "Describe the invariant your `insert` implementation must preserve, and show where it could break.",
 				tags: ["data-structures"],
-				input: "text",
+				content: "text",
 			},
 		},
 		FULL_ACCESS,
@@ -908,7 +909,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				title: "Stack vs. queue",
 				stem: "Describe a scenario where a queue is the wrong structure and a stack is the right one, or vice versa.",
 				tags: ["stacks", "queues"],
-				input: "text",
+				content: "text",
 			},
 		},
 		FULL_ACCESS,
@@ -1673,7 +1674,7 @@ async function seedGradeColumns(
 }
 
 /// One student's answers to a seeded exam, by question slug.
-type SeededAnswers = Record<string, Record<string, unknown>>;
+type SeededAnswers = Record<string, QuestionResponse | null>;
 
 /// Answers `exam` as `student` and closes the attempt; returns each answer's submission id by question slug.
 async function answerExam(
@@ -1725,15 +1726,15 @@ async function seedReleasedQuiz(
 	const exam = "quiz-01";
 
 	const hopper = await answerExam(course, exam, students.hopper, {
-		"recursion-basics": { choice: "base-case" },
-		"factorial-of-five": { value: 120 },
+		"recursion-basics": "base-case",
+		"factorial-of-five": 120,
 	});
 	await botGrade(hopper["recursion-basics"], "1");
 	await botGrade(hopper["factorial-of-five"], "1");
 
 	const hamilton = await answerExam(course, exam, students.hamilton, {
-		"recursion-basics": { choice: "base-case" },
-		"factorial-of-five": { value: 25 },
+		"recursion-basics": "base-case",
+		"factorial-of-five": 25,
 	});
 	await botGrade(hamilton["recursion-basics"], "1");
 	await botGrade(hamilton["factorial-of-five"], "0");
@@ -1774,7 +1775,6 @@ async function seedOpenQuiz(course: Course["id"]): Promise<void> {
 				stem: "What error does a recursion without a base case usually end in?",
 				tags: ["recursion"],
 				accept: [{ pattern: "stack overflow" }],
-				reject: [{ pattern: "*" }],
 			},
 		},
 		FULL_ACCESS,
@@ -1855,7 +1855,7 @@ async function seedGradedExam(
 				title: "Explain recursion",
 				stem: "Explain, in your own words, why a recursive function needs a base case.",
 				tags: ["recursion"],
-				input: "text",
+				content: "text",
 			},
 		},
 		FULL_ACCESS,
@@ -1880,23 +1880,20 @@ async function seedGradedExam(
 
 	// Hopper: objective answers graded by the bot, the essay still pending.
 	const hopper = await answerExam(course, exam, students.hopper, {
-		"recursion-basics": { choice: "base-case" },
-		"factorial-of-five": { value: 120 },
-		"explain-recursion": {
-			essay:
-				"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
-		},
+		"recursion-basics": "base-case",
+		"factorial-of-five": 120,
+		"explain-recursion":
+			"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
 	});
 	await botGrade(hopper["recursion-basics"], "1");
 	await botGrade(hopper["factorial-of-five"], "1");
 
 	// Hamilton: everything graded, the essay by the instructor with a comment.
 	const hamilton = await answerExam(course, exam, students.hamilton, {
-		"recursion-basics": { choice: "tail-call" },
-		"factorial-of-five": { value: 100 },
-		"explain-recursion": {
-			essay: "The base case is where the function returns a value directly.",
-		},
+		"recursion-basics": "tail-call",
+		"factorial-of-five": 100,
+		"explain-recursion":
+			"The base case is where the function returns a value directly.",
 	});
 	await botGrade(hamilton["recursion-basics"], "0");
 	await botGrade(hamilton["factorial-of-five"], "0");
@@ -1912,8 +1909,8 @@ async function seedGradedExam(
 
 	// Liskov: one question unanswered, and an empty essay marked will-not-grade.
 	const liskov = await answerExam(course, exam, students.liskov, {
-		"recursion-basics": { choice: "base-case" },
-		"explain-recursion": { essay: "" },
+		"recursion-basics": "base-case",
+		"explain-recursion": "",
 	});
 	await botGrade(liskov["recursion-basics"], "1");
 	await db.feedback.create(
@@ -1933,10 +1930,9 @@ async function seedGradedExam(
 
 	// Bob: nothing graded yet, not even the objective answer.
 	await answerExam(course, exam, students.bob, {
-		"recursion-basics": { choice: "tail-call" },
-		"explain-recursion": {
-			essay: "Recursion is when a function calls itself until it is done.",
-		},
+		"recursion-basics": "tail-call",
+		"explain-recursion":
+			"Recursion is when a function calls itself until it is done.",
 	});
 
 	await db.exam.update(
@@ -1988,7 +1984,7 @@ async function seedExamExceptions(
 		FULL_ACCESS,
 	);
 	const hamilton = await answerExam(course, "test-02", students.hamilton, {
-		"recursion-basics": { choice: "base-case" },
+		"recursion-basics": "base-case",
 	});
 	await botGrade(hamilton["recursion-basics"], "1");
 	await db.exam.update(
@@ -2025,7 +2021,7 @@ async function seedExamExceptions(
 		FULL_ACCESS,
 	);
 	await answerExam(course, "test-03", students.liskov, {
-		"recursion-basics": { choice: "base-case" },
+		"recursion-basics": "base-case",
 	});
 	await db.exam.update(
 		{ course, slug: "test-03" },
@@ -2143,98 +2139,70 @@ async function seedQuestionStatsExam(
 	);
 
 	/// Each row: the answer and its score to every question, by student in `students` order.
-	const rows: [string, Record<string, unknown>, string][][] = [
+	const rows: [string, QuestionResponse, string][][] = [
 		[
-			["fastest-sort", { choice: "merge" }, "1"],
-			["n-log-n", { choices: ["merge", "quick"] }, "1"],
-			[
-				"stack-facts",
-				{ answers: { lifo: true, fifo: false, push: true } },
-				"1",
-			],
-			["pivot-trap", { choice: "linearithmic" }, "0"],
-			["factorial-of-five", { value: 120 }, "1"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "merge", "1"],
+			["n-log-n", ["merge", "quick"], "1"],
+			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
+			["pivot-trap", "linearithmic", "0"],
+			["factorial-of-five", 120, "1"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "merge" }, "1"],
-			["n-log-n", { choices: ["merge", "quick"] }, "1"],
-			[
-				"stack-facts",
-				{ answers: { lifo: true, fifo: false, push: true } },
-				"1",
-			],
-			["pivot-trap", { choice: "linearithmic" }, "0"],
-			["factorial-of-five", { value: 120 }, "1"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "merge", "1"],
+			["n-log-n", ["merge", "quick"], "1"],
+			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
+			["pivot-trap", "linearithmic", "0"],
+			["factorial-of-five", 120, "1"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "merge" }, "1"],
-			["n-log-n", { choices: ["merge", "quick"] }, "1"],
-			[
-				"stack-facts",
-				{ answers: { lifo: true, fifo: false, push: true } },
-				"1",
-			],
-			["pivot-trap", { choice: "linearithmic" }, "0"],
-			["factorial-of-five", { value: 120 }, "1"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "merge", "1"],
+			["n-log-n", ["merge", "quick"], "1"],
+			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
+			["pivot-trap", "linearithmic", "0"],
+			["factorial-of-five", 120, "1"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "insertion" }, "0"],
-			["n-log-n", { choices: ["merge"] }, "0.5"],
-			["stack-facts", { answers: { lifo: true, fifo: false } }, "0.67"],
-			["pivot-trap", { choice: "linearithmic" }, "0"],
-			["factorial-of-five", { value: 120 }, "1"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "insertion", "0"],
+			["n-log-n", ["merge"], "0.5"],
+			["stack-facts", { lifo: true, fifo: false }, "0.67"],
+			["pivot-trap", "linearithmic", "0"],
+			["factorial-of-five", 120, "1"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "merge" }, "1"],
-			["n-log-n", { choices: ["merge", "quick", "bubble"] }, "0.5"],
-			[
-				"stack-facts",
-				{ answers: { lifo: true, fifo: true, push: true } },
-				"0.33",
-			],
-			["pivot-trap", { choice: "quadratic" }, "1"],
-			["factorial-of-five", { value: 120 }, "1"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "merge", "1"],
+			["n-log-n", ["merge", "quick", "bubble"], "0.5"],
+			["stack-facts", { lifo: true, fifo: true, push: true }, "0.33"],
+			["pivot-trap", "quadratic", "1"],
+			["factorial-of-five", 120, "1"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "bubble" }, "0"],
-			["n-log-n", { choices: ["merge"] }, "0.5"],
-			[
-				"stack-facts",
-				{ answers: { lifo: true, fifo: false, push: true } },
-				"1",
-			],
-			["pivot-trap", { choice: "quadratic" }, "1"],
-			["factorial-of-five", { value: 100 }, "0"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "bubble", "0"],
+			["n-log-n", ["merge"], "0.5"],
+			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
+			["pivot-trap", "quadratic", "1"],
+			["factorial-of-five", 100, "0"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "bubble" }, "0"],
-			["n-log-n", { choices: [] }, "0"],
-			[
-				"stack-facts",
-				{ answers: { lifo: false, fifo: true, push: false } },
-				"0",
-			],
-			["pivot-trap", { choice: "quadratic" }, "1"],
-			["factorial-of-five", { value: 100 }, "0"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "bubble", "0"],
+			["n-log-n", [], "0"],
+			["stack-facts", { lifo: false, fifo: true, push: false }, "0"],
+			["pivot-trap", "quadratic", "1"],
+			["factorial-of-five", 100, "0"],
+			["stack-top", "top", "1"],
 		],
 		[
-			["fastest-sort", { choice: "bubble" }, "0"],
-			["n-log-n", { choices: ["bubble"] }, "0"],
-			[
-				"stack-facts",
-				{ answers: { lifo: false, fifo: true, push: false } },
-				"0",
-			],
-			["pivot-trap", { choice: "quadratic" }, "1"],
-			["factorial-of-five", { value: 24 }, "0"],
-			["stack-top", { choice: "top" }, "1"],
+			["fastest-sort", "bubble", "0"],
+			["n-log-n", ["bubble"], "0"],
+			["stack-facts", { lifo: false, fifo: true, push: false }, "0"],
+			["pivot-trap", "quadratic", "1"],
+			["factorial-of-five", 24, "0"],
+			["stack-top", "top", "1"],
 		],
 	];
 	for (const [index, student] of students.entries()) {
@@ -2299,22 +2267,22 @@ async function seedRegradeExam(
 		FULL_ACCESS,
 	);
 	const own = await answerExam(course, exam, student, {
-		"recursion-basics": { choice: "tail-call" },
-		"factorial-of-five": { value: 120 },
-		"fastest-sort": { choice: "bubble" },
+		"recursion-basics": "tail-call",
+		"factorial-of-five": 120,
+		"fastest-sort": "bubble",
 	});
 	await botGrade(own["recursion-basics"], "0");
 	await botGrade(own["factorial-of-five"], "1");
 	await botGrade(own["fastest-sort"], "0");
 	const hopper = await answerExam(course, exam, students.hopper, {
-		"recursion-basics": { choice: "tail-call" },
-		"factorial-of-five": { value: 120 },
+		"recursion-basics": "tail-call",
+		"factorial-of-five": 120,
 	});
 	await botGrade(hopper["recursion-basics"], "0");
 	await botGrade(hopper["factorial-of-five"], "1");
 	const hamilton = await answerExam(course, exam, students.hamilton, {
-		"recursion-basics": { choice: "base-case" },
-		"factorial-of-five": { value: 25 },
+		"recursion-basics": "base-case",
+		"factorial-of-five": 25,
 	});
 	await botGrade(hamilton["recursion-basics"], "1");
 	await botGrade(hamilton["factorial-of-five"], "0");

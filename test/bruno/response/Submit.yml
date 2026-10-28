@@ -12,7 +12,7 @@ http:
       {
           "exam": "quiz-02",
           "question": "foo",
-          "payload": { "base-case": true }
+          "payload": "base-case"
       }
   auth: inherit
 

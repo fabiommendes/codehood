@@ -6,7 +6,6 @@
 	"exams_phase_archived": "Archived",
 	"exams_tab_student_view": "Student view",
 	"exams_tab_correct_answer": "Correct answer",
-	"exams_question_preview_unavailable": "Preview for \"{type}\" questions is not implemented yet.",
 	"exams_not_scheduled": "Not scheduled",
 	"exams_row_answers_to_grade": [
 		{
@@ -153,7 +152,6 @@
 	"exams_attempt_not_saved": "Not saved",
 	"exams_attempt_saved": "Saved",
 	"exams_attempt_score_label": "Score",
-	"exams_attempt_unsupported": "Answering \"{type}\" questions is not supported yet.",
 	"exams_group_open": "Open",
 	"exams_group_practice": "Practice",
 	"exams_group_upcoming": "Upcoming",

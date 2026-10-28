@@ -13,7 +13,8 @@ function buildSubmission(
 	return {
 		response: params.response ?? { id: 0 as schema.ResponseId },
 		question: params.question ?? `question-${sequence}`,
-		payload: params.payload ?? { answer: `answer-${sequence}` },
+		// A skipped question, which is a valid response to a question of any type.
+		payload: params.payload === undefined ? null : params.payload,
 		status: params.status,
 		automaticallyTriggered: params.automaticallyTriggered,
 		startedAt: params.startedAt,

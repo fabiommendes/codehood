@@ -1,70 +1,68 @@
 /**
- * Well-formed question documents, one per MDQ type, and the builders that make
- * them.
+ * Well-formed question documents, one per hosted MDQ type, and the builders
+ * that make them.
  *
- * Every fixture here parses against its schema and reports no problem from
- * `validateQuestion`, so a test that needs "some valid question" can take one
- * instead of hand-writing a document that drifts from the schemas. Tests that
- * need a *malformed* document should build it from a builder and break the one
- * field under test, keeping the defect visible at the call site.
+ * Every fixture here passes `validateDocument` and has an id on each choice,
+ * so a test that needs "some valid question" can take one instead of
+ * hand-writing a document that drifts from the spec. Tests that need a
+ * *malformed* document should build it from a builder and break the one field
+ * under test, keeping the defect visible at the call site.
  */
-import { Question } from "./question";
 import type {
-	Question as AnyQuestion,
-	Essay,
-	FillIn,
-	MultipleChoice,
-	MultipleSelection,
-	Numeric,
-	ShortAnswer,
-	TrueFalse,
-} from "./schemas-generated";
+	EssayQuestion,
+	FillInQuestion,
+	MultipleChoiceQuestion,
+	MultipleSelectionQuestion,
+	NumericQuestion,
+	QuestionDocument,
+	ShortAnswerQuestion,
+	TrueFalseQuestion,
+} from "./index";
 
 // -----------------------------------------------------------------------------
 // Builders
 
 /** Builds a multiple-choice document, supplying its discriminator. */
 export function multipleChoice(
-	data: Omit<MultipleChoice, "type">,
-): MultipleChoice {
+	data: Omit<MultipleChoiceQuestion, "type">,
+): MultipleChoiceQuestion {
 	return { type: "multiple-choice", ...data };
 }
 
 /** Builds a multiple-selection document, supplying its discriminator. */
 export function multipleSelection(
-	data: Omit<MultipleSelection, "type">,
-): MultipleSelection {
+	data: Omit<MultipleSelectionQuestion, "type">,
+): MultipleSelectionQuestion {
 	return { type: "multiple-selection", ...data };
 }
 
 /** Builds a true-false document, supplying its discriminator. */
-export function trueFalse(data: Omit<TrueFalse, "type">): TrueFalse {
+export function trueFalse(
+	data: Omit<TrueFalseQuestion, "type">,
+): TrueFalseQuestion {
 	return { type: "true-false", ...data };
 }
 
 /** Builds an essay document, supplying its discriminator. */
-export function essay(data: Omit<Essay, "type">): Essay {
+export function essay(data: Omit<EssayQuestion, "type">): EssayQuestion {
 	return { type: "essay", ...data };
 }
 
 /** Builds a numeric document, supplying its discriminator. */
-export function numeric(data: Omit<Numeric, "type">): Numeric {
+export function numeric(data: Omit<NumericQuestion, "type">): NumericQuestion {
 	return { type: "numeric", ...data };
 }
 
 /** Builds a short-answer document, supplying its discriminator. */
-export function shortAnswer(data: Omit<ShortAnswer, "type">): ShortAnswer {
+export function shortAnswer(
+	data: Omit<ShortAnswerQuestion, "type">,
+): ShortAnswerQuestion {
 	return { type: "short-answer", ...data };
 }
 
 /** Builds a fill-in document, supplying its discriminator. */
-export function fillIn(data: Omit<FillIn, "type">): FillIn {
+export function fillIn(data: Omit<FillInQuestion, "type">): FillInQuestion {
 	return { type: "fill-in", ...data };
-}
-
-/** Wraps a document in the `Question` class, for the methods rather than the data. */
-export function asQuestion<Q extends AnyQuestion>(data: Q): Question<Q> {
-	return new Question(data);
 }
 
 // -----------------------------------------------------------------------------
@@ -72,7 +70,7 @@ export function asQuestion<Q extends AnyQuestion>(data: Q): Question<Q> {
 
 /// Scores spread over the whole [-1, 1] range, so a fixture exercising a
 /// penalty does not have to introduce a negative score of its own.
-export const capitalChoice: MultipleChoice = multipleChoice({
+export const capitalChoice: MultipleChoiceQuestion = multipleChoice({
 	id: "capital-of-brazil",
 	title: "Capital of Brazil",
 	stem: "Which city is the capital of Brazil?",
@@ -89,21 +87,26 @@ export const capitalChoice: MultipleChoice = multipleChoice({
 	],
 });
 
-/// Two of four correct, so a partially correct answer is expressible.
-export const primesSelection: MultipleSelection = multipleSelection({
+/// Three of four correct, so a partially correct answer is expressible.
+export const primesSelection: MultipleSelectionQuestion = multipleSelection({
 	id: "primes-under-six",
 	stem: "Select every prime number below six.",
 	choices: [
 		{ id: "two", text: "2", correct: true },
 		{ id: "three", text: "3", correct: true },
-		{ id: "four", text: "4", feedback: "Four is two squared." },
+		{
+			id: "four",
+			text: "4",
+			correct: false,
+			feedback: "Four is two squared.",
+		},
 		{ id: "five", text: "5", correct: true },
 	],
 });
 
 /// Mixes true and false statements, so an answer can be right about one and
 /// wrong about another.
-export const protocolsTrueFalse: TrueFalse = trueFalse({
+export const protocolsTrueFalse: TrueFalseQuestion = trueFalse({
 	id: "network-protocols",
 	stem: "Judge each statement about network protocols.",
 	choices: [
@@ -122,28 +125,27 @@ export const protocolsTrueFalse: TrueFalse = trueFalse({
 	],
 });
 
-/// Carries an `answerKey`, which the public representation has to withhold.
-export const idempotenceEssay: Essay = essay({
+/// Carries an `answerKey`, which the public form has to withhold.
+export const idempotenceEssay: EssayQuestion = essay({
 	id: "define-idempotence",
 	stem: "In one sentence, define idempotence.",
-	input: "plain",
+	content: "plain",
 	answerKey:
 		"An operation is idempotent when applying it more than once has the same effect as applying it once.",
 });
 
 /// Carries a unit and an absolute tolerance, so a near miss is still credited.
-export const waterNumeric: Numeric = numeric({
+export const waterNumeric: NumericQuestion = numeric({
 	id: "grams-of-water",
-	stem: "How many grams of water are there in a liter?",
-	preamble: "Assume pure water at 4 °C, where its density is exactly 1 g/mL.",
+	stem: "Assume pure water at 4 °C, where its density is exactly 1 g/mL.\n\nHow many grams of water are there in a liter?",
 	answer: 1000,
 	unit: "g",
 	tolerance: { absolute: 5 },
 });
 
-/// Ends its reject list with a wildcard, so every response lands in one list
-/// or the other and nothing is left for an instructor to settle by hand.
-export const capitalShortAnswer: ShortAnswer = shortAnswer({
+/// Has an `accept` list, so a response that matches no pattern is incorrect
+/// and nothing is left for an instructor to settle by hand.
+export const capitalShortAnswer: ShortAnswerQuestion = shortAnswer({
 	id: "capital-of-brazil-typed",
 	stem: "What is the capital of Brazil?",
 	accept: [{ pattern: "Brasília", feedback: "Good call!" }],
@@ -152,13 +154,13 @@ export const capitalShortAnswer: ShortAnswer = shortAnswer({
 			pattern: "Rio de Janeiro",
 			feedback: "It used to be, but it is not anymore.",
 		},
-		{ pattern: "*", feedback: "Sorry, that is not the correct answer." },
 	],
+	incorrectFeedback: "Sorry, that is not the correct answer.",
 });
 
 /// One blank of each kind, all three referenced by the stem, which is what
-/// `validateQuestion` checks and JSON Schema cannot.
-export const brasiliaFillIn: FillIn = fillIn({
+/// the model rules check and the schema cannot.
+export const brasiliaFillIn: FillInQuestion = fillIn({
 	id: "brasilia-blanks",
 	stem: "The capital of Brazil is [^capital], a city of roughly [^size] on the [^river] plateau.",
 	blanks: [
@@ -177,15 +179,15 @@ export const brasiliaFillIn: FillIn = fillIn({
 			unit: "people",
 			tolerance: { relative: 0.1 },
 		},
-		{ id: "river", type: "short-answer", oneOf: ["Central", "Planalto"] },
+		{ id: "river", type: "short-answer", accept: ["Central", "Planalto"] },
 	],
 });
 
 /**
- * One well-formed document of every MDQ type, for tests that must cover the
- * whole union.
+ * One well-formed document of every hosted MDQ type, for tests that must cover
+ * the whole union.
  *
- * Adding a type to `questionSchema` without adding it here leaves a hole no
+ * Adding a type to `questionDocument` without adding it here leaves a hole no
  * table-driven test would notice, so keep this exhaustive.
  */
 export const everyQuestionType = [
@@ -196,4 +198,4 @@ export const everyQuestionType = [
 	waterNumeric,
 	capitalShortAnswer,
 	brasiliaFillIn,
-] as const satisfies readonly AnyQuestion[];
+] as const satisfies readonly QuestionDocument[];

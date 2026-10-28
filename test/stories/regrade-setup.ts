@@ -66,7 +66,7 @@ export async function releasedExam(prefix: string, studentCount: number) {
 				course: course.id,
 				exam: exam.slug,
 				question: "q-short",
-				payload: { text: `Reply number ${i}` },
+				payload: `Reply number ${i}`,
 			},
 			{ actor: student },
 		);

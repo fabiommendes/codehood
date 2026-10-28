@@ -7,9 +7,7 @@
  * an objective question spread over its choices.
  */
 
-import { resolveChoiceIds } from "@/mdq/choices";
-import type { Question as MdqQuestion } from "@/mdq/schemas-generated";
-import { answerKey } from "@/mdq/scoring";
+import { correctResponses, type QuestionDocument } from "@/mdq";
 import { examResult } from "./exam-result";
 import {
 	attemptState,
@@ -330,8 +328,7 @@ export type AnswerDistribution =
  * at zero. A `removed` row only exists with a non-zero count.
  *
  * Multiple choice counts each answer once, so the counts add up to
- * `answers`; its `correct` choices are the ones `answerKey.multipleChoice`
- * returns. Multiple selection counts each ticked choice, and an answer with
+ * `answers`; its `correct` choices are the ones `correctResponses` returns. Multiple selection counts each ticked choice, and an answer with
  * nothing ticked in the `empty` row; `correct` is the choice's `correct`
  * flag. True-false counts each statement's verdicts, and `true + false +
  * abstained` is `answers` on every row.
@@ -343,7 +340,7 @@ export type AnswerDistribution =
  * @params question The question version the exam pins, or the latest when it pins none.
  */
 export function answerDistribution(
-	question: MdqQuestion,
+	question: QuestionDocument,
 	answers: readonly Pick<CountingAnswer, "payload">[],
 ): AnswerDistribution | null {
 	switch (question.type) {
@@ -353,12 +350,10 @@ export function answerDistribution(
 				answers: answers.length,
 				rows: choiceRows(
 					question.choices,
-					new Set(answerKey.multipleChoice(question)),
-					answers.map((answer) => {
-						const choice = (answer.payload as { choice?: unknown } | null)
-							?.choice;
-						return typeof choice === "string" && choice !== "" ? [choice] : [];
-					}),
+					new Set(correctResponses(question)),
+					answers.map(({ payload }) =>
+						typeof payload === "string" && payload !== "" ? [payload] : [],
+					),
 				),
 			};
 		case "multiple-selection":
@@ -367,20 +362,22 @@ export function answerDistribution(
 				answers: answers.length,
 				rows: choiceRows(
 					question.choices,
-					answerKey.multipleSelection(question),
-					answers.map((answer) => {
-						const choices = (answer.payload as { choices?: unknown } | null)
-							?.choices;
-						return Array.isArray(choices)
+					new Set(
+						question.choices.flatMap((choice) =>
+							choice.correct && choice.id ? [choice.id] : [],
+						),
+					),
+					answers.map(({ payload }) =>
+						Array.isArray(payload)
 							? [
 									...new Set(
-										choices.filter(
+										payload.filter(
 											(id): id is string => typeof id === "string",
 										),
 									),
 								]
-							: [];
-					}),
+							: [],
+					),
 				),
 			};
 		case "true-false":
@@ -389,16 +386,11 @@ export function answerDistribution(
 				answers: answers.length,
 				rows: statementRows(
 					question.choices,
-					answerKey.trueFalse(question),
-					answers.map((answer) => {
-						const verdicts = (answer.payload as { answers?: unknown } | null)
-							?.answers;
-						return verdicts &&
-							typeof verdicts === "object" &&
-							!Array.isArray(verdicts)
-							? (verdicts as Record<string, unknown>)
-							: {};
-					}),
+					answers.map(({ payload }) =>
+						payload && typeof payload === "object" && !Array.isArray(payload)
+							? (payload as Record<string, unknown>)
+							: {},
+					),
 				),
 			};
 		default:
@@ -412,7 +404,7 @@ function choiceRows(
 	correct: ReadonlySet<string>,
 	picks: readonly (readonly string[])[],
 ): ChoiceRow[] {
-	const ids = resolveChoiceIds(choices);
+	const ids = choices.map((choice) => choice.id ?? "");
 	const counts = new Map<string, number>();
 	let empty = 0;
 	for (const ticked of picks) {
@@ -439,11 +431,10 @@ function choiceRows(
 
 /// The statement rows: one per statement, then `removed` rows by id, from the verdicts each answer holds.
 function statementRows(
-	choices: readonly { id?: string; text: string }[],
-	key: ReadonlyMap<string, boolean>,
+	choices: readonly { id?: string; text: string; correct: boolean }[],
 	verdicts: readonly Record<string, unknown>[],
 ): StatementRow[] {
-	const ids = resolveChoiceIds(choices);
+	const ids = choices.map((choice) => choice.id ?? "");
 	const tally = (id: string) => {
 		let yes = 0;
 		let no = 0;
@@ -461,7 +452,7 @@ function statementRows(
 			kind: "statement",
 			id,
 			text: choice.text,
-			correct: key.get(id) ?? false,
+			correct: choice.correct,
 			...tally(id),
 		};
 	});

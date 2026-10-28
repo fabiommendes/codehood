@@ -18,12 +18,20 @@ export const submissionStatus = z.enum([
 ]);
 
 /**
- * A student's answer to one question.
+ * A student's response to one question, as mdq `docs/responses.md` defines it,
+ * or `null` for a skipped question.
  *
  * The shape depends on the question's type, so it is checked against the
  * question when the submission is created rather than here.
  */
-export const submissionPayload = z.record(z.string(), z.unknown());
+export const submissionPayload = z.union([
+	z.string(),
+	z.number(),
+	z.boolean(),
+	z.array(z.unknown()).readonly(),
+	z.record(z.string(), z.unknown()).readonly(),
+	z.null(),
+]);
 
 /// Identifies a response from outside the response schema, which imports this module.
 export const responseRef = z.union([

@@ -283,7 +283,7 @@ async function releasedExam(
 			course: course.id,
 			exam: slug,
 			question: question.slug,
-			payload: { choice: "brasilia" },
+			payload: "brasilia",
 			author: username,
 		},
 		FULL_ACCESS,

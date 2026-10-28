@@ -109,7 +109,7 @@ async function answer(
 	minutes: number,
 ): Promise<string> {
 	const response = await db.response.submit(
-		{ course: course.id, exam, question, payload: { text } },
+		{ course: course.id, exam, question, payload: text },
 		{ actor: student },
 	);
 	const publicId = response.submissions.at(-1)?.publicId ?? "";
@@ -421,7 +421,7 @@ test("question page: a correct answer is shown under a Correct answer heading, f
 			course: course.id,
 			exam: exam.slug,
 			question: "q-choice",
-			payload: { choice: "rio" },
+			payload: "rio",
 		},
 		{ actor: student },
 	);

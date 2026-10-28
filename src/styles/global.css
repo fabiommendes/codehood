@@ -453,7 +453,13 @@ h6 {
 	background-color: var(--shiki-dark-bg);
 }
 
-/* mdq/css/daisyui.css leaves Markdown blocks without typography. */
-.mdq-markdown:not([data-inline]) {
-	@apply prose prose-sm max-w-none;
+/*
+ * mdq/css/daisyui.css leaves Markdown blocks without typography. In the base
+ * layer, so the component rules of that file (feedback color, edge margins)
+ * still win over it.
+ */
+@layer base {
+	.mdq-markdown:not([data-inline]) {
+		@apply prose prose-sm max-w-none;
+	}
 }

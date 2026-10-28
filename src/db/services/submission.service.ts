@@ -21,6 +21,7 @@ import {
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
 import { m } from "@/i18n";
+import { assertResponse, type QuestionDocument, ResponseError } from "@/mdq";
 import {
 	attemptDeadline,
 	type ExamTiming,
@@ -191,6 +192,7 @@ export class SubmissionService extends CrudBase<{
 			response.exam.courseId,
 			response.examId,
 			input.question,
+			input.payload,
 		);
 
 		const row = await invalidIfExists(tx.submission.create, {
@@ -523,25 +525,28 @@ export function assertAcceptingSubmissions(
 
 /**
  * Resolves a question slug to the question ref it names, refusing one the
- * exam does not carry.
+ * exam does not carry or a response that does not fit the question.
  *
- * Shared with `ResponseService.submit`, which appends a submission the same
- * way `SubmissionService.create` does.
+ * The response is checked against the version the exam pins, or the latest
+ * when it pins none. Shared with `ResponseService.submit`, which appends a
+ * submission the same way `SubmissionService.create` does.
  *
  * @throws {@link NotFound} If no question in the course has this slug.
- * @throws {@link InvalidData} If the question is not one of the exam's questions.
+ * @throws {@link InvalidData} If the question is not one of the exam's
+ *   questions, or `payload` is not a well-formed response to it.
  */
 export async function resolveExamQuestion(
 	tx: PrismaTx,
 	courseId: number,
 	examId: number,
 	slug: string,
+	payload: unknown,
 ) {
 	const question = valueOrNotFound(
 		"question",
 		await tx.questionRef.findFirst({
 			where: { courseId, slug },
-			select: { id: true, slug: true },
+			select: { id: true, slug: true, latestId: true },
 		}),
 	);
 
@@ -554,6 +559,32 @@ export async function resolveExamQuestion(
 				{
 					code: "not-exists",
 					message: m.errors_question_not_in_exam({ slug: question.slug }),
+				},
+			],
+		});
+	}
+
+	const version = valueOrNotFound(
+		"question-version",
+		await tx.questionData.findFirst({
+			where: inExam.version
+				? { refId: question.id, versionHash: inExam.version }
+				: { id: question.latestId ?? -1 },
+			select: { privatePayload: true },
+		}),
+	);
+	try {
+		assertResponse(
+			version.privatePayload as unknown as QuestionDocument,
+			payload,
+		);
+	} catch (error) {
+		if (!(error instanceof ResponseError)) throw error;
+		throw new InvalidData({
+			payload: [
+				{
+					code: "invalid",
+					message: m.errors_response_malformed({ detail: error.message }),
 				},
 			],
 		});

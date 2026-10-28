@@ -11,25 +11,10 @@ import {
 	Switch,
 } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
-import EssayView from "@/components/question/EssayView";
-import FillInView from "@/components/question/FillInView";
-import MultipleChoiceView from "@/components/question/MultipleChoiceView";
-import MultipleSelectionView from "@/components/question/MultipleSelectionView";
-import NumericView from "@/components/question/NumericView";
-import ShortAnswerView from "@/components/question/ShortAnswerView";
-import TrueFalseView from "@/components/question/TrueFalseView";
+import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
-import type {
-	PublicEssay,
-	PublicFillIn,
-	PublicMultipleChoice,
-	PublicMultipleSelection,
-	PublicNumeric,
-	PublicShortAnswer,
-	PublicTrueFalse,
-} from "@/mdq/public";
 import {
 	type ExamResult,
 	formatScore,
@@ -38,20 +23,7 @@ import {
 import type { AttemptState } from "@/services/exam-state";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
-import {
-	type AnswerPayload,
-	answersOf,
-	blanksOf,
-	choiceOf,
-	choicesOf,
-	essayOf,
-	fromAnswers,
-	fromChoices,
-	isAnswered,
-	isTextEntry,
-	numberOf,
-	textOf,
-} from "./answer-payload";
+import { type AnswerPayload, isAnswered, isTextEntry } from "./answer-payload";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 
 export interface ExamAttemptProps {
@@ -329,7 +301,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							})()}
 							questions={props.questions.map((entry, index) => ({
 								number: index + 1,
-								answered: isAnswered(answers()[entry.slug]),
+								answered: isAnswered(
+									entry.question.type,
+									answers()[entry.slug],
+								),
 								failed: saveErrors()[entry.slug] !== undefined,
 							}))}
 							saving={unsaved().size > 0}
@@ -357,7 +332,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 											<SaveState
 												failed={saveErrors()[entry.slug] !== undefined}
 												saving={unsaved().has(entry.slug)}
-												answered={isAnswered(answers()[entry.slug])}
+												answered={isAnswered(
+													entry.question.type,
+													answers()[entry.slug],
+												)}
 											/>
 										</Show>
 									</div>
@@ -616,71 +594,13 @@ interface AnswerFieldProps {
 
 /// One question in answer mode, or frozen on the student's saved answer.
 function AnswerField(props: AnswerFieldProps): JSX.Element {
-	const mode = () => (props.readonly ? "readonly" : "answer");
 	return (
-		<Switch
-			fallback={
-				<p class="text-sm text-base-content/60">
-					{m.exams_attempt_unsupported({ type: props.question.type })}
-				</p>
-			}
-		>
-			<Match when={props.question.type === "multiple-choice"}>
-				<MultipleChoiceView
-					question={props.question as PublicMultipleChoice}
-					value={choiceOf(props.payload)}
-					onChange={(choice) => props.onChange({ choice })}
-					mode={mode()}
-				/>
-			</Match>
-			<Match when={props.question.type === "multiple-selection"}>
-				<MultipleSelectionView
-					question={props.question as PublicMultipleSelection}
-					value={choicesOf(props.payload)}
-					onChange={(choices) => props.onChange(fromChoices(choices))}
-					mode={mode()}
-				/>
-			</Match>
-			<Match when={props.question.type === "true-false"}>
-				<TrueFalseView
-					question={props.question as PublicTrueFalse}
-					value={answersOf(props.payload)}
-					onChange={(answers) => props.onChange(fromAnswers(answers))}
-					mode={mode()}
-				/>
-			</Match>
-			<Match when={props.question.type === "numeric"}>
-				<NumericView
-					question={props.question as PublicNumeric}
-					value={numberOf(props.payload)}
-					onChange={(value) => props.onChange({ value })}
-					mode={mode()}
-				/>
-			</Match>
-			<Match when={props.question.type === "short-answer"}>
-				<ShortAnswerView
-					question={props.question as PublicShortAnswer}
-					value={textOf(props.payload)}
-					onChange={(text) => props.onChange({ text })}
-					mode={mode()}
-				/>
-			</Match>
-			<Match when={props.question.type === "essay"}>
-				<EssayView
-					question={props.question as PublicEssay}
-					value={essayOf(props.payload)}
-					onChange={(essay) => props.onChange({ essay })}
-					mode={mode()}
-				/>
-			</Match>
-			<Match when={props.question.type === "fill-in"}>
-				<FillInView
-					question={props.question as PublicFillIn}
-					value={blanksOf(props.payload)}
-					onChange={(blanks) => props.onChange({ blanks })}
-					mode={mode()}
-				/>
-			</Match>
-		</Switch>
+		<AnyQuestionView
+			question={props.question}
+			value={props.payload ?? null}
+			onChange={props.onChange}
+			mode={props.readonly ? "readonly" : "answer"}
+			messages={mdqMessages}
+		/>
 	);
 }

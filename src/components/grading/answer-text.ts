@@ -1,12 +1,6 @@
 import {
 	type AnswerPayload,
-	answersOf,
-	blanksOf,
-	choiceOf,
-	choicesOf,
-	essayOf,
-	numberOf,
-	textOf,
+	isAnswered,
 } from "@/components/exam/answer-payload";
 
 /// How a saved answer is shown in its article.
@@ -27,43 +21,35 @@ export function displayAnswer(
 	type: string,
 	payload: AnswerPayload | undefined,
 ): AnswerDisplay {
+	if (!isAnswered(type, payload)) return { kind: "empty" };
 	switch (type) {
 		case "short-answer":
-			return plain(textOf(payload), false);
 		case "essay":
-			return plain(essayOf(payload), true);
-		case "numeric": {
-			const value = numberOf(payload);
-			return value === null
-				? { kind: "empty" }
-				: { kind: "text", text: String(value), multiline: false };
-		}
+		case "numeric":
+			return {
+				kind: "text",
+				text: responseText(payload),
+				multiline: type === "essay",
+			};
 		case "fill-in": {
-			const entries = Object.entries(blanksOf(payload)).filter(
-				([, text]) => text.trim() !== "",
-			);
-			return entries.length === 0
-				? { kind: "empty" }
-				: { kind: "blanks", entries };
+			const blanks = (payload ?? {}) as Record<string, unknown>;
+			const entries = Object.entries(blanks)
+				.map(([id, value]): [string, string] => [id, responseText(value)])
+				.filter(([, text]) => text.trim() !== "");
+			return { kind: "blanks", entries };
 		}
-		case "multiple-choice":
-			return choiceOf(payload) === null
-				? { kind: "empty" }
-				: { kind: "choices" };
-		case "multiple-selection":
-			return choicesOf(payload).size === 0
-				? { kind: "empty" }
-				: { kind: "choices" };
 		default:
-			return answersOf(payload).size === 0
-				? { kind: "empty" }
-				: { kind: "choices" };
+			return { kind: "choices" };
 	}
 }
 
-/// A text answer, or `empty` when it holds only whitespace.
-function plain(text: string, multiline: boolean): AnswerDisplay {
-	return text.trim() === ""
-		? { kind: "empty" }
-		: { kind: "text", text, multiline };
+/// A typed response as text: a string or number as is, a numeric response with its unit.
+function responseText(response: unknown): string {
+	if (typeof response === "string") return response;
+	if (typeof response === "number") return String(response);
+	if (response && typeof response === "object" && "value" in response) {
+		const { value, unit } = response as { value: unknown; unit?: string };
+		return unit ? `${value} ${unit}` : String(value);
+	}
+	return "";
 }

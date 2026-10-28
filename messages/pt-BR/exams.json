@@ -6,7 +6,6 @@
 	"exams_phase_archived": "Arquivada",
 	"exams_tab_student_view": "Visão do estudante",
 	"exams_tab_correct_answer": "Resposta correta",
-	"exams_question_preview_unavailable": "A pré-visualização de questões \"{type}\" ainda não foi implementada.",
 	"exams_not_scheduled": "Sem data marcada",
 	"exams_row_answers_to_grade": [
 		{
@@ -153,7 +152,6 @@
 	"exams_attempt_not_saved": "Não salva",
 	"exams_attempt_saved": "Salva",
 	"exams_attempt_score_label": "Nota",
-	"exams_attempt_unsupported": "Ainda não é possível responder questões do tipo \"{type}\".",
 	"exams_group_open": "Abertas",
 	"exams_group_practice": "Exercícios",
 	"exams_group_upcoming": "Próximas",

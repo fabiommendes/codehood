@@ -29,7 +29,7 @@ async function twoExams(prefix: string) {
 			course: world.course.id,
 			exam: other.slug,
 			question: "q-short",
-			payload: { text: "Another reply" },
+			payload: "Another reply",
 		},
 		{ actor: student },
 	);

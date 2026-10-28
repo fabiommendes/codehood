@@ -28,10 +28,13 @@ import {
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
 import { m } from "@/i18n";
-import type { PublicQuestion } from "@/mdq/public";
-import { Question as MdqQuestion } from "@/mdq/question";
-import { mergeQuestion, splitQuestion } from "@/mdq/split";
-import type { JSONValue } from "@/typing/concrete-types";
+import {
+	type PublicQuestion,
+	publicForm,
+	type QuestionDocument,
+	questionProblems,
+	withIds,
+} from "@/mdq";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
@@ -523,16 +526,12 @@ function fromDb(row: DbQuestion): Question {
 		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
-		// Prisma types a stored JSON object's values as possibly `undefined`,
-		// which a value parsed back out of a JSON column never is.
-		question: mergeQuestion(
-			latest.publicPayload as JSONValue,
-			latest.privatePayload as JSONValue,
-		),
+		// The private column holds the whole document, validated on the way in.
+		question: latest.privatePayload as unknown as QuestionDocument,
 	};
 }
 
-/** Converts a database row into the student-safe half — no merge, since the private column was never fetched in the first place. */
+/** Converts a database row into the public form, the only half a student-safe read fetches. */
 function fromDbPublic(row: DbQuestionPublic): QuestionPublic {
 	const latest = valueOrNotFound("question-version", row.latest);
 
@@ -659,9 +658,16 @@ async function writeVersion(
 	ref: { id: number; slug: string },
 	input: Pick<Question, "version" | "question">,
 ): Promise<number> {
-	// Round-tripped through JSON so it compares equal to what the column
-	// hands back; both halves are plain JSON by construction.
-	const halves = JSON.parse(JSON.stringify(splitQuestion(input.question))) as {
+	// The ids are written into the stored document, since responses address
+	// choices by id and grading never derives them. Round-tripped through JSON
+	// so it compares equal to what the column hands back.
+	const document = withIds(input.question);
+	const halves = JSON.parse(
+		JSON.stringify({
+			publicPayload: publicForm(document),
+			privatePayload: document,
+		}),
+	) as {
 		publicPayload: Prisma.InputJsonValue;
 		privatePayload: Prisma.InputJsonValue;
 	};
@@ -688,8 +694,8 @@ async function writeVersion(
 		data: {
 			refId: ref.id,
 			versionHash: input.version,
-			title: input.question.title ?? ref.slug,
-			stem: input.question.stem,
+			title: document.title ?? ref.slug,
+			stem: document.stem,
 			...halves,
 		},
 	});
@@ -697,15 +703,14 @@ async function writeVersion(
 }
 
 /**
- * Refuses a document whose fields are individually valid but disagree with
- * each other — a fill-in stem naming a blank it never defines, for one.
+ * Refuses a document whose fields are individually valid but break a model
+ * rule of the mdq spec — a fill-in stem naming a blank it never defines, for one.
  *
- * The Zod schema on the way in checks one field at a time, which is all JSON
- * Schema can express; these are mdq.spec's rules *between* fields, and a
- * document that breaks one is a question nobody can answer.
+ * The Zod schema on the way in checks one field at a time; a document that
+ * breaks one of these rules is a question nobody can answer.
  */
 function assertWellFormed(data: Question["question"]): void {
-	const problems = new MdqQuestion(data).validate();
+	const problems = questionProblems(data);
 	if (problems.length === 0) return;
 
 	throw new InvalidData(

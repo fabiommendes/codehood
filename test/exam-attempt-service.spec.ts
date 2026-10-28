@@ -180,7 +180,7 @@ for (const { label, exam: overrides, open } of clockCases) {
 				course: course.id,
 				exam: exam.slug,
 				question: question.slug,
-				payload: { answer: 1 },
+				payload: null,
 			},
 			{ actor: student },
 		);
@@ -225,7 +225,7 @@ for (const { label, exam: overrides, open } of clockCases) {
 			{
 				response: { publicId: response.publicId },
 				question: question.slug,
-				payload: { answer: 1 },
+				payload: null,
 			},
 			{ actor: student },
 		);
@@ -265,7 +265,7 @@ test("response.submit() refuses a DRAFT exam", async () => {
 				exam: exam.slug,
 				question: question.slug,
 				author: student.username,
-				payload: { answer: 1 },
+				payload: null,
 			},
 			FULL_ACCESS,
 		),
@@ -293,7 +293,7 @@ async function startedAgo(minutes: number, exam: ExamOverrides) {
 				course: course.id,
 				exam: created.slug,
 				question: question.slug,
-				payload: { answer: 1 },
+				payload: null,
 			},
 			{ actor: student },
 		);
@@ -355,7 +355,7 @@ async function withAttempt() {
 			course: ctx.course.id,
 			exam: exam.slug,
 			question: ctx.question.slug,
-			payload: { answer: 1 },
+			payload: null,
 		},
 		{ actor: ctx.student },
 	);
@@ -403,7 +403,7 @@ test("response.submit() is refused after finish()", async () => {
 				course: course.id,
 				exam: exam.slug,
 				question: question.slug,
-				payload: { answer: 2 },
+				payload: null,
 			},
 			{ actor: student },
 		),

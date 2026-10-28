@@ -408,7 +408,7 @@ async function answer(
 	minutes: number,
 ): Promise<string> {
 	const response = await db.response.submit(
-		{ course: course.id, exam, question, payload: { text } },
+		{ course: course.id, exam, question, payload: text },
 		{ actor: student },
 	);
 	const publicId =

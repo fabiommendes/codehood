@@ -6,7 +6,7 @@ import RegradeResolve from "@/components/grading/RegradeResolve";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { Question } from "@/mdq/question";
+import { type PublicQuestion, publicForm } from "@/mdq";
 import { formatScore } from "@/services/exam-result";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
@@ -53,7 +53,7 @@ const cards = requests.map((request) => {
 	return {
 		request,
 		title: doc?.title ?? request.question,
-		asked: doc ? new Question(doc).toPublic() : null,
+		asked: doc ? (publicForm(doc) as PublicQuestion) : null,
 		payload: submission?.payload as AnswerPayload | undefined,
 		answer: counting.get(request.submission),
 		student: names.get(request.author) ?? request.author,

@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import type { Question, QuestionPublic } from "@/db/services/question.service";
 import { persistedUserFactory } from "@/fixtures/user.factory";
-import type { PublicQuestion } from "@/mdq/public";
+import type { PublicQuestion } from "@/mdq";
 
 type Doc = z.infer<typeof questionSchema>["question"];
 
@@ -182,7 +182,7 @@ test("create() refuses a document whose fields disagree, and writes nothing", as
 					type: "fill-in",
 					stem: "The capital of Brazil is a city.",
 					blanks: [
-						{ id: "capital", type: "short-answer", oneOf: ["Brasilia"] },
+						{ id: "capital", type: "short-answer", accept: ["Brasilia"] },
 					],
 				},
 			},
@@ -530,7 +530,7 @@ test("update() refuses a document whose fields disagree, and writes nothing", as
 					type: "fill-in",
 					stem: "The capital of Brazil is a city.",
 					blanks: [
-						{ id: "capital", type: "short-answer", oneOf: ["Brasilia"] },
+						{ id: "capital", type: "short-answer", accept: ["Brasilia"] },
 					],
 				},
 			},

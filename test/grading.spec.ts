@@ -112,16 +112,14 @@ function answersOf(
 //
 
 test("countingAnswers: the answer of a closed attempt carries its submission, question, author, payload and time", () => {
-	const answers = answersOf([
-		submission("s1", "q1", 5, { payload: { choice: "b" } }),
-	]);
+	const answers = answersOf([submission("s1", "q1", 5, { payload: "b" })]);
 
 	expect(answers).toEqual([
 		{
 			submission: "s1",
 			question: "q1",
 			author: "ana",
-			payload: { choice: "b" },
+			payload: "b",
 			createdAt: at(5),
 			state: "pending",
 			verdict: null,

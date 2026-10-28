@@ -1,28 +1,11 @@
 import { type Accessor, type JSX, Match, Switch } from "solid-js";
 import type { ExamQuestionRow } from "@/components/exam/ExamQuestionsList";
-import EssayView from "@/components/question/EssayView";
-import FillInView from "@/components/question/FillInView";
-import MultipleChoiceView from "@/components/question/MultipleChoiceView";
-import MultipleSelectionView from "@/components/question/MultipleSelectionView";
-import NumericView from "@/components/question/NumericView";
+import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import QuestionPreview, {
 	type PreviewTab,
 } from "@/components/question/QuestionPreview";
-import ShortAnswerView from "@/components/question/ShortAnswerView";
-import TrueFalseView from "@/components/question/TrueFalseView";
 import type { QuestionPublic } from "@/db";
-import { m } from "@/i18n";
-import type {
-	PublicEssay,
-	PublicFillIn,
-	PublicMultipleChoice,
-	PublicMultipleSelection,
-	PublicNumeric,
-	PublicShortAnswer,
-	PublicTrueFalse,
-} from "@/mdq/public";
-import { Question } from "@/mdq/question";
-import type * as schema from "@/mdq/schemas-generated";
+import { type PublicQuestion, publicForm, type QuestionDocument } from "@/mdq";
 
 export interface ExamQuestionProps {
 	/** The pinned version of the question, as `question.service` handed it back. */
@@ -45,25 +28,26 @@ export interface ExamQuestionProps {
  * full authored document, so it reuses `QuestionPreview` whole — the
  * student/key toggle the question's own detail page already offers. A
  * student's `question` was fetched with `public: true` and never held more
- * than the public half in the first place (see `question.service`'s
- * public/private split), so it dispatches straight to the type's own
- * `*View` in `readonly` mode: a frozen look at the question, no answer key,
- * nothing to interact with here.
+ * than the public form in the first place (see `question.service`), so it
+ * goes straight to the question's view in `readonly` mode: a frozen look at
+ * the question, no answer key, nothing to interact with here.
  */
 export default function ExamQuestion(props: ExamQuestionProps): JSX.Element {
 	return (
 		<Switch>
 			<Match when={props.canManage && props.tab?.() === "key"}>
 				<QuestionPreview
-					data={props.question.question as schema.Question}
+					data={props.question.question as QuestionDocument}
 					tab={props.tab}
 				/>
 			</Match>
 			<Match when={props.canManage}>
 				<PublicQuestionView
-					question={new Question(
-						props.question.question as schema.Question,
-					).toPublic()}
+					question={
+						publicForm(
+							props.question.question as QuestionDocument,
+						) as PublicQuestion
+					}
 				/>
 			</Match>
 			<Match when={!props.canManage}>
@@ -79,52 +63,13 @@ interface PublicQuestionViewProps {
 	question: QuestionPublic["question"];
 }
 
-/** The frozen, no-answer-key rendering of a question's public half. */
+/** The frozen, no-answer-key rendering of a question's public form. */
 function PublicQuestionView(props: PublicQuestionViewProps): JSX.Element {
 	return (
-		<Switch
-			fallback={
-				<p class="text-sm text-base-content/60">
-					{m.exams_question_preview_unavailable({ type: props.question.type })}
-				</p>
-			}
-		>
-			<Match when={props.question.type === "essay"}>
-				<EssayView question={props.question as PublicEssay} mode="readonly" />
-			</Match>
-			<Match when={props.question.type === "numeric"}>
-				<NumericView
-					question={props.question as PublicNumeric}
-					mode="readonly"
-				/>
-			</Match>
-			<Match when={props.question.type === "short-answer"}>
-				<ShortAnswerView
-					question={props.question as PublicShortAnswer}
-					mode="readonly"
-				/>
-			</Match>
-			<Match when={props.question.type === "multiple-choice"}>
-				<MultipleChoiceView
-					question={props.question as PublicMultipleChoice}
-					mode="readonly"
-				/>
-			</Match>
-			<Match when={props.question.type === "multiple-selection"}>
-				<MultipleSelectionView
-					question={props.question as PublicMultipleSelection}
-					mode="readonly"
-				/>
-			</Match>
-			<Match when={props.question.type === "true-false"}>
-				<TrueFalseView
-					question={props.question as PublicTrueFalse}
-					mode="readonly"
-				/>
-			</Match>
-			<Match when={props.question.type === "fill-in"}>
-				<FillInView question={props.question as PublicFillIn} mode="readonly" />
-			</Match>
-		</Switch>
+		<AnyQuestionView
+			question={props.question}
+			mode="readonly"
+			messages={mdqMessages}
+		/>
 	);
 }

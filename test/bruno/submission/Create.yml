@@ -12,7 +12,7 @@ http:
       {
           "response": { "publicId": "resp_example" },
           "question": "foo",
-          "payload": { "base-case": true }
+          "payload": "base-case"
       }
   auth: inherit
 

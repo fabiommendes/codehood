@@ -68,7 +68,7 @@ test("instructor: grade submissions by hand", async ({ page }) => {
 				course: course.id,
 				exam: exam.slug,
 				question: "q-short",
-				payload: { text },
+				payload: text,
 			},
 			{ actor: student },
 		);
@@ -281,7 +281,7 @@ test("instructor: see the whole class's results", async ({ page }) => {
 					course: course.id,
 					exam: slug,
 					question: "q-short",
-					payload: { text: `${student.username} on ${slug}` },
+					payload: `${student.username} on ${slug}`,
 				},
 				{ actor: student },
 			);
@@ -666,8 +666,8 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 	]);
 	for (const [i, student] of students.slice(0, 4).entries()) {
 		await sit("pop-quiz", student, [
-			["fruit", { choice: i < 2 ? "pear" : "apple" }, i < 2 ? "1" : "0"],
-			["protocols", { answers: { s1: true, s2: false } }, "1"],
+			["fruit", i < 2 ? "pear" : "apple", i < 2 ? "1" : "0"],
+			["protocols", { s1: true, s2: false }, "1"],
 		]);
 	}
 	await prisma.exam.update({
@@ -709,9 +709,9 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 	for (const [i, student] of students.entries()) {
 		const strong = i < 4 ? "1" : "0";
 		await sit("final", student, [
-			["fruit", { choice: fruitChoice[i] ?? "" }, strong],
-			["protocols", { answers: protocolAnswers[i] ?? {} }, strong],
-			["trick", { text: `guess ${i}` }, trickScore[i] ?? "0"],
+			["fruit", fruitChoice[i] ?? "", strong],
+			["protocols", protocolAnswers[i] ?? {}, strong],
+			["trick", `guess ${i}`, trickScore[i] ?? "0"],
 		]);
 	}
 	await prisma.exam.update({
@@ -735,7 +735,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 				course: course.id,
 				exam: "drill",
 				question: "fruit",
-				payload: { choice: "fig" },
+				payload: "fig",
 			},
 			{ actor: student },
 		);

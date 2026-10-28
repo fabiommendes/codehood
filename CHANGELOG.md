@@ -57,6 +57,21 @@
 
 ### Changed
 
+- Questions follow the current mdq spec through the `mdq` library, linked
+  from the sibling `mdq-spec` checkout, instead of the server's own copy of an
+  older format (`src/mdq/` is now a thin facade). Documents are validated by
+  the library's schemas and model rules and stored with their choice ids;
+  `publicPayload` is the spec's public form and `privatePayload` the whole
+  document. A submission's payload is the spec's response (`"id"`, `["id"]`,
+  `{id: true}`, a number or a string, `null` for skipped) and is checked
+  against the pinned question version: an unknown choice is a 400. The
+  question views are the `mdq/solid` components with `mdq/css/daisyui.css`.
+  Grading follows the spec: the correct choices of a multiple-choice question
+  are the ones scoring 1, short answers fold diacritics by default, and a
+  fill-in scores the mean of its blanks. `codehood push` sends the parsed
+  document as is, so `weight`, `grading`, `diacritics`, `unmatched` and
+  blank patterns now reach the server, and essay and fraction numeric pushes
+  no longer fail. `ordering` questions are still refused.
 - An edition's term has at most two digits (`2026-1` to `2026-99`), slugs at
   most 200 characters and public ids at most 64.
 - A meeting that ended earlier today stays in view until the day turns: its

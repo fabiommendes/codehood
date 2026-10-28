@@ -51,7 +51,11 @@ async function enrollStudent(courseId: schema.CourseId) {
 }
 
 async function makeQuestion(courseId: schema.CourseId) {
-	return persistedQuestionFactory.create({ course: courseId, slug: tag("q-") });
+	// An essay takes any text, so each submission can carry a distinct answer.
+	return persistedQuestionFactory.create(
+		{ course: courseId, slug: tag("q-") },
+		{ transient: { type: "essay" } },
+	);
 }
 
 async function makeExam(
@@ -87,7 +91,7 @@ test("submit() against two questions of an ongoing exam ends with one response h
 			course: course.id,
 			exam: exam.slug,
 			question: q1.slug,
-			payload: { answer: "q1-first" },
+			payload: "q1-first",
 		},
 		{ actor: student },
 	);
@@ -97,7 +101,7 @@ test("submit() against two questions of an ongoing exam ends with one response h
 			course: course.id,
 			exam: exam.slug,
 			question: q2.slug,
-			payload: { answer: "q2" },
+			payload: "q2",
 		},
 		{ actor: student },
 	);
@@ -119,7 +123,7 @@ test("submit() against two questions of an ongoing exam ends with one response h
 			course: course.id,
 			exam: exam.slug,
 			question: q1.slug,
-			payload: { answer: "q1-second" },
+			payload: "q1-second",
 		},
 		{ actor: student },
 	);
@@ -127,9 +131,9 @@ test("submit() against two questions of an ongoing exam ends with one response h
 	expect(afterThird.id).toBe(afterFirst.id);
 	expect(afterThird.submissions).toHaveLength(3);
 	expect(afterThird.submissions.map((s) => s.payload)).toEqual([
-		{ answer: "q1-first" },
-		{ answer: "q2" },
-		{ answer: "q1-second" },
+		"q1-first",
+		"q2",
+		"q1-second",
 	]);
 	expect(
 		afterThird.submissions.filter((s) => s.questionId === q1.id),
@@ -366,7 +370,7 @@ for (const { label, secondsAgo, reused } of practiceWindowCases) {
 				course: course.id,
 				exam: exam.slug,
 				question: question.slug,
-				payload: { answer: "first" },
+				payload: "first",
 			},
 			{ actor: student },
 		);
@@ -382,7 +386,7 @@ for (const { label, secondsAgo, reused } of practiceWindowCases) {
 				course: course.id,
 				exam: exam.slug,
 				question: question.slug,
-				payload: { answer: "second" },
+				payload: "second",
 			},
 			{ actor: student },
 		);
@@ -416,7 +420,7 @@ test("submit() against a graded exam always resolves the single slotKey=0 attemp
 			course: course.id,
 			exam: exam.slug,
 			question: question.slug,
-			payload: { answer: "first" },
+			payload: "first",
 		},
 		{ actor: student },
 	);
@@ -433,7 +437,7 @@ test("submit() against a graded exam always resolves the single slotKey=0 attemp
 			course: course.id,
 			exam: exam.slug,
 			question: question.slug,
-			payload: { answer: "second" },
+			payload: "second",
 		},
 		{ actor: student },
 	);

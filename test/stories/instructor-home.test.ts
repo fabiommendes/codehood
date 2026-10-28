@@ -382,7 +382,7 @@ async function answer(
 			course: course.id,
 			exam,
 			question: questionSlug,
-			payload: { choice: "brasilia" },
+			payload: "brasilia",
 		},
 		{ actor: student },
 	);
@@ -415,6 +415,10 @@ async function brokenQuestion(course: Course, slug: string) {
 				stem: broken,
 				publicPayload: {
 					...(version.publicPayload as Record<string, unknown>),
+					stem: broken,
+				},
+				privatePayload: {
+					...(version.privatePayload as Record<string, unknown>),
 					stem: broken,
 				},
 			},

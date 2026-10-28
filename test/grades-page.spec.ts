@@ -99,7 +99,7 @@ async function makeExam(
 				course: course.id,
 				exam: slug,
 				question: "q-one",
-				payload: { text: `${student.username} on ${slug}` },
+				payload: `${student.username} on ${slug}`,
 			},
 			{ actor: student },
 		);

@@ -4,7 +4,7 @@
  * Use these when a test needs *many* questions, or a question varying in one
  * field; use the hand-written documents in `./fixtures` when it needs a
  * specific, readable one. Every factory emits a document that parses against
- * its schema and reports no problem from `validateQuestion`, including under
+ * its schema and passes `validateDocument`, including under
  * overrides — `fillInFactory` rewrites its stem to match whatever `blanks` it
  * is given, since a stem and its blanks disagreeing is the one defect the
  * schemas cannot catch.
@@ -21,16 +21,17 @@ import {
 	trueFalse,
 } from "./fixtures";
 import type {
-	Essay,
-	FillIn,
-	FillInBlank,
-	MultipleChoice,
-	MultipleSelection,
-	Numeric,
-	Question,
-	ShortAnswer,
-	TrueFalse,
-} from "./schemas-generated";
+	EssayQuestion as Essay,
+	FillInQuestion as FillIn,
+	MultipleChoiceQuestion as MultipleChoice,
+	MultipleSelectionQuestion as MultipleSelection,
+	NumericQuestion as Numeric,
+	QuestionDocument as Question,
+	ShortAnswerQuestion as ShortAnswer,
+	TrueFalseQuestion as TrueFalse,
+} from "./index";
+
+type FillInBlank = FillIn["blanks"][number];
 
 /// Url-friendly and unique per run, matching the `id` pattern the schemas impose.
 function id(prefix: string, sequence: number): string {
@@ -65,8 +66,8 @@ export const multipleSelectionFactory = Factory.define<MultipleSelection>(
 			choices: [
 				{ id: "in-1", text: faker.lorem.words(2), correct: true },
 				{ id: "in-2", text: faker.lorem.words(2), correct: true },
-				{ id: "out-1", text: faker.lorem.words(2) },
-				{ id: "out-2", text: faker.lorem.words(2) },
+				{ id: "out-1", text: faker.lorem.words(2), correct: false },
+				{ id: "out-2", text: faker.lorem.words(2), correct: false },
 			],
 		}),
 );
@@ -88,7 +89,7 @@ export const essayFactory = Factory.define<Essay>(({ sequence }) =>
 		id: id("essay", sequence),
 		title: faker.lorem.words(3),
 		stem: stem(),
-		input: "plain",
+		content: "plain",
 		answerKey: faker.lorem.paragraph(),
 	}),
 );
@@ -111,9 +112,10 @@ export const shortAnswerFactory = Factory.define<ShortAnswer>(
 			id: id("sa", sequence),
 			title: faker.lorem.words(3),
 			stem: stem(),
-			oneOf: [expected],
-			// A trailing wildcard, so no response is left for a human to settle.
-			reject: [{ pattern: "*", feedback: faker.lorem.sentence() }],
+			accept: [expected],
+			// With `accept`, a response matching nothing is incorrect, so no
+			// response is left for a human to settle.
+			incorrectFeedback: faker.lorem.sentence(),
 		});
 	},
 );
@@ -137,12 +139,12 @@ function blanks(sequence: number): FillInBlank[] {
 		{
 			id: id("word", sequence),
 			type: "short-answer",
-			oneOf: [faker.lorem.word()],
+			accept: [faker.lorem.word()],
 		},
 	];
 }
 
-/// A stem referencing every blank exactly once, which is what `validateQuestion` demands.
+/// A stem referencing every blank exactly once, which is what the mdq model rules demand.
 function stemFor(items: readonly FillInBlank[]): string {
 	const refs = items.map((blank) => `[^${blank.id}]`).join(", ");
 	return `${faker.lorem.sentence().replace(/\.$/, "")}: ${refs}.`;

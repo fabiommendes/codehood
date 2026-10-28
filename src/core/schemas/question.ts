@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { publicQuestionSchema } from "@/mdq/public-schemas";
-import { questionSchema as mdqQuestionSchema } from "@/mdq/schemas-generated";
+import { type QuestionType as MdqQuestionType, questionDocument } from "@/mdq";
+import { publicQuestionSchema } from "@/mdq/public-schema";
 import type { AssertEqual } from "@/utils/types";
 import { questionRefId, rev, slug } from "./base";
 import { courseRef } from "./course";
@@ -15,7 +15,7 @@ export const questionSchema = z.object({
 	updatedAt: z.date(),
 
 	/// The MDQ document representing the question.
-	question: mdqQuestionSchema,
+	question: questionDocument,
 });
 
 export const questionPublicSchema = questionSchema
@@ -102,10 +102,7 @@ export const questionType = z.enum([
 	"fill-in",
 ]);
 export type QuestionType = z.infer<typeof questionType>;
-true satisfies AssertEqual<
-	QuestionType,
-	z.infer<typeof mdqQuestionSchema>["type"]
->;
+true satisfies AssertEqual<QuestionType, MdqQuestionType>;
 
 /// The question bank's status control: a question by URL segments and the status to move it to.
 export const questionStatusUpdate = z.object({

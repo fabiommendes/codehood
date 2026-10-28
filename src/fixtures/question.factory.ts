@@ -1,7 +1,7 @@
 import { Factory } from "fishery";
 import { db, type QuestionCreate, type QuestionView, type schema } from "@/db";
+import type { QuestionType } from "@/mdq";
 import { questionFactory as mdqFactory } from "@/mdq/factory";
-import type { Question as MdqQuestion } from "@/mdq/schemas-generated";
 import { persistedCourseFactory } from "./course.factory";
 import { type PersistParams, serviceOpts } from "./support";
 
@@ -11,7 +11,7 @@ export interface QuestionParams extends PersistParams {
 	 * MDQ type of the generated document. Left unset, the type cycles through
 	 * every one in turn, so a `buildList` covers the whole union.
 	 */
-	type?: MdqQuestion["type"];
+	type?: QuestionType;
 }
 
 /**

@@ -183,7 +183,7 @@ async function gradedWorld(tag: string, examTitle = "Midterm exam") {
 			course: course.id,
 			exam: exam.slug,
 			question: "capq",
-			payload: { text: "Brasilia" },
+			payload: "Brasilia",
 		},
 		{ actor: student },
 	);

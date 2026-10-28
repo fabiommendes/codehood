@@ -11,6 +11,7 @@ import {
 	username,
 } from "./base";
 import { courseRef } from "./course";
+import { submissionPayload } from "./submission";
 
 export const examStatus = z.enum([
 	"DRAFT",
@@ -139,7 +140,7 @@ export const examParams = z.object({
 /// One answer to one question of the actor's open attempt, addressed by URL segments.
 export const examAnswer = examParams.extend({
 	question: z.string().min(1),
-	payload: z.record(z.string(), z.unknown()),
+	payload: submissionPayload,
 });
 
 /// Reopens one student's attempt at an exam, addressed by URL segments.

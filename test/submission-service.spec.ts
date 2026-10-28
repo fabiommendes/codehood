@@ -52,7 +52,11 @@ async function enrollStudent(courseId: schema.CourseId) {
 }
 
 async function makeQuestion(courseId: schema.CourseId) {
-	return persistedQuestionFactory.create({ course: courseId, slug: tag("q-") });
+	// An essay takes any text, so each submission can carry a distinct answer.
+	return persistedQuestionFactory.create(
+		{ course: courseId, slug: tag("q-") },
+		{ transient: { type: "essay" } },
+	);
 }
 
 async function makeExam(
@@ -108,7 +112,7 @@ test("create() appends an attempt to an open response, resolving responseId/ques
 		{
 			response: { publicId: response.publicId },
 			question: question.slug,
-			payload: { answer: 42 },
+			payload: "42",
 			startedAt: new Date("2026-02-01T00:00:00Z"),
 		},
 		{ actor: student },
@@ -118,7 +122,7 @@ test("create() appends an attempt to an open response, resolving responseId/ques
 	expect(submission.questionId).toBe(question.id);
 	expect(submission.status).toBe("PENDING_GRADE");
 	expect(submission.automaticallyTriggered).toBe(false);
-	expect(submission.payload).toEqual({ answer: 42 });
+	expect(submission.payload).toEqual("42");
 	expect(submission.startedAt).toEqual(new Date("2026-02-01T00:00:00Z"));
 
 	// Visible to its author and to the instructor, by publicId.
@@ -137,7 +141,7 @@ test("create() appends an attempt to an open response, resolving responseId/ques
 		{ actor: instructor },
 	);
 	expect(graded.status).toBe("GRADED_MANUALLY");
-	expect(graded.payload).toEqual({ answer: 42 });
+	expect(graded.payload).toEqual("42");
 
 	await db.submission.delete(
 		{ publicId: submission.publicId },
@@ -173,7 +177,7 @@ test("create() refuses a question the exam does not carry", async () => {
 			{
 				response: { publicId: response.publicId },
 				question: notInExam.slug,
-				payload: { answer: 1 },
+				payload: "1",
 			},
 			{ actor: student },
 		),
@@ -205,7 +209,7 @@ test("create() refuses an attempt against a closed response", async () => {
 			{
 				response: { publicId: response.publicId },
 				question: question.slug,
-				payload: { answer: 1 },
+				payload: "1",
 			},
 			{ actor: student },
 		),
@@ -251,7 +255,7 @@ for (const { status, allowed } of examStatuses) {
 			{
 				response: { publicId: response.publicId },
 				question: question.slug,
-				payload: { answer: 1 },
+				payload: "1",
 			},
 			{ actor: student },
 		);
@@ -287,7 +291,7 @@ test("create() ignores a responseId/questionId smuggled in the payload and alway
 	const smuggled = {
 		response: { publicId: response.publicId },
 		question: question.slug,
-		payload: { answer: 1 },
+		payload: "1",
 		responseId: foreignResponse.id,
 		questionId: foreignQuestion.id,
 		// biome-ignore lint/suspicious/noExplicitAny: intentionally smuggled fields the create schema does not declare
@@ -438,7 +442,7 @@ test("create() is NotFound both for a response the actor may not read and for on
 		{
 			response: { publicId: response.publicId },
 			question: question.slug,
-			payload: { answer: 1 },
+			payload: "1",
 		},
 		{ actor: peer },
 	);
@@ -446,7 +450,7 @@ test("create() is NotFound both for a response the actor may not read and for on
 		{
 			response: { publicId: "no-such-response" },
 			question: question.slug,
-			payload: { answer: 1 },
+			payload: "1",
 		},
 		{ actor: peer },
 	);
@@ -489,7 +493,7 @@ test("create() refuses NotAllowed, not NotFound, for an actor who can read the r
 			{
 				response: { publicId: response.publicId },
 				question: question.slug,
-				payload: { answer: 1 },
+				payload: "1",
 			},
 			{ actor: author },
 		),

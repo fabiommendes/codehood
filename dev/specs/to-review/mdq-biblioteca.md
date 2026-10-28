@@ -1,8 +1,8 @@
 ---
 type: spec
-status: draft
+status: review
 tags: [mdq, questions, exams, grading, cli, components]
-relatedTo: [dev/issues/server-mdq-atrasado-em-relacao-ao-mdq-py.md, ../mdq/dev/rfcs/0002-componentes-solid.md]
+relatedTo: [dev/issues/ordering-no-servidor.md, ../mdq/dev/rfcs/0002-componentes-solid.md]
 ---
 
 # Trocar `src/mdq` pela biblioteca `mdq`
@@ -59,12 +59,11 @@ spec. Nada de adaptadores que preservem formatos antigos.
    vira pendente"; `*` sozinho é erro; fill-in `symmetric` = média dos blanks;
    numeric com `Fraction` e arredondamento. Feedbacks já gravados não mudam;
    telas de revisão e estatísticas passam a marcar o correto pela spec.
-8. **Mesmo `versionHash`, metades diferentes.** O hash é o md5 do arquivo, então
-   mesmo hash = mesmo arquivo. Se o documento recebido difere do gravado (a
-   conversão antiga perdia campos), o servidor substitui o gravado em vez de
-   responder 409.
-9. **`ordering` fica fora.** Exige enum Prisma, views e seed; vira spec própria.
-   O CLI continua bloqueando o push de ordering.
+8. **Mesmo `versionHash`, metades diferentes.** Continua 409: sem migração
+   de dados, as duas metades são derivadas do documento de forma
+   determinística, e uma versão gravada nunca é reescrita.
+9. **`ordering` fica fora.** Exige enum Prisma, views e seed; registrado em
+   `dev/issues/ordering-no-servidor.md`. O CLI continua bloqueando o push.
 10. **Componentes.** Cada componente de `src/components/question/` é apagado
     quando a versão de `mdq/solid` chega, na ordem MultipleChoice, TrueFalse,
     MultipleSelection, ShortAnswer, Numeric, Essay, FillIn, QuestionView. Até
@@ -78,7 +77,7 @@ spec. Nada de adaptadores que preservem formatos antigos.
 
 Cada fase termina com `pnpm run lint` e a suíte Playwright verdes.
 
-- **F0. Infra** (feito, não commitado): dependência, `noExternal`, CI,
+- **F0. Infra:** dependência, `noExternal`, CI,
   `scripts/package.ts`, `mdq/css/daisyui.css` e ajustes de prose em
   `src/styles/global.css`.
 - **F1. Schemas e API.** `core/schemas/question.ts` sobre os schemas Zod do

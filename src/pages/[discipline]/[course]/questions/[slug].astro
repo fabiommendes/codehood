@@ -6,7 +6,7 @@ import Badge from "@/components/ui/Badge";
 import { db } from "@/db";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { Question } from "@/mdq/question";
+import { questionProblems } from "@/mdq";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
 import {
@@ -35,7 +35,7 @@ const question = await db.question.findOne(
 if (!question) return Astro.rewrite("/404");
 const { question: doc } = question;
 
-const problems = new Question(doc).validate();
+const problems = questionProblems(doc);
 ---
 
 <AppLayout title={m.questions_detail_page_title({ title: doc.title ?? question.slug })}

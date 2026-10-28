@@ -93,14 +93,12 @@ async function answer(
 	minutes: number,
 ): Promise<string> {
 	const response = await db.response.submit(
-		{ course: course.id, exam, question, payload: { text } },
+		{ course: course.id, exam, question, payload: text },
 		{ actor: student },
 	);
 	const publicId =
 		response.submissions.find(
-			(s) =>
-				s.question === question &&
-				(s.payload as { text?: string }).text === text,
+			(s) => s.question === question && s.payload === text,
 		)?.publicId ?? "";
 	await prisma.submission.update({
 		where: { publicId },

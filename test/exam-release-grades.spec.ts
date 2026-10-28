@@ -74,7 +74,7 @@ async function gradedExam(shape: ExamShape = { status: "COMPLETED" }) {
 			course: ctx.course.id,
 			exam: exam.slug,
 			question: question.slug,
-			payload: { answer: 1 },
+			payload: null,
 		},
 		{ actor: ctx.student },
 	);

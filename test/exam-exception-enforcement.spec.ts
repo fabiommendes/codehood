@@ -121,7 +121,7 @@ function submitAnswer(
 			course: ctx.course.id,
 			exam: exam.slug,
 			question: ctx.question.slug,
-			payload: { answer: 1 },
+			payload: null,
 		},
 		{ actor: actor as typeof ctx.student },
 	);
@@ -147,7 +147,7 @@ function addSubmission(
 		{
 			response: { publicId: response.publicId },
 			question: ctx.question.slug,
-			payload: { answer: 1 },
+			payload: null,
 		},
 		{ actor },
 	);

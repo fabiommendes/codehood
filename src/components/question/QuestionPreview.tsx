@@ -7,22 +7,24 @@ import {
 	Show,
 	Switch,
 } from "solid-js";
+import { isAnswered } from "@/components/exam/answer-payload";
 import { m } from "@/i18n";
-import { Question } from "@/mdq/question";
-import type * as schema from "@/mdq/schemas-generated";
-import type { QuestionResult } from "@/mdq/scoring";
-import EssayView from "./EssayView";
-import FillInView from "./FillInView";
+import {
+	correctResponses,
+	NotAutoGradable,
+	type PublicQuestion,
+	publicForm,
+	type QuestionDocument,
+	ResponseError,
+	scoreBlanks,
+	scoreResponse,
+} from "@/mdq";
 import { ResetIcon, SubmitIcon } from "./icons";
-import MultipleChoiceView from "./MultipleChoiceView";
-import MultipleSelectionView from "./MultipleSelectionView";
-import NumericView from "./NumericView";
-import ShortAnswerView from "./ShortAnswerView";
-import TrueFalseView from "./TrueFalseView";
+import { AnyQuestionView, type AnyQuestionViewProps, mdqMessages } from "./mdq";
 
 export interface QuestionPreviewProps {
 	/** The full authored document, answer key included. */
-	data: schema.Question;
+	data: QuestionDocument;
 	/**
 	 * Drives the tab from outside instead of this component's own signal, and
 	 * hides its tab bar — for a caller like `ExamQuestionsList` that puts one
@@ -47,17 +49,15 @@ const TABS: { id: PreviewTab; label: () => string }[] = [
  * answer it, or with its keyed answer revealed.
  *
  * The student tab is interactive — the instructor can answer the question
- * and have it scored on the spot with `Question#score()` — and the key tab
- * runs `answerKey()` back through the same `score()`, so the score it shows
- * is a real one rather than a fabricated 1.00. Every type dispatches to its
- * own `*View` component in the appropriate mode; this never invents a fourth
- * rendering path, it only decides what value and result to feed the existing
- * `answer` / `review` modes with.
+ * and have it scored on the spot with `scoreResponse` — and the key tab runs
+ * the first correct response back through the same function, so the score it
+ * shows is a real one rather than a fabricated 1.00. Both tabs render the
+ * question's own view; this only decides what value and result to feed its
+ * `answer` and `review` modes with.
  */
 export default function QuestionPreview(
 	props: QuestionPreviewProps,
 ): JSX.Element {
-	const question = createMemo(() => new Question(props.data));
 	const [internalTab, setInternalTab] = createSignal<PreviewTab>("student");
 	const tab = () => (props.tab ? props.tab() : internalTab());
 
@@ -79,63 +79,11 @@ export default function QuestionPreview(
 				</div>
 			</Show>
 
-			<Switch
-				fallback={
-					<p class="text-sm text-base-content/60">
-						{m.questions_preview_not_implemented({ type: question().type })}
-					</p>
-				}
-			>
-				<Match when={question().type === "essay"}>
-					<EssayPreview
-						question={question() as Question<schema.Essay>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-				<Match when={question().type === "numeric"}>
-					<NumericPreview
-						question={question() as Question<schema.Numeric>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-				<Match when={question().type === "short-answer"}>
-					<ShortAnswerPreview
-						question={question() as Question<schema.ShortAnswer>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-				<Match when={question().type === "multiple-choice"}>
-					<MultipleChoicePreview
-						question={question() as Question<schema.MultipleChoice>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-				<Match when={question().type === "multiple-selection"}>
-					<MultipleSelectionPreview
-						question={question() as Question<schema.MultipleSelection>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-				<Match when={question().type === "true-false"}>
-					<TrueFalsePreview
-						question={question() as Question<schema.TrueFalse>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-				<Match when={question().type === "fill-in"}>
-					<FillInPreview
-						question={question() as Question<schema.FillIn>}
-						tab={tab}
-						hideScore={props.hideScore}
-					/>
-				</Match>
-			</Switch>
+			<TypePreview
+				question={props.data}
+				tab={tab}
+				hideScore={props.hideScore}
+			/>
 		</div>
 	);
 }
@@ -186,76 +134,75 @@ function SimulateControls(props: SimulateControlsProps): JSX.Element {
 	);
 }
 
-interface TypePreviewProps<Q extends schema.Question> {
-	question: Question<Q>;
+interface TypePreviewProps {
+	question: QuestionDocument;
 	tab: Accessor<PreviewTab>;
 	hideScore?: boolean;
 }
 
-function EssayPreview(props: TypePreviewProps<schema.Essay>): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	const keyResult = createMemo<QuestionResult<"essay">>(() => ({
-		...props.question.score({ essay: key() }),
-		correct: key(),
-	}));
+/// What the review mode of a view takes as `result`.
+type PreviewResult = NonNullable<AnyQuestionViewProps["result"]>;
 
-	const [value, setValue] = createSignal("");
-	const [result, setResult] = createSignal<QuestionResult<"essay">>();
-
-	function check(): void {
-		setResult({ ...props.question.score({ essay: value() }), correct: key() });
+/**
+ * The first correct response of `question`, to seed the key tab with, or
+ * `null` when it has none.
+ *
+ * A fill-in question lists the correct responses per blank, so its key is one
+ * correct response for each blank.
+ */
+function keyResponse(question: QuestionDocument): unknown {
+	const correct = correctResponses(question);
+	if (!Array.isArray(correct)) {
+		return Object.fromEntries(
+			Object.entries(correct).flatMap(([id, responses]) =>
+				responses.length > 0 ? [[id, responses[0]]] : [],
+			),
+		);
 	}
-	function reset(): void {
-		setValue("");
-		setResult(undefined);
-	}
-
-	return (
-		<Switch>
-			<Match when={props.tab() === "student"}>
-				<div class="flex flex-col gap-3">
-					<EssayView
-						question={publicQ()}
-						mode={result() ? "review" : "answer"}
-						value={value()}
-						onChange={setValue}
-						result={result()}
-					/>
-					<SimulateControls
-						disabled={value().trim() === ""}
-						checked={result() !== undefined}
-						onCheck={check}
-						onReset={reset}
-					/>
-				</div>
-			</Match>
-			<Match when={props.tab() === "key"}>
-				<EssayView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={key()}
-					result={keyResult()}
-				/>
-			</Match>
-		</Switch>
-	);
+	return correct[0] ?? null;
 }
 
-function NumericPreview(props: TypePreviewProps<schema.Numeric>): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	const keyResult = createMemo<QuestionResult<"numeric">>(() => ({
-		...props.question.score({ value: key() }),
-		correct: key(),
-	}));
+/**
+ * The result of `response` as a view shows it: its score and feedback, or
+ * pending when only an instructor can grade it.
+ *
+ * The correct responses go along, so the view can mark the answer key.
+ */
+function previewResult(
+	question: QuestionDocument,
+	response: unknown,
+): PreviewResult {
+	const correct = correctResponses(question) as PreviewResult["correct"];
+	try {
+		return { ...scoreResponse(question, response), correct };
+	} catch (error) {
+		if (error instanceof NotAutoGradable) {
+			// A fill-in still marks the blanks that need no instructor.
+			const blanks =
+				question.type === "fill-in"
+					? scoreBlanks(question, response)
+					: undefined;
+			return { pending: true, blanks, correct };
+		}
+		if (error instanceof ResponseError) {
+			return { score: 0, feedback: [], correct };
+		}
+		throw error;
+	}
+}
 
-	const [value, setValue] = createSignal<number | null>(null);
-	const [result, setResult] = createSignal<QuestionResult<"numeric">>();
+function TypePreview(props: TypePreviewProps): JSX.Element {
+	const publicQ = createMemo(
+		() => publicForm(props.question) as PublicQuestion,
+	);
+	const key = createMemo(() => keyResponse(props.question));
+	const keyResult = createMemo(() => previewResult(props.question, key()));
+
+	const [value, setValue] = createSignal<unknown>(null);
+	const [result, setResult] = createSignal<PreviewResult>();
 
 	function check(): void {
-		setResult({ ...props.question.score({ value: value() }), correct: key() });
+		setResult(previewResult(props.question, value()));
 	}
 	function reset(): void {
 		setValue(null);
@@ -266,15 +213,21 @@ function NumericPreview(props: TypePreviewProps<schema.Numeric>): JSX.Element {
 		<Switch>
 			<Match when={props.tab() === "student"}>
 				<div class="flex flex-col gap-3">
-					<NumericView
+					<AnyQuestionView
 						question={publicQ()}
 						mode={result() ? "review" : "answer"}
 						value={value()}
 						onChange={setValue}
 						result={result()}
+						messages={mdqMessages}
 					/>
 					<SimulateControls
-						disabled={value() === null}
+						disabled={
+							!isAnswered(
+								props.question.type,
+								value() as Parameters<typeof isAnswered>[1],
+							)
+						}
 						checked={result() !== undefined}
 						onCheck={check}
 						onReset={reset}
@@ -282,304 +235,13 @@ function NumericPreview(props: TypePreviewProps<schema.Numeric>): JSX.Element {
 				</div>
 			</Match>
 			<Match when={props.tab() === "key"}>
-				<NumericView
+				<AnyQuestionView
 					question={publicQ()}
 					mode="review"
 					hideScore={props.hideScore}
 					value={key()}
 					result={keyResult()}
-				/>
-			</Match>
-		</Switch>
-	);
-}
-
-function ShortAnswerPreview(
-	props: TypePreviewProps<schema.ShortAnswer>,
-): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	// The key's first literal spelling, or "" when it has none — a regex-only
-	// question has nothing a text box can be seeded with.
-	const keyValue = createMemo(() => key()[0] ?? "");
-	const keyResult = createMemo<QuestionResult<"short-answer">>(() => ({
-		...props.question.score({ text: keyValue() }),
-		correct: key(),
-	}));
-
-	const [value, setValue] = createSignal("");
-	const [result, setResult] = createSignal<QuestionResult<"short-answer">>();
-
-	function check(): void {
-		setResult({ ...props.question.score({ text: value() }), correct: key() });
-	}
-	function reset(): void {
-		setValue("");
-		setResult(undefined);
-	}
-
-	return (
-		<Switch>
-			<Match when={props.tab() === "student"}>
-				<div class="flex flex-col gap-3">
-					<ShortAnswerView
-						question={publicQ()}
-						mode={result() ? "review" : "answer"}
-						value={value()}
-						onChange={setValue}
-						result={result()}
-					/>
-					<SimulateControls
-						disabled={value().trim() === ""}
-						checked={result() !== undefined}
-						onCheck={check}
-						onReset={reset}
-					/>
-				</div>
-			</Match>
-			<Match when={props.tab() === "key"}>
-				<ShortAnswerView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={keyValue()}
-					result={keyResult()}
-				/>
-			</Match>
-		</Switch>
-	);
-}
-
-function MultipleChoicePreview(
-	props: TypePreviewProps<schema.MultipleChoice>,
-): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	// A tied-best choice, when there is one — a question with no choice worth
-	// anything has no answer to seed the key tab with.
-	const keyChoice = createMemo(() => key()[0]);
-	const keyResult = createMemo<QuestionResult<"multiple-choice">>(() => {
-		const choice = keyChoice();
-		return choice === undefined
-			? { score: 0, correct: key() }
-			: { ...props.question.score({ choice }), correct: key() };
-	});
-
-	const [value, setValue] = createSignal<string | null>(null);
-	const [result, setResult] = createSignal<QuestionResult<"multiple-choice">>();
-
-	function check(): void {
-		const choice = value();
-		if (choice === null) return;
-		setResult({ ...props.question.score({ choice }), correct: key() });
-	}
-	function reset(): void {
-		setValue(null);
-		setResult(undefined);
-	}
-
-	return (
-		<Switch>
-			<Match when={props.tab() === "student"}>
-				<div class="flex flex-col gap-3">
-					<MultipleChoiceView
-						question={publicQ()}
-						mode={result() ? "review" : "answer"}
-						value={value()}
-						onChange={setValue}
-						result={result()}
-					/>
-					<SimulateControls
-						disabled={value() === null}
-						checked={result() !== undefined}
-						onCheck={check}
-						onReset={reset}
-					/>
-				</div>
-			</Match>
-			<Match when={props.tab() === "key"}>
-				<MultipleChoiceView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={keyChoice() ?? null}
-					result={keyResult()}
-				/>
-			</Match>
-		</Switch>
-	);
-}
-
-function MultipleSelectionPreview(
-	props: TypePreviewProps<schema.MultipleSelection>,
-): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	const keyResult = createMemo<QuestionResult<"multiple-selection">>(() => ({
-		...props.question.score({ choices: key() }),
-		correct: key(),
-	}));
-
-	const [value, setValue] = createSignal<ReadonlySet<string>>(new Set());
-	const [result, setResult] =
-		createSignal<QuestionResult<"multiple-selection">>();
-
-	function check(): void {
-		setResult({
-			...props.question.score({ choices: new Set(value()) }),
-			correct: key(),
-		});
-	}
-	function reset(): void {
-		setValue(new Set<string>());
-		setResult(undefined);
-	}
-
-	return (
-		<Switch>
-			<Match when={props.tab() === "student"}>
-				<div class="flex flex-col gap-3">
-					<MultipleSelectionView
-						question={publicQ()}
-						mode={result() ? "review" : "answer"}
-						value={value()}
-						onChange={setValue}
-						result={result()}
-					/>
-					<SimulateControls
-						disabled={value().size === 0}
-						checked={result() !== undefined}
-						onCheck={check}
-						onReset={reset}
-					/>
-				</div>
-			</Match>
-			<Match when={props.tab() === "key"}>
-				<MultipleSelectionView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={key()}
-					result={keyResult()}
-				/>
-			</Match>
-		</Switch>
-	);
-}
-
-function TrueFalsePreview(
-	props: TypePreviewProps<schema.TrueFalse>,
-): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	const keyResult = createMemo<QuestionResult<"true-false">>(() => ({
-		...props.question.score({ answers: key() }),
-		correct: key(),
-	}));
-
-	const [value, setValue] = createSignal<ReadonlyMap<string, boolean>>(
-		new Map(),
-	);
-	const [result, setResult] = createSignal<QuestionResult<"true-false">>();
-
-	function check(): void {
-		setResult({
-			...props.question.score({ answers: new Map(value()) }),
-			correct: key(),
-		});
-	}
-	function reset(): void {
-		setValue(new Map());
-		setResult(undefined);
-	}
-
-	return (
-		<Switch>
-			<Match when={props.tab() === "student"}>
-				<div class="flex flex-col gap-3">
-					<TrueFalseView
-						question={publicQ()}
-						mode={result() ? "review" : "answer"}
-						value={value()}
-						onChange={setValue}
-						result={result()}
-					/>
-					<SimulateControls
-						disabled={value().size === 0}
-						checked={result() !== undefined}
-						onCheck={check}
-						onReset={reset}
-					/>
-				</div>
-			</Match>
-			<Match when={props.tab() === "key"}>
-				<TrueFalseView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={key()}
-					result={keyResult()}
-				/>
-			</Match>
-		</Switch>
-	);
-}
-
-function FillInPreview(props: TypePreviewProps<schema.FillIn>): JSX.Element {
-	const publicQ = createMemo(() => props.question.toPublic());
-	const key = createMemo(() => props.question.answerKey());
-	// One accepted spelling per blank, so the key tab has something to fill
-	// every blank with — a blank whose key is a regex-only list stays empty.
-	const keyValue = createMemo<Record<string, string>>(() =>
-		Object.fromEntries(
-			Object.entries(key()).map(([id, spellings]) => [id, spellings[0] ?? ""]),
-		),
-	);
-	const keyResult = createMemo<QuestionResult<"fill-in">>(() => ({
-		...props.question.score({ blanks: keyValue() }),
-		correct: key(),
-	}));
-
-	const [value, setValue] = createSignal<Record<string, string>>({});
-	const [result, setResult] = createSignal<QuestionResult<"fill-in">>();
-
-	function check(): void {
-		setResult({
-			...props.question.score({ blanks: value() }),
-			correct: key(),
-		});
-	}
-	function reset(): void {
-		setValue({});
-		setResult(undefined);
-	}
-
-	return (
-		<Switch>
-			<Match when={props.tab() === "student"}>
-				<div class="flex flex-col gap-3">
-					<FillInView
-						question={publicQ()}
-						mode={result() ? "review" : "answer"}
-						value={value()}
-						onChange={setValue}
-						result={result()}
-					/>
-					<SimulateControls
-						disabled={Object.values(value()).every((v) => v.trim() === "")}
-						checked={result() !== undefined}
-						onCheck={check}
-						onReset={reset}
-					/>
-				</div>
-			</Match>
-			<Match when={props.tab() === "key"}>
-				<FillInView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={keyValue()}
-					result={keyResult()}
+					messages={mdqMessages}
 				/>
 			</Match>
 		</Switch>

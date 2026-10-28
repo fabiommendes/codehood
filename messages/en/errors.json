@@ -73,6 +73,7 @@
 	"errors_exam_not_open": "This exam is not currently open",
 	"errors_response_closed": "This response is not accepting new submissions",
 	"errors_response_time_out": "The time to answer this exam has run out",
+	"errors_response_malformed": "This answer does not fit the question: {detail}",
 	"errors_exam_exception_empty": "An exception needs extra time or a new date; delete it to remove it",
 	"errors_exam_exception_untimed": "A new date needs an exam with a duration",
 	"errors_exam_exception_practice": "Practice exams take no exceptions",

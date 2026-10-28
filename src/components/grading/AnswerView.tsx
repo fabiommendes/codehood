@@ -1,44 +1,13 @@
 import type { JSX } from "solid-js";
-import {
-	type AnswerPayload,
-	answersOf,
-	blanksOf,
-	choiceOf,
-	choicesOf,
-	essayOf,
-	numberOf,
-	textOf,
-} from "@/components/exam/answer-payload";
-import QuestionView, {
-	type QuestionViewProps,
-} from "@/components/question/QuestionView";
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { QuestionPublic } from "@/db";
 
 export interface AnswerViewProps {
-	/// The public half of the question, as the student saw it.
+	/// The public form of the question, as the student saw it.
 	question: QuestionPublic["question"];
 	/// The student's saved answer, or nothing to show the question alone.
 	payload?: AnswerPayload;
-}
-
-/// The value the view of a question of `type` takes from a saved answer.
-function savedValue(type: string, payload: AnswerPayload | undefined): unknown {
-	switch (type) {
-		case "multiple-choice":
-			return choiceOf(payload);
-		case "multiple-selection":
-			return choicesOf(payload);
-		case "true-false":
-			return answersOf(payload);
-		case "numeric":
-			return numberOf(payload);
-		case "short-answer":
-			return textOf(payload);
-		case "essay":
-			return essayOf(payload);
-		default:
-			return blanksOf(payload);
-	}
 }
 
 /**
@@ -49,12 +18,11 @@ function savedValue(type: string, payload: AnswerPayload | undefined): unknown {
  */
 export default function AnswerView(props: AnswerViewProps): JSX.Element {
 	return (
-		<QuestionView
-			{...({
-				question: props.question,
-				mode: "readonly",
-				value: savedValue(props.question.type, props.payload),
-			} as QuestionViewProps)}
+		<AnyQuestionView
+			question={props.question}
+			mode="readonly"
+			value={props.payload ?? null}
+			messages={mdqMessages}
 		/>
 	);
 }

@@ -80,7 +80,7 @@ async function attempt(
 				course: course.id,
 				exam,
 				question: slug,
-				payload: { choice: "brasilia" },
+				payload: "brasilia",
 			},
 			{ actor: student },
 		);

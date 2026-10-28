@@ -20,7 +20,13 @@
 			"@prisma/*": ["./node_modules/.prisma/client/*"],
 			// Test-only: see test/astro-env-client.ts for why this is safe
 			// alongside the real Astro build.
-			"astro:env/client": ["./test/astro-env-client.ts"]
+			"astro:env/client": ["./test/astro-env-client.ts"],
+			// `mdq` is linked from a sibling checkout with its own node_modules:
+			// its types must see the same zod and Solid as this project.
+			"zod": ["./node_modules/zod"],
+			"zod/*": ["./node_modules/zod/*"],
+			"solid-js": ["./node_modules/solid-js"],
+			"solid-js/*": ["./node_modules/solid-js/*"]
 		}
 	},
 	"include": [".astro/types.d.ts", "**/*"],

@@ -1,6 +1,6 @@
 import type { UserActor } from "@/auth/actor";
 import { type Course, db } from "@/db";
-import { Question } from "@/mdq/question";
+import { questionProblems } from "@/mdq";
 import { examResult } from "@/services/exam-result";
 import {
 	type ExamRegrades,
@@ -79,7 +79,7 @@ export async function loadInstructorHome(
 			const taughtCourse: TaughtCourse = {
 				course: home,
 				questionsWithProblems: questions.filter(
-					({ question }) => new Question(question).validate().length > 0,
+					({ question }) => questionProblems(question).length > 0,
 				).length,
 			};
 			const regrades: ExamRegrades[] = exams.map((exam) => ({

@@ -613,16 +613,16 @@ const FRUIT = multipleChoice({
 
 test("answerDistribution: multiple choice lists each choice in statement order, then removed choices by id, then the empty row", () => {
 	const answers = payloads(
-		{ choice: "apple" },
-		{ choice: "apple" },
-		{ choice: "pear" },
-		{ choice: "pear" },
-		{ choice: "pear" },
-		{ choice: "kiwi" },
-		{ choice: "zz-old" },
-		{ choice: "aa-old" },
-		{ choice: "aa-old" },
-		{ choice: "" },
+		"apple",
+		"apple",
+		"pear",
+		"pear",
+		"pear",
+		"kiwi",
+		"zz-old",
+		"aa-old",
+		"aa-old",
+		"",
 		{ text: "wrong shape" },
 	);
 
@@ -665,7 +665,7 @@ test("answerDistribution: multiple choice with no positive score marks no choice
 		],
 	});
 
-	const result = answerDistribution(nobodyScores, payloads({ choice: "a" }));
+	const result = answerDistribution(nobodyScores, payloads("a"));
 
 	expect(
 		result?.rows.map((row) => row.kind === "choice" && row.correct),
@@ -678,18 +678,13 @@ test("answerDistribution: multiple selection counts each ticked choice, with rem
 		stem: "Tick the vowels.",
 		choices: [
 			{ id: "x", text: "X", correct: true },
-			{ id: "y", text: "Y" },
+			{ id: "y", text: "Y", correct: false },
 			{ id: "z", text: "Z", correct: true },
 		],
 	});
-	const answers = payloads(
-		{ choices: ["x", "z"] },
-		{ choices: ["x"] },
-		{ choices: ["x"] },
-		{ choices: ["y", "gone"] },
-		{ choices: [] },
-		{ text: "wrong shape" },
-	);
+	const answers = payloads(["x", "z"], ["x"], ["x"], ["y", "gone"], [], {
+		text: "wrong shape",
+	});
 
 	expect(answerDistribution(letters, answers)).toEqual({
 		type: "multiple-selection",
@@ -714,12 +709,12 @@ test("answerDistribution: true-false counts true, false and abstained per statem
 		],
 	});
 	const answers = payloads(
-		{ answers: { s1: true, s2: false } },
-		{ answers: { s1: true, s2: true } },
-		{ answers: { s1: false } },
-		{ answers: {} },
+		{ s1: true, s2: false },
+		{ s1: true, s2: true },
+		{ s1: false },
+		{},
 		{ text: "wrong shape" },
-		{ answers: { s1: true, old: true } },
+		{ s1: true, old: true },
 	);
 
 	expect(answerDistribution(statements, answers)).toEqual({
@@ -761,7 +756,7 @@ test("answerDistribution: a true-false payload whose answers is an array abstain
 
 	const result = answerDistribution(
 		statements,
-		payloads({ answers: ["s1"] } as unknown as Payload),
+		payloads(["s1"] as unknown as Payload),
 	);
 
 	expect(result?.rows).toEqual([
@@ -844,7 +839,7 @@ async function answer(
 	minutes: number,
 ): Promise<string> {
 	const response = await db.response.submit(
-		{ course: course.id, exam, question, payload: { text } },
+		{ course: course.id, exam, question, payload: text },
 		{ actor: student },
 	);
 	const publicId =

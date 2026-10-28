@@ -56,6 +56,8 @@ export default defineConfig({
 		// `mdq` is linked from a sibling checkout as a dev dependency, so the
 		// server bundle carries it and a production install never needs it.
 		ssr: { noExternal: ["mdq"] },
+		// The linked `mdq` has its own node_modules; one copy of each peer.
+		resolve: { dedupe: ["zod", "solid-js"] },
 	},
 	// `context: "client"` values are read the same way on the server and in the
 	// browser (`astro:env/client`), which is what `SERVER_TZ` needs: it renders

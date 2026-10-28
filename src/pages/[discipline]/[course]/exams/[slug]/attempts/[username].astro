@@ -7,7 +7,7 @@ import { attemptTotalLabel } from "@/components/grading/attempt-total";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { Question } from "@/mdq/question";
+import { type PublicQuestion, publicForm } from "@/mdq";
 import { examResult, formatScore } from "@/services/exam-result";
 import { canReopenAttempt } from "@/services/exam-state";
 import { attemptRows } from "@/services/grading";
@@ -93,7 +93,7 @@ const rows = outcomes.questions.map((outcome, index) => {
 		label: m.exams_attempt_question_label({ number: index + 1 }),
 		outcome,
 		title: doc?.title ?? outcome.question,
-		asked: doc ? new Question(doc).toPublic() : null,
+		asked: doc ? (publicForm(doc) as PublicQuestion) : null,
 		counting,
 	};
 });

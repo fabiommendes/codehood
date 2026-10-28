@@ -1,39 +1,9 @@
 {
 	"questions_score": "Score {score}",
-	"questions_awaiting_grading": "Awaiting grading",
-	"questions_your_answer": "Your answer",
-	"questions_your_answer_label": "Your answer:",
-	"questions_model_answer": "Model answer",
-	"questions_no_answer_submitted": "No answer submitted.",
-	"questions_write_code_placeholder": "Write your code here…",
-	"questions_write_answer_placeholder": "Write your answer here…",
-	"questions_markdown_supported": "Markdown is supported.",
-	"questions_expected": "Expected",
-	"questions_expected_value": "Expected {value}",
-	"questions_blank_not_shown": "Not shown for this blank",
-	"questions_accepted_answers": [
-		{
-			"declarations": ["input count", "local countPlural = count: plural"],
-			"selectors": ["countPlural"],
-			"match": {
-				"countPlural=one": "Accepted answer",
-				"countPlural=other": "Accepted answers"
-			}
-		}
-	],
-	"questions_graded_by_hand": "This question is graded by hand.",
-	"questions_short_answer_mismatch": "That does not look like the kind of answer this question expects.",
-	"questions_true": "True",
-	"questions_false": "False",
-	"questions_true_or_false": "True or false: {statement}",
-	"questions_icon_correct": "Correct",
-	"questions_icon_incorrect": "Incorrect",
 	"questions_submit": "Submit",
 	"questions_reset": "Reset",
 	"questions_tab_student_view": "Student view",
 	"questions_tab_correct_answer": "Correct answer",
-	"questions_preview_not_implemented": "Preview for \"{type}\" questions is not implemented yet.",
-	"questions_render_not_implemented": "Rendering for \"{type}\" questions is not implemented yet.",
 	"questions_title": "Questions",
 	"questions_list_page_title": "Questions · {discipline}",
 	"questions_detail_page_title": "{title} · Questions",

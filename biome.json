@@ -56,10 +56,6 @@
 	},
 	"overrides": [
 		{
-			"includes": ["src/mdq/schemas-generated.ts"],
-			"linter": { "enabled": false }
-		},
-		{
 			"includes": ["**/*.astro"],
 			"linter": {
 				"rules": {

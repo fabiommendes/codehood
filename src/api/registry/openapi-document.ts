@@ -23,6 +23,24 @@ function stripFormMeta(node: unknown, isNameMap = false): void {
 	}
 }
 
+/// Turns the JSON Schema `examples` list the `mdq` schemas carry into the
+/// single `example` an OpenAPI 3.0 schema takes, keeping an `example` already set.
+function examplesToExample(node: unknown, isNameMap = false): void {
+	if (Array.isArray(node)) {
+		for (const item of node) examplesToExample(item);
+		return;
+	}
+	if (typeof node !== "object" || node === null) return;
+	const record = node as Record<string, unknown>;
+	if (!isNameMap && Array.isArray(record.examples)) {
+		if (record.example === undefined) record.example = record.examples[0];
+		delete record.examples;
+	}
+	for (const [key, value] of Object.entries(record)) {
+		examplesToExample(value, !isNameMap && key === "properties");
+	}
+}
+
 /**
  * Builds the OpenAPI document from every path registered on `registry`.
  *
@@ -43,5 +61,6 @@ export function buildOpenApiDocument() {
 		security: [{ BearerAuth: [] }],
 	});
 	stripFormMeta(document);
+	examplesToExample(document);
 	return document;
 }

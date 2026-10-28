@@ -148,7 +148,7 @@ test("writes under another course's path are 404: a submission to its response, 
 		data: {
 			response: { publicId: c.response.publicId },
 			question: c.question.slug,
-			payload: {},
+			payload: null,
 		},
 	});
 	expect(submit.status()).toBe(404);

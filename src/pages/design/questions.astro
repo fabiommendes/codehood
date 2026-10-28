@@ -1,19 +1,5 @@
 ---
-import EssayView from "@/components/question/EssayView";
-import FillInView from "@/components/question/FillInView";
-import MultipleChoiceView from "@/components/question/MultipleChoiceView";
-import MultipleSelectionView from "@/components/question/MultipleSelectionView";
-import NumericView from "@/components/question/NumericView";
-import QuestionView, {
-	type QuestionViewProps,
-} from "@/components/question/QuestionView";
-import ShortAnswerView from "@/components/question/ShortAnswerView";
-import TrueFalseView from "@/components/question/TrueFalseView";
-import Card from "@/components/ui/Card";
-import DesignLayout from "@/layouts/DesignLayout.astro";
-import type { PublicQuestion } from "@/mdq/public";
-import { Question } from "@/mdq/question";
-import type {
+import {
 	Essay,
 	FillIn,
 	MultipleChoice,
@@ -21,31 +7,36 @@ import type {
 	Numeric,
 	ShortAnswer,
 	TrueFalse,
-} from "@/mdq/schemas-generated";
-import type { QuestionResult } from "@/mdq/scoring";
+} from "mdq/solid";
+import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
+import Card from "@/components/ui/Card";
+import { locale } from "@/i18n";
+import DesignLayout from "@/layouts/DesignLayout.astro";
+import {
+	correctResponses,
+	NotAutoGradable,
+	type PublicQuestion,
+	publicForm,
+	scoreResponse,
+} from "@/mdq";
+import {
+	essay,
+	fillIn,
+	multipleChoice,
+	multipleSelection,
+	numeric,
+	shortAnswer,
+	trueFalse,
+} from "@/mdq/fixtures";
 
 export const prerender = false;
 
-// Every fixture below is a real `Question`, built the same way an mdq file
-// would produce one after validation — the showcase drives `toPublic()`,
-// `score()`, and `answerKey()` on it rather than hand-writing the public
-// payload the components expect.
-function mc(data: Omit<MultipleChoice, "type">): Question<MultipleChoice> {
-	return new Question({ type: "multiple-choice", ...data } as MultipleChoice);
-}
+// Every fixture below is a document, built the way an mdq file would be after
+// validation. The showcase feeds the components `publicForm()` of it, and
+// computes each review result with `scoreResponse()` and `correctResponses()`
+// rather than hand-writing the payloads the components expect.
 
-function ms(
-	data: Omit<MultipleSelection, "type">,
-	extra: Partial<MultipleSelection> = {},
-): Question<MultipleSelection> {
-	return new Question({
-		type: "multiple-selection",
-		...data,
-		...extra,
-	} as MultipleSelection);
-}
-
-const capitals = mc({
+const capitals = multipleChoice({
 	stem: "Which city is the capital of Brazil?",
 	choices: [
 		{ id: "brasilia", text: "Brasília", score: 1, feedback: "Correct." },
@@ -59,11 +50,9 @@ const capitals = mc({
 	],
 });
 
-const markdownFixture = mc({
+const markdownFixture = multipleChoice({
 	title: "Big-O of binary search",
-	stem: "What is the time complexity of binary search on a sorted array of `n` elements?",
-	preamble:
-		"A function repeatedly halves the search range until it finds the target or the range is empty.",
+	stem: "A function repeatedly halves the search range until it finds the target or the range is empty.\n\nWhat is the time complexity of binary search on a sorted array of `n` elements?",
 	epilogue: "See *Introduction to Algorithms*, ch. 2, for the derivation.",
 	tags: ["algorithms", "complexity"],
 	choices: [
@@ -71,7 +60,7 @@ const markdownFixture = mc({
 			id: "log-n",
 			text: "`O(log n)`",
 			score: 1,
-			feedback: "Correct — the range halves each step.",
+			feedback: "Correct: the range halves each step.",
 		},
 		{
 			id: "linear",
@@ -84,182 +73,143 @@ const markdownFixture = mc({
 	],
 });
 
-// Every type in the union now has an arm, so the fallback is only reachable
-// with a payload the types say cannot exist — which is exactly the payload a
-// question stored before a type was added would be.
+// A type this version of the components has no renderer for, which is what a
+// payload from a newer server looks like.
 const unknownStub = {
-	type: "ordering",
-	stem: "Put the following steps in order.",
+	type: "matching",
+	stem: "Match each country to its capital.",
 } as unknown as PublicQuestion;
 
-const wrongPickResult: QuestionResult<"multiple-choice"> = {
-	score: capitals.score({ choice: "sao-paulo" }).score,
-	feedback: capitals.score({ choice: "sao-paulo" }).feedback,
-	correct: capitals.answerKey(),
+const wrongPickResult = {
+	...scoreResponse(capitals, "sao-paulo"),
+	correct: correctResponses(capitals),
 };
 
-const correctPickResult: QuestionResult<"multiple-choice"> = {
-	score: capitals.score({ choice: "brasilia" }).score,
-	feedback: capitals.score({ choice: "brasilia" }).feedback,
-	correct: capitals.answerKey(),
+const correctPickResult = {
+	...scoreResponse(capitals, "brasilia"),
+	correct: correctResponses(capitals),
 };
 
-const withheldResult: QuestionResult<"multiple-choice"> = {
-	score: capitals.score({ choice: "brasilia" }).score,
-};
+const withheldResult = scoreResponse(capitals, "brasilia");
 
 //
 // Multiple selection
 //
 
-const primes = ms({
+const primes = multipleSelection({
 	stem: "Which of the following numbers are prime?",
 	choices: [
 		{ id: "two", text: "2", correct: true, feedback: "Prime." },
 		{ id: "three", text: "3", correct: true, feedback: "Prime." },
-		{ id: "four", text: "4", feedback: "Not prime — 2 × 2." },
-		{ id: "nine", text: "9", feedback: "Not prime — 3 × 3." },
+		{ id: "four", text: "4", correct: false, feedback: "Not prime: 2 × 2." },
+		{ id: "nine", text: "9", correct: false, feedback: "Not prime: 3 × 3." },
 	],
 });
 
-// Ticked every correct choice and nothing else: every row is judged
-// correctly, so the feedback list comes back empty.
-const perfectAnswer = { choices: new Set(["two", "three"]) };
-const perfectResult: QuestionResult<"multiple-selection"> = {
-	...primes.score(perfectAnswer),
-	correct: primes.answerKey(),
+// Ticked every correct choice and nothing else.
+const perfectAnswer = ["two", "three"];
+const perfectResult = {
+	...scoreResponse(primes, perfectAnswer),
+	correct: correctResponses(primes),
 };
 
-// Ticked "four" (wrong) and missed "two" (also wrong, since leaving a correct
-// choice unticked asserts it is false) — the card that shows feedback landing
-// on a choice the student never touched.
-const partialAnswer = { choices: new Set(["three", "four"]) };
-const partialResult: QuestionResult<"multiple-selection"> = {
-	...primes.score(partialAnswer),
-	correct: primes.answerKey(),
+// Ticked "four" (wrong) and missed "two".
+const partialAnswer = ["three", "four"];
+const partialResult = {
+	...scoreResponse(primes, partialAnswer),
+	correct: correctResponses(primes),
 };
 
-// Same answer, graded, but with the key withheld — an exam still open for
-// review, showing no right/wrong markers at all.
-const withheldSelectionResult: QuestionResult<"multiple-selection"> = {
-	score: primes.score(partialAnswer).score,
-};
+// Same answer, graded, but with the key withheld.
+const withheldSelectionResult = scoreResponse(primes, partialAnswer);
 
 //
 // True/false
 //
 
-function tf(
-	data: Omit<TrueFalse, "type">,
-	extra: Partial<TrueFalse> = {},
-): Question<TrueFalse> {
-	return new Question({
-		type: "true-false",
-		...data,
-		...extra,
-	} as TrueFalse);
-}
-
-const protocols = tf({
+const protocols = trueFalse({
 	stem: "Judge each statement about network protocols.",
 	choices: [
 		{
 			id: "tcp-order",
 			text: "TCP guarantees ordered delivery.",
 			correct: true,
-			feedback: "True — TCP reassembles segments in order.",
+			feedback: "True: TCP reassembles segments in order.",
 		},
 		{
 			id: "udp-guarantee",
 			text: "UDP guarantees delivery.",
 			correct: false,
-			feedback: "False — UDP makes no delivery guarantee at all.",
+			feedback: "False: UDP makes no delivery guarantee at all.",
 		},
 		{
 			id: "http2-multiplex",
 			text: "HTTP/2 multiplexes multiple streams over one connection.",
 			correct: true,
-			feedback: "True — that is the point of HTTP/2 framing.",
+			feedback: "True: that is the point of HTTP/2 framing.",
 		},
 		{
 			id: "dns-tcp",
 			text: "DNS resolution requires TCP.",
 			correct: false,
 			feedback:
-				"False — DNS mostly uses UDP, falling back to TCP only for large responses.",
+				"False: DNS mostly uses UDP, falling back to TCP only for large responses.",
 		},
 	],
 });
 
-// Some true, some false, and "http2-multiplex" left unmarked, so all three
-// toggle positions are visible on the same card.
-const partlyMarkedAnswer = new Map([
-	["tcp-order", true],
-	["udp-guarantee", false],
-]);
+// Some true, some false, and the rest unmarked, so all three toggle positions
+// are visible on the same card.
+const partlyMarkedAnswer = { "tcp-order": true, "udp-guarantee": false };
 
 const flawlessAnswer = {
-	answers: new Map([
-		["tcp-order", true],
-		["udp-guarantee", false],
-		["http2-multiplex", true],
-		["dns-tcp", false],
-	]),
+	"tcp-order": true,
+	"udp-guarantee": false,
+	"http2-multiplex": true,
+	"dns-tcp": false,
 };
-const flawlessResult: QuestionResult<"true-false"> = {
-	...protocols.score(flawlessAnswer),
-	correct: protocols.answerKey(),
+const flawlessResult = {
+	...scoreResponse(protocols, flawlessAnswer),
+	correct: correctResponses(protocols),
 };
 
 // Got "tcp-order" right, "udp-guarantee" wrong, and abstained on
-// "http2-multiplex" — the card that shows the third outcome next to the
-// other two, with feedback landing on both the wrong statement and the
-// abstained one.
+// "http2-multiplex".
 const mixedAnswer = {
-	answers: new Map([
-		["tcp-order", true],
-		["udp-guarantee", true],
-		["dns-tcp", false],
-	]),
+	"tcp-order": true,
+	"udp-guarantee": true,
+	"dns-tcp": false,
 };
-const mixedResult: QuestionResult<"true-false"> = {
-	...protocols.score(mixedAnswer),
-	correct: protocols.answerKey(),
+const mixedResult = {
+	...scoreResponse(protocols, mixedAnswer),
+	correct: correctResponses(protocols),
 };
 
 // Same answer, graded, but with the key withheld.
-const withheldTrueFalseResult: QuestionResult<"true-false"> = {
-	score: protocols.score(mixedAnswer).score,
-};
+const withheldTrueFalseResult = scoreResponse(protocols, mixedAnswer);
 
 //
 // Essay
 //
 
-function es(data: Omit<Essay, "type">): Question<Essay> {
-	return new Question({ type: "essay", ...data } as Essay);
-}
-
-const greenhouse = es({
-	stem: "Describe how the greenhouse effect works and how it affects the climate.",
-	preamble:
-		"The atmosphere is transparent to most incoming sunlight but not to the heat the surface radiates back.",
-	input: "text",
+const greenhouse = essay({
+	stem: "The atmosphere is transparent to most incoming sunlight but not to the heat the surface radiates back.\n\nDescribe how the greenhouse effect works and how it affects the climate.",
+	content: "text",
 	answerKey:
 		"Sunlight passes through the atmosphere and warms the surface, which re-radiates the energy as *infrared*. Greenhouse gases absorb part of that infrared and re-emit it downwards, keeping the lower atmosphere warmer than it would otherwise be. Raising their concentration raises the equilibrium temperature.",
 	comment: "Accept any answer that names absorption and re-emission.",
 });
 
-const areaFunction = es({
+const areaFunction = essay({
 	stem: "Write a function `area(r)` that returns the area of a circle of radius `r`.",
-	input: "code",
+	content: "code",
 	highlight: "python",
 	answerKey: "import math\n\n\ndef area(r):\n    return math.pi * r**2",
 });
 
-const definition = es({
+const definition = essay({
 	stem: "In one sentence, define idempotence.",
-	input: "plain",
+	content: "plain",
 	answerKey:
 		"An operation is idempotent when applying it more than once has the same effect as applying it once.",
 });
@@ -269,89 +219,80 @@ const greenhouseAnswer =
 
 const codeAnswer = "def area(r):\n    return 3.14159 * r * r";
 
-// Straight out of `score()`: the model layer cannot grade an essay, so it
-// returns a placeholder flagged `pending` and the badge says so.
-const ungradedResult: QuestionResult<"essay"> = {
-	...greenhouse.score({ essay: greenhouseAnswer }),
-	correct: greenhouse.answerKey(),
-};
+// An essay is not auto-gradable, so a response to it waits for an instructor.
+function pendingResult(question: typeof greenhouse) {
+	try {
+		scoreResponse(question, greenhouseAnswer);
+	} catch (error) {
+		if (!(error instanceof NotAutoGradable)) throw error;
+	}
+	return { pending: true as const, correct: correctResponses(question) };
+}
+const ungradedResult = pendingResult(greenhouse);
 
 // What an instructor's grade looks like: a real score, no `pending`.
-const gradedResult: QuestionResult<"essay"> = {
+const gradedResult = {
 	score: 0.75,
-	feedback: "Correct mechanism, but the answer never mentions equilibrium.",
-	correct: greenhouse.answerKey(),
+	feedback: ["Correct mechanism, but the answer never mentions equilibrium."],
+	correct: correctResponses(greenhouse),
 };
 
-// Graded with the model answer withheld, which is the normal state while an
-// exam is still open.
-const withheldEssayResult: QuestionResult<"essay"> = {
+// Graded with the model answer withheld, the normal state while an exam is
+// still open.
+const withheldEssayResult = {
 	score: 1,
-	feedback: "Exactly right.",
+	feedback: ["Exactly right."],
 };
 
 //
 // Numeric
 //
 
-function nm(data: Omit<Numeric, "type">): Question<Numeric> {
-	return new Question({ type: "numeric", ...data } as Numeric);
-}
-
-const water = nm({
-	stem: "How many grams of water are there in a liter?",
-	preamble: "Assume pure water at 4 °C, where its density is exactly 1 g/mL.",
+const water = numeric({
+	stem: "Assume pure water at 4 °C, where its density is exactly 1 g/mL.\n\nHow many grams of water are there in a liter?",
 	answer: 1000,
 	unit: "g",
 	tolerance: { absolute: 5 },
+	incorrectFeedback:
+		"Off by a factor of ten? Check the milliliter-to-liter step.",
 });
 
-const pi = nm({
+const pi = numeric({
 	stem: "Give the value of `π` to two decimal places.",
 	answer: 3.14,
 	decimalPlaces: 2,
 	tolerance: { absolute: 0.005 },
 });
 
-const slope = nm({
+const slope = numeric({
 	stem: "What is the slope of the line through `(0, 1)` and `(3, 0)`?",
-	answer: -1 / 3,
+	answer: "-1/3",
 	domain: "fraction",
 	tolerance: { relative: 0.01 },
 });
 
-// Inside the 5 g tolerance, and outside it: the two review cards, both graded
-// by `score()` rather than by hand.
-const closeEnough = { value: 998 };
-const wayOff = { value: 100 };
+// Inside the 5 g tolerance, and outside it.
+const closeEnough = 998;
+const wayOff = 100;
 
-const acceptedResult: QuestionResult<"numeric"> = {
-	...water.score(closeEnough),
-	feedback:
-		"A liter of water massing a kilogram is the definition of the gram.",
-	correct: water.answerKey(),
+const acceptedResult = {
+	...scoreResponse(water, closeEnough),
+	correct: correctResponses(water),
 };
 
-const rejectedResult: QuestionResult<"numeric"> = {
-	...water.score(wayOff),
-	feedback: "Off by a factor of ten — check the milliliter-to-liter step.",
-	correct: water.answerKey(),
+const rejectedResult = {
+	...scoreResponse(water, wayOff),
+	correct: correctResponses(water),
 };
 
-// Graded with the expected value withheld. The check still shows: there is
-// one box here, and the score badge beside it already says it was right.
-const withheldNumericResult: QuestionResult<"numeric"> =
-	water.score(closeEnough);
+// Graded with the expected value withheld.
+const withheldNumericResult = scoreResponse(water, closeEnough);
 
 //
 // Short answer
 //
 
-function sa(data: Omit<ShortAnswer, "type">): Question<ShortAnswer> {
-	return new Question({ type: "short-answer", ...data } as ShortAnswer);
-}
-
-const capital = sa({
+const capital = shortAnswer({
 	stem: "What is the capital of Brazil?",
 	accept: [
 		{ pattern: "Brasília", feedback: "Good call!" },
@@ -362,61 +303,60 @@ const capital = sa({
 			pattern: "Rio de Janeiro",
 			feedback: "It used to be, but it is not anymore.",
 		},
-		{ pattern: "Brasilia", feedback: 'You forgot the accent on the "i".' },
-		{ pattern: "*", feedback: "Sorry, that is not the correct answer." },
 	],
+	incorrectFeedback: "Sorry, that is not the correct answer.",
 });
 
-// No trailing wildcard, so a response matching neither list is the
-// instructor's rather than the grader's.
-const isnan = sa({
+// A response matching neither list is the instructor's rather than the grader's.
+const isnan = shortAnswer({
 	stem: "Which **Python** function checks whether a number is `NaN`?",
-	oneOf: ["`math.isnan`"],
+	accept: ["`math.isnan`"],
 	reject: [
-		{ pattern: "`isnan`", feedback: "Close — it lives in the `math` module." },
+		{ pattern: "`isnan`", feedback: "Close: it lives in the `math` module." },
 	],
+	unmatched: "manual",
 });
 
-const headcount = sa({
+const headcount = shortAnswer({
 	stem: "How many people were in the room? Write the number in digits.",
-	oneOf: ["12"],
+	accept: ["12"],
 	preAccept: ["/\\d+/"],
 	preReject: [{ pattern: "/0+/", feedback: "Zero is not a count." }],
 });
 
-const openEnded = sa({
+const openEnded = shortAnswer({
 	stem: "In a few words, why does binary search need a sorted array?",
-	openEnded: true,
+	accept: [],
+	unmatched: "manual",
 });
 
-const rightResult: QuestionResult<"short-answer"> = {
-	...capital.score({ text: "brasília" }),
-	correct: capital.answerKey(),
+const rightResult = {
+	...scoreResponse(capital, "brasília"),
+	correct: correctResponses(capital),
 };
 
-const wrongResult: QuestionResult<"short-answer"> = {
-	...capital.score({ text: "Brasilia" }),
-	correct: capital.answerKey(),
+const wrongResult = {
+	...scoreResponse(capital, "Rio de Janeiro"),
+	correct: correctResponses(capital),
 };
 
-// Matched neither list, because `isnan` writes its reject block out and does
-// not end it with a wildcard. The badge says so instead of saying "Score 0".
-const unsettledResult: QuestionResult<"short-answer"> = {
-	...isnan.score({ text: "numpy.isnan" }),
-	correct: isnan.answerKey(),
-};
+// Matched neither list, and `isnan` leaves those to the instructor.
+function unsettled(response: string) {
+	try {
+		scoreResponse(isnan, response);
+	} catch (error) {
+		if (!(error instanceof NotAutoGradable)) throw error;
+	}
+	return { pending: true as const, correct: correctResponses(isnan) };
+}
+const unsettledResult = unsettled("numpy.isnan");
 
 //
 // Fill in the blanks
 //
 
-function fi(data: Omit<FillIn, "type">): Question<FillIn> {
-	return new Question({ type: "fill-in", ...data } as FillIn);
-}
-
-const brasilia = fi({
-	stem: "The capital of Brazil is [^capital], a city of roughly [^size] on the [^river] plateau.",
-	preamble: "Fill each blank with the answer its control asks for.",
+const brasilia = fillIn({
+	stem: "Fill each blank with the answer its control asks for.\n\nThe capital of Brazil is [^capital], a city of roughly [^size] on the [^river] plateau.",
 	blanks: [
 		{
 			id: "capital",
@@ -439,12 +379,12 @@ const brasilia = fi({
 			unit: "people",
 			tolerance: { relative: 0.1 },
 		},
-		{ id: "river", type: "short-answer", oneOf: ["Central", "Planalto"] },
+		{ id: "river", type: "short-answer", accept: ["Central", "Planalto"] },
 	],
 });
 
 // Choices carrying Markdown, which is why the blank is not a native `<select>`.
-const complexity = fi({
+const complexity = fillIn({
 	title: "Binary search",
 	stem: "Binary search runs in [^time] time and uses [^space] extra space.",
 	blanks: [
@@ -467,27 +407,14 @@ const complexity = fi({
 	],
 });
 
-const filledIn = {
-	blanks: { capital: "brasilia", size: "2750000", river: "Planalto" },
-};
+const filledIn = { capital: "brasilia", size: "2750000", river: "Planalto" };
 
-const mixedUp = {
-	blanks: { capital: "lisbon", size: "12", river: "" },
-};
+const mixedUp = { capital: "lisbon", size: "12", river: "" };
 
-const filledInResult: QuestionResult<"fill-in"> = {
-	...brasilia.score(filledIn),
-	correct: brasilia.answerKey(),
-};
+// The component takes the score and feedback only: no key, no per-blank marks.
+const filledInResult = scoreResponse(brasilia, filledIn);
 
-const mixedUpResult: QuestionResult<"fill-in"> = {
-	...brasilia.score(mixedUp),
-	correct: brasilia.answerKey(),
-};
-
-// Graded with the key withheld — an exam still open, where the per-blank marks
-// show which blank went wrong without saying what would have been right.
-const withheldFillInResult: QuestionResult<"fill-in"> = brasilia.score(mixedUp);
+const mixedUpResult = scoreResponse(brasilia, mixedUp);
 
 // The side nav. Its ids are the `id` of the matching <section> below; the
 // order is the order they appear on the page, which is the order the types
@@ -537,10 +464,12 @@ const sectionLinks = [
   <section class="mb-14">
     <h1 class="text-3xl font-bold">Questions</h1>
     <p class="mt-3 max-w-2xl text-base-content/70">
-      Views from <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">src/components/question/</code> and the
-      <code class="font-mono">QuestionView</code> dispatcher, rendering fixtures built from real
-      <code class="font-mono">Question</code> objects in <code class="font-mono">src/mdq/</code>{" "}
-      &mdash; nothing on this page hand-writes the public payload the components expect.
+      The components of <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-sm">mdq/solid</code> and its
+      <code class="font-mono">QuestionView</code> dispatcher, rendering question documents built with the
+      fixtures of <code class="font-mono">src/mdq/fixtures.ts</code>. The components get{" "}
+      <code class="font-mono">publicForm()</code> of each document, and every review result comes from{" "}
+      <code class="font-mono">scoreResponse()</code> and <code class="font-mono">correctResponses()</code>
+      &mdash; nothing on this page hand-writes the payloads the components expect, except an instructor's grade.
     </p>
   </section>
 
@@ -552,15 +481,15 @@ const sectionLinks = [
       <p class="mb-5 text-sm text-base-content/60">
         The interactive form a student fills in. One is empty; the other is seeded with a choice already picked,
         to show the controlled path. Markdown in the stem and inline code in the choices come from{" "}
-        <code class="font-mono">markdownFixture</code>, a fixture with a <code class="font-mono">preamble</code>,
-        an <code class="font-mono">epilogue</code>, and <code class="font-mono">tags</code>.
+        <code class="font-mono">markdownFixture</code>, a fixture whose stem has two paragraphs and that has an{" "}
+        <code class="font-mono">epilogue</code> and <code class="font-mono">tags</code>.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Unanswered">
-          <MultipleChoiceView client:load question={capitals.toPublic()} mode="answer" />
+          <MultipleChoice client:load locale={locale} question={publicForm(capitals)} mode="answer" />
         </Card>
         <Card title="Pre-answered, with markdown">
-          <MultipleChoiceView client:load question={markdownFixture.toPublic()} mode="answer" value="log-n" />
+          <MultipleChoice client:load locale={locale} question={publicForm(markdownFixture)} mode="answer" value="log-n" />
         </Card>
       </div>
     </section>
@@ -572,39 +501,39 @@ const sectionLinks = [
         the others are muted, and typed answers read as plain text.
       </p>
       <Card>
-        <MultipleChoiceView question={capitals.toPublic()} mode="readonly" value="rio" />
+        <MultipleChoice messages={mdqMessages} question={publicForm(capitals)} mode="readonly" value="rio" />
       </Card>
     </section>
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
       <p class="mb-5 text-sm text-base-content/60">
-        Three graded states, all driven by <code class="font-mono">capitals.score()</code> and{" "}
-        <code class="font-mono">capitals.answerKey()</code>: a correct pick, a wrong pick with the choice's own
+        Three graded states, all driven by <code class="font-mono">scoreResponse(capitals, ...)</code> and{" "}
+        <code class="font-mono">correctResponses(capitals)</code>: a correct pick, a wrong pick with the choice's own
         feedback and a score below zero, and a graded answer whose key is withheld
         (<code class="font-mono">result</code> with no <code class="font-mono">correct</code>) &mdash; that last
         one is what an exam still open for review looks like, and it deliberately shows no right/wrong markers.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card title="Correct pick">
-          <MultipleChoiceView
-            question={capitals.toPublic()}
+          <MultipleChoice messages={mdqMessages}
+            question={publicForm(capitals)}
             mode="review"
             value="brasilia"
             result={correctPickResult}
           />
         </Card>
         <Card title="Wrong pick, with feedback">
-          <MultipleChoiceView
-            question={capitals.toPublic()}
+          <MultipleChoice messages={mdqMessages}
+            question={publicForm(capitals)}
             mode="review"
             value="sao-paulo"
             result={wrongPickResult}
           />
         </Card>
         <Card title="Key withheld">
-          <MultipleChoiceView
-            question={capitals.toPublic()}
+          <MultipleChoice messages={mdqMessages}
+            question={publicForm(capitals)}
             mode="review"
             value="brasilia"
             result={withheldResult}
@@ -625,14 +554,14 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Unanswered">
-          <MultipleSelectionView client:load question={primes.toPublic()} mode="answer" />
+          <MultipleSelection client:load locale={locale} question={publicForm(primes)} mode="answer" />
         </Card>
         <Card title="Pre-answered">
-          <MultipleSelectionView
-            client:load
-            question={primes.toPublic()}
+          <MultipleSelection
+            client:load locale={locale}
+            question={publicForm(primes)}
             mode="answer"
-            value={new Set(["two", "three"])}
+            value={["two", "three"]}
           />
         </Card>
       </div>
@@ -644,7 +573,7 @@ const sectionLinks = [
         Same visuals as answer mode, but the checkboxes are disabled and nothing is clickable.
       </p>
       <Card>
-        <MultipleSelectionView question={primes.toPublic()} mode="readonly" value={new Set(["three"])} />
+        <MultipleSelection messages={mdqMessages} question={publicForm(primes)} mode="readonly" value={["three"]} />
       </Card>
     </section>
 
@@ -659,26 +588,26 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card title="Perfect answer">
-          <MultipleSelectionView
-            question={primes.toPublic()}
+          <MultipleSelection messages={mdqMessages}
+            question={publicForm(primes)}
             mode="review"
-            value={perfectAnswer.choices}
+            value={perfectAnswer}
             result={perfectResult}
           />
         </Card>
         <Card title="Ticked wrong, missed right">
-          <MultipleSelectionView
-            question={primes.toPublic()}
+          <MultipleSelection messages={mdqMessages}
+            question={publicForm(primes)}
             mode="review"
-            value={partialAnswer.choices}
+            value={partialAnswer}
             result={partialResult}
           />
         </Card>
         <Card title="Key withheld">
-          <MultipleSelectionView
-            question={primes.toPublic()}
+          <MultipleSelection messages={mdqMessages}
+            question={publicForm(primes)}
             mode="review"
-            value={partialAnswer.choices}
+            value={partialAnswer}
             result={withheldSelectionResult}
           />
         </Card>
@@ -701,10 +630,10 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Unanswered">
-          <TrueFalseView client:load question={protocols.toPublic()} mode="answer" />
+          <TrueFalse client:load locale={locale} question={publicForm(protocols)} mode="answer" />
         </Card>
         <Card title="Partly marked">
-          <TrueFalseView client:load question={protocols.toPublic()} mode="answer" value={partlyMarkedAnswer} />
+          <TrueFalse client:load locale={locale} question={publicForm(protocols)} mode="answer" value={partlyMarkedAnswer} />
         </Card>
       </div>
     </section>
@@ -715,14 +644,14 @@ const sectionLinks = [
         Same visuals as answer mode, but every toggle is disabled and nothing is clickable.
       </p>
       {/*
-        `client:load` here is load-bearing, not decorative: the centered knob
+        `client:load locale={locale}` here is load-bearing, not decorative: the centered knob
         for an abstained statement comes from the `indeterminate` DOM property,
         which cannot be expressed in server-rendered markup. Without
         hydration, an abstained statement would render looking like a
         confident "False" — do not remove this directive as an "optimization."
       */}
       <Card>
-        <TrueFalseView client:load question={protocols.toPublic()} mode="readonly" value={partlyMarkedAnswer} />
+        <TrueFalse client:load locale={locale} question={publicForm(protocols)} mode="readonly" value={partlyMarkedAnswer} />
       </Card>
     </section>
 
@@ -738,29 +667,29 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Flawless paper">
-          <TrueFalseView
-            client:load
-            question={protocols.toPublic()}
+          <TrueFalse
+            client:load locale={locale}
+            question={publicForm(protocols)}
             mode="review"
-            value={flawlessAnswer.answers}
+            value={flawlessAnswer}
             result={flawlessResult}
           />
         </Card>
         <Card title="Right, wrong, and abstained">
-          <TrueFalseView
-            client:load
-            question={protocols.toPublic()}
+          <TrueFalse
+            client:load locale={locale}
+            question={publicForm(protocols)}
             mode="review"
-            value={mixedAnswer.answers}
+            value={mixedAnswer}
             result={mixedResult}
           />
         </Card>
         <Card title="Key withheld">
-          <TrueFalseView
-            client:load
-            question={protocols.toPublic()}
+          <TrueFalse
+            client:load locale={locale}
+            question={publicForm(protocols)}
             mode="review"
-            value={mixedAnswer.answers}
+            value={mixedAnswer}
             result={withheldTrueFalseResult}
           />
         </Card>
@@ -782,10 +711,10 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Rich text (empty)">
-          <EssayView client:load question={greenhouse.toPublic()} mode="answer" />
+          <Essay client:load locale={locale} question={publicForm(greenhouse)} mode="answer" />
         </Card>
         <Card title="Code">
-          <EssayView client:load question={areaFunction.toPublic()} mode="answer" value={codeAnswer} />
+          <Essay client:load locale={locale} question={publicForm(areaFunction)} mode="answer" value={codeAnswer} />
         </Card>
       </div>
     </section>
@@ -802,13 +731,13 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Rich text">
-          <EssayView client:load question={greenhouse.toPublic()} mode="readonly" value={greenhouseAnswer} />
+          <Essay client:load locale={locale} question={publicForm(greenhouse)} mode="readonly" value={greenhouseAnswer} />
         </Card>
         <Card title="Code">
-          <EssayView client:load question={areaFunction.toPublic()} mode="readonly" value={codeAnswer} />
+          <Essay client:load locale={locale} question={publicForm(areaFunction)} mode="readonly" value={codeAnswer} />
         </Card>
         <Card title="Plain text, nothing submitted">
-          <EssayView client:load question={definition.toPublic()} mode="readonly" value="" />
+          <Essay client:load locale={locale} question={publicForm(definition)} mode="readonly" value="" />
         </Card>
       </div>
     </section>
@@ -817,34 +746,35 @@ const sectionLinks = [
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
       <p class="mb-5 text-sm text-base-content/60">
         Nothing here is marked right or wrong, because nothing in an essay can be: mdq.spec grades them manually.
-        The first card is what <code class="font-mono">score()</code> actually returns — a placeholder flagged{" "}
-        <code class="font-mono">pending</code>, badged "Awaiting grading" rather than "Score 0.00", since a human
+        The first card is what an essay response gets: <code class="font-mono">scoreResponse()</code> throws{" "}
+        <code class="font-mono">NotAutoGradable</code>, so the result is <code class="font-mono">pending</code>,
+        badged "Awaiting grading" rather than "Score 0.00", since a human
         who reads the essay and marks it worthless also scores 0. The second is an instructor's grade. The last
         one is graded with the model answer withheld, which is the normal state while an exam is still open.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Awaiting grading">
-          <EssayView
-            client:load
-            question={greenhouse.toPublic()}
+          <Essay
+            client:load locale={locale}
+            question={publicForm(greenhouse)}
             mode="review"
             value={greenhouseAnswer}
             result={ungradedResult}
           />
         </Card>
         <Card title="Graded, with the model answer">
-          <EssayView
-            client:load
-            question={greenhouse.toPublic()}
+          <Essay
+            client:load locale={locale}
+            question={publicForm(greenhouse)}
             mode="review"
             value={greenhouseAnswer}
             result={gradedResult}
           />
         </Card>
         <Card title="Model answer withheld">
-          <EssayView
-            client:load
-            question={definition.toPublic()}
+          <Essay
+            client:load locale={locale}
+            question={publicForm(definition)}
             mode="review"
             value="Doing it twice is the same as doing it once."
             result={withheldEssayResult}
@@ -861,7 +791,7 @@ const sectionLinks = [
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
       <p class="mb-5 text-sm text-base-content/60">
         One box, shaped by the question's <code class="font-mono">domain</code> — resolved by{" "}
-        <code class="font-mono">toPublic()</code>, so the view never reimplements mdq.spec's coercion table. An{" "}
+        <code class="font-mono">publicForm()</code>, so the view never reimplements mdq.spec's coercion table. An{" "}
         <code class="font-mono">integer</code> or <code class="font-mono">decimal</code> question gets a number
         input stepped by <code class="font-mono">decimalPlaces</code>; a <code class="font-mono">fraction</code>
         {" "}question gets a text input, because a number input rejects <code class="font-mono">1/3</code> outright
@@ -870,13 +800,13 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Integer, with a unit">
-          <NumericView client:load question={water.toPublic()} mode="answer" />
+          <Numeric client:load locale={locale} question={publicForm(water)} mode="answer" />
         </Card>
         <Card title="Decimal, two places">
-          <NumericView client:load question={pi.toPublic()} mode="answer" value={3.14} />
+          <Numeric client:load locale={locale} question={publicForm(pi)} mode="answer" value={3.14} />
         </Card>
         <Card title="Fraction">
-          <NumericView client:load question={slope.toPublic()} mode="answer" />
+          <Numeric client:load locale={locale} question={publicForm(slope)} mode="answer" />
         </Card>
       </div>
     </section>
@@ -889,7 +819,7 @@ const sectionLinks = [
         value keeps its normal text color rather than being dimmed away.
       </p>
       <Card>
-        <NumericView client:load question={water.toPublic()} mode="readonly" value={998} />
+        <Numeric client:load locale={locale} question={publicForm(water)} mode="readonly" value={closeEnough} />
       </Card>
     </section>
 
@@ -904,17 +834,17 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Inside the tolerance">
-          <NumericView client:load question={water.toPublic()} mode="review" value={998} result={acceptedResult} />
+          <Numeric client:load locale={locale} question={publicForm(water)} mode="review" value={closeEnough} result={acceptedResult} />
         </Card>
         <Card title="Outside it">
-          <NumericView client:load question={water.toPublic()} mode="review" value={100} result={rejectedResult} />
+          <Numeric client:load locale={locale} question={publicForm(water)} mode="review" value={wayOff} result={rejectedResult} />
         </Card>
         <Card title="Expected value withheld">
-          <NumericView
-            client:load
-            question={water.toPublic()}
+          <Numeric
+            client:load locale={locale}
+            question={publicForm(water)}
             mode="review"
-            value={998}
+            value={closeEnough}
             result={withheldNumericResult}
           />
         </Card>
@@ -937,13 +867,13 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Plain">
-          <ShortAnswerView client:load question={capital.toPublic()} mode="answer" />
+          <ShortAnswer client:load locale={locale} question={publicForm(capital)} mode="answer" />
         </Card>
         <Card title="With pre-validation">
-          <ShortAnswerView client:load question={headcount.toPublic()} mode="answer" />
+          <ShortAnswer client:load locale={locale} question={publicForm(headcount)} mode="answer" />
         </Card>
         <Card title="Open ended">
-          <ShortAnswerView client:load question={openEnded.toPublic()} mode="answer" />
+          <ShortAnswer client:load locale={locale} question={publicForm(openEnded)} mode="answer" />
         </Card>
       </div>
     </section>
@@ -955,7 +885,7 @@ const sectionLinks = [
         only essay's textarea had a reason to be dropped.
       </p>
       <Card>
-        <ShortAnswerView client:load question={capital.toPublic()} mode="readonly" value="Brasília" />
+        <ShortAnswer client:load locale={locale} question={publicForm(capital)} mode="readonly" value="Brasília" />
       </Card>
     </section>
 
@@ -964,35 +894,37 @@ const sectionLinks = [
       <p class="mb-5 text-sm text-base-content/60">
         Grading is binary, but how much of it is automatic is not. The first two cards are settled by the
         question's own patterns, with the feedback of the first matching pattern that carries a message. The third
-        is the case that makes this type different: <code class="font-mono">isnan</code> writes its reject block
-        out and does not end it with a <code class="font-mono">*</code>, so a response matching neither list is
-        not something the question claims to know about &mdash; it badges "Awaiting grading" rather than "Score
-        0.00", and shows neither a check nor an x. Adding the wildcard back is how an author closes that off.
+        is the case that makes this type different: <code class="font-mono">isnan</code> sets{" "}
+        <code class="font-mono">unmatched: "manual"</code>, so a response matching neither list is not something
+        the question claims to know about (<code class="font-mono">scoreResponse()</code> throws{" "}
+        <code class="font-mono">NotAutoGradable</code>) &mdash; it badges "Awaiting grading" rather than "Score
+        0.00", and shows neither a check nor an x. Leaving <code class="font-mono">unmatched</code> out, or adding{" "}
+        <code class="font-mono">incorrectFeedback</code>, is how an author closes that off.
         Regexes never appear under "Accepted answers": a grading rule is not an answer anyone can read.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Accepted">
-          <ShortAnswerView
-            client:load
-            question={capital.toPublic()}
+          <ShortAnswer
+            client:load locale={locale}
+            question={publicForm(capital)}
             mode="review"
             value="brasília"
             result={rightResult}
           />
         </Card>
         <Card title="Rejected, with feedback">
-          <ShortAnswerView
-            client:load
-            question={capital.toPublic()}
+          <ShortAnswer
+            client:load locale={locale}
+            question={publicForm(capital)}
             mode="review"
-            value="Brasilia"
+            value="Rio de Janeiro"
             result={wrongResult}
           />
         </Card>
         <Card title="Matched neither list">
-          <ShortAnswerView
-            client:load
-            question={isnan.toPublic()}
+          <ShortAnswer
+            client:load locale={locale}
+            question={publicForm(isnan)}
             mode="review"
             value="numpy.isnan"
             result={unsettledResult}
@@ -1020,10 +952,10 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Three kinds of blank">
-          <FillInView client:load question={brasilia.toPublic()} mode="answer" />
+          <FillIn client:load locale={locale} question={publicForm(brasilia)} mode="answer" />
         </Card>
         <Card title="Markdown in a choice">
-          <FillInView client:load question={complexity.toPublic()} mode="answer" />
+          <FillIn client:load locale={locale} question={publicForm(complexity)} mode="answer" />
         </Card>
       </div>
     </section>
@@ -1035,45 +967,44 @@ const sectionLinks = [
         &mdash; a frozen sentence that hid its own answers would be showing nothing at all.
       </p>
       <Card>
-        <FillInView client:load question={brasilia.toPublic()} mode="readonly" value={filledIn.blanks} />
+        <FillIn client:load locale={locale} question={publicForm(brasilia)} mode="readonly" value={filledIn} />
       </Card>
     </section>
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
       <p class="mb-5 text-sm text-base-content/60">
-        A single badge for a sentence full of separate answers would say nothing useful, so{" "}
-        <code class="font-mono">Scored</code> carries a score per blank and each one draws its own mark. A blank
-        left empty draws none: under <code class="font-mono">symmetric</code> it neither adds nor subtracts, and
-        a cross would claim otherwise. The second card is graded with the key withheld &mdash; the marks still
-        show which blank went wrong without saying what would have been right.
+        The result of a fill-in response is its score and the feedback of every blank in one list; the component
+        draws no per-blank mark and has no answer key to show yet. The first two cards differ in what was typed. The third is a result still{" "}
+        <code class="font-mono">pending</code>: a blank an instructor has yet to grade leaves the whole response
+        without a score.
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Every blank right">
-          <FillInView
-            client:load
-            question={brasilia.toPublic()}
+          <FillIn
+            client:load locale={locale}
+            question={publicForm(brasilia)}
             mode="review"
-            value={filledIn.blanks}
+            value={filledIn}
             result={filledInResult}
           />
         </Card>
         <Card title="One wrong, one priced, one empty">
-          <FillInView
-            client:load
-            question={brasilia.toPublic()}
+          <FillIn
+            client:load locale={locale}
+            question={publicForm(brasilia)}
             mode="review"
-            value={mixedUp.blanks}
+            value={mixedUp}
             result={mixedUpResult}
           />
         </Card>
-        <Card title="Key withheld">
-          <FillInView
-            client:load
-            question={brasilia.toPublic()}
+        <Card title="Pending blank">
+          <FillIn
+            client:load locale={locale}
+            question={publicForm(brasilia)}
             mode="review"
-            value={mixedUp.blanks}
-            result={withheldFillInResult}
+            value={mixedUp}
+            result={{ pending: true }}
           />
         </Card>
       </div>
@@ -1084,15 +1015,14 @@ const sectionLinks = [
     <h2 class="mb-2 text-xl font-semibold">Unknown type</h2>
     <p class="mb-5 text-sm text-base-content/60">
       Every type mdq.spec defines now has a renderer, so <code class="font-mono">QuestionView</code>'s fallback is
-      unreachable from the union. It stays: the union is a compile-time claim and a stored question is a runtime
+      unreachable from the union (the stub below is a made-up <code class="font-mono">matching</code> type). It stays: the union is a compile-time claim and a stored question is a runtime
       fact, and a client one version behind is better served by a named warning than by a blank space.
     </p>
     {/*
-     * `QuestionViewProps` is a discriminated union, and the stub is a type
-     * with no arm in it at all — which is the point of the demo, and why the
-     * cast is here rather than a bug.
+     * The stub is a type with no arm in `PublicQuestion` at all, which is the
+     * point of the demo, and why it is cast on its way in.
      */}
-    <QuestionView {...({ question: unknownStub } as QuestionViewProps)} />
+    <AnyQuestionView question={unknownStub} messages={mdqMessages} />
   </section>
   </div>
   </div>

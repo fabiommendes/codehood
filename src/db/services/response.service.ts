@@ -485,6 +485,7 @@ export class ResponseService extends CrudBase<{
 				row.exam.courseId,
 				row.examId,
 				input.question,
+				input.payload,
 			);
 
 			await invalidIfExists(tx.submission.create, {
