@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "mdq/css/daisyui.css";
 
 @plugin "@tailwindcss/typography";
 
@@ -450,4 +451,9 @@ h6 {
 [data-theme="codehood-dark"] .shiki span {
 	color: var(--shiki-dark);
 	background-color: var(--shiki-dark-bg);
+}
+
+/* mdq/css/daisyui.css leaves Markdown blocks without typography. */
+.mdq-markdown:not([data-inline]) {
+	@apply prose prose-sm max-w-none;
 }

@@ -24,6 +24,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -82,7 +83,12 @@ const commit = spawnSync("git", ["rev-parse", "--verify", `${tag}^{commit}`], {
 if (commit.status !== 0) fail(`Unknown tag ${tag}.`);
 
 const out = resolve(args.out);
-const work = mkdtempSync(join(tmpdir(), "codehood-package-"));
+// `mdq` is linked from `../mdq/mdq-js`, so the export gets a sibling that
+// points at the local mdq checkout.
+const scratch = mkdtempSync(join(tmpdir(), "codehood-package-"));
+const work = join(scratch, "codehood");
+mkdirSync(work);
+symlinkSync(resolve("../mdq"), join(scratch, "mdq"));
 
 try {
 	console.log(`▶ Exporting ${tag} to ${work}`);
@@ -110,6 +116,7 @@ try {
 		ENVIRONMENT: "prod",
 		DATABASE_URL: "file:./build.db",
 	};
+	run("Building mdq", join(scratch, "mdq", "mdq-js"), "pnpm", ["build"], env);
 	run(
 		"Installing dependencies",
 		work,
@@ -161,5 +168,5 @@ try {
 	console.log(`\n✔ ${tarball}`);
 } finally {
 	if (args.keep) console.log(`Kept ${work}`);
-	else rmSync(work, { recursive: true, force: true });
+	else rmSync(scratch, { recursive: true, force: true });
 }

@@ -138,6 +138,9 @@ importers:
       fishery:
         specifier: ^2.4.0
         version: 2.4.0
+      mdq:
+        specifier: link:../mdq/mdq-js
+        version: link:../mdq/mdq-js
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3

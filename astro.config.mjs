@@ -53,6 +53,9 @@ export default defineConfig({
 		// Sourcemaps let `pnpm coverage` (c8, run against the built webServer process)
 		// map V8 coverage on the bundled output back to the original src/*.ts files.
 		build: { sourcemap: !!process.env.COVERAGE },
+		// `mdq` is linked from a sibling checkout as a dev dependency, so the
+		// server bundle carries it and a production install never needs it.
+		ssr: { noExternal: ["mdq"] },
 	},
 	// `context: "client"` values are read the same way on the server and in the
 	// browser (`astro:env/client`), which is what `SERVER_TZ` needs: it renders
