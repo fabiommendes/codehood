@@ -534,7 +534,7 @@ for (const submission of attempt?.submissions ?? []) {
           <h2 class="text-lg font-semibold">{m.exams_detail_questions_heading()}</h2>
           {staffQuestions.length > 0 ? (
             <div class="mt-3">
-              <ExamQuestionsList questions={staffQuestions} canManage={canManage} client:load />
+              <ExamQuestionsList questions={staffQuestions} client:load />
             </div>
           ) : (
             <p class="mt-3 text-sm text-base-content/60">{m.exams_detail_no_questions()}</p>

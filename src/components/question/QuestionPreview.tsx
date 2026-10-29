@@ -12,7 +12,6 @@ import { m } from "@/i18n";
 import {
 	correctResponses,
 	NotAutoGradable,
-	type PublicQuestion,
 	publicForm,
 	type QuestionDocument,
 	ResponseError,
@@ -192,9 +191,7 @@ function previewResult(
 }
 
 function TypePreview(props: TypePreviewProps): JSX.Element {
-	const publicQ = createMemo(
-		() => publicForm(props.question) as PublicQuestion,
-	);
+	const publicQ = createMemo(() => publicForm(props.question));
 	const key = createMemo(() => keyResponse(props.question));
 	const keyResult = createMemo(() => previewResult(props.question, key()));
 

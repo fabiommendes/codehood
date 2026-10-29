@@ -8,7 +8,7 @@ import AnswerKey from "@/components/grading/AnswerKey";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { type PublicQuestion, publicForm } from "@/mdq";
+import { publicForm } from "@/mdq";
 import { formatScore } from "@/services/exam-result";
 import { answersTo } from "@/services/grading";
 import { answerDistribution } from "@/services/question-stats";
@@ -51,7 +51,7 @@ const versionMissing =
 	pinnedVersion !== null && stored.version !== pinnedVersion;
 const doc = stored.question;
 const title = doc.title ?? stored.slug;
-const asked = publicForm(doc) as PublicQuestion;
+const asked = publicForm(doc);
 // An essay's model answer is a hint for the grader, not a correct answer.
 const hasKey = doc.type !== "essay";
 // The answer key carries the statement, so only a question without one shows it alone.
