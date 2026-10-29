@@ -716,6 +716,7 @@ enum QuestionType {
   NUMERIC
   SHORT_ANSWER
   FILL_IN
+  ORDERING
 }
 
 /// A QuestionRef is the main entity representing a unique question in the system.

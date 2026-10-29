@@ -2,7 +2,7 @@
 type: spec
 status: review
 tags: [mdq, questions, exams, grading, cli, components]
-relatedTo: [dev/issues/ordering-no-servidor.md, ../mdq/dev/rfcs/0002-componentes-solid.md]
+relatedTo: [../mdq/dev/rfcs/0002-componentes-solid.md]
 ---
 
 # Trocar `src/mdq` pela biblioteca `mdq`
@@ -62,8 +62,9 @@ spec. Nada de adaptadores que preservem formatos antigos.
 8. **Mesmo `versionHash`, metades diferentes.** Continua 409: sem migração
    de dados, as duas metades são derivadas do documento de forma
    determinística, e uma versão gravada nunca é reescrita.
-9. **`ordering` fica fora.** Exige enum Prisma, views e seed; registrado em
-   `dev/issues/ordering-no-servidor.md`. O CLI continua bloqueando o push.
+9. **`ordering` entrou depois** do resto: enum Prisma `ORDERING`, schema
+   público e seed. A página da prova embaralha o pool por tentativa
+   (`src/mdq/shuffle.ts`), como a spec exige do host.
 10. **Componentes.** Cada componente de `src/components/question/` é apagado
     quando a versão de `mdq/solid` chega, na ordem MultipleChoice, TrueFalse,
     MultipleSelection, ShortAnswer, Numeric, Essay, FillIn, QuestionView. Até
@@ -100,16 +101,21 @@ Cada fase termina com `pnpm run lint` e a suíte Playwright verdes.
   `split.ts`, `scoring.ts` e afins; fechar
   `dev/issues/server-mdq-atrasado-em-relacao-ao-mdq-py.md`.
 
-## Pendências na biblioteca
+## Pendências
 
-- O resultado do mdq (`{score, feedback: string[]}`) não traz a nota por blank
-  nem o estado pendente. O FillIn precisa da nota de cada blank para marcar
-  qual errou; essay e short-answer `manual` precisam distinguir "ainda não
-  corrigido" de "zero".
-  - Nota por blank: lacuna da spec, levada à mdq-py (proposta: `blanks`
-    opcional em `QuestionScore`). As marcas do FillIn em revisão esperam.
-  - Pendente: `ReviewResult<R> = QuestionResult<R> | PendingResult<R>` com
-    `isPending()` em `mdq/solid`; forma exata nos handoffs de Essay e
-    ShortAnswer.
-- `parseFillInStem`, `parseNumericInput` e `prevalidate` são usados pelas views
-  antigas; somem com os componentes do mdq.
+- **Nota por blank: feita no mdq** (spec `docs/question-types/fill-in.md`,
+  seção "Blank scores"; mdq-py b4bbdaa). `QuestionScore.blanks` é um
+  `Record<blankId, BlankScore | null>`: `null` é blank pendente, blank vazio é
+  `{score: 0, feedback: []}`. A mdq-js já tem `BlankScore` (59236eb), que
+  `src/components/question/mdq.ts` usa.
+- `scoreBlanks` também serve para resposta pendente (tela de revisão);
+  `combineBlanks(question, response, manual)` dá a nota com a nota do
+  professor em [0, 1] para cada blank pendente. O comentário do professor por
+  blank não vai para a biblioteca: fica no codehood, junto da nota manual.
+- O FillIn de `mdq/solid` já marca cada blank em revisão e mostra o feedback
+  de cada um, com a marca "parcial" para 0 < nota < 1 (mdq-js 1d9d9bb).
+- Resultado pendente: `PendingResult` e `isPending` já estão em `mdq/solid`.
+- No codehood, só a prévia do professor usa `scoreBlanks` e o resultado
+  pendente. A revisão do aluno e a correção mostram a resposta em `readonly`,
+  sem marcas por blank nem estado pendente, e a correção manual ainda não
+  pontua blank a blank.

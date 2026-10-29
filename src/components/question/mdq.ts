@@ -7,7 +7,7 @@ import {
 } from "mdq/solid";
 import type { JSX } from "solid-js";
 import { locale, m } from "@/i18n";
-import type { PublicQuestion, QuestionScore } from "@/mdq";
+import type { BlankScore, PublicQuestion, QuestionScore } from "@/mdq";
 
 /// The strings of the `mdq/solid` components in the locale of this installation.
 export const mdqMessages: Messages = {
@@ -33,7 +33,7 @@ export interface AnyQuestionViewProps {
 		| (QuestionScore & { correct?: CorrectResponses })
 		| {
 				pending: true;
-				blanks?: Record<string, QuestionScore | null>;
+				blanks?: Record<string, BlankScore | null>;
 				correct?: CorrectResponses;
 		  };
 	messages?: Partial<Messages>;

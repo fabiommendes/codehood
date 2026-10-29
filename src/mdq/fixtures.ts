@@ -1,5 +1,5 @@
 /**
- * Well-formed question documents, one per hosted MDQ type, and the builders
+ * Well-formed question documents, one per MDQ type, and the builders
  * that make them.
  *
  * Every fixture here passes `validateDocument` and has an id on each choice,
@@ -14,6 +14,7 @@ import type {
 	MultipleChoiceQuestion,
 	MultipleSelectionQuestion,
 	NumericQuestion,
+	OrderingQuestion,
 	QuestionDocument,
 	ShortAnswerQuestion,
 	TrueFalseQuestion,
@@ -63,6 +64,13 @@ export function shortAnswer(
 /** Builds a fill-in document, supplying its discriminator. */
 export function fillIn(data: Omit<FillInQuestion, "type">): FillInQuestion {
 	return { type: "fill-in", ...data };
+}
+
+/** Builds an ordering document, supplying its discriminator. */
+export function ordering(
+	data: Omit<OrderingQuestion, "type">,
+): OrderingQuestion {
+	return { type: "ordering", ...data };
 }
 
 // -----------------------------------------------------------------------------
@@ -183,8 +191,26 @@ export const brasiliaFillIn: FillInQuestion = fillIn({
 	],
 });
 
+/// Code whose indentation counts, with a distractor line the student must leave out.
+export const fibonacciOrdering: OrderingQuestion = ordering({
+	id: "fibonacci-loop",
+	title: "Fibonacci loop",
+	stem: "Sort the lines into a loop that prints the first Fibonacci numbers.",
+	content: "code",
+	highlight: "python",
+	indentation: "strict",
+	lines: [
+		[0, "x, y = 1, 1"],
+		[0, "for _ in range(10):"],
+		[1, "print(x)"],
+		[1, "x, y = y, x + y"],
+	],
+	extra: [[1, "x = y"]],
+	incorrectFeedback: "Print before you advance the pair.",
+});
+
 /**
- * One well-formed document of every hosted MDQ type, for tests that must cover
+ * One well-formed document of every MDQ type, for tests that must cover
  * the whole union.
  *
  * Adding a type to `questionDocument` without adding it here leaves a hole no
@@ -198,4 +224,5 @@ export const everyQuestionType = [
 	waterNumeric,
 	capitalShortAnswer,
 	brasiliaFillIn,
+	fibonacciOrdering,
 ] as const satisfies readonly QuestionDocument[];

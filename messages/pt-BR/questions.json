@@ -21,6 +21,7 @@
 	"questions_type_numeric": "Numérica",
 	"questions_type_short_answer": "Resposta curta",
 	"questions_type_fill_in": "Preencher lacunas",
+	"questions_type_ordering": "Ordenação",
 	"questions_status_draft": "Rascunho",
 	"questions_status_published": "Publicada",
 	"questions_status_archived": "Arquivada",

@@ -122,6 +122,20 @@
 		}
 	],
 	"exams_attempt_submit_body": "Não será possível alterar as respostas depois do envio. Questões deixadas em branco continuam em branco.",
+	"exams_attempt_submit_skips_ordering": [
+		{
+			"declarations": [
+				"input count",
+				"input numbers",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "A questão de ordenação {numbers} ainda não tem resposta e será pulada. Para enviar a ordem mostrada, use “Manter esta ordem” na questão.",
+				"countPlural=other": "As questões de ordenação {numbers} ainda não têm resposta e serão puladas. Para enviar a ordem mostrada, use “Manter esta ordem” em cada uma."
+			}
+		}
+	],
 	"exams_attempt_submit": [
 		{
 			"declarations": ["input type"],

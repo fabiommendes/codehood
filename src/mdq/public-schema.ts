@@ -11,15 +11,20 @@ import {
 	DiacriticsType,
 	EssayContent,
 	FillInGrading,
+	Indentation,
 	MultipleChoiceGrading,
 	MultipleSelectionGrading,
+	Normalization,
 	NumericDomain,
 	numericAnswerShape,
+	OrderingContent,
+	OrderingLine,
 	type PublicEssayQuestion,
 	type PublicFillInQuestion,
 	type PublicMultipleChoiceQuestion,
 	type PublicMultipleSelectionQuestion,
 	type PublicNumericQuestion,
+	type PublicOrderingQuestion,
 	type PublicShortAnswerQuestion,
 	type PublicTrueFalseQuestion,
 	QuestionShuffle,
@@ -130,7 +135,19 @@ export const publicFillInSchema = z.object({
 	blanks: z.array(publicBlank),
 });
 
-/** The public form of every question type this server hosts. */
+export const publicOrderingSchema = z.object({
+	...base,
+	type: z.literal("ordering"),
+	content: OrderingContent,
+	highlight: z.string().optional(),
+	indentation: Indentation.optional(),
+	unmatched: Unmatched,
+	normalizations: z.array(Normalization).optional(),
+	maxLevel: z.number().int().min(1).optional(),
+	pool: z.array(OrderingLine),
+});
+
+/** The public form of every question type. */
 export const publicQuestionSchema = z.discriminatedUnion("type", [
 	publicMultipleChoiceSchema,
 	publicMultipleSelectionSchema,
@@ -139,6 +156,7 @@ export const publicQuestionSchema = z.discriminatedUnion("type", [
 	publicShortAnswerSchema,
 	publicEssaySchema,
 	publicFillInSchema,
+	publicOrderingSchema,
 ]);
 
 true satisfies AssertEqual<
@@ -168,4 +186,8 @@ true satisfies AssertEqual<
 true satisfies AssertEqual<
 	z.infer<typeof publicFillInSchema>,
 	PublicFillInQuestion
+>;
+true satisfies AssertEqual<
+	z.infer<typeof publicOrderingSchema>,
+	PublicOrderingQuestion
 >;

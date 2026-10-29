@@ -100,6 +100,7 @@ export const questionType = z.enum([
 	"numeric",
 	"short-answer",
 	"fill-in",
+	"ordering",
 ]);
 export type QuestionType = z.infer<typeof questionType>;
 true satisfies AssertEqual<QuestionType, MdqQuestionType>;

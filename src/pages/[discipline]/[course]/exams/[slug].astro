@@ -16,6 +16,7 @@ import type { ExamExceptionView, Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { shufflePool } from "@/mdq/shuffle";
 import { examResult } from "@/services/exam-result";
 import {
 	attemptState,
@@ -332,7 +333,10 @@ const openRegrades =
 // Fetched with `public: true` above, so a student's copy never held an answer key.
 const attemptQuestions = pinnedQuestions.map(({ slug, question }) => ({
 	slug,
-	question: question as QuestionPublic["question"],
+	question: shufflePool(
+		question as QuestionPublic["question"],
+		`${attempt?.publicId ?? actor.username}:${slug}`,
+	),
 }));
 // Questions stay on the server until the student is in the attempt.
 const showQuestions =

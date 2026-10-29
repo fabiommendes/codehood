@@ -122,6 +122,20 @@
 		}
 	],
 	"exams_attempt_submit_body": "Your answers can't be changed after you submit. Questions you left blank stay blank.",
+	"exams_attempt_submit_skips_ordering": [
+		{
+			"declarations": [
+				"input count",
+				"input numbers",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Ordering question {numbers} has no answer yet and will be skipped. To submit the order shown, use “Keep this order” on the question.",
+				"countPlural=other": "Ordering questions {numbers} have no answer yet and will be skipped. To submit the order shown, use “Keep this order” on each of them."
+			}
+		}
+	],
 	"exams_attempt_submit": [
 		{
 			"declarations": ["input type"],

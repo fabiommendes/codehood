@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
-import { capitalChoice } from "@/mdq/fixtures";
+import { capitalChoice, fibonacciOrdering } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
@@ -156,4 +156,59 @@ test("an answer lost to a network failure says so, and later answers still save"
 			return response?.submissions[0]?.payload ?? null;
 		})
 		.toEqual("brasilia");
+});
+
+test("an ordering question left untouched is named in the submit dialog until its order is kept", async ({
+	page,
+}) => {
+	const { student, course, href } = await setup();
+	await db.question.create(
+		{
+			status: "PUBLISHED",
+			version: "1",
+			course: course.id,
+			slug: "fibonacci",
+			question: fibonacciOrdering,
+		},
+		FULL_ACCESS,
+	);
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "live",
+		status: "ONGOING",
+		questions: [{ slug: "capital" }, { slug: "fibonacci" }],
+	});
+	await db.response.create(
+		{ course: course.id, exam: exam.slug, author: student.username },
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, student);
+	await page.goto(`${href}/exams/${exam.slug}`);
+	const dialog = page.getByRole("dialog");
+	const warning = dialog.getByText(
+		"Ordering question 2 has no answer yet and will be skipped.",
+		{ exact: false },
+	);
+
+	await page.getByRole("button", { name: "Submit exam" }).first().click();
+	await expect(warning).toBeVisible();
+	await dialog.getByRole("button", { name: "Cancel" }).click();
+
+	await page.getByRole("button", { name: "Keep this order" }).click();
+	await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+	const saved = await prisma.response.findFirst({
+		where: { authorId: student.username, examId: exam.id },
+		include: { submissions: { orderBy: { id: "desc" }, take: 1 } },
+	});
+	const lines = saved?.submissions[0]?.payload as [number, string][];
+	expect(lines.map(([, text]) => text).sort()).toEqual(
+		[...fibonacciOrdering.lines, ...(fibonacciOrdering.extra ?? [])]
+			.map(([, text]) => text)
+			.sort(),
+	);
+
+	await page.getByRole("button", { name: "Submit exam" }).first().click();
+	await expect(dialog.getByText("Your answers can't be changed")).toBeVisible();
+	await expect(warning).toHaveCount(0);
 });

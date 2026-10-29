@@ -17,6 +17,7 @@ import {
 	multipleChoice,
 	multipleSelection,
 	numeric,
+	ordering,
 	shortAnswer,
 	trueFalse,
 } from "./fixtures";
@@ -26,6 +27,7 @@ import type {
 	MultipleChoiceQuestion as MultipleChoice,
 	MultipleSelectionQuestion as MultipleSelection,
 	NumericQuestion as Numeric,
+	OrderingQuestion as Ordering,
 	QuestionDocument as Question,
 	ShortAnswerQuestion as ShortAnswer,
 	TrueFalseQuestion as TrueFalse,
@@ -38,38 +40,53 @@ function id(prefix: string, sequence: number): string {
 	return `${prefix}-${sequence}`;
 }
 
+/// A source of choice texts that never repeats one, since mdq forbids two choices with the same text.
+function distinctTexts(words = 2): () => string {
+	const used = new Set<string>();
+	return () => {
+		let text = faker.lorem.words(words);
+		while (used.has(text)) text = faker.lorem.words(words);
+		used.add(text);
+		return text;
+	};
+}
+
 /// A question stem phrased as a question, so generated documents read like documents.
 function stem(): string {
 	return faker.lorem.sentence().replace(/\.$/, "?");
 }
 
 export const multipleChoiceFactory = Factory.define<MultipleChoice>(
-	({ sequence }) =>
-		multipleChoice({
+	({ sequence }) => {
+		const text = distinctTexts();
+		return multipleChoice({
 			id: id("mc", sequence),
 			title: faker.lorem.words(3),
 			stem: stem(),
 			choices: [
-				{ id: "right", text: faker.lorem.words(2), score: 1 },
-				{ id: "wrong-1", text: faker.lorem.words(2), score: 0 },
-				{ id: "wrong-2", text: faker.lorem.words(2), score: 0 },
+				{ id: "right", text: text(), score: 1 },
+				{ id: "wrong-1", text: text(), score: 0 },
+				{ id: "wrong-2", text: text(), score: 0 },
 			],
-		}),
+		});
+	},
 );
 
 export const multipleSelectionFactory = Factory.define<MultipleSelection>(
-	({ sequence }) =>
-		multipleSelection({
+	({ sequence }) => {
+		const text = distinctTexts();
+		return multipleSelection({
 			id: id("ms", sequence),
 			title: faker.lorem.words(3),
 			stem: stem(),
 			choices: [
-				{ id: "in-1", text: faker.lorem.words(2), correct: true },
-				{ id: "in-2", text: faker.lorem.words(2), correct: true },
-				{ id: "out-1", text: faker.lorem.words(2), correct: false },
-				{ id: "out-2", text: faker.lorem.words(2), correct: false },
+				{ id: "in-1", text: text(), correct: true },
+				{ id: "in-2", text: text(), correct: true },
+				{ id: "out-1", text: text(), correct: false },
+				{ id: "out-2", text: text(), correct: false },
 			],
-		}),
+		});
+	},
 );
 
 export const trueFalseFactory = Factory.define<TrueFalse>(({ sequence }) =>
@@ -122,13 +139,14 @@ export const shortAnswerFactory = Factory.define<ShortAnswer>(
 
 /// The three blank kinds, so a generated fill-in exercises every control.
 function blanks(sequence: number): FillInBlank[] {
+	const text = distinctTexts(1);
 	return [
 		{
 			id: id("pick", sequence),
 			type: "multiple-choice",
 			choices: [
-				{ id: "right", text: faker.lorem.word(), score: 1 },
-				{ id: "wrong", text: faker.lorem.word(), score: 0 },
+				{ id: "right", text: text(), score: 1 },
+				{ id: "wrong", text: text(), score: 0 },
 			],
 		},
 		{
@@ -168,6 +186,20 @@ export const fillInFactory = Factory.define<FillIn>(({ sequence, params }) => {
 	});
 });
 
+export const orderingFactory = Factory.define<Ordering>(({ sequence }) =>
+	ordering({
+		id: id("or", sequence),
+		title: faker.lorem.words(3),
+		stem: "Put the steps in order.",
+		content: "text",
+		lines: [
+			[0, `${faker.lorem.word()} 1`],
+			[0, `${faker.lorem.word()} 2`],
+			[0, `${faker.lorem.word()} 3`],
+		],
+	}),
+);
+
 /// The factory for each question type, so a missing type is a compile error.
 const FACTORIES: {
 	[K in Question["type"]]: Factory<Extract<Question, { type: K }>>;
@@ -179,6 +211,7 @@ const FACTORIES: {
 	numeric: numericFactory,
 	"short-answer": shortAnswerFactory,
 	"fill-in": fillInFactory,
+	ordering: orderingFactory,
 };
 
 /// The question types in a fixed order, so `questionFactory` cycles predictably.
@@ -190,12 +223,13 @@ const TYPES = [
 	"numeric",
 	"short-answer",
 	"fill-in",
+	"ordering",
 ] as const satisfies readonly Question["type"][];
 
 /**
  * Builds a question of any type, cycling through the types in order.
  *
- * `questionFactory.buildList(7)` is one document of every type, which is what a
+ * `questionFactory.buildList(8)` is one document of every type, which is what a
  * test covering the whole union wants. Pass `type` to pin it instead.
  */
 export const questionFactory = Factory.define<Question>(

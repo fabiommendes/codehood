@@ -107,6 +107,16 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const [unsaved, setUnsaved] = createSignal<ReadonlySet<string>>(new Set());
 	let dialog: HTMLDialogElement | undefined;
 
+	// An ordering question shows its lines before the student touches them, so
+	// leaving it unanswered is easy to miss: the submit dialog names them.
+	const unsortedNumbers = () =>
+		props.questions.flatMap((entry, index) =>
+			entry.question.type === "ordering" &&
+			!isAnswered(entry.question.type, answers()[entry.slug])
+				? [index + 1]
+				: [],
+		);
+
 	const opensAt = () =>
 		props.state.kind === "not-open" ? props.state.opensAt : null;
 	const deadline = () =>
@@ -378,6 +388,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							<p class="mt-2 text-sm text-base-content/70">
 								{m.exams_attempt_submit_body()}
 							</p>
+							<Show when={unsortedNumbers().length > 0}>
+								<p role="alert" class="alert alert-warning mt-3 text-sm">
+									{m.exams_attempt_submit_skips_ordering({
+										count: unsortedNumbers().length,
+										numbers: unsortedNumbers().join(", "),
+									})}
+								</p>
+							</Show>
 							<div class="modal-action">
 								<button
 									type="button"

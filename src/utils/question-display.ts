@@ -15,6 +15,7 @@ export const questionTypeLabels: Record<QuestionType, string> = {
 	numeric: m.questions_type_numeric(),
 	"short-answer": m.questions_type_short_answer(),
 	"fill-in": m.questions_type_fill_in(),
+	ordering: m.questions_type_ordering(),
 };
 
 /** Sentence-case label for each question status. */

@@ -10,6 +10,7 @@ import {
 	brasiliaFillIn,
 	capitalChoice,
 	everyQuestionType,
+	fibonacciOrdering,
 	idempotenceEssay,
 } from "@/mdq/fixtures";
 import { publicQuestionSchema } from "@/mdq/public-schema";
@@ -23,17 +24,16 @@ test("every fixture is a hosted question document with no model problem", () => 
 	}
 });
 
-test("an ordering question is not a hosted question document", () => {
-	const ordering = {
-		type: "ordering",
-		stem: "Put the steps in order.",
-		content: "text",
-		lines: [
-			[0, "first"],
-			[0, "second"],
-		],
-	};
-	expect(questionDocument.safeParse(ordering).success).toBe(false);
+test("the public form of an ordering question hides the answer", () => {
+	const form = publicQuestionSchema.parse(publicForm(fibonacciOrdering));
+	expect(form).toEqual(publicForm(fibonacciOrdering));
+	expect(form).not.toHaveProperty("lines");
+	expect(form).not.toHaveProperty("extra");
+	expect(form).not.toHaveProperty("incorrectFeedback");
+	// Under `strict` the pool levels are 0, so they do not give the answer away.
+	expect(
+		form.type === "ordering" && form.pool.every(([level]) => level === 0),
+	).toBe(true);
 });
 
 test("the public form of every fixture parses against the public schema", () => {
@@ -75,6 +75,22 @@ test.describe("assertResponse", () => {
 
 	test("refuses a response of the wrong shape", () => {
 		expect(() => assertResponse(capitalChoice, { choice: "brasilia" })).toThrow(
+			ResponseError,
+		);
+	});
+
+	test("accepts an ordering of lines from the pool", () => {
+		expect(() =>
+			assertResponse(fibonacciOrdering, [
+				[0, "x, y = 1, 1"],
+				[0, "for _ in range(10):"],
+				[1, "x = y"],
+			]),
+		).not.toThrow();
+	});
+
+	test("refuses an ordering line the pool does not offer", () => {
+		expect(() => assertResponse(fibonacciOrdering, [[0, "print(y)"]])).toThrow(
 			ResponseError,
 		);
 	});

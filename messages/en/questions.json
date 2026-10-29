@@ -21,6 +21,7 @@
 	"questions_type_numeric": "Numeric",
 	"questions_type_short_answer": "Short answer",
 	"questions_type_fill_in": "Fill in the blank",
+	"questions_type_ordering": "Ordering",
 	"questions_status_draft": "Draft",
 	"questions_status_published": "Published",
 	"questions_status_archived": "Archived",

@@ -1805,6 +1805,32 @@ async function seedOpenQuiz(course: Course["id"]): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+	await db.question.create(
+		{
+			course,
+			slug: "factorial-lines",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "ordering",
+				title: "Recursive factorial",
+				stem: "Sort and indent the lines into a recursive `factorial(n)`. One line is not part of it.",
+				tags: ["recursion"],
+				content: "code",
+				highlight: "python",
+				indentation: "strict",
+				lines: [
+					[0, "def factorial(n):"],
+					[1, "if n == 0:"],
+					[2, "return 1"],
+					[1, "return n * factorial(n - 1)"],
+				],
+				extra: [[1, "return factorial(n)"]],
+				incorrectFeedback: "The base case comes before the recursive call.",
+			},
+		},
+		FULL_ACCESS,
+	);
 	await db.exam.create(
 		{
 			course,
@@ -1822,6 +1848,7 @@ async function seedOpenQuiz(course: Course["id"]): Promise<void> {
 				{ slug: "factorial-of-five", version: "v1" },
 				{ slug: "stack-overflow-name", version: "v1" },
 				{ slug: "recursive-sum", version: "v1" },
+				{ slug: "factorial-lines", version: "v1" },
 				{ slug: "explain-recursion", version: "v1" },
 			],
 		},
@@ -1860,6 +1887,30 @@ async function seedGradedExam(
 		},
 		FULL_ACCESS,
 	);
+	await db.question.create(
+		{
+			course,
+			slug: "factorial-returns",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "ordering",
+				title: "Returns of factorial(3)",
+				stem: "In what order do the calls of `factorial(3)` return?",
+				tags: ["recursion"],
+				content: "text",
+				// An order nobody keyed waits for the instructor instead of scoring 0.
+				unmatched: "manual",
+				lines: [
+					[0, "factorial(0) returns 1"],
+					[0, "factorial(1) returns 1"],
+					[0, "factorial(2) returns 2"],
+					[0, "factorial(3) returns 6"],
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
 	await db.exam.create(
 		{
 			course,
@@ -1872,6 +1923,7 @@ async function seedGradedExam(
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
 				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "factorial-returns", version: "v1" },
 				{ slug: "explain-recursion", version: "v1" },
 			],
 		},
@@ -1882,16 +1934,30 @@ async function seedGradedExam(
 	const hopper = await answerExam(course, exam, students.hopper, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 120,
+		"factorial-returns": [
+			[0, "factorial(0) returns 1"],
+			[0, "factorial(1) returns 1"],
+			[0, "factorial(2) returns 2"],
+			[0, "factorial(3) returns 6"],
+		],
 		"explain-recursion":
 			"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
 	});
 	await botGrade(hopper["recursion-basics"], "1");
 	await botGrade(hopper["factorial-of-five"], "1");
+	await botGrade(hopper["factorial-returns"], "1");
 
-	// Hamilton: everything graded, the essay by the instructor with a comment.
+	// Hamilton: everything graded but the ordering, the essay by the instructor with a comment.
 	const hamilton = await answerExam(course, exam, students.hamilton, {
 		"recursion-basics": "tail-call",
 		"factorial-of-five": 100,
+		// The order of the calls, not of the returns: matches no key, so it is pending.
+		"factorial-returns": [
+			[0, "factorial(3) returns 6"],
+			[0, "factorial(2) returns 2"],
+			[0, "factorial(1) returns 1"],
+			[0, "factorial(0) returns 1"],
+		],
 		"explain-recursion":
 			"The base case is where the function returns a value directly.",
 	});

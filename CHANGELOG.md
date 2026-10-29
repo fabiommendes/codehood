@@ -4,6 +4,12 @@
 
 ### Added
 
+- Ordering questions: the student sorts (and, for code, indents) a pool of
+  lines, which the exam page shuffles once per attempt. An untouched question
+  counts as unanswered, and the submit dialog names it and points to "Keep
+  this order". `codehood push` no longer refuses them. The dev seed adds one
+  to quiz 2 and an `unmatched: manual` one to test 1, with a correct and a
+  pending answer.
 - Repositories: a course shares versioned file trees, pushed by the CLI from
   `repositories/`. Students clone them with `git clone` and get corrections
   with `git pull`, served as a read-only dumb-HTTP git repository built from
@@ -71,7 +77,7 @@
   fill-in scores the mean of its blanks. `codehood push` sends the parsed
   document as is, so `weight`, `grading`, `diacritics`, `unmatched` and
   blank patterns now reach the server, and essay and fraction numeric pushes
-  no longer fail. `ordering` questions are still refused.
+  no longer fail.
 - An edition's term has at most two digits (`2026-1` to `2026-99`), slugs at
   most 200 characters and public ids at most 64.
 - A meeting that ended earlier today stays in view until the day turns: its

@@ -2,29 +2,19 @@
  * The MDQ questions this server hosts, on top of the `mdq` library.
  *
  * Documents, public forms, responses and scores all follow the mdq spec; this
- * module only narrows the library to the question types the server stores and
- * adds the few checks a service needs before writing.
+ * module only adds the few checks a service needs before writing.
  */
 import {
 	type Diagnostic,
-	EssayQuestion,
-	FillInQuestion,
 	type PublicQuestion as MdqPublicQuestion,
-	type Question as MdqQuestion,
-	MultipleChoiceQuestion,
-	MultipleSelectionQuestion,
 	modelDiagnostics,
 	NotAutoGradable,
-	NumericQuestion,
-	type OrderingQuestion,
-	type PublicOrderingQuestion,
-	ShortAnswerQuestion,
+	Question,
 	scoreResponse,
-	TrueFalseQuestion,
 } from "mdq";
-import { z } from "zod";
 
 export type {
+	BlankScore,
 	ChoiceBlank,
 	Diagnostic,
 	EssayQuestion,
@@ -37,6 +27,9 @@ export type {
 	NumericBlank,
 	NumericQuestion,
 	NumericResponse,
+	OrderingLine,
+	OrderingQuestion,
+	OrderingResponse,
 	PublicBlank,
 	PublicChoice,
 	PublicEssayQuestion,
@@ -44,6 +37,7 @@ export type {
 	PublicMultipleChoiceQuestion,
 	PublicMultipleSelectionQuestion,
 	PublicNumericQuestion,
+	PublicOrderingQuestion,
 	PublicShortAnswerQuestion,
 	PublicTrueFalseQuestion,
 	QuestionResponse,
@@ -65,23 +59,15 @@ export {
 	withIds,
 } from "mdq";
 
-/** A question document of a type this server hosts: every mdq type but `ordering`. */
-export const questionDocument = z.discriminatedUnion("type", [
-	MultipleChoiceQuestion,
-	MultipleSelectionQuestion,
-	TrueFalseQuestion,
-	NumericQuestion,
-	ShortAnswerQuestion,
-	EssayQuestion,
-	FillInQuestion,
-]);
-export type QuestionDocument = Exclude<MdqQuestion, OrderingQuestion>;
+/** A question document of any mdq type. */
+export const questionDocument = Question;
+export type QuestionDocument = Question;
 
-/** The type of a hosted question document. */
+/** The type of a question document. */
 export type QuestionType = QuestionDocument["type"];
 
-/** The public form of a hosted question document. */
-export type PublicQuestion = Exclude<MdqPublicQuestion, PublicOrderingQuestion>;
+/** The public form of a question document. */
+export type PublicQuestion = MdqPublicQuestion;
 
 /**
  * The rules of the mdq spec that `question` breaks beyond its schema, such as a
