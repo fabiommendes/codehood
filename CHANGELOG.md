@@ -4,6 +4,15 @@
 
 ### Added
 
+- Answers are reviewed with the marks of the mdq library: the grading and
+  attempt pages show each choice, fill-in or ordering answer in review mode
+  (marks and feedback, the score still from the grading passes), and a
+  student sees the same once grades are released, without the answer key. A
+  fill-in answer with a blank no pattern settles is graded blank by blank: a
+  percentage and a comment per pending blank, combined by the library into
+  the question score (`grading.gradeBlanks`, stored in the new
+  `Feedback.blanks`). The dev seed has one waiting in test 1 and one graded
+  in quiz 1.
 - Ordering questions: the student sorts (and, for code, indents) a pool of
   lines, which the exam page shuffles once per attempt. An untouched question
   counts as unanswered, and the submit dialog names it and points to "Keep

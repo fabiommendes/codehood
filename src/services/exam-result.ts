@@ -10,6 +10,13 @@ import { scoreValue } from "@/core/score";
 import type { Feedback } from "@/db/services/feedback.service";
 import type { Submission } from "@/db/services/submission.service";
 
+/// The part of a grading pass the result depends on.
+export type ResultFeedback = Pick<
+	Feedback,
+	"submission" | "score" | "feedback" | "updatedAt"
+> &
+	Partial<Pick<Feedback, "blanks">>;
+
 export type QuestionOutcomeStatus =
 	| "graded"
 	| "pending"
@@ -64,6 +71,8 @@ export interface QuestionOutcome {
 	status: QuestionOutcomeStatus;
 	/// The current verdict as a number in `[-1, 1]`, or `null` unless `graded`.
 	score: number | null;
+	/// The blank grades of the current verdict, when the instructor graded the blanks one by one.
+	blanks?: Feedback["blanks"];
 	/// Every non-empty written comment on the answer, newest first.
 	comments: string[];
 }
@@ -95,7 +104,7 @@ export interface ExamResult {
 export function examResult(
 	questions: string[],
 	submissions: ResultSubmission[],
-	feedback: Pick<Feedback, "submission" | "score" | "feedback" | "updatedAt">[],
+	feedback: ResultFeedback[],
 ): ExamResult {
 	const outcomes = questions.map((slug) =>
 		outcomeOf(slug, submissions, feedback),
@@ -107,7 +116,7 @@ export function examResult(
 function outcomeOf(
 	slug: string,
 	submissions: ResultSubmission[],
-	feedback: Pick<Feedback, "submission" | "score" | "feedback" | "updatedAt">[],
+	feedback: ResultFeedback[],
 ): QuestionOutcome {
 	const counting = submissions
 		.filter((submission) => submission.question === slug)
@@ -152,6 +161,7 @@ function outcomeOf(
 		submission: counting.publicId,
 		status: "graded",
 		score: verdict,
+		...(passes[0]?.blanks ? { blanks: passes[0].blanks } : {}),
 		comments,
 	};
 }

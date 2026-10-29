@@ -1,11 +1,12 @@
 ---
 /**
- * A student's saved answer as visible text, or as the question's read-only
- * view when the answer is a pick among choices.
+ * A student's saved answer as visible text, or as the question's view when
+ * the answer is a pick, a set of blanks or a list of lines.
  */
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import type { QuestionPublic } from "@/db";
 import { m } from "@/i18n";
+import type { ReviewResult } from "@/services/review";
 import AnswerView from "./AnswerView";
 import { displayAnswer } from "./answer-text";
 
@@ -13,9 +14,11 @@ interface Props {
 	/// The public half of the question, as the student saw it.
 	question: QuestionPublic["question"];
 	payload: AnswerPayload | undefined;
+	/// The marks to show on the view, without a score of its own; read-only without it.
+	result?: ReviewResult;
 }
 
-const { question, payload } = Astro.props;
+const { question, payload, result } = Astro.props;
 const shown = displayAnswer(question.type, payload);
 ---
 
@@ -25,16 +28,4 @@ const shown = displayAnswer(question.type, payload);
     <p class:list={["text-base-content", shown.multiline && "whitespace-pre-wrap"]}>{shown.text}</p>
   )
 }
-{
-  shown.kind === "blanks" && (
-    <dl class="flex flex-col gap-1">
-      {shown.entries.map(([id, text]) => (
-        <div class="flex gap-2">
-          <dt class="font-mono text-sm text-base-content/60">{id}</dt>
-          <dd class="whitespace-pre-wrap">{text}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-{shown.kind === "choices" && <AnswerView client:load question={question} payload={payload} />}
+{shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} />}

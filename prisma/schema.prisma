@@ -907,6 +907,11 @@ model Feedback {
 
   feedback String?
 
+  /// The instructor's grade of each pending blank of a fill-in question, by
+  /// blank id: `{score, comment?}`, the score in [0, 1]. `score` above is the
+  /// question score these combine into.
+  blanks Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

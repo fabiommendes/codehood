@@ -12,5 +12,7 @@ Na suíte completa, `test/islands-no-raw-ids.spec.ts` › "exam detail
 vezes, cobrindo todos os tipos de questão da factory. A falha não guardou o
 status nem o log do servidor.
 
-Próximo passo: quando reaparecer, guardar o status HTTP e o corpo da resposta
-na mensagem do `expect` para saber se é 500, timeout ou outra coisa.
+Reapareceu numa segunda rodada completa: a resposta veio rápida e sem `ok`,
+não por timeout. Isolado, com `--repeat-each=15`, passou 150 vezes. Nenhum
+documento da factory faz a prévia lançar (testado com 40 mil). A mensagem do
+`expect` agora traz o status e o começo do corpo; na próxima falha, ler ali.

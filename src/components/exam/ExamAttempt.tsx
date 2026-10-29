@@ -21,6 +21,7 @@ import {
 	type QuestionOutcome,
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
+import type { ReviewResult } from "@/services/review";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import { type AnswerPayload, isAnswered, isTextEntry } from "./answer-payload";
@@ -43,6 +44,8 @@ export interface ExamAttemptProps {
 	answers: Record<string, AnswerPayload>;
 	/// The graded outcome per question, present once the grades are released.
 	result?: ExamResult;
+	/// The marks and feedback of each answered question, by question slug, once the grades are released.
+	reviews?: Record<string, ReviewResult>;
 	/// What the student may do about the regrade of each question's answer, by question slug.
 	regrades?: Record<string, QuestionRegrade>;
 }
@@ -353,6 +356,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										question={entry.question}
 										payload={answers()[entry.slug]}
 										readonly={kind() !== "in-progress"}
+										review={
+											kind() === "results"
+												? props.reviews?.[entry.slug]
+												: undefined
+										}
 										onChange={(payload) =>
 											change(entry.slug, entry.question.type, payload)
 										}
@@ -607,17 +615,21 @@ interface AnswerFieldProps {
 	question: QuestionPublic["question"];
 	payload: AnswerPayload | undefined;
 	readonly: boolean;
+	/// The answer's marks and feedback, shown in `review` mode; the score is the outcome's, below.
+	review?: ReviewResult;
 	onChange: (payload: AnswerPayload) => void;
 }
 
-/// One question in answer mode, or frozen on the student's saved answer.
+/// One question in answer mode, frozen on the student's saved answer, or reviewed with its marks.
 function AnswerField(props: AnswerFieldProps): JSX.Element {
 	return (
 		<AnyQuestionView
 			question={props.question}
 			value={props.payload ?? null}
 			onChange={props.onChange}
-			mode={props.readonly ? "readonly" : "answer"}
+			mode={props.review ? "review" : props.readonly ? "readonly" : "answer"}
+			result={props.review}
+			hideScore
 			messages={mdqMessages}
 		/>
 	);

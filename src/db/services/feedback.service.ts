@@ -25,7 +25,7 @@ import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
 import { m } from "@/i18n";
 import { resultsReleased } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
-import type { Prisma, PrismaTx } from "../client";
+import { DbNull, type Prisma, type PrismaTx } from "../client";
 import {
 	courseRefMatch,
 	courseRefWhere,
@@ -149,6 +149,7 @@ export class FeedbackService extends CrudBase<{
 				graderId,
 				botId,
 				feedback: input.feedback ?? null,
+				blanks: input.blanks ?? DbNull,
 			},
 			include: feedbackInclude(),
 		});
@@ -294,6 +295,9 @@ export class FeedbackService extends CrudBase<{
 			data: {
 				...(fields.score !== undefined ? { score: fields.score } : {}),
 				...(fields.feedback !== undefined ? { feedback: fields.feedback } : {}),
+				...(fields.blanks !== undefined
+					? { blanks: fields.blanks ?? DbNull }
+					: {}),
 			},
 			include: feedbackInclude(),
 		});
@@ -354,6 +358,7 @@ export class FeedbackService extends CrudBase<{
 				data: {
 					score: input.score,
 					feedback: input.feedback ?? null,
+					blanks: input.blanks ?? DbNull,
 				},
 				include: feedbackInclude(),
 			});
@@ -369,6 +374,7 @@ export class FeedbackService extends CrudBase<{
 				graderId,
 				botId,
 				feedback: input.feedback ?? null,
+				blanks: input.blanks ?? DbNull,
 			},
 			include: feedbackInclude(),
 		});
@@ -647,6 +653,7 @@ export function fromDb(row: FeedbackFromDbRow): Feedback {
 		grader: row.graderId as Feedback["grader"],
 		bot: row.botId,
 		feedback: row.feedback,
+		blanks: (row.blanks ?? null) as Feedback["blanks"],
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 	};

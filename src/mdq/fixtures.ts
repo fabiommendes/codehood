@@ -191,6 +191,24 @@ export const brasiliaFillIn: FillInQuestion = fillIn({
 	],
 });
 
+/// A fill-in whose short-answer blank goes to the instructor when it matches nothing.
+export const plateauFillIn: FillInQuestion = fillIn({
+	id: "capital-plateau",
+	stem: "The capital of Brazil is [^capital], on the [^plateau] plateau.",
+	unmatched: "manual",
+	blanks: [
+		{
+			id: "capital",
+			type: "multiple-choice",
+			choices: [
+				{ id: "brasilia", text: "Brasília", score: 1, feedback: "Correct." },
+				{ id: "rio", text: "Rio de Janeiro" },
+			],
+		},
+		{ id: "plateau", type: "short-answer", accept: ["Central"] },
+	],
+});
+
 /// Code whose indentation counts, with a distractor line the student must leave out.
 export const fibonacciOrdering: OrderingQuestion = ordering({
 	id: "fibonacci-loop",

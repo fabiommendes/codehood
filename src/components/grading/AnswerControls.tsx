@@ -5,6 +5,7 @@ import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { answerWillNotGrade } from "@/core/schemas";
 import { m } from "@/i18n";
+import BlankGradeForm from "./BlankGradeForm";
 import { FOCUS_KEY } from "./focus";
 import GradeForm from "./GradeForm";
 
@@ -17,12 +18,15 @@ export interface AnswerControlsProps {
 	submission: string;
 	/// Where the answer stands: waiting for a grade, graded, or marked will-not-grade.
 	state: "pending" | "graded" | "not-graded";
+	/// The pending blanks of a fill-in answer, which the instructor grades one by one instead of the whole answer.
+	blanks?: string[];
 }
 
 /**
  * What the instructor can do to one answer: grade it, change its grade, or mark it will-not-grade.
  *
- * A pending answer shows its grading form at once. A resolved one offers
+ * A pending answer shows its grading form at once: one score for the whole
+ * answer, or one per pending blank of a fill-in answer. A resolved one offers
  * "Change grade", which reveals the same form. "Will not grade" asks for a
  * comment for the student in a dialog first. Each action reloads the page so
  * the answer moves and the numbering follows the server.
@@ -43,15 +47,31 @@ export default function AnswerControls(
 	return (
 		<div class="mt-4 flex flex-col gap-3">
 			<Show when={props.state === "pending" || changing()}>
-				<GradeForm
-					discipline={props.discipline}
-					course={props.course}
-					exam={props.exam}
-					submission={props.submission}
-					onCancel={
-						props.state === "pending" ? undefined : () => setChanging(false)
+				<Show
+					when={props.blanks?.length}
+					fallback={
+						<GradeForm
+							discipline={props.discipline}
+							course={props.course}
+							exam={props.exam}
+							submission={props.submission}
+							onCancel={
+								props.state === "pending" ? undefined : () => setChanging(false)
+							}
+						/>
 					}
-				/>
+				>
+					<BlankGradeForm
+						discipline={props.discipline}
+						course={props.course}
+						exam={props.exam}
+						submission={props.submission}
+						blanks={props.blanks ?? []}
+						onCancel={
+							props.state === "pending" ? undefined : () => setChanging(false)
+						}
+					/>
+				</Show>
 			</Show>
 
 			<div class="flex flex-wrap gap-2">

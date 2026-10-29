@@ -915,6 +915,39 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	// A blank that matches no pattern goes to the instructor, who grades it on its own.
+	await db.question.create(
+		{
+			course: cs101.id,
+			slug: "base-case-blanks",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "fill-in",
+				title: "Base case, in words",
+				stem: "A recursive function stops at its [^stop] case, and each call works on a [^smaller] input.",
+				tags: ["recursion"],
+				unmatched: "manual",
+				blanks: [
+					{
+						id: "stop",
+						type: "multiple-choice",
+						choices: [
+							{ id: "base", text: "base", score: 1, feedback: "Right." },
+							{ id: "recursive", text: "recursive" },
+						],
+					},
+					{
+						id: "smaller",
+						type: "short-answer",
+						accept: ["smaller", "simpler"],
+					},
+				],
+			},
+		},
+		FULL_ACCESS,
+	);
+
 	// Exams in several states, so a course page can show a draft being written,
 	// one waiting to start, one running, and one already over.
 	await db.exam.create(
@@ -931,6 +964,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			questions: [
 				{ slug: "recursion-basics", version: "v1" },
 				{ slug: "factorial-of-five", version: "v1" },
+				{ slug: "base-case-blanks", version: "v1" },
 			],
 		},
 		FULL_ACCESS,
@@ -1728,16 +1762,35 @@ async function seedReleasedQuiz(
 	const hopper = await answerExam(course, exam, students.hopper, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 120,
+		"base-case-blanks": { stop: "base", smaller: "shorter" },
 	});
 	await botGrade(hopper["recursion-basics"], "1");
 	await botGrade(hopper["factorial-of-five"], "1");
+	// "shorter" matches no pattern: the instructor graded that blank on its own.
+	await db.feedback.create(
+		{
+			submission: { publicId: hopper["base-case-blanks"] ?? "" },
+			ref: "manual-1",
+			score: "0.9",
+			grader: "ada",
+			blanks: {
+				smaller: {
+					score: 0.8,
+					comment: "Shorter works for lists, not in general.",
+				},
+			},
+		},
+		FULL_ACCESS,
+	);
 
 	const hamilton = await answerExam(course, exam, students.hamilton, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 25,
+		"base-case-blanks": { stop: "recursive", smaller: "smaller" },
 	});
 	await botGrade(hamilton["recursion-basics"], "1");
 	await botGrade(hamilton["factorial-of-five"], "0");
+	await botGrade(hamilton["base-case-blanks"], "0");
 
 	await db.exam.update(
 		{ course, slug: exam },
@@ -1924,6 +1977,7 @@ async function seedGradedExam(
 				{ slug: "recursion-basics", version: "v1" },
 				{ slug: "factorial-of-five", version: "v1" },
 				{ slug: "factorial-returns", version: "v1" },
+				{ slug: "base-case-blanks", version: "v1" },
 				{ slug: "explain-recursion", version: "v1" },
 			],
 		},
@@ -1940,6 +1994,8 @@ async function seedGradedExam(
 			[0, "factorial(2) returns 2"],
 			[0, "factorial(3) returns 6"],
 		],
+		// "lighter" matches no pattern, so the blank waits for the instructor.
+		"base-case-blanks": { stop: "base", smaller: "lighter" },
 		"explain-recursion":
 			"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
 	});

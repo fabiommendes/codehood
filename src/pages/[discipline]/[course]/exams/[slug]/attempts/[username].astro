@@ -11,6 +11,7 @@ import { type PublicQuestion, publicForm } from "@/mdq";
 import { examResult, formatScore } from "@/services/exam-result";
 import { canReopenAttempt } from "@/services/exam-state";
 import { attemptRows } from "@/services/grading";
+import { reviewResult } from "@/services/review";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
@@ -95,6 +96,13 @@ const rows = outcomes.questions.map((outcome, index) => {
 		title: doc?.title ?? outcome.question,
 		asked: doc ? (publicForm(doc) as PublicQuestion) : null,
 		counting,
+		review:
+			doc && counting && counting.payload !== null
+				? reviewResult(doc, counting.payload, {
+						score: outcome.score,
+						blanks: outcome.blanks,
+					})
+				: undefined,
 	};
 });
 
@@ -162,7 +170,7 @@ const stateLabel = (status: string, score: number | null): string => {
 
     <div class="mt-8 flex flex-col gap-6">
       {
-        rows.map(({ label, outcome, title, asked, counting }) => (
+        rows.map(({ label, outcome, title, asked, counting, review }) => (
           <article aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <h3 class="text-lg font-semibold">{title}</h3>
@@ -171,7 +179,7 @@ const stateLabel = (status: string, score: number | null): string => {
               )}
               {counting && asked ? (
                 <>
-                  <Answer question={asked} payload={counting.payload as AnswerPayload} />
+                  <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} />
                   <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
                   {outcome.comments.map((comment) => (
                     <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>

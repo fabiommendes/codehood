@@ -49,6 +49,7 @@ export type {
 	TrueFalseResponse,
 } from "mdq";
 export {
+	combineBlanks,
 	correctResponses,
 	MissingIdError,
 	NotAutoGradable,

@@ -12,6 +12,7 @@ import { type PublicQuestion, publicForm } from "@/mdq";
 import { formatScore } from "@/services/exam-result";
 import { answersTo } from "@/services/grading";
 import { answerDistribution } from "@/services/question-stats";
+import { pendingBlanks, reviewResult } from "@/services/review";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref, wantsNames } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
@@ -102,6 +103,15 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
 	answer,
 	label: m.grades_question_answer_n({ n: index + 1 }),
 	isPending: answer.state === "pending",
+	// The marks the library gives; the score that counts is in the passes below.
+	result:
+		answer.payload === null
+			? undefined
+			: reviewResult(doc, answer.payload, {
+					score: answer.verdict,
+					blanks: answer.blanks,
+				}),
+	blanks: pendingBlanks(doc, answer.payload),
 }));
 ---
 
@@ -150,7 +160,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
 
     <div class="mt-8 flex flex-col gap-6">
       {
-        shown.map(({ answer, label, isPending }, index) => (
+        shown.map(({ answer, label, isPending, result, blanks }, index) => (
           <>
             {!isPending && (index === 0 || shown[index - 1]?.isPending) && (
               <h3 class="text-lg font-semibold">{m.grades_question_graded()}</h3>
@@ -162,7 +172,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                   <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                 )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
-                <Answer question={asked} payload={answer.payload as AnswerPayload} />
+                <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} />
 
                 {!isPending && (
                   <>
@@ -194,6 +204,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                   exam={exam.slug}
                   submission={answer.submission}
                   state={answer.state}
+                  blanks={blanks}
                 />
               </div>
             </article>

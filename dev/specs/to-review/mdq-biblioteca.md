@@ -115,7 +115,4 @@ Cada fase termina com `pnpm run lint` e a suíte Playwright verdes.
 - O FillIn de `mdq/solid` já marca cada blank em revisão e mostra o feedback
   de cada um, com a marca "parcial" para 0 < nota < 1 (mdq-js 1d9d9bb).
 - Resultado pendente: `PendingResult` e `isPending` já estão em `mdq/solid`.
-- No codehood, só a prévia do professor usa `scoreBlanks` e o resultado
-  pendente. A revisão do aluno e a correção mostram a resposta em `readonly`,
-  sem marcas por blank nem estado pendente, e a correção manual ainda não
-  pontua blank a blank.
+- O codehood usa tudo isso desde `dev/specs/to-review/revisao-por-lacuna.md`.

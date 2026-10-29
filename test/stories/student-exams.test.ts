@@ -433,8 +433,9 @@ test("student: see my grades and feedback", async ({ page }) => {
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeDisabled();
 		await expect(page.getByRole("radio", { name: "Mercury" })).toBeChecked();
 		await expect(page.getByRole("radio", { name: "Mercury" })).toBeDisabled();
-		await expect(page.getByRole("textbox")).toHaveCount(0);
-		await expect(page.getByText("Your answer: Brasilia")).toBeVisible();
+		// Reviewed with its marks: the typed answer sits in a disabled field.
+		await expect(page.getByRole("textbox")).toBeDisabled();
+		await expect(page.getByRole("textbox")).toHaveValue("Brasilia");
 	});
 
 	await test.step("once the last question is graded the total appears", async () => {

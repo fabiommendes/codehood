@@ -56,6 +56,8 @@ export interface CountingAnswer {
 	state: AnswerState;
 	/// The score of the newest pass, or `null` unless `graded`.
 	verdict: number | null;
+	/// The blank grades of the newest pass, when it graded the blanks one by one.
+	blanks?: Feedback["blanks"];
 	/// Every pass on this submission, newest first (by `updatedAt`).
 	passes: GradingPass[];
 }
@@ -80,7 +82,7 @@ export type GradingFeedback = Pick<
 	Feedback,
 	"submission" | "score" | "feedback" | "grader" | "bot" | "updatedAt"
 > &
-	Partial<Pick<Feedback, "ref">>;
+	Partial<Pick<Feedback, "ref" | "blanks">>;
 
 /**
  * The counting answers of every closed attempt at `exam`, in submission order.
@@ -160,6 +162,9 @@ export function countingAnswers(
 					createdAt: submission.createdAt,
 					state,
 					verdict,
+					...(verdict !== null && newestPass?.blanks
+						? { blanks: newestPass.blanks }
+						: {}),
 					passes: passes.map(toGradingPass),
 				},
 			});

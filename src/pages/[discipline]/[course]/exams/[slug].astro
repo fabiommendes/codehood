@@ -43,6 +43,7 @@ import {
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadStudents } from "@/utils/load-grading";
+import { loadReviews } from "@/utils/load-review";
 import { renderMarkdown } from "@/utils/markdown";
 import {
 	durationToMinutes,
@@ -282,6 +283,17 @@ const examOutcome =
 			)
 		: undefined;
 
+// The marks and feedback of each answer, now that the student may see them.
+const reviews =
+	examOutcome && attempt
+		? await loadReviews(
+				course.id,
+				exam.questions,
+				examOutcome,
+				attempt.submissions,
+			)
+		: undefined;
+
 // What the student may do about each answer's grade, decided by the same rule the service enforces.
 const requests =
 	examOutcome && attempt
@@ -463,6 +475,7 @@ for (const submission of attempt?.submissions ?? []) {
             questions={showQuestions ? attemptQuestions : []}
             answers={latestAnswers}
             result={examOutcome}
+            reviews={reviews}
             regrades={questionRegrades}
           />
         </section>

@@ -28,6 +28,13 @@ export const score = z
 	}, m.forms_schema_score_range())
 	.openapi({ example: "3/4" });
 
+/// The instructor's grade of one pending blank of a fill-in question.
+export const blankGrade = z.object({
+	score: z.number().min(0).max(1),
+	comment: z.string().optional(),
+});
+export type BlankGrade = z.infer<typeof blankGrade>;
+
 export const feedbackSchema = z.object({
 	id: feedbackId,
 
@@ -51,6 +58,9 @@ export const feedbackSchema = z.object({
 
 	feedback: z.string().nullable(),
 
+	/// The grade of each pending blank of a fill-in question, by blank id, when the instructor graded them one by one.
+	blanks: z.record(slug, blankGrade).nullable(),
+
 	createdAt: z.date(),
 	updatedAt: z.date(),
 });
@@ -72,11 +82,12 @@ export const feedbackCreate = feedbackSchema
 
 		bot: z.string().nullish(),
 		feedback: z.string().nullish(),
+		blanks: z.record(slug, blankGrade).nullish(),
 	});
 
 /// Re-grading appends another pass; only the verdict moves on an existing one.
 export const feedbackUpdate = feedbackSchema
-	.pick({ score: true, feedback: true })
+	.pick({ score: true, feedback: true, blanks: true })
 	.partial();
 
 export const feedbackPK = z.union([

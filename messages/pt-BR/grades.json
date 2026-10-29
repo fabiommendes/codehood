@@ -122,6 +122,7 @@
 	"grades_controls_wng_title": "Não corrigir esta resposta?",
 	"grades_controls_wng_body": "A resposta conta como zero no total, e o estudante lê \"Sem correção\". As notas anteriores são mantidas, e você pode corrigir a resposta depois com \"Alterar nota\".",
 	"grades_controls_wng_submit": "Marcar como sem correção",
+	"grades_blank_legend": "Lacuna {blank}",
 	"grades_form_save": "Salvar nota",
 	"grades_release_column_button": "Liberar",
 	"grades_release_column_button_named": "Liberar {title}",

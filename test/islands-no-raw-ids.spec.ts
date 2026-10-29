@@ -139,7 +139,10 @@ for (const { name, setUp } of PAGES) {
 	}) => {
 		const url = await setUp(page);
 		const response = await page.goto(url);
-		expect(response?.ok(), `${name} did not load (${url})`).toBe(true);
+		expect(
+			response?.ok(),
+			`${name} did not load (${url}): ${response?.status()} ${(await response?.text())?.slice(0, 500)}`,
+		).toBe(true);
 
 		const islands = await page.locator("astro-island").evaluateAll((elements) =>
 			elements.map((el) => ({

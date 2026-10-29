@@ -122,6 +122,7 @@
 	"grades_controls_wng_title": "Will not grade this answer?",
 	"grades_controls_wng_body": "The answer counts as zero in the total, and the student reads \"Not graded\". Earlier grades are kept, and you can grade the answer later with \"Change grade\".",
 	"grades_controls_wng_submit": "Mark as not graded",
+	"grades_blank_legend": "Blank {blank}",
 	"grades_form_save": "Save grade",
 	"grades_release_column_button": "Release",
 	"grades_release_column_button_named": "Release {title}",

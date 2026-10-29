@@ -7,15 +7,15 @@ import {
 export type AnswerDisplay =
 	| { kind: "empty" }
 	| { kind: "text"; text: string; multiline: boolean }
-	| { kind: "blanks"; entries: [id: string, text: string][] }
-	| { kind: "choices" };
+	| { kind: "view" };
 
 /**
  * Decides how the answer to a question of `type` is shown.
  *
- * Text-entry answers become plain text, so the statement is not repeated for
- * each of them. A choice answer is shown by the question's own read-only view,
- * which marks the picks. An answer with nothing in it is `empty`.
+ * Short, numeric and essay answers become plain text, so the statement is not
+ * repeated for each of them. Any other answer is shown by the question's own
+ * view, which marks the picks, blanks or lines. An answer with nothing in it
+ * is `empty`.
  */
 export function displayAnswer(
 	type: string,
@@ -31,15 +31,8 @@ export function displayAnswer(
 				text: responseText(payload),
 				multiline: type === "essay",
 			};
-		case "fill-in": {
-			const blanks = (payload ?? {}) as Record<string, unknown>;
-			const entries = Object.entries(blanks)
-				.map(([id, value]): [string, string] => [id, responseText(value)])
-				.filter(([, text]) => text.trim() !== "");
-			return { kind: "blanks", entries };
-		}
 		default:
-			return { kind: "choices" };
+			return { kind: "view" };
 	}
 }
 

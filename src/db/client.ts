@@ -1,5 +1,8 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "../generated/prisma/client";
+import {
+	PrismaClient,
+	Prisma as PrismaRuntime,
+} from "../generated/prisma/client";
 
 export type {
 	ApiKey,
@@ -28,6 +31,9 @@ export type {
 	Weekday,
 } from "../generated/prisma/client";
 export { PrismaClient } from "../generated/prisma/client";
+
+/// Writes SQL `NULL` to an optional `Json` column, where a plain `null` is refused.
+export const DbNull = PrismaRuntime.DbNull;
 
 type PrismaTxFn = Parameters<PrismaClient["$transaction"]>[0];
 export type PrismaTx = Parameters<PrismaTxFn>[0];
