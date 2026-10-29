@@ -58,6 +58,34 @@ test("the instructor's exam page keeps the answer key toggle and has no student 
 	await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(0);
 });
 
+test("the instructor's exam page shows a pinned ordering question", async ({
+	page,
+}) => {
+	const { course, href } = await setup();
+	await db.question.create(
+		{
+			status: "PUBLISHED",
+			version: "1",
+			course: course.id,
+			slug: "fibonacci",
+			question: fibonacciOrdering,
+		},
+		FULL_ACCESS,
+	);
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "midterm",
+		status: "ONGOING",
+		questions: [{ slug: "fibonacci" }],
+	});
+
+	await logInAs(page, course.instructor);
+	const response = await page.goto(`${href}/exams/midterm`);
+
+	expect(response?.status()).toBe(200);
+	await expect(page.getByText("x, y = y, x + y")).toBeVisible();
+});
+
 test("an attempt past its own deadline shows as submitted, with nothing left to do", async ({
 	page,
 }) => {

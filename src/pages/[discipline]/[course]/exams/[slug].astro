@@ -90,30 +90,43 @@ const preambleHtml =
 		? renderMarkdown(exam.preamble)
 		: null;
 
-// Each pinned question is fetched with the same `public` flag `canManage`
-// already picks for the rest of the page — `ExamQuestion` never sees more
-// of a question than the actor it renders for is allowed to. A slug that no
-// longer resolves (an archived or otherwise inaccessible question) is
-// dropped rather than shown blank.
-const pinnedQuestions = (
-	await Promise.all(
-		exam.questions.map((question) =>
-			canManage
-				? db.question.findOne(
-						{ course: course.id, slug: question.slug, public: false },
-						{ actor },
-					)
-				: db.question.findOne(
-						{ course: course.id, slug: question.slug, public: true },
+// Staff read the pinned questions with their answer keys, a student only their
+// public form; each list stays empty for the other side. A slug that no longer
+// resolves (an archived or otherwise inaccessible question) is dropped rather
+// than shown blank.
+const staffQuestions = canManage
+	? found(
+			await Promise.all(
+				exam.questions.map(({ slug }) =>
+					db.question.findOne(
+						{ course: course.id, slug, public: false },
 						{ actor },
 					),
-		),
-	)
-)
-	.filter(
-		(question): question is Question | QuestionPublic => question !== null,
-	)
-	.map(({ id: _id, ...question }) => question);
+				),
+			),
+		)
+	: [];
+const studentQuestions = canManage
+	? []
+	: found(
+			await Promise.all(
+				exam.questions.map(({ slug }) =>
+					db.question.findOne(
+						{ course: course.id, slug, public: true },
+						{ actor },
+					),
+				),
+			),
+		);
+
+/// The questions that resolved, without their database ids.
+function found<Q extends Question | QuestionPublic>(
+	questions: (Q | null)[],
+): Omit<Q, "id">[] {
+	return questions
+		.filter((question): question is Q => question !== null)
+		.map(({ id: _id, ...question }) => question);
+}
 
 // A student sees the exam through their own attempt: what they may do now,
 // and, once they are in it, the questions with their latest saved answers.
@@ -176,7 +189,7 @@ if (canManage && exam.type !== "PRACTICE") {
 		exceptions,
 	);
 	statsRows = questionStats(exam, slugs, attempts, feedback, now, exceptions);
-	for (const pinned of pinnedQuestions) {
+	for (const pinned of staffQuestions) {
 		if (pinned.question.title) {
 			questionTitles.set(pinned.slug, pinned.question.title);
 		}
@@ -342,11 +355,10 @@ const openRegrades =
 			).length
 		: 0;
 
-// Fetched with `public: true` above, so a student's copy never held an answer key.
-const attemptQuestions = pinnedQuestions.map(({ slug, question }) => ({
+const attemptQuestions = studentQuestions.map(({ slug, question }) => ({
 	slug,
 	question: shufflePool(
-		question as QuestionPublic["question"],
+		question,
 		`${attempt?.publicId ?? actor.username}:${slug}`,
 	),
 }));
@@ -520,9 +532,9 @@ for (const submission of attempt?.submissions ?? []) {
       canManage && (
         <section class="mt-8">
           <h2 class="text-lg font-semibold">{m.exams_detail_questions_heading()}</h2>
-          {pinnedQuestions.length > 0 ? (
+          {staffQuestions.length > 0 ? (
             <div class="mt-3">
-              <ExamQuestionsList questions={pinnedQuestions} canManage={canManage} client:load />
+              <ExamQuestionsList questions={staffQuestions} canManage={canManage} client:load />
             </div>
           ) : (
             <p class="mt-3 text-sm text-base-content/60">{m.exams_detail_no_questions()}</p>
