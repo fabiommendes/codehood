@@ -104,20 +104,24 @@ export async function loadGrading(
 /**
  * The students of a course, dropped ones included.
  *
- * The enrollment service lists one status per query, so this makes one for
- * each.
+ * Active students come first, then the dropped ones.
  */
 export async function loadStudents(
 	course: Course["id"],
 	actor: UserActor,
 ): Promise<GradedStudent[]> {
-	const [active, dropped] = await Promise.all([
-		db.enrollment.findMany({ course, status: "ACTIVE" }, { actor }),
-		db.enrollment.findMany({ course, status: "DROPPED" }, { actor }),
-	]);
+	const rows = await db.enrollment.findMany(
+		{ course, status: ["ACTIVE", "DROPPED"] },
+		{ actor },
+	);
+	const students = rows.map(({ username, name, status }) => ({
+		username,
+		name,
+		dropped: status === "DROPPED",
+	}));
 	return [
-		...active.map(({ username, name }) => ({ username, name, dropped: false })),
-		...dropped.map(({ username, name }) => ({ username, name, dropped: true })),
+		...students.filter((student) => !student.dropped),
+		...students.filter((student) => student.dropped),
 	];
 }
 

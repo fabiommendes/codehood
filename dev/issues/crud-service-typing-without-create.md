@@ -1,6 +1,6 @@
 ---
 type: issue
-status: active
+status: backlog
 tags: [api, typing, crud]
 relatedTo: [roll-call]
 ---

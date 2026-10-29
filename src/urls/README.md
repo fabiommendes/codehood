@@ -139,11 +139,10 @@ with `Authorization: Bearer <key>`. The live set of paths is
 A course is addressed in the API by the same natural key it uses on the web, so
 the CLI builds one string and uses it for both. There is no `/api/course/<id>`.
 Course-scoped endpoints hang off that address the way the web pages do
-(`/api/course/<discipline>/<username>_<edition>/{resource,question,exam,time-slot}`)
+(`/api/course/<discipline>/<username>_<edition>/{resource,question,exam,time-slot,calendar-event}`)
 and never take the course in a body or query string. A resource's slug is
 flat, so it is always exactly one segment; the CLI normalizes repository paths
-into that form. The remaining course-scoped resources — `calendar-event` and
-`passphrase` — still use flat addresses until they are converted. Everything
+into that form. Everything
 else under `/api/` is addressed by a single segment carrying its primary key.
 
 The status codes deliberately differ from the web app, which rounds a malformed
@@ -169,6 +168,8 @@ have to invent a resource for. Methods are named `namespace.verb` and live in
 
 Astro Actions post to `/_actions/<namespace>.<name>` and are called through
 `Astro.callAction` or the `actions` client import rather than by URL. Current
-namespaces are `auth`, `profile`, `admin` and `course`. The path is Astro's,
+namespaces are `auth`, `profile`, `admin`, `course`, `exam`, `gradeColumn`,
+`grading`, `question`, `regrade`, `report`, `repository`, `rollCall` and
+`checkIn`. The path is Astro's,
 not ours, but `_actions` is on the reserved list because it occupies a first
 segment.

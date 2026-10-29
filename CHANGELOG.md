@@ -703,8 +703,8 @@
 - `TimeSlotService` moves to `CrudBase` with `*Tx` methods, mirroring
   `ExamService`. `timeSlotSchema.startMin: number` is now `start: { hour,
   minute }` — `src/utils/schedule-time.ts` gained `toClockTime`/`toMinutes`/
-  `formatClock` for the conversion; `durationMin` is unchanged, since a
-  duration is a quantity of minutes, not a wall-clock reading. `timeSlotPK`
+  `formatClock` for the conversion; `durationMin` was later replaced by
+  `duration: { hours, minutes }` beside `start`. `timeSlotPK`
   drops the `{ ref: ... }` wrapper in favor of `{ id } | { courseId, slug } |
   courseNaturalKey & { slug }`, and REST moves from `/api/time-slot` to
   `/api/course/<discipline>/<instructor>_<edition>/time-slot`, the same
@@ -1208,15 +1208,15 @@
 - Every foreign key pointing at `User` now follows the same `<relation>Id`
   convention: `Course.instructorSlug` → `instructorId` (and its
   `@map("instructorRef")` is
-  dropped, so the column name matches the field), `Enrollment.username`,
-  `Session.username`, `GroupMembership.username` and `InviteRedemption.username`
-  → `userId`, and `Exam.authorUsername`, `QuestionRef.authorUsername`,
-  `Response.authorUsername` → `authorId`, `Submission.graderUsername` →
-  `graderId`. Public entity shapes are unchanged — `userInfo` (`{ name,
+  dropped, so the column name matches the field), `Exam.authorUsername`,
+  `QuestionRef.authorUsername`, `Response.authorUsername` → `authorId`, and
+  `Submission.graderUsername` → `graderId`. `Enrollment`, `Session`,
+  `GroupMembership` and `InviteRedemption` keep `username` (a first pass
+  renamed them to `userId`; it was reverted). Public entity shapes are unchanged — `userInfo` (`{ name,
   username }`) still calls the field `username`; only the database layer and
   the `fromDb`/`toX` mapping step in between were touched. `Course`'s compound
   `@@unique` accessors renamed accordingly
-  (`disciplineSlug_instructorId_editionSlug`, `userId_courseId`), and
+  (`disciplineSlug_instructorId_editionSlug`, `username_courseId`), and
   `auth/permissions.ts`'s `CourseWithEnrollment.enrollments` is now `{ userId:
   UserId }[]` — `db/services/course.service.ts` exports `toEnrollmentView()` to
   adapt the public `Course` entity (`enrollments: {username, name}[]`) to that

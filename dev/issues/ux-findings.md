@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: backlog
 tags: [ux, grading, mobile, exams]
 relatedTo: [ux-principles, web-grading, grades-table, navigation]
 ---
@@ -20,8 +20,6 @@ Found by walking every page as a student, an instructor and an admin, at
   questions.
 - The grades table heads a column nobody attempted with "no average · 0 of 4"
   and fills it with "Missed" (P2: the column holds nothing to act on).
-- `db.enrollment.findMany` filters one status per call, so `loadStudents`
-  makes two queries.
 
 ## Exams
 

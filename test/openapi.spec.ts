@@ -171,9 +171,18 @@ for (const path of courseScopedCollections) {
 		const collection = document.paths?.[path];
 		expect(collection?.get).toBeDefined();
 
-		const queryNames = (collection?.get?.parameters ?? [])
-			.map((p) => ("name" in p ? p.name : ""))
-			.filter((name) => !["discipline", "course", "publicId"].includes(name));
+		const parameters = (collection?.get?.parameters ?? []).flatMap((p) =>
+			"name" in p ? [p] : [],
+		);
+		const pathNames = parameters
+			.filter((p) => p.in === "path")
+			.map((p) => p.name);
+		expect(pathNames).toContain("discipline");
+		expect(pathNames).toContain("course");
+
+		const queryNames = parameters
+			.filter((p) => p.in === "query")
+			.map((p) => p.name);
 		expect(queryNames).not.toContain("courseId");
 		expect(queryNames).not.toContain("course");
 		expect(queryNames.some((name) => name.startsWith("courseRef"))).toBe(false);

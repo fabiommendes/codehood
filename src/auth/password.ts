@@ -63,6 +63,16 @@ export function hashPassword(password: string): Promise<string> {
 	return hash(password, HASHING_OPTIONS);
 }
 
+let DUMMY_HASH: Promise<string> | undefined;
+
+/**
+ * A valid hash of a throwaway password, for verifying against when no account exists.
+ */
+export function dummyPasswordHash(): Promise<string> {
+	DUMMY_HASH ??= hashPassword("codehood-dummy-password");
+	return DUMMY_HASH;
+}
+
 /**
  * Verifies a plaintext password against a stored hash produced by {@link hashPassword}.
  */

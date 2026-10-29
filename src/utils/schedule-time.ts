@@ -268,29 +268,6 @@ export function isoWeekDay(weekday: Weekday): number {
 }
 
 /**
- * The first date on or after `startAt` whose local weekday in `zone` is
- * `targetWeekday`.
- *
- * `startAt` itself qualifies: a course that opens on a Monday holds its
- * Monday slot in week 0 on the start date, not seven days later.
- *
- * @param zone The time zone `startAt`'s weekday is read in, defaulting to
- *   `SERVER_TZ`.
- */
-export function weekdayOnOrAfter(
-	startAt: Date,
-	targetWeekday: Weekday,
-	zone: string = SERVER_TZ,
-): Date {
-	const currentWeekday = weekdayOf(startAt, zone);
-	const daysUntilTarget =
-		(isoWeekDay(targetWeekday) - isoWeekDay(currentWeekday) + 7) % 7;
-	const result = new Date(startAt);
-	result.setDate(result.getDate() + daysUntilTarget);
-	return result;
-}
-
-/**
  * The instant a weekly slot meets in the given week of a course.
  *
  * Week 0 falls on the first `weekday` on or after `courseStart`. `startMin` is

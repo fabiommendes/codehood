@@ -2,8 +2,7 @@
  * Questions and their versions.
  *
  * A question lives in exactly one course, so writes are ownership-gated
- * (`canWriteCourseContent`) and reads follow `canViewQuestion`. What a read
- * returns depends on the actor: an author sees the MDQ document whole, anyone
+ * (`course.update-contents`). What a read returns depends on the actor: an author sees the MDQ document whole, anyone
  * else the public half of a published question, and nothing of a draft.
  */
 import { isDeepStrictEqual } from "node:util";
@@ -65,7 +64,7 @@ export type QuestionView = Question | QuestionPublic;
  * the query itself, not application code filtering it out afterwards, is
  * what keeps the answer key out of a student's read (see the module
  * docstring). Defaults to `false`: callers that haven't yet checked
- * `canWriteCourseContent` get the safe shape for free.
+ * `course.update-contents` get the safe shape for free.
  */
 function questionInclude<Private extends boolean = false>(
 	includePrivate: Private = false as Private,
@@ -452,45 +451,6 @@ export class QuestionService extends CrudBase<{
 			data: { status: "ARCHIVED" },
 		});
 	}
-
-	// Auxiliary functions -----------------------------------------------------
-
-	/**
-	 * Expensive check to determine if the actor can view the given question.
-	 *
-	 * This can be used in tests or in one-offs. This method performs database
-	 * access, so do not use to check items in a large collection.
-	 */
-	async canViewQuestion(
-		actor: Actor,
-		question: Question,
-		visibility: "private" | "public",
-	): Promise<boolean> {
-		if (actor === SYSTEM) return true;
-
-		const data = await this.prisma.questionRef.findUnique({
-			where: { id: question.id },
-			select: {
-				course: {
-					select: {
-						instructor: { select: { username: true } },
-						id: true,
-						enrollments: {
-							select: { username: true },
-						},
-					},
-				},
-			},
-		});
-		if (!data) return false;
-
-		const perm =
-			visibility === "public"
-				? "course.read-contents"
-				: "course.update-contents";
-
-		return hasPerm(actor, perm, data.course);
-	}
 }
 
 //
@@ -498,7 +458,7 @@ export class QuestionService extends CrudBase<{
 //
 
 /**
- * Prisma `where` fragment implementing the same rule as {@link canReadQuestion}.
+ * Prisma `where` fragment implementing the same read rule as the question permissions.
  */
 export function questionWhere(
 	actor: Actor,

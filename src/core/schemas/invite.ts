@@ -57,10 +57,12 @@ export const inviteFilter = z.object({
 	active: z.boolean().optional(),
 });
 
-export const inviteUpdate = z.object({
-	expiresAt: instant.optional(),
-	maxUses: z.number().nullable().optional(),
-});
+export const inviteUpdate = z
+	.object({
+		expiresAt: instant.optional(),
+		maxUses: z.number().int().min(1).nullable().optional(),
+	})
+	.strict();
 
 /**
  * A single-use invite sent to an email.

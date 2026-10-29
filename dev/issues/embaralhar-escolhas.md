@@ -1,6 +1,6 @@
 ---
 type: issue
-status: active
+status: todo
 tags: [mdq, exams, shuffle]
 ---
 

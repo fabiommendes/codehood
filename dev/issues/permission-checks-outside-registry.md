@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: backlog
 tags: [permissions, auth]
 relatedTo: [permissions-registry, question-service]
 ---
@@ -18,11 +18,6 @@ never run and the rules can drift:
   `isCourseOwner`/`hasReadAccess`.
 - `feedback.update` / `feedback.delete`: `FeedbackService` checks
   `isCourseOwner`.
-
-`QuestionService.canViewQuestion` is a public parallel predicate with no
-callers. It ignores enrollment status (a DROPPED student gets `true`) and
-question status (DRAFT counts as public). Delete it, and the stale
-`canReadQuestion`/`canWriteCourseContent` references in the module docs.
 
 `UserService.updatePassword` (no current password needed) is allowed under
 `user.update`, which includes the user themself; its doc says SYSTEM/admin

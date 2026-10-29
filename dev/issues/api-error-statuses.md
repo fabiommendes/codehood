@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: todo
 tags: [api, errors, rpc]
 relatedTo: [time-slot, calendar-event, invite, api-key]
 ---
@@ -16,8 +16,5 @@ relatedTo: [time-slot, calendar-event, invite, api-key]
     (should be `NotFound`).
 - `DELETE` under a course that does not exist returns 200 `{deleted:false}`:
   `deleteHandler` swallows the course `NotFound`.
-- `DELETE /api/api-key/<unknown>` is 403, not 404.
 - `POST /api/invite` still accepts a raw numeric `course` id (`inviteCreate`
   and `inviteFilter` keep the `courseId` branch of the union).
-- `resource.service.ts` checks the update permission under the action code
-  `"resource.read"`.

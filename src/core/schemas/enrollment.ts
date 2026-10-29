@@ -32,8 +32,10 @@ export const enrollmentCreate = z.object({
 export const enrollmentPK = enrollmentCreate;
 
 export const enrollmentFilterBase = z.object({
-	// Defaults to `ACTIVE` in the service.
-	status: enrollmentStatus.optional(),
+	// One status or several. Defaults to `ACTIVE` in the service.
+	status: z
+		.union([enrollmentStatus, z.array(enrollmentStatus).min(1)])
+		.optional(),
 });
 
 export const enrollmentFilter = enrollmentFilterBase.extend({

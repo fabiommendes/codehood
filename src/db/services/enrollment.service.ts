@@ -117,7 +117,7 @@ export class EnrollmentService
 	}
 
 	/**
-	 * Lists a course's enrollments in `filter.status`, `ACTIVE` by default.
+	 * Lists a course's enrollments in `filter.status` (one or several), `ACTIVE` by default.
 	 *
 	 * The course's owner (or system) only; a non-owning admin is refused too.
 	 */
@@ -135,7 +135,10 @@ export class EnrollmentService
 		ensurePerm(opts.actor, "enrollment.read", course.view);
 
 		const rows = await client.enrollment.findMany({
-			where: { courseId: course.id, status: filter.status ?? "ACTIVE" },
+			where: {
+				courseId: course.id,
+				status: { in: [filter.status ?? "ACTIVE"].flat() },
+			},
 			include: enrollmentInclude,
 			orderBy: { createdAt: "asc" },
 		});

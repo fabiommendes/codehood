@@ -319,7 +319,7 @@ export class ResourceService
 			);
 			ensureAllowed({
 				value: target.__raw.course,
-				action: "resource.read",
+				action: "resource.update",
 				pred: (course) => hasPerm(opts.actor, "course.update-contents", course),
 			});
 

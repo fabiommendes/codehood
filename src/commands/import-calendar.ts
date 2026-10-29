@@ -135,6 +135,7 @@ export const importCalendarCommand = new Command("import-calendar")
 			}
 
 			const slotsBySlug = new Map<string, TimeSlot>();
+			let slotFailed = false;
 			for (const entry of manifest.slots) {
 				try {
 					const existing = await db.timeSlot.findOne(
@@ -174,6 +175,7 @@ export const importCalendarCommand = new Command("import-calendar")
 						`  ✗ slot ${entry.slug}: ${error instanceof Error ? error.message : error}`,
 					);
 					process.exitCode = 1;
+					slotFailed = true;
 				}
 			}
 
@@ -234,7 +236,11 @@ export const importCalendarCommand = new Command("import-calendar")
 				}
 			}
 
-			if (options.prune) {
+			if (options.prune && slotFailed) {
+				console.error(
+					"  ✗ prune skipped: a slot failed to import, so its events would look absent.",
+				);
+			} else if (options.prune) {
 				const current = await db.calendarEvent.findMany(
 					{ courseIds: [course.id] },
 					FULL_ACCESS,

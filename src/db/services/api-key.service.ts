@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { hasPerm } from "@/auth/permissions";
 import { generateToken, hashToken } from "@/auth/token";
-import { NotAllowed, RuleViolation } from "@/core/error";
+import { NotAllowed, NotFound, RuleViolation } from "@/core/error";
 import {
 	type ApiKeyId,
 	apiKeyCreate,
@@ -152,7 +152,8 @@ export class ApiKeyService
 		const apiKey = await client.apiKey.findUnique({
 			where: apiKeyWhere(filter),
 		});
-		if (!apiKey || !hasPerm(opts.actor, "api-key.manage", apiKey.createdById)) {
+		if (!apiKey) throw new NotFound("api-key");
+		if (!hasPerm(opts.actor, "api-key.manage", apiKey.createdById)) {
 			throw new NotAllowed("api-key.delete");
 		}
 		await client.apiKey.delete({ where: { id: apiKey.id } });

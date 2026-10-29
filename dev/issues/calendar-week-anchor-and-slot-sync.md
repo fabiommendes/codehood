@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: backlog
 tags: [calendar, time-slot, import]
 relatedTo: [calendar-event-service, import-calendar]
 ---
@@ -17,13 +17,7 @@ relatedTo: [calendar-event-service, import-calendar]
   slot duration.
 - `findMany` has no database lower bound for `from`: it loads every event
   before `to` and filters in memory.
-- `/calendar?month=2026-13` passes the regex, renders January 2027, and the
-  "next" link becomes `2026-14`.
 - `manage import-calendar`:
   - event `date`/`start`/`duration` are parsed and silently ignored;
   - `RECESS` collapses to `REGULAR`, so a recess counts as a meeting;
-  - `--prune` still runs after a slot import fails, deleting every event on
-    that slot;
   - no tests.
-- `weekdayOnOrAfter` in `src/utils/schedule-time.ts` has no caller left in
-  `src/` since `slotInstant` replaced it.

@@ -86,7 +86,7 @@ const exams = (
 const entries = calendarEntries(events, exams);
 
 const monthParam = Astro.url.searchParams.get("month");
-const monthMatch = monthParam?.match(/^(\d{4})-(\d{2})$/);
+const monthMatch = monthParam?.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
 // Without ?month, open on the next entry's month, else the last one's, else today's.
 const defaultMonthDate =
 	entries.find((entry) => entry.endAt >= startOfToday)?.startAt ??

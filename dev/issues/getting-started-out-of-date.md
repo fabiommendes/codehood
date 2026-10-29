@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: todo
 tags: [cli, getting-started, onboarding, copy]
 relatedTo: [cli, api-key]
 ---

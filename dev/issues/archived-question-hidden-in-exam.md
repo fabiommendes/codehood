@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: todo
 tags: [questions, exams, visibility]
 relatedTo: [question-service, exam-page]
 ---

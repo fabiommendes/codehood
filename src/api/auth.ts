@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FULL_ACCESS } from "@/auth/actor";
-import { verifyPassword } from "@/auth/password";
+import { dummyPasswordHash, verifyPassword } from "@/auth/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
 import { usernameOrEmail } from "@/core/schemas";
@@ -71,7 +71,10 @@ export const login = POST("/api/auth/login", {
 		const { login, password } = body;
 
 		const user = await db.user.findOne({ login }, FULL_ACCESS);
-		if (!user || !(await verifyPassword(user.passwordHash, password))) {
+		// Verify against a dummy hash for an unknown login so both paths cost the same.
+		const passwordHash = user?.passwordHash ?? (await dummyPasswordHash());
+		const valid = await verifyPassword(passwordHash, password);
+		if (!user || !valid) {
 			throw new NotAllowed("session.create", {
 				message: m.errors_invalid_login(),
 				status: 401,

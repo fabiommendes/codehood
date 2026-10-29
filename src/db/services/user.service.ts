@@ -74,6 +74,15 @@ export class UserService extends CrudBase<{
 		if (!input.schoolId && isStudent)
 			throw new FieldError("schoolId", m.errors_required_for_students());
 		assertSchoolIdFormat(input.schoolId);
+		// Seeds and imports run as SYSTEM with throwaway passwords; skip, not warn.
+		if (opts.actor !== SYSTEM) {
+			await assertPasswordStrength(
+				input.username,
+				input.password,
+				opts,
+				"password",
+			);
+		}
 
 		const githubId = input.githubId ?? nullSentinel(input.username);
 		const schoolId = input.schoolId ?? nullSentinel(input.username);
@@ -279,19 +288,7 @@ export class UserService extends CrudBase<{
 	): Promise<{ hash: string }> {
 		ensurePerm(opts.actor, "user.update", user);
 
-		// Validate password strength
-		const issues = await passwordStrengthIssues(password);
-		if (issues && opts.actor === SYSTEM) {
-			// System can define any password it wants, but we issue a warning
-			// anyway so that the system admin can see it in the logs.
-			for (const issue of issues) {
-				console.warn(
-					`[password-${issue.code}] for ${user.username}: ${issue.message}`,
-				);
-			}
-		} else if (issues) {
-			throw new WeakPassword(issues);
-		}
+		await assertPasswordStrength(user.username, password, opts);
 
 		const client = opts.tx ?? this.prisma;
 		const updated = await client.user.update({
@@ -374,6 +371,21 @@ export function userWhere(actor: Actor): Prisma.UserWhereInput {
 function assertSchoolIdFormat(schoolId: string | null | undefined): void {
 	if (schoolId && SCHOOL_ID_PATTERN && !SCHOOL_ID_PATTERN.test(schoolId))
 		throw new FieldError("schoolId", m.errors_school_id_format());
+}
+
+/// Refuses a weak password; SYSTEM may set any, but it is logged.
+async function assertPasswordStrength(
+	username: string,
+	password: string,
+	opts: { actor: unknown },
+	field = "newPassword",
+): Promise<void> {
+	const issues = await passwordStrengthIssues(password);
+	if (!issues) return;
+	if (opts.actor !== SYSTEM) throw new WeakPassword(issues, field);
+	for (const issue of issues) {
+		console.warn(`[password-${issue.code}] for ${username}: ${issue.message}`);
+	}
 }
 
 // The `schoolId`/`githubId` columns are NOT NULL @unique, so an account with

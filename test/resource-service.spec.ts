@@ -157,6 +157,24 @@ test("create and update reject a LINK url that is not http or https", async () =
 	).rejects.toMatchObject({ code: "invalid-data" });
 });
 
+test("create rejects a slug that is not in the slug format", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+
+	await expect(
+		db.resource.create(
+			{
+				course: course.id,
+				slug: "Week 1/Notes",
+				title: "Notes",
+				data: link("https://example.com/a"),
+				rev: tag("h"),
+			},
+			{ actor: instructor },
+		),
+	).rejects.toMatchObject({ code: "invalid-data" });
+});
+
 test("create rejects a duplicate slug in one course, and accepts the same slug in another", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const courseA = await makeCourse(instructor.username);

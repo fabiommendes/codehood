@@ -117,10 +117,10 @@ export interface Crud<
 //
 
 /**
- * Runs a `findOne`-then-`create`-or-`update` upsert inside a transaction.
+ * Runs a `findOne`-then-`create`-or-`update` upsert.
  *
- * Reuses `opts.tx` when the caller already opened one, so an upsert nested in a
- * wider transaction does not open a second.
+ * It opens no transaction of its own: the steps run on `opts.tx` when the
+ * caller passes one, and otherwise as separate statements.
  */
 export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 	service: Crud<{

@@ -133,3 +133,16 @@ test("past the first two, upcoming entries fold behind a toggle", async ({
 	await upcoming.getByText("Show fewer").click();
 	await expect(upcoming.getByText("Third quiz")).toBeHidden();
 });
+
+test("a month outside 01-12 falls back to the current month", async ({
+	page,
+}) => {
+	const student = await seedUser({ role: "STUDENT" });
+	await logInAs(page, student);
+
+	await page.goto("/calendar?month=2026-13");
+
+	await expect(
+		page.getByRole("heading", { name: monthLabel(new Date()) }),
+	).toBeVisible();
+});

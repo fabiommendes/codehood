@@ -19,20 +19,23 @@ CLI. The server MUST NOT generate them by expanding time slots.
 **FR-CAL-011** — An event MUST carry a kind, replacing the current `isHoliday`
 boolean:
 
-`LECTURE` · `LAB` · `EXAM` · `REVIEW` · `SEMINAR` · `PROJECT` · `SELF_STUDY` ·
-`HOLIDAY` · `RECESS` · `CANCELLED`
+`REGULAR` · `HOLIDAY` · `CANCELLED`
+
+A recess is several `HOLIDAY` events, one per displaced meeting.
 
 **FR-CAL-012** — A cancelled or suspended meeting MUST retain its title and
 description, so the calendar can show what would have happened.
 
-**FR-CAL-013** — An event MAY link to an exam through a nullable `examId`. The
-link MUST NOT be restricted to `EXAM`-kind events.
+**FR-CAL-013** — An event MUST NOT link to an exam. Exams enter the calendar
+through their own `scheduledAt`, beside the events.
 
 **FR-CAL-014** — Deleting an event from the repository MUST delete the row
 (FR-SYNC-013). Events are not archived.
 
 **FR-CAL-015** — `Event.week` MUST be authored, not derived. Week numbering is
-the instructor's, and a holiday does not renumber the weeks around it.
+the instructor's, and a holiday does not renumber the weeks around it. The
+event's date is not authored: `startAt` is derived from the course start, the
+week and the slot.
 
 ## Views
 
@@ -58,9 +61,8 @@ Nothing writes these tables yet, so this is a create rather than a migration.
   are spelled the same way.
 - `TimeSlot` gains `slug` (its sync identity, stable when the hour moves) and an
   optional `title` for the syllabus line.
-- `Event.isHoliday Boolean` → `kind EventKind`.
-- `Event` gains `examId Int?` with a relation to `Exam`, derived from window
-  overlap rather than authored.
+- `Event.isHoliday Boolean` → `kind EventKind` (`REGULAR`, `HOLIDAY`,
+  `CANCELLED`).
 - `Event` gains `courseId`, with a composite foreign key pinning it to its
   slot's course, and `contentHash`, the CLI-supplied manifest marker
   (FR-SYNC-002).
@@ -74,7 +76,6 @@ Both of the questions this file opened are answered in
 - **No `OFFICE_HOURS`, `WORKSHOP`, or guest-talk kind in V1.** Office hours are
   recurring and undated — a `TimeSlot` with a title and no events, which the
   syllabus line already renders.
-- **The two times are independent and may disagree.** The link is derived from
-  window overlap, the calendar shows the event's hours, the exam page shows its
-  own, and the instructor sees a warning when an exam runs past the meetings it
-  overlaps.
+- **The two times are independent and may disagree.** There is no link between
+  an event and an exam: the calendar shows the event's hours and the exam's own
+  `scheduledAt` as separate entries.

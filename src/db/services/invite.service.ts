@@ -300,9 +300,11 @@ export class InviteService extends CrudBase<{
 				await tx.inviteRedemption.create({
 					data: { inviteId: invite.id, username: username },
 				});
-			} catch {
+			} catch (error) {
 				// (inviteId, username) is unique: this user already redeemed this invite.
-				throw new InviteError("already_redeemed");
+				if ((error as { code?: string }).code === "P2002")
+					throw new InviteError("already_redeemed");
+				throw error;
 			}
 
 			return invite;
@@ -314,7 +316,10 @@ export class InviteService extends CrudBase<{
 	 */
 	checkRedeemable(invite: Invite, email: string): InviteErrorCode | undefined {
 		if (invite.expiresAt < new Date()) return "expired";
-		if (invite.kind === "PERSONAL" && invite.email !== email)
+		if (
+			invite.kind === "PERSONAL" &&
+			invite.email?.toLowerCase() !== email.toLowerCase()
+		)
 			return "email_mismatch";
 		if (invite.maxUses !== null && invite.redemptions >= invite.maxUses)
 			return "exhausted";

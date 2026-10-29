@@ -89,6 +89,7 @@ export const resourceCreate = resourceSchema
 	})
 	.extend({
 		course: courseRef,
+		slug: slug,
 		description: resourceSchema.shape.description.nullish(),
 		/// Omitted means a general resource on create and upsert, and
 		/// unchanged on update.

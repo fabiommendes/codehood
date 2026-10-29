@@ -102,7 +102,7 @@ test("create() rejects an instructor or student actor, accepts an admin", async 
 			username: "admin-registered",
 			name: "Admin Registered",
 			role: "STUDENT",
-			password: "x",
+			password: "correct horse battery staple",
 			githubId: "admin-registered",
 			schoolId: "admin-registered",
 		},

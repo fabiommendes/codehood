@@ -121,7 +121,9 @@ test("GET /api/course/[discipline]/[course] resolves a course by its natural key
 	expect(res.status()).toBe(200);
 	const body = await res.json();
 	expect(Array.isArray(body)).toBe(false);
-	expect(body.id).toBe(course.id);
+	expect(body.discipline.slug).toBe(course.discipline.slug);
+	expect(body.instructor.username).toBe(course.instructor.username);
+	expect(body.edition.slug).toBe(course.edition.slug);
 });
 
 test("GET /api/course/[id] is gone", async ({ request }) => {
