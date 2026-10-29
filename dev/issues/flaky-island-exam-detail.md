@@ -1,6 +1,6 @@
 ---
 type: issue
-status: active
+status: deferred
 tags: [tests, flaky]
 ---
 

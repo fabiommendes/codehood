@@ -1,8 +1,9 @@
 ---
-type: note
-status: active
+type: issue
+status: deprecated
 tags: [mdq, scoring, numeric, mdq-js]
 relatedTo: [question-numeric]
+closed: 2026-10-29
 ---
 
 # Numeric questions reject values on the tolerance boundary

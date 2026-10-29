@@ -24,8 +24,14 @@ menu) describes a CLI that no longer exists:
   ("live for your students"), and `cli/README.md` has nothing for students
   yet.
 
-Fix: rewrite the steps as install, `codehood login` (or a key from the
-page), `codehood init`, edit the course files, `codehood push`, with the
-terminal text copied from the real CLI. Decide what a student gets: no
+`cli/README.md` is out of date too: it says `init` asks for credentials and
+stores them in `codehood.toml`, lists a `roster.csv` the scaffold does not
+create, and never mentions `login`.
+
+Fix: rewrite the steps as install, `codehood init`, `codehood login` (or a
+key from the page), edit the course files, `codehood push`. `login` needs a
+`codehood.toml` in the current directory, so it cannot come before `init`.
+Copy the
+terminal text from the real CLI. Decide what a student gets: no
 "Set up the CLI" link and a redirect, or a short note that the CLI is for
 instructors for now.

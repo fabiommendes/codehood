@@ -40,5 +40,3 @@ Found by walking every page as a student, an instructor and an admin, at
   already shared.
 - "Set up the CLI" is in every user's menu and `/getting-started` tells
   students to scaffold a course (P2).
-- The footer shows a "Design system" link in development only; check that a
-  production build hides it.

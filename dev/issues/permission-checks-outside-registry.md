@@ -13,7 +13,8 @@ never run and the rules can drift:
 
 - `question.read` / `question.read-public`: `QuestionService` checks
   `course.update-contents` / `course.read-contents` directly.
-- `response.*` / `submission.*`: both services use their own
+- `response.*` / `submission.*`: create and submit go through `ensurePerm`,
+  but reads, updates and deletes still use the services' own
   `isCourseOwner`/`hasReadAccess`.
 - `feedback.update` / `feedback.delete`: `FeedbackService` checks
   `isCourseOwner`.

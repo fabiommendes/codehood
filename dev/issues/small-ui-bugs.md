@@ -1,8 +1,9 @@
 ---
-type: note
-status: active
+type: issue
+status: completed
 tags: [ui, mdq, profile]
 relatedTo: [short-answer, profile, course-home]
+closed: 2026-10-29
 ---
 
 # Small UI and parsing bugs

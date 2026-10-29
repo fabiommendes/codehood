@@ -1,22 +1,14 @@
 ---
 type: note
-status: active
-tags: [exam-page, question-views, readonly, mdq-js]
+status: backlog
+tags: [exam-page, tests, mdq-js]
 relatedTo: [exam-attempt, question-views]
 ---
 
-# Submitted answers are hard to read on the exam page
+# Answer save and restore is tested for short answer only
 
-Seen on the student exam page after "Submit exam":
-
-- A true/false statement the student left blank renders as "False", the same
-  as an answered "False".
-- The selected radio of a multiple-choice question is low contrast in
-  `readonly` mode, so the chosen option is hard to spot.
-
-The question views in `src/components/question/` are due to be replaced by
-the mdq-js renderer. Fix both there once it is integrated, rather than in the
-current views.
-
-Tests for answer save and restore cover multiple choice and short answer
-only; the other question types get covered when mdq-js lands.
+`test/stories/student-exams.test.ts` reloads the exam page and checks the
+restored answer for a short-answer question only. Multiple choice, multiple
+selection, true/false, numeric, fill-in and ordering answers have no
+save-and-restore test, although the mdq-js views now render all of them on
+the exam page.

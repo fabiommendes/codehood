@@ -14,9 +14,6 @@ relatedTo: [resource-service, attachment-service]
     an unchanged FILE fails.
   - New bytes: the old attachment stays on the resource, charged to the
     uploader's quota and never collected.
-- `create` is not transactional. A FILE create that fails on the filename or
-  the quota leaves a `Resource` row with `attachmentId = null`; a retry then
-  collides on `(courseId, slug)`.
 - `delete` is not transactional either, and removes blob directories from
   inside a DB transaction that a rollback cannot restore.
 - A title-only `update` of a FILE resource returns `filename:

@@ -12,3 +12,6 @@ transaction. `course.upsert` and `resource.upsert` call it without one, and
 `FeedbackService.upsertTx` has the same shape. Two concurrent PUTs on a new
 key make the second fail on the unique index (`InvalidData`) instead of
 updating.
+
+The doc comment of `upsert` says it runs "inside a transaction", but it
+only reuses `opts.tx` and never opens one.

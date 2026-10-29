@@ -1,6 +1,6 @@
 ---
-type: note
-status: active
+type: issue
+status: deferred
 tags: [tooling, base, glossary, agents]
 relatedTo: [glossary, agents-md, base-domains]
 ---
