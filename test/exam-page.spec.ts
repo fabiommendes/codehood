@@ -240,3 +240,55 @@ test("an ordering question left untouched is named in the submit dialog until it
 	await expect(dialog.getByText("Your answers can't be changed")).toBeVisible();
 	await expect(warning).toHaveCount(0);
 });
+
+test("a question archived during an open exam stays on the student's page", async ({
+	page,
+}) => {
+	const { student, course, href } = await setup();
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "midterm",
+		status: "ONGOING",
+		questions: [{ slug: "capital", version: "1" }],
+	});
+	await db.response.create(
+		{ course: course.id, exam: exam.slug, author: student.username },
+		FULL_ACCESS,
+	);
+	await db.question.delete({ course: course.id, slug: "capital" }, FULL_ACCESS);
+
+	await logInAs(page, student);
+	await page.goto(`${href}/exams/${exam.slug}`);
+
+	await expect(page.getByText(capitalChoice.stem)).toBeVisible();
+});
+
+test("the student's exam page shows the version the exam pins", async ({
+	page,
+}) => {
+	const { student, course, href } = await setup();
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "midterm",
+		status: "ONGOING",
+		questions: [{ slug: "capital", version: "1" }],
+	});
+	await db.question.update(
+		{ course: course.id, slug: "capital" },
+		{
+			version: "2",
+			question: { ...capitalChoice, stem: "Which city hosts the Congress?" },
+		},
+		FULL_ACCESS,
+	);
+	await db.response.create(
+		{ course: course.id, exam: exam.slug, author: student.username },
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, student);
+	await page.goto(`${href}/exams/${exam.slug}`);
+
+	await expect(page.getByText(capitalChoice.stem)).toBeVisible();
+	await expect(page.getByText("Which city hosts the Congress?")).toHaveCount(0);
+});

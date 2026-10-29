@@ -91,15 +91,14 @@ const preambleHtml =
 		: null;
 
 // Staff read the pinned questions with their answer keys, a student only their
-// public form; each list stays empty for the other side. A slug that no longer
-// resolves (an archived or otherwise inaccessible question) is dropped rather
-// than shown blank.
+// public form, both at the version the exam pins; each list stays empty for the
+// other side. A slug that no longer resolves is dropped rather than shown blank.
 const staffQuestions = canManage
 	? found(
 			await Promise.all(
-				exam.questions.map(({ slug }) =>
+				exam.questions.map(({ slug, version }) =>
 					db.question.findOne(
-						{ course: course.id, slug, public: false },
+						{ course: course.id, slug, version, public: false },
 						{ actor },
 					),
 				),
@@ -110,9 +109,9 @@ const studentQuestions = canManage
 	? []
 	: found(
 			await Promise.all(
-				exam.questions.map(({ slug }) =>
+				exam.questions.map(({ slug, version }) =>
 					db.question.findOne(
-						{ course: course.id, slug, public: true },
+						{ course: course.id, slug, version, public: true },
 						{ actor },
 					),
 				),

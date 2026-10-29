@@ -6,6 +6,7 @@ import type { questionSchema } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import type { Question, QuestionPublic } from "@/db/services/question.service";
+import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import type { PublicQuestion } from "@/mdq";
 
@@ -892,6 +893,69 @@ test("an enrolled student sees only published questions", async () => {
 				{ actor: student },
 			),
 		).toBeNull();
+	}
+});
+
+test("an archived question an exam pins stays readable to an enrolled student", async () => {
+	const { course, opts } = await makeCourse();
+	const student = await persistedUserFactory.create({ role: "STUDENT" });
+	await db.enrollment.create(
+		{ course: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	for (const slug of ["pinned", "loose"]) {
+		await db.question.create(
+			{
+				course: course.id,
+				slug,
+				status: "PUBLISHED",
+				version: "v1",
+				question: multipleChoice,
+			},
+			opts,
+		);
+	}
+	await persistedExamFactory.create({
+		course: course.id,
+		questions: [{ slug: "pinned", version: "v1" }],
+	});
+	await db.question.delete({ course: course.id, slug: "pinned" }, opts);
+	await db.question.delete({ course: course.id, slug: "loose" }, opts);
+
+	const pinned = await db.question.findOne(
+		{ course: course.id, slug: "pinned", public: true, version: "v1" },
+		{ actor: student },
+	);
+	expect(pinned?.slug).toBe("pinned");
+	expect(
+		await db.question.findOne(
+			{ course: course.id, slug: "loose", public: true },
+			{ actor: student },
+		),
+	).toBeNull();
+});
+
+test("a user outside the course is refused a question whatever its status", async () => {
+	const { course, opts } = await makeCourse();
+	const outsider = await persistedUserFactory.create({ role: "STUDENT" });
+	for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
+		await db.question.create(
+			{
+				course: course.id,
+				slug: status.toLowerCase(),
+				status,
+				version: "v1",
+				question: multipleChoice,
+			},
+			opts,
+		);
+	}
+
+	// Refusing every status alike keeps the slugs of hidden questions secret.
+	for (const slug of ["draft", "published", "archived"]) {
+		await expect(
+			db.question.findOne({ course: course.id, slug }, { actor: outsider }),
+		).rejects.toMatchObject({ code: "not-allowed" });
 	}
 });
 

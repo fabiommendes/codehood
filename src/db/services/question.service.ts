@@ -250,12 +250,22 @@ export class QuestionService extends CrudBase<{
 
 		const full = hasPerm(opts.actor, "course.update-contents", row.course);
 
-		// A draft or archived question does not exist for a non-author, whether
-		// or not they may read the course's contents.
-		if (!full && row.status !== "PUBLISHED") return null;
-
+		// Refused before the status check, so an outsider cannot tell a hidden
+		// slug from a missing one.
 		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
 			throw new NotAllowed("question.read");
+		}
+
+		// A draft or archived question does not exist for a non-author, except
+		// an archived one an exam still pins: archiving never pulls a question
+		// out of an exam.
+		if (!full && row.status !== "PUBLISHED") {
+			const pinned =
+				row.status === "ARCHIVED" &&
+				(await tx.questionsForExam.count({
+					where: { questionRefId: row.id },
+				})) > 0;
+			if (!pinned) return null;
 		}
 		if (filter.public === false && !full) {
 			throw new NotAllowed("question.read");
