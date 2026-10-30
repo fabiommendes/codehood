@@ -103,6 +103,8 @@
   lights; static under reduced motion), a calmer "already recorded" state for
   a repeat scan, a welcome when the scan joins the course, a link to the
   course, and refusals that read clearly as "not recorded".
+- The daisyUI styles of the question components moved from mdq-js
+  (`mdq/css/daisyui.css`) to `src/styles/mdq.css`, on the Codehood tokens.
 
 ### Fixed
 
@@ -115,6 +117,12 @@
   textareas, empty checkboxes and radios, and the rows of choice questions use
   the new `field-border` color instead of DaisyUI's 20% border, which measured
   1.2:1 to 1.8:1.
+- Review shows the student's choice: a disabled choice input no longer dims to
+  20%, and the chosen row gets the primary border outside answer mode, as
+  readonly already did.
+- Keyboard focus is a 2px ring in the info color on every control. Sidebar
+  links had only a background tint (1.1:1) and the rest the browser's 1px
+  outline.
 - Signing up through a roll call that acts as an invite no longer fails
   with an expired code when the page reloads after the code rotated, as it
   does when the form comes back with an error.

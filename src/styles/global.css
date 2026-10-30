@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "mdq/css/daisyui.css";
+@import "./mdq.css";
 
 @plugin "@tailwindcss/typography";
 
@@ -174,7 +174,7 @@ body {
 	/* A checked radio draws its ring in the text color; leave it alone. A radio
 	   group with nothing checked matches :indeterminate too, hence the type. */
 	:where(
-		:is(.checkbox, .radio, .mdq-choice-input):not(
+		:is(.checkbox, .radio):not(
 			[type="radio"]:checked,
 			[type="checkbox"]:indeterminate,
 			[class*="checkbox-"],
@@ -183,16 +183,15 @@ body {
 	) {
 		border-color: var(--color-field-border);
 	}
+}
 
-	/* A choice is a clickable row; the states mdq colors keep their border. */
-	:where(
-		.mdq-choice:not(
-			[data-mode="readonly"] [data-selected],
-			[data-key="correct"],
-			[data-key="incorrect"]
-		)
-	) {
-		border-color: var(--color-field-border);
+/* One focus ring for every control, in the info color. DaisyUI leaves menu
+   items with a background tint only (1.1:1) and the rest with the browser's
+   1px outline. */
+@layer utilities {
+	:where(:focus-visible) {
+		outline: 2px solid var(--color-info);
+		outline-offset: 2px;
 	}
 }
 
@@ -536,15 +535,4 @@ h6 {
 [data-theme="codehood-dark"] .shiki span {
 	color: var(--shiki-dark);
 	background-color: var(--shiki-dark-bg);
-}
-
-/*
- * mdq/css/daisyui.css leaves Markdown blocks without typography. In the base
- * layer, so the component rules of that file (feedback color, edge margins)
- * still win over it.
- */
-@layer base {
-	.mdq-markdown:not([data-inline]) {
-		@apply prose prose-sm max-w-none;
-	}
 }

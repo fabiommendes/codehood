@@ -1,0 +1,422 @@
+/*
+ * Codehood styles for the mdq/solid components, on daisyUI 5 and the Codehood
+ * tokens (`muted`, `field-border`). mdq-js ships only a plain stylesheet.
+ *
+ * The rules live in `@layer components`. The `prose` typography for Markdown
+ * blocks sits in `@layer base`, so the component rules (feedback color, edge
+ * margins) still win over it. It applies to block Markdown only,
+ * `.mdq-markdown:not([data-inline])`, or inline code in a choice would get the
+ * block styles.
+ */
+
+@layer base {
+	.mdq-markdown:not([data-inline]) {
+		@apply prose prose-sm max-w-none;
+	}
+}
+
+@layer components {
+	.mdq-sr-only {
+		@apply sr-only;
+	}
+
+	.mdq-question {
+		@apply flex flex-col gap-4;
+	}
+
+	.mdq-markdown > :first-child {
+		margin-top: 0;
+	}
+	.mdq-markdown > :last-child {
+		margin-bottom: 0;
+	}
+
+	.mdq-feedback .mdq-markdown {
+		color: inherit;
+	}
+
+	.mdq-header {
+		@apply flex justify-end;
+	}
+
+	.mdq-preamble,
+	.mdq-epilogue {
+		@apply text-base-content/70;
+	}
+
+	.mdq-stem {
+		@apply text-base font-medium;
+	}
+
+	.mdq-score {
+		@apply badge;
+	}
+	.mdq-score[data-sign="positive"] {
+		@apply badge-success;
+	}
+	.mdq-score[data-sign="negative"] {
+		@apply badge-error;
+	}
+	.mdq-score[data-sign="zero"] {
+		@apply badge-neutral badge-ghost;
+	}
+
+	.mdq-score[data-sign="pending"] {
+		@apply badge-warning badge-soft;
+	}
+
+	.mdq-choices {
+		@apply flex flex-col gap-2;
+	}
+
+	.mdq-choice {
+		@apply flex items-center gap-3 rounded-box border border-field-border p-3;
+	}
+	.mdq-question[data-mode="answer"] .mdq-choice {
+		@apply cursor-pointer;
+	}
+	.mdq-question[data-mode="readonly"] .mdq-choice {
+		@apply text-muted;
+	}
+	/* Outside answer mode the student's choice is the point of the screen. */
+	.mdq-question:not([data-mode="answer"]) .mdq-choice[data-selected] {
+		@apply font-medium text-base-content;
+	}
+	.mdq-question:not([data-mode="answer"])
+		.mdq-choice[data-selected]:not([data-key]) {
+		@apply border-primary bg-primary/5;
+	}
+	.mdq-choice[data-key="correct"] {
+		@apply border-success bg-success/10;
+	}
+	.mdq-choice[data-key="incorrect"] {
+		@apply border-error bg-error/10;
+	}
+
+	.mdq-choice-input[type="radio"] {
+		@apply radio;
+	}
+	.mdq-choice-input[type="checkbox"] {
+		@apply checkbox;
+	}
+	/* An empty box needs its edge at 3:1; a checked radio keeps its ring. */
+	.mdq-choice-input:not([type="radio"]:checked) {
+		@apply border-field-border;
+	}
+	/* daisyUI dims a disabled input to 20%, which hides the answer in review. */
+	.mdq-choice-input:disabled {
+		opacity: 1;
+	}
+	.mdq-question[data-mode="readonly"] .mdq-choice-input {
+		@apply sr-only;
+	}
+
+	.mdq-choice-text {
+		@apply flex-1;
+	}
+
+	.mdq-statement {
+		@apply flex items-center gap-3 rounded-box border border-base-300 p-3;
+	}
+	.mdq-statement[data-key="correct"] {
+		@apply border-success bg-success/10;
+	}
+	.mdq-statement[data-key="incorrect"] {
+		@apply border-error bg-error/10;
+	}
+
+	.mdq-statement-text {
+		@apply flex-1;
+	}
+
+	.mdq-toggle-label {
+		@apply text-xs font-bold text-muted;
+	}
+	.mdq-toggle-label[data-active] {
+		@apply text-base-content/80;
+	}
+
+	/* daisyUI colors only the checked toggle, so the false state is painted
+	   with currentColor. The unmarked state centers the knob with the grid
+	   that daisyUI uses for :indeterminate, which a DOM property cannot give
+	   to server-rendered markup. */
+	.mdq-toggle {
+		@apply toggle;
+	}
+	.mdq-toggle[data-state="true"] {
+		@apply toggle-success;
+	}
+	.mdq-toggle[data-state="false"] {
+		@apply text-error;
+	}
+	.mdq-toggle[data-state="unmarked"] {
+		grid-template-columns: 0.5fr 1fr 0.5fr;
+	}
+	/* A disabled toggle would dim to 30%, which hides what review shows. */
+	.mdq-toggle:disabled {
+		opacity: 1;
+	}
+
+	.mdq-empty {
+		@apply text-sm italic text-muted;
+	}
+
+	.mdq-input-row {
+		@apply flex flex-wrap items-center gap-3;
+	}
+
+	.mdq-input {
+		@apply input w-full max-w-sm disabled:text-base-content;
+	}
+	.mdq-input[aria-invalid="true"] {
+		@apply input-warning;
+	}
+
+	.mdq-warning {
+		@apply text-sm text-warning;
+	}
+
+	.mdq-note {
+		@apply text-xs text-muted;
+	}
+
+	.mdq-answer {
+		@apply text-sm;
+	}
+	.mdq-answer-label {
+		@apply text-muted;
+	}
+	.mdq-answer-text {
+		@apply font-mono font-medium;
+	}
+
+	.mdq-accepted {
+		@apply rounded-box border border-info/40 bg-info/5 p-4;
+	}
+	.mdq-accepted-title {
+		@apply mb-2 text-sm font-semibold text-info;
+	}
+	.mdq-accepted-list {
+		@apply flex flex-wrap gap-2;
+	}
+	.mdq-accepted-item {
+		@apply badge badge-outline;
+	}
+
+	.mdq-numeric {
+		@apply inline-flex flex-col gap-1;
+	}
+	.mdq-numeric-box {
+		@apply input w-48;
+	}
+	.mdq-numeric-box[data-invalid] {
+		@apply input-warning;
+	}
+	.mdq-numeric-input {
+		@apply grow disabled:text-base-content;
+	}
+	.mdq-unit {
+		@apply label;
+	}
+
+	.mdq-expected {
+		@apply text-sm text-muted;
+	}
+
+	.mdq-editor {
+		@apply flex flex-col gap-2;
+	}
+	.mdq-language {
+		@apply badge badge-outline badge-sm self-end;
+	}
+	.mdq-textarea {
+		@apply textarea h-40 w-full;
+	}
+	.mdq-textarea[data-content="code"] {
+		@apply h-56 font-mono text-sm;
+	}
+
+	.mdq-panel {
+		@apply rounded-box border border-base-300 p-4;
+	}
+	.mdq-panel[data-tone="key"] {
+		@apply border-info/40 bg-info/5;
+	}
+	.mdq-panel-title {
+		@apply mb-2 text-sm font-semibold text-muted;
+	}
+	.mdq-panel[data-tone="key"] .mdq-panel-title {
+		@apply text-info;
+	}
+	.mdq-plain {
+		@apply whitespace-pre-wrap text-sm;
+	}
+	.mdq-code {
+		@apply mockup-code w-full text-sm;
+	}
+
+	/* A tall line: every control is taller than a line of text. */
+	.mdq-sentence {
+		@apply text-base font-medium leading-[2.75];
+	}
+	.mdq-blank {
+		@apply mx-1 inline-flex items-center gap-1 align-middle leading-normal;
+	}
+	.mdq-sentence .mdq-input {
+		@apply input-sm w-36;
+	}
+	/* The box grows with the unit; the input keeps room for a long value. */
+	.mdq-sentence .mdq-numeric-box {
+		@apply input-sm w-auto;
+	}
+	.mdq-sentence .mdq-numeric-input {
+		@apply w-[12ch] grow-0;
+	}
+	/* daisyUI fades a disabled border to the page color, which would show a
+	   frozen empty blank as a gap. */
+	.mdq-question:not([data-mode="answer"])
+		.mdq-blank
+		:is(.mdq-input, .mdq-numeric-box, .mdq-select-button) {
+		@apply border-field-border;
+	}
+
+	.mdq-question
+		.mdq-blank[data-key="correct"]
+		:is(.mdq-input, .mdq-numeric-box, .mdq-select-button) {
+		@apply border-success;
+	}
+	.mdq-question
+		.mdq-blank[data-key="partial"]
+		:is(.mdq-input, .mdq-numeric-box, .mdq-select-button) {
+		@apply border-warning;
+	}
+	.mdq-question
+		.mdq-blank[data-key="incorrect"]
+		:is(.mdq-input, .mdq-numeric-box, .mdq-select-button) {
+		@apply border-error;
+	}
+	.mdq-blank-feedback {
+		@apply flex flex-col gap-1;
+	}
+	.mdq-blank-feedback-label {
+		@apply text-sm font-semibold;
+	}
+	.mdq-key {
+		@apply rounded-box border border-info/40 bg-info/5 p-4;
+	}
+	.mdq-key-title {
+		@apply mb-2 text-sm font-semibold text-info;
+	}
+	.mdq-key-list {
+		@apply flex flex-col gap-1;
+	}
+	.mdq-key-label {
+		@apply font-semibold;
+	}
+	.mdq-key-answers {
+		@apply inline-flex flex-wrap gap-2;
+	}
+	.mdq-key-answer {
+		@apply badge badge-outline;
+	}
+	.mdq-key-none {
+		@apply text-sm text-muted;
+	}
+
+	.mdq-select {
+		@apply dropdown inline-block align-middle;
+	}
+	.mdq-select[data-open] {
+		@apply dropdown-open;
+	}
+	.mdq-select-button {
+		@apply select select-sm inline-flex w-auto items-center gap-1 text-left disabled:text-base-content;
+	}
+	.mdq-select-list {
+		@apply dropdown-content z-10 mt-1 flex w-max min-w-40 flex-col rounded-box border border-base-300 bg-base-100 p-1 shadow-lg;
+	}
+	.mdq-select-option {
+		@apply cursor-pointer rounded-field px-3 py-1.5 text-sm;
+	}
+	.mdq-select-option[data-active] {
+		@apply bg-base-200;
+	}
+	.mdq-select-option[data-selected] {
+		@apply font-semibold;
+	}
+	.mdq-select-placeholder {
+		@apply text-muted;
+	}
+
+	.mdq-ordering-list {
+		@apply flex flex-col gap-2;
+	}
+	.mdq-panel .mdq-ordering-list + .mdq-ordering-list {
+		@apply mt-3 border-t border-dashed border-base-300 pt-3;
+	}
+	.mdq-panel[data-tone="unused"] {
+		@apply border-dashed;
+	}
+	.mdq-ordering-line {
+		@apply flex items-center gap-3 rounded-box border border-base-300 bg-base-100 p-2;
+	}
+	/* The level comes from the component as a custom property. */
+	.mdq-ordering-body {
+		@apply min-w-0 flex-1;
+		margin-left: calc(var(--mdq-level, 0) * 1.5rem);
+	}
+	.mdq-ordering-code {
+		@apply whitespace-pre font-mono text-sm;
+	}
+	.mdq-ordering-controls {
+		@apply flex shrink-0 gap-1;
+	}
+	.mdq-ordering-button {
+		@apply btn btn-ghost btn-sm btn-square;
+	}
+	.mdq-ordering-button[aria-disabled="true"] {
+		@apply cursor-default opacity-40;
+	}
+	.mdq-ordering-keep {
+		@apply flex flex-wrap items-center gap-2;
+	}
+	.mdq-ordering-keep-button {
+		@apply btn btn-sm btn-primary;
+	}
+
+	.mdq-unsupported {
+		@apply alert alert-warning;
+	}
+
+	.mdq-mark {
+		@apply inline-flex shrink-0;
+	}
+	.mdq-mark svg {
+		@apply h-5 w-5;
+	}
+	.mdq-mark[data-mark="correct"] {
+		@apply text-success;
+	}
+	.mdq-mark[data-mark="partial"] {
+		@apply text-warning;
+	}
+	.mdq-mark[data-mark="incorrect"] {
+		@apply text-error;
+	}
+	.mdq-mark[data-mark="selected"] {
+		@apply text-primary;
+	}
+
+	.mdq-feedback {
+		@apply alert flex-col items-start;
+	}
+	.mdq-feedback[data-sign="positive"] {
+		@apply alert-success;
+	}
+	.mdq-feedback[data-sign="negative"] {
+		@apply alert-error;
+	}
+	.mdq-feedback[data-sign="zero"] {
+		@apply alert-info;
+	}
+}
