@@ -11,7 +11,6 @@ import {
 	resourceSchema,
 	resourceUpdate,
 } from "@/core/schemas";
-import { db } from "@/db";
 import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
 import { m } from "@/i18n";
 import type { FillUndefineds, Pretty } from "@/typing";
@@ -28,7 +27,7 @@ import {
 	valueOrNotAllowed,
 	valueOrNotFound,
 } from "../utils";
-import type { Attachment, AttachmentService } from "./attachment.service";
+import type { AttachmentService } from "./attachment.service";
 import { courseContentsWhere } from "./course.service";
 
 export type { ResourceId } from "@/core/schemas";
@@ -323,26 +322,21 @@ export class ResourceService
 				pred: (course) => hasPerm(opts.actor, "course.update-contents", course),
 			});
 
-			// Update attachment, if necessary
-			let attachment:
-				| Pick<Attachment, "id" | "hash" | "filename" | "mimeType">
-				| undefined;
-			if (fields.data?.type === "FILE") {
-				const row = await self.attachment.create(
-					{
-						attachedTo: { type: "RESOURCE", id: target.id },
-						filename: fields.data.filename,
-						buffer: fields.data.buffer,
-					},
-					{ tx, actor: opts.actor },
-				);
-				attachment = {
-					id: row.id,
-					hash: row.hash,
-					filename: row.filename,
-					mimeType: row.mimeType,
-				};
-			}
+			// The same bytes and filename come back as the current attachment.
+			const previousId = target.__raw.attachmentId;
+			const attachmentId =
+				fields.data?.type === "FILE"
+					? (
+							await self.attachment.create(
+								{
+									attachedTo: { type: "RESOURCE", id: target.id },
+									filename: fields.data.filename,
+									buffer: fields.data.buffer,
+								},
+								{ tx, actor: opts.actor },
+							)
+						).id
+					: undefined;
 
 			const eventId = await self.eventId(target.courseId, fields.event, tx);
 			const row = await tx.resource.update({
@@ -354,12 +348,20 @@ export class ResourceService
 					description: fields.description,
 					data: fields.data ? self.toRawData(fields.data) : undefined,
 					extra: fields.data ? self.toRawExtra(fields.data) : undefined,
-					attachmentId: attachment?.id,
+					attachmentId,
 					rev: fields.rev,
 				},
 				include: resourceInclude,
 			});
-			row.attachment = attachment ?? null;
+
+			// Last, so the files it removes stay put if anything above fails.
+			if (
+				previousId &&
+				attachmentId !== undefined &&
+				attachmentId !== previousId
+			) {
+				await self.attachment.delete({ id: previousId }, { tx, actor: SYSTEM });
+			}
 			return fromDb(row);
 		}
 
@@ -409,7 +411,7 @@ export class ResourceService
 		const self = this;
 
 		async function run(tx: PrismaTx) {
-			const target = await self.findOne(filter, opts);
+			const target = await self.findOne(filter, { ...opts, tx });
 
 			if (!target) throw new NotFound("resource");
 
@@ -424,19 +426,17 @@ export class ResourceService
 			) {
 				throw new NotAllowed("resource.delete");
 			}
-			// Detach the attachment first: `AttachmentService.delete` resolves
-			// its output by looking the owning resource back up, which fails
-			// once the resource row itself is gone.
-			if (current.attachmentId && current.attachment) {
-				await db.attachment.delete(
+			await tx.resource.delete({ where: { id: target.id } });
+
+			// Last, so the files it removes stay put if anything above fails.
+			if (current.attachmentId) {
+				await self.attachment.delete(
 					{ id: current.attachmentId },
 					{ tx, actor: SYSTEM },
 				);
 			}
-
-			await tx.resource.delete({ where: { id: target.id } });
 		}
-		return run(opts.tx ?? this.prisma);
+		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
 	}
 
 	//

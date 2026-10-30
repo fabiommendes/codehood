@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type Resource } from "@/db";
+import { prisma } from "@/db/client";
 import { groupResourcesByType } from "@/db/services/resource.service";
 
 // A random suffix, not an incrementing counter: this file's own `tag()`
@@ -757,4 +758,95 @@ test("a dropped student loses access to the course's resources", async () => {
 	await expect(
 		db.resource.findMany({ course: course.id }, { actor: student }),
 	).resolves.toHaveLength(1);
+});
+
+async function makeFileResource(filename = "notes.txt") {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const buffer = Buffer.from(`file bytes ${tag("f")}`);
+	const resource = await db.resource.create(
+		{
+			course: course.id,
+			slug: "notes",
+			title: "Notes",
+			data: { type: "FILE", filename, buffer },
+		},
+		{ actor: instructor },
+	);
+	const attachedTo = {
+		type: "RESOURCE" as const,
+		id: resource.id,
+		title: resource.title,
+		slug: resource.slug,
+	};
+	return { instructor, course, buffer, resource, attachedTo };
+}
+
+test("update with the same FILE bytes and filename keeps the one attachment", async () => {
+	const { instructor, buffer, resource, attachedTo } = await makeFileResource();
+
+	const updated = await db.resource.update(
+		{ id: resource.id },
+		{ data: { type: "FILE", filename: "notes.txt", buffer } },
+		{ actor: instructor },
+	);
+
+	expect(updated.data.type === "FILE" && updated.data.filename).toBe(
+		"notes.txt",
+	);
+	expect(
+		await db.attachment.allAttachedTo(attachedTo, FULL_ACCESS),
+	).toHaveLength(1);
+});
+
+test("update with new FILE bytes replaces the attachment and frees the old one's quota", async () => {
+	const { instructor, resource, attachedTo } = await makeFileResource();
+	const fresh = Buffer.from(`new bytes, longer than before ${tag("f")}`);
+
+	await db.resource.update(
+		{ id: resource.id },
+		{ data: { type: "FILE", filename: "notes.txt", buffer: fresh } },
+		{ actor: instructor },
+	);
+
+	const attachments = await db.attachment.allAttachedTo(
+		attachedTo,
+		FULL_ACCESS,
+	);
+	expect(attachments.map((a) => a.size)).toEqual([fresh.length]);
+	expect(await db.attachment.usageBytes(instructor.username)).toBe(
+		fresh.length,
+	);
+});
+
+test("a title-only update of a FILE resource returns its file", async () => {
+	const { instructor, resource } = await makeFileResource("slides.pdf");
+
+	const updated = await db.resource.update(
+		{ id: resource.id },
+		{ title: "Slides" },
+		{ actor: instructor },
+	);
+
+	expect(updated.title).toBe("Slides");
+	expect(updated.data.type === "FILE" && updated.data.filename).toBe(
+		"slides.pdf",
+	);
+});
+
+test("attachment findMany skips an attachment whose resource is gone", async () => {
+	const { instructor, resource } = await makeFileResource();
+	const kept = await makeFileResource();
+	await prisma.resource.delete({ where: { id: resource.id } });
+
+	const found = await db.attachment.findMany(
+		{ uploader: instructor.username },
+		FULL_ACCESS,
+	);
+	expect(found).toEqual([]);
+	const others = await db.attachment.findMany(
+		{ uploader: kept.instructor.username },
+		FULL_ACCESS,
+	);
+	expect(others.map((a) => a.attachedTo.id)).toEqual([kept.resource.id]);
 });

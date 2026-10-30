@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { SYSTEM, type UserActor } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
-import { NotAllowed, NotFound } from "@/core/error";
+import { NotAllowed, NotFound, NotImplemented } from "@/core/error";
 import type { ReportId, RepositoryId } from "@/core/schemas";
 import {
 	attachmentAttach,
@@ -13,6 +13,7 @@ import {
 	attachmentUpdate,
 } from "@/core/schemas";
 import type { ServiceOpts } from "@/db";
+import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
 import { mimeFor } from "@/utils/mime";
 import { Validate } from "@/utils/validate";
@@ -98,6 +99,17 @@ export class AttachmentService {
 			const filename = sanitizeFilename(input.filename);
 			const mimeType = mimeFor(filename);
 
+			const duplicate = await tx.attachment.findFirst({
+				where: {
+					hash: hashBytes(input.buffer),
+					filename,
+					attachedToType: input.attachedTo.type,
+					attachedToId: input.attachedTo.id,
+				},
+				include: attachmentInclude,
+			});
+			if (duplicate) return this.ownedOrNotFound(duplicate, tx);
+
 			await this.assertWithinQuota(input.buffer.length, scoped);
 
 			const blob = await this.blob.create(
@@ -110,7 +122,7 @@ export class AttachmentService {
 					? (input.uploaderId ?? null)
 					: opts.actor.username;
 
-			return this.fromDbWithSource(
+			return this.ownedOrNotFound(
 				await tx.attachment.create({
 					data: {
 						hash: blob.hash,
@@ -227,7 +239,10 @@ export class AttachmentService {
 	async delete(filter: AttachmentPK, opts: ServiceOpts): Promise<void> {
 		const client = opts.tx ?? this.prisma;
 
-		const target = await this.findOne(filter, opts);
+		// The raw row, not `findOne`: an owner deleted first must not block this.
+		const target = await client.attachment.findUnique({
+			where: { id: filter.id },
+		});
 		if (!target) return;
 
 		await client.attachment.delete({ where: { id: target.id } });
@@ -324,7 +339,7 @@ export class AttachmentService {
 				},
 				include: attachmentInclude,
 			});
-			if (duplicate) return this.fromDbWithSource(duplicate, tx);
+			if (duplicate) return this.ownedOrNotFound(duplicate, tx);
 
 			await this.assertWithinQuota(blob.size, scoped);
 			await this.blob.link(blob.hash, filename);
@@ -333,7 +348,7 @@ export class AttachmentService {
 					? (input.uploaderId ?? null)
 					: opts.actor.username;
 
-			return this.fromDbWithSource(
+			return this.ownedOrNotFound(
 				await tx.attachment.create({
 					data: {
 						hash: blob.hash,
@@ -438,8 +453,21 @@ export class AttachmentService {
 		};
 	}
 
+	/// `null` for an attachment whose owner is gone.
 	private async fromDbWithSource(raw: DbAttachment, tx: PrismaTx) {
-		return this.fromDb(raw, await this.attachmentSource(raw, tx));
+		const source = await this.attachmentSource(raw, tx);
+		return source && this.fromDb(raw, source);
+	}
+
+	/// An attachment just written for `raw.attachedTo`, which must exist.
+	private async ownedOrNotFound(raw: DbAttachment, tx: PrismaTx) {
+		const attachment = await this.fromDbWithSource(raw, tx);
+		if (!attachment) {
+			throw new NotFound(raw.attachedToType.toLowerCase(), {
+				id: raw.attachedToId,
+			});
+		}
+		return attachment;
 	}
 
 	private async fromDbWithSources(raw: DbAttachment[], tx: PrismaTx) {
@@ -464,17 +492,18 @@ export class AttachmentService {
 			resources.map((r) => [r.id, { ...r, type: "RESOURCE" as const }]),
 		);
 
-		// Collect all attachments with their associated resources
+		// Attachments whose owner is gone are left out.
 		const results: Attachment[] = [];
 		for (const r of raw) {
-			const resource = resourceMap[r.attachedToId];
-			if (resource) {
-				results.push(this.fromDb(r, resource));
+			if (r.attachedToType === "RESOURCE") {
+				const resource = resourceMap[r.attachedToId];
+				if (resource) results.push(this.fromDb(r, resource));
 				continue;
 			}
 
-			// Any other owner is resolved one by one (and a missing resource throws).
-			results.push(this.fromDb(r, await this.attachmentSource(r, tx)));
+			// Any other owner is resolved one by one.
+			const source = await this.attachmentSource(r, tx);
+			if (source) results.push(this.fromDb(r, source));
 		}
 		return results;
 	}
@@ -482,7 +511,7 @@ export class AttachmentService {
 	private async attachmentSource(
 		raw: DbAttachment,
 		tx: PrismaTx,
-	): Promise<Attachment["attachedTo"]> {
+	): Promise<Attachment["attachedTo"] | null> {
 		switch (raw.attachedToType) {
 			case "RESOURCE": {
 				const resource = await tx.resource.findUnique({
@@ -493,32 +522,24 @@ export class AttachmentService {
 						slug: true,
 					},
 				});
-				if (!resource) {
-					throw new Error(`Resource with ID ${raw.attachedToId} not found`);
-				}
-				return { ...resource, type: "RESOURCE" };
+				return resource && { ...resource, type: "RESOURCE" };
 			}
 			case "QUESTION": {
-				throw new Error("Question support is not yet implemented");
+				throw new NotImplemented("question attachments");
 			}
 			case "REPORT": {
 				const report = await tx.report.findUnique({
 					where: { id: raw.attachedToId as ReportId },
 					select: { id: true, publicId: true },
 				});
-				if (!report) {
-					throw new Error(`Report with ID ${raw.attachedToId} not found`);
-				}
-				return { ...report, type: "REPORT" };
+				return report && { ...report, type: "REPORT" };
 			}
 			case "REPOSITORY": {
 				const repository = await tx.repository.findUnique({
 					where: { id: raw.attachedToId as RepositoryId },
 					select: { id: true, slug: true },
 				});
-				if (!repository) {
-					throw new Error(`Repository with ID ${raw.attachedToId} not found`);
-				}
+				if (!repository) return null;
 				return {
 					type: "REPOSITORY",
 					id: repository.id,
