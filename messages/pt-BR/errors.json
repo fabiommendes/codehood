@@ -142,5 +142,10 @@
 	"errors_repository_hash_unknown": "Nenhum arquivo no servidor tem o hash {hash}.",
 	"errors_repository_file_hash_mismatch": "Os bytes enviados não correspondem ao hash {hash}.",
 	"errors_repository_file_too_large": "O arquivo {hash} passa de {max} bytes.",
-	"errors_repository_event_unknown": "O curso não tem repositório com o slug \"{slug}\"."
+	"errors_repository_event_unknown": "O curso não tem repositório com o slug \"{slug}\".",
+	"errors_invite_classroom_student_only": "Um convite de turma concede apenas o papel de aluno.",
+	"errors_invite_classroom_course_required": "Um convite de turma precisa de um curso.",
+	"errors_invite_classroom_no_email": "Um convite de turma não é endereçado a um e-mail.",
+	"errors_invite_personal_email_required": "Um convite pessoal precisa de um e-mail.",
+	"errors_invite_personal_single_use": "Um convite pessoal é de uso único: maxUses deve ser 1."
 }

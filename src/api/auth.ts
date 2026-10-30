@@ -26,11 +26,13 @@ const invalidCredentials = z
 export const logout = POST("/api/auth/logout", {
 	out: z.object({ success: z.boolean() }).openapi("LogoutResponse"),
 	summary: "Logs out the current user.",
-	description: "Logs out the current user by invalidating their session.",
+	description:
+		"Logs out the current user by invalidating their sessions and revoking the API key the request used, if any.",
 	tags: ["Authentication"],
 	operationId: "logout",
-	handler: async ({ actor, cookies }) => {
+	handler: async ({ actor, cookies, apiKey }) => {
 		await db.session.delete({ username: actor.username }, { actor });
+		if (apiKey) await db.apiKey.delete({ id: apiKey.id }, { actor });
 		cookies.delete(SESSION_COOKIE, { path: "/" });
 		return { success: true };
 	},

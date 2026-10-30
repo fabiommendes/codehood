@@ -142,5 +142,10 @@
 	"errors_repository_hash_unknown": "No file on the server has the hash {hash}.",
 	"errors_repository_file_hash_mismatch": "The bytes sent do not match the hash {hash}.",
 	"errors_repository_file_too_large": "The file {hash} is larger than {max} bytes.",
-	"errors_repository_event_unknown": "The course has no repository with the slug \"{slug}\"."
+	"errors_repository_event_unknown": "The course has no repository with the slug \"{slug}\".",
+	"errors_invite_classroom_student_only": "A classroom invite grants the student role only.",
+	"errors_invite_classroom_course_required": "A classroom invite needs a course.",
+	"errors_invite_classroom_no_email": "A classroom invite is not addressed to an email.",
+	"errors_invite_personal_email_required": "A personal invite needs an email.",
+	"errors_invite_personal_single_use": "A personal invite is single-use: maxUses must be 1."
 }

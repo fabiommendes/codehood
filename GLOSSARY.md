@@ -297,7 +297,8 @@ drifted pairs let the list page and detail page disagree about a row.
 
 Type: domain
 
-A single-use invite addressed to one email, which the invitee must match exactly.
+A single-use invite addressed to one email, which the invitee must match,
+ignoring case.
 Used from instructor to student or admin to instructor. Contrast
 [Classroom invite](#classroom-invite).
 

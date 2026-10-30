@@ -38,9 +38,27 @@ export const inviteCreate = inviteSchema
 		// Absent for an invite not bound to a course.
 		course: courseRef.optional(),
 		expiresInMs: z.number().int().optional(),
+		maxUses: z.number().int().min(1).nullable(),
 		// Only honoured for SYSTEM callers, which have no actor to derive it
 		// from; any other caller gets `createdBy` from `opts.actor` instead.
 		createdBy: userInfo.optional(),
+	})
+	.superRefine((input, ctx) => {
+		const issue = (path: string, message: string) =>
+			ctx.addIssue({ code: "custom", path: [path], message });
+		if (input.kind === "CLASSROOM") {
+			if (input.invitedRole !== "STUDENT")
+				issue("invitedRole", m.errors_invite_classroom_student_only());
+			if (input.course === undefined)
+				issue("course", m.errors_invite_classroom_course_required());
+			if (input.email !== null)
+				issue("email", m.errors_invite_classroom_no_email());
+		} else {
+			if (input.email === null)
+				issue("email", m.errors_invite_personal_email_required());
+			if (input.maxUses !== 1)
+				issue("maxUses", m.errors_invite_personal_single_use());
+		}
 	});
 
 export const invitePK = z.union([

@@ -127,7 +127,7 @@ async function makeChain(request: APIRequestContext) {
 			invitedRole: "STUDENT",
 			email: `${tag("invitee")}@codehood.test`,
 			course: course.id,
-			maxUses: null,
+			maxUses: 1,
 			createdBy: { username: instructor.username, name: instructor.name },
 		},
 		FULL_ACCESS,
@@ -177,7 +177,7 @@ test("POST /api/invite returns a publicId and a token, never an id", async ({
 			kind: "PERSONAL",
 			invitedRole: "STUDENT",
 			email: `${tag("invitee")}@codehood.test`,
-			maxUses: null,
+			maxUses: 1,
 		},
 	});
 	expect(res.status()).toBe(200);
@@ -198,7 +198,7 @@ test("GET and DELETE /api/invite/<publicId> address the invite; a numeric id in 
 			kind: "PERSONAL",
 			invitedRole: "STUDENT",
 			email: `${tag("invitee")}@codehood.test`,
-			maxUses: null,
+			maxUses: 1,
 		},
 	});
 	expect(created.status()).toBe(200);

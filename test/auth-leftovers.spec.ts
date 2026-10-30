@@ -1,8 +1,9 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { dummyPasswordHash, verifyPassword } from "@/auth/password";
-import { inviteUpdate } from "@/core/schemas";
+import { inviteCreate, inviteUpdate } from "@/core/schemas";
 import { db } from "@/db";
+import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { userFactory } from "@/fixtures/user.factory";
 
 // Regressions for small auth gaps. API-level, no page behind them.
@@ -51,9 +52,11 @@ test("InviteService.redeem only maps the unique violation to already_redeemed", 
 		userFactory.build({ role: "ADMIN", username: "leftover-admin2" }),
 		FULL_ACCESS,
 	);
+	const course = await persistedCourseFactory.create();
 	const { token } = await db.invite.create(
 		{
 			kind: "CLASSROOM",
+			course: course.id,
 			maxUses: 5,
 			invitedRole: "STUDENT",
 			email: null,
@@ -143,4 +146,50 @@ test("deleting an unknown API key is a NotFound, not a 403", async ({
 	});
 	expect(res.status()).toBe(200);
 	expect((await res.json()).deleted).toBe(false);
+});
+
+test("logging out with a Bearer key revokes that key", async ({ request }) => {
+	const token = await adminToken(request);
+	const headers = { Authorization: `Bearer ${token}` };
+
+	const out = await request.post("/api/auth/logout", { headers });
+	expect(out.status()).toBe(200);
+
+	const again = await request.post("/api/auth/logout", { headers });
+	expect(again.status()).toBe(401);
+});
+
+test("inviteCreate enforces the rules of each invite kind", () => {
+	const course = { discipline: "cs101", instructor: "ada", edition: "2026-1" };
+	const classroom = {
+		kind: "CLASSROOM",
+		invitedRole: "STUDENT",
+		email: null,
+		course,
+		maxUses: null,
+	} as const;
+	const personal = {
+		kind: "PERSONAL",
+		invitedRole: "STUDENT",
+		email: "someone@example.edu",
+		maxUses: 1,
+	} as const;
+
+	expect(inviteCreate.safeParse(classroom).success).toBe(true);
+	expect(inviteCreate.safeParse(personal).success).toBe(true);
+
+	for (const invalid of [
+		{ ...classroom, invitedRole: "INSTRUCTOR" },
+		{ ...classroom, course: undefined },
+		{ ...classroom, email: "someone@example.edu" },
+		{ ...classroom, maxUses: 0 },
+		{ ...personal, email: null },
+		{ ...personal, maxUses: null },
+		{ ...personal, maxUses: 5 },
+	]) {
+		expect(
+			inviteCreate.safeParse(invalid).success,
+			JSON.stringify(invalid),
+		).toBe(false);
+	}
 });

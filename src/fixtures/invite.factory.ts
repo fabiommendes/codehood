@@ -8,9 +8,9 @@ function buildInvite(params: Partial<InviteCreate>): InviteCreate {
 	return {
 		kind: "PERSONAL",
 		invitedRole: "STUDENT",
-		email: null,
+		email: `invitee-${crypto.randomUUID().slice(0, 8)}@codehood.test`,
 		course: params.course,
-		maxUses: null,
+		maxUses: 1,
 		createdBy: params.createdBy,
 	};
 }

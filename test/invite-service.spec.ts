@@ -274,11 +274,13 @@ test("findMany visibility agrees with invite.read: admins see all, instructors s
 
 test("findMany carries the creator and the redemption count, never a token", async () => {
 	const instructor = await makeInstructor("list-instructor");
+	const course = await makeCourse(instructor.username, "inv-disc-list");
 	await db.invite.create(
 		{
 			kind: "CLASSROOM",
 			invitedRole: "STUDENT",
 			email: null,
+			course: course.id,
 			maxUses: 5,
 			createdBy: { username: instructor.username, name: instructor.name },
 		},
@@ -297,11 +299,13 @@ test("findMany carries the creator and the redemption count, never a token", asy
 test("update() extends an expiry and adjusts maxUses, and refuses another instructor", async () => {
 	const owner = await makeInstructor("update-owner");
 	const other = await makeInstructor("update-other");
+	const course = await makeCourse(owner.username, "inv-disc-update");
 	const invite = await db.invite.create(
 		{
 			kind: "CLASSROOM",
 			invitedRole: "STUDENT",
 			email: null,
+			course: course.id,
 			maxUses: 2,
 			createdBy: { username: owner.username, name: owner.name },
 		},
@@ -330,12 +334,14 @@ test("delete() refuses a stranger, and succeeds for the creator and for an admin
 	const owner = await makeInstructor("delete-owner");
 	const other = await makeInstructor("delete-other");
 	const admin = await makeAdmin("delete-admin@codehood.test");
+	const course = await makeCourse(owner.username, "inv-disc-delete");
 
 	const first = await db.invite.create(
 		{
 			kind: "CLASSROOM",
 			invitedRole: "STUDENT",
 			email: null,
+			course: course.id,
 			maxUses: null,
 			createdBy: { username: owner.username, name: owner.name },
 		},
@@ -361,6 +367,7 @@ test("delete() refuses a stranger, and succeeds for the creator and for an admin
 			kind: "CLASSROOM",
 			invitedRole: "STUDENT",
 			email: null,
+			course: course.id,
 			maxUses: null,
 			createdBy: { username: owner.username, name: owner.name },
 		},
@@ -450,11 +457,14 @@ test("findOne by id is actor-filtered; by token it is not", async () => {
 
 test("an invite never exposes its token hash", async () => {
 	const admin = await makeAdmin("invitehash@codehood.test");
+	const instructor = await makeInstructor("invitehash-instructor");
+	const course = await makeCourse(instructor.username, "inv-disc-hash");
 	const created = await db.invite.create(
 		{
 			kind: "CLASSROOM",
 			maxUses: null,
 			email: null,
+			course: course.id,
 			invitedRole: "STUDENT",
 		},
 		{ actor: admin },

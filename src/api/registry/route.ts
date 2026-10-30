@@ -54,12 +54,16 @@ type HandlerArgs<In, Actor> = Actor extends Actor
 			body: In;
 			params: Record<string, string>;
 			cookies: AstroCookies;
+			/// The API key the request authenticated with, if any.
+			apiKey?: App.Locals["apiKey"];
 		}
 	: {
 			actor?: Actor;
 			body: In;
 			params: Record<string, string>;
 			cookies: AstroCookies;
+			/// The API key the request authenticated with, if any.
+			apiKey?: App.Locals["apiKey"];
 		};
 
 /// The Handler function itself
@@ -236,6 +240,7 @@ export function route<In, Out, IsPublic extends boolean = false>(
 				body: validated?.data,
 				params: params as Record<string, string>,
 				cookies,
+				apiKey: locals.apiKey,
 			} as any);
 			// biome-ignore-end lint/suspicious/noExplicitAny: ...
 
