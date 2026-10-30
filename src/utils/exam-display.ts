@@ -35,7 +35,7 @@ export function examPhaseBadgeClass(phase: ExamPhase): string {
 		case "upcoming":
 			return "badge-info";
 		case "open":
-			return "badge-warning";
+			return "badge-success";
 		case "closed":
 			return "badge-ghost";
 	}
@@ -47,7 +47,7 @@ export function examPhaseBadgeClass(phase: ExamPhase): string {
  *
  * @example
  * examBadge("open", { kind: "submitted" }); // { label: m.exams_badge_awaiting_grading(), ... }
- * examBadge("open"); // { label: "Open now", className: "badge-warning" }
+ * examBadge("open"); // { label: "Open now", className: "badge-success" }
  */
 export function examBadge(
 	phase: ExamPhase,

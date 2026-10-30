@@ -407,16 +407,17 @@
 		@apply text-primary;
 	}
 
+	/* A tint with a colored edge: a solid slab would outshine the question. */
 	.mdq-feedback {
-		@apply alert flex-col items-start;
+		@apply alert flex-col items-start text-base-content;
 	}
 	.mdq-feedback[data-sign="positive"] {
-		@apply alert-success;
+		@apply border-success bg-success/10;
 	}
 	.mdq-feedback[data-sign="negative"] {
-		@apply alert-error;
+		@apply border-error bg-error/10;
 	}
 	.mdq-feedback[data-sign="zero"] {
-		@apply alert-info;
+		@apply border-info bg-info/10;
 	}
 }

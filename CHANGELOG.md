@@ -103,6 +103,10 @@
   lights; static under reduced motion), a calmer "already recorded" state for
   a repeat scan, a welcome when the scan joins the course, a link to the
   course, and refusals that read clearly as "not recorded".
+- Color follows meaning: an open exam is green ("Open now"), the admin role
+  takes the accent instead of the warning orange, question feedback is a
+  tint with a colored edge instead of a solid block, and the force-logout row
+  action in the users table is a ghost button with a red icon.
 - Highlighted code uses the Codehood palettes instead of GitHub's: the
   landing page's terminal in the dark theme, ink on the page color in the
   light one (`src/utils/code-themes.ts`).

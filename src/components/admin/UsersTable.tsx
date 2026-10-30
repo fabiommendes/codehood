@@ -25,7 +25,7 @@ const ROLE_LABEL = {
 } as const;
 
 const ROLE_BADGE = {
-	ADMIN: "warning",
+	ADMIN: "accent",
 	INSTRUCTOR: "primary",
 	STUDENT: undefined,
 } as const;
@@ -157,7 +157,7 @@ export default function UsersTable(props: Props): JSX.Element {
 
 					<button
 						type="button"
-						class="btn btn-square btn-error btn-sm text-white"
+						class="btn btn-square btn-ghost btn-sm text-error"
 						aria-label={m.admin_force_logout_user({ name: user.name })}
 						title={m.admin_force_logout()}
 						data-open-dialog={`force-logout-${user.username}`}
