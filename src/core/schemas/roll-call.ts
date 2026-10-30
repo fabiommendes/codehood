@@ -160,7 +160,9 @@ export const checkInCode = z.object({
 		.string()
 		.trim()
 		.min(1)
-		.meta({ form: { label: m.forms_label_code() } }),
+		.meta({
+			form: { label: m.forms_label_code(), hint: m.forms_hint_check_in_code() },
+		}),
 });
 
 /// Creates the account of a student who scanned a roll call that acts as an invite.

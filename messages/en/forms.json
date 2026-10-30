@@ -48,6 +48,7 @@
 	"forms_label_key_name": "Key name",
 	"forms_placeholder_key_name": "e.g. my laptop",
 	"forms_label_counts_as_invite": "Counts as an invite",
+	"forms_hint_check_in_code": "The 6 letters and digits your instructor shows in class.",
 	"forms_hint_counts_as_invite": "Anyone who checks in is enrolled, and gets an account if they have none.",
 	"forms_label_code": "Code",
 	"forms_label_email": "Email",

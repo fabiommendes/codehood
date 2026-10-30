@@ -115,9 +115,9 @@
   here or in the OS, and tracks OS changes live; it reports its state with
   `aria-pressed`. The mobile browser bar takes the theme's color
   (`theme-color`), and app pages open with a "Skip to content" link.
-- The check-in pages are quiet: the tile wall shrinks to one row along the
-  top and the card drops its tape (`CenteredLayout`'s `quiet`). Login and
-  invites keep the full wall.
+- The check-in pages are quiet: no tile wall behind the card and no tape on
+  it (`CenteredLayout`'s `quiet`). Login and invites keep the full wall. The
+  code field takes focus on load and says what to type.
 - A released score gets the ipê bouquets and tape only from 70% up; a lower
   score shows the same card without them. The bouquets shrink on phones so
   the card no longer overflows.

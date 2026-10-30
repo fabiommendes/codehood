@@ -48,6 +48,7 @@
 	"forms_label_key_name": "Nome da chave",
 	"forms_placeholder_key_name": "ex.: meu notebook",
 	"forms_label_counts_as_invite": "Conta como convite",
+	"forms_hint_check_in_code": "As 6 letras e números que o docente mostra em aula.",
 	"forms_hint_counts_as_invite": "Quem registra presença é matriculado e ganha uma conta, se não tiver.",
 	"forms_label_code": "Código",
 	"forms_label_email": "E-mail",
