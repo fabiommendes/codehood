@@ -111,6 +111,10 @@
   days use the muted color, a draft exam or row gets a dashed edge, the
   calendar's labels and the smallest badges are 11px, and a numeric or
   essay answer under review keeps a visible field border.
+- The theme toggle follows the system again once the choice matches it,
+  here or in the OS, and tracks OS changes live; it reports its state with
+  `aria-pressed`. The mobile browser bar takes the theme's color
+  (`theme-color`), and app pages open with a "Skip to content" link.
 - Highlighted code uses the Codehood palettes instead of GitHub's: the
   landing page's terminal in the dark theme, ink on the page color in the
   light one (`src/utils/code-themes.ts`).

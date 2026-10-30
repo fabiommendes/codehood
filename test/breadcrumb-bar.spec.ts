@@ -327,7 +327,7 @@ test.describe("long trails", () => {
 
 		const navBox = await nav.boundingBox();
 		const toggleBox = await page
-			.getByRole("button", { name: "Toggle dark mode" })
+			.getByRole("button", { name: "Dark theme", pressed: false })
 			.boundingBox();
 		expect(navBox).not.toBeNull();
 		expect(toggleBox).not.toBeNull();

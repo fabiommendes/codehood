@@ -18,7 +18,7 @@ const { class: className, variant = "icon" } = Astro.props;
       <span class="theme-only-dark">{m.common_light_theme()}</span>
     </button>
   ) : (
-<button type="button" class:list={["btn btn-square btn-ghost", className]} aria-label={m.common_toggle_dark_mode()} data-theme-toggle>
+<button type="button" class:list={["btn btn-square btn-ghost", className]} aria-label={m.common_dark_theme()} aria-pressed="false" data-theme-toggle>
   <svg class="theme-icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6" />
     <path
@@ -53,11 +53,40 @@ const { class: className, variant = "icon" } = Astro.props;
 <script>
 	const STORAGE_KEY = "codehood-theme";
 
+	const DARK = "codehood-dark";
+	const LIGHT = "codehood";
+	const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+
+	/// The theme the operating system asks for.
+	const systemTheme = () => (systemDark.matches ? DARK : LIGHT);
+
+	/// Shows `theme` on the page, on the icon toggles and in the browser's chrome.
+	function apply(theme: string) {
+		const dark = theme === DARK;
+		document.documentElement.setAttribute("data-theme", theme);
+		for (const btn of document.querySelectorAll("[data-theme-toggle][aria-pressed]")) {
+			btn.setAttribute("aria-pressed", String(dark));
+		}
+		for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+			meta.content = (dark ? meta.dataset.dark : meta.dataset.light) ?? meta.content;
+		}
+	}
+
+	apply(document.documentElement.getAttribute("data-theme") ?? systemTheme());
+
+	// A choice is stored only while it differs from the system, so switching
+	// back to the system's theme, here or in the OS, follows the OS again.
 	document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]").forEach((btn) => {
 		btn.addEventListener("click", () => {
-			const next = document.documentElement.getAttribute("data-theme") === "codehood-dark" ? "codehood" : "codehood-dark";
-			localStorage.setItem(STORAGE_KEY, next);
-			document.documentElement.setAttribute("data-theme", next);
+			const next = document.documentElement.getAttribute("data-theme") === DARK ? LIGHT : DARK;
+			if (next === systemTheme()) localStorage.removeItem(STORAGE_KEY);
+			else localStorage.setItem(STORAGE_KEY, next);
+			apply(next);
 		});
+	});
+
+	systemDark.addEventListener("change", () => {
+		if (localStorage.getItem(STORAGE_KEY) === systemTheme()) localStorage.removeItem(STORAGE_KEY);
+		if (!localStorage.getItem(STORAGE_KEY)) apply(systemTheme());
 	});
 </script>

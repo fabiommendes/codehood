@@ -12,6 +12,11 @@ const { title = "Codehood" } = Astro.props;
 <!doctype html>
 <html lang={locale}>
 	<head>
+		<!-- The browser's own chrome takes base-100 of the theme on the page. The
+		     media queries hold without JS; the scripts below and in ThemeToggle.astro
+		     point both tags at the theme actually shown. -->
+		<meta name="theme-color" content="#fffdf8" media="(prefers-color-scheme: light)" data-light="#fffdf8" data-dark="#15302a" />
+		<meta name="theme-color" content="#15302a" media="(prefers-color-scheme: dark)" data-light="#fffdf8" data-dark="#15302a" />
 		<script is:inline>
 			// Runs before first paint to avoid a flash of the wrong theme. Mirrors the
 			// resolution logic in ThemeToggle.astro — keep the two in sync.
@@ -25,6 +30,9 @@ const { title = "Codehood" } = Astro.props;
 								? "codehood-dark"
 								: "codehood";
 					document.documentElement.setAttribute("data-theme", theme);
+					document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
+						meta.content = theme === "codehood-dark" ? meta.dataset.dark : meta.dataset.light;
+					});
 				} catch (e) {}
 			})();
 		</script>

@@ -1,6 +1,7 @@
 {
 	"nav_open_sidebar": "Abrir menu lateral",
 	"nav_close_sidebar": "Fechar menu lateral",
+	"nav_skip_to_content": "Pular para o conteúdo",
 	"nav_log_in": "Entrar",
 	"nav_page_title": "{title} — Codehood",
 	"nav_error_page_title": "{code} — {title} — Codehood",

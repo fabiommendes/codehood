@@ -75,6 +75,12 @@ const reportContentPage =
 
 <Layout title={title ? m.nav_page_title({ title }) : undefined}>
   <PencilFilter />
+  <a
+    href="#content"
+    class="btn btn-primary btn-sm fixed top-3 left-3 z-50 -translate-y-20 focus:translate-y-0"
+  >
+    {m.nav_skip_to_content()}
+  </a>
   <div class="flex min-h-screen flex-col">
     <div
       class="navbar sticky top-0 z-30 border-b border-base-300 bg-base-100 p-0"
@@ -132,7 +138,7 @@ const reportContentPage =
           class="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 bg-gradient-to-b from-base-200 to-transparent"
         >
         </div>
-        <div class="relative z-10 flex-1">
+        <div id="content" tabindex="-1" class="relative z-10 flex-1 outline-none">
           <slot />
         </div>
         <AppFooter class="relative z-10 px-6" reportable={!!user} />

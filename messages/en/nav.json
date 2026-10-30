@@ -1,6 +1,7 @@
 {
 	"nav_open_sidebar": "Open sidebar",
 	"nav_close_sidebar": "Close sidebar",
+	"nav_skip_to_content": "Skip to content",
 	"nav_log_in": "Log in",
 	"nav_page_title": "{title} — Codehood",
 	"nav_error_page_title": "{code} — {title} — Codehood",
