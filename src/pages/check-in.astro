@@ -20,7 +20,7 @@ const form = await actionForm(Astro, actions.checkIn.register, checkInCode, {
 });
 ---
 
-<CenteredLayout title={m.auth_check_in_title()}>
+<CenteredLayout title={m.auth_check_in_title()} quiet>
   {
     result?.data ? (
       <AttendanceResult view={result.data} another />

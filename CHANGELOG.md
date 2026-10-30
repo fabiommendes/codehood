@@ -115,6 +115,9 @@
   here or in the OS, and tracks OS changes live; it reports its state with
   `aria-pressed`. The mobile browser bar takes the theme's color
   (`theme-color`), and app pages open with a "Skip to content" link.
+- The check-in pages are quiet: the tile wall shrinks to one row along the
+  top and the card drops its tape (`CenteredLayout`'s `quiet`). Login and
+  invites keep the full wall.
 - Highlighted code uses the Codehood palettes instead of GitHub's: the
   landing page's terminal in the dark theme, ink on the page color in the
   light one (`src/utils/code-themes.ts`).

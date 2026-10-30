@@ -71,7 +71,7 @@ const logInHref = `/login?next=${encodeURIComponent(Astro.url.pathname)}`;
 const logInLink = `<a class="link link-primary" href="${escapeHtml(logInHref)}">${escapeHtml(m.auth_check_in_log_in())}</a>`;
 ---
 
-<CenteredLayout title={wantsSignUp ? m.auth_check_in_join_class() : m.auth_check_in_title()}>
+<CenteredLayout title={wantsSignUp ? m.auth_check_in_join_class() : m.auth_check_in_title()} quiet>
   {
     error && (
       <AttendanceRefused message={error} next={!actor ? "start" : retypeable ? "retype" : "courses"} />
