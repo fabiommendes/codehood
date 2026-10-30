@@ -11,6 +11,7 @@ interface Props {
 	download?: string;
 	/** Opens the link in another tab, without a referrer. */
 	external?: boolean;
+	/** Draws the row with a dashed edge, for an entry that is not published yet. */
 	muted?: boolean;
 	class?: string;
 }
@@ -26,11 +27,12 @@ const {
 
 const cardClass = [
 	// A visible rule and a faint tint set the row apart from the page, which
-	// is base-100 itself, in both themes.
-	"card border border-base-content/15 bg-base-200/50",
+	// is base-100 itself, in both themes. A muted row keeps full contrast and
+	// swaps the solid rule for a dashed one.
+	"card border bg-base-200/50",
+	muted ? "border-dashed border-base-content/40" : "border-base-content/15",
 	(href || openDialog) && "transition-colors hover:border-primary",
 	openDialog && "w-full text-left",
-	muted && "opacity-70",
 	className,
 ]
 	.filter(Boolean)

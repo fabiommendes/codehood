@@ -148,6 +148,11 @@ body {
 		color: var(--color-muted);
 		opacity: 1;
 	}
+
+	/* DaisyUI sets the smallest badge at 10px; 11px is the floor for UI text. */
+	.badge-xs {
+		font-size: 0.6875rem;
+	}
 }
 
 /* Fields share the card's background, so the border is their only edge and

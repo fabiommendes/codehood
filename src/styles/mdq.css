@@ -273,10 +273,9 @@
 		@apply w-[12ch] grow-0;
 	}
 	/* daisyUI fades a disabled border to the page color, which would show a
-	   frozen empty blank as a gap. */
+	   frozen field, the answer under review included, as a gap. */
 	.mdq-question:not([data-mode="answer"])
-		.mdq-blank
-		:is(.mdq-input, .mdq-numeric-box, .mdq-select-button) {
+	:is(.mdq-input, .mdq-numeric-box, .mdq-select-button, .mdq-textarea) {
 		@apply border-field-border;
 	}
 

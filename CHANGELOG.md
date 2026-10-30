@@ -107,6 +107,10 @@
   takes the accent instead of the warning orange, question feedback is a
   tint with a colored edge instead of a solid block, and the force-logout row
   action in the users table is a ghost button with a red icon.
+- Nothing fades below WCAG contrast to say "past" or "draft": past calendar
+  days use the muted color, a draft exam or row gets a dashed edge, the
+  calendar's labels and the smallest badges are 11px, and a numeric or
+  essay answer under review keeps a visible field border.
 - Highlighted code uses the Codehood palettes instead of GitHub's: the
   landing page's terminal in the dark theme, ink on the page color in the
   light one (`src/utils/code-themes.ts`).

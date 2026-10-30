@@ -367,10 +367,10 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                   class:list={[
                     isToday
                       ? "rounded-full bg-primary px-1.5 font-semibold text-primary-content"
-                      : dayEntries.length > 0
-                        ? "font-semibold"
-                        : "text-base-content/70",
-                    isPast && !isToday && "opacity-50",
+                      : [
+                          dayEntries.length > 0 && "font-semibold",
+                          isPast && "text-muted",
+                        ],
                   ]}
                 >
                   {day}
@@ -382,8 +382,9 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                       class:list={[
                         "inline-block h-1.5 w-1.5",
                         markerShape(entry),
-                        courseColor.get(entry.courseId),
-                        isDraft(entry) && "opacity-40",
+                        isDraft(entry)
+                          ? "border border-dashed border-base-content"
+                          : courseColor.get(entry.courseId),
                       ]}
                     />
                   ))}
@@ -393,8 +394,10 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                     <span
                       title={isDraft(entry) ? m.schedule_calendar_draft_title({ title: entry.exam.title }) : entry.exam.title}
                       class:list={[
-                        "hidden w-full min-w-0 items-center gap-1 rounded-sm bg-secondary/15 px-0.5 text-[10px] text-base-content sm:flex",
-                        isDraft(entry) && "opacity-50",
+                        "hidden w-full min-w-0 items-center gap-1 rounded-sm border px-0.5 text-[11px] leading-tight text-base-content sm:flex",
+                        isDraft(entry)
+                          ? "border-dashed border-base-content/60"
+                          : "border-transparent bg-secondary/15",
                       ]}
                     >
                       <span
@@ -412,7 +415,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                   ) : (
                     <span
                       title={entry.event.title}
-                      class="hidden w-full min-w-0 items-center gap-1 text-[10px] text-muted sm:flex"
+                      class="hidden w-full min-w-0 items-center gap-1 text-[11px] leading-tight text-muted sm:flex"
                     >
                       <span
                         class:list={[
@@ -426,7 +429,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                   ),
                 )}
                 {dayEntries.length > 2 && (
-                  <span class="hidden text-[10px] text-muted sm:inline">
+                  <span class="hidden text-[11px] leading-tight text-muted sm:inline">
                     {m.schedule_calendar_more({ count: dayEntries.length - 2 })}
                   </span>
                 )}
@@ -467,7 +470,6 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                         href={entryHref(entry)}
                         class:list={[
                           "flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-base-200",
-                          isDraft(entry) && "opacity-60",
                         ]}
                       >
                         <span class="w-12 shrink-0 tabular-nums text-muted">
@@ -501,7 +503,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                             <span
                               class:list={[
                                 "font-medium",
-                                entry.event.kind === "CANCELLED" && "line-through opacity-60",
+                                entry.event.kind === "CANCELLED" && "text-muted line-through",
                               ]}
                             >
                               {entry.event.title}
