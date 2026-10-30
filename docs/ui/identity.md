@@ -247,9 +247,10 @@ Quiet screens use the radius and nothing else from this list.
   cropped to the section.
 - **Party lights.** A string of colored bulbs. Celebrations only.
 - **Ipê bouquets.** Three overlapping clusters of yellow ipê. They flank a
-  student's score once grades are released (`ReleasedScore`), marking the
-  moment without cheering the number: party lights over a low score would
-  read as mockery. Always yellow, since the white ipê vanishes on a light card.
+  released score of 70% or more (`ReleasedScore`), with the card's tape. A
+  lower score gets the same card without flowers or tape: flowers over a low
+  score would read as mockery. Always yellow, since the white ipê vanishes on
+  a light card.
 - **Fireflies and stars.** Night decoration in the dark theme.
 - **The house.** From the logo's H. Home icon, and small houses on a hill
   for community-themed art.

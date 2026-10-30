@@ -714,6 +714,10 @@ const triagedReport: ReportRow = {
             <ReleasedScore score={0.85} releasedAt={minutes(-60 * 48)} />
           </figure>
           <figure class="flex flex-col gap-2">
+            <figcaption class="font-semibold">Below 70%</figcaption>
+            <ReleasedScore score={0.55} releasedAt={minutes(-60 * 48)} />
+          </figure>
+          <figure class="flex flex-col gap-2">
             <figcaption class="font-semibold">Negative score</figcaption>
             <ReleasedScore score={-0.1} releasedAt={minutes(-60 * 48)} />
           </figure>

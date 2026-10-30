@@ -118,6 +118,9 @@
 - The check-in pages are quiet: the tile wall shrinks to one row along the
   top and the card drops its tape (`CenteredLayout`'s `quiet`). Login and
   invites keep the full wall.
+- A released score gets the ipê bouquets and tape only from 70% up; a lower
+  score shows the same card without them. The bouquets shrink on phones so
+  the card no longer overflows.
 - Highlighted code uses the Codehood palettes instead of GitHub's: the
   landing page's terminal in the dark theme, ink on the page color in the
   light one (`src/utils/code-themes.ts`).
