@@ -57,3 +57,6 @@ prompt/
 
 # Instance deployment, a separate (private) repository
 /deploy/
+
+# Impeccable engine binary, fetched on demand by its launcher
+.claude/skills/impeccable/scripts/bin/
