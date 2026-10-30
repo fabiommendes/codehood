@@ -119,7 +119,7 @@ const stateLabel = (status: string, score: number | null): string => {
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 
-    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-base-content/60 hover:text-primary">← {exam.title}</a>
+    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
 
     <h2 class="mt-2 text-2xl font-bold">
       {row.name}
@@ -128,17 +128,17 @@ const stateLabel = (status: string, score: number | null): string => {
 
     <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-3">
       <div>
-        <dt class="text-sm text-base-content/50">{m.exams_attempt_started()}</dt>
+        <dt class="text-sm text-muted">{m.exams_attempt_started()}</dt>
         <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>
       </div>
       <div>
-        <dt class="text-sm text-base-content/50">{m.exams_attempt_submitted()}</dt>
+        <dt class="text-sm text-muted">{m.exams_attempt_submitted()}</dt>
         <dd class="mt-0.5 font-medium">
           {closed ? formatDateTime(attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
         </dd>
       </div>
       <div>
-        <dt class="text-sm text-base-content/50">{m.exams_attempt_total()}</dt>
+        <dt class="text-sm text-muted">{m.exams_attempt_total()}</dt>
         <dd class="mt-0.5 font-medium">{attemptTotalLabel(row.total, row.state)}</dd>
       </div>
     </dl>
@@ -199,7 +199,7 @@ const stateLabel = (status: string, score: number | null): string => {
                   )}
                 </>
               ) : (
-                <p class="text-base-content/60">{m.exams_attempt_not_answered()}</p>
+                <p class="text-muted">{m.exams_attempt_not_answered()}</p>
               )}
             </div>
           </article>

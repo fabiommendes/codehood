@@ -217,7 +217,7 @@ export default function RollCallManager(
 						</span>
 						<span
 							class="font-mono text-sm tabular-nums"
-							classList={{ "text-base-content/60": !isOpen() }}
+							classList={{ "text-muted": !isOpen() }}
 						>
 							<Reserve
 								widest={[
@@ -335,7 +335,7 @@ export default function RollCallManager(
 													{student.name}
 												</div>
 												<div class="flex h-5 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs">
-													<span class="shrink-0 font-mono text-base-content/60">
+													<span class="shrink-0 font-mono text-muted">
 														{student.username}
 													</span>
 													<Show when={student.dropped}>
@@ -398,7 +398,7 @@ export default function RollCallManager(
 													}
 												/>
 												<span
-													class="loading loading-spinner loading-xs text-base-content/50"
+													class="loading loading-spinner loading-xs text-muted"
 													classList={{ invisible: !saving() }}
 													role="status"
 													aria-label={m.attendance_manager_saving()}

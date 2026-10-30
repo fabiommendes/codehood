@@ -55,7 +55,7 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 		{ title: m.admin_col_name(), render: (row) => row.name },
 		{
 			title: m.admin_col_courses(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (row) => m.admin_courses_count({ count: row.courseCount }),
 		},
 		{

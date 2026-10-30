@@ -32,15 +32,13 @@ export default function CoursesTable(props: Props): JSX.Element {
 			render: (course) => (
 				<>
 					<div class="font-mono font-medium">{course.discipline.slug}</div>
-					<div class="text-xs text-base-content/60">
-						{course.discipline.name}
-					</div>
+					<div class="text-xs text-muted">{course.discipline.name}</div>
 				</>
 			),
 		},
 		{
 			title: m.admin_courses_col_edition(),
-			class: "font-mono text-base-content/60",
+			class: "font-mono text-muted",
 			render: (row) => row.edition.slug,
 		},
 		{
@@ -49,7 +47,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.admin_courses_col_students(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (row) => {
 				const count = row.enrollmentCount;
 				return m.admin_courses_students({ count });
@@ -57,7 +55,7 @@ export default function CoursesTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.admin_courses_col_term(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (row) => formatTerm(row),
 		},
 		{

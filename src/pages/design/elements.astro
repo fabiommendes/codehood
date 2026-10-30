@@ -76,7 +76,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Both themes</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       The same components inside a <code class="font-mono">data-theme</code> wrapper for each theme. Cards and
       buttons get the irregular hand-cut radius from <code class="font-mono">global.css</code>; badges and chips
       use a smaller one, inputs a plain 8 px.
@@ -114,7 +114,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Loud and quiet screens</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       Personality is strong at the edges and quiet where people work. Quiet screens keep the colors, type and
       rounded paper shapes, and drop tilt, tape and illustration.
     </p>
@@ -142,7 +142,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Button</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<Button variant="primary">`}</code>: renders
       an
       <code class="font-mono">&lt;a&gt;</code> instead of a <code
@@ -162,7 +162,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Badge</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<Badge variant="success">`}</code>: used for
       role labels and API key kinds elsewhere in the app.
     </p>
@@ -179,7 +179,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Alert</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<Alert variant="error">`}</code>: the same
       pattern used for action-result messages on the login, invite, and profile pages.
     </p>
@@ -197,7 +197,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Card</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<Card title="...">`}</code>: a bordered container
       with an optional title; every section on this page (including this one) is one.
     </p>
@@ -219,7 +219,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Divider &amp; list</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       Not (yet) wrapped in components: plain daisyUI classes, used as-is
       on the profile page's API key list.
     </p>
@@ -229,7 +229,7 @@ const tabItems = [
           <li class="list-row">
             <div>
               <div class="font-medium">my laptop</div>
-              <div class="text-xs text-base-content/60">
+              <div class="text-xs text-muted">
                 created Jan 3 &middot; last used yesterday
               </div>
             </div>
@@ -238,7 +238,7 @@ const tabItems = [
           <li class="list-row">
             <div>
               <div class="font-medium">grading bot</div>
-              <div class="text-xs text-base-content/60">
+              <div class="text-xs text-muted">
                 created Feb 12 &middot; last used never
               </div>
             </div>
@@ -246,7 +246,7 @@ const tabItems = [
           </li>
         </ul>
         <div class="divider"></div>
-        <p class="text-xs text-base-content/50">
+        <p class="text-xs text-muted">
           <code class="font-mono">divider</code> separates the list from whatever
           follows it. On the profile page, that is the create-key form.
         </p>
@@ -256,7 +256,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Table</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<Table columns={...} data={...} />`}</code>:
       a data-driven
       <code class="font-mono">&lt;table&gt;</code>; each column declares its
@@ -268,7 +268,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">Tabs</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<Tabs items={...} active="..." />`}</code>:
       the tab strip on this very page. Link mode (shown above, no <code
         class="font-mono">name</code
@@ -285,7 +285,7 @@ const tabItems = [
 
   <section class="mb-14">
     <h2 class="mb-2 text-xl font-semibold">ListRow</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<ListRow href="..." muted>`}</code>: a single-row
       card with optional leading/trailing slots. Renders an <code
         class="font-mono">&lt;a&gt;</code
@@ -300,7 +300,7 @@ const tabItems = [
     <div class="flex flex-col gap-3">
       <ListRow href="#">
         <div class="font-medium">Midterm exam</div>
-        <div class="text-xs text-base-content/60">
+        <div class="text-xs text-muted">
           opens Mar 3 &middot; 90 minutes
         </div>
         <Fragment slot="trailing">
@@ -309,7 +309,7 @@ const tabItems = [
       </ListRow>
       <ListRow muted>
         <div class="font-medium">Final exam</div>
-        <div class="text-xs text-base-content/60">opens Jun 12</div>
+        <div class="text-xs text-muted">opens Jun 12</div>
         <Fragment slot="trailing">
           <Badge variant="neutral" style="outline">locked</Badge>
         </Fragment>
@@ -319,7 +319,7 @@ const tabItems = [
 
   <section>
     <h2 class="mb-2 text-xl font-semibold">PageKicker &amp; BrandSquares</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       <code class="font-mono">{`<PageKicker text="..." squares />`}</code>:
       the small mono eyebrow above a page's heading, seen at the top of the design
       index. The
@@ -335,7 +335,7 @@ const tabItems = [
         <PageKicker text="Section" />
         <div class="flex items-center gap-2">
           <BrandSquares />
-          <span class="text-xs text-base-content/60"
+          <span class="text-xs text-muted"
             >BrandSquares on its own</span
           >
         </div>

@@ -39,7 +39,7 @@ const courseParams = {
     <CourseHeader course={course} active="questions" />
 
     <h2 class="mt-6 text-xl font-semibold">{m.questions_title()}</h2>
-    <p class="mt-1 text-sm text-base-content/60">{course.discipline.name}</p>
+    <p class="mt-1 text-sm text-muted">{course.discipline.name}</p>
 
     <QuestionsTable
       questions={questions.map(({ id: _id, ...q }) => q)}

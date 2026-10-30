@@ -39,27 +39,27 @@ export default function StudentsTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.courses_students_col_username(),
-			class: "font-mono text-sm text-base-content/60",
+			class: "font-mono text-sm text-muted",
 			render: (user) => `@${user.username}`,
 		},
 		{
 			title: m.courses_students_col_email(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (user) => user.email,
 		},
 		{
 			title: m.courses_students_col_github(),
-			class: "font-mono text-sm text-base-content/60",
+			class: "font-mono text-sm text-muted",
 			render: (user) => user.githubId,
 		},
 		{
 			title: m.courses_students_col_school_id(),
-			class: "font-mono text-sm text-base-content/60",
+			class: "font-mono text-sm text-muted",
 			render: (user) => user.schoolId,
 		},
 		{
 			title: m.courses_students_col_enrolled(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (user) => formatDate(user.enrolledAt),
 		},
 		{

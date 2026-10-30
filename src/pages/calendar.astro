@@ -244,7 +244,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
       <SectionHeader title={m.schedule_calendar_upcoming()} />
       {
         upcoming.length === 0 ? (
-          <p class="mt-4 text-sm text-base-content/60">{m.schedule_calendar_nothing_upcoming()}</p>
+          <p class="mt-4 text-sm text-muted">{m.schedule_calendar_nothing_upcoming()}</p>
         ) : (
           <div class="mt-4 flex flex-col gap-3">
             {/* A checkbox the labels below toggle: no script, and the rows
@@ -275,13 +275,13 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                     <span class="badge badge-ghost badge-sm ml-1">{m.schedule_draft()}</span>
                   )}
                 </p>
-                <p class="text-sm text-base-content/60">
+                <p class="text-sm text-muted">
                   {courseNames.get(entry.courseId)}
                   {entry.kind === "exam" && entry.exam.duration && (
                     <span> · {formatDuration(entry.exam.duration)}</span>
                   )}
                 </p>
-                <span slot="trailing" class="text-sm text-base-content/60">
+                <span slot="trailing" class="text-sm text-muted">
                   {formatDateTime(entry.startAt)}
                 </span>
               </ListRow>
@@ -338,7 +338,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
       </div>
 
       <div
-        class="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-base-content/50"
+        class="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-muted"
       >
         {weekdayLabels.map((day) => <div class="py-1">{day}</div>)}
       </div>
@@ -412,7 +412,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                   ) : (
                     <span
                       title={entry.event.title}
-                      class="hidden w-full min-w-0 items-center gap-1 text-[10px] text-base-content/60 sm:flex"
+                      class="hidden w-full min-w-0 items-center gap-1 text-[10px] text-muted sm:flex"
                     >
                       <span
                         class:list={[
@@ -426,7 +426,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                   ),
                 )}
                 {dayEntries.length > 2 && (
-                  <span class="hidden text-[10px] text-base-content/40 sm:inline">
+                  <span class="hidden text-[10px] text-muted sm:inline">
                     {m.schedule_calendar_more({ count: dayEntries.length - 2 })}
                   </span>
                 )}
@@ -438,7 +438,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
 
       {
         monthEntries.length === 0 && courses.length > 0 && (
-          <p class="mt-4 text-center text-sm text-base-content/50">
+          <p class="mt-4 text-center text-sm text-muted">
             {m.schedule_calendar_nothing_month()}
           </p>
         )
@@ -454,7 +454,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                 <h3
                   class:list={[
                     "text-sm font-semibold group-target:text-primary",
-                    dayKey < today && "text-base-content/50",
+                    dayKey < today && "text-muted",
                   ]}
                 >
                   {dayLabel(dayEntries[0]!.startAt)}
@@ -470,7 +470,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                           isDraft(entry) && "opacity-60",
                         ]}
                       >
-                        <span class="w-12 shrink-0 tabular-nums text-base-content/60">
+                        <span class="w-12 shrink-0 tabular-nums text-muted">
                           {startTime(entry.startAt)}
                         </span>
                         <span
@@ -489,7 +489,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                             {isDraft(entry) && (
                               <span class="badge badge-ghost badge-sm ml-1">{m.schedule_draft()}</span>
                             )}
-                            <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
+                            <span class="block text-xs text-muted sm:ml-2 sm:inline">
                               {courseNames.get(entry.courseId)}
                               {entry.exam.duration && (
                                 <span> · {formatDuration(entry.exam.duration)}</span>
@@ -511,7 +511,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                                 {entry.event.kind === "HOLIDAY" ? m.schedule_event_holiday() : m.schedule_event_cancelled()}
                               </span>
                             )}
-                            <span class="block text-xs text-base-content/60 sm:ml-2 sm:inline">
+                            <span class="block text-xs text-muted sm:ml-2 sm:inline">
                               {courseNames.get(entry.courseId)}
                             </span>
                           </span>

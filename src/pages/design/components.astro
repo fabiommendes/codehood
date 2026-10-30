@@ -549,14 +549,14 @@ const triagedReport: ReportRow = {
 <DesignLayout title="Components" active="components">
   <div class="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10">
     <nav aria-label="Components" class="sticky top-6 self-start max-lg:hidden">
-      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-base-content/40">Components</p>
+      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Components</p>
       <ul class="flex flex-col gap-1 border-l border-base-300">
         {
           sectionLinks.map((link) => (
             <li>
               <a
                 href={`#${link.id}`}
-                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-base-content/60 transition-colors hover:border-base-300 hover:text-base-content"
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-base-300 hover:text-base-content"
               >
                 {link.label}
               </a>
@@ -579,7 +579,7 @@ const triagedReport: ReportRow = {
 
       <section id="check-in" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Check-in</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           What a student sees after scanning a roll call code or typing it on <code class="font-mono">/check-in</code>:{" "}
           <code class="font-mono">AttendanceResult</code>, <code class="font-mono">AttendanceRefused</code> and{" "}
           <code class="font-mono">SignUpForm</code>, each in the card the page puts it in.
@@ -592,7 +592,7 @@ const triagedReport: ReportRow = {
               <figure class="flex flex-col gap-2">
                 <figcaption>
                   <span class="font-semibold">{state.label}</span>
-                  <span class="text-sm text-base-content/60"> {state.note}</span>
+                  <span class="text-sm text-muted"> {state.note}</span>
                 </figcaption>
                 <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
                   <div class="card-body">
@@ -606,7 +606,7 @@ const triagedReport: ReportRow = {
         </div>
 
         <h3 class="mt-10 mb-3 text-xl font-semibold">Refused</h3>
-        <p class="mb-5 text-sm text-base-content/60">
+        <p class="mb-5 text-sm text-muted">
           The scanned link page. On <code class="font-mono">/check-in</code> a wrong or expired code shows as an error on
           the code field instead, and the rest in the form's alert.
         </p>
@@ -616,7 +616,7 @@ const triagedReport: ReportRow = {
               <figure class="flex flex-col gap-2">
                 <figcaption>
                   <span class="font-semibold">{state.label}</span>
-                  <span class="text-sm text-base-content/60"> {state.loggedIn ? "Logged in." : "Logged out."}</span>
+                  <span class="text-sm text-muted"> {state.loggedIn ? "Logged in." : "Logged out."}</span>
                 </figcaption>
                 <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
                   <div class="card-body">
@@ -630,7 +630,7 @@ const triagedReport: ReportRow = {
         </div>
 
         <h3 class="mt-10 mb-3 text-xl font-semibold">Sign-up from a roll call invite</h3>
-        <p class="mb-5 text-sm text-base-content/60">
+        <p class="mb-5 text-sm text-muted">
           A logged-out student who scans the code of a roll call that acts as an invite.
         </p>
         <div class="card card-border w-full max-w-sm bg-base-100 shadow-sm">
@@ -644,7 +644,7 @@ const triagedReport: ReportRow = {
 
       <section id="roll-call" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Roll call</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           <code class="font-mono">RollCallManager</code>, the instructor's roll call page. The roster covers a student
           present, absent, with a note, dropped, new in class (enrolled and new account), and two who checked in from
           the same device. The countdown is frozen at render time.
@@ -657,7 +657,7 @@ const triagedReport: ReportRow = {
 
       <section id="projection" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Projection</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           <code class="font-mono">RollCallProjector</code> fills the classroom screen. Here it runs in a 1280×720 box
           shown at half size, with its <code class="font-mono">h-screen</code> replaced by the box's height.
         </p>
@@ -684,7 +684,7 @@ const triagedReport: ReportRow = {
 
       <section id="exam-exceptions" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Exam exceptions</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           <code class="font-mono">ExamExceptions</code> on the instructor's exam page: extra time, a new date with its
           personal window, and the empty table.
         </p>
@@ -696,7 +696,7 @@ const triagedReport: ReportRow = {
 
       <section id="release" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Grade release</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           <code class="font-mono">ReleaseGrades</code> for the instructor and <code class="font-mono">ReleasedScore</code>{" "}
           for the student once grades are out.
         </p>
@@ -722,7 +722,7 @@ const triagedReport: ReportRow = {
 
       <section id="regrades" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Regrades</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           <code class="font-mono">RegradeControls</code> under a question on the student's exam page, and{" "}
           <code class="font-mono">RegradeResolve</code>, the instructor's form on an open request.
         </p>
@@ -748,7 +748,7 @@ const triagedReport: ReportRow = {
 
       <section id="statistics" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Statistics</h2>
-        <p class="mt-2 text-sm text-base-content/60">
+        <p class="mt-2 text-sm text-muted">
           <code class="font-mono">QuestionStats</code> on the exam's grading page and{" "}
           <code class="font-mono">AnswerDistribution</code> on a question's. The mixed table has a healthy question, a weak
           one, a negative discrimination, one with no variance and one still waiting for grades.
@@ -773,7 +773,7 @@ const triagedReport: ReportRow = {
 
       <section id="reports" class="mb-14 scroll-mt-6">
         <h2 class="text-2xl font-bold">Reports</h2>
-        <p class="mt-2 mb-6 text-sm text-base-content/60">
+        <p class="mt-2 mb-6 text-sm text-muted">
           <code class="font-mono">ReportDialog</code>, the "Report a problem" dialog, and{" "}
           <code class="font-mono">ReportQueue</code>, the triage queue of the admin and of a course's instructor.
         </p>

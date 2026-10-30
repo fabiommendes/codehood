@@ -175,7 +175,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.exams_table_col_type(),
-			class: `text-base-content/60 ${CARD_CELL}`,
+			class: `text-muted ${CARD_CELL}`,
 			sortKey: "type" satisfies SortField,
 			render: (exam) => examTypeLabels[exam.type],
 		},
@@ -194,7 +194,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.exams_table_col_scheduled(),
-			class: `text-base-content/60 ${CARD_CELL}`,
+			class: `text-muted ${CARD_CELL}`,
 			sortKey: "scheduled" satisfies SortField,
 			render: (exam) =>
 				exam.scheduledAt
@@ -203,7 +203,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.exams_table_col_duration(),
-			class: `text-base-content/60 ${CARD_CELL}`,
+			class: `text-muted ${CARD_CELL}`,
 			sortKey: "duration" satisfies SortField,
 			render: (exam) => formatDuration(exam.duration),
 		},

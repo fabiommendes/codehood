@@ -26,7 +26,7 @@ function formatSize(bytes: number): string {
       <a href={`${href}/${encodeURIComponent(entry.name)}`} class="flex items-center gap-3">
         <span class="flex-1 font-mono text-sm">{entry.type === "dir" ? `${entry.name}/` : entry.name}</span>
         {entry.size !== null && (
-          <span class="text-xs text-base-content/60">{formatSize(entry.size)}</span>
+          <span class="text-xs text-muted">{formatSize(entry.size)}</span>
         )}
       </a>
     </li>

@@ -409,7 +409,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.questions_table_col_type(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			sortKey: "type" satisfies SortField,
 			render: (question) => questionTypeLabels[question.question.type],
 		},
@@ -439,7 +439,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.questions_table_col_updated(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			sortKey: "updated" satisfies SortField,
 			render: (question) =>
 				question.updatedAt.toLocaleDateString(locale, {
@@ -589,7 +589,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 					</div>
 				</Show>
 
-				<span class="text-sm text-base-content/60">
+				<span class="text-sm text-muted">
 					{m.questions_table_count({
 						shown: sorted().length,
 						total: props.questions.length,
@@ -609,16 +609,12 @@ export default function QuestionsTable(props: Props): JSX.Element {
 
 			<Show
 				when={props.questions.length > 0}
-				fallback={
-					<p class="text-sm text-base-content/60">
-						{m.questions_table_empty()}
-					</p>
-				}
+				fallback={<p class="text-sm text-muted">{m.questions_table_empty()}</p>}
 			>
 				<Show
 					when={sorted().length > 0}
 					fallback={
-						<p class="text-sm text-base-content/60">
+						<p class="text-sm text-muted">
 							{m.questions_table_no_match()}{" "}
 							<button type="button" class="link" onClick={clearFilters}>
 								{m.questions_filter_clear_all()}

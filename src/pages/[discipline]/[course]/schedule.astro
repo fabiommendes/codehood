@@ -138,19 +138,19 @@ function weekSpan(weeks: { week: number }[]): string {
               )
               .join(", ")}
           </p>
-          <p class="mt-1 text-xs text-base-content/50">
+          <p class="mt-1 text-xs text-muted">
             {m.schedule_meetings_held({ count: meetingsHeld })}
           </p>
 
           {entries.length === 0 ? (
-            <p class="mt-8 text-sm text-base-content/60">
+            <p class="mt-8 text-sm text-muted">
               {m.schedule_no_events()}
             </p>
           ) : (
             <div class="mt-8 flex flex-col gap-8">
               {foldPast && (
                 <details id="past-weeks">
-                  <summary class="cursor-pointer text-sm font-medium text-base-content/60 hover:text-base-content">
+                  <summary class="cursor-pointer text-sm font-medium text-muted hover:text-base-content">
                     {m.schedule_past_weeks({ span: weekSpan(past), count: past.length })}
                   </summary>
                   <div class="mt-6 flex flex-col gap-8">

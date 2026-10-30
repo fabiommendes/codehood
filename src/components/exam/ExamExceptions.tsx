@@ -129,9 +129,7 @@ export default function ExamExceptions(
 			<Show
 				when={props.rows.length > 0}
 				fallback={
-					<p class="text-sm text-base-content/60">
-						{m.exams_exceptions_empty()}
-					</p>
+					<p class="text-sm text-muted">{m.exams_exceptions_empty()}</p>
 				}
 			>
 				<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">

@@ -57,12 +57,12 @@ export default function UsersTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.admin_col_username(),
-			class: "font-mono text-sm text-base-content/60",
+			class: "font-mono text-sm text-muted",
 			render: (user) => `@${user.username}`,
 		},
 		{
 			title: m.admin_col_email(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (user) => user.email,
 		},
 		{
@@ -82,7 +82,7 @@ export default function UsersTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.admin_col_joined(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (user) => formatDate(user.createdAt),
 		},
 		{

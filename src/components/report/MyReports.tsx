@@ -47,7 +47,7 @@ export default function MyReports(props: MyReportsProps): JSX.Element {
 		<Show
 			when={rows().length > 0}
 			fallback={
-				<p class="rounded-box border border-dashed border-base-300 p-8 text-center text-base-content/60">
+				<p class="rounded-box border border-dashed border-base-300 p-8 text-center text-muted">
 					{m.report_mine_empty()}
 				</p>
 			}
@@ -84,7 +84,7 @@ function MyReport(props: {
 					<span class="badge badge-neutral">
 						{REPORT_STATUS_LABELS[props.row.status]()}
 					</span>
-					<span class="text-base-content/60">
+					<span class="text-muted">
 						{new Date(props.row.createdAt).toLocaleDateString()}
 					</span>
 				</header>

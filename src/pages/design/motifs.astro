@@ -204,7 +204,7 @@ const TILE_THEMES = [
         ).map(([art, seed]) => (
           <figure class="grid gap-1">
             <Sketch art={art} seed={seed} />
-            <figcaption class="font-mono text-xs text-base-content/60">
+            <figcaption class="font-mono text-xs text-muted">
               {art}
               {art === "athos" && ` · seed ${seed}`}
             </figcaption>

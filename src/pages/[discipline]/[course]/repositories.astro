@@ -61,12 +61,12 @@ function code(text: string): string {
           <div class="card-body gap-1 p-4">
             <a href={`${href}/repositories/${repository.slug}`} class="link link-hover font-medium">{repository.title}</a>
             {repository.head ? (
-              <p class="text-sm text-base-content/60">
+              <p class="text-sm text-muted">
                 {repository.message}
                 {repository.committedAt && <> · {formatDateTime(repository.committedAt)}</>}
               </p>
             ) : (
-              <p class="text-sm text-base-content/60">{m.repositories_pending()}</p>
+              <p class="text-sm text-muted">{m.repositories_pending()}</p>
             )}
           </div>
         </li>

@@ -65,7 +65,7 @@ const hasAttempt = (cell: GradeCell): boolean =>
                 <a href={`${href}/exams/${column.exam.slug}`} class="link">
                   {column.exam.title}
                 </a>
-                <div class="mt-1 text-xs font-normal text-base-content/60">
+                <div class="mt-1 text-xs font-normal text-muted">
                   {column.mean === null ? m.grades_table_no_average() : m.grades_table_average({ score: formatScore(column.mean) })} · {m.grades_table_attempted({ attempted: column.attempted, students: column.students })}
                 </div>
               </div>

@@ -186,9 +186,9 @@ const themes = [
                 <p>
                   Text, <span class="font-mono text-xs">{theme.key === "light" ? "#1f2a24" : "#e6f0ea"}</span>
                 </p>
-                <p class="text-base-content/70">
-                  Secondary text, a mix of content on the surface. Muted reference:{" "}
-                  <span class="font-mono text-xs">{theme.key === "light" ? "#5f6862" : "#8fb3a4"}</span>
+                <p class="text-muted">
+                  Secondary text, <span class="font-mono text-xs">text-muted</span>,{" "}
+                  <span class="font-mono text-xs">{theme.key === "light" ? "#575f5a" : "#8fb3a4"}</span>
                 </p>
                 <a href="#colors" class="link link-primary w-fit">
                   A link in primary
@@ -225,14 +225,14 @@ const themes = [
     </ul>
     <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div data-theme="codehood" class="rounded-box border border-base-300 bg-base-200 p-4">
-        <p class="mb-2 text-xs text-base-content/60">Light, fills (correct)</p>
+        <p class="mb-2 text-xs text-muted">Light, fills (correct)</p>
         <div class="flex flex-wrap gap-2">
           <span class="badge badge-secondary">secondary</span>
           <span class="badge badge-warning">warning</span>
         </div>
       </div>
       <div data-theme="codehood" class="rounded-box border border-base-300 bg-base-200 p-4">
-        <p class="mb-2 text-xs text-base-content/60">Light, as text (never)</p>
+        <p class="mb-2 text-xs text-muted">Light, as text (never)</p>
         <p class="text-secondary line-through">secondary text</p>
         <p class="text-warning line-through">warning text</p>
       </div>
@@ -241,7 +241,7 @@ const themes = [
 
   <section>
     <h2 class="mb-3 text-xl font-semibold">Usage</h2>
-    <p class="max-w-2xl text-sm text-base-content/60">
+    <p class="max-w-2xl text-sm text-muted">
       Use <code class="font-mono">primary</code> for the one most important action on a page. Reach for{" "}
       <code class="font-mono">secondary</code> and <code class="font-mono">accent</code> sparingly; most of a page
       stays in the base surfaces. The CLI maps the same roles onto the 16 ANSI colors: red is error, green

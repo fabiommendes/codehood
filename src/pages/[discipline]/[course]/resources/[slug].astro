@@ -60,7 +60,7 @@ const bodyHtml =
       href={resource.event
         ? `${href}/schedule#event-${resource.event.id}`
         : `${href}/resources`}
-      class="text-sm text-base-content/60 hover:text-primary"
+      class="text-sm text-muted hover:text-primary"
       >{resource.event ? m.courses_resource_back_schedule() : m.courses_resource_back_resources()}</a
     >
 
@@ -76,7 +76,7 @@ const bodyHtml =
     </div>
     {
       resource.description && (
-        <p class="mt-1 text-sm text-base-content/60">{resource.description}</p>
+        <p class="mt-1 text-sm text-muted">{resource.description}</p>
       )
     }
 

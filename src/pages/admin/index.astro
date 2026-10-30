@@ -137,7 +137,7 @@ const editionCreatedParts = editionResult?.data
 
     <div class="mt-10">
       <h2 class="text-lg font-semibold">{m.admin_overview_actions_title()}</h2>
-      <p class="mt-1 text-sm text-base-content/60">
+      <p class="mt-1 text-sm text-muted">
         {m.admin_overview_actions_intro()}
       </p>
 
@@ -163,7 +163,7 @@ const editionCreatedParts = editionResult?.data
               </span>
               <div>
                 <h3 class="text-sm font-semibold">{m.admin_overview_invite_title()}</h3>
-                <p class="mt-1 text-sm text-base-content/60">
+                <p class="mt-1 text-sm text-muted">
                   {m.admin_overview_invite_text()}
                 </p>
               </div>
@@ -206,7 +206,7 @@ const editionCreatedParts = editionResult?.data
               </span>
               <div>
                 <h3 class="text-sm font-semibold">{m.admin_new_discipline()}</h3>
-                <p class="mt-1 text-sm text-base-content/60">
+                <p class="mt-1 text-sm text-muted">
                   {disciplineExampleBefore}<span class="font-mono">cs102</span>{disciplineExampleAfter}
                 </p>
               </div>
@@ -238,7 +238,7 @@ const editionCreatedParts = editionResult?.data
               </span>
               <div>
                 <h3 class="text-sm font-semibold">{m.admin_new_edition()}</h3>
-                <p class="mt-1 text-sm text-base-content/60">
+                <p class="mt-1 text-sm text-muted">
                   {editionExampleBefore}<span class="font-mono">2026-1</span>{editionExampleAfter}
                 </p>
               </div>
@@ -259,7 +259,7 @@ const editionCreatedParts = editionResult?.data
 
     <div class="mt-10">
       <h2 class="text-lg font-semibold">{m.admin_overview_pending_title()}</h2>
-      <p class="mt-1 text-sm text-base-content/60">
+      <p class="mt-1 text-sm text-muted">
         {m.admin_overview_pending_intro()}
       </p>
 
@@ -338,7 +338,7 @@ const editionCreatedParts = editionResult?.data
         pendingInvites.length > 0 ? (
           <InvitesTable invites={pendingInvites} />
         ) : (
-          <p class="mt-4 text-sm text-base-content/50">
+          <p class="mt-4 text-sm text-muted">
             {m.admin_overview_no_pending()}
           </p>
         )

@@ -120,7 +120,7 @@ const layouts = [
           <div class="card-body">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <h2 class="card-title font-mono text-lg">{layout.name}</h2>
-              <span class="text-xs text-base-content/50">{layout.path}</span>
+              <span class="text-xs text-muted">{layout.path}</span>
             </div>
             <p class="text-base-content/70">{layout.description}</p>
               <!-- prettier-ignore -->
@@ -182,7 +182,7 @@ const layouts = [
               <div data-theme={theme} class="h-[520px] overflow-hidden rounded-box border border-base-300 text-base-content">
                 <AppSidebar courses={SAMPLE_COURSES} currentPath={path} admin />
               </div>
-              {theme === "codehood" && <figcaption class="text-xs text-base-content/60">{label}</figcaption>}
+              {theme === "codehood" && <figcaption class="text-xs text-muted">{label}</figcaption>}
             </figure>
           ))}
         </div>
@@ -203,7 +203,7 @@ const layouts = [
     </div>
     <div class="mt-4 flex flex-wrap items-center gap-3">
       {["ada", "alan", "grace", "linus", "barbara", "edsger"].map((u) => <Avatar username={u} size={36} />)}
-      <span class="text-sm text-base-content/60">Avatar without a picture: a tile seeded by the username.</span>
+      <span class="text-sm text-muted">Avatar without a picture: a tile seeded by the username.</span>
     </div>
 
     <h3 class="mt-8 mb-3 font-semibold">AppFooter</h3>

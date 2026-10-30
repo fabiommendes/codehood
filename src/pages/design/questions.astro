@@ -440,7 +440,7 @@ const sectionLinks = [
       the page is short enough to scroll on a phone.
     */}
     <nav aria-label="Question types" class="sticky top-6 self-start max-lg:hidden">
-      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-base-content/40">
+      <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
         Question types
       </p>
       <ul class="flex flex-col gap-1 border-l border-base-300">
@@ -450,7 +450,7 @@ const sectionLinks = [
               <a
                 href={`#${link.id}`}
                 data-section-link={link.id}
-                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-base-content/60 transition-colors hover:border-base-300 hover:text-base-content aria-current:border-primary aria-current:font-semibold aria-current:text-primary"
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-base-300 hover:text-base-content aria-current:border-primary aria-current:font-semibold aria-current:text-primary"
               >
                 {link.label}
               </a>
@@ -478,7 +478,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         The interactive form a student fills in. One is empty; the other is seeded with a choice already picked,
         to show the controlled path. Markdown in the stem and inline code in the choices come from{" "}
         <code class="font-mono">markdownFixture</code>, a fixture whose stem has two paragraphs and that has an{" "}
@@ -496,7 +496,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         The question shown back to a student without letting them change it: the picked option carries a check and
         the others are muted, and typed answers read as plain text.
       </p>
@@ -507,7 +507,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Three graded states, all driven by <code class="font-mono">scoreResponse(capitals, ...)</code> and{" "}
         <code class="font-mono">correctResponses(capitals)</code>: a correct pick, a wrong pick with the choice's own
         feedback and a score below zero, and a graded answer whose key is withheld
@@ -548,7 +548,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Checkboxes rather than radios &mdash; toggling a row adds or removes its id from the answer set. One card
         is empty; the other is seeded with a couple of choices already ticked, to show the controlled path.
       </p>
@@ -569,7 +569,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Same visuals as answer mode, but the checkboxes are disabled and nothing is clickable.
       </p>
       <Card>
@@ -579,7 +579,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Marking is by judgement, not by ticked-ness: a row reads correct when whether it was ticked matches
         whether <code class="font-mono">result.correct</code> says it should have been. The middle card ticked "4"
         (wrong) and left "2" alone (also wrong &mdash; a correct choice left unticked asserts it is false), so it
@@ -620,7 +620,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Each statement gets one toggle with three states, not a checkbox: unchecked is False, checked is True, and
         the knob centered (the native <code class="font-mono">indeterminate</code> property) is unmarked, because a
         student can judge a statement or abstain on it. Clicking (or pressing space) cycles unmarked &rarr; True
@@ -640,7 +640,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Same visuals as answer mode, but every toggle is disabled and nothing is clickable.
       </p>
       {/*
@@ -657,7 +657,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Three outcomes per statement, not two: judged correctly, judged wrongly, and abstained. The middle card
         marked "tcp-order" right, "udp-guarantee" wrong, and left "http2-multiplex" unmarked, so it shows feedback
         landing on the wrong statement <em>and</em> on the abstained one — mdq.spec includes abstentions in the
@@ -702,7 +702,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         One textarea, shaped by the question's <code class="font-mono">input</code> field:{" "}
         <code class="font-mono">text</code> accepts Markdown, <code class="font-mono">plain</code> does not, and{" "}
         <code class="font-mono">code</code> gets a monospace box with spell-checking off and the{" "}
@@ -721,7 +721,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Unlike the other three views, this one does not freeze its control — it drops the textarea and renders the
         submitted text instead. A disabled textarea would leave a long answer stranded behind a scrollbar the
         student can no longer drag, which is the opposite of what a frozen view is for. Each <code
@@ -744,7 +744,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Nothing here is marked right or wrong, because nothing in an essay can be: mdq.spec grades them manually.
         The first card is what an essay response gets: <code class="font-mono">scoreResponse()</code> throws{" "}
         <code class="font-mono">NotAutoGradable</code>, so the result is <code class="font-mono">pending</code>,
@@ -789,7 +789,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         One box, shaped by the question's <code class="font-mono">domain</code> — resolved by{" "}
         <code class="font-mono">publicForm()</code>, so the view never reimplements mdq.spec's coercion table. An{" "}
         <code class="font-mono">integer</code> or <code class="font-mono">decimal</code> question gets a number
@@ -813,7 +813,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         The input is kept and disabled, unlike the essay view which drops its textarea entirely. A disabled number
         box shows its one value completely; a disabled textarea strands a long answer behind a scrollbar. The
         value keeps its normal text color rather than being dimmed away.
@@ -825,7 +825,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Grading is binary: 998 g is inside the question's 5 g tolerance and scores 1, and 100 g scores 0. There is
         no partial credit for being close — the tolerance is the only notion of closeness mdq.spec has. The check
         and the x are read off <code class="font-mono">result.score</code>, not derived from the key, because the
@@ -857,7 +857,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         One line of text. The patterns that decide the grade never reach the browser, but{" "}
         <code class="font-mono">preAccept</code> and <code class="font-mono">preReject</code> do &mdash; mdq.spec
         asks that a student be warned about an invalid submission <em>before</em> committing to it, and they
@@ -880,7 +880,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         The input is kept and disabled, as numeric does &mdash; a single line shows completely when frozen, and
         only essay's textarea had a reason to be dropped.
       </p>
@@ -891,7 +891,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Grading is binary, but how much of it is automatic is not. The first two cards are settled by the
         question's own patterns, with the feedback of the first matching pattern that carries a message. The third
         is the case that makes this type different: <code class="font-mono">isnan</code> sets{" "}
@@ -939,7 +939,7 @@ const sectionLinks = [
 
     <section class="mt-6">
       <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         The only type whose stem has a grammar. It is split on its <code class="font-mono">[^id]</code>{" "}
         references and the controls are dropped in place, so each blank flows with the sentence rather than
         stacking under it. A choice blank is a native <code class="font-mono">select</code> &mdash; a stack of
@@ -962,7 +962,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         Every control is kept and disabled, as numeric and short answer do. What the student picked stays legible
         &mdash; a frozen sentence that hid its own answers would be showing nothing at all.
       </p>
@@ -973,7 +973,7 @@ const sectionLinks = [
 
     <section class="mt-10">
       <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
-      <p class="mb-5 text-sm text-base-content/60">
+      <p class="mb-5 text-sm text-muted">
         The result of a fill-in response is its score and the feedback of every blank in one list; the component
         draws no per-blank mark and has no answer key to show yet. The first two cards differ in what was typed. The third is a result still{" "}
         <code class="font-mono">pending</code>: a blank an instructor has yet to grade leaves the whole response
@@ -1013,7 +1013,7 @@ const sectionLinks = [
 
   <section id="unknown" class="scroll-mt-6">
     <h2 class="mb-2 text-xl font-semibold">Unknown type</h2>
-    <p class="mb-5 text-sm text-base-content/60">
+    <p class="mb-5 text-sm text-muted">
       Every type mdq.spec defines now has a renderer, so <code class="font-mono">QuestionView</code>'s fallback is
       unreachable from the union (the stub below is a made-up <code class="font-mono">matching</code> type). It stays: the union is a compile-time claim and a stored question is a runtime
       fact, and a client one version behind is better served by a named warning than by a blank space.

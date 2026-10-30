@@ -55,7 +55,7 @@ const percent = (count: number): number =>
                 {row.kind === "choice" ? (
                   <span class="font-medium" set:html={renderMarkdownInline(row.text)} />
                 ) : (
-                  <span class="font-medium text-base-content/60">
+                  <span class="font-medium text-muted">
                     {row.kind === "removed"
                       ? m.grades_dist_removed({ id: row.id })
                       : distribution.type === "multiple-selection"

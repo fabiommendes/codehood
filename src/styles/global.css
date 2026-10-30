@@ -22,6 +22,7 @@
 	--color-base-200: #f7f3ea;
 	--color-base-300: #e6dfd0;
 	--color-base-content: #1f2a24;
+	--color-muted: #575f5a;
 	--color-primary: #1b4b9b;
 	--color-primary-content: #ffffff;
 	--color-secondary: #f2b800;
@@ -64,6 +65,7 @@
 	--color-base-200: #0d211a;
 	--color-base-300: #1f4034;
 	--color-base-content: #e6f0ea;
+	--color-muted: #8fb3a4;
 	--color-primary: #4aa0ff;
 	--color-primary-content: #04121f;
 	--color-secondary: #ffc400;
@@ -95,6 +97,8 @@
 }
 
 @theme {
+	/* Registers `text-muted` and friends; each DaisyUI theme above sets the value. */
+	--color-muted: #575f5a;
 	--font-sans: "Atkinson Hyperlegible", system-ui, sans-serif;
 	--font-display: "Fraunces", Georgia, serif;
 	--font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -109,6 +113,37 @@ body {
 
 [data-theme="codehood-dark"] body {
 	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8 .12' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .03 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* DaisyUI fades secondary text to 20-60% of base-content, below 4.5:1 in one
+   theme or both. Muted keeps 4.5:1 or more on every base color. `:where` keeps
+   the specificity at zero, so a `text-*` utility on the element still wins. */
+@layer utilities {
+	:where(
+		.menu-title,
+		.label,
+		.fieldset-label,
+		.stat-title,
+		.stat-desc,
+		.table thead,
+		.table tfoot,
+		.tab:not(
+			:checked,
+			label:has(:checked),
+			:hover,
+			.tab-active,
+			[aria-selected="true"],
+			[aria-current="true"],
+			[aria-current="page"]
+		)
+	) {
+		color: var(--color-muted);
+	}
+
+	::placeholder {
+		color: var(--color-muted);
+		opacity: 1;
+	}
 }
 
 h1,

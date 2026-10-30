@@ -58,7 +58,7 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             >
             <p class="font-medium">{m.auth_gs_step2()}</p>
           </div>
-          <p class="text-sm text-base-content/60" set:html={m.auth_gs_step2_body({ code: codeTag("content/") })} />
+          <p class="text-sm text-muted" set:html={m.auth_gs_step2_body({ code: codeTag("content/") })} />
         </div>
       </li>
 
@@ -71,7 +71,7 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             >
             <p class="font-medium">{m.auth_gs_step3()}</p>
           </div>
-          <p class="text-sm text-base-content/60">{m.auth_gs_step3_body()}</p>
+          <p class="text-sm text-muted">{m.auth_gs_step3_body()}</p>
 
           <FormAlert error={createApiKeyResult?.error && errorMessage(createApiKeyResult.error)} />
           {

@@ -34,7 +34,7 @@ const user = Astro.locals?.actor;
     {
       import.meta.env.DEV && error && (
         <details class="mt-2 w-full max-w-lg text-left">
-          <summary class="cursor-pointer text-sm text-base-content/60">{m.nav_error_details_dev()}</summary>
+          <summary class="cursor-pointer text-sm text-muted">{m.nav_error_details_dev()}</summary>
           <pre class="mt-2 overflow-x-auto rounded-box bg-neutral p-4 font-mono text-xs text-neutral-content">{error.stack ?? error.message}</pre>
         </details>
       )

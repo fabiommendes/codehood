@@ -106,6 +106,11 @@
 
 ### Fixed
 
+- Secondary text meets WCAG AA (4.5:1) in both themes. The new `muted` color
+  (`text-muted`) replaces `text-base-content/40`, `/50` and `/60`, which fell
+  to 3.2:1 in the dark theme and 4.05:1 in the light one, and also colors the
+  DaisyUI parts that faded on their own: menu titles, table headers, stat and
+  field labels, inactive tabs and placeholders.
 - Signing up through a roll call that acts as an invite no longer fails
   with an expired code when the page reloads after the code rotated, as it
   does when the form comes back with an error.

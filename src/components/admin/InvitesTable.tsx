@@ -21,12 +21,12 @@ export default function InvitesTable(props: Props): JSX.Element {
 		{ title: m.admin_col_email(), render: (row) => row.email },
 		{
 			title: m.admin_col_created_by(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (row) => row.createdBy.name,
 		},
 		{
 			title: m.admin_col_created(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (row) => formatDate(row.createdAt),
 		},
 		{
@@ -34,7 +34,7 @@ export default function InvitesTable(props: Props): JSX.Element {
 			render: (row) => {
 				const expired = row.expiresAt < new Date();
 				return (
-					<span class={expired ? "text-error" : "text-base-content/60"}>
+					<span class={expired ? "text-error" : "text-muted"}>
 						{formatDate(row.expiresAt)}
 					</span>
 				);
@@ -42,7 +42,7 @@ export default function InvitesTable(props: Props): JSX.Element {
 		},
 		{
 			title: m.admin_col_uses(),
-			class: "text-base-content/60",
+			class: "text-muted",
 			render: (row) => `${row.redemptions} / ${row.maxUses ?? "—"}`,
 		},
 		{

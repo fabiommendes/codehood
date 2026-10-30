@@ -22,7 +22,7 @@ const { trail, static: isStatic = false } = Astro.props;
       data-breadcrumbs
       data-static={isStatic || undefined}
       data-shown={isStatic || undefined}
-      class="breadcrumbs hidden min-w-0 flex-1 overflow-hidden pr-4 text-sm text-base-content/60 lg:flex"
+      class="breadcrumbs hidden min-w-0 flex-1 overflow-hidden pr-4 text-sm text-muted lg:flex"
     >
       <ul>
         {trail.map((crumb) => (

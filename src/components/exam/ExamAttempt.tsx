@@ -457,10 +457,10 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 				</span>
 			</Match>
 			<Match when={props.saving}>
-				<span class="text-base-content/60">{m.exams_attempt_saving()}</span>
+				<span class="text-muted">{m.exams_attempt_saving()}</span>
 			</Match>
 			<Match when={answered() > 0}>
-				<span class="text-base-content/60">{m.exams_attempt_all_saved()}</span>
+				<span class="text-muted">{m.exams_attempt_all_saved()}</span>
 			</Match>
 		</Switch>
 	);
@@ -483,7 +483,7 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 							{timeLeft(props.seconds ?? 0)}
 						</span>
 					</Show>
-					<span class="text-base-content/60">
+					<span class="text-muted">
 						{m.exams_attempt_progress({
 							answered: answered(),
 							total: props.questions.length,
@@ -545,14 +545,10 @@ function SaveState(props: {
 				<span class="text-xs text-error">{m.exams_attempt_not_saved()}</span>
 			</Match>
 			<Match when={props.saving}>
-				<span class="text-xs text-base-content/50">
-					{m.exams_attempt_saving()}
-				</span>
+				<span class="text-xs text-muted">{m.exams_attempt_saving()}</span>
 			</Match>
 			<Match when={props.answered}>
-				<span class="text-xs text-base-content/50">
-					{m.exams_attempt_saved()}
-				</span>
+				<span class="text-xs text-muted">{m.exams_attempt_saved()}</span>
 			</Match>
 		</Switch>
 	);
@@ -571,7 +567,7 @@ function Outcome(props: {
 					<p class="font-semibold">
 						<Switch>
 							<Match when={outcome().status === "graded"}>
-								<span class="font-normal text-base-content/60">
+								<span class="font-normal text-muted">
 									{m.exams_attempt_score_label()}
 								</span>{" "}
 								{formatScore(outcome().score ?? 0)}

@@ -151,7 +151,7 @@ saturated colors are light sources.
 | base-100   | `#15302a` |           | Cards, surfaces              |
 | base-300   | `#1f4034` |           | Borders, dividers            |
 | content    | `#e6f0ea` |           | Text                         |
-| muted      | `#8fb3a4` |           | Secondary text (no DaisyUI token; `text-base-content/70` is close) |
+| muted      | `#8fb3a4` |           | Secondary text (`text-muted`) |
 | neutral    | `#081510` | `#e6f0ea` | Terminal, dark blocks        |
 | primary    | `#4aa0ff` | `#04121f` | Main action, links           |
 | secondary  | `#ffc400` | `#0d211a` | Secondary action             |
@@ -174,7 +174,7 @@ colors carry place names in the UI.
 | base-100   | `#fffdf8` |           | Cards, surfaces              |
 | base-300   | `#e6dfd0` |           | Borders, dividers            |
 | content    | `#1f2a24` |           | Text                         |
-| muted      | `#5f6862` |           | Secondary text (no DaisyUI token; `text-base-content/70` is close) |
+| muted      | `#575f5a` |           | Secondary text (`text-muted`) |
 | neutral    | `#1f2a24` | `#f7f3ea` | Terminal, dark blocks        |
 | primary    | `#1b4b9b` | `#ffffff` | Main action, links (tile blue) |
 | secondary  | `#f2b800` | `#1f2a24` | Secondary action (yellow ipê) |

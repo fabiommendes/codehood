@@ -146,7 +146,7 @@ const csvRows = [
 
     <section class="mt-4">
       <h2 class="text-xl font-semibold">{m.courses_roster_add_heading()}</h2>
-      <p class="mt-1 text-sm text-base-content/60">
+      <p class="mt-1 text-sm text-muted">
         {m.courses_roster_add_intro()}
       </p>
 
@@ -204,7 +204,7 @@ const csvRows = [
         disabled={students.length === 0}
       />
     </div>
-    <p class="mt-1 text-base-content/60">
+    <p class="mt-1 text-muted">
       {m.courses_roster_enrolled_count({
         discipline: course.discipline.name,
         count: students.length,
@@ -213,7 +213,7 @@ const csvRows = [
 
     {
       students.length === 0 ? (
-        <p class="mt-8 text-center text-base-content/50">
+        <p class="mt-8 text-center text-muted">
           {m.courses_roster_empty()}
         </p>
       ) : (
@@ -236,7 +236,7 @@ const csvRows = [
       </button>
     </form>
     <h3 class="text-lg font-bold">{m.courses_roster_add_student()}</h3>
-    <p class="mt-1 text-sm text-base-content/60">
+    <p class="mt-1 text-sm text-muted">
       {m.courses_roster_add_body()}
     </p>
 
@@ -314,7 +314,7 @@ const csvRows = [
       </button>
     </form>
     <h3 class="text-lg font-bold">{m.courses_roster_passphrase()}</h3>
-    <p class="mt-1 text-sm text-base-content/60">
+    <p class="mt-1 text-sm text-muted">
       {m.courses_roster_passphrase_body()}
     </p>
 
@@ -334,7 +334,7 @@ const csvRows = [
       >
         {currentPassphrase?.value ?? "——————"}
       </span>
-      <p id="passphrase-meta" class="text-xs text-base-content/50">
+      <p id="passphrase-meta" class="text-xs text-muted">
         {
           currentPassphrase
             ? m.courses_roster_passphrase_live_until({
@@ -398,7 +398,7 @@ const csvRows = [
       </button>
     </form>
     <h3 class="text-lg font-bold">{m.courses_roster_invite_title()}</h3>
-    <p class="mt-1 text-sm text-base-content/60">
+    <p class="mt-1 text-sm text-muted">
       {m.courses_roster_invite_body()}
     </p>
 
@@ -469,7 +469,7 @@ const csvRows = [
       </button>
     </form>
     <h3 class="text-lg font-bold">{m.courses_roster_revoke_title()}</h3>
-    <p class="mt-1 text-sm text-base-content/60">
+    <p class="mt-1 text-sm text-muted">
       {m.courses_roster_revoke_body()}
     </p>
 
@@ -480,7 +480,7 @@ const csvRows = [
     <div id="revoke-invites-list" class="mt-4 flex flex-col gap-3">
       {
         invites.length === 0 ? (
-          <p class="text-sm text-base-content/50">{m.courses_roster_no_invites()}</p>
+          <p class="text-sm text-muted">{m.courses_roster_no_invites()}</p>
         ) : (
           invites.map((invite) => {
             const expired = invite.expiresAt < new Date();
@@ -494,7 +494,7 @@ const csvRows = [
                     <p class="text-sm font-medium">
                       {formatDate(invite.createdAt)}
                     </p>
-                    <p class="text-xs text-base-content/60">
+                    <p class="text-xs text-muted">
                       {m.courses_roster_invite_used({
                         used: invite.redemptions,
                         max: invite.maxUses ?? "∞",

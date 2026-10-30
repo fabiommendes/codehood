@@ -79,7 +79,7 @@ function faded(entry: CalendarEntry): boolean {
 ---
 
 <section>
-  <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">
+  <h3 class="text-sm font-semibold tracking-wide text-muted uppercase">
     {m.schedule_week({ week })}
   </h3>
   <ol class="mt-3 divide-y divide-base-content/10 rounded-box border border-base-content/15 bg-base-200/50">
@@ -95,7 +95,7 @@ function faded(entry: CalendarEntry): boolean {
               faded(entry) && "opacity-60",
             ]}
           >
-            <span class="text-[11px] font-medium text-base-content/50">
+            <span class="text-[11px] font-medium text-muted">
               {formatDateTime(entry.startAt, {
                 month: undefined,
                 day: undefined,
@@ -110,10 +110,10 @@ function faded(entry: CalendarEntry): boolean {
                 minute: undefined,
               })}
             </span>
-            <span class="text-[11px] text-base-content/60">{timeRange(entry)}</span>
+            <span class="text-[11px] text-muted">{timeRange(entry)}</span>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="mb-1 text-xs text-base-content/60 sm:hidden">
+            <p class="mb-1 text-xs text-muted sm:hidden">
               {formatDateTime(entry.startAt, { hour: undefined, minute: undefined })}
               {` · ${timeRange(entry)}`}
             </p>
@@ -123,7 +123,7 @@ function faded(entry: CalendarEntry): boolean {
                   class:list={[
                     "font-medium",
                     entry.event.kind === "CANCELLED" && "line-through",
-                    faded(entry) && "text-base-content/60",
+                    faded(entry) && "text-muted",
                   ]}
                 >
                   {entry.event.title}
@@ -133,7 +133,7 @@ function faded(entry: CalendarEntry): boolean {
                   href={`${href}/exams/${entry.exam.slug}`}
                   class:list={[
                     "link link-hover font-medium",
-                    faded(entry) && "text-base-content/60",
+                    faded(entry) && "text-muted",
                   ]}
                 >
                   {entry.exam.title}
@@ -180,7 +180,7 @@ function faded(entry: CalendarEntry): boolean {
               )}
             </div>
             {entry.kind === "exam" && (
-              <p class="mt-1 text-sm text-base-content/60">
+              <p class="mt-1 text-sm text-muted">
                 {formatDuration(entry.exam.duration)}
               </p>
             )}

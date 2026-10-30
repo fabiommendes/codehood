@@ -28,7 +28,7 @@ const command = `git clone ${cloneUrl}`;
       {zipHref && <a href={zipHref} class="btn btn-sm btn-primary">{m.repositories_download_zip()}</a>}
     </div>
     <p
-      class="text-sm text-base-content/60"
+      class="text-sm text-muted"
       set:html={m.repositories_pull_note({
         command: `<code class="rounded bg-base-300 px-1.5 py-0.5 font-mono">${escapeHtml("git pull --no-rebase")}</code>`,
       })}

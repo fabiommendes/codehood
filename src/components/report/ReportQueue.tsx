@@ -62,7 +62,7 @@ export default function ReportQueue(props: ReportQueueProps): JSX.Element {
 			<Show
 				when={rows().length > 0}
 				fallback={
-					<p class="rounded-box border border-dashed border-base-300 p-8 text-center text-base-content/60">
+					<p class="rounded-box border border-dashed border-base-300 p-8 text-center text-muted">
 						{m.report_queue_empty()}
 					</p>
 				}
@@ -131,9 +131,7 @@ function ReportCard(props: {
 					<span class="badge badge-neutral">
 						{REPORT_STATUS_LABELS[props.row.status]()}
 					</span>
-					<span class="text-base-content/60">
-						{formatDate(props.row.createdAt)}
-					</span>
+					<span class="text-muted">{formatDate(props.row.createdAt)}</span>
 				</header>
 
 				<p class="whitespace-pre-wrap">{props.row.message}</p>

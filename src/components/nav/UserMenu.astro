@@ -34,7 +34,7 @@ const { user, open = false } = Astro.props;
       <Avatar username={user.username} size={36} />
       <span class="grid leading-tight">
         <span class="font-semibold">{user.name}</span>
-        <span class="text-xs text-base-content/60">@{user.username}</span>
+        <span class="text-xs text-muted">@{user.username}</span>
       </span>
     </li>
     <li>

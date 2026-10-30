@@ -124,7 +124,7 @@ function code(text: string): string {
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="repositories" />
 
-    <a href={`${href}/repositories`} class="text-sm text-base-content/60 hover:text-primary">{m.repositories_back()}</a>
+    <a href={`${href}/repositories`} class="text-sm text-muted hover:text-primary">{m.repositories_back()}</a>
 
     <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
       <h2 class="text-xl font-semibold">{repository.title}</h2>
@@ -144,7 +144,7 @@ function code(text: string): string {
       repository.head ? (
         <div class="mt-4 flex flex-col gap-2">
           <CloneBox cloneUrl={repository.cloneUrl} zipHref={`${repoHref}.zip`} />
-          <p class="text-sm text-base-content/60">
+          <p class="text-sm text-muted">
             {repository.message}
             {repository.committedAt && <> · {m.repositories_last_commit({ date: formatDateTime(repository.committedAt) })}</>}
           </p>
@@ -163,7 +163,7 @@ function code(text: string): string {
         <a href={repoHref} class="link link-hover">{repository.slug}</a>
         {segments.map((segment, index) => (
           <>
-            <span class="text-base-content/40">/</span>
+            <span class="text-muted">/</span>
             {index < segments.length - 1 ? (
               <a href={`${repoHref}/${segments.slice(0, index + 1).map(encodeURIComponent).join("/")}`} class="link link-hover">{segment}</a>
             ) : (

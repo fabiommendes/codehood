@@ -121,7 +121,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
 
-    <a href={gradingHref(queueHref, { names })} class="text-sm text-base-content/60 hover:text-primary">← {m.grades_question_back()}</a>
+    <a href={gradingHref(queueHref, { names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</a>
 
     <h2 class="mt-2 text-2xl font-bold">{title}</h2>
 
@@ -167,7 +167,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
             )}
             <article id={`answer-${answer.submission}`} aria-label={label} class="card card-border bg-base-100">
               <div class="card-body">
-                <p class="text-sm font-semibold text-base-content/60">{label}</p>
+                <p class="text-sm font-semibold text-muted">{label}</p>
                 {openRegrades.has(answer.submission) && (
                   <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                 )}
@@ -187,7 +187,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                         <li class="rounded-box bg-base-200/50 px-3 py-2 text-sm">
                           <p>
                             <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
-                            <span class="text-base-content/60"> · {graderName(pass)}</span>
+                            <span class="text-muted"> · {graderName(pass)}</span>
                           </p>
                           {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
                         </li>

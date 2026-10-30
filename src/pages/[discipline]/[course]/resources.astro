@@ -46,7 +46,7 @@ function code(text: string): string {
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />
 
-    {hasEventResources && <p class="mt-4 text-sm text-base-content/60" set:html={m.courses_resources_on_schedule({
+    {hasEventResources && <p class="mt-4 text-sm text-muted" set:html={m.courses_resources_on_schedule({
       schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
     })} />}
     {
@@ -74,7 +74,7 @@ function code(text: string): string {
       {
         groups.map((group) => (
           <section>
-            <h3 class="text-sm font-semibold tracking-wide text-base-content/50 uppercase">
+            <h3 class="text-sm font-semibold tracking-wide text-muted uppercase">
               {group.label}
             </h3>
             <div class="mt-2 flex flex-col gap-3">
@@ -102,7 +102,7 @@ function code(text: string): string {
                       </svg>
                     </span>
                     <p class="font-medium">{resource.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       {resourceDetail(resource)}
                     </p>
                     {RESOURCE_ACTION_ICONS[resource.data.type] && (
@@ -112,7 +112,7 @@ function code(text: string): string {
                         height="18"
                         viewBox="0 0 24 24"
                         fill="none"
-                        class="shrink-0 text-base-content/60"
+                        class="shrink-0 text-muted"
                         aria-hidden="true"
                       >
                         <path

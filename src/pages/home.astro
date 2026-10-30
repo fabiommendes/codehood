@@ -62,7 +62,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                       {closesAt && (
                         <span title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</span>
@@ -88,7 +88,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                     </p>
                   </div>
@@ -111,7 +111,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                     </p>
                   </div>
@@ -134,7 +134,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                     </p>
                   </div>
@@ -157,7 +157,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{course.name}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                     </p>
                   </div>
@@ -183,7 +183,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                       {deadline && !started && (
                         <span title={exact(deadline)}> · {m.courses_home_closes({ when: formatRelative(deadline, now) })}</span>
@@ -218,7 +218,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                     </p>
                   </div>
@@ -244,7 +244,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                       {kind === "CANCELLED" && ` · ${m.schedule_event_cancelled()}`}
                     </p>
@@ -271,7 +271,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                       <span title={exact(releasedAt)}> · {m.courses_home_released({ when: formatRelative(releasedAt, now) })}</span>
                     </p>
@@ -299,7 +299,7 @@ const clock = (date: Date) =>
                 <div class="card-body flex-row items-center gap-4 py-4">
                   <div class="min-w-0 flex-1">
                     <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-base-content/60">
+                    <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span> · {questionTitle ?? request.question}
                     </p>
                   </div>

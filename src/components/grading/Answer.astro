@@ -22,7 +22,7 @@ const { question, payload, result } = Astro.props;
 const shown = displayAnswer(question.type, payload);
 ---
 
-{shown.kind === "empty" && <p class="text-base-content/60">{m.grades_answer_none()}</p>}
+{shown.kind === "empty" && <p class="text-muted">{m.grades_answer_none()}</p>}
 {
   shown.kind === "text" && (
     <p class:list={["text-base-content", shown.multiline && "whitespace-pre-wrap"]}>{shown.text}</p>

@@ -187,7 +187,7 @@ const nextEvents = await db.calendarEvent.findMany(
       meetingNow && (
         <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3">
           <span class="font-medium">{meetingNow.title}</span>
-          <span class="text-sm text-base-content/60">{m.courses_home_happening_now()}</span>
+          <span class="text-sm text-muted">{m.courses_home_happening_now()}</span>
           {meetingNowRollCall ? (
             <a
               href={`${href}/roll-call/${meetingNow.week}/${meetingNow.timeSlot.slug}`}
@@ -248,7 +248,7 @@ const nextEvents = await db.calendarEvent.findMany(
               return (
                 <li class="flex items-baseline justify-between gap-4 rounded-box border border-base-300 bg-base-100 px-4 py-3">
                   <span class="font-medium">{column.title}</span>
-                  <span class={value === undefined ? "text-sm text-base-content/60" : "font-medium"}>
+                  <span class={value === undefined ? "text-sm text-muted" : "font-medium"}>
                     {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}
                   </span>
                 </li>
@@ -264,7 +264,7 @@ const nextEvents = await db.calendarEvent.findMany(
 
       {
         resources.length === 0 ? (
-          <p class="mt-4 text-sm text-base-content/60">
+          <p class="mt-4 text-sm text-muted">
             {eventResources.size > 0 ? (
               <span
                 set:html={m.courses_resources_on_schedule({
@@ -292,7 +292,7 @@ const nextEvents = await db.calendarEvent.findMany(
                 external={resource.data.type === "LINK"}
               >
                 <p class="font-medium">{resource.title}</p>
-                <p class="text-sm text-base-content/60">{resourceDetail(resource)}</p>
+                <p class="text-sm text-muted">{resourceDetail(resource)}</p>
               </ListRow>
             ))}
           </div>
@@ -305,7 +305,7 @@ const nextEvents = await db.calendarEvent.findMany(
 
       {
         slots.length === 0 ? (
-          <p class="mt-4 text-sm text-base-content/60">
+          <p class="mt-4 text-sm text-muted">
             {canWrite ? (
               <>
                 {m.schedule_none_instructor()} <CliSetupLink />
@@ -333,7 +333,7 @@ const nextEvents = await db.calendarEvent.findMany(
             </p>
             <div class="mt-4 flex flex-col gap-3">
               {nextEvents.length === 0 ? (
-                <p class="text-sm text-base-content/60">
+                <p class="text-sm text-muted">
                   {m.courses_home_nothing_on_calendar()}
                 </p>
               ) : (
@@ -341,11 +341,11 @@ const nextEvents = await db.calendarEvent.findMany(
                   <ListRow href={`${href}/schedule#event-${event.id}`}>
                     <p class="font-medium">{event.title}</p>
                     {eventKindLabel(event.kind) && (
-                      <p class="text-sm text-base-content/60">
+                      <p class="text-sm text-muted">
                         {eventKindLabel(event.kind)}
                       </p>
                     )}
-                    <span slot="trailing" class="text-sm text-base-content/60">
+                    <span slot="trailing" class="text-sm text-muted">
                       {formatDateTime(event.startAt)}
                     </span>
                   </ListRow>
@@ -359,7 +359,7 @@ const nextEvents = await db.calendarEvent.findMany(
 
     {
       isEnrolled && (
-        <p class="mt-12 border-t border-base-content/10 pt-4 text-sm text-base-content/60">
+        <p class="mt-12 border-t border-base-content/10 pt-4 text-sm text-muted">
           {m.courses_home_enrolled_since({ date: formatDate(course.joinedAt) })}{" "}
           <button
             type="button"

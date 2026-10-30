@@ -19,7 +19,7 @@ const courses = await db.course.findMany({}, { actor });
 	<main class="mx-auto max-w-4xl px-4 py-10">
 		<AdminHeader active="courses" />
 
-		<p class="max-w-xl text-base-content/60">
+		<p class="max-w-xl text-muted">
 			{m.admin_courses_intro()}
 		</p>
 

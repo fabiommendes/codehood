@@ -46,9 +46,9 @@ const csvFilename = `attendance-${course.discipline.slug}-${course.edition.slug}
 
     {
       report.events.length === 0 ? (
-        <p class="mt-4 text-base-content/60">{m.attendance_page_no_roll_calls()}</p>
+        <p class="mt-4 text-muted">{m.attendance_page_no_roll_calls()}</p>
       ) : report.students.length === 0 ? (
-        <p class="mt-4 text-base-content/60">{m.attendance_page_no_students()}</p>
+        <p class="mt-4 text-muted">{m.attendance_page_no_students()}</p>
       ) : (
         <AttendanceTable report={report} />
       )

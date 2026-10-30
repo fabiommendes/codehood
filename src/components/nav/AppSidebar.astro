@@ -121,7 +121,7 @@ function sketch(): { art: SketchArt; seed?: string } {
             <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
             <span class="flex-1 truncate">
               <span class="font-mono">{course.code}</span>
-              <span class="text-base-content/60"> · {course.edition}</span>
+              <span class="text-muted"> · {course.edition}</span>
             </span>
             {course.teaching && <span class="badge badge-ghost badge-xs">{m.nav_teaching()}</span>}
           </a>

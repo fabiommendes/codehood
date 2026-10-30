@@ -206,7 +206,7 @@ const pieces = [
             {[48, 32, 24, 20, 16].map((h) => (
               <div class="grid justify-items-start gap-1">
                 <Logo height={h} />
-                <span class="font-mono text-xs text-base-content/60">{h}px</span>
+                <span class="font-mono text-xs text-muted">{h}px</span>
               </div>
             ))}
           </div>
@@ -214,7 +214,7 @@ const pieces = [
             {[64, 32, 16].map((h) => (
               <div class="grid justify-items-start gap-1">
                 <Logo height={h} variant="mark" />
-                <span class="font-mono text-xs text-base-content/60">mark {h}px</span>
+                <span class="font-mono text-xs text-muted">mark {h}px</span>
               </div>
             ))}
           </div>
@@ -245,12 +245,12 @@ const pieces = [
               {[48, 24, 16].map((h) => (
                 <div class="grid justify-items-start gap-1">
                   <Logo height={h} tone={tone} />
-                  <span class="font-mono text-xs text-base-content/60">{h}px</span>
+                  <span class="font-mono text-xs text-muted">{h}px</span>
                 </div>
               ))}
               <div class="grid justify-items-start gap-1">
                 <Logo height={32} variant="mark" tone={tone} />
-                <span class="font-mono text-xs text-base-content/60">mark</span>
+                <span class="font-mono text-xs text-muted">mark</span>
               </div>
             </div>
           </div>
