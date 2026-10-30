@@ -111,6 +111,10 @@
   to 3.2:1 in the dark theme and 4.05:1 in the light one, and also colors the
   DaisyUI parts that faded on their own: menu titles, table headers, stat and
   field labels, inactive tabs and placeholders.
+- Form fields have a visible edge (WCAG 1.4.11, 3:1). Inputs, selects,
+  textareas, empty checkboxes and radios, and the rows of choice questions use
+  the new `field-border` color instead of DaisyUI's 20% border, which measured
+  1.2:1 to 1.8:1.
 - Signing up through a roll call that acts as an invite no longer fails
   with an expired code when the page reloads after the code rotated, as it
   does when the form comes back with an error.

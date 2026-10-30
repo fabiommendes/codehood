@@ -23,6 +23,7 @@
 	--color-base-300: #e6dfd0;
 	--color-base-content: #1f2a24;
 	--color-muted: #575f5a;
+	--color-field-border: #858c87;
 	--color-primary: #1b4b9b;
 	--color-primary-content: #ffffff;
 	--color-secondary: #f2b800;
@@ -66,6 +67,7 @@
 	--color-base-300: #1f4034;
 	--color-base-content: #e6f0ea;
 	--color-muted: #8fb3a4;
+	--color-field-border: #5f8a78;
 	--color-primary: #4aa0ff;
 	--color-primary-content: #04121f;
 	--color-secondary: #ffc400;
@@ -97,8 +99,10 @@
 }
 
 @theme {
-	/* Registers `text-muted` and friends; each DaisyUI theme above sets the value. */
+	/* Registers `text-muted`, `border-field-border` and friends; each DaisyUI
+	   theme above sets the value. */
 	--color-muted: #575f5a;
+	--color-field-border: #858c87;
 	--font-sans: "Atkinson Hyperlegible", system-ui, sans-serif;
 	--font-display: "Fraunces", Georgia, serif;
 	--font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -143,6 +147,52 @@ body {
 	::placeholder {
 		color: var(--color-muted);
 		opacity: 1;
+	}
+}
+
+/* Fields share the card's background, so the border is their only edge and
+   needs 3:1 (WCAG 1.4.11); DaisyUI draws it at 20% of base-content, about
+   1.5:1. Focus and the color variants are declared again after the default
+   because this layer outranks DaisyUI's own state rules. */
+@layer utilities {
+	:where(.input, .select, .textarea) {
+		--input-color: var(--color-field-border);
+	}
+	:where(.input, .select, .textarea):where(:focus, :focus-within) {
+		--input-color: var(--color-base-content);
+	}
+	:where(.input-success) {
+		--input-color: var(--color-success);
+	}
+	:where(.input-warning) {
+		--input-color: var(--color-warning);
+	}
+	:where(.input-error, .select-error, .textarea-error) {
+		--input-color: var(--color-error);
+	}
+
+	/* A checked radio draws its ring in the text color; leave it alone. A radio
+	   group with nothing checked matches :indeterminate too, hence the type. */
+	:where(
+		:is(.checkbox, .radio, .mdq-choice-input):not(
+			[type="radio"]:checked,
+			[type="checkbox"]:indeterminate,
+			[class*="checkbox-"],
+			[class*="radio-"]
+		)
+	) {
+		border-color: var(--color-field-border);
+	}
+
+	/* A choice is a clickable row; the states mdq colors keep their border. */
+	:where(
+		.mdq-choice:not(
+			[data-mode="readonly"] [data-selected],
+			[data-key="correct"],
+			[data-key="incorrect"]
+		)
+	) {
+		border-color: var(--color-field-border);
 	}
 }
 

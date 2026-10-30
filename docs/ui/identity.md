@@ -152,6 +152,7 @@ saturated colors are light sources.
 | base-300   | `#1f4034` |           | Borders, dividers            |
 | content    | `#e6f0ea` |           | Text                         |
 | muted      | `#8fb3a4` |           | Secondary text (`text-muted`) |
+| field-border | `#5f8a78` |         | Edge of inputs and choices (3:1) |
 | neutral    | `#081510` | `#e6f0ea` | Terminal, dark blocks        |
 | primary    | `#4aa0ff` | `#04121f` | Main action, links           |
 | secondary  | `#ffc400` | `#0d211a` | Secondary action             |
@@ -175,6 +176,7 @@ colors carry place names in the UI.
 | base-300   | `#e6dfd0` |           | Borders, dividers            |
 | content    | `#1f2a24` |           | Text                         |
 | muted      | `#575f5a` |           | Secondary text (`text-muted`) |
+| field-border | `#858c87` |         | Edge of inputs and choices (3:1) |
 | neutral    | `#1f2a24` | `#f7f3ea` | Terminal, dark blocks        |
 | primary    | `#1b4b9b` | `#ffffff` | Main action, links (tile blue) |
 | secondary  | `#f2b800` | `#1f2a24` | Secondary action (yellow ipê) |
