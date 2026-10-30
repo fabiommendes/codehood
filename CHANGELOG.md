@@ -103,6 +103,9 @@
   lights; static under reduced motion), a calmer "already recorded" state for
   a repeat scan, a welcome when the scan joins the course, a link to the
   course, and refusals that read clearly as "not recorded".
+- Highlighted code uses the Codehood palettes instead of GitHub's: the
+  landing page's terminal in the dark theme, ink on the page color in the
+  light one (`src/utils/code-themes.ts`).
 - The daisyUI styles of the question components moved from mdq-js
   (`mdq/css/daisyui.css`) to `src/styles/mdq.css`, on the Codehood tokens.
 

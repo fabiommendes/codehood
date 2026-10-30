@@ -1,4 +1,5 @@
 import { bundledLanguages, bundledLanguagesAlias, codeToHtml } from "shiki";
+import { CODE_THEMES } from "./code-themes";
 
 /**
  * Renders `code` as highlighted HTML using `lang` (a `CODE` resource's
@@ -17,7 +18,7 @@ export async function highlightCode(
 		key && (key in bundledLanguages || key in bundledLanguagesAlias);
 	return codeToHtml(code, {
 		lang: known ? key : "plaintext",
-		themes: { light: "github-light", dark: "github-dark" },
+		themes: CODE_THEMES,
 		defaultColor: false,
 	});
 }

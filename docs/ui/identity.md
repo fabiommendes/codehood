@@ -193,6 +193,14 @@ color above 4.5:1. The light secondary (ipê yellow) is a fill only; it is
 1.6:1 as text on the background and must never be used for text. Light
 warning is 2.9:1 as text for the same reason.
 
+### Code
+
+Highlighted code (`src/utils/code-themes.ts`) uses the same roles. Dark draws
+it as the landing page's terminal, on `neutral`; light puts ink on `base-200`.
+Keywords take the accent, strings success, constants secondary (dark) or
+error (light), functions primary, types info, and comments muted. Every token
+is 4.5:1 or more on its background.
+
 ### CLI
 
 The CLI maps the same roles onto the 16 ANSI colors and its Textual theme:
