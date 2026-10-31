@@ -52,6 +52,8 @@ export interface InstructorHome {
 		/// Attempts closed to answers (submitted, or past their deadline).
 		submitted: number;
 		enrolled: number;
+		/// Once the exam's own window has closed, the students whose personal window is still upcoming or open; `0` before.
+		personalWindows: number;
 		/// The window end, or `null` for an exam without one.
 		closesAt: Date | null;
 	}[];
@@ -71,8 +73,8 @@ export interface InstructorHome {
  * exams never appear.
  *
  * With exceptions, each attempt is judged by its author's personal timing.
- * An exam stays in `inProgress` while any personal window is `open` or
- * `upcoming`, with `closesAt` at {@link lastWindowEnd}; `toRelease` asks
+ * An exam that has opened stays in `inProgress` while any personal window is
+ * `open` or `upcoming`, with `closesAt` at {@link lastWindowEnd}; `toRelease` asks
  * {@link gradeReleaseBlocker} with the exceptions, so a pending makeup keeps
  * the exam out of it.
  */
@@ -89,31 +91,44 @@ export function instructorHome(
 	});
 
 	const inProgress = shown
+		.map((taught) => ({
+			...taught,
+			personalWindows: personalWindowsOf(taught, now),
+		}))
 		.filter(
-			({ exam, exceptions }) =>
+			({ exam, exceptions, personalWindows }) =>
 				examPhase(exam, now) === "open" ||
-				[...(exceptions?.values() ?? [])].some((exception) =>
-					isPersonallyOpen(exam, exception, now),
+				personalWindows > 0 ||
+				[...(exceptions?.values() ?? [])].some(
+					(exception) =>
+						!exception.dropped &&
+						examPhase(personalTiming(exam, exception), now) === "open",
 				),
 		)
-		.map(({ course, exam, enrolled, attempts, exceptions }) => {
-			const kinds = attempts.map(
-				({ attempt }) =>
-					attemptState(
-						personalTiming(exam, exceptions?.get(attempt.author ?? "") ?? null),
-						attempt,
-						now,
-					).kind,
-			);
-			return {
-				course,
-				exam,
-				started: kinds.filter((kind) => kind === "in-progress").length,
-				submitted: kinds.filter(isClosed).length,
-				enrolled,
-				closesAt: lastWindowEnd(exam, [...(exceptions?.values() ?? [])]),
-			};
-		})
+		.map(
+			({ course, exam, enrolled, attempts, exceptions, personalWindows }) => {
+				const kinds = attempts.map(
+					({ attempt }) =>
+						attemptState(
+							personalTiming(
+								exam,
+								exceptions?.get(attempt.author ?? "") ?? null,
+							),
+							attempt,
+							now,
+						).kind,
+				);
+				return {
+					course,
+					exam,
+					started: kinds.filter((kind) => kind === "in-progress").length,
+					submitted: kinds.filter(isClosed).length,
+					enrolled,
+					personalWindows,
+					closesAt: lastWindowEnd(exam, [...(exceptions?.values() ?? [])]),
+				};
+			},
+		)
 		.sort((a, b) => {
 			if (a.closesAt === null || b.closesAt === null) {
 				return Number(a.closesAt === null) - Number(b.closesAt === null);
@@ -170,15 +185,17 @@ export function instructorHome(
 	return { inProgress, toGrade, toRelease, problems };
 }
 
-/// Whether the personal window of `exception` is still upcoming or open at `now`.
-function isPersonallyOpen(
-	exam: Exam,
-	exception: ExceptionTiming,
+/// After the exam's own window closed, how many students still have a personal window upcoming or open at `now`.
+function personalWindowsOf(
+	{ exam, exceptions }: TaughtExam,
 	now: Date,
-): boolean {
-	if (exception.dropped) return false;
-	const phase = examPhase(personalTiming(exam, exception), now);
-	return phase === "upcoming" || phase === "open";
+): number {
+	if (examPhase(exam, now) !== "closed") return 0;
+	return [...(exceptions?.values() ?? [])].filter((exception) => {
+		if (exception.dropped) return false;
+		const phase = examPhase(personalTiming(exam, exception), now);
+		return phase === "upcoming" || phase === "open";
+	}).length;
 }
 
 /// Whether an attempt state means the student can no longer answer.

@@ -5,6 +5,16 @@
 	"courses_home_in_progress": "Em andamento",
 	"courses_home_closes": "Fecha {when}",
 	"courses_home_submitted": "{submitted} de {enrolled} enviaram",
+	"courses_home_personal_windows": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} aluno em horário especial",
+				"countPlural=other": "{count} alunos em horário especial"
+			}
+		}
+	],
 	"courses_home_to_grade": "Para corrigir",
 	"courses_home_answers_to_grade": [
 		{

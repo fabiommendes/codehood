@@ -129,6 +129,10 @@
 
 ### Fixed
 
+- The instructor's home no longer lists an exam that has not opened as in
+  progress because a student has extra time. After an exam's window closes,
+  its row counts the students still on personal time instead of "1 of 10
+  submitted", and courses that share a code show their edition.
 - Secondary text meets WCAG AA (4.5:1) in both themes. The new `muted` color
   (`text-muted`) replaces `text-base-content/40`, `/50` and `/60`, which fell
   to 3.2:1 in the dark theme and 4.05:1 in the light one, and also colors the

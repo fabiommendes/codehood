@@ -5,6 +5,16 @@
 	"courses_home_in_progress": "In progress",
 	"courses_home_closes": "Closes {when}",
 	"courses_home_submitted": "{submitted} of {enrolled} submitted",
+	"courses_home_personal_windows": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} student on personal time",
+				"countPlural=other": "{count} students on personal time"
+			}
+		}
+	],
 	"courses_home_to_grade": "To grade",
 	"courses_home_answers_to_grade": [
 		{

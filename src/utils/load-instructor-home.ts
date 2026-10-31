@@ -11,6 +11,7 @@ import {
 	type TaughtCourse,
 	type TaughtExam,
 } from "@/services/instructor-home";
+import type { HomeCourse } from "@/services/student-home";
 import { courseHref } from "@/urls";
 import { loadCourseExceptions } from "./load-exam-exceptions";
 
@@ -33,9 +34,14 @@ export async function loadInstructorHome(
 				(course) => course.instructor.username === actor.username,
 			);
 
+	const codes = courses.map((course) => course.discipline.slug);
+	const repeated = new Set(
+		codes.filter((code, i) => codes.indexOf(code) !== i),
+	);
+
 	const loaded = await Promise.all(
 		courses.map(async (course) => {
-			const home = {
+			const home: HomeCourse = {
 				href: courseHref({
 					discipline: course.discipline.slug,
 					instructor: course.instructor.username,
@@ -43,6 +49,9 @@ export async function loadInstructorHome(
 				}),
 				code: course.discipline.slug,
 				name: course.discipline.name,
+				edition: repeated.has(course.discipline.slug)
+					? course.edition.slug
+					: undefined,
 			};
 			const [exams, attempts, feedback, questions, exceptions, open] =
 				await Promise.all([

@@ -147,6 +147,7 @@ test("inProgress: an open exam counts attempts still being answered and attempts
 			started: 2,
 			submitted: 1,
 			enrolled: 5,
+			personalWindows: 0,
 			closesAt: at(50 * MINUTE),
 		},
 	]);
@@ -529,4 +530,52 @@ test("a pending makeup keeps a completed exam in progress until its window ends,
 		["Final", at(DAY + HOUR)],
 	]);
 	expect(withMakeup.toRelease).toEqual([]);
+});
+
+test("an exam that has not opened stays out of inProgress even when a student has extra time", () => {
+	const quiz = exam({
+		title: "Quiz",
+		scheduledAt: at(12 * DAY),
+		duration: { minutes: 60 },
+	});
+
+	const home = instructorHome(
+		[taught(quiz, [], { exceptions: new Map([["ana", extraMinutes(30)]]) })],
+		[],
+		NOW,
+	);
+
+	expect(home.inProgress).toEqual([]);
+});
+
+test("inProgress counts personal windows only once the exam's own window has closed", () => {
+	const finalExam = closedExam({
+		title: "Final",
+		scheduledAt: at(-3 * DAY),
+		duration: { minutes: 60 },
+	});
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(DAY) };
+	const midterm = openExam({ title: "Midterm" });
+
+	const home = instructorHome(
+		[
+			taught(finalExam, [done()], {
+				exceptions: new Map([
+					["ana", makeup],
+					["bia", makeup],
+					["caio", { ...makeup, dropped: true }],
+				]),
+			}),
+			taught(midterm, [], { exceptions: new Map([["ana", extraMinutes(30)]]) }),
+		],
+		[],
+		NOW,
+	);
+
+	expect(home.inProgress.map((i) => [i.exam.title, i.personalWindows])).toEqual(
+		[
+			["Midterm", 0],
+			["Final", 2],
+		],
+	);
 });

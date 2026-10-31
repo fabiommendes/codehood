@@ -28,6 +28,8 @@ export interface HomeCourse {
 	/// The discipline code, e.g. `cs101`.
 	code: string;
 	name: string;
+	/// The edition slug, e.g. `2026-1`, set when the code alone does not tell the course apart.
+	edition?: string;
 }
 
 /// One exam of a course the student takes, with the student's own attempt.
