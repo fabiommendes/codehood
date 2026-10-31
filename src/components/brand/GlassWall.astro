@@ -1,0 +1,97 @@
+---
+interface Props {
+	cols?: number;
+	rows?: number;
+	class?: string;
+}
+
+const { cols = 90, rows = 60, class: className } = Astro.props;
+
+/// Distance between neighboring cells, in units where a D is 24 tall.
+const PITCH = 18;
+
+const mod = (a: number, n: number) => ((a % n) + n) % n;
+
+/// A D on every other cell of a checker, turning a quarter every two columns
+/// and every row. The pitch is shorter than the piece, so the corners of
+/// diagonal neighbors overlap and the blend mode lights them, like the logo.
+const pieces = Array.from({ length: cols * rows }, (_, i) => {
+	const c = i % cols;
+	const r = Math.floor(i / cols);
+	if (mod(c + r, 2)) return null;
+	const x = c * PITCH;
+	const y = r * PITCH;
+	return {
+		d: `M${x + 3} ${y}h6a12 12 0 0 1 0 24h-6Z`,
+		turn: `rotate(${mod(Math.floor(c / 2) + r, 4) * 90} ${x + 12} ${y + 12})`,
+		tone: mod(r, 2) ? "gw-a" : "gw-b",
+	};
+}).filter((p) => p !== null);
+---
+
+<div class:list={["glass-wall", className]} aria-hidden="true">
+  <svg
+    viewBox={`0 0 ${cols * PITCH} ${rows * PITCH}`}
+    style={`--gw-cols:${cols};--gw-rows:${rows}`}
+  >
+    <g>
+      {pieces.map((p) => <path d={p.d} transform={p.turn} class={p.tone} />)}
+    </g>
+  </svg>
+</div>
+
+<style>
+  .glass-wall {
+    /* Pixels per cell; a D is 24/18 of it. */
+    --gw-cell: 20px;
+    /* Two piece colors, each mixed into the ground by --gw-mix. */
+    --gw-a: var(--color-field-border);
+    --gw-b: var(--color-warning);
+    --gw-mix: 46%;
+    --gw-ground: var(--color-base-200);
+    --gw-blend: lighten;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  :global([data-theme="codehood-dark"]) .glass-wall {
+    --gw-a: var(--color-info);
+    --gw-b: var(--color-field-border);
+    --gw-mix: 34%;
+    --gw-ground: var(--color-base-200);
+    --gw-blend: lighten;
+  }
+
+  @media (min-width: 768px) {
+    .glass-wall {
+      --gw-cell: 24px;
+    }
+  }
+
+  .glass-wall svg {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: calc(var(--gw-cols) * var(--gw-cell));
+    height: calc(var(--gw-rows) * var(--gw-cell));
+    max-width: none;
+    translate: -50% 0;
+  }
+
+  .glass-wall g {
+    isolation: isolate;
+  }
+
+  .glass-wall path {
+    mix-blend-mode: var(--gw-blend);
+  }
+
+  .gw-a {
+    fill: color-mix(in oklab, var(--gw-a) var(--gw-mix), var(--gw-ground));
+  }
+
+  .gw-b {
+    fill: color-mix(in oklab, var(--gw-b) var(--gw-mix), var(--gw-ground));
+  }
+</style>

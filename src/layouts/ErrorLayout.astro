@@ -1,7 +1,7 @@
 ---
+import GlassWall from "@/components/brand/GlassWall.astro";
 import Scene from "@/components/brand/Scene.astro";
 import type { SceneName } from "@/components/brand/scenes";
-import TileWall from "@/components/brand/TileWall.astro";
 import Logo from "@/components/Logo.astro";
 import ReportDialog from "@/components/report/ReportDialog";
 import ThemeToggle from "@/components/ThemeToggle.astro";
@@ -21,7 +21,7 @@ const user = Astro.locals?.actor;
 
 <Layout title={m.nav_error_page_title({ code, title })}>
   <main class="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-base-200 p-4 py-12">
-    <TileWall seed={13} class="-z-10" />
+    <GlassWall class="-z-10" />
     <ThemeToggle class="absolute top-4 right-4 z-10" />
     <div class="card card-border tape w-full max-w-lg bg-base-100 shadow-xl">
       <div class="card-body items-center gap-5 text-center">

@@ -1,0 +1,301 @@
+---
+/**
+ * A floating panel for calibrating a piece of interface by hand, rendered only
+ * by the dev server. Each param drives a CSS custom property, optionally for
+ * one theme only; the panel previews changes live, keeps them across reloads
+ * and copies the chosen values as JSON. See dev/adrs/0003-tuner.md.
+ *
+ * @example
+ * <Tuner id="glass-wall" params={[
+ *   { name: "cell", var: "--gw-cell", selector: ".glass-wall", kind: "range", min: 12, max: 40, value: 24, unit: "px" },
+ * ]} />
+ */
+export type TunerParam = {
+	/// Key in the JSON output; unique within the panel.
+	name: string;
+	/// Custom property to set, such as `--gw-cell`. Omit for a param that only
+	/// feeds the `tuner:change` event.
+	var?: string;
+	/// Elements that receive the property. Defaults to `:root`.
+	selector?: string;
+	/// Applies the value only under this theme.
+	theme?: "codehood" | "codehood-dark";
+	/// Shown instead of `name`.
+	label?: string;
+} & (
+	| {
+			kind: "range";
+			min: number;
+			max: number;
+			step?: number;
+			value: number;
+			unit?: string;
+	  }
+	| { kind: "color"; value: string }
+	| { kind: "select"; options: string[]; value: string }
+	| { kind: "text"; value: string }
+);
+
+interface Props {
+	/// Names the calibration in the JSON and in localStorage.
+	id: string;
+	params: TunerParam[];
+	title?: string;
+}
+
+const { id, params, title = id } = Astro.props;
+const enabled = import.meta.env.DEV;
+---
+
+{
+  enabled && (
+    <tuner-panel data-id={id} data-params={JSON.stringify(params)} data-title={title} />
+  )
+}
+
+<script>
+  import { PALETTE } from "./palette";
+
+  type Param = {
+    name: string;
+    var?: string;
+    selector?: string;
+    theme?: string;
+    label?: string;
+    kind: "range" | "color" | "select" | "text";
+    min?: number;
+    max?: number;
+    step?: number;
+    unit?: string;
+    options?: string[];
+    value: string | number;
+  };
+
+  /// Builds the panel from its data attributes and keeps a <style> element in
+  /// sync with the chosen values.
+  class TunerPanel extends HTMLElement {
+    connectedCallback() {
+      const id = this.dataset.id ?? "tuner";
+      const params: Param[] = JSON.parse(this.dataset.params ?? "[]");
+      const key = `tuner:${id}`;
+      const defaults = Object.fromEntries(params.map((p) => [p.name, p.value]));
+      const saved = JSON.parse(localStorage.getItem(key) ?? "{}");
+      const values: Record<string, string | number> = { ...defaults, ...saved };
+
+      const sheet = document.createElement("style");
+      document.head.append(sheet);
+
+      const css = (p: Param) => {
+        const v = values[p.name];
+        return p.kind === "range" ? `${v}${p.unit ?? ""}` : String(v);
+      };
+      /// Palette groups offered for a color param: its theme's, or both.
+      const groups = (p: Param) =>
+        p.theme === "codehood" || p.theme === "codehood-dark"
+          ? PALETTE[p.theme]
+          : [...PALETTE.codehood, ...PALETTE["codehood-dark"]];
+      /// Name of the palette color equal to the param's value, if any.
+      const swatch = (p: Param) => {
+        if (p.kind !== "color") return undefined;
+        const v = String(values[p.name]).toLowerCase();
+        for (const g of groups(p))
+          for (const [n, c] of Object.entries(g.colors)) if (c === v) return n;
+        return undefined;
+      };
+      const shownText = (p: Param) => {
+        const n = swatch(p);
+        return n ? `${n} ${css(p)}` : css(p);
+      };
+      const apply = () => {
+        sheet.textContent = params
+          .filter((p) => p.var)
+          .map((p) => {
+            const scope = p.theme ? `:root[data-theme="${p.theme}"] ` : "";
+            return `${scope}${p.selector ?? ":root"} { ${p.var}: ${css(p)} !important; }`;
+          })
+          .join("\n");
+        localStorage.setItem(key, JSON.stringify(values));
+        window.dispatchEvent(new CustomEvent("tuner:change", { detail: { id, values: { ...values } } }));
+        out.textContent = json();
+      };
+      const json = () => {
+        const changed = Object.fromEntries(
+          params.filter((p) => values[p.name] !== p.value).map((p) => [p.name, values[p.name]]),
+        );
+        const full = Object.fromEntries(
+          params.map((p) => {
+            const n = swatch(p);
+            return [
+              p.name,
+              { value: css(p), ...(n && { swatch: n }), ...(p.var && { var: p.var }), ...(p.theme && { theme: p.theme }) },
+            ];
+          }),
+        );
+        return JSON.stringify({ tuner: id, changed, values: full }, null, 2);
+      };
+
+      const box = document.createElement("div");
+      box.className =
+        "fixed right-4 bottom-4 z-[9999] w-80 max-h-[80vh] overflow-auto rounded-box border border-base-300 bg-base-100 text-base-content shadow-xl text-sm";
+      box.innerHTML = `
+        <details open>
+          <summary title="Arraste para mover" class="flex cursor-grab touch-none select-none items-center justify-between px-3 py-2 font-semibold">
+            <span>Tuner: ${this.dataset.title}</span><span class="text-xs text-muted">dev</span>
+          </summary>
+          <div class="flex flex-col gap-3 px-3 pb-3" data-fields></div>
+          <div class="flex gap-2 px-3 pb-3">
+            <button type="button" class="btn btn-primary btn-sm flex-1" data-copy>Copiar JSON</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-reset>Resetar</button>
+          </div>
+          <pre class="mx-3 mb-3 max-h-40 overflow-auto rounded bg-base-200 p-2 text-xs" data-out></pre>
+        </details>`;
+      const fields = box.querySelector("[data-fields]") as HTMLElement;
+      const out = box.querySelector("[data-out]") as HTMLElement;
+
+      for (const p of params) {
+        const row = document.createElement("div");
+        row.className = "flex flex-col gap-1";
+        const head = document.createElement("span");
+        head.className = "flex justify-between text-xs";
+        const name = document.createElement("span");
+        name.textContent = `${p.label ?? p.name}${p.theme ? ` (${p.theme === "codehood-dark" ? "escuro" : "claro"})` : ""}`;
+        const shown = document.createElement("span");
+        shown.className = "font-mono";
+        head.append(name, shown);
+
+        let input: HTMLInputElement | HTMLSelectElement;
+        if (p.kind === "select") {
+          input = document.createElement("select");
+          input.className = "select select-sm w-full";
+          for (const o of p.options ?? []) input.append(new Option(o, o));
+        } else {
+          input = document.createElement("input");
+          if (p.kind === "range") {
+            input.type = "range";
+            input.className = "range range-xs";
+            input.min = String(p.min);
+            input.max = String(p.max);
+            input.step = String(p.step ?? 1);
+          } else if (p.kind === "color") {
+            input.type = "color";
+            input.className = "h-6 w-16 cursor-pointer";
+          } else {
+            input.type = "text";
+            input.className = "input input-sm w-full font-mono";
+          }
+        }
+        input.setAttribute("aria-label", name.textContent);
+        /// For colors: a button showing the current color that opens a
+        /// popover with the palette and the browser's own picker.
+        const trigger = document.createElement("button");
+        const sync = () => {
+          input.value = String(values[p.name]);
+          shown.textContent = shownText(p);
+          trigger.style.background = String(values[p.name]);
+        };
+        const set = (v: string | number) => {
+          values[p.name] = v;
+          sync();
+          apply();
+        };
+        input.addEventListener("input", () => set(p.kind === "range" ? Number(input.value) : input.value));
+        if (p.kind === "color") {
+          trigger.type = "button";
+          trigger.className = "h-8 w-full cursor-pointer rounded border border-base-300";
+          trigger.setAttribute("aria-label", name.textContent);
+          trigger.setAttribute("aria-expanded", "false");
+          const pop = document.createElement("div");
+          pop.className = "hidden flex-col gap-2 rounded border border-base-300 bg-base-200 p-2";
+          const toggle = (open: boolean) => {
+            pop.classList.toggle("hidden", !open);
+            pop.classList.toggle("flex", open);
+            trigger.setAttribute("aria-expanded", String(open));
+          };
+          trigger.addEventListener("click", () => toggle(pop.classList.contains("hidden")));
+          for (const g of groups(p)) {
+            const strip = document.createElement("div");
+            strip.className = "flex flex-wrap gap-1";
+            for (const [n, c] of Object.entries(g.colors)) {
+              const b = document.createElement("button");
+              b.type = "button";
+              b.title = `${g.group}: ${n} ${c}`;
+              b.setAttribute("aria-label", b.title);
+              b.className = "size-5 rounded border border-base-300 hover:scale-125 transition-transform";
+              b.style.background = c;
+              b.addEventListener("click", () => {
+                set(c);
+                toggle(false);
+              });
+              strip.append(b);
+            }
+            pop.append(strip);
+          }
+          const other = document.createElement("label");
+          other.className = "flex items-center justify-between gap-2 text-xs";
+          other.textContent = "Outra cor";
+          other.append(input);
+          pop.append(other);
+          row.append(head, trigger, pop);
+        } else {
+          row.append(head, input);
+        }
+        fields.append(row);
+        sync();
+        row.addEventListener("tuner:sync", sync);
+      }
+
+      box.querySelector("[data-copy]")?.addEventListener("click", async (e) => {
+        await navigator.clipboard.writeText(json());
+        const b = e.currentTarget as HTMLButtonElement;
+        b.textContent = "Copiado";
+        setTimeout(() => (b.textContent = "Copiar JSON"), 1200);
+      });
+      box.querySelector("[data-reset]")?.addEventListener("click", () => {
+        Object.assign(values, defaults);
+        for (const row of fields.children) row.dispatchEvent(new Event("tuner:sync"));
+        apply();
+      });
+
+      /// Drag by the header to uncover other parts of the page. A drag that
+      /// moved more than a few pixels does not toggle the panel open or closed.
+      const posKey = `${key}:pos`;
+      const place = (x: number, y: number) => {
+        const r = box.getBoundingClientRect();
+        const left = Math.min(Math.max(0, x), window.innerWidth - r.width);
+        const top = Math.min(Math.max(0, y), window.innerHeight - 40);
+        Object.assign(box.style, { left: `${left}px`, top: `${top}px`, right: "auto", bottom: "auto" });
+        return { left, top };
+      };
+      const summary = box.querySelector("summary") as HTMLElement;
+      let drag: { dx: number; dy: number; x0: number; y0: number; moved: boolean } | null = null;
+      summary.addEventListener("pointerdown", (e) => {
+        const r = box.getBoundingClientRect();
+        drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false };
+        summary.setPointerCapture(e.pointerId);
+      });
+      summary.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
+        drag.moved = true;
+        summary.classList.add("cursor-grabbing");
+        place(e.clientX - drag.dx, e.clientY - drag.dy);
+      });
+      summary.addEventListener("pointerup", () => {
+        if (drag?.moved) {
+          const r = box.getBoundingClientRect();
+          localStorage.setItem(posKey, JSON.stringify({ left: r.left, top: r.top }));
+          summary.addEventListener("click", (e) => e.preventDefault(), { once: true });
+        }
+        summary.classList.remove("cursor-grabbing");
+        drag = null;
+      });
+
+      this.append(box);
+      const pos = JSON.parse(localStorage.getItem(posKey) ?? "null");
+      if (pos) place(pos.left, pos.top);
+      apply();
+    }
+  }
+
+  if (!customElements.get("tuner-panel")) customElements.define("tuner-panel", TunerPanel);
+</script>

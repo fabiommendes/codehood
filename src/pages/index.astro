@@ -1,10 +1,10 @@
 ---
+import GlassWall from "@/components/brand/GlassWall.astro";
 import HeroScene from "@/components/brand/HeroScene.astro";
 import PartyLights from "@/components/brand/PartyLights.astro";
 import { C, O, roof, wall } from "@/components/brand/paper";
 import Scene from "@/components/brand/Scene.astro";
 import type { SceneName } from "@/components/brand/scenes";
-import TileWall from "@/components/brand/TileWall.astro";
 import CourseTile from "@/components/CourseTile.astro";
 import Logo from "@/components/Logo.astro";
 import AppFooter from "@/components/nav/AppFooter.astro";
@@ -105,7 +105,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
       </section>
 
       <section id="how-it-works" class="relative mt-10 overflow-hidden py-24">
-        <TileWall seed={3} />
+        <GlassWall />
         <div class="wrap relative">
           <div class="card tape tilt-l inline-block bg-base-100 px-7 py-5 shadow-lg">
             <p class="eyebrow">{m.auth_home_how_eyebrow()}</p>
@@ -206,7 +206,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
       </section>
 
       <section id="join" class="relative overflow-hidden py-20">
-        <TileWall seed={11} />
+        <GlassWall />
         <div class="wrap relative">
           <div class="card tape tilt-l bg-base-100 px-8 pb-10 pt-4 shadow-xl">
             <PartyLights />

@@ -235,16 +235,21 @@ Quiet screens use the radius and nothing else from this list.
 
 ## Motifs
 
+- **Glass wall.** The wall behind whole sections of loud pages (login,
+  invite, error pages, the home sections), with paper cards taped on top
+  (`GlassWall`). The logo's D on every other cell of a checker, turning a
+  quarter every two columns and every row. The cell is shorter than the D, so
+  diagonal neighbors overlap at the corners and the blend mode lights the
+  overlap, as the dark logo does. Two colors from the theme tokens, mixed into
+  the page background: `field-border` and `warning` at 46% in the light
+  theme, `info` and `field-border` at 34% in the dark, both with `lighten`.
+  Cells are 20 px on phones and 24 px from 768 px; the wall is cropped to the
+  section. Not as thin divider strips.
 - **Athos Bulcão tiles.** Square tiles with one figure each (half-disc,
   quarter disc, disc, band), rotated in steps of 90° as the workers who laid
-  Athos's panels did. Uses: a 2×2 block derived from each course code for
-  course lists and the sidebar (the same course always gets the same block),
-  and full tiled walls behind whole sections of loud pages, with paper cards
-  taped on top. Not as thin divider strips. Walls use the `soft` tone: the
-  checkerboard ground stays and the figures fade to 45%, so the cards read
-  first. Figures, colors and turns are drawn at random per tile. Tiles
-  keep a fixed size (40 px on phones, 60 px from 768 px) and the wall is
-  cropped to the section.
+  Athos's panels did. A 2×2 block derived from each course code marks the
+  course in lists and the sidebar (the same course always gets the same
+  block). `TileWall` still lays them as a full wall on `/design/motifs`.
 - **Party lights.** A string of colored bulbs. Celebrations only.
 - **Ipê bouquets.** Three overlapping clusters of yellow ipê. They flank a
   released score of 70% or more (`ReleasedScore`), with the card's tape. A
