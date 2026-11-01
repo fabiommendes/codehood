@@ -72,6 +72,17 @@
 	],
 	"courses_home_role_teaching": "Teaching",
 	"courses_home_role_taking": "Taking",
+	"courses_home_answering_now": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} answering now",
+				"countPlural=other": "{count} answering now"
+			}
+		}
+	],
+	"courses_home_oldest_request": "oldest {when}",
 	"courses_home_today": "Today",
 	"courses_home_new_results": "New results",
 	"courses_home_released": "Released {when}",

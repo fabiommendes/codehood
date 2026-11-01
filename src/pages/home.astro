@@ -81,9 +81,9 @@ const clock = (date: Date) =>
                     <p class="text-sm text-muted">
                       <span class="font-mono">{event.course.code}</span>
                       {event.course.edition && ` · ${event.course.edition}`} ·{" "}
-                      <span title={exact(event.startAt)}>
+                      <time datetime={event.startAt.toISOString()} title={exact(event.startAt)}>
                         {meeting ? `${clock(meeting.startAt)}–${clock(meeting.endsAt)}` : clock(event.startAt)}
-                      </span>
+                      </time>
                       {event.kind === "CANCELLED" && ` · ${m.schedule_event_cancelled()}`}
                       {showRole && ` · ${meeting ? m.courses_home_role_teaching() : m.courses_home_role_taking()}`}
                     </p>
@@ -129,7 +129,7 @@ const clock = (date: Date) =>
         <section class="mt-8">
           <h2 class="text-xl font-semibold">{m.courses_home_in_progress()}</h2>
           <div class="mt-3 flex flex-col gap-3">
-            {teaching.inProgress.map(({ course, exam, submitted, enrolled, personalWindows, closesAt }) =>
+            {teaching.inProgress.map(({ course, exam, started, submitted, enrolled, personalWindows, closesAt }) =>
               personalWindows > 0 ? (
                 <CountRow
                   href={`${course.href}/exams/${exam.slug}`}
@@ -140,8 +140,9 @@ const clock = (date: Date) =>
                   course={course}
                 >
                   {closesAt && (
-                    <span title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</span>
+                    <time datetime={closesAt.toISOString()} title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</time>
                   )}
+                  {started > 0 && ` · ${m.courses_home_answering_now({ count: started })}`}
                 </CountRow>
               ) : (
                 <CountRow
@@ -154,8 +155,9 @@ const clock = (date: Date) =>
                   course={course}
                 >
                   {closesAt && (
-                    <span title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</span>
+                    <time datetime={closesAt.toISOString()} title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</time>
                   )}
+                  {started > 0 && ` · ${m.courses_home_answering_now({ count: started })}`}
                 </CountRow>
               ),
             )}
@@ -189,7 +191,7 @@ const clock = (date: Date) =>
         <section class="mt-8">
           <h2 class="text-xl font-semibold">{m.grades_regrade_home_queue()}</h2>
           <div class="mt-3 flex flex-col gap-3">
-            {teaching.regrades.map(({ course, exam, open }) => (
+            {teaching.regrades.map(({ course, exam, open, oldest }) => (
               <CountRow
                 href={`${course.href}/exams/${exam.slug}/regrades`}
                 count={open}
@@ -197,7 +199,12 @@ const clock = (date: Date) =>
                 label={m.grades_regrade_home_open({ count: open })}
                 title={exam.title}
                 course={course}
-              />
+              >
+                {" · "}
+                <time datetime={oldest.toISOString()} title={exact(oldest)}>
+                  {m.courses_home_oldest_request({ when: formatRelative(oldest, now) })}
+                </time>
+              </CountRow>
             ))}
           </div>
         </section>
@@ -281,7 +288,7 @@ const clock = (date: Date) =>
                       <span class="font-mono">{course.code}</span>
                       {course.edition && ` · ${course.edition}`}
                       {deadline && !started && (
-                        <span title={exact(deadline)}> · {m.courses_home_closes({ when: formatRelative(deadline, now) })}</span>
+                        <time datetime={deadline.toISOString()} title={exact(deadline)}> · {m.courses_home_closes({ when: formatRelative(deadline, now) })}</time>
                       )}
                     </p>
                   </div>
@@ -318,7 +325,7 @@ const clock = (date: Date) =>
                       {course.edition && ` · ${course.edition}`}
                     </p>
                   </div>
-                  <span title={exact(opensAt)}>{m.courses_home_opens({ when: formatRelative(opensAt, now) })}</span>
+                  <time datetime={opensAt.toISOString()} title={exact(opensAt)}>{m.courses_home_opens({ when: formatRelative(opensAt, now) })}</time>
                 </div>
               </a>
             ))}
@@ -343,7 +350,7 @@ const clock = (date: Date) =>
                     <p class="text-sm text-muted">
                       <span class="font-mono">{course.code}</span>
                       {course.edition && ` · ${course.edition}`}
-                      <span title={exact(releasedAt)}> · {m.courses_home_released({ when: formatRelative(releasedAt, now) })}</span>
+                      <time datetime={releasedAt.toISOString()} title={exact(releasedAt)}> · {m.courses_home_released({ when: formatRelative(releasedAt, now) })}</time>
                     </p>
                   </div>
                   {total === null ? (
@@ -395,7 +402,7 @@ const clock = (date: Date) =>
                 {next.kind === "exam" ? next.exam.title : next.event.title}
               </span>{" "}
               · <span class="font-mono">{next.course.code}</span> ·{" "}
-              <span title={exact(next.at)}>{formatRelative(next.at, now)}</span>
+              <time datetime={next.at.toISOString()} title={exact(next.at)}>{formatRelative(next.at, now)}</time>
             </p>
           ) : (
             <p>{m.courses_home_nothing_ahead()}</p>

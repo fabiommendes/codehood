@@ -8,7 +8,9 @@
   and opens or links to its roll call, warning first when the roll call
   would open outside the meeting. It also lists courses with open content
   reports, leads each item with its count (`CountRow`), and, when nothing
-  needs attention, names the next meeting or exam of either role.
+  needs attention, names the next meeting or exam of either role. Exams in
+  progress say how many students are answering now, regrade requests how
+  old the oldest is, and dates are marked up as `<time>`.
 - Answers are reviewed with the marks of the mdq library: the grading and
   attempt pages show each choice, fill-in or ordering answer in review mode
   (marks and feedback, the score still from the grading passes), and a
