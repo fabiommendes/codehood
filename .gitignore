@@ -60,3 +60,7 @@ prompt/
 
 # Impeccable engine binary, fetched on demand by its launcher
 .claude/skills/impeccable/scripts/bin/
+
+# impeccable session state (critiques are kept)
+/.impeccable/hook.cache.json
+/.impeccable/live/
