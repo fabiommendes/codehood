@@ -2,7 +2,11 @@ import { expect, test } from "@playwright/test";
 import type { Exam } from "@/db";
 import type { ExamResult, QuestionOutcome } from "@/services/exam-result";
 import type { ExceptionTiming } from "@/services/exam-state";
-import { instructorHome, type TaughtExam } from "@/services/instructor-home";
+import {
+	instructorHome,
+	type TaughtEvent,
+	type TaughtExam,
+} from "@/services/instructor-home";
 import type { HomeCourse } from "@/services/student-home";
 
 const MINUTE = 60_000;
@@ -114,12 +118,15 @@ function taught(
 
 const titles = (items: { exam: Exam }[]) => items.map((i) => i.exam.title);
 
-test("instructorHome: nothing at all yields four empty sections", () => {
+test("instructorHome: nothing at all yields empty sections and nothing next", () => {
 	expect(instructorHome([], [], NOW)).toEqual({
 		inProgress: [],
 		toGrade: [],
 		toRelease: [],
 		problems: [],
+		reports: [],
+		today: [],
+		next: null,
 	});
 });
 
@@ -578,4 +585,87 @@ test("inProgress counts personal windows only once the exam's own window has clo
 			["Final", 2],
 		],
 	);
+});
+
+//
+// Meetings and reports
+//
+
+let nextWeek = 1;
+
+/// A meeting of `algebra` that starts `startsIn` from `NOW` and lasts `minutes`.
+function meeting(
+	startsIn: number,
+	overrides: Partial<TaughtEvent> = {},
+	minutes = 100,
+): TaughtEvent {
+	const startAt = at(startsIn);
+	return {
+		course: algebra,
+		title: "Lecture",
+		kind: "REGULAR",
+		startAt,
+		endsAt: new Date(startAt.getTime() + minutes * MINUTE),
+		meeting: {
+			discipline: "mat101",
+			course: "ada_2026-1",
+			week: nextWeek++,
+			timeSlot: "mon",
+		},
+		rollCallClosesAt: null,
+		...overrides,
+	};
+}
+
+test("today: the meetings on the day of now, earliest first, with their roll call state", () => {
+	const later = meeting(6 * HOUR, { title: "Lab" });
+	const now = meeting(-10 * MINUTE, {
+		title: "Lecture",
+		rollCallClosesAt: at(5 * MINUTE),
+	});
+	const morning = meeting(-4 * HOUR, {
+		title: "Seminar",
+		rollCallClosesAt: at(-3 * HOUR),
+	});
+	const tomorrow = meeting(DAY, { title: "Tomorrow" });
+
+	const home = instructorHome([], [], NOW, [later, now, morning, tomorrow]);
+
+	expect(home.today.map((m) => [m.title, m.rollCall, m.inMeeting])).toEqual([
+		["Seminar", "closed", false],
+		["Lecture", "open", true],
+		["Lab", "none", false],
+	]);
+});
+
+test("next: the earliest meeting or exam ahead, only when nothing needs the instructor", () => {
+	const nextWeekMeeting = meeting(7 * DAY, { title: "Lecture" });
+	const quiz = exam({ title: "Quiz", scheduledAt: at(3 * DAY) });
+
+	const idle = instructorHome([taught(quiz)], [], NOW, [nextWeekMeeting]);
+	expect(idle.next).toMatchObject({ kind: "exam", at: at(3 * DAY) });
+
+	const onlyMeeting = instructorHome([], [], NOW, [nextWeekMeeting]);
+	expect(onlyMeeting.next).toMatchObject({
+		kind: "event",
+		at: at(7 * DAY),
+		course: algebra,
+	});
+
+	const busy = instructorHome([taught(openExam())], [], NOW, [nextWeekMeeting]);
+	expect(busy.next).toBeNull();
+});
+
+test("reports: courses with open content reports", () => {
+	const home = instructorHome(
+		[],
+		[
+			{ course: algebra, questionsWithProblems: 0, openReports: 2 },
+			{ course: compilers, questionsWithProblems: 0, openReports: 0 },
+		],
+		NOW,
+	);
+
+	expect(home.reports).toEqual([{ course: algebra, open: 2 }]);
+	expect(home.next).toBeNull();
 });

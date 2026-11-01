@@ -5,6 +5,12 @@
 	"courses_home_in_progress": "In progress",
 	"courses_home_closes": "Closes {when}",
 	"courses_home_submitted": "{submitted} of {enrolled} submitted",
+	"courses_home_unit_submitted": "submitted",
+	"courses_home_unit_personal_time": "on own time",
+	"courses_home_unit_to_grade": "to grade",
+	"courses_home_unit_to_release": "to release",
+	"courses_home_unit_with_problems": "with issues",
+	"courses_home_unit_open": "open",
 	"courses_home_personal_windows": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],
@@ -53,6 +59,19 @@
 	"courses_home_start": "Start",
 	"courses_home_coming_up": "Coming up",
 	"courses_home_opens": "Opens {when}",
+	"courses_home_reports": "Open reports",
+	"courses_home_open_reports": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} open report",
+				"countPlural=other": "{count} open reports"
+			}
+		}
+	],
+	"courses_home_role_teaching": "Teaching",
+	"courses_home_role_taking": "Taking",
 	"courses_home_today": "Today",
 	"courses_home_new_results": "New results",
 	"courses_home_released": "Released {when}",

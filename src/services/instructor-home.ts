@@ -7,6 +7,7 @@
  */
 
 import type { Exam, RegradeRequest } from "@/db";
+import { localDateOf } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 import {
 	type AttemptTiming,
@@ -40,6 +41,33 @@ export interface TaughtCourse {
 	course: HomeCourse;
 	/// Questions whose document fails validation.
 	questionsWithProblems: number;
+	/// Content reports nobody has triaged yet.
+	openReports?: number;
+}
+
+/// One calendar event of a course the instructor teaches.
+export interface TaughtEvent {
+	course: HomeCourse;
+	title: string;
+	kind: string;
+	startAt: Date;
+	endsAt: Date;
+	/// Where the roll call actions find the meeting: the course's URL segments, its week and time slot.
+	meeting: {
+		discipline: string;
+		course: string;
+		week: number;
+		timeSlot: string;
+	};
+	/// When the meeting's roll call stops taking check-ins, or `null` if it has none.
+	rollCallClosesAt: Date | null;
+}
+
+/// A meeting on the home page, with what the instructor can do about its roll call at `now`.
+export interface HomeMeeting extends TaughtEvent {
+	rollCall: "none" | "open" | "closed";
+	/// Whether `now` falls between the meeting's start and end.
+	inMeeting: boolean;
 }
 
 export interface InstructorHome {
@@ -63,6 +91,15 @@ export interface InstructorHome {
 	toRelease: { course: HomeCourse; exam: Exam; attempts: number }[];
 	/// Courses whose question bank has validation problems.
 	problems: { course: HomeCourse; questions: number }[];
+	/// Courses with content reports nobody has triaged yet.
+	reports: { course: HomeCourse; open: number }[];
+	/// Meetings on the same calendar day as `now` (server time zone), earliest first.
+	today: HomeMeeting[];
+	/// When every list above is empty, the next meeting or exam ahead, however far; otherwise `null`.
+	next:
+		| { kind: "exam"; course: HomeCourse; exam: Exam; at: Date }
+		| { kind: "event"; course: HomeCourse; event: TaughtEvent; at: Date }
+		| null;
 }
 
 /**
@@ -82,6 +119,7 @@ export function instructorHome(
 	exams: TaughtExam[],
 	courses: TaughtCourse[],
 	now: Date,
+	events: TaughtEvent[] = [],
 ): InstructorHome {
 	const shown = exams.filter(({ exam }) => {
 		const phase = examPhase(exam, now);
@@ -182,7 +220,65 @@ export function instructorHome(
 			questions: questionsWithProblems,
 		}));
 
-	return { inProgress, toGrade, toRelease, problems };
+	const reports = courses
+		.filter(({ openReports = 0 }) => openReports > 0)
+		.map(({ course, openReports = 0 }) => ({ course, open: openReports }));
+
+	const today = events
+		.filter((event) => localDateOf(event.startAt) === localDateOf(now))
+		.sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+		.map((event) => ({
+			...event,
+			rollCall: rollCallState(event.rollCallClosesAt, now),
+			inMeeting: event.startAt <= now && now < event.endsAt,
+		}));
+
+	const busy = [inProgress, toGrade, toRelease, problems, reports, today].some(
+		(list) => list.length > 0,
+	);
+	return {
+		inProgress,
+		toGrade,
+		toRelease,
+		problems,
+		reports,
+		today,
+		next: busy ? null : nextTaught(shown, events, now),
+	};
+}
+
+/// Whether a roll call closing at `closesAt` is missing, still open, or closed at `now`.
+function rollCallState(
+	closesAt: Date | null,
+	now: Date,
+): HomeMeeting["rollCall"] {
+	if (!closesAt) return "none";
+	return closesAt > now ? "open" : "closed";
+}
+
+/// The earliest meeting or exam start after `now`, however far ahead.
+function nextTaught(
+	exams: TaughtExam[],
+	events: TaughtEvent[],
+	now: Date,
+): InstructorHome["next"] {
+	const candidates: NonNullable<InstructorHome["next"]>[] = [
+		...events
+			.filter((event) => event.startAt > now)
+			.map((event) => ({
+				kind: "event" as const,
+				course: event.course,
+				event,
+				at: event.startAt,
+			})),
+		...exams.flatMap(({ course, exam }) =>
+			exam.scheduledAt && exam.scheduledAt > now
+				? [{ kind: "exam" as const, course, exam, at: exam.scheduledAt }]
+				: [],
+		),
+	];
+	candidates.sort((a, b) => a.at.getTime() - b.at.getTime());
+	return candidates[0] ?? null;
 }
 
 /// After the exam's own window closed, how many students still have a personal window upcoming or open at `now`.

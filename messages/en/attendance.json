@@ -27,6 +27,7 @@
 	"attendance_roll_call_page_title": "{event} · Roll call",
 	"attendance_roll_call": "Roll call",
 	"attendance_open_title": "Open the roll call",
+	"attendance_open_outside_meeting": "This meeting runs from {start} to {end}, so the roll call will open outside it.",
 	"attendance_open_body": "Students check in for 15 minutes with the code on the projected screen.",
 	"attendance_cancel": "Cancel",
 	"attendance_open_submit": "Open roll call",

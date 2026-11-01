@@ -1,6 +1,8 @@
 ---
+import CountRow from "@/components/CountRow.astro";
 import EmptyState from "@/components/EmptyState.astro";
 import PageKicker from "@/components/PageKicker.astro";
+import OpenRollCallDialog from "@/components/roll-call/OpenRollCallDialog";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { formatScore } from "@/services/exam-result";
@@ -20,7 +22,9 @@ const [home, teaching] = await Promise.all([
 	loadInstructorHome(actor, now),
 ]);
 const teachingBusy =
-	teaching.inProgress.length +
+	teaching.today.length +
+		teaching.reports.length +
+		teaching.inProgress.length +
 		teaching.toGrade.length +
 		teaching.regrades.length +
 		teaching.toRelease.length +
@@ -38,6 +42,18 @@ const busy = teachingBusy || studentBusy;
 const card =
 	"card card-border bg-base-100 transition-colors hover:border-primary";
 
+/// Today's meetings and classes in one list, by start time; each says its role when the actor has both.
+const today = [
+	...teaching.today.map((meeting) => ({ teaching: meeting, event: meeting })),
+	...home.today.map((event) => ({ teaching: undefined, event })),
+].sort((a, b) => a.event.startAt.getTime() - b.event.startAt.getTime());
+const showRole = teaching.today.length > 0 && home.today.length > 0;
+
+/// The earlier of the two roles' next thing, for the idle page.
+const next = [teaching.next, home.next]
+	.filter((entry) => entry !== null)
+	.sort((a, b) => a.at.getTime() - b.at.getTime())[0];
+
 const exact = (date: Date) => formatDateTime(date, { year: "numeric" });
 const clock = (date: Date) =>
 	formatDateTime(date, {
@@ -53,31 +69,96 @@ const clock = (date: Date) =>
     <h1 class="text-3xl font-bold">{m.courses_home_title()}</h1>
 
     {
+      today.length > 0 && (
+        <section class="mt-8">
+          <h2 class="text-xl font-semibold">{m.courses_home_today()}</h2>
+          <div class="mt-3 flex flex-col gap-3">
+            {today.map(({ teaching: meeting, event }) => (
+              <div class="card card-border bg-base-100">
+                <div class="card-body flex-row flex-wrap items-center gap-x-4 gap-y-2 py-4">
+                  <div class="min-w-0 flex-1">
+                    <a href={`${event.course.href}/schedule`} class="font-medium link-hover">{event.title}</a>
+                    <p class="text-sm text-muted">
+                      <span class="font-mono">{event.course.code}</span>
+                      {event.course.edition && ` · ${event.course.edition}`} ·{" "}
+                      <span title={exact(event.startAt)}>
+                        {meeting ? `${clock(meeting.startAt)}–${clock(meeting.endsAt)}` : clock(event.startAt)}
+                      </span>
+                      {event.kind === "CANCELLED" && ` · ${m.schedule_event_cancelled()}`}
+                      {showRole && ` · ${meeting ? m.courses_home_role_teaching() : m.courses_home_role_taking()}`}
+                    </p>
+                  </div>
+                  {meeting &&
+                    meeting.kind === "REGULAR" &&
+                    (meeting.rollCall === "none" ? (
+                      <OpenRollCallDialog
+                        client:load
+                        label={m.courses_home_open_roll_call()}
+                        discipline={meeting.meeting.discipline}
+                        course={meeting.meeting.course}
+                        week={meeting.meeting.week}
+                        timeSlot={meeting.meeting.timeSlot}
+                        href={meeting.course.href}
+                        warning={
+                          meeting.inMeeting
+                            ? undefined
+                            : m.attendance_open_outside_meeting({
+                                start: clock(meeting.startAt),
+                                end: clock(meeting.endsAt),
+                              })
+                        }
+                      />
+                    ) : (
+                      <a
+                        href={`${meeting.course.href}/roll-call/${meeting.meeting.week}/${meeting.meeting.timeSlot}`}
+                        class:list={["btn btn-sm", meeting.rollCall === "open" ? "btn-primary" : "btn-ghost"]}
+                      >
+                        {m.courses_home_view_roll_call()}
+                      </a>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
       teaching.inProgress.length > 0 && (
         <section class="mt-8">
           <h2 class="text-xl font-semibold">{m.courses_home_in_progress()}</h2>
           <div class="mt-3 flex flex-col gap-3">
-            {teaching.inProgress.map(({ course, exam, submitted, enrolled, personalWindows, closesAt }) => (
-              <a href={`${course.href}/exams/${exam.slug}`} class={card}>
-                <div class="card-body flex-row items-center gap-4 py-4">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-muted">
-                      <span class="font-mono">{course.code}</span>
-                      {course.edition && ` · ${course.edition}`}
-                      {closesAt && (
-                        <span title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</span>
-                      )}
-                    </p>
-                  </div>
-                  <span>
-                    {personalWindows > 0
-                      ? m.courses_home_personal_windows({ count: personalWindows })
-                      : m.courses_home_submitted({ submitted, enrolled })}
-                  </span>
-                </div>
-              </a>
-            ))}
+            {teaching.inProgress.map(({ course, exam, submitted, enrolled, personalWindows, closesAt }) =>
+              personalWindows > 0 ? (
+                <CountRow
+                  href={`${course.href}/exams/${exam.slug}`}
+                  count={personalWindows}
+                  unit={m.courses_home_unit_personal_time()}
+                  label={m.courses_home_personal_windows({ count: personalWindows })}
+                  title={exam.title}
+                  course={course}
+                >
+                  {closesAt && (
+                    <span title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</span>
+                  )}
+                </CountRow>
+              ) : (
+                <CountRow
+                  href={`${course.href}/exams/${exam.slug}`}
+                  count={submitted}
+                  of={enrolled}
+                  unit={m.courses_home_unit_submitted()}
+                  label={m.courses_home_submitted({ submitted, enrolled })}
+                  title={exam.title}
+                  course={course}
+                >
+                  {closesAt && (
+                    <span title={exact(closesAt)}> · {m.courses_home_closes({ when: formatRelative(closesAt, now) })}</span>
+                  )}
+                </CountRow>
+              ),
+            )}
           </div>
         </section>
       )
@@ -89,18 +170,14 @@ const clock = (date: Date) =>
           <h2 class="text-xl font-semibold">{m.courses_home_to_grade()}</h2>
           <div class="mt-3 flex flex-col gap-3">
             {teaching.toGrade.map(({ course, exam, pending }) => (
-              <a href={`${course.href}/exams/${exam.slug}/grading`} class={card}>
-                <div class="card-body flex-row items-center gap-4 py-4">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-muted">
-                      <span class="font-mono">{course.code}</span>
-                      {course.edition && ` · ${course.edition}`}
-                    </p>
-                  </div>
-                  <span>{m.courses_home_answers_to_grade({ count: pending })}</span>
-                </div>
-              </a>
+              <CountRow
+                href={`${course.href}/exams/${exam.slug}/grading`}
+                count={pending}
+                unit={m.courses_home_unit_to_grade()}
+                label={m.courses_home_answers_to_grade({ count: pending })}
+                title={exam.title}
+                course={course}
+              />
             ))}
           </div>
         </section>
@@ -113,18 +190,14 @@ const clock = (date: Date) =>
           <h2 class="text-xl font-semibold">{m.grades_regrade_home_queue()}</h2>
           <div class="mt-3 flex flex-col gap-3">
             {teaching.regrades.map(({ course, exam, open }) => (
-              <a href={`${course.href}/exams/${exam.slug}/regrades`} class={card}>
-                <div class="card-body flex-row items-center gap-4 py-4">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-muted">
-                      <span class="font-mono">{course.code}</span>
-                      {course.edition && ` · ${course.edition}`}
-                    </p>
-                  </div>
-                  <span>{m.grades_regrade_home_open({ count: open })}</span>
-                </div>
-              </a>
+              <CountRow
+                href={`${course.href}/exams/${exam.slug}/regrades`}
+                count={open}
+                unit={m.courses_home_unit_open()}
+                label={m.grades_regrade_home_open({ count: open })}
+                title={exam.title}
+                course={course}
+              />
             ))}
           </div>
         </section>
@@ -137,18 +210,14 @@ const clock = (date: Date) =>
           <h2 class="text-xl font-semibold">{m.courses_home_ready_to_release()}</h2>
           <div class="mt-3 flex flex-col gap-3">
             {teaching.toRelease.map(({ course, exam, attempts }) => (
-              <a href={`${course.href}/exams/${exam.slug}`} class={card}>
-                <div class="card-body flex-row items-center gap-4 py-4">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium">{exam.title}</p>
-                    <p class="text-sm text-muted">
-                      <span class="font-mono">{course.code}</span>
-                      {course.edition && ` · ${course.edition}`}
-                    </p>
-                  </div>
-                  <span>{m.courses_home_attempts_graded({ count: attempts })}</span>
-                </div>
-              </a>
+              <CountRow
+                href={`${course.href}/exams/${exam.slug}`}
+                count={attempts}
+                unit={m.courses_home_unit_to_release()}
+                label={m.courses_home_attempts_graded({ count: attempts })}
+                title={exam.title}
+                course={course}
+              />
             ))}
           </div>
         </section>
@@ -161,18 +230,34 @@ const clock = (date: Date) =>
           <h2 class="text-xl font-semibold">{m.courses_home_question_problems()}</h2>
           <div class="mt-3 flex flex-col gap-3">
             {teaching.problems.map(({ course, questions }) => (
-              <a href={`${course.href}/questions`} class={card}>
-                <div class="card-body flex-row items-center gap-4 py-4">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium">{course.name}</p>
-                    <p class="text-sm text-muted">
-                      <span class="font-mono">{course.code}</span>
-                      {course.edition && ` · ${course.edition}`}
-                    </p>
-                  </div>
-                  <span>{m.courses_home_questions_with_problems({ count: questions })}</span>
-                </div>
-              </a>
+              <CountRow
+                href={`${course.href}/questions`}
+                count={questions}
+                unit={m.courses_home_unit_with_problems()}
+                label={m.courses_home_questions_with_problems({ count: questions })}
+                title={course.name}
+                course={course}
+              />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
+      teaching.reports.length > 0 && (
+        <section class="mt-8">
+          <h2 class="text-xl font-semibold">{m.courses_home_reports()}</h2>
+          <div class="mt-3 flex flex-col gap-3">
+            {teaching.reports.map(({ course, open }) => (
+              <CountRow
+                href={`${course.href}/reports`}
+                count={open}
+                unit={m.courses_home_unit_open()}
+                label={m.courses_home_open_reports({ count: open })}
+                title={course.name}
+                course={course}
+              />
             ))}
           </div>
         </section>
@@ -243,34 +328,6 @@ const clock = (date: Date) =>
     }
 
     {
-      home.today.length > 0 && (
-        <section class="mt-8">
-          <h2 class="text-xl font-semibold">{m.courses_home_today()}</h2>
-          <div class="mt-3 flex flex-col gap-3">
-            {home.today.map(({ course, title, kind, startAt }) => (
-              <a
-                href={`${course.href}/schedule`}
-                class="card card-border bg-base-100 transition-colors hover:border-primary"
-              >
-                <div class="card-body flex-row items-center gap-4 py-4">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium">{title}</p>
-                    <p class="text-sm text-muted">
-                      <span class="font-mono">{course.code}</span>
-                      {course.edition && ` · ${course.edition}`}
-                      {kind === "CANCELLED" && ` · ${m.schedule_event_cancelled()}`}
-                    </p>
-                  </div>
-                  <span title={exact(startAt)}>{clock(startAt)}</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </section>
-      )
-    }
-
-    {
       home.results.length > 0 && (
         <section class="mt-8">
           <h2 class="text-xl font-semibold">{m.courses_home_new_results()}</h2>
@@ -331,14 +388,14 @@ const clock = (date: Date) =>
     {
       !busy && (
         <EmptyState scene="binaryTree" title={m.courses_home_idle_title()} class="mt-10">
-          {home.next ? (
+          {next ? (
             <p>
               {m.courses_home_next()}{" "}
               <span class="font-medium">
-                {home.next.kind === "exam" ? home.next.exam.title : home.next.event.title}
+                {next.kind === "exam" ? next.exam.title : next.event.title}
               </span>{" "}
-              · <span class="font-mono">{home.next.course.code}</span> ·{" "}
-              <span title={exact(home.next.at)}>{formatRelative(home.next.at, now)}</span>
+              · <span class="font-mono">{next.course.code}</span> ·{" "}
+              <span title={exact(next.at)}>{formatRelative(next.at, now)}</span>
             </p>
           ) : (
             <p>{m.courses_home_nothing_ahead()}</p>

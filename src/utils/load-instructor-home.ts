@@ -9,16 +9,19 @@ import {
 	type RegradeQueueItem,
 	regradeQueue,
 	type TaughtCourse,
+	type TaughtEvent,
 	type TaughtExam,
 } from "@/services/instructor-home";
 import type { HomeCourse } from "@/services/student-home";
 import { courseHref } from "@/urls";
 import { loadCourseExceptions } from "./load-exam-exceptions";
+import { durationToMinutes, startOfLocalDay } from "./schedule-time";
 
 /**
  * Loads the courses `actor` teaches and builds their home page sections at `now`.
  *
  * Each course costs one query per kind of data, never one per exam or student.
+ * Meetings, roll calls and reports are left out when building for `only`.
  *
  * @param only Builds the sections for this course alone, which the caller
  *   has already checked `actor` may manage.
@@ -85,26 +88,72 @@ export async function loadInstructorHome(
 						),
 					})),
 			}));
+			const [rollCalls, openReports] = only
+				? [[], 0]
+				: await Promise.all([
+						db.rollCall.findMany({ course: course.id }, { actor }),
+						db.report.countOpen(course.id, { actor }),
+					]);
 			const taughtCourse: TaughtCourse = {
 				course: home,
 				questionsWithProblems: questions.filter(
 					({ question }) => questionProblems(question).length > 0,
 				).length,
+				openReports,
 			};
 			const regrades: ExamRegrades[] = exams.map((exam) => ({
 				course: home,
 				exam,
 				requests: open.filter((request) => request.exam === exam.slug),
 			}));
-			return { taughtExams, taughtCourse, regrades };
+			return { course, home, taughtExams, taughtCourse, regrades, rollCalls };
 		}),
 	);
+
+	const events =
+		only || courses.length === 0
+			? []
+			: await db.calendarEvent.findMany(
+					{
+						courseIds: courses.map((course) => course.id),
+						from: startOfLocalDay(now),
+					},
+					{ actor },
+				);
+	const byCourse = new Map(loaded.map((entry) => [entry.course.id, entry]));
+	const taughtEvents: TaughtEvent[] = events.flatMap((event) => {
+		const entry = byCourse.get(event.courseId);
+		if (!entry) return [];
+		const rollCall = entry.rollCalls.find(
+			(r) => r.week === event.week && r.timeSlot === event.timeSlot.slug,
+		);
+		return [
+			{
+				course: entry.home,
+				title: event.title,
+				kind: event.kind,
+				startAt: event.startAt,
+				endsAt: new Date(
+					event.startAt.getTime() +
+						durationToMinutes(event.timeSlot.duration) * 60_000,
+				),
+				meeting: {
+					discipline: entry.course.discipline.slug,
+					course: `${entry.course.instructor.username}_${entry.course.edition.slug}`,
+					week: event.week,
+					timeSlot: event.timeSlot.slug,
+				},
+				rollCallClosesAt: rollCall?.closesAt ?? null,
+			},
+		];
+	});
 
 	return {
 		...instructorHome(
 			loaded.flatMap(({ taughtExams }) => taughtExams),
 			loaded.map(({ taughtCourse }) => taughtCourse),
 			now,
+			taughtEvents,
 		),
 		regrades: regradeQueue(loaded.flatMap(({ regrades }) => regrades)),
 	};

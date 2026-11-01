@@ -1,8 +1,9 @@
 import { actions } from "astro:actions";
-import type { JSX } from "solid-js";
+import { type JSX, Show } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
+import Alert from "@/components/ui/Alert";
 import { rollCallOpen } from "@/core/schemas";
 import { m } from "@/i18n";
 
@@ -17,6 +18,8 @@ export interface OpenRollCallDialogProps {
 	href: string;
 	/// The opening button's text; "Roll call" by default.
 	label?: string;
+	/// Shown above the form, e.g. when the roll call would open outside the meeting.
+	warning?: string;
 }
 
 /**
@@ -30,7 +33,7 @@ export default function OpenRollCallDialog(
 ): JSX.Element {
 	let dialog: HTMLDialogElement | undefined;
 	const form = createSchemaForm(rollCallOpen, {
-		id: `open-roll-call-${props.week}-${props.timeSlot}`,
+		id: `open-roll-call-${props.discipline}-${props.course}-${props.week}-${props.timeSlot}`,
 		action: actions.rollCall.open,
 		hidden: {
 			discipline: props.discipline,
@@ -58,6 +61,11 @@ export default function OpenRollCallDialog(
 					<p class="mt-2 text-sm text-base-content/70">
 						{m.attendance_open_body()}
 					</p>
+					<Show when={props.warning}>
+						<Alert variant="warning" class="mt-3">
+							<span>{props.warning}</span>
+						</Alert>
+					</Show>
 					<form
 						noValidate
 						class="mt-4 flex flex-col gap-3"

@@ -5,6 +5,12 @@
 	"courses_home_in_progress": "Em andamento",
 	"courses_home_closes": "Fecha {when}",
 	"courses_home_submitted": "{submitted} de {enrolled} enviaram",
+	"courses_home_unit_submitted": "enviaram",
+	"courses_home_unit_personal_time": "em horário próprio",
+	"courses_home_unit_to_grade": "a corrigir",
+	"courses_home_unit_to_release": "a liberar",
+	"courses_home_unit_with_problems": "com problema",
+	"courses_home_unit_open": "em aberto",
 	"courses_home_personal_windows": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],
@@ -53,6 +59,19 @@
 	"courses_home_start": "Iniciar",
 	"courses_home_coming_up": "Em breve",
 	"courses_home_opens": "Abre {when}",
+	"courses_home_reports": "Relatos abertos",
+	"courses_home_open_reports": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} relato aberto",
+				"countPlural=other": "{count} relatos abertos"
+			}
+		}
+	],
+	"courses_home_role_teaching": "Ensinando",
+	"courses_home_role_taking": "Cursando",
 	"courses_home_today": "Hoje",
 	"courses_home_new_results": "Novos resultados",
 	"courses_home_released": "Liberado {when}",

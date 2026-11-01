@@ -1,0 +1,50 @@
+---
+import CourseTile from "@/components/CourseTile.astro";
+
+/**
+ * A linked card led by the number that asks for action, such as answers to grade, with a short caption under it.
+ */
+interface Props {
+	href: string;
+	/// The number shown large; `of` adds a total after a slash, as in 3/10.
+	count: number;
+	of?: number;
+	/// A caption that reads for any count, such as "to grade".
+	unit: string;
+	/// The whole sentence ("5 answers to grade"), read by screen readers in place of the number and caption.
+	label: string;
+	title: string;
+	course: { href: string; code: string; edition?: string | null };
+}
+
+const { href, count, of, unit, label, title, course } = Astro.props;
+---
+
+<a href={href} class="card card-border bg-base-100 transition-colors hover:border-primary">
+  <div class="card-body flex-row items-center gap-4 py-3">
+    <div class="w-16 shrink-0 text-center sm:w-20" aria-hidden="true">
+      <span class="count-figure block text-4xl leading-none tabular-nums">
+        {count}{of !== undefined && <span class="text-xl text-muted">/{of}</span>}
+      </span>
+      <span class="mt-1.5 block font-mono text-[0.6875rem] uppercase leading-tight tracking-wider text-muted">{unit}</span>
+    </div>
+    <span class="sr-only">{label}</span>
+    <div class="min-w-0 flex-1 border-l border-base-300 pl-4">
+      <p class="font-medium">{title}</p>
+      <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
+        <CourseTile seed={course.href} size={14} class="shrink-0" />
+        <span><span class="font-mono">{course.code}</span>{course.edition && ` · ${course.edition}`}<slot /></span>
+      </p>
+    </div>
+  </div>
+</a>
+
+<style>
+  .count-figure {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-variation-settings:
+      "SOFT" 100,
+      "WONK" 1;
+  }
+</style>

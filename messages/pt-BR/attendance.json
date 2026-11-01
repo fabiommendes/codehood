@@ -27,6 +27,7 @@
 	"attendance_roll_call_page_title": "{event} · Chamada",
 	"attendance_roll_call": "Chamada",
 	"attendance_open_title": "Abrir a chamada",
+	"attendance_open_outside_meeting": "Esta aula vai das {start} às {end}. A chamada vai abrir fora desse horário.",
 	"attendance_open_body": "Estudantes registram presença por 15 minutos com o código da tela projetada.",
 	"attendance_cancel": "Cancelar",
 	"attendance_open_submit": "Abrir chamada",
