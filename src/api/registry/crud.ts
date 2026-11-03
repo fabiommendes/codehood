@@ -178,10 +178,12 @@ type CrudOptions<
 		FindMany<FilterT & ScopeT, EntityT> &
 		Update<KeyT, UpdateT, EntityT> &
 		Delete<KeyT> &
-		(CreateSchema extends null
+		// Not distributed over `ZodX | null`, and `CreateExtra` comes from the
+		// path parsers only, never inferred from the service it should check.
+		([CreateSchema] extends [null]
 			? unknown
-			: Create<CreateOf<CreateSchema> & CreateExtra, EntityT> &
-					Upsert<CreateOf<CreateSchema> & CreateExtra, EntityT>);
+			: Create<CreateOf<CreateSchema> & NoInfer<CreateExtra>, EntityT> &
+					Upsert<CreateOf<CreateSchema> & NoInfer<CreateExtra>, EntityT>);
 };
 
 class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {

@@ -52,3 +52,43 @@ test("a route with a create schema still requires create and upsert on the servi
 		});
 	expect(typeof register).toBe("function");
 });
+
+test("a route with a create schema refuses a service whose create takes another shape", () => {
+	const register = () =>
+		CRUD("/api/test-crud-wrong-create", {
+			name: "WrongCreate",
+			entity,
+			create: z.object({ slug: z.string() }),
+			update,
+			filter: null,
+			key,
+			tags: ["Test"],
+			service: {
+				...readUpdateDelete,
+				// @ts-expect-error - takes a number slug, the schema a string
+				create: async (_input: { slug: number }) => ({ slug: "a" }),
+				// @ts-expect-error - takes a number slug, the schema a string
+				upsert: async (_input: { slug: number }) => ({ slug: "a" }),
+			},
+		});
+	expect(typeof register).toBe("function");
+});
+
+test("a create schema that may be null still requires create and upsert", () => {
+	const maybe = z.object({ slug: z.string() }) as z.ZodObject<{
+		slug: z.ZodString;
+	}> | null;
+	const register = () =>
+		CRUD("/api/test-crud-maybe-create", {
+			name: "MaybeCreate",
+			entity,
+			create: maybe,
+			update,
+			filter: null,
+			key,
+			tags: ["Test"],
+			// @ts-expect-error - the service has no `create` nor `upsert`
+			service: readUpdateDelete,
+		});
+	expect(typeof register).toBe("function");
+});
