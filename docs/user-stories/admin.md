@@ -16,9 +16,9 @@ deployment and the work is done from the command line.
 
     status: cli
 
-A freshly deployed instance has no users at all, and accounts only come into
-existence through invites, so there is nobody to issue the first one. Sysadmin
-creates the first admin account from the command line, outside the app.
+A freshly deployed instance has no users at all, so there is nobody to issue
+an invite or open the admin panel. Sysadmin creates the first admin account from
+the command line, outside the app.
 
 
 ### Check that the instance is healthy
@@ -44,7 +44,8 @@ validate against, so it cannot drift from the implementation.
 
 ### Create a user account directly
 
-    status: todo
+    status: implemented
+    url: /admin/users
 
 Admin has someone who needs an account now and cannot wait on an invite round
 trip. Knowing their email, name and desired username, the admin creates the
@@ -105,8 +106,7 @@ exists, it just cannot act until somebody logs in again.
     url: /admin/disciplines
 
 Admin registers a subject that will be taught, giving it a slug like `cs101`. The
-discipline outlives the courses that instantiate it and owns the question bank
-shared across them.
+discipline outlives the courses that instantiate it.
 
 Slugs like `login` or `admin` are refused with an explanation, because course
 URLs live in the root namespace and such a slug would silently make every course

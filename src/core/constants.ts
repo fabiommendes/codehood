@@ -148,7 +148,7 @@ export const SCHOOL_ID_PATTERN = wholeMatch(readEnv("SCHOOL_ID_PATTERN", ""));
  * Defaults to a folder next to the SQLite database so a fresh dev checkout
  * works with no extra setup; a real deployment should point this at a persistent
  * volume and have its reverse proxy `try_files` that path before falling back
- * to the app (FR-SYNC-013).
+ * to the app, which answers for tombstoned blobs.
  */
 export const RESOURCE_ROOT = readEnv("RESOURCE_ROOT", "./storage/resources");
 

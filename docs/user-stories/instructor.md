@@ -217,10 +217,11 @@ passphrase".
     status: todo
 
 Instructor writes a question in their local repository, of one of the supported
-types, and pushes it. It belongs to the discipline rather than to one course, so
-it can be reused next term. Rewriting a question that is already on a finished
-exam appends a new version rather than overwriting the old one, and the exam that
-pinned the previous version still shows what the students actually answered.
+types, and pushes it. It belongs to the course it was pushed to; reusing it next
+term means pushing the same file to the new course. Rewriting a question that is
+already on a finished exam appends a new version rather than overwriting the old
+one, and the exam that pinned the previous version still shows what the students
+actually answered.
 
 
 ### Browse the question bank
@@ -231,8 +232,10 @@ pinned the previous version still shows what the students actually answered.
 Instructor already pushed questions with the CLI and wants to check what
 landed on the server: which type each one is, whether it is published or
 still a draft, and when it last changed. The course's Questions tab lists
-them, and opening one shows its stem, tags and current status — a read-only
-mirror of what was pushed, since authoring itself still happens locally.
+them, and opening one shows its stem, tags and current status. The content is
+a mirror of what was pushed, since authoring happens locally, but the status is
+not: a button on each row publishes, archives or moves the question back to
+draft.
 
 
 ### Browse the exam list
@@ -251,23 +254,27 @@ does not mean reading the whole table.
 
     status: todo
 
-Several instructors teach the same discipline and want one shared bank. They
-maintain questions as a group, where membership carries its own admin flag
-independent of anyone's global role.
+Several instructors teach the same discipline and want to see each other's
+questions. The owner of a question that declares a uuid shares it from the web,
+and any other instructor can then read it in full, but not change it. A
+question with no uuid cannot be shared, and the page says what to add. To reuse
+a shared question, an instructor copies its file into their own repository and
+pushes it to their course.
 
 
 ### Assemble and schedule an exam
 
     status: todo
 
-Instructor builds an exam for a course from questions in the bank and chooses its
-type. Each question is pinned to the version current at that moment, so the paper
-cannot change under the students taking it. While they are still assembling it,
-the exam is listed for them as a draft, on the same page and the same URL
-students use rather than a parallel screen, and students do not see it at all.
-Setting when it opens and closes moves it from draft to scheduled, and the
-meetings it overlaps on the calendar pick up a link to it, so students find the
-exam where they are already looking.
+Instructor writes an exam in the course repository, choosing its type and its
+questions from the bank, and pushes it with the CLI. When the exam starts, as
+the first attempt is opened, each question is pinned to its current version, so
+the paper cannot change under the students taking it. While they are still
+assembling it, the exam is listed for them as a draft, on the same page and the
+same URL students use rather than a parallel screen, and students do not see it
+at all. Setting when it opens and closes moves it from draft to scheduled, and
+the exam appears on its date in the course schedule and in students' calendars,
+next to the meetings, so students find it where they are already looking.
 
 
 ### Grade submissions by hand
@@ -313,6 +320,19 @@ student's window is still open, and the student continues where they stopped.
 Removing an exception takes the student back to the exam's own timing.
 
 
+### Release an exam's grades
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>
+
+Instructor finished grading an exam and wants the class to see the results.
+The exam page offers "Release results" once the exam is closed and nothing is
+left to grade, behind a confirmation that says what students will see and that
+it cannot be undone. After confirming, the page says when the grades were
+released and every student sees their grade and feedback. Quizzes need no such
+step: their grades come out on their own once the quiz closes.
+
+
 ### Let a bot grade for me
 
     status: implemented
@@ -321,8 +341,8 @@ Instructor runs an automated grader for programming answers. They issue an API
 key of kind `BOT`, and the bot posts grades and feedback back through the REST
 API. It currently acts as the instructor who issued its key.
 
-Issuing the key and authenticating with it work today. The REST API registers
-no responses or grades routes yet, so the posting half has nothing to call.
+The bot reads the course's submissions and posts a score and a comment on each
+one as feedback, through the same REST API the CLI uses.
 
 
 ### See the whole class's results

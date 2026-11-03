@@ -319,7 +319,7 @@ const PERMISSIONS = {
 	} satisfies PermDef<CourseWithEnrollment>,
 
 	// Rule: SYSTEM or the course's own instructor. No admin branch — an admin
-	// who does not teach the course is denied (FR-ACC-010). Unlike
+	// who does not teach the course is denied. Unlike
 	// `course.update`/`course.delete`, a non-owning admin gets no branch here:
 	// an admin's authority stops at the course *record* (`/admin/courses`),
 	// and never reaches into content only its instructor may write. Contrast
@@ -330,7 +330,9 @@ const PERMISSIONS = {
 		audit: auditCourse,
 	} satisfies PermDef<CourseTarget>,
 
-	// Rule: SYSTEM, any admin, or the instructor (FR-ACC-011) — that authority
+	// Rule: SYSTEM, any admin, or the instructor. Admins keep authority over
+	// records that are not course content (disciplines, editions, accounts,
+	// course archival) — that authority
 	// is exercised from `/admin/courses`, not from the course itself. Contrast
 	// `enrollment.manage`, which covers course *operations* and pointedly does
 	// not grant them to a non-owning admin.

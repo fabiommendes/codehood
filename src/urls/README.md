@@ -56,7 +56,7 @@ Everything belonging to a course hangs off its address:
 Every one of these renders the same tab strip (`CourseHeader.astro`,
 `courseTabs()` in `src/utils/course-tabs.ts`); which tabs show up is a function
 of the course and the viewer, not of which URL they typed. A student never sees
-the instructor tabs and gets a 403 if they follow the link anyway (FR-CRS-033).
+the instructor tabs and gets a 403 if they follow the link anyway.
 `/<course>/manage` has no tab and redirects to `/<course>/roster`.
 
 Instructor-only pages live under the course rather than in a separate
@@ -121,7 +121,7 @@ the same commit**, and checking that no existing discipline already claims it.
 | `/openapi.json`          | public | the OpenAPI document                                  |
 | `/rpc/docs`              | public | RPC API reference                                     |
 | `/openrpc.json`          | public | the OpenRPC document                                  |
-| `/files/<hash>[/<name>]` | none   | resource blobs — no auth check by design (FR-NFR-030) |
+| `/files/<hash>[/<name>]` | none   | resource blobs — no auth check by design (ADR 0010)    |
 | `/git/<token>/<slug>.git/...` | token | read-only git protocol of a course repository; the token is the credential, any failure is 404 |
 | `/<course>/repositories/<slug>.zip` | user | zip of a repository head, needs `course.read-contents` |
 | `/403`, `/404`, `/500`   | public | error pages                                           |

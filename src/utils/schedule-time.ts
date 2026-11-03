@@ -27,7 +27,7 @@ import { locale } from "@/i18n";
 // process's environment at request time. If `SERVER_TZ` changes without a
 // rebuild, or differs between the machine that built the deployed artifact
 // and the one running it, this stays at whatever value the build saw.
-/** The server's configured time zone (FR-NFR-020) — every instant is rendered here. */
+/** The server's configured time zone; instants are stored in UTC and every one is rendered here. */
 export const SERVER_TZ: string = ENV_SERVER_TZ;
 
 const WEEKDAY_ORDER: readonly Weekday[] = [

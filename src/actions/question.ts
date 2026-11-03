@@ -11,7 +11,7 @@ export const question = {
 	 * Moves a question to `status`, called from the question bank table's
 	 * archive/status control.
 	 *
-	 * `update` refuses to touch an archived row (FR-SYNC-012), so reviving one
+	 * `update` refuses to touch an archived row, so reviving one
 	 * goes through `upsert` instead, carrying its current document forward
 	 * unchanged — the same distinction `course.addStudent` draws between an
 	 * existing and a not-yet-existing account.

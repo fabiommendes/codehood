@@ -28,7 +28,7 @@ import { courseRefWhere } from "../utils";
 
 export type { PassphraseId } from "@/core/schemas";
 
-const EXPIRY_MS = 5 * 60 * 1000; // 5 minutes — FR-CRS-041's "live" window.
+const EXPIRY_MS = 5 * 60 * 1000; // 5 minutes; the join form shows only while one is live.
 
 // Uppercase letters and digits only, minus the pairs a student squinting at a
 // slide is likely to confuse (0/O, 1/I/L) — this is read aloud and typed once,

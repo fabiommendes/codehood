@@ -114,7 +114,7 @@ Type: domain
 One offering of a [Discipline](#discipline) by one instructor in one
 [Edition](#edition). Those three fields are its unique key and also its
 [Course URL](#course-url). It owns everything that varies between runs:
-schedule, exams, enrollments, and passphrases.
+schedule, questions, exams, enrollments, and passphrases.
 
 ## Course URL
 
@@ -144,8 +144,7 @@ Also: subject
 Type: domain
 
 The stable subject a course teaches, identified by a slug such as `cs101`.
-A discipline outlives the [Courses](#course) that instantiate it and owns the
-[Question](#question) bank shared across them.
+A discipline outlives the [Courses](#course) that instantiate it.
 
 ## Discrimination
 
@@ -178,10 +177,9 @@ Only active enrollments grant access to course contents.
 Type: domain
 
 One dated occurrence of a [Time slot](#time-slot) — a single class meeting in a
-given week, with its own title, description, and kind (lecture, lab, exam,
-review, seminar, project, self-study, holiday, recess, or cancelled).
-May carry a derived link to an [Exam](#exam) whose window overlaps it. This is
-what the calendar renders.
+given week, with its own title, description, and kind (regular, holiday, or
+cancelled). The calendar renders events and dated [Exams](#exam) side by side;
+an event holds no link to an exam.
 
 ## Event resource
 
@@ -195,10 +193,11 @@ that meeting on the schedule instead of on the Resources tab.
 Type: domain
 
 A set of [Questions](#question) assigned to a course, of type PRACTICE, QUIZ,
-or EXAM. Its status moves DRAFT → SCHEDULED → ONGOING → COMPLETED
-(or ARCHIVED), and only ONGOING accepts submissions. Each question is pinned to
-a [Question version](#question-version) so the paper does not change while
-students are taking it.
+or EXAM, written in the course repository and pushed by the [CLI](#cli). Its
+stored status is DRAFT, SCHEDULED, ONGOING, COMPLETED, or ARCHIVED, and the
+clock decides the rest: an ONGOING exam, or a SCHEDULED one inside its window,
+is open and accepts submissions. A question may be pinned to a
+[Question version](#question-version); with no pin it follows the latest.
 
 ## Exam exception
 
@@ -228,14 +227,6 @@ An automated client that grades submissions through the
 instructor who issued its key and therefore sees everything that instructor
 sees.
 
-## Group
-
-Type: domain
-
-A set of users who share ownership of [Questions](#question), so a teaching team
-can maintain a bank together. Membership carries an independent admin flag,
-separate from the user's global [Role](#role).
-
 ## Instructions
 
 Type: domain
@@ -255,7 +246,8 @@ teach plus any they are enrolled in.
 
 Type: domain
 
-The only way an account comes into existence, since there is no public sign-up.
+How an account comes into existence, since there is no public sign-up; an
+admin can also create one directly, from `/admin/users` or `manage create-user`.
 An invite fixes the [Role](#role) it grants and expires. Redeeming it creates
 the [User](#user). Comes in two kinds: [Personal](#personal-invite) and
 [Classroom](#classroom-invite).
@@ -324,10 +316,11 @@ while the public id is generated in the service layer.
 Also: question ref 
 Type: domain
 
-The stable identity of a question: its author, discipline, type (multiple-choice,
-multiple-selection, true-false, or essay), status (draft, published, or archived),
-and tags. The text lives in its [versions](#question-version) instead, so the
-reference stays lightweight and editing never rewrites history.
+The stable identity of a question: its [Course](#course), slug, type
+(multiple-choice, multiple-selection, true-false, essay, numeric, short-answer,
+fill-in, or ordering), status (draft, published, or archived), and tags. It
+has no author field. The text lives in its [versions](#question-version)
+instead, so the reference stays lightweight and editing never rewrites history.
 
 ## Question version
 
@@ -335,7 +328,7 @@ Type: domain
 
 One immutable revision of a question's content — title, stem, and a
 type-specific JSON payload — identified by a hash. Editing appends a version;
-exams and courses may pin an older one.
+an exam may pin an older one.
 
 ## Regrade request
 
@@ -422,8 +415,9 @@ copy to detect changes and conflicts. Not an identifier.
 Type: domain
 
 The account-wide permission level — [Admin](#admin), [Instructor](#instructor),
-or [Student](#student) — fixed by the [Invite](#invite) that created the
-account. Per-course authority is decided by ownership and [Enrollment](#enrollment).
+or [Student](#student) — fixed when the account is created, by its
+[Invite](#invite) or by the admin who created it. Per-course authority is
+decided by ownership and [Enrollment](#enrollment).
 
 ## Roll call
 
@@ -494,7 +488,8 @@ Type: domain
 
 A course's recurring weekly meeting — a weekday and a start and end time. Carries
 an authored slug (stable when the hour moves) and an optional title for the
-syllabus line. Concrete dated meetings are its [Events](#event).
+syllabus line. Concrete dated meetings are its [Events](#event). A slot may
+have none: office hours are a titled slot with no events.
 
 ## User
 
@@ -533,7 +528,6 @@ are not translated.
 | Exam (type QUIZ)  | quiz                      |
 | Grade column      | coluna de notas           |
 | Grading bot       | corretor automático       |
-| Group             | grupo                     |
 | Instructions      | instruções                |
 | Instructor        | docente                   |
 | Invite            | convite                   |

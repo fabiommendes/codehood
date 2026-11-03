@@ -31,7 +31,7 @@ Whenever a new command is created, document it in this file.
 : Creates an academic edition (term). Prompts for the display name, if not
   given, and for the window during which new courses may be created for it.
   The slug is the token that appears in every course URL (`ada_2026-1`), so it
-  must match `^[0-9]{4}(-([1-9][0-9]*|0))?$` and cannot be changed afterwards.
+  must match `^[0-9]{4}(-([1-9][0-9]?|0))?$` and cannot be changed afterwards.
 
 `manage create-course <discipline-slug> <instructor> <edition>`
 : Creates a course taught by `<instructor>` (a username). Creates the

@@ -120,7 +120,7 @@ test("delete marks the enrollment DROPPED rather than deleting it, and create re
 	expect(students).toHaveLength(1);
 });
 
-test("a student drops themselves — the half of FR-CRS-042 that used to be missing", async () => {
+test("a student drops their own enrollment", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const student = await makeUser("STUDENT");
 	const course = await makeCourse(instructor.username);

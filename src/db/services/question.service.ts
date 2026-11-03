@@ -375,7 +375,8 @@ export class QuestionService extends CrudBase<{
 	 *
 	 * Stored versions are never rewritten: an exam may be pinned to any of
 	 * them. A `status` change alone produces no version, and an archived
-	 * question is refused (FR-SYNC-012); `create` or `upsert` revive it.
+	 * question is refused, since a sync must not silently write to an archived
+	 * natural key; `create` or `upsert` revive it.
 	 */
 	@Validate({
 		service: true,
@@ -446,7 +447,7 @@ export class QuestionService extends CrudBase<{
 	}
 
 	/**
-	 * Archives a question rather than removing it (FR-SYNC-013).
+	 * Archives a question rather than removing it, since responses reference it.
 	 *
 	 * The row stays readable through an exam that references it, and only
 	 * `create` or `upsert` bring it back.

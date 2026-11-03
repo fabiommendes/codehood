@@ -30,7 +30,7 @@ const { general: resources, byEvent } = splitByEvent(all);
 const hasEventResources = byEvent.size > 0;
 const groups = groupResourcesByType(resources);
 
-// Blob URLs carry no auth check of their own (FR-NFR-030); this page's referrer
+// Blob URLs carry no auth check of their own (ADR 0010); this page's referrer
 // still shouldn't leak into every link it hands out.
 Astro.response.headers.set("Referrer-Policy", "no-referrer");
 

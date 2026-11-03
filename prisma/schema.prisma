@@ -205,8 +205,8 @@ model Blob {
   size Int
 
   /// Set when the bytes are removed from disk; the row survives as a
-  /// tombstone so the URL can explain itself instead of 404ing (FR-SYNC-013,
-  /// FR-SYNC-015).
+  /// tombstone so the URL answers with an explanatory error instead of a bare
+  /// 404. Deleting a resource deletes its bytes but keeps its URL.
   deletedAt DateTime?
 
   /// Lowercase-hex sha1 of `"blob <size>\0" + bytes`, as git names the file.
@@ -453,6 +453,8 @@ model TimeSlot {
   @@unique([id, courseId])
 }
 
+/// Not called `Event` because `Event` is a DOM global, and a page importing the
+/// row type would shadow it.
 model CalendarEvent {
   id          Int       @id @default(autoincrement())
   kind        EventKind @default(REGULAR)
@@ -774,10 +776,10 @@ model QuestionData {
   stem  String
 
   /// What a student may see, stored on its own so a student-facing read never
-  /// selects the other half. Reassembled with `privatePayload` for grading.
+  /// selects the private column.
   publicPayload  Json
-  /// Everything the public half leaves out: the answer key, per-choice scores
-  /// and feedback, instructor comments.
+  /// The whole question document, answer key, per-choice scores, feedback and
+  /// instructor comments included. Grading reads only this column.
   privatePayload Json
 
   createdAt DateTime @default(now())
@@ -1025,8 +1027,9 @@ model Exam {
 
   scheduledAt DateTime?
   durationMs  Int?
-  /// Extra time granted on top of durationMs (FR-EXAM-020/022), part of the
-  /// exam's window (src/services/exam-state.ts).
+  /// Extra time granted on top of durationMs, extending the window for every
+  /// student alike (src/services/exam-state.ts). Server-side state the course
+  /// repository must not set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
   extraTimeMs Int       @default(0)
 
   /// When the instructor released this exam's grades to its students. Null

@@ -5,7 +5,7 @@ import { db } from "@/db";
 /**
  * Resources are addressed under their course's natural key,
  * `/api/course/<discipline>/<instructor>_<edition>/resource[/<slug>]`, so the
- * CLI never needs a numeric id (FR-SYNC-010).
+ * CLI never needs a numeric id (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
  */
 
 function tag(prefix: string): string {

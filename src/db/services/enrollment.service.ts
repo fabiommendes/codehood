@@ -165,7 +165,7 @@ export class EnrollmentService
 	/**
 	 * Marks the enrollment `DROPPED`; idempotent.
 	 *
-	 * The course's owner drops any student; a student drops only themselves (FR-CRS-042).
+	 * The course's owner drops any student; a student drops only themselves.
 	 */
 	@Validate({ service: true, args: [enrollmentPK] })
 	async delete(filter: EnrollmentPK, opts: ServiceOpts): Promise<void> {

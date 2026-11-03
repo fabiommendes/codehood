@@ -107,24 +107,24 @@ Backlog items are categorized in sections, not on priority.
 
 ## Localization
 
-* **English and Brazilian Portuguese UI (FR-NFR-021).** Every screen is
-  hardcoded English today, `src/i18n/` does not exist, and the calendar,
-  course-tabs, and question specs each add more strings. Interface strings only
-  — course content stays whatever language the instructor wrote (FR-NFR-022),
-  and the locale is a server-wide setting, not per user. Deferred deliberately:
-  doing it late costs a sweep over the strings, doing it now costs it on every
-  screen before the screens are settled.
+* **English and Brazilian Portuguese UI.** The message catalogue exists
+  (`messages/en/`, `messages/pt-BR/`, compiled by Paraglide and exposed by
+  `src/i18n/`), and the locale is fixed per installation at build time
+  (`CODEHOOD_LOCALE`), not per user. Interface strings only: course content
+  stays in whatever language the instructor wrote it. Both catalogues hold the
+  same keys today and no obvious hardcoded UI string remains, so what is left
+  is keeping pt-BR in step as new strings land.
 
 
 ## Questions and exams
 
-* **Question weights (FR-QST-030 … FR-QST-032).** `QuestionsForExam.weight
+* **Question weights.** `QuestionsForExam.weight
   Float?` defaulting to 1, the `Σ(weight × score) / Σ(weight)` score, and the
   rule that weights freeze while an exam is `ONGOING`. Cut from
   `dev/specs/to-do/questions.md`: they live on the exam side of the join table
   and mean nothing until an exam can be taken.
-* **Version pins (FR-QST-014).** An unset pin means `QuestionRef.latest` and
-  must not be user-settable. Note that `FR-QST-014` says the server stamps it at
-  `SCHEDULED` while `FR-EXAM-013` says at `ONGOING`; the two requirements
-  disagree and the exam slice has to settle it.
+* **Version pins.** An unset pin means `QuestionRef.latest` and must not be
+  user-settable. Decided: the server pins each question's version when the exam
+  starts (its first attempt is opened). Not built yet; see
+  `dev/issues/versao-da-questao-fixada-ao-iniciar-o-exame.md`.
 

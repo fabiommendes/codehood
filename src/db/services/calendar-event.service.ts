@@ -357,7 +357,7 @@ export class CalendarEventService extends CrudBase<{
 	}
 
 	/**
-	 * Removes the row outright — events are never archived (FR-CAL-014).
+	 * Removes the row outright — events are never archived.
 	 *
 	 * A subsequent `findOne` returns `null`.
 	 *

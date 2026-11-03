@@ -20,13 +20,14 @@ it must not touch `course.update-contents`.
 
 ### Sharing: a question carries a UUID, and its owner may share it
 
-`FR-ACC-040` says a `Group` grants its members read access to the questions
-associated with it. That mechanism never got built, and the note under the
-requirement says what it is actually for: "so co-teaching instructors can
-inspect a shared bank and, in a later milestone, compare a question's
-performance across courses."
+The schema has a `Group` model, meant to give its members read access to the
+questions associated with it. That mechanism never got built, and what it was
+for is narrower than a group: let co-teaching instructors inspect a shared bank
+and, in a later milestone, compare a question's performance across courses.
 
-Sharing does that directly, without a group to administer first.
+Sharing does that directly, without a group to administer first. Per-question
+`sharedAt` **replaces** `Group`: this spec removes `Group`, `GroupMembership`
+and `QuestionRef.groupId` from the schema (see [Schema](#schema)).
 
 ```prisma
 model QuestionRef {
@@ -47,8 +48,8 @@ The reason is identity. `(courseId, slug)` addresses a question inside one
 course and says nothing across courses, so a shared question referenced from
 another instructor's screen has no name that survives the course it came from.
 A UUID is authored once, in the file, and travels with the file — including into
-next year's copy, which is exactly the lineage token
-`04-questions.md`'s open question asks for. Requiring it *at the moment of
+next year's copy, which is exactly the lineage token that cross-edition
+statistics need to tell "the same question, next term" from a stranger. Requiring it *at the moment of
 sharing* rather than always is the cheap version: a question nobody shares never
 needs one, and the demand appears at the point where the author gets something
 for it.
@@ -62,12 +63,39 @@ The server validates the shape (RFC 4122) and nothing else. It does not generate
 UUIDs: a server-generated one would not be in the file, so the next push would
 not carry it back, and the identity would live on exactly one side.
 
+### The `uuid` never leaves the server, except to the question's owner
+
+Hard rule. The `uuid` is the question's identity across courses and editions;
+whoever holds it can claim lineage with the question. So no response, page,
+API payload, export or error message carries it to anyone but the instructor
+of the course that owns the question. That includes:
+
+- another instructor reading a question shared with them;
+- an admin;
+- a student, at any status, including after grades are released (the answer
+  key a student may see is a separate, whitelisted payload, never the raw
+  private document).
+
+Consequences:
+
+- The `uuid` is not part of the stored document a non-owner can read. If the
+  parser keeps it in the front matter, the write path strips it from the
+  stored payloads and keeps it only in the `QuestionRef.uuid` column.
+- Every read serializes `uuid` only after an ownership check on that row; the
+  `returns:` validator for a non-owner read has no `uuid` field (ADR 0006,
+  `dev/adr/0006-validacao-de-entrada-e-saida-nos-services.md`), so a leak fails
+  validation instead of reaching the client.
+- `/questions/shared` groups rows by `uuid` **on the server**. What reaches the
+  page is the groups themselves (lists of rows), with no `uuid` and no value
+  derived from it (no hash, no stable group key) that would let two readers
+  match a question across courses.
+
 ### Sharing grants reading, because writing is not the owner's to give
 
-A shared question is readable, in full — both payloads — by any instructor. It
-is never writable by anyone but its own course's instructor, and no share can
-change that: `FR-ACC-010` makes content writable only by the course's owner, and
-`course.update-contents` does not consult `sharedAt`.
+A shared question is readable in full (both payloads, minus the `uuid`) by any
+instructor. It is never writable by anyone but its own course's instructor, and
+no share can change that: course content is writable only by the course's
+owner, and `course.update-contents` does not consult `sharedAt`.
 
 Both halves, deliberately. An instructor judging whether to reuse a question
 needs its answer key and its grading configuration — a question you cannot see
@@ -83,14 +111,15 @@ the CLI is still how it moves.
 
 | Actor             | Own questions                   | Shared by others | Everything else                  |
 | :---------------- | :------------------------------ | :--------------- | :------------------------------- |
-| Instructor        | read both halves, write via CLI | read both halves | nothing                          |
-| Admin             | —                               | read both halves | public half, via `course.read-contents` |
+| Instructor        | read both halves and `uuid`, write via CLI | read both halves, no `uuid` | nothing                          |
+| Admin             | -                               | read both halves, no `uuid` | public half, via `course.read-contents` |
 | Student, enrolled | `PUBLISHED`, public half        | no               | nothing                          |
 
 Sharing is server-side state, not content. It is not in the pushed file, a
-re-push never clears it, and it does not enter `versionHash` — the same line
-`FR-EXAM-002` draws for exam lifecycle, and for the same reason: a flag the
-repository could set would be a flag the repository could silently unset.
+re-push never clears it, and it does not enter `versionHash`. ADR 0011
+(`dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md`) draws the same line
+for exam lifecycle, for the same reason: a flag the repository could set would
+be a flag the repository could silently unset.
 
 ### `/questions`, a new top-level route
 
@@ -113,10 +142,12 @@ slug, type, status, tags, and a **Share** toggle per row, disabled with a reason
 when the question has no `uuid`. On `/questions/shared`: the owner's name and
 course alongside, so "who wrote this" is answerable without a lookup, and rows
 grouped by `uuid` so the same question across two editions reads as one entry
-rather than two strangers.
+rather than two strangers. The grouping happens on the server; the `uuid`
+itself is not rendered (see the hard rule above).
 
-`questions` goes into `RESERVED_SLUGS` **in the same commit** — `FR-CRS-004`,
-and the failure mode is silent: a discipline slugged `questions` would not
+`questions` goes into `RESERVED_SLUGS` (`src/urls/constants.ts`, the discipline
+slugs that system routes take) **in the same commit**. The failure mode is
+silent: a discipline slugged `questions` would not
 error, it would just make every course under it unreachable. It goes into
 `src/urls/README.md`'s system-route table too.
 
@@ -133,9 +164,10 @@ courses.
   `@@unique([courseId, uuid])`.
 - `QuestionForCourse` is still in the schema, unused. Drop it with its
   back-relations on `Course` and `QuestionRef` in the same migration.
-- `Group` keeps its relation to `QuestionRef`, unused. `FR-ACC-040` names
-  `Group` as the sharing mechanism and needs amending: either it moves to
-  sharing, or `Group` stays for bulk sharing later.
+- `Group`, `GroupMembership`, `User.groupMemberships` and
+  `QuestionRef.group`/`groupId` are dropped in the same migration: per-question
+  sharing replaces them. Nothing in `src/` uses them today (only commented-out
+  lines in `src/db/branding.ts:44-45`, removed too).
 
 ## Tests
 
@@ -156,18 +188,32 @@ courses.
 - A malformed `uuid` is refused at write time, and the server never generates
   one.
 - `questions` is a reserved discipline slug.
+- The `uuid` reaches only the owner: reading a shared question as another
+  instructor, as an admin and as a student returns no `uuid` anywhere in the
+  payload (column or front matter), on the web page and on the REST API.
+- `/questions/shared` renders two same-`uuid` rows from different courses as one
+  group, and the page HTML contains neither `uuid`.
+- The non-owner `returns:` validator rejects a payload that carries a `uuid`.
+
+## Acceptance
+
+- An instructor shares a question with a `uuid` from `/questions`, and another
+  instructor finds it on `/questions/shared`, reads both halves, and cannot
+  write it.
+- At no point does a non-owner (instructor, admin, student) receive the
+  question's `uuid`, by page, API, export or error message.
+- `Group`, `GroupMembership` and `QuestionRef.groupId` are gone from
+  `prisma/schema.prisma`.
 
 ## Documentation to update in the same change
 
-- `src/urls/constants.ts`: `questions` joins `RESERVED_SLUGS` (`FR-CRS-004`).
+- `src/urls/constants.ts`: `questions` joins `RESERVED_SLUGS`.
 - `src/urls/README.md`: `/questions` and `/questions/shared` join the
   system-route table.
 - `GLOSSARY.md`: a `Shared question` entry, and `Question` gains its `uuid`.
-- `dev/requirements/04-questions.md`: the schema impact gains `uuid` and
-  `sharedAt`.
-- `dev/requirements/01-accounts-access.md`: amend `FR-ACC-040`.
 
 ## Follow-up, not in this spec
 
 - Cross-edition statistics, keyed on `uuid`.
-- Bulk sharing through `Group`, if per-question sharing proves tedious.
+- Bulk sharing (a course-wide or tag-wide share), if per-question sharing
+  proves tedious. Not through `Group`, which this spec removes.

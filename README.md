@@ -69,7 +69,7 @@ Then use one of the following, depending on what you want to do:
 | `BLOB_QUOTA_STUDENT`     | no       | `200mb`              | Upload quota per student.                                      |
 | `DEBUG`                  | no       | `false`              | Verbose error output.                                          |
 | `LOG_ENV`                | no       | `false`              | Echo the resolved environment at startup. Set by `pnpm run dev`. |
-| `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in (FR-NFR-020).            |
+| `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in.                         |
 | `PUBLIC_URL`             | no       | none                 | Build time. Address of a deployed instance, see [Deploying](#deploying). |
 | `CODEHOOD_LOCALE`        | no       | base locale (`en`)   | Build time. Locale the build compiles for; must be one of `project.inlang/settings.json` `locales`. |
 

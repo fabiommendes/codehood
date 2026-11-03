@@ -63,7 +63,7 @@ export const gradeColumnCreate = gradeColumnSchema
 	});
 
 // `slug` and `course` are deliberately absent: `slug` is the sync natural
-// key, and changing it is a delete plus a create (FR-SYNC-011).
+// key, and changing it is a delete plus a create (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
 export const gradeColumnUpdate = gradeColumnCreate
 	.omit({ course: true, slug: true })
 	.partial();

@@ -206,11 +206,12 @@ the calendar to know whether they missed something.
 
     status: implemented
 
-Student opens an exam that is ongoing and answers its questions. Progress is kept
+Student opens an exam that is open and answers its questions. Progress is kept
 as they go, so when the browser crashes halfway through they log back in, reopen
 the exam and find the answers they had already given, with the remaining time
-counting from where it actually is rather than restarting. Once the exam is no
-longer ongoing it stops accepting submissions.
+counting from where it actually is rather than restarting. When they are done
+they press "Submit exam", and a confirmation warns that the answers cannot be
+changed afterwards. Once the exam closes it stops accepting submissions.
 
 
 ### Answer an exam with the extra time I was granted

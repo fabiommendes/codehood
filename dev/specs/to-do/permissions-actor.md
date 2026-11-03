@@ -2,18 +2,20 @@
 
 `Actor` is `AuthUser | typeof SYSTEM` today — an `{ id, role }` pair or a
 symbol. It says who a call acts as and nothing about how they got here, so every
-rule the requirements draw around *credentials* rather than people is currently
+rule drawn around *credentials* rather than people is currently
 unenforceable.
 
 The gap is not theoretical. `apiKeyMiddleware` authenticates a key and then
 writes `locals.user = { id: apiKey.user.id, role: apiKey.user.role }`. From that
 line onward a `BOT` key is indistinguishable from its owner sitting at a
-browser, and FR-ACC-023 — "a `BOT` key MUST NOT create or modify questions,
-exams, calendar events, resources, courses, or enrollments" — has nothing left
-to check. `locals.apiKey` carries the kind and no code reads it.
+browser, and the rule that a `BOT` key never creates or modifies questions,
+exams, calendar events, resources, courses, or enrollments has nothing left to
+check. `locals.apiKey` carries the kind and no code reads it.
 
-This refactor gives the actor a kind and a credential identity, so the rules in
-FR-ACC-022, FR-ACC-023, and FR-SYNC-040 become expressible.
+This refactor gives the actor a kind and a credential identity, so three rules
+become expressible: a `CLI` key writes course content and nothing else, a `BOT`
+key writes grades and never content, and content operations accept only a `CLI`
+key or the course instructor's session, refusing admins and `BOT` keys.
 
 ## Scope
 
@@ -21,7 +23,7 @@ FR-ACC-022, FR-ACC-023, and FR-SYNC-040 become expressible.
   `kind` and `authenticationKey`.
 - `ApiKey` gains `publicId`, so a key has a name that is safe to hold.
 - `credentialAllows` in `src/auth/permissions.ts`: the write ceiling per kind,
-  which is FR-ACC-022's table as code.
+  which is the key-kind table below as code.
 - Every existing predicate moves from `actor === SYSTEM` to the new narrowing,
   and the content and operation predicates gain their credential check.
 - `locals.actor` replaces the `locals.user` / `locals.apiKey` pair; the three
@@ -30,8 +32,7 @@ FR-ACC-022, FR-ACC-023, and FR-SYNC-040 become expressible.
   keep working unchanged.
 
 Out of scope: the REST endpoints that would exercise a `CLI` key (the sync spec
-builds those), the grading endpoints a `BOT` key writes through
-(`06-grading.md`), and any audit log — this makes one possible, and does not
+builds those), the grading endpoints a `BOT` key writes through, and any audit log — this makes one possible, and does not
 build it.
 
 ## Design decisions
@@ -42,7 +43,7 @@ build it.
 export type ActorKind = "USER" | "CLI" | "BOT" | "SYSTEM";
 
 interface CredentialedActor {
-  /** The `User` this actor acts as. For a key, its owner — FR-ACC-024. */
+  /** The `User` this actor acts as. For a key, its owner: a key never sees more than its owner. */
   readonly id: number;
   readonly role: Role;
   readonly authenticationKey: string;
@@ -57,7 +58,7 @@ export type Actor = UserActor | CliActor | BotActor | SystemActor;
 ```
 
 `id` and `role` still mean what they mean today: the person this call acts as. A
-key acts as its owner and never sees more (FR-ACC-024), so a `BotActor` carries
+key acts as its owner and never sees more, so a `BotActor` carries
 the owner's id, and narrowing happens through `kind` rather than through a
 different id.
 
@@ -74,15 +75,17 @@ The request named two, `User` and `Bot`. This spec ships four, and the extra two
 are load-bearing:
 
 `SYSTEM` has to stay a kind because it is already an actor and already bypasses
-every rule (FR-ACC-012). Folding it in makes the union total, so there is no
+every rule: seeds, `manage` commands and internal transactions are not REST
+callers. Folding it in makes the union total, so there is no
 second axis to check.
 
-`CLI` has to be distinct from `USER` because FR-ACC-022 gives them different
-write surfaces, and `00-overview.md`'s actor table says so in prose:
-"Instructor | Web app + CLI | **Own courses: content via CLI, operations via
-web**". A `CLI` key may push questions, exams, calendar events, and resources.
-It may not grant extra exam time (FR-EXAM-022, web-app-only), transition an exam
-(FR-EXAM-002), drop a student, or issue an invite. Collapsing `CLI` into `USER`
+`CLI` has to be distinct from `USER` because they have different write
+surfaces: an instructor writes their own courses' content through the CLI and
+runs operations through the web. A `CLI` key may push questions, exams, calendar
+events, and resources. It may not grant extra exam time, transition an exam,
+drop a student, or issue an invite: exam status and extra time are server-side
+state the repository must not set (`dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md`; the REST API still accepts both, see
+`dev/issues/status-e-tempo-extra-so-pela-web.md`). Collapsing `CLI` into `USER`
 would leave those writable by anyone holding a key that was only ever meant to
 push a repository.
 
@@ -92,12 +95,12 @@ this spec is unaffected.
 
 ### `authenticationKey` is the credential's public name, never the credential
 
-For a `USER`, it is the **username** — stable, immutable (FR-ACC-004), and
+For a `USER`, it is the **username** — stable, immutable (it is a path segment of every course URL the user owns), and
 already the thing that names a person everywhere else in the system.
 
 For a `CLI` or `BOT` actor, it is the key's `publicId`, **not the key**. This is
 the one place this spec contradicts the request as stated, and the reason is
-FR-NFR-042: API keys are stored as SHA-256 hashes and are "never recoverable".
+that API keys are stored as SHA-256 hashes and are never recoverable.
 The plaintext key exists in exactly one place — the `Authorization` header of
 the request being authenticated — and putting it on the actor would carry it
 into every service call, every thrown `ForbiddenError`, every log line that
@@ -144,7 +147,7 @@ is denied. Fail-closed, with a test that says so.
 
 ### The credential is a ceiling, applied after the ownership rule
 
-FR-ACC-022 is a table, so it becomes one:
+What each key kind may write is a table, so it becomes one:
 
 ```ts
 export type WriteSurface = "content" | "operations" | "grades" | "account";
@@ -153,17 +156,19 @@ export type WriteSurface = "content" | "operations" | "grades" | "account";
 export function credentialAllows(actor: Actor, surface: WriteSurface): boolean;
 ```
 
-| Kind     | content | operations | grades | account | Source                             |
-| :------- | :------ | :--------- | :----- | :------ | :--------------------------------- |
-| `USER`   | yes     | yes        | yes    | yes     | role and ownership decide the rest |
-| `CLI`    | yes     | no         | no     | no      | FR-ACC-022                         |
-| `BOT`    | no      | no         | yes    | no      | FR-ACC-022, FR-ACC-023, FR-GRD-030 |
-| `SYSTEM` | yes     | yes        | yes    | yes     | FR-ACC-012                         |
+| Kind     | content | operations | grades | account | Why                                  |
+| :------- | :------ | :--------- | :----- | :------ | :----------------------------------- |
+| `USER`   | yes     | yes        | yes    | yes     | role and ownership decide the rest   |
+| `CLI`    | yes     | no         | no     | no      | content via CLI, operations via web  |
+| `BOT`    | no      | no         | yes    | no      | a grading bot never writes content   |
+| `SYSTEM` | yes     | yes        | yes    | yes     | seeds and `manage` bypass every rule |
 
-- **content** — questions, exams, calendar events, resources (FR-ACC-010).
+- **content** — questions, exams, calendar events, resources. Writable only by
+  the course's instructor, admins included in the refusal.
 - **operations** — enrollment, invites, exam lifecycle and extra time, the
   course record.
-- **grades** — scores, feedback, grading status (FR-GRD-030, FR-GRD-033).
+- **grades** — scores, feedback, grading status. A bot writes them through the
+  same endpoints as the instructor, so there is one grading contract.
 - **account** — users, sessions, keys, disciplines, editions.
 
 The composite predicates become a conjunction, and the order is the point:
@@ -179,11 +184,11 @@ who, and the kind decides through what. That keeps one rule per question instead
 of a matrix, and it means adding a kind later cannot accidentally widen an
 existing rule.
 
-FR-ACC-024's other half — that a `BOT` reads only responses and submissions in
+The other half — that a `BOT` reads only responses and submissions in
 its owner's courses, which is *narrower* than its owner reads — is a read
 ceiling, and it has nothing to bite on yet: `ResponseService` and
 `SubmissionService` do not exist. The table above is the write half. The read
-half is declared in `06-grading.md` and enforced when those services land; this
+half is enforced when those services land; this
 spec does not pretend to cover it.
 
 ### `locals.actor` replaces the pun
@@ -249,8 +254,8 @@ no keys yet.
 `test/permissions.spec.ts`:
 
 - `credentialAllows` reproduces the table above in full — four kinds × four
-  surfaces, sixteen assertions. It is FR-ACC-022 transcribed, so it should read
-  like the requirement.
+  surfaces, sixteen assertions. It is the key-kind table transcribed, so it
+  should read like it.
 - **The regression this refactor exists for:** a `BotActor` whose `id` is the
   course's instructor is refused by `canWriteCourseContent`, and by every other
   content predicate the calendar and question specs add.
@@ -279,10 +284,10 @@ behaviour, the refactor has done something it should not have.
 
 ## Follow-up, not in this spec
 
-- **The bot read ceiling.** FR-ACC-022's read column needs `ResponseService` and
+- **The bot read ceiling.** A `BOT` key reads only responses and submissions in
+  its owner's courses. Enforcing that needs `ResponseService` and
   `SubmissionService` to exist before it can be enforced.
-- **Per-course bot binding.** `01-accounts-access.md` asks whether a `BOT` key
-  is scoped to one course or to all of its owner's; `kind` is the hook that
+- **Per-course bot binding.** Open question: is a `BOT` key scoped to one course or to all of its owner's; `kind` is the hook that
   question will hang on, and answering it now would be guessing.
 - **An audit log.** `(kind, authenticationKey, operation, outcome)` is now a
   complete row. Nothing writes it yet.

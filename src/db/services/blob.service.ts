@@ -376,10 +376,9 @@ export class BlobService {
 
 	/**
 	 * Serves the blob named by `hash`, behind both blob routes
-	 * (`/files/[hash]` and `/files/[hash]/[name]`) — see
-	 * No authentication check by design
-	 * (FR-NFR-030, amended): the URL is the content's own hash, and nothing
-	 * whose disclosure matters is meant to live in a resource (FR-NFR-032).
+	 * (`/files/[hash]` and `/files/[hash]/[name]`), with no authentication
+	 * check by design: the URL is the content's own hash, and nothing whose
+	 * disclosure matters is meant to live in a resource (dev/adr/0010-blobs-publicos-e-permanentes.md).
 	 *
 	 * `name` is the URL's decorative trailing segment, used as the
 	 * `Content-Disposition` filename when present — the page that links here
