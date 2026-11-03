@@ -141,6 +141,13 @@
 
 ### Fixed
 
+- The REST API answers broken business rules and unknown keys with a 4xx
+  instead of a 500: an overlapping, empty or past-midnight time slot and an
+  event on an unknown slot are 400 `invalid-data`; deleting a time slot with
+  events, or an edition or discipline with courses, is 409 `not-allowed`;
+  updating an unknown course, edition or discipline is 404. A `DELETE` under
+  a course that does not exist is 404 instead of `{ deleted: false }`, and
+  `POST /api/invite` takes the course by natural key only.
 - The readonly and review samples of multiple choice and multiple selection
   on `/design/questions` each keep their own pick: they render as islands,
   so their radios no longer share a `name` across questions.
