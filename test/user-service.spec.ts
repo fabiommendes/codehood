@@ -3,7 +3,7 @@ import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { hasPerm } from "@/auth/permissions";
-import { WeakPassword } from "@/core/error";
+import { NotAllowed, WeakPassword } from "@/core/error";
 import type { UserId } from "@/core/schemas";
 import { db } from "@/db";
 
@@ -442,7 +442,11 @@ test("updatePassword sets a password without the current one only for an admin; 
 
 	await expect(
 		db.user.updatePassword(owner, "taken-over-123", { actor: self }),
-	).rejects.toThrow();
+	).rejects.toBeInstanceOf(NotAllowed);
+	const kept = await db.user.findOne({ username: owner.username }, FULL_ACCESS);
+	expect(
+		await verifyPassword(kept?.passwordHash ?? "", "first-password-42"),
+	).toBe(true);
 
 	await db.user.changePassword(
 		owner,

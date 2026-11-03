@@ -141,6 +141,11 @@
 
 ### Fixed
 
+- `UserService.updatePassword`, which sets a password without the current
+  one, needs `user.reset-password`; a user could call it on their own
+  account. Responses, submissions and feedback check their `response.*`,
+  `submission.*` and `feedback.*` permission entries instead of local
+  copies of the rules, so a refusal carries the entry's audit target.
 - `CRUD()` asks the service for `create` and `upsert` only when the route has
   a create schema, so `rollCallApi` no longer casts its service to `never`
   and is type checked again. A route without a create schema no longer

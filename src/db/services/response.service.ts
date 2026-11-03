@@ -410,8 +410,10 @@ export class ResponseService extends CrudBase<{
 			);
 			const authorId = resolveAuthorId(input.author, scoped.actor);
 			if (
-				!isCourseOwner(scoped.actor, course) &&
-				(scoped.actor === SYSTEM || scoped.actor.username !== authorId)
+				!hasPerm(scoped.actor, "response.read", {
+					author: { username: authorId },
+					course,
+				})
 			) {
 				throw new NotFound("response");
 			}
