@@ -1,4 +1,17 @@
-# 0003. Tuner: calibrar a interface com o humano
+---
+type: adr
+status: accepted
+tags: [ui, dev, design]
+created: 2026-10-31
+decided: 2026-10-31
+---
+
+# Tuner: calibrar a interface com o humano
+
+Para calibrar valores visuais, o agente põe na página o painel
+`src/components/dev/Tuner.astro`, que expõe variáveis CSS como controles. O
+humano ajusta ao vivo e cola de volta o JSON gerado. O painel só renderiza no
+dev server e sai antes do commit.
 
 ## Contexto
 

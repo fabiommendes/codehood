@@ -36,7 +36,8 @@ humano aprovar a atual:
 
 1. **Banco**: modelos Prisma, com comentários `///` e cascatas.
 2. **Entidades**: schemas Zod em `src/core/schemas/`, métodos do service
-   além do CRUD. Siga `src/db/services/README.md`.
+   além do CRUD. Siga os ADRs 0004 a 0006 e o RFC
+   `dev/rfc/como-criar-e-escrever-um-service.md`.
 3. **REST e permissões**: tabela de rotas e tabela papel × ação.
 4. **Telas e fluxos**: uma linha por tela, com quem acessa e o que faz.
 5. **CLI**: o que muda em `cli/` (leia `cli/CLAUDE.md` antes).
@@ -142,8 +143,8 @@ Escolha do modelo por tarefa:
 
   | Se a tarefa toca             | Leia                                     |
   | :--------------------------- | :--------------------------------------- |
-  | `src/db/`, `src/core/schemas/` | `src/db/services/README.md`            |
-  | `src/api/`                   | `src/api/README.md`                      |
+  | `src/db/`, `src/core/schemas/` | ADRs 0004 a 0006, RFC `como-criar-e-escrever-um-service` |
+  | `src/api/`                   | ADRs 0007 e 0008, `src/api/README.md`    |
   | rotas e páginas de curso     | `src/urls/README.md`                     |
   | `src/commands/`              | `src/commands/README.md`                 |
   | `test/stories/`              | `test/stories/README.md`                 |

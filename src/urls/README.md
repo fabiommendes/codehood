@@ -80,7 +80,7 @@ page listing every edition of a discipline. Do not use it for anything else.
   `userSchema.username` stays a plain `z.string()` — it is also the `returns:`
   schema on four service methods, and an output validator's job is the shape,
   not re-checking a constraint already enforced on write
-  (`src/db/services/README.md`).
+  (ADR 0006, `dev/adr/0006-validacao-de-entrada-e-saida-nos-services.md`).
 - **Edition** — either a four-digit year, or a year and a term number joined by
   a hyphen: `2026`, `2026-1`, `2026-2`, `2026-0`. No leading zero on the term
   number, so `2026-1` and `2026-01` cannot both exist and point at different

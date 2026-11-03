@@ -15,7 +15,7 @@ export type ValidateOptions = {
 	/** True for methods of a service class.
 	 *
 	 * It assumes that the last parameter is a ServiceOpts object and method is async.
-	 * ServiceOpts.skipValidation is used to conditionally skip input and/or output validation.
+	 * `ServiceOpts.validate` turns input and/or output validation off.
 	 */
 	service?: boolean;
 

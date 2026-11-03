@@ -35,8 +35,8 @@ not yet applied) and **Open questions**.
 | `SYSTEM` | In-process | Everything; seeds, `manage`, internal transactions |
 
 `SYSTEM` is not a user. It is the sentinel actor for callers with no person
-behind them, and it bypasses the rules below by design — see
-`src/db/services/README.md`.
+behind them, and it bypasses the rules below by design — see ADR 0005
+(`dev/adr/0005-actor-obrigatorio-em-toda-chamada-de-service.md`).
 
 ## The shape of the system
 

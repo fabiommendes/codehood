@@ -155,7 +155,7 @@ uma por aluno.
 ### Service e permissões
 
 **R9.** `ExamExceptionService` em `src/db/services/exam-exception.service.ts`,
-seguindo `src/db/services/README.md`. Chave natural: `(course, exam, username)`.
+seguindo `dev/rfc/como-criar-e-escrever-um-service.md`. Chave natural: `(course, exam, username)`.
 Métodos: `create`, `findOne`, `findMany` (filtros `course`, `exam`,
 `username`), `update`, `upsert`, `delete`.
 
@@ -190,7 +190,7 @@ versão.
   (início–fim), nota, ações (editar, remover).
 - Botão "Adicionar exceção" que abre um diálogo com: aluno (select com os
   matriculados), tempo extra em minutos, nova data e hora (opcional), nota.
-  Formulário segundo `dev/adrs/` sobre forms (`src/forms/`).
+  Formulário segundo `dev/adr/` sobre forms (`src/forms/`).
 - Remover pede confirmação no próprio diálogo (sem `confirm()` do navegador).
 
 **R14.** Página da tentativa (`attempts/[username].astro`): mostra a exceção do

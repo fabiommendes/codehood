@@ -11,7 +11,7 @@ creator: Fábio Macêdo Mendes
 # `src/core/schemas/` repete schemas e usa sentinela no lugar de coluna nula
 
 A troca de `.optional()` por `.nullish()` nos campos de colunas anuláveis já
-foi feita, e a regra está em `src/db/services/README.md:78`. Restam dois
+foi feita, e a regra está no ADR 0006. Restam dois
 problemas.
 
 ## 1. `passphraseCreate` e `passphraseUpdate` são reescritos em vez de derivados
@@ -40,3 +40,17 @@ bancos recusam nulos repetidos em `@unique`; o SQLite aceita.
 - Obtido: sentinela em todo caminho de leitura e escrita de usuário.
 
 Exige migração.
+
+---
+by: claude
+
+Achados ao escrever o ADR 0006:
+
+- Schemas de entrada redigitados com `z.object` em vez de derivados:
+  `enrollment.ts:26`, `blob.ts:26`, `passphrase.ts:14` e `:20`,
+  `session.ts:13`, `repository.ts:59`, `invite.ts:78` (`inviteUpdate`),
+  `report.ts:87` e `:123`.
+- `reportUpdate.status` e `reportUpdate.kind` são `.nullish()` (`report.ts:124`)
+  sobre colunas não anuláveis: um `null` chega ao Prisma e falha.
+- `inviteUpdate.maxUses` usa `.nullable().optional()` (`invite.ts:81`), mesmo
+  efeito de `.nullish()` mas fora da forma da regra.

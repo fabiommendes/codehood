@@ -115,7 +115,7 @@ correção mostra o pedido aberto junto da resposta (R11).
 ### Service e permissões
 
 **R7.** `RegradeRequestService` em `src/db/services/regrade-request.service.ts`,
-seguindo `src/db/services/README.md`. Chave natural: `publicId`. Métodos:
+seguindo `dev/rfc/como-criar-e-escrever-um-service.md`. Chave natural: `publicId`. Métodos:
 `create` (aluno), `findOne`, `findMany` (filtros `course`, `exam`, `status`,
 `author`), `delete` (retirar), mais `accept` e `reject`. `update` e `upsert`
 ficam como stubs `never`.

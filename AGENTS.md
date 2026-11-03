@@ -27,7 +27,8 @@ Here are some files and folders agents might be interested in:
 | `dev/specs/to-do/*.md`     | Detailed guidelines for implementation of specific features.                          |
 | `dev/specs/to-review/*.md` | Specs that are ready for review before implementation.                                |
 | `dev/issues/*.md`          | Store issues and bugs. Once fixed, register in the changelog and delete the file.     |
-| `dev/adrs/*.md`            | Short architecture decisions; how to use a cross-cutting API (e.g. forms).            |
+| `dev/adr/*.md`             | Short architecture decisions; how to use a cross-cutting API (e.g. forms).            |
+| `dev/rfc/*.md`             | Designs under discussion, and accepted best practices (e.g. how to write a Service).  |
 | `src/api/`                 | Implements controllers for the REST API.                                              |
 | `src/actions/`             | Implements Astro Actions.                                                             |
 | `src/auth/`                | Authentication and authorization. Permission rules.                                   |
@@ -53,7 +54,7 @@ Code that does not read or write the database stays out of `src/db/`, even when
 it works on entities: domain rules (grading, exam results) go to
 `src/services/`, generic helpers to `src/utils/`.
 
-[^readme]: Currently it exists at `src/api/`, `src/urls/`, `src/db/services/`, `src/commands/`, `test/stories/`.
+[^readme]: Currently it exists at `src/api/`, `src/urls/`, `src/commands/`, `test/stories/`.
 
 ## Workflow
 
@@ -226,7 +227,7 @@ glossary. Add in alphabetical order.
 Input schemas constrain values, output schemas constrain shape. Keep the
 `returns:` validators — they whitelist what leaves a service — but do not
 repeat a format rule there that the create/update schema already enforces. See
-`src/db/services/README.md`.
+ADR 0006 (`dev/adr/0006-validacao-de-entrada-e-saida-nos-services.md`).
 
 ## Skills
 

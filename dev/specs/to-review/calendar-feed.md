@@ -58,7 +58,7 @@ leitura do calendário. Gerado com `generateToken()` de `src/auth/token.ts`
 ### Service
 
 **R4.** `CalendarFeedService` em `src/db/services/calendar-feed.service.ts`,
-seguindo `src/db/services/README.md`, com:
+seguindo `dev/rfc/como-criar-e-escrever-um-service.md`, com:
 
 - `get(username, opts)`: o feed do usuário ou `null`.
 - `rotate(username, opts)`: cria o feed se não existe, ou troca o token se

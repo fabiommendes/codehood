@@ -15,7 +15,7 @@ campos, validação e mensagens de erro dos schemas zod que o projeto já tem, s
 adotar uma biblioteca de formulários.
 
 A API que os formulários usam está em
-[`dev/adrs/0001-formularios-por-schema.md`](../../adrs/0001-formularios-por-schema.md),
+[`dev/adr/0001-formularios-por-schema.md`](../../adr/0001-formularios-por-schema.md),
 e este spec segue os nomes de lá (`formState`, `createSchemaForm`, `Field`,
 `FormAlert`, `FieldError`).
 
