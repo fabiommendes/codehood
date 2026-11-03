@@ -64,3 +64,6 @@ prompt/
 # impeccable session state (critiques are kept)
 /.impeccable/hook.cache.json
 /.impeccable/live/
+
+# disposable copies of seed repositories (pnpm run db:seed:cli)
+tmp/

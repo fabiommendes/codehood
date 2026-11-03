@@ -4,6 +4,13 @@
 
 ### Added
 
+- `pnpm run db:seed:cli` pushes a full course, `pyxel101` (Python and games
+  with Pyxel, 16 weeks), with `ch push` as `ada`, from a copy in
+  `tmp/pyxel101/` with the edition and dates moved to the seed's current
+  term. The course is written as an instructor would want it, so the push
+  reports what Codehood cannot do yet; `cli/seed/GAPS.md` records each gap.
+  The seed now creates the `pyxel101` discipline and a fixed CLI key for
+  `ada`, `dev-ada-cli`.
 - English and Brazilian Portuguese UI: every interface string comes from the
   Paraglide catalogue (`messages/en/`, `messages/pt-BR/`, exposed by
   `src/i18n/`), and the locale is fixed per installation at build time

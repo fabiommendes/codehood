@@ -29,6 +29,7 @@
 		"release": "tsx scripts/release.ts",
 		"package": "tsx scripts/package.ts",
 		"db:reset": "rm -f dev.db && prisma db push && prisma db seed",
+		"db:seed:cli": "tsx scripts/seed-cli.ts",
 		"db:generate": "prisma generate && tsx scripts/brand-generated-types.ts",
 		"test": "tsx test/run.ts",
 		"test-e2e": "tsx test/run.ts",

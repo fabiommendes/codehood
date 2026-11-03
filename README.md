@@ -55,6 +55,7 @@ Then use one of the following, depending on what you want to do:
 | `pnpm run lint`      | Run linter, typecheck, and story coverage   |
 | `pnpm run manage`    | Run management CLI commands                 |
 | `pnpm run db:reset`  | Reset the dev database and re-seed          |
+| `pnpm run db:seed:cli` | Push the `pyxel101` course with `ch push` |
 | `pnpm run clear`     | Reset the project to a freshly-cloned state |
 
 ### Environment variables
@@ -98,6 +99,11 @@ machine's value is what ships, not the deployed machine's.
 
 Demo accounts are never created by a request. They come from
 `pnpm run db:seed` (and the test runner), and only when `ENVIRONMENT=dev`.
+
+`pnpm run db:seed:cli` adds a full course, `pyxel101/ada_<edition>`, through the
+CLI rather than the services: it copies `cli/seed/pyxel101/` to `tmp/pyxel101/`
+and runs `ch push` there as `ada`. The dev server must be running. See
+`cli/seed/README.md`.
 
 `pnpm run clear` deletes every generated artifact — `node_modules/`, the Prisma
 client, the Astro cache, builds, test output, `dev.db` and the `storage/`

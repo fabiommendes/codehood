@@ -1,5 +1,6 @@
 import { deflateSync } from "node:zlib";
 import { FULL_ACCESS } from "@/auth/actor";
+import { hashToken } from "@/auth/token";
 import { DEVELOPMENT } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
 import { prisma } from "@/db/client";
@@ -21,6 +22,8 @@ const DEV_STUDENT_USERNAME = "student";
 const DEV_STUDENT_EMAIL = "student@codehood.local";
 /// Fixed so the dev student's calendar URL works right after a reset.
 const DEV_STUDENT_FEED_TOKEN = "dev-student-calendar";
+/// Fixed so the CLI can authenticate as `ada` right after a reset.
+export const DEV_ADA_CLI_TOKEN = "dev-ada-cli";
 
 let devAdminPromise: Promise<void> | null = null;
 
@@ -172,6 +175,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	for (const discipline of [
 		{ slug: "cs101", name: "Introduction to Programming" },
 		{ slug: "cs201", name: "Data Structures" },
+		// Has no course here: `pnpm run db:seed:cli` creates it with `ch push`.
+		{ slug: "pyxel101", name: "Introdução à Programação com Python e Jogos" },
 	]) {
 		await db.discipline.create(discipline, FULL_ACCESS);
 	}
@@ -266,6 +271,18 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await prisma.calendarFeed.create({
 		data: { username: DEV_STUDENT_USERNAME, token: DEV_STUDENT_FEED_TOKEN },
+	});
+
+	// Written straight to the table, like the feed above: the service mints
+	// its own random token.
+	await prisma.apiKey.create({
+		data: {
+			publicId: "dev-ada-cli",
+			keyHash: hashToken(DEV_ADA_CLI_TOKEN),
+			name: "Dev CLI",
+			kind: "CLI",
+			createdById: ada.username,
+		},
 	});
 
 	// One resource of each type, so /resources has something real to show.
