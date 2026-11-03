@@ -141,6 +141,10 @@
 
 ### Fixed
 
+- A page whose island throws while the server renders it answers 500 with
+  the error page, instead of a response the browser waits on until it times
+  out. HTML pages are rendered in full before they are sent, so they are no
+  longer streamed.
 - `UserService.updatePassword`, which sets a password without the current
   one, needs `user.reset-password`; a user could call it on their own
   account. Responses, submissions and feedback check their `response.*`,
