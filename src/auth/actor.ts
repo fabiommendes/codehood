@@ -27,6 +27,7 @@ export interface UserActor extends Pick<User, "role" | "username" | "name"> {}
  * A symbol so it can never arrive by accident from parsed JSON or a
  * forgotten variable — writing `SYSTEM` is a decision you can see in a diff.
  */
+// r2: adr-0005
 export const SYSTEM = Symbol("system");
 
 /**

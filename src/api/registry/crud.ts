@@ -111,6 +111,7 @@ export type CrudRouteOptions<
  *    by the findOne, update and delete operations.
  *
  */
+// r2: adr-0007
 export function CRUD<
 	Entity,
 	CreateSchema extends ZodType | null,

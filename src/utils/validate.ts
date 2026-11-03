@@ -56,6 +56,7 @@ type This = any;
  *
  * @param options - The validation options. See {@link ValidateOptions}.
  */
+// r2: adr-0006
 export function Validate(options: ValidateOptions) {
 	const argSchemas = options.args ?? [];
 	const hasArgSchemas = argSchemas.some((schema) => schema !== undefined);

@@ -15,6 +15,7 @@ import { courseRefWhere, valueOrNotFound } from "./utils";
 /**
  * Common set of options for service methods. `tx` is optional, but `actor` is required.
  */
+// r2: adr-0005
 export type ServiceOpts = {
 	tx?: PrismaTx;
 	actor: Actor;
@@ -212,6 +213,7 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
  * Document the private Tx variants as if they were the public CRUD methods
  * themselves.
  */
+// r2: adr-0004
 export class CrudBase<
 	T extends CrudT<unknown, unknown, unknown, unknown, unknown>,
 > implements

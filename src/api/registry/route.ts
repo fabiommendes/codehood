@@ -213,6 +213,7 @@ export function route<In, Out, IsPublic extends boolean = false>(
 			// `actor: undefined`, which typically blows up as an unhandled
 			// TypeError deep in a service and surfaces as a bare 500 instead of
 			// the 401 the client needs to distinguish "log in" from "we're broken".
+			// r2: adr-0008
 			if (!options.isPublic && !user) {
 				throw new NotAllowed("auth.authenticated", {
 					message: m.errors_authentication_required(),
