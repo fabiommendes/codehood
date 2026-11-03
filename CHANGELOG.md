@@ -141,6 +141,9 @@
 
 ### Fixed
 
+- Two concurrent upserts of the same new course or resource (two `PUT`s at
+  once) no longer fail on the unique index: the upsert runs in one
+  transaction, so the second one updates the row the first one created.
 - `/getting-started` follows the CLI as it is: install, `codehood init`,
   `codehood login` (or a key generated on the page and pasted into
   `~/.codehood/credentials.toml`), the course files and `codehood push`, with
