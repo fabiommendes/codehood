@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { ensurePerm } from "@/auth/permissions";
-import { FieldError, InvalidData } from "@/core/error";
+import { FieldError, InvalidData, NotAllowed, NotFound } from "@/core/error";
 import {
 	editionCreate,
 	editionFilter,
@@ -132,7 +132,10 @@ export class EditionService
 			where: { slug: filter.slug },
 		});
 		if (!current) {
-			throw new Error(m.errors_edition_not_found({ slug: filter.slug }));
+			throw new NotFound("edition", {
+				id: filter.slug,
+				message: m.errors_edition_not_found({ slug: filter.slug }),
+			});
 		}
 		assertWindow(
 			fields.startAt ?? current.startAt,
@@ -193,9 +196,13 @@ export class EditionService
 			where: { editionSlug: filter.slug },
 		});
 		if (courses > 0) {
-			throw new Error(
-				m.errors_edition_has_courses({ slug: filter.slug, count: courses }),
-			);
+			throw new NotAllowed("edition.delete", {
+				status: 409,
+				message: m.errors_edition_has_courses({
+					slug: filter.slug,
+					count: courses,
+				}),
+			});
 		}
 		await client.edition.deleteMany({ where: { slug: filter.slug } });
 	}

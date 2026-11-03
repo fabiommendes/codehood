@@ -6,7 +6,7 @@
  */
 import type { z } from "zod";
 import { hasPerm } from "@/auth/permissions";
-import { NotAllowed } from "@/core/error";
+import { InvalidData, NotAllowed } from "@/core/error";
 import {
 	type CourseId,
 	type courseNaturalKey,
@@ -282,12 +282,13 @@ export class TimeSlotService extends CrudBase<{
 			where: { timeSlotId: current.id },
 		});
 		if (eventCount > 0) {
-			throw new Error(
-				m.errors_time_slot_has_events({
+			throw new NotAllowed("time-slot.delete", {
+				status: 409,
+				message: m.errors_time_slot_has_events({
 					slug: current.slug,
 					count: eventCount,
 				}),
-			);
+			});
 		}
 		await tx.timeSlot.delete({ where: { id: current.id } });
 	}
@@ -378,13 +379,23 @@ async function writableSlot(
 	return slot;
 }
 
-/** A slot lasts at least a minute and does not run past midnight. */
+/**
+ * Refuses a slot shorter than a minute or one that runs past midnight.
+ *
+ * @throws {@link InvalidData} On `duration` or `start`.
+ */
 function validateWindow(startMin: number, durationMin: number): void {
 	if (durationMin <= 0) {
-		throw new Error(m.errors_time_slot_duration_positive());
+		throw new InvalidData({
+			duration: [
+				{ code: "invalid", message: m.errors_time_slot_duration_positive() },
+			],
+		});
 	}
 	if (startMin + durationMin > 1440) {
-		throw new Error(m.errors_time_slot_past_midnight());
+		throw new InvalidData({
+			start: [{ code: "invalid", message: m.errors_time_slot_past_midnight() }],
+		});
 	}
 }
 
@@ -401,6 +412,8 @@ function minutesOverlap(
 /**
  * Refuses a slot that overlaps a sibling on the same weekday in the same
  * course. `excludeId` lets an update or upsert's own row through.
+ *
+ * @throws {@link InvalidData} On `start`.
  */
 async function assertNoOverlap(
 	tx: PrismaTx,
@@ -422,7 +435,14 @@ async function assertNoOverlap(
 		minutesOverlap(startMin, durationMin, s.startMin, s.durationMin),
 	);
 	if (collision) {
-		throw new Error(m.errors_time_slot_overlap({ slug: collision.slug, day }));
+		throw new InvalidData({
+			start: [
+				{
+					code: "invalid",
+					message: m.errors_time_slot_overlap({ slug: collision.slug, day }),
+				},
+			],
+		});
 	}
 }
 

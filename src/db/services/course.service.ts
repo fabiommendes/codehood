@@ -240,8 +240,7 @@ export class CourseService
 		fields: CourseUpdate,
 		opts: ServiceOpts,
 	): Promise<Course> {
-		const target = await this.loadRow(filter, opts);
-		if (!target) throw new Error("course not found");
+		const target = valueOrNotFound("course", await this.loadRow(filter, opts));
 		if (!hasPerm(opts.actor, "course.update", target))
 			throw new NotAllowed("course.update");
 
@@ -292,8 +291,6 @@ export class CourseService
 	@Validate({ service: true, args: [coursePK] })
 	async delete(filter: CoursePK, opts: ServiceOpts): Promise<void> {
 		const target = valueOrNotFound("course", await this.loadRow(filter, opts));
-
-		if (!target) throw new Error("course not found");
 		if (!hasPerm(opts.actor, "course.delete", target))
 			throw new NotAllowed("course.delete");
 

@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { Actor } from "@/auth/actor";
 import { ensurePerm } from "@/auth/permissions";
-import { FieldError } from "@/core/error";
+import { FieldError, NotAllowed, NotFound } from "@/core/error";
 import {
 	disciplineCreate,
 	disciplineFilter,
@@ -135,7 +135,10 @@ export class DisciplineService
 			where: { slug: filter.slug },
 		});
 		if (!current) {
-			throw new Error(m.errors_discipline_not_found({ slug: filter.slug }));
+			throw new NotFound("discipline", {
+				id: filter.slug,
+				message: m.errors_discipline_not_found({ slug: filter.slug }),
+			});
 		}
 		return client.discipline.update({
 			where: { slug: filter.slug },
@@ -182,9 +185,13 @@ export class DisciplineService
 			where: { disciplineSlug: filter.slug },
 		});
 		if (courses > 0) {
-			throw new Error(
-				m.errors_discipline_has_courses({ slug: filter.slug, count: courses }),
-			);
+			throw new NotAllowed("discipline.delete", {
+				status: 409,
+				message: m.errors_discipline_has_courses({
+					slug: filter.slug,
+					count: courses,
+				}),
+			});
 		}
 		await client.discipline.deleteMany({ where: { slug: filter.slug } });
 	}

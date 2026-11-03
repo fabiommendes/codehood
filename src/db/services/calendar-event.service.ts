@@ -103,12 +103,17 @@ export class CalendarEventService extends CrudBase<{
 		});
 
 		if (!slot || slot.courseId !== course.id) {
-			throw new Error(
-				m.errors_time_slot_wrong_course({
-					slot: String(input.timeSlot),
-					course: course.id,
-				}),
-			);
+			throw new InvalidData({
+				timeSlot: [
+					{
+						code: "not-exists",
+						message: m.errors_time_slot_wrong_course({
+							slot: String(input.timeSlot),
+							course: course.id,
+						}),
+					},
+				],
+			});
 		}
 
 		const timestamp = slotInstant(
@@ -288,12 +293,17 @@ export class CalendarEventService extends CrudBase<{
 					: { courseId: course.id, slug: input.timeSlot },
 		});
 		if (!slot || slot.courseId !== course.id) {
-			throw new Error(
-				m.errors_time_slot_wrong_course({
-					slot: String(input.timeSlot),
-					course: course.id,
-				}),
-			);
+			throw new InvalidData({
+				timeSlot: [
+					{
+						code: "not-exists",
+						message: m.errors_time_slot_wrong_course({
+							slot: String(input.timeSlot),
+							course: course.id,
+						}),
+					},
+				],
+			});
 		}
 
 		const existing = await tx.calendarEvent.findUnique({

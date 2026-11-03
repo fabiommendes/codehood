@@ -15,7 +15,10 @@ import type {
 	Update,
 	Upsert,
 } from "@/db/base-service";
+import { prisma } from "@/db/client";
+import { courseRefWhere, valueOrNotFound } from "@/db/utils";
 import { m } from "@/i18n";
+import { parseCourseParams } from "@/urls";
 import { coerceForSchema } from "@/utils/query-coerce";
 import { slugify } from "@/utils/slugify";
 import { DELETE, GET, PATCH, POST, PUT } from "./route";
@@ -446,6 +449,7 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 			await this.service.delete(key, { actor });
 		} catch (error) {
 			if (error instanceof NotFound) {
+				await this.assertScopeExists(params);
 				deleted = false;
 				message = m.errors_not_present({ name: this.name });
 			} else throw error;
@@ -456,6 +460,21 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 			message,
 			deleted,
 		};
+	}
+
+	/// Throws `NotFound` when the route lives under a course that does not
+	/// exist, so a missing parent is not mistaken for a missing entity.
+	private async assertScopeExists(
+		params: Record<string, string>,
+	): Promise<void> {
+		if (!this.path.startsWith("/api/course/[discipline]/[course]/")) return;
+		valueOrNotFound(
+			"course",
+			await prisma.course.findUnique({
+				where: courseRefWhere(parseCourseParams(params)),
+				select: { id: true },
+			}),
+		);
 	}
 
 	/**

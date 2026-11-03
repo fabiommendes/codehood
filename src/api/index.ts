@@ -268,9 +268,15 @@ export const inviteApi = CRUD("/api/invite", {
 	plural: "Invites",
 	keySegment: "/[publicId]",
 	entity: schema.inviteSchema.omit({ id: true, courseId: true }),
-	create: schema.inviteCreate,
+	// Over the API a course is only ever named by its natural key; the service
+	// itself still accepts the raw id too, e.g. from pages.
+	create: schema.inviteCreate.safeExtend({
+		course: schema.courseNaturalKey.optional(),
+	}),
 	update: null,
-	filter: schema.inviteFilter,
+	filter: schema.inviteFilter.extend({
+		course: schema.courseNaturalKey.optional(),
+	}),
 	key: schema.invitePK,
 	tags: ["Invites"],
 	service: db.invite,
