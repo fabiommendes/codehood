@@ -141,6 +141,10 @@
 
 ### Fixed
 
+- `CRUD()` asks the service for `create` and `upsert` only when the route has
+  a create schema, so `rollCallApi` no longer casts its service to `never`
+  and is type checked again. A route without a create schema no longer
+  registers a `PUT`.
 - Two concurrent upserts of the same new course or resource (two `PUT`s at
   once) no longer fail on the unique index: the upsert runs in one
   transaction, so the second one updates the row the first one created.
