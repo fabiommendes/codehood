@@ -277,9 +277,12 @@ export class UserService extends CrudBase<{
 
 	// TODO: this method should be moved to the auth service.
 	/**
-	 * Update password for a user.
+	 * Sets a user's password without proof of the current one.
 	 *
-	 * Returns the password hash.
+	 * Returns the password hash. A user changes their own password through
+	 * `changePassword`, which proves the current one.
+	 *
+	 * @throws NotAllowed when the actor lacks `user.reset-password`.
 	 */
 	@Validate({ service: true, args: [userSchema] })
 	async updatePassword(
@@ -287,8 +290,16 @@ export class UserService extends CrudBase<{
 		password: string,
 		opts: ServiceOpts,
 	): Promise<{ hash: string }> {
-		ensurePerm(opts.actor, "user.update", user);
+		ensurePerm(opts.actor, "user.reset-password");
+		return this.writePassword(user, password, opts);
+	}
 
+	/// Checks the strength of `password` and stores its hash, with no permission check.
+	private async writePassword(
+		user: User,
+		password: string,
+		opts: ServiceOpts,
+	): Promise<{ hash: string }> {
 		await assertPasswordStrength(user.username, password, opts);
 
 		const client = opts.tx ?? this.prisma;
@@ -330,7 +341,7 @@ export class UserService extends CrudBase<{
 			});
 		}
 
-		await this.updatePassword(user, input.newPassword, opts);
+		await this.writePassword(user, input.newPassword, opts);
 		await sessions.delete({ username: user.username }, opts);
 	}
 

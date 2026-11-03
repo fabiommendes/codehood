@@ -488,18 +488,9 @@ function canReadFeedback(actor: Actor, row: DbFeedback, now: Date): boolean {
 /// Whether `actor` may read a submission whose response resolved to `response`.
 function hasSubmissionReadAccess(
 	actor: Actor,
-	response: {
-		authorId: string;
-		exam: {
-			course: {
-				instructor: { username: string };
-				enrollments: { username: string }[];
-			};
-		};
-	},
+	response: Parameters<typeof responseTargetFrom>[0],
 ): boolean {
-	if (isCourseOwner(actor, response.exam.course)) return true;
-	return actor !== SYSTEM && actor.username === response.authorId;
+	return hasPerm(actor, "submission.read", responseTargetFrom(response));
 }
 
 /**
@@ -631,9 +622,15 @@ async function writableFeedback(
 	});
 	if (!row) throw new NotFound("feedback");
 
-	if (isCourseOwner(actor, row.submission.response.exam.course)) return row;
-	if (!canReadFeedback(actor, row, new Date())) throw new NotFound("feedback");
-	throw new NotAllowed(action);
+	const target = responseTargetFrom(row.submission.response);
+	if (
+		!hasPerm(actor, action, target) &&
+		!canReadFeedback(actor, row, new Date())
+	) {
+		throw new NotFound("feedback");
+	}
+	ensurePerm(actor, action, target);
+	return row;
 }
 
 /// The minimal relation `fromDb` needs to fill in the pass's public reference

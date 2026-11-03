@@ -590,6 +590,20 @@ test("create()/update()/upsert()/delete(): the owning instructor and SYSTEM may 
 	await expect(
 		db.feedback.delete({ id: feedback.id }, { actor: author }),
 	).rejects.toBeInstanceOf(NotAllowed);
+	// Refused by the `feedback.*` entries of the permission registry, which
+	// record the response's author on the error.
+	for (const write of [
+		db.feedback.update(
+			{ id: feedback.id },
+			{ score: "0.5" },
+			{ actor: author },
+		),
+		db.feedback.delete({ id: feedback.id }, { actor: author }),
+	]) {
+		await expect(write).rejects.toMatchObject({
+			target: { author: author.username },
+		});
+	}
 
 	// A peer, another instructor and a non-owning admin cannot even read the
 	// submission this feedback grades, so every write is NotFound.

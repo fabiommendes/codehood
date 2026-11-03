@@ -8,7 +8,11 @@
  */
 import type { z } from "zod";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
-import { ensurePerm, hasPerm } from "@/auth/permissions";
+import {
+	ensurePerm,
+	hasPerm,
+	type ResponseWithCourse,
+} from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { PRACTICE_SESSION_WINDOW_MS } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
@@ -335,9 +339,7 @@ export class ResponseService extends CrudBase<{
 
 		// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
 		if (input.acceptingSubmissions && !row.acceptingSubmissions) {
-			if (!isCourseOwner(opts.actor, row.exam.course)) {
-				throw new NotAllowed("response.update");
-			}
+			ensurePerm(opts.actor, "response.update", responseTarget(row));
 			await assertReopenable(tx, row);
 		}
 
@@ -581,21 +583,27 @@ function restrictToAuthor(
 	return username;
 }
 
-/// Whether `actor` may read a response row fetched with `responseInclude`.
-function hasReadAccess(
-	actor: Actor,
-	row: {
-		authorId: string;
-		exam: {
-			course: {
-				instructor: { username: string };
-				enrollments: { username: string }[];
-			};
+/// The `response.*` permission target of a row fetched with `responseInclude`.
+function responseTarget(row: {
+	id: number;
+	authorId: string;
+	exam: {
+		course: {
+			instructor: { username: string };
+			enrollments: { username: string }[];
 		};
-	},
-): boolean {
-	if (isCourseOwner(actor, row.exam.course)) return true;
-	return actor !== SYSTEM && actor.username === row.authorId;
+	};
+}): ResponseWithCourse {
+	return {
+		id: row.id,
+		author: { username: row.authorId },
+		course: row.exam.course,
+	};
+}
+
+/// Whether `actor` may read a response row fetched with `responseInclude`.
+function hasReadAccess(actor: Actor, row: DbResponse): boolean {
+	return hasPerm(actor, "response.read", responseTarget(row));
 }
 
 /**
@@ -616,9 +624,12 @@ async function writableResponse(
 	});
 	if (!row) throw new NotFound("response");
 
-	if (isCourseOwner(actor, row.exam.course)) return row;
-	if (!hasReadAccess(actor, row)) throw new NotFound("response");
-	throw new NotAllowed(action);
+	const target = responseTarget(row);
+	if (!hasPerm(actor, action, target) && !hasReadAccess(actor, row)) {
+		throw new NotFound("response");
+	}
+	ensurePerm(actor, action, target);
+	return row;
 }
 
 /// Resolves the author for a write, defaulting to the actor.

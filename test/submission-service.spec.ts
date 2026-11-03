@@ -368,6 +368,20 @@ test("update()/delete(): the author may read but not write, so gets NotAllowed; 
 	await expect(
 		db.submission.delete({ publicId: submission.publicId }, { actor: author }),
 	).rejects.toBeInstanceOf(NotAllowed);
+	// Refused by the `submission.*` entries of the permission registry, which
+	// record the response's author on the error.
+	for (const write of [
+		db.submission.update(
+			{ publicId: submission.publicId },
+			{ status: "WILL_NOT_GRADE" },
+			{ actor: author },
+		),
+		db.submission.delete({ publicId: submission.publicId }, { actor: author }),
+	]) {
+		await expect(write).rejects.toMatchObject({
+			target: { author: author.username },
+		});
+	}
 
 	for (const actor of [peer, otherInstructor, admin]) {
 		await expect(

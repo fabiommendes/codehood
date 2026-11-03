@@ -374,6 +374,10 @@ const PERMISSIONS = {
 	// Rule: the public half goes to whoever may write the question, or, once
 	// `PUBLISHED`, to whoever may see the course's contents; a draft or
 	// archived question is its author's alone.
+	//
+	// No service calls this entry: `QuestionService.findOneTx` hides a draft
+	// or archived question as missing rather than refused, and still shows an
+	// archived one an exam pins, which this rule cannot express.
 	"question.read-public": {
 		other: (actor, target) =>
 			isCourseOwner(actor, target.course) ||

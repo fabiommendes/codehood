@@ -8,7 +8,11 @@
  */
 import type { z } from "zod";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
-import { ensurePerm } from "@/auth/permissions";
+import {
+	ensurePerm,
+	hasPerm,
+	type ResponseWithCourse,
+} from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { CourseRef, ExamId, SubmissionId } from "@/core/schemas";
@@ -177,10 +181,7 @@ export class SubmissionService extends CrudBase<{
 		// may read but not write to (e.g. its author, no longer enrolled) is
 		// `NotAllowed`.
 		if (!hasReadAccess(opts.actor, response)) throw new NotFound("response");
-		ensurePerm(opts.actor, "submission.create", {
-			author: { username: response.authorId },
-			course: response.exam.course,
-		});
+		ensurePerm(opts.actor, "submission.create", submissionTarget(response));
 
 		assertAcceptingSubmissions(
 			response,
@@ -411,10 +412,17 @@ function isCourseOwner(
 	return actor.username === course.instructor.username;
 }
 
+/// The `submission.*` permission target of the response a submission belongs to.
+function submissionTarget(response: ResponseTarget): ResponseWithCourse {
+	return {
+		author: { username: response.authorId },
+		course: response.exam.course,
+	};
+}
+
 /// Whether `actor` may read a submission whose response resolved to `response`.
 function hasReadAccess(actor: Actor, response: ResponseTarget): boolean {
-	if (isCourseOwner(actor, response.exam.course)) return true;
-	return actor !== SYSTEM && actor.username === response.authorId;
+	return hasPerm(actor, "submission.read", submissionTarget(response));
 }
 
 /**
@@ -457,9 +465,12 @@ async function writableSubmission(
 	});
 	if (!row) throw new NotFound("submission");
 
-	if (isCourseOwner(actor, row.response.exam.course)) return row;
-	if (!hasReadAccess(actor, row.response)) throw new NotFound("submission");
-	throw new NotAllowed(action);
+	const target = submissionTarget(row.response);
+	if (!hasPerm(actor, action, target) && !hasReadAccess(actor, row.response)) {
+		throw new NotFound("submission");
+	}
+	ensurePerm(actor, action, target);
+	return row;
 }
 
 /**

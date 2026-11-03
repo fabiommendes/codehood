@@ -248,7 +248,11 @@ export class QuestionService extends CrudBase<{
 
 		if (!row) return null;
 
-		const full = hasPerm(opts.actor, "course.update-contents", row.course);
+		const full = hasPerm(opts.actor, "question.read", {
+			id: row.id,
+			status: row.status,
+			course: row.course,
+		});
 
 		// Refused before the status check, so an outsider cannot tell a hidden
 		// slug from a missing one.

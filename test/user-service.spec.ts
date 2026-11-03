@@ -424,3 +424,48 @@ test("a weak password is refused with WeakPassword on newPassword, naming each i
 		expect.arrayContaining([expect.objectContaining({ code: "too-common" })]),
 	);
 });
+
+test("updatePassword sets a password without the current one only for an admin; the owner goes through changePassword", async () => {
+	const owner = await db.user.create(
+		{
+			email: "update-password@codehood.test",
+			username: "updatepassword",
+			name: "Update Password",
+			role: "STUDENT",
+			password: "first-password-42",
+			githubId: "updatepassword",
+			schoolId: "updatepassword",
+		},
+		FULL_ACCESS,
+	);
+	const self = actorOf(owner.username, "STUDENT");
+
+	await expect(
+		db.user.updatePassword(owner, "taken-over-123", { actor: self }),
+	).rejects.toThrow();
+
+	await db.user.changePassword(
+		owner,
+		{ currentPassword: "first-password-42", newPassword: "second-pass-4242" },
+		{ actor: self },
+	);
+	const changed = await db.user.findOne(
+		{ username: owner.username },
+		FULL_ACCESS,
+	);
+	expect(
+		await verifyPassword(changed?.passwordHash ?? "", "second-pass-4242"),
+	).toBe(true);
+
+	// biome-ignore lint/style/noNonNullAssertion: found just above.
+	await db.user.updatePassword(changed!, "third-pass-424242", {
+		actor: actorOf("some-admin", "ADMIN"),
+	});
+	const reset = await db.user.findOne(
+		{ username: owner.username },
+		FULL_ACCESS,
+	);
+	expect(
+		await verifyPassword(reset?.passwordHash ?? "", "third-pass-424242"),
+	).toBe(true);
+});
