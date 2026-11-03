@@ -420,3 +420,32 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 	);
 	expect(createdByAdmin.edition.slug).toBe(closedSlug);
 });
+
+test("two concurrent upserts of a new course both succeed on one row", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const disciplineSlug = await makeDiscipline();
+	const editionSlug = await ensureEdition();
+	const input = (description: string) => ({
+		discipline: disciplineSlug,
+		instructor: instructor.username,
+		edition: editionSlug,
+		description,
+		startAt: new Date("2026-01-01"),
+		endAt: new Date("2026-05-01"),
+	});
+
+	const [a, b] = await Promise.all([
+		db.course.upsert(input("a"), FULL_ACCESS),
+		db.course.upsert(input("b"), FULL_ACCESS),
+	]);
+	expect(a.id).toBe(b.id);
+	const rows = await db.course.findMany(
+		{
+			discipline: disciplineSlug,
+			instructor: instructor.username,
+			edition: editionSlug,
+		},
+		FULL_ACCESS,
+	);
+	expect(rows).toHaveLength(1);
+});

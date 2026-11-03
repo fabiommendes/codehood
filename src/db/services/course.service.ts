@@ -267,6 +267,7 @@ export class CourseService
 	async upsert(input: CourseCreate, opts: ServiceOpts): Promise<Course> {
 		return upsert(this, input, {
 			...opts,
+			client: this.prisma,
 			action: "course.create",
 			pk: (i) => ({
 				discipline: i.discipline,

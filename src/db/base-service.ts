@@ -117,10 +117,11 @@ export interface Crud<
 //
 
 /**
- * Runs a `findOne`-then-`create`-or-`update` upsert.
+ * Runs a `findOne`-then-`create`-or-`update` upsert in one transaction.
  *
- * It opens no transaction of its own: the steps run on `opts.tx` when the
- * caller passes one, and otherwise as separate statements.
+ * The steps run on `opts.tx` when the caller passes one, and otherwise in a
+ * transaction opened on `client`, so two upserts of the same new key cannot
+ * both miss the row and both create it.
  */
 export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 	service: Crud<{
@@ -132,6 +133,9 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 	}>,
 	input: In,
 	args: ServiceOpts & {
+		/// The service's client, used to open a transaction when `tx` is absent.
+		client: PrismaClient | PrismaTx;
+
 		// The natural key the upsert is keyed on. Never `id`.
 		pk: (input: In) => PkFilter;
 
@@ -154,6 +158,12 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 		action: ActionCode;
 	},
 ): Promise<Entity> {
+	if (!args.tx && "$transaction" in args.client) {
+		return args.client.$transaction((tx) =>
+			upsert(service, input, { ...args, tx }),
+		);
+	}
+
 	const scoped: ServiceOpts = {
 		tx: args.tx,
 		actor: args.actor,

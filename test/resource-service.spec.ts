@@ -850,3 +850,27 @@ test("attachment findMany skips an attachment whose resource is gone", async () 
 	);
 	expect(others.map((a) => a.attachedTo.id)).toEqual([kept.resource.id]);
 });
+
+test("two concurrent upserts of a new resource both succeed on one row", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const input = (title: string) => ({
+		course: course.id,
+		slug: "raced-resource",
+		title,
+		description: null,
+		data: link("https://example.com/raced"),
+		rev: tag("h"),
+	});
+
+	const [a, b] = await Promise.all([
+		db.resource.upsert(input("a"), { actor: instructor }),
+		db.resource.upsert(input("b"), { actor: instructor }),
+	]);
+	expect(a.id).toBe(b.id);
+	const rows = await db.resource.findMany(
+		{ course: course.id },
+		{ actor: instructor },
+	);
+	expect(rows.filter((r) => r.slug === "raced-resource")).toHaveLength(1);
+});

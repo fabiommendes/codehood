@@ -240,6 +240,7 @@ export class UserService extends CrudBase<{
 
 		const user = await upsert(this, input, {
 			...scoped,
+			client: tx,
 			action: "user.create",
 			pk: (i) => ({ username: i.username }),
 			update: (i) => ({

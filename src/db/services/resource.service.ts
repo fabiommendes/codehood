@@ -385,6 +385,7 @@ export class ResourceService
 
 		return upsert(this, input, {
 			...opts,
+			client: this.prisma,
 			action: "resource.create",
 			update: (input) => ({ ...input, event: input.event ?? null }),
 			pk({ slug, course }) {
