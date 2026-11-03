@@ -105,17 +105,6 @@ Backlog items are categorized in sections, not on priority.
 * 2FA (TOTP) for instructors and admins.
 
 
-## Localization
-
-* **English and Brazilian Portuguese UI.** The message catalogue exists
-  (`messages/en/`, `messages/pt-BR/`, compiled by Paraglide and exposed by
-  `src/i18n/`), and the locale is fixed per installation at build time
-  (`CODEHOOD_LOCALE`), not per user. Interface strings only: course content
-  stays in whatever language the instructor wrote it. Both catalogues hold the
-  same keys today and no obvious hardcoded UI string remains, so what is left
-  is keeping pt-BR in step as new strings land.
-
-
 ## Questions and exams
 
 * **Question weights.** `QuestionsForExam.weight

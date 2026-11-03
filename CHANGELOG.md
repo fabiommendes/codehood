@@ -4,6 +4,10 @@
 
 ### Added
 
+- English and Brazilian Portuguese UI: every interface string comes from the
+  Paraglide catalogue (`messages/en/`, `messages/pt-BR/`, exposed by
+  `src/i18n/`), and the locale is fixed per installation at build time
+  (`CODEHOOD_LOCALE`). Course content stays in the language it was written in.
 - The instructor's home opens with today's meetings: each shows its hours
   and opens or links to its roll call, warning first when the roll call
   would open outside the meeting. It also lists courses with open content

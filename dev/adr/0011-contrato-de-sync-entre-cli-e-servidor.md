@@ -43,18 +43,26 @@ sobre estado do servidor foi decidida em 2026-11-03. O lado do CLI está em
 - Renomear é apagar um item e criar outro. Não há operação de rename nem
   histórico entre identidades; o slug é a chave natural
   (`src/core/schemas/time-slot.ts:36`, `src/core/schemas/grade-column.ts:65`).
-- Estado do servidor nunca é gravável pelo repositório: `status` do exame
-  (ciclo de vida), `extraTime`, `gradesReleasedAt` e `sharedAt` da questão.
-  Um campo que o push pode gravar é um campo que o próximo push desfaz sem
-  aviso. "Começar agora", "reabrir" e "tempo extra" são ações da web.
+- Estado do servidor nunca é gravável pelo repositório: `extraTime`,
+  `gradesReleasedAt`, `sharedAt` da questão e a parte do ciclo de vida do
+  exame que acontece no servidor (`ONGOING`, `COMPLETED`). Um campo que o push
+  pode gravar é um campo que o próximo push desfaz sem aviso. "Começar agora",
+  "reabrir" e "tempo extra" são ações da web.
+- O `status` do exame que o repositório declara é só `DRAFT`, `SCHEDULED` ou
+  `ARCHIVED`, derivado do arquivo (`cli/dev/specs/to-do/push-exams.md`). O
+  servidor recusa `ONGOING`/`COMPLETED` vindos do REST e ignora qualquer
+  `status` enviado para um exame que já está `ONGOING` ou `COMPLETED`.
+- O `status` da questão (`DRAFT`/`PUBLISHED`) é escrito pelo push e pela web.
+  O servidor aceita os dois e não arbitra; a regra para quando divergem fica
+  no CLI (`cli/dev/issues/question-status-divergence.md`).
 
 ## Consequências
 
 - Renomear uma questão com respostas deixa as respostas no original
   arquivado (o `DELETE` de questão arquiva, `test/question-service.spec.ts:646`).
 - O código ainda não cumpre a regra de estado do servidor: `examCreate` aceita
-  `status` (`src/core/schemas/exam.ts:89`) e `examUpdate` aceita `extraTime`
-  (`:105`). Ver `dev/issues/status-e-tempo-extra-so-pela-web.md`.
+  qualquer `status` (`src/core/schemas/exam.ts:89`) e `examUpdate` aceita
+  `extraTime` (`:105`). Ver `dev/issues/status-e-tempo-extra-so-pela-web.md`.
   `gradesReleasedAt` já fica de fora (`:81`); `sharedAt` ainda não existe
   (`dev/specs/to-do/question-sharing.md`).
 

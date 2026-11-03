@@ -61,9 +61,10 @@ nenhuma transição é gravada. Então, na prática:
 - Atualizar `GLOSSARY.md` (Exam, Question version) e remover a nota de
   `BACKLOG.md:125-129` quando o carimbo existir.
 
-Ponto aberto: exames `PRACTICE` ficam abertos sempre (`examPhase`,
-`src/services/exam-state.ts:62`). Carimbar na primeira tentativa congela a
-prática para sempre. Decidir se `PRACTICE` fica fora do carimbo.
+Exames `PRACTICE` ficam fora do carimbo: estão sempre abertos (`examPhase`,
+`src/services/exam-state.ts:62`), e carimbar na primeira tentativa
+congelaria a prática para sempre. Uma prática sem pin segue a versão mais
+recente.
 
 ## Critérios de aceitação
 
@@ -72,6 +73,8 @@ prática para sempre. Decidir se `PRACTICE` fica fora do carimbo.
       contra a versão do momento da abertura.
 - [ ] Push durante `SCHEDULED`, antes de qualquer tentativa, muda a versão
       servida.
+- [ ] Exame `PRACTICE` com tentativa aberta passa a servir a versão nova
+      depois de um push.
 - [ ] Reenviar a lista de questões de um exame em andamento não apaga os pins.
 - [ ] Duas aberturas concorrentes gravam o mesmo pin.
 - [ ] Glossário e `BACKLOG.md` descrevem o carimbo como feito.
