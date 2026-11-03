@@ -141,6 +141,9 @@
 
 ### Fixed
 
+- The readonly and review samples of multiple choice and multiple selection
+  on `/design/questions` each keep their own pick: they render as islands,
+  so their radios no longer share a `name` across questions.
 - The instructor's home no longer lists an exam that has not opened as in
   progress because a student has extra time. After an exam's window closes,
   its row counts the students still on personal time instead of "1 of 10
