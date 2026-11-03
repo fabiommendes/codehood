@@ -141,6 +141,12 @@
 
 ### Fixed
 
+- `/getting-started` follows the CLI as it is: install, `codehood init`,
+  `codehood login` (or a key generated on the page and pasted into
+  `~/.codehood/credentials.toml`), the course files and `codehood push`, with
+  transcripts taken from the real CLI. Students no longer get the "Set up the
+  CLI" menu item, and the page tells them the CLI is for instructors for now.
+  `cli/README.md` shows the real scaffold and the login step.
 - The REST API answers broken business rules and unknown keys with a 4xx
   instead of a 500: an overlapping, empty or past-midnight time slot and an
   event on an unknown slot are 400 `invalid-data`; deleting a time slot with
