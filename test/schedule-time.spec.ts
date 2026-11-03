@@ -147,3 +147,14 @@ test("slotInstant counts ISO weeks: week 0 is the Monday-to-Sunday week the cour
 		expect(at("FRIDAY", 1)).toBe("2026-03-20");
 	}
 });
+
+test("a course starting on a Sunday has week 0 on the Monday before it", () => {
+	const zone = "America/Sao_Paulo";
+	const sunday = toInstant("2026-03-15", 0, zone);
+	expect(
+		localDateOf(slotInstant(sunday, "MONDAY", 0, 14 * 60, zone), zone),
+	).toBe("2026-03-09");
+	expect(
+		localDateOf(slotInstant(sunday, "SUNDAY", 0, 14 * 60, zone), zone),
+	).toBe("2026-03-15");
+});

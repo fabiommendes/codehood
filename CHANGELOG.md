@@ -141,6 +141,14 @@
 
 ### Fixed
 
+- Week 0 of a course is the ISO week (Monday to Sunday) its start date falls
+  in, on the server and in the CLI, as the schema says. A Monday class of a
+  course starting on a Wednesday used to land a week late. Editing a time
+  slot's day, hour or duration, or a course's start, moves the events with
+  it. `manage recompute-event-times` repairs events stored under the old
+  rule (run it once after the release). `manage import-calendar` imports a
+  `RECESS` as a holiday and warns that an event's own date and time are
+  ignored.
 - A page whose island throws while the server renders it answers 500 with
   the error page, instead of a response the browser waits on until it times
   out. HTML pages are rendered in full before they are sent, so they are no

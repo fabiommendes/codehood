@@ -665,3 +665,36 @@ test("recomputeTimes restores every event's time from its course, slot and week,
 	expect(row.durationMin).toBe(120);
 	expect(await db.calendarEvent.recomputeTimes(FULL_ACCESS)).toBe(0);
 });
+
+test("findMany from keeps an event that started almost a day earlier and is still running", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await db.timeSlot.create(
+		{
+			course: course.id,
+			slug: "long",
+			day: "MONDAY",
+			start: { hour: 0, minute: 30 },
+			duration: { hours: 23, minutes: 30 },
+		},
+		opts,
+	);
+	const event = await db.calendarEvent.create(
+		{
+			course: course.id,
+			timeSlot: slot.id,
+			week: 1,
+			title: "Long",
+			rev: tag("h"),
+		},
+		opts,
+	);
+
+	const from = new Date(event.startAt.getTime() + 23 * 3_600_000);
+	const found = await db.calendarEvent.findMany(
+		{ courseIds: [course.id], from },
+		opts,
+	);
+	expect(found.map((e) => e.id)).toEqual([event.id]);
+});

@@ -274,7 +274,9 @@ export function isoWeekDay(weekday: Weekday): number {
  * the course starts in. The start date is read twelve hours after
  * `courseStart`, because a start day is stored either at local midnight (the
  * web form) or at UTC midnight (the CLI), and both land on the intended day
- * at noon UTC for any zone within twelve hours of it.
+ * at noon UTC for any zone within twelve hours of it. `courseStart` is a
+ * date: a start stored at a later hour (a Sunday at 23:00, say) may be read
+ * as the next day.
  */
 export function courseWeekZero(
 	courseStart: Date,

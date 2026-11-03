@@ -6,6 +6,7 @@ import { prisma } from "@/db/client";
 import type { QuestionResponse } from "@/mdq";
 import { hashBytes } from "@/utils/content-hash";
 import {
+	courseWeekZero,
 	localDateOf,
 	slotInstant,
 	toInstant,
@@ -531,10 +532,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	// A few meetings in the coming weeks, counted from the day the seed runs,
 	// so the calendar's upcoming list and "today" always have something near.
-	const weeksSoFar = Math.floor(
-		(Date.now() - (cs101.startAt?.getTime() ?? Date.now())) /
-			(7 * 24 * 3600 * 1000),
-	);
+	const weeksSoFar = cs101.startAt
+		? Math.floor(
+				(Date.parse(`${localDateOf(new Date())}T00:00:00Z`) -
+					Date.parse(`${courseWeekZero(cs101.startAt)}T00:00:00Z`)) /
+					(7 * 24 * 3600 * 1000),
+			)
+		: 0;
 	for (const event of [
 		{
 			slot: cs101Mon,
