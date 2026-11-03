@@ -6,11 +6,10 @@ import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import node from "@astrojs/node";
 import solidJs from "@astrojs/solid-js";
-import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
-import { localeDefine, paraglideOptions } from "./scripts/lib/paraglide";
+import { localeDefine, paraglidePlugin } from "./scripts/lib/paraglide";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 
@@ -47,7 +46,7 @@ export default defineConfig({
 	adapter: node({ mode: "standalone" }),
 	integrations: [solidJs(), dynamicRouterHook()],
 	vite: {
-		plugins: [tailwindcss(), paraglideVitePlugin(paraglideOptions(root))],
+		plugins: [tailwindcss(), paraglidePlugin(root)],
 		// Fixes the locale the build compiles for (`CODEHOOD_LOCALE`).
 		define: localeDefine(root, process.env),
 		// Sourcemaps let `pnpm coverage` (c8, run against the built webServer process)
@@ -58,6 +57,43 @@ export default defineConfig({
 		ssr: { noExternal: ["mdq"] },
 		// The linked `mdq` has its own node_modules; one copy of each peer.
 		resolve: { dedupe: ["zod", "solid-js"] },
+		// Nothing under these is served by the dev server. `cli/` alone carries a
+		// Python virtualenv of ~9k files, and walking it slowed every dev start.
+		// `storage/` and the databases change at runtime and must not trigger reloads.
+		server: {
+			watch: {
+				ignored: [
+					"cli",
+					"test/.tmp",
+					"test-results",
+					"playwright-report",
+					"coverage",
+					"dist",
+					"storage",
+					"deploy",
+					".base-ast-cache",
+					".claude",
+					".impeccable",
+				]
+					.map((dir) => `${root}${dir}/**`)
+					.concat(`${root}*.db*`, `${root}.idea/**`)
+					// Dotfiles a sandboxed shell mounts over the project root. Listed
+					// one by one so that `.env` changes still reach the watcher.
+					.concat(
+						[
+							".bashrc",
+							".bash_profile",
+							".profile",
+							".zshrc",
+							".zprofile",
+							".gitconfig",
+							".gitmodules",
+							".ripgreprc",
+							".mcp.json",
+						].map((file) => `${root}${file}`),
+					),
+			},
+		},
 	},
 	// `context: "client"` values are read the same way on the server and in the
 	// browser (`astro:env/client`), which is what `SERVER_TZ` needs: it renders

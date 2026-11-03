@@ -79,6 +79,11 @@
 
 ### Changed
 
+- `pnpm run dev` starts in about 3s instead of 10-30s. `pnpm run generate`
+  skips the Paraglide compile and the route-pattern scan when their inputs
+  are unchanged (`--force` runs them anyway), the Paraglide Vite plugin only
+  recompiles on changes to `messages/` or `project.inlang/`, and the Vite
+  watcher skips `cli/`, test runs, builds, `storage/` and the databases.
 - Questions follow the current mdq spec through the `mdq` library, linked
   from the sibling `mdq-spec` checkout, instead of the server's own copy of an
   older format (`src/mdq/` is now a thin facade). Documents are validated by

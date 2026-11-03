@@ -7,10 +7,31 @@
  * or a whole `CRUD()` block — is picked up the same way. `hook.ts` itself
  * cannot do this: it runs during `astro:config:setup`, where importing the API
  * modules pulls in Astro internals that are not ready yet. Hence this file.
+ *
+ * Every pattern is a literal inside `src/api/`, so the script skips the slow
+ * import of the API modules when nothing there changed since the last run.
+ * Pass `--force` to regenerate anyway.
  */
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { inputsStamp } from "./lib/inputs-stamp";
+
+const rootDir = path.resolve(
+	path.dirname(fileURLToPath(import.meta.url)),
+	"..",
+);
+const apiDir = path.join(rootDir, "src", "api");
+const outPath = path.join(apiDir, "registry", "route-patterns.json");
+const stamp = inputsStamp(
+	path.join(rootDir, "src", "generated", "route-patterns.hash"),
+	{ paths: [apiDir], exclude: [outPath] },
+	[outPath],
+);
+if (stamp.fresh && !process.argv.includes("--force")) {
+	console.log("Route patterns are up to date");
+	process.exit(0);
+}
 
 // This script only enumerates routes registered by importing the API modules
 // below; it never reads DEVELOPMENT/PRODUCTION or anything derived from
@@ -28,18 +49,6 @@ const { getRouteMapping } = await import("../src/api/registry/route");
 // populates the registry. Same trick as openapi-document.ts.
 await import("../src/api/registry/dynamicHandler");
 
-const rootDir = path.resolve(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"..",
-);
-const outPath = path.join(
-	rootDir,
-	"src",
-	"api",
-	"registry",
-	"route-patterns.json",
-);
-
 const routes = Object.entries(getRouteMapping())
 	.map(([pattern, methods]) => ({
 		pattern,
@@ -48,6 +57,7 @@ const routes = Object.entries(getRouteMapping())
 	.sort((a, b) => a.pattern.localeCompare(b.pattern));
 
 writeFileSync(outPath, `${JSON.stringify(routes, null, "\t")}\n`);
+stamp.write();
 console.log(
 	`Wrote ${path.relative(rootDir, outPath)} (${routes.length} patterns)`,
 );
