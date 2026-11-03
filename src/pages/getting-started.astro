@@ -19,6 +19,9 @@ const apiKeys = await db.apiKey.findMany(
 	{ actor: Astro.locals.actor },
 );
 const hasKey = apiKeys.length > 0;
+const isStudent = Astro.locals.actor.role === "STUDENT";
+const username = Astro.locals.actor.username;
+const server = Astro.url.origin;
 const codeTag = (text: string) =>
 	`<code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">${text}</code>`;
 const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}</a>`;
@@ -29,6 +32,11 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
     <div class="max-w-2xl">
     <PageKicker text={m.auth_gs_kicker()} squares />
     <h1 class="text-3xl font-bold">{m.auth_gs_heading()}</h1>
+    {
+      isStudent ? (
+        <p class="mt-2 max-w-xl text-base-content/70">{m.auth_gs_students()}</p>
+      ) : (
+    <>
     <p class="mt-2 max-w-xl text-base-content/70">
       {m.auth_gs_intro()}
     </p>
@@ -43,9 +51,14 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             >
             <p class="font-medium">{m.auth_gs_step1()}</p>
           </div>
+          <p
+            class="text-sm text-muted"
+            set:html={m.auth_gs_step1_body({ mdq: codeTag("mdq"), uv: codeTag("uv") })}
+          />
           <pre
-            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood init
-  created course/ (codehood.toml, content/)</code></pre>
+            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ git clone https://github.com/fabiommendes/codehood.git
+$ git clone https://github.com/fabiommendes/mdq-spec.git mdq
+$ uv tool install --editable codehood/cli</code></pre>
         </div>
       </li>
 
@@ -58,7 +71,24 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             >
             <p class="font-medium">{m.auth_gs_step2()}</p>
           </div>
-          <p class="text-sm text-muted" set:html={m.auth_gs_step2_body({ code: codeTag("content/") })} />
+          <p class="text-sm text-muted" set:html={m.auth_gs_step2_body({ init: codeTag("codehood init") })} />
+          <pre
+            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood init cs101
+Discipline slug: cs101
+Instructor username: {username}
+Edition: 2026-1
+Server URL: {server}
+  created  codehood.toml
+  created  README.md
+  created  calendar.md
+  created  questions/
+  created  exams/
+  created  resources/
+  created  repositories/
+  created  questions/example.md
+  created  exams/example.md
+next: codehood login
+$ cd cs101</code></pre>
         </div>
       </li>
 
@@ -71,7 +101,20 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             >
             <p class="font-medium">{m.auth_gs_step3()}</p>
           </div>
-          <p class="text-sm text-muted">{m.auth_gs_step3_body()}</p>
+          <p class="text-sm text-muted" set:html={m.auth_gs_step3_body({ login: codeTag("codehood login") })} />
+          <pre
+            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood login
+Login [{username}]:
+Password:
+logged in to {server} as {username}</code></pre>
+
+          <p
+            class="text-sm text-muted"
+            set:html={m.auth_gs_step3_alt({ file: codeTag("~/.codehood/credentials.toml") })}
+          />
+          <pre
+            class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>[servers]
+"{server}" = "&lt;key&gt;"</code></pre>
 
           <FormAlert error={createApiKeyResult?.error && errorMessage(createApiKeyResult.error)} />
           {
@@ -119,14 +162,40 @@ const profileLink = `<a href="/profile" class="link">${m.auth_gs_profile_link()}
             >
             <p class="font-medium">{m.auth_gs_step4()}</p>
           </div>
+          <p
+            class="text-sm text-muted"
+            set:html={m.auth_gs_step4_body({
+              questions: codeTag("questions/"),
+              exams: codeTag("exams/"),
+              resources: codeTag("resources/"),
+              calendar: codeTag("calendar.md"),
+            })}
+          />
+        </div>
+      </li>
+
+      <li class="card card-border bg-base-100">
+        <div class="card-body gap-3 p-5">
+          <div class="flex items-center gap-3">
+            <span
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content"
+              >5</span
+            >
+            <p class="font-medium">{m.auth_gs_step5()}</p>
+          </div>
           <pre
             class="overflow-x-auto rounded-box bg-neutral p-4 font-mono text-sm text-neutral-content"><code>$ codehood push
-  syncing content/questions/*.q.md
-  syncing content/exams/midterm.md
-  live for your students</code></pre>
+    ok  course cs101/{username}_2026-1: upserted course cs101/{username}_2026-1
+    ok  time slot mon: upserted mon
+    ok  event 0/mon (REGULAR): upserted 0/mon
+    ok  question example: upserted example
+summary: 4 operation(s) executed, 0 failed, 0 skipped</code></pre>
         </div>
       </li>
     </ol>
+    </>
+      )
+    }
     </div>
   </main>
 </AppLayout>

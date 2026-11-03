@@ -86,9 +86,10 @@ test("instructor: get started with the CLI", async ({ page }) => {
 	await test.step("the page walks through the CLI in order", async () => {
 		const headings = page.getByRole("listitem");
 		await expect(headings).toContainText([
+			/Install the CLI/,
 			/Scaffold a course/,
+			/Log in/,
 			/Write your content/,
-			/Create a CLI API key/,
 			/Push, and it's live/,
 		]);
 	});
