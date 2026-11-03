@@ -6,7 +6,7 @@
  * never authored directly.
  */
 import type { z } from "zod";
-import { hasPerm } from "@/auth/permissions";
+import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed } from "@/core/error";
 import {
 	type CalendarEventId,
@@ -18,7 +18,11 @@ import {
 	calendarEventUpdate,
 	type TimeSlotId,
 } from "@/core/schemas";
-import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	CrudBase,
+	type ServiceOpts,
+	type ServiceOptsWithoutTx,
+} from "@/db/base-service";
 import { m } from "@/i18n";
 import {
 	endOf,
@@ -28,6 +32,7 @@ import {
 } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
+import { recomputeEventTimes } from "../event-times";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 import { courseContentsWhere } from "./course.service";
 
@@ -178,9 +183,9 @@ export class CalendarEventService extends CrudBase<{
 	 * The course is given either as `courseIds` or as its natural key; with
 	 * neither, returns everything the actor may see, which is what
 	 * `/calendar` wants. `from` is inclusive of an event still running at
-	 * that instant, applied after the database query since it depends on
-	 * `durationMin`; every other filter is a plain `where`. Ordered by
-	 * `startAt`.
+	 * that instant: the query keeps events starting at most a day before it,
+	 * the longest a slot lasts, and the exact cut uses `durationMin` after
+	 * the query. Every other filter is a plain `where`. Ordered by `startAt`.
 	 */
 	@Validate({
 		service: true,
@@ -201,6 +206,13 @@ export class CalendarEventService extends CrudBase<{
 					filter.kinds ? { kind: { in: filter.kinds } } : {},
 					filter.weeks ? { week: { in: filter.weeks } } : {},
 					filter.to !== undefined ? { startAt: { lt: filter.to } } : {},
+					filter.from !== undefined
+						? {
+								startAt: {
+									gte: new Date(filter.from.getTime() - LONGEST_SLOT_MS),
+								},
+							}
+						: {},
 					{ course: courseContentsWhere(opts.actor) },
 				],
 			},
@@ -265,6 +277,19 @@ export class CalendarEventService extends CrudBase<{
 
 		await setRepositories(tx, row.id, current.courseId, fields.repositories);
 		return fromDb(await reload(tx, row.id));
+	}
+
+	/**
+	 * Recomputes the `startAt` and `durationMin` of every event from its
+	 * course, slot and week, and returns how many changed.
+	 *
+	 * Repairs events written under an older rule; a no-op once they agree.
+	 *
+	 * @throws NotAllowed when the actor lacks `system.manage`.
+	 */
+	async recomputeTimes(opts: ServiceOpts): Promise<number> {
+		ensurePerm(opts.actor, "system.manage");
+		return this.$transaction(opts, (tx) => recomputeEventTimes(tx, {}));
 	}
 
 	/**
@@ -363,6 +388,9 @@ export class CalendarEventService extends CrudBase<{
 //
 // Auxiliary functions
 //
+
+/// A slot never runs past midnight, so no event lasts longer than a day.
+const LONGEST_SLOT_MS = 24 * 60 * 60_000;
 
 /// The courses a listing is narrowed to, or `null` for every course the actor
 /// may read. A natural key that matches no course narrows to nothing.

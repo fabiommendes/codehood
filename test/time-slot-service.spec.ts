@@ -205,7 +205,7 @@ test("create rejects a duplicate slug in one course, and accepts the same slug i
 	).resolves.toMatchObject({ slug: "mon" });
 });
 
-test("update moves the hour; the slot's existing events keep their own times", async () => {
+test("update moves the hour, and the slot's existing events move with it", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
 	const { course } = await makeCourse(instructor.username);
 	const opts = { actor: instructor };
@@ -239,11 +239,11 @@ test("update moves the hour; the slot's existing events keep their own times", a
 	expect(moved.start).toEqual({ hour: 10, minute: 0 });
 	expect(moved.duration).toEqual({ hours: 1, minutes: 30 });
 
-	// The event's own `startAt` was computed once at creation and is never
-	// recomputed by a later slot move — moving the slot's hour does not move
-	// a single row in `CalendarEvent`.
+	// Same day, four hours earlier.
 	const reloaded = await db.calendarEvent.findOne({ id: event.id }, opts);
-	expect(reloaded?.startAt.getTime()).toBe(event.startAt.getTime());
+	expect(reloaded?.startAt.getTime()).toBe(
+		event.startAt.getTime() - 4 * 3_600_000,
+	);
 });
 
 test("delete throws while events reference the slot, naming the count, and succeeds once they are gone", async () => {

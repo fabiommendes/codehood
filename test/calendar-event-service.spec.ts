@@ -3,6 +3,7 @@ import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
 import { db, type ServiceOpts } from "@/db";
+import { prisma } from "@/db/client";
 import { localDateOf, toInstant, weekdayOf } from "@/utils/schedule-time";
 
 // Random suffix, not an incrementing counter: shared test database across
@@ -571,4 +572,96 @@ test("upsert is gated on course.update-contents whether creating or updating", a
 			opts,
 		),
 	).resolves.toMatchObject({ id: existing.id, title: "Existing, resynced" });
+});
+
+test("moving or resizing a time slot moves and resizes its events", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts);
+	const event = await db.calendarEvent.create(
+		{
+			course: course.id,
+			timeSlot: slot.id,
+			week: 1,
+			title: "Intro",
+			rev: tag("h"),
+		},
+		opts,
+	);
+
+	await db.timeSlot.update(
+		{ id: slot.id },
+		{
+			day: "WEDNESDAY",
+			start: { hour: 9, minute: 30 },
+			duration: { hours: 1 },
+		},
+		opts,
+	);
+
+	const row = await prisma.calendarEvent.findUniqueOrThrow({
+		where: { id: event.id },
+	});
+	expect(row.startAt).toEqual(toInstant("2026-01-14", 9 * 60 + 30));
+	expect(row.durationMin).toBe(60);
+});
+
+test("moving a course's start moves its events with it", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts);
+	const event = await db.calendarEvent.create(
+		{
+			course: course.id,
+			timeSlot: slot.id,
+			week: 1,
+			title: "Intro",
+			rev: tag("h"),
+		},
+		opts,
+	);
+
+	await db.course.update(
+		{ id: course.id },
+		{ startAt: new Date("2026-01-12T12:00:00Z") },
+		FULL_ACCESS,
+	);
+
+	const row = await prisma.calendarEvent.findUniqueOrThrow({
+		where: { id: event.id },
+	});
+	expect(row.startAt).toEqual(toInstant("2026-01-19", 14 * 60));
+});
+
+test("recomputeTimes restores every event's time from its course, slot and week, and needs an admin", async () => {
+	const instructor = await makeUser("INSTRUCTOR");
+	const course = await makeCourse(instructor.username);
+	const opts = { actor: instructor };
+	const slot = await makeSlot(course.id, opts);
+	const event = await db.calendarEvent.create(
+		{
+			course: course.id,
+			timeSlot: slot.id,
+			week: 1,
+			title: "Intro",
+			rev: tag("h"),
+		},
+		opts,
+	);
+	await prisma.calendarEvent.update({
+		where: { id: event.id },
+		data: { startAt: new Date("2020-01-01T00:00:00Z"), durationMin: 5 },
+	});
+
+	await expect(db.calendarEvent.recomputeTimes(opts)).rejects.toThrow();
+	expect(await db.calendarEvent.recomputeTimes(FULL_ACCESS)).toBeGreaterThan(0);
+
+	const row = await prisma.calendarEvent.findUniqueOrThrow({
+		where: { id: event.id },
+	});
+	expect(row.startAt).toEqual(event.startAt);
+	expect(row.durationMin).toBe(120);
+	expect(await db.calendarEvent.recomputeTimes(FULL_ACCESS)).toBe(0);
 });

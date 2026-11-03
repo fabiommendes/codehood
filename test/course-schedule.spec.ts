@@ -144,3 +144,18 @@ test("a week whose last meeting ended earlier today stays ahead until the day tu
 	const nextDay = courseSchedule(entries, START, day(1));
 	expect(titles(nextDay.past)).toEqual([[0, ["Intro"]]]);
 });
+
+test("weeks are ISO weeks: a course starting on a Wednesday puts the next Monday in week 1", () => {
+	const wednesday = new Date("2026-03-04T15:00:00Z");
+	const entries = [
+		exam("Kickoff", wednesday),
+		exam("Quiz", new Date("2026-03-09T15:00:00Z")),
+	];
+
+	const { ahead } = courseSchedule(entries, wednesday, day(-1));
+
+	expect(titles(ahead)).toEqual([
+		[0, ["Kickoff"]],
+		[1, ["Quiz"]],
+	]);
+});

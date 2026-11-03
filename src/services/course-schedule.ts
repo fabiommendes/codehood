@@ -5,7 +5,11 @@
  * Pure: the page builds the entries with `calendarEntries`.
  */
 
-import { localDateOf, startOfLocalDay } from "@/utils/schedule-time";
+import {
+	courseWeekZero,
+	localDateOf,
+	startOfLocalDay,
+} from "@/utils/schedule-time";
 import type { CalendarEntry } from "./calendar-entries";
 
 const DAY = 86_400_000;
@@ -70,9 +74,10 @@ function isHeld(entry: CalendarEntry): boolean {
 		: entry.exam.status !== "DRAFT";
 }
 
-/// The course week `instant` falls in, by local calendar days from `courseStart`.
+/// The ISO course week `instant` falls in, by local calendar days from the Monday of week 0.
 function weekOf(instant: Date, courseStart: Date): number {
-	const days = (dayNumber(instant) - dayNumber(courseStart)) / DAY;
+	const monday = Date.parse(`${courseWeekZero(courseStart)}T00:00:00Z`);
+	const days = (dayNumber(instant) - monday) / DAY;
 	return Math.floor(days / 7);
 }
 

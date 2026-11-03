@@ -268,11 +268,31 @@ export function isoWeekDay(weekday: Weekday): number {
 }
 
 /**
+ * The Monday of week 0 of a course, as `YYYY-MM-DD` in `zone`.
+ *
+ * Weeks are ISO weeks: week 0 runs from the Monday to the Sunday of the week
+ * the course starts in. The start date is read twelve hours after
+ * `courseStart`, because a start day is stored either at local midnight (the
+ * web form) or at UTC midnight (the CLI), and both land on the intended day
+ * at noon UTC for any zone within twelve hours of it.
+ */
+export function courseWeekZero(
+	courseStart: Date,
+	zone: string = SERVER_TZ,
+): string {
+	const startDay = new Date(courseStart.getTime() + 12 * 3_600_000);
+	return addDays(
+		localDateOf(startDay, zone),
+		1 - isoWeekDay(weekdayOf(startDay, zone)),
+	);
+}
+
+/**
  * The instant a weekly slot meets in the given week of a course.
  *
- * Week 0 falls on the first `weekday` on or after `courseStart`. `startMin` is
- * a wall clock in `zone`, so the meeting keeps its clock time whatever the
- * process's own time zone, and across DST changes.
+ * Week 0 is the ISO week the course starts in (see {@link courseWeekZero}).
+ * `startMin` is a wall clock in `zone`, so the meeting keeps its clock time
+ * whatever the process's own time zone, and across DST changes.
  *
  * @param zone The time zone the slot's clock time is read in, defaulting to
  *   `SERVER_TZ`.
@@ -284,11 +304,9 @@ export function slotInstant(
 	startMin: number,
 	zone: string = SERVER_TZ,
 ): Date {
-	const daysUntilWeekday =
-		(isoWeekDay(weekday) - isoWeekDay(weekdayOf(courseStart, zone)) + 7) % 7;
 	const day = addDays(
-		localDateOf(courseStart, zone),
-		daysUntilWeekday + week * 7,
+		courseWeekZero(courseStart, zone),
+		isoWeekDay(weekday) - 1 + week * 7,
 	);
 	return toInstant(day, startMin, zone);
 }

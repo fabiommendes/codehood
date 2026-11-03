@@ -27,6 +27,7 @@ import {
 	type PrismaTx,
 	prisma,
 } from "../client";
+import { recomputeEventTimes } from "../event-times";
 import { invalidIfExists, valueOrNotFound } from "../utils";
 import { isEditionOpen } from "./edition.service";
 
@@ -244,12 +245,21 @@ export class CourseService
 		if (!hasPerm(opts.actor, "course.update", target))
 			throw new NotAllowed("course.update");
 
-		const client = opts.tx ?? this.prisma;
-		const row = await client.course.update({
-			where: { id: target.id },
-			data: fields,
-			include: courseInclude,
-		});
+		const write = async (client: PrismaTx | PrismaClient) => {
+			const row = await client.course.update({
+				where: { id: target.id },
+				data: fields,
+				include: courseInclude,
+			});
+			// Event times are derived from the course's start.
+			if (fields.startAt) {
+				await recomputeEventTimes(client, { courseId: target.id });
+			}
+			return row;
+		};
+		const row = opts.tx
+			? await write(opts.tx)
+			: await this.prisma.$transaction(write);
 		return fromDb(row, opts.actor);
 	}
 

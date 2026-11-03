@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { Weekday } from "@/db";
 import {
 	endOf,
 	formatDateTime,
@@ -127,5 +128,22 @@ test("a datetime-local value survives the trip through parseLocalDateTime and ba
 		"2027-01-01T00:00",
 	]) {
 		expect(toLocalDateTimeInput(parseLocalDateTime(value))).toBe(value);
+	}
+});
+
+test("slotInstant counts ISO weeks: week 0 is the Monday-to-Sunday week the course starts in", () => {
+	const zone = "America/Sao_Paulo";
+	// A Wednesday, as the CLI stores it (UTC midnight) and as the web form
+	// stores it (local midnight).
+	for (const courseStart of [
+		new Date("2026-03-11T00:00:00Z"),
+		toInstant("2026-03-11", 0, zone),
+	]) {
+		const at = (day: Weekday, week: number) =>
+			localDateOf(slotInstant(courseStart, day, week, 14 * 60, zone), zone);
+		expect(at("MONDAY", 0)).toBe("2026-03-09");
+		expect(at("WEDNESDAY", 0)).toBe("2026-03-11");
+		expect(at("MONDAY", 1)).toBe("2026-03-16");
+		expect(at("FRIDAY", 1)).toBe("2026-03-20");
 	}
 });

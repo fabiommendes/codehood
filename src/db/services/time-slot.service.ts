@@ -27,6 +27,7 @@ import {
 } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
+import { recomputeEventTimes } from "../event-times";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 
 export type { TimeSlotId } from "@/core/schemas";
@@ -184,9 +185,8 @@ export class TimeSlotService extends CrudBase<{
 	/**
 	 * Changes `title`, `day`, `start`, or `duration`. Never `slug`.
 	 *
-	 * A slot's existing events keep their own times: moving the hour here
-	 * does not move a single row in `CalendarEvent` (see "Week numbers are
-	 * authored" in the spec) — the CLI plans that as its own writes.
+	 * The slot's events move with it: their `startAt` and `durationMin` are
+	 * recomputed in the same transaction.
 	 */
 	@Validate({
 		service: true,
@@ -226,6 +226,9 @@ export class TimeSlotService extends CrudBase<{
 			},
 			include: timeSlotInclude,
 		});
+		if (fields.day || fields.start || fields.duration) {
+			await recomputeEventTimes(tx, { timeSlotId: current.id });
+		}
 		return fromDb(row);
 	}
 

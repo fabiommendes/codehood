@@ -53,3 +53,8 @@ Whenever a new command is created, document it in this file.
 : Imports calendar events for a course from a YAML manifest shaped like the
   sync payload.
 
+`manage recompute-event-times`
+: Recomputes every calendar event's start and duration from its course's
+  start, its time slot and its week. Repairs events written under an older
+  rule; running it again changes nothing.
+

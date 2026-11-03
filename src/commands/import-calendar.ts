@@ -18,8 +18,9 @@ const WEEKDAYS = [
 	"SATURDAY",
 ] as const;
 
-// Legacy manifests may still carry the old ten-value kind. Anything that
-// is not HOLIDAY or CANCELLED collapses to REGULAR (see EventKind).
+// Legacy manifests may still carry the old ten-value kind. RECESS becomes
+// HOLIDAY, since no class is held; anything else that is not HOLIDAY or
+// CANCELLED collapses to REGULAR (see EventKind).
 const EVENT_KINDS = [
 	"LECTURE",
 	"LAB",
@@ -37,6 +38,7 @@ const EVENT_KINDS = [
 /** Maps a manifest's (possibly legacy) kind onto the current `EventKind`. */
 function toEventKind(kind: (typeof EVENT_KINDS)[number] | undefined) {
 	if (kind === "HOLIDAY" || kind === "CANCELLED") return kind;
+	if (kind === "RECESS") return "HOLIDAY" as const;
 	return "REGULAR" as const;
 }
 
@@ -191,6 +193,15 @@ export const importCalendarCommand = new Command("import-calendar")
 					continue;
 				}
 				seenEventKeys.add(`${entry.week}:${slot.id}`);
+				if (
+					entry.date !== undefined ||
+					entry.start !== undefined ||
+					entry.duration !== undefined
+				) {
+					console.warn(
+						`  ! event ${entry.slug}: date, start and duration are ignored; its time comes from slot "${entry.slot}" and week ${entry.week}.`,
+					);
+				}
 				const kind = toEventKind(entry.kind);
 				try {
 					const existing = await db.calendarEvent.findOne(
