@@ -501,7 +501,7 @@ const sectionLinks = [
         the others are muted, and typed answers read as plain text.
       </p>
       <Card>
-        <MultipleChoice messages={mdqMessages} question={publicForm(capitals)} mode="readonly" value="rio" />
+        <MultipleChoice client:load locale={locale} question={publicForm(capitals)} mode="readonly" value="rio" />
       </Card>
     </section>
 
@@ -516,7 +516,7 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card title="Correct pick">
-          <MultipleChoice messages={mdqMessages}
+          <MultipleChoice client:load locale={locale}
             question={publicForm(capitals)}
             mode="review"
             value="brasilia"
@@ -524,7 +524,7 @@ const sectionLinks = [
           />
         </Card>
         <Card title="Wrong pick, with feedback">
-          <MultipleChoice messages={mdqMessages}
+          <MultipleChoice client:load locale={locale}
             question={publicForm(capitals)}
             mode="review"
             value="sao-paulo"
@@ -532,7 +532,7 @@ const sectionLinks = [
           />
         </Card>
         <Card title="Key withheld">
-          <MultipleChoice messages={mdqMessages}
+          <MultipleChoice client:load locale={locale}
             question={publicForm(capitals)}
             mode="review"
             value="brasilia"
@@ -573,7 +573,7 @@ const sectionLinks = [
         Same visuals as answer mode, but the checkboxes are disabled and nothing is clickable.
       </p>
       <Card>
-        <MultipleSelection messages={mdqMessages} question={publicForm(primes)} mode="readonly" value={["three"]} />
+        <MultipleSelection client:load locale={locale} question={publicForm(primes)} mode="readonly" value={["three"]} />
       </Card>
     </section>
 
@@ -588,7 +588,7 @@ const sectionLinks = [
       </p>
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card title="Perfect answer">
-          <MultipleSelection messages={mdqMessages}
+          <MultipleSelection client:load locale={locale}
             question={publicForm(primes)}
             mode="review"
             value={perfectAnswer}
@@ -596,7 +596,7 @@ const sectionLinks = [
           />
         </Card>
         <Card title="Ticked wrong, missed right">
-          <MultipleSelection messages={mdqMessages}
+          <MultipleSelection client:load locale={locale}
             question={publicForm(primes)}
             mode="review"
             value={partialAnswer}
@@ -604,7 +604,7 @@ const sectionLinks = [
           />
         </Card>
         <Card title="Key withheld">
-          <MultipleSelection messages={mdqMessages}
+          <MultipleSelection client:load locale={locale}
             question={publicForm(primes)}
             mode="review"
             value={partialAnswer}
