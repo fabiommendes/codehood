@@ -3,36 +3,50 @@ type: issue
 status: deferred
 tags: [tooling, base, glossary, agents]
 relatedTo: [glossary, agents-md, base-domains]
+kind: task
+created: 2026-09-30
+creator: Fábio Macêdo Mendes
 ---
 
-# Inject glossary definitions on demand through base
+# Injetar definições do glossário sob demanda pelo base
 
-`AGENTS.md` tells every agent to read the list of glossary terms at the start
-of a session and grep `GLOSSARY.md` for each definition it needs. That is a
-fragile grep per term, on every session, in three repositories (server, CLI,
-mdq).
+## Contexto
 
-`base` cannot do this from a synced document: `base sync` files
-`GLOSSARY.md` as one node with `hasSection` edges, `base recall --keyword`
-does not find the sections, and the prompt hook injects per matched domain,
-not per term mentioned. What it can do is match a keyword to a domain and
-inject that domain's rules once per session.
+O `AGENTS.md` manda todo agente ler a lista de termos do glossário no início
+da sessão e fazer grep no `GLOSSARY.md` para cada definição de que precisar.
+É um grep frágil por termo, em toda sessão, em três repositórios (servidor,
+CLI, mdq).
 
-## Proposal
+O `base` não consegue fazer isso a partir de um documento sincronizado: o
+`base sync` guarda o `GLOSSARY.md` como um nó só, com arestas `hasSection`,
+o `base recall --keyword` não encontra as seções, e o hook de prompt injeta
+por domínio encontrado, não por termo mencionado. O que ele consegue é
+associar uma palavra-chave a um domínio e injetar as regras desse domínio uma
+vez por sessão.
 
-- One domain per glossary term, in `~/git/codehood/.base/domains.toml`:
-  `prompt_keywords = ["<term>"]`, and `file_keywords` with the same term, so
-  a prompt or a touched file that mentions it brings the definition in.
-- The definition as the domain's single rule (`base rule add`).
-- A script, `~/git/codehood/.base/scripts/glossary-to-base`, that reads the
-  `## Term` sections of the three glossaries and regenerates the domains and
-  rules, removing the ones whose term is gone. Run by hand after editing a
-  glossary, or from the session-start hook.
-- `AGENTS.md` then drops the grep instructions and says that definitions
-  arrive through `base` when a term comes up, with `GLOSSARY.md` still the
-  source to edit.
+## Requisitos
 
-Cost: about 45 domains and rules that must follow the glossaries, hence the
-script. Alternative with no script: every definition as a note of one
-domain, which injects the whole list on each match, about 1.5k tokens per
-session.
+- R1. Um domínio por termo do glossário, em `~/git/codehood/.base/domains.toml`,
+  com `prompt_keywords = ["<term>"]` e `file_keywords` com o mesmo termo.
+  - Aceitação: um prompt ou um arquivo tocado que menciona o termo traz a
+    definição.
+- R2. A definição é a única regra do domínio (`base rule add`).
+  - Aceitação: cada domínio de termo tem exatamente uma regra, com o texto
+    da definição.
+- R3. Um script, `~/git/codehood/.base/scripts/glossary-to-base`, lê as
+  seções `## Term` dos três glossários e regenera domínios e regras,
+  removendo os de termos que saíram. Roda à mão depois de editar um
+  glossário, ou no hook de início de sessão.
+  - Aceitação: depois de remover um termo de um glossário e rodar o script,
+    o domínio e a regra dele somem.
+- R4. O `AGENTS.md` deixa de ter as instruções de grep e diz que as
+  definições chegam pelo `base` quando um termo aparece, com o `GLOSSARY.md`
+  ainda como a fonte a editar.
+  - Aceitação: o `AGENTS.md` não manda mais fazer grep no glossário.
+
+## Custo e alternativa
+
+Cerca de 45 domínios e regras que precisam acompanhar os glossários, daí o
+script. Alternativa sem script: todas as definições como notas de um único
+domínio, o que injeta a lista inteira a cada correspondência, cerca de 1,5k
+tokens por sessão.

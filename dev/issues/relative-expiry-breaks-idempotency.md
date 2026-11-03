@@ -1,30 +1,53 @@
-# Relative expiry on create breaks idempotency
+---
+type: issue
+status: backlog
+tags: [services, invite, passphrase, api]
+relatedTo: [schemas-verbose-and-optional-vs-nullable]
+kind: enhancement
+created: 2026-09-13
+creator: Fábio Macêdo Mendes
+---
 
-`inviteCreate` takes `expiresInMs` and `passphraseService.create` computes its
-own deadline. Both mean the same request produces a different row every time it
-is sent: the resulting `expiresAt` depends on when the server received the call,
-not on what the caller asked for.
+# Validade relativa na criação impede a idempotência
 
-That is why `invite` and `passphrase` are excluded from
-`dev/specs/to-review/service-upsert.md`: an upsert whose result depends on wall
-clock is not an upsert. It is also the reason `inviteUpdate` already takes an
-absolute `expiresAt` while `inviteCreate` does not — the two halves of the same
-entity disagree about how expiry is expressed.
+`inviteCreate` recebe `expiresInMs` (`src/core/schemas/invite.ts:40`) e o
+service calcula `Date.now() + expiresInMs`
+(`src/db/services/invite.service.ts:126-128`). `PassphraseService.create`
+calcula o próprio prazo com `Date.now() + EXPIRY_MS`
+(`src/db/services/passphrase.service.ts:119`), e `passphraseCreate` nem tem
+campo de validade (`src/core/schemas/passphrase.ts:14-18`).
 
-## Fix
+## Passos para reproduzir
 
-- `inviteCreate.expiresInMs` → `expiresAt: z.date()`.
-- `passphraseCreate` gains an explicit `expiresAt`. Derive it from
-  `passphraseSchema` while at it (see
-  [schemas-verbose-and-optional-vs-nullable.md](schemas-verbose-and-optional-vs-nullable.md) §1).
-- Export `expiresIn(ms: number): Date` from `src/utils/` for callers that think
-  in durations, so the convenience survives without living in the schema.
+1. Enviar duas vezes o mesmo `POST /api/invite` com o mesmo `expiresInMs`.
 
-Once done, both services can take a real `upsert` (natural keys: the invite's
-token hash is unusable, so `invite` likely stays excluded; `passphrase` keys on
-`value`).
+## Esperado
 
-## Cost
+O mesmo pedido descreve a mesma linha: `expiresAt` depende só do que o cliente
+mandou.
 
-API contract change. Touches `public/openapi.json`, the REST controllers, the
-Astro actions and any CLI caller. Not a drop-in.
+## Obtido
+
+Cada envio grava um `expiresAt` diferente, que depende da hora em que o
+servidor recebeu a chamada. Por isso `invite` e `passphrase` não têm `upsert`
+(`src/db/services/invite.service.ts:67`,
+`src/db/services/passphrase.service.ts:86`). As duas metades da entidade
+também discordam: `inviteUpdate` já recebe um `expiresAt` absoluto
+(`src/core/schemas/invite.ts:80`) e `inviteCreate` não.
+
+## Correção
+
+- Trocar `inviteCreate.expiresInMs` por `expiresAt` absoluto.
+- Dar a `passphraseCreate` um `expiresAt` explícito, derivando o schema de
+  `passphraseSchema` (ver `schemas-verbose-and-optional-vs-nullable`, item 1).
+- Exportar `expiresIn(ms: number): Date` em `src/utils/` para quem pensa em
+  duração.
+
+Depois disso `passphrase` pode ganhar `upsert` pela chave `value`. `invite`
+provavelmente continua sem, porque a única chave natural é o hash do token.
+
+## Custo
+
+Muda o contrato da API: `cli/resources/openapi/codehood.json`,
+`test/bruno/openapi.json`, `test/bruno/invite/Create.yml`, controllers REST,
+actions e `test/invite-service.spec.ts`.

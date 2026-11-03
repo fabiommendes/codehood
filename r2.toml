@@ -1,0 +1,11 @@
+# r2 watches this project because this file is here.
+# Delete the file to stop.
+
+[web]
+# name = "a better name than the directory"
+
+# The robot r2 web draws for this project's agents; picked from the
+# project's path when unset.
+# [web.robot]
+# body = "astromech"            # astromech, boxbot, ball, hal, bmo, cyclops
+# colors = ["blue", "yellow"]   # blue, red, purple, yellow, green, grey

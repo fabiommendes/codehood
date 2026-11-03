@@ -1,39 +1,42 @@
-# `src/core/schemas/` is verbose and confuses optional with nullable
+---
+type: issue
+status: backlog
+tags: [schemas, validation, user]
+relatedTo: [relative-expiry-breaks-idempotency]
+kind: task
+created: 2026-09-13
+creator: Fábio Macêdo Mendes
+---
 
-Three problems, same file.
+# `src/core/schemas/` repete schemas e usa sentinela no lugar de coluna nula
 
-## 1. `passphraseCreate` and `passphraseUpdate` are retyped instead of derived
+A troca de `.optional()` por `.nullish()` nos campos de colunas anuláveis já
+foi feita, e a regra está em `src/db/services/README.md:78`. Restam dois
+problemas.
 
-Every other create/update schema derives from its entity schema via
-`pick`/`omit`/`extend`/`partial`. These two are still plain `z.object`s and
-drift from `passphraseSchema` silently. Rewrite them the same way; do it
-together with [relative-expiry-breaks-idempotency.md](relative-expiry-breaks-idempotency.md),
-which adds `expiresAt` to `passphraseCreate`.
+## 1. `passphraseCreate` e `passphraseUpdate` são reescritos em vez de derivados
 
-## 2. `.optional()` where the column is nullable
+Os outros schemas de criação e atualização derivam do schema da entidade com
+`pick`/`omit`/`extend`/`partial`. Estes dois ainda são `z.object` soltos
+(`src/core/schemas/passphrase.ts:14-22`) e podem divergir de
+`passphraseSchema` sem aviso.
 
-A nullable column reached through an `.optional()` field cannot be cleared:
-`undefined` reaches Prisma as "leave it alone". Every create/update field over a
-nullable column must be `.nullish()` — absent means keep or default, `null`
-means clear.
+- Esperado: derivados de `passphraseSchema`, como os demais.
+- Obtido: objetos escritos à mão.
 
-Already converted by `dev/specs/to-review/service-upsert.md` (the seven upsertable
-entities): `courseCreate.description`, `timeSlotCreate.title`,
-`resourceCreate`/`resourceUpdate`'s `description`/`data`/`extra`/`fileId`,
-`calendarEventUpdate.description`. What remains is the sweep over the rest of
-the file and the rule being applied to new schemas.
+Fazer junto com `relative-expiry-breaks-idempotency`, que acrescenta
+`expiresAt` a `passphraseCreate`.
 
-Carve-out: `apiKeySchema.token` and `inviteSchema.token` are legitimately
-`.optional()`. They are output-shape optionality — present only in the create
-response — not nullable columns. Do not "fix" them.
+## 2. `githubId` e `schoolId` usam um sentinela no lugar de `NULL`
 
-Rule of thumb worth recording once this lands: `.optional()` = "I am not
-saying", `.nullish()` = "I can also say nothing", plain = required.
+`User.githubId` e `User.schoolId` são `String @unique` NOT NULL
+(`prisma/schema.prisma:47-48`) e guardam `!<username>` quando ausentes.
+`user.service.ts` grava o sentinela com `nullSentinel`/`mask` e o remove na
+leitura com `unmask` (`src/db/services/user.service.ts:87-88`,
+`src/db/services/user.service.ts:394-426`). O sentinela existe porque alguns
+bancos recusam nulos repetidos em `@unique`; o SQLite aceita.
 
-## 3. `nullSentinel` should become a real nullable column
+- Esperado: `String? @unique`, sem `nullSentinel`/`mask`/`unmask`.
+- Obtido: sentinela em todo caminho de leitura e escrita de usuário.
 
-`User.githubId` and `User.schoolId` are `String @unique` NOT NULL holding a
-`!<username>` sentinel when absent, unmasked on read by `user.service.ts`. The
-sentinel exists because `@unique` rejects duplicate nulls in some engines —
-SQLite does not, so the column can simply be `String? @unique`. Needs a
-migration plus removing `nullSentinel`/`unmask`.
+Exige migração.
