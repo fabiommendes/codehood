@@ -1,0 +1,19 @@
+---
+// A page whose island throws while the server renders it, to check that a
+// crash in an island answers with the error page instead of a broken stream.
+// Only outside production.
+import CrashingIsland from "@/components/design/CrashingIsland";
+import { DEVELOPMENT } from "@/core/constants";
+
+export const prerender = false;
+
+if (!DEVELOPMENT) return new Response(null, { status: 404 });
+---
+
+<html lang="en">
+  <body>
+    <p>Before the island.</p>
+    <CrashingIsland client:load />
+    <p>After the island.</p>
+  </body>
+</html>

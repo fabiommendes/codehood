@@ -109,11 +109,36 @@ export const originMiddleware = defineMiddleware((context, next) => {
 	);
 });
 
+/**
+ * Renders an HTML page in full before sending it, so an error thrown while
+ * rendering answers with the error page.
+ *
+ * A streamed page has its status and first chunks on the wire before an
+ * island further down throws; the Node adapter then cuts the connection and
+ * the browser waits on a document that never completes. Reading the body here
+ * turns that error into a throw Astro answers with `500.astro`. The node
+ * adapter's `experimentalDisableStreaming` does the same, but only for the
+ * built server, not for `astro dev`.
+ */
+export const bufferHtmlMiddleware = defineMiddleware(async (_context, next) => {
+	const response = await next();
+	const type = response.headers.get("content-type") ?? "";
+	if (!response.body || !type.startsWith("text/html")) return response;
+
+	const html = await response.text();
+	return new Response(html, {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	});
+});
+
 const COMMON_MIDDLEWARES = [
 	sessionMiddleware,
 	apiKeyMiddleware,
 	originMiddleware,
 	adminMiddleware,
+	bufferHtmlMiddleware,
 ] as const;
 
 // No request ever creates a user. Demo accounts and demo courses are seeded
