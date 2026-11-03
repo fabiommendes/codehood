@@ -230,9 +230,7 @@ export const rollCallApi = CRUD("/api/course/[discipline]/[course]/roll-call", {
 	key: schema.rollCallPK,
 
 	tags: ["Roll Calls"],
-	// `create` and `upsert` are withheld, and the service's `create` takes an
-	// event rather than the scope the registry would hand it.
-	service: db.rollCall as never,
+	service: db.rollCall,
 
 	parseKeyParams(params) {
 		return {

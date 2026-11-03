@@ -111,11 +111,19 @@ export type CrudRouteOptions<
  *    by the findOne, update and delete operations.
  *
  */
-export function CRUD<Entity, Create, Filter, Key, Update, Scope, CreateExtra>(
+export function CRUD<
+	Entity,
+	CreateSchema extends ZodType | null,
+	Filter,
+	Key,
+	Update,
+	Scope,
+	CreateExtra,
+>(
 	path: `/api/${string}`,
-	options: CrudRouteOptions<
+	options: CrudOptions<
 		Entity,
-		Create,
+		CreateSchema,
 		Filter,
 		Key,
 		Update,
@@ -123,9 +131,58 @@ export function CRUD<Entity, Create, Filter, Key, Update, Scope, CreateExtra>(
 		CreateExtra
 	>,
 ) {
-	const api = new CRUDApi(path, options);
+	// `create: null` withholds every route that would call `create` or
+	// `upsert`, so the service only needs them when there is a create schema.
+	const api = new CRUDApi(
+		path,
+		options as unknown as CrudRouteOptions<
+			Entity,
+			CreateOf<CreateSchema>,
+			Filter,
+			Key,
+			Update,
+			Scope,
+			CreateExtra
+		>,
+	);
 	return api.generate();
 }
+
+/// The output type of a create schema, `never` when there is none.
+type CreateOf<CreateSchema> = CreateSchema extends ZodType<infer T> ? T : never;
+
+/// The options `CRUD()` takes: a service without `create` and `upsert` is
+/// accepted when the route has no create schema.
+type CrudOptions<
+	EntityT,
+	CreateSchema extends ZodType | null,
+	FilterT,
+	KeyT,
+	UpdateT,
+	ScopeT,
+	CreateExtra,
+> = Omit<
+	CrudRouteOptions<
+		EntityT,
+		CreateOf<CreateSchema>,
+		FilterT,
+		KeyT,
+		UpdateT,
+		ScopeT,
+		CreateExtra
+	>,
+	"create" | "service"
+> & {
+	create: CreateSchema;
+	service: FindOne<KeyT, EntityT> &
+		FindMany<FilterT & ScopeT, EntityT> &
+		Update<KeyT, UpdateT, EntityT> &
+		Delete<KeyT> &
+		(CreateSchema extends null
+			? unknown
+			: Create<CreateOf<CreateSchema> & CreateExtra, EntityT> &
+					Upsert<CreateOf<CreateSchema> & CreateExtra, EntityT>);
+};
 
 class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	path: string;
@@ -182,7 +239,9 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 			findOne: !this.options.skipFindOne || undefined,
 			findMany: this.options.filter !== null || undefined,
 			upsert:
-				(this.options.upsert !== false && this.options.update !== null) ||
+				(this.options.upsert !== false &&
+					this.options.create !== null &&
+					this.options.update !== null) ||
 				undefined,
 			update: this.options.update !== null || undefined,
 			delete: !this.options.skipDelete || undefined,
