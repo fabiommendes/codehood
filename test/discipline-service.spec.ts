@@ -46,10 +46,12 @@ test("findOne() returns a discipline by slug, or null", async () => {
 		{ slug: "disc-findone", name: "Find One" },
 		FULL_ACCESS,
 	);
-	expect((await db.discipline.findOne({ slug: "disc-findone" }))?.name).toBe(
-		"Find One",
-	);
-	expect(await db.discipline.findOne({ slug: "disc-missing" })).toBeNull();
+	expect(
+		(await db.discipline.findOne({ slug: "disc-findone" }, FULL_ACCESS))?.name,
+	).toBe("Find One");
+	expect(
+		await db.discipline.findOne({ slug: "disc-missing" }, FULL_ACCESS),
+	).toBeNull();
 });
 
 test("update() renames a discipline and refuses a non-admin", async () => {
@@ -118,7 +120,7 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 
 	await db.course.delete({ id: course.id }, FULL_ACCESS);
 	await db.discipline.delete({ slug }, FULL_ACCESS);
-	expect(await db.discipline.findOne({ slug })).toBeNull();
+	expect(await db.discipline.findOne({ slug }, FULL_ACCESS)).toBeNull();
 });
 
 test("upsert creates on first call, updates the same row in place on the second, and a different slug creates a separate row", async () => {
@@ -136,7 +138,10 @@ test("upsert creates on first call, updates the same row in place on the second,
 	expect(updated.slug).toBe("disc-upsert"); // same key, same row
 	expect(updated.name).toBe("After"); // changed
 
-	const sameSlug = await db.discipline.findMany({ slugs: ["disc-upsert"] });
+	const sameSlug = await db.discipline.findMany(
+		{ slugs: ["disc-upsert"] },
+		FULL_ACCESS,
+	);
 	expect(sameSlug).toHaveLength(1);
 
 	const other = await db.discipline.upsert(
@@ -144,9 +149,12 @@ test("upsert creates on first call, updates the same row in place on the second,
 		FULL_ACCESS,
 	);
 	expect(other.slug).toBe("disc-upsert-2");
-	const both = await db.discipline.findMany({
-		slugs: ["disc-upsert", "disc-upsert-2"],
-	});
+	const both = await db.discipline.findMany(
+		{
+			slugs: ["disc-upsert", "disc-upsert-2"],
+		},
+		FULL_ACCESS,
+	);
 	expect(both).toHaveLength(2);
 });
 

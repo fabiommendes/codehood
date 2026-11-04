@@ -22,15 +22,11 @@ import {
 	examExceptionSchema,
 	examExceptionUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { released } from "@/services/exam-state";
 import { durationToMinutes } from "@/utils/schedule-time";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefWhere,
@@ -80,7 +76,7 @@ function fromDb(row: DbExamException): ExamException {
 	};
 }
 
-/// Refuses an exception that breaks the rules of {@link ExamExceptionService.create}.
+/// Refuses an exception that breaks the rules of `create`.
 async function checkRules(
 	tx: PrismaTx,
 	courseId: number,
@@ -139,37 +135,17 @@ async function checkRules(
 
 const examExceptionView = examExceptionSchema.or(examExceptionPublicSchema);
 
-export class ExamExceptionService extends CrudBase<{
+/// The CRUD shape of the service.
+type ExamExceptionT = {
 	entity: ExamExceptionView;
 	pkFilter: ExamExceptionPK;
 	create: ExamExceptionCreate;
 	filter: ExamExceptionFilter;
 	update: ExamExceptionUpdate;
-}> {
-	// Only holders of `exam.manage-exceptions` write, so a write always returns
-	// the whole row. The logic and its docs live in the `*Tx` methods.
-	override create<Opt extends ServiceOpts>(
-		input: ExamExceptionCreate,
-		opts: Opt,
-	): Promise<ExamException> {
-		return super.create(input, opts) as Promise<ExamException>;
-	}
+};
 
-	override update<Opt extends ServiceOpts>(
-		filter: ExamExceptionPK,
-		fields: ExamExceptionUpdate,
-		opts: Opt,
-	): Promise<ExamException> {
-		return super.update(filter, fields, opts) as Promise<ExamException>;
-	}
-
-	override upsert<Opt extends ServiceOpts>(
-		input: ExamExceptionCreate,
-		opts: Opt,
-	): Promise<ExamException> {
-		return super.upsert(input, opts) as Promise<ExamException>;
-	}
-
+/** The service of `client` (the shared client by default). */
+export const makeExamExceptionService = defineService<ExamExceptionT>()(() => {
 	/**
 	 * Creates the exception of `input.username` on `input.exam`.
 	 *
@@ -184,106 +160,112 @@ export class ExamExceptionService extends CrudBase<{
 	 * If a rule above fails (keyed on `exam`, `scheduledAt`, `username` or
 	 * `extraTime`), or the student already has an exception on this exam.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [examExceptionCreate],
 		returns: examExceptionSchema,
-		args: [undefined, examExceptionCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: ExamExceptionCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<ExamException> {
-		const { course, exam } = await this.load(tx, input);
-		ensurePerm(opts.actor, "exam.manage-exceptions", course);
-		await checkRules(tx, course.id, await withRelease(tx, exam, course), input);
-		return fromDb(await createRow(tx, exam.id, input));
-	}
+		run: async (
+			tx: PrismaTx,
+			input: ExamExceptionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ExamException> => {
+			const { course, exam } = await loadCourseAndExam(tx, input);
+			ensurePerm(opts.actor, "exam.manage-exceptions", course);
+			await checkRules(
+				tx,
+				course.id,
+				await withRelease(tx, exam, course),
+				input,
+			);
+			return fromDb(await createRow(tx, exam.id, input));
+		},
+	});
 
 	/**
 	 * Finds the exception of one student on one exam.
 	 *
 	 * A holder of `exam.manage-exceptions` gets the whole row and the student
-	 * it belongs to gets {@link ExamExceptionPublic}. Anyone else gets `null`,
+	 * it belongs to gets `ExamExceptionPublic`. Anyone else gets `null`,
 	 * the same answer as for a student with no exception.
 	 *
 	 * @throws {@link NotFound} If the course or the exam does not exist.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [examExceptionPK],
 		returns: examExceptionView.nullable(),
-		args: [undefined, examExceptionPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: ExamExceptionPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<ExamExceptionView | null> {
-		const { course, exam } = await this.load(tx, filter);
-		const full = hasPerm(opts.actor, "exam.manage-exceptions", course);
-		if (!full && !isSelf(opts.actor, filter.username)) return null;
+		run: async (
+			tx: PrismaTx,
+			filter: ExamExceptionPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ExamExceptionView | null> => {
+			const { course, exam } = await loadCourseAndExam(tx, filter);
+			const full = hasPerm(opts.actor, "exam.manage-exceptions", course);
+			if (!full && !isSelf(opts.actor, filter.username)) return null;
 
-		const row = await tx.examException.findUnique({
-			where: {
-				examId_username: { examId: exam.id, username: filter.username },
-			},
-			include: examExceptionInclude,
-		});
-		return row ? toView(row, full) : null;
-	}
+			const row = await tx.examException.findUnique({
+				where: {
+					examId_username: { examId: exam.id, username: filter.username },
+				},
+				include: examExceptionInclude,
+			});
+			return row ? toView(row, full) : null;
+		},
+	});
 
 	/**
 	 * Lists the exceptions of a course, optionally narrowed to one exam or one student, in one query.
 	 *
 	 * A holder of `exam.manage-exceptions` gets every matching row in full. A
 	 * student enrolled in the course gets at most their own, as
-	 * {@link ExamExceptionPublic}, whatever `filter.username` says. Ordered by
+	 * `ExamExceptionPublic`, whatever `filter.username` says. Ordered by
 	 * exam slug, then username.
 	 *
 	 * @throws {@link NotFound} If the course, or `filter.exam` when given, does not exist.
 	 * @throws {@link NotAllowed} If `actor` may neither manage exceptions nor read the course's contents.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [examExceptionFilter],
 		returns: examExceptionView.array(),
-		args: [undefined, examExceptionFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: ExamExceptionFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<ExamExceptionView[]> {
-		const course = await loadCourse(tx, filter.course);
-		const full = hasPerm(opts.actor, "exam.manage-exceptions", course);
-		if (!full && !hasPerm(opts.actor, "course.read-contents", course)) {
-			throw new NotAllowed("exam.read");
-		}
-		if (filter.exam !== undefined) {
-			valueOrNotFound(
-				"exam",
-				await tx.exam.findUnique({
-					where: { courseId_slug: { courseId: course.id, slug: filter.exam } },
-					select: { id: true },
-				}),
-			);
-		}
+		run: async (
+			tx: PrismaTx,
+			filter: ExamExceptionFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ExamExceptionView[]> => {
+			const course = await loadCourse(tx, filter.course);
+			const full = hasPerm(opts.actor, "exam.manage-exceptions", course);
+			if (!full && !hasPerm(opts.actor, "course.read-contents", course)) {
+				throw new NotAllowed("exam.read");
+			}
+			if (filter.exam !== undefined) {
+				valueOrNotFound(
+					"exam",
+					await tx.exam.findUnique({
+						where: {
+							courseId_slug: { courseId: course.id, slug: filter.exam },
+						},
+						select: { id: true },
+					}),
+				);
+			}
 
-		const username = full
-			? filter.username
-			: (opts.actor as { username: string }).username;
-		const rows = await tx.examException.findMany({
-			where: {
-				exam: {
-					courseId: course.id,
-					...(filter.exam === undefined ? {} : { slug: filter.exam }),
+			const username = full
+				? filter.username
+				: (opts.actor as { username: string }).username;
+			const rows = await tx.examException.findMany({
+				where: {
+					exam: {
+						courseId: course.id,
+						...(filter.exam === undefined ? {} : { slug: filter.exam }),
+					},
+					...(username === undefined ? {} : { username }),
 				},
-				...(username === undefined ? {} : { username }),
-			},
-			include: examExceptionInclude,
-			orderBy: [{ exam: { slug: "asc" } }, { username: "asc" }],
-		});
-		return rows.map((row) => toView(row, full));
-	}
+				include: examExceptionInclude,
+				orderBy: [{ exam: { slug: "asc" } }, { username: "asc" }],
+			});
+			return rows.map((row) => toView(row, full));
+		},
+	});
 
 	/**
 	 * Changes `extraTime`, `scheduledAt` or `note` of an existing exception.
@@ -295,37 +277,36 @@ export class ExamExceptionService extends CrudBase<{
 	 * @throws {@link NotAllowed} If `actor` lacks `exam.manage-exceptions` on the course.
 	 * @throws {@link InvalidData} If the merged exception breaks a rule of `create`.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [examExceptionPK, examExceptionUpdate],
 		returns: examExceptionSchema,
-		args: [undefined, examExceptionPK, examExceptionUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: ExamExceptionPK,
-		fields: ExamExceptionUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<ExamException> {
-		const { course, exam } = await this.load(tx, filter);
-		ensurePerm(opts.actor, "exam.manage-exceptions", course);
-		const existing = valueOrNotFound(
-			"exam exception",
-			await tx.examException.findUnique({
-				where: {
-					examId_username: { examId: exam.id, username: filter.username },
-				},
-			}),
-		);
+		run: async (
+			tx: PrismaTx,
+			filter: ExamExceptionPK,
+			fields: ExamExceptionUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ExamException> => {
+			const { course, exam } = await loadCourseAndExam(tx, filter);
+			ensurePerm(opts.actor, "exam.manage-exceptions", course);
+			const existing = valueOrNotFound(
+				"exam exception",
+				await tx.examException.findUnique({
+					where: {
+						examId_username: { examId: exam.id, username: filter.username },
+					},
+				}),
+			);
 
-		const merged = mergeFields(existing, fields);
-		await checkRules(tx, course.id, await withRelease(tx, exam, course), {
-			username: filter.username,
-			...merged,
-		});
-		return fromDb(
-			await saveRow(tx, exam.id, { username: filter.username, ...merged }),
-		);
-	}
+			const merged = mergeFields(existing, fields);
+			await checkRules(tx, course.id, await withRelease(tx, exam, course), {
+				username: filter.username,
+				...merged,
+			});
+			return fromDb(
+				await saveRow(tx, exam.id, { username: filter.username, ...merged }),
+			);
+		},
+	});
 
 	/**
 	 * Creates or updates the exception keyed on `(course, exam, username)`.
@@ -337,33 +318,32 @@ export class ExamExceptionService extends CrudBase<{
 	 * @throws {@link NotAllowed} If `actor` lacks `exam.manage-exceptions` on the course.
 	 * @throws {@link InvalidData} If the resulting exception breaks a rule of `create`.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [examExceptionCreate],
 		returns: examExceptionSchema,
-		args: [undefined, examExceptionCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: ExamExceptionCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<ExamException> {
-		const { course, exam } = await this.load(tx, input);
-		ensurePerm(opts.actor, "exam.manage-exceptions", course);
-		const existing = await tx.examException.findUnique({
-			where: {
-				examId_username: { examId: exam.id, username: input.username },
-			},
-		});
+		run: async (
+			tx: PrismaTx,
+			input: ExamExceptionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ExamException> => {
+			const { course, exam } = await loadCourseAndExam(tx, input);
+			ensurePerm(opts.actor, "exam.manage-exceptions", course);
+			const existing = await tx.examException.findUnique({
+				where: {
+					examId_username: { examId: exam.id, username: input.username },
+				},
+			});
 
-		const merged = existing ? mergeFields(existing, input) : input;
-		await checkRules(tx, course.id, await withRelease(tx, exam, course), {
-			username: input.username,
-			...merged,
-		});
-		return fromDb(
-			await saveRow(tx, exam.id, { username: input.username, ...merged }),
-		);
-	}
+			const merged = existing ? mergeFields(existing, input) : input;
+			await checkRules(tx, course.id, await withRelease(tx, exam, course), {
+				username: input.username,
+				...merged,
+			});
+			return fromDb(
+				await saveRow(tx, exam.id, { username: input.username, ...merged }),
+			);
+		},
+	});
 
 	/**
 	 * Deletes an exception, which is the only way to take one back.
@@ -371,48 +351,53 @@ export class ExamExceptionService extends CrudBase<{
 	 * @throws {@link NotFound} If the course, the exam or the exception does not exist.
 	 * @throws {@link NotAllowed} If `actor` lacks `exam.manage-exceptions` on the course.
 	 */
-	@Validate({ service: true, args: [undefined, examExceptionPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: ExamExceptionPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const { course, exam } = await this.load(tx, filter);
-		ensurePerm(opts.actor, "exam.manage-exceptions", course);
-		const existing = valueOrNotFound(
-			"exam exception",
-			await tx.examException.findUnique({
-				where: {
-					examId_username: { examId: exam.id, username: filter.username },
-				},
-				select: { id: true },
-			}),
-		);
-		await tx.examException.delete({ where: { id: existing.id } });
-	}
+	const remove = op({
+		args: [examExceptionPK],
+		run: async (
+			tx: PrismaTx,
+			filter: ExamExceptionPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const { course, exam } = await loadCourseAndExam(tx, filter);
+			ensurePerm(opts.actor, "exam.manage-exceptions", course);
+			const existing = valueOrNotFound(
+				"exam exception",
+				await tx.examException.findUnique({
+					where: {
+						examId_username: { examId: exam.id, username: filter.username },
+					},
+					select: { id: true },
+				}),
+			);
+			await tx.examException.delete({ where: { id: existing.id } });
+		},
+	});
 
-	// Private utilities -------------------------------------------------------
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
 
-	/// Loads the course and then the exam of `filter`, so a missing course wins over a missing exam.
-	private async load(
-		tx: PrismaTx,
-		filter: Pick<ExamExceptionPK, "course" | "exam">,
-	) {
-		const course = await loadCourse(tx, filter.course);
-		const exam = valueOrNotFound(
-			"exam",
-			await tx.exam.findUnique({
-				where: { courseId_slug: { courseId: course.id, slug: filter.exam } },
-				select: {
-					id: true,
-					...examTimingSelect,
-					gradesReleasedAt: true,
-					durationMs: true,
-				},
-			}),
-		);
-		return { course, exam };
-	}
+/** The service, as built by {@link makeExamExceptionService}. */
+export type ExamExceptionService = ReturnType<typeof makeExamExceptionService>;
+
+/// Loads the course and then the exam of `filter`, so a missing course wins over a missing exam.
+async function loadCourseAndExam(
+	tx: PrismaTx,
+	filter: Pick<ExamExceptionPK, "course" | "exam">,
+) {
+	const course = await loadCourse(tx, filter.course);
+	const exam = valueOrNotFound(
+		"exam",
+		await tx.exam.findUnique({
+			where: { courseId_slug: { courseId: course.id, slug: filter.exam } },
+			select: {
+				id: true,
+				...examTimingSelect,
+				gradesReleasedAt: true,
+				durationMs: true,
+			},
+		}),
+	);
+	return { course, exam };
 }
 
 /// `exam` plus whether its results are already released, which freezes its exceptions.

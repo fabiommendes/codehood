@@ -21,10 +21,10 @@ import {
 	feedbackSchema,
 	feedbackUpdate,
 } from "@/core/schemas";
-import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { released } from "@/services/exam-state";
-import { Validate } from "@/utils/validate";
 import { DbNull, type Prisma, type PrismaTx } from "../client";
 import {
 	courseRefMatch,
@@ -97,13 +97,17 @@ type DbFeedback = Prisma.FeedbackGetPayload<{
 
 type ExamRelease = DbFeedback["submission"]["response"]["exam"];
 
-export class FeedbackService extends CrudBase<{
+/// The CRUD shape of the service.
+type FeedbackT = {
 	entity: Feedback;
 	pkFilter: FeedbackPK;
 	create: FeedbackCreate;
 	filter: FeedbackFilter;
 	update: FeedbackUpdate;
-}> {
+};
+
+/** The service of `client` (the shared client by default). */
+export const makeFeedbackService = defineService<FeedbackT>()(() => {
 	/**
 	 * Records a grading pass against a submission, under `input.ref`.
 	 *
@@ -123,40 +127,39 @@ export class FeedbackService extends CrudBase<{
 	 * @throws {@link NotAllowed}
 	 * If `actor` may read the submission but not grade it.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [feedbackCreate],
 		returns: feedbackSchema,
-		args: [undefined, feedbackCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: FeedbackCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Feedback> {
-		const submission = await resolveGradableSubmission(
-			tx,
-			input.submission,
-			opts.actor,
-		);
+		run: async (
+			tx: PrismaTx,
+			input: FeedbackCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Feedback> => {
+			const submission = await resolveGradableSubmission(
+				tx,
+				input.submission,
+				opts.actor,
+			);
 
-		const { graderId, botId } = resolveGrader(input, opts.actor);
+			const { graderId, botId } = resolveGrader(input, opts.actor);
 
-		const row = await invalidIfExists(tx.feedback.create, {
-			data: {
-				submissionId: submission.id,
-				ref: input.ref,
-				score: input.score,
-				graderId,
-				botId,
-				feedback: input.feedback ?? null,
-				blanks: input.blanks ?? DbNull,
-			},
-			include: feedbackInclude(),
-		});
-		await markGraded(tx, submission.id, graderId);
+			const row = await invalidIfExists(tx.feedback.create, {
+				data: {
+					submissionId: submission.id,
+					ref: input.ref,
+					score: input.score,
+					graderId,
+					botId,
+					feedback: input.feedback ?? null,
+					blanks: input.blanks ?? DbNull,
+				},
+				include: feedbackInclude(),
+			});
+			await markGraded(tx, submission.id, graderId);
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Finds a grading pass by `id`, or by the submission it grades and its
@@ -166,25 +169,25 @@ export class FeedbackService extends CrudBase<{
 	 * student once the exam releases it. A pass the actor may not read is
 	 * `null`, exactly as a missing one is.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [feedbackPK],
 		returns: feedbackSchema.nullable(),
-		args: [undefined, feedbackPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: FeedbackPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Feedback | null> {
-		const row = await tx.feedback.findFirst({
-			where: feedbackWhere(filter),
-			include: feedbackInclude(),
-		});
-		if (!row) return null;
+		run: async (
+			tx: PrismaTx,
+			filter: FeedbackPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Feedback | null> => {
+			const row = await tx.feedback.findFirst({
+				where: feedbackWhere(filter),
+				include: feedbackInclude(),
+			});
+			if (!row) return null;
 
-		if (!canReadFeedback(opts.actor, row, new Date())) return null;
-		return fromDb(row);
-	}
+			if (!canReadFeedback(opts.actor, row, new Date())) return null;
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Lists the grading passes made in one course, narrowed to what `actor` may
@@ -198,70 +201,70 @@ export class FeedbackService extends CrudBase<{
 	 * If `actor` may not read the course's contents at all, or names another
 	 * author in `filter` while narrowed to their own rows.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [feedbackFilter],
 		returns: feedbackSchema.array(),
-		args: [undefined, feedbackFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: FeedbackFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Feedback[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: {
-					id: true,
-					instructor: { select: { username: true } },
-					enrollments: {
-						where: { status: "ACTIVE" as const },
-						select: { username: true },
-					},
-				},
-			}),
-		);
-
-		ensurePerm(opts.actor, "course.read-contents", course);
-
-		const owner = isCourseOwner(opts.actor, course);
-		const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
-
-		const rows = await tx.feedback.findMany({
-			where: {
-				submission: {
-					response: {
-						exam: {
-							courseId: course.id,
-							...(filter.exam ? { slug: filter.exam } : {}),
+		run: async (
+			tx: PrismaTx,
+			filter: FeedbackFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Feedback[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: {
+						id: true,
+						instructor: { select: { username: true } },
+						enrollments: {
+							where: { status: "ACTIVE" as const },
+							select: { username: true },
 						},
-						...(restrictTo
-							? { authorId: restrictTo }
-							: filter.author
-								? { authorId: filter.author }
-								: {}),
 					},
-					...(filter.question ? { question: { slug: filter.question } } : {}),
-					...(filter.submission ? submissionRefWhere(filter.submission) : {}),
-				},
-				...(filter.grader ? { graderId: filter.grader } : {}),
-				...(filter.bot ? { botId: filter.bot } : {}),
-				...(filter.automated !== undefined
-					? filter.automated
-						? { botId: { not: null } }
-						: { graderId: { not: null } }
-					: {}),
-			},
-			include: feedbackInclude(),
-			orderBy: [{ submissionId: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-		});
+				}),
+			);
 
-		const now = new Date();
-		return rows
-			.filter((row) => canReadFeedback(opts.actor, row, now))
-			.map(fromDb);
-	}
+			ensurePerm(opts.actor, "course.read-contents", course);
+
+			const owner = isCourseOwner(opts.actor, course);
+			const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
+
+			const rows = await tx.feedback.findMany({
+				where: {
+					submission: {
+						response: {
+							exam: {
+								courseId: course.id,
+								...(filter.exam ? { slug: filter.exam } : {}),
+							},
+							...(restrictTo
+								? { authorId: restrictTo }
+								: filter.author
+									? { authorId: filter.author }
+									: {}),
+						},
+						...(filter.question ? { question: { slug: filter.question } } : {}),
+						...(filter.submission ? submissionRefWhere(filter.submission) : {}),
+					},
+					...(filter.grader ? { graderId: filter.grader } : {}),
+					...(filter.bot ? { botId: filter.bot } : {}),
+					...(filter.automated !== undefined
+						? filter.automated
+							? { botId: { not: null } }
+							: { graderId: { not: null } }
+						: {}),
+				},
+				include: feedbackInclude(),
+				orderBy: [{ submissionId: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+			});
+
+			const now = new Date();
+			return rows
+				.filter((row) => canReadFeedback(opts.actor, row, now))
+				.map(fromDb);
+		},
+	});
 
 	/**
 	 * Revises a grading pass in place, moving its score, its comment or both.
@@ -272,45 +275,46 @@ export class FeedbackService extends CrudBase<{
 	 * If no pass matches `filter`, or the actor may not read the one that does.
 	 * @throws {@link NotAllowed} If `actor` may read the pass but not write it.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [feedbackPK, feedbackUpdate],
 		returns: feedbackSchema,
-		args: [undefined, feedbackPK, feedbackUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: FeedbackPK,
-		fields: FeedbackUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Feedback> {
-		const feedback = await writableFeedback(
-			tx,
-			filter,
-			opts.actor,
-			"feedback.update",
-		);
+		run: async (
+			tx: PrismaTx,
+			filter: FeedbackPK,
+			fields: FeedbackUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Feedback> => {
+			const feedback = await writableFeedback(
+				tx,
+				filter,
+				opts.actor,
+				"feedback.update",
+			);
 
-		const row = await tx.feedback.update({
-			where: { id: feedback.id },
-			data: {
-				...(fields.score !== undefined ? { score: fields.score } : {}),
-				...(fields.feedback !== undefined ? { feedback: fields.feedback } : {}),
-				...(fields.blanks !== undefined
-					? { blanks: fields.blanks ?? DbNull }
-					: {}),
-			},
-			include: feedbackInclude(),
-		});
+			const row = await tx.feedback.update({
+				where: { id: feedback.id },
+				data: {
+					...(fields.score !== undefined ? { score: fields.score } : {}),
+					...(fields.feedback !== undefined
+						? { feedback: fields.feedback }
+						: {}),
+					...(fields.blanks !== undefined
+						? { blanks: fields.blanks ?? DbNull }
+						: {}),
+				},
+				include: feedbackInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Writes the pass named by `input.ref`, revising it when it is already there.
 	 *
 	 * Keyed on `(submission, ref)`, never on `id`.
 	 *
-	 * Writing a new pass moves the submission's status as {@link createTx}
+	 * Writing a new pass moves the submission's status as `create`
 	 * does. Revising an existing pass leaves it as it is.
 	 *
 	 * @throws {@link NotFound}
@@ -326,62 +330,61 @@ export class FeedbackService extends CrudBase<{
 	 * If `actor` may read the submission but not grade it, or names a grader
 	 * or bot it may not write as.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [feedbackCreate],
 		returns: feedbackSchema,
-		args: [undefined, feedbackCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: FeedbackCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Feedback> {
-		const submission = await resolveGradableSubmission(
-			tx,
-			input.submission,
-			opts.actor,
-		);
+		run: async (
+			tx: PrismaTx,
+			input: FeedbackCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Feedback> => {
+			const submission = await resolveGradableSubmission(
+				tx,
+				input.submission,
+				opts.actor,
+			);
 
-		const existing = await tx.feedback.findUnique({
-			where: {
-				submissionId_ref: { submissionId: submission.id, ref: input.ref },
-			},
-		});
+			const existing = await tx.feedback.findUnique({
+				where: {
+					submissionId_ref: { submissionId: submission.id, ref: input.ref },
+				},
+			});
 
-		if (existing) {
-			// The pass keeps its grader, but naming one still has to be allowed.
-			if (input.grader != null || input.bot != null) {
-				resolveGrader(input, opts.actor);
+			if (existing) {
+				// The pass keeps its grader, but naming one still has to be allowed.
+				if (input.grader != null || input.bot != null) {
+					resolveGrader(input, opts.actor);
+				}
+				const row = await tx.feedback.update({
+					where: { id: existing.id },
+					data: {
+						score: input.score,
+						feedback: input.feedback ?? null,
+						blanks: input.blanks ?? DbNull,
+					},
+					include: feedbackInclude(),
+				});
+				return fromDb(row);
 			}
-			const row = await tx.feedback.update({
-				where: { id: existing.id },
+
+			const { graderId, botId } = resolveGrader(input, opts.actor);
+			const row = await invalidIfExists(tx.feedback.create, {
 				data: {
+					submissionId: submission.id,
+					ref: input.ref,
 					score: input.score,
+					graderId,
+					botId,
 					feedback: input.feedback ?? null,
 					blanks: input.blanks ?? DbNull,
 				},
 				include: feedbackInclude(),
 			});
+			await markGraded(tx, submission.id, graderId);
+
 			return fromDb(row);
-		}
-
-		const { graderId, botId } = resolveGrader(input, opts.actor);
-		const row = await invalidIfExists(tx.feedback.create, {
-			data: {
-				submissionId: submission.id,
-				ref: input.ref,
-				score: input.score,
-				graderId,
-				botId,
-				feedback: input.feedback ?? null,
-				blanks: input.blanks ?? DbNull,
-			},
-			include: feedbackInclude(),
-		});
-		await markGraded(tx, submission.id, graderId);
-
-		return fromDb(row);
-	}
+		},
+	});
 
 	/**
 	 * Removes a grading pass.
@@ -393,22 +396,29 @@ export class FeedbackService extends CrudBase<{
 	 * If no pass matches `filter`, or the actor may not read the one that does.
 	 * @throws {@link NotAllowed} If `actor` may read the pass but not write it.
 	 */
-	@Validate({ service: true, args: [undefined, feedbackPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: FeedbackPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const feedback = await writableFeedback(
-			tx,
-			filter,
-			opts.actor,
-			"feedback.delete",
-		);
+	const remove = op({
+		args: [feedbackPK],
+		run: async (
+			tx: PrismaTx,
+			filter: FeedbackPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const feedback = await writableFeedback(
+				tx,
+				filter,
+				opts.actor,
+				"feedback.delete",
+			);
 
-		await tx.feedback.delete({ where: { id: feedback.id } });
-	}
-}
+			await tx.feedback.delete({ where: { id: feedback.id } });
+		},
+	});
+
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
+
+/** The service, as built by {@link makeFeedbackService}. */
+export type FeedbackService = ReturnType<typeof makeFeedbackService>;
 
 // Private utilities -----------------------------------------------------------
 

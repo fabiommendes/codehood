@@ -152,7 +152,7 @@ test("delete() refuses while a course uses the edition, and succeeds once it is 
 
 	await db.course.delete({ id: course.id }, FULL_ACCESS);
 	await db.edition.delete({ slug }, FULL_ACCESS);
-	expect(await db.edition.findOne({ slug })).toBeNull();
+	expect(await db.edition.findOne({ slug }, FULL_ACCESS)).toBeNull();
 });
 
 test("findMany({ active: true }) returns only editions whose window contains now", async () => {
@@ -165,7 +165,7 @@ test("findMany({ active: true }) returns only editions whose window contains now
 		FULL_ACCESS,
 	);
 
-	const active = await db.edition.findMany({ active: true });
+	const active = await db.edition.findMany({ active: true }, FULL_ACCESS);
 	const slugs = active.map((e) => e.slug);
 	expect(slugs).toContain("2107");
 	expect(slugs).not.toContain("2106");
@@ -223,7 +223,10 @@ test("upsert creates on first call, updates the same row in place on the second,
 	expect(updated.endAt).toEqual(newEndAt); // changed
 	expect(updated.startAt).toEqual(WINDOW.startAt); // untouched
 
-	const sameSlug = await db.edition.findMany({ slugs: ["2201-1"] });
+	const sameSlug = await db.edition.findMany(
+		{ slugs: ["2201-1"] },
+		FULL_ACCESS,
+	);
 	expect(sameSlug).toHaveLength(1);
 
 	const other = await db.edition.upsert(
@@ -231,6 +234,9 @@ test("upsert creates on first call, updates the same row in place on the second,
 		FULL_ACCESS,
 	);
 	expect(other.slug).toBe("2201-2");
-	const both = await db.edition.findMany({ slugs: ["2201-1", "2201-2"] });
+	const both = await db.edition.findMany(
+		{ slugs: ["2201-1", "2201-2"] },
+		FULL_ACCESS,
+	);
 	expect(both).toHaveLength(2);
 });

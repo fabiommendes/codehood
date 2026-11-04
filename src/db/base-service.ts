@@ -1,16 +1,7 @@
 import type { Actor } from "@/auth/actor";
-import { ensurePerm } from "@/auth/permissions";
 import type { ActionCode } from "@/core/error";
 import { NotAllowed } from "@/core/error";
-import type { CourseId } from "@/core/schemas";
-import type { CourseNaturalKey } from "@/urls";
-import {
-	type Prisma,
-	type PrismaClient,
-	type PrismaTx,
-	prisma,
-} from "./client";
-import { courseRefWhere, valueOrNotFound } from "./utils";
+import type { PrismaClient, PrismaTx } from "./client";
 
 /**
  * Common set of options for service methods. `tx` is optional, but `actor` is required.
@@ -78,7 +69,7 @@ export interface Delete<Pk> {
 	delete<Opt extends ServiceOpts>(filter: Pk, opts: Opt): Promise<void>;
 }
 
-type CrudT<
+export type CrudT<
 	Entity,
 	Filter,
 	Pk = Entity extends { id: unknown } ? { id: Entity["id"] } : unknown,
@@ -97,7 +88,7 @@ type CrudT<
 };
 
 /// `upsert` takes exactly what `create` takes, unless `T` switched it off.
-type UpsertIn<T extends { create?: unknown; upsert?: boolean }> =
+export type UpsertIn<T extends { create?: unknown; upsert?: boolean }> =
 	T["upsert"] extends false ? never : T["create"];
 
 /**
@@ -194,244 +185,4 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 		: (input as unknown as CreateIn);
 
 	return service.create(create, scoped);
-}
-
-/**
- * A base class for CRUD operations with transaction support.
- *
- * Provides default implementations for CRUD operations that can be overridden
- * by subclasses. It provides some common functionality that many Codehood
- * services may rely on.
- *
- * ## Notice for Subclasses
- *
- * The subclass may directly override the public CRUD methods. If the method
- * makes multiple database operations, prefer overriding the transaction-aware
- * methods (`createTx`, `findOneTx`, etc.) due to convenience and the guarantees
- * they provide.
- *
- * Document the private Tx variants as if they were the public CRUD methods
- * themselves.
- */
-// r2: adr-0004
-export class CrudBase<
-	T extends CrudT<unknown, unknown, unknown, unknown, unknown>,
-> implements
-		Create<T["create"], T["entity"]>,
-		FindMany<T["filter"], T["entity"]>,
-		FindOne<T["pkFilter"], T["entity"]>,
-		Update<T["pkFilter"], T["update"], T["entity"]>,
-		Delete<T["pkFilter"]>,
-		Upsert<UpsertIn<T>, T["entity"]>
-{
-	protected readonly prisma: PrismaTx | PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
-	protected $transaction<T, Opt extends ServiceOpts>(
-		opts: Opt,
-		fn: (tx: PrismaTx, scoped: Omit<Opt, "tx">) => Promise<T>,
-	): Promise<T> {
-		const withoutTx: Omit<Opt, "tx"> & { tx?: PrismaTx } = { ...opts };
-		delete withoutTx.tx;
-
-		if (opts.tx) return fn(opts.tx, withoutTx);
-		return this.prisma.$transaction((tx) => fn(tx, withoutTx));
-	}
-
-	/**
-	 * Create a new Entity.
-	 *
-	 * Subclasses may implement `createTx` to provide the actual creation logic
-	 * in a transaction-aware manner.
-	 */
-	create<Opt extends ServiceOpts>(
-		input: T["create"],
-		opts: Opt,
-	): Promise<T["entity"]> {
-		return this.$transaction(opts, (tx, scoped) =>
-			this.createTx(tx, input, scoped),
-		);
-	}
-
-	protected createTx<Opt extends ServiceOptsWithoutTx>(
-		_tx: PrismaTx,
-		_input: T["create"],
-		_opts: Opt,
-	): Promise<T["entity"]> {
-		throw new Error("Method not implemented.");
-	}
-
-	/**
-	 * Find the first Entity matching `filter`, or `null` if none is found.
-	 *
-	 * Subclasses may implement `findOneTx` to provide the actual lookup logic
-	 * in a transaction-aware manner.
-	 */
-	findOne<Opt extends ServiceOpts>(
-		filter: T["pkFilter"],
-		opts: Opt,
-	): Promise<T["entity"] | null> {
-		return this.$transaction(opts, (tx, scoped) =>
-			this.findOneTx(tx, filter, scoped),
-		);
-	}
-
-	protected findOneTx<Opt extends ServiceOptsWithoutTx>(
-		_tx: PrismaTx,
-		_filter: T["pkFilter"],
-		_opts: Opt,
-	): Promise<T["entity"] | null> {
-		throw new Error("Method not implemented.");
-	}
-
-	/**
-	 * Find all Entities matching `filter`.
-	 *
-	 * Subclasses may implement `findManyTx` to provide the actual lookup logic
-	 * in a transaction-aware manner.
-	 */
-	findMany<Opt extends ServiceOpts>(
-		filter: T["filter"],
-		opts: Opt,
-	): Promise<T["entity"][]> {
-		return this.$transaction(opts, (tx, scoped) =>
-			this.findManyTx(tx, filter, scoped),
-		);
-	}
-
-	protected findManyTx<Opt extends ServiceOptsWithoutTx>(
-		_tx: PrismaTx,
-		_filter: T["filter"],
-		_opts: Opt,
-	): Promise<T["entity"][]> {
-		throw new Error("Method not implemented.");
-	}
-
-	/**
-	 * Update the first Entity matching `filter`.
-	 *
-	 * Subclasses may implement `updateTx` to provide the actual update logic
-	 * in a transaction-aware manner.
-	 */
-	update<Opt extends ServiceOpts>(
-		filter: T["pkFilter"],
-		update: T["update"],
-		opts: Opt,
-	): Promise<T["entity"]> {
-		return this.$transaction(opts, (tx, scoped) =>
-			this.updateTx(tx, filter, update, scoped),
-		);
-	}
-
-	protected updateTx<Opt extends ServiceOptsWithoutTx>(
-		_tx: PrismaTx,
-		_filter: T["pkFilter"],
-		_update: T["update"],
-		_opts: Opt,
-	): Promise<T["entity"]> {
-		throw new Error("Method not implemented.");
-	}
-
-	/**
-	 * Update an Entity if it exists, or create it if it does not (upsert).
-	 *
-	 * Subclasses may implement `upsertTx` to provide the actual upsert logic
-	 * in a transaction-aware manner.
-	 */
-	upsert<Opt extends ServiceOpts>(
-		input: UpsertIn<T>,
-		opts: Opt,
-	): Promise<T["entity"]> {
-		return this.$transaction(opts, (tx, scoped) =>
-			this.upsertTx(tx, input, scoped),
-		);
-	}
-
-	protected upsertTx<Opt extends ServiceOptsWithoutTx>(
-		_tx: PrismaTx,
-		_input: UpsertIn<T>,
-		_opts: Opt,
-	): Promise<T["entity"]> {
-		throw new Error("Method not implemented.");
-	}
-
-	/**
-	 * Delete the first Entity matching `filter`.
-	 *
-	 * Subclasses may implement `deleteTx` to provide the actual deletion logic
-	 * in a transaction-aware manner.
-	 */
-	delete<Opt extends ServiceOpts>(
-		filter: T["pkFilter"],
-		opts: Opt,
-	): Promise<void> {
-		return this.$transaction(opts, (tx, scoped) =>
-			this.deleteTx(tx, filter, scoped),
-		);
-	}
-
-	protected deleteTx<Opt extends ServiceOptsWithoutTx>(
-		_tx: PrismaTx,
-		_filter: T["pkFilter"],
-		_opts: Opt,
-	): Promise<void> {
-		throw new Error("Method not implemented.");
-	}
-
-	/**
-	 * Reusable logic to find the course by reference or ID.
-	 *
-	 * @throws {@link NotFound}
-	 * If the course cannot be found.
-	 *
-	 * @throws {@link NotAllowed}
-	 * If actor is not permitted to access the course with the desired action.
-	 */
-	protected async course<StartAt extends boolean>(
-		ref: CourseNaturalKey | CourseId,
-		tx: PrismaTx | undefined,
-		opts: ServiceOpts,
-		select?: {
-			startAt?: StartAt;
-			enrollments?: boolean;
-			perm?: "course.read" | "course.read-contents" | "course.update-contents";
-		},
-	): Promise<
-		Prisma.CourseGetPayload<{
-			select: {
-				id: true;
-				instructor: { select: { username: true } };
-				enrollments: { select: { username: true } };
-				startAt: StartAt extends true ? true : false;
-			};
-		}>
-	> {
-		const client = tx ?? opts.tx ?? this.prisma;
-
-		let course = await client.course.findUnique({
-			where: courseRefWhere(ref),
-			select: {
-				id: true,
-				instructor: { select: { username: true } },
-				startAt: select?.startAt ?? true,
-				enrollments: {
-					select: {
-						username:
-							select?.enrollments ??
-							(true || select?.perm === "course.read-contents"),
-					},
-				},
-			},
-		});
-		course = valueOrNotFound("course", course);
-		course.enrollments ??= [];
-
-		if (select?.perm) ensurePerm(opts.actor, select.perm, course);
-
-		// biome-ignore lint/suspicious/noExplicitAny: intentional cast for flexible return type
-		return course as any;
-	}
 }

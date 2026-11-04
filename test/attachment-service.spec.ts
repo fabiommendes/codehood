@@ -237,28 +237,37 @@ test("allAttachedTo returns the attachments recorded against one resource, and a
 	);
 
 	await expect(
-		db.attachment.allAttachedTo({
-			type: "RESOURCE",
-			id: resourceA.id,
-			title: resourceA.title,
-			slug: resourceA.slug,
-		}),
+		db.attachment.allAttachedTo(
+			{
+				type: "RESOURCE",
+				id: resourceA.id,
+				title: resourceA.title,
+				slug: resourceA.slug,
+			},
+			FULL_ACCESS,
+		),
 	).resolves.toHaveLength(1);
 	await expect(
-		db.attachment.allAttachedTo({
-			type: "RESOURCE",
-			id: resourceB.id,
-			title: resourceB.title,
-			slug: resourceB.slug,
-		}),
+		db.attachment.allAttachedTo(
+			{
+				type: "RESOURCE",
+				id: resourceB.id,
+				title: resourceB.title,
+				slug: resourceB.slug,
+			},
+			FULL_ACCESS,
+		),
 	).resolves.toHaveLength(2);
 	await expect(
-		db.attachment.allAttachedTo({
-			type: "RESOURCE",
-			id: resourceC.id,
-			title: resourceC.title,
-			slug: resourceC.slug,
-		}),
+		db.attachment.allAttachedTo(
+			{
+				type: "RESOURCE",
+				id: resourceC.id,
+				title: resourceC.title,
+				slug: resourceC.slug,
+			},
+			FULL_ACCESS,
+		),
 	).resolves.toHaveLength(0);
 });
 
@@ -278,9 +287,9 @@ test("usageBytes sums a user's attachment bytes and is unmoved by another user u
 		},
 		FULL_ACCESS,
 	);
-	await expect(db.attachment.usageBytes(userA.username)).resolves.toBe(
-		bytes.length,
-	);
+	await expect(
+		db.attachment.usageBytes(userA.username, FULL_ACCESS),
+	).resolves.toBe(bytes.length);
 
 	await db.attachment.create(
 		{
@@ -291,12 +300,12 @@ test("usageBytes sums a user's attachment bytes and is unmoved by another user u
 		},
 		FULL_ACCESS,
 	);
-	await expect(db.attachment.usageBytes(userA.username)).resolves.toBe(
-		bytes.length,
-	);
-	await expect(db.attachment.usageBytes(userB.username)).resolves.toBe(
-		bytes.length,
-	);
+	await expect(
+		db.attachment.usageBytes(userA.username, FULL_ACCESS),
+	).resolves.toBe(bytes.length);
+	await expect(
+		db.attachment.usageBytes(userB.username, FULL_ACCESS),
+	).resolves.toBe(bytes.length);
 });
 
 test("quotaFor reads BLOB_QUOTA_BY_ROLE, and ADMIN has no limit", () => {
@@ -322,7 +331,7 @@ test("assertWithinQuota allows exactly up to the limit and throws one byte past 
 		},
 		FULL_ACCESS,
 	);
-	const usage = await db.attachment.usageBytes(student.username);
+	const usage = await db.attachment.usageBytes(student.username, FULL_ACCESS);
 	const quota = BLOB_QUOTA_BY_ROLE.STUDENT;
 	if (quota === null) {
 		throw new Error("test assumes STUDENT has a finite quota");
@@ -370,9 +379,9 @@ test("create refuses an upload that would exceed the actor's quota, writing noth
 			attachedToId: fillerResource.id,
 		},
 	});
-	await expect(db.attachment.usageBytes(student.username)).resolves.toBe(
-		quota - 10,
-	);
+	await expect(
+		db.attachment.usageBytes(student.username, FULL_ACCESS),
+	).resolves.toBe(quota - 10);
 
 	const tooBig = Buffer.from("x".repeat(20));
 	const targetResource = await makeResource();

@@ -5,23 +5,23 @@
  */
 export * as schema from "@/core/schemas";
 
-import { ApiKeyService } from "./services/api-key.service";
-import { AttachmentService } from "./services/attachment.service";
-import { BlobService } from "./services/blob.service";
-import { CalendarEventService } from "./services/calendar-event.service";
-import { CalendarFeedService } from "./services/calendar-feed.service";
-import { CourseService } from "./services/course.service";
-import { DisciplineService } from "./services/discipline.service";
-import { EditionService } from "./services/edition.service";
-import { EnrollmentService } from "./services/enrollment.service";
-import { ExamService } from "./services/exam.service";
-import { ExamExceptionService } from "./services/exam-exception.service";
-import { FeedbackService } from "./services/feedback.service";
-import { GradeColumnService } from "./services/grade-column.service";
-import { InviteService } from "./services/invite.service";
-import { PassphraseService } from "./services/passphrase.service";
-import { QuestionService } from "./services/question.service";
-import { RegradeRequestService } from "./services/regrade-request.service";
+import { makeApiKeyService } from "./services/api-key.service";
+import { makeAttachmentService } from "./services/attachment.service";
+import { makeBlobService } from "./services/blob.service";
+import { makeCalendarEventService } from "./services/calendar-event.service";
+import { makeCalendarFeedService } from "./services/calendar-feed.service";
+import { makeCourseService } from "./services/course.service";
+import { makeDisciplineService } from "./services/discipline.service";
+import { makeEditionService } from "./services/edition.service";
+import { makeEnrollmentService } from "./services/enrollment.service";
+import { makeExamService } from "./services/exam.service";
+import { makeExamExceptionService } from "./services/exam-exception.service";
+import { makeFeedbackService } from "./services/feedback.service";
+import { makeGradeColumnService } from "./services/grade-column.service";
+import { checkRedeemable, makeInviteService } from "./services/invite.service";
+import { makePassphraseService } from "./services/passphrase.service";
+import { makeQuestionService } from "./services/question.service";
+import { makeRegradeRequestService } from "./services/regrade-request.service";
 
 export type {
 	Report,
@@ -31,15 +31,18 @@ export type {
 	ReportUpdate,
 } from "./services/report.service";
 
-import { ReportService } from "./services/report.service";
-import { RepositoryService } from "./services/repository.service";
-import { ResourceService } from "./services/resource.service";
-import { ResponseService } from "./services/response.service";
-import { RollCallService } from "./services/roll-call.service";
-import { SessionService } from "./services/session.service";
-import { SubmissionService } from "./services/submission.service";
-import { TimeSlotService } from "./services/time-slot.service";
-import { UserService } from "./services/user.service";
+import { makeReportService } from "./services/report.service";
+import { makeRepositoryService } from "./services/repository.service";
+import { makeResourceService } from "./services/resource.service";
+import { makeResponseService } from "./services/response.service";
+import { makeRollCallService } from "./services/roll-call.service";
+import {
+	makeSessionService,
+	validateSession,
+} from "./services/session.service";
+import { makeSubmissionService } from "./services/submission.service";
+import { makeTimeSlotService } from "./services/time-slot.service";
+import { makeUserService } from "./services/user.service";
 
 export type {
 	ApiKeyKind,
@@ -254,9 +257,9 @@ export type {
 } from "./services/user.service";
 
 // Instantiate dependencies.
-const blobService = new BlobService();
-const attachmentService = new AttachmentService(blobService);
-const feedbackService = new FeedbackService();
+const blobService = makeBlobService();
+const attachmentService = makeAttachmentService(blobService);
+const feedbackService = makeFeedbackService();
 
 /**
  * This is the main entry point for the database layer.
@@ -264,30 +267,30 @@ const feedbackService = new FeedbackService();
  * All services are accessed through the db namespace in this module.
  */
 export const db = {
-	apiKey: new ApiKeyService(),
+	apiKey: makeApiKeyService(),
 	attachment: attachmentService,
 	blob: blobService,
-	calendarEvent: new CalendarEventService(),
-	calendarFeed: new CalendarFeedService(),
-	course: new CourseService(),
-	discipline: new DisciplineService(),
-	edition: new EditionService(),
-	enrollment: new EnrollmentService(),
-	exam: new ExamService(),
-	examException: new ExamExceptionService(),
+	calendarEvent: makeCalendarEventService(),
+	calendarFeed: makeCalendarFeedService(),
+	course: makeCourseService(),
+	discipline: makeDisciplineService(),
+	edition: makeEditionService(),
+	enrollment: makeEnrollmentService(),
+	exam: makeExamService(),
+	examException: makeExamExceptionService(),
 	feedback: feedbackService,
-	gradeColumn: new GradeColumnService(),
-	invite: new InviteService(),
-	passphrase: new PassphraseService(),
-	question: new QuestionService(),
-	regradeRequest: new RegradeRequestService(feedbackService),
-	report: new ReportService(attachmentService, blobService),
-	repository: new RepositoryService(blobService, attachmentService),
-	resource: new ResourceService(attachmentService),
-	response: new ResponseService(),
-	rollCall: new RollCallService(),
-	session: new SessionService(),
-	submission: new SubmissionService(),
-	timeSlot: new TimeSlotService(),
-	user: new UserService(),
+	gradeColumn: makeGradeColumnService(),
+	invite: { ...makeInviteService(), checkRedeemable },
+	passphrase: makePassphraseService(),
+	question: makeQuestionService(),
+	regradeRequest: makeRegradeRequestService(),
+	report: makeReportService(attachmentService, blobService),
+	repository: makeRepositoryService(blobService, attachmentService),
+	resource: makeResourceService(attachmentService),
+	response: makeResponseService(),
+	rollCall: makeRollCallService(),
+	session: { ...makeSessionService(), validate: validateSession },
+	submission: makeSubmissionService(),
+	timeSlot: makeTimeSlotService(),
+	user: makeUserService(),
 } as const;

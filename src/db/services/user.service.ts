@@ -17,17 +17,12 @@ import {
 	userSchema,
 	userUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-	upsert,
-} from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
-import { Validate } from "@/utils/validate";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
-import { SessionService } from "./session.service";
+import { makeSessionService } from "./session.service";
 
 export type { UserId } from "@/core/schemas";
 
@@ -42,65 +37,68 @@ export type UserUpdate = z.infer<typeof userUpdate>;
 export type PasswordChange = z.infer<typeof passwordChange>;
 export type PasswordReset = z.infer<typeof passwordReset>;
 
-/// Session sweep on a password change. Honours `opts.tx` when one is open.
-const sessions = new SessionService();
-
-export class UserService extends CrudBase<{
+/// The CRUD shape of the user service.
+type UserT = {
 	entity: User;
 	pkFilter: UserPK;
 	create: UserCreate;
 	filter: UserFilter;
 	update: UserUpdate;
-}> {
+};
+
+/** The user service of `client` (the shared client by default). */
+export const makeUserService = defineService<UserT>()((client) => {
+	/// Session sweep on a password change.
+	const sessions = makeSessionService(client);
+
 	/**
 	 * Create a new user.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [userCreate],
 		returns: userSchema,
-		args: [undefined, userCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: UserCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<User> {
-		ensurePerm(opts.actor, "user.create");
+		run: async (
+			tx: PrismaTx,
+			input: UserCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<User> => {
+			ensurePerm(opts.actor, "user.create");
 
-		// Grades and pushed grade files match students by these; staff may skip them.
-		const isStudent = input.role === "STUDENT";
-		if (!input.githubId && isStudent)
-			throw new FieldError("githubId", m.errors_required_for_students());
-		if (!input.schoolId && isStudent)
-			throw new FieldError("schoolId", m.errors_required_for_students());
-		assertSchoolIdFormat(input.schoolId);
-		// Seeds and imports run as SYSTEM with throwaway passwords; skip, not warn.
-		if (opts.actor !== SYSTEM) {
-			await assertPasswordStrength(
-				input.username,
-				input.password,
-				opts,
-				"password",
+			// Grades and pushed grade files match students by these; staff may skip them.
+			const isStudent = input.role === "STUDENT";
+			if (!input.githubId && isStudent)
+				throw new FieldError("githubId", m.errors_required_for_students());
+			if (!input.schoolId && isStudent)
+				throw new FieldError("schoolId", m.errors_required_for_students());
+			assertSchoolIdFormat(input.schoolId);
+			// Seeds and imports run as SYSTEM with throwaway passwords; skip, not warn.
+			if (opts.actor !== SYSTEM) {
+				await assertPasswordStrength(
+					input.username,
+					input.password,
+					opts,
+					"password",
+				);
+			}
+
+			const githubId = input.githubId ?? nullSentinel(input.username);
+			const schoolId = input.schoolId ?? nullSentinel(input.username);
+
+			return toUser(
+				await tx.user.create({
+					data: {
+						email: input.email,
+						name: input.name,
+						username: input.username,
+						role: input.role,
+						passwordHash: await hashPassword(input.password),
+						githubId,
+						schoolId,
+					},
+				}),
 			);
-		}
-
-		const githubId = input.githubId ?? nullSentinel(input.username);
-		const schoolId = input.schoolId ?? nullSentinel(input.username);
-
-		return toUser(
-			await tx.user.create({
-				data: {
-					email: input.email,
-					name: input.name,
-					username: input.username,
-					role: input.role,
-					passwordHash: await hashPassword(input.password),
-					githubId,
-					schoolId,
-				},
-			}),
-		);
-	}
+		},
+	});
 
 	/**
 	 * Finds a single user by one of the unique search fields.
@@ -108,74 +106,77 @@ export class UserService extends CrudBase<{
 	 * It accepts a single filter at a time, can search by email, username,
 	 * githubId, schoolId or login (email or username).
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [userPK],
 		returns: userSchema.nullable(),
-		args: [undefined, userPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: UserPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<User | null> {
-		let user: DbUser | null = null;
-		const by = filter as FillUndefineds<UserPK>; // zod doesn't narrow to a single field, so we do it here
+		run: async (
+			tx: PrismaTx,
+			filter: UserPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<User | null> => {
+			let user: DbUser | null = null;
+			const by = filter as FillUndefineds<UserPK>; // zod doesn't narrow to a single field, so we do it here
 
-		if (by.email) {
-			user = await tx.user.findUnique({
-				where: { email: by.email },
-			});
-		} else if (by.username) {
-			user = await tx.user.findUnique({
-				where: { username: by.username },
-			});
-		} else if (by.githubId) {
-			user = await tx.user.findUnique({
-				where: { githubId: by.githubId },
-			});
-		} else if (by.schoolId) {
-			user = await tx.user.findUnique({
-				where: { schoolId: by.schoolId },
-			});
-		} else if (by.login) {
-			user = await tx.user.findFirst({
-				where: {
-					OR: [
-						{ email: by.login },
-						{ username: by.login.trim().toLowerCase() },
-					],
-				},
-			});
-		}
+			if (by.email) {
+				user = await tx.user.findUnique({
+					where: { email: by.email },
+				});
+			} else if (by.username) {
+				user = await tx.user.findUnique({
+					where: { username: by.username },
+				});
+			} else if (by.githubId) {
+				user = await tx.user.findUnique({
+					where: { githubId: by.githubId },
+				});
+			} else if (by.schoolId) {
+				user = await tx.user.findUnique({
+					where: { schoolId: by.schoolId },
+				});
+			} else if (by.login) {
+				user = await tx.user.findFirst({
+					where: {
+						OR: [
+							{ email: by.login },
+							{ username: by.login.trim().toLowerCase() },
+						],
+					},
+				});
+			}
 
-		if (!user) return null;
-		ensurePerm(opts.actor, "user.read", user);
-		return toUser(user);
-	}
+			if (!user) return null;
+			ensurePerm(opts.actor, "user.read", user);
+			return toUser(user);
+		},
+	});
 
 	/**
 	 * Find many users by some search criteria, narrowed to what `actor` may
 	 * see. Newest first.
 	 */
-	@Validate({ service: true, returns: userSchema.array() })
-	protected async findManyTx(
-		tx: PrismaTx,
-		by: UserFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<User[]> {
-		const users = await tx.user.findMany({
-			where: {
-				AND: [
-					by.usernames ? { username: { in: by.usernames } } : {},
-					userWhere(opts.actor),
-				],
-			},
-			orderBy: { createdAt: "desc" },
-			take: by.take,
-		});
-		for (const user of users) ensurePerm(opts.actor, "user.read", user);
-		return users.map(toUser);
-	}
+	const findMany = op({
+		transaction: false,
+		returns: userSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			by: UserFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<User[]> => {
+			const users = await tx.user.findMany({
+				where: {
+					AND: [
+						by.usernames ? { username: { in: by.usernames } } : {},
+						userWhere(opts.actor),
+					],
+				},
+				orderBy: { createdAt: "desc" },
+				take: by.take,
+			});
+			for (const user of users) ensurePerm(opts.actor, "user.read", user);
+			return users.map(toUser);
+		},
+	});
 
 	/**
 	 * Updates the editable profile fields for a user.
@@ -183,97 +184,102 @@ export class UserService extends CrudBase<{
 	 * The password is not one of them: {@link changePassword} handles it, and
 	 * demands the current password first.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [userPK, userUpdate],
 		returns: userSchema,
-		args: [undefined, userPK, userUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: UserPK,
-		payload: UserUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<User> {
-		const target = await this.findOne(filter, { ...opts, tx });
+		run: async (
+			tx: PrismaTx,
+			filter: UserPK,
+			payload: UserUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<User> => {
+			const target = await findOne(tx, filter, opts);
 
-		if (!target) throw new Error("user not found");
-		ensurePerm(opts.actor, "user.update", target);
+			if (!target) throw new Error("user not found");
+			ensurePerm(opts.actor, "user.update", target);
 
-		const { githubId, schoolId, ...rest } = payload;
-		assertSchoolIdFormat(schoolId);
+			const { githubId, schoolId, ...rest } = payload;
+			assertSchoolIdFormat(schoolId);
 
-		return toUser(
-			await tx.user.update({
-				where: { username: target.username },
-				data: {
-					...rest,
-					githubId: mask(githubId, target.username),
-					schoolId: mask(schoolId, target.username),
-				},
-			}),
-		);
-	}
+			return toUser(
+				await tx.user.update({
+					where: { username: target.username },
+					data: {
+						...rest,
+						githubId: mask(githubId, target.username),
+						schoolId: mask(schoolId, target.username),
+					},
+				}),
+			);
+		},
+	});
 
 	/**
 	 * Upserts a user keyed on `username`: creates one if absent, else updates
 	 * `name`/`email`/`githubId`/`schoolId`.
 	 *
-	 * PUT semantics: admin-only whether creating or updating — the create
-	 * permission ({@link assertCanCreateUser}) is enforced on the update
-	 * branch too, so a student cannot reach a wider write through `upsert`
-	 * than `update` already grants for their own profile. `password` is only
-	 * read on the create branch: an existing user's stored one is left alone,
-	 * and is changed through {@link passwordChange} instead.
+	 * PUT semantics: admin-only whether creating or updating, because the
+	 * create permission is enforced on the update branch too, so a student
+	 * cannot reach a wider write through `upsert` than `update` already
+	 * grants for their own profile. `password` is only read on the create
+	 * branch: an existing user's stored one is left alone, and is changed
+	 * through {@link changePassword} instead.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [userCreate],
 		returns: userSchema,
-		args: [undefined, userCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: UserCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<User> {
-		const scoped: ServiceOpts = { ...opts, tx };
-		assertSchoolIdFormat(input.schoolId);
+		run: async (
+			tx: PrismaTx,
+			input: UserCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<User> => {
+			assertSchoolIdFormat(input.schoolId);
 
-		const user = await upsert(this, input, {
-			...scoped,
-			client: tx,
-			action: "user.create",
-			pk: (i) => ({ username: i.username }),
-			update: (i) => ({
-				name: i.name,
-				email: i.email,
-				githubId: i.githubId,
-				schoolId: i.schoolId,
-			}),
-			assertCreatable: (_i, o) => ensurePerm(o.actor, "user.create"),
-		});
+			const pk = { username: input.username };
+			let existing: User | null;
+			try {
+				existing = await findOne(tx, pk, opts);
+			} catch (error) {
+				throw error instanceof NotAllowed ? error.as("user.create") : error;
+			}
+			if (!existing) return create(tx, input, opts);
 
-		return user;
-	}
+			ensurePerm(opts.actor, "user.create");
+			return update(
+				tx,
+				pk,
+				{
+					name: input.name,
+					email: input.email,
+					githubId: input.githubId,
+					schoolId: input.schoolId,
+				},
+				opts,
+			);
+		},
+	});
 
 	/**
 	 * Deletes a user. Only SYSTEM can delete users, and it is irreversible.
 	 */
-	@Validate({ service: true, args: [undefined, userPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: UserPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		if (opts.actor !== SYSTEM) throw new NotAllowed("user.delete");
+	const remove = op({
+		args: [userPK],
+		run: async (
+			tx: PrismaTx,
+			filter: UserPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			if (opts.actor !== SYSTEM) throw new NotAllowed("user.delete");
 
-		const user = await this.findOne(filter, { ...opts, tx });
+			const user = await findOne(tx, filter, opts);
 
-		// TODO: define an error for NotFound entities
-		if (!user) throw new Error("user not found");
+			// TODO: define an error for NotFound entities
+			if (!user) throw new Error("user not found");
 
-		// TODO: delete or soft delete? design decision
-		await tx.user.delete({ where: { username: user.username } });
-	}
+			// TODO: delete or soft delete? design decision
+			await tx.user.delete({ where: { username: user.username } });
+		},
+	});
 
 	// TODO: this method should be moved to the auth service.
 	/**
@@ -284,31 +290,18 @@ export class UserService extends CrudBase<{
 	 *
 	 * @throws NotAllowed when the actor lacks `user.reset-password`.
 	 */
-	@Validate({ service: true, args: [userSchema] })
-	async updatePassword(
-		user: User,
-		password: string,
-		opts: ServiceOpts,
-	): Promise<{ hash: string }> {
-		ensurePerm(opts.actor, "user.reset-password");
-		return this.writePassword(user, password, opts);
-	}
-
-	/// Checks the strength of `password` and stores its hash, with no permission check.
-	private async writePassword(
-		user: User,
-		password: string,
-		opts: ServiceOpts,
-	): Promise<{ hash: string }> {
-		await assertPasswordStrength(user.username, password, opts);
-
-		const client = opts.tx ?? this.prisma;
-		const updated = await client.user.update({
-			where: { username: user.username },
-			data: { passwordHash: await hashPassword(password) },
-		});
-		return { hash: updated.passwordHash };
-	}
+	const updatePassword = op({
+		args: [userSchema],
+		run: async (
+			tx: PrismaTx,
+			user: User,
+			password: string,
+			opts: ServiceOptsWithoutTx,
+		): Promise<{ hash: string }> => {
+			ensurePerm(opts.actor, "user.reset-password");
+			return writePassword(tx, user, password, opts);
+		},
+	});
 
 	// TODO: move to the auth service.
 	/**
@@ -326,24 +319,27 @@ export class UserService extends CrudBase<{
 	 *
 	 * @throws NotAllowed when `currentPassword` does not match.
 	 */
-	@Validate({ service: true, args: [userSchema, passwordChange] })
-	async changePassword(
-		user: User,
-		input: PasswordChange,
-		opts: ServiceOpts,
-	): Promise<void> {
-		ensurePerm(opts.actor, "user.update", user);
+	const changePassword = op({
+		args: [userSchema, passwordChange],
+		run: async (
+			tx: PrismaTx,
+			user: User,
+			input: PasswordChange,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			ensurePerm(opts.actor, "user.update", user);
 
-		if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
-			throw new NotAllowed("user.update", {
-				message: m.errors_current_password_incorrect(),
-				status: 401,
-			});
-		}
+			if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+				throw new NotAllowed("user.update", {
+					message: m.errors_current_password_incorrect(),
+					status: 401,
+				});
+			}
 
-		await this.writePassword(user, input.newPassword, opts);
-		await sessions.delete({ username: user.username }, opts);
-	}
+			await writePassword(tx, user, input.newPassword, opts);
+			await sessions.delete({ username: user.username }, { ...opts, tx });
+		},
+	});
 
 	// TODO: move to the auth service.
 	/**
@@ -354,15 +350,52 @@ export class UserService extends CrudBase<{
 	 *
 	 * @throws NotFound when no account has `input.username`.
 	 */
-	@Validate({ service: true, args: [passwordReset] })
-	async resetPassword(input: PasswordReset, opts: ServiceOpts): Promise<void> {
-		ensurePerm(opts.actor, "user.reset-password");
-		const user = await this.findOne({ username: input.username }, opts);
-		if (!user) throw new NotFound("user", input.username);
+	const resetPassword = op({
+		args: [passwordReset],
+		run: async (
+			tx: PrismaTx,
+			input: PasswordReset,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			ensurePerm(opts.actor, "user.reset-password");
+			const user = await findOne(tx, { username: input.username }, opts);
+			if (!user) throw new NotFound("user", input.username);
 
-		await this.updatePassword(user, input.newPassword, opts);
-		await sessions.delete({ username: user.username }, opts);
-	}
+			await updatePassword(tx, user, input.newPassword, opts);
+			await sessions.delete({ username: user.username }, { ...opts, tx });
+		},
+	});
+
+	return {
+		create,
+		findOne,
+		findMany,
+		update,
+		upsert,
+		delete: remove,
+		updatePassword,
+		changePassword,
+		resetPassword,
+	};
+});
+
+/** The user service, as built by {@link makeUserService}. */
+export type UserService = ReturnType<typeof makeUserService>;
+
+/// Checks the strength of `password` and stores its hash, with no permission check.
+async function writePassword(
+	tx: PrismaTx,
+	user: User,
+	password: string,
+	opts: ServiceOptsWithoutTx,
+): Promise<{ hash: string }> {
+	await assertPasswordStrength(user.username, password, opts);
+
+	const updated = await tx.user.update({
+		where: { username: user.username },
+		data: { passwordHash: await hashPassword(password) },
+	});
+	return { hash: updated.passwordHash };
 }
 
 //

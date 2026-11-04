@@ -26,6 +26,7 @@ export const apiKeyApi = CRUD("/api/api-key", {
 	filter: schema.apiKeyFilter,
 	key: schema.apiKeyPK,
 	tags: ["Api Keys"],
+	upsert: false,
 	service: db.apiKey,
 });
 
@@ -277,6 +278,7 @@ export const inviteApi = CRUD("/api/invite", {
 	}),
 	key: schema.invitePK,
 	tags: ["Invites"],
+	upsert: false,
 	service: db.invite,
 });
 

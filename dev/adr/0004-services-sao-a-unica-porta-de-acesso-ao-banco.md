@@ -46,8 +46,13 @@ CRUD da REST API a partir dessa interface (ADR 0007).
   Uma operação que não faz sentido para o modelo é declarada com tipo `never`
   (o parâmetro do `Crud`, ou `upsert: false`), para que a ausência apareça no
   tipo e não como um "Method not implemented" em tempo de execução.
-- Subclasses de `CrudBase` implementam os métodos protegidos `createTx`,
-  `findOneTx` etc., e a base cuida da transação.
+- Cada Service é `defineService<XT>()((client) => ({ create: op({...}), ... }))`
+  (`src/db/define-service.ts`). Cada operação é escrita uma vez, contra uma
+  transação (`run(tx, ...args, opts)`), e o builder deriva o método público que
+  abre a transação ou reusa `opts.tx`. Só as operações fornecidas existem no
+  tipo do resultado, então chamar uma operação ausente é erro de compilação no
+  chamador. Isso substitui o `never` por operação; o `upsert: false` do `CrudT`
+  continua valendo para tipar o CRUD (`UpsertIn`).
 - Soft delete reusa `delete()`: para quem chama, não há diferença em relação a
   um delete físico. Hoje só `Blob` tem `deletedAt`; `Question` arquiva com
   `status: "ARCHIVED"`.
@@ -66,3 +71,12 @@ criar um Service) estão no RFC `dev/rfc/como-criar-e-escrever-um-service.md`.
 - Modelos que não são CRUD (sessão, feed de calendário, blob) ficam
   desajeitados: declaram vários métodos `never` e expõem a API real em métodos
   extras.
+- Não há mais classe base nem métodos `xxxTx`: um Service é um valor criado por
+  `defineService`, e a ausência de uma operação é checada pelo compilador, não
+  por um "Method not implemented" em tempo de execução.
+
+## Notas
+
+- 2026-11-04: os 26 Services migraram de `CrudBase` e `@Validate` para
+  `defineService`. `CrudBase` foi removida de `src/db/base-service.ts`, que
+  mantém só os tipos CRUD, `ServiceOpts` e o helper `upsert`.

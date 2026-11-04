@@ -47,7 +47,7 @@ async function makeCourse() {
 		{ slug: discipline, name: discipline },
 		FULL_ACCESS,
 	);
-	if (!(await db.edition.findOne({ slug: edition }))) {
+	if (!(await db.edition.findOne({ slug: edition }, FULL_ACCESS))) {
 		await db.edition.create(
 			{
 				slug: edition,

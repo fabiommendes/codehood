@@ -23,7 +23,8 @@ import {
 	submissionSchema,
 	submissionUpdate,
 } from "@/core/schemas";
-import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { assertResponse, type QuestionDocument, ResponseError } from "@/mdq";
 import {
@@ -33,7 +34,6 @@ import {
 	examPhase,
 	viewerTiming,
 } from "@/services/exam-state";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefMatch,
@@ -132,7 +132,8 @@ type DbSubmission = Prisma.SubmissionGetPayload<{
 	include: ReturnType<typeof submissionInclude>;
 }>;
 
-export class SubmissionService extends CrudBase<{
+/// The CRUD shape of the service.
+type SubmissionT = {
 	entity: Submission;
 	pkFilter: SubmissionPK;
 	create: SubmissionCreate;
@@ -140,7 +141,10 @@ export class SubmissionService extends CrudBase<{
 	update: SubmissionUpdate;
 	// An attempt is never revised in place: every answer is a new row.
 	upsert: false;
-}> {
+};
+
+/** The service of `client` (the shared client by default). */
+export const makeSubmissionService = defineService<SubmissionT>()(() => {
 	/**
 	 * Appends an answer to a response.
 	 *
@@ -154,63 +158,62 @@ export class SubmissionService extends CrudBase<{
 	 * @throws {@link NotAllowed}
 	 * If `actor` may read the response but not write the author's work.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [submissionCreate],
 		returns: submissionSchema,
-		args: [undefined, submissionCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: SubmissionCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Submission> {
-		const response = valueOrNotFound(
-			"response",
-			await tx.response.findFirst({
-				where: responseRefWhere(
-					"publicId" in input.response && input.course !== undefined
-						? { ...input.response, course: input.course }
-						: input.response,
-				),
-				include: responseTargetInclude(),
-			}),
-		);
+		run: async (
+			tx: PrismaTx,
+			input: SubmissionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Submission> => {
+			const response = valueOrNotFound(
+				"response",
+				await tx.response.findFirst({
+					where: responseRefWhere(
+						"publicId" in input.response && input.course !== undefined
+							? { ...input.response, course: input.course }
+							: input.response,
+					),
+					include: responseTargetInclude(),
+				}),
+			);
 
-		// A response the actor may not even read is `NotFound`, so a publicId
-		// cannot be used to probe whether another student answered; one they
-		// may read but not write to (e.g. its author, no longer enrolled) is
-		// `NotAllowed`.
-		if (!hasReadAccess(opts.actor, response)) throw new NotFound("response");
-		ensurePerm(opts.actor, "submission.create", submissionTarget(response));
+			// A response the actor may not even read is `NotFound`, so a publicId
+			// cannot be used to probe whether another student answered; one they
+			// may read but not write to (e.g. its author, no longer enrolled) is
+			// `NotAllowed`.
+			if (!hasReadAccess(opts.actor, response)) throw new NotFound("response");
+			ensurePerm(opts.actor, "submission.create", submissionTarget(response));
 
-		assertAcceptingSubmissions(
-			response,
-			new Date(),
-			await loadExceptionTiming(tx, response.examId, response.authorId),
-		);
-		const question = await resolveExamQuestion(
-			tx,
-			response.exam.courseId,
-			response.examId,
-			input.question,
-			input.payload,
-		);
+			assertAcceptingSubmissions(
+				response,
+				new Date(),
+				await loadExceptionTiming(tx, response.examId, response.authorId),
+			);
+			const question = await resolveExamQuestion(
+				tx,
+				response.exam.courseId,
+				response.examId,
+				input.question,
+				input.payload,
+			);
 
-		const row = await invalidIfExists(tx.submission.create, {
-			data: {
-				publicId: generateToken(9),
-				responseId: response.id,
-				questionId: question.id,
-				payload: input.payload as Prisma.InputJsonValue,
-				status: input.status ?? "PENDING_GRADE",
-				automaticallyTriggered: input.automaticallyTriggered ?? false,
-				startedAt: input.startedAt ?? null,
-			},
-			include: submissionInclude(),
-		});
+			const row = await invalidIfExists(tx.submission.create, {
+				data: {
+					publicId: generateToken(9),
+					responseId: response.id,
+					questionId: question.id,
+					payload: input.payload as Prisma.InputJsonValue,
+					status: input.status ?? "PENDING_GRADE",
+					automaticallyTriggered: input.automaticallyTriggered ?? false,
+					startedAt: input.startedAt ?? null,
+				},
+				include: submissionInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Finds an answer by `id` or by its `publicId`.
@@ -219,25 +222,25 @@ export class SubmissionService extends CrudBase<{
 	 * actor may not read is `null`, exactly as a missing one is, so an id is
 	 * not a probe for whether somebody else answered.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [submissionPK],
 		returns: submissionSchema.nullable(),
-		args: [undefined, submissionPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: SubmissionPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Submission | null> {
-		const row = await tx.submission.findFirst({
-			where: submissionWhere(filter),
-			include: submissionInclude(),
-		});
-		if (!row) return null;
+		run: async (
+			tx: PrismaTx,
+			filter: SubmissionPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Submission | null> => {
+			const row = await tx.submission.findFirst({
+				where: submissionWhere(filter),
+				include: submissionInclude(),
+			});
+			if (!row) return null;
 
-		if (!hasReadAccess(opts.actor, row.response)) return null;
-		return fromDb(row);
-	}
+			if (!hasReadAccess(opts.actor, row.response)) return null;
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Lists the answers made in one course, narrowed to what `actor` may see.
@@ -250,67 +253,67 @@ export class SubmissionService extends CrudBase<{
 	 * If `actor` may not read the course's contents at all, or names another
 	 * author in `filter` while narrowed to their own rows.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [submissionFilter],
 		returns: submissionSchema.array(),
-		args: [undefined, submissionFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: SubmissionFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Submission[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: {
-					id: true,
-					instructor: { select: { username: true } },
-					enrollments: {
-						where: { status: "ACTIVE" as const },
-						select: { username: true },
+		run: async (
+			tx: PrismaTx,
+			filter: SubmissionFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Submission[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: {
+						id: true,
+						instructor: { select: { username: true } },
+						enrollments: {
+							where: { status: "ACTIVE" as const },
+							select: { username: true },
+						},
 					},
-				},
-			}),
-		);
+				}),
+			);
 
-		ensurePerm(opts.actor, "course.read-contents", course);
+			ensurePerm(opts.actor, "course.read-contents", course);
 
-		const owner = isCourseOwner(opts.actor, course);
-		const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
+			const owner = isCourseOwner(opts.actor, course);
+			const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
 
-		const rows = await tx.submission.findMany({
-			where: {
-				response: {
-					exam: {
-						courseId: course.id,
-						...(filter.exam ? { slug: filter.exam } : {}),
-					},
-					...(filter.practice !== undefined
-						? filter.practice
-							? { slotKey: { not: 0 } }
-							: { slotKey: 0 }
-						: {}),
-					...(restrictTo
-						? { authorId: restrictTo }
-						: filter.author
-							? { authorId: filter.author }
+			const rows = await tx.submission.findMany({
+				where: {
+					response: {
+						exam: {
+							courseId: course.id,
+							...(filter.exam ? { slug: filter.exam } : {}),
+						},
+						...(filter.practice !== undefined
+							? filter.practice
+								? { slotKey: { not: 0 } }
+								: { slotKey: 0 }
 							: {}),
-					...(filter.response ? responseRefWhere(filter.response) : {}),
+						...(restrictTo
+							? { authorId: restrictTo }
+							: filter.author
+								? { authorId: filter.author }
+								: {}),
+						...(filter.response ? responseRefWhere(filter.response) : {}),
+					},
+					...(filter.question ? { question: { slug: filter.question } } : {}),
+					...(filter.statuses ? { status: { in: filter.statuses } } : {}),
+					...(filter.automaticallyTriggered !== undefined
+						? { automaticallyTriggered: filter.automaticallyTriggered }
+						: {}),
 				},
-				...(filter.question ? { question: { slug: filter.question } } : {}),
-				...(filter.statuses ? { status: { in: filter.statuses } } : {}),
-				...(filter.automaticallyTriggered !== undefined
-					? { automaticallyTriggered: filter.automaticallyTriggered }
-					: {}),
-			},
-			include: submissionInclude(),
-			orderBy: { createdAt: "asc" },
-		});
+				include: submissionInclude(),
+				orderBy: { createdAt: "asc" },
+			});
 
-		return rows.map(fromDb);
-	}
+			return rows.map(fromDb);
+		},
+	});
 
 	/**
 	 * Moves an answer's grading status.
@@ -322,32 +325,31 @@ export class SubmissionService extends CrudBase<{
 	 * does.
 	 * @throws {@link NotAllowed} If `actor` may read the answer but not write it.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [submissionPK, submissionUpdate],
 		returns: submissionSchema,
-		args: [undefined, submissionPK, submissionUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: SubmissionPK,
-		fields: SubmissionUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Submission> {
-		const submission = await writableSubmission(
-			tx,
-			filter,
-			opts.actor,
-			"submission.update",
-		);
+		run: async (
+			tx: PrismaTx,
+			filter: SubmissionPK,
+			fields: SubmissionUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Submission> => {
+			const submission = await writableSubmission(
+				tx,
+				filter,
+				opts.actor,
+				"submission.update",
+			);
 
-		const row = await tx.submission.update({
-			where: { id: submission.id },
-			data: { status: fields.status },
-			include: submissionInclude(),
-		});
+			const row = await tx.submission.update({
+				where: { id: submission.id },
+				data: { status: fields.status },
+				include: submissionInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Removes an answer.
@@ -360,22 +362,29 @@ export class SubmissionService extends CrudBase<{
 	 * does.
 	 * @throws {@link NotAllowed} If `actor` may read the answer but not write it.
 	 */
-	@Validate({ service: true, args: [undefined, submissionPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: SubmissionPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const submission = await writableSubmission(
-			tx,
-			filter,
-			opts.actor,
-			"submission.delete",
-		);
+	const remove = op({
+		args: [submissionPK],
+		run: async (
+			tx: PrismaTx,
+			filter: SubmissionPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const submission = await writableSubmission(
+				tx,
+				filter,
+				opts.actor,
+				"submission.delete",
+			);
 
-		await tx.submission.delete({ where: { id: submission.id } });
-	}
-}
+			await tx.submission.delete({ where: { id: submission.id } });
+		},
+	});
+
+	return { create, findOne, findMany, update, delete: remove };
+});
+
+/** The service, as built by {@link makeSubmissionService}. */
+export type SubmissionService = ReturnType<typeof makeSubmissionService>;
 
 // Private utilities -----------------------------------------------------------
 
@@ -540,7 +549,7 @@ export function assertAcceptingSubmissions(
  *
  * The response is checked against the version the exam pins, or the latest
  * when it pins none. Shared with `ResponseService.submit`, which appends a
- * submission the same way `SubmissionService.create` does.
+ * submission the same way `submissionService.create` does.
  *
  * @throws {@link NotFound} If no question in the course has this slug.
  * @throws {@link InvalidData} If the question is not one of the exam's

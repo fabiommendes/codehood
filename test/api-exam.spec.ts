@@ -47,7 +47,7 @@ async function makeCourse(request: APIRequestContext) {
 		{ slug: discipline, name: discipline },
 		FULL_ACCESS,
 	);
-	if (!(await db.edition.findOne({ slug: "2026-1" }))) {
+	if (!(await db.edition.findOne({ slug: "2026-1" }, FULL_ACCESS))) {
 		await db.edition.create(
 			{
 				slug: "2026-1",

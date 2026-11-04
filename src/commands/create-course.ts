@@ -23,7 +23,7 @@ export const createCourseCommand = new Command("create-course")
 			}
 
 			const discipline = (
-				await db.discipline.findMany({ slugs: [disciplineSlug] })
+				await db.discipline.findMany({ slugs: [disciplineSlug] }, FULL_ACCESS)
 			)[0];
 			if (!discipline) {
 				const name = await input({

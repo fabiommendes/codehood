@@ -9,11 +9,11 @@ import {
 	disciplineSchema,
 	disciplineUpdate,
 } from "@/core/schemas";
-import type { Crud, ServiceOpts } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
-import { Validate } from "@/utils/validate";
-import { type PrismaClient, prisma } from "../client";
+import type { PrismaTx } from "../client";
 
 //
 // Type definitions
@@ -24,30 +24,24 @@ export type DisciplineFilter = z.infer<typeof disciplineFilter>;
 export type DisciplinePK = z.infer<typeof disciplinePK>;
 export type DisciplineUpdate = z.infer<typeof disciplineUpdate>;
 
+/// The CRUD shape of the discipline service.
+type DisciplineT = {
+	entity: Discipline;
+	pkFilter: DisciplinePK;
+	create: DisciplineCreate;
+	filter: DisciplineFilter;
+	update: DisciplineUpdate;
+};
+
 /**
  * Every discipline is public — there is no catalog-visibility rule — so
- * `findOne`/`findMany` take no permission-gated `opts`.
+ * `findOne`/`findMany` carry no permission rule.
  *
  * Only `create`/`update`/`delete` carry a rule, because a discipline slug
  * occupies the root URL namespace shared with every system route (see
  * `src/urls/README.md`).
  */
-export class DisciplineService
-	implements
-		Crud<{
-			entity: Discipline;
-			pkFilter: DisciplinePK;
-			create: DisciplineCreate;
-			filter: DisciplineFilter;
-			update: DisciplineUpdate;
-		}>
-{
-	prisma: PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+export const makeDisciplineService = defineService<DisciplineT>()(() => {
 	/**
 	 * Creates a discipline.
 	 *
@@ -55,61 +49,59 @@ export class DisciplineService
 	 * reserved route — a discipline slug occupies the root URL namespace
 	 * shared with every system route.
 	 */
-	@Validate({
-		service: true,
-		returns: disciplineSchema,
+	const create = op({
 		args: [disciplineCreate],
-	})
-	async create(
-		input: DisciplineCreate,
-		opts: ServiceOpts,
-	): Promise<Discipline> {
-		assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
-		const client = opts.tx ?? this.prisma;
-		try {
-			return await client.discipline.create({
-				data: { slug: input.slug, name: input.name },
-			});
-		} catch (error) {
-			if ((error as { code?: string }).code === "P2002") {
-				throw new FieldError("slug", m.errors_slug_taken({ slug: input.slug }));
+		returns: disciplineSchema,
+		run: async (
+			tx: PrismaTx,
+			input: DisciplineCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Discipline> => {
+			assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
+			try {
+				return await tx.discipline.create({
+					data: { slug: input.slug, name: input.name },
+				});
+			} catch (error) {
+				if ((error as { code?: string }).code === "P2002") {
+					throw new FieldError(
+						"slug",
+						m.errors_slug_taken({ slug: input.slug }),
+					);
+				}
+				throw error;
 			}
-			throw error;
-		}
-	}
+		},
+	});
 
-	/**
-	 * Finds a single discipline by slug.
-	 */
-	@Validate({
-		returns: disciplineSchema.nullable(),
+	/** Finds a single discipline by slug. */
+	const findOne = op({
+		transaction: false,
 		args: [disciplinePK],
-	})
-	findOne(
-		filter: DisciplinePK,
-		opts?: ServiceOpts,
-	): Promise<Discipline | null> {
-		const client = opts?.tx ?? this.prisma;
-		return client.discipline.findUnique({ where: { slug: filter.slug } });
-	}
+		returns: disciplineSchema.nullable(),
+		run: async (
+			tx: PrismaTx,
+			filter: DisciplinePK,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Discipline | null> =>
+			tx.discipline.findUnique({ where: { slug: filter.slug } }),
+	});
 
-	/**
-	 * Finds many disciplines, optionally narrowed to `filter.slugs`.
-	 */
-	@Validate({
-		returns: disciplineSchema.array(),
+	/** Finds many disciplines, optionally narrowed to `filter.slugs`. */
+	const findMany = op({
+		transaction: false,
 		args: [disciplineFilter],
-	})
-	findMany(
-		filter: DisciplineFilter,
-		opts?: ServiceOpts,
-	): Promise<Discipline[]> {
-		const client = opts?.tx ?? this.prisma;
-		return client.discipline.findMany({
-			where: filter.slugs ? { slug: { in: filter.slugs } } : undefined,
-			orderBy: { name: "asc" },
-		});
-	}
+		returns: disciplineSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			filter: DisciplineFilter,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Discipline[]> =>
+			tx.discipline.findMany({
+				where: filter.slugs ? { slug: { in: filter.slugs } } : undefined,
+				orderBy: { name: "asc" },
+			}),
+	});
 
 	/**
 	 * Updates a discipline's name.
@@ -119,32 +111,31 @@ export class DisciplineService
 	 * changing it would move every one of those courses without touching a
 	 * row.
 	 */
-	@Validate({
-		service: true,
-		returns: disciplineSchema,
+	const update = op({
 		args: [disciplinePK, disciplineUpdate],
-	})
-	async update(
-		filter: DisciplinePK,
-		fields: DisciplineUpdate,
-		opts: ServiceOpts,
-	): Promise<Discipline> {
-		assertCanWriteDiscipline(opts.actor, filter.slug, "discipline.update");
-		const client = opts.tx ?? this.prisma;
-		const current = await client.discipline.findUnique({
-			where: { slug: filter.slug },
-		});
-		if (!current) {
-			throw new NotFound("discipline", {
-				id: filter.slug,
-				message: m.errors_discipline_not_found({ slug: filter.slug }),
+		returns: disciplineSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: DisciplinePK,
+			fields: DisciplineUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Discipline> => {
+			assertCanWriteDiscipline(opts.actor, filter.slug, "discipline.update");
+			const current = await tx.discipline.findUnique({
+				where: { slug: filter.slug },
 			});
-		}
-		return client.discipline.update({
-			where: { slug: filter.slug },
-			data: { name: fields.name },
-		});
-	}
+			if (!current) {
+				throw new NotFound("discipline", {
+					id: filter.slug,
+					message: m.errors_discipline_not_found({ slug: filter.slug }),
+				});
+			}
+			return tx.discipline.update({
+				where: { slug: filter.slug },
+				data: { name: fields.name },
+			});
+		},
+	});
 
 	/**
 	 * Upserts a discipline keyed on `slug`: creates it if absent, else updates
@@ -154,20 +145,22 @@ export class DisciplineService
 	 * via {@link assertCanWriteDiscipline} regardless of which branch Prisma
 	 * takes.
 	 */
-	@Validate({
-		service: true,
-		returns: disciplineSchema,
+	const upsert = op({
 		args: [disciplineCreate],
-	})
-	upsert(input: DisciplineCreate, opts: ServiceOpts): Promise<Discipline> {
-		assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
-		const client = opts.tx ?? this.prisma;
-		return client.discipline.upsert({
-			where: { slug: input.slug },
-			update: { name: input.name },
-			create: { slug: input.slug, name: input.name },
-		});
-	}
+		returns: disciplineSchema,
+		run: async (
+			tx: PrismaTx,
+			input: DisciplineCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Discipline> => {
+			assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
+			return tx.discipline.upsert({
+				where: { slug: input.slug },
+				update: { name: input.name },
+				create: { slug: input.slug, name: input.name },
+			});
+		},
+	});
 
 	/**
 	 * Deletes a discipline.
@@ -177,25 +170,35 @@ export class DisciplineService
 	 * what is in the way. Questions hang off a course, so a discipline with no
 	 * courses has none.
 	 */
-	@Validate({ service: true, args: [disciplinePK] })
-	async delete(filter: DisciplinePK, opts: ServiceOpts): Promise<void> {
-		ensurePerm(opts.actor, "discipline.delete");
-		const client = opts.tx ?? this.prisma;
-		const courses = await client.course.count({
-			where: { disciplineSlug: filter.slug },
-		});
-		if (courses > 0) {
-			throw new NotAllowed("discipline.delete", {
-				status: 409,
-				message: m.errors_discipline_has_courses({
-					slug: filter.slug,
-					count: courses,
-				}),
+	const remove = op({
+		args: [disciplinePK],
+		run: async (
+			tx: PrismaTx,
+			filter: DisciplinePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			ensurePerm(opts.actor, "discipline.delete");
+			const courses = await tx.course.count({
+				where: { disciplineSlug: filter.slug },
 			});
-		}
-		await client.discipline.deleteMany({ where: { slug: filter.slug } });
-	}
-}
+			if (courses > 0) {
+				throw new NotAllowed("discipline.delete", {
+					status: 409,
+					message: m.errors_discipline_has_courses({
+						slug: filter.slug,
+						count: courses,
+					}),
+				});
+			}
+			await tx.discipline.deleteMany({ where: { slug: filter.slug } });
+		},
+	});
+
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
+
+/** The discipline service, as built by {@link makeDisciplineService}. */
+export type DisciplineService = ReturnType<typeof makeDisciplineService>;
 
 //
 // Auxiliary functions

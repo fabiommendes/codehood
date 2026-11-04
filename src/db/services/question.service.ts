@@ -22,11 +22,8 @@ import {
 	questionSchema,
 	questionUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
 	type PublicQuestion,
@@ -36,7 +33,6 @@ import {
 	withIds,
 } from "@/mdq";
 import { type QuestionStatus, writable } from "@/services/question-status";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 import { courseContentsWhere } from "./course.service";
@@ -135,87 +131,49 @@ async function findPinnedVersion(
 
 const questionView = questionSchema.or(questionPublicSchema);
 
-export class QuestionService extends CrudBase<{
+/// The CRUD shape of the question service.
+type QuestionT = {
 	entity: QuestionView;
 	pkFilter: QuestionPK;
 	create: QuestionCreate;
 	filter: QuestionFilter;
 	update: QuestionUpdate;
-}> {
-	// Overloads only narrow the return type on `filter.public`; the logic and
-	// its docs live in `findOneTx`/`findManyTx`.
-	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionFindOneFilter & { public: true },
-		opts: Opt,
-	): Promise<QuestionPublic | null>;
-	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionFindOneFilter & { public: false },
-		opts: Opt,
-	): Promise<Question | null>;
-	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionFindOneFilter,
-		opts: Opt,
-	): Promise<QuestionView | null>;
-	override findOne<Opt extends ServiceOpts>(
-		filter: QuestionFindOneFilter,
-		opts: Opt,
-	): Promise<QuestionView | null> {
-		return super.findOne(filter, opts);
-	}
+};
 
-	override findMany<Opt extends ServiceOpts>(
-		filter: QuestionFilter & { public: true },
-		opts: Opt,
-	): Promise<QuestionPublic[]>;
-	override findMany<Opt extends ServiceOpts>(
-		filter: QuestionFilter & { public: false },
-		opts: Opt,
-	): Promise<Question[]>;
-	override findMany<Opt extends ServiceOpts>(
-		filter: QuestionFilter,
-		opts: Opt,
-	): Promise<QuestionView[]>;
-	override findMany<Opt extends ServiceOpts>(
-		filter: QuestionFilter,
-		opts: Opt,
-	): Promise<QuestionView[]> {
-		return super.findMany(filter, opts);
-	}
-
+const buildQuestionService = defineService<QuestionT>()(() => {
 	/**
 	 * Creates a question and its first version, or revives an archived one
 	 * under the same slug.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [questionCreate],
 		returns: questionSchema,
-		args: [undefined, questionCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: QuestionCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Question> {
-		assertWellFormed(input.question);
-		const course = await writableCourse(tx, input.course, opts.actor);
+		run: async (
+			tx: PrismaTx,
+			input: QuestionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Question> => {
+			assertWellFormed(input.question);
+			const course = await writableCourse(tx, input.course, opts.actor);
 
-		const archived = await tx.questionRef.findFirst({
-			where: { courseId: course.id, slug: input.slug, status: "ARCHIVED" },
-			select: { id: true, slug: true },
-		});
-		if (archived) return applyWrite(tx, archived, input);
+			const archived = await tx.questionRef.findFirst({
+				where: { courseId: course.id, slug: input.slug, status: "ARCHIVED" },
+				select: { id: true, slug: true },
+			});
+			if (archived) return applyWrite(tx, archived, input);
 
-		const row = await tx.questionRef.create({
-			data: {
-				publicId: generateToken(9),
-				slug: input.slug,
-				status: input.status,
-				type: toDbType(input.question.type),
-				courseId: course.id,
-			},
-		});
-		return applyWrite(tx, row, input);
-	}
+			const row = await tx.questionRef.create({
+				data: {
+					publicId: generateToken(9),
+					slug: input.slug,
+					status: input.status,
+					type: toDbType(input.question.type),
+					courseId: course.id,
+				},
+			});
+			return applyWrite(tx, row, input);
+		},
+	});
 
 	/**
 	 * Finds a question by id, public id, or its `(course, slug)` natural key.
@@ -230,133 +188,140 @@ export class QuestionService extends CrudBase<{
 	 * question as it is now (status, rev, timestamps). A version the question
 	 * never had falls back to the latest.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [questionFindOneFilter],
 		returns: questionView.nullable(),
-		args: [undefined, questionFindOneFilter],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: QuestionFindOneFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<QuestionView | null> {
-		// Resolved with the public-safe include: at this point `actor` hasn't
-		// been checked against the course, so `latest.privatePayload` must not
-		// be in the query yet.
-		const row = await tx.questionRef.findFirst({
-			where: refWhere(filter),
-			include: questionInclude(),
-		});
+		run: async (
+			tx: PrismaTx,
+			filter: QuestionFindOneFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<QuestionView | null> => {
+			// Resolved with the public-safe include: at this point `actor` hasn't
+			// been checked against the course, so `latest.privatePayload` must not
+			// be in the query yet.
+			const row = await tx.questionRef.findFirst({
+				where: refWhere(filter),
+				include: questionInclude(),
+			});
 
-		if (!row) return null;
+			if (!row) return null;
 
-		// An outsider is refused whatever the status, so a hidden slug cannot
-		// be told from a published one; a draft, hidden or archived question
-		// is missing for a non-author, unless an exam still pins it.
-		const access = questionAccess(opts.actor, row, await isPinned(tx, row));
-		const error = accessError(access, "read", "question.read");
-		if (error instanceof NotFound) return null;
-		if (error) throw error;
+			// An outsider is refused whatever the status, so a hidden slug cannot
+			// be told from a published one; a draft, hidden or archived question
+			// is missing for a non-author, unless an exam still pins it.
+			const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+			const error = accessError(access, "read", "question.read");
+			if (error instanceof NotFound) return null;
+			if (error) throw error;
 
-		const full = access === "write";
-		if (filter.public === false && !full) {
-			throw new NotAllowed("question.read");
-		}
-		if (filter.public || !full) {
-			const pinned = await findPinnedVersion(tx, row.id, filter.version, false);
-			return fromDbPublic(
-				pinned ? ({ ...row, latest: pinned } as typeof row) : row,
+			const full = access === "write";
+			if (filter.public === false && !full) {
+				throw new NotAllowed("question.read");
+			}
+			if (filter.public || !full) {
+				const pinned = await findPinnedVersion(
+					tx,
+					row.id,
+					filter.version,
+					false,
+				);
+				return fromDbPublic(
+					pinned ? ({ ...row, latest: pinned } as typeof row) : row,
+				);
+			}
+
+			// Only now, with the full view granted, does the query touching
+			// `privatePayload` get sent.
+			const pinned = await findPinnedVersion(tx, row.id, filter.version, true);
+			const fullRow = valueOrNotFound(
+				"question",
+				await tx.questionRef.findUnique({
+					where: { id: row.id },
+					include: pinned
+						? { ...questionInclude(true), latest: false }
+						: questionInclude(true),
+				}),
 			);
-		}
-
-		// Only now, with the full view granted, does the query touching
-		// `privatePayload` get sent.
-		const pinned = await findPinnedVersion(tx, row.id, filter.version, true);
-		const fullRow = valueOrNotFound(
-			"question",
-			await tx.questionRef.findUnique({
-				where: { id: row.id },
-				include: pinned
-					? { ...questionInclude(true), latest: false }
-					: questionInclude(true),
-			}),
-		);
-		return fromDb(
-			pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
-		);
-	}
+			return fromDb(
+				pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
+			);
+		},
+	});
 
 	/**
 	 * Lists the questions of one course, narrowed to what `actor` may see.
 	 *
-	 * `filter.public` picks the view, as in {@link findOneTx}.
+	 * `filter.public` picks the view, as in `findOne`.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [questionFilter],
 		returns: questionView.array(),
-		args: [undefined, questionFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: QuestionFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<QuestionView[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: {
-					id: true,
-					instructor: { select: { username: true } },
-					enrollments: {
-						where: { status: "ACTIVE" as const },
-						select: { username: true },
+		run: async (
+			tx: PrismaTx,
+			filter: QuestionFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<QuestionView[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: {
+						id: true,
+						instructor: { select: { username: true } },
+						enrollments: {
+							where: { status: "ACTIVE" as const },
+							select: { username: true },
+						},
 					},
-				},
-			}),
-		);
+				}),
+			);
 
-		if (!hasPerm(opts.actor, "course.read-contents", course)) {
-			throw new NotAllowed("question.read");
-		}
+			if (!hasPerm(opts.actor, "course.read-contents", course)) {
+				throw new NotAllowed("question.read");
+			}
 
-		const full = hasPerm(opts.actor, "course.update-contents", course);
-		const isPublic = filter.public ?? !full;
-		if (filter.public === false && !full) {
-			throw new NotAllowed("question.read");
-		}
+			const full = hasPerm(opts.actor, "course.update-contents", course);
+			const isPublic = filter.public ?? !full;
+			if (filter.public === false && !full) {
+				throw new NotAllowed("question.read");
+			}
 
-		const where = {
-			AND: [
-				questionWhere(opts.actor, isPublic),
-				{
-					courseId: course.id,
-					...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
-					...(filter.statuses ? { status: { in: filter.statuses } } : {}),
-					...(filter.types ? { type: { in: filter.types.map(toDbType) } } : {}),
-					...(filter.tags
-						? { questionTags: { some: { tag: { in: filter.tags } } } }
-						: {}),
-				},
-			],
-		} satisfies Prisma.QuestionRefWhereInput;
+			const where = {
+				AND: [
+					questionWhere(opts.actor, isPublic),
+					{
+						courseId: course.id,
+						...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
+						...(filter.statuses ? { status: { in: filter.statuses } } : {}),
+						...(filter.types
+							? { type: { in: filter.types.map(toDbType) } }
+							: {}),
+						...(filter.tags
+							? { questionTags: { some: { tag: { in: filter.tags } } } }
+							: {}),
+					},
+				],
+			} satisfies Prisma.QuestionRefWhereInput;
 
-		if (isPublic) {
+			if (isPublic) {
+				const rows = await tx.questionRef.findMany({
+					where,
+					include: questionInclude(false),
+					orderBy: { slug: "asc" },
+				});
+				return rows.map(fromDbPublic);
+			}
+
 			const rows = await tx.questionRef.findMany({
 				where,
-				include: questionInclude(false),
+				include: questionInclude(true),
 				orderBy: { slug: "asc" },
 			});
-			return rows.map(fromDbPublic);
-		}
-
-		const rows = await tx.questionRef.findMany({
-			where,
-			include: questionInclude(true),
-			orderBy: { slug: "asc" },
-		});
-		return rows.map(fromDb);
-	}
+			return rows.map(fromDb);
+		},
+	});
 
 	/**
 	 * Appends a version when `question` changes, and repoints `latest`.
@@ -366,36 +331,35 @@ export class QuestionService extends CrudBase<{
 	 * question is refused, since a sync must not silently write to an archived
 	 * natural key; `create` or `upsert` revive it.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [questionPK, questionUpdate],
 		returns: questionSchema,
-		args: [undefined, questionPK, questionUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: QuestionPK,
-		fields: QuestionUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Question> {
-		if ((fields.question === undefined) !== (fields.version === undefined)) {
-			throw new InvalidData({
-				[fields.question ? "version" : "question"]: [
-					{ code: "missing", message: m.errors_question_version_together() },
-				],
-			});
-		}
-		if (fields.question) assertWellFormed(fields.question);
+		run: async (
+			tx: PrismaTx,
+			filter: QuestionPK,
+			fields: QuestionUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Question> => {
+			if ((fields.question === undefined) !== (fields.version === undefined)) {
+				throw new InvalidData({
+					[fields.question ? "version" : "question"]: [
+						{ code: "missing", message: m.errors_question_version_together() },
+					],
+				});
+			}
+			if (fields.question) assertWellFormed(fields.question);
 
-		const ref = await writableRef(tx, filter, opts.actor, "question.update");
-		if (!writable(ref.status)) {
-			throw new NotAllowed("question.update", {
-				status: 409,
-				message: m.errors_question_archived({ slug: ref.slug }),
-			});
-		}
+			const ref = await writableRef(tx, filter, opts.actor, "question.update");
+			if (!writable(ref.status)) {
+				throw new NotAllowed("question.update", {
+					status: 409,
+					message: m.errors_question_archived({ slug: ref.slug }),
+				});
+			}
 
-		return applyWrite(tx, ref, fields);
-	}
+			return applyWrite(tx, ref, fields);
+		},
+	});
 
 	/**
 	 * Upserts a question keyed on its `(course, slug)` natural key.
@@ -403,36 +367,35 @@ export class QuestionService extends CrudBase<{
 	 * An archived question under that key takes the create branch, which
 	 * revives it.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [questionCreate],
 		returns: questionSchema,
-		args: [undefined, questionCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: QuestionCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<QuestionView> {
-		// Checked up front so both branches refuse a non-author the same way,
-		// without telling them whether the question exists.
-		const course = await writableCourse(tx, input.course, opts.actor);
-		const scoped = { ...opts, tx };
+		run: async (
+			tx: PrismaTx,
+			input: QuestionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<QuestionView> => {
+			// Checked up front so both branches refuse a non-author the same way,
+			// without telling them whether the question exists.
+			const course = await writableCourse(tx, input.course, opts.actor);
 
-		const existing = await tx.questionRef.findUnique({
-			where: { slug_courseId: { slug: input.slug, courseId: course.id } },
-			select: { status: true },
-		});
-		if (!existing || !writable(existing.status)) {
-			return this.create({ ...input, course: course.id }, scoped);
-		}
+			const existing = await tx.questionRef.findUnique({
+				where: { slug_courseId: { slug: input.slug, courseId: course.id } },
+				select: { status: true },
+			});
+			if (!existing || !writable(existing.status)) {
+				return create(tx, { ...input, course: course.id }, opts);
+			}
 
-		const { status, version, question, rev } = input;
-		return this.update(
-			{ course: course.id, slug: input.slug },
-			{ status, version, question, rev },
-			scoped,
-		);
-	}
+			const { status, version, question, rev } = input;
+			return update(
+				tx,
+				{ course: course.id, slug: input.slug },
+				{ status, version, question, rev },
+				opts,
+			);
+		},
+	});
 
 	/**
 	 * Archives a question rather than removing it, since responses reference it.
@@ -440,21 +403,66 @@ export class QuestionService extends CrudBase<{
 	 * The row stays readable through an exam that references it, and only
 	 * `create` or `upsert` bring it back.
 	 */
-	@Validate({ service: true, args: [undefined, questionPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: QuestionPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const ref = await writableRef(tx, filter, opts.actor, "question.delete");
-		if (!writable(ref.status)) return;
+	const remove = op({
+		args: [questionPK],
+		run: async (
+			tx: PrismaTx,
+			filter: QuestionPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const ref = await writableRef(tx, filter, opts.actor, "question.delete");
+			if (!writable(ref.status)) return;
 
-		await tx.questionRef.update({
-			where: { id: ref.id },
-			data: { status: "ARCHIVED" },
-		});
-	}
-}
+			await tx.questionRef.update({
+				where: { id: ref.id },
+				data: { status: "ARCHIVED" },
+			});
+		},
+	});
+
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
+
+/// The service `buildQuestionService` makes, with `findOne` and `findMany` overloaded on `filter.public` to narrow the view they return.
+type QuestionServiceBuilt = ReturnType<typeof buildQuestionService>;
+
+/** The question service, as built by {@link makeQuestionService}. */
+export type QuestionService = Omit<
+	QuestionServiceBuilt,
+	"findOne" | "findMany"
+> & {
+	findOne: {
+		(
+			filter: QuestionFindOneFilter & { public: true },
+			opts: ServiceOpts,
+		): Promise<QuestionPublic | null>;
+		(
+			filter: QuestionFindOneFilter & { public: false },
+			opts: ServiceOpts,
+		): Promise<Question | null>;
+		(
+			filter: QuestionFindOneFilter,
+			opts: ServiceOpts,
+		): Promise<QuestionView | null>;
+	};
+	findMany: {
+		(
+			filter: QuestionFilter & { public: true },
+			opts: ServiceOpts,
+		): Promise<QuestionPublic[]>;
+		(
+			filter: QuestionFilter & { public: false },
+			opts: ServiceOpts,
+		): Promise<Question[]>;
+		(filter: QuestionFilter, opts: ServiceOpts): Promise<QuestionView[]>;
+	};
+};
+
+/** The question service of `client` (the shared client by default). */
+export const makeQuestionService = (
+	...args: Parameters<typeof buildQuestionService>
+): QuestionService =>
+	buildQuestionService(...args) as unknown as QuestionService;
 
 //
 // Auxiliary functions

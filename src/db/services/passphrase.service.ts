@@ -13,17 +13,11 @@ import {
 	passphraseSchema,
 	passphraseUpdate,
 } from "@/core/schemas";
-import type { Crud, ServiceOpts } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
-import { Validate } from "@/utils/validate";
-import {
-	type Passphrase as DbPassphrase,
-	type Prisma,
-	type PrismaClient,
-	type PrismaTx,
-	prisma,
-} from "../client";
+import type { Passphrase as DbPassphrase, Prisma, PrismaTx } from "../client";
 import { courseRefWhere } from "../utils";
 
 export type { PassphraseId } from "@/core/schemas";
@@ -47,7 +41,18 @@ export type PassphraseUpdate = z.infer<typeof passphraseUpdate>;
 /// Why a passphrase could not be redeemed.
 export type PassphraseErrorCode = "unknown" | "expired" | "own_course";
 
-/** Refusal from {@link PassphraseService.redeem}, carrying a machine-readable `code`. */
+/// The CRUD shape of the passphrase service. `upsert` is off: `value` is
+/// server-generated and the only updatable field is `expiresAt`.
+type PassphraseT = {
+	entity: Passphrase;
+	pkFilter: PassphrasePK;
+	create: PassphraseCreate;
+	filter: PassphraseFilter;
+	update: PassphraseUpdate;
+	upsert: false;
+};
+
+/** Refusal from `redeem`, carrying a machine-readable `code`. */
 export class PassphraseError extends Error {
 	constructor(public code: PassphraseErrorCode) {
 		super(code);
@@ -75,23 +80,7 @@ export interface PassphraseRedemption {
  * credential a joining student presents, not something they're granted read
  * access to separately.
  */
-export class PassphraseService
-	implements
-		Crud<{
-			entity: Passphrase;
-			pkFilter: PassphrasePK;
-			create: PassphraseCreate;
-			filter: PassphraseFilter;
-			update: PassphraseUpdate;
-			upsert: false;
-		}>
-{
-	prisma: PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+export const makePassphraseService = defineService<PassphraseT>()(() => {
 	/**
 	 * Creates a passphrase for `input.courseId`, course-owner (or system)
 	 * only.
@@ -101,80 +90,78 @@ export class PassphraseService
 	 * own override that collides is refused with a message naming the
 	 * conflict, rather than silently regenerated out from under them.
 	 */
-	@Validate({
-		service: true,
-		returns: passphraseSchema,
+	const create = op({
 		args: [passphraseCreate],
-	})
-	async create(
-		input: PassphraseCreate,
-		opts: ServiceOpts,
-	): Promise<Passphrase> {
-		const course = await this.requireManageableCourse(
-			input.course,
-			opts,
-			"create",
-		);
-		const client = opts.tx ?? this.prisma;
-		const expiresAt = new Date(Date.now() + EXPIRY_MS);
+		returns: passphraseSchema,
+		run: async (
+			tx: PrismaTx,
+			input: PassphraseCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Passphrase> => {
+			const course = await requireManageableCourse(
+				tx,
+				input.course,
+				opts,
+				"create",
+			);
+			const expiresAt = new Date(Date.now() + EXPIRY_MS);
 
-		if (input.value) {
-			if (
-				await client.passphrase.findUnique({ where: { value: input.value } })
-			) {
-				throw new Error(m.errors_passphrase_in_use({ value: input.value }));
+			if (input.value) {
+				if (await tx.passphrase.findUnique({ where: { value: input.value } })) {
+					throw new Error(m.errors_passphrase_in_use({ value: input.value }));
+				}
+				return toPassphrase(
+					await tx.passphrase.create({
+						data: { courseId: course.id, value: input.value, expiresAt },
+					}),
+				);
 			}
-			return toPassphrase(
-				await client.passphrase.create({
-					data: { courseId: course.id, value: input.value, expiresAt },
-				}),
-			);
-		}
 
-		for (let attempt = 0; attempt < 5; attempt++) {
-			const value = generateValue();
-			if (await client.passphrase.findUnique({ where: { value } })) continue;
-			return toPassphrase(
-				await client.passphrase.create({
-					data: { courseId: course.id, value, expiresAt },
-				}),
-			);
-		}
-		throw new Error(m.errors_passphrase_generate_failed());
-	}
+			for (let attempt = 0; attempt < 5; attempt++) {
+				const value = generateValue();
+				if (await tx.passphrase.findUnique({ where: { value } })) continue;
+				return toPassphrase(
+					await tx.passphrase.create({
+						data: { courseId: course.id, value, expiresAt },
+					}),
+				);
+			}
+			throw new Error(m.errors_passphrase_generate_failed());
+		},
+	});
 
 	/**
 	 * Finds a single passphrase by id or by its value.
 	 *
-	 * Not actor-filtered on the `value` path — see the class doc. The `id`
+	 * Not actor-filtered on the `value` path — see the service doc. The `id`
 	 * path is used internally by `update`/`delete` and isn't reachable from
 	 * outside this file today, but stays consistent with every other
 	 * service's `findOne`.
 	 */
-	@Validate({
-		service: true,
-		returns: passphraseSchema.nullable(),
+	const findOne = op({
+		transaction: false,
 		args: [passphrasePK],
-	})
-	async findOne(
-		filter: PassphrasePK,
-		opts: ServiceOpts,
-	): Promise<Passphrase | null> {
-		const client = opts.tx ?? this.prisma;
-		const by = filter as FillUndefineds<PassphrasePK>; // zod doesn't narrow to a single field, so we do it here
+		returns: passphraseSchema.nullable(),
+		run: async (
+			tx: PrismaTx,
+			filter: PassphrasePK,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Passphrase | null> => {
+			const by = filter as FillUndefineds<PassphrasePK>; // zod doesn't narrow to a single field, so we do it here
 
-		let row: DbPassphrase | null = null;
-		if (by.id !== undefined) {
-			row = await client.passphrase.findUnique({
-				where: { id: by.id as PassphraseId },
-			});
-		} else if (by.value !== undefined) {
-			row = await client.passphrase.findUnique({
-				where: { value: by.value },
-			});
-		}
-		return row && toPassphrase(row);
-	}
+			let row: DbPassphrase | null = null;
+			if (by.id !== undefined) {
+				row = await tx.passphrase.findUnique({
+					where: { id: by.id as PassphraseId },
+				});
+			} else if (by.value !== undefined) {
+				row = await tx.passphrase.findUnique({
+					where: { value: by.value },
+				});
+			}
+			return row && toPassphrase(row);
+		},
+	});
 
 	/**
 	 * Lists a course's passphrases, course-owner (or system) only.
@@ -183,59 +170,58 @@ export class PassphraseService
 	 * across every course at once. No caller yet — there is no management
 	 * UI.
 	 */
-	@Validate({
-		service: true,
-		returns: passphraseSchema.array(),
+	const findMany = op({
+		transaction: false,
 		args: [passphraseFilter],
-	})
-	async findMany(
-		filter: PassphraseFilter,
-		opts: ServiceOpts,
-	): Promise<Passphrase[]> {
-		const client = opts.tx ?? this.prisma;
-		let course: { id: CourseId } | undefined;
-		if (filter.course !== undefined) {
-			course = await this.requireManageableCourse(filter.course, opts, "read");
-		} else if (opts.actor !== SYSTEM) {
-			throw new NotAllowed("passphrase.read");
-		}
-		const rows = await client.passphrase.findMany({
-			where: {
-				AND: [
-					course ? { courseId: course.id } : {},
-					filter.active ? { expiresAt: { gt: new Date() } } : {},
-				],
-			},
-			orderBy: { createdAt: "desc" },
-		});
-		return rows.map(toPassphrase);
-	}
+		returns: passphraseSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			filter: PassphraseFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Passphrase[]> => {
+			let course: { id: CourseId } | undefined;
+			if (filter.course !== undefined) {
+				course = await requireManageableCourse(tx, filter.course, opts, "read");
+			} else if (opts.actor !== SYSTEM) {
+				throw new NotAllowed("passphrase.read");
+			}
+			const rows = await tx.passphrase.findMany({
+				where: {
+					AND: [
+						course ? { courseId: course.id } : {},
+						filter.active ? { expiresAt: { gt: new Date() } } : {},
+					],
+				},
+				orderBy: { createdAt: "desc" },
+			});
+			return rows.map(toPassphrase);
+		},
+	});
 
 	/**
 	 * Extends (or shortens) how long a passphrase stays live. Course-owner
 	 * (or system) only.
 	 */
-	@Validate({
-		service: true,
-		returns: passphraseSchema,
+	const update = op({
 		args: [passphrasePK, passphraseUpdate],
-	})
-	async update(
-		filter: PassphrasePK,
-		fields: PassphraseUpdate,
-		opts: ServiceOpts,
-	): Promise<Passphrase> {
-		const target = await this.findOne(filter, opts);
-		if (!target) throw new Error("passphrase not found");
-		await this.requireManageableCourse(target.courseId, opts, "update");
-		const client = opts.tx ?? this.prisma;
-		return toPassphrase(
-			await client.passphrase.update({
-				where: { id: target.id },
-				data: { expiresAt: fields.expiresAt },
-			}),
-		);
-	}
+		returns: passphraseSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: PassphrasePK,
+			fields: PassphraseUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Passphrase> => {
+			const target = await findOne(tx, filter, opts);
+			if (!target) throw new Error("passphrase not found");
+			await requireManageableCourse(tx, target.courseId, opts, "update");
+			return toPassphrase(
+				await tx.passphrase.update({
+					where: { id: target.id },
+					data: { expiresAt: fields.expiresAt },
+				}),
+			);
+		},
+	});
 
 	/**
 	 * Enrolls the actor in the course a live passphrase belongs to.
@@ -249,15 +235,16 @@ export class PassphraseService
 	 *   `expired` when it is past `expiresAt`, `own_course` when the actor
 	 *   teaches the course.
 	 */
-	async redeem(
-		value: string,
-		opts: ServiceOpts,
-	): Promise<PassphraseRedemption> {
-		if (opts.actor === SYSTEM) throw new NotAllowed("enrollment.create");
-		const username = opts.actor.username;
-		const typed = value.trim();
+	const redeem = op({
+		run: async (
+			tx: PrismaTx,
+			value: string,
+			opts: ServiceOptsWithoutTx,
+		): Promise<PassphraseRedemption> => {
+			if (opts.actor === SYSTEM) throw new NotAllowed("enrollment.create");
+			const username = opts.actor.username;
+			const typed = value.trim();
 
-		const run = async (tx: PrismaTx) => {
 			const select = {
 				id: true,
 				expiresAt: true,
@@ -297,52 +284,54 @@ export class PassphraseService
 				edition: course.editionSlug,
 				name: course.discipline.name,
 			};
-		};
-		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
-	}
-
-	// No upsert: `value` is server-generated unless pinned, and the only
-	// updatable field is `expiresAt`.
-	upsert<Opt extends ServiceOpts>(_entity: never, _opts: Opt): Promise<never> {
-		throw new Error("Method not implemented.");
-	}
+		},
+	});
 
 	/**
 	 * Revokes a passphrase early. Course-owner (or system) only. No caller
 	 * yet — it expires on its own in 5 minutes.
 	 */
-	@Validate({ service: true, args: [passphrasePK] })
-	async delete(filter: PassphrasePK, opts: ServiceOpts): Promise<void> {
-		const target = await this.findOne(filter, opts);
-		if (!target) throw new Error("passphrase not found");
-		await this.requireManageableCourse(target.courseId, opts, "delete");
-		const client = opts.tx ?? this.prisma;
-		await client.passphrase.delete({ where: { id: target.id } });
-	}
+	const remove = op({
+		args: [passphrasePK],
+		run: async (
+			tx: PrismaTx,
+			filter: PassphrasePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const target = await findOne(tx, filter, opts);
+			if (!target) throw new Error("passphrase not found");
+			await requireManageableCourse(tx, target.courseId, opts, "delete");
+			await tx.passphrase.delete({ where: { id: target.id } });
+		},
+	});
 
-	//
-	// Utility methods
-	//
-	private async requireManageableCourse(
-		ref: CourseRef,
-		opts: ServiceOpts,
-		action: "read" | "create" | "update" | "delete",
-	): Promise<{ id: CourseId }> {
-		const client = opts.tx ?? this.prisma;
+	// No upsert: `value` is server-generated unless pinned, and the only
+	// updatable field is `expiresAt`.
+	return { create, findOne, findMany, update, redeem, delete: remove };
+});
 
-		const course = await client.course.findUnique({
-			where: courseRefWhere(ref),
-			select: { id: true, instructor: { select: { username: true } } },
-		});
-		if (!course) throw new NotFound("course");
+/** The passphrase service, as built by {@link makePassphraseService}. */
+export type PassphraseService = ReturnType<typeof makePassphraseService>;
 
-		// A passphrase is one of the course's operations, not an enrollment
-		// row: `enrollment.manage`, so a non-owning admin cannot mint one.
-		if (!hasPerm(opts.actor, "enrollment.manage", course))
-			throw new NotAllowed(`passphrase.${action}`);
+/// Finds the course `ref` names, refusing an actor who may not manage its passphrases.
+async function requireManageableCourse(
+	tx: PrismaTx,
+	ref: CourseRef,
+	opts: ServiceOptsWithoutTx,
+	action: "read" | "create" | "update" | "delete",
+): Promise<{ id: CourseId }> {
+	const course = await tx.course.findUnique({
+		where: courseRefWhere(ref),
+		select: { id: true, instructor: { select: { username: true } } },
+	});
+	if (!course) throw new NotFound("course");
 
-		return { id: course.id as CourseId };
-	}
+	// A passphrase is one of the course's operations, not an enrollment
+	// row: `enrollment.manage`, so a non-owning admin cannot mint one.
+	if (!hasPerm(opts.actor, "enrollment.manage", course))
+		throw new NotAllowed(`passphrase.${action}`);
+
+	return { id: course.id as CourseId };
 }
 
 //

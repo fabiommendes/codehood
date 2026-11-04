@@ -11,10 +11,10 @@ import {
 	resourceSchema,
 	resourceUpdate,
 } from "@/core/schemas";
-import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds, Pretty } from "@/typing";
-import { Validate } from "@/utils/validate";
 import {
 	type Prisma,
 	type PrismaClient,
@@ -70,502 +70,469 @@ const resourceInclude = {
 	},
 } satisfies Prisma.ResourceInclude;
 
-export class ResourceService
-	implements
-		Crud<{
-			entity: Resource;
-			pkFilter: ResourcePK;
-			create: ResourceCreate;
-			filter: ResourceFilter;
-			update: ResourceUpdate;
-		}>
-{
-	prisma: PrismaClient;
-	attachment: AttachmentService;
+/// The CRUD shape of the resource service.
+type ResourceT = {
+	entity: Resource;
+	pkFilter: ResourcePK;
+	create: ResourceCreate;
+	filter: ResourceFilter;
+	update: ResourceUpdate;
+};
 
-	constructor(attachment: AttachmentService, client: PrismaClient = prisma) {
-		this.prisma = client;
-		this.attachment = attachment;
-	}
-
-	/**
-	 * Creates a resource.
-	 *
-	 * A `FILE` carries its bytes, or the hash of a blob the server already
-	 * has; either way the attachment is charged to the actor's quota.
-	 *
-	 * @throws {@link NotFound} If a `FILE` names a hash with no blob.
-	 */
-	@Validate({
-		service: true,
-		returns: resourceSchema,
-		args: [resourceCreate],
-	})
-	async create(input: ResourceCreate, opts: ServiceOpts): Promise<Resource> {
-		const self = this;
-
-		async function run(tx: PrismaTx) {
-			const course = await self.courseInfo(input.course, {
-				actor: opts.actor,
-				action: "resource.create",
-				perms: "write",
-				tx,
-			});
-
-			const eventId = await self.eventId(course.id, input.event, tx);
-			const row = await tx.resource.create({
-				data: {
-					courseId: course.id,
-					eventId,
-					slug: input.slug,
-					type: input.data.type,
-					title: input.title,
-					description: input.description,
-					data: self.toRawData(input.data),
-					extra: self.toRawExtra(input.data),
-
-					// We set attachment to null and then use the attachment
-					// service to create the real Attachment and Blob
-					attachmentId: null,
-					rev: input.rev,
-				},
-				include: resourceInclude,
-			});
-
-			// Create attachment now that we have the row id.
-			if (input.data.type === "FILE") {
-				const attachment = await self.attachFile(row.id, input.data, {
-					tx,
-					actor: opts.actor,
-				});
-
-				// The row above was created with `attachmentId: null` since the
-				// attachment can't exist before the resource's own id does — link
-				// it back now, or every re-fetch after this one finds no
-				// attachment and falls back to `fillData`'s "corrupted-file" stub.
-				await tx.resource.update({
-					where: { id: row.id },
-					data: { attachmentId: attachment.id },
-				});
-
-				row.attachment = {
-					id: attachment.id,
-					hash: attachment.hash,
-					filename: attachment.filename,
-					mimeType: attachment.mimeType,
-				};
-			}
-
-			return row && fromDb(row);
-		}
-
-		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
-	}
-
-	/**
-	 * Finds a resource by id or by its `(courseId, slug)` natural key.
-	 *
-	 * Throws `FORBIDDEN` if it exists but `actor` may not see its course's
-	 * contents (see the `course.read-contents` permission); returns `null` if
-	 * it does not exist.
-	 */
-	async findOne(
-		filter: ResourcePK,
-		opts: ServiceOpts & { skipValidation: { output: true } },
-	): Promise<(Resource & { __raw: DbResource }) | null>;
-
-	async findOne(
-		filter: ResourcePK,
-		opts: ServiceOpts extends { skipValidation: { output: true } }
-			? never
-			: ServiceOpts,
-	): Promise<Resource | null>;
-
-	@Validate({
-		service: true,
-		returns: resourceSchema.nullable(),
-		args: [resourcePK],
-	})
-	async findOne(
-		filter: ResourcePK,
-		opts: ServiceOpts,
-	): Promise<(Resource & { __raw?: DbResource }) | null> {
-		const self = this;
-
-		async function run(tx: PrismaTx) {
-			const by = filter as FillUndefineds<ResourcePK>;
-			let row: DbResource | null = null;
-
-			// filter by resource id
-			if (by.id !== undefined) {
-				row = await tx.resource.findUnique({
-					where: { id: by.id },
-					include: resourceInclude,
-				});
-
-				// filter by course and resource slug
-			} else if (by.course !== undefined) {
-				const courseId = await self.courseId(by.course, tx);
-				row = await tx.resource.findUnique({
-					where: {
-						courseId_slug: { courseId, slug: by.slug },
-					},
-					include: resourceInclude,
-				});
-			} else {
-				throw new Error(
-					"Invalid resource filter: must specify either id or course and slug",
-				);
-			}
-
-			if (!row) return null;
-
-			ensureAllowed({
-				value: row.course,
-				action: "resource.read",
-				pred: (course) => hasPerm(opts.actor, "course.read-contents", course),
-			});
-
-			return fromDb(row, { __raw: row });
-		}
-
-		return opts.tx ? run(opts.tx) : run(this.prisma);
-	}
-
-	/**
-	 * Lists resources narrowed to what `actor` may see.
-	 *
-	 * See the `course.read-contents` permission: an admin or the course's own
-	 * instructor sees everything, an actively enrolled student sees the
-	 * course's resources, everyone else sees none.
-	 *
-	 * Use {@link groupResourcesByType} on the result to build the page's
-	 * four sections.
-	 */
-	@Validate({
-		service: true,
-		returns: resourceSchema.array(),
-		args: [resourceFilter],
-	})
-	async findMany(
-		filter: ResourceFilter,
-		opts: ServiceOpts,
-	): Promise<Resource[]> {
-		const self = this;
-
-		async function run(tx: PrismaTx) {
-			const course = await self.courseInfo(filter.course, {
-				tx,
-				actor: opts.actor,
-				action: "resource.read",
-				perms: "read",
-			});
-
-			const rows = await tx.resource.findMany({
-				where: {
-					AND: [
-						course
-							? { courseId: course.id }
-							: { course: courseContentsWhere(opts.actor) },
-						filter.types ? { type: { in: filter.types } } : {},
-						filter.slugs ? { slug: { in: filter.slugs } } : {},
-						filter.event === undefined ? {} : { eventId: filter.event },
-					],
-				},
-				include: resourceInclude,
-				orderBy: { title: "asc" },
-			});
-			for (const row of rows) {
-				if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
-					throw new NotAllowed("resource.read");
-				}
-			}
-			return rows.map(fromDb);
-		}
-
-		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
-	}
-
-	/**
-	 * Updates everything but `slug` and `courseId`.
-	 *
-	 * `manage import-resources` uses this to update an existing row in
-	 * place when re-pushing an unchanged slug. Re-validates the merged
-	 * shape, so switching a resource's `type` (unusual, but not refused)
-	 * cannot leave it in an invalid one.
-	 */
-	@Validate({
-		service: true,
-		returns: resourceSchema,
-		args: [resourcePK, resourceUpdate],
-	})
-	async update(
-		filter: ResourcePK,
-		fields: ResourceUpdate,
-		opts: ServiceOpts,
-	): Promise<Resource> {
-		const self = this;
-
-		async function run(tx: PrismaTx) {
-			const target = valueOrNotFound(
-				"resource",
-				await self.findOne(filter, {
-					tx,
-					actor: opts.actor,
-					skipValidation: { output: true },
-				}),
-			);
-			ensureAllowed({
-				value: target.__raw.course,
-				action: "resource.update",
-				pred: (course) => hasPerm(opts.actor, "course.update-contents", course),
-			});
-
-			// The same bytes and filename come back as the current attachment.
-			const previousId = target.__raw.attachmentId;
-			const attachmentId =
-				fields.data?.type === "FILE"
-					? (
-							await self.attachFile(target.id, fields.data, {
-								tx,
-								actor: opts.actor,
-							})
-						).id
-					: undefined;
-
-			const eventId = await self.eventId(target.courseId, fields.event, tx);
-			const row = await tx.resource.update({
-				where: { id: target.id },
-				data: {
-					eventId,
-					type: fields.data?.type,
-					title: fields.title,
-					description: fields.description,
-					data: fields.data ? self.toRawData(fields.data) : undefined,
-					extra: fields.data ? self.toRawExtra(fields.data) : undefined,
-					attachmentId,
-					rev: fields.rev,
-				},
-				include: resourceInclude,
-			});
-
-			// Last, so the files it removes stay put if anything above fails.
-			if (
-				previousId &&
-				attachmentId !== undefined &&
-				attachmentId !== previousId
-			) {
-				await self.attachment.delete({ id: previousId }, { tx, actor: SYSTEM });
-			}
-			return fromDb(row);
-		}
-
-		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
-	}
-
-	/**
-	 * Upserts a resource keyed on `{courseId | courseRef, slug}`.
-	 *
-	 * PUT semantics: gated on the `course.update-contents` permission whether
-	 * creating or updating, same as `create`/`update`; the shape-by-type check
-	 * ({@link validateResourceShape}) re-runs on whichever branch fires.
-	 */
-	@Validate({
-		service: true,
-		returns: resourceSchema,
-		args: [resourceCreate],
-	})
-	async upsert(input: ResourceCreate, opts: ServiceOpts): Promise<Resource> {
-		const self = this;
-
-		return upsert(this, input, {
-			...opts,
-			client: this.prisma,
-			action: "resource.create",
-			update: (input) => ({ ...input, event: input.event ?? null }),
-			pk({ slug, course }) {
-				return { slug, course } satisfies ResourcePK;
-			},
-			async assertCreatable(input, opts) {
-				const course = await self.courseInfo(input.course, opts);
-				if (!hasPerm(opts.actor, "course.update-contents", course))
-					throw new NotAllowed("resource.create");
-			},
-		});
-	}
-
-	/**
-	 * Removes the resource row outright.
-	 *
-	 * If it pointed at an `Attachment`, releases that reference:
-	 * `AttachmentService.delete` only reaches the disk once the last resource
-	 * pointing at the blob is gone, since content addressing means another
-	 * course may still share it.
-	 */
-	@Validate({ service: true, args: [resourcePK] })
-	async delete(filter: ResourcePK, opts: ServiceOpts): Promise<void> {
-		const self = this;
-
-		async function run(tx: PrismaTx) {
-			const target = await self.findOne(filter, { ...opts, tx });
-
-			if (!target) throw new NotFound("resource");
-
-			const current = await tx.resource.findUnique({
-				where: { id: target.id },
-				include: resourceInclude,
-			});
-
-			if (
-				!current ||
-				!hasPerm(opts.actor, "course.update-contents", current.course)
-			) {
-				throw new NotAllowed("resource.delete");
-			}
-			await tx.resource.delete({ where: { id: target.id } });
-
-			// Last, so the files it removes stay put if anything above fails.
-			if (current.attachmentId) {
-				await self.attachment.delete(
-					{ id: current.attachmentId },
-					{ tx, actor: SYSTEM },
-				);
-			}
-		}
-		return opts.tx ? run(opts.tx) : this.prisma.$transaction(run);
-	}
-
-	//
-	// Private helpers
-	//
-
+/**
+ * The resource service of `client` (the shared client by default), storing
+ * the bytes of `FILE` resources through `attachment`.
+ */
+export function makeResourceService(
+	attachment: AttachmentService,
+	client: PrismaClient = prisma,
+) {
 	/// Attaches a `FILE`'s bytes when they were sent, else the blob already
 	/// stored under its hash, which must exist.
-	private attachFile(
+	function attachFile(
+		tx: PrismaTx,
 		id: Resource["id"],
 		data: Extract<ResourceCreate["data"], { type: "FILE" }>,
-		opts: ServiceOpts & { tx: PrismaTx },
+		actor: ServiceOptsWithoutTx["actor"],
 	) {
 		const owner = {
 			attachedTo: { type: "RESOURCE" as const, id },
 			filename: data.filename,
 		};
 		return "buffer" in data
-			? this.attachment.create({ ...owner, buffer: data.buffer }, opts)
-			: this.attachment.attach({ ...owner, hash: data.hash }, opts);
-	}
-	private toRawData(raw: ResourceCreate["data"]): DbResource["data"] {
-		switch (raw.type) {
-			case "LINK":
-				return raw.url;
-			case "CODE":
-			case "MD":
-				return raw.content;
-			default:
-				return null;
-		}
+			? attachment.create({ ...owner, buffer: data.buffer }, { tx, actor })
+			: attachment.attach({ ...owner, hash: data.hash }, { tx, actor });
 	}
 
-	private toRawExtra(raw: ResourceCreate["data"]): DbResource["extra"] {
-		switch (raw.type) {
-			case "LINK":
-				return null;
-			case "CODE":
-				return raw.language ?? null;
-			default:
-				return null;
-		}
-	}
+	return defineService<ResourceT>()(() => {
+		/**
+		 * Creates a resource.
+		 *
+		 * A `FILE` carries its bytes, or the hash of a blob the server already
+		 * has; either way the attachment is charged to the actor's quota.
+		 *
+		 * @throws {@link NotFound} If a `FILE` names a hash with no blob.
+		 */
+		const create = op({
+			args: [resourceCreate],
+			returns: resourceSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ResourceCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Resource> => {
+				const course = await courseInfo(tx, input.course, {
+					actor: opts.actor,
+					action: "resource.create",
+					perms: "write",
+				});
 
-	/**
-	 * Resolves the course if actor can do the given actions.
-	 *
-	 * Throws `NotFound` or `NotAllowed` if no course is found or the actor may not
-	 * write/read its content.
-	 */
-	private async courseInfo(
-		ref: ResourceCreate["course"],
-		args: ServiceOpts &
-			({ perms: "read" | "write"; action: ActionCode } | object),
-	): Promise<{
-		id: CourseId;
-		instructor: { username: string };
-		enrollments: { username: string }[];
-	}> {
-		const {
-			tx = this.prisma,
-			perms,
-			action,
-			actor,
-		} = args as ServiceOpts & {
-			perms: "read" | "write";
-			action: ActionCode;
-		};
+				const eventId = await resolveEventId(tx, course.id, input.event);
+				const row = await tx.resource.create({
+					data: {
+						courseId: course.id,
+						eventId,
+						slug: input.slug,
+						type: input.data.type,
+						title: input.title,
+						description: input.description,
+						data: toRawData(input.data),
+						extra: toRawExtra(input.data),
 
-		const select = {
-			id: true,
-			instructor: { select: { username: true } },
-			enrollments: {
-				where: { status: "ACTIVE" as const },
-				select: { username: true },
+						// We set attachment to null and then use the attachment
+						// service to create the real Attachment and Blob
+						attachmentId: null,
+						rev: input.rev,
+					},
+					include: resourceInclude,
+				});
+
+				// Create attachment now that we have the row id.
+				if (input.data.type === "FILE") {
+					const stored = await attachFile(tx, row.id, input.data, opts.actor);
+
+					// The row above was created with `attachmentId: null` since the
+					// attachment can't exist before the resource's own id does — link
+					// it back now, or every re-fetch after this one finds no
+					// attachment and falls back to `fillData`'s "corrupted-file" stub.
+					await tx.resource.update({
+						where: { id: row.id },
+						data: { attachmentId: stored.id },
+					});
+
+					row.attachment = {
+						id: stored.id,
+						hash: stored.hash,
+						filename: stored.filename,
+						mimeType: stored.mimeType,
+					};
+				}
+
+				return fromDb(row);
 			},
-		};
+		});
 
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(ref),
-				select,
-			}),
-		);
-
-		if (perms === undefined) return course;
-
-		const pred =
-			perms === "write"
-				? (c: typeof course) => hasPerm(actor, "course.update-contents", c)
-				: (c: typeof course) => hasPerm(actor, "course.read-contents", c);
-		return valueOrNotAllowed(action, course, pred);
-	}
-
-	/**
-	 * Resolves an event key within a course to the event id.
-	 *
-	 * Returns `undefined` when the key is omitted (leave unchanged) and `null`
-	 * when it is null (no event). Throws `NotFound` if the course has no such event.
-	 */
-	private async eventId(
-		courseId: CourseId,
-		key: ResourceCreate["event"],
-		tx: PrismaTx,
-	): Promise<number | null | undefined> {
-		if (key === undefined || key === null) return key;
-
-		const event = await tx.calendarEvent.findFirst({
-			where: {
-				courseId,
-				week: key.week,
-				timeSlot: { slug: key.timeSlot, courseId },
+		/**
+		 * Finds a resource by id or by its `(courseId, slug)` natural key.
+		 *
+		 * Throws `FORBIDDEN` if it exists but `actor` may not see its course's
+		 * contents (see the `course.read-contents` permission); returns `null` if
+		 * it does not exist.
+		 */
+		const findOne = op({
+			transaction: false,
+			args: [resourcePK],
+			returns: resourceSchema.nullable(),
+			run: async (
+				tx: PrismaTx,
+				filter: ResourcePK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Resource | null> => {
+				const row = await readableRow(tx, filter, opts.actor);
+				return row && fromDb(row);
 			},
-			select: { id: true },
 		});
-		return valueOrNotFound("calendar event", event).id;
-	}
 
-	private async courseId(ref: CourseRef, tx: PrismaTx): Promise<CourseId> {
-		if (typeof ref === "number") return ref;
+		/**
+		 * Lists resources narrowed to what `actor` may see.
+		 *
+		 * See the `course.read-contents` permission: an admin or the course's own
+		 * instructor sees everything, an actively enrolled student sees the
+		 * course's resources, everyone else sees none.
+		 *
+		 * Use {@link groupResourcesByType} on the result to build the page's
+		 * four sections.
+		 */
+		const findMany = op({
+			transaction: false,
+			args: [resourceFilter],
+			returns: resourceSchema.array(),
+			run: async (
+				tx: PrismaTx,
+				filter: ResourceFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Resource[]> => {
+				const course = await courseInfo(tx, filter.course, {
+					actor: opts.actor,
+					action: "resource.read",
+					perms: "read",
+				});
 
-		const course = await tx.course.findUnique({
-			where: courseRefWhere(ref),
-			select: { id: true },
+				const rows = await tx.resource.findMany({
+					where: {
+						AND: [
+							course
+								? { courseId: course.id }
+								: { course: courseContentsWhere(opts.actor) },
+							filter.types ? { type: { in: filter.types } } : {},
+							filter.slugs ? { slug: { in: filter.slugs } } : {},
+							filter.event === undefined ? {} : { eventId: filter.event },
+						],
+					},
+					include: resourceInclude,
+					orderBy: { title: "asc" },
+				});
+				for (const row of rows) {
+					if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+						throw new NotAllowed("resource.read");
+					}
+				}
+				return rows.map(fromDb);
+			},
 		});
-		return valueOrNotFound("course", course).id;
-	}
+
+		/**
+		 * Updates everything but `slug` and `courseId`.
+		 *
+		 * `manage import-resources` uses this to update an existing row in
+		 * place when re-pushing an unchanged slug. Re-validates the merged
+		 * shape, so switching a resource's `type` (unusual, but not refused)
+		 * cannot leave it in an invalid one.
+		 */
+		const update = op({
+			args: [resourcePK, resourceUpdate],
+			returns: resourceSchema,
+			run: async (
+				tx: PrismaTx,
+				filter: ResourcePK,
+				fields: ResourceUpdate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Resource> => {
+				const target = valueOrNotFound(
+					"resource",
+					await readableRow(tx, filter, opts.actor),
+				);
+				ensureAllowed({
+					value: target.course,
+					action: "resource.update",
+					pred: (course) =>
+						hasPerm(opts.actor, "course.update-contents", course),
+				});
+
+				// The same bytes and filename come back as the current attachment.
+				const previousId = target.attachmentId;
+				const attachmentId =
+					fields.data?.type === "FILE"
+						? (await attachFile(tx, target.id, fields.data, opts.actor)).id
+						: undefined;
+
+				const eventId = await resolveEventId(tx, target.courseId, fields.event);
+				const row = await tx.resource.update({
+					where: { id: target.id },
+					data: {
+						eventId,
+						type: fields.data?.type,
+						title: fields.title,
+						description: fields.description,
+						data: fields.data ? toRawData(fields.data) : undefined,
+						extra: fields.data ? toRawExtra(fields.data) : undefined,
+						attachmentId,
+						rev: fields.rev,
+					},
+					include: resourceInclude,
+				});
+
+				// Last, so the files it removes stay put if anything above fails.
+				if (
+					previousId &&
+					attachmentId !== undefined &&
+					attachmentId !== previousId
+				) {
+					await attachment.delete({ id: previousId }, { tx, actor: SYSTEM });
+				}
+				return fromDb(row);
+			},
+		});
+
+		/**
+		 * Upserts a resource keyed on `{courseId | courseRef, slug}`.
+		 *
+		 * PUT semantics: gated on the `course.update-contents` permission whether
+		 * creating or updating, same as `create`/`update`; the shape-by-type check
+		 * re-runs on whichever branch fires.
+		 */
+		const upsert = op({
+			args: [resourceCreate],
+			returns: resourceSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ResourceCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Resource> => {
+				const pk = {
+					slug: input.slug,
+					course: input.course,
+				} satisfies ResourcePK;
+
+				let existing: DbResource | null;
+				try {
+					existing = await readableRow(tx, pk, opts.actor);
+				} catch (error) {
+					throw error instanceof NotAllowed
+						? error.as("resource.create")
+						: error;
+				}
+				if (!existing) return create(tx, input, opts);
+
+				const course = await courseInfo(tx, input.course);
+				if (!hasPerm(opts.actor, "course.update-contents", course)) {
+					throw new NotAllowed("resource.create");
+				}
+				return update(tx, pk, { ...input, event: input.event ?? null }, opts);
+			},
+		});
+
+		/**
+		 * Removes the resource row outright.
+		 *
+		 * If it pointed at an `Attachment`, releases that reference:
+		 * `AttachmentService.delete` only reaches the disk once the last resource
+		 * pointing at the blob is gone, since content addressing means another
+		 * course may still share it.
+		 */
+		const remove = op({
+			args: [resourcePK],
+			run: async (
+				tx: PrismaTx,
+				filter: ResourcePK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<void> => {
+				const current = await readableRow(tx, filter, opts.actor);
+				if (!current) throw new NotFound("resource");
+
+				if (!hasPerm(opts.actor, "course.update-contents", current.course)) {
+					throw new NotAllowed("resource.delete");
+				}
+				await tx.resource.delete({ where: { id: current.id } });
+
+				// Last, so the files it removes stay put if anything above fails.
+				if (current.attachmentId) {
+					await attachment.delete(
+						{ id: current.attachmentId },
+						{ tx, actor: SYSTEM },
+					);
+				}
+			},
+		});
+
+		return { create, findOne, findMany, update, upsert, delete: remove };
+	})(client);
 }
+
+/** The resource service, as built by {@link makeResourceService}. */
+export type ResourceService = ReturnType<typeof makeResourceService>;
 
 //
 // Auxiliary functions
 //
+
+/// The row `filter` names, or `null` when there is none, refusing an actor who may not read its course's contents.
+async function readableRow(
+	tx: PrismaTx,
+	filter: ResourcePK,
+	actor: ServiceOptsWithoutTx["actor"],
+): Promise<DbResource | null> {
+	const by = filter as FillUndefineds<ResourcePK>;
+	let row: DbResource | null = null;
+
+	// filter by resource id
+	if (by.id !== undefined) {
+		row = await tx.resource.findUnique({
+			where: { id: by.id },
+			include: resourceInclude,
+		});
+
+		// filter by course and resource slug
+	} else if (by.course !== undefined) {
+		const courseId = await resolveCourseId(tx, by.course);
+		row = await tx.resource.findUnique({
+			where: {
+				courseId_slug: { courseId, slug: by.slug },
+			},
+			include: resourceInclude,
+		});
+	} else {
+		throw new Error(
+			"Invalid resource filter: must specify either id or course and slug",
+		);
+	}
+
+	if (!row) return null;
+
+	ensureAllowed({
+		value: row.course,
+		action: "resource.read",
+		pred: (course) => hasPerm(actor, "course.read-contents", course),
+	});
+	return row;
+}
+
+function toRawData(raw: ResourceCreate["data"]): DbResource["data"] {
+	switch (raw.type) {
+		case "LINK":
+			return raw.url;
+		case "CODE":
+		case "MD":
+			return raw.content;
+		default:
+			return null;
+	}
+}
+
+function toRawExtra(raw: ResourceCreate["data"]): DbResource["extra"] {
+	switch (raw.type) {
+		case "LINK":
+			return null;
+		case "CODE":
+			return raw.language ?? null;
+		default:
+			return null;
+	}
+}
+
+/**
+ * Resolves the course, and when `check` is given also that the actor can do
+ * the given actions on it.
+ *
+ * Throws `NotFound` or `NotAllowed` if no course is found or the actor may not
+ * write/read its content.
+ */
+async function courseInfo(
+	tx: PrismaTx,
+	ref: ResourceCreate["course"],
+	check?: {
+		actor: ServiceOptsWithoutTx["actor"];
+		perms: "read" | "write";
+		action: ActionCode;
+	},
+): Promise<{
+	id: CourseId;
+	instructor: { username: string };
+	enrollments: { username: string }[];
+}> {
+	const select = {
+		id: true,
+		instructor: { select: { username: true } },
+		enrollments: {
+			where: { status: "ACTIVE" as const },
+			select: { username: true },
+		},
+	};
+
+	const course = valueOrNotFound(
+		"course",
+		await tx.course.findUnique({
+			where: courseRefWhere(ref),
+			select,
+		}),
+	);
+
+	if (check === undefined) return course;
+
+	const { actor, perms, action } = check;
+	const pred =
+		perms === "write"
+			? (c: typeof course) => hasPerm(actor, "course.update-contents", c)
+			: (c: typeof course) => hasPerm(actor, "course.read-contents", c);
+	return valueOrNotAllowed(action, course, pred);
+}
+
+/**
+ * Resolves an event key within a course to the event id.
+ *
+ * Returns `undefined` when the key is omitted (leave unchanged) and `null`
+ * when it is null (no event). Throws `NotFound` if the course has no such event.
+ */
+async function resolveEventId(
+	tx: PrismaTx,
+	courseId: CourseId,
+	key: ResourceCreate["event"],
+): Promise<number | null | undefined> {
+	if (key === undefined || key === null) return key;
+
+	const event = await tx.calendarEvent.findFirst({
+		where: {
+			courseId,
+			week: key.week,
+			timeSlot: { slug: key.timeSlot, courseId },
+		},
+		select: { id: true },
+	});
+	return valueOrNotFound("calendar event", event).id;
+}
+
+async function resolveCourseId(
+	tx: PrismaTx,
+	ref: CourseRef,
+): Promise<CourseId> {
+	if (typeof ref === "number") return ref;
+
+	const course = await tx.course.findUnique({
+		where: courseRefWhere(ref),
+		select: { id: true },
+	});
+	return valueOrNotFound("course", course).id;
+}
 
 // Convert a database resource record to the public-facing resource type.
 function fromDb<T = Record<string, unknown>>(

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
 import {
@@ -51,7 +52,7 @@ test.describe("edition form", () => {
 		await expect(group(page, "Ends")).not.toContainText("Required");
 		// What was typed comes back.
 		await expect(group(page, "Name").locator("input")).toHaveValue("Some term");
-		expect(await db.edition.findOne({ slug })).toBeNull();
+		expect(await db.edition.findOne({ slug }, FULL_ACCESS)).toBeNull();
 	});
 
 	test("an end date before the start is refused on the end date", async ({
@@ -68,7 +69,7 @@ test.describe("edition form", () => {
 		await expect(group(page, "Ends")).toContainText(
 			"Must be after the start date.",
 		);
-		expect(await db.edition.findOne({ slug })).toBeNull();
+		expect(await db.edition.findOne({ slug }, FULL_ACCESS)).toBeNull();
 	});
 
 	test("a malformed slug is refused on the slug", async ({ page }) => {
@@ -115,7 +116,10 @@ test.describe("edition form", () => {
 
 		await expect(dialog).toBeVisible();
 		await expect(group(dialog, "Starts")).toContainText("Required");
-		const stored = await db.edition.findOne({ slug: edition.slug });
+		const stored = await db.edition.findOne(
+			{ slug: edition.slug },
+			FULL_ACCESS,
+		);
 		expect(stored?.startAt.getTime()).toBe(edition.startAt.getTime());
 	});
 });
@@ -259,7 +263,7 @@ test("discipline edit dialog: an empty name is refused on the name", async ({
 
 	await expect(dialog).toBeVisible();
 	await expect(group(dialog, "Name")).toContainText("Required");
-	expect((await db.discipline.findOne({ slug: discipline.slug }))?.name).toBe(
-		discipline.name,
-	);
+	expect(
+		(await db.discipline.findOne({ slug: discipline.slug }, FULL_ACCESS))?.name,
+	).toBe(discipline.name);
 });

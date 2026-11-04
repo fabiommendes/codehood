@@ -34,7 +34,7 @@ async function makeDiscipline() {
 
 /** The demo edition every fixture course lives in; created once, window wide open. */
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await db.edition.findOne({ slug }))) {
+	if (!(await db.edition.findOne({ slug }, FULL_ACCESS))) {
 		await db.edition.create(
 			{
 				slug,

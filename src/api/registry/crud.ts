@@ -126,9 +126,10 @@ export function CRUD<
 	CreateSchema extends ZodType | null,
 	Filter,
 	Key,
-	Update,
+	UpdateSchema extends ZodType | null,
 	Scope,
 	CreateExtra,
+	UpsertFlag extends false | undefined = undefined,
 >(
 	path: `/api/${string}`,
 	options: CrudOptions<
@@ -136,21 +137,23 @@ export function CRUD<
 		CreateSchema,
 		Filter,
 		Key,
-		Update,
+		UpdateSchema,
 		Scope,
-		CreateExtra
+		CreateExtra,
+		UpsertFlag
 	>,
 ) {
 	// `create: null` withholds every route that would call `create` or
-	// `upsert`, so the service only needs them when there is a create schema.
+	// `upsert`, and `update: null` the one that would call `update`, so the
+	// service only needs an operation when a route calls it.
 	const api = new CRUDApi(
 		path,
 		options as unknown as CrudRouteOptions<
 			Entity,
-			CreateOf<CreateSchema>,
+			OutputOf<CreateSchema>,
 			Filter,
 			Key,
-			Update,
+			OutputOf<UpdateSchema>,
 			Scope,
 			CreateExtra
 		>,
@@ -158,42 +161,50 @@ export function CRUD<
 	return api.generate();
 }
 
-/// The output type of a create schema, `never` when there is none.
-type CreateOf<CreateSchema> = CreateSchema extends ZodType<infer T> ? T : never;
+/// The output type of a body schema, `never` when the route has none.
+type OutputOf<Schema> = Schema extends ZodType<infer T> ? T : never;
 
-/// The options `CRUD()` takes: a service without `create` and `upsert` is
-/// accepted when the route has no create schema.
+/// The options `CRUD()` takes. The service only needs the operations the
+/// routes call: `create: null` drops `create` and `upsert`, `upsert: false`
+/// drops `upsert`, and `update: null` drops `update`.
 type CrudOptions<
 	EntityT,
 	CreateSchema extends ZodType | null,
 	FilterT,
 	KeyT,
-	UpdateT,
+	UpdateSchema extends ZodType | null,
 	ScopeT,
 	CreateExtra,
+	UpsertFlag extends false | undefined = undefined,
 > = Omit<
 	CrudRouteOptions<
 		EntityT,
-		CreateOf<CreateSchema>,
+		OutputOf<CreateSchema>,
 		FilterT,
 		KeyT,
-		UpdateT,
+		OutputOf<UpdateSchema>,
 		ScopeT,
 		CreateExtra
 	>,
-	"create" | "service"
+	"create" | "update" | "service" | "upsert"
 > & {
 	create: CreateSchema;
+	update: UpdateSchema;
+	upsert?: UpsertFlag;
 	service: FindOne<KeyT, EntityT> &
 		FindMany<FilterT & ScopeT, EntityT> &
-		Update<KeyT, UpdateT, EntityT> &
 		Delete<KeyT> &
 		// Not distributed over `ZodX | null`, and `CreateExtra` comes from the
 		// path parsers only, never inferred from the service it should check.
+		([UpdateSchema] extends [null]
+			? unknown
+			: Update<KeyT, OutputOf<UpdateSchema>, EntityT>) &
 		([CreateSchema] extends [null]
 			? unknown
-			: Create<CreateOf<CreateSchema> & NoInfer<CreateExtra>, EntityT> &
-					Upsert<CreateOf<CreateSchema> & NoInfer<CreateExtra>, EntityT>);
+			: Create<OutputOf<CreateSchema> & NoInfer<CreateExtra>, EntityT> &
+					([UpsertFlag] extends [false]
+						? unknown
+						: Upsert<OutputOf<CreateSchema> & NoInfer<CreateExtra>, EntityT>));
 };
 
 class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {

@@ -42,7 +42,7 @@ const failedSlug = updateResult?.error
 	? (await submittedValues(Astro.request)).slug
 	: undefined;
 
-const disciplines = await db.discipline.findMany({});
+const disciplines = await db.discipline.findMany({}, { actor });
 const courses = await db.course.findMany({}, { actor });
 const courseCounts = new Map<string, number>();
 for (const course of courses) {

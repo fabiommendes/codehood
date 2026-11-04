@@ -1,6 +1,5 @@
 import type { z } from "zod";
 import { type CourseTarget, ensurePerm } from "@/auth/permissions";
-import { NotImplemented } from "@/core/error";
 import {
 	type CourseId,
 	enrollmentCreate,
@@ -8,9 +7,9 @@ import {
 	enrollmentPK,
 	enrollmentSchema,
 } from "@/core/schemas";
-import type { Crud, ServiceOpts } from "@/db/base-service";
-import { Validate } from "@/utils/validate";
-import { type Prisma, type PrismaClient, prisma } from "../client";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
+import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotFound } from "../utils";
 import { toUser } from "./user.service";
 
@@ -32,6 +31,17 @@ type CourseRef = EnrollmentCreate["course"];
 // The full user row, so `toUser` can unmask `githubId`/`schoolId`.
 const enrollmentInclude = { user: true } satisfies Prisma.EnrollmentInclude;
 
+/// The CRUD shape of the enrollment service. `update` and `upsert` are off:
+/// the only mutable field is `status`, driven by `create` and `delete`.
+type EnrollmentT = {
+	entity: Enrollment;
+	pkFilter: EnrollmentPK;
+	create: EnrollmentCreate;
+	filter: EnrollmentFilter;
+	update: EnrollmentUpdate;
+	upsert: false;
+};
+
 /**
  * A student's membership in a course.
  *
@@ -39,177 +49,148 @@ const enrollmentInclude = { user: true } satisfies Prisma.EnrollmentInclude;
  * keeps history. Students cannot list their classmates, a privacy default
  * rather than a technical limit.
  */
-export class EnrollmentService
-	implements
-		Crud<{
-			entity: Enrollment;
-			pkFilter: EnrollmentPK;
-			create: EnrollmentCreate;
-			filter: EnrollmentFilter;
-			update: EnrollmentUpdate;
-			upsert: false;
-		}>
-{
-	prisma: PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+export const makeEnrollmentService = defineService<EnrollmentT>()(() => {
 	/**
 	 * Enrolls `input.username` in the course, or reactivates a `DROPPED` enrollment.
 	 *
 	 * The course's owner (or system) only: a student joins through a classroom
 	 * invite, which enrolls them as `SYSTEM` inside the redemption transaction.
 	 */
-	@Validate({
-		service: true,
-		returns: enrollmentSchema,
+	const create = op({
 		args: [enrollmentCreate],
-	})
-	async create(
-		input: EnrollmentCreate,
-		opts: ServiceOpts,
-	): Promise<Enrollment> {
-		const client = opts.tx ?? this.prisma;
-		const course = await this.course(input.course, opts);
-		ensurePerm(opts.actor, "enrollment.create", course.view);
+		returns: enrollmentSchema,
+		run: async (
+			tx: PrismaTx,
+			input: EnrollmentCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Enrollment> => {
+			const course = await resolveCourse(tx, input.course);
+			ensurePerm(opts.actor, "enrollment.create", course.view);
 
-		const row = await client.enrollment.upsert({
-			where: {
-				username_courseId: { username: input.username, courseId: course.id },
-			},
-			update: { status: "ACTIVE" },
-			create: { username: input.username, courseId: course.id },
-			include: enrollmentInclude,
-		});
-		return fromDb(row);
-	}
+			const row = await tx.enrollment.upsert({
+				where: {
+					username_courseId: { username: input.username, courseId: course.id },
+				},
+				update: { status: "ACTIVE" },
+				create: { username: input.username, courseId: course.id },
+				include: enrollmentInclude,
+			});
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Finds `filter.username`'s enrollment in the course, in any status.
 	 *
 	 * Visible to the course's owner and to the student themselves.
 	 */
-	@Validate({
-		service: true,
-		returns: enrollmentSchema.nullable(),
+	const findOne = op({
+		transaction: false,
 		args: [enrollmentPK],
-	})
-	async findOne(
-		filter: EnrollmentPK,
-		opts: ServiceOpts,
-	): Promise<Enrollment | null> {
-		const client = opts.tx ?? this.prisma;
-		const course = await this.course(filter.course, opts);
-		ensurePerm(opts.actor, "enrollment.read", {
-			course: course.view,
-			user: { username: filter.username },
-		});
+		returns: enrollmentSchema.nullable(),
+		run: async (
+			tx: PrismaTx,
+			filter: EnrollmentPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Enrollment | null> => {
+			const course = await resolveCourse(tx, filter.course);
+			ensurePerm(opts.actor, "enrollment.read", {
+				course: course.view,
+				user: { username: filter.username },
+			});
 
-		const row = await client.enrollment.findUnique({
-			where: {
-				username_courseId: { username: filter.username, courseId: course.id },
-			},
-			include: enrollmentInclude,
-		});
-		return row && fromDb(row);
-	}
+			const row = await tx.enrollment.findUnique({
+				where: {
+					username_courseId: { username: filter.username, courseId: course.id },
+				},
+				include: enrollmentInclude,
+			});
+			return row && fromDb(row);
+		},
+	});
 
 	/**
 	 * Lists a course's enrollments in `filter.status` (one or several), `ACTIVE` by default.
 	 *
 	 * The course's owner (or system) only; a non-owning admin is refused too.
 	 */
-	@Validate({
-		service: true,
-		returns: enrollmentSchema.array(),
+	const findMany = op({
+		transaction: false,
 		args: [enrollmentFilter],
-	})
-	async findMany(
-		filter: EnrollmentFilter,
-		opts: ServiceOpts,
-	): Promise<Enrollment[]> {
-		const client = opts.tx ?? this.prisma;
-		const course = await this.course(filter.course, opts);
-		ensurePerm(opts.actor, "enrollment.read", course.view);
+		returns: enrollmentSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			filter: EnrollmentFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Enrollment[]> => {
+			const course = await resolveCourse(tx, filter.course);
+			ensurePerm(opts.actor, "enrollment.read", course.view);
 
-		const rows = await client.enrollment.findMany({
-			where: {
-				courseId: course.id,
-				status: { in: [filter.status ?? "ACTIVE"].flat() },
-			},
-			include: enrollmentInclude,
-			orderBy: { createdAt: "asc" },
-		});
-		return rows.map(fromDb);
-	}
-
-	// No update: the only mutable field is `status`, driven by create/delete.
-	async update<Opt extends ServiceOpts>(
-		_filter: EnrollmentPK,
-		_update: never,
-		_opts: Opt,
-	): Promise<never> {
-		throw new NotImplemented("enrollment.update");
-	}
-
-	// No upsert: `create` already reactivates a dropped enrollment.
-	async upsert<Opt extends ServiceOpts>(
-		_input: never,
-		_opts: Opt,
-	): Promise<never> {
-		throw new NotImplemented("enrollment.upsert");
-	}
+			const rows = await tx.enrollment.findMany({
+				where: {
+					courseId: course.id,
+					status: { in: [filter.status ?? "ACTIVE"].flat() },
+				},
+				include: enrollmentInclude,
+				orderBy: { createdAt: "asc" },
+			});
+			return rows.map(fromDb);
+		},
+	});
 
 	/**
 	 * Marks the enrollment `DROPPED`; idempotent.
 	 *
 	 * The course's owner drops any student; a student drops only themselves.
 	 */
-	@Validate({ service: true, args: [enrollmentPK] })
-	async delete(filter: EnrollmentPK, opts: ServiceOpts): Promise<void> {
-		const client = opts.tx ?? this.prisma;
-		const course = await this.course(filter.course, opts);
-		ensurePerm(opts.actor, "enrollment.delete", {
-			course: course.view,
-			user: { username: filter.username },
-		});
+	const remove = op({
+		args: [enrollmentPK],
+		run: async (
+			tx: PrismaTx,
+			filter: EnrollmentPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const course = await resolveCourse(tx, filter.course);
+			ensurePerm(opts.actor, "enrollment.delete", {
+				course: course.view,
+				user: { username: filter.username },
+			});
 
-		await client.enrollment.updateMany({
-			where: { username: filter.username, courseId: course.id },
-			data: { status: "DROPPED" },
-		});
-	}
+			await tx.enrollment.updateMany({
+				where: { username: filter.username, courseId: course.id },
+				data: { status: "DROPPED" },
+			});
+		},
+	});
 
-	//
-	// Utility methods
-	//
+	return { create, findOne, findMany, delete: remove };
+});
 
-	// Resolves a course reference to its id and the shape the enrollment
-	// permissions need; throws `NotFound` for an unknown course.
-	private async course(
-		ref: CourseRef,
-		opts: ServiceOpts,
-	): Promise<{ id: CourseId; view: CourseTarget }> {
-		const client = opts.tx ?? this.prisma;
-		const course = valueOrNotFound(
-			"course",
-			await client.course.findUnique({
-				where: courseRefWhere(ref),
-				select: { id: true, instructor: { select: { username: true } } },
-			}),
-		);
-		return {
-			id: course.id as CourseId,
-			view: { id: course.id, instructor: course.instructor },
-		};
-	}
-}
+/** The enrollment service, as built by {@link makeEnrollmentService}. */
+export type EnrollmentService = ReturnType<typeof makeEnrollmentService>;
 
 //
 // Auxiliary functions
 //
+
+// Resolves a course reference to its id and the shape the enrollment
+// permissions need; throws `NotFound` for an unknown course.
+async function resolveCourse(
+	tx: PrismaTx,
+	ref: CourseRef,
+): Promise<{ id: CourseId; view: CourseTarget }> {
+	const course = valueOrNotFound(
+		"course",
+		await tx.course.findUnique({
+			where: courseRefWhere(ref),
+			select: { id: true, instructor: { select: { username: true } } },
+		}),
+	);
+	return {
+		id: course.id as CourseId,
+		view: { id: course.id, instructor: course.instructor },
+	};
+}
 
 // Convert a database enrollment record to the public-facing enrollment type.
 function fromDb(row: DbEnrollment): Enrollment {

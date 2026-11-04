@@ -32,7 +32,7 @@ async function makeDiscipline() {
 
 /** The demo edition every fixture course lives in; created once, window wide open. */
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await db.edition.findOne({ slug }))) {
+	if (!(await db.edition.findOne({ slug }, FULL_ACCESS))) {
 		await db.edition.create(
 			{
 				slug,
@@ -412,9 +412,8 @@ test("create and delete accept a course natural key", async () => {
 	).resolves.toMatchObject({ status: "DROPPED" });
 });
 
-test("an unknown course is NotFound, and update/upsert are not implemented", async () => {
+test("an unknown course is NotFound", async () => {
 	const instructor = await makeUser("INSTRUCTOR");
-	const student = await makeUser("STUDENT");
 	const unknown = {
 		discipline: "nope",
 		instructor: instructor.username,
@@ -424,14 +423,4 @@ test("an unknown course is NotFound, and update/upsert are not implemented", asy
 	await expect(
 		db.enrollment.findMany({ course: unknown }, { actor: instructor }),
 	).rejects.toBeInstanceOf(NotFound);
-	await expect(
-		db.enrollment.update(
-			{ course: unknown, username: student.username },
-			undefined as never,
-			FULL_ACCESS,
-		),
-	).rejects.toThrow();
-	await expect(
-		db.enrollment.upsert(undefined as never, FULL_ACCESS),
-	).rejects.toThrow();
 });

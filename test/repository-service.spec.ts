@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import type { UserActor } from "@/auth/actor";
-import { SYSTEM } from "@/auth/actor";
+import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import { MAX_REPOSITORY_FILES, type RepositoryEntry } from "@/core/schemas";
 import type { Repository, RepositoryPK } from "@/db";
@@ -659,11 +659,16 @@ test.describe("batch 4: zip", () => {
 	test("is not charged to anyone's quota", async () => {
 		const { pk } = await newRepository();
 		await push(pk, spec);
-		const before = await db.attachment.usageBytes(instructor.username);
+		const before = await db.attachment.usageBytes(
+			instructor.username,
+			FULL_ACCESS,
+		);
 
 		await db.repository.zip(pk, { actor: instructor });
 
-		expect(await db.attachment.usageBytes(instructor.username)).toBe(before);
+		expect(
+			await db.attachment.usageBytes(instructor.username, FULL_ACCESS),
+		).toBe(before);
 	});
 
 	test("survives the cleanup of a later push that leaves the tree as it is", async () => {

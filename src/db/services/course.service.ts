@@ -17,16 +17,11 @@ import {
 	courseSchema,
 	courseUpdate,
 } from "@/core/schemas";
-import { type Crud, type ServiceOpts, upsert } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
-import { Validate } from "@/utils/validate";
-import {
-	type Prisma,
-	type PrismaClient,
-	type PrismaTx,
-	prisma,
-} from "../client";
+import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { recomputeEventTimes } from "../event-times";
 import { invalidIfExists, valueOrNotFound } from "../utils";
 import { isEditionOpen } from "./edition.service";
@@ -74,22 +69,16 @@ const courseInclude = {
 const SYSTEM_TO_INSTRUCTOR_ERROR =
 	"If actor is SYSTEM, you must provide an instructor";
 
-export class CourseService
-	implements
-		Crud<{
-			entity: Course;
-			pkFilter: CoursePK;
-			create: CourseCreate;
-			filter: CourseFilter;
-			update: CourseUpdate;
-		}>
-{
-	prisma: PrismaClient;
+/// The CRUD shape of the course service.
+type CourseT = {
+	entity: Course;
+	pkFilter: CoursePK;
+	create: CourseCreate;
+	filter: CourseFilter;
+	update: CourseUpdate;
+};
 
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+const buildCourseService = defineService<CourseT>()(() => {
 	/**
 	 * Creates a course.
 	 *
@@ -99,28 +88,34 @@ export class CourseService
 	 * `manage create-course`) may do both of the latter on any instructor's
 	 * behalf.
 	 */
-	@Validate({ service: true, returns: courseSchema, args: [courseCreate] })
-	async create(input: CourseCreate, opts: ServiceOpts): Promise<Course> {
-		const client = opts.tx ?? this.prisma;
-		await assertCanCreateCourse(client, input, opts, { enforceWindow: true });
+	const create = op({
+		args: [courseCreate],
+		returns: courseSchema,
+		run: async (
+			tx: PrismaTx,
+			input: CourseCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Course> => {
+			await assertCanCreateCourse(tx, input, opts, { enforceWindow: true });
 
-		const row = await invalidIfExists(client.course.create, {
-			data: {
-				disciplineSlug: input.discipline,
-				instructorId:
-					input.instructor ??
-					(opts.actor as UserActor).username ??
-					raise(new ImproperBehavior(SYSTEM_TO_INSTRUCTOR_ERROR)),
-				editionSlug: input.edition,
-				description: input.description,
-				rev: input.rev,
-				startAt: input.startAt,
-				endAt: input.endAt,
-			},
-			include: courseInclude,
-		});
-		return fromDb(row, opts.actor);
-	}
+			const row = await invalidIfExists(tx.course.create, {
+				data: {
+					disciplineSlug: input.discipline,
+					instructorId:
+						input.instructor ??
+						(opts.actor as UserActor).username ??
+						raise(new ImproperBehavior(SYSTEM_TO_INSTRUCTOR_ERROR)),
+					editionSlug: input.edition,
+					description: input.description,
+					rev: input.rev,
+					startAt: input.startAt,
+					endAt: input.endAt,
+				},
+				include: courseInclude,
+			});
+			return fromDb(row, opts.actor);
+		},
+	});
 
 	/**
 	 * Finds a single course by id or by its URL reference.
@@ -128,58 +123,19 @@ export class CourseService
 	 * Throws `FORBIDDEN` if the course exists but `actor` may not see it (see
 	 * the `course.read` permission); returns `null` if it does not exist.
 	 */
-	@Validate({
-		service: true,
-		returns: courseSchema.nullable(),
+	const findOne = op({
+		transaction: false,
 		args: [coursePK],
-	})
-	async findOne(filter: CoursePK, opts: ServiceOpts): Promise<Course | null> {
-		const row = await this.loadRow(filter, opts);
-		return row && fromDb(row, opts.actor);
-	}
-
-	/**
-	 * Loads the raw db row for `filter`, enforcing `course.read`.
-	 *
-	 * Shared by `findOne`, `update`, and `delete` — the latter two need the
-	 * row itself (not the public {@link Course}, which no longer carries
-	 * `enrollments`) to check `course.update`/`course.delete` against
-	 * {@link CourseWithEnrollment}.
-	 */
-	private async loadRow(
-		filter: CoursePK,
-		opts: ServiceOpts,
-	): Promise<DbCourse | null> {
-		const client = opts.tx ?? this.prisma;
-
-		let row: DbCourse | null = null;
-		const by = filter as FillUndefineds<CoursePK>; // zod doesn't narrow to a single field, so we do it here
-
-		if (by.id !== undefined) {
-			row = await client.course.findUnique({
-				where: { id: by.id },
-				include: courseInclude,
-			});
-		} else if (by.discipline && by.instructor && by.edition) {
-			row = await client.course.findUnique({
-				where: {
-					disciplineSlug_instructorId_editionSlug: {
-						disciplineSlug: by.discipline,
-						instructorId: by.instructor,
-						editionSlug: by.edition,
-					},
-				},
-				include: courseInclude,
-			});
-		}
-
-		if (!row) return null;
-
-		const viewAllowed = hasPerm(opts.actor, "course.read", row);
-		if (!viewAllowed) throw new NotAllowed("course.read");
-
-		return row;
-	}
+		returns: courseSchema.nullable(),
+		run: async (
+			tx: PrismaTx,
+			filter: CoursePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Course | null> => {
+			const row = await loadRow(tx, filter, opts);
+			return row && fromDb(row, opts.actor);
+		},
+	});
 
 	/**
 	 * Finds many courses, narrowed to what `actor` may see (see
@@ -189,79 +145,76 @@ export class CourseService
 	 * teach plus the courses they are enrolled in. `/courses` calls this
 	 * with no extra filter and gets back exactly that actor's course list.
 	 */
-	@Validate({
-		service: true,
-		returns: courseSchema.array(),
+	const findMany = op({
+		transaction: false,
 		args: [courseFilter],
-	})
-	async findMany(filter: CourseFilter, opts: ServiceOpts): Promise<Course[]> {
-		const client = opts.tx ?? this.prisma;
-		const rows = await client.course.findMany({
-			where: {
-				AND: [
-					filter.instructor ? { instructorId: filter.instructor } : {},
-					filter.discipline ? { disciplineSlug: filter.discipline } : {},
-					filter.edition ? { editionSlug: filter.edition } : {},
-					filter.member
-						? {
-								OR: [
-									{ instructorId: filter.member },
-									{
-										enrollments: {
-											some: { username: filter.member, status: "ACTIVE" },
+		returns: courseSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			filter: CourseFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Course[]> => {
+			const rows = await tx.course.findMany({
+				where: {
+					AND: [
+						filter.instructor ? { instructorId: filter.instructor } : {},
+						filter.discipline ? { disciplineSlug: filter.discipline } : {},
+						filter.edition ? { editionSlug: filter.edition } : {},
+						filter.member
+							? {
+									OR: [
+										{ instructorId: filter.member },
+										{
+											enrollments: {
+												some: { username: filter.member, status: "ACTIVE" },
+											},
 										},
-									},
-								],
-							}
-						: {},
-					courseWhere(opts.actor),
-				],
-			},
-			include: courseInclude,
-			orderBy: { createdAt: "desc" },
-		});
-		for (const row of rows) {
-			if (!hasPerm(opts.actor, "course.read", row)) {
-				throw new NotAllowed("course.read");
+									],
+								}
+							: {},
+						courseWhere(opts.actor),
+					],
+				},
+				include: courseInclude,
+				orderBy: { createdAt: "desc" },
+			});
+			for (const row of rows) {
+				if (!hasPerm(opts.actor, "course.read", row)) {
+					throw new NotAllowed("course.read");
+				}
 			}
-		}
-		return rows.map((row) => fromDb(row, opts.actor));
-	}
+			return rows.map((row) => fromDb(row, opts.actor));
+		},
+	});
 
 	/**
 	 * Updates a course's editable fields.
 	 */
-	@Validate({
-		service: true,
-		returns: courseSchema,
+	const update = op({
 		args: [coursePK, courseUpdate],
-	})
-	async update(
-		filter: CoursePK,
-		fields: CourseUpdate,
-		opts: ServiceOpts,
-	): Promise<Course> {
-		const target = valueOrNotFound("course", await this.loadRow(filter, opts));
-		if (!hasPerm(opts.actor, "course.update", target))
-			throw new NotAllowed("course.update");
+		returns: courseSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: CoursePK,
+			fields: CourseUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Course> => {
+			const target = valueOrNotFound("course", await loadRow(tx, filter, opts));
+			if (!hasPerm(opts.actor, "course.update", target))
+				throw new NotAllowed("course.update");
 
-		const write = async (client: PrismaTx | PrismaClient) => {
-			const row = await client.course.update({
+			const row = await tx.course.update({
 				where: { id: target.id },
 				data: fields,
 				include: courseInclude,
 			});
 			// Event times are derived from the course's start.
 			if (fields.startAt) {
-				await recomputeEventTimes(client, { courseId: target.id });
+				await recomputeEventTimes(tx, { courseId: target.id });
 			}
-			return row;
-		};
-		const row = opts.tx
-			? await write(opts.tx)
-			: await this.prisma.$transaction(write);
-		return fromDb(row, opts.actor);
-	}
+			return fromDb(row, opts.actor);
+		},
+	});
 
 	/**
 	 * Upserts a course keyed on `{discipline, instructor, edition}`.
@@ -273,48 +226,112 @@ export class CourseService
 	 * `create`-branch-only, or last term's material would become permanently
 	 * un-syncable.
 	 */
-	@Validate({ service: true, returns: courseSchema, args: [courseCreate] })
-	async upsert(input: CourseCreate, opts: ServiceOpts): Promise<Course> {
-		return upsert(this, input, {
-			...opts,
-			client: this.prisma,
-			action: "course.create",
-			pk: (i) => ({
-				discipline: i.discipline,
+	const upsert = op({
+		args: [courseCreate],
+		returns: courseSchema,
+		run: async (
+			tx: PrismaTx,
+			input: CourseCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Course> => {
+			const pk: CoursePK = {
+				discipline: input.discipline,
 				instructor:
-					i.instructor ??
+					input.instructor ??
 					(opts.actor as UserActor).username ??
 					raise(new ImproperBehavior(SYSTEM_TO_INSTRUCTOR_ERROR)),
-				edition: i.edition,
-			}),
-			assertCreatable: async (i, o) => {
-				const client = o.tx ?? this.prisma;
-				await assertCanCreateCourse(client, i, o, {
-					action: "course.create",
-				});
-			},
-		});
-	}
+				edition: input.edition,
+			};
+
+			let existing: Course | null;
+			try {
+				existing = await findOne(tx, pk, opts);
+			} catch (error) {
+				throw error instanceof NotAllowed ? error.as("course.create") : error;
+			}
+			if (!existing) return create(tx, input, opts);
+
+			await assertCanCreateCourse(tx, input, opts, {
+				action: "course.create",
+			});
+			return update(tx, pk, input, opts);
+		},
+	});
 
 	/**
 	 * Deletes a course.
 	 */
-	@Validate({ service: true, args: [coursePK] })
-	async delete(filter: CoursePK, opts: ServiceOpts): Promise<void> {
-		const target = valueOrNotFound("course", await this.loadRow(filter, opts));
-		if (!hasPerm(opts.actor, "course.delete", target))
-			throw new NotAllowed("course.delete");
+	const remove = op({
+		args: [coursePK],
+		run: async (
+			tx: PrismaTx,
+			filter: CoursePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const target = valueOrNotFound("course", await loadRow(tx, filter, opts));
+			if (!hasPerm(opts.actor, "course.delete", target))
+				throw new NotAllowed("course.delete");
 
-		const client = opts.tx ?? this.prisma;
-		await client.course.delete({ where: { id: target.id } });
-	}
+			await tx.course.delete({ where: { id: target.id } });
+		},
+	});
 
-	//
-	// Public utilities
-	//
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
+
+/** The course service of `client` (the shared client by default). */
+export const makeCourseService = (client?: PrismaClient) => ({
+	...buildCourseService(client),
+
+	/** The `discipline/instructor_edition` text identifying a course. */
 	naturalKey(courseRef: CourseNaturalKey): string {
 		return `${courseRef.discipline}/${courseRef.instructor}_${courseRef.edition}`;
+	},
+});
+
+/** The course service, as built by {@link makeCourseService}. */
+export type CourseService = ReturnType<typeof makeCourseService>;
+
+/**
+ * Loads the raw db row for `filter`, enforcing `course.read`.
+ *
+ * Shared by `findOne`, `update`, and `delete` — the latter two need the
+ * row itself (not the public {@link Course}, which no longer carries
+ * `enrollments`) to check `course.update`/`course.delete` against
+ * `CourseWithEnrollment`.
+ */
+async function loadRow(
+	tx: PrismaTx,
+	filter: CoursePK,
+	opts: ServiceOptsWithoutTx,
+): Promise<DbCourse | null> {
+	let row: DbCourse | null = null;
+	const by = filter as FillUndefineds<CoursePK>; // zod doesn't narrow to a single field, so we do it here
+
+	if (by.id !== undefined) {
+		row = await tx.course.findUnique({
+			where: { id: by.id },
+			include: courseInclude,
+		});
+	} else if (by.discipline && by.instructor && by.edition) {
+		row = await tx.course.findUnique({
+			where: {
+				disciplineSlug_instructorId_editionSlug: {
+					disciplineSlug: by.discipline,
+					instructorId: by.instructor,
+					editionSlug: by.edition,
+				},
+			},
+			include: courseInclude,
+		});
 	}
+
+	if (!row) return null;
+
+	const viewAllowed = hasPerm(opts.actor, "course.read", row);
+	if (!viewAllowed) throw new NotAllowed("course.read");
+
+	return row;
 }
 
 //
@@ -344,9 +361,9 @@ export function courseContentsWhere(actor: Actor): Prisma.CourseWhereInput {
  * Assert user can create course for edition and for instructor.
  */
 async function assertCanCreateCourse(
-	client: PrismaClient | PrismaTx,
+	client: PrismaTx,
 	input: Pick<CourseCreate, "edition" | "instructor">,
-	opts: ServiceOpts,
+	opts: ServiceOptsWithoutTx,
 	options: { action?: ActionCode; enforceWindow?: boolean } = {},
 ) {
 	const { action = "course.create", enforceWindow = false } = options;
@@ -411,7 +428,7 @@ function joinedAtFor(row: DbCourse, actor: Actor): Date {
 
 // Convert a database course record (with its `courseInclude` relations) to the public-facing course type.
 function fromDb(row: DbCourse, actor: Actor): Course {
-	// Destructured out rather than left in the `...rest` spread: `@Validate`
+	// Destructured out rather than left in the `...rest` spread: the validator
 	// only checks its `returns` schema, it does not strip what the schema
 	// doesn't declare, so the raw roster would otherwise still ride along on
 	// the returned object under its own name.

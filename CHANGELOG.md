@@ -4,6 +4,21 @@
 
 ### Added
 
+- `defineService` (`src/db/define-service.ts`) builds a service from `op({
+  args, returns, run })` operations written against a transaction. Only the
+  operations a service provides exist on its type, so calling a missing one is
+  a compile error. All 26 services moved to it; `CrudBase` and the `@Validate`
+  decorator are gone.
+  Reads declare `op({ transaction: false })` and run on the client (or the
+  caller's `tx`) without opening a transaction.
+- `src/auth/access.ts`: ordered access levels. Someone outside the course gets
+  403 on a draft and on a published exam alike, without revealing that it
+  exists.
+- `src/services/question-status.ts`: the question status transition table and
+  who may see a question in each status.
+- `src/services/exam-state.ts`: `ExamSchedule`, `hiddenFromStudents` and a
+  marked `PersonalTiming`.
+
 - Hidden questions. `HIDDEN` withdraws a published question from students
   while it stays editable and stays in the exams that pin it. The question
   bank's status button now moves a published question to Hidden and back,
@@ -102,6 +117,9 @@
 
 ### Changed
 
+- `CRUD()` in `src/api/registry/crud.ts` only requires of a service the
+  operations its routes call (`update: null`, `upsert: false`).
+
 - `pnpm run dev` starts in about 3s instead of 10-30s. `pnpm run generate`
   skips the Paraglide compile and the route-pattern scan when their inputs
   are unchanged (`--force` runs them anyway), the Paraglide Vite plugin only
@@ -163,6 +181,8 @@
   (`mdq/css/daisyui.css`) to `src/styles/mdq.css`, on the Codehood tokens.
 
 ### Fixed
+
+- `course-access.ts` only counts ACTIVE enrollments as access to a course.
 
 - Week 0 of a course is the ISO week (Monday to Sunday) its start date falls
   in, on the server and in the CLI, as the schema says. A Monday class of a

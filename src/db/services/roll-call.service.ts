@@ -30,15 +30,11 @@ import {
 	rollCallUpdate,
 } from "@/core/schemas";
 import { rollCallId } from "@/core/schemas/base";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { codeAt, generateSecret, isCodeValid } from "@/services/roll-call-code";
 import { CLAIM_TTL_MS } from "@/utils/pending-check-in";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
@@ -123,14 +119,18 @@ const rollCallSelect = {
 
 type DbRollCall = Prisma.RollCallGetPayload<{ select: typeof rollCallSelect }>;
 
-export class RollCallService extends CrudBase<{
+/// The CRUD shape of the roll call service. `upsert` is off: a roll call is opened, not synced.
+type RollCallT = {
 	entity: RollCall;
 	pkFilter: RollCallPK;
 	create: RollCallCreate;
 	filter: RollCallFilter;
 	update: RollCallUpdate;
 	upsert: false;
-}> {
+};
+
+/** The roll call service of `client` (the shared client by default). */
+export const makeRollCallService = defineService<RollCallT>()(() => {
 	/**
 	 * Opens the roll call of an event for 15 min.
 	 *
@@ -138,52 +138,51 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
 	 * @throws {@link InvalidData} If the event is a holiday or cancelled, or already has a roll call.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [rollCallCreate],
 		returns: rollCallSchema,
-		args: [undefined, rollCallCreate],
-	})
-	protected override async createTx(
-		tx: PrismaTx,
-		input: RollCallCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<RollCall> {
-		const event = valueOrNotFound(
-			"calendar-event",
-			await tx.calendarEvent.findFirst({
-				where: await eventWhere(tx, input.event),
-				select: { id: true, kind: true, ...eventSelect },
-			}),
-		);
-		ensurePerm(opts.actor, "roll-call.manage", event.course);
+		run: async (
+			tx: PrismaTx,
+			input: RollCallCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RollCall> => {
+			const event = valueOrNotFound(
+				"calendar-event",
+				await tx.calendarEvent.findFirst({
+					where: await eventWhere(tx, input.event),
+					select: { id: true, kind: true, ...eventSelect },
+				}),
+			);
+			ensurePerm(opts.actor, "roll-call.manage", event.course);
 
-		if (event.kind === "HOLIDAY" || event.kind === "CANCELLED") {
-			throw new InvalidData({
-				event: [
-					{
-						code: "invalid",
-						message:
-							event.kind === "HOLIDAY"
-								? m.errors_holiday_has_no_roll_call()
-								: m.errors_cancelled_has_no_roll_call(),
+			if (event.kind === "HOLIDAY" || event.kind === "CANCELLED") {
+				throw new InvalidData({
+					event: [
+						{
+							code: "invalid",
+							message:
+								event.kind === "HOLIDAY"
+									? m.errors_holiday_has_no_roll_call()
+									: m.errors_cancelled_has_no_roll_call(),
+						},
+					],
+				});
+			}
+
+			const row = await invalidIfExists(() =>
+				tx.rollCall.create({
+					data: {
+						eventId: event.id,
+						secret: generateSecret(),
+						actsAsInvite: input.actsAsInvite ?? false,
+						closesAt: new Date(Date.now() + OPEN_MS),
 					},
-				],
-			});
-		}
-
-		const row = await invalidIfExists(() =>
-			tx.rollCall.create({
-				data: {
-					eventId: event.id,
-					secret: generateSecret(),
-					actsAsInvite: input.actsAsInvite ?? false,
-					closesAt: new Date(Date.now() + OPEN_MS),
-				},
-				select: rollCallSelect,
-			}),
-		);
-		return fromDb(row, opts.actor);
-	}
+					select: rollCallSelect,
+				}),
+			);
+			return fromDb(row, opts.actor);
+		},
+	});
 
 	/**
 	 * Finds a roll call by id, or by course, week and time slot.
@@ -193,25 +192,25 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the filter references a course that does not exist.
 	 * @throws {@link NotAllowed} If the roll call exists but the actor may not read the course.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [rollCallPK],
 		returns: rollCallSchema.nullable(),
-		args: [undefined, rollCallPK],
-	})
-	protected override async findOneTx(
-		tx: PrismaTx,
-		filter: RollCallPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<RollCall | null> {
-		const row = await tx.rollCall.findFirst({
-			where: await rollCallWhere(tx, filter),
-			select: rollCallSelect,
-		});
-		if (!row) return null;
+		run: async (
+			tx: PrismaTx,
+			filter: RollCallPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RollCall | null> => {
+			const row = await tx.rollCall.findFirst({
+				where: await rollCallWhere(tx, filter),
+				select: rollCallSelect,
+			});
+			if (!row) return null;
 
-		ensurePerm(opts.actor, "course.read-contents", row.event.course);
-		return fromDb(row, opts.actor);
-	}
+			ensurePerm(opts.actor, "course.read-contents", row.event.course);
+			return fromDb(row, opts.actor);
+		},
+	});
 
 	/**
 	 * Lists the roll calls of a course in date order.
@@ -221,25 +220,25 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the course does not exist.
 	 * @throws {@link NotAllowed} If the actor may not read the course.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [rollCallFilter],
 		returns: rollCallSchema.array(),
-		args: [undefined, rollCallFilter],
-	})
-	protected override async findManyTx(
-		tx: PrismaTx,
-		filter: RollCallFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<RollCall[]> {
-		const course = await readableCourse(tx, filter.course, opts.actor);
+		run: async (
+			tx: PrismaTx,
+			filter: RollCallFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RollCall[]> => {
+			const course = await readableCourse(tx, filter.course, opts.actor);
 
-		const rows = await tx.rollCall.findMany({
-			where: { event: { courseId: course.id } },
-			select: rollCallSelect,
-			orderBy: { event: { startAt: "asc" } },
-		});
-		return rows.map((row) => fromDb(row, opts.actor));
-	}
+			const rows = await tx.rollCall.findMany({
+				where: { event: { courseId: course.id } },
+				select: rollCallSelect,
+				orderBy: { event: { startAt: "asc" } },
+			});
+			return rows.map((row) => fromDb(row, opts.actor));
+		},
+	});
 
 	/**
 	 * Merges `fields.attendances` into the stored ones and sets `actsAsInvite`.
@@ -252,62 +251,61 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
 	 * @throws {@link InvalidData} If a student has no enrollment in the course.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [rollCallPK, rollCallUpdate],
 		returns: rollCallSchema,
-		args: [undefined, rollCallPK, rollCallUpdate],
-	})
-	protected override async updateTx(
-		tx: PrismaTx,
-		filter: RollCallPK,
-		fields: RollCallUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<RollCall> {
-		const current = await manageable(tx, filter, opts.actor);
-		const entries = Object.entries(fields.attendances ?? {});
+		run: async (
+			tx: PrismaTx,
+			filter: RollCallPK,
+			fields: RollCallUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RollCall> => {
+			const current = await manageable(tx, filter, opts.actor);
+			const entries = Object.entries(fields.attendances ?? {});
 
-		const marked = entries.filter(([, entry]) => entry !== null);
-		await checkEnrolled(
-			tx,
-			current.event.courseId,
-			marked.map(([name]) => name),
-		);
+			const marked = entries.filter(([, entry]) => entry !== null);
+			await checkEnrolled(
+				tx,
+				current.event.courseId,
+				marked.map(([name]) => name),
+			);
 
-		if (fields.actsAsInvite !== undefined) {
-			await tx.rollCall.update({
-				where: { id: current.id },
-				data: { actsAsInvite: fields.actsAsInvite },
-			});
-		}
-
-		for (const [name, entry] of entries) {
-			const where = {
-				rollCallId_username: { rollCallId: current.id, username: name },
-			};
-			if (entry === null) {
-				await tx.attendance.deleteMany({
-					where: { rollCallId: current.id, username: name },
-				});
-			} else if (await tx.attendance.findUnique({ where })) {
-				if (entry.note !== undefined) {
-					await tx.attendance.update({
-						where,
-						data: { note: entry.note },
-					});
-				}
-			} else {
-				await tx.attendance.create({
-					data: {
-						rollCallId: current.id,
-						username: name,
-						source: "MANUAL",
-						note: entry.note ?? null,
-					},
+			if (fields.actsAsInvite !== undefined) {
+				await tx.rollCall.update({
+					where: { id: current.id },
+					data: { actsAsInvite: fields.actsAsInvite },
 				});
 			}
-		}
-		return this.readWhole(tx, current.id, opts.actor);
-	}
+
+			for (const [name, entry] of entries) {
+				const where = {
+					rollCallId_username: { rollCallId: current.id, username: name },
+				};
+				if (entry === null) {
+					await tx.attendance.deleteMany({
+						where: { rollCallId: current.id, username: name },
+					});
+				} else if (await tx.attendance.findUnique({ where })) {
+					if (entry.note !== undefined) {
+						await tx.attendance.update({
+							where,
+							data: { note: entry.note },
+						});
+					}
+				} else {
+					await tx.attendance.create({
+						data: {
+							rollCallId: current.id,
+							username: name,
+							source: "MANUAL",
+							note: entry.note ?? null,
+						},
+					});
+				}
+			}
+			return readWhole(tx, current.id, opts.actor);
+		},
+	});
 
 	/**
 	 * Deletes a roll call and its attendances.
@@ -315,15 +313,17 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the roll call does not exist.
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
 	 */
-	@Validate({ service: true, args: [undefined, rollCallPK] })
-	protected override async deleteTx(
-		tx: PrismaTx,
-		filter: RollCallPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const current = await manageable(tx, filter, opts.actor);
-		await tx.rollCall.delete({ where: { id: current.id } });
-	}
+	const remove = op({
+		args: [rollCallPK],
+		run: async (
+			tx: PrismaTx,
+			filter: RollCallPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const current = await manageable(tx, filter, opts.actor);
+			await tx.rollCall.delete({ where: { id: current.id } });
+		},
+	});
 
 	/**
 	 * Reopens the roll call for 15 min from now.
@@ -331,17 +331,16 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the roll call does not exist.
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
 	 */
-	@Validate({
-		service: true,
-		returns: rollCallSchema,
+	const open = op({
 		args: [rollCallPK],
-	})
-	open<Opt extends ServiceOpts>(
-		filter: RollCallPK,
-		opts: Opt,
-	): Promise<RollCall> {
-		return this.setClosesAt(filter, opts, () => new Date(Date.now() + OPEN_MS));
-	}
+		returns: rollCallSchema,
+		run: (
+			tx: PrismaTx,
+			filter: RollCallPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RollCall> =>
+			setClosesAt(tx, filter, opts, () => new Date(Date.now() + OPEN_MS)),
+	});
 
 	/**
 	 * Closes the roll call now.
@@ -349,17 +348,15 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the roll call does not exist.
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
 	 */
-	@Validate({
-		service: true,
-		returns: rollCallSchema,
+	const close = op({
 		args: [rollCallPK],
-	})
-	close<Opt extends ServiceOpts>(
-		filter: RollCallPK,
-		opts: Opt,
-	): Promise<RollCall> {
-		return this.setClosesAt(filter, opts, () => new Date());
-	}
+		returns: rollCallSchema,
+		run: (
+			tx: PrismaTx,
+			filter: RollCallPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RollCall> => setClosesAt(tx, filter, opts, () => new Date()),
+	});
 
 	/**
 	 * Returns the code on the instructor's screen, the instant it came up and the instant it changes.
@@ -367,20 +364,19 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the roll call does not exist.
 	 * @throws {@link NotAllowed} If the actor may not manage the course's roll calls.
 	 */
-	@Validate({
-		service: true,
-		returns: currentCodeSchema,
+	const currentCode = op({
+		transaction: false,
 		args: [rollCallPK],
-	})
-	currentCode<Opt extends ServiceOpts>(
-		filter: RollCallPK,
-		opts: Opt,
-	): Promise<z.infer<typeof currentCodeSchema>> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const current = await manageable(tx, filter, scoped.actor);
+		returns: currentCodeSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: RollCallPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<z.infer<typeof currentCodeSchema>> => {
+			const current = await manageable(tx, filter, opts.actor);
 			return codeAt(current.secret, new Date());
-		});
-	}
+		},
+	});
 
 	/**
 	 * Builds the attendance report of a course.
@@ -393,17 +389,16 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotFound} If the course does not exist.
 	 * @throws {@link NotAllowed} If the actor may not read the course.
 	 */
-	@Validate({
-		service: true,
-		returns: courseAttendanceSchema,
+	const courseAttendance = op({
+		transaction: false,
 		args: [courseRef],
-	})
-	courseAttendance<Opt extends ServiceOpts>(
-		course: CourseRef,
-		opts: Opt,
-	): Promise<CourseAttendance> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const found = await readableCourse(tx, course, scoped.actor);
+		returns: courseAttendanceSchema,
+		run: async (
+			tx: PrismaTx,
+			course: CourseRef,
+			opts: ServiceOptsWithoutTx,
+		): Promise<CourseAttendance> => {
+			const found = await readableCourse(tx, course, opts.actor);
 			const id = found.id;
 
 			const events = await tx.calendarEvent.findMany({
@@ -420,9 +415,9 @@ export class RollCallService extends CrudBase<{
 			const enrollments = await tx.enrollment.findMany({
 				where: {
 					courseId: id,
-					...(hasPerm(scoped.actor, "roll-call.manage", found)
+					...(hasPerm(opts.actor, "roll-call.manage", found)
 						? {}
-						: { username: usernameOf(scoped.actor) }),
+						: { username: usernameOf(opts.actor) }),
 				},
 				select: {
 					status: true,
@@ -474,8 +469,8 @@ export class RollCallService extends CrudBase<{
 					};
 				}),
 			};
-		});
-	}
+		},
+	});
 
 	/**
 	 * Marks the acting student present with a code typed or scanned now.
@@ -486,25 +481,23 @@ export class RollCallService extends CrudBase<{
 	 *
 	 * @throws {@link CheckInError} If the check-in is refused.
 	 */
-	@Validate({
-		service: true,
-		returns: checkInResultSchema,
+	const checkIn = op({
 		args: [checkInInput],
-	})
-	checkIn<Opt extends ServiceOpts>(
-		input: CheckInInput,
-		opts: Opt,
-	): Promise<CheckInResult> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const student = studentOf(scoped.actor);
+		returns: checkInResultSchema,
+		run: async (
+			tx: PrismaTx,
+			input: CheckInInput,
+			opts: ServiceOptsWithoutTx,
+		): Promise<CheckInResult> => {
+			const student = studentOf(opts.actor);
 			const now = new Date();
 			const target =
 				input.rollCallId === undefined
 					? await matchOpenRollCall(tx, student, input.code, now)
 					: await verifyRollCall(tx, input.rollCallId, input.code, now);
 			return markPresent(tx, student, target, input.deviceId, false);
-		});
-	}
+		},
+	});
 
 	/**
 	 * Completes a check-in whose code was verified at `claimedAt`, after login or signup.
@@ -514,17 +507,15 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link CheckInError} If the check-in is refused.
 	 * @throws {@link NotFound} If the roll call does not exist.
 	 */
-	@Validate({
-		service: true,
-		returns: checkInResultSchema,
+	const checkInClaim = op({
 		args: [checkInClaimInput],
-	})
-	checkInClaim<Opt extends ServiceOpts>(
-		input: CheckInClaimInput,
-		opts: Opt,
-	): Promise<CheckInResult> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const student = studentOf(scoped.actor);
+		returns: checkInResultSchema,
+		run: async (
+			tx: PrismaTx,
+			input: CheckInClaimInput,
+			opts: ServiceOptsWithoutTx,
+		): Promise<CheckInResult> => {
+			const student = studentOf(opts.actor);
 			if (Date.now() - input.claimedAt.getTime() >= CLAIM_TTL_MS) {
 				throw new CheckInError("claim-expired");
 			}
@@ -542,8 +533,8 @@ export class RollCallService extends CrudBase<{
 				input.deviceId,
 				input.accountCreated,
 			);
-		});
-	}
+		},
+	});
 
 	/**
 	 * Verifies a scanned code for a roll call and returns what the pending-claim cookie needs.
@@ -554,17 +545,16 @@ export class RollCallService extends CrudBase<{
 	 * @throws {@link NotAllowed} Unless the actor is `SYSTEM`.
 	 * @throws {@link CheckInError} If the roll call is closed or the code is not accepted now.
 	 */
-	@Validate({
-		service: true,
-		returns: claimTargetSchema,
+	const claimTarget = op({
+		transaction: false,
 		args: [claimTargetInput],
-	})
-	claimTarget<Opt extends ServiceOpts>(
-		input: z.input<typeof claimTargetInput>,
-		opts: Opt,
-	): Promise<z.infer<typeof claimTargetSchema>> {
-		requireSystem(opts.actor);
-		return this.$transaction(opts, async (tx) => {
+		returns: claimTargetSchema,
+		run: async (
+			tx: PrismaTx,
+			input: z.input<typeof claimTargetInput>,
+			opts: ServiceOptsWithoutTx,
+		): Promise<z.infer<typeof claimTargetSchema>> => {
+			requireSystem(opts.actor);
 			const target = await verifyRollCall(
 				tx,
 				input.rollCallId,
@@ -572,8 +562,8 @@ export class RollCallService extends CrudBase<{
 				new Date(),
 			);
 			return { secret: target.secret, actsAsInvite: target.actsAsInvite };
-		});
-	}
+		},
+	});
 
 	/**
 	 * Returns what signs and gates the pending claims of a roll call, or `null` when it does not exist.
@@ -582,55 +572,70 @@ export class RollCallService extends CrudBase<{
 	 *
 	 * @throws {@link NotAllowed} Unless the actor is `SYSTEM`.
 	 */
-	@Validate({
-		service: true,
-		returns: claimTargetSchema.nullable(),
+	const claimInfo = op({
+		transaction: false,
 		args: [z.object({ rollCallId })],
-	})
-	claimInfo<Opt extends ServiceOpts>(
-		input: { rollCallId: RollCallId },
-		opts: Opt,
-	): Promise<z.infer<typeof claimTargetSchema> | null> {
-		requireSystem(opts.actor);
-		return this.$transaction(opts, async (tx) => {
+		returns: claimTargetSchema.nullable(),
+		run: async (
+			tx: PrismaTx,
+			input: { rollCallId: RollCallId },
+			opts: ServiceOptsWithoutTx,
+		): Promise<z.infer<typeof claimTargetSchema> | null> => {
+			requireSystem(opts.actor);
 			const row = await tx.rollCall.findUnique({
 				where: { id: input.rollCallId },
 				select: { secret: true, actsAsInvite: true },
 			});
 			return row ?? null;
-		});
-	}
+		},
+	});
 
-	// Private utilities ---------------------------------------------------------
+	return {
+		create,
+		findOne,
+		findMany,
+		update,
+		delete: remove,
+		open,
+		close,
+		currentCode,
+		courseAttendance,
+		checkIn,
+		checkInClaim,
+		claimTarget,
+		claimInfo,
+	};
+});
 
-	/// Sets `closesAt` to the instant `when` returns.
-	private setClosesAt<Opt extends ServiceOpts>(
-		filter: RollCallPK,
-		opts: Opt,
-		when: () => Date,
-	): Promise<RollCall> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const current = await manageable(tx, filter, scoped.actor);
-			await tx.rollCall.update({
-				where: { id: current.id },
-				data: { closesAt: when() },
-			});
-			return this.readWhole(tx, current.id, scoped.actor);
-		});
-	}
+/** The roll call service, as built by {@link makeRollCallService}. */
+export type RollCallService = ReturnType<typeof makeRollCallService>;
 
-	/// Reads a roll call back as `actor` sees it.
-	private async readWhole(
-		tx: PrismaTx,
-		id: RollCallId,
-		actor: Actor,
-	): Promise<RollCall> {
-		const row = await tx.rollCall.findUniqueOrThrow({
-			where: { id },
-			select: rollCallSelect,
-		});
-		return fromDb(row, actor);
-	}
+/// Sets `closesAt` to the instant `when` returns.
+async function setClosesAt(
+	tx: PrismaTx,
+	filter: RollCallPK,
+	opts: ServiceOptsWithoutTx,
+	when: () => Date,
+): Promise<RollCall> {
+	const current = await manageable(tx, filter, opts.actor);
+	await tx.rollCall.update({
+		where: { id: current.id },
+		data: { closesAt: when() },
+	});
+	return readWhole(tx, current.id, opts.actor);
+}
+
+/// Reads a roll call back as `actor` sees it.
+async function readWhole(
+	tx: PrismaTx,
+	id: RollCallId,
+	actor: Actor,
+): Promise<RollCall> {
+	const row = await tx.rollCall.findUniqueOrThrow({
+		where: { id },
+		select: rollCallSelect,
+	});
+	return fromDb(row, actor);
 }
 
 //

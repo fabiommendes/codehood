@@ -12,7 +12,6 @@ import {
 	InvalidData,
 	NotAllowed,
 	NotFound,
-	NotImplemented,
 	TooManyRequests,
 } from "@/core/error";
 import {
@@ -27,15 +26,11 @@ import {
 	reportSchema,
 	reportUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { sanitizeFilename } from "@/utils/filename";
 import { extensionOf } from "@/utils/mime";
-import { Validate } from "@/utils/validate";
 import {
 	type Prisma,
 	type PrismaClient,
@@ -80,344 +75,357 @@ type DbAttachment = Prisma.AttachmentGetPayload<{
 	include: { blob: { select: { size: true } } };
 }>;
 
-export class ReportService extends CrudBase<{
+/// The CRUD shape of the report service. `upsert` is off: a report is sent once, with `create`.
+type ReportT = {
 	entity: Report;
 	pkFilter: ReportPK;
 	create: ReportCreate;
 	filter: ReportFilter;
 	update: ReportUpdate;
 	upsert: false;
-}> {
-	private readonly attachments: AttachmentService;
-	private readonly blob: BlobService;
+};
 
-	constructor(
-		attachments: AttachmentService,
-		blob: BlobService,
-		client: PrismaClient = prisma,
-	) {
-		super(client);
-		this.attachments = attachments;
-		this.blob = blob;
-	}
+/**
+ * The report service of `client` (the shared client by default), storing
+ * attachments through `attachments` and reading their bytes through `blob`.
+ */
+export function makeReportService(
+	attachments: AttachmentService,
+	blob: BlobService,
+	client: PrismaClient = prisma,
+) {
+	return defineService<ReportT>()(() => {
+		/**
+		 * Opens a report authored by the actor, `OPEN`, with its attachments stored in the same transaction.
+		 *
+		 * Attachment names are sanitised; a name that clashes with an earlier one
+		 * gets a numeric suffix (`image.png`, `image-2.png`).
+		 *
+		 * @throws {@link TooManyRequests}
+		 * If the author already sent `REPORT_DAILY_LIMIT` reports in the last 24 hours.
+		 * @throws {@link InvalidData}
+		 * If an attachment is not a `.png`, `.jpg`, `.jpeg` or `.webp`, or is larger
+		 * than `REPORT_MAX_ATTACHMENT_BYTES`.
+		 * @throws {@link NotFound}
+		 * If `input.course` does not exist.
+		 * @throws {@link NotAllowed}
+		 * If the actor is `SYSTEM`, which has no username to author a report.
+		 */
+		const create = op({
+			args: [reportCreate],
+			returns: reportSchema,
+			run: async (
+				tx: PrismaTx,
+				input: ReportCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Report> => {
+				const actor = opts.actor;
+				if (actor === SYSTEM || !hasPerm(actor, "report.create")) {
+					throw new NotAllowed("report.create");
+				}
+				const files = reportAttachmentFiles(input.attachments ?? []);
 
-	/**
-	 * Opens a report authored by the actor, `OPEN`, with its attachments stored in the same transaction.
-	 *
-	 * Attachment names are sanitised; a name that clashes with an earlier one
-	 * gets a numeric suffix (`image.png`, `image-2.png`).
-	 *
-	 * @throws {@link TooManyRequests}
-	 * If the author already sent `REPORT_DAILY_LIMIT` reports in the last 24 hours.
-	 * @throws {@link InvalidData}
-	 * If an attachment is not a `.png`, `.jpg`, `.jpeg` or `.webp`, or is larger
-	 * than `REPORT_MAX_ATTACHMENT_BYTES`.
-	 * @throws {@link NotFound}
-	 * If `input.course` does not exist.
-	 * @throws {@link NotAllowed}
-	 * If the actor is `SYSTEM`, which has no username to author a report.
-	 */
-	@Validate({
-		service: true,
-		returns: reportSchema,
-		args: [undefined, reportCreate],
-	})
-	protected override async createTx(
-		tx: PrismaTx,
-		input: ReportCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Report> {
-		const actor = opts.actor;
-		if (actor === SYSTEM || !hasPerm(actor, "report.create")) {
-			throw new NotAllowed("report.create");
-		}
-		const files = reportAttachmentFiles(input.attachments ?? []);
-
-		const recent = await tx.report.count({
-			where: {
-				authorId: actor.username,
-				createdAt: { gte: new Date(Date.now() - DAY_MS) },
-			},
-		});
-		if (recent >= REPORT_DAILY_LIMIT) throw new TooManyRequests();
-
-		let courseId: CourseId | null = null;
-		if (input.course != null) {
-			const course = await tx.course.findUnique({
-				where: courseWhere(input.course),
-				select: { id: true },
-			});
-			if (!course) throw new NotFound("course");
-			courseId = course.id;
-		}
-
-		const row = await tx.report.create({
-			data: {
-				publicId: randomBytes(9).toString("hex"),
-				kind: input.kind,
-				message: input.message,
-				url: input.url ?? null,
-				userAgent: input.userAgent ?? null,
-				viewport: input.viewport ?? null,
-				authorId: actor.username,
-				courseId,
-			},
-			include: reportInclude,
-		});
-
-		for (const file of files) {
-			await this.attachments.create(
-				{
-					filename: file.filename,
-					buffer: file.bytes,
-					attachedTo: { type: "REPORT", id: row.id as ReportId },
-				},
-				{ ...opts, tx },
-			);
-		}
-
-		return this.toReport(tx, row, actor);
-	}
-
-	/**
-	 * Finds a report by its `publicId`; `null` if it does not exist or the actor may not read it.
-	 *
-	 * The triage `note` is left out for an actor who reads it only as its author.
-	 */
-	@Validate({
-		service: true,
-		returns: reportSchema.nullable(),
-		args: [undefined, reportPK],
-	})
-	protected override async findOneTx(
-		tx: PrismaTx,
-		pk: ReportPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Report | null> {
-		const row = await tx.report.findUnique({
-			where: { publicId: pk.publicId },
-			include: reportInclude,
-		});
-		if (!row || !hasPerm(opts.actor, "report.read", targetOf(row))) {
-			return null;
-		}
-		return this.toReport(tx, row, opts.actor);
-	}
-
-	/**
-	 * Finds the reports matching `filter` that the actor may read, oldest first.
-	 *
-	 * The query already narrows to what the actor may read; each row is then
-	 * checked against `report.read`. An empty `status` or `kind` list does not filter.
-	 */
-	@Validate({
-		service: true,
-		returns: reportSchema.array(),
-		args: [undefined, reportFilter],
-	})
-	protected override async findManyTx(
-		tx: PrismaTx,
-		filter: ReportFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Report[]> {
-		const rows = await tx.report.findMany({
-			where: {
-				AND: [
-					visibleWhere(opts.actor),
-					filter.status?.length ? { status: { in: filter.status } } : {},
-					filter.kind?.length ? { kind: { in: filter.kind } } : {},
-					filter.course != null
-						? { course: courseRefMatch(filter.course) }
-						: {},
-					filter.author ? { authorId: filter.author } : {},
-				],
-			},
-			include: reportInclude,
-			orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-		});
-		const readable = rows.filter((row) =>
-			hasPerm(opts.actor, "report.read", targetOf(row)),
-		);
-		return Promise.all(
-			readable.map((row) => this.toReport(tx, row, opts.actor)),
-		);
-	}
-
-	/**
-	 * Triages a report: changes its status, kind or note.
-	 */
-	@Validate({
-		service: true,
-		returns: reportSchema,
-		args: [undefined, reportPK, reportUpdate],
-	})
-	protected override async updateTx(
-		tx: PrismaTx,
-		pk: ReportPK,
-		input: ReportUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Report> {
-		const row = await this.readableRow(tx, pk, opts.actor);
-		ensurePerm(opts.actor, "report.triage", targetOf(row));
-
-		const kind = input.kind ?? row.kind;
-		if (kind === "CONTENT" && row.courseId === null) {
-			throw new InvalidData({
-				kind: [
-					{ code: "invalid", message: m.forms_schema_report_course_required() },
-				],
-			});
-		}
-
-		const data: Prisma.ReportUncheckedUpdateInput = { kind };
-		if (input.note !== undefined) data.note = input.note;
-		if (input.status != null && input.status !== row.status) {
-			data.status = input.status;
-			const actor = opts.actor;
-			const reopened = input.status === "OPEN";
-			data.triagedById = reopened || actor === SYSTEM ? null : actor.username;
-			data.triagedAt = reopened ? null : new Date();
-		}
-
-		const updated = await tx.report.update({
-			where: { id: row.id },
-			data,
-			include: reportInclude,
-		});
-		return this.toReport(tx, updated, opts.actor);
-	}
-
-	/**
-	 * Deletes a report and releases its attachments.
-	 *
-	 * @throws {@link NotFound} If the report does not exist or the actor may not read it.
-	 * @throws {@link NotAllowed} If the actor may read it but not delete it.
-	 */
-	@Validate({ service: true, args: [undefined, reportPK] })
-	protected override async deleteTx(
-		tx: PrismaTx,
-		pk: ReportPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const row = await this.readableRow(tx, pk, opts.actor);
-		ensurePerm(opts.actor, "report.delete", targetOf(row));
-		await this.attachments.detach("REPORT", row.id, { ...opts, tx });
-		await tx.report.delete({ where: { id: row.id } });
-	}
-
-	/// No upsert: a report is sent once, with `create`.
-	override upsert<Opt extends ServiceOpts>(
-		_input: never,
-		_opts: Opt,
-	): Promise<never> {
-		throw new NotImplemented("report.upsert");
-	}
-
-	/**
-	 * The bytes and mime type of the attachment `filename` of a report.
-	 *
-	 * Readable by whoever may read the report.
-	 *
-	 * @throws {@link NotFound}
-	 * If the report does not exist or the actor may not read it, or it has no
-	 * attachment called `filename`.
-	 */
-	async attachment(
-		pk: ReportPK,
-		filename: string,
-		opts: ServiceOpts,
-	): Promise<{ bytes: Buffer; mimeType: string; filename: string }> {
-		const client = opts.tx ?? this.prisma;
-		const report = await client.report.findUnique({
-			where: { publicId: pk.publicId },
-			include: reportInclude,
-		});
-		if (!report || !hasPerm(opts.actor, "report.read", targetOf(report))) {
-			throw new NotFound("report", pk.publicId);
-		}
-		const row = await client.attachment.findFirst({
-			where: {
-				attachedToType: "REPORT",
-				attachedToId: report.id,
-				filename,
-			},
-			include: { blob: true },
-		});
-		const bytes = row && (await this.blob.readBlob(row.blob));
-		if (!row || !bytes) throw new NotFound("attachment", filename);
-		return { bytes, mimeType: row.mimeType, filename: row.filename };
-	}
-
-	/**
-	 * How many `OPEN` `CONTENT` reports of `course` the actor may read.
-	 */
-	async countOpen(course: CourseRef, opts: ServiceOpts): Promise<number> {
-		const client = opts.tx ?? this.prisma;
-		return client.report.count({
-			where: {
-				AND: [
-					visibleWhere(opts.actor),
-					{
-						status: "OPEN",
-						kind: "CONTENT",
-						course: courseRefMatch(course),
+				const recent = await tx.report.count({
+					where: {
+						authorId: actor.username,
+						createdAt: { gte: new Date(Date.now() - DAY_MS) },
 					},
-				],
+				});
+				if (recent >= REPORT_DAILY_LIMIT) throw new TooManyRequests();
+
+				let courseId: CourseId | null = null;
+				if (input.course != null) {
+					const course = await tx.course.findUnique({
+						where: courseWhere(input.course),
+						select: { id: true },
+					});
+					if (!course) throw new NotFound("course");
+					courseId = course.id;
+				}
+
+				const row = await tx.report.create({
+					data: {
+						publicId: randomBytes(9).toString("hex"),
+						kind: input.kind,
+						message: input.message,
+						url: input.url ?? null,
+						userAgent: input.userAgent ?? null,
+						viewport: input.viewport ?? null,
+						authorId: actor.username,
+						courseId,
+					},
+					include: reportInclude,
+				});
+
+				for (const file of files) {
+					await attachments.create(
+						{
+							filename: file.filename,
+							buffer: file.bytes,
+							attachedTo: { type: "REPORT", id: row.id as ReportId },
+						},
+						{ ...opts, tx },
+					);
+				}
+
+				return toReport(tx, row, actor);
 			},
 		});
-	}
 
-	/// The report `pk`, or `NotFound` when it does not exist or `actor` may not read it.
-	private async readableRow(
-		tx: PrismaTx,
-		pk: ReportPK,
-		actor: Actor,
-	): Promise<DbReport> {
-		const row = await tx.report.findUnique({
-			where: { publicId: pk.publicId },
-			include: reportInclude,
+		/**
+		 * Finds a report by its `publicId`; `null` if it does not exist or the actor may not read it.
+		 *
+		 * The triage `note` is left out for an actor who reads it only as its author.
+		 */
+		const findOne = op({
+			transaction: false,
+			args: [reportPK],
+			returns: reportSchema.nullable(),
+			run: async (
+				tx: PrismaTx,
+				pk: ReportPK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Report | null> => {
+				const row = await tx.report.findUnique({
+					where: { publicId: pk.publicId },
+					include: reportInclude,
+				});
+				if (!row || !hasPerm(opts.actor, "report.read", targetOf(row))) {
+					return null;
+				}
+				return toReport(tx, row, opts.actor);
+			},
 		});
-		if (!row || !hasPerm(actor, "report.read", targetOf(row))) {
-			throw new NotFound("report", pk.publicId);
-		}
-		return row;
-	}
 
-	/// The public shape of `row`, with its attachments, hiding the note from a reader who is only the author.
-	private async toReport(
-		tx: PrismaTx | PrismaClient,
-		row: DbReport,
-		actor: Actor,
-	): Promise<Report> {
-		const attachments = await tx.attachment.findMany({
-			where: { attachedToType: "REPORT", attachedToId: row.id },
-			include: { blob: { select: { size: true } } },
-			orderBy: { id: "asc" },
+		/**
+		 * Finds the reports matching `filter` that the actor may read, oldest first.
+		 *
+		 * The query already narrows to what the actor may read; each row is then
+		 * checked against `report.read`. An empty `status` or `kind` list does not filter.
+		 */
+		const findMany = op({
+			transaction: false,
+			args: [reportFilter],
+			returns: reportSchema.array(),
+			run: async (
+				tx: PrismaTx,
+				filter: ReportFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Report[]> => {
+				const rows = await tx.report.findMany({
+					where: {
+						AND: [
+							visibleWhere(opts.actor),
+							filter.status?.length ? { status: { in: filter.status } } : {},
+							filter.kind?.length ? { kind: { in: filter.kind } } : {},
+							filter.course != null
+								? { course: courseRefMatch(filter.course) }
+								: {},
+							filter.author ? { authorId: filter.author } : {},
+						],
+					},
+					include: reportInclude,
+					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+				});
+				const readable = rows.filter((row) =>
+					hasPerm(opts.actor, "report.read", targetOf(row)),
+				);
+				return Promise.all(
+					readable.map((row) => toReport(tx, row, opts.actor)),
+				);
+			},
 		});
-		const triages = hasPerm(actor, "report.triage", targetOf(row));
+
+		/** Triages a report: changes its status, kind or note. */
+		const update = op({
+			args: [reportPK, reportUpdate],
+			returns: reportSchema,
+			run: async (
+				tx: PrismaTx,
+				pk: ReportPK,
+				input: ReportUpdate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Report> => {
+				const row = await readableRow(tx, pk, opts.actor);
+				ensurePerm(opts.actor, "report.triage", targetOf(row));
+
+				const kind = input.kind ?? row.kind;
+				if (kind === "CONTENT" && row.courseId === null) {
+					throw new InvalidData({
+						kind: [
+							{
+								code: "invalid",
+								message: m.forms_schema_report_course_required(),
+							},
+						],
+					});
+				}
+
+				const data: Prisma.ReportUncheckedUpdateInput = { kind };
+				if (input.note !== undefined) data.note = input.note;
+				if (input.status != null && input.status !== row.status) {
+					data.status = input.status;
+					const actor = opts.actor;
+					const reopened = input.status === "OPEN";
+					data.triagedById =
+						reopened || actor === SYSTEM ? null : actor.username;
+					data.triagedAt = reopened ? null : new Date();
+				}
+
+				const updated = await tx.report.update({
+					where: { id: row.id },
+					data,
+					include: reportInclude,
+				});
+				return toReport(tx, updated, opts.actor);
+			},
+		});
+
+		/**
+		 * Deletes a report and releases its attachments.
+		 *
+		 * @throws {@link NotFound} If the report does not exist or the actor may not read it.
+		 * @throws {@link NotAllowed} If the actor may read it but not delete it.
+		 */
+		const remove = op({
+			args: [reportPK],
+			run: async (
+				tx: PrismaTx,
+				pk: ReportPK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<void> => {
+				const row = await readableRow(tx, pk, opts.actor);
+				ensurePerm(opts.actor, "report.delete", targetOf(row));
+				await attachments.detach("REPORT", row.id, { ...opts, tx });
+				await tx.report.delete({ where: { id: row.id } });
+			},
+		});
+
+		/**
+		 * The bytes and mime type of the attachment `filename` of a report.
+		 *
+		 * Readable by whoever may read the report.
+		 *
+		 * @throws {@link NotFound}
+		 * If the report does not exist or the actor may not read it, or it has no
+		 * attachment called `filename`.
+		 */
+		const attachment = op({
+			transaction: false,
+			run: async (
+				tx: PrismaTx,
+				pk: ReportPK,
+				filename: string,
+				opts: ServiceOptsWithoutTx,
+			): Promise<{ bytes: Buffer; mimeType: string; filename: string }> => {
+				const report = await tx.report.findUnique({
+					where: { publicId: pk.publicId },
+					include: reportInclude,
+				});
+				if (!report || !hasPerm(opts.actor, "report.read", targetOf(report))) {
+					throw new NotFound("report", pk.publicId);
+				}
+				const row = await tx.attachment.findFirst({
+					where: {
+						attachedToType: "REPORT",
+						attachedToId: report.id,
+						filename,
+					},
+					include: { blob: true },
+				});
+				const bytes = row && (await blob.readBlob(row.blob));
+				if (!row || !bytes) throw new NotFound("attachment", filename);
+				return { bytes, mimeType: row.mimeType, filename: row.filename };
+			},
+		});
+
+		/** How many `OPEN` `CONTENT` reports of `course` the actor may read. */
+		const countOpen = op({
+			transaction: false,
+			run: async (
+				tx: PrismaTx,
+				course: CourseRef,
+				opts: ServiceOptsWithoutTx,
+			): Promise<number> =>
+				tx.report.count({
+					where: {
+						AND: [
+							visibleWhere(opts.actor),
+							{
+								status: "OPEN",
+								kind: "CONTENT",
+								course: courseRefMatch(course),
+							},
+						],
+					},
+				}),
+		});
+
 		return {
-			id: row.id as ReportId,
-			publicId: row.publicId,
-			kind: row.kind,
-			message: row.message,
-			status: row.status,
-			...(triages && { note: row.note }),
-			url: row.url,
-			userAgent: row.userAgent,
-			viewport: row.viewport,
-			author: row.authorId,
-			course: row.course && {
-				discipline: row.course.disciplineSlug,
-				instructor: row.course.instructorId,
-				edition: row.course.editionSlug,
-			},
-			attachments: attachments.map((a) => attachmentView(row.publicId, a)),
-			triagedBy: row.triagedById,
-			triagedAt: row.triagedAt,
-			createdAt: row.createdAt,
-			updatedAt: row.updatedAt,
+			create,
+			findOne,
+			findMany,
+			update,
+			delete: remove,
+			attachment,
+			countOpen,
 		};
+	})(client);
+}
+
+/** The report service, as built by {@link makeReportService}. */
+export type ReportService = ReturnType<typeof makeReportService>;
+
+/// The report `pk`, or `NotFound` when it does not exist or `actor` may not read it.
+async function readableRow(
+	tx: PrismaTx,
+	pk: ReportPK,
+	actor: Actor,
+): Promise<DbReport> {
+	const row = await tx.report.findUnique({
+		where: { publicId: pk.publicId },
+		include: reportInclude,
+	});
+	if (!row || !hasPerm(actor, "report.read", targetOf(row))) {
+		throw new NotFound("report", pk.publicId);
 	}
+	return row;
+}
+
+/// The public shape of `row`, with its attachments, hiding the note from a reader who is only the author.
+async function toReport(
+	tx: PrismaTx,
+	row: DbReport,
+	actor: Actor,
+): Promise<Report> {
+	const attachments = await tx.attachment.findMany({
+		where: { attachedToType: "REPORT", attachedToId: row.id },
+		include: { blob: { select: { size: true } } },
+		orderBy: { id: "asc" },
+	});
+	const triages = hasPerm(actor, "report.triage", targetOf(row));
+	return {
+		id: row.id as ReportId,
+		publicId: row.publicId,
+		kind: row.kind,
+		message: row.message,
+		status: row.status,
+		...(triages && { note: row.note }),
+		url: row.url,
+		userAgent: row.userAgent,
+		viewport: row.viewport,
+		author: row.authorId,
+		course: row.course && {
+			discipline: row.course.disciplineSlug,
+			instructor: row.course.instructorId,
+			edition: row.course.editionSlug,
+		},
+		attachments: attachments.map((a) => attachmentView(row.publicId, a)),
+		triagedBy: row.triagedById,
+		triagedAt: row.triagedAt,
+		createdAt: row.createdAt,
+		updatedAt: row.updatedAt,
+	};
 }
 
 //

@@ -17,7 +17,8 @@ import {
 	timeSlotSchema,
 	timeSlotUpdate,
 } from "@/core/schemas";
-import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
 	durationToMinutes,
@@ -25,7 +26,6 @@ import {
 	toDuration,
 	toMinutes,
 } from "@/utils/schedule-time";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { recomputeEventTimes } from "../event-times";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
@@ -60,13 +60,17 @@ const timeSlotInclude = {
 	},
 } satisfies Prisma.TimeSlotInclude;
 
-export class TimeSlotService extends CrudBase<{
+/// The CRUD shape of the time slot service.
+type TimeSlotT = {
 	entity: TimeSlot;
 	pkFilter: TimeSlotPK;
 	create: TimeSlotCreate;
 	filter: TimeSlotFilter;
 	update: TimeSlotUpdate;
-}> {
+};
+
+/** The time slot service of `client` (the shared client by default). */
+export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 	/**
 	 * Creates a time slot.
 	 *
@@ -74,35 +78,34 @@ export class TimeSlotService extends CrudBase<{
 	 * slot in the same course overlapping an existing one on the same
 	 * weekday.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [timeSlotCreate],
 		returns: timeSlotSchema,
-		args: [undefined, timeSlotCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: TimeSlotCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<TimeSlot> {
-		const course = await writableCourse(tx, input.course, opts.actor);
-		const startMin = toMinutes(input.start);
-		const durationMin = durationToMinutes(input.duration);
-		validateWindow(startMin, durationMin);
-		await assertNoOverlap(tx, course.id, input.day, startMin, durationMin);
+		run: async (
+			tx: PrismaTx,
+			input: TimeSlotCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TimeSlot> => {
+			const course = await writableCourse(tx, input.course, opts.actor);
+			const startMin = toMinutes(input.start);
+			const durationMin = durationToMinutes(input.duration);
+			validateWindow(startMin, durationMin);
+			await assertNoOverlap(tx, course.id, input.day, startMin, durationMin);
 
-		const row = await tx.timeSlot.create({
-			data: {
-				courseId: course.id,
-				slug: input.slug,
-				title: input.title,
-				day: input.day,
-				startMin,
-				durationMin,
-			},
-			include: timeSlotInclude,
-		});
-		return fromDb(row);
-	}
+			const row = await tx.timeSlot.create({
+				data: {
+					courseId: course.id,
+					slug: input.slug,
+					title: input.title,
+					day: input.day,
+					startMin,
+					durationMin,
+				},
+				include: timeSlotInclude,
+			});
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Finds a slot by id, by `(courseId, slug)`, or by its course's natural key
@@ -112,75 +115,75 @@ export class TimeSlotService extends CrudBase<{
 	 * contents, and `NotFound` when the filter names a course that does not
 	 * exist; returns `null` for a course that exists without that slug.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [timeSlotPK],
 		returns: timeSlotSchema.nullable(),
-		args: [undefined, timeSlotPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: TimeSlotPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<TimeSlot | null> {
-		const row = await tx.timeSlot.findFirst({
-			where: timeSlotWhere(filter),
-			include: timeSlotInclude,
-		});
-		if (!row) {
-			if (!("id" in filter)) await assertCourseExists(tx, filter);
-			return null;
-		}
+		run: async (
+			tx: PrismaTx,
+			filter: TimeSlotPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TimeSlot | null> => {
+			const row = await tx.timeSlot.findFirst({
+				where: timeSlotWhere(filter),
+				include: timeSlotInclude,
+			});
+			if (!row) {
+				if (!("id" in filter)) await assertCourseExists(tx, filter);
+				return null;
+			}
 
-		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
-			throw new NotAllowed("time-slot.read");
-		}
+			if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
+				throw new NotAllowed("time-slot.read");
+			}
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Lists the slots of one course, narrowed to what `actor` may see, ordered
 	 * by weekday then start time so the syllabus line reads Monday-first.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [timeSlotFilter],
 		returns: timeSlotSchema.array(),
-		args: [undefined, timeSlotFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: TimeSlotFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<TimeSlot[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: {
-					id: true,
-					instructor: { select: { username: true } },
-					enrollments: {
-						where: { status: "ACTIVE" as const },
-						select: { username: true },
+		run: async (
+			tx: PrismaTx,
+			filter: TimeSlotFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TimeSlot[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: {
+						id: true,
+						instructor: { select: { username: true } },
+						enrollments: {
+							where: { status: "ACTIVE" as const },
+							select: { username: true },
+						},
 					},
+				}),
+			);
+
+			if (!hasPerm(opts.actor, "course.read-contents", course)) {
+				throw new NotAllowed("time-slot.read");
+			}
+
+			const rows = await tx.timeSlot.findMany({
+				where: {
+					courseId: course.id,
+					...(filter.days ? { day: { in: filter.days } } : {}),
 				},
-			}),
-		);
-
-		if (!hasPerm(opts.actor, "course.read-contents", course)) {
-			throw new NotAllowed("time-slot.read");
-		}
-
-		const rows = await tx.timeSlot.findMany({
-			where: {
-				courseId: course.id,
-				...(filter.days ? { day: { in: filter.days } } : {}),
-			},
-			include: timeSlotInclude,
-			orderBy: [{ day: "asc" }, { startMin: "asc" }],
-		});
-		return rows.map(fromDb);
-	}
+				include: timeSlotInclude,
+				orderBy: [{ day: "asc" }, { startMin: "asc" }],
+			});
+			return rows.map(fromDb);
+		},
+	});
 
 	/**
 	 * Changes `title`, `day`, `start`, or `duration`. Never `slug`.
@@ -188,49 +191,50 @@ export class TimeSlotService extends CrudBase<{
 	 * The slot's events move with it: their `startAt` and `durationMin` are
 	 * recomputed in the same transaction.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [timeSlotPK, timeSlotUpdate],
 		returns: timeSlotSchema,
-		args: [undefined, timeSlotPK, timeSlotUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: TimeSlotPK,
-		fields: TimeSlotUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<TimeSlot> {
-		const current = await writableSlot(
-			tx,
-			filter,
-			opts.actor,
-			"time-slot.update",
-		);
+		run: async (
+			tx: PrismaTx,
+			filter: TimeSlotPK,
+			fields: TimeSlotUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TimeSlot> => {
+			const current = await writableSlot(
+				tx,
+				filter,
+				opts.actor,
+				"time-slot.update",
+			);
 
-		const day = fields.day ?? current.day;
-		const startMin = fields.start ? toMinutes(fields.start) : current.startMin;
-		const durationMin = fields.duration
-			? durationToMinutes(fields.duration)
-			: current.durationMin;
-		validateWindow(startMin, durationMin);
-		await assertNoOverlap(tx, current.courseId, day, startMin, durationMin, {
-			excludeId: current.id,
-		});
+			const day = fields.day ?? current.day;
+			const startMin = fields.start
+				? toMinutes(fields.start)
+				: current.startMin;
+			const durationMin = fields.duration
+				? durationToMinutes(fields.duration)
+				: current.durationMin;
+			validateWindow(startMin, durationMin);
+			await assertNoOverlap(tx, current.courseId, day, startMin, durationMin, {
+				excludeId: current.id,
+			});
 
-		const row = await tx.timeSlot.update({
-			where: { id: current.id },
-			data: {
-				title: fields.title,
-				day: fields.day,
-				startMin: fields.start ? startMin : undefined,
-				durationMin: fields.duration ? durationMin : undefined,
-			},
-			include: timeSlotInclude,
-		});
-		if (fields.day || fields.start || fields.duration) {
-			await recomputeEventTimes(tx, { timeSlotId: current.id });
-		}
-		return fromDb(row);
-	}
+			const row = await tx.timeSlot.update({
+				where: { id: current.id },
+				data: {
+					title: fields.title,
+					day: fields.day,
+					startMin: fields.start ? startMin : undefined,
+					durationMin: fields.duration ? durationMin : undefined,
+				},
+				include: timeSlotInclude,
+			});
+			if (fields.day || fields.start || fields.duration) {
+				await recomputeEventTimes(tx, { timeSlotId: current.id });
+			}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Upserts a time slot keyed on `{courseId, slug}`.
@@ -239,28 +243,26 @@ export class TimeSlotService extends CrudBase<{
 	 * creating or updating, same as `create`/`update`; the overlap check
 	 * re-runs on whichever branch fires.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [timeSlotCreate],
 		returns: timeSlotSchema,
-		args: [undefined, timeSlotCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: TimeSlotCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<TimeSlot> {
-		const course = await writableCourse(tx, input.course, opts.actor);
-		const scoped = { ...opts, tx };
+		run: async (
+			tx: PrismaTx,
+			input: TimeSlotCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<TimeSlot> => {
+			const course = await writableCourse(tx, input.course, opts.actor);
 
-		const existing = await tx.timeSlot.findUnique({
-			where: { courseId_slug: { courseId: course.id, slug: input.slug } },
-			select: { id: true },
-		});
-		if (!existing) return this.create({ ...input, course: course.id }, scoped);
+			const existing = await tx.timeSlot.findUnique({
+				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
+				select: { id: true },
+			});
+			if (!existing) return create(tx, { ...input, course: course.id }, opts);
 
-		const { slug: _slug, course: _course, ...fields } = input;
-		return this.update({ course: course.id, slug: input.slug }, fields, scoped);
-	}
+			const { slug: _slug, course: _course, ...fields } = input;
+			return update(tx, { course: course.id, slug: input.slug }, fields, opts);
+		},
+	});
 
 	/**
 	 * Deletes a time slot.
@@ -268,34 +270,38 @@ export class TimeSlotService extends CrudBase<{
 	 * Refuses one that still has events, naming the count — the same
 	 * pattern as `editionService.delete` refusing an edition in use.
 	 */
-	@Validate({ service: true, args: [undefined, timeSlotPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: TimeSlotPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const current = await writableSlot(
-			tx,
-			filter,
-			opts.actor,
-			"time-slot.delete",
-		);
+	const remove = op({
+		args: [timeSlotPK],
+		run: async (
+			tx: PrismaTx,
+			filter: TimeSlotPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const current = await writableSlot(
+				tx,
+				filter,
+				opts.actor,
+				"time-slot.delete",
+			);
 
-		const eventCount = await tx.calendarEvent.count({
-			where: { timeSlotId: current.id },
-		});
-		if (eventCount > 0) {
-			throw new NotAllowed("time-slot.delete", {
-				status: 409,
-				message: m.errors_time_slot_has_events({
-					slug: current.slug,
-					count: eventCount,
-				}),
+			const eventCount = await tx.calendarEvent.count({
+				where: { timeSlotId: current.id },
 			});
-		}
-		await tx.timeSlot.delete({ where: { id: current.id } });
-	}
-}
+			if (eventCount > 0) {
+				throw new NotAllowed("time-slot.delete", {
+					status: 409,
+					message: m.errors_time_slot_has_events({
+						slug: current.slug,
+						count: eventCount,
+					}),
+				});
+			}
+			await tx.timeSlot.delete({ where: { id: current.id } });
+		},
+	});
+
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
 
 //
 // Auxiliary functions

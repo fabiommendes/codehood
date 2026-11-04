@@ -15,7 +15,7 @@ import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { AttachmentLinkMode } from "@/core/constants";
 import { prisma } from "@/db/client";
-import { BlobService } from "@/db/services/blob.service";
+import { type BlobService, makeBlobService } from "@/db/services/blob.service";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { hashBytes, isBlobHash } from "@/utils/content-hash";
 import { TEST_RESOURCE_ROOT } from "./env";
@@ -41,7 +41,7 @@ function makeRoot(): string {
 function makeService(
 	opts: { linkMode?: AttachmentLinkMode } = {},
 ): BlobService {
-	return new BlobService(prisma, { root: makeRoot(), linkMode: opts.linkMode });
+	return makeBlobService(prisma, { root: makeRoot(), linkMode: opts.linkMode });
 }
 
 const notSystem: Actor = { username: tag("user"), role: "STUDENT", name: "x" };
@@ -142,13 +142,13 @@ test("delete is a no-op while an attachment points at the blob, and removes the 
 
 	await service.delete({ hash: blob.hash }, FULL_ACCESS);
 	expect(existsSync(service.blobPath(blob.hash))).toBe(true);
-	let current = await service.findOne({ hash: blob.hash });
+	let current = await service.findOne({ hash: blob.hash }, FULL_ACCESS);
 	expect(current?.deletedAt).toBeNull();
 
 	await prisma.attachment.deleteMany({ where: { hash: blob.hash } });
 	await service.delete({ hash: blob.hash }, FULL_ACCESS);
 	expect(existsSync(service.blobPath(blob.hash))).toBe(false);
-	current = await service.findOne({ hash: blob.hash });
+	current = await service.findOne({ hash: blob.hash }, FULL_ACCESS);
 	expect(current?.deletedAt).not.toBeNull();
 });
 
@@ -200,11 +200,11 @@ test("collectGarbage tombstones every unattached blob older than the cutoff, ret
 	expect(collected).toContain(unattached.hash);
 	expect(collected).not.toContain(attached.hash);
 
-	const gone = await service.findOne({ hash: unattached.hash });
+	const gone = await service.findOne({ hash: unattached.hash }, FULL_ACCESS);
 	expect(gone?.deletedAt).not.toBeNull();
 	expect(existsSync(service.blobPath(unattached.hash))).toBe(false);
 
-	const spared = await service.findOne({ hash: attached.hash });
+	const spared = await service.findOne({ hash: attached.hash }, FULL_ACCESS);
 	expect(spared?.deletedAt).toBeNull();
 	expect(existsSync(service.blobPath(attached.hash))).toBe(true);
 });
@@ -271,7 +271,7 @@ test("readBlob returns bytes for a live blob, null for a tombstoned one, and nul
 	expect(await service.readBlob(blob)).toEqual(bytes);
 
 	await service.delete({ hash: blob.hash }, FULL_ACCESS);
-	const tombstoned = await service.findOne({ hash: blob.hash });
+	const tombstoned = await service.findOne({ hash: blob.hash }, FULL_ACCESS);
 	expect(tombstoned).not.toBeNull();
 	if (tombstoned) {
 		expect(await service.readBlob(tombstoned)).toBeNull();

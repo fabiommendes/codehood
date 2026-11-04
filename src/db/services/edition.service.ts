@@ -8,10 +8,10 @@ import {
 	editionSchema,
 	editionUpdate,
 } from "@/core/schemas";
-import type { Crud, ServiceOpts } from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
-import { Validate } from "@/utils/validate";
-import { type PrismaClient, prisma } from "../client";
+import type { PrismaTx } from "../client";
 
 //
 // Type definitions
@@ -22,92 +22,99 @@ export type EditionFilter = z.infer<typeof editionFilter>;
 export type EditionPK = z.infer<typeof editionPK>;
 export type EditionUpdate = z.infer<typeof editionUpdate>;
 
+/// The CRUD shape of the edition service.
+type EditionT = {
+	entity: Edition;
+	pkFilter: EditionPK;
+	create: EditionCreate;
+	filter: EditionFilter;
+	update: EditionUpdate;
+};
+
 /**
  * Every user sees every edition — they are labels on courses, not secrets —
- * so `findOne`/`findMany` take no permission-gated `opts`.
+ * so `findOne`/`findMany` carry no permission rule.
  *
  * Only the writes carry a rule, because an edition slug occupies part of the
  * course URL namespace and is shared by every instructor teaching that term.
  */
-export class EditionService
-	implements
-		Crud<{
-			entity: Edition;
-			pkFilter: EditionPK;
-			create: EditionCreate;
-			filter: EditionFilter;
-			update: EditionUpdate;
-		}>
-{
-	prisma: PrismaClient;
-
-	constructor(client: PrismaClient = prisma) {
-		this.prisma = client;
-	}
-
+export const makeEditionService = defineService<EditionT>()(() => {
 	/**
 	 * Creates an edition.
 	 *
 	 * Rejects a slug that doesn't match `EDITION_RE`, and a window where
 	 * `startAt` is not before `endAt`.
 	 */
-	@Validate({ service: true, returns: editionSchema, args: [editionCreate] })
-	async create(input: EditionCreate, opts: ServiceOpts): Promise<Edition> {
-		const client = opts.tx ?? this.prisma;
+	const create = op({
+		args: [editionCreate],
+		returns: editionSchema,
+		run: async (
+			tx: PrismaTx,
+			input: EditionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Edition> => {
+			ensurePerm(opts.actor, "edition.create");
+			assertWindow(input.startAt, input.endAt);
 
-		ensurePerm(opts.actor, "edition.create");
-		assertWindow(input.startAt, input.endAt);
-
-		try {
-			return await client.edition.create({
-				data: {
-					slug: input.slug,
-					name: input.name,
-					startAt: input.startAt,
-					endAt: input.endAt,
-				},
-			});
-		} catch (error) {
-			if ((error as { code?: string }).code === "P2002") {
-				throw new FieldError("slug", m.errors_slug_taken({ slug: input.slug }));
+			try {
+				return await tx.edition.create({
+					data: {
+						slug: input.slug,
+						name: input.name,
+						startAt: input.startAt,
+						endAt: input.endAt,
+					},
+				});
+			} catch (error) {
+				if ((error as { code?: string }).code === "P2002") {
+					throw new FieldError(
+						"slug",
+						m.errors_slug_taken({ slug: input.slug }),
+					);
+				}
+				throw error;
 			}
-			throw error;
-		}
-	}
+		},
+	});
 
-	/**
-	 * Finds a single edition by slug.
-	 */
-	@Validate({
-		returns: editionSchema.nullable(),
+	/** Finds a single edition by slug. */
+	const findOne = op({
+		transaction: false,
 		args: [editionPK],
-	})
-	findOne(filter: EditionPK, opts?: ServiceOpts): Promise<Edition | null> {
-		const client = opts?.tx ?? this.prisma;
-		return client.edition.findUnique({ where: { slug: filter.slug } });
-	}
+		returns: editionSchema.nullable(),
+		run: async (
+			tx: PrismaTx,
+			filter: EditionPK,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Edition | null> =>
+			tx.edition.findUnique({ where: { slug: filter.slug } }),
+	});
 
 	/**
 	 * Finds many editions, optionally narrowed to `filter.slugs` and/or
 	 * `filter.active`.
 	 */
-	@Validate({
-		returns: editionSchema.array(),
+	const findMany = op({
+		transaction: false,
 		args: [editionFilter],
-	})
-	findMany(filter: EditionFilter, opts?: ServiceOpts): Promise<Edition[]> {
-		const client = opts?.tx ?? this.prisma;
-		const now = new Date();
-		return client.edition.findMany({
-			where: {
-				AND: [
-					filter.slugs ? { slug: { in: filter.slugs } } : {},
-					filter.active ? { startAt: { lte: now }, endAt: { gte: now } } : {},
-				],
-			},
-			orderBy: { slug: "desc" },
-		});
-	}
+		returns: editionSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			filter: EditionFilter,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Edition[]> => {
+			const now = new Date();
+			return tx.edition.findMany({
+				where: {
+					AND: [
+						filter.slugs ? { slug: { in: filter.slugs } } : {},
+						filter.active ? { startAt: { lte: now }, endAt: { gte: now } } : {},
+					],
+				},
+				orderBy: { slug: "desc" },
+			});
+		},
+	});
 
 	/**
 	 * Updates an edition's editable fields.
@@ -116,70 +123,70 @@ export class EditionService
 	 * edition (see `src/urls/README.md`), so changing it would
 	 * move every one of those courses without touching a row.
 	 */
-	@Validate({
-		service: true,
-		returns: editionSchema,
+	const update = op({
 		args: [editionPK, editionUpdate],
-	})
-	async update(
-		filter: EditionPK,
-		fields: EditionUpdate,
-		opts: ServiceOpts,
-	): Promise<Edition> {
-		ensurePerm(opts.actor, "edition.update");
-		const client = opts.tx ?? this.prisma;
-		const current = await client.edition.findUnique({
-			where: { slug: filter.slug },
-		});
-		if (!current) {
-			throw new NotFound("edition", {
-				id: filter.slug,
-				message: m.errors_edition_not_found({ slug: filter.slug }),
+		returns: editionSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: EditionPK,
+			fields: EditionUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Edition> => {
+			ensurePerm(opts.actor, "edition.update");
+			const current = await tx.edition.findUnique({
+				where: { slug: filter.slug },
 			});
-		}
-		assertWindow(
-			fields.startAt ?? current.startAt,
-			fields.endAt ?? current.endAt,
-		);
-		return client.edition.update({
-			where: { slug: filter.slug },
-			data: fields,
-		});
-	}
+			if (!current) {
+				throw new NotFound("edition", {
+					id: filter.slug,
+					message: m.errors_edition_not_found({ slug: filter.slug }),
+				});
+			}
+			assertWindow(
+				fields.startAt ?? current.startAt,
+				fields.endAt ?? current.endAt,
+			);
+			return tx.edition.update({
+				where: { slug: filter.slug },
+				data: fields,
+			});
+		},
+	});
 
 	/**
 	 * Upserts an edition keyed on `slug`: creates it if absent, else updates
 	 * its editable fields.
 	 *
-	 * Same permission and window checks as `create`/`update`, run once via
-	 * `assertPerm`/{@link assertWindow} regardless of which
-	 * branch Prisma takes.
+	 * Same permission and window checks as `create`/`update`, run once
+	 * regardless of which branch Prisma takes.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
 		args: [editionCreate],
 		returns: editionSchema,
-	})
-	upsert(input: EditionCreate, opts: ServiceOpts): Promise<Edition> {
-		ensurePerm(opts.actor, "edition.create");
-		assertWindow(input.startAt, input.endAt);
-		const client = opts.tx ?? this.prisma;
+		run: async (
+			tx: PrismaTx,
+			input: EditionCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Edition> => {
+			ensurePerm(opts.actor, "edition.create");
+			assertWindow(input.startAt, input.endAt);
 
-		return client.edition.upsert({
-			where: { slug: input.slug },
-			update: {
-				name: input.name,
-				startAt: input.startAt,
-				endAt: input.endAt,
-			},
-			create: {
-				slug: input.slug,
-				name: input.name,
-				startAt: input.startAt,
-				endAt: input.endAt,
-			},
-		});
-	}
+			return tx.edition.upsert({
+				where: { slug: input.slug },
+				update: {
+					name: input.name,
+					startAt: input.startAt,
+					endAt: input.endAt,
+				},
+				create: {
+					slug: input.slug,
+					name: input.name,
+					startAt: input.startAt,
+					endAt: input.endAt,
+				},
+			});
+		},
+	});
 
 	/**
 	 * Deletes an edition.
@@ -188,25 +195,35 @@ export class EditionService
 	 * anyway; checking first is what turns a constraint error into a
 	 * message naming how many courses are in the way.
 	 */
-	@Validate({ service: true, args: [editionPK] })
-	async delete(filter: EditionPK, opts: ServiceOpts): Promise<void> {
-		ensurePerm(opts.actor, "edition.delete");
-		const client = opts.tx ?? this.prisma;
-		const courses = await client.course.count({
-			where: { editionSlug: filter.slug },
-		});
-		if (courses > 0) {
-			throw new NotAllowed("edition.delete", {
-				status: 409,
-				message: m.errors_edition_has_courses({
-					slug: filter.slug,
-					count: courses,
-				}),
+	const remove = op({
+		args: [editionPK],
+		run: async (
+			tx: PrismaTx,
+			filter: EditionPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			ensurePerm(opts.actor, "edition.delete");
+			const courses = await tx.course.count({
+				where: { editionSlug: filter.slug },
 			});
-		}
-		await client.edition.deleteMany({ where: { slug: filter.slug } });
-	}
-}
+			if (courses > 0) {
+				throw new NotAllowed("edition.delete", {
+					status: 409,
+					message: m.errors_edition_has_courses({
+						slug: filter.slug,
+						count: courses,
+					}),
+				});
+			}
+			await tx.edition.deleteMany({ where: { slug: filter.slug } });
+		},
+	});
+
+	return { create, findOne, findMany, update, upsert, delete: remove };
+});
+
+/** The edition service, as built by {@link makeEditionService}. */
+export type EditionService = ReturnType<typeof makeEditionService>;
 
 function assertWindow(startAt: Date, endAt: Date): void {
 	if (startAt >= endAt) {

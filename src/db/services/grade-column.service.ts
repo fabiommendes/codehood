@@ -23,13 +23,9 @@ import {
 	gradeColumnSchema,
 	gradeColumnUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
@@ -79,54 +75,57 @@ type DbValue = {
 	label: string | null;
 };
 
-export class GradeColumnService extends CrudBase<{
+/// The CRUD shape of the grade column service.
+type GradeColumnT = {
 	entity: GradeColumn;
 	pkFilter: GradeColumnPK;
 	create: GradeColumnCreate;
 	filter: GradeColumnFilter;
 	update: GradeColumnUpdate;
-}> {
+};
+
+/** The grade column service of `client` (the shared client by default). */
+export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 	/**
 	 * Creates a column, with its values, hidden from students.
 	 *
 	 * @throws {@link InvalidData} If a value does not fit the kind, or a username is not enrolled.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [gradeColumnCreate],
 		returns: gradeColumnSchema,
-		args: [undefined, gradeColumnCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: GradeColumnCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<GradeColumn> {
-		const course = await writableCourse(
-			tx,
-			input.course,
-			opts.actor,
-			"grade-column.create",
-		);
-		checkValuesFit(input.kind, input.values);
-		await checkEnrolled(tx, course.id, input.values);
+		run: async (
+			tx: PrismaTx,
+			input: GradeColumnCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradeColumn> => {
+			const course = await writableCourse(
+				tx,
+				input.course,
+				opts.actor,
+				"grade-column.create",
+			);
+			checkValuesFit(input.kind, input.values);
+			await checkEnrolled(tx, course.id, input.values);
 
-		const row = await invalidIfExists(
-			tx.gradeColumn.create.bind(tx.gradeColumn),
-			{
-				data: {
-					courseId: course.id,
-					slug: input.slug,
-					title: input.title,
-					kind: input.kind,
-					position: input.position,
-					rev: input.rev ?? null,
+			const row = await invalidIfExists(
+				tx.gradeColumn.create.bind(tx.gradeColumn),
+				{
+					data: {
+						courseId: course.id,
+						slug: input.slug,
+						title: input.title,
+						kind: input.kind,
+						position: input.position,
+						rev: input.rev ?? null,
+					},
+					select: { id: true },
 				},
-				select: { id: true },
-			},
-		);
-		await replaceValues(tx, row.id, input.kind, input.values);
-		return readWhole(tx, row.id);
-	}
+			);
+			await replaceValues(tx, row.id, input.kind, input.values);
+			return readWhole(tx, row.id);
+		},
+	});
 
 	/**
 	 * Finds a column by id or by course and slug.
@@ -137,38 +136,38 @@ export class GradeColumnService extends CrudBase<{
 	 * @throws {@link NotFound} If the filter references a course that does not exist.
 	 * @throws {@link NotAllowed} If the column exists but the actor may not read the course.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [gradeColumnPK],
 		returns: gradeColumnSchema.nullable(),
-		args: [undefined, gradeColumnPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: GradeColumnPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<GradeColumn | null> {
-		const row = await tx.gradeColumn.findFirst({
-			where: columnWhere(filter),
-			select: columnSelect,
-		});
-		if (!row) {
-			if (!("id" in filter)) {
-				valueOrNotFound(
-					"course",
-					await tx.course.findUnique({
-						where: courseRefWhere(filter.course),
-						select: { id: true },
-					}),
-				);
+		run: async (
+			tx: PrismaTx,
+			filter: GradeColumnPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradeColumn | null> => {
+			const row = await tx.gradeColumn.findFirst({
+				where: columnWhere(filter),
+				select: columnSelect,
+			});
+			if (!row) {
+				if (!("id" in filter)) {
+					valueOrNotFound(
+						"course",
+						await tx.course.findUnique({
+							where: courseRefWhere(filter.course),
+							select: { id: true },
+						}),
+					);
+				}
+				return null;
 			}
-			return null;
-		}
 
-		const access = accessTo(opts.actor, row.course);
-		if (access === "none") throw new NotAllowed("grade-column.read");
-		if (access === "released" && !row.releasedAt) return null;
-		return fromDb(row, await loadValues(tx, row.id, access, opts.actor));
-	}
+			const access = accessTo(opts.actor, row.course);
+			if (access === "none") throw new NotAllowed("grade-column.read");
+			if (access === "released" && !row.releasedAt) return null;
+			return fromDb(row, await loadValues(tx, row.id, access, opts.actor));
+		},
+	});
 
 	/**
 	 * Lists the columns of one course, ordered by position then slug.
@@ -178,45 +177,45 @@ export class GradeColumnService extends CrudBase<{
 	 * @throws {@link NotFound} If the course does not exist.
 	 * @throws {@link NotAllowed} If the actor may not read the course.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [gradeColumnFilter],
 		returns: gradeColumnSchema.array(),
-		args: [undefined, gradeColumnFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: GradeColumnFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<GradeColumn[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: courseSelect,
-			}),
-		);
-		const access = accessTo(opts.actor, course);
-		if (access === "none") throw new NotAllowed("grade-column.read");
+		run: async (
+			tx: PrismaTx,
+			filter: GradeColumnFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradeColumn[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: courseSelect,
+				}),
+			);
+			const access = accessTo(opts.actor, course);
+			if (access === "none") throw new NotAllowed("grade-column.read");
 
-		const rows = await tx.gradeColumn.findMany({
-			where: {
-				courseId: course.id,
-				...(access === "released" ? { releasedAt: { not: null } } : {}),
-			},
-			select: {
-				...columnSelect,
-				values: {
-					...(access === "released"
-						? { where: { username: actorUsername(opts.actor) } }
-						: {}),
-					select: { username: true, number: true, label: true },
-					orderBy: { username: "asc" },
+			const rows = await tx.gradeColumn.findMany({
+				where: {
+					courseId: course.id,
+					...(access === "released" ? { releasedAt: { not: null } } : {}),
 				},
-			},
-			orderBy: [{ position: "asc" }, { slug: "asc" }],
-		});
-		return rows.map(({ values, ...row }) => fromDb(row, values));
-	}
+				select: {
+					...columnSelect,
+					values: {
+						...(access === "released"
+							? { where: { username: actorUsername(opts.actor) } }
+							: {}),
+						select: { username: true, number: true, label: true },
+						orderBy: { username: "asc" },
+					},
+				},
+				orderBy: [{ position: "asc" }, { slug: "asc" }],
+			});
+			return rows.map(({ values, ...row }) => fromDb(row, values));
+		},
+	});
 
 	/**
 	 * Updates a column. Never `slug` or `releasedAt`.
@@ -225,105 +224,104 @@ export class GradeColumnService extends CrudBase<{
 	 *
 	 * @throws {@link InvalidData} If a value does not fit the kind, a username is not enrolled, or `kind` changes without `values`.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [gradeColumnPK, gradeColumnUpdate],
 		returns: gradeColumnSchema,
-		args: [undefined, gradeColumnPK, gradeColumnUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: GradeColumnPK,
-		fields: GradeColumnUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<GradeColumn> {
-		const current = await writableColumn(
-			tx,
-			filter,
-			opts.actor,
-			"grade-column.update",
-		);
-		const kind = fields.kind ?? current.kind;
-		if (fields.values) {
-			checkValuesFit(kind, fields.values);
-			await checkEnrolled(tx, current.courseId, fields.values);
-		} else if (kind !== current.kind) {
-			throw new InvalidData({
-				kind: [
-					{
-						code: "invalid",
-						message: m.errors_grade_column_kind_needs_values(),
-					},
-				],
-			});
-		}
+		run: async (
+			tx: PrismaTx,
+			filter: GradeColumnPK,
+			fields: GradeColumnUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradeColumn> => {
+			const current = await writableColumn(
+				tx,
+				filter,
+				opts.actor,
+				"grade-column.update",
+			);
+			const kind = fields.kind ?? current.kind;
+			if (fields.values) {
+				checkValuesFit(kind, fields.values);
+				await checkEnrolled(tx, current.courseId, fields.values);
+			} else if (kind !== current.kind) {
+				throw new InvalidData({
+					kind: [
+						{
+							code: "invalid",
+							message: m.errors_grade_column_kind_needs_values(),
+						},
+					],
+				});
+			}
 
-		await tx.gradeColumn.update({
-			where: { id: current.id },
-			data: {
-				title: fields.title,
-				kind: fields.kind,
-				position: fields.position,
-				rev: fields.rev,
-			},
-		});
-		if (fields.values) {
-			await replaceValues(tx, current.id, kind, fields.values);
-		}
-		return readWhole(tx, current.id);
-	}
+			await tx.gradeColumn.update({
+				where: { id: current.id },
+				data: {
+					title: fields.title,
+					kind: fields.kind,
+					position: fields.position,
+					rev: fields.rev,
+				},
+			});
+			if (fields.values) {
+				await replaceValues(tx, current.id, kind, fields.values);
+			}
+			return readWhole(tx, current.id);
+		},
+	});
 
 	/**
 	 * Creates the column, or updates it when its course and slug exist.
 	 *
 	 * Replaces the values whole either way.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [gradeColumnCreate],
 		returns: gradeColumnSchema,
-		args: [undefined, gradeColumnCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: GradeColumnCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<GradeColumn> {
-		const course = await writableCourse(
-			tx,
-			input.course,
-			opts.actor,
-			"grade-column.create",
-		);
-		const scoped = { ...opts, tx };
+		run: async (
+			tx: PrismaTx,
+			input: GradeColumnCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradeColumn> => {
+			const course = await writableCourse(
+				tx,
+				input.course,
+				opts.actor,
+				"grade-column.create",
+			);
 
-		const existing = await tx.gradeColumn.findUnique({
-			where: { courseId_slug: { courseId: course.id, slug: input.slug } },
-			select: { id: true },
-		});
-		if (!existing) return this.create({ ...input, course: course.id }, scoped);
+			const existing = await tx.gradeColumn.findUnique({
+				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
+				select: { id: true },
+			});
+			if (!existing) return create(tx, { ...input, course: course.id }, opts);
 
-		const { slug: _slug, course: _course, ...fields } = input;
-		return this.update({ id: existing.id as GradeColumnId }, fields, scoped);
-	}
+			const { slug: _slug, course: _course, ...fields } = input;
+			return update(tx, { id: existing.id as GradeColumnId }, fields, opts);
+		},
+	});
 
 	/**
 	 * Deletes a column and its values.
 	 *
 	 * @throws {@link NotFound} If the column does not exist.
 	 */
-	@Validate({ service: true, args: [undefined, gradeColumnPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: GradeColumnPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const current = await writableColumn(
-			tx,
-			filter,
-			opts.actor,
-			"grade-column.delete",
-		);
-		await tx.gradeColumn.delete({ where: { id: current.id } });
-	}
+	const remove = op({
+		args: [gradeColumnPK],
+		run: async (
+			tx: PrismaTx,
+			filter: GradeColumnPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const current = await writableColumn(
+				tx,
+				filter,
+				opts.actor,
+				"grade-column.delete",
+			);
+			await tx.gradeColumn.delete({ where: { id: current.id } });
+		},
+	});
 
 	/**
 	 * Releases a column to its students now.
@@ -334,16 +332,14 @@ export class GradeColumnService extends CrudBase<{
 	 * @throws {@link NotFound} If the column does not exist or `actor` may not see it.
 	 * @throws {@link NotAllowed} If `actor` may not write the course's contents.
 	 */
-	@Validate({
-		service: true,
-		returns: gradeColumnSchema,
+	const release = op({
 		args: [gradeColumnPK],
-	})
-	release<Opt extends ServiceOpts>(
-		filter: GradeColumnPK,
-		opts: Opt,
-	): Promise<GradeColumn> {
-		return this.$transaction(opts, async (tx, scoped) => {
+		returns: gradeColumnSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: GradeColumnPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradeColumn> => {
 			const row = valueOrNotFound(
 				"grade-column",
 				await tx.gradeColumn.findFirst({
@@ -352,7 +348,7 @@ export class GradeColumnService extends CrudBase<{
 				}),
 			);
 
-			const access = accessTo(scoped.actor, row.course);
+			const access = accessTo(opts.actor, row.course);
 			if (access !== "all") {
 				const seen = access === "released" && row.releasedAt !== null;
 				throw seen
@@ -367,9 +363,14 @@ export class GradeColumnService extends CrudBase<{
 				});
 			}
 			return readWhole(tx, row.id);
-		});
-	}
-}
+		},
+	});
+
+	return { create, findOne, findMany, update, upsert, delete: remove, release };
+});
+
+/** The grade column service, as built by {@link makeGradeColumnService}. */
+export type GradeColumnService = ReturnType<typeof makeGradeColumnService>;
 
 //
 // Auxiliary functions

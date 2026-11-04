@@ -28,18 +28,14 @@ import {
 	responseSubmit,
 	responseUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
 	canReopen,
 	examSchedule,
 	hiddenFromStudents,
 } from "@/services/exam-state";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefMatch,
@@ -111,13 +107,17 @@ type DbResponse = Prisma.ResponseGetPayload<{
 	include: ReturnType<typeof responseInclude>;
 }>;
 
-export class ResponseService extends CrudBase<{
+/// The CRUD shape of the response service.
+type ResponseT = {
 	entity: Response;
 	pkFilter: ResponsePK;
 	create: ResponseCreate;
 	filter: ResponseFilter;
 	update: ResponseUpdate;
-}> {
+};
+
+/** The response service of `client` (the shared client by default). */
+export const makeResponseService = defineService<ResponseT>()(() => {
 	/**
 	 * Opens an attempt for one student on one exam.
 	 *
@@ -132,46 +132,45 @@ export class ResponseService extends CrudBase<{
 	 * graded exam.
 	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [responseCreate],
 		returns: responseSchema,
-		args: [undefined, responseCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: ResponseCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Response> {
-		const { exam, authorId } = await prepareAttempt(
-			tx,
-			input,
-			opts.actor,
-			"response.create",
-		);
-		assertExamOpen(
-			exam,
-			new Date(),
-			await loadExceptionTiming(tx, exam.id, authorId),
-		);
+		run: async (
+			tx: PrismaTx,
+			input: ResponseCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response> => {
+			const { exam, authorId } = await prepareAttempt(
+				tx,
+				input,
+				opts.actor,
+				"response.create",
+			);
+			assertExamOpen(
+				exam,
+				new Date(),
+				await loadExceptionTiming(tx, exam.id, authorId),
+			);
 
-		const slotKey =
-			exam.type === "PRACTICE"
-				? dateToSlotKey(input.practiceSession ?? new Date())
-				: 0;
+			const slotKey =
+				exam.type === "PRACTICE"
+					? dateToSlotKey(input.practiceSession ?? new Date())
+					: 0;
 
-		const row = await invalidIfExists(tx.response.create, {
-			data: {
-				publicId: generateToken(9),
-				authorId,
-				examId: exam.id,
-				slotKey,
-				acceptingSubmissions: input.acceptingSubmissions ?? true,
-			},
-			include: responseInclude(),
-		});
+			const row = await invalidIfExists(tx.response.create, {
+				data: {
+					publicId: generateToken(9),
+					authorId,
+					examId: exam.id,
+					slotKey,
+					acceptingSubmissions: input.acceptingSubmissions ?? true,
+				},
+				include: responseInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Finds an attempt by `id` or by its `publicId`, with every submission it holds.
@@ -180,25 +179,25 @@ export class ResponseService extends CrudBase<{
 	 * actor may not read is `null`, exactly as a missing one is, so an id is
 	 * not a probe for whether somebody else answered.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [responsePK],
 		returns: responseSchema.nullable(),
-		args: [undefined, responsePK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: ResponsePK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Response | null> {
-		const row = await tx.response.findFirst({
-			where: responseWhere(filter),
-			include: responseInclude(),
-		});
-		if (!row) return null;
+		run: async (
+			tx: PrismaTx,
+			filter: ResponsePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response | null> => {
+			const row = await tx.response.findFirst({
+				where: responseWhere(filter),
+				include: responseInclude(),
+			});
+			if (!row) return null;
 
-		if (!hasReadAccess(opts.actor, row)) return null;
-		return fromDb(row);
-	}
+			if (!hasReadAccess(opts.actor, row)) return null;
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Lists the attempts of one course, narrowed to what `actor` may see.
@@ -211,55 +210,55 @@ export class ResponseService extends CrudBase<{
 	 * If `actor` may not read the course's contents at all, or names another
 	 * author in `filter` while narrowed to their own rows.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [responseFilter],
 		returns: responseSchema.array(),
-		args: [undefined, responseFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: ResponseFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Response[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: courseSelect(),
-			}),
-		);
+		run: async (
+			tx: PrismaTx,
+			filter: ResponseFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: courseSelect(),
+				}),
+			);
 
-		ensurePerm(opts.actor, "course.read-contents", course);
+			ensurePerm(opts.actor, "course.read-contents", course);
 
-		const owner = isCourseOwner(opts.actor, course);
-		const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
+			const owner = isCourseOwner(opts.actor, course);
+			const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
 
-		const rows = await tx.response.findMany({
-			where: {
-				exam: {
-					courseId: course.id,
-					...(filter.exam ? { slug: filter.exam } : {}),
-				},
-				...(filter.practice !== undefined
-					? filter.practice
-						? { slotKey: { not: 0 } }
-						: { slotKey: 0 }
-					: {}),
-				...(filter.acceptingSubmissions !== undefined
-					? { acceptingSubmissions: filter.acceptingSubmissions }
-					: {}),
-				...(restrictTo
-					? { authorId: restrictTo }
-					: filter.author
-						? { authorId: filter.author }
+			const rows = await tx.response.findMany({
+				where: {
+					exam: {
+						courseId: course.id,
+						...(filter.exam ? { slug: filter.exam } : {}),
+					},
+					...(filter.practice !== undefined
+						? filter.practice
+							? { slotKey: { not: 0 } }
+							: { slotKey: 0 }
 						: {}),
-			},
-			include: responseInclude(),
-			orderBy: { createdAt: "asc" },
-		});
+					...(filter.acceptingSubmissions !== undefined
+						? { acceptingSubmissions: filter.acceptingSubmissions }
+						: {}),
+					...(restrictTo
+						? { authorId: restrictTo }
+						: filter.author
+							? { authorId: filter.author }
+							: {}),
+				},
+				include: responseInclude(),
+				orderBy: { createdAt: "asc" },
+			});
 
-		return rows.map(fromDb);
-	}
+			return rows.map(fromDb);
+		},
+	});
 
 	/**
 	 * Opens or closes an attempt to further submissions.
@@ -281,36 +280,35 @@ export class ResponseService extends CrudBase<{
 	 * If reopening an attempt whose personal window has closed, keyed on
 	 * `response` with `errors_response_window_closed`.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [responsePK, responseUpdate],
 		returns: responseSchema,
-		args: [undefined, responsePK, responseUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: ResponsePK,
-		fields: ResponseUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Response> {
-		const response = await writableResponse(
-			tx,
-			filter,
-			opts.actor,
-			"response.update",
-		);
+		run: async (
+			tx: PrismaTx,
+			filter: ResponsePK,
+			fields: ResponseUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response> => {
+			const response = await writableResponse(
+				tx,
+				filter,
+				opts.actor,
+				"response.update",
+			);
 
-		if (fields.acceptingSubmissions === true) {
-			await assertReopenable(tx, response);
-		}
+			if (fields.acceptingSubmissions === true) {
+				await assertReopenable(tx, response);
+			}
 
-		const row = await tx.response.update({
-			where: { id: response.id },
-			data: { acceptingSubmissions: fields.acceptingSubmissions },
-			include: responseInclude(),
-		});
+			const row = await tx.response.update({
+				where: { id: response.id },
+				data: { acceptingSubmissions: fields.acceptingSubmissions },
+				include: responseInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Resolves the attempt an exam write belongs to, creating it when absent.
@@ -324,38 +322,37 @@ export class ResponseService extends CrudBase<{
 	 * If the exam is not open and `actor` is not the course's instructor.
 	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [responseCreate],
 		returns: responseSchema,
-		args: [undefined, responseCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: ResponseCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Response> {
-		const row = await resolveOrCreateAttempt(
-			tx,
-			input,
-			opts.actor,
-			"response.create",
-		);
+		run: async (
+			tx: PrismaTx,
+			input: ResponseCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response> => {
+			const row = await resolveOrCreateAttempt(
+				tx,
+				input,
+				opts.actor,
+				"response.create",
+			);
 
-		if (input.acceptingSubmissions === undefined) return fromDb(row);
+			if (input.acceptingSubmissions === undefined) return fromDb(row);
 
-		// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
-		if (input.acceptingSubmissions && !row.acceptingSubmissions) {
-			ensurePerm(opts.actor, "response.update", responseTarget(row));
-			await assertReopenable(tx, row);
-		}
+			// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
+			if (input.acceptingSubmissions && !row.acceptingSubmissions) {
+				ensurePerm(opts.actor, "response.update", responseTarget(row));
+				await assertReopenable(tx, row);
+			}
 
-		const updated = await tx.response.update({
-			where: { id: row.id },
-			data: { acceptingSubmissions: input.acceptingSubmissions },
-			include: responseInclude(),
-		});
-		return fromDb(updated);
-	}
+			const updated = await tx.response.update({
+				where: { id: row.id },
+				data: { acceptingSubmissions: input.acceptingSubmissions },
+				include: responseInclude(),
+			});
+			return fromDb(updated);
+		},
+	});
 
 	/**
 	 * Removes an attempt and every submission made in it.
@@ -365,26 +362,24 @@ export class ResponseService extends CrudBase<{
 	 * does.
 	 * @throws {@link NotAllowed} If `actor` may read the attempt but not write it.
 	 */
-	@Validate({ service: true, args: [undefined, responsePK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: ResponsePK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const response = await writableResponse(
-			tx,
-			filter,
-			opts.actor,
-			"response.delete",
-		);
+	const remove = op({
+		args: [responsePK],
+		run: async (
+			tx: PrismaTx,
+			filter: ResponsePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const response = await writableResponse(
+				tx,
+				filter,
+				opts.actor,
+				"response.delete",
+			);
 
-		await tx.submission.deleteMany({ where: { responseId: response.id } });
-		await tx.response.delete({ where: { id: response.id } });
-	}
-
-	//
-	// Additional public methods
-	//
+			await tx.submission.deleteMany({ where: { responseId: response.id } });
+			await tx.response.delete({ where: { id: response.id } });
+		},
+	});
 
 	/**
 	 * Closes the author's graded attempt at an exam to further answers.
@@ -397,16 +392,14 @@ export class ResponseService extends CrudBase<{
 	 * If the author has no attempt at the exam, or it belongs to someone the
 	 * actor may not see.
 	 */
-	@Validate({
-		service: true,
-		returns: responseSchema,
+	const finish = op({
 		args: [responseFinish],
-	})
-	finish<Opt extends ServiceOpts>(
-		input: ResponseFinish,
-		opts: Opt,
-	): Promise<Response> {
-		return this.$transaction(opts, async (tx, scoped) => {
+		returns: responseSchema,
+		run: async (
+			tx: PrismaTx,
+			input: ResponseFinish,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response> => {
 			const course = valueOrNotFound(
 				"course",
 				await tx.course.findUnique({
@@ -414,9 +407,9 @@ export class ResponseService extends CrudBase<{
 					select: courseSelect(),
 				}),
 			);
-			const authorId = resolveAuthorId(input.author, scoped.actor);
+			const authorId = resolveAuthorId(input.author, opts.actor);
 			if (
-				!hasPerm(scoped.actor, "response.read", {
+				!hasPerm(opts.actor, "response.read", {
 					author: { username: authorId },
 					course,
 				})
@@ -448,8 +441,8 @@ export class ResponseService extends CrudBase<{
 				include: responseInclude(),
 			});
 			return fromDb(updated);
-		});
-	}
+		},
+	});
 
 	/**
 	 * Resolves the attempt and appends one submission to it, in one call.
@@ -464,16 +457,14 @@ export class ResponseService extends CrudBase<{
 	 * its deadline has passed, or the question is not one the exam carries.
 	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
 	 */
-	@Validate({
-		service: true,
-		returns: responseSchema,
+	const submit = op({
 		args: [responseSubmit],
-	})
-	submit<Opt extends ServiceOpts>(
-		input: ResponseSubmit,
-		opts: Opt,
-	): Promise<Response> {
-		return this.$transaction(opts, async (tx, scoped) => {
+		returns: responseSchema,
+		run: async (
+			tx: PrismaTx,
+			input: ResponseSubmit,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Response> => {
 			const row = await resolveOrCreateAttempt(
 				tx,
 				{
@@ -481,7 +472,7 @@ export class ResponseService extends CrudBase<{
 					exam: input.exam,
 					author: input.author,
 				},
-				scoped.actor,
+				opts.actor,
 				"response.submit",
 			);
 
@@ -517,9 +508,23 @@ export class ResponseService extends CrudBase<{
 				}),
 			);
 			return fromDb(updated);
-		});
-	}
-}
+		},
+	});
+
+	return {
+		create,
+		findOne,
+		findMany,
+		update,
+		upsert,
+		delete: remove,
+		finish,
+		submit,
+	};
+});
+
+/** The response service, as built by {@link makeResponseService}. */
+export type ResponseService = ReturnType<typeof makeResponseService>;
 
 // Private utilities -----------------------------------------------------------
 

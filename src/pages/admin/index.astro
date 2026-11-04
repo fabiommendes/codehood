@@ -50,8 +50,8 @@ const editionFormState = await actionForm(
 const [users, courses, disciplines, editions, invites] = await Promise.all([
 	db.user.findMany({}, { actor }),
 	db.course.findMany({}, { actor }),
-	db.discipline.findMany({}),
-	db.edition.findMany({}),
+	db.discipline.findMany({}, { actor }),
+	db.edition.findMany({}, { actor }),
 	db.invite.findMany({ kind: "PERSONAL" }, { actor }),
 ]);
 

@@ -20,11 +20,9 @@ import {
 	examSchema,
 	examUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import { courseAccess } from "@/db/course-access";
+import { defineService, op } from "@/db/define-service";
 import { courseContentsWhere } from "@/db/services/course.service";
 import { m } from "@/i18n";
 import { type ExamResult, examResult } from "@/services/exam-result";
@@ -37,7 +35,6 @@ import {
 	releaseBlocker,
 	viewerTiming,
 } from "@/services/exam-state";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefWhere,
@@ -96,59 +93,62 @@ type DbExam = Prisma.ExamGetPayload<{
 	include: ReturnType<typeof examInclude>;
 }>;
 
-export class ExamService extends CrudBase<{
+/// The CRUD shape of the exam service.
+type ExamT = {
 	entity: Exam;
 	pkFilter: ExamPK;
 	create: ExamCreate;
 	filter: ExamFilter;
 	update: ExamUpdate;
-}> {
+};
+
+/** The exam service of `client` (the shared client by default). */
+export const makeExamService = defineService<ExamT>()(() => {
 	/**
 	 * Creates an exam in a course, with its tags and its pinned questions.
 	 *
 	 * The questions are given by slug and must live in the same course; a slug
 	 * that does not resolve there is refused rather than silently dropped.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [examCreate],
 		returns: examSchema,
-		args: [undefined, examCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: ExamCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Exam> {
-		const course = await this.course(input.course, tx, opts, {
-			perm: "course.update-contents",
-		});
-		const questions = await resolveQuestions(tx, course.id, input.questions);
+		run: async (
+			tx: PrismaTx,
+			input: ExamCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam> => {
+			const course = await courseAccess(tx, input.course, opts, {
+				perm: "course.update-contents",
+			});
+			const questions = await resolveQuestions(tx, course.id, input.questions);
 
-		const row = await invalidIfExists(tx.exam.create.bind(tx.exam), {
-			data: {
-				courseId: course.id,
-				slug: input.slug,
-				type: input.type,
-				status: input.status,
-				title: input.title,
-				description: input.description ?? null,
-				preamble: input.preamble ?? null,
-				format: input.format ?? "MARKDOWN",
-				scheduledAt: input.scheduledAt ?? null,
-				durationMs: toMs(input.duration) ?? null,
-				rev: input.rev,
-				authorId:
-					opts.actor === SYSTEM
-						? course.instructor.username
-						: opts.actor.username,
-				examTags: { create: (input.tags ?? []).map((tag) => ({ tag })) },
-				questionsForExams: { create: questions },
-			},
-			include: examInclude(),
-		});
+			const row = await invalidIfExists(tx.exam.create.bind(tx.exam), {
+				data: {
+					courseId: course.id,
+					slug: input.slug,
+					type: input.type,
+					status: input.status,
+					title: input.title,
+					description: input.description ?? null,
+					preamble: input.preamble ?? null,
+					format: input.format ?? "MARKDOWN",
+					scheduledAt: input.scheduledAt ?? null,
+					durationMs: toMs(input.duration) ?? null,
+					rev: input.rev,
+					authorId:
+						opts.actor === SYSTEM
+							? course.instructor.username
+							: opts.actor.username,
+					examTags: { create: (input.tags ?? []).map((tag) => ({ tag })) },
+					questionsForExams: { create: questions },
+				},
+				include: examInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Finds an exam by id or by its `(course, slug)` natural key.
@@ -156,30 +156,34 @@ export class ExamService extends CrudBase<{
 	 * A `DRAFT` or `ARCHIVED` exam does not exist for anyone but whoever may
 	 * write the course's contents.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [examPK],
 		returns: examSchema.nullable(),
-		args: [undefined, examPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: ExamPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Exam | null> {
-		const row = await tx.exam.findFirst({
-			where: examWhere(filter),
-			include: examInclude(),
-		});
-		if (!row) return null;
+		run: async (
+			tx: PrismaTx,
+			filter: ExamPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam | null> => {
+			const row = await tx.exam.findFirst({
+				where: examWhere(filter),
+				include: examInclude(),
+			});
+			if (!row) return null;
 
-		// An outsider is refused whatever the status, so a draft slug cannot be
-		// told from a published one.
-		const error = accessError(examAccess(opts.actor, row), "read", "exam.read");
-		if (error instanceof NotFound) return null;
-		if (error) throw error;
+			// An outsider is refused whatever the status, so a draft slug cannot be
+			// told from a published one.
+			const error = accessError(
+				examAccess(opts.actor, row),
+				"read",
+				"exam.read",
+			);
+			if (error instanceof NotFound) return null;
+			if (error) throw error;
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Lists the exams of one course, narrowed to what `actor` may see.
@@ -187,57 +191,57 @@ export class ExamService extends CrudBase<{
 	 * Drafts and archived exams are left out for anyone but whoever may write
 	 * the course's contents.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [examFilter],
 		returns: examSchema.array(),
-		args: [undefined, examFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: ExamFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Exam[]> {
-		const course = valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(filter.course),
-				select: {
-					id: true,
-					instructor: { select: { username: true } },
-					enrollments: {
-						where: { status: "ACTIVE" as const },
-						select: { username: true },
+		run: async (
+			tx: PrismaTx,
+			filter: ExamFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam[]> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: {
+						id: true,
+						instructor: { select: { username: true } },
+						enrollments: {
+							where: { status: "ACTIVE" as const },
+							select: { username: true },
+						},
 					},
+				}),
+			);
+
+			if (!hasPerm(opts.actor, "course.read-contents", course)) {
+				throw new NotAllowed("exam.read");
+			}
+			const full = hasPerm(opts.actor, "course.update-contents", course);
+
+			const rows = await tx.exam.findMany({
+				where: {
+					courseId: course.id,
+					// Both conditions hold together: a status filter narrows what the
+					// actor may see, it never widens it to drafts.
+					AND: [
+						full ? {} : { status: { notIn: [...hiddenExamStatuses] } },
+						filter.statuses ? { status: { in: filter.statuses } } : {},
+					],
+					...(filter.exams ? { slug: { in: filter.exams } } : {}),
+					...(filter.types ? { type: { in: filter.types } } : {}),
+					...(filter.tags
+						? { examTags: { some: { tag: { in: filter.tags } } } }
+						: {}),
 				},
-			}),
-		);
+				include: examInclude(),
+				orderBy: { slug: "asc" },
+			});
 
-		if (!hasPerm(opts.actor, "course.read-contents", course)) {
-			throw new NotAllowed("exam.read");
-		}
-		const full = hasPerm(opts.actor, "course.update-contents", course);
-
-		const rows = await tx.exam.findMany({
-			where: {
-				courseId: course.id,
-				// Both conditions hold together: a status filter narrows what the
-				// actor may see, it never widens it to drafts.
-				AND: [
-					full ? {} : { status: { notIn: [...hiddenExamStatuses] } },
-					filter.statuses ? { status: { in: filter.statuses } } : {},
-				],
-				...(filter.exams ? { slug: { in: filter.exams } } : {}),
-				...(filter.types ? { type: { in: filter.types } } : {}),
-				...(filter.tags
-					? { examTags: { some: { tag: { in: filter.tags } } } }
-					: {}),
-			},
-			include: examInclude(),
-			orderBy: { slug: "asc" },
-		});
-
-		return rows.map(fromDb);
-	}
+			return rows.map(fromDb);
+		},
+	});
 
 	/**
 	 * Lists the exams of several courses in one query, each paired with its course id and narrowed to what `actor` may see.
@@ -247,45 +251,45 @@ export class ExamService extends CrudBase<{
 	 * contents the actor may not read contributes no exams; it is not an error.
 	 * An empty `courseIds` returns an empty list without querying.
 	 */
-	@Validate({
-		service: true,
-		returns: courseExamSchema.array(),
+	const findManyInCourses = op({
+		transaction: false,
 		args: [examFilterByCourses],
-	})
-	async findManyInCourses(
-		filter: ExamFilterByCourses,
-		opts: ServiceOpts,
-	): Promise<CourseExam[]> {
-		if (filter.courseIds.length === 0) return [];
-		const client = opts.tx ?? this.prisma;
-		const rows = await client.exam.findMany({
-			where: {
-				courseId: { in: filter.courseIds },
-				// Prunes courses the actor cannot read; the loop below enforces it again.
-				course: courseContentsWhere(opts.actor),
-				...(filter.statuses ? { status: { in: filter.statuses } } : {}),
-				...(filter.exams ? { slug: { in: filter.exams } } : {}),
-				...(filter.types ? { type: { in: filter.types } } : {}),
-				...(filter.tags
-					? { examTags: { some: { tag: { in: filter.tags } } } }
-					: {}),
-			},
-			// SYSTEM passes every check without enrollments, so it loads none.
-			include: examInclude(opts.actor === SYSTEM ? "" : opts.actor.username),
-			orderBy: [{ courseId: "asc" }, { slug: "asc" }],
-		});
+		returns: courseExamSchema.array(),
+		run: async (
+			tx: PrismaTx,
+			filter: ExamFilterByCourses,
+			opts: ServiceOptsWithoutTx,
+		): Promise<CourseExam[]> => {
+			if (filter.courseIds.length === 0) return [];
+			const rows = await tx.exam.findMany({
+				where: {
+					courseId: { in: filter.courseIds },
+					// Prunes courses the actor cannot read; the loop below enforces it again.
+					course: courseContentsWhere(opts.actor),
+					...(filter.statuses ? { status: { in: filter.statuses } } : {}),
+					...(filter.exams ? { slug: { in: filter.exams } } : {}),
+					...(filter.types ? { type: { in: filter.types } } : {}),
+					...(filter.tags
+						? { examTags: { some: { tag: { in: filter.tags } } } }
+						: {}),
+				},
+				// SYSTEM passes every check without enrollments, so it loads none.
+				include: examInclude(opts.actor === SYSTEM ? "" : opts.actor.username),
+				orderBy: [{ courseId: "asc" }, { slug: "asc" }],
+			});
 
-		const result: CourseExam[] = [];
-		for (const row of rows) {
-			if (!hasPerm(opts.actor, "course.read-contents", row.course)) continue;
-			const full = hasPerm(opts.actor, "course.update-contents", row.course);
-			if (!full && hiddenFromStudents(row.status)) {
-				continue;
+			const result: CourseExam[] = [];
+			for (const row of rows) {
+				if (!hasPerm(opts.actor, "course.read-contents", row.course)) continue;
+				const full = hasPerm(opts.actor, "course.update-contents", row.course);
+				if (!full && hiddenFromStudents(row.status)) {
+					continue;
+				}
+				result.push({ courseId: row.courseId as CourseId, exam: fromDb(row) });
 			}
-			result.push({ courseId: row.courseId as CourseId, exam: fromDb(row) });
-		}
-		return result;
-	}
+			return result;
+		},
+	});
 
 	/**
 	 * Updates an exam's fields, its tag set, and the questions it pins.
@@ -293,68 +297,67 @@ export class ExamService extends CrudBase<{
 	 * `tags` and `questions` are replaced wholesale when given, so a push always
 	 * leaves the exam holding exactly what the caller sent.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [examPK, examUpdate],
 		returns: examSchema,
-		args: [undefined, examPK, examUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: ExamPK,
-		fields: ExamUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Exam> {
-		const exam = await writableExam(tx, filter, opts.actor, "exam.update");
-		const questions = fields.questions
-			? await resolveQuestions(tx, exam.courseId, fields.questions)
-			: undefined;
+		run: async (
+			tx: PrismaTx,
+			filter: ExamPK,
+			fields: ExamUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam> => {
+			const exam = await writableExam(tx, filter, opts.actor, "exam.update");
+			const questions = fields.questions
+				? await resolveQuestions(tx, exam.courseId, fields.questions)
+				: undefined;
 
-		// A new date only makes sense in a window, so the duration stays while one exists.
-		if (fields.duration === null) {
-			const makeups = await tx.examException.count({
-				where: { examId: exam.id, scheduledAt: { not: null } },
-			});
-			if (makeups > 0) {
-				throw new InvalidData({
-					duration: [
-						{
-							code: "invalid",
-							message: m.errors_exam_duration_needed_by_exceptions(),
-						},
-					],
+			// A new date only makes sense in a window, so the duration stays while one exists.
+			if (fields.duration === null) {
+				const makeups = await tx.examException.count({
+					where: { examId: exam.id, scheduledAt: { not: null } },
 				});
+				if (makeups > 0) {
+					throw new InvalidData({
+						duration: [
+							{
+								code: "invalid",
+								message: m.errors_exam_duration_needed_by_exceptions(),
+							},
+						],
+					});
+				}
 			}
-		}
 
-		const row = await tx.exam.update({
-			where: { id: exam.id },
-			data: {
-				type: fields.type,
-				status: fields.status,
-				title: fields.title,
-				description: fields.description,
-				preamble: fields.preamble,
-				format: fields.format,
-				scheduledAt: fields.scheduledAt,
-				durationMs: toMs(fields.duration),
-				rev: fields.rev,
-				// The column is not nullable: no extra time is stored as zero.
-				extraTimeMs: fields.extraTime === null ? 0 : toMs(fields.extraTime),
-				...(fields.tags && {
-					examTags: {
-						deleteMany: {},
-						create: fields.tags.map((tag) => ({ tag })),
-					},
-				}),
-				...(questions && {
-					questionsForExams: { deleteMany: {}, create: questions },
-				}),
-			},
-			include: examInclude(),
-		});
+			const row = await tx.exam.update({
+				where: { id: exam.id },
+				data: {
+					type: fields.type,
+					status: fields.status,
+					title: fields.title,
+					description: fields.description,
+					preamble: fields.preamble,
+					format: fields.format,
+					scheduledAt: fields.scheduledAt,
+					durationMs: toMs(fields.duration),
+					rev: fields.rev,
+					// The column is not nullable: no extra time is stored as zero.
+					extraTimeMs: fields.extraTime === null ? 0 : toMs(fields.extraTime),
+					...(fields.tags && {
+						examTags: {
+							deleteMany: {},
+							create: fields.tags.map((tag) => ({ tag })),
+						},
+					}),
+					...(questions && {
+						questionsForExams: { deleteMany: {}, create: questions },
+					}),
+				},
+				include: examInclude(),
+			});
 
-		return fromDb(row);
-	}
+			return fromDb(row);
+		},
+	});
 
 	/**
 	 * Upserts an exam keyed on its `(course, slug)` natural key.
@@ -362,33 +365,30 @@ export class ExamService extends CrudBase<{
 	 * An archived exam under that key takes the update branch, which revives it
 	 * only if the caller sends a new `status`.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
+		args: [examCreate],
 		returns: examSchema,
-		args: [undefined, examCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: ExamCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Exam> {
-		// Checked up front so both branches refuse a non-author the same way,
-		// without telling them whether the exam exists.
-		const course = await this.course(input.course, tx, opts, {
-			perm: "course.update-contents",
-		});
+		run: async (
+			tx: PrismaTx,
+			input: ExamCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam> => {
+			// Checked up front so both branches refuse a non-author the same way,
+			// without telling them whether the exam exists.
+			const course = await courseAccess(tx, input.course, opts, {
+				perm: "course.update-contents",
+			});
 
-		const scoped = { ...opts, tx };
+			const existing = await tx.exam.findUnique({
+				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
+				select: { id: true },
+			});
+			if (!existing) return create(tx, { ...input, course: course.id }, opts);
 
-		const existing = await tx.exam.findUnique({
-			where: { courseId_slug: { courseId: course.id, slug: input.slug } },
-			select: { id: true },
-		});
-		if (!existing) return this.create({ ...input, course: course.id }, scoped);
-
-		const { slug: _slug, course: _course, ...fields } = input;
-		return this.update({ course: course.id, slug: input.slug }, fields, scoped);
-	}
+			const { slug: _slug, course: _course, ...fields } = input;
+			return update(tx, { course: course.id, slug: input.slug }, fields, opts);
+		},
+	});
 
 	/**
 	 * Releases an exam's grades to its students now.
@@ -403,12 +403,14 @@ export class ExamService extends CrudBase<{
 	 * @throws {@link InvalidData}
 	 * If the exam is not an `EXAM`, is not closed, or has an answer waiting for a grade.
 	 */
-	@Validate({ service: true, returns: examSchema, args: [examPK] })
-	releaseGrades<Opt extends ServiceOpts>(
-		filter: ExamPK,
-		opts: Opt,
-	): Promise<Exam> {
-		return this.$transaction(opts, async (tx, scoped) => {
+	const releaseGrades = op({
+		args: [examPK],
+		returns: examSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: ExamPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam> => {
 			const row = valueOrNotFound(
 				"exam",
 				await tx.exam.findFirst({
@@ -417,7 +419,7 @@ export class ExamService extends CrudBase<{
 				}),
 			);
 
-			requireAccess(examAccess(scoped.actor, row), "write", "exam.update");
+			requireAccess(examAccess(opts.actor, row), "write", "exam.update");
 
 			const exam = fromDb(row);
 			const now = new Date();
@@ -445,8 +447,8 @@ export class ExamService extends CrudBase<{
 				include: examInclude(),
 			});
 			return fromDb(updated);
-		});
-	}
+		},
+	});
 
 	/**
 	 * Archives an exam rather than removing it.
@@ -454,27 +456,43 @@ export class ExamService extends CrudBase<{
 	 * Responses point at the exam they were written for, so the row stays
 	 * readable; `update` or `upsert` bring it back.
 	 */
-	@Validate({ service: true, args: [undefined, examPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: ExamPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const exam = await writableExam(tx, filter, opts.actor, "exam.delete");
-		if (exam.status === "ARCHIVED") return;
+	const remove = op({
+		args: [examPK],
+		run: async (
+			tx: PrismaTx,
+			filter: ExamPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const exam = await writableExam(tx, filter, opts.actor, "exam.delete");
+			if (exam.status === "ARCHIVED") return;
 
-		await tx.exam.update({
-			where: { id: exam.id },
-			data: { status: "ARCHIVED" },
-		});
-	}
-}
+			await tx.exam.update({
+				where: { id: exam.id },
+				data: { status: "ARCHIVED" },
+			});
+		},
+	});
+
+	return {
+		create,
+		findOne,
+		findMany,
+		findManyInCourses,
+		update,
+		upsert,
+		releaseGrades,
+		delete: remove,
+	};
+});
+
+/** The exam service, as built by {@link makeExamService}. */
+export type ExamService = ReturnType<typeof makeExamService>;
 
 //
 // Auxiliary functions
 //
 
-/// Why {@link ExamService.releaseGrades} refuses, for each blocker it reports.
+/// Why `releaseGrades` refuses, for each blocker it reports.
 const releaseRefusals: Record<
 	Exclude<GradeReleaseBlocker, "released">,
 	() => string

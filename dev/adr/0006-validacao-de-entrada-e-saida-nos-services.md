@@ -9,22 +9,24 @@ creator: claude
 
 # Validação de entrada e saída nos Services
 
-Todo método de Service passa por `@Validate`, que valida os argumentos na
+Toda operação de Service passa por `op()`, que valida os argumentos na
 entrada e o resultado (`returns:`) na saída. A entrada é tão estrita quanto o
 domínio permite e pode converter valores; a saída só restringe a forma do que
 sai, sem converter nem repetir regras de formato.
 
 ## Contexto
 
-O decorator `@Validate` (`src/utils/validate.ts:59`) entrou no commit
-`26d8181` (2026-09-02). Um schema de entrada frouxo deixa passar dados que
+O decorator `@Validate` entrou no commit `26d8181` (2026-09-02) e foi
+substituído por `op()` em 2026-11-04. Um schema de entrada frouxo deixa passar dados que
 violam regras de negócio; um schema de saída ausente deixa um campo novo do
 banco (um hash, um token) chegar à API sem ninguém notar.
 
 ## Decisão
 
-- `@Validate` envolve todo método de Service. Em subclasses de `CrudBase`, ele
-  fica nos métodos `xxxTx` (`createTx`, `findOneTx`...), não nos públicos.
+- `op({ args, returns, run })` envolve cada operação; `args` é posicional sobre
+  os argumentos próprios da operação (sem `tx` e sem `opts`). Anote os
+  parâmetros de `run` (`tx: PrismaTx`, ..., `opts: ServiceOptsWithoutTx`),
+  senão o tipo dos argumentos degrada para `any[]`.
 - **Entrada protege a consistência do banco.** O schema é tão estrito quanto o
   domínio permite. Pode converter valores para o formato certo.
 - **Saída protege a forma.** `returns:` funciona como lista branca do que sai
@@ -58,3 +60,8 @@ banco (um hash, um token) chegar à API sem ninguém notar.
 - Um campo novo no banco não sai do Service até alguém o pôr no schema de
   saída.
 - Um `out` errado só aparece em tempo de execução, como erro 500.
+
+## Notas
+
+- 2026-11-04: o decorator `@Validate` foi removido; a validação vive em `op()`
+  (`src/db/define-service.ts`), sobre `validateArgs` de `src/utils/validate.ts`.

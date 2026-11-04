@@ -29,7 +29,7 @@ async function makeUser(role: "ADMIN" | "INSTRUCTOR" | "STUDENT") {
 }
 
 async function ensureEdition(slug = "2026-1"): Promise<string> {
-	if (!(await db.edition.findOne({ slug }))) {
+	if (!(await db.edition.findOne({ slug }, FULL_ACCESS))) {
 		await db.edition.create(
 			{
 				slug,
@@ -814,7 +814,7 @@ test("update with new FILE bytes replaces the attachment and frees the old one's
 		FULL_ACCESS,
 	);
 	expect(attachments.map((a) => a.size)).toEqual([fresh.length]);
-	expect(await db.attachment.usageBytes(instructor.username)).toBe(
+	expect(await db.attachment.usageBytes(instructor.username, FULL_ACCESS)).toBe(
 		fresh.length,
 	);
 });

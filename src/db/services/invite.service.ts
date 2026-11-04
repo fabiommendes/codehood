@@ -10,14 +10,10 @@ import {
 	inviteSchema,
 	inviteUpdate,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotFound } from "../utils";
 
@@ -58,14 +54,19 @@ const inviteInclude = {
 	},
 } satisfies Prisma.InviteInclude;
 
-export class InviteService extends CrudBase<{
+/// The CRUD shape of the invite service. `upsert` is off: `create` mints a
+/// token, and re-minting a fresh invite token on every sync is wrong.
+type InviteT = {
 	entity: Invite;
 	pkFilter: InvitePK;
 	create: InviteCreate;
 	filter: InviteFilter;
 	update: InviteUpdate;
 	upsert: false;
-}> {
+};
+
+/** The invite service of `client` (the shared client by default). */
+export const makeInviteService = defineService<InviteT>()(() => {
 	/**
 	 * Creates an invite, returning the plaintext token and the invite row.
 	 *
@@ -78,62 +79,61 @@ export class InviteService extends CrudBase<{
 	 * other caller has it derived from `opts.actor` and silently ignored if
 	 * sent.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
+		args: [inviteCreate],
 		returns: inviteSchema,
-		args: [undefined, inviteCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: InviteCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Invite> {
-		const course = input.course
-			? await tx.course.findUnique({
-					where: courseRefWhere(input.course),
-					select: { id: true, instructor: { select: { username: true } } },
-				})
-			: null;
-		if (input.course && !course) {
-			throw new NotFound("course");
-		}
-		ensurePerm(opts.actor, "invite.create", {
-			invitedRole: input.invitedRole,
-			course,
-		});
-		const createdById =
-			opts.actor === SYSTEM ? input.createdBy?.username : opts.actor.username;
-		if (createdById === undefined) {
-			throw new InvalidData({
-				createdBy: [
-					{
-						code: "missing",
-						message: m.errors_invite_created_by_required(),
-					},
-				],
-			});
-		}
-		const token = generateToken();
-		const invite = await tx.invite.create({
-			data: {
-				publicId: generateToken(9),
-				tokenHash: hashToken(token),
-				kind: input.kind,
-				email: input.email,
+		run: async (
+			tx: PrismaTx,
+			input: InviteCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Invite> => {
+			const course = input.course
+				? await tx.course.findUnique({
+						where: courseRefWhere(input.course),
+						select: { id: true, instructor: { select: { username: true } } },
+					})
+				: null;
+			if (input.course && !course) {
+				throw new NotFound("course");
+			}
+			ensurePerm(opts.actor, "invite.create", {
 				invitedRole: input.invitedRole,
-				courseId: course?.id,
-				maxUses: input.maxUses ?? null,
-				expiresAt: new Date(
-					Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
-				),
-				createdById,
-			},
-			include: inviteInclude,
-		});
-		const result = fromDb(invite);
-		result.token = token; // only here, never in the database
-		return result;
-	}
+				course,
+			});
+			const createdById =
+				opts.actor === SYSTEM ? input.createdBy?.username : opts.actor.username;
+			if (createdById === undefined) {
+				throw new InvalidData({
+					createdBy: [
+						{
+							code: "missing",
+							message: m.errors_invite_created_by_required(),
+						},
+					],
+				});
+			}
+			const token = generateToken();
+			const invite = await tx.invite.create({
+				data: {
+					publicId: generateToken(9),
+					tokenHash: hashToken(token),
+					kind: input.kind,
+					email: input.email,
+					invitedRole: input.invitedRole,
+					courseId: course?.id,
+					maxUses: input.maxUses ?? null,
+					expiresAt: new Date(
+						Date.now() + (input.expiresInMs ?? DEFAULT_EXPIRY_MS),
+					),
+					createdById,
+				},
+				include: inviteInclude,
+			});
+			const result = fromDb(invite);
+			result.token = token; // only here, never in the database
+			return result;
+		},
+	});
 
 	/**
 	 * Finds a single invite by its raw token or by its id.
@@ -144,78 +144,79 @@ export class InviteService extends CrudBase<{
 	 * ids are sequential and would otherwise let any account walk every
 	 * invite's email, role, course and creator.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
+		args: [invitePK],
 		returns: inviteSchema.nullable(),
-		args: [undefined, invitePK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: InvitePK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Invite | null> {
-		const by = filter as FillUndefineds<InvitePK>;
-		const where = by.token
-			? { tokenHash: hashToken(by.token) }
-			: by.publicId
-				? { publicId: by.publicId }
-				: { id: by.id };
+		run: async (
+			tx: PrismaTx,
+			filter: InvitePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Invite | null> => {
+			const by = filter as FillUndefineds<InvitePK>;
+			const where = by.token
+				? { tokenHash: hashToken(by.token) }
+				: by.publicId
+					? { publicId: by.publicId }
+					: { id: by.id };
 
-		const invite = await tx.invite.findUnique({
-			where,
-			include: inviteInclude,
-		});
-		if (invite == null) return null;
-		if (!by.token) ensurePerm(opts.actor, "invite.read", invite);
+			const invite = await tx.invite.findUnique({
+				where,
+				include: inviteInclude,
+			});
+			if (invite == null) return null;
+			if (!by.token) ensurePerm(opts.actor, "invite.read", invite);
 
-		return fromDb(invite);
-	}
+			return fromDb(invite);
+		},
+	});
 
 	/**
 	 * Lists invites narrowed to what `actor` may see (see
 	 * {@link inviteWhere}): every invite for an admin, self-issued ones
 	 * for an instructor, none for a student.
 	 *
-	 * Never returns a token — only `tokenHash` is stored, so a lost link is
+	 * Never returns a token: only `tokenHash` is stored, so a lost link is
 	 * reissued, not recovered.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
+		args: [inviteFilter],
 		returns: inviteSchema.array(),
-		args: [undefined, inviteFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: InviteFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Invite[]> {
-		const course = filter.course
-			? valueOrNotFound(
-					"course",
-					await tx.course.findUnique({
-						where: courseRefWhere(filter.course),
-						select: { id: true },
-					}),
-				)
-			: null;
+		run: async (
+			tx: PrismaTx,
+			filter: InviteFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Invite[]> => {
+			const course = filter.course
+				? valueOrNotFound(
+						"course",
+						await tx.course.findUnique({
+							where: courseRefWhere(filter.course),
+							select: { id: true },
+						}),
+					)
+				: null;
 
-		const invites = await tx.invite.findMany({
-			where: {
-				AND: [
-					filter.createdBy ? { createdById: filter.createdBy } : {},
-					filter.kind ? { kind: filter.kind } : {},
-					course ? { courseId: course.id } : {},
-					filter.active ? { expiresAt: { gt: new Date() } } : {},
-					inviteWhere(opts.actor),
-				],
-			},
-			include: inviteInclude,
-			orderBy: { createdAt: "desc" },
-		});
-		const result = invites.map(fromDb);
-		for (const invite of result) ensurePerm(opts.actor, "invite.read", invite);
-		return result;
-	}
+			const invites = await tx.invite.findMany({
+				where: {
+					AND: [
+						filter.createdBy ? { createdById: filter.createdBy } : {},
+						filter.kind ? { kind: filter.kind } : {},
+						course ? { courseId: course.id } : {},
+						filter.active ? { expiresAt: { gt: new Date() } } : {},
+						inviteWhere(opts.actor),
+					],
+				},
+				include: inviteInclude,
+				orderBy: { createdAt: "desc" },
+			});
+			const result = invites.map(fromDb);
+			for (const invite of result)
+				ensurePerm(opts.actor, "invite.read", invite);
+			return result;
+		},
+	});
 
 	/**
 	 * Extends an expiry or adjusts `maxUses`.
@@ -224,37 +225,32 @@ export class InviteService extends CrudBase<{
 	 * simply exhausts the invite; it never revokes an account that was
 	 * already created.
 	 */
-	@Validate({
-		service: true,
+	const update = op({
+		args: [invitePK, inviteUpdate],
 		returns: inviteSchema,
-		args: [undefined, invitePK, inviteUpdate],
-	})
-	protected async updateTx(
-		tx: PrismaTx,
-		filter: InvitePK,
-		fields: InviteUpdate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Invite> {
-		const invite = await this.findOne(filter, { ...opts, tx });
+		run: async (
+			tx: PrismaTx,
+			filter: InvitePK,
+			fields: InviteUpdate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Invite> => {
+			const invite = await findOne(tx, filter, opts);
 
-		if (!invite || !hasPerm(opts.actor, "invite.update", invite)) {
-			throw new NotAllowed("invite.update");
-		}
+			if (!invite || !hasPerm(opts.actor, "invite.update", invite)) {
+				throw new NotAllowed("invite.update");
+			}
 
-		const updated = await tx.invite.update({
-			where: { id: invite.id },
-			data: {
-				expiresAt: fields.expiresAt,
-				maxUses: fields.maxUses,
-			},
-			include: inviteInclude,
-		});
-		return fromDb(updated);
-	}
-
-	// No upsert: `create` mints a token and returns a token-plus-entity
-	// wrapper, not the entity — re-minting a fresh invite token on every sync
-	// is wrong. Left unimplemented; CrudBase.upsertTx already throws.
+			const updated = await tx.invite.update({
+				where: { id: invite.id },
+				data: {
+					expiresAt: fields.expiresAt,
+					maxUses: fields.maxUses,
+				},
+				include: inviteInclude,
+			});
+			return fromDb(updated);
+		},
+	});
 
 	/**
 	 * Revokes an invite.
@@ -262,38 +258,46 @@ export class InviteService extends CrudBase<{
 	 * Redemptions cascade with it, which removes the record that an account
 	 * came from this invite but never the account itself.
 	 */
-	@Validate({ service: true, args: [undefined, invitePK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: InvitePK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const invite = await this.findOne(filter, { ...opts, tx });
-		if (!invite || !hasPerm(opts.actor, "invite.delete", invite)) {
-			throw new NotAllowed("invite.delete");
-		}
+	const remove = op({
+		args: [invitePK],
+		run: async (
+			tx: PrismaTx,
+			filter: InvitePK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const invite = await findOne(tx, filter, opts);
+			if (!invite || !hasPerm(opts.actor, "invite.delete", invite)) {
+				throw new NotAllowed("invite.delete");
+			}
 
-		await tx.invite.delete({ where: { id: invite.id } });
-	}
+			await tx.invite.delete({ where: { id: invite.id } });
+		},
+	});
 
 	// TODO: validate this schema. Should not impose tasks on the caller.
 	/**
 	 * Redeems an invite for `username`, atomically re-checking expiry/capacity/email match.
 	 *
 	 * Callers should run {@link checkRedeemable} first to avoid doing
-	 * invite-rejected work (e.g. creating the User row) — this transaction
+	 * invite-rejected work (e.g. creating the User row): this transaction
 	 * is the authoritative, race-safe check. Pass `tx` when the caller
 	 * already has one open (e.g. `acceptInvite`, which creates the `User`,
 	 * redeems the invite, and enrolls the student in one transaction so a
 	 * redemption failure can't leave a User row with no invite behind it).
 	 * Without one, this opens its own.
 	 */
-	redeem(token: string, username: string, email: string, opts: ServiceOpts) {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const invite = await this.findOne({ token }, { ...scoped, tx });
+	const redeem = op({
+		run: async (
+			tx: PrismaTx,
+			token: string,
+			username: string,
+			email: string,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Invite> => {
+			const invite = await findOne(tx, { token }, opts);
 			if (!invite) throw new NotFound("invite", { id: token });
 
-			const errorCode = this.checkRedeemable(invite, email);
+			const errorCode = checkRedeemable(invite, email);
 			if (errorCode) throw new InviteError(errorCode);
 
 			try {
@@ -308,23 +312,34 @@ export class InviteService extends CrudBase<{
 			}
 
 			return invite;
-		});
-	}
+		},
+	});
 
-	/**
-	 * Check if Invite is redeemable.
-	 */
-	checkRedeemable(invite: Invite, email: string): InviteErrorCode | undefined {
-		if (invite.expiresAt < new Date()) return "expired";
-		if (
-			invite.kind === "PERSONAL" &&
-			invite.email?.toLowerCase() !== email.toLowerCase()
-		)
-			return "email_mismatch";
-		if (invite.maxUses !== null && invite.redemptions >= invite.maxUses)
-			return "exhausted";
-		return undefined;
-	}
+	return { create, findOne, findMany, update, delete: remove, redeem };
+});
+
+/** The invite service, as built by {@link makeInviteService}. */
+export type InviteService = ReturnType<typeof makeInviteService>;
+
+/**
+ * Checks whether an invite is redeemable by `email`, returning the reason it
+ * is not.
+ *
+ * Pure, so it is a plain function rather than a service operation.
+ */
+export function checkRedeemable(
+	invite: Invite,
+	email: string,
+): InviteErrorCode | undefined {
+	if (invite.expiresAt < new Date()) return "expired";
+	if (
+		invite.kind === "PERSONAL" &&
+		invite.email?.toLowerCase() !== email.toLowerCase()
+	)
+		return "email_mismatch";
+	if (invite.maxUses !== null && invite.redemptions >= invite.maxUses)
+		return "exhausted";
+	return undefined;
 }
 
 //

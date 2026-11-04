@@ -32,11 +32,8 @@ import {
 	repositoryPK,
 	repositorySchema,
 } from "@/core/schemas";
-import {
-	CrudBase,
-	type ServiceOpts,
-	type ServiceOptsWithoutTx,
-} from "@/db/base-service";
+import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import { defineService, inTx, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
 	blobSha,
@@ -53,7 +50,6 @@ import { writeZip, type ZipFile } from "@/services/git/zip";
 import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
 import { mimeFor } from "@/utils/mime";
-import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { prisma } from "../client";
 import { courseRefMatch, courseRefWhere, valueOrNotFound } from "../utils";
@@ -88,28 +84,38 @@ export type RepositoryServiceOptions = {
 	publicUrl?: string;
 };
 
-export class RepositoryService extends CrudBase<{
+/// The CRUD shape of the repository service. There is no `update`: a
+/// repository changes through `commit` and `rotateToken`.
+type RepositoryT = {
 	entity: Repository;
 	pkFilter: RepositoryPK;
 	create: RepositoryCreate;
 	filter: RepositoryFilter;
-	update: never;
-}> {
-	protected readonly blob: BlobService;
-	protected readonly attachment: AttachmentService;
-	protected readonly publicUrl: string;
+};
 
-	constructor(
-		blob: BlobService,
-		attachment: AttachmentService,
-		client: PrismaClient = prisma,
-		options: RepositoryServiceOptions = {},
-	) {
-		super(client);
-		this.blob = blob;
-		this.attachment = attachment;
-		this.publicUrl = options.publicUrl ?? PUBLIC_URL;
-	}
+/// What `zipPlan` hands to the writing phase of `zip`.
+type ZipBuild = {
+	id: RepositoryId;
+	slug: string;
+	head: string;
+	date: Date;
+	files: ZipFile[];
+};
+
+/**
+ * The repository service of `client` (the shared client by default).
+ *
+ * Besides the operations, it exposes `findByToken` and `readObject`, which
+ * take no actor (the clone token is the credential) and so cannot be
+ * operations (ADR 0005), and `zip`, which spans two transactions.
+ */
+export function makeRepositoryService(
+	blobStore: BlobService,
+	attachmentService: AttachmentService,
+	client: PrismaClient = prisma,
+	options: RepositoryServiceOptions = {},
+) {
+	const publicUrl = options.publicUrl ?? PUBLIC_URL;
 
 	/**
 	 * Creates an empty repository (no `head`) with a fresh clone token; its
@@ -121,22 +127,21 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link InvalidData} If the course already has a repository with
 	 * this slug.
 	 */
-	@Validate({
-		service: true,
+	const create = op({
 		returns: repositorySchema,
-		args: [undefined, repositoryCreate],
-	})
-	protected async createTx(
-		tx: PrismaTx,
-		input: RepositoryCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Repository> {
-		const course = await this.courseOf(tx, input.course);
-		if (!hasPerm(opts.actor, "course.update-contents", course)) {
-			throw new NotAllowed("repository.create");
-		}
-		return this.insert(tx, course.id, input.slug);
-	}
+		args: [repositoryCreate],
+		run: async (
+			tx: PrismaTx,
+			input: RepositoryCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Repository> => {
+			const course = await courseOf(tx, input.course);
+			if (!hasPerm(opts.actor, "course.update-contents", course)) {
+				throw new NotAllowed("repository.create");
+			}
+			return insert(tx, course.id, input.slug, publicUrl);
+		},
+	});
 
 	/**
 	 * Finds a repository by id or by `(course, slug)`, with `tree`, `message`
@@ -148,24 +153,24 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link NotAllowed} `repository.read` if the actor lacks
 	 * `course.read-contents` on its course.
 	 */
-	@Validate({
-		service: true,
+	const findOne = op({
+		transaction: false,
 		returns: repositorySchema.nullable(),
-		args: [undefined, repositoryPK],
-	})
-	protected async findOneTx(
-		tx: PrismaTx,
-		filter: RepositoryPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Repository | null> {
-		const row = await tx.repository.findFirst({
-			where: repositoryWhere(filter),
-			include: REPOSITORY_INCLUDE,
-		});
-		if (!row) return null;
-		if (!this.visible(row, opts.actor)) return null;
-		return this.toRepository(tx, row);
-	}
+		args: [repositoryPK],
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Repository | null> => {
+			const row = await tx.repository.findFirst({
+				where: repositoryWhere(filter),
+				include: REPOSITORY_INCLUDE,
+			});
+			if (!row) return null;
+			if (!visible(row, opts.actor)) return null;
+			return toRepository(tx, row, publicUrl);
+		},
+	});
 
 	/**
 	 * Lists the repositories of a course, ordered by slug; those without a
@@ -175,31 +180,31 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link NotAllowed} `repository.read` if the actor lacks
 	 * `course.read-contents` on the course.
 	 */
-	@Validate({
-		service: true,
+	const findMany = op({
+		transaction: false,
 		returns: repositorySchema.array(),
-		args: [undefined, repositoryFilter],
-	})
-	protected async findManyTx(
-		tx: PrismaTx,
-		filter: RepositoryFilter,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Repository[]> {
-		const course = await this.courseOf(tx, filter.course);
-		if (!hasPerm(opts.actor, "course.read-contents", course)) {
-			throw new NotAllowed("repository.read");
-		}
-		const canWrite = hasPerm(opts.actor, "course.update-contents", course);
-		const rows = await tx.repository.findMany({
-			where: {
-				courseId: course.id,
-				...(canWrite ? {} : { head: { not: null } }),
-			},
-			include: REPOSITORY_INCLUDE,
-			orderBy: { slug: "asc" },
-		});
-		return this.toRepositories(tx, rows);
-	}
+		args: [repositoryFilter],
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Repository[]> => {
+			const course = await courseOf(tx, filter.course);
+			if (!hasPerm(opts.actor, "course.read-contents", course)) {
+				throw new NotAllowed("repository.read");
+			}
+			const canWrite = hasPerm(opts.actor, "course.update-contents", course);
+			const rows = await tx.repository.findMany({
+				where: {
+					courseId: course.id,
+					...(canWrite ? {} : { head: { not: null } }),
+				},
+				include: REPOSITORY_INCLUDE,
+				orderBy: { slug: "asc" },
+			});
+			return toRepositories(tx, rows, publicUrl);
+		},
+	});
 
 	/**
 	 * Creates the repository if `(course, slug)` is free, or returns the
@@ -209,27 +214,26 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link NotAllowed} `repository.create` if the actor lacks
 	 * `course.update-contents`, whether or not the repository exists.
 	 */
-	@Validate({
-		service: true,
+	const upsert = op({
 		returns: repositorySchema,
-		args: [undefined, repositoryCreate],
-	})
-	protected async upsertTx(
-		tx: PrismaTx,
-		input: RepositoryCreate,
-		opts: ServiceOptsWithoutTx,
-	): Promise<Repository> {
-		const course = await this.courseOf(tx, input.course);
-		if (!hasPerm(opts.actor, "course.update-contents", course)) {
-			throw new NotAllowed("repository.create");
-		}
-		const existing = await tx.repository.findUnique({
-			where: { courseId_slug: { courseId: course.id, slug: input.slug } },
-			include: REPOSITORY_INCLUDE,
-		});
-		if (existing) return this.toRepository(tx, existing);
-		return this.insert(tx, course.id, input.slug);
-	}
+		args: [repositoryCreate],
+		run: async (
+			tx: PrismaTx,
+			input: RepositoryCreate,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Repository> => {
+			const course = await courseOf(tx, input.course);
+			if (!hasPerm(opts.actor, "course.update-contents", course)) {
+				throw new NotAllowed("repository.create");
+			}
+			const existing = await tx.repository.findUnique({
+				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
+				include: REPOSITORY_INCLUDE,
+			});
+			if (existing) return toRepository(tx, existing, publicUrl);
+			return insert(tx, course.id, input.slug, publicUrl);
+		},
+	});
 
 	/**
 	 * Deletes the repository, its git objects and its links to calendar
@@ -239,23 +243,25 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link NotAllowed} `repository.delete` if the actor lacks
 	 * `course.update-contents`.
 	 */
-	@Validate({ service: true, args: [undefined, repositoryPK] })
-	protected async deleteTx(
-		tx: PrismaTx,
-		filter: RepositoryPK,
-		opts: ServiceOptsWithoutTx,
-	): Promise<void> {
-		const row = await tx.repository.findFirst({
-			where: repositoryWhere(filter),
-			include: REPOSITORY_INCLUDE,
-		});
-		if (!row) return;
-		if (!hasPerm(opts.actor, "course.update-contents", row.course)) {
-			throw new NotAllowed("repository.delete");
-		}
-		await this.attachment.detach("REPOSITORY", row.id, { ...opts, tx });
-		await tx.repository.delete({ where: { id: row.id } });
-	}
+	const remove = op({
+		args: [repositoryPK],
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<void> => {
+			const row = await tx.repository.findFirst({
+				where: repositoryWhere(filter),
+				include: REPOSITORY_INCLUDE,
+			});
+			if (!row) return;
+			if (!hasPerm(opts.actor, "course.update-contents", row.course)) {
+				throw new NotAllowed("repository.delete");
+			}
+			await attachmentService.detach("REPOSITORY", row.id, { ...opts, tx });
+			await tx.repository.delete({ where: { id: row.id } });
+		},
+	});
 
 	/**
 	 * Stores the files of a coming commit as blobs (with `gitSha`) and
@@ -272,23 +278,16 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link InvalidData} If a key is not the sha-256 of its bytes,
 	 * or a file exceeds `MAX_UPLOAD_BYTES`; nothing is stored then.
 	 */
-	@Validate({
-		service: true,
+	const addFiles = op({
 		returns: repositoryFilesResult,
 		args: [repositoryPK, repositoryFilesSchema],
-	})
-	async addFiles(
-		filter: RepositoryPK,
-		files: RepositoryFiles,
-		opts: ServiceOpts,
-	): Promise<RepositoryFilesResult> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const row = await this.writable(
-				tx,
-				filter,
-				opts.actor,
-				"repository.update",
-			);
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			files: RepositoryFiles,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RepositoryFilesResult> => {
+			const row = await writable(tx, filter, opts.actor, "repository.update");
 			const hashes = Object.keys(files);
 			for (const hash of hashes) {
 				const bytes = files[hash as keyof typeof files] as Buffer;
@@ -323,18 +322,18 @@ export class RepositoryService extends CrudBase<{
 					select: { id: true },
 				});
 				if (attached) continue;
-				await this.attachment.create(
+				await attachmentService.create(
 					{
 						filename: placeholderName(hash),
 						buffer: files[hash as keyof typeof files] as Buffer,
 						attachedTo: { type: "REPOSITORY", id: row.id as RepositoryId },
 					},
-					{ ...scoped, tx },
+					{ ...opts, tx },
 				);
 			}
 			return { added: hashes };
-		});
-	}
+		},
+	});
 
 	/**
 	 * Records `input.tree` as the new head, in one transaction.
@@ -356,24 +355,17 @@ export class RepositoryService extends CrudBase<{
 	 * @throws {@link InvalidData} If the tree breaks a path rule, or a `hash`
 	 * is neither attached to the repository nor a live blob on the server.
 	 */
-	@Validate({
-		service: true,
+	const commit = op({
 		returns: repositorySchema,
 		args: [repositoryPK, repositoryCommit],
-	})
-	async commit(
-		filter: RepositoryPK,
-		input: RepositoryCommit,
-		opts: ServiceOpts,
-	): Promise<Repository> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const row = await this.writable(
-				tx,
-				filter,
-				opts.actor,
-				"repository.update",
-			);
-			const inner = { ...scoped, tx };
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			input: RepositoryCommit,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Repository> => {
+			const row = await writable(tx, filter, opts.actor, "repository.update");
+			const inner = { ...opts, tx };
 			const owner = { type: "REPOSITORY", id: row.id as RepositoryId } as const;
 
 			// R7: every hash is a blob of this repository or a live blob of the server.
@@ -406,7 +398,7 @@ export class RepositoryService extends CrudBase<{
 			for (const blob of blobs.values()) {
 				let gitSha = blob.gitSha;
 				if (!gitSha) {
-					const bytes = await this.blob.readBlob(blob);
+					const bytes = await blobStore.readBlob(blob);
 					if (!bytes) {
 						throw new InvalidData({
 							tree: [
@@ -435,11 +427,9 @@ export class RepositoryService extends CrudBase<{
 			}));
 			const trees = buildTrees(files);
 
-			const headCommit = row.head
-				? await this.commitOf(tx, row.id, row.head)
-				: null;
+			const headCommit = row.head ? await commitOf(tx, row.id, row.head) : null;
 			if (headCommit && headCommit.tree === trees.root) {
-				return this.toRepository(tx, row);
+				return toRepository(tx, row, publicUrl);
 			}
 
 			// Attach what the server already had, named after the first path.
@@ -449,7 +439,7 @@ export class RepositoryService extends CrudBase<{
 			}
 			for (const hash of hashes) {
 				if (attachedHashes.has(hash)) continue;
-				await this.attachment.attach(
+				await attachmentService.attach(
 					{
 						hash,
 						filename:
@@ -463,7 +453,7 @@ export class RepositoryService extends CrudBase<{
 			for (const att of attached) {
 				if (att.filename !== placeholderName(att.hash)) continue;
 				const name = attachmentName(firstPath.get(att.hash) as string);
-				if (name) await this.rename(tx, att, name);
+				if (name) await rename(tx, blobStore, att, name);
 			}
 
 			// Git objects.
@@ -502,85 +492,23 @@ export class RepositoryService extends CrudBase<{
 			});
 
 			// The cached zip belongs to the old tree.
-			if (row.zipHash) await this.releaseHash(tx, row.id, row.zipHash, inner);
+			if (row.zipHash)
+				await releaseHash(tx, attachmentService, row.id, row.zipHash, inner);
 
-			await this.dropAbandoned(tx, row.id, inner);
+			await dropAbandoned(tx, attachmentService, row.id, inner);
 
 			const updated = await tx.repository.update({
 				where: { id: row.id },
 				data: {
 					head: commitSha,
-					title: await this.titleOf(input.tree, row.slug),
+					title: await titleOf(blobStore, input.tree, row.slug),
 					zipHash: null,
 				},
 				include: REPOSITORY_INCLUDE,
 			});
-			return this.toRepository(tx, updated);
-		});
-	}
-
-	/**
-	 * Resolves the token and slug of a clone URL, with no actor: the token is
-	 * the credential.
-	 *
-	 * Returns `null` when the token matches no repository, when it belongs to
-	 * a repository with another slug, or when either is malformed.
-	 */
-	async findByToken(
-		token: string,
-		slug: string,
-		opts: Pick<ServiceOpts, "tx"> = {},
-	): Promise<RepositoryHandle | null> {
-		if (!TOKEN_PATTERN.test(token) || !slug) return null;
-		const client = opts.tx ?? this.prisma;
-		const row = await client.repository.findUnique({
-			where: { token },
-			select: { id: true, slug: true, head: true },
-		});
-		if (!row || row.slug !== slug) return null;
-		return { id: row.id as RepositoryId, slug: row.slug, head: row.head };
-	}
-
-	/**
-	 * Streams one git object of the repository, header included and not
-	 * compressed, so the sha1 of the stream is `sha`.
-	 *
-	 * Commits and trees come from the repository's stored objects. A blob
-	 * comes from disk, looked up by `gitSha` among the repository's own
-	 * attachments only; with colliding blobs, any one of them. Returns `null`
-	 * for an unknown or malformed sha.
-	 */
-	async readObject(
-		repository: RepositoryHandle,
-		sha: string,
-		opts: Pick<ServiceOpts, "tx"> = {},
-	): Promise<Readable | null> {
-		if (!GIT_SHA_PATTERN.test(sha)) return null;
-		const client = opts.tx ?? this.prisma;
-		const object = await client.gitObject.findUnique({
-			where: { repositoryId_sha: { repositoryId: repository.id, sha } },
-		});
-		if (object) {
-			const content = Buffer.from(object.content);
-			return objectStream(
-				object.type === "COMMIT" ? "commit" : "tree",
-				content.length,
-				content,
-			);
-		}
-
-		const attachment = await client.attachment.findFirst({
-			where: {
-				...ownedBy(repository.id),
-				blob: { gitSha: sha, deletedAt: null },
-			},
-			include: { blob: { select: { hash: true, size: true } } },
-		});
-		if (!attachment) return null;
-		const file = this.blob.blobPath(attachment.blob.hash);
-		if (!(await stat(file).catch(() => null))) return null;
-		return objectStream("blob", attachment.blob.size, createReadStream(file));
-	}
+			return toRepository(tx, updated, publicUrl);
+		},
+	});
 
 	/**
 	 * Lists a directory of the head tree, `""` for the root: directories
@@ -591,22 +519,21 @@ export class RepositoryService extends CrudBase<{
 	 *
 	 * @throws {@link NotAllowed} `repository.read` as `findOne` does.
 	 */
-	@Validate({
-		service: true,
+	const listDir = op({
+		transaction: false,
 		returns: repositoryDirEntry.array().nullable(),
 		args: [repositoryPK, repositoryDirPath],
-	})
-	async listDir(
-		filter: RepositoryPK,
-		path: string,
-		opts: ServiceOpts,
-	): Promise<RepositoryDirEntry[] | null> {
-		return this.$transaction(opts, async (tx) => {
-			const row = await this.readable(tx, filter, opts.actor);
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			path: string,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RepositoryDirEntry[] | null> => {
+			const row = await readable(tx, filter, opts.actor);
 			if (!row?.head) return null;
-			const commit = await this.commitOf(tx, row.id, row.head);
+			const commit = await commitOf(tx, row.id, row.head);
 			const segments = path === "" ? [] : path.split("/");
-			const entries = await this.dirAt(tx, row.id, commit.tree, segments);
+			const entries = await dirAt(tx, row.id, commit.tree, segments);
 			if (!entries) return null;
 
 			const shas = entries.filter((e) => e.mode !== "40000").map((e) => e.sha);
@@ -636,8 +563,8 @@ export class RepositoryService extends CrudBase<{
 						Number(a.type === "file") - Number(b.type === "file") ||
 						(a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
 				);
-		});
-	}
+		},
+	});
 
 	/**
 	 * The attachment of the file at `path` in the head tree.
@@ -647,23 +574,22 @@ export class RepositoryService extends CrudBase<{
 	 *
 	 * @throws {@link NotAllowed} `repository.read` as `findOne` does.
 	 */
-	@Validate({
-		service: true,
+	const readFile = op({
+		transaction: false,
 		returns: attachmentSchema.nullable(),
 		args: [repositoryPK, repositoryPath],
-	})
-	async readFile(
-		filter: RepositoryPK,
-		path: string,
-		opts: ServiceOpts,
-	): Promise<Attachment | null> {
-		return this.$transaction(opts, async (tx, scoped) => {
-			const row = await this.readable(tx, filter, opts.actor);
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			path: string,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Attachment | null> => {
+			const row = await readable(tx, filter, opts.actor);
 			if (!row?.head) return null;
-			const commit = await this.commitOf(tx, row.id, row.head);
+			const commit = await commitOf(tx, row.id, row.head);
 			const segments = path.split("/");
 			const name = segments.pop() as string;
-			const entries = await this.dirAt(tx, row.id, commit.tree, segments);
+			const entries = await dirAt(tx, row.id, commit.tree, segments);
 			const entry = entries?.find((e) => e.name === name && e.mode !== "40000");
 			if (!entry) return null;
 
@@ -675,30 +601,44 @@ export class RepositoryService extends CrudBase<{
 				select: { id: true },
 			});
 			if (!attachment) return null;
-			return this.attachment.findOne({ id: attachment.id }, { ...scoped, tx });
-		});
-	}
+			return attachmentService.findOne({ id: attachment.id }, { ...opts, tx });
+		},
+	});
 
 	/**
-	 * The sha-256 of the zip of the head tree, building it on the first call.
+	 * Replaces the clone token, so the old clone URL stops resolving.
 	 *
-	 * The archive is written by `writeZip` in streaming to a scratch file,
-	 * stored as a blob attached to the repository with no uploader (no quota
-	 * charge), and cached in `zipHash` until the next commit. Concurrent
-	 * first calls build identical bytes. Returns `null` when the repository
-	 * has no head.
-	 *
-	 * @throws {@link NotAllowed} `repository.read` as `findOne` does.
+	 * @throws {@link NotFound} If the repository does not exist.
+	 * @throws {@link NotAllowed} `repository.update` if the actor lacks
+	 * `course.update-contents`.
 	 */
-	@Validate({
-		service: true,
-		returns: blobHash.nullable(),
+	const rotateToken = op({
+		returns: repositorySchema,
 		args: [repositoryPK],
-	})
-	async zip(filter: RepositoryPK, opts: ServiceOpts): Promise<string | null> {
-		const client = opts.tx ?? this.prisma;
-		const plan = await this.$transaction(opts, async (tx) => {
-			const row = await this.readable(tx, filter, opts.actor);
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Repository> => {
+			const row = await writable(tx, filter, opts.actor, "repository.update");
+			const updated = await tx.repository.update({
+				where: { id: row.id },
+				data: { token: newToken() },
+				include: REPOSITORY_INCLUDE,
+			});
+			return toRepository(tx, updated, publicUrl);
+		},
+	});
+
+	/// The first phase of `zip`: decides whether the archive is cached, or what to build.
+	const zipPlan = op({
+		args: [repositoryPK],
+		run: async (
+			tx: PrismaTx,
+			filter: RepositoryPK,
+			opts: ServiceOptsWithoutTx,
+		) => {
+			const row = await readable(tx, filter, opts.actor);
 			if (!row?.head) return null;
 			if (row.zipHash) {
 				const cached = await tx.attachment.findFirst({
@@ -708,8 +648,8 @@ export class RepositoryService extends CrudBase<{
 				if (cached) return { kind: "cached", hash: row.zipHash } as const;
 			}
 
-			const commit = await this.commitOf(tx, row.id, row.head);
-			const flat = await this.flatten(tx, row.id, commit.tree, "");
+			const commit = await commitOf(tx, row.id, row.head);
+			const flat = await flatten(tx, row.id, commit.tree, "");
 			const blobs = new Map(
 				(
 					await tx.blob.findMany({
@@ -725,7 +665,7 @@ export class RepositoryService extends CrudBase<{
 			const files: ZipFile[] = flat.map((f) => {
 				const blob = blobs.get(f.sha);
 				if (!blob) throw new Error(`blob ${f.sha} of ${f.path} is missing`);
-				const file = this.blob.blobPath(blob.hash);
+				const file = blobStore.blobPath(blob.hash);
 				return {
 					path: f.path,
 					mode: f.mode,
@@ -741,41 +681,78 @@ export class RepositoryService extends CrudBase<{
 				date: commit.committer.date,
 				files,
 			} as const;
-		});
+		},
+	});
+
+	/// The last phase of `zip`: stores the archive written at `scratch` and caches it.
+	const zipStore = op({
+		returns: blobHash,
+		run: async (
+			tx: PrismaTx,
+			scratch: string,
+			plan: ZipBuild,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<string> => {
+			const system: ServiceOpts = { actor: SYSTEM, tx };
+			const blob = await blobStore.createFromFile(scratch, system);
+			const current = await tx.repository.findUnique({
+				where: { id: plan.id },
+				select: { head: true },
+			});
+			// A commit that landed meanwhile makes this archive stale: serve it
+			// once, but do not cache it.
+			if (current?.head === plan.head) {
+				await attachmentService.attach(
+					{
+						hash: blob.hash,
+						filename: `${plan.slug}.zip`,
+						attachedTo: { type: "REPOSITORY", id: plan.id as RepositoryId },
+					},
+					system,
+				);
+				await tx.repository.update({
+					where: { id: plan.id },
+					data: { zipHash: blob.hash },
+				});
+			}
+			return blob.hash;
+		},
+	});
+
+	/**
+	 * The sha-256 of the zip of the head tree, building it on the first call.
+	 *
+	 * The archive is written by `writeZip` in streaming to a scratch file,
+	 * stored as a blob attached to the repository with no uploader (no quota
+	 * charge), and cached in `zipHash` until the next commit. Concurrent
+	 * first calls build identical bytes. Returns `null` when the repository
+	 * has no head.
+	 *
+	 * Not an operation of the builder: the archive is written to disk between
+	 * two short transactions, so one transaction around the whole call would
+	 * hold the database open for the duration of the write.
+	 *
+	 * @throws {@link NotAllowed} `repository.read` as `findOne` does.
+	 */
+	async function zip(
+		filter: RepositoryPK,
+		opts: ServiceOpts,
+	): Promise<string | null> {
+		const plan = await inTx(client, opts, (tx, scoped) =>
+			zipPlan(tx, filter, scoped),
+		);
 		if (!plan) return null;
 		if (plan.kind === "cached") return plan.hash;
 
-		const scratch = await this.blob.tempPath();
+		const scratch = await blobStore.tempPath();
 		try {
 			await pipeline(
 				writeZip(plan.files, { root: plan.slug, date: plan.date }),
 				createWriteStream(scratch),
 			);
-			return await this.$transaction(opts, async (tx) => {
-				const system: ServiceOpts = { actor: SYSTEM, tx };
-				const blob = await this.blob.createFromFile(scratch, system);
-				const current = await tx.repository.findUnique({
-					where: { id: plan.id },
-					select: { head: true },
-				});
-				// A commit that landed meanwhile makes this archive stale: serve it
-				// once, but do not cache it.
-				if (current?.head === plan.head) {
-					await this.attachment.attach(
-						{
-							hash: blob.hash,
-							filename: `${plan.slug}.zip`,
-							attachedTo: { type: "REPOSITORY", id: plan.id as RepositoryId },
-						},
-						system,
-					);
-					await tx.repository.update({
-						where: { id: plan.id },
-						data: { zipHash: blob.hash },
-					});
-				}
-				return blob.hash;
-			});
+			return await inTx(client, opts, (tx, scoped) =>
+				zipStore(tx, scratch, plan, scoped),
+			);
 		} catch (error) {
 			// A concurrent first call may have stored the same archive already.
 			const fresh = await client.repository.findUnique({
@@ -790,291 +767,341 @@ export class RepositoryService extends CrudBase<{
 	}
 
 	/**
-	 * Replaces the clone token, so the old clone URL stops resolving.
+	 * Resolves the token and slug of a clone URL, with no actor: the token is
+	 * the credential.
 	 *
-	 * @throws {@link NotFound} If the repository does not exist.
-	 * @throws {@link NotAllowed} `repository.update` if the actor lacks
-	 * `course.update-contents`.
+	 * Returns `null` when the token matches no repository, when it belongs to
+	 * a repository with another slug, or when either is malformed.
 	 */
-	@Validate({
-		service: true,
-		returns: repositorySchema,
-		args: [repositoryPK],
-	})
-	async rotateToken(
-		filter: RepositoryPK,
-		opts: ServiceOpts,
-	): Promise<Repository> {
-		return this.$transaction(opts, async (tx) => {
-			const row = await this.writable(
-				tx,
-				filter,
-				opts.actor,
-				"repository.update",
-			);
-			const updated = await tx.repository.update({
-				where: { id: row.id },
-				data: { token: newToken() },
-				include: REPOSITORY_INCLUDE,
-			});
-			return this.toRepository(tx, updated);
-		});
-	}
-
-	// Private utilities ------------------------------------------------------
-
-	/// The course of `ref` with what the course permissions read.
-	private async courseOf(tx: PrismaTx, ref: RepositoryCreate["course"]) {
-		return valueOrNotFound(
-			"course",
-			await tx.course.findUnique({
-				where: courseRefWhere(ref),
-				select: COURSE_SELECT,
-			}),
-		);
-	}
-
-	/// Inserts a repository with a fresh token, refusing a taken slug.
-	private async insert(
-		tx: PrismaTx,
-		courseId: CourseId,
+	async function findByToken(
+		token: string,
 		slug: string,
-	): Promise<Repository> {
-		const taken = await tx.repository.findUnique({
-			where: { courseId_slug: { courseId, slug } },
-			select: { id: true },
+		opts: Pick<ServiceOpts, "tx"> = {},
+	): Promise<RepositoryHandle | null> {
+		if (!TOKEN_PATTERN.test(token) || !slug) return null;
+		const reader = opts.tx ?? client;
+		const row = await reader.repository.findUnique({
+			where: { token },
+			select: { id: true, slug: true, head: true },
 		});
-		if (taken) {
-			throw new InvalidData({
-				slug: [{ code: "not-unique", message: m.errors_repository_exists() }],
-			});
-		}
-		const row = await tx.repository.create({
-			data: { courseId, slug, title: slug, token: newToken() },
-			include: REPOSITORY_INCLUDE,
-		});
-		return this.toRepository(tx, row);
+		if (!row || row.slug !== slug) return null;
+		return { id: row.id as RepositoryId, slug: row.slug, head: row.head };
 	}
 
-	/// Whether `actor` sees `row`: it may not read the course (throws), or the
-	/// repository has no commit and the actor cannot write the course (false).
-	private visible(row: DbRepository, actor: Actor): boolean {
-		if (!hasPerm(actor, "course.read-contents", row.course)) {
-			throw new NotAllowed("repository.read");
+	/**
+	 * Streams one git object of the repository, header included and not
+	 * compressed, so the sha1 of the stream is `sha`.
+	 *
+	 * Commits and trees come from the repository's stored objects. A blob
+	 * comes from disk, looked up by `gitSha` among the repository's own
+	 * attachments only; with colliding blobs, any one of them. Returns `null`
+	 * for an unknown or malformed sha.
+	 */
+	async function readObject(
+		repository: RepositoryHandle,
+		sha: string,
+		opts: Pick<ServiceOpts, "tx"> = {},
+	): Promise<Readable | null> {
+		if (!GIT_SHA_PATTERN.test(sha)) return null;
+		const reader = opts.tx ?? client;
+		const object = await reader.gitObject.findUnique({
+			where: { repositoryId_sha: { repositoryId: repository.id, sha } },
+		});
+		if (object) {
+			const content = Buffer.from(object.content);
+			return objectStream(
+				object.type === "COMMIT" ? "commit" : "tree",
+				content.length,
+				content,
+			);
 		}
-		return (
-			row.head !== null || hasPerm(actor, "course.update-contents", row.course)
-		);
+
+		const attachment = await reader.attachment.findFirst({
+			where: {
+				...ownedBy(repository.id),
+				blob: { gitSha: sha, deletedAt: null },
+			},
+			include: { blob: { select: { hash: true, size: true } } },
+		});
+		if (!attachment) return null;
+		const file = blobStore.blobPath(attachment.blob.hash);
+		if (!(await stat(file).catch(() => null))) return null;
+		return objectStream("blob", attachment.blob.size, createReadStream(file));
 	}
 
-	private async readable(
-		tx: PrismaTx,
-		filter: RepositoryPK,
-		actor: Actor,
-	): Promise<DbRepository | null> {
-		const row = await tx.repository.findFirst({
+	const crud = defineService<RepositoryT>()(() => ({
+		create,
+		findOne,
+		findMany,
+		upsert,
+		delete: remove,
+		addFiles,
+		commit,
+		listDir,
+		readFile,
+		rotateToken,
+	}))(client);
+
+	return { ...crud, zip, findByToken, readObject };
+}
+
+/** The repository service, as built by {@link makeRepositoryService}. */
+export type RepositoryService = ReturnType<typeof makeRepositoryService>;
+
+/// The course of `ref` with what the course permissions read.
+async function courseOf(tx: PrismaTx, ref: RepositoryCreate["course"]) {
+	return valueOrNotFound(
+		"course",
+		await tx.course.findUnique({
+			where: courseRefWhere(ref),
+			select: COURSE_SELECT,
+		}),
+	);
+}
+
+/// Inserts a repository with a fresh token, refusing a taken slug.
+async function insert(
+	tx: PrismaTx,
+	courseId: CourseId,
+	slug: string,
+	publicUrl: string,
+): Promise<Repository> {
+	const taken = await tx.repository.findUnique({
+		where: { courseId_slug: { courseId, slug } },
+		select: { id: true },
+	});
+	if (taken) {
+		throw new InvalidData({
+			slug: [{ code: "not-unique", message: m.errors_repository_exists() }],
+		});
+	}
+	const row = await tx.repository.create({
+		data: { courseId, slug, title: slug, token: newToken() },
+		include: REPOSITORY_INCLUDE,
+	});
+	return toRepository(tx, row, publicUrl);
+}
+
+/// Whether `actor` sees `row`: it may not read the course (throws), or the
+/// repository has no commit and the actor cannot write the course (false).
+function visible(row: DbRepository, actor: Actor): boolean {
+	if (!hasPerm(actor, "course.read-contents", row.course)) {
+		throw new NotAllowed("repository.read");
+	}
+	return (
+		row.head !== null || hasPerm(actor, "course.update-contents", row.course)
+	);
+}
+
+async function readable(
+	tx: PrismaTx,
+	filter: RepositoryPK,
+	actor: Actor,
+): Promise<DbRepository | null> {
+	const row = await tx.repository.findFirst({
+		where: repositoryWhere(filter),
+		include: REPOSITORY_INCLUDE,
+	});
+	return row && visible(row, actor) ? row : null;
+}
+
+async function writable(
+	tx: PrismaTx,
+	filter: RepositoryPK,
+	actor: Actor,
+	action: "repository.update",
+): Promise<DbRepository> {
+	const row = valueOrNotFound(
+		"repository",
+		await tx.repository.findFirst({
 			where: repositoryWhere(filter),
 			include: REPOSITORY_INCLUDE,
+		}),
+	);
+	if (!hasPerm(actor, "course.update-contents", row.course)) {
+		throw new NotAllowed(action);
+	}
+	return row;
+}
+
+async function toRepository(
+	tx: PrismaTx,
+	row: DbRepository,
+	publicUrl: string,
+): Promise<Repository> {
+	return (await toRepositories(tx, [row], publicUrl))[0] as Repository;
+}
+
+async function toRepositories(
+	tx: PrismaTx,
+	rows: DbRepository[],
+	publicUrl: string,
+): Promise<Repository[]> {
+	const withHead = rows.filter((r) => r.head);
+	const commits = new Map<string, ReturnType<typeof parseCommit>>();
+	if (withHead.length > 0) {
+		const objects = await tx.gitObject.findMany({
+			where: {
+				OR: withHead.map((r) => ({
+					repositoryId: r.id,
+					sha: r.head as string,
+				})),
+			},
 		});
-		return row && this.visible(row, actor) ? row : null;
-	}
-
-	private async writable(
-		tx: PrismaTx,
-		filter: RepositoryPK,
-		actor: Actor,
-		action: "repository.update",
-	): Promise<DbRepository> {
-		const row = valueOrNotFound(
-			"repository",
-			await tx.repository.findFirst({
-				where: repositoryWhere(filter),
-				include: REPOSITORY_INCLUDE,
-			}),
-		);
-		if (!hasPerm(actor, "course.update-contents", row.course)) {
-			throw new NotAllowed(action);
-		}
-		return row;
-	}
-
-	private async toRepository(
-		tx: PrismaTx,
-		row: DbRepository,
-	): Promise<Repository> {
-		return (await this.toRepositories(tx, [row]))[0] as Repository;
-	}
-
-	private async toRepositories(
-		tx: PrismaTx,
-		rows: DbRepository[],
-	): Promise<Repository[]> {
-		const withHead = rows.filter((r) => r.head);
-		const commits = new Map<string, ReturnType<typeof parseCommit>>();
-		if (withHead.length > 0) {
-			const objects = await tx.gitObject.findMany({
-				where: {
-					OR: withHead.map((r) => ({
-						repositoryId: r.id,
-						sha: r.head as string,
-					})),
-				},
-			});
-			for (const object of objects) {
-				commits.set(
-					`${object.repositoryId}/${object.sha}`,
-					parseCommit(Buffer.from(object.content)),
-				);
-			}
-		}
-		return rows.map((row) => {
-			const commit = row.head
-				? commits.get(`${row.id}/${row.head}`)
-				: undefined;
-			return {
-				id: row.id as RepositoryId,
-				courseId: row.courseId as CourseId,
-				slug: row.slug,
-				title: row.title,
-				head: row.head,
-				tree: commit?.tree ?? null,
-				message: commit ? commit.message.replace(/\n+$/, "") : null,
-				committedAt: commit?.committer.date ?? null,
-				cloneUrl: `${this.publicUrl}/git/${row.token}/${row.slug}.git`,
-				createdAt: row.createdAt,
-				updatedAt: row.updatedAt,
-			};
-		});
-	}
-
-	private async commitOf(tx: PrismaTx, repositoryId: number, sha: string) {
-		const object = await tx.gitObject.findUniqueOrThrow({
-			where: { repositoryId_sha: { repositoryId, sha } },
-		});
-		return parseCommit(Buffer.from(object.content));
-	}
-
-	private async treeOf(
-		tx: PrismaTx,
-		repositoryId: number,
-		sha: string,
-	): Promise<GitTreeEntry[]> {
-		const object = await tx.gitObject.findUniqueOrThrow({
-			where: { repositoryId_sha: { repositoryId, sha } },
-		});
-		return parseTree(Buffer.from(object.content));
-	}
-
-	/// The entries of the directory at `segments` under the tree `root`, or
-	/// `null` when some segment is missing or is a file.
-	private async dirAt(
-		tx: PrismaTx,
-		repositoryId: number,
-		root: string,
-		segments: string[],
-	): Promise<GitTreeEntry[] | null> {
-		let entries = await this.treeOf(tx, repositoryId, root);
-		for (const segment of segments) {
-			const next = entries.find(
-				(e) => e.name === segment && e.mode === "40000",
+		for (const object of objects) {
+			commits.set(
+				`${object.repositoryId}/${object.sha}`,
+				parseCommit(Buffer.from(object.content)),
 			);
-			if (!next) return null;
-			entries = await this.treeOf(tx, repositoryId, next.sha);
-		}
-		return entries;
-	}
-
-	/// Every file under the tree `sha`, with paths prefixed by `prefix`.
-	private async flatten(
-		tx: PrismaTx,
-		repositoryId: number,
-		sha: string,
-		prefix: string,
-	): Promise<{ path: string; mode: "100644" | "100755"; sha: string }[]> {
-		const out: { path: string; mode: "100644" | "100755"; sha: string }[] = [];
-		for (const entry of await this.treeOf(tx, repositoryId, sha)) {
-			const path = `${prefix}${entry.name}`;
-			if (entry.mode === "40000") {
-				out.push(
-					...(await this.flatten(tx, repositoryId, entry.sha, `${path}/`)),
-				);
-			} else {
-				out.push({ path, mode: entry.mode, sha: entry.sha });
-			}
-		}
-		return out;
-	}
-
-	/// Renames an attachment and its on-disk link, refreshing the mime type.
-	private async rename(
-		tx: PrismaTx,
-		attachment: { id: AttachmentId; hash: string; filename: string },
-		filename: string,
-	): Promise<void> {
-		if (attachment.filename === filename) return;
-		await this.blob.link(attachment.hash, filename);
-		await tx.attachment.update({
-			where: { id: attachment.id },
-			data: { filename, mimeType: mimeFor(filename) },
-		});
-		const siblings = await tx.attachment.count({
-			where: { hash: attachment.hash, filename: attachment.filename },
-		});
-		if (siblings === 0)
-			await this.blob.unlink(attachment.hash, attachment.filename);
-	}
-
-	/// Detaches the repository's attachments of `hash`.
-	private async releaseHash(
-		tx: PrismaTx,
-		repositoryId: number,
-		hash: string,
-		opts: ServiceOpts,
-	): Promise<void> {
-		const rows = await tx.attachment.findMany({
-			where: { hash, ...ownedBy(repositoryId) },
-			select: { id: true },
-		});
-		for (const row of rows) await this.attachment.delete({ id: row.id }, opts);
-	}
-
-	/// Detaches the file attachments no tree of the repository points at.
-	private async dropAbandoned(
-		tx: PrismaTx,
-		repositoryId: number,
-		opts: ServiceOpts,
-	): Promise<void> {
-		const referenced = new Set<string>();
-		const trees = await tx.gitObject.findMany({
-			where: { repositoryId, type: "TREE" },
-			select: { content: true },
-		});
-		for (const tree of trees) {
-			for (const entry of parseTree(Buffer.from(tree.content))) {
-				if (entry.mode !== "40000") referenced.add(entry.sha);
-			}
-		}
-		const attachments = await tx.attachment.findMany({
-			where: ownedBy(repositoryId),
-			include: { blob: { select: { gitSha: true } } },
-		});
-		for (const attachment of attachments) {
-			const sha = attachment.blob.gitSha;
-			if (sha && referenced.has(sha)) continue;
-			await this.attachment.delete({ id: attachment.id }, opts);
 		}
 	}
+	return rows.map((row) => {
+		const commit = row.head ? commits.get(`${row.id}/${row.head}`) : undefined;
+		return {
+			id: row.id as RepositoryId,
+			courseId: row.courseId as CourseId,
+			slug: row.slug,
+			title: row.title,
+			head: row.head,
+			tree: commit?.tree ?? null,
+			message: commit ? commit.message.replace(/\n+$/, "") : null,
+			committedAt: commit?.committer.date ?? null,
+			cloneUrl: `${publicUrl}/git/${row.token}/${row.slug}.git`,
+			createdAt: row.createdAt,
+			updatedAt: row.updatedAt,
+		};
+	});
+}
 
-	/// H1 of the root `README.md` of the tree, else the slug.
-	private async titleOf(tree: RepositoryCommit["tree"], slug: string) {
-		const readme = tree.find((entry) => entry.path === "README.md");
-		if (!readme) return slug;
-		const bytes = await this.blob.readBlob({
-			hash: readme.hash,
-			deletedAt: null,
-		});
-		return (bytes && readmeTitle(bytes.toString("utf8"))) || slug;
+async function commitOf(tx: PrismaTx, repositoryId: number, sha: string) {
+	const object = await tx.gitObject.findUniqueOrThrow({
+		where: { repositoryId_sha: { repositoryId, sha } },
+	});
+	return parseCommit(Buffer.from(object.content));
+}
+
+async function treeOf(
+	tx: PrismaTx,
+	repositoryId: number,
+	sha: string,
+): Promise<GitTreeEntry[]> {
+	const object = await tx.gitObject.findUniqueOrThrow({
+		where: { repositoryId_sha: { repositoryId, sha } },
+	});
+	return parseTree(Buffer.from(object.content));
+}
+
+/// The entries of the directory at `segments` under the tree `root`, or
+/// `null` when some segment is missing or is a file.
+async function dirAt(
+	tx: PrismaTx,
+	repositoryId: number,
+	root: string,
+	segments: string[],
+): Promise<GitTreeEntry[] | null> {
+	let entries = await treeOf(tx, repositoryId, root);
+	for (const segment of segments) {
+		const next = entries.find((e) => e.name === segment && e.mode === "40000");
+		if (!next) return null;
+		entries = await treeOf(tx, repositoryId, next.sha);
 	}
+	return entries;
+}
+
+/// Every file under the tree `sha`, with paths prefixed by `prefix`.
+async function flatten(
+	tx: PrismaTx,
+	repositoryId: number,
+	sha: string,
+	prefix: string,
+): Promise<{ path: string; mode: "100644" | "100755"; sha: string }[]> {
+	const out: { path: string; mode: "100644" | "100755"; sha: string }[] = [];
+	for (const entry of await treeOf(tx, repositoryId, sha)) {
+		const path = `${prefix}${entry.name}`;
+		if (entry.mode === "40000") {
+			out.push(...(await flatten(tx, repositoryId, entry.sha, `${path}/`)));
+		} else {
+			out.push({ path, mode: entry.mode, sha: entry.sha });
+		}
+	}
+	return out;
+}
+
+/// Renames an attachment and its on-disk link, refreshing the mime type.
+async function rename(
+	tx: PrismaTx,
+	blob: BlobService,
+	attachment: { id: AttachmentId; hash: string; filename: string },
+	filename: string,
+): Promise<void> {
+	if (attachment.filename === filename) return;
+	await blob.link(attachment.hash, filename);
+	await tx.attachment.update({
+		where: { id: attachment.id },
+		data: { filename, mimeType: mimeFor(filename) },
+	});
+	const siblings = await tx.attachment.count({
+		where: { hash: attachment.hash, filename: attachment.filename },
+	});
+	if (siblings === 0) await blob.unlink(attachment.hash, attachment.filename);
+}
+
+/// Detaches the repository's attachments of `hash`.
+async function releaseHash(
+	tx: PrismaTx,
+	attachmentService: AttachmentService,
+	repositoryId: number,
+	hash: string,
+	opts: ServiceOpts,
+): Promise<void> {
+	const rows = await tx.attachment.findMany({
+		where: { hash, ...ownedBy(repositoryId) },
+		select: { id: true },
+	});
+	for (const row of rows) await attachmentService.delete({ id: row.id }, opts);
+}
+
+/// Detaches the file attachments no tree of the repository points at.
+async function dropAbandoned(
+	tx: PrismaTx,
+	attachmentService: AttachmentService,
+	repositoryId: number,
+	opts: ServiceOpts,
+): Promise<void> {
+	const referenced = new Set<string>();
+	const trees = await tx.gitObject.findMany({
+		where: { repositoryId, type: "TREE" },
+		select: { content: true },
+	});
+	for (const tree of trees) {
+		for (const entry of parseTree(Buffer.from(tree.content))) {
+			if (entry.mode !== "40000") referenced.add(entry.sha);
+		}
+	}
+	const attachments = await tx.attachment.findMany({
+		where: ownedBy(repositoryId),
+		include: { blob: { select: { gitSha: true } } },
+	});
+	for (const attachment of attachments) {
+		const sha = attachment.blob.gitSha;
+		if (sha && referenced.has(sha)) continue;
+		await attachmentService.delete({ id: attachment.id }, opts);
+	}
+}
+
+/// H1 of the root `README.md` of the tree, else the slug.
+async function titleOf(
+	blob: BlobService,
+	tree: RepositoryCommit["tree"],
+	slug: string,
+) {
+	const readme = tree.find((entry) => entry.path === "README.md");
+	if (!readme) return slug;
+	const bytes = await blob.readBlob({
+		hash: readme.hash,
+		deletedAt: null,
+	});
+	return (bytes && readmeTitle(bytes.toString("utf8"))) || slug;
 }
 
 //
