@@ -5,6 +5,7 @@ import type { Role } from "@/db/client";
 type UserId = schema.UserId;
 
 import { NotAllowed } from "@/core/error";
+import { type QuestionStatus, visibility } from "@/services/question-status";
 import type { Assert, AssertNever, NotNever, Pretty } from "@/typing";
 import type { JSONObject, JSONValue } from "@/typing/concrete-types";
 import type {
@@ -150,7 +151,9 @@ export type InviteTarget = { id?: number; createdBy: UserTarget };
  */
 export interface QuestionWithCourse {
 	id?: number;
-	status: "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED";
+	status: QuestionStatus;
+	/// Whether an exam pins the question; `false` when left out.
+	pinned?: boolean;
 	course: CourseTarget | CourseWithEnrollment;
 }
 
@@ -373,18 +376,19 @@ const PERMISSIONS = {
 		audit: auditQuestion,
 	} satisfies PermDef<QuestionWithCourse>,
 
-	// Rule: the public half goes to whoever may write the question, or, once
-	// `PUBLISHED`, to whoever may see the course's contents; a draft, hidden
-	// or archived question is its author's alone.
-	//
-	// No service calls this entry: `QuestionService.findOneTx` hides a draft,
-	// hidden or archived question as missing rather than refused, and still
-	// shows a hidden or archived one an exam pins, which this rule cannot
-	// express.
+	// Rule: the public half goes to whoever `visibility` gives the full
+	// document or the public half: the author, and a course member for a
+	// published question or one an exam pins. Everyone else is refused or
+	// sees nothing. `target.pinned` is whether an exam pins the question.
 	"question.read-public": {
-		other: (actor, target) =>
-			isCourseOwner(actor, target.course) ||
-			(target.status === "PUBLISHED" && courseVisible(actor, target.course)),
+		other: (actor, target) => {
+			const seen = visibility(target.status, {
+				author: isCourseOwner(actor, target.course),
+				member: courseVisible(actor, target.course),
+				pinned: target.pinned ?? false,
+			});
+			return seen === "full" || seen === "public";
+		},
 		audit: auditQuestion,
 	} satisfies PermDef<QuestionWithCourse>,
 

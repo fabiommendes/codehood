@@ -8,7 +8,7 @@
 import type { Exam } from "@/db";
 import { groupExamsForStudent } from "@/db/services/exam.service";
 import { m } from "@/i18n";
-import { type ExceptionTiming, examPhase, personalTiming } from "./exam-state";
+import { type ExceptionTiming, examPhase, viewerTiming } from "./exam-state";
 
 /// One previewed exam, with the answers still waiting for a grade (0 for a student).
 export interface CourseHomeExam {
@@ -61,8 +61,8 @@ export function courseHomeExams(
 		: [];
 	const upcoming = [...group("upcoming"), ...drafts].sort((a, b) =>
 		byDate(
-			personalTiming(a, exceptions.get(a.slug) ?? null),
-			personalTiming(b, exceptions.get(b.slug) ?? null),
+			viewerTiming(a, exceptions.get(a.slug)),
+			viewerTiming(b, exceptions.get(b.slug)),
 		),
 	);
 

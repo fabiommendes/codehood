@@ -16,10 +16,11 @@ import {
 	newestPassesFirst,
 } from "./exam-result";
 import {
-	attemptState,
+	attemptOf,
 	type ExamTiming,
 	type ExceptionTiming,
-	personalTiming,
+	examSchedule,
+	isFinished,
 } from "./exam-state";
 
 /// Where a counting answer stands: waiting for a grade, graded, or marked will-not-grade.
@@ -96,8 +97,7 @@ export type GradingFeedback = Pick<
  * Otherwise it is `graded` when its newest pass has a score, and `pending`
  * when it has none.
  *
- * An attempt is judged against its author's personal timing,
- * `personalTiming(exam, exceptions.get(author) ?? null)`, so an attempt
+ * An attempt is judged against its author's personal timing, so an attempt
  * whose author still has time left is not counted yet.
  *
  * @params questions The exam's question slugs.
@@ -112,6 +112,7 @@ export function countingAnswers(
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): CountingAnswer[] {
+	const schedule = examSchedule(exam, exceptions);
 	const passesBySubmission = new Map<string, GradingFeedback[]>();
 	for (const pass of feedback) {
 		const list = passesBySubmission.get(pass.submission);
@@ -121,12 +122,8 @@ export function countingAnswers(
 
 	const answers: { answer: CountingAnswer; id: number }[] = [];
 	for (const attempt of attempts) {
-		const { kind } = attemptState(
-			personalTiming(exam, exceptions.get(attempt.author) ?? null),
-			attempt,
-			now,
-		);
-		if (kind !== "submitted" && kind !== "results") continue;
+		if (!isFinished(attemptOf(schedule, attempt.author, attempt, now)))
+			continue;
 
 		const newest = new Map<string, GradingAttempt["submissions"][number]>();
 		for (const submission of attempt.submissions) {
@@ -305,6 +302,7 @@ export function attemptRows(
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): AttemptRow[] {
+	const schedule = examSchedule(exam, exceptions);
 	const studentsByUsername = new Map(
 		students.map((student) => [student.username, student]),
 	);
@@ -325,12 +323,9 @@ export function attemptRows(
 	}
 
 	const rows = attempts.map((attempt): AttemptRow => {
-		const { kind } = attemptState(
-			personalTiming(exam, exceptions.get(attempt.author) ?? null),
-			attempt,
-			now,
+		const closed = isFinished(
+			attemptOf(schedule, attempt.author, attempt, now),
 		);
-		const closed = kind === "submitted" || kind === "results";
 		const student = studentsByUsername.get(attempt.author);
 		const answered = new Set(
 			attempt.submissions

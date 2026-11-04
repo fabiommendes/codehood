@@ -7,11 +7,13 @@
  * within {@link PRACTICE_SESSION_WINDOW_MS}.
  */
 import type { z } from "zod";
+import { requireAccess, responseAccess } from "@/auth/access";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
 import {
 	ensurePerm,
 	hasPerm,
 	type ResponseWithCourse,
+	simplifyTarget,
 } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { PRACTICE_SESSION_WINDOW_MS } from "@/core/constants";
@@ -32,7 +34,11 @@ import {
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
 import { m } from "@/i18n";
-import { canReopenAttempt } from "@/services/exam-state";
+import {
+	canReopen,
+	examSchedule,
+	hiddenFromStudents,
+} from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
@@ -539,9 +545,12 @@ async function assertReopenable(
 		response.authorId,
 	);
 	if (
-		!canReopenAttempt(
-			examTimingFromDb(response.exam),
-			exception,
+		!canReopen(
+			examSchedule(
+				examTimingFromDb(response.exam),
+				exception ? new Map([[response.authorId, exception]]) : undefined,
+			),
+			response.authorId,
 			response,
 			new Date(),
 		)
@@ -627,10 +636,9 @@ async function writableResponse(
 	if (!row) throw new NotFound("response");
 
 	const target = responseTarget(row);
-	if (!hasPerm(actor, action, target) && !hasReadAccess(actor, row)) {
-		throw new NotFound("response");
-	}
-	ensurePerm(actor, action, target);
+	requireAccess(responseAccess(actor, target), "write", action, {
+		target: simplifyTarget(action, target),
+	});
 	return row;
 }
 
@@ -690,7 +698,7 @@ async function prepareAttempt(
 
 	if (
 		!hasPerm(actor, "course.update-contents", course) &&
-		(exam.status === "DRAFT" || exam.status === "ARCHIVED")
+		hiddenFromStudents(exam.status)
 	) {
 		throw new NotFound("exam");
 	}

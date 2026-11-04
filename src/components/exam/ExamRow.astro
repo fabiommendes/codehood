@@ -9,7 +9,7 @@ import {
 	type AttemptState,
 	type ExceptionTiming,
 	examPhase,
-	personalTiming,
+	viewerTiming,
 } from "@/services/exam-state";
 import {
 	examBadge,
@@ -44,7 +44,7 @@ const {
 	exception = null,
 } = Astro.props;
 
-const timing = personalTiming(exam, exception);
+const timing = viewerTiming(exam, exception);
 const phase = examPhase(timing, new Date());
 const badge = examBadge(phase, state);
 /// A score already says the exam is graded, and a heading may already say its phase.

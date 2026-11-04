@@ -23,13 +23,13 @@ import {
 } from "@/core/schemas";
 import { CrudBase, type ServiceOptsWithoutTx } from "@/db/base-service";
 import { m } from "@/i18n";
-import { resultsReleased } from "@/services/exam-state";
+import { released } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import { DbNull, type Prisma, type PrismaTx } from "../client";
 import {
 	courseRefMatch,
 	courseRefWhere,
-	exceptionTimings,
+	exceptionSchedule,
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
@@ -412,15 +412,15 @@ export class FeedbackService extends CrudBase<{
 
 // Private utilities -----------------------------------------------------------
 
-/// Whether `exam` has released its grades to its students as of `now`, see {@link resultsReleased}.
+/// Whether `exam` has released its grades to its students as of `now`, see {@link released}.
 function releasedToStudents(exam: ExamRelease, now: Date): boolean {
-	return resultsReleased(
-		{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
-		now,
-		exceptionTimings(
+	return released(
+		exceptionSchedule(
+			{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
 			exam.exceptions,
 			exam.course.enrollments.map((enrollment) => enrollment.username),
 		),
+		now,
 	);
 }
 

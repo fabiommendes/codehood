@@ -1,7 +1,7 @@
 import type { UserActor } from "@/auth/actor";
 import { db } from "@/db";
 import { examResult } from "@/services/exam-result";
-import { resultsReleased } from "@/services/exam-state";
+import { examSchedule, released } from "@/services/exam-state";
 import {
 	type HomeCourse,
 	type HomeEvent,
@@ -60,21 +60,21 @@ export async function loadStudentHome(
 
 			const homeExams: HomeExam[] = exams.map((exam) => {
 				const attempt = attempts.find((entry) => entry.exam === exam.slug);
-				const all = [...(exceptions.get(exam.slug)?.values() ?? [])];
-				const released = attempt && resultsReleased(exam, now, all);
+				const schedule = examSchedule(exam, exceptions.get(exam.slug));
 				return {
 					course: home,
 					exam,
 					attempt: attempt ?? null,
-					exception: exceptions.get(exam.slug)?.get(actor.username) ?? null,
-					exceptions: all,
-					result: released
-						? examResult(
-								exam.questions.map((question) => question.slug),
-								attempt.submissions,
-								feedback,
-							)
-						: null,
+					author: actor.username,
+					exceptions: schedule.exceptions,
+					result:
+						attempt && released(schedule, now)
+							? examResult(
+									exam.questions.map((question) => question.slug),
+									attempt.submissions,
+									feedback,
+								)
+							: null,
 				};
 			});
 			const resolved = requests.filter((request) => request.status !== "OPEN");

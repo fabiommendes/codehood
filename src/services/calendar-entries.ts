@@ -10,7 +10,7 @@
 import type { CalendarEvent } from "@/db/services/calendar-event.service";
 import type { Exam } from "@/db/services/exam.service";
 import { durationToMinutes, endOf } from "@/utils/schedule-time";
-import { type ExceptionTiming, personalTiming, windowEnd } from "./exam-state";
+import { type ExceptionTiming, viewerTiming, windowEnd } from "./exam-state";
 
 type CourseId = CalendarEvent["courseId"];
 
@@ -21,7 +21,7 @@ export interface CourseExam {
 	/**
 	 * The viewer's own exception on this exam, absent for none or for an
 	 * instructor. The entry then starts and ends with the viewer's personal
-	 * window, `personalTiming(exam, exception)` through `windowEnd`.
+	 * window, `viewerTiming(exam, exception)` through `windowEnd`.
 	 */
 	exception?: ExceptionTiming | null;
 }
@@ -48,7 +48,7 @@ export function calendarEntries(
 ): CalendarEntry[] {
 	const examEntries: CalendarEntry[] = [];
 	for (const { courseId, exam, exception } of exams) {
-		const personal = personalTiming(exam, exception ?? null);
+		const personal = viewerTiming(exam, exception);
 		if (!personal.scheduledAt || exam.status === "ARCHIVED") continue;
 		examEntries.push({
 			kind: "exam",

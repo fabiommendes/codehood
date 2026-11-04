@@ -10,7 +10,12 @@ import {
 import type { InvalidDataCode } from "@/core/error-response";
 import type { CourseRef, Duration } from "@/core/schemas";
 import { m } from "@/i18n";
-import type { ExceptionTiming } from "@/services/exam-state";
+import {
+	type BaseTiming,
+	type ExamSchedule,
+	type ExceptionTiming,
+	examSchedule,
+} from "@/services/exam-state";
 import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 
 /**
@@ -238,16 +243,46 @@ export function fromMs(ms: number | null): Duration | null {
  * @params activeUsernames The usernames holding an `ACTIVE` enrollment in the exam's course.
  */
 export function exceptionTimings(
-	rows: readonly {
-		username: string;
-		extraTimeMs: number;
-		scheduledAt: Date | null;
-	}[],
+	rows: readonly ExceptionRow[],
 	activeUsernames: readonly string[],
 ): ExceptionTiming[] {
-	return rows.map((row) => ({
+	return rows.map((row) => timingOfRow(row, activeUsernames));
+}
+
+/**
+ * The schedule of `exam` under its stored exceptions, flagging those of students who are not actively enrolled.
+ *
+ * @params rows Every exception row of the exam.
+ * @params activeUsernames The usernames holding an `ACTIVE` enrollment in the exam's course.
+ */
+export function exceptionSchedule<T extends BaseTiming>(
+	exam: T,
+	rows: readonly ExceptionRow[],
+	activeUsernames: readonly string[],
+): ExamSchedule<T> {
+	return examSchedule(
+		exam,
+		new Map(
+			rows.map((row) => [row.username, timingOfRow(row, activeUsernames)]),
+		),
+	);
+}
+
+/// The columns of an exception row that timing needs.
+interface ExceptionRow {
+	username: string;
+	extraTimeMs: number;
+	scheduledAt: Date | null;
+}
+
+/// The timing one exception row gives, flagged `dropped` when its student is not in `activeUsernames`.
+function timingOfRow(
+	row: ExceptionRow,
+	activeUsernames: readonly string[],
+): ExceptionTiming {
+	return {
 		extraTime: fromMs(row.extraTimeMs),
 		scheduledAt: row.scheduledAt,
 		dropped: !activeUsernames.includes(row.username),
-	}));
+	};
 }

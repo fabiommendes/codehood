@@ -64,3 +64,15 @@ export function unsafeBrandIdAtField<
 >(obj: T): BrandIdAtField<Brand, Path, T> {
 	return obj as unknown as BrandIdAtField<Brand, Path, T>;
 }
+
+declare const markKey: unique symbol;
+
+/**
+ * `T` marked with `Tag`, so a value of it no longer fits where `T` is expected unmarked.
+ *
+ * Pair it with {@link Unmarked} on the parameter that must refuse marked values.
+ */
+export type Marked<T, Tag extends string> = T & { readonly [markKey]: Tag };
+
+/// `T` as long as it carries no {@link Marked} mark; a marked value is not assignable to it.
+export type Unmarked<T> = T & { readonly [markKey]?: never };

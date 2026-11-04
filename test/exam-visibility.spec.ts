@@ -27,3 +27,26 @@ test("a student asking for drafts or archived exams by status still gets only th
 
 	expect(exams.map((exam) => exam.slug)).toEqual(["ongoing"]);
 });
+
+test("an outsider is refused a draft exam exactly as a published one, and a missing one is null", async () => {
+	const outsider = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create();
+	for (const [slug, status] of [
+		["rascunho", "DRAFT"],
+		["publicada", "ONGOING"],
+	] as const) {
+		await persistedExamFactory.create({ course: course.id, slug, status });
+	}
+
+	for (const slug of ["rascunho", "publicada"]) {
+		await expect(
+			db.exam.findOne({ course: course.id, slug }, { actor: outsider }),
+		).rejects.toMatchObject({ code: "not-allowed", status: 403 });
+	}
+	expect(
+		await db.exam.findOne(
+			{ course: course.id, slug: "inexistente" },
+			{ actor: outsider },
+		),
+	).toBeNull();
+});

@@ -10,10 +10,11 @@
 import { correctResponses, type QuestionDocument } from "@/mdq";
 import { examResult } from "./exam-result";
 import {
-	attemptState,
+	attemptOf,
 	type ExamTiming,
 	type ExceptionTiming,
-	personalTiming,
+	examSchedule,
+	isFinished,
 } from "./exam-state";
 import {
 	type CountingAnswer,
@@ -133,14 +134,10 @@ function closedAttemptCount(
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming>,
 ): number {
-	return attempts.filter((attempt) => {
-		const { kind } = attemptState(
-			personalTiming(exam, exceptions.get(attempt.author) ?? null),
-			attempt,
-			now,
-		);
-		return kind === "submitted" || kind === "results";
-	}).length;
+	const schedule = examSchedule(exam, exceptions);
+	return attempts.filter((attempt) =>
+		isFinished(attemptOf(schedule, attempt.author, attempt, now)),
+	).length;
 }
 
 /// One score row per closed attempt with no pending answer, each holding its `examResult` score per question.
@@ -153,13 +150,10 @@ function scoreRows(
 	exceptions: ReadonlyMap<string, ExceptionTiming>,
 ): number[][] {
 	const rows: number[][] = [];
+	const schedule = examSchedule(exam, exceptions);
 	for (const attempt of attempts) {
-		const { kind } = attemptState(
-			personalTiming(exam, exceptions.get(attempt.author) ?? null),
-			attempt,
-			now,
-		);
-		if (kind !== "submitted" && kind !== "results") continue;
+		if (!isFinished(attemptOf(schedule, attempt.author, attempt, now)))
+			continue;
 		const result = examResult(questions, attempt.submissions, feedback);
 		if (result.total === null) continue;
 		rows.push(result.questions.map((outcome) => outcome.score ?? 0));

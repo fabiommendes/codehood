@@ -11,6 +11,7 @@
 import type { Duration } from "@/core/schemas";
 import type { Exam } from "@/db/services/exam.service";
 import { m } from "@/i18n";
+import type { Marked, Unmarked } from "@/typing/branding";
 import { durationToMinutes, toDuration } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 
@@ -20,6 +21,15 @@ export type ExamTiming = Pick<
 	"type" | "status" | "scheduledAt" | "duration" | "extraTime"
 > &
 	Partial<Pick<Exam, "gradesReleasedAt">>;
+
+/// The timing of an exam as the whole class sees it, never adjusted by an exception.
+export type BaseTiming<T extends ExamTiming = ExamTiming> = Unmarked<T>;
+
+/// The timing of an exam as one student sees it, after their exception; the mark keeps it out of the class-wide functions.
+export type PersonalTiming<T extends ExamTiming = ExamTiming> = Marked<
+	T,
+	"personal"
+>;
 
 /// The part of one student's exam exception their timing depends on.
 export interface ExceptionTiming {
@@ -112,11 +122,11 @@ export function windowEnd(exam: ExamTiming): Date | null {
  *
  * Every other field of `exam` is copied as is; `exam` itself is not modified.
  */
-export function personalTiming<T extends ExamTiming>(
+export function personalTiming<T extends BaseTiming>(
 	exam: T,
 	exception: ExceptionTiming | null,
-): T {
-	if (!exception || exam.type === "PRACTICE") return exam;
+): PersonalTiming<T> {
+	if (!exception || exam.type === "PRACTICE") return marked(exam);
 
 	const extraMinutes =
 		(exam.extraTime ? durationToMinutes(exam.extraTime) : 0) +
@@ -128,28 +138,30 @@ export function personalTiming<T extends ExamTiming>(
 
 	if (exception.scheduledAt) {
 		personal.scheduledAt = exception.scheduledAt;
-		if (exam.status !== "DRAFT" && exam.status !== "ARCHIVED") {
+		if (!hiddenFromStudents(exam.status)) {
 			personal.status = "SCHEDULED";
 		}
 	}
-	return personal;
+	return marked(personal);
+}
+
+/// `timing` as a {@link PersonalTiming}; the mark exists only in the type, so the value is untouched.
+function marked<T extends BaseTiming>(timing: T): PersonalTiming<T> {
+	return timing as unknown as PersonalTiming<T>;
 }
 
 /**
- * The latest end among the window of `exam` and the personal windows of `exceptions`, or `null` when any of them has no end.
+ * The latest end among the window of the exam and the personal windows of its exceptions, or `null` when any of them has no end.
  *
- * Each personal window is {@link windowEnd} of {@link personalTiming}. With no
- * exceptions it equals `windowEnd(exam)`. An exception of a `dropped` student
- * is left out.
+ * With no exceptions it equals `windowEnd(schedule.base)`. An exception of a
+ * `dropped` student is left out.
  */
-export function lastWindowEnd(
-	exam: ExamTiming,
-	exceptions: readonly ExceptionTiming[],
-): Date | null {
-	let last = windowEnd(exam);
-	for (const exception of exceptions) {
+export function lastWindowEnd(schedule: ExamSchedule): Date | null {
+	const { base } = schedule;
+	let last = windowEnd(base);
+	for (const exception of schedule.exceptions.values()) {
 		if (exception.dropped) continue;
-		const end = windowEnd(personalTiming(exam, exception));
+		const end = windowEnd(personalTiming(base, exception));
 		if (!last || !end) return null;
 		if (end > last) last = end;
 	}
@@ -163,7 +175,7 @@ export function lastWindowEnd(
  * deadline has passed, since reopening it then would not let them answer.
  */
 export function canReopenAttempt(
-	exam: ExamTiming,
+	exam: BaseTiming,
 	exception: ExceptionTiming | null,
 	attempt: AttemptTiming,
 	now: Date,
@@ -214,8 +226,8 @@ export function attemptDeadline(
  * `draft` and `archived` exams are never shown to students; they report
  * `not-open` with `opensAt: null`.
  *
- * @params exam The student's own timing, {@link personalTiming} when they have an exception.
- * @params opts `released` replaces the call to {@link resultsReleased} on `exam`; pass `resultsReleased(baseExam, now, exceptions)` so a pending makeup keeps everyone at `submitted`.
+ * @params exam The student's own timing, from {@link timingFor}.
+ * @params opts `released` replaces the call to {@link resultsReleased} on `exam`; {@link attemptOf} passes {@link released} of the schedule so a pending makeup keeps everyone at `submitted`.
  */
 export function attemptState(
 	exam: ExamTiming,
@@ -263,11 +275,10 @@ function submittedState(
  * is set and not in the future; a missing `gradesReleasedAt` counts as not
  * released.
  *
- * @params exam The exam's own timing, never a {@link personalTiming}.
  * @params exceptions Every exception of `exam`; each is applied to `exam` through {@link personalTiming}.
  */
 export function resultsReleased(
-	exam: ExamTiming,
+	exam: BaseTiming,
 	now: Date,
 	exceptions: readonly ExceptionTiming[] = [],
 ): boolean {
@@ -285,37 +296,31 @@ export function resultsReleased(
 }
 
 /**
- * When the students of `exam` got their grades, or `null` if they have not yet or the moment is unknown.
+ * When the students of the exam got their grades, or `null` if they have not yet or the moment is unknown.
  *
  * An `EXAM` releases at `gradesReleasedAt` and a timed, scheduled `QUIZ` at
- * {@link lastWindowEnd} of `exam` and `exceptions`. A `PRACTICE` exam, and a
- * `QUIZ` completed by hand before or without that end, are released with no
- * known moment.
- *
- * @params exam The exam's own timing, never a {@link personalTiming}.
- * @params exceptions Every exception of `exam`, as in {@link resultsReleased}.
+ * {@link lastWindowEnd} of the schedule. A `PRACTICE` exam, and a `QUIZ`
+ * completed by hand before or without that end, are released with no known
+ * moment.
  */
-export function releaseMoment(
-	exam: ExamTiming,
-	now: Date,
-	exceptions: readonly ExceptionTiming[] = [],
-): Date | null {
-	if (!resultsReleased(exam, now, exceptions)) return null;
-	switch (exam.type) {
+export function releaseMoment(schedule: ExamSchedule, now: Date): Date | null {
+	const { base } = schedule;
+	if (!released(schedule, now)) return null;
+	switch (base.type) {
 		case "PRACTICE":
 			return null;
 		case "QUIZ": {
-			const end = lastWindowEnd(exam, exceptions);
+			const end = lastWindowEnd(schedule);
 			return end && end <= now ? end : null;
 		}
 		default:
-			return exam.gradesReleasedAt ?? null;
+			return base.gradesReleasedAt ?? null;
 	}
 }
 
 /// Whether some exception's personal phase is still `upcoming` or `open` at `now`, those of dropped students aside.
 function hasOpenException(
-	exam: ExamTiming,
+	exam: BaseTiming,
 	now: Date,
 	exceptions: readonly ExceptionTiming[],
 ): boolean {
@@ -345,11 +350,10 @@ export type GradeReleaseBlocker =
  * can be released.
  *
  * @params results The result of every graded attempt, as the instructor sees it.
- * @params exam The exam's own timing, never a {@link personalTiming}.
  * @params exceptions Every exception of `exam`, as in {@link resultsReleased}.
  */
 export function gradeReleaseBlocker(
-	exam: ExamTiming,
+	exam: BaseTiming,
 	results: ExamResult[],
 	now: Date,
 	exceptions: readonly ExceptionTiming[] = [],
@@ -362,4 +366,121 @@ export function gradeReleaseBlocker(
 		result.questions.some((outcome) => outcome.status === "pending"),
 	);
 	return pending ? "pending" : null;
+}
+
+// Exam schedule ---------------------------------------------------------------
+
+/// The statuses an instructor has not published or has withdrawn, see {@link hiddenFromStudents}.
+export const hiddenExamStatuses: readonly ExamTiming["status"][] = [
+	"DRAFT",
+	"ARCHIVED",
+];
+
+/** Whether an exam with `status` is kept out of what students see. */
+export function hiddenFromStudents(status: ExamTiming["status"]): boolean {
+	return hiddenExamStatuses.includes(status);
+}
+
+/// An exam's own timing together with the exceptions that adjust it, by username.
+export interface ExamSchedule<T extends BaseTiming = BaseTiming> {
+	readonly base: T;
+	readonly exceptions: ReadonlyMap<string, ExceptionTiming>;
+}
+
+/**
+ * The schedule of `exam` under `exceptions`, built once and then asked for each student.
+ *
+ * `exceptions` must hold every exception of the exam, the ones of dropped
+ * students flagged, because the release of grades depends on all of them.
+ *
+ * @example
+ * const schedule = examSchedule(exam, new Map([["ana", { extraTime: { minutes: 30 }, scheduledAt: null }]]));
+ * attemptOf(schedule, "ana", attempt, now);
+ */
+export function examSchedule<T extends BaseTiming>(
+	exam: T,
+	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
+): ExamSchedule<T> {
+	return { base: exam, exceptions };
+}
+
+/**
+ * The timing of `exam` for a student whose own exception is all the caller knows.
+ *
+ * Enough to place the exam in that student's phase and dates; whether grades
+ * are released needs every exception, so go through {@link examSchedule}.
+ */
+export function viewerTiming<T extends BaseTiming>(
+	exam: T,
+	exception: ExceptionTiming | null | undefined,
+): PersonalTiming<T> {
+	return personalTiming(exam, exception ?? null);
+}
+
+/** The timing of the schedule's exam for `author`, after their exception, if any. */
+export function timingFor<T extends BaseTiming>(
+	schedule: ExamSchedule<T>,
+	author: string | null,
+): PersonalTiming<T> {
+	const exception = author ? schedule.exceptions.get(author) : undefined;
+	return personalTiming(schedule.base, exception ?? null);
+}
+
+/** Whether the students of the schedule's exam may see their grades at `now`, holding exceptions into account. */
+export function released(schedule: ExamSchedule, now: Date): boolean {
+	return resultsReleased(schedule.base, now, [...schedule.exceptions.values()]);
+}
+
+/** What `author`, holding `attempt` or none, may do with the schedule's exam at `now`. */
+export function attemptOf(
+	schedule: ExamSchedule,
+	author: string | null,
+	attempt: AttemptTiming | null,
+	now: Date,
+): AttemptState {
+	return attemptState(timingFor(schedule, author), attempt, now, {
+		released: released(schedule, now),
+	});
+}
+
+/** Whether `state` is an attempt the student can no longer answer: `submitted` or `results`. */
+export function isFinished(state: AttemptState): boolean {
+	return state.kind === "submitted" || state.kind === "results";
+}
+
+/** The first thing stopping the release of grades of the schedule's exam at `now`, or `null`, see {@link gradeReleaseBlocker}. */
+export function releaseBlocker(
+	schedule: ExamSchedule,
+	results: ExamResult[],
+	now: Date,
+): GradeReleaseBlocker | null {
+	return gradeReleaseBlocker(schedule.base, results, now, [
+		...schedule.exceptions.values(),
+	]);
+}
+
+/** Whether the attempt of `author` can still be reopened at `now`, see {@link canReopenAttempt}. */
+export function canReopen(
+	schedule: ExamSchedule,
+	author: string,
+	attempt: AttemptTiming,
+	now: Date,
+): boolean {
+	return canReopenAttempt(
+		schedule.base,
+		schedule.exceptions.get(author) ?? null,
+		attempt,
+		now,
+	);
+}
+
+/** The usernames of students whose own window is still `upcoming` or `open` at `now`, those who dropped aside. */
+export function openWindowAuthors(schedule: ExamSchedule, now: Date): string[] {
+	return [...schedule.exceptions.entries()]
+		.filter(([, exception]) => !exception.dropped)
+		.map(([author]) => author)
+		.filter((author) => {
+			const phase = examPhase(timingFor(schedule, author), now);
+			return phase === "upcoming" || phase === "open";
+		});
 }

@@ -11,12 +11,17 @@ import { localDateOf } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 import {
 	type AttemptTiming,
-	attemptState,
+	attemptOf,
+	type ExamSchedule,
 	type ExceptionTiming,
 	examPhase,
-	gradeReleaseBlocker,
+	examSchedule,
+	hiddenFromStudents,
+	isFinished,
 	lastWindowEnd,
-	personalTiming,
+	openWindowAuthors,
+	releaseBlocker,
+	timingFor,
 } from "./exam-state";
 import type { HomeCourse } from "./student-home";
 
@@ -121,52 +126,45 @@ export function instructorHome(
 	now: Date,
 	events: TaughtEvent[] = [],
 ): InstructorHome {
-	const shown = exams.filter(({ exam }) => {
-		const phase = examPhase(exam, now);
-		return (
-			exam.type !== "PRACTICE" && phase !== "draft" && phase !== "archived"
-		);
-	});
+	const shown = exams
+		.filter(
+			({ exam }) =>
+				exam.type !== "PRACTICE" && !hiddenFromStudents(exam.status),
+		)
+		.map((taught) => ({
+			...taught,
+			schedule: examSchedule(taught.exam, taught.exceptions),
+		}));
 
 	const inProgress = shown
 		.map((taught) => ({
 			...taught,
-			personalWindows: personalWindowsOf(taught, now),
+			personalWindows: personalWindowsOf(taught.schedule, now),
 		}))
 		.filter(
-			({ exam, exceptions, personalWindows }) =>
+			({ exam, schedule, personalWindows }) =>
 				examPhase(exam, now) === "open" ||
 				personalWindows > 0 ||
-				[...(exceptions?.values() ?? [])].some(
-					(exception) =>
+				[...schedule.exceptions.entries()].some(
+					([author, exception]) =>
 						!exception.dropped &&
-						examPhase(personalTiming(exam, exception), now) === "open",
+						examPhase(timingFor(schedule, author), now) === "open",
 				),
 		)
-		.map(
-			({ course, exam, enrolled, attempts, exceptions, personalWindows }) => {
-				const kinds = attempts.map(
-					({ attempt }) =>
-						attemptState(
-							personalTiming(
-								exam,
-								exceptions?.get(attempt.author ?? "") ?? null,
-							),
-							attempt,
-							now,
-						).kind,
-				);
-				return {
-					course,
-					exam,
-					started: kinds.filter((kind) => kind === "in-progress").length,
-					submitted: kinds.filter(isClosed).length,
-					enrolled,
-					personalWindows,
-					closesAt: lastWindowEnd(exam, [...(exceptions?.values() ?? [])]),
-				};
-			},
-		)
+		.map(({ course, exam, enrolled, attempts, schedule, personalWindows }) => {
+			const states = attempts.map(({ attempt }) =>
+				attemptOf(schedule, attempt.author ?? null, attempt, now),
+			);
+			return {
+				course,
+				exam,
+				started: states.filter((state) => state.kind === "in-progress").length,
+				submitted: states.filter(isFinished).length,
+				enrolled,
+				personalWindows,
+				closesAt: lastWindowEnd(schedule),
+			};
+		})
 		.sort((a, b) => {
 			if (a.closesAt === null || b.closesAt === null) {
 				return Number(a.closesAt === null) - Number(b.closesAt === null);
@@ -175,21 +173,12 @@ export function instructorHome(
 		});
 
 	const toGrade = shown
-		.map(({ course, exam, attempts, exceptions }) => ({
+		.map(({ course, exam, attempts, schedule }) => ({
 			course,
 			exam,
 			pending: attempts
 				.filter(({ attempt }) =>
-					isClosed(
-						attemptState(
-							personalTiming(
-								exam,
-								exceptions?.get(attempt.author ?? "") ?? null,
-							),
-							attempt,
-							now,
-						).kind,
-					),
+					isFinished(attemptOf(schedule, attempt.author ?? null, attempt, now)),
 				)
 				.reduce((sum, { result }) => sum + pendingIn(result), 0),
 		}))
@@ -198,13 +187,12 @@ export function instructorHome(
 
 	const toRelease = shown
 		.filter(
-			({ exam, attempts, exceptions }) =>
+			({ schedule, attempts }) =>
 				attempts.length > 0 &&
-				gradeReleaseBlocker(
-					exam,
+				releaseBlocker(
+					schedule,
 					attempts.map(({ result }) => result),
 					now,
-					[...(exceptions?.values() ?? [])],
 				) === null,
 		)
 		.map(({ course, exam, attempts }) => ({
@@ -282,21 +270,9 @@ function nextTaught(
 }
 
 /// After the exam's own window closed, how many students still have a personal window upcoming or open at `now`.
-function personalWindowsOf(
-	{ exam, exceptions }: TaughtExam,
-	now: Date,
-): number {
-	if (examPhase(exam, now) !== "closed") return 0;
-	return [...(exceptions?.values() ?? [])].filter((exception) => {
-		if (exception.dropped) return false;
-		const phase = examPhase(personalTiming(exam, exception), now);
-		return phase === "upcoming" || phase === "open";
-	}).length;
-}
-
-/// Whether an attempt state means the student can no longer answer.
-function isClosed(kind: string): boolean {
-	return kind === "submitted" || kind === "results";
+function personalWindowsOf(schedule: ExamSchedule, now: Date): number {
+	if (examPhase(schedule.base, now) !== "closed") return 0;
+	return openWindowAuthors(schedule, now).length;
 }
 
 /// How many answered questions of one attempt have no verdict yet.

@@ -51,7 +51,7 @@ import {
 import {
 	courseRefMatch,
 	courseRefWhere,
-	exceptionTimings,
+	exceptionSchedule,
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
@@ -286,7 +286,7 @@ export class RegradeRequestService extends CrudBase<{
 	 *
 	 * The request is refused unless `regradeBlocker` returns `null` for the
 	 * submission at the current time, judged on the exam's own timing, every
-	 * exception of the exam (`exceptionTimings`, dropped students flagged),
+	 * exception of the exam (`exceptionSchedule`, dropped students flagged),
 	 * the author's own exception, the author's attempt, and the outcome
 	 * `examResult` computes over every submission of the attempt and every
 	 * grading pass on it. The `publicId` is 18 lowercase hex characters, so
@@ -335,12 +335,16 @@ export class RegradeRequestService extends CrudBase<{
 		ensurePerm(opts.actor, "regrade.request", target);
 
 		const now = new Date();
-		const exceptions = exceptionTimings(
-			response.exam.exceptions,
-			response.exam.course.enrollments.map((entry) => entry.username),
+		const active = response.exam.course.enrollments.map(
+			(entry) => entry.username,
 		);
-		const own = response.exam.exceptions.findIndex(
-			(entry) => entry.username === response.authorId,
+		const schedule = exceptionSchedule(
+			{
+				...examTimingFromDb(response.exam),
+				gradesReleasedAt: response.exam.gradesReleasedAt,
+			},
+			response.exam.exceptions,
+			active,
 		);
 		const answers = response.submissions.filter(
 			(entry) => entry.questionId === contested.questionId,
@@ -362,12 +366,8 @@ export class RegradeRequestService extends CrudBase<{
 
 		const blocker = regradeBlocker(
 			{
-				exam: {
-					...examTimingFromDb(response.exam),
-					gradesReleasedAt: response.exam.gradesReleasedAt,
-				},
-				exceptions,
-				exception: own === -1 ? null : (exceptions[own] ?? null),
+				schedule,
+				author: response.authorId,
 				attempt: response,
 				outcome,
 				submission: input.submission,

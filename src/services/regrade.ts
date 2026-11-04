@@ -10,12 +10,9 @@ import { m } from "@/i18n";
 import type { QuestionOutcome } from "./exam-result";
 import {
 	type AttemptTiming,
-	attemptState,
-	type ExamTiming,
-	type ExceptionTiming,
-	personalTiming,
+	attemptOf,
+	type ExamSchedule,
 	releaseMoment,
-	resultsReleased,
 } from "./exam-state";
 
 /// Milliseconds in a day.
@@ -42,12 +39,10 @@ export type RegradeBlocker =
 
 /// What {@link regradeBlocker} needs to judge one answer of one attempt.
 export interface RegradeContext {
-	/// The exam's own timing, never a `personalTiming`, with `gradesReleasedAt`.
-	exam: ExamTiming;
-	/// Every exception of the exam, dropped students flagged, as `resultsReleased` takes them.
-	exceptions: readonly ExceptionTiming[];
-	/// The author's own exception, or `null` when they have none.
-	exception: ExceptionTiming | null;
+	/// The exam's schedule, with `gradesReleasedAt` on its base and every exception, dropped students flagged.
+	schedule: ExamSchedule;
+	/// The username of the attempt's author.
+	author: string;
 	/// The author's attempt.
 	attempt: AttemptTiming;
 	/// The outcome of the contested answer's question, as `examResult` computes it over the attempt.
@@ -64,8 +59,7 @@ export interface RegradeContext {
  * The checks run in this order and the first one that fails is reported:
  *
  * - `practice`: the exam is a `PRACTICE` exam.
- * - `not-released`: `attemptState(personalTiming(exam, exception), attempt,
- *   now, { released: resultsReleased(exam, now, exceptions) })` is not
+ * - `not-released`: `attemptOf(schedule, author, attempt, now)` is not
  *   `results`.
  * - `not-counting`: `ctx.submission` is not `ctx.outcome.submission`, the
  *   answer that counts for its question.
@@ -80,15 +74,10 @@ export function regradeBlocker(
 	ctx: RegradeContext,
 	now: Date,
 ): RegradeBlocker | null {
-	const { exam, outcome } = ctx;
-	if (exam.type === "PRACTICE") return "practice";
+	const { schedule, outcome } = ctx;
+	if (schedule.base.type === "PRACTICE") return "practice";
 
-	const state = attemptState(
-		personalTiming(exam, ctx.exception),
-		ctx.attempt,
-		now,
-		{ released: resultsReleased(exam, now, ctx.exceptions) },
-	);
+	const state = attemptOf(schedule, ctx.author, ctx.attempt, now);
 	if (state.kind !== "results") return "not-released";
 
 	if (outcome.submission !== ctx.submission) return "not-counting";
@@ -97,7 +86,7 @@ export function regradeBlocker(
 	}
 	if (ctx.requested) return "exists";
 
-	const deadline = regradeDeadline(exam, now, ctx.exceptions);
+	const deadline = regradeDeadline(schedule, now);
 	if (deadline && now > deadline) return "expired";
 	return null;
 }
@@ -105,19 +94,15 @@ export function regradeBlocker(
 /**
  * The last moment the students of `exam` may ask for a regrade, or `null` when there is no limit.
  *
- * `releaseMoment(exam, now, exceptions)` plus `REGRADE_WINDOW_DAYS` days; a
- * request at exactly that moment is still on time. `null` when the release
- * moment is unknown or the grades are not released yet.
- *
- * @params exam The exam's own timing, never a `personalTiming`.
- * @params exceptions Every exception of `exam`, as in `releaseMoment`.
+ * `releaseMoment(schedule, now)` plus `REGRADE_WINDOW_DAYS` days; a request at
+ * exactly that moment is still on time. `null` when the release moment is
+ * unknown or the grades are not released yet.
  */
 export function regradeDeadline(
-	exam: ExamTiming,
+	schedule: ExamSchedule,
 	now: Date,
-	exceptions: readonly ExceptionTiming[],
 ): Date | null {
-	const released = releaseMoment(exam, now, exceptions);
+	const released = releaseMoment(schedule, now);
 	if (!released) return null;
 	return new Date(released.getTime() + REGRADE_WINDOW_DAYS * DAY_MS);
 }

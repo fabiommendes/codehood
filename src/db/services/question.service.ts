@@ -7,6 +7,7 @@
  */
 import { isDeepStrictEqual } from "node:util";
 import type { z } from "zod";
+import { accessError, questionAccess, requireAccess } from "@/auth/access";
 import { type Actor, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
@@ -34,6 +35,7 @@ import {
 	questionProblems,
 	withIds,
 } from "@/mdq";
+import { type QuestionStatus, writable } from "@/services/question-status";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
@@ -248,29 +250,15 @@ export class QuestionService extends CrudBase<{
 
 		if (!row) return null;
 
-		const full = hasPerm(opts.actor, "question.read", {
-			id: row.id,
-			status: row.status,
-			course: row.course,
-		});
+		// An outsider is refused whatever the status, so a hidden slug cannot
+		// be told from a published one; a draft, hidden or archived question
+		// is missing for a non-author, unless an exam still pins it.
+		const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+		const error = accessError(access, "read", "question.read");
+		if (error instanceof NotFound) return null;
+		if (error) throw error;
 
-		// Refused before the status check, so an outsider cannot tell a hidden
-		// slug from a missing one.
-		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
-			throw new NotAllowed("question.read");
-		}
-
-		// A draft, hidden or archived question does not exist for a non-author,
-		// except a hidden or archived one an exam still pins: withdrawing a
-		// question never pulls it out of an exam.
-		if (!full && row.status !== "PUBLISHED") {
-			const pinned =
-				row.status !== "DRAFT" &&
-				(await tx.questionsForExam.count({
-					where: { questionRefId: row.id },
-				})) > 0;
-			if (!pinned) return null;
-		}
+		const full = access === "write";
 		if (filter.public === false && !full) {
 			throw new NotAllowed("question.read");
 		}
@@ -399,7 +387,7 @@ export class QuestionService extends CrudBase<{
 		if (fields.question) assertWellFormed(fields.question);
 
 		const ref = await writableRef(tx, filter, opts.actor, "question.update");
-		if (ref.status === "ARCHIVED") {
+		if (!writable(ref.status)) {
 			throw new NotAllowed("question.update", {
 				status: 409,
 				message: m.errors_question_archived({ slug: ref.slug }),
@@ -434,7 +422,7 @@ export class QuestionService extends CrudBase<{
 			where: { slug_courseId: { slug: input.slug, courseId: course.id } },
 			select: { status: true },
 		});
-		if (!existing || existing.status === "ARCHIVED") {
+		if (!existing || !writable(existing.status)) {
 			return this.create({ ...input, course: course.id }, scoped);
 		}
 
@@ -459,7 +447,7 @@ export class QuestionService extends CrudBase<{
 		opts: ServiceOptsWithoutTx,
 	): Promise<void> {
 		const ref = await writableRef(tx, filter, opts.actor, "question.delete");
-		if (ref.status === "ARCHIVED") return;
+		if (!writable(ref.status)) return;
 
 		await tx.questionRef.update({
 			where: { id: ref.id },
@@ -562,7 +550,7 @@ async function writableCourse(
 /**
  * Finds the question a write targets, refusing an actor who may not write to its course.
  *
- * A draft, hidden or archived question is `NotFound` for a non-author, as on reads.
+ * Who sees the question at all is decided as on reads.
  */
 async function writableRef(
 	tx: PrismaTx,
@@ -578,14 +566,28 @@ async function writableRef(
 				id: true,
 				slug: true,
 				status: true,
-				course: { select: { instructor: { select: { username: true } } } },
+				course: questionInclude().course,
 			},
 		}),
 	);
 
-	if (hasPerm(actor, "course.update-contents", ref.course)) return ref;
-	if (ref.status !== "PUBLISHED") throw new NotFound("question");
-	throw new NotAllowed(action);
+	requireAccess(
+		questionAccess(actor, ref, await isPinned(tx, ref)),
+		"write",
+		action,
+	);
+	return ref;
+}
+
+/// Whether an exam pins the question; only a hidden or archived one can be told apart by it.
+async function isPinned(
+	tx: PrismaTx,
+	row: { id: number; status: QuestionStatus },
+): Promise<boolean> {
+	if (row.status !== "HIDDEN" && row.status !== "ARCHIVED") return false;
+	return (
+		(await tx.questionsForExam.count({ where: { questionRefId: row.id } })) > 0
+	);
 }
 
 /** Writes `fields` onto `ref`, appending a version when `question` is given. */

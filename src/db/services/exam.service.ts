@@ -6,6 +6,7 @@
  * `DRAFT` or `ARCHIVED` exam visible to its author alone.
  */
 import type { z } from "zod";
+import { accessError, examAccess, requireAccess } from "@/auth/access";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
@@ -31,14 +32,16 @@ import {
 	type ExceptionTiming,
 	examPhase,
 	type GradeReleaseBlocker,
-	gradeReleaseBlocker,
-	personalTiming,
+	hiddenExamStatuses,
+	hiddenFromStudents,
+	releaseBlocker,
+	viewerTiming,
 } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefWhere,
-	exceptionTimings,
+	exceptionSchedule,
 	fromMs,
 	invalidIfExists,
 	toMs,
@@ -169,13 +172,11 @@ export class ExamService extends CrudBase<{
 		});
 		if (!row) return null;
 
-		if (hasPerm(opts.actor, "course.update-contents", row.course)) {
-			return fromDb(row);
-		}
-		if (row.status === "DRAFT" || row.status === "ARCHIVED") return null;
-		if (!hasPerm(opts.actor, "course.read-contents", row.course)) {
-			throw new NotAllowed("exam.read");
-		}
+		// An outsider is refused whatever the status, so a draft slug cannot be
+		// told from a published one.
+		const error = accessError(examAccess(opts.actor, row), "read", "exam.read");
+		if (error instanceof NotFound) return null;
+		if (error) throw error;
 
 		return fromDb(row);
 	}
@@ -222,7 +223,7 @@ export class ExamService extends CrudBase<{
 				// Both conditions hold together: a status filter narrows what the
 				// actor may see, it never widens it to drafts.
 				AND: [
-					full ? {} : { status: { notIn: ["DRAFT", "ARCHIVED"] } },
+					full ? {} : { status: { notIn: [...hiddenExamStatuses] } },
 					filter.statuses ? { status: { in: filter.statuses } } : {},
 				],
 				...(filter.exams ? { slug: { in: filter.exams } } : {}),
@@ -278,7 +279,7 @@ export class ExamService extends CrudBase<{
 		for (const row of rows) {
 			if (!hasPerm(opts.actor, "course.read-contents", row.course)) continue;
 			const full = hasPerm(opts.actor, "course.update-contents", row.course);
-			if (!full && (row.status === "DRAFT" || row.status === "ARCHIVED")) {
+			if (!full && hiddenFromStudents(row.status)) {
 				continue;
 			}
 			result.push({ courseId: row.courseId as CourseId, exam: fromDb(row) });
@@ -416,17 +417,12 @@ export class ExamService extends CrudBase<{
 				}),
 			);
 
-			if (!hasPerm(scoped.actor, "course.update-contents", row.course)) {
-				const seen =
-					row.status !== "DRAFT" &&
-					row.status !== "ARCHIVED" &&
-					hasPerm(scoped.actor, "course.read-contents", row.course);
-				throw seen ? new NotAllowed("exam.update") : new NotFound("exam");
-			}
+			requireAccess(examAccess(scoped.actor, row), "write", "exam.update");
 
 			const exam = fromDb(row);
 			const now = new Date();
-			const exceptions = exceptionTimings(
+			const schedule = exceptionSchedule(
+				exam,
 				await tx.examException.findMany({
 					where: { examId: row.id },
 					select: { username: true, extraTimeMs: true, scheduledAt: true },
@@ -434,13 +430,8 @@ export class ExamService extends CrudBase<{
 				row.course.enrollments.map((enrollment) => enrollment.username),
 			);
 			const blocker =
-				gradeReleaseBlocker(exam, [], now, exceptions) ??
-				gradeReleaseBlocker(
-					exam,
-					await attemptResults(tx, row),
-					now,
-					exceptions,
-				);
+				releaseBlocker(schedule, [], now) ??
+				releaseBlocker(schedule, await attemptResults(tx, row), now);
 			if (blocker === "released") return exam;
 			if (blocker) {
 				throw new InvalidData({
@@ -562,16 +553,13 @@ async function writableExam(
 				id: true,
 				courseId: true,
 				status: true,
-				course: { select: { instructor: { select: { username: true } } } },
+				course: examInclude().course,
 			},
 		}),
 	);
 
-	if (hasPerm(actor, "course.update-contents", exam.course)) return exam;
-	if (exam.status === "DRAFT" || exam.status === "ARCHIVED") {
-		throw new NotFound("exam");
-	}
-	throw new NotAllowed(action);
+	requireAccess(examAccess(actor, exam), "write", action);
+	return exam;
 }
 
 /**
@@ -680,7 +668,7 @@ const GROUP_ORDER: { key: ExamGroup["key"]; label: string }[] = [
  * window is in "Open".
  *
  * With `exceptions` (the viewing student's own, by exam slug), membership and
- * order follow `personalTiming(exam, exception)`, while the groups still hold
+ * order follow `viewerTiming(exam, exception)`, while the groups still hold
  * the exams themselves.
  */
 export function groupExamsForStudent(
@@ -689,10 +677,10 @@ export function groupExamsForStudent(
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
 ): ExamGroup[] {
 	const visible = exams
-		.filter((exam) => exam.status !== "DRAFT" && exam.status !== "ARCHIVED")
+		.filter((exam) => !hiddenFromStudents(exam.status))
 		.map((exam) => ({
 			exam,
-			personal: personalTiming(exam, exceptions.get(exam.slug) ?? null),
+			personal: viewerTiming(exam, exceptions.get(exam.slug)),
 		}));
 
 	const groups: ExamGroup[] = [];

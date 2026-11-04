@@ -3,6 +3,7 @@ import { requireUser } from "@/auth/require-user";
 import { questionStatusUpdate } from "@/core/schemas";
 import { db } from "@/db";
 import { m } from "@/i18n";
+import { writable } from "@/services/question-status";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
 
@@ -33,7 +34,7 @@ export const question = {
 				});
 			}
 
-			if (existing.status === "ARCHIVED") {
+			if (!writable(existing.status)) {
 				const updated = await db.question.upsert(
 					{
 						course,

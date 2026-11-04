@@ -68,6 +68,13 @@ function homeExam(
 	return { course: algebra, exam: e, attempt: null, result: null, ...extra };
 }
 
+/// The overrides that give the student `exception` on the exam.
+function ownException(
+	exception: ExceptionTiming,
+): Pick<HomeExam, "author" | "exceptions"> {
+	return { author: "ana", exceptions: new Map([["ana", exception]]) };
+}
+
 function event(
 	title: string,
 	startAt: Date,
@@ -661,7 +668,7 @@ test("openNow: a student with extra time sees an exam closed for the class as op
 	});
 
 	const mine = studentHome(
-		[homeExam(closed, { exception: extraMinutes(90) })],
+		[homeExam(closed, ownException(extraMinutes(90)))],
 		[],
 		NOW,
 	);
@@ -687,7 +694,7 @@ test("a makeup date puts a completed exam in upcoming for that student, with the
 	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(2 * DAY) };
 
 	const home = studentHome(
-		[homeExam(completed, { exception: makeup })],
+		[homeExam(completed, ownException(makeup))],
 		[],
 		NOW,
 	);
@@ -711,7 +718,7 @@ test("a makeup in progress is open now until the personal window ends", () => {
 	};
 
 	const home = studentHome(
-		[homeExam(completed, { exception: makeup })],
+		[homeExam(completed, ownException(makeup))],
 		[],
 		NOW,
 	);
@@ -737,7 +744,7 @@ test("a quiz result is not announced while a classmate's makeup is pending", () 
 	expect(released.results).toHaveLength(1);
 
 	const held = studentHome(
-		[homeExam(quiz, { ...mine, exceptions: [makeup] })],
+		[homeExam(quiz, { ...mine, exceptions: new Map([["classmate", makeup]]) })],
 		[],
 		NOW,
 	);

@@ -24,6 +24,7 @@ import {
 import type { QuestionType } from "@/core/schemas";
 import type { Question } from "@/db/services/question.service";
 import { locale, m } from "@/i18n";
+import { webNext } from "@/services/question-status";
 import {
 	questionStatusLabels,
 	questionTypeLabels,
@@ -73,19 +74,6 @@ const STATUS_PARAM: Record<Question["status"], string> = {
 	PUBLISHED: "published",
 	HIDDEN: "hidden",
 	ARCHIVED: "archived",
-};
-
-/// What the Actions column's status button moves a question to next.
-///
-/// A published question is withdrawn as `HIDDEN`, not moved back to `DRAFT`:
-/// a push never undoes `HIDDEN`, while it republishes a draft whose file has
-/// no `_` prefix. Archiving is deleting, which a push also reverts while the
-/// file exists, so the button never offers it.
-const STATUS_CYCLE: Record<Question["status"], Question["status"]> = {
-	ARCHIVED: "DRAFT",
-	DRAFT: "PUBLISHED",
-	PUBLISHED: "HIDDEN",
-	HIDDEN: "PUBLISHED",
 };
 
 /// What the status button shows, keyed by the status it moves *to* — the
@@ -312,7 +300,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 	 */
 	async function cycleStatus(question: QuestionRow): Promise<void> {
 		const previous = question.status;
-		const next = STATUS_CYCLE[previous];
+		const next = webNext[previous];
 
 		setPendingSlugs((current) => new Set(current).add(question.slug));
 		setStatusOverrides((current) => ({ ...current, [question.slug]: next }));
@@ -460,7 +448,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 			class: "text-right",
 			headerClass: "text-right",
 			render: (question) => {
-				const action = STATUS_ACTION[STATUS_CYCLE[question.status]];
+				const action = STATUS_ACTION[webNext[question.status]];
 				const pending = () => pendingSlugs().has(question.slug);
 				return (
 					<div class="flex justify-end gap-1">

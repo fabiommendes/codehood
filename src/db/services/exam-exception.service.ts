@@ -28,13 +28,13 @@ import {
 	type ServiceOptsWithoutTx,
 } from "@/db/base-service";
 import { m } from "@/i18n";
-import { resultsReleased } from "@/services/exam-state";
+import { released } from "@/services/exam-state";
 import { durationToMinutes } from "@/utils/schedule-time";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
 import {
 	courseRefWhere,
-	exceptionTimings,
+	exceptionSchedule,
 	fromMs,
 	invalidIfExists,
 	toMs,
@@ -432,15 +432,17 @@ async function withRelease<
 					select: { username: true, extraTimeMs: true, scheduledAt: true },
 				})
 			: [];
-	const released = resultsReleased(
-		{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
-		new Date(),
-		exceptionTimings(
-			rows,
-			course.enrollments.map((entry) => entry.username),
+	return {
+		...exam,
+		released: released(
+			exceptionSchedule(
+				{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
+				rows,
+				course.enrollments.map((entry) => entry.username),
+			),
+			new Date(),
 		),
-	);
-	return { ...exam, released };
+	};
 }
 
 /// The course as the permission predicates need it: its instructor and active enrollments.

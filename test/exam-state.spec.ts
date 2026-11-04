@@ -4,17 +4,23 @@ import type { ExamResult, QuestionOutcomeStatus } from "@/services/exam-result";
 import {
 	type AttemptTiming,
 	attemptDeadline,
+	attemptOf,
 	attemptState,
 	type ExamPhase,
 	type ExamTiming,
 	type ExceptionTiming,
 	examPhase,
 	examPhaseLabels,
+	examSchedule,
 	gradeReleaseBlocker,
+	hiddenFromStudents,
+	isFinished,
 	lastWindowEnd,
 	personalTiming,
+	released,
 	releaseMoment,
 	resultsReleased,
+	timingFor,
 	windowEnd,
 } from "@/services/exam-state";
 
@@ -42,6 +48,14 @@ function timed(overrides: Partial<ExamTiming> = {}): ExamTiming {
 
 function untimed(overrides: Partial<ExamTiming> = {}): ExamTiming {
 	return timed({ duration: null, extraTime: null, ...overrides });
+}
+
+/// The schedule of `exam` with `exceptions` held by classmates `u0`, `u1`, ...
+function sched(exam: ExamTiming, exceptions: readonly ExceptionTiming[] = []) {
+	return examSchedule(
+		exam,
+		new Map(exceptions.map((entry, index) => [`u${index}`, entry])),
+	);
 }
 
 function attempt(overrides: Partial<AttemptTiming> = {}): AttemptTiming {
@@ -530,33 +544,36 @@ test("attemptState: an open PRACTICE exam keeps an attempt in progress and lets 
 
 test("releaseMoment: a timed QUIZ releases at its window end, and not before", () => {
 	const quiz = timed({ type: "QUIZ" });
-	expect(releaseMoment(quiz, at(60))).toBeNull();
-	expect(releaseMoment(quiz, at(10_000))).toEqual(at(120));
+	expect(releaseMoment(sched(quiz), at(60))).toBeNull();
+	expect(releaseMoment(sched(quiz), at(10_000))).toEqual(at(120));
 });
 
 test("releaseMoment: a QUIZ completed before or without a window end has no known moment", () => {
 	expect(
-		releaseMoment(timed({ type: "QUIZ", status: "COMPLETED" }), at(30)),
+		releaseMoment(sched(timed({ type: "QUIZ", status: "COMPLETED" })), at(30)),
 	).toBeNull();
 	expect(
-		releaseMoment(untimed({ type: "QUIZ", status: "COMPLETED" }), at(30)),
+		releaseMoment(
+			sched(untimed({ type: "QUIZ", status: "COMPLETED" })),
+			at(30),
+		),
 	).toBeNull();
 });
 
 test("releaseMoment: an untimed QUIZ still open is not released", () => {
 	const quiz = untimed({ type: "QUIZ" });
 	expect(resultsReleased(quiz, at(10_000))).toBe(false);
-	expect(releaseMoment(quiz, at(10_000))).toBeNull();
+	expect(releaseMoment(sched(quiz), at(10_000))).toBeNull();
 });
 
 test("releaseMoment: an EXAM releases at gradesReleasedAt once reached", () => {
 	const exam = timed({ gradesReleasedAt: at(300) });
-	expect(releaseMoment(exam, at(200))).toBeNull();
-	expect(releaseMoment(exam, at(400))).toEqual(at(300));
+	expect(releaseMoment(sched(exam), at(200))).toBeNull();
+	expect(releaseMoment(sched(exam), at(400))).toEqual(at(300));
 });
 
 test("releaseMoment: a PRACTICE exam is released with no known moment", () => {
-	expect(releaseMoment(timed({ type: "PRACTICE" }), at(30))).toBeNull();
+	expect(releaseMoment(sched(timed({ type: "PRACTICE" })), at(30))).toBeNull();
 });
 
 test("releaseMoment: whenever it returns a moment, resultsReleased holds and the moment is not after now", () => {
@@ -578,7 +595,7 @@ test("releaseMoment: whenever it returns a moment, resultsReleased holds and the
 					gradesReleasedAt: released === null ? null : at(released),
 				});
 				const now = at(when);
-				const moment = releaseMoment(exam, now);
+				const moment = releaseMoment(sched(exam), now);
 				if (moment === null) return;
 				expect(resultsReleased(exam, now)).toBe(true);
 				expect(moment.getTime()).toBeLessThanOrEqual(now.getTime());
@@ -769,34 +786,34 @@ for (const status of ["DRAFT", "ARCHIVED"] as const) {
 // ---------------------------------------------------------------------------
 
 test("lastWindowEnd: without exceptions it is the end of the exam's window", () => {
-	expect(lastWindowEnd(timed(), [])).toEqual(at(120));
+	expect(lastWindowEnd(sched(timed(), []))).toEqual(at(120));
 });
 
 test("lastWindowEnd: a makeup after the exam is the latest end", () => {
-	expect(lastWindowEnd(timed(), [makeup(2000)])).toEqual(at(2120));
+	expect(lastWindowEnd(sched(timed(), [makeup(2000)]))).toEqual(at(2120));
 });
 
 test("lastWindowEnd: extra time pushes the end past the exam's own", () => {
-	expect(lastWindowEnd(timed(), [extra(45)])).toEqual(at(165));
+	expect(lastWindowEnd(sched(timed(), [extra(45)]))).toEqual(at(165));
 });
 
 test("lastWindowEnd: picks the latest among several personal windows", () => {
 	const exceptions = [extra(45), makeup(500), makeup(300), extra(10)];
-	expect(lastWindowEnd(timed(), exceptions)).toEqual(at(620));
+	expect(lastWindowEnd(sched(timed(), exceptions))).toEqual(at(620));
 });
 
 test("lastWindowEnd: a makeup before the exam does not pull the end back", () => {
-	expect(lastWindowEnd(timed(), [makeup(-1000)])).toEqual(at(120));
+	expect(lastWindowEnd(sched(timed(), [makeup(-1000)]))).toEqual(at(120));
 });
 
 test("lastWindowEnd: an exam without duration has no end, exceptions or not", () => {
-	expect(lastWindowEnd(untimed(), [])).toBeNull();
-	expect(lastWindowEnd(untimed(), [extra(45)])).toBeNull();
+	expect(lastWindowEnd(sched(untimed(), []))).toBeNull();
+	expect(lastWindowEnd(sched(untimed(), [extra(45)]))).toBeNull();
 });
 
 test("lastWindowEnd: an exam without a date has no end even with a makeup on it", () => {
 	const unscheduled = timed({ status: "ONGOING", scheduledAt: null });
-	expect(lastWindowEnd(unscheduled, [makeup(2000)])).toBeNull();
+	expect(lastWindowEnd(sched(unscheduled, [makeup(2000)]))).toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -946,15 +963,15 @@ test("resultsReleased: exceptions do not hold back a PRACTICE exam", () => {
 });
 
 test("releaseMoment: a QUIZ is released when the last personal window ends", () => {
-	expect(releaseMoment(quiz(), at(200), [extra(45)])).toEqual(at(165));
-	expect(releaseMoment(quiz(), at(2200), [makeup(2000), extra(10)])).toEqual(
-		at(2120),
-	);
+	expect(releaseMoment(sched(quiz(), [extra(45)]), at(200))).toEqual(at(165));
+	expect(
+		releaseMoment(sched(quiz(), [makeup(2000), extra(10)]), at(2200)),
+	).toEqual(at(2120));
 });
 
 test("releaseMoment: a QUIZ has no release moment while a personal window is pending", () => {
-	expect(releaseMoment(quiz(), at(130), [extra(45)])).toBeNull();
-	expect(releaseMoment(quiz(), at(130), [makeup(2000)])).toBeNull();
+	expect(releaseMoment(sched(quiz(), [extra(45)]), at(130))).toBeNull();
+	expect(releaseMoment(sched(quiz(), [makeup(2000)]), at(130))).toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -997,4 +1014,192 @@ test("attemptState: a missed attempt stays missed although released is true", ()
 	expect(attemptState(quiz(), null, at(130), { released: true })).toEqual({
 		kind: "missed",
 	});
+});
+
+// ---------------------------------------------------------------------------
+// ExamSchedule
+// ---------------------------------------------------------------------------
+
+/// Instants around every boundary of the windows used below, in minutes after START.
+const INSTANTS = [
+	-10_000, -1, 0, 1, 30, 119, 120, 121, 164, 165, 166, 1999, 2000, 2119, 2120,
+	2121, 10_000,
+];
+
+const scheduleCases: Array<[string, ExamTiming, ExceptionTiming[]]> = [
+	["a timed QUIZ with no exception", timed({ type: "QUIZ" }), []],
+	["a timed QUIZ with extra time", timed({ type: "QUIZ" }), [extra(45)]],
+	["a timed QUIZ with a makeup", timed({ type: "QUIZ" }), [makeup(2000)]],
+	[
+		"a timed QUIZ with both",
+		timed({ type: "QUIZ" }),
+		[extra(45), makeup(2000)],
+	],
+	[
+		"a completed QUIZ with a makeup",
+		timed({ type: "QUIZ", status: "COMPLETED" }),
+		[makeup(2000)],
+	],
+	["an untimed QUIZ", untimed({ type: "QUIZ" }), [extra(10)]],
+	[
+		"an EXAM released at +300",
+		timed({ gradesReleasedAt: at(300) }),
+		[makeup(2000)],
+	],
+	["a PRACTICE exam", timed({ type: "PRACTICE" }), [makeup(2000)]],
+];
+
+for (const [title, exam, exceptions] of scheduleCases) {
+	test(`released: once true it stays true at every later instant (${title})`, () => {
+		const schedule = sched(exam, exceptions);
+		let seen = false;
+		for (const minutes of INSTANTS) {
+			const now = released(schedule, at(minutes));
+			if (seen) expect(now, `at +${minutes}`).toBe(true);
+			seen ||= now;
+		}
+	});
+
+	test(`lastWindowEnd: is never before the exam's own end (${title})`, () => {
+		const end = lastWindowEnd(sched(exam, exceptions));
+		const own = windowEnd(exam);
+		if (end === null) return;
+		expect(own).not.toBeNull();
+		expect(end.getTime()).toBeGreaterThanOrEqual(own?.getTime() ?? 0);
+	});
+
+	test(`released: matches resultsReleased over the same exceptions (${title})`, () => {
+		for (const minutes of INSTANTS) {
+			expect(released(sched(exam, exceptions), at(minutes))).toBe(
+				resultsReleased(exam, at(minutes), exceptions),
+			);
+		}
+	});
+}
+
+test("lastWindowEnd: holds for any generated exam and exceptions", () => {
+	fc.assert(
+		fc.property(
+			fc.integer({ min: 1, max: 300 }),
+			fc.array(
+				fc.record({
+					extra: fc.option(fc.integer({ min: 1, max: 200 })),
+					start: fc.option(fc.integer({ min: -3000, max: 3000 })),
+					dropped: fc.boolean(),
+				}),
+				{ maxLength: 4 },
+			),
+			(minutes, rows) => {
+				const exam = timed({ duration: { minutes }, extraTime: null });
+				const exceptions: ExceptionTiming[] = rows.map((row) => ({
+					extraTime: row.extra === null ? null : { minutes: row.extra },
+					scheduledAt: row.start === null ? null : at(row.start),
+					dropped: row.dropped,
+				}));
+				const end = lastWindowEnd(sched(exam, exceptions));
+				expect(end?.getTime()).toBeGreaterThanOrEqual(
+					windowEnd(exam)?.getTime() ?? 0,
+				);
+			},
+		),
+	);
+});
+
+test("released: is monotonic in time for generated schedules", () => {
+	fc.assert(
+		fc.property(
+			fc.constantFrom("PRACTICE", "QUIZ", "EXAM"),
+			fc.constantFrom("SCHEDULED", "ONGOING", "COMPLETED"),
+			fc.option(fc.integer({ min: 1, max: 300 })),
+			fc.option(fc.integer({ min: -500, max: 500 })),
+			fc.array(fc.integer({ min: -3000, max: 3000 }), { maxLength: 3 }),
+			fc.integer({ min: -4000, max: 4000 }),
+			fc.integer({ min: 0, max: 4000 }),
+			(type, status, minutes, gradesAt, makeups, from, later) => {
+				const exam = timed({
+					type,
+					status,
+					duration: minutes === null ? null : { minutes },
+					gradesReleasedAt: gradesAt === null ? null : at(gradesAt),
+				});
+				const schedule = sched(exam, makeups.map(makeup));
+				if (released(schedule, at(from))) {
+					expect(released(schedule, at(from + later))).toBe(true);
+				}
+			},
+		),
+	);
+});
+
+test("timingFor: gives the exam itself to an author without exception and to nobody", () => {
+	const schedule = sched(timed(), [extra(45)]);
+	expect(windowEnd(timingFor(schedule, "nobody"))).toEqual(at(120));
+	expect(windowEnd(timingFor(schedule, null))).toEqual(at(120));
+	expect(windowEnd(timingFor(schedule, "u0"))).toEqual(at(165));
+});
+
+test("attemptOf: matches attemptState over the personal timing and the released flag", () => {
+	for (const [title, exam, exceptions] of scheduleCases) {
+		const schedule = sched(exam, exceptions);
+		for (const author of ["u0", "u1", "nobody"]) {
+			for (const minutes of INSTANTS) {
+				for (const own of [
+					null,
+					attempt(),
+					attempt({ acceptingSubmissions: false }),
+				]) {
+					const now = at(minutes);
+					const exception = schedule.exceptions.get(author) ?? null;
+					expect(
+						attemptOf(schedule, author, own, now),
+						`${title} ${author} +${minutes}`,
+					).toEqual(
+						attemptState(personalTiming(exam, exception), own, now, {
+							released: resultsReleased(exam, now, exceptions),
+						}),
+					);
+				}
+			}
+		}
+	}
+});
+
+test("attemptOf: a classmate's pending makeup keeps a finished QUIZ attempt at submitted", () => {
+	const schedule = sched(quiz(), [makeup(2000)]);
+	const finished = attempt({ acceptingSubmissions: false });
+	expect(attemptOf(schedule, "other", finished, at(130))).toEqual({
+		kind: "submitted",
+	});
+	expect(attemptOf(sched(quiz()), "other", finished, at(130))).toEqual({
+		kind: "results",
+	});
+});
+
+test("isFinished: only submitted and results", () => {
+	expect(isFinished({ kind: "submitted" })).toBe(true);
+	expect(isFinished({ kind: "results" })).toBe(true);
+	expect(isFinished({ kind: "missed" })).toBe(false);
+	expect(isFinished({ kind: "can-start" })).toBe(false);
+	expect(isFinished({ kind: "in-progress", deadline: null })).toBe(false);
+	expect(isFinished({ kind: "not-open", opensAt: null })).toBe(false);
+});
+
+for (const status of [
+	"DRAFT",
+	"ARCHIVED",
+	"SCHEDULED",
+	"ONGOING",
+	"COMPLETED",
+] as const) {
+	test(`hiddenFromStudents: ${status}`, () => {
+		expect(hiddenFromStudents(status)).toBe(
+			status === "DRAFT" || status === "ARCHIVED",
+		);
+	});
+}
+
+test("resultsReleased: a personal timing is refused by the type checker", () => {
+	const personal = personalTiming(timed(), extra(10));
+	// @ts-expect-error resultsReleased takes the exam's own timing, never a personal one.
+	expect(resultsReleased(personal, at(0))).toBe(false);
 });

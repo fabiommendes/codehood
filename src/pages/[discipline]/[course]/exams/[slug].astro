@@ -19,12 +19,13 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { shufflePool } from "@/mdq/shuffle";
 import { examResult } from "@/services/exam-result";
 import {
-	attemptState,
+	attemptOf,
+	releaseBlocker as blockerOf,
 	examPhase,
 	examPhaseLabels,
-	gradeReleaseBlocker,
-	personalTiming,
-	resultsReleased,
+	examSchedule,
+	type GradeReleaseBlocker,
+	timingFor,
 	windowEnd,
 } from "@/services/exam-state";
 import {
@@ -72,11 +73,11 @@ const now = new Date();
 // window and, for the instructor, what still blocks the release.
 const exceptions =
 	(await loadCourseExceptions(course.id)).get(slug) ?? new Map();
-const ownException = canManage
-	? null
-	: (exceptions.get(actor.username) ?? null);
+const schedule = examSchedule(exam, exceptions);
+const viewer = canManage ? null : actor.username;
+const ownException = viewer ? (exceptions.get(viewer) ?? null) : null;
 // What the viewer sees of the schedule: the student's own window, the exam's for the instructor.
-const shown = personalTiming(exam, ownException);
+const shown = timingFor(schedule, viewer);
 const phase = examPhase(shown, now);
 
 // Rendered like a resource note: PLAINTEXT/HTML text is shown as-is rather
@@ -143,15 +144,13 @@ const attempt = canManage
 				{ actor },
 			)
 		).at(-1) ?? null);
-const state = attemptState(shown, attempt, now, {
-	released: resultsReleased(exam, now, [...exceptions.values()]),
-});
+const state = attemptOf(schedule, viewer, attempt, now);
 // The instructor has no attempt of their own, so the phase is all they see.
 const badge = examBadge(phase, canManage ? undefined : state);
 
 // One fetch serves both the release control and the results table.
 let canRelease = false;
-let releaseBlocker: ReturnType<typeof gradeReleaseBlocker> = null;
+let releaseBlocker: GradeReleaseBlocker | null = null;
 let students: GradedStudent[] = [];
 let storedExceptions: ExamExceptionView[] = [];
 let resultRows: AttemptRow[] = [];
@@ -174,9 +173,7 @@ if (canManage && exam.type !== "PRACTICE") {
 	const results = attempts.map((entry) =>
 		examResult(slugs, entry.submissions, feedback),
 	);
-	releaseBlocker = gradeReleaseBlocker(exam, results, now, [
-		...exceptions.values(),
-	]);
+	releaseBlocker = blockerOf(schedule, results, now);
 	canRelease = releaseBlocker === null;
 	resultRows = attemptRows(
 		exam,
@@ -206,7 +203,7 @@ const exceptionStudents = students
 	.map(({ username, name }) => ({ username, name }));
 const exceptionRows: ExceptionRow[] = storedExceptions
 	.map((exception) => {
-		const personal = personalTiming(exam, exception);
+		const personal = timingFor(schedule, exception.username);
 		const end = windowEnd(personal);
 		const extraMinutes = exception.extraTime
 			? durationToMinutes(exception.extraTime)
@@ -324,9 +321,8 @@ for (const outcome of examOutcome?.questions ?? []) {
 		canRequest:
 			regradeBlocker(
 				{
-					exam,
-					exceptions: [...exceptions.values()],
-					exception: ownException,
+					schedule,
+					author: actor.username,
 					attempt,
 					outcome,
 					submission: outcome.submission,

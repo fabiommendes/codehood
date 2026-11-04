@@ -7,6 +7,7 @@
 
 import type { Course } from "@/db";
 import type { CalendarEntry } from "@/services/calendar-entries";
+import { hiddenFromStudents } from "@/services/exam-state";
 import { courseHref } from "@/urls";
 import { examTypeLabels } from "@/utils/exam-display";
 import { type IcalEvent, renderIcal } from "@/utils/ical";
@@ -65,10 +66,7 @@ export function renderCalendar(
 	const host = new URL(opts.origin).host;
 	const events: IcalEvent[] = [];
 	for (const entry of entries) {
-		if (
-			entry.kind === "exam" &&
-			(entry.exam.status === "DRAFT" || entry.exam.status === "ARCHIVED")
-		) {
+		if (entry.kind === "exam" && hiddenFromStudents(entry.exam.status)) {
 			continue;
 		}
 		const course = opts.courses.get(entry.courseId);

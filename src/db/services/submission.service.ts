@@ -31,7 +31,7 @@ import {
 	type ExamTiming,
 	type ExceptionTiming,
 	examPhase,
-	personalTiming,
+	viewerTiming,
 } from "@/services/exam-state";
 import { Validate } from "@/utils/validate";
 import type { Prisma, PrismaTx } from "../client";
@@ -483,7 +483,7 @@ export function assertExamOpen(
 	now: Date,
 	exception: ExceptionTiming | null = null,
 ): void {
-	const timing = personalTiming(examTimingFromDb(exam), exception);
+	const timing = viewerTiming(examTimingFromDb(exam), exception);
 	if (examPhase(timing, now) !== "open") {
 		throw new InvalidData({
 			exam: [{ code: "invalid", message: m.errors_exam_not_open() }],
@@ -519,7 +519,7 @@ export function assertAcceptingSubmissions(
 	assertExamOpen(response.exam, now, exception);
 
 	const deadline = attemptDeadline(
-		personalTiming(examTimingFromDb(response.exam), exception),
+		viewerTiming(examTimingFromDb(response.exam), exception),
 		response,
 	);
 	if (deadline && now > deadline) {

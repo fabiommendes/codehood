@@ -11,7 +11,11 @@ import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import type { QuestionOutcome } from "@/services/exam-result";
-import type { ExamTiming, ExceptionTiming } from "@/services/exam-state";
+import {
+	type ExamTiming,
+	type ExceptionTiming,
+	examSchedule,
+} from "@/services/exam-state";
 import {
 	type RegradeBlocker,
 	type RegradeContext,
@@ -75,12 +79,36 @@ function outcome(overrides: Partial<QuestionOutcome> = {}): QuestionOutcome {
 	};
 }
 
+/// The schedule of `base`, `exceptions` held by classmates and `own` by the author.
+function scheduleOf(
+	base: ExamTiming,
+	exceptions: readonly ExceptionTiming[],
+	own: ExceptionTiming | null,
+) {
+	const byUser = new Map<string, ExceptionTiming>();
+	exceptions.forEach((entry, index) => {
+		if (entry !== own) byUser.set(`classmate${index}`, entry);
+	});
+	if (own) byUser.set(AUTHOR, own);
+	return examSchedule(base, byUser);
+}
+
+/// The username of the author in {@link context}.
+const AUTHOR = "ana";
+
+/// The fields of a context a test overrides; the schedule is given as its parts.
+type ContextOverrides = Partial<Omit<RegradeContext, "schedule" | "author">> & {
+	exam?: ExamTiming;
+	exceptions?: readonly ExceptionTiming[];
+	exception?: ExceptionTiming | null;
+};
+
 /// A request that nothing blocks: released exam, counting graded answer, no request yet, inside the window.
-function context(overrides: Partial<RegradeContext> = {}): RegradeContext {
+function context(overrides: ContextOverrides = {}): RegradeContext {
+	const { exam: base, exceptions, exception, ...rest } = overrides;
 	return {
-		exam: exam(),
-		exceptions: [],
-		exception: null,
+		schedule: scheduleOf(base ?? exam(), exceptions ?? [], exception ?? null),
+		author: AUTHOR,
 		attempt: {
 			createdAt: plusMs(START, 10 * MINUTE),
 			acceptingSubmissions: false,
@@ -88,7 +116,7 @@ function context(overrides: Partial<RegradeContext> = {}): RegradeContext {
 		outcome: outcome(),
 		submission: "s1",
 		requested: false,
-		...overrides,
+		...rest,
 	};
 }
 
@@ -216,7 +244,7 @@ test("regradeBlocker: a QUIZ with no known release moment never expires", () => 
 });
 
 // Each row fails two checks; the earlier one in the documented order must win.
-const PRECEDENCE: [string, Partial<RegradeContext>, RegradeBlocker][] = [
+const PRECEDENCE: [string, ContextOverrides, RegradeBlocker][] = [
 	[
 		"practice over not-counting and exists",
 		{
@@ -281,9 +309,9 @@ test("regradeBlocker precedence: not-gradable over expired", () => {
 //
 
 test("regradeDeadline: an EXAM's deadline is the release plus 14 days", () => {
-	expect(regradeDeadline(exam(), NOW, [])?.toISOString()).toBe(
-		"2026-04-03T12:00:00.000Z",
-	);
+	expect(
+		regradeDeadline(scheduleOf(exam(), [], null), NOW)?.toISOString(),
+	).toBe("2026-04-03T12:00:00.000Z");
 });
 
 test("regradeDeadline: a QUIZ's deadline counts from the end of the last makeup window", () => {
@@ -292,10 +320,10 @@ test("regradeDeadline: a QUIZ's deadline counts from the end of the last makeup 
 		scheduledAt: new Date("2026-03-12T10:00:00Z"),
 	};
 	const now = new Date("2026-03-13T00:00:00Z");
-	expect(regradeDeadline(quiz(), now, [makeup])?.toISOString()).toBe(
-		"2026-03-26T11:30:00.000Z",
-	);
-	expect(regradeDeadline(quiz(), now, [])?.getTime()).toBe(
+	expect(
+		regradeDeadline(scheduleOf(quiz(), [makeup], null), now)?.toISOString(),
+	).toBe("2026-03-26T11:30:00.000Z");
+	expect(regradeDeadline(scheduleOf(quiz(), [], null), now)?.getTime()).toBe(
 		QUIZ_RELEASE.getTime() + REGRADE_WINDOW_DAYS * DAY,
 	);
 });
@@ -306,12 +334,19 @@ test("regradeDeadline: null when the release moment is unknown", () => {
 		scheduledAt: null,
 		duration: null,
 	});
-	expect(regradeDeadline(handCompleted, NOW, [])).toBeNull();
-	expect(regradeDeadline(exam({ type: "PRACTICE" }), NOW, [])).toBeNull();
+	expect(regradeDeadline(scheduleOf(handCompleted, [], null), NOW)).toBeNull();
+	expect(
+		regradeDeadline(scheduleOf(exam({ type: "PRACTICE" }), [], null), NOW),
+	).toBeNull();
 });
 
 test("regradeDeadline: null while the grades are not released", () => {
-	expect(regradeDeadline(exam({ gradesReleasedAt: null }), NOW, [])).toBeNull();
+	expect(
+		regradeDeadline(
+			scheduleOf(exam({ gradesReleasedAt: null }), [], null),
+			NOW,
+		),
+	).toBeNull();
 });
 
 //

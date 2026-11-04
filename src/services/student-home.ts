@@ -10,11 +10,13 @@ import { localDateOf } from "@/utils/schedule-time";
 import type { ExamResult } from "./exam-result";
 import {
 	type AttemptTiming,
-	attemptState,
+	attemptOf,
 	type ExceptionTiming,
 	examPhase,
-	personalTiming,
+	examSchedule,
+	hiddenFromStudents,
 	releaseMoment,
+	timingFor,
 	windowEnd,
 } from "./exam-state";
 
@@ -39,15 +41,15 @@ export interface HomeExam {
 	attempt: AttemptTiming | null;
 	/// The student's graded result, or `null` when the exam has not released results.
 	result: ExamResult | null;
-	/// The student's own exception on this exam. Absent means none.
-	exception?: ExceptionTiming | null;
+	/// The username of the student, whose own exception in `exceptions` shapes their timing.
+	author?: string;
 	/**
-	 * Every exception of the exam, used only to decide whether and when
-	 * results are released ({@link resultsReleased}, {@link releaseMoment}).
-	 * Loaded by a trusted actor, since a student cannot read other students'
-	 * exceptions; never shown. Absent means none.
+	 * Every exception of the exam, by username: the student's own shapes their
+	 * timing and all of them decide whether and when results are released
+	 * ({@link releaseMoment}). Loaded by a trusted actor, since a student
+	 * cannot read other students' exceptions; never shown. Absent means none.
 	 */
-	exceptions?: readonly ExceptionTiming[];
+	exceptions?: ReadonlyMap<string, ExceptionTiming>;
 }
 
 /// One calendar event of a course the student takes.
@@ -92,8 +94,8 @@ export interface StudentHome {
  * {@link releaseMoment}, so one released with no known moment never does.
  *
  * Each exam is placed by the student's personal timing (`openNow`,
- * `upcoming`, `next` and their dates, from `personalTiming(exam, exception)`),
- * while release is decided on the exam's own timing and `exceptions`. The
+ * `upcoming`, `next` and their dates, from {@link timingFor}), while release
+ * is decided on the exam's own timing and every exception. The
  * returned `exam` is always the exam itself, not the personal timing.
  */
 export function studentHome(
@@ -103,18 +105,19 @@ export function studentHome(
 ): StudentHome {
 	const visible = exams
 		.filter(({ exam }) => exam.type !== "PRACTICE")
-		.map((entry) => ({
-			...entry,
-			personal: personalTiming(entry.exam, entry.exception ?? null),
-		}))
-		.filter(
-			({ personal }) =>
-				!["draft", "archived"].includes(examPhase(personal, now)),
-		);
+		.map((entry) => {
+			const schedule = examSchedule(entry.exam, entry.exceptions);
+			return {
+				...entry,
+				schedule,
+				personal: timingFor(schedule, entry.author ?? null),
+			};
+		})
+		.filter(({ personal }) => !hiddenFromStudents(personal.status));
 
 	const openNow = visible
-		.flatMap(({ course, exam, personal, attempt }) => {
-			const state = attemptState(personal, attempt, now);
+		.flatMap(({ course, exam, personal, attempt, schedule, author }) => {
+			const state = attemptOf(schedule, author ?? null, attempt, now);
 			if (state.kind === "can-start") {
 				return [
 					{ course, exam, deadline: windowEnd(personal), started: false },
@@ -145,8 +148,8 @@ export function studentHome(
 
 	const since = now.getTime() - HOME_HORIZON_MS;
 	const results = visible
-		.flatMap(({ course, exam, attempt, result, exceptions = [] }) => {
-			const releasedAt = releaseMoment(exam, now, exceptions);
+		.flatMap(({ course, exam, attempt, result, schedule }) => {
+			const releasedAt = releaseMoment(schedule, now);
 			if (!attempt || !result || !releasedAt) return [];
 			const at = releasedAt.getTime();
 			if (at < since || at > now.getTime()) return [];

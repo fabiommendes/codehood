@@ -236,13 +236,13 @@ test("releaseGrades: a student of the course is refused and nothing changes", as
 	expect(await storedRelease(exam.id)).toBeNull();
 });
 
-test("releaseGrades: an instructor of another course gets NotFound and nothing changes", async () => {
+test("releaseGrades: an instructor of another course is refused as on reads and nothing changes", async () => {
 	const { pk, exam } = await gradedExam();
 	const { instructor: outsider } = await makeCourse();
 
 	await expect(
 		db.exam.releaseGrades(pk, { actor: outsider }),
-	).rejects.toBeInstanceOf(NotFound);
+	).rejects.toBeInstanceOf(NotAllowed);
 
 	expect(await storedRelease(exam.id)).toBeNull();
 });

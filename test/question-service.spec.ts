@@ -1022,17 +1022,20 @@ test("an admin who does not teach the course reads only the public half of publi
 	).toBeNull();
 });
 
-test("writes to a draft by a non-author are 404, as if it never existed", async () => {
+test("writes to a draft by a non-author are 404 for a course member and 403 for an outsider, as on reads", async () => {
 	const { pk } = await seedQuestion("DRAFT");
 	const stranger = await persistedUserFactory.create({ role: "INSTRUCTOR" });
 	const admin = await persistedUserFactory.create({ role: "ADMIN" });
 
-	for (const actor of [stranger, admin]) {
+	for (const [actor, status] of [
+		[stranger, 403],
+		[admin, 404],
+	] as const) {
 		await expect(
 			db.question.update(pk, { status: "PUBLISHED" }, { actor }),
-		).rejects.toMatchObject({ status: 404 });
+		).rejects.toMatchObject({ status });
 		await expect(db.question.delete(pk, { actor })).rejects.toMatchObject({
-			status: 404,
+			status,
 		});
 	}
 	expect(

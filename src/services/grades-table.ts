@@ -12,7 +12,13 @@ import type { courseGradesSchema } from "@/core/schemas";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { Exam } from "@/db/services/exam.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";
-import { type ExceptionTiming, examPhase, personalTiming } from "./exam-state";
+import {
+	type ExceptionTiming,
+	examPhase,
+	examSchedule,
+	hiddenFromStudents,
+	timingFor,
+} from "./exam-state";
 import {
 	attemptRows,
 	compareStudents,
@@ -128,13 +134,13 @@ export function gradesTable(
 	const shown = exams
 		.filter((exam) => {
 			if (exam.type !== "EXAM" && exam.type !== "QUIZ") return false;
-			const phase = examPhase(exam, now);
-			return phase !== "draft" && phase !== "archived";
+			return !hiddenFromStudents(exam.status);
 		})
 		.sort(compareExams);
 
 	const cellsByExam = shown.map((exam) => {
 		const exceptions = options.exceptions?.get(exam.slug) ?? new Map();
+		const schedule = examSchedule(exam, exceptions);
 		const rows = attemptRows(
 			exam,
 			exam.questions.map((question) => question.slug),
@@ -151,10 +157,7 @@ export function gradesTable(
 		return listed.map((student): GradeCell => {
 			const row = byAuthor.get(student.username);
 			if (!row) {
-				const own = personalTiming(
-					exam,
-					exceptions.get(student.username) ?? null,
-				);
+				const own = timingFor(schedule, student.username);
 				return { kind: examPhase(own, now) === "closed" ? "missed" : "empty" };
 			}
 			if (row.state === "in-progress") return { kind: "in-progress" };

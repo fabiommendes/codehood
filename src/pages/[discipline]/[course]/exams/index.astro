@@ -10,10 +10,10 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { examResult, formatScore } from "@/services/exam-result";
 import {
 	type AttemptState,
-	attemptState,
+	attemptOf,
 	type ExceptionTiming,
-	personalTiming,
-	resultsReleased,
+	examSchedule,
+	released,
 } from "@/services/exam-state";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
@@ -63,18 +63,12 @@ if (!canWrite) {
 	]);
 	for (const exam of exams) {
 		const attempt = attempts.find((entry) => entry.exam === exam.slug);
-		const everyone = [...(exceptions.get(exam.slug)?.values() ?? [])];
-		const released = resultsReleased(exam, now, everyone);
+		const schedule = examSchedule(exam, exceptions.get(exam.slug));
 		states.set(
 			exam.slug,
-			attemptState(
-				personalTiming(exam, ownExceptions.get(exam.slug) ?? null),
-				attempt ?? null,
-				now,
-				{ released },
-			),
+			attemptOf(schedule, actor.username, attempt ?? null, now),
 		);
-		if (!attempt || !released) continue;
+		if (!attempt || !released(schedule, now)) continue;
 		const { total } = examResult(
 			exam.questions.map((question) => question.slug),
 			attempt.submissions,
