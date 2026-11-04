@@ -182,6 +182,14 @@
 
 ### Fixed
 
+- A REST request that fails with a bug on the server (any exception that is
+  not a Codehood error, or a `RuleViolation`) answers in production with a
+  bare 500 whose message says nothing about the exception; the exception goes
+  to the server log instead. It used to carry the raw message of Prisma or Zod.
+- Multipart uploads are capped at 2 in flight per user and 6 per server
+  (`src/utils/concurrency.ts`). Past that the REST API answers 429 before
+  reading the body, so parallel 16 MB uploads can no longer fill the memory.
+
 - `course-access.ts` only counts ACTIVE enrollments as access to a course.
 
 - Week 0 of a course is the ISO week (Monday to Sunday) its start date falls

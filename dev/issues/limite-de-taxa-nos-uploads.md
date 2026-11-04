@@ -23,8 +23,13 @@ multipart de 16 MB em paralelo, para `.../resource` ou
 `.../repository/<slug>/files`, e ocupar a memória do servidor mesmo que
 todas sejam recusadas por cota ou permissão.
 
-## Proposta
+## Feito
 
-- Limitar requisições multipart simultâneas por usuário (por exemplo, 2) e
-  responder 429 acima disso.
+- Até 2 uploads multipart simultâneos por usuário e 6 no servidor
+  (`acquireUploadSlot` em `src/api/registry/route.ts`); acima disso, 429.
+
+## Falta
+
 - Checar a permissão de escrita antes de ler o corpo, quando a rota permite.
+  Hoje um usuário sem permissão ainda ocupa um dos seus 2 slots, por até
+  16 MB, até a rota recusar.

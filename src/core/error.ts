@@ -367,17 +367,6 @@ export class RuleViolation extends BaseSerializableError<RuleViolationResponse> 
 			info: this.info,
 		};
 	}
-
-	toInternalErrorResponse(): InternalErrorResponse {
-		const { message } = this;
-		return {
-			type: "error",
-			code: "internal-error",
-			status: 500,
-			message: m.errors_rule_violation_internal({ message }),
-			timestamp: new Date(),
-		};
-	}
 }
 
 /**

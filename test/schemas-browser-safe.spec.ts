@@ -18,7 +18,8 @@ test("the schemas barrel loads in a browser, without process or Buffer", async (
 		logLevel: "silent",
 	});
 	const code = result.outputFiles[0]?.text ?? "";
-	const context = vm.createContext({});
+	// Globals every browser has; `process` and `Buffer` stay out.
+	const context = vm.createContext({ TextEncoder, TextDecoder });
 	expect(() => vm.runInContext(code, context)).not.toThrow();
 	const schemas = vm.runInContext("schemas", context);
 	expect(typeof schemas.answerGrade.safeParse).toBe("function");

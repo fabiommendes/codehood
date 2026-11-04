@@ -1,11 +1,23 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { CRUD } from "@/api/registry";
+import { registry } from "@/api/registry/route";
 
 /**
  * `CRUD()` asks the service for `create` and `upsert` only when the route has
  * a create schema, and never registers a `PUT` without one.
  */
+
+/// `registry.definitions` is a getter that returns a fresh copy, so the
+/// cleanup has to reach the array it copies. Without it the routes below leak
+/// into `buildOpenApiDocument()` for later files in the same worker.
+const definitions = (registry as unknown as { _definitions: unknown[] })
+	._definitions;
+const definitionsBefore = [...definitions];
+
+test.afterAll(() => {
+	definitions.splice(0, definitions.length, ...definitionsBefore);
+});
 
 const entity = z.object({ slug: z.string() });
 const key = z.object({ slug: z.string() });

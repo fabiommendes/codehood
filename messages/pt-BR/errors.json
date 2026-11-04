@@ -2,7 +2,7 @@
 	"errors_resource_not_found": "Recurso não encontrado",
 	"errors_permission_denied": "Permissão negada",
 	"errors_rule_violation": "Violação de regra",
-	"errors_rule_violation_internal": "Violação de regra: {message}",
+	"errors_internal": "Erro interno do servidor",
 	"errors_service_unavailable": "Serviço indisponível",
 	"errors_too_many_requests": "Muitas requisições",
 	"errors_report_attachment_type": "Os anexos devem ser imagens .png, .jpg, .jpeg ou .webp.",

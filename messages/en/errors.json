@@ -2,7 +2,7 @@
 	"errors_resource_not_found": "Resource not found",
 	"errors_permission_denied": "Permission denied",
 	"errors_rule_violation": "Rule violation",
-	"errors_rule_violation_internal": "Rule violation: {message}",
+	"errors_internal": "Internal server error",
 	"errors_service_unavailable": "Service unavailable",
 	"errors_too_many_requests": "Too many requests",
 	"errors_report_attachment_type": "Attachments must be .png, .jpg, .jpeg or .webp images.",

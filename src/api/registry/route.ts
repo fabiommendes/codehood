@@ -5,10 +5,11 @@ import {
 import type { APIContext, AstroCookies } from "astro";
 import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
-import { InvalidData, NotAllowed } from "@/core/error";
+import { InvalidData, NotAllowed, TooManyRequests } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
 import { buffer } from "@/core/schemas/base";
 import { m } from "@/i18n";
+import { createSlots } from "@/utils/concurrency";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
 import { readJsonMultipart, readMultipart } from "./multipart";
 import { segmentNames, toOpenApiPath } from "./util";
@@ -162,6 +163,19 @@ export function openApiRequest(
 	};
 }
 
+/// Multipart bodies in flight. Each one is buffered whole in memory until its
+/// handler returns, so the pool bounds the memory uploads can take: `total`
+/// times `MAX_UPLOAD_BYTES`.
+const uploadSlots = createSlots({ perKey: 2, total: 6 });
+
+/// Takes an upload slot for the actor, or throws when they or the server
+/// already have too many uploads in flight.
+function acquireUploadSlot(actor: UserActor | undefined): () => void {
+	const release = uploadSlots.acquire(actor?.username ?? "");
+	if (!release) throw new TooManyRequests();
+	return release;
+}
+
 /// Whether the request declares a `multipart/form-data` body.
 function isMultipart(request: Request): boolean {
 	return (request.headers.get("content-type") ?? "")
@@ -258,31 +272,39 @@ export function route<In, Out, IsPublic extends boolean = false>(
 
 			let files: Record<string, Buffer> = {};
 			let raw: unknown;
-			if (!options.in) raw = undefined;
-			else if (readsQueryString) {
-				raw = coerceForSchema(
-					options.in,
-					collectSearchParams(new URL(request.url).searchParams),
-				);
-			} else if (options.inMultipart === "json" && isMultipart(request)) {
-				({ json: raw, files } = await readJsonMultipart(request));
-			} else if (options.inMultipart === true) {
-				raw = await readMultipart(request, options.in);
-			} else raw = await request.json();
-			const validated = options.in?.safeParse(raw);
-			if (validated?.error)
-				throw InvalidData.fromZodError(validated.error, validated.data);
+			let release: (() => void) | undefined;
+			let value: Out;
+			try {
+				if (!options.in) raw = undefined;
+				else if (readsQueryString) {
+					raw = coerceForSchema(
+						options.in,
+						collectSearchParams(new URL(request.url).searchParams),
+					);
+				} else if (options.inMultipart === "json" && isMultipart(request)) {
+					release = acquireUploadSlot(user);
+					({ json: raw, files } = await readJsonMultipart(request));
+				} else if (options.inMultipart === true) {
+					release = acquireUploadSlot(user);
+					raw = await readMultipart(request, options.in);
+				} else raw = await request.json();
+				const validated = options.in?.safeParse(raw);
+				if (validated?.error)
+					throw InvalidData.fromZodError(validated.error, validated.data);
 
-			// biome-ignore-start lint/suspicious/noExplicitAny: Typescript cannot narrow the type to be correct in all possiblities (Body, Actor) in terms of being nullable or not.
-			const value = await action({
-				actor: user,
-				body: validated?.data,
-				params: params as Record<string, string>,
-				cookies,
-				apiKey: locals.apiKey,
-				files,
-			} as any);
-			// biome-ignore-end lint/suspicious/noExplicitAny: ...
+				// biome-ignore-start lint/suspicious/noExplicitAny: Typescript cannot narrow the type to be correct in all possiblities (Body, Actor) in terms of being nullable or not.
+				value = await action({
+					actor: user,
+					body: validated?.data,
+					params: params as Record<string, string>,
+					cookies,
+					apiKey: locals.apiKey,
+					files,
+				} as any);
+				// biome-ignore-end lint/suspicious/noExplicitAny: ...
+			} finally {
+				release?.();
+			}
 
 			// `out` is not just documentation: parsing the handler's return value
 			// through it strips anything the schema doesn't declare (e.g. a raw

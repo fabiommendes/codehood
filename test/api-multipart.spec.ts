@@ -329,3 +329,81 @@ test.describe("OpenAPI", () => {
 		expect(Object.keys(media)).toEqual(["multipart/form-data"]);
 	});
 });
+
+test.describe("uploads in flight", () => {
+	const SLOW_PATH = "/api/__test/multipart-slow";
+	/// Resolves the uploads the slow handler is holding.
+	let finish: () => void = () => {};
+	let held = new Promise<void>((resolve) => {
+		finish = resolve;
+	});
+
+	const slow = POST(SLOW_PATH, {
+		inMultipart: true,
+		in: z.object({ file: buffer }),
+		out: z.object({ size: z.number() }),
+		handler: async ({ body }) => {
+			await held;
+			return { size: body.file.length };
+		},
+	});
+
+	function uploadAs(username: string): Promise<Response> {
+		const form = new FormData();
+		form.set("file", new File(["x"], "a.txt"));
+		const request = new Request(`http://test${SLOW_PATH}`, {
+			method: "POST",
+			body: form,
+		});
+		return slow.view({
+			...contextFor(request),
+			locals: { actor: { username } },
+		} as unknown as APIContext);
+	}
+
+	test.beforeEach(() => {
+		held = new Promise<void>((resolve) => {
+			finish = resolve;
+		});
+	});
+
+	test("a user's third concurrent upload answers 429 and later ones go through", async () => {
+		const first = uploadAs("ana");
+		const second = uploadAs("ana");
+		const third = await uploadAs("ana");
+		expect(third.status).toBe(429);
+		expect((await third.json()).code).toBe("too-many-requests");
+
+		finish();
+		expect((await first).status).toBe(200);
+		expect((await second).status).toBe(200);
+		expect((await uploadAs("ana")).status).toBe(200);
+	});
+
+	test("the server refuses uploads past six in flight, whoever sends them", async () => {
+		const users = ["a", "b", "c", "d", "e", "f"];
+		const pending = users.map((user) => uploadAs(user));
+		expect((await uploadAs("g")).status).toBe(429);
+
+		finish();
+		for (const response of await Promise.all(pending)) {
+			expect(response.status).toBe(200);
+		}
+	});
+
+	test("a failed upload gives its slot back", async () => {
+		finish();
+		const bad = new Request(`http://test${SLOW_PATH}`, {
+			method: "POST",
+			body: new FormData(),
+		});
+		for (let i = 0; i < 3; i++) {
+			const response = await slow.view({
+				...contextFor(bad.clone()),
+				locals: { actor: { username: "ana" } },
+			} as unknown as APIContext);
+			expect(response.status).toBe(400);
+		}
+		expect((await uploadAs("ana")).status).toBe(200);
+	});
+});
