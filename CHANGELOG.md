@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0 (2026-11-04)
+
 ### Added
 
 - `defineService` (`src/db/define-service.ts`) builds a service from `op({
