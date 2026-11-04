@@ -50,7 +50,7 @@ interface Props {
 // zod enums at runtime without breaking hydration. These literal tuples are
 // pinned against the schema's own types below, so an enum drifting out of
 // sync with this list fails to compile instead of silently under-filtering.
-const STATUS_OPTIONS = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
+const STATUS_OPTIONS = ["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"] as const;
 true satisfies AssertEqual<(typeof STATUS_OPTIONS)[number], Question["status"]>;
 
 const TYPE_OPTIONS = [
@@ -71,14 +71,21 @@ const STATUS_LABELS = questionStatusLabels;
 const STATUS_PARAM: Record<Question["status"], string> = {
 	DRAFT: "draft",
 	PUBLISHED: "published",
+	HIDDEN: "hidden",
 	ARCHIVED: "archived",
 };
 
 /// What the Actions column's status button moves a question to next.
+///
+/// A published question is withdrawn as `HIDDEN`, not moved back to `DRAFT`:
+/// a push never undoes `HIDDEN`, while it republishes a draft whose file has
+/// no `_` prefix. Archiving is deleting, which a push also reverts while the
+/// file exists, so the button never offers it.
 const STATUS_CYCLE: Record<Question["status"], Question["status"]> = {
 	ARCHIVED: "DRAFT",
 	DRAFT: "PUBLISHED",
-	PUBLISHED: "ARCHIVED",
+	PUBLISHED: "HIDDEN",
+	HIDDEN: "PUBLISHED",
 };
 
 /// What the status button shows, keyed by the status it moves *to* — the
@@ -92,6 +99,7 @@ const STATUS_ACTION: Record<
 		Icon: PublishIcon,
 		tone: "text-success",
 	},
+	HIDDEN: { label: m.questions_action_hide(), Icon: ArchiveIcon },
 	ARCHIVED: { label: m.questions_action_archive(), Icon: ArchiveIcon },
 	DRAFT: { label: m.questions_action_draft(), Icon: DraftIcon },
 };
@@ -298,7 +306,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 	}
 
 	/**
-	 * Cycles a question's status (ARCHIVED → DRAFT → PUBLISHED → ARCHIVED),
+	 * Cycles a question's status (DRAFT → PUBLISHED ⇄ HIDDEN; ARCHIVED → DRAFT),
 	 * optimistically reflecting the new status in the table and rolling back
 	 * if the action fails.
 	 */

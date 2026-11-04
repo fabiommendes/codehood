@@ -701,10 +701,14 @@ model CalendarEventRepository {
 // =============================================================================
 // Question Models
 // =============================================================================
+/// `DRAFT` and `PUBLISHED` come from the repository (a `_` prefix marks a
+/// draft); `HIDDEN` is set only on the web, withdraws a published question
+/// and is never undone by a push; `ARCHIVED` is a deleted question.
 enum QuestionStatus {
   DRAFT
   ARCHIVED
   PUBLISHED
+  HIDDEN
 }
 
 /// The set of question types the server supports. Mirrors mdq's discriminator

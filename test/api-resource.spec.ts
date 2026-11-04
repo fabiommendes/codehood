@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
@@ -381,4 +382,169 @@ test("an unknown event key answers 404 on POST, PUT and PATCH and writes nothing
 	expect(patch.status()).toBe(404);
 	const after = await request.get(`${url}/real`, { headers });
 	expect((await after.json()).title).toBe("Real");
+});
+
+/// The sha-256 of `bytes`, the name its multipart part travels under.
+function sha256(bytes: Buffer): string {
+	return createHash("sha256").update(bytes).digest("hex");
+}
+
+/// A PUT body for a `FILE` resource naming its blob by hash.
+function fileBody(slug: string, hash: string, filename = "notes.pdf") {
+	return {
+		slug,
+		title: "Notes",
+		rev: tag("h"),
+		data: { type: "FILE" as const, filename, hash },
+	};
+}
+
+/// A multipart request: the JSON body in `json`, one part per file by hash.
+function multipart(body: unknown, ...files: Buffer[]) {
+	return {
+		json: JSON.stringify(body),
+		...Object.fromEntries(
+			files.map((bytes) => [
+				sha256(bytes),
+				{ name: "file", mimeType: "application/octet-stream", buffer: bytes },
+			]),
+		),
+	};
+}
+
+test("PUT multipart creates a FILE resource with its bytes, and a JSON PUT reuses the blob by hash", async ({
+	request,
+}) => {
+	const { instructor, url } = await makeCourse();
+	const headers = await tokenFor(request, instructor.username);
+	const bytes = Buffer.from(`%PDF-1.4 ${tag("pdf")}`);
+	const hash = sha256(bytes);
+
+	const missing = await request.post("/api/blob/missing", {
+		headers,
+		data: { hashes: [hash] },
+	});
+	expect((await missing.json()).missing).toEqual([hash]);
+
+	const put = await request.put(url, {
+		headers,
+		multipart: multipart(fileBody("slides", hash), bytes),
+	});
+	expect(put.status()).toBe(200);
+	const created = await put.json();
+	expect(created.data).toMatchObject({
+		type: "FILE",
+		filename: "notes.pdf",
+		mimeType: "application/pdf",
+	});
+
+	const served = await request.get(created.data.link, { headers });
+	expect(served.status()).toBe(200);
+	expect(Buffer.from(await served.body())).toEqual(bytes);
+
+	// The server has the blob now: a second resource needs only its hash.
+	const reused = await request.put(url, {
+		headers,
+		data: fileBody("slides-copy", hash, "copy.pdf"),
+	});
+	expect(reused.status()).toBe(200);
+	expect((await reused.json()).data.filename).toBe("copy.pdf");
+	const after = await request.post("/api/blob/missing", {
+		headers,
+		data: { hashes: [hash] },
+	});
+	expect((await after.json()).missing).toEqual([]);
+});
+
+test("PATCH multipart replaces a FILE resource's bytes", async ({
+	request,
+}) => {
+	const { instructor, url } = await makeCourse();
+	const headers = await tokenFor(request, instructor.username);
+	const first = Buffer.from(`first ${tag("v")}`);
+	const second = Buffer.from(`second ${tag("v")}`);
+	await request.put(url, {
+		headers,
+		multipart: multipart(fileBody("handout", sha256(first)), first),
+	});
+
+	const patch = await request.patch(`${url}/handout`, {
+		headers,
+		multipart: multipart(
+			{ data: { type: "FILE", filename: "notes.pdf", hash: sha256(second) } },
+			second,
+		),
+	});
+	expect(patch.status()).toBe(200);
+	const served = await request.get((await patch.json()).data.link, {
+		headers,
+	});
+	expect(Buffer.from(await served.body())).toEqual(second);
+});
+
+test("a FILE whose hash the server lacks and the request did not send answers 404 and writes nothing", async ({
+	request,
+}) => {
+	const { instructor, url } = await makeCourse();
+	const headers = await tokenFor(request, instructor.username);
+	const unknown = sha256(Buffer.from(tag("never-sent")));
+
+	const json = await request.put(url, {
+		headers,
+		data: fileBody("ghost", unknown),
+	});
+	expect(json.status()).toBe(404);
+
+	// A part for other bytes does not stand in for the one the body names.
+	const other = Buffer.from(tag("other"));
+	const form = await request.put(url, {
+		headers,
+		multipart: multipart(fileBody("ghost", unknown), other),
+	});
+	expect(form.status()).toBe(404);
+	expect((await request.get(`${url}/ghost`, { headers })).status()).toBe(404);
+});
+
+test("a multipart body is refused with 400 when a part's bytes do not match its sha-256, the json part is missing, or a stray text part comes along", async ({
+	request,
+}) => {
+	const { instructor, url } = await makeCourse();
+	const headers = await tokenFor(request, instructor.username);
+	const bytes = Buffer.from(tag("bytes"));
+	const hash = sha256(bytes);
+	const file = {
+		name: "file",
+		mimeType: "application/octet-stream",
+		buffer: Buffer.from("tampered"),
+	};
+
+	const cases = {
+		mismatch: { json: JSON.stringify(fileBody("bad", hash)), [hash]: file },
+		noJson: { [hash]: { ...file, buffer: bytes } },
+		strayText: {
+			json: JSON.stringify(fileBody("bad", hash)),
+			title: "Sneaky",
+		},
+	};
+	for (const [name, form] of Object.entries(cases)) {
+		const response = await request.put(url, { headers, multipart: form });
+		expect(response.status(), name).toBe(400);
+	}
+	expect((await request.get(`${url}/bad`, { headers })).status()).toBe(404);
+});
+
+test("a JSON FILE body with a buffer field and no hash is refused with 400", async ({
+	request,
+}) => {
+	const { instructor, url } = await makeCourse();
+	const headers = await tokenFor(request, instructor.username);
+	const response = await request.put(url, {
+		headers,
+		data: {
+			slug: "inline",
+			title: "Inline",
+			data: { type: "FILE", filename: "a.txt", buffer: "aGVsbG8=" },
+		},
+	});
+	expect(response.status()).toBe(400);
 });

@@ -150,7 +150,7 @@ export type InviteTarget = { id?: number; createdBy: UserTarget };
  */
 export interface QuestionWithCourse {
 	id?: number;
-	status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+	status: "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED";
 	course: CourseTarget | CourseWithEnrollment;
 }
 
@@ -374,12 +374,13 @@ const PERMISSIONS = {
 	} satisfies PermDef<QuestionWithCourse>,
 
 	// Rule: the public half goes to whoever may write the question, or, once
-	// `PUBLISHED`, to whoever may see the course's contents; a draft or
-	// archived question is its author's alone.
+	// `PUBLISHED`, to whoever may see the course's contents; a draft, hidden
+	// or archived question is its author's alone.
 	//
-	// No service calls this entry: `QuestionService.findOneTx` hides a draft
-	// or archived question as missing rather than refused, and still shows an
-	// archived one an exam pins, which this rule cannot express.
+	// No service calls this entry: `QuestionService.findOneTx` hides a draft,
+	// hidden or archived question as missing rather than refused, and still
+	// shows a hidden or archived one an exam pins, which this rule cannot
+	// express.
 	"question.read-public": {
 		other: (actor, target) =>
 			isCourseOwner(actor, target.course) ||

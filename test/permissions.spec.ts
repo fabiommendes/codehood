@@ -252,7 +252,7 @@ test("course.update-contents denies a non-owning admin; course.update and course
 
 test("question.read is exactly course.update-contents on question.course: no admin branch for a non-owning admin", () => {
 	const course = courseFixture();
-	const question = (status: "DRAFT" | "PUBLISHED" | "ARCHIVED") => ({
+	const question = (status: "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED") => ({
 		status,
 		course,
 	});

@@ -87,6 +87,15 @@ export type CrudRouteOptions<
 	skipDelete?: boolean;
 	skipFindOne?: boolean;
 
+	/**
+	 * Lets create, upsert and update also take a multipart body (see
+	 * `readJsonMultipart`), and puts the file parts in the parsed body before
+	 * the service sees it.
+	 *
+	 * `files` holds the bytes by sha-256, already checked against it.
+	 */
+	withFiles?: <B>(body: B, files: Record<string, Buffer>) => B;
+
 	service: FindOne<KeyT, EntityT> &
 		FindMany<FilterT & ScopeT, EntityT> &
 		Create<CreateT & CreateExtra, EntityT> &
@@ -329,12 +338,17 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 				POST(this.path, {
 					operationId: this.operationId("create"),
 					in: this.options.create.openapi(`${this.name}Create`),
+					inMultipart: this.inMultipart,
 					out: this.options.entity.openapi(this.name),
 					summary: `Creates a new ${this.name}.`,
 					tags: this.options.tags,
 					errors: this.errors("create"),
-					handler({ actor, body, params }) {
-						return self.createHandler({ actor, body, params });
+					handler({ actor, body, params, files }) {
+						return self.createHandler({
+							actor,
+							body: self.withFiles(body, files),
+							params,
+						});
 					},
 				}),
 
@@ -375,12 +389,17 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 				PATCH(this.pathWithKey, {
 					operationId: this.operationId("update"),
 					in: this.options.update,
+					inMultipart: this.inMultipart,
 					out: this.options.entity,
 					summary: `Update a single ${this.name}.`,
 					tags: this.options.tags,
 					errors: this.errors("update"),
-					handler: async ({ actor, body, params }) => {
-						return self.updateHandler({ actor, body, params });
+					handler: async ({ actor, body, params, files }) => {
+						return self.updateHandler({
+							actor,
+							body: self.withFiles(body, files),
+							params,
+						});
 					},
 				}),
 
@@ -389,12 +408,17 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 				PUT(this.path, {
 					operationId: this.operationId("upsert"),
 					in: this.options.create as ZodType<Create>,
+					inMultipart: this.inMultipart,
 					out: this.options.entity,
 					summary: `Upsert a single ${this.name}. Creates if it does not exist, update otherwise.`,
 					tags: this.options.tags,
 					errors: this.errors("upsert"),
-					handler: async ({ actor, body, params }) => {
-						return self.upsertHandler({ actor, body, params });
+					handler: async ({ actor, body, params, files }) => {
+						return self.upsertHandler({
+							actor,
+							body: self.withFiles(body, files),
+							params,
+						});
 					},
 				}),
 
@@ -557,6 +581,18 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	}
 
 	// Private helpers
+
+	/// `"json"` on the write routes when the options take files.
+	private get inMultipart(): "json" | undefined {
+		return this.options.withFiles ? "json" : undefined;
+	}
+
+	/// Runs the `withFiles` hook, if any, when the request sent files.
+	private withFiles<B>(body: B, files: Record<string, Buffer> = {}): B {
+		const hook = this.options.withFiles;
+		return hook && Object.keys(files).length ? hook(body, files) : body;
+	}
+
 	private operationId(action: string) {
 		return `${action}${this.slugTitle}`;
 	}

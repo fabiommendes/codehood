@@ -2,6 +2,7 @@ import type { ZodType } from "zod";
 import { InvalidData } from "@/core/error";
 import type { InvalidDataCode } from "@/core/error-response";
 import { MAX_UPLOAD_BYTES } from "@/core/schemas";
+import { hashBytes } from "@/utils/content-hash";
 import { coerceForSchema } from "@/utils/query-coerce";
 
 /// Builds the single-field error shared by every rejection in this module.
@@ -36,6 +37,31 @@ async function readLimited(request: Request, maxBytes: number) {
 	return Buffer.concat(chunks);
 }
 
+/// Checks the content type and size of a `multipart/form-data` request and
+/// parses it.
+async function readForm(request: Request, maxBytes: number): Promise<FormData> {
+	const type = request.headers.get("content-type") ?? "";
+	if (!type.toLowerCase().startsWith("multipart/form-data")) {
+		throw reject("Expected a multipart/form-data body", 400);
+	}
+	const header = request.headers.get("content-length")?.trim();
+	if (header && /^\d+$/.test(header) && Number(header) > maxBytes) {
+		throw tooLarge(maxBytes);
+	}
+
+	let form: FormData;
+	try {
+		const bytes = await readLimited(request, maxBytes);
+		form = await new Response(bytes, {
+			headers: { "content-type": type },
+		}).formData();
+	} catch (error) {
+		if (error instanceof InvalidData) throw error;
+		throw reject("Malformed multipart/form-data body", 400);
+	}
+	return form;
+}
+
 /**
  * Reads a `multipart/form-data` request into the raw object a route's `in`
  * schema validates.
@@ -57,25 +83,7 @@ export async function readMultipart(
 	schema: ZodType,
 	maxBytes: number = MAX_UPLOAD_BYTES,
 ): Promise<Record<string, unknown>> {
-	const type = request.headers.get("content-type") ?? "";
-	if (!type.toLowerCase().startsWith("multipart/form-data")) {
-		throw reject("Expected a multipart/form-data body", 400);
-	}
-	const header = request.headers.get("content-length")?.trim();
-	if (header && /^\d+$/.test(header) && Number(header) > maxBytes) {
-		throw tooLarge(maxBytes);
-	}
-
-	let form: FormData;
-	try {
-		const bytes = await readLimited(request, maxBytes);
-		form = await new Response(bytes, {
-			headers: { "content-type": type },
-		}).formData();
-	} catch (error) {
-		if (error instanceof InvalidData) throw error;
-		throw reject("Malformed multipart/form-data body", 400);
-	}
+	const form = await readForm(request, maxBytes);
 
 	const files: Record<string, Buffer> = Object.create(null);
 	const text: Record<string, string | string[]> = Object.create(null);
@@ -102,3 +110,58 @@ export async function readMultipart(
 	}
 	return { ...coerceForSchema(schema, text), ...files };
 }
+
+/// What {@link readJsonMultipart} hands the route: the parsed `json` part and
+/// the bytes of every file part, keyed by their verified sha-256.
+export type JsonMultipart = {
+	json: unknown;
+	files: Record<string, Buffer>;
+};
+
+/**
+ * Reads a `multipart/form-data` body made of one text part `json`, holding
+ * the JSON body, and file parts named after the sha-256 of their bytes.
+ *
+ * The size limit is the one {@link readMultipart} applies. The `json` part is
+ * not validated: the caller runs the route's `in` schema on it.
+ *
+ * @throws {@link InvalidData} With status 413 past `maxBytes`, and 400 when
+ * the body is not multipart, the `json` part is missing, repeated or not
+ * JSON, a text part other than `json` is present, or a file part's name is
+ * not the sha-256 of its bytes.
+ */
+export async function readJsonMultipart(
+	request: Request,
+	maxBytes: number = MAX_UPLOAD_BYTES,
+): Promise<JsonMultipart> {
+	const form = await readForm(request, maxBytes);
+	const files: Record<string, Buffer> = Object.create(null);
+	let text: string | undefined;
+	for (const [key, value] of form.entries()) {
+		if (typeof value === "string") {
+			if (key !== "json") {
+				throw reject(`Unexpected text part "${key}"`, 400);
+			}
+			if (text !== undefined) throw reject('Part "json" is repeated', 400);
+			text = value;
+			continue;
+		}
+		if (!SHA256.test(key)) {
+			throw reject(`File part "${key}" is not named by a sha-256`, 400);
+		}
+		const bytes = Buffer.from(await value.arrayBuffer());
+		if (hashBytes(bytes) !== key) {
+			throw reject(`File part "${key}" does not match its sha-256`, 400);
+		}
+		files[key] = bytes;
+	}
+	if (text === undefined) throw reject('Missing the "json" part', 400);
+	try {
+		return { json: JSON.parse(text), files };
+	} catch {
+		throw reject('Part "json" is not valid JSON', 400);
+	}
+}
+
+/// A lowercase sha-256, the name of a file part.
+const SHA256 = /^[0-9a-f]{64}$/;

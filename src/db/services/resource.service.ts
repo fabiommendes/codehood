@@ -91,7 +91,10 @@ export class ResourceService
 	/**
 	 * Creates a resource.
 	 *
-	 * It automatically create the blobs and attachment for FILE resources.
+	 * A `FILE` carries its bytes, or the hash of a blob the server already
+	 * has; either way the attachment is charged to the actor's quota.
+	 *
+	 * @throws {@link NotFound} If a `FILE` names a hash with no blob.
 	 */
 	@Validate({
 		service: true,
@@ -131,14 +134,10 @@ export class ResourceService
 
 			// Create attachment now that we have the row id.
 			if (input.data.type === "FILE") {
-				const attachment = await self.attachment.create(
-					{
-						attachedTo: { type: "RESOURCE", id: row.id },
-						filename: input.data.filename,
-						buffer: input.data.buffer,
-					},
-					{ tx, actor: opts.actor },
-				);
+				const attachment = await self.attachFile(row.id, input.data, {
+					tx,
+					actor: opts.actor,
+				});
 
 				// The row above was created with `attachmentId: null` since the
 				// attachment can't exist before the resource's own id does — link
@@ -327,14 +326,10 @@ export class ResourceService
 			const attachmentId =
 				fields.data?.type === "FILE"
 					? (
-							await self.attachment.create(
-								{
-									attachedTo: { type: "RESOURCE", id: target.id },
-									filename: fields.data.filename,
-									buffer: fields.data.buffer,
-								},
-								{ tx, actor: opts.actor },
-							)
+							await self.attachFile(target.id, fields.data, {
+								tx,
+								actor: opts.actor,
+							})
 						).id
 					: undefined;
 
@@ -443,6 +438,22 @@ export class ResourceService
 	//
 	// Private helpers
 	//
+
+	/// Attaches a `FILE`'s bytes when they were sent, else the blob already
+	/// stored under its hash, which must exist.
+	private attachFile(
+		id: Resource["id"],
+		data: Extract<ResourceCreate["data"], { type: "FILE" }>,
+		opts: ServiceOpts & { tx: PrismaTx },
+	) {
+		const owner = {
+			attachedTo: { type: "RESOURCE" as const, id },
+			filename: data.filename,
+		};
+		return "buffer" in data
+			? this.attachment.create({ ...owner, buffer: data.buffer }, opts)
+			: this.attachment.attach({ ...owner, hash: data.hash }, opts);
+	}
 	private toRawData(raw: ResourceCreate["data"]): DbResource["data"] {
 		switch (raw.type) {
 			case "LINK":

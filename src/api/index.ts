@@ -418,6 +418,16 @@ export const blobMissingApi = POST("/api/blob/missing", {
 	}),
 });
 
+/// Swaps a `FILE`'s hash for the bytes sent with it, so the service writes
+/// the blob and its attachment together; without them the hash stays.
+function inlineResourceFile<B>(body: B, files: Record<string, Buffer>): B {
+	const data = (body as { data?: { type: string; hash?: string } }).data;
+	const bytes = data?.type === "FILE" && data.hash && files[data.hash];
+	if (!data || !bytes) return body;
+	const { hash: _, ...rest } = data;
+	return { ...body, data: { ...rest, buffer: bytes } };
+}
+
 export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	name: "Resource",
 	plural: "Resources",
@@ -427,8 +437,8 @@ export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	entity: schema.resourceSchema
 		.omit({ id: true, courseId: true })
 		.extend({ event: schema.resourceEventKey.nullable() }),
-	create: schema.resourceCreate.omit({ course: true }),
-	update: schema.resourceUpdate,
+	create: schema.resourceCreateRest.omit({ course: true }),
+	update: schema.resourceUpdateRest,
 	filter: schema.resourceFilterBase,
 	scope: courseScope,
 	key: schema.resourcePK,
@@ -436,10 +446,12 @@ export const resourceApi = CRUD("/api/course/[discipline]/[course]/resource", {
 	tags: ["Resources"],
 	service: db.resource,
 
-	parseKeyParams(params) {
+	withFiles: inlineResourceFile,
+
+	parseKeyParams(params: Record<string, string>) {
 		return { course: parseCourseParams(params), slug: params.slug as string };
 	},
-	parseScopeParams(params) {
+	parseScopeParams(params: Record<string, string>) {
 		return { course: parseCourseParams(params) };
 	},
 });

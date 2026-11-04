@@ -8,7 +8,7 @@ import { courseRef } from "./course";
 export const questionSchema = z.object({
 	slug: slug,
 	id: questionRefId,
-	status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
+	status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"]),
 	version: z.string().min(1),
 	rev: rev.nullable(),
 	createdAt: z.date(),

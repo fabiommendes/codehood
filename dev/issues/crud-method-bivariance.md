@@ -33,3 +33,12 @@ Compila.
 
 Declarar `create`/`upsert` como propriedades com tipo de função, e tratar os
 erros que aparecerem nos services.
+
+## Observado também
+
+Quando nenhuma das duas direções é atribuível, o erro aparece e mostra que
+`CreateExtra` não foi inferido: com `parseScopeParams(params) { ... }` sem
+anotação, o método é sensível ao contexto e o TypeScript adia a inferência.
+O `resourceApi` (`src/api/index.ts`) só compilou depois de anotar
+`params: Record<string, string>` em `parseScopeParams` e `parseKeyParams`.
+Os outros `CRUD()` dependem da bivariância para passar.

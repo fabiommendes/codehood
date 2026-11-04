@@ -7,9 +7,10 @@ import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
+import { buffer } from "@/core/schemas/base";
 import { m } from "@/i18n";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
-import { readMultipart } from "./multipart";
+import { readJsonMultipart, readMultipart } from "./multipart";
 import { segmentNames, toOpenApiPath } from "./util";
 
 type ActionAPIContext = APIContext;
@@ -34,9 +35,12 @@ export type RouteOptions<In, Out, IsPublic extends boolean = false> = {
 	isPublic?: IsPublic;
 	operationId?: string;
 	in?: ZodType<In>;
-	/// Reads `in` from a `multipart/form-data` body (see `readMultipart`)
-	/// instead of JSON, and documents it so. Only for POST, PUT and PATCH.
-	inMultipart?: boolean;
+	/// `true` reads `in` from a `multipart/form-data` body (see
+	/// `readMultipart`) instead of JSON. `"json"` takes either a JSON body or
+	/// a multipart one with the JSON in a `json` part and files named by
+	/// sha-256 (see `readJsonMultipart`), handed to the handler as `files`.
+	/// Only for POST, PUT and PATCH.
+	inMultipart?: boolean | "json";
 	out: ZodType<Out>;
 	summary?: string;
 	description?: string;
@@ -56,6 +60,8 @@ type HandlerArgs<In, Actor> = Actor extends Actor
 			cookies: AstroCookies;
 			/// The API key the request authenticated with, if any.
 			apiKey?: App.Locals["apiKey"];
+			/// File parts by sha-256, empty unless `inMultipart: "json"`.
+			files: Record<string, Buffer>;
 		}
 	: {
 			actor?: Actor;
@@ -64,6 +70,8 @@ type HandlerArgs<In, Actor> = Actor extends Actor
 			cookies: AstroCookies;
 			/// The API key the request authenticated with, if any.
 			apiKey?: App.Locals["apiKey"];
+			/// File parts by sha-256, empty unless `inMultipart: "json"`.
+			files: Record<string, Buffer>;
 		};
 
 /// The Handler function itself
@@ -115,14 +123,34 @@ export function openApiRequest(
 	const pathParams = segmentNames(path);
 	if (!options.in && !pathParams.length) return undefined;
 
-	const contentType = options.inMultipart
-		? "multipart/form-data"
-		: "application/json";
+	const content =
+		options.inMultipart === "json"
+			? {
+					"application/json": { schema: options.in },
+					"multipart/form-data": {
+						schema: z
+							.object({
+								json: z.string().openapi({
+									description: "The `application/json` body, as text.",
+								}),
+							})
+							.catchall(buffer)
+							.openapi({
+								description:
+									"Every other part is a file named after the sha-256 of its bytes.",
+							}),
+					},
+				}
+			: {
+					[options.inMultipart ? "multipart/form-data" : "application/json"]: {
+						schema: options.in,
+					},
+				};
 	return {
 		...(options.in
 			? readsQueryString
 				? { query: options.in as unknown as ZodObject }
-				: { body: { content: { [contentType]: { schema: options.in } } } }
+				: { body: { content } }
 			: {}),
 		...(pathParams.length
 			? {
@@ -132,6 +160,13 @@ export function openApiRequest(
 				}
 			: {}),
 	};
+}
+
+/// Whether the request declares a `multipart/form-data` body.
+function isMultipart(request: Request): boolean {
+	return (request.headers.get("content-type") ?? "")
+		.toLowerCase()
+		.startsWith("multipart/form-data");
 }
 
 //
@@ -221,16 +256,19 @@ export function route<In, Out, IsPublic extends boolean = false>(
 				});
 			}
 
-			const raw = options.in
-				? readsQueryString
-					? coerceForSchema(
-							options.in,
-							collectSearchParams(new URL(request.url).searchParams),
-						)
-					: options.inMultipart
-						? await readMultipart(request, options.in)
-						: await request.json()
-				: undefined;
+			let files: Record<string, Buffer> = {};
+			let raw: unknown;
+			if (!options.in) raw = undefined;
+			else if (readsQueryString) {
+				raw = coerceForSchema(
+					options.in,
+					collectSearchParams(new URL(request.url).searchParams),
+				);
+			} else if (options.inMultipart === "json" && isMultipart(request)) {
+				({ json: raw, files } = await readJsonMultipart(request));
+			} else if (options.inMultipart === true) {
+				raw = await readMultipart(request, options.in);
+			} else raw = await request.json();
 			const validated = options.in?.safeParse(raw);
 			if (validated?.error)
 				throw InvalidData.fromZodError(validated.error, validated.data);
@@ -242,6 +280,7 @@ export function route<In, Out, IsPublic extends boolean = false>(
 				params: params as Record<string, string>,
 				cookies,
 				apiKey: locals.apiKey,
+				files,
 			} as any);
 			// biome-ignore-end lint/suspicious/noExplicitAny: ...
 

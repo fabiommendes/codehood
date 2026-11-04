@@ -220,7 +220,7 @@ export class QuestionService extends CrudBase<{
 	 *
 	 * `filter.public` picks the view (see `questionFindOneQuery`); asking for
 	 * the whole document without the right to see it throws `NotAllowed`, and
-	 * a draft or archived question is `null` for anyone but its author.
+	 * a draft, hidden or archived question is `null` for anyone but its author.
 	 *
 	 * `filter.version` picks the stored version by its `versionHash`, as an
 	 * exam pins it; left out or `null`, the read returns the latest. Every
@@ -260,12 +260,12 @@ export class QuestionService extends CrudBase<{
 			throw new NotAllowed("question.read");
 		}
 
-		// A draft or archived question does not exist for a non-author, except
-		// an archived one an exam still pins: archiving never pulls a question
-		// out of an exam.
+		// A draft, hidden or archived question does not exist for a non-author,
+		// except a hidden or archived one an exam still pins: withdrawing a
+		// question never pulls it out of an exam.
 		if (!full && row.status !== "PUBLISHED") {
 			const pinned =
-				row.status === "ARCHIVED" &&
+				row.status !== "DRAFT" &&
 				(await tx.questionsForExam.count({
 					where: { questionRefId: row.id },
 				})) > 0;
@@ -562,7 +562,7 @@ async function writableCourse(
 /**
  * Finds the question a write targets, refusing an actor who may not write to its course.
  *
- * A draft or archived question is `NotFound` for a non-author, as on reads.
+ * A draft, hidden or archived question is `NotFound` for a non-author, as on reads.
  */
 async function writableRef(
 	tx: PrismaTx,

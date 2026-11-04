@@ -318,7 +318,7 @@ Type: domain
 
 The stable identity of a question: its [Course](#course), slug, type
 (multiple-choice, multiple-selection, true-false, essay, numeric, short-answer,
-fill-in, or ordering), status (draft, published, or archived), and tags. It
+fill-in, or ordering), status (draft, published, hidden, or archived), and tags. It
 has no author field. The text lives in its [versions](#question-version)
 instead, so the reference stays lightweight and editing never rewrites history.
 

@@ -8,6 +8,7 @@ import {
 	rev,
 	slug,
 } from "./base";
+import { blobHash } from "./blob";
 import { courseRef } from "./course";
 
 /// A calendar event of the resource's course, by the natural key the CLI
@@ -75,6 +76,12 @@ export const resourceFileDataCreate = resourceFileData
 		buffer: buffer,
 	});
 
+/// A `FILE` whose bytes are a blob the server already has, or one sent in
+/// the same multipart request under its sha-256.
+export const resourceFileDataRef = resourceFileData
+	.pick({ filename: true })
+	.extend({ type: z.literal("FILE"), hash: blobHash });
+
 // Exactly one of `courseId`/`courseRef` is required. The service checks it,
 // not a refinement, because the REST API derives its body with `.omit()`.
 export const resourceCreate = resourceSchema
@@ -98,12 +105,29 @@ export const resourceCreate = resourceSchema
 		data: z.union([
 			resourceLinkData,
 			resourceFileDataCreate,
+			resourceFileDataRef,
 			resourceCodeData,
 			resourceMdData,
 		]),
 	});
 
+/// The REST body of a create or upsert: a `FILE` names its blob by hash,
+/// since no JSON value is a `Buffer`.
+export const resourceCreateRest = resourceCreate.extend({
+	data: z.union([
+		resourceLinkData,
+		resourceFileDataRef,
+		resourceCodeData,
+		resourceMdData,
+	]),
+});
+
 export const resourceUpdate = resourceCreate
+	.omit({ slug: true, course: true })
+	.partial();
+
+/// The REST body of an update, see {@link resourceCreateRest}.
+export const resourceUpdateRest = resourceCreateRest
 	.omit({ slug: true, course: true })
 	.partial();
 

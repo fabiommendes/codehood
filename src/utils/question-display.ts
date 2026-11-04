@@ -22,6 +22,7 @@ export const questionTypeLabels: Record<QuestionType, string> = {
 export const questionStatusLabels: Record<QuestionStatus, string> = {
 	DRAFT: m.questions_status_draft(),
 	PUBLISHED: m.questions_status_published(),
+	HIDDEN: m.questions_status_hidden(),
 	ARCHIVED: m.questions_status_archived(),
 };
 
@@ -32,6 +33,8 @@ export function statusBadgeClass(status: QuestionStatus): string {
 			return "badge-success";
 		case "DRAFT":
 			return "badge-outline";
+		case "HIDDEN":
+			return "badge-warning";
 		case "ARCHIVED":
 			return "badge-neutral";
 	}

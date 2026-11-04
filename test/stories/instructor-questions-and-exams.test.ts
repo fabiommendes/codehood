@@ -116,6 +116,30 @@ test("instructor: browse the question bank", async ({ page }) => {
 		await expect(page.getByText("ARCHIVED", { exact: true })).toHaveCount(0);
 	});
 
+	await test.step("a hidden one offers to publish it again", async () => {
+		await db.question.create(
+			{
+				course: course.id,
+				slug: "withdrawn-question",
+				status: "HIDDEN",
+				version: "v1",
+				question: {
+					type: "essay",
+					title: "Withdrawn question",
+					stem: "Published by mistake.",
+					tags: ["withdrawn"],
+					content: "text",
+				},
+			},
+			FULL_ACCESS,
+		);
+		await page.goto(`${href}/questions`);
+		const row = page.getByRole("row", { name: /Withdrawn question/ });
+		await expect(row.getByText("Hidden", { exact: true })).toBeVisible();
+		await expect(row.getByRole("button", { name: "Publish" })).toBeVisible();
+		await expect(page.getByText("HIDDEN", { exact: true })).toHaveCount(0);
+	});
+
 	await test.step("opening one shows its title, type and status", async () => {
 		await page.goto(`${href}/questions`);
 		await page.getByText("Recursion basics").click();

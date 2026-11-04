@@ -216,7 +216,7 @@ test("questionWhere selects exactly the rows question.read and question.read-pub
 		enrollments: [{ username: active.username }],
 	};
 
-	const statuses = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
+	const statuses = ["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"] as const;
 	const rows: { id: number; target: QuestionWithCourse }[] = [];
 	for (const status of statuses) {
 		const input = questionFactory.build({

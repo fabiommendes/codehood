@@ -4,6 +4,18 @@
 
 ### Added
 
+- Hidden questions. `HIDDEN` withdraws a published question from students
+  while it stays editable and stays in the exams that pin it. The question
+  bank's status button now moves a published question to Hidden and back,
+  instead of to Archived, which is what deleting a question does.
+- `FILE` resources over the REST API. The `data` of a `FILE` names its blob
+  by sha-256 (`{type, filename, hash}`). When the server lacks the blob, the
+  same `PUT`, `POST` or `PATCH` goes as `multipart/form-data`, with the JSON
+  body in a `json` part and the bytes in a part named by the hash. Bytes
+  always arrive with their owner, so the uploader's quota is charged in the
+  same transaction. Any route opts in with `inMultipart: "json"`, or with
+  `withFiles` on `CRUD()`.
+
 - `pnpm run db:seed:cli` pushes a full course, `pyxel101` (Python and games
   with Pyxel, 16 weeks), with `ch push` as `ada`, from a copy in
   `tmp/pyxel101/` with the edition and dates moved to the seed's current

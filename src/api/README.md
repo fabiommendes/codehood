@@ -22,7 +22,7 @@ This file maps where each piece lives.
 | `utils.ts`                     | Shared path-segment parsers                    |
 | `registry/index.ts`            | Re-exports `CRUD` and the verb wrappers        |
 | `registry/route.ts`            | `route()` and the verb wrappers [^route]       |
-| `registry/multipart.ts`        | `readMultipart` for `inMultipart` routes [^mp] |
+| `registry/multipart.ts`        | Multipart readers for `inMultipart` [^mp]      |
 | `registry/crud.ts`             | `CRUD()` — one resource into six routes        |
 | `registry/openapi-document.ts` | `buildOpenApiDocument()` [^doc]                |
 | `registry/dynamicHandler.ts`   | The Astro entrypoint every route shares [^dyn] |
@@ -52,7 +52,12 @@ Outside this directory:
     input, calls the handler, parses the result through `out`, and turns a
     thrown error into a JSON response. Also declares the `BearerAuth` scheme.
 
-[^mp]: Rejects a body over the size limit with 413.
+[^mp]: Rejects a body over the size limit with 413. `inMultipart: true` reads
+    form fields into `in`. `inMultipart: "json"` takes a JSON body, or a
+    multipart one with that JSON in a `json` part and one file part per blob,
+    named by its sha-256 and checked against it. `CRUD()` turns it on for the
+    write routes when `withFiles` is set: the resource route uses it so a
+    `FILE` and its bytes arrive in one request.
 
 [^doc]: Imports `dynamicHandler` for its registration side effects, then turns
     `registry.definitions` into the document. It strips the `form` meta of the

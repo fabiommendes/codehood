@@ -35,8 +35,15 @@ sobre estado do servidor foi decidida em 2026-11-03. O lado do CLI está em
   converge. Um deck de 40 MB que falha em 90% não desfaz as trinta questões
   que já entraram.
 - Bytes de arquivo vão em `multipart/form-data`, uma parte por arquivo com o
-  sha-256 como nome (`src/api/index.ts:376-382`), depois de
-  `POST /api/blob/missing` (`:408`) dizer quais hashes faltam. Não há base64.
+  sha-256 como nome, depois de `POST /api/blob/missing` dizer quais hashes
+  faltam. Não há base64.
+- Os bytes sempre sobem junto com o dono deles: na rota do repositório
+  (`repositoryAddFiles`) ou na própria rota da entidade, que aceita o corpo
+  JSON numa parte `json` (`inMultipart: "json"`, ver
+  `src/api/registry/multipart.ts`). Um `FILE` de recurso referencia o blob
+  pelo hash; se o servidor já o tem, o corpo vai em JSON puro. Não existe
+  upload de blob sem dono: assim a cota do usuário é cobrada na mesma
+  transação que grava o arquivo, para qualquer papel.
 - Syncs concorrentes: last-write-wins. Um repositório é dono do conteúdo de um
   curso; coautores se acertam no Git. O `rev` gravado em cada entidade é opaco
   para o servidor; é o CLI que o usa para detectar conflitos.
@@ -52,9 +59,11 @@ sobre estado do servidor foi decidida em 2026-11-03. O lado do CLI está em
   `ARCHIVED`, derivado do arquivo (`cli/dev/specs/to-do/push-exams.md`). O
   servidor recusa `ONGOING`/`COMPLETED` vindos do REST e ignora qualquer
   `status` enviado para um exame que já está `ONGOING` ou `COMPLETED`.
-- O `status` da questão (`DRAFT`/`PUBLISHED`) é escrito pelo push e pela web.
-  O servidor aceita os dois e não arbitra; a regra para quando divergem fica
-  no CLI (`cli/dev/issues/question-status-divergence.md`).
+- O `status` da questão é escrito pelo push e pela web, e o servidor não
+  arbitra. O push só avança na ordem `DRAFT`, `PUBLISHED`, `HIDDEN`: manda o
+  maior entre o do arquivo (`_` é rascunho) e o do servidor. `HIDDEN` só se
+  escolhe na web, para retirar uma questão publicada, e nenhum push o desfaz.
+  `ARCHIVED` é questão apagada, fora dessa ordem (mapping doc, "Question").
 
 ## Consequências
 

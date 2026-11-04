@@ -408,7 +408,7 @@ function toDbWhere(pk: { course: number; slug: string }) {
 }
 
 async function seedQuestion(
-	status: "DRAFT" | "PUBLISHED" | "ARCHIVED" = "PUBLISHED",
+	status: "DRAFT" | "PUBLISHED" | "HIDDEN" | "ARCHIVED" = "PUBLISHED",
 ) {
 	const ctx = await makeCourse();
 	await db.question.create(
@@ -687,6 +687,20 @@ test("update() on an archived question is refused", async () => {
 	).toBe("ARCHIVED");
 });
 
+test("update() on a hidden question appends a version and keeps it hidden", async () => {
+	const { course, opts, pk } = await seedQuestion("HIDDEN");
+
+	const question = await db.question.update(
+		pk,
+		{ version: "v2", question: edited },
+		opts,
+	);
+
+	expect(question.status).toBe("HIDDEN");
+	expect(question.version).toBe("v2");
+	expect(await versionsOf(course.id)).toHaveLength(2);
+});
+
 for (const method of ["create", "upsert"] as const) {
 	test(`${method}() revives an archived question in place, keeping its history`, async () => {
 		const { course, opts, pk } = await seedQuestion();
@@ -772,7 +786,12 @@ test("findMany() returns exactly the questions the read permission allows, for e
 	);
 
 	for (const { course, opts } of [a, b]) {
-		for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
+		for (const status of [
+			"DRAFT",
+			"PUBLISHED",
+			"HIDDEN",
+			"ARCHIVED",
+		] as const) {
 			await db.question.create(
 				{
 					course: course.id,
@@ -801,7 +820,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 			},
 		},
 	});
-	expect(stored).toHaveLength(6);
+	expect(stored).toHaveLength(8);
 
 	for (const actor of [SYSTEM, a.opts.actor, enrolled, admin] as Actor[]) {
 		for (const isPublic of [true, false]) {
@@ -855,6 +874,7 @@ test("findMany() returns exactly the questions the read permission allows, for e
 	expect(visible(a.opts.actor, false)).toEqual([
 		"a/archived",
 		"a/draft",
+		"a/hidden",
 		"a/published",
 	]);
 });
@@ -866,7 +886,7 @@ test("an enrolled student sees only published questions", async () => {
 		{ course: course.id, username: student.username },
 		FULL_ACCESS,
 	);
-	for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
+	for (const status of ["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"] as const) {
 		await db.question.create(
 			{
 				course: course.id,
@@ -886,7 +906,7 @@ test("an enrolled student sees only published questions", async () => {
 	expect(listed.map((q) => q.slug)).toEqual(["published"]);
 
 	// Hidden as if they never existed, not refused.
-	for (const slug of ["draft", "archived"]) {
+	for (const slug of ["draft", "hidden", "archived"]) {
 		expect(
 			await db.question.findOne(
 				{ course: course.id, slug },
@@ -896,49 +916,54 @@ test("an enrolled student sees only published questions", async () => {
 	}
 });
 
-test("an archived question an exam pins stays readable to an enrolled student", async () => {
-	const { course, opts } = await makeCourse();
-	const student = await persistedUserFactory.create({ role: "STUDENT" });
-	await db.enrollment.create(
-		{ course: course.id, username: student.username },
-		FULL_ACCESS,
-	);
-	for (const slug of ["pinned", "loose"]) {
-		await db.question.create(
-			{
-				course: course.id,
-				slug,
-				status: "PUBLISHED",
-				version: "v1",
-				question: multipleChoice,
-			},
-			opts,
+for (const withdrawn of ["HIDDEN", "ARCHIVED"] as const) {
+	test(`a ${withdrawn.toLowerCase()} question an exam pins stays readable to an enrolled student`, async () => {
+		const { course, opts } = await makeCourse();
+		const student = await persistedUserFactory.create({ role: "STUDENT" });
+		await db.enrollment.create(
+			{ course: course.id, username: student.username },
+			FULL_ACCESS,
 		);
-	}
-	await persistedExamFactory.create({
-		course: course.id,
-		questions: [{ slug: "pinned", version: "v1" }],
-	});
-	await db.question.delete({ course: course.id, slug: "pinned" }, opts);
-	await db.question.delete({ course: course.id, slug: "loose" }, opts);
+		for (const slug of ["pinned", "loose"]) {
+			await db.question.create(
+				{
+					course: course.id,
+					slug,
+					status: "PUBLISHED",
+					version: "v1",
+					question: multipleChoice,
+				},
+				opts,
+			);
+		}
+		await persistedExamFactory.create({
+			course: course.id,
+			questions: [{ slug: "pinned", version: "v1" }],
+		});
+		for (const slug of ["pinned", "loose"]) {
+			const pk = { course: course.id, slug };
+			if (withdrawn === "ARCHIVED") await db.question.delete(pk, opts);
+			else await db.question.update(pk, { status: withdrawn }, opts);
+		}
 
-	const pinned = await db.question.findOne(
-		{ course: course.id, slug: "pinned", public: true, version: "v1" },
-		{ actor: student },
-	);
-	expect(pinned?.slug).toBe("pinned");
-	expect(
-		await db.question.findOne(
-			{ course: course.id, slug: "loose", public: true },
+		const pinned = await db.question.findOne(
+			{ course: course.id, slug: "pinned", public: true, version: "v1" },
 			{ actor: student },
-		),
-	).toBeNull();
-});
+		);
+		expect(pinned?.slug).toBe("pinned");
+		expect(
+			await db.question.findOne(
+				{ course: course.id, slug: "loose", public: true },
+				{ actor: student },
+			),
+		).toBeNull();
+	});
+}
 
 test("a user outside the course is refused a question whatever its status", async () => {
 	const { course, opts } = await makeCourse();
 	const outsider = await persistedUserFactory.create({ role: "STUDENT" });
-	for (const status of ["DRAFT", "PUBLISHED", "ARCHIVED"] as const) {
+	for (const status of ["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"] as const) {
 		await db.question.create(
 			{
 				course: course.id,
@@ -952,7 +977,7 @@ test("a user outside the course is refused a question whatever its status", asyn
 	}
 
 	// Refusing every status alike keeps the slugs of hidden questions secret.
-	for (const slug of ["draft", "published", "archived"]) {
+	for (const slug of ["draft", "published", "hidden", "archived"]) {
 		await expect(
 			db.question.findOne({ course: course.id, slug }, { actor: outsider }),
 		).rejects.toMatchObject({ code: "not-allowed" });
