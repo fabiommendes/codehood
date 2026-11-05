@@ -15,8 +15,10 @@ as notas.
   `codehood push` não envia provas. A `prolog-moodle` antiga ficou `ARCHIVED`.
 - Questões do curso (`~/aulas/paradigmas/ch`) enviadas com os slugs novos
   (`id` do frontmatter). Na `prova-1`:
-  - `prolog-avaliador-de-expressoes` tem um `## [accept]` com a cláusula de `*`
-    antes da de `+` (os dois códigos funcionam; alunos reclamaram);
+  - `prolog-avaliador-de-expressoes` aceita as 8 ordens que funcionam
+    (cláusula de `+` antes ou depois da de `*`, operandos em qualquer ordem),
+    todas testadas no SWI-Prolog 10. Critério do professor: código válido que
+    resolve a questão vale 1, o resto vale 0;
   - `logica-negacao-escopo` e `prolog-meta-motivacao` têm `grading: partial`.
 - O curso local não tem nenhum commit no git.
 
@@ -28,7 +30,7 @@ as notas.
 | `tmp/moodle-prolog/{quiz.mdq.md,responses.yaml,grades.csv}` | Saída do `aprender fetch raw.json`. `grades.csv` tem as notas do Moodle em pontos, não em fração. |
 | `tmp/moodle-prolog/build-plan.mjs` | Gera `plan.json` e `report.md` a partir dessa saída e das questões de um banco. Rodar da raiz: `node tmp/moodle-prolog/build-plan.mjs --db <banco>`. |
 | `deploy/scripts/import-moodle-responses.mjs` | Grava o plano no banco com `node:sqlite`, sem dependências. Simula por padrão; `--apply` grava. Idempotente: quem já tem tentativa é pulado. Falha se as questões da prova mudaram depois do plano (`versionHash`). Sem commit no repositório `deploy/`. |
-| `tmp/dev.db.prod-20261105-clean` | Cópia de prod de 2026-11-05 13:26 UTC, antes da importação. |
+| `tmp/dev.db.prod-20261105-clean` | Cópia de prod de 2026-11-05 13:45 UTC, antes da importação. |
 
 O que o script grava: `ResponseRef` fechada (`acceptingSubmissions = 0`) com
 início e fim do Moodle; um `Submission` por questão respondida
@@ -39,7 +41,7 @@ tempo extra (50 min).
 
 ### Validação feita
 
-- `dev.db` = prod de 2026-11-05 13:26 UTC mais a importação. Resultado: 158
+- `dev.db` = prod de 2026-11-05 13:45 UTC mais a importação. Resultado: 158
   tentativas, 2042 respostas, 1579 notas, 92 exceções; segunda rodada não grava
   nada.
 - Pelo app (com a prova em `SCHEDULED`): a correção mostra 155/155/153
@@ -47,9 +49,9 @@ tempo extra (50 min).
   horários do Moodle e a exceção. Com a prova em `DRAFT`, tudo aparece como "In
   progress"/"No answers": em prod a prova precisa sair de `DRAFT`.
 - `report.md`: q5, q7 a q12 iguais ao Moodle. Diferenças:
-  - q4: 15 alunos sobem para 1,00 (o `[accept]` novo). **10 alunos caem para
-    0**: o mdq dá 0 ou 1 na ordenação, e o Moodle deu crédito parcial
-    (0,25 a 0,75). Decisão pendente, abaixo.
+  - q4: 20 alunos sobem para 1,00. 5 ficam com 0 contra 0,25 a 0,75 no
+    Moodle: as ordens deles não compilam ou falham na execução (testado no
+    SWI-Prolog, arquivos em `tmp/moodle-prolog/q4/`). Decidido: vale 0.
   - q13: com `partial`, o mdq dá nota maior ou igual à do Moodle para todos.
   - q6: 4 alunos com "brasília" acentuado ganham 1,00 (Moodle deu 0,75).
 - 17 alunos sem conta no Codehood ficaram de fora (lista no `report.md`).
@@ -57,16 +59,9 @@ tempo extra (50 min).
 - 1 aluno respondeu 4.5 na q9 (domínio inteiro): importado com nota 0, como a
   tela de revisão trata uma resposta malformada.
 
-### Decisão pendente
-
-Q4, os 10 alunos que perderiam o crédito parcial do Moodle. Opções:
-(a) `unmatched: manual` na questão: essas respostas ficam pendentes para
-correção manual (o professor decide); (b) gravar a nota do Moodle como
-`Feedback` do professor nesses 10; (c) aceitar o 0.
-
 ### Passos para prod
 
-1. Fechar a decisão da q4 e os pesos (seção 2), se forem antes.
+1. Implementar os pesos (seção 2), se forem antes.
 2. `ansible-playbook deploy/backup.yml` e gerar o plano a partir dessa cópia
    (`build-plan.mjs --db <cópia>`); conferir o `report.md`.
 3. Copiar `plan.json` e o script para a VPS; rodar como o usuário `codehood`
