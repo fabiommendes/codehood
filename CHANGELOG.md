@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.2 (2026-11-05)
+
 ### Fixed
 
 - `codehood-manage` failed on a deployed instance since 0.3.0 (`Cannot find
