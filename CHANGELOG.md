@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- `codehood-manage` failed on a deployed instance since 0.3.0 (`Cannot find
+  package 'mdq'`): `dist/manage.mjs` left every package external, and the
+  linked `mdq` is a dev dependency that a production install leaves out. Only
+  `dependencies` stay external now.
+
 ## 0.3.1 (2026-11-05)
 
 ### Fixed
