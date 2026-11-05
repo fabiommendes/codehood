@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.1 (2026-11-05)
+
 ### Fixed
 
 - Questions stored by 0.2 broke every instructor page that lists them (home,
