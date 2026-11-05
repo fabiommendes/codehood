@@ -109,6 +109,8 @@
 	],
 	"exams_attempt_submitted_waiting": "Submitted. Results are not out yet.",
 	"exams_attempt_question_of": "Question {number} of {total}",
+	"exams_attempt_question_short": "Q{number}",
+	"exams_attempt_weight": "weight {weight}",
 	"exams_attempt_save_error": "Could not save this answer: {message}. It will be retried when you change it or submit.",
 	"exams_attempt_submit_title": [
 		{

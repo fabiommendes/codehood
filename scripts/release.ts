@@ -4,8 +4,9 @@
  *
  * Usage: `pnpm run release <patch|minor|major|x.y.z> [--allow-data-loss] [--dry-run]`
  *
- * 1. Requires `main` with a clean tree. Uncommitted migrations are allowed,
- *    so a migration edited by hand after a failed run is kept.
+ * 1. Requires `main` with a clean tree and an empty design playground (only
+ *    `src/pages/design/playground/index.astro`). Uncommitted migrations are
+ *    allowed, so a migration edited by hand after a failed run is kept.
  * 2. `pnpm run db:migrate`: writes the migration for the schema changes since
  *    the last release and checks it for data loss.
  * 3. The gate: `pnpm run lint` and `pnpm test`.
@@ -15,7 +16,7 @@
  * `--dry-run` stops after the gate. Nothing is pushed.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 const { values: args, positionals } = parseArgs({
@@ -25,6 +26,9 @@ const { values: args, positionals } = parseArgs({
 		"dry-run": { type: "boolean", default: false },
 	},
 });
+
+/// Scratch pages for design work in progress; a release ships none of them.
+const PLAYGROUND = "src/pages/design/playground";
 
 function fail(message: string): never {
 	console.error(`\n✖ ${message}`);
@@ -71,6 +75,15 @@ const dirty = output("git", ["status", "--porcelain"])
 	.filter(Boolean)
 	.filter((line) => !line.slice(3).startsWith("prisma/migrations/"));
 if (dirty.length > 0) fail(`The tree is not clean:\n${dirty.join("\n")}`);
+const playground = readdirSync(PLAYGROUND, {
+	recursive: true,
+	encoding: "utf8",
+})
+	.filter((entry) => entry !== "index.astro")
+	.map((entry) => `${PLAYGROUND}/${entry}`);
+if (playground.length > 0) {
+	fail(`The design playground must be empty:\n${playground.join("\n")}`);
+}
 if (output("git", ["tag", "--list", tag])) fail(`Tag ${tag} already exists.`);
 console.log(`▶ Releasing ${pkg.version} → ${version}`);
 

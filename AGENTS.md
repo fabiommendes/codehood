@@ -88,6 +88,16 @@ update the changelog. If you find any bugs, create a new issue in `dev/issues/`.
 If the bug is simple, create a regression test and fix it. If it is complex, ask
 the human for help.
 
+## Design playground
+
+Never write standalone HTML mockups: prototype in Astro, with the app's own
+layouts (`AppLayout`) and components. A change to an existing screen is
+prototyped in place, on the real component, against data in `dev.db`. New
+screens, and alternatives compared side by side, go to
+`src/pages/design/playground/<work>/`, one subfolder per piece of work. Helpers that are not pages take a `_` prefix. The
+playground may stay on `main` while a design settles, but `pnpm run release`
+refuses to run until only `index.astro` is left there.
+
 ## Releases and migrations
 
 The schema evolves with `prisma db push` during development. Never write

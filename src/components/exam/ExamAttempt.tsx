@@ -120,6 +120,28 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				: [],
 		);
 
+	// Weights show only when some question weighs other than the default 1.
+	const weighted = () =>
+		props.questions.some((entry) => weightOf(entry.question) !== 1);
+
+	// The question whose card crosses the line under the attempt bar.
+	const [current, setCurrent] = createSignal<number | null>(null);
+	onMount(() => {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (!entry.isIntersecting) continue;
+					setCurrent(Number(entry.target.id.replace("question-", "")));
+				}
+			},
+			{ rootMargin: "-224px 0px -60% 0px" },
+		);
+		for (const element of document.querySelectorAll("[id^='question-']")) {
+			observer.observe(element);
+		}
+		onCleanup(() => observer.disconnect());
+	});
+
 	const opensAt = () =>
 		props.state.kind === "not-open" ? props.state.opensAt : null;
 	const deadline = () =>
@@ -246,7 +268,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	});
 
 	return (
-		<div class="flex flex-col gap-6">
+		<div class="flex flex-col gap-10">
 			<FormAlert error={failure() ?? undefined} />
 
 			<Switch>
@@ -319,7 +341,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									answers()[entry.slug],
 								),
 								failed: saveErrors()[entry.slug] !== undefined,
+								weight: weighted() ? weightOf(entry.question) : null,
 							}))}
+							current={current()}
 							saving={unsaved().size > 0}
 							busy={busy()}
 							onSubmit={() => dialog?.showModal()}
@@ -327,65 +351,117 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					</Show>
 
 					<For each={props.questions}>
-						{(entry, index) => (
-							<div
-								id={`question-${index() + 1}`}
-								class={`card card-border overflow-hidden bg-base-100/50 ${QUESTION_SCROLL_MARGIN}`}
-							>
-								{/* focusout bubbles, so leaving any control of the question saves it. */}
-								<div class="card-body" onFocusOut={() => saveNow(entry.slug)}>
-									<div class="flex items-baseline justify-between gap-3">
-										<span class="kicker">
-											{m.exams_attempt_question_of({
-												number: index() + 1,
-												total: props.questions.length,
-											})}
-										</span>
-										<Show when={kind() === "in-progress"}>
-											<SaveState
-												failed={saveErrors()[entry.slug] !== undefined}
-												saving={unsaved().has(entry.slug)}
-												answered={isAnswered(
-													entry.question.type,
-													answers()[entry.slug],
-												)}
+						{(entry, index) => {
+							const answered = () =>
+								isAnswered(entry.question.type, answers()[entry.slug]);
+							const failed = () => saveErrors()[entry.slug] !== undefined;
+							const tone = () =>
+								kind() !== "in-progress"
+									? "text-primary"
+									: failed()
+										? "text-error"
+										: answered()
+											? "text-success"
+											: "text-base-content/70";
+							return (
+								<section
+									id={`question-${index() + 1}`}
+									aria-label={m.exams_attempt_question_label({
+										number: index() + 1,
+									})}
+									class={`grid gap-x-4 sm:grid-cols-[4.5rem_1fr] ${QUESTION_SCROLL_MARGIN}`}
+								>
+									{/* The number stays in view while a long question scrolls past. */}
+									<div class="hidden sm:block">
+										<div class="sticky top-48 text-right">
+											<QuestionNumber
+												number={index() + 1}
+												tone={tone()}
+												class="text-4xl"
 											/>
-										</Show>
+											<Show when={weighted()}>
+												<WeightPips
+													weight={weightOf(entry.question)}
+													class="mt-2 justify-end"
+												/>
+												<p class="mt-0.5 text-xs text-muted">
+													{m.exams_attempt_weight({
+														weight: weightOf(entry.question),
+													})}
+												</p>
+											</Show>
+										</div>
 									</div>
-									<AnswerField
-										question={entry.question}
-										payload={answers()[entry.slug]}
-										readonly={kind() !== "in-progress"}
-										review={
-											kind() === "results"
-												? props.reviews?.[entry.slug]
-												: undefined
-										}
-										onChange={(payload) =>
-											change(entry.slug, entry.question.type, payload)
-										}
-									/>
-									<Show when={kind() === "results" && props.result}>
-										{(result) => (
-											<Outcome
-												outcome={result().questions.find(
-													(outcome) => outcome.question === entry.slug,
-												)}
-												regrade={props.regrades?.[entry.slug]}
-												target={target}
+									<div class="card card-border overflow-hidden bg-base-100 shadow-sm">
+										<header class="flex items-baseline gap-3 border-b border-base-300 bg-base-200/60 px-6 py-3">
+											<QuestionNumber
+												number={index() + 1}
+												tone={tone()}
+												class="text-2xl sm:hidden"
 											/>
-										)}
-									</Show>
-									<Show when={saveErrors()[entry.slug]}>
-										{(message) => (
-											<p role="alert" class="text-sm text-error">
-												{m.exams_attempt_save_error({ message: message() })}
-											</p>
-										)}
-									</Show>
-								</div>
-							</div>
-						)}
+											<h3 class="min-w-0 flex-1 truncate font-display text-lg font-semibold">
+												{entry.question.title ??
+													m.exams_attempt_question_of({
+														number: index() + 1,
+														total: props.questions.length,
+													})}
+											</h3>
+											<Show when={weighted()}>
+												<span class="text-xs text-muted sm:hidden">
+													{m.exams_attempt_weight({
+														weight: weightOf(entry.question),
+													})}
+												</span>
+											</Show>
+											<Show when={kind() === "in-progress"}>
+												<SaveState
+													failed={failed()}
+													saving={unsaved().has(entry.slug)}
+													answered={answered()}
+												/>
+											</Show>
+										</header>
+										{/* focusout bubbles, so leaving any control of the question saves it. */}
+										<div
+											class="card-body"
+											onFocusOut={() => saveNow(entry.slug)}
+										>
+											<AnswerField
+												question={entry.question}
+												payload={answers()[entry.slug]}
+												readonly={kind() !== "in-progress"}
+												review={
+													kind() === "results"
+														? props.reviews?.[entry.slug]
+														: undefined
+												}
+												onChange={(payload) =>
+													change(entry.slug, entry.question.type, payload)
+												}
+											/>
+											<Show when={kind() === "results" && props.result}>
+												{(result) => (
+													<Outcome
+														outcome={result().questions.find(
+															(outcome) => outcome.question === entry.slug,
+														)}
+														regrade={props.regrades?.[entry.slug]}
+														target={target}
+													/>
+												)}
+											</Show>
+											<Show when={saveErrors()[entry.slug]}>
+												{(message) => (
+													<p role="alert" class="text-sm text-error">
+														{m.exams_attempt_save_error({ message: message() })}
+													</p>
+												)}
+											</Show>
+										</div>
+									</div>
+								</section>
+							);
+						}}
 					</For>
 
 					<dialog ref={dialog} class="modal">
@@ -437,7 +513,15 @@ interface AttemptBarProps {
 	type: Exam["type"];
 	/// Seconds until the deadline, or `null` when the attempt has none.
 	seconds: number | null;
-	questions: { number: number; answered: boolean; failed: boolean }[];
+	/// `weight` is `null` when the exam shows no weights.
+	questions: {
+		number: number;
+		answered: boolean;
+		failed: boolean;
+		weight: number | null;
+	}[];
+	/// The number of the question in view, if any.
+	current: number | null;
 	/// Whether some change still waits for the server.
 	saving: boolean;
 	busy: boolean;
@@ -515,21 +599,71 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 										})
 									: m.exams_attempt_question_label({ number: question.number })
 							}
-							class={`btn btn-xs btn-square ${
+							aria-current={
+								props.current === question.number ? "location" : undefined
+							}
+							class={`btn btn-sm btn-square h-10 flex-col gap-0 font-mono ${
 								question.failed
 									? "btn-error"
 									: question.answered
-										? "btn-primary"
+										? "btn-success"
 										: "btn-outline"
-							}`}
+							} ${props.current === question.number ? "outline-2 outline-offset-2 outline-primary" : ""}`}
 						>
 							{question.number}
+							<Show when={question.weight !== null}>
+								<WeightPips
+									weight={question.weight ?? 1}
+									class="opacity-70"
+									small
+								/>
+							</Show>
 						</a>
 					)}
 				</For>
 			</nav>
 			<p class="mt-1 text-xs sm:hidden">{saveStatus()}</p>
 		</div>
+	);
+}
+
+/// The weight a question declares, 1 when it declares none.
+function weightOf(question: QuestionPublic["question"]): number {
+	return question.weight ?? 1;
+}
+
+/// "Q3", the label students and instructors use to refer to a question.
+function QuestionNumber(props: {
+	number: number;
+	tone: string;
+	class?: string;
+}): JSX.Element {
+	return (
+		<span
+			class={`font-display font-semibold leading-none tracking-tight ${props.tone} ${props.class ?? ""}`}
+		>
+			{m.exams_attempt_question_short({ number: props.number })}
+		</span>
+	);
+}
+
+/// One dot per unit of weight, so heavier questions stand out at a glance; a fractional weight rounds.
+function WeightPips(props: {
+	weight: number;
+	small?: boolean;
+	class?: string;
+}): JSX.Element {
+	const dots = () => Math.min(5, Math.max(0, Math.round(props.weight)));
+	return (
+		<span aria-hidden="true" class={`flex gap-0.5 ${props.class ?? ""}`}>
+			<For each={Array.from({ length: dots() })}>
+				{() => (
+					<span
+						class={`rounded-full bg-current ${props.small ? "size-1" : "size-1.5"}`}
+					/>
+				)}
+			</For>
+		</span>
 	);
 }
 
