@@ -24,7 +24,11 @@ const { course, href } = result;
 const actor = Astro.locals.actor!;
 
 const weekNumber = Number(week);
-if (!Number.isInteger(weekNumber) || !slug.safeParse(timeSlot).success) {
+if (
+	!Number.isInteger(weekNumber) ||
+	!timeSlot ||
+	!slug.safeParse(timeSlot).success
+) {
 	return Astro.rewrite("/404");
 }
 const pk = { course: course.id, week: weekNumber, timeSlot };
