@@ -54,8 +54,20 @@ tempo extra (50 min).
     SWI-Prolog, arquivos em `tmp/moodle-prolog/q4/`). Decidido: vale 0.
   - q13: com `partial`, o mdq dá nota maior ou igual à do Moodle para todos.
   - q6: 4 alunos com "brasília" acentuado ganham 1,00 (Moodle deu 0,75).
-- 17 alunos sem conta no Codehood ficaram de fora (lista no `report.md`).
-  Rodar o script de novo quando se cadastrarem.
+- Os 17 alunos do Moodle sem conta casada pela matrícula (todos fizeram a
+  prova inteira, com notas perto da mediana):
+  - 9 já tinham conta ativa no curso com a matrícula errada no perfil ("UnB",
+    "1", "mat054", dois erros de digitação...). Casados pelo nome ou e-mail;
+    o plano corrige a matrícula (`SCHOOL_ID_FIXES` em `build-plan.mjs`,
+    `schoolIdFixes` no plano). O script recusa se a matrícula atual não for a
+    esperada.
+  - 8 ganham conta nova com `--create-missing`: usuário `nome-sobrenome`,
+    e-mail `<matrícula>@aluno.unb.br`, `githubId` vazio (`!<username>`, o
+    aluno preenche no perfil, onde é obrigatório) e senha aleatória
+    descartada. O professor redefine em sala:
+    `codehood-manage reset-password <usuário>`. Lista no `report.md`.
+  - Com isso, os 175 alunos do Moodle entram: 2262 respostas, 1748 notas, 102
+    exceções.
 - 1 aluno respondeu 4.5 na q9 (domínio inteiro): importado com nota 0, como a
   tela de revisão trata uma resposta malformada.
 
@@ -63,7 +75,7 @@ tempo extra (50 min).
 
 1. Implementar os pesos (seção 2), se forem antes.
 2. `ansible-playbook deploy/backup.yml` e gerar o plano a partir dessa cópia
-   (`build-plan.mjs --db <cópia>`); conferir o `report.md`.
+   (`build-plan.mjs --db <cópia> --create-missing`); conferir o `report.md`.
 3. Copiar `plan.json` e o script para a VPS; rodar como o usuário `codehood`
    com o banco `/var/lib/codehood/codehood.db`, primeiro sem `--apply`.
 4. Passar a `prova-1` para `SCHEDULED` (`PATCH /api/course/paradigmas/chips_2026-2/exam/prova-1`).
