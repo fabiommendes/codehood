@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+
+- Questions stored by 0.2 broke every instructor page that lists them (home,
+  course home, question bank) with a 500: 0.3 reads the whole document from
+  the private column, which 0.2 filled with only the half the public column
+  leaves out, in an older mdq spec. `manage upgrade-questions` rewrites them
+  (merges the halves; `preamble` opens the `stem`, essay `input` becomes
+  `content`, short answer `oneOf` becomes `accept`) and relabels each version
+  so the next push of the unchanged file appends a version instead of a 409.
+  Run it once after deploying.
+- A roll call URL whose time slot is not a slug answers 404 instead of 500.
+
 ## 0.3.0 (2026-11-04)
 
 ### Added

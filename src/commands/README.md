@@ -58,3 +58,11 @@ Whenever a new command is created, document it in this file.
   start, its time slot and its week. Repairs events written under an older
   rule; running it again changes nothing.
 
+### Questions
+
+`manage upgrade-questions [--dry-run]`
+: Rewrites the question versions stored by Codehood 0.2 (public and private
+  halves split, `preamble`, essay `input`, short answer `oneOf`) as the
+  current mdq document and its public form. Versions already current are left
+  alone; running it again changes nothing. Exits with 1 when a version cannot
+  be converted, naming it.

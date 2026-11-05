@@ -9,7 +9,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { z } from "zod";
 import { accessError, questionAccess, requireAccess } from "@/auth/access";
 import { type Actor, SYSTEM } from "@/auth/actor";
-import { hasPerm } from "@/auth/permissions";
+import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { QuestionRefId } from "@/core/schemas";
@@ -32,7 +32,9 @@ import {
 	questionProblems,
 	withIds,
 } from "@/mdq";
+import { upgradeLegacyQuestion } from "@/mdq/legacy";
 import { type QuestionStatus, writable } from "@/services/question-status";
+import type { JSONValue } from "@/typing/concrete-types";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 import { courseContentsWhere } from "./course.service";
@@ -420,8 +422,100 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 		},
 	});
 
-	return { create, findOne, findMany, update, upsert, delete: remove };
+	/**
+	 * Rewrites every version stored in the 0.2 format (split halves, older mdq
+	 * fields) as the current document and its public form.
+	 *
+	 * A version already in the current format is left alone, so running it
+	 * again changes nothing. `dryRun` reports without writing. An upgraded
+	 * version is relabelled with {@link LEGACY_VERSION_SUFFIX}: its label
+	 * digested the source the old parser read, and the next push of that
+	 * unchanged source must append a version rather than clash with this one.
+	 *
+	 * @throws NotAllowed when the actor lacks `system.manage`.
+	 */
+	const upgradeLegacyVersions = op({
+		run: async (
+			tx: PrismaTx,
+			options: { dryRun?: boolean },
+			opts: ServiceOptsWithoutTx,
+		): Promise<LegacyUpgradeReport> => {
+			ensurePerm(opts.actor, "system.manage");
+			const report: LegacyUpgradeReport = {
+				upgraded: 0,
+				current: 0,
+				failed: [],
+			};
+			const rows = await tx.questionData.findMany({
+				select: {
+					id: true,
+					versionHash: true,
+					publicPayload: true,
+					privatePayload: true,
+					ref: { select: { slug: true } },
+				},
+				orderBy: { id: "asc" },
+			});
+			for (const row of rows) {
+				let document: QuestionDocument | null;
+				try {
+					document = upgradeLegacyQuestion(
+						row.publicPayload as JSONValue,
+						row.privatePayload as JSONValue,
+					);
+				} catch (error) {
+					report.failed.push({
+						id: row.id,
+						slug: row.ref.slug,
+						reason: error instanceof Error ? error.message : String(error),
+					});
+					continue;
+				}
+				if (!document) {
+					report.current++;
+					continue;
+				}
+				report.upgraded++;
+				if (options.dryRun) continue;
+				const halves = JSON.parse(
+					JSON.stringify({
+						publicPayload: publicForm(document),
+						privatePayload: document,
+					}),
+				);
+				await tx.questionData.update({
+					where: { id: row.id },
+					data: {
+						...halves,
+						stem: document.stem,
+						versionHash: `${row.versionHash}${LEGACY_VERSION_SUFFIX}`,
+					},
+				});
+			}
+			return report;
+		},
+	});
+
+	return {
+		create,
+		findOne,
+		findMany,
+		update,
+		upsert,
+		delete: remove,
+		upgradeLegacyVersions,
+	};
 });
+
+/// Appended to the label of a version rewritten by `upgradeLegacyVersions`.
+export const LEGACY_VERSION_SUFFIX = "+from-0.2";
+
+/** What {@link QuestionService.upgradeLegacyVersions} did, version by version. */
+export type LegacyUpgradeReport = {
+	upgraded: number;
+	current: number;
+	failed: { id: number; slug: string; reason: string }[];
+};
 
 /// The service `buildQuestionService` makes, with `findOne` and `findMany` overloaded on `filter.public` to narrow the view they return.
 type QuestionServiceBuilt = ReturnType<typeof buildQuestionService>;
