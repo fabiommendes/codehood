@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Grading bots: a request authenticated by a `BOT` API key writes feedback
+  under the key's name (a slug), never as a human, so the submission reads
+  "Graded automatically". `chalk codehood autograde` (in the chalk project)
+  uses one to grade code answers in a sandbox from the course's `graders/`.
+- Feedback `notes`: text for the instructor only, such as signs of tampering
+  found by a bot. The grading page shows them with a "suspicious" badge.
+
 ### Changed
 
 - The exam submit dialog warns about unanswered questions: it lists them

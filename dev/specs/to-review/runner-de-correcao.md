@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [grading, bots, chalk, api-keys]
 relatedTo: [auto-grading, web-grading, chaves-de-api-com-escopo, prova-moodle-e-pesos]
 ---

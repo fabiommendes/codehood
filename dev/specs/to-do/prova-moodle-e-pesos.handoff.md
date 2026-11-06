@@ -79,6 +79,16 @@ tempo extra (50 min).
 3. Copiar `plan.json` e o script para a VPS; rodar como o usuário `codehood`
    com o banco `/var/lib/codehood/codehood.db`, primeiro sem `--apply`.
 4. Passar a `prova-1` para `SCHEDULED` (`PATCH /api/course/paradigmas/chips_2026-2/exam/prova-1`).
+5. Corrigir a q1 (`prolog-fatorial-com-is`) com o chalk. Precisa de um
+   release com `Feedback.notes` e as chaves `BOT` (spec
+   `runner-de-correcao`) e de uma chave `BOT` `runner` criada em `/profile`.
+   Do curso: `CODEHOOD_BOT_KEY=... chalk codehood autograde --exam prova-1
+   --dry-run`, depois sem `--dry-run`. Grader em
+   `graders/logico/aritmetica/fatorial-com-is/` (`all-or-nothing`,
+   `on_build_error: manual`). Na cópia de prod com a importação
+   (2026-11-06): 134 com 1, 8 com 0 (todas calculam `F is N * F1` antes da
+   recursão), 30 para correção manual (código com texto em volta, erro de
+   sintaxe, CLPFD sem alterar).
 
 ## 2. Pesos por questão (funcionalidade nova)
 
