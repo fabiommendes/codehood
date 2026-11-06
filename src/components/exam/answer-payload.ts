@@ -17,8 +17,12 @@ export function isTextEntry(type: string): boolean {
 }
 
 /**
- * Whether the payload of a question of `type` holds an answer: a pick, a
- * verdict, a number, or some non-blank text.
+ * Whether the payload of a question of `type` holds an answer.
+ *
+ * Only `null` skips a question, as mdq `docs/responses.md` has it: an empty
+ * selection or an abstention on every statement is an answer the student gave
+ * after touching the question. Text that is blank, and a fill-in with every
+ * blank empty, count as no answer, since nothing was written.
  */
 export function isAnswered(
 	type: string,
@@ -26,7 +30,25 @@ export function isAnswered(
 ): boolean {
 	if (payload === undefined || payload === null) return false;
 	if (typeof payload === "string") return payload.trim() !== "";
-	if (typeof payload === "number" || type === "numeric") return true;
-	if (Array.isArray(payload)) return payload.length > 0;
-	return Object.values(payload).some((entry) => entry !== null && entry !== "");
+	if (
+		type === "fill-in" &&
+		typeof payload === "object" &&
+		!Array.isArray(payload)
+	) {
+		return Object.values(payload).some(
+			(entry) => entry !== null && entry !== "",
+		);
+	}
+	return true;
+}
+
+/**
+ * The payload saved for a change: `null` when it holds no answer.
+ *
+ * @example
+ * toSaved("essay", "  ") // null
+ * toSaved("multiple-selection", []) // []
+ */
+export function toSaved(type: string, payload: AnswerPayload): AnswerPayload {
+	return isAnswered(type, payload) ? payload : null;
 }

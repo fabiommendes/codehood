@@ -198,6 +198,18 @@ body {
 		outline: 2px solid var(--color-info);
 		outline-offset: 2px;
 	}
+	/* A control boxed in a daisyUI field (a label with `.input` around the
+	   input, as for a number with its unit) leaves the ring to the box, or the
+	   ring would draw the inner input's square edges inside the field.
+	   `.mdq-numeric-box` takes `.input` by `@apply`, so it lacks the class. */
+	:where(.input, .select, .textarea, .mdq-numeric-box)
+	:where(input, select, textarea):focus-visible {
+		outline: none;
+	}
+	:where(.input, .select, .textarea, .mdq-numeric-box):has(:focus-visible) {
+		outline: 2px solid var(--color-info);
+		outline-offset: 2px;
+	}
 }
 
 h1,
@@ -531,4 +543,51 @@ h6 {
 [data-theme="codehood-dark"] .shiki span {
 	color: var(--shiki-dark);
 	background-color: var(--shiki-dark-bg);
+}
+
+/* Side view of water at rest: a translucent body with two waves drifting
+   along its surface. Its height is set inline; the box it sits in clips it. */
+.water {
+	--water-period: 28px;
+	--water-amp: 5px;
+	--water-wave: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='14' viewBox='0 0 240 14' preserveAspectRatio='none'><path d='M0 7 Q60 0 120 7 T240 7 V14 H0 Z'/></svg>");
+	position: absolute;
+	inset-inline: 0;
+	bottom: 0;
+	z-index: -1;
+	pointer-events: none;
+	background: var(--water-color, var(--color-base-200));
+	transition:
+		background-color 200ms,
+		height 900ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.water::before,
+.water::after {
+	content: "";
+	position: absolute;
+	bottom: 100%;
+	left: 0;
+	width: calc(100% + var(--water-period));
+	height: var(--water-amp);
+	background: inherit;
+	mask: var(--water-wave) repeat-x 0 100% / var(--water-period) 100%;
+	animation: water-drift 3s linear infinite;
+	animation-delay: var(--water-phase, 0s);
+}
+.water::after {
+	height: calc(var(--water-amp) * 1.4);
+	opacity: 0.6;
+	animation-duration: 4.7s;
+	animation-direction: reverse;
+}
+@keyframes water-drift {
+	to {
+		transform: translateX(calc(-1 * var(--water-period)));
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.water::before,
+	.water::after {
+		animation: none;
+	}
 }

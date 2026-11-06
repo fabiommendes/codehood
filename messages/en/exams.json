@@ -108,9 +108,11 @@
 		}
 	],
 	"exams_attempt_submitted_waiting": "Submitted. Results are not out yet.",
-	"exams_attempt_question_of": "Question {number} of {total}",
 	"exams_attempt_question_short": "Q{number}",
-	"exams_attempt_weight": "weight {weight}",
+	"exams_attempt_submit_short": "Submit",
+	"exams_attempt_points": "points: {points}/100",
+	"exams_attempt_points_label": "points",
+	"exams_attempt_points_value": "{points}/100",
 	"exams_attempt_save_error": "Could not save this answer: {message}. It will be retried when you change it or submit.",
 	"exams_attempt_submit_title": [
 		{
@@ -182,6 +184,10 @@
 	"exams_attempt_question_answered": "Question {number}, answered",
 	"exams_attempt_not_saved": "Not saved",
 	"exams_attempt_saved": "Saved",
+	"exams_attempt_clear_answer": "Clear answer",
+	"exams_attempt_clear": "Clear",
+	"exams_attempt_nav_back": "Earlier questions",
+	"exams_attempt_nav_forward": "Later questions",
 	"exams_attempt_score_label": "Score",
 	"exams_group_open": "Open",
 	"exams_group_practice": "Practice",

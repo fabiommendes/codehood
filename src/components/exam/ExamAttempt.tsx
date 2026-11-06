@@ -3,6 +3,7 @@ import {
 	createEffect,
 	createSignal,
 	For,
+	Index,
 	type JSX,
 	Match,
 	onCleanup,
@@ -14,7 +15,7 @@ import FormAlert from "@/components/form/FormAlert";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
-import { m } from "@/i18n";
+import { locale, m } from "@/i18n";
 import {
 	type ExamResult,
 	formatScore,
@@ -24,7 +25,12 @@ import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
-import { type AnswerPayload, isAnswered, isTextEntry } from "./answer-payload";
+import {
+	type AnswerPayload,
+	isAnswered,
+	isTextEntry,
+	toSaved,
+} from "./answer-payload";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { questionList, unansweredWarning } from "./unanswered-warning";
 
@@ -52,7 +58,10 @@ export interface ExamAttemptProps {
 }
 
 /// The box every state sentence of an attempt sits in.
-const NOTICE = "rounded-box border border-base-300 bg-base-200 p-4 text-sm";
+const NOTICE = "rounded-box border border-info bg-info/5 p-4 text-sm";
+
+/// How long a save may take before it shows as "Saving…".
+const SLOW_SAVE_MS = 400;
 
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
@@ -109,6 +118,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const [saveErrors, setSaveErrors] = createSignal<Record<string, string>>({});
 	// Questions with a change not yet confirmed by the server.
 	const [unsaved, setUnsaved] = createSignal<ReadonlySet<string>>(new Set());
+	// Questions the server has confirmed an answer for, the loaded ones included.
+	const [confirmed, setConfirmed] = createSignal<ReadonlySet<string>>(
+		new Set(Object.keys(props.answers)),
+	);
 	let dialog: HTMLDialogElement | undefined;
 
 	// An ordering question shows its lines before the student touches them, so
@@ -130,6 +143,23 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	// Weights show only when some question weighs other than the default 1.
 	const weighted = () =>
 		props.questions.some((entry) => weightOf(entry.question) !== 1);
+	const totalWeight = () =>
+		props.questions.reduce((sum, entry) => sum + weightOf(entry.question), 0);
+	/// The part of the exam total a question carries, in [0, 1].
+	const shareOf = (question: QuestionPublic["question"]) =>
+		totalWeight() > 0 ? weightOf(question) / totalWeight() : 0;
+
+	/// The mean weight of the questions still unanswered, which the water levels compare against.
+	const remainingMean = () => {
+		const weights = props.questions
+			.filter(
+				(entry) => !isAnswered(entry.question.type, answers()[entry.slug]),
+			)
+			.map((entry) => weightOf(entry.question));
+		return weights.length === 0
+			? 0
+			: weights.reduce((sum, weight) => sum + weight, 0) / weights.length;
+	};
 
 	// The question whose card crosses the line under the attempt bar.
 	const [current, setCurrent] = createSignal<number | null>(null);
@@ -196,6 +226,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				);
 			if (message === null) {
 				setSaveError(slug, null);
+				setConfirmed((current) => new Set(current).add(slug));
 				if (!pending.has(slug)) markUnsaved(slug, false);
 				return;
 			}
@@ -213,11 +244,12 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		return pending.size === 0;
 	}
 
-	function change(slug: string, type: string, payload: AnswerPayload): void {
+	function change(slug: string, type: string, edited: AnswerPayload): void {
+		const payload = toSaved(type, edited);
 		setAnswers((current) => ({ ...current, [slug]: payload }));
 		pending.set(slug, payload);
 		markUnsaved(slug, true);
-		if (!isTextEntry(type)) {
+		if (payload === null || !isTextEntry(type)) {
 			saveNow(slug);
 			return;
 		}
@@ -348,7 +380,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									answers()[entry.slug],
 								),
 								failed: saveErrors()[entry.slug] !== undefined,
-								weight: weighted() ? weightOf(entry.question) : null,
+								level: isAnswered(entry.question.type, answers()[entry.slug])
+									? 1
+									: waterLevel(weightOf(entry.question), remainingMean()),
 							}))}
 							current={current()}
 							saving={unsaved().size > 0}
@@ -362,72 +396,118 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							const answered = () =>
 								isAnswered(entry.question.type, answers()[entry.slug]);
 							const failed = () => saveErrors()[entry.slug] !== undefined;
+							// Back to no answer at all, which a radio cannot be unticked to.
+							const clearButton = () => (
+								<Show
+									when={
+										kind() === "in-progress" &&
+										(answers()[entry.slug] ?? null) !== null
+									}
+								>
+									<button
+										type="button"
+										aria-label={m.exams_attempt_clear_answer()}
+										class="btn btn-ghost btn-xs -mr-1.5 gap-1 whitespace-nowrap px-1.5 text-muted"
+										onClick={() =>
+											change(entry.slug, entry.question.type, null)
+										}
+									>
+										<svg
+											aria-hidden="true"
+											viewBox="0 0 24 24"
+											class="size-3.5 shrink-0"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+											<path d="M22 21H7" />
+											<path d="m5 11 9 9" />
+										</svg>
+										{m.exams_attempt_clear()}
+									</button>
+								</Show>
+							);
+							const slowSave = createSlowFlag(
+								() => unsaved().has(entry.slug),
+								SLOW_SAVE_MS,
+							);
+							// Answered or not, never right or wrong: an answered number is
+							// simply solid, an unanswered one faded, a failed save red.
 							const tone = () =>
-								kind() !== "in-progress"
-									? "text-primary"
-									: failed()
-										? "text-error"
-										: answered()
-											? "text-success"
-											: "text-base-content/70";
+								failed()
+									? "text-error"
+									: kind() !== "in-progress" || answered()
+										? "text-base-content"
+										: "text-base-content/50";
 							return (
 								<section
 									id={`question-${index() + 1}`}
 									aria-label={m.exams_attempt_question_label({
 										number: index() + 1,
 									})}
-									class={`grid gap-x-4 sm:grid-cols-[4.5rem_1fr] ${QUESTION_SCROLL_MARGIN}`}
+									class={`grid gap-x-4 sm:grid-cols-[4.5rem_1fr] sm:grid-rows-[auto_1fr] ${QUESTION_SCROLL_MARGIN}`}
 								>
 									{/* The number stays in view while a long question scrolls past. */}
-									<div class="hidden sm:block">
+									<div class="hidden sm:col-start-1 sm:row-start-2 sm:block">
 										<div class="sticky top-48 text-right">
 											<QuestionNumber
 												number={index() + 1}
 												tone={tone()}
-												class="text-4xl"
+												class="block text-4xl"
 											/>
 											<Show when={weighted()}>
-												<WeightPips
-													weight={weightOf(entry.question)}
-													class="mt-2 justify-end"
-												/>
-												<p class="mt-0.5 text-xs text-muted">
-													{m.exams_attempt_weight({
-														weight: weightOf(entry.question),
+												<p class="mt-2 text-xs text-muted">
+													{m.exams_attempt_points_label()}
+												</p>
+												<p class="text-sm font-semibold tabular-nums">
+													{m.exams_attempt_points_value({
+														points: formatPoints(shareOf(entry.question)),
 													})}
 												</p>
 											</Show>
+											<div class="mt-3">{clearButton()}</div>
 										</div>
 									</div>
-									<div class="card card-border overflow-hidden bg-base-100 shadow-sm">
-										<header class="flex items-baseline gap-3 border-b border-base-300 bg-base-200/60 px-6 py-3">
-											<QuestionNumber
-												number={index() + 1}
-												tone={tone()}
-												class="text-2xl sm:hidden"
+									{/* A file-folder tab: as wide as the title, its right edge slanted. */}
+									<header class="relative z-10 inline-flex min-w-1/3 max-w-[calc(100%-1.5rem)] items-baseline gap-3 justify-self-start sm:col-start-2 py-2 pr-6 pl-6">
+										<span
+											aria-hidden="true"
+											class="absolute inset-y-0 left-0 right-2 -z-10 rounded-tl-[18px_8px] bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
+										/>
+										<span
+											aria-hidden="true"
+											class="absolute inset-y-0 -right-3 -z-10 w-9 origin-bottom skew-x-[18deg] rounded-tr-xl bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
+										/>
+										<QuestionNumber
+											number={index() + 1}
+											tone={tone()}
+											class="text-xl sm:hidden"
+										/>
+										<h3 class="min-w-0 truncate font-display text-base font-semibold text-shadow-[0_0_3px_var(--color-base-100),0_0_10px_var(--color-base-100),0_0_18px_var(--color-base-100)]">
+											{entry.question.title ??
+												m.exams_attempt_question_label({ number: index() + 1 })}
+										</h3>
+										<Show when={weighted()}>
+											<span class="whitespace-nowrap text-xs tabular-nums sm:hidden">
+												{m.exams_attempt_points({
+													points: formatPoints(shareOf(entry.question)),
+												})}
+											</span>
+										</Show>
+										<Show when={kind() === "in-progress"}>
+											<SaveState
+												failed={failed()}
+												saving={slowSave()}
+												pending={unsaved().has(entry.slug)}
+												confirmed={confirmed().has(entry.slug)}
+												answered={answered()}
 											/>
-											<h3 class="min-w-0 flex-1 truncate font-display text-lg font-semibold">
-												{entry.question.title ??
-													m.exams_attempt_question_of({
-														number: index() + 1,
-														total: props.questions.length,
-													})}
-											</h3>
-											<Show when={weighted()}>
-												<span class="text-xs text-muted sm:hidden">
-													{m.exams_attempt_weight({
-														weight: weightOf(entry.question),
-													})}
-												</span>
-											</Show>
-											<Show when={kind() === "in-progress"}>
-												<SaveState
-													failed={failed()}
-													saving={unsaved().has(entry.slug)}
-													answered={answered()}
-												/>
-											</Show>
-										</header>
+										</Show>
+									</header>
+									<div class="card card-border min-w-0 overflow-hidden rounded-tl-none! bg-base-200/25 shadow-sm sm:col-start-2">
 										{/* focusout bubbles, so leaving any control of the question saves it. */}
 										<div
 											class="card-body"
@@ -446,6 +526,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 													change(entry.slug, entry.question.type, payload)
 												}
 											/>
+											<div class="self-end sm:hidden">{clearButton()}</div>
 											<Show when={kind() === "results" && props.result}>
 												{(result) => (
 													<Outcome
@@ -460,7 +541,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 											<Show when={saveErrors()[entry.slug]}>
 												{(message) => (
 													<p role="alert" class="text-sm text-error">
-														{m.exams_attempt_save_error({ message: message() })}
+														{m.exams_attempt_save_error({
+															message: message(),
+														})}
 													</p>
 												)}
 											</Show>
@@ -525,12 +608,12 @@ interface AttemptBarProps {
 	type: Exam["type"];
 	/// Seconds until the deadline, or `null` when the attempt has none.
 	seconds: number | null;
-	/// `weight` is `null` when the exam shows no weights.
 	questions: {
 		number: number;
 		answered: boolean;
 		failed: boolean;
-		weight: number | null;
+		/// How full the button's water is, in [0, 1]: full once answered, else see `waterLevel`.
+		level: number;
 	}[];
 	/// The number of the question in view, if any.
 	current: number | null;
@@ -545,98 +628,229 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 	const answered = () => props.questions.filter((q) => q.answered).length;
 	const failed = () => props.questions.filter((q) => q.failed).length;
 
+	const saving = createSlowFlag(() => props.saving, SLOW_SAVE_MS);
+
+	// On a phone the buttons keep to one row that scrolls sideways, with an
+	// arrow on each side while there is more to see that way.
+	let strip: HTMLElement | undefined;
+	const [canBack, setCanBack] = createSignal(false);
+	const [canForward, setCanForward] = createSignal(false);
+	function measure(): void {
+		if (!strip) return;
+		setCanBack(strip.scrollLeft > 1);
+		setCanForward(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1);
+	}
+	function page(direction: 1 | -1): void {
+		strip?.scrollBy({
+			left: direction * strip.clientWidth * 0.8,
+			behavior: "smooth",
+		});
+	}
+	onMount(() => {
+		measure();
+		const observer = new ResizeObserver(measure);
+		if (strip) observer.observe(strip);
+		onCleanup(() => observer.disconnect());
+	});
+	// Keeps the question in view on the page in view on the strip too.
+	createEffect(() => {
+		const number = props.current;
+		if (!strip || number === null) return;
+		const link = strip.querySelector<HTMLElement>(
+			`a[href="#question-${number}"]`,
+		);
+		if (!link) return;
+		const left = link.offsetLeft - strip.offsetLeft;
+		const right = left + link.offsetWidth;
+		if (left < strip.scrollLeft) {
+			strip.scrollTo({ left: left - 8, behavior: "smooth" });
+		} else if (right > strip.scrollLeft + strip.clientWidth) {
+			strip.scrollTo({
+				left: right - strip.clientWidth + 8,
+				behavior: "smooth",
+			});
+		}
+	});
 	const saveStatus = () => (
-		<Switch>
-			<Match when={failed() > 0}>
-				<span class="text-error">
-					{m.exams_attempt_answers_not_saved({ count: failed() })}
-				</span>
-			</Match>
-			<Match when={props.saving}>
-				<span class="text-muted">{m.exams_attempt_saving()}</span>
-			</Match>
-			<Match when={answered() > 0}>
-				<span class="text-muted">{m.exams_attempt_all_saved()}</span>
-			</Match>
-		</Switch>
+		<StackedLabel
+			labels={[
+				{
+					when: failed() > 0,
+					text: m.exams_attempt_answers_not_saved({ count: failed() }),
+					class: "text-error",
+				},
+				{
+					when: saving(),
+					text: m.exams_attempt_saving(),
+					class: "text-muted",
+				},
+				{
+					when: answered() > 0,
+					text: m.exams_attempt_all_saved(),
+					class: `text-muted transition-opacity ${props.saving ? "opacity-40" : ""}`,
+				},
+			]}
+		/>
 	);
 
 	return (
 		<div class="sticky top-16 z-20 -mx-4 border-b border-base-300 bg-base-100 px-4 py-3">
-			<div class="flex items-center justify-between gap-3">
-				<div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-					<Show
-						when={props.seconds !== null}
-						fallback={
-							<span class="font-semibold">
-								{m.exams_attempt_no_time_limit()}
-							</span>
-						}
+			<div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+				<Show
+					when={props.seconds !== null}
+					fallback={
+						<span class="font-semibold">{m.exams_attempt_no_time_limit()}</span>
+					}
+				>
+					<span
+						class={`font-semibold tabular-nums ${timeClass(props.seconds ?? 0)}`}
 					>
-						<span
-							class={`font-semibold tabular-nums ${timeClass(props.seconds ?? 0)}`}
-						>
-							{timeLeft(props.seconds ?? 0)}
-						</span>
-					</Show>
-					<span class="text-muted">
-						{m.exams_attempt_progress({
-							answered: answered(),
-							total: props.questions.length,
-						})}
+						{timeLeft(props.seconds ?? 0)}
 					</span>
-					<span class="hidden sm:inline">{saveStatus()}</span>
-				</div>
+				</Show>
+				<span class="text-muted">
+					{m.exams_attempt_progress({
+						answered: answered(),
+						total: props.questions.length,
+					})}
+				</span>
+				<span class="hidden sm:inline">{saveStatus()}</span>
+			</div>
+			<div class="mt-2 flex items-center gap-1 sm:items-start sm:gap-3">
+				<ScrollArrow
+					direction={-1}
+					enabled={canBack()}
+					onClick={() => page(-1)}
+				/>
+				<nav
+					ref={strip}
+					aria-label={m.exams_attempt_nav_label()}
+					onScroll={measure}
+					class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto p-1 [scrollbar-width:none] sm:flex-wrap sm:justify-center sm:overflow-visible sm:p-0"
+				>
+					<Index each={props.questions}>
+						{(question) => (
+							<a
+								href={`#question-${question().number}`}
+								aria-label={
+									question().answered
+										? m.exams_attempt_question_answered({
+												number: question().number,
+											})
+										: m.exams_attempt_question_label({
+												number: question().number,
+											})
+								}
+								aria-current={
+									props.current === question().number ? "location" : undefined
+								}
+								class={`btn btn-sm group relative isolate overflow-hidden hover:bg-transparent hover:border-base-content hover:text-base-content flex-col gap-0 font-mono h-11 w-12 shrink-0 px-1 sm:w-auto sm:min-w-12 sm:max-w-20 sm:flex-1 sm:shrink ${
+									question().failed
+										? "btn-error"
+										: question().answered
+											? "btn-outline border-base-content/70 text-base-content"
+											: "btn-outline border-base-content/15 text-base-content/50"
+								} ${props.current === question().number ? "outline-2 outline-offset-2 outline-primary" : ""}`}
+							>
+								<span
+									aria-hidden="true"
+									class="water group-hover:[--water-color:var(--color-base-300)]"
+									style={{
+										height: `${question().level * 100}%`,
+										"--water-phase": `${(question().number * -1.7) % 7}s`,
+									}}
+								/>
+								<span class="relative">
+									{m.exams_attempt_question_short({
+										number: question().number,
+									})}
+								</span>
+							</a>
+						)}
+					</Index>
+				</nav>
+				<ScrollArrow
+					direction={1}
+					enabled={canForward()}
+					onClick={() => page(1)}
+				/>
 				<button
 					type="button"
-					class="btn btn-primary btn-sm shrink-0"
+					aria-label={m.exams_attempt_submit({ type: props.type })}
+					class="btn btn-primary btn-sm h-11 shrink-0 gap-1.5"
 					disabled={props.busy}
 					onClick={props.onSubmit}
 				>
-					{m.exams_attempt_submit({ type: props.type })}
+					<svg
+						aria-hidden="true"
+						viewBox="0 0 24 24"
+						class="size-4"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M14.5 21.5 22 2 2.5 9.5l7.5 3.5 4.5 8.5Z" />
+						<path d="M22 2 10 13" />
+					</svg>
+					<span class="hidden sm:inline">{m.exams_attempt_submit_short()}</span>
 				</button>
 			</div>
-			<nav
-				aria-label={m.exams_attempt_nav_label()}
-				class="mt-2 flex flex-wrap gap-1.5"
-			>
-				<For each={props.questions}>
-					{(question) => (
-						<a
-							href={`#question-${question.number}`}
-							aria-label={
-								question.answered
-									? m.exams_attempt_question_answered({
-											number: question.number,
-										})
-									: m.exams_attempt_question_label({ number: question.number })
-							}
-							aria-current={
-								props.current === question.number ? "location" : undefined
-							}
-							class={`btn btn-sm btn-square h-10 flex-col gap-0 font-mono ${
-								question.failed
-									? "btn-error"
-									: question.answered
-										? "btn-success"
-										: "btn-outline"
-							} ${props.current === question.number ? "outline-2 outline-offset-2 outline-primary" : ""}`}
-						>
-							{question.number}
-							<Show when={question.weight !== null}>
-								<WeightPips
-									weight={question.weight ?? 1}
-									class="opacity-70"
-									small
-								/>
-							</Show>
-						</a>
-					)}
-				</For>
-			</nav>
 			<p class="mt-1 text-xs sm:hidden">{saveStatus()}</p>
 		</div>
 	);
+}
+
+/// An arrow that pages the question strip sideways; phones only, since wider screens wrap the strip.
+function ScrollArrow(props: {
+	direction: 1 | -1;
+	enabled: boolean;
+	onClick: () => void;
+}): JSX.Element {
+	return (
+		<button
+			type="button"
+			aria-label={
+				props.direction < 0
+					? m.exams_attempt_nav_back()
+					: m.exams_attempt_nav_forward()
+			}
+			class="btn btn-ghost btn-sm h-11 w-6 shrink-0 px-0 disabled:bg-transparent sm:hidden"
+			disabled={!props.enabled}
+			onClick={props.onClick}
+		>
+			<svg
+				aria-hidden="true"
+				viewBox="0 0 24 24"
+				class="size-4"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d={props.direction < 0 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+			</svg>
+		</button>
+	);
+}
+
+/// How sharply the water level moves away from half as a weight leaves the mean.
+const WATER_STEEPNESS = 1.5;
+
+/**
+ * The water level, in [0, 1], of a question weighing `weight` in an exam whose
+ * mean weight is `mean`: half at the mean, toward 1 above it, toward 0 below.
+ *
+ * @example
+ * waterLevel(1, 1) // 0.5
+ * waterLevel(3, 1.5) // ≈ 0.74
+ */
+function waterLevel(weight: number, mean: number): number {
+	if (mean <= 0) return 0.5;
+	const ratio = (weight / mean) ** WATER_STEEPNESS;
+	return ratio / (1 + ratio);
 }
 
 /// The weight a question declares, 1 when it declares none.
@@ -659,45 +873,99 @@ function QuestionNumber(props: {
 	);
 }
 
-/// One dot per unit of weight, so heavier questions stand out at a glance; a fractional weight rounds.
-function WeightPips(props: {
-	weight: number;
-	small?: boolean;
+/// A part of the total as points out of 100, up to one decimal: `15`, `7.5`.
+function formatPoints(share: number): string {
+	return (share * 100).toLocaleString(locale, { maximumFractionDigits: 1 });
+}
+
+/**
+ * One question's save state while answering; nothing until it has an answer.
+ *
+ * A change the server has not confirmed yet dims the last "Saved" rather
+ * than replacing it, so a quick save does not flash; "Saving…" shows only
+ * once `saving` says it is slow.
+ */
+function SaveState(props: {
+	failed: boolean;
+	saving: boolean;
+	pending: boolean;
+	confirmed: boolean;
+	answered: boolean;
+}): JSX.Element {
+	return (
+		<StackedLabel
+			class="text-xs"
+			labels={[
+				{
+					when: props.failed,
+					text: m.exams_attempt_not_saved(),
+					class: "text-error",
+				},
+				{
+					when: props.saving,
+					text: m.exams_attempt_saving(),
+					class: "text-muted",
+				},
+				{
+					when: props.answered && (props.confirmed || !props.pending),
+					text: m.exams_attempt_saved(),
+					class: `text-muted transition-opacity ${props.pending ? "opacity-40" : ""}`,
+				},
+			]}
+		/>
+	);
+}
+
+/**
+ * The first label whose `when` holds, in a box as wide as the widest label,
+ * so switching between them never moves what is around it.
+ *
+ * The other labels take their room as invisible `::before` text, which
+ * assistive technology and text queries do not see.
+ */
+function StackedLabel(props: {
+	labels: { when: boolean; text: string; class: string }[];
 	class?: string;
 }): JSX.Element {
-	const dots = () => Math.min(5, Math.max(0, Math.round(props.weight)));
+	const shown = () => props.labels.find((label) => label.when);
 	return (
-		<span aria-hidden="true" class={`flex gap-0.5 ${props.class ?? ""}`}>
-			<For each={Array.from({ length: dots() })}>
-				{() => (
+		<span class={`inline-grid whitespace-nowrap ${props.class ?? ""}`}>
+			<For each={props.labels}>
+				{(label) => (
 					<span
-						class={`rounded-full bg-current ${props.small ? "size-1" : "size-1.5"}`}
+						aria-hidden="true"
+						data-text={label.text}
+						class="invisible col-start-1 row-start-1 before:content-[attr(data-text)]"
 					/>
 				)}
 			</For>
+			<Show when={shown()}>
+				{(label) => (
+					<span class={`col-start-1 row-start-1 ${label().class}`}>
+						{label().text}
+					</span>
+				)}
+			</Show>
 		</span>
 	);
 }
 
-/// One question's save state while answering; nothing until it has an answer.
-function SaveState(props: {
-	failed: boolean;
-	saving: boolean;
-	answered: boolean;
-}): JSX.Element {
-	return (
-		<Switch>
-			<Match when={props.failed}>
-				<span class="text-xs text-error">{m.exams_attempt_not_saved()}</span>
-			</Match>
-			<Match when={props.saving}>
-				<span class="text-xs text-muted">{m.exams_attempt_saving()}</span>
-			</Match>
-			<Match when={props.answered}>
-				<span class="text-xs text-muted">{m.exams_attempt_saved()}</span>
-			</Match>
-		</Switch>
-	);
+/**
+ * Follows `source`, but turns true only once it has stayed true for `ms`.
+ *
+ * A save the server confirms at once then never flashes "Saving…".
+ */
+function createSlowFlag(source: () => boolean, ms: number): () => boolean {
+	const [slow, setSlow] = createSignal(false);
+	createEffect(() => {
+		if (!source()) {
+			setSlow(false);
+			return;
+		}
+		const timer = setTimeout(() => setSlow(true), ms);
+		onCleanup(() => clearTimeout(timer));
+	});
+	return slow;
 }
 
 /// The verdict on one question: its score or why it has none, and the comments.

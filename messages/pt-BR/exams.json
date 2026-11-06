@@ -108,9 +108,11 @@
 		}
 	],
 	"exams_attempt_submitted_waiting": "Enviado. Os resultados ainda não foram liberados.",
-	"exams_attempt_question_of": "Questão {number} de {total}",
 	"exams_attempt_question_short": "Q{number}",
-	"exams_attempt_weight": "peso {weight}",
+	"exams_attempt_submit_short": "Entregar",
+	"exams_attempt_points": "pontos: {points}/100",
+	"exams_attempt_points_label": "pontos",
+	"exams_attempt_points_value": "{points}/100",
 	"exams_attempt_save_error": "Não foi possível salvar esta resposta: {message}. Será tentado de novo quando você a alterar ou enviar.",
 	"exams_attempt_submit_title": [
 		{
@@ -182,6 +184,10 @@
 	"exams_attempt_question_answered": "Questão {number}, respondida",
 	"exams_attempt_not_saved": "Não salva",
 	"exams_attempt_saved": "Salva",
+	"exams_attempt_clear_answer": "Limpar resposta",
+	"exams_attempt_clear": "Limpar",
+	"exams_attempt_nav_back": "Questões anteriores",
+	"exams_attempt_nav_forward": "Próximas questões",
 	"exams_attempt_score_label": "Nota",
 	"exams_group_open": "Abertas",
 	"exams_group_practice": "Exercícios",
