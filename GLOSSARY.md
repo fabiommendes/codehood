@@ -217,15 +217,24 @@ pushed with the [CLI](#cli), holding at most one number or label per
 [Student](#student). Hidden from students until the instructor releases it on
 the web.
 
+## Grader
+
+Type: domain
+
+The folder `graders/<path>/` of a course repository with the chalk
+autograder settings (`grader.yaml`), tests (`template/`) and reference
+solution (`solution/`) of one code [Question](#question), mirroring the
+question's path under `questions/`. Run by the [Runner](#runner).
+
 ## Grading bot
 
 Also: bot 
 Type: domain
 
 An automated client that grades submissions through the
-[REST API](#rest-api) using an [API key](#api-key). A bot currently acts as the
-instructor who issued its key and therefore sees everything that instructor
-sees.
+[REST API](#rest-api) using an [API key](#api-key). A bot authenticates with a `BOT` key, acts as the instructor who issued it
+and therefore sees everything that instructor sees, but its grades are
+recorded under the key's name instead of the instructor's.
 
 ## Instructions
 
@@ -418,6 +427,15 @@ The account-wide permission level — [Admin](#admin), [Instructor](#instructor)
 or [Student](#student) — fixed when the account is created, by its
 [Invite](#invite) or by the admin who created it. Per-course authority is
 decided by ownership and [Enrollment](#enrollment).
+
+## Runner
+
+Type: platform
+
+The `chalk codehood autograde` command, run on the instructor's machine. It
+grades each answer to a question with a [Grader](#grader) in chalk's sandbox
+and writes the score through the [REST API](#rest-api) as a
+[Grading bot](#grading-bot).
 
 ## Roll call
 
