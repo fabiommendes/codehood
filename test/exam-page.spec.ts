@@ -215,12 +215,15 @@ test("an ordering question left untouched is named in the submit dialog until it
 	await page.goto(`${href}/exams/${exam.slug}`);
 	const dialog = page.getByRole("dialog");
 	const warning = dialog.getByText(
-		"Ordering question 2 has no answer yet and will be skipped.",
+		"Ordering question Q2 has no answer yet and will be skipped.",
 		{ exact: false },
 	);
 
 	await page.getByRole("button", { name: "Submit exam" }).first().click();
 	await expect(warning).toBeVisible();
+	await expect(
+		dialog.getByText("Questions Q1 and Q2 were not answered."),
+	).toBeVisible();
 	await dialog.getByRole("button", { name: "Cancel" }).click();
 
 	await page.getByRole("button", { name: "Keep this order" }).click();
@@ -237,7 +240,9 @@ test("an ordering question left untouched is named in the submit dialog until it
 	);
 
 	await page.getByRole("button", { name: "Submit exam" }).first().click();
-	await expect(dialog.getByText("Your answers can't be changed")).toBeVisible();
+	await expect(
+		dialog.getByText("You won't be able to change your answers"),
+	).toBeVisible();
 	await expect(warning).toHaveCount(0);
 });
 

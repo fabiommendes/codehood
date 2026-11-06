@@ -5,6 +5,7 @@ import {
 	MultipleChoice,
 	MultipleSelection,
 	Numeric,
+	Ordering,
 	ShortAnswer,
 	TrueFalse,
 } from "mdq/solid";
@@ -25,6 +26,7 @@ import {
 	multipleChoice,
 	multipleSelection,
 	numeric,
+	ordering,
 	shortAnswer,
 	trueFalse,
 } from "@/mdq/fixtures";
@@ -416,6 +418,60 @@ const filledInResult = scoreResponse(brasilia, filledIn);
 
 const mixedUpResult = scoreResponse(brasilia, mixedUp);
 
+//
+// Ordering
+//
+
+// Code under strict indentation: the student sets each level, and one extra
+// line is a distractor.
+const fibonacci = ordering({
+	stem: "Sort the lines into a loop that prints the first Fibonacci numbers.",
+	content: "code",
+	highlight: "python",
+	indentation: "strict",
+	lines: [
+		[0, "x, y = 1, 1"],
+		[0, "for _ in range(10):"],
+		[1, "print(x)"],
+		[1, "x, y = y, x + y"],
+	],
+	extra: [[1, "x = y"]],
+	incorrectFeedback: "Print before you advance the pair.",
+});
+
+// Text under fixed levels, with a distractor to leave out.
+const coffee = ordering({
+	stem: "Put the stages of coffee in order, from the plant to the cup. Not every line belongs.",
+	content: "text",
+	lines: [
+		[0, "Plant the seedlings on the hillside."],
+		[0, "Pick the ripe cherries."],
+		[0, "Dry the beans on the patio."],
+		[0, "Roast the beans."],
+		[0, "Grind the *roasted* coffee."],
+	],
+	extra: [[0, "Ferment the sugarcane juice."]],
+});
+
+const fibonacciRight = fibonacci.lines;
+
+const fibonacciSwapped: [number, string][] = [
+	[0, "x, y = 1, 1"],
+	[0, "for _ in range(10):"],
+	[1, "x, y = y, x + y"],
+	[1, "print(x)"],
+];
+
+const fibonacciRightResult = {
+	...scoreResponse(fibonacci, fibonacciRight),
+	correct: correctResponses(fibonacci),
+};
+
+const fibonacciSwappedResult = {
+	...scoreResponse(fibonacci, fibonacciSwapped),
+	correct: correctResponses(fibonacci),
+};
+
 // The side nav. Its ids are the `id` of the matching <section> below; the
 // order is the order they appear on the page, which is the order the types
 // were built in.
@@ -427,7 +483,7 @@ const sectionLinks = [
 	{ id: "numeric", label: "Numeric" },
 	{ id: "short-answer", label: "Short answer" },
 	{ id: "fill-in", label: "Fill in the blanks" },
-	{ id: "unknown", label: "Unknown type" },
+	{ id: "ordering", label: "Ordering" },
 ] as const;
 ---
 
@@ -1005,6 +1061,68 @@ const sectionLinks = [
             mode="review"
             value={mixedUp}
             result={{ pending: true }}
+          />
+        </Card>
+      </div>
+    </section>
+  </section>
+
+  <section id="ordering" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Ordering</h2>
+
+    <section class="mt-6">
+      <h3 class="mb-2 text-xl font-semibold">Answer mode</h3>
+      <p class="mb-5 text-sm text-muted">
+        A line moves by dragging: a mouse drags the whole line, a finger only its handle, so the page still
+        scrolls over the text. Dropping a line on <em>Not used</em> leaves it out, which is how a distractor goes
+        away; that list shows as a target during a drag even while it is empty. The handle also takes the
+        arrow keys: up and down move the line, left and right change its level under{" "}
+        <code class="font-mono">lenient</code> and <code class="font-mono">strict</code>. Until the first move,
+        <em>Keep this order</em> takes the order on screen as the answer.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Code, student sets the levels">
+          <Ordering client:load locale={locale} question={publicForm(fibonacci)} mode="answer" />
+        </Card>
+        <Card title="Text, fixed levels, one distractor">
+          <Ordering client:load locale={locale} question={publicForm(coffee)} mode="answer" />
+        </Card>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Readonly mode</h3>
+      <p class="mb-5 text-sm text-muted">
+        The lines of the response at their levels, with no handle and no controls.
+      </p>
+      <Card>
+        <Ordering client:load locale={locale} question={publicForm(fibonacci)} mode="readonly" value={fibonacciSwapped} />
+      </Card>
+    </section>
+
+    <section class="mt-10">
+      <h3 class="mb-2 text-xl font-semibold">Review mode</h3>
+      <p class="mb-5 text-sm text-muted">
+        The spec grades a whole ordering, never a line, so there is no per-line mark: the response shows beside
+        every accepted ordering.
+      </p>
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card title="Right order">
+          <Ordering
+            client:load locale={locale}
+            question={publicForm(fibonacci)}
+            mode="review"
+            value={fibonacciRight}
+            result={fibonacciRightResult}
+          />
+        </Card>
+        <Card title="Two lines swapped">
+          <Ordering
+            client:load locale={locale}
+            question={publicForm(fibonacci)}
+            mode="review"
+            value={fibonacciSwapped}
+            result={fibonacciSwappedResult}
           />
         </Card>
       </div>

@@ -123,7 +123,22 @@
 			}
 		}
 	],
-	"exams_attempt_submit_body": "Your answers can't be changed after you submit. Questions you left blank stay blank.",
+	"exams_attempt_submit_body": "You won't be able to change your answers after you submit.",
+	"exams_attempt_submit_unanswered_list": [
+		{
+			"declarations": [
+				"input count",
+				"input numbers",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Question {numbers} was not answered.",
+				"countPlural=other": "Questions {numbers} were not answered."
+			}
+		}
+	],
+	"exams_attempt_submit_unanswered_count": "{count} questions were not answered.",
 	"exams_attempt_submit_skips_ordering": [
 		{
 			"declarations": [

@@ -376,6 +376,22 @@
 	.mdq-ordering-button[aria-disabled="true"] {
 		@apply cursor-default opacity-40;
 	}
+	/* A finger drags from the handle only; the rest of the line scrolls the page. */
+	.mdq-ordering-grip {
+		@apply btn btn-ghost btn-sm btn-square shrink-0 cursor-grab text-muted;
+		touch-action: none;
+	}
+	.mdq-ordering-line[data-dragging] {
+		@apply pointer-events-none relative z-10 cursor-grabbing border-primary shadow-lg;
+	}
+	/* Its negative margins cancel the gap it adds, so the rows do not shift. */
+	.mdq-ordering-drop {
+		@apply pointer-events-none h-[3px] list-none rounded-full bg-primary;
+		margin: calc(-0.25rem - 1.5px) 0;
+	}
+	.mdq-question[data-dragging] {
+		@apply cursor-grabbing select-none;
+	}
 	.mdq-ordering-keep {
 		@apply flex flex-wrap items-center gap-2;
 	}

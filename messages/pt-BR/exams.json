@@ -123,7 +123,22 @@
 			}
 		}
 	],
-	"exams_attempt_submit_body": "Não será possível alterar as respostas depois do envio. Questões deixadas em branco continuam em branco.",
+	"exams_attempt_submit_body": "Você não poderá mais alterar suas respostas depois do envio.",
+	"exams_attempt_submit_unanswered_list": [
+		{
+			"declarations": [
+				"input count",
+				"input numbers",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "A questão {numbers} não foi preenchida.",
+				"countPlural=other": "As questões {numbers} não foram preenchidas."
+			}
+		}
+	],
+	"exams_attempt_submit_unanswered_count": "{count} questões não foram preenchidas.",
 	"exams_attempt_submit_skips_ordering": [
 		{
 			"declarations": [

@@ -26,6 +26,7 @@ import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import { type AnswerPayload, isAnswered, isTextEntry } from "./answer-payload";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
+import { questionList, unansweredWarning } from "./unanswered-warning";
 
 export interface ExamAttemptProps {
 	/// The course's URL segments and the exam slug, as the exam actions take them.
@@ -118,6 +119,12 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			!isAnswered(entry.question.type, answers()[entry.slug])
 				? [index + 1]
 				: [],
+		);
+
+	/// The numbers of every question still unanswered, which the submit dialog warns about.
+	const unansweredNumbers = () =>
+		props.questions.flatMap((entry, index) =>
+			isAnswered(entry.question.type, answers()[entry.slug]) ? [] : [index + 1],
 		);
 
 	// Weights show only when some question weighs other than the default 1.
@@ -472,11 +479,16 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							<p class="mt-2 text-sm text-base-content/70">
 								{m.exams_attempt_submit_body()}
 							</p>
+							<Show when={unansweredNumbers().length > 0}>
+								<p role="alert" class="alert alert-warning mt-3 text-sm">
+									{unansweredWarning(unansweredNumbers())}
+								</p>
+							</Show>
 							<Show when={unsortedNumbers().length > 0}>
 								<p role="alert" class="alert alert-warning mt-3 text-sm">
 									{m.exams_attempt_submit_skips_ordering({
 										count: unsortedNumbers().length,
-										numbers: unsortedNumbers().join(", "),
+										numbers: questionList(unsortedNumbers()),
 									})}
 								</p>
 							</Show>

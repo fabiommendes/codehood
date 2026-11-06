@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+
+- The exam submit dialog warns about unanswered questions: it lists them
+  ("Q1, Q4 and Q5") up to five, and gives only the count above that. Its
+  text now says the student can no longer change the answers, since the
+  instructor may still reopen an attempt.
+- Ordering questions reorder by drag and drop (mdq-js): a handle on each
+  line, with arrow keys for the keyboard. The design page of questions shows
+  the type.
+
 ## 0.3.2 (2026-11-05)
 
 ### Fixed
