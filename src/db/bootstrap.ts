@@ -24,6 +24,8 @@ const DEV_STUDENT_EMAIL = "student@codehood.local";
 const DEV_STUDENT_FEED_TOKEN = "dev-student-calendar";
 /// Fixed so the CLI can authenticate as `ada` right after a reset.
 export const DEV_ADA_CLI_TOKEN = "dev-ada-cli";
+/// Fixed so a grading runner can authenticate with `ada`'s BOT key `runner` right after a reset.
+export const DEV_RUNNER_TOKEN = "dev-runner-bot";
 
 let devAdminPromise: Promise<void> | null = null;
 
@@ -281,6 +283,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			keyHash: hashToken(DEV_ADA_CLI_TOKEN),
 			name: "Dev CLI",
 			kind: "CLI",
+			createdById: ada.username,
+		},
+	});
+
+	await prisma.apiKey.create({
+		data: {
+			publicId: "dev-runner",
+			keyHash: hashToken(DEV_RUNNER_TOKEN),
+			name: "runner",
+			kind: "BOT",
 			createdById: ada.username,
 		},
 	});
@@ -1054,6 +1066,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
+	await seedCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
 	await seedOpenQuiz(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
@@ -2077,6 +2090,103 @@ async function seedGradedExam(
 		"explain-recursion":
 			"Recursion is when a function calls itself until it is done.",
 	});
+
+	await db.exam.update(
+		{ course, slug: exam },
+		{ status: "COMPLETED" },
+		FULL_ACCESS,
+	);
+}
+
+/**
+ * Closes an exam with a Prolog code question for a grading runner to correct.
+ *
+ * Four answers wait for a grade: one correct, one that still leans on CLP(FD)
+ * and so inverts the relation, one that does not load, and one the bot
+ * `runner` already graded with notes for the instructor.
+ */
+async function seedCodeExam(
+	course: Course["id"],
+	students: { hopper: User; hamilton: User; liskov: User; bob: User },
+): Promise<void> {
+	const exam = "test-06";
+	const question = "prolog-factorial-with-is";
+
+	await db.question.create(
+		{
+			course,
+			slug: question,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Factorial in Prolog, without CLP(FD)",
+				stem: "Define `factorial(N, F)` so that `F` is the factorial of `N`. Use `is`, not `clpfd`.",
+				tags: ["prolog"],
+				content: "code",
+				highlight: "prolog",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 6: Prolog",
+			description: "A code answer for a grading runner.",
+			tags: ["prolog"],
+			questions: [{ slug: question, version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+
+	await answerExam(course, exam, students.hopper, {
+		[question]: [
+			"factorial(0, 1).",
+			"factorial(N, F) :-",
+			"    N > 0,",
+			"    M is N - 1,",
+			"    factorial(M, G),",
+			"    F is N * G.",
+		].join("\n"),
+	});
+	await answerExam(course, exam, students.hamilton, {
+		[question]: [
+			":- use_module(library(clpfd)).",
+			"factorial(0, 1).",
+			"factorial(N, F) :-",
+			"    N #> 0,",
+			"    M #= N - 1,",
+			"    F #= N * G,",
+			"    factorial(M, G).",
+		].join("\n"),
+	});
+	await answerExam(course, exam, students.liskov, {
+		[question]: ["factorial(0, 1)", "factorial(N, F) :- N > 0, F is N *"].join(
+			"\n",
+		),
+	});
+	const bob = await answerExam(course, exam, students.bob, {
+		[question]: [
+			"factorial(0, 1).",
+			"factorial(N, F) :- N > 0, M is N - 1, factorial(M, G), F is N * G.",
+			"% factorial(10, 3628800).",
+		].join("\n"),
+	});
+	await db.feedback.create(
+		{
+			submission: { publicId: bob[question] ?? "" },
+			ref: "auto-1",
+			score: "1",
+			bot: "runner",
+			feedback: "All tests passed.",
+			notes: "The answer hard-codes an expected output in a comment.",
+		},
+		FULL_ACCESS,
+	);
 
 	await db.exam.update(
 		{ course, slug: exam },

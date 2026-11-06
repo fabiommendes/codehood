@@ -58,6 +58,9 @@ export const feedbackSchema = z.object({
 
 	feedback: z.string().nullable(),
 
+	/// Text for the instructor only. Absent from what a student reads.
+	notes: z.string().nullable().optional(),
+
 	/// The grade of each pending blank of a fill-in question, by blank id, when the instructor graded them one by one.
 	blanks: z.record(slug, blankGrade).nullable(),
 
@@ -82,12 +85,13 @@ export const feedbackCreate = feedbackSchema
 
 		bot: z.string().nullish(),
 		feedback: z.string().nullish(),
+		notes: z.string().nullish(),
 		blanks: z.record(slug, blankGrade).nullish(),
 	});
 
 /// Re-grading appends another pass; only the verdict moves on an existing one.
 export const feedbackUpdate = feedbackSchema
-	.pick({ score: true, feedback: true, blanks: true })
+	.pick({ score: true, feedback: true, notes: true, blanks: true })
 	.partial();
 
 export const feedbackPK = z.union([

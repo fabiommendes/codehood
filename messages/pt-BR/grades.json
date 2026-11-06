@@ -98,6 +98,8 @@
 	"grades_queue_questions": "Questões",
 	"grades_question_title": "{question} · Correção · {exam}",
 	"grades_question_auto": "Corrigida automaticamente",
+	"grades_question_notes": "Notas da correção",
+	"grades_question_suspicious": "Suspeita",
 	"grades_question_answer_n": "Resposta {n}",
 	"grades_question_back": "Correção",
 	"grades_question_previous": "Questão anterior",

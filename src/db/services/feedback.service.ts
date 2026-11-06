@@ -151,13 +151,14 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 					graderId,
 					botId,
 					feedback: input.feedback ?? null,
+					notes: input.notes ?? null,
 					blanks: input.blanks ?? DbNull,
 				},
 				include: feedbackInclude(),
 			});
 			await markGraded(tx, submission.id, graderId);
 
-			return fromDb(row);
+			return present(opts.actor, row);
 		},
 	});
 
@@ -185,7 +186,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			if (!row) return null;
 
 			if (!canReadFeedback(opts.actor, row, new Date())) return null;
-			return fromDb(row);
+			return present(opts.actor, row);
 		},
 	});
 
@@ -262,7 +263,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			const now = new Date();
 			return rows
 				.filter((row) => canReadFeedback(opts.actor, row, now))
-				.map(fromDb);
+				.map((row) => present(opts.actor, row));
 		},
 	});
 
@@ -298,6 +299,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 					...(fields.feedback !== undefined
 						? { feedback: fields.feedback }
 						: {}),
+					...(fields.notes !== undefined ? { notes: fields.notes } : {}),
 					...(fields.blanks !== undefined
 						? { blanks: fields.blanks ?? DbNull }
 						: {}),
@@ -305,7 +307,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				include: feedbackInclude(),
 			});
 
-			return fromDb(row);
+			return present(opts.actor, row);
 		},
 	});
 
@@ -360,11 +362,12 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 					data: {
 						score: input.score,
 						feedback: input.feedback ?? null,
+						notes: input.notes ?? null,
 						blanks: input.blanks ?? DbNull,
 					},
 					include: feedbackInclude(),
 				});
-				return fromDb(row);
+				return present(opts.actor, row);
 			}
 
 			const { graderId, botId } = resolveGrader(input, opts.actor);
@@ -376,13 +379,14 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 					graderId,
 					botId,
 					feedback: input.feedback ?? null,
+					notes: input.notes ?? null,
 					blanks: input.blanks ?? DbNull,
 				},
 				include: feedbackInclude(),
 			});
 			await markGraded(tx, submission.id, graderId);
 
-			return fromDb(row);
+			return present(opts.actor, row);
 		},
 	});
 
@@ -573,15 +577,32 @@ async function markGraded(
  *
  * `grader` defaults to a user actor's own username when neither is given.
  * Naming a different grader, or any bot, is refused for anyone but SYSTEM.
+ * An actor authenticated by a BOT key writes as that bot instead: it never
+ * grades as a human, and may only name its own bot.
  *
  * @throws {@link NotAllowed}
- * If a non-SYSTEM actor names a different grader or a bot.
+ * If a non-SYSTEM actor names a different grader or a bot, or a bot actor
+ * names a grader or another bot.
  * @throws {@link InvalidData} If neither or both of `grader`/`bot` are set.
  */
 function resolveGrader(
 	input: { grader?: string | null; bot?: string | null },
 	actor: Actor,
 ): { graderId: string | null; botId: string | null } {
+	if (actor !== SYSTEM && actor.bot !== undefined) {
+		if (input.grader != null) {
+			throw new NotAllowed("feedback.create", {
+				message: m.errors_feedback_bot_key_no_grader(),
+			});
+		}
+		if (input.bot != null && input.bot !== actor.bot) {
+			throw new NotAllowed("feedback.create", {
+				message: m.errors_feedback_bot_key_own_name(),
+			});
+		}
+		return { graderId: null, botId: actor.bot };
+	}
+
 	let graderId = input.grader ?? null;
 	const botId = input.bot ?? null;
 
@@ -649,7 +670,20 @@ type FeedbackFromDbRow = Prisma.FeedbackGetPayload<{
 	include: { submission: { select: { publicId: true } } };
 }>;
 
-/** Converts a database row into the feedback entity. */
+/// The entity `actor` may see: `notes` is dropped unless they can grade the submission.
+function present(actor: Actor, row: DbFeedback): Feedback {
+	const feedback = fromDb(row);
+	const canGrade = hasPerm(
+		actor,
+		"feedback.create",
+		responseTargetFrom(row.submission.response),
+	);
+	if (canGrade) return feedback;
+	const { notes: _notes, ...visible } = feedback;
+	return visible;
+}
+
+/** Converts a database row into the feedback entity, notes included. */
 export function fromDb(row: FeedbackFromDbRow): Feedback {
 	return {
 		id: row.id as Feedback["id"],
@@ -660,6 +694,7 @@ export function fromDb(row: FeedbackFromDbRow): Feedback {
 		grader: row.graderId as Feedback["grader"],
 		bot: row.botId,
 		feedback: row.feedback,
+		notes: row.notes,
 		blanks: (row.blanks ?? null) as Feedback["blanks"],
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

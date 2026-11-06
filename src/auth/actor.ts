@@ -17,7 +17,10 @@ const ROLE_RANK: Record<Role, number> = {
  * This is used to avoid passing around the full User object when only a few
  * fields are needed.
  */
-export interface UserActor extends Pick<User, "role" | "username" | "name"> {}
+export interface UserActor extends Pick<User, "role" | "username" | "name"> {
+	/// The name of the BOT API key the request authenticated with. Only `FeedbackService` reads it.
+	bot?: string;
+}
 
 /**
  * Sentinel actor for callers with no user behind them.

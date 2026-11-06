@@ -913,6 +913,10 @@ model Feedback {
 
   feedback String?
 
+  /// Text for the instructor only, never shown to the student: signals from
+  /// grading bots (suspicious patterns, truncated compiler logs).
+  notes String?
+
   /// The instructor's grade of each pending blank of a fill-in question, by
   /// blank id: `{score, comment?}`, the score in [0, 1]. `score` above is the
   /// question score these combine into.

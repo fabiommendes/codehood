@@ -98,6 +98,8 @@
 	"grades_queue_questions": "Questions",
 	"grades_question_title": "{question} · Grading · {exam}",
 	"grades_question_auto": "Graded automatically",
+	"grades_question_notes": "Grading notes",
+	"grades_question_suspicious": "Suspicious",
 	"grades_question_answer_n": "Answer {n}",
 	"grades_question_back": "Grading",
 	"grades_question_previous": "Previous question",

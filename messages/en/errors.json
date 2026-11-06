@@ -68,6 +68,8 @@
 	"errors_feedback_grader_system_only": "Only SYSTEM may name a different grader",
 	"errors_feedback_grader_xor_bot": "Exactly one of `grader` or `bot` is required",
 	"errors_feedback_bot_system_only": "Only SYSTEM may record a bot's grading pass",
+	"errors_feedback_bot_key_no_grader": "A bot key cannot grade as a user",
+	"errors_feedback_bot_key_own_name": "A bot key can only write as the bot it is named after",
 	"errors_event_has_roll_call": "The event has a roll call; delete the roll call first",
 	"errors_time_slot_wrong_course": "Time slot {slot} does not belong to course {course}.",
 	"errors_exam_not_open": "This exam is not currently open",

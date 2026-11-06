@@ -70,6 +70,7 @@ export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 			role: apiKey.createdBy.role,
 			username: apiKey.createdBy.username,
 			name: apiKey.createdBy.name,
+			...(apiKey.kind === "BOT" ? { bot: apiKey.name } : {}),
 		};
 		context.locals.apiKey = { id: apiKey.id, kind: apiKey.kind };
 	}

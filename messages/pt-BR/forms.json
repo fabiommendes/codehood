@@ -19,6 +19,7 @@
 	"forms_schema_duration_positive": "A duração deve ser maior que zero",
 	"forms_schema_extra_time_max": "O tempo extra é de no máximo 24 horas",
 	"forms_schema_score_format": "Informe um decimal ou uma fração 'n/d'.",
+	"forms_schema_bot_key_name": "O nome de uma chave de bot usa só letras minúsculas, dígitos e hífens (1 a 40 caracteres).",
 	"forms_schema_score_range": "A nota deve ser um número entre -1 e 1.",
 	"forms_schema_grade_one_value": "Cada estudante tem no máximo um valor por coluna.",
 	"forms_schema_invite_course_together": "Informe a disciplina e a turma juntas.",

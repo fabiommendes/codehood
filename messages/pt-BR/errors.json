@@ -68,6 +68,8 @@
 	"errors_feedback_grader_system_only": "Somente SYSTEM pode indicar outro avaliador",
 	"errors_feedback_grader_xor_bot": "Informe exatamente um entre `grader` e `bot`",
 	"errors_feedback_bot_system_only": "Somente SYSTEM pode registrar a correção de um corretor automático",
+	"errors_feedback_bot_key_no_grader": "Uma chave de bot não corrige como usuário",
+	"errors_feedback_bot_key_own_name": "Uma chave de bot só escreve como o bot que dá nome a ela",
 	"errors_event_has_roll_call": "A aula tem uma chamada; exclua a chamada primeiro",
 	"errors_time_slot_wrong_course": "O horário {slot} não pertence à turma {course}.",
 	"errors_exam_not_open": "Esta avaliação não está aberta no momento",

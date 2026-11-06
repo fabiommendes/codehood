@@ -16,11 +16,20 @@ export const apiKeySchema = z.object({
 	/** Token is only shown in the `create` response. Undefined in all other cases. */
 	token: z.string().optional(),
 });
-export const apiKeyCreate = apiKeySchema.pick({
-	name: true,
-	kind: true,
-	createdBy: true,
-});
+
+/// A BOT key's name becomes the `bot` of the feedback it writes.
+const BOT_NAME_RE = /^[a-z0-9-]{1,40}$/;
+
+export const apiKeyCreate = apiKeySchema
+	.pick({
+		name: true,
+		kind: true,
+		createdBy: true,
+	})
+	.refine((key) => key.kind !== "BOT" || BOT_NAME_RE.test(key.name), {
+		path: ["name"],
+		message: m.forms_schema_bot_key_name(),
+	});
 export const apiKeyPK = z.union([
 	z.object({ id: apiKeyId }),
 	z.object({ publicId: publicId }),

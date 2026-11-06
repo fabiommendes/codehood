@@ -32,6 +32,8 @@ export interface GradingPass {
 	score: number | null;
 	/// The written comment, or `null` when empty or only whitespace.
 	comment: string | null;
+	/// The text for the instructor only. Absent when empty or only whitespace.
+	notes?: string;
 	/// The user who graded, or `null` when a bot did.
 	grader: string | null;
 	/// The bot that graded, or `null` when a user did.
@@ -83,7 +85,7 @@ export type GradingFeedback = Pick<
 	Feedback,
 	"submission" | "score" | "feedback" | "grader" | "bot" | "updatedAt"
 > &
-	Partial<Pick<Feedback, "ref" | "blanks">>;
+	Partial<Pick<Feedback, "ref" | "blanks" | "notes">>;
 
 /**
  * The counting answers of every closed attempt at `exam`, in submission order.
@@ -182,6 +184,7 @@ function toGradingPass(pass: GradingFeedback): GradingPass {
 	return {
 		score: scoreValue(pass.score),
 		comment: pass.feedback?.trim() ? pass.feedback : null,
+		...(pass.notes?.trim() ? { notes: pass.notes } : {}),
 		grader: pass.grader,
 		bot: pass.bot,
 		willNotGrade: pass.ref?.startsWith(WILL_NOT_GRADE_REF) ?? false,

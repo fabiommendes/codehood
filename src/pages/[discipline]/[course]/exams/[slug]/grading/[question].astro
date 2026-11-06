@@ -171,6 +171,9 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                 {openRegrades.has(answer.submission) && (
                   <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
                 )}
+                {answer.passes.some((pass) => pass.notes !== undefined) && (
+                  <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
+                )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
                 <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} />
 
@@ -190,6 +193,12 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                             <span class="text-muted"> · {graderName(pass)}</span>
                           </p>
                           {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
+                          {pass.notes && (
+                            <div role="note" aria-label={m.grades_question_notes()} class="alert alert-warning alert-soft mt-2 block text-sm">
+                              <p class="font-semibold">{m.grades_question_notes()}</p>
+                              <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
