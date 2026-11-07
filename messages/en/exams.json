@@ -233,6 +233,7 @@
 	"exams_code_conflict_server_time": "saved at {time}",
 	"exams_code_conflict_server_empty": "no saved answer",
 	"exams_code_keep_draft": "Keep this browser's draft",
+	"exams_code_logout_discards_draft": "This browser holds code the server has not confirmed. Logging out deletes that draft. Log out anyway?",
 	"exams_code_use_server": "Use the server's version",
 	"exams_code_pick_first": "Pick a version first"
 }

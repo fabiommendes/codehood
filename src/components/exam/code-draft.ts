@@ -85,6 +85,8 @@ export interface DraftStore {
 	clearOthers(username: string, now: number): void;
 	/** Removes every key starting with `DRAFT_KEY_PREFIX`, for every user (logout). */
 	clearAll(): void;
+	/** Whether any draft is stored: one the server has not confirmed, since confirmed drafts are removed. */
+	hasAny(): boolean;
 }
 
 /** A `DraftStore` over `storage` (`window.localStorage` in the browser). */
@@ -177,6 +179,9 @@ export function draftStore(storage: Storage): DraftStore {
 		clearAll() {
 			removeWhere(() => true);
 		},
+		hasAny() {
+			return safely(() => ownKeys().some((key) => parse(key) !== null), false);
+		},
 	};
 }
 
@@ -188,6 +193,7 @@ const NO_DRAFTS: DraftStore = {
 	clearExam: () => {},
 	clearOthers: () => {},
 	clearAll: () => {},
+	hasAny: () => false,
 };
 
 /**

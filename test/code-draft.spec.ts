@@ -166,3 +166,16 @@ test("measureClockOffset takes the midpoint of the round trip, free of the page 
 	expect(measureClockOffset(105_200, 100_000, 100_400)).toBe(5_000);
 	expect(measureClockOffset(100_200, 100_000, 100_400)).toBe(0);
 });
+
+test("hasAny sees only well-formed drafts of this module", () => {
+	const storage = new FakeStorage();
+	const store = draftStore(storage);
+	expect(store.hasAny()).toBe(false);
+	storage.setItem("theme", "dark");
+	storage.setItem(`${DRAFT_KEY_PREFIX}broken`, "not json");
+	expect(store.hasAny()).toBe(false);
+	store.write(REF, draft("code"));
+	expect(store.hasAny()).toBe(true);
+	storage.fail.all = new Error("blocked");
+	expect(store.hasAny()).toBe(false);
+});

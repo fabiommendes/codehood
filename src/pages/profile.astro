@@ -233,7 +233,7 @@ const profileTabs = [
               <form
                 method="POST"
                 action={actions.profile.logoutEverywhere}
-                data-clear-drafts
+                data-clear-drafts={m.exams_code_logout_discards_draft()}
                 class="card-actions"
               >
                 <button type="submit" class="btn btn-outline btn-error"

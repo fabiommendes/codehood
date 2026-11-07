@@ -170,6 +170,11 @@ const reportContentPage =
       event.target instanceof HTMLFormElement &&
       event.target.matches("form[data-clear-drafts]")
     ) {
+      // Drafts still stored were never confirmed by the server.
+      if (drafts.hasAny() && !confirm(event.target.dataset.clearDrafts)) {
+        event.preventDefault();
+        return;
+      }
       drafts.clearAll();
     }
   });

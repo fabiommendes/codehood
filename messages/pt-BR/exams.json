@@ -233,6 +233,7 @@
 	"exams_code_conflict_server_time": "salvo às {time}",
 	"exams_code_conflict_server_empty": "nenhuma resposta salva",
 	"exams_code_keep_draft": "Manter o rascunho deste navegador",
+	"exams_code_logout_discards_draft": "Este navegador guarda código que o servidor não confirmou. Sair apaga esse rascunho. Sair mesmo assim?",
 	"exams_code_use_server": "Usar a versão do servidor",
 	"exams_code_pick_first": "Escolha uma versão primeiro"
 }

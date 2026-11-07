@@ -54,7 +54,7 @@ const { user, open = false } = Astro.props;
       <ThemeToggle variant="menu" class="cut" />
     </li>
     <li>
-      <form method="POST" action={actions.auth.logout} data-clear-drafts class="cut p-0">
+      <form method="POST" action={actions.auth.logout} data-clear-drafts={m.exams_code_logout_discards_draft()} class="cut p-0">
         <button type="submit" class="w-full px-3 py-1.5 text-left">{m.nav_log_out()}</button>
       </form>
     </li>
