@@ -1,5 +1,6 @@
 {
 	"grades_answer_none": "No answer written.",
+	"grades_answer_code_label": "Student's code",
 	"grades_results_title": "Results",
 	"grades_results_review": "Review grades",
 	"grades_results_empty": "No attempts yet.",

@@ -175,7 +175,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                   <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
                 )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
-                <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} />
+                <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} />
 
                 {!isPending && (
                   <>

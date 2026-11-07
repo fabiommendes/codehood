@@ -171,7 +171,7 @@ const stateLabel = (status: string, score: number | null): string => {
     <div class="mt-8 flex flex-col gap-6">
       {
         rows.map(({ label, outcome, title, asked, counting, review }) => (
-          <article aria-label={label} class="card card-border bg-base-100">
+          <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <h3 class="text-lg font-semibold">{title}</h3>
               {counting && openRegrades.has(counting.publicId) && (
@@ -179,7 +179,7 @@ const stateLabel = (status: string, score: number | null): string => {
               )}
               {counting && asked ? (
                 <>
-                  <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} />
+                  <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} submission={counting.publicId} />
                   <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
                   {outcome.comments.map((comment) => (
                     <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>

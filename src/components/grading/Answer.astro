@@ -1,12 +1,18 @@
 ---
 /**
  * A student's saved answer as visible text, or as the question's view when
- * the answer is a pick, a set of blanks or a list of lines.
+ * the answer is a pick, a set of blanks or a list of lines. A code answer is
+ * highlighted, and runnable when its language has a runner and the answer's
+ * submission is known.
  */
 import type { AnswerPayload } from "@/components/exam/answer-payload";
+import CodeRunner from "@/components/runner/CodeRunner";
+import { RUNNER_ORIGIN } from "@/core/constants";
 import type { QuestionPublic } from "@/db";
 import { m } from "@/i18n";
+import { runnerLanguage } from "@/runner/languages";
 import type { ReviewResult } from "@/services/review";
+import { highlightCode } from "@/utils/highlight-code";
 import AnswerView from "./AnswerView";
 import { displayAnswer } from "./answer-text";
 
@@ -16,16 +22,60 @@ interface Props {
 	payload: AnswerPayload | undefined;
 	/// The marks to show on the view, without a score of its own; read-only without it.
 	result?: ReviewResult;
+	/// The public id of the answer's submission; a code answer runs only with it.
+	submission?: string;
 }
 
-const { question, payload, result } = Astro.props;
-const shown = displayAnswer(question.type, payload);
+const { question, payload, result, submission } = Astro.props;
+const shown = displayAnswer(
+	question.type,
+	payload,
+	question.type === "essay"
+		? { content: question.content, highlight: question.highlight }
+		: undefined,
+);
+const runLanguage =
+	shown.kind === "code" && submission && RUNNER_ORIGIN !== null
+		? runnerLanguage(shown.highlight)
+		: null;
+const codeHtml =
+	shown.kind === "code"
+		? await highlightCode(
+				shown.text,
+				shown.highlight,
+				runLanguage ? { theme: "vscode" } : {},
+			)
+		: "";
 ---
 
 {shown.kind === "empty" && <p class="text-muted">{m.grades_answer_none()}</p>}
 {
   shown.kind === "text" && (
     <p class:list={["text-base-content", shown.multiline && "whitespace-pre-wrap"]}>{shown.text}</p>
+  )
+}
+{
+  shown.kind === "code" && runLanguage && (
+    <CodeRunner
+      client:visible
+      mode="review"
+      language={runLanguage}
+      code={shown.text}
+      highlightedHtml={codeHtml}
+      runnerOrigin={RUNNER_ORIGIN}
+      submission={submission}
+      label={m.grades_answer_code_label()}
+      compact
+    />
+  )
+}
+{
+  shown.kind === "code" && !runLanguage && (
+    <div
+      class="overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+      data-answer-code
+      set:html={codeHtml}
+    />
   )
 }
 {shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} />}

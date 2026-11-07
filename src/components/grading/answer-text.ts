@@ -7,6 +7,7 @@ import {
 export type AnswerDisplay =
 	| { kind: "empty" }
 	| { kind: "text"; text: string; multiline: boolean }
+	| { kind: "code"; text: string; highlight: string | null }
 	| { kind: "view" };
 
 /**
@@ -16,12 +17,23 @@ export type AnswerDisplay =
  * repeated for each of them. Any other answer is shown by the question's own
  * view, which marks the picks, blanks or lines. An answer with nothing in it
  * is `empty`.
+ *
+ * An essay whose `content` is `"code"` is `code` instead, with the question's
+ * `highlight` tag, which may name a language with no runner.
  */
 export function displayAnswer(
 	type: string,
 	payload: AnswerPayload | undefined,
+	essay?: { content?: string; highlight?: string },
 ): AnswerDisplay {
 	if (!isAnswered(type, payload)) return { kind: "empty" };
+	if (type === "essay" && essay?.content === "code") {
+		return {
+			kind: "code",
+			text: responseText(payload),
+			highlight: essay.highlight ?? null,
+		};
+	}
 	switch (type) {
 		case "short-answer":
 		case "essay":
