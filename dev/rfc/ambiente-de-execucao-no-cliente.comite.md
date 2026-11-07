@@ -535,3 +535,14 @@ Decisão do presidente para B17, dentro do desenho aprovado (rascunho limpo
 no logout): se houver rascunho não confirmado pelo servidor, o logout pede
 confirmação dizendo que o rascunho será apagado. Todos os itens vão para um
 lote de correção.
+
+Lote final corrigido (8e71585 … 4717810); suíte: só as 3 falhas aceitas.
+Efeito colateral do security B1: `clearAll` em página sem usuário apaga o
+rascunho de quem teve a sessão expirada no meio da prova e reabre `/login`.
+
+### Rodada 14
+
+- **R1.** Em página sem usuário, apagar só rascunhos já confirmados pelo
+  servidor ou vencidos (14 dias); rascunho não confirmado fica até outro
+  usuário entrar (`clearOthers`) ou vencer. Presidente: sim; o risco
+  residual (devtools sem login) é só de edição que o servidor não recebeu.
