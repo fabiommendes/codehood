@@ -2,6 +2,7 @@ import { ActionError, defineAction } from "astro:actions";
 import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { requireUser } from "@/auth/require-user";
+import { clearSessionCookie } from "@/auth/session-cookie";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { FieldError } from "@/core/error";
 import {
@@ -54,7 +55,7 @@ export const auth = {
 		handler: async (_input, context) => {
 			const token = context.cookies.get(SESSION_COOKIE)?.value;
 			if (token) await db.session.delete({ token }, FULL_ACCESS);
-			context.cookies.delete(SESSION_COOKIE, { path: "/" });
+			clearSessionCookie(context.cookies);
 		},
 	}),
 

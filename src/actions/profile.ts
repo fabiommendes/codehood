@@ -1,6 +1,7 @@
 import type { ActionAPIContext } from "astro:actions";
 import { ActionError, defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
+import { clearSessionCookie } from "@/auth/session-cookie";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { FieldError, NotAllowed } from "@/core/error";
 import { profileUpdate } from "@/core/schemas";
@@ -108,7 +109,7 @@ export const profile = {
 		handler: async (_input, context) => {
 			const actor = requireUser(context);
 			await db.session.delete({ username: actor.username }, { actor });
-			context.cookies.delete(SESSION_COOKIE, { path: "/" });
+			clearSessionCookie(context.cookies);
 		},
 	}),
 };

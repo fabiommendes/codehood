@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { SESSION_COOKIE } from "@/core/constants";
+import { clearSessionCookie } from "@/auth/session-cookie";
 import { NotFound } from "@/core/error";
 import * as schema from "@/core/schemas";
 import { db } from "@/db";
@@ -711,7 +711,7 @@ export const userApi = {
 			if (!user) throw new NotFound("user", { id: actor.username });
 
 			await db.user.changePassword(user, body, { actor });
-			cookies.delete(SESSION_COOKIE, { path: "/" });
+			clearSessionCookie(cookies);
 			return { success: true };
 		},
 	}),

@@ -50,6 +50,16 @@ test("the long spellings of ENVIRONMENT are accepted as aliases", () => {
 	}
 });
 
+test("clearing the session cookie repeats Secure and path in production", () => {
+	const script =
+		'import("@/auth/session-cookie").then((m) => console.log(JSON.stringify(m.sessionCookieClearOptions())));';
+	const out = execFileSync("node_modules/.bin/tsx", ["-e", script], {
+		env: { ...process.env, ENVIRONMENT: "prod" },
+		encoding: "utf8",
+	});
+	expect(JSON.parse(out)).toMatchObject({ secure: true, path: "/" });
+});
+
 test("the session cookie is Secure exactly when ENVIRONMENT is prod", () => {
 	// This process runs as `dev`, so the shared options say so.
 	expect(SESSION_COOKIE_OPTIONS).toMatchObject({

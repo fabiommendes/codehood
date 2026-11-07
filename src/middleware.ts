@@ -1,5 +1,6 @@
 import { defineMiddleware, sequence } from "astro:middleware";
 import { hasPerm } from "@/auth/permissions";
+import { clearSessionCookie } from "@/auth/session-cookie";
 import { db } from "@/db";
 import * as env from "./core/constants";
 import { RUNNER_ORIGIN, SESSION_COOKIE } from "./core/constants";
@@ -45,7 +46,7 @@ export const sessionMiddleware = defineMiddleware(async (context, next) => {
 
 	const session = await db.session.validate(token);
 	if (!session) {
-		context.cookies.delete(SESSION_COOKIE, { path: "/" });
+		clearSessionCookie(context.cookies);
 		return next();
 	}
 	const { role, name, username } = session.user;

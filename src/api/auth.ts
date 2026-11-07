@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { FULL_ACCESS } from "@/auth/actor";
 import { dummyPasswordHash, verifyPassword } from "@/auth/password";
+import { clearSessionCookie } from "@/auth/session-cookie";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
 import { usernameOrEmail } from "@/core/schemas";
@@ -33,7 +34,7 @@ export const logout = POST("/api/auth/logout", {
 	handler: async ({ actor, cookies, apiKey }) => {
 		await db.session.delete({ username: actor.username }, { actor });
 		if (apiKey) await db.apiKey.delete({ id: apiKey.id }, { actor });
-		cookies.delete(SESSION_COOKIE, { path: "/" });
+		clearSessionCookie(cookies);
 		return { success: true };
 	},
 });
