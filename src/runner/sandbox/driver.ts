@@ -52,6 +52,9 @@ export interface Driver {
 	/**
 	 * Downloads and starts the runtime.
 	 *
+	 * Runs in a Worker already locked down (`lockDownWorkerScope`), before any
+	 * program is known; it may run long before `run`, or never be followed by it.
+	 *
 	 * @throws {Error} when the runtime cannot be loaded; the run ends with `load-failed`.
 	 */
 	load(ctx: LoadContext): Promise<void>;

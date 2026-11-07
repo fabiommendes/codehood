@@ -2,8 +2,9 @@
  * The `sw` stdin transport: the runner's service worker answers synchronous
  * XHRs from the Worker with the lines the frame posts to it.
  *
- * The Worker sends `GET ${SW_STDIN_PATH}<runId>`. The service worker holds the
- * request up to `SW_POLL_MS` and answers:
+ * The Worker sends `GET ${SW_STDIN_PATH}<runId>` with header
+ * `X-Stdin-Token: <token>`. The service worker holds the request up to
+ * `SW_POLL_MS` and answers:
  *
  * | Status | Header `X-Stdin` | Meaning                                  |
  * | :----- | :--------------- | :--------------------------------------- |
@@ -11,10 +12,16 @@
  * | 200    | `eof`            | end of input                             |
  * | 204    |                  | nothing yet; ask again                   |
  * | 410    |                  | channel cancelled or unknown             |
- * | 403    |                  | request from a client that does not own the channel |
+ * | 403    |                  | wrong or missing token, or a client that does not own the channel |
  *
- * The first request for a `runId` binds the channel to its
- * `FetchEvent.clientId`; requests from any other client get 403.
+ * The channel is bound to its owner when the frame creates it, before any
+ * read: `stdin-open` registers a random `token` (`crypto.randomUUID()`) that
+ * only the frame and, through `start`, the run's Worker know. A request
+ * without that token gets 403, whatever its `runId`, even before the owner's
+ * first read. The frame cannot learn the Worker's service worker client id,
+ * so on top of the token the first request carrying it also binds the
+ * channel to its `FetchEvent.clientId`; later requests from another client
+ * get 403 even with the token.
  */
 
 import { z } from "zod";
@@ -27,7 +34,11 @@ import type { StdinReader, StdinWriter } from "./types";
  * origin, never from a Worker.
  */
 export const frameToSwMessage = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("stdin-open"), runId: z.uuid() }),
+	z.object({
+		type: z.literal("stdin-open"),
+		runId: z.uuid(),
+		token: z.uuid(),
+	}),
 	z.object({
 		type: z.literal("stdin-line"),
 		runId: z.uuid(),
@@ -39,8 +50,8 @@ export const frameToSwMessage = z.discriminatedUnion("type", [
 export type FrameToSwMessage = z.infer<typeof frameToSwMessage>;
 
 /**
- * Creates the frame's end of an `sw` channel and posts `stdin-open` to the
- * controlling service worker.
+ * Creates the frame's end of an `sw` channel with a fresh token and posts
+ * `stdin-open` to the controlling service worker.
  *
  * @throws {Error} when no service worker controls the frame.
  */
@@ -49,6 +60,6 @@ export function createSwWriter(_runId: string): StdinWriter {
 }
 
 /** Opens the Worker's end of an `sw` channel; each `readLine` polls with synchronous XHR. */
-export function openSwReader(_runId: string): StdinReader {
+export function openSwReader(_runId: string, _token: string): StdinReader {
 	throw new Error("not implemented");
 }

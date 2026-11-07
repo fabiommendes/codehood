@@ -308,3 +308,37 @@ stubs: saída em lotes por intervalo, `status` repetido descartado e limite
 contando mensagens além de bytes; APIs removidas viram `undefined`
 somente leitura (não getter que lança); `run` com `runId` repetido é
 ignorado. O architect incorpora antes de os implementers começarem.
+
+### Rodada 8: reabertura do 7' (medições da E1.6)
+
+Medições (RFC, seção "Medições"): Pyodide 1969/2209 ms (mediana/p90) no
+desktop e 7775/8562 ms com CPU 4x; swipl-wasm 146/167 e 1434/1856; recarga
+do frame 50/55 e 437/461. Pyodide e swipl-wasm rodam sem as APIs
+bloqueadas. Pyodide com CPU lenta passa da meta de 3 s; pela condição do
+7', a decisão reabre.
+
+- **P1.** Proposta do presidente: manter um Worker novo por run, mas
+  **pré-aquecido**: a página mantém um Worker reserva por linguagem já
+  inicializado (runtime carregado, escopo bloqueado, sem código do aluno).
+  Rodar consome a reserva e dispara a criação da próxima em segundo plano.
+  A reserva é criada no primeiro foco/edição de um editor daquela
+  linguagem, não no carregamento da página. Em `review`, o frame recarregado
+  já cria a reserva. Isolamento igual ao 7' (nenhum Worker roda código de
+  dois runs); custo: memória de um runtime ocioso por linguagem na página.
+- Alternativa (usuario, rodada 3): reaproveitar o Worker entre runs com
+  memória limpa. O presidente vota contra: reabre B1 (estado vaza entre
+  runs) e o Parar volta a matar o runtime.
+
+Votos da rodada 8: **P1 aprovado por unanimidade**, com condições:
+
+- Worker em duas fases: `load` (bloqueio do escopo na inicialização, antes
+  do runtime; `Driver.load`; sem código do aluno) e `start` (arquivos e
+  stdin). Protocolo ganha `prepare { language }`; `RunnerHost.prepare`.
+- A reserva aceita um único `start`; `runId` e canal de stdin só se ligam
+  ao consumi-la; o frame encerra a reserva que mandar mensagem fora do
+  protocolo de carga. Teste de que a reserva já nasce bloqueada.
+- Reserva seguinte só depois que o run atual termina; reserva descartada
+  quando a aba fica oculta (`visibilitychange`); nenhuma reserva quando a
+  execução está desligada (`allowCodeRun` falso, sem `RUNNER_ORIGIN`).
+- UI mostra "preparando…" se Rodar chegar antes da reserva.
+- Plano B na E3b: medir snapshot de memória do Pyodide.

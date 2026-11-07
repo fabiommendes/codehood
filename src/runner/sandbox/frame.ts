@@ -33,11 +33,22 @@ export const STORAGE_CLEANUP_TIMEOUT_MS = 2000;
  * starts listening to the app and posts `ready`, without waiting for the
  * cleanup.
  *
+ * Reserves: on `prepare` it creates a module Worker from
+ * `${bundleBase}worker.js` and sends `load`, keeping at most one reserve per
+ * language. A reserve is not tied to any `runId` or stdin channel until a
+ * run consumes it. A reserve that posts anything outside the load protocol
+ * is terminated. All reserves are terminated when the document becomes
+ * hidden (`visibilitychange`). A failed reserve is dropped silently.
+ *
  * For each `run` it starts `clearOriginStorage` without waiting for it,
- * creates a module Worker from `${bundleBase}worker.js`, opens a stdin
- * channel and sends `start`. It forwards Worker messages that parse: output
+ * takes the language's reserve (or creates a Worker and sends `load` if
+ * there is none), opens a stdin channel and, once the Worker posted
+ * `loaded`, sends `start`. The next reserve for that language is created
+ * only after this run ends, and only if the app sent `prepare` for it since
+ * the last reserve was consumed or dropped. It forwards Worker messages that parse: output
  * in batches every `OUTPUT_FLUSH_MS`, a `status` only when the state
- * changes. It counts output bytes and output messages, and terminates the
+ * changes. It counts output bytes and every message the Worker posts after
+ * `start` (dropped ones included), and terminates the
  * Worker on `stop`, when either output limit is passed, or on the first
  * `exit` the Worker posts (student code can forge one); later messages from
  * that Worker are dropped. A `run` with a `runId` already used in this frame

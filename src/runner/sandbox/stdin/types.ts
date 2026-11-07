@@ -34,7 +34,7 @@ export const SW_STDIN_PATH = "/runner/__stdin/";
 /** What the frame hands the Worker so it can open a reader. Structured-cloneable. */
 export type StdinTransport =
 	| { kind: "sab"; buffer: SharedArrayBuffer }
-	| { kind: "sw"; runId: string };
+	| { kind: "sw"; runId: string; token: string };
 
 /** The Worker's end: blocks the Worker thread until a line, EOF or cancellation. */
 export interface StdinReader {

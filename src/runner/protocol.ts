@@ -20,7 +20,8 @@ export const RUNNER_PROTOCOL_VERSION = 1;
 /// A run that goes over is terminated with reason `output-limit`.
 export const OUTPUT_LIMIT_BYTES = 1024 * 1024;
 
-/// Maximum `output` messages a run's Worker may post. A run that goes over
+/// Maximum messages a run's Worker may post after `start`, of any type,
+/// forged or not (`output`, `status`, malformed ones). A run that goes over
 /// is terminated with reason `output-limit`, even under the byte limit.
 export const OUTPUT_MESSAGES_LIMIT = 100_000;
 
@@ -66,8 +67,8 @@ export type RunState = z.infer<typeof runState>;
  * `exited`: the program finished, `code` says how. `crashed`: the driver
  * itself failed while running. `load-failed`: the runtime could not be
  * downloaded or started. `stopped`: the app sent `stop`. `output-limit`: the
- * program wrote more than `maxOutputBytes` or posted more than
- * `OUTPUT_MESSAGES_LIMIT` output messages.
+ * program wrote more than `maxOutputBytes` or its Worker posted more than
+ * `OUTPUT_MESSAGES_LIMIT` messages.
  */
 export const exitReason = z.enum([
 	"exited",
@@ -101,6 +102,22 @@ export const runMessage = z.object({
 	maxOutputBytes: z.int().positive().max(OUTPUT_LIMIT_BYTES).optional(),
 });
 
+/**
+ * Asks the frame to keep a reserve Worker for `language`: created, locked
+ * down and with its runtime loaded, but with no program.
+ *
+ * The next `run` in that language consumes the reserve instead of loading a
+ * runtime. At most one reserve per language; a `prepare` while one exists,
+ * is loading, or a run in that language is active is ignored, as is one for
+ * a language the frame did not announce. The app sends it on the first focus
+ * or edit of an editor, never on page load, and never when code execution is
+ * off.
+ */
+export const prepareMessage = z.object({
+	type: z.literal("prepare"),
+	language: languageId,
+});
+
 /** One line typed in the terminal, without its newline. */
 export const stdinMessage = z.object({
 	type: z.literal("stdin"),
@@ -121,6 +138,7 @@ export const stopMessage = z.object({
 });
 
 export const appToRunnerMessage = z.discriminatedUnion("type", [
+	prepareMessage,
 	runMessage,
 	stdinMessage,
 	stdinEofMessage,
@@ -146,7 +164,12 @@ export const readyMessage = z.object({
 	languages: z.array(languageId),
 });
 
-/** The run changed state; never sent twice in a row with the same `state`. */
+/**
+ * The run changed state; never sent twice in a row with the same `state`.
+ *
+ * A run that consumed a ready reserve goes straight to `running`; one that
+ * arrived before its reserve finished loading reports `loading` first.
+ */
 export const statusMessage = z.object({
 	type: z.literal("status"),
 	runId,

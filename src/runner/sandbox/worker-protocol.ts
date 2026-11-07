@@ -12,24 +12,45 @@ import type { languageId, runMode, sourcePath } from "../protocol";
 import type { StdinTransport } from "./stdin/types";
 
 /**
- * The only message the frame sends to a Worker, right after creating it.
+ * First message the frame sends to a new Worker: load the runtime.
  *
- * `runtimeBase` is the absolute URL of the versioned directory the driver
- * downloads its runtime files from.
+ * The Worker is already locked down when it arrives. `runtimeBase` is the
+ * absolute URL of the versioned directory the driver downloads its runtime
+ * files from. During this phase the Worker may post only `progress`,
+ * `loaded` or an `exit` with reason `load-failed`; the frame terminates a
+ * Worker that posts anything else.
+ */
+export interface LoadMessage {
+	type: "load";
+	language: z.infer<typeof languageId>;
+	runtimeBase: string;
+}
+
+/**
+ * Second and last message: run one program.
+ *
+ * Sent once, only after `loaded`, when a run consumes this Worker. The
+ * Worker ignores any `start` after the first.
  */
 export interface StartMessage {
 	type: "start";
-	language: z.infer<typeof languageId>;
 	mode: z.infer<typeof runMode>;
 	files: Record<string, string>;
 	entry: z.infer<typeof sourcePath>;
 	stdin: StdinTransport;
-	runtimeBase: string;
 }
 
+export type FrameToWorkerMessage = LoadMessage | StartMessage;
+
+/** The runtime finished loading; the Worker waits for `start`. */
+export const workerLoadedMessage = z.object({
+	type: z.literal("loaded"),
+});
+
+/** Sent only after `start`: `running` first, then around each blocking read. */
 export const workerStatusMessage = z.object({
 	type: z.literal("status"),
-	state: z.enum(["loading", "running", "waiting-input"]),
+	state: z.enum(["running", "waiting-input"]),
 });
 
 export const workerProgressMessage = z.object({
@@ -59,6 +80,7 @@ export const workerExitMessage = z.object({
 });
 
 export const workerToFrameMessage = z.discriminatedUnion("type", [
+	workerLoadedMessage,
 	workerStatusMessage,
 	workerProgressMessage,
 	workerOutputMessage,

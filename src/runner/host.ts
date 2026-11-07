@@ -114,6 +114,18 @@ export class RunnerHost {
 	}
 
 	/**
+	 * Asks the frame to keep a loaded reserve Worker for `language`.
+	 *
+	 * Call it on the first focus or edit of an editor of that language, and
+	 * again after `reload()`. Never call it when code execution is off. Adds
+	 * the iframe if needed; does nothing when the runner is unavailable.
+	 * Never throws.
+	 */
+	prepare(_language: LanguageId): void {
+		throw new Error("not implemented");
+	}
+
+	/**
 	 * Starts a run with a fresh `runId`.
 	 *
 	 * @throws {RunnerUnavailable} as `ready()` does.

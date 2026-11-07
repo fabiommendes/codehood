@@ -172,9 +172,13 @@ src/pages/runner/[...path].ts   endpoint (sem stub: só chama assets.ts)
 
 ```
 app (A)                     frame (B)                    Worker (B)        SW (B)
-RunnerHost.run ── run ────► cria Worker, StdinWriter ─ start ─►
-                                                    ◄─ status loading
-           ◄── status/progress ──┤                  ◄─ progress
+                                                    (bloqueia o escopo ao nascer)
+RunnerHost.prepare ─ prepare ► cria reserva ─── load ──►
+                                                    ◄─ progress (não repassado)
+                                                    ◄─ loaded
+RunnerHost.run ── run ────► consome a reserva, StdinWriter ─ start ─►
+           ◄── status loading ───┤ (só se a reserva ainda carrega)
+           ◄── progress ─────────┤                  ◄─ progress
            ◄── status running ───┤                  ◄─ status running
            ◄── output ───────────┤ conta bytes      ◄─ output
                                                     ◄─ status waiting-input
@@ -200,7 +204,25 @@ Regras que os stubs fixam:
   stream a cada `OUTPUT_FLUSH_MS` (50 ms), esvaziada antes de qualquer
   `status` ou `exit`. `status` igual ao anterior é descartado. O limite de
   saída conta bytes (`maxOutputBytes`) e mensagens do Worker
-  (`OUTPUT_MESSAGES_LIMIT`); passar de qualquer um dá `output-limit`.
+  (`OUTPUT_MESSAGES_LIMIT`); passar de qualquer um dá `output-limit`. A
+  contagem de mensagens inclui toda mensagem do Worker depois do `start`,
+  de qualquer tipo, forjada ou não, inclusive `status` e mensagens que não
+  passam no schema.
+- Reserva (P1): o Worker chama `lockDownWorkerScope` ao ser avaliado, antes
+  de receber `load`. Em `load` só carrega o runtime; na fase de carga só pode
+  mandar `progress`, `loaded` ou `exit { load-failed }`, senão o frame o
+  encerra. A reserva aceita um único `start`; `runId` e canal de stdin só se
+  ligam a ela quando um run a consome. No máximo uma reserva por linguagem;
+  a seguinte só é criada depois que o run atual termina e se a app mandou
+  `prepare` de novo. Todas são encerradas quando o documento fica oculto
+  (`visibilitychange`). A app nunca manda `prepare` com a execução
+  desligada (`allowCodeRun` falso, `RUNNER_ORIGIN` null); com o run antes
+  da reserva pronta, a UI mostra "preparando…" (`status: loading`).
+- Canal `sw`: o frame gera um `token` aleatório por run, registra no SW em
+  `stdin-open` e entrega ao Worker só no `start`. Pedido sem o token dá 403,
+  mesmo antes da primeira leitura do dono, sabendo o `runId` ou não. O
+  `clientId` do Worker não é visível ao frame, então ele é amarrado no
+  primeiro pedido com token válido, como segunda trava.
 - Antes de carregar o driver, o Worker chama `lockDownWorkerScope`
   (`sandbox/worker.ts`): apaga `indexedDB`, `caches`, `Worker`,
   `SharedWorker`, `BroadcastChannel`, `navigator.storage` e
@@ -402,6 +424,12 @@ como em `test/environment-switch.spec.ts`. Cada tarefa termina com
   - `runId` repetido é ignorado (nenhuma mensagem para ele, o run original
     segue); linguagem desconhecida dá `crashed`; mensagem que não passa no
     schema é ignorada sem derrubar o frame.
+  - `prepare` + `run`: o run vai direto a `running`, sem `loading`; `run`
+    antes de `loaded` manda `loading` e depois `running`; `prepare` repetido
+    não cria segunda reserva; reserva não é recriada antes de o run acabar;
+    `visibilitychange` para oculto encerra as reservas; reserva que manda
+    `output` antes do `start` é encerrada; `load-fail` na reserva não afeta o
+    run seguinte, que tenta de novo.
   - Saída em lotes: 10 000 `out` seguidos chegam em bem menos de 10 000
     mensagens, em ordem e completos; nunca dois `status` iguais seguidos;
     `output` pendente chega antes do `exit`.
@@ -429,7 +457,10 @@ como em `test/environment-switch.spec.ts`. Cada tarefa termina com
   iframe e o run em andamento termina com `stopped`; `RunnerHost.exclusive`
   cria iframe próprio e um `run()` novo para o anterior; mensagem forjada de outra
   janela (`window.postMessage` da própria página) é ignorada; frame que não
-  manda `ready` dá `RunnerUnavailable("timeout")`.
+  manda `ready` dá `RunnerUnavailable("timeout")`; `prepare` antes de Rodar
+  faz o run começar sem `loading`; `prepare` com o runner indisponível não
+  lança; a página de diagnóstico chama `prepare` no primeiro foco do
+  editor.
 
 **E1.5 Testes de isolamento** (tester dedicado; não muda código de produção,
 salvo falha encontrada).
@@ -453,7 +484,13 @@ salvo falha encontrada).
     via `Blob` URL) funciona.
   - Um run que tenta persistir algo por qualquer caminho acima não vê nada
     no run seguinte, no mesmo frame e depois de recarregá-lo.
-  - Requisição ao caminho de stdin com `runId` de outro run dá 403 ou 410.
+  - Requisição ao caminho de stdin com `runId` de outro run, sem o token,
+    dá 403, inclusive antes da primeira leitura do Worker dono; o dono lê
+    normalmente depois.
+  - A reserva já nasce bloqueada: as APIs valem `undefined` antes do `load`
+    e durante `Driver.load`.
+  - `status` forjado pelo Worker em laço conta no `OUTPUT_MESSAGES_LIMIT` e
+    dá `output-limit`.
   - `/runner/frame` não carrega dentro de página de outra origem
     (`frame-ancestors`).
   - Popup aberto pela app e janela que abre a app, ambos de outra origem,
@@ -475,6 +512,49 @@ como o spike).
   iframe até o `ready`, e até o primeiro `status: running` depois dela.
 - Entrega: tabela com mediana e p90 no RFC, seção "Medições". Acima de 3 s,
   o presidente reabre a decisão de Worker por run.
+
+## Medições
+
+E1.6, tempo do `run` (postado pela app) até `status: running` (runtime
+carregado, antes do código do aluno), cache HTTP quente, 10 runs seguidos
+depois de 2 de aquecimento. Recarga: troca do iframe até o `ready` do frame
+novo. Valores em ms.
+
+| Cenário | Desktop mediana | Desktop p90 | CPU 4x mediana | CPU 4x p90 |
+| :------ | --------------: | ----------: | -------------: | ---------: |
+| Pyodide | 1969 | 2209 | 7775 | 8562 |
+| swipl-wasm | 146 | 167 | 1434 | 1856 |
+| Recarga do frame | 50 | 55 | 437 | 461 |
+
+- Pyodide passa de 3 s com CPU 4x, e o tempo é quase todo `loadPyodide`
+  (importar `pyodide.mjs` leva 3 ms). Pelo critério da E1, a decisão de
+  Worker por run reabre para Python. swipl-wasm e a recarga ficam abaixo.
+- Compatibilidade: Pyodide e swipl-wasm carregam e leem `input()` e `read/1`
+  (stdin por SAB + `Atomics.wait`) com as APIs bloqueadas, tanto redefinidas
+  como `undefined` quanto como getter que lança. Nenhum procura
+  `indexedDB`, `caches`, `navigator.storage`, `Worker`, `SharedWorker` ou
+  `BroadcastChannel` ao carregar. Depois do bloqueio, nenhum descritor da
+  cadeia de protótipos de `self` e `navigator` devolve a API original.
+- Versões: Chromium 156.0.8078.79 headless (Linux, desktop), Pyodide 314.0.7
+  (npm `pyodide`), npm `swipl-wasm` 8.3.0 (SWI-Prolog 10.1.20, build
+  `swipl-web`, sem pthreads). Runtimes servidos da origem do runner com
+  `immutable`; o log do servidor confirmou que só `/frame` ia à rede.
+- Montagem: app em `localhost`, runner em `127.0.0.1`, frame com
+  `Document-Isolation-Policy: isolate-and-credentialless`
+  (`crossOriginIsolated` verdadeiro), Worker de módulo novo por run,
+  bloqueio antes do `import()` do runtime, limpeza de IndexedDB, Cache
+  Storage e OPFS disparada sem espera no início do run. `swipl-web.js` é
+  script clássico; o bench o serviu com `export default SWIPL` no fim para
+  importá-lo no Worker de módulo, e o bundle de produção precisa do mesmo.
+- CPU 4x: `Emulation.setCPUThrottlingRate` não serve, porque o Chromium o
+  recusa em alvos de Worker ("only supported for pages") e um laço no Worker
+  roda na mesma velocidade com a página a 4x. A medição usou cgroup
+  (`systemd-run --scope`, `CPUQuota=25%`, período de 10 ms), calibrado com
+  um laço de CPU: 655 ms sem limite e 2602 ms com o limite, no Worker e na
+  página. A cota vale para o navegador inteiro (todas as threads somadas),
+  mais severo que um celular com vários núcleos lentos; isso pesa mais em
+  swipl-wasm e na recarga, cujo tempo varia muito nesse modo. Com o período
+  padrão de 100 ms: Pyodide 8789/9392, swipl-wasm 1702/2301, recarga 494/498.
 
 ## Em aberto
 
