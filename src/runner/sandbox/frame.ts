@@ -15,6 +15,7 @@
 import {
 	type AppToRunnerMessage,
 	appToRunnerMessage,
+	type Diagnostic,
 	type ExitReason,
 	FILES_LIMIT_BYTES,
 	type LanguageId,
@@ -206,6 +207,7 @@ export function startFrame(config: FrameConfig): void {
 		reason: ExitReason,
 		code: number | null,
 		message?: string,
+		diagnostics?: Diagnostic[],
 	): void {
 		if (run.ended) return;
 		run.ended = true;
@@ -223,6 +225,7 @@ export function startFrame(config: FrameConfig): void {
 			reason,
 			code,
 			...(message === undefined ? {} : { message: message.slice(0, 2000) }),
+			...(diagnostics?.length ? { diagnostics } : {}),
 		});
 		if (
 			wanted.has(run.language) &&
@@ -310,6 +313,7 @@ export function startFrame(config: FrameConfig): void {
 					message.reason,
 					message.reason === "exited" ? message.code : null,
 					message.message,
+					message.reason === "exited" ? message.diagnostics : undefined,
 				);
 				break;
 		}

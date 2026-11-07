@@ -7,7 +7,7 @@
  * the Worker.
  */
 
-import type { LanguageId, RunMode } from "../protocol";
+import type { Diagnostic, LanguageId, RunMode } from "../protocol";
 
 /** What a driver may use while loading its runtime. */
 export interface LoadContext {
@@ -37,6 +37,14 @@ export interface RunContext {
 
 	stdout(text: string): void;
 	stderr(text: string): void;
+
+	/**
+	 * Reports a problem at a place in the source, which the editor marks.
+	 *
+	 * The message still has to be written to stderr: a diagnostic only adds
+	 * the mark. Reports past `DIAGNOSTICS_LIMIT` are dropped.
+	 */
+	diagnose(diagnostic: Diagnostic): void;
 
 	/**
 	 * Blocks until the user enters a line.

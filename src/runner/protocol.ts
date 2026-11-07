@@ -208,11 +208,28 @@ export const outputMessage = z.object({
 	text: z.string(),
 });
 
+/// Most diagnostics one run reports.
+export const DIAGNOSTICS_LIMIT = 20;
+
+/**
+ * A problem the driver found at a place in the source, e.g. a syntax error.
+ *
+ * `line` is 1-based and `column` 0-based, both in `file`.
+ */
+export const diagnostic = z.object({
+	file: sourcePath,
+	line: z.int().positive(),
+	column: z.int().nonnegative(),
+	message: z.string().max(500),
+});
+export type Diagnostic = z.infer<typeof diagnostic>;
+
 /**
  * The run ended; no other message for this `runId` follows.
  *
  * `code` is the program's exit code for `exited`, null otherwise. `message`
  * is a short plain-text explanation for `crashed` and `load-failed`.
+ * `diagnostics` come only with `exited`, when the driver located a problem.
  */
 export const exitMessage = z.object({
 	type: z.literal("exit"),
@@ -220,6 +237,7 @@ export const exitMessage = z.object({
 	reason: exitReason,
 	code: z.int().nullable(),
 	message: z.string().max(2000).optional(),
+	diagnostics: z.array(diagnostic).max(DIAGNOSTICS_LIMIT).optional(),
 });
 
 /**

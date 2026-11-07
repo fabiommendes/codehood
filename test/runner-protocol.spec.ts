@@ -468,11 +468,30 @@ test.describe("JavaScript driver", () => {
 		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
 	});
 
-	test("a syntax error exits with 1", async ({ page }) => {
+	test("a syntax error points at its line and column and exits with 1", async ({
+		page,
+	}) => {
 		const h = await loadFrame(page);
-		const result = await run(h, "let = = 1", "javascript");
-		expect(result.stderr).toContain("SyntaxError");
-		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
+		const result = await run(
+			h,
+			"let sum = 0;\nfunction add(n: number) {}\n",
+			"javascript",
+		);
+		expect(result.stderr).toMatch(
+			/^main\.js:2:15\nfunction add\(n: number\) \{\}\n {14}\^\n\nSyntaxError: /,
+		);
+		expect(result.exit).toMatchObject({
+			reason: "exited",
+			code: 1,
+			diagnostics: [
+				{
+					file: "main.js",
+					line: 2,
+					column: 14,
+					message: expect.stringMatching(/^SyntaxError: /),
+				},
+			],
+		});
 	});
 
 	test("pending timers keep the script alive", async ({ page }) => {

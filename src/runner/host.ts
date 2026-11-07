@@ -48,7 +48,7 @@ export interface RunHandlers {
  * bundle went stale while this run was active. The run did not fail by
  * itself; the UI should tell the user to run it again.
  */
-export type RunExit = Pick<ExitMessage, "code" | "message"> & {
+export type RunExit = Pick<ExitMessage, "code" | "message" | "diagnostics"> & {
 	reason: ExitMessage["reason"] | "reloaded";
 };
 
@@ -423,6 +423,7 @@ export class RunnerHost {
 					reason: message.reason,
 					code: message.code,
 					message: message.message,
+					diagnostics: message.diagnostics,
 				});
 				break;
 		}

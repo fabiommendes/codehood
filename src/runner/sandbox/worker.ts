@@ -9,6 +9,7 @@
  * Worker posts `waiting-input` before blocking and `running` after.
  */
 
+import { DIAGNOSTICS_LIMIT, type Diagnostic } from "../protocol";
 import type { Driver } from "./driver";
 import { loadDriver } from "./drivers";
 import { openStdinReader } from "./stdin";
@@ -131,6 +132,7 @@ export function startWorker(): void {
 			}
 			post({ type: "output", stream, text });
 		};
+		const diagnostics: Diagnostic[] = [];
 		try {
 			const code = await current.run({
 				files: message.files,
@@ -138,6 +140,9 @@ export function startWorker(): void {
 				mode: message.mode,
 				stdout: (text) => emit("stdout", text),
 				stderr: (text) => emit("stderr", text),
+				diagnose(found) {
+					if (diagnostics.length < DIAGNOSTICS_LIMIT) diagnostics.push(found);
+				},
 				readLine() {
 					post({ type: "status", state: "waiting-input" });
 					try {
@@ -151,6 +156,7 @@ export function startWorker(): void {
 				type: "exit",
 				reason: "exited",
 				code: Number.isInteger(code) ? code : 0,
+				...(diagnostics.length > 0 ? { diagnostics } : {}),
 			});
 		} catch (error) {
 			// A stop is decided by the frame, which terminates the Worker first:

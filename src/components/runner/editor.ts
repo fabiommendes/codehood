@@ -20,8 +20,18 @@ export interface RunnerEditor {
 	/** Makes the editor read-only (still focusable and selectable) or writable. */
 	setReadOnly(readOnly: boolean): void;
 
+	/** Underlines each problem at its place, replacing the previous ones; `[]` clears them. */
+	showDiagnostics(diagnostics: readonly EditorDiagnostic[]): void;
+
 	focus(): void;
 	destroy(): void;
+}
+
+/// A problem in the source: 1-based `line`, 0-based `column`.
+export interface EditorDiagnostic {
+	line: number;
+	column: number;
+	message: string;
 }
 
 export interface CreateEditorOptions {
@@ -53,7 +63,7 @@ let hints = 0;
 export async function createEditor(
 	options: CreateEditorOptions,
 ): Promise<RunnerEditor> {
-	const [state, view, commands, language, lezer, vscode, javascript] =
+	const [state, view, commands, language, lezer, vscode, javascript, lint] =
 		await Promise.all([
 			import("@codemirror/state"),
 			import("@codemirror/view"),
@@ -62,6 +72,7 @@ export async function createEditor(
 			import("@lezer/highlight"),
 			import("@replit/codemirror-vscode-keymap"),
 			import("@codemirror/lang-javascript"),
+			import("@codemirror/lint"),
 		]);
 	const { Compartment, EditorState, Prec } = state;
 	const {
@@ -133,6 +144,12 @@ export async function createEditor(
 				color: "#c6c6c6",
 			},
 			".cm-panels": { backgroundColor: "#252526", color: "#d4d4d4" },
+			".cm-tooltip": {
+				backgroundColor: "#252526",
+				color: "#d4d4d4",
+				border: "1px solid #454545",
+			},
+			".cm-diagnostic": { fontFamily: "inherit", whiteSpace: "pre-wrap" },
 		},
 		{ dark: true },
 	);
@@ -190,6 +207,7 @@ export async function createEditor(
 					"aria-describedby": hintId,
 				}),
 				lineNumbers(),
+				lint.lintGutter(),
 				EditorView.updateListener.of((update) => {
 					if (
 						update.docChanged &&
@@ -214,11 +232,29 @@ export async function createEditor(
 				changes: { from: 0, to: editor.state.doc.length, insert: code },
 				annotations: external.of(true),
 			});
+			editor.dispatch(lint.setDiagnostics(editor.state, []));
 		},
 		setReadOnly(value) {
 			editor.dispatch({
 				effects: readOnly.reconfigure(readOnlyExtensions(value)),
 			});
+		},
+		showDiagnostics(diagnostics) {
+			const { doc } = editor.state;
+			const marks = diagnostics
+				.filter((d) => d.line <= doc.lines)
+				.map((d) => {
+					const line = doc.line(d.line);
+					const from = Math.min(line.from + d.column, line.to);
+					// One character, so a mark at the end of a line stays visible.
+					return {
+						from,
+						to: Math.min(from + 1, line.to),
+						severity: "error" as const,
+						message: d.message,
+					};
+				});
+			editor.dispatch(lint.setDiagnostics(editor.state, marks));
 		},
 		focus() {
 			editor.focus();

@@ -105,4 +105,14 @@ test.describe("typescript smoke", () => {
 		expect(result.stderr).toContain("main.ts:3");
 		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
 	});
+
+	test("a syntax error points at its line and column", async ({ page }) => {
+		const h = await loadFrame(page);
+		const id = await start(h, "let x = 1;\nif (x > 0 {}\n", "typescript");
+		const result = await collect(h, id, 60_000);
+		expect(result.stderr).toBe(
+			'main.ts:2:11\nif (x > 0 {}\n          ^\n\nSyntaxError: Unexpected token, expected ")"\n',
+		);
+		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
+	});
 });

@@ -17,6 +17,7 @@
 import type { Driver, RunContext } from "../driver";
 import { StdinCancelled } from "../stdin/types";
 import { cleanStack } from "./javascript-stack";
+import { formatSyntaxError, locateJavaScriptSyntaxError } from "./syntax-error";
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (
 	source: string,
@@ -233,11 +234,22 @@ function nextUncaught(): Promise<{ error: unknown }> {
 }
 
 async function runScript(ctx: RunContext): Promise<number> {
+	const source = ctx.files[ctx.entry] ?? "";
 	let main: () => Promise<unknown>;
 	try {
-		main = new AsyncFunction(ctx.files[ctx.entry] ?? "");
+		main = new AsyncFunction(source);
 	} catch (error) {
-		ctx.stderr(`${describeThrown(error, ctx.entry, WRAPPER_LINES)}\n`);
+		const at =
+			error instanceof SyntaxError
+				? await locateJavaScriptSyntaxError(source)
+				: null;
+		if (!at) {
+			ctx.stderr(`${describeThrown(error, ctx.entry, WRAPPER_LINES)}\n`);
+			return 1;
+		}
+		const message = String(error);
+		ctx.stderr(`${formatSyntaxError(ctx.entry, source, at, message)}\n`);
+		ctx.diagnose({ file: ctx.entry, ...at, message });
 		return 1;
 	}
 	const timers = trackTimers();

@@ -8,7 +8,13 @@
  */
 
 import { z } from "zod";
-import type { languageId, runMode, sourcePath } from "../protocol";
+import {
+	DIAGNOSTICS_LIMIT,
+	diagnostic,
+	type languageId,
+	type runMode,
+	type sourcePath,
+} from "../protocol";
 import type { StdinTransport } from "./stdin/types";
 
 /**
@@ -81,6 +87,7 @@ export const workerExitMessage = z.object({
 	reason: z.enum(["exited", "crashed", "load-failed"]),
 	code: z.int().nullable(),
 	message: z.string().max(2000).optional(),
+	diagnostics: z.array(diagnostic).max(DIAGNOSTICS_LIMIT).optional(),
 });
 
 export const workerToFrameMessage = z.discriminatedUnion("type", [

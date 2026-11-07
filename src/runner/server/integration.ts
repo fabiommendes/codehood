@@ -20,14 +20,15 @@ import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
 import { BUNDLE_DIR_NAME, DEV_BUNDLE_DIR, MANIFEST_NAME } from "./assets";
 
 /// Whether `file` may be part of the bundle: the sandbox, its entries,
-/// the shared protocol and zod.
+/// the shared protocol, zod and acorn (to locate JavaScript syntax errors).
 function isAllowed(root: string, file: string): boolean {
 	const rel = resolve(root, "src", "runner");
 	return (
 		file.startsWith(join(rel, "sandbox") + sep) ||
 		file.startsWith(join(rel, "server", "entries") + sep) ||
 		file === join(rel, "protocol.ts") ||
-		file.includes(`${sep}node_modules${sep}zod${sep}`)
+		file.includes(`${sep}node_modules${sep}zod${sep}`) ||
+		file.includes(`${sep}node_modules${sep}acorn${sep}`)
 	);
 }
 
@@ -35,7 +36,7 @@ function isAllowed(root: string, file: string): boolean {
 function restrictImports(
 	root: string,
 	allowed: (file: string) => boolean = (file) => isAllowed(root, file),
-	allowedText = "src/runner/sandbox/**, src/runner/protocol.ts and zod",
+	allowedText = "src/runner/sandbox/**, src/runner/protocol.ts, zod and acorn",
 ): Plugin {
 	return {
 		name: "runner-restrict-imports",

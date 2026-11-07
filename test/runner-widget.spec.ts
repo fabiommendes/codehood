@@ -167,6 +167,22 @@ test("the stack points at the user's file and line, not at the runner", async ({
 	await expect(terminalText(w)).not.toContainText("http");
 });
 
+test("a syntax error is underlined in the editor until the next run", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "let sum = 0;\nfunction add(n: number) {}\n");
+	await run(w);
+	await expect(terminalText(w)).toContainText("main.js:2:15");
+	const mark = w.locator(".cm-lintRange-error");
+	await expect(mark).toHaveText(":");
+	await w.locator(".cm-content").fill("console.log(1);");
+	await run(w);
+	await expect(terminalText(w)).toContainText("1");
+	await expect(mark).toHaveCount(0);
+});
+
 test("Edit, change and Run uses the new code; Reset brings the original back", async ({
 	page,
 }) => {

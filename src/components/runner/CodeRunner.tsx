@@ -359,12 +359,15 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		const copy = modified();
 		setRunModified(copy);
 		dispatch({ type: "run-requested" });
+		editor?.showDiagnostics([]);
 		const finish = (exit: RunExit) => {
 			if (current !== token) return;
 			current = null;
 			active = null;
 			reading = false;
 			terminal?.cancelRead();
+			const marks = exit.diagnostics?.filter((d) => d.file === filename());
+			if (marks?.length) editor?.showDiagnostics(marks);
 			dispatch({
 				type: "exit",
 				exit,

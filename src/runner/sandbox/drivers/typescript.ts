@@ -11,6 +11,7 @@
 import type { Driver, LoadContext, RunContext } from "../driver";
 import { RUNTIMES, runtimePath } from "../runtimes";
 import { javascriptDriver } from "./javascript";
+import { formatSyntaxError } from "./syntax-error";
 
 type Transform = (
 	code: string,
@@ -44,16 +45,30 @@ export const typescriptDriver: Driver = {
 
 	async run(ctx: RunContext) {
 		if (!transform) throw new Error("The TypeScript runtime was not loaded.");
+		const source = ctx.files[ctx.entry] ?? "";
 		let code: string;
 		try {
-			code = transform(ctx.files[ctx.entry] ?? "", {
+			code = transform(source, {
 				transforms: ["typescript"],
 				filePath: ctx.entry,
 				disableESTransforms: true,
 			}).code;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			ctx.stderr(`${ctx.entry}: SyntaxError: ${message}\n`);
+			// Sucrase wraps the message as `Error transforming <file>: <text> (line:column)`
+			// and sets `loc`, with a 1-based column.
+			const loc = (error as { loc?: { line: number; column: number } }).loc;
+			const text = message
+				.replace(/^Error transforming .*?: /, "")
+				.replace(/ \(\d+:\d+\)$/, "");
+			if (!loc) {
+				ctx.stderr(`${ctx.entry}: SyntaxError: ${message}\n`);
+				return 1;
+			}
+			const at = { line: loc.line, column: Math.max(0, loc.column - 1) };
+			const described = `SyntaxError: ${text}`;
+			ctx.stderr(`${formatSyntaxError(ctx.entry, source, at, described)}\n`);
+			ctx.diagnose({ file: ctx.entry, ...at, message: described });
 			return 1;
 		}
 		return javascriptDriver.run({
