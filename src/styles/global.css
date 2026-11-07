@@ -545,6 +545,31 @@ h6 {
 	background-color: var(--shiki-dark-bg);
 }
 
+/* Runnable blocks of a rendered note are widgets, not paragraphs: keep them
+   apart from the text and from each other. */
+.code-runner-block {
+	margin-block: 1.25rem;
+}
+
+/* Line numbers of the static view of a runner widget, laid out like the
+   editor's gutter (`--digits` is the width of the largest number). */
+[data-line-numbers] {
+	counter-reset: runner-line;
+}
+
+[data-line-numbers] .line::before {
+	counter-increment: runner-line;
+	content: counter(runner-line);
+	display: inline-block;
+	box-sizing: content-box;
+	min-width: max(calc(var(--digits, 1) * 1ch), 12px);
+	padding: 0 3px 0 5px;
+	margin-right: 0.75rem;
+	text-align: right;
+	color: #858585;
+	user-select: none;
+}
+
 /* Side view of water at rest: a translucent body with two waves drifting
    along its surface. Its height is set inline; the box it sits in clips it. */
 .water {

@@ -3,7 +3,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { courseHref } from "@/urls";
-import { renderMarkdown } from "@/utils/markdown";
+import { highlightRunnerBlocks, renderMarkdown } from "@/utils/markdown";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.describe("rendering", () => {
@@ -40,6 +40,19 @@ test.describe("rendering", () => {
 		expect(renderMarkdown('```js run" onload="x\ncode\n```\n')).not.toContain(
 			"onload=",
 		);
+	});
+});
+
+test.describe("highlighting", () => {
+	test("the static view uses the dark palette in both site themes", async () => {
+		const html = await highlightRunnerBlocks(
+			renderMarkdown('```js run\nconst x = "a"; // c\n```\n'),
+		);
+		const pairs = [
+			...html.matchAll(/--shiki-light:(#\w+);--shiki-dark:(#\w+)/g),
+		];
+		expect(pairs.length).toBeGreaterThan(0);
+		for (const [, light, dark] of pairs) expect(light).toBe(dark);
 	});
 });
 
@@ -103,6 +116,21 @@ test.describe("page", () => {
 			widgets.nth(1).locator("[data-terminal] .xterm-accessibility-tree"),
 		).toContainText("second-out", { timeout: 20_000 });
 		await expect(page.locator("iframe[data-runner-frame]")).toHaveCount(1);
+
+		// Each block has its own file name, the terminal fits its output, and
+		// the widgets do not touch.
+		await expect(widgets.nth(0)).toContainText("block-1.js");
+		await expect(widgets.nth(1)).toContainText("block-2.js");
+		const terminalBox = await widgets
+			.nth(0)
+			.locator("[data-terminal]")
+			.boundingBox();
+		expect(terminalBox?.height).toBeLessThan(100);
+		const first = await widgets.nth(0).boundingBox();
+		const second = await widgets.nth(1).boundingBox();
+		expect(
+			(second?.y ?? 0) - ((first?.y ?? 0) + (first?.height ?? 0)),
+		).toBeGreaterThanOrEqual(12);
 
 		const staticBlock = page.locator("pre", { hasText: "static();" });
 		await expect(staticBlock).toBeVisible();

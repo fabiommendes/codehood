@@ -218,6 +218,35 @@ test.describe("RunnerHost", () => {
 		expect(await pending).toBe("timeout");
 	});
 
+	test("ready() after a timeout builds a new iframe", async ({ page }) => {
+		await openPage(page);
+		await page.clock.install();
+		const dead = "iframe[data-runner-frame][src^='http://127.0.0.1:9/']";
+		const outcome = page.evaluate(async (origin) => {
+			const host = window.__runner.RunnerHost.shared(origin);
+			return host.ready().then(
+				() => "ready",
+				() => "failed",
+			);
+		}, DEAD_ORIGIN);
+		await page.clock.runFor(16_000);
+		expect(await outcome).toBe("failed");
+		const result = await page.evaluate(
+			({ origin, selector }) => {
+				const before = document.querySelector(selector);
+				window.__runner.RunnerHost.shared(origin)
+					.ready()
+					.catch(() => {});
+				return {
+					replaced: before !== document.querySelector(selector),
+					count: document.querySelectorAll(selector).length,
+				};
+			},
+			{ origin: DEAD_ORIGIN, selector: dead },
+		);
+		expect(result).toEqual({ replaced: true, count: 1 });
+	});
+
 	test("prepare with an unavailable runner does not throw", async ({
 		page,
 	}) => {

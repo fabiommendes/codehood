@@ -249,6 +249,19 @@ async function loadXtermStyles(): Promise<void> {
 	});
 }
 
+/// Options of `createTerminal`.
+export interface CreateTerminalOptions {
+	/// Sizes the container to its content, between these row counts, instead
+	/// of leaving its height to the caller.
+	autoHeight?: { minRows: number; maxRows: number };
+}
+
+/// Height of a terminal row when none is rendered yet.
+const DEFAULT_ROW_PX = 17;
+
+/// Vertical padding of the terminal container (`py-1`).
+const CONTAINER_PADDING_PX = 8;
+
 /**
  * Creates a terminal in `container`, loading xterm.js and its links addon
  * with dynamic `import()` on the first call; never imported statically.
@@ -257,6 +270,7 @@ async function loadXtermStyles(): Promise<void> {
  */
 export async function createTerminal(
 	container: HTMLElement,
+	options: CreateTerminalOptions = {},
 ): Promise<RunnerTerminal> {
 	const [{ Terminal }, { WebLinksAddon }, { FitAddon }] = await Promise.all([
 		import("@xterm/xterm"),
@@ -299,9 +313,25 @@ export async function createTerminal(
 			// The container has no size yet (hidden); the next resize retries.
 		}
 	};
+	const { autoHeight } = options;
+	/// Fits the container to the rows in use, the cursor's row included.
+	const resize = () => {
+		if (!autoHeight) return;
+		const buffer = terminal.buffer.active;
+		const used = buffer.baseY + buffer.cursorY + 1;
+		const rows = Math.max(
+			autoHeight.minRows,
+			Math.min(autoHeight.maxRows, used),
+		);
+		const row = container.querySelector(".xterm-rows > div");
+		const rowPx = row?.getBoundingClientRect().height || DEFAULT_ROW_PX;
+		container.style.height = `${Math.ceil(rows * rowPx) + CONTAINER_PADDING_PX}px`;
+	};
+	resize();
 	refit();
 	const observer = new ResizeObserver(refit);
 	observer.observe(container);
+	const written = terminal.onWriteParsed(resize);
 
 	const editor = new LineEditor();
 	let pending: ((line: string | null) => void) | null = null;
@@ -337,6 +367,7 @@ export async function createTerminal(
 			settle(null);
 			editor.reset();
 			terminal.reset();
+			resize();
 		},
 		readLine() {
 			settle(null);
@@ -358,6 +389,7 @@ export async function createTerminal(
 		dispose() {
 			settle(null);
 			data.dispose();
+			written.dispose();
 			observer.disconnect();
 			terminal.dispose();
 		},

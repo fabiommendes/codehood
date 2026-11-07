@@ -9,6 +9,7 @@
 import {
 	createEffect,
 	createSignal,
+	For,
 	type JSX,
 	on,
 	onCleanup,
@@ -60,7 +61,7 @@ export interface CodeRunnerProps {
 	/// `script` runs the file once; `repl` loads it and opens the toplevel.
 	runMode?: RunMode;
 	/// Server-highlighted HTML of `code` (Shiki, `highlightCode` with the
-	/// `light-plus`/`dark-plus` themes, matching the editor's VS Code theme),
+	/// `vscode` theme, `dark-plus` like the editor),
 	/// shown until the editor mounts and in server rendering. Trusted: never
 	/// user HTML.
 	highlightedHtml?: string;
@@ -78,6 +79,9 @@ export interface CodeRunnerProps {
 	footer?: JSX.Element;
 }
 
+/// How long "Preparing…" shows before it becomes "Still loading…".
+const SLOW_PREPARING_MS = 3000;
+
 /// Phases where running is impossible rather than merely paused.
 const BLOCKED: ReadonlySet<IdePhase> = new Set([
 	"disabled",
@@ -91,10 +95,14 @@ const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
 };
 
 /// Text of the terminal header's status for a phase, or null when it has none.
-function phaseText(phase: IdePhase, lastExit: RunExit | null): string | null {
+function phaseText(
+	phase: IdePhase,
+	lastExit: RunExit | null,
+	slow: boolean,
+): string | null {
 	switch (phase) {
 		case "preparing":
-			return m.runner_preparing();
+			return slow ? m.runner_preparing_slow() : m.runner_preparing();
 		case "running":
 			return m.runner_status_running();
 		case "waiting-input":
@@ -154,10 +162,16 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const [terminalShown, setTerminalShown] = createSignal(!props.compact);
 	const [terminalReady, setTerminalReady] = createSignal(false);
 	const [coarse, setCoarse] = createSignal(false);
+	const [slowPreparing, setSlowPreparing] = createSignal(false);
+	/// Pixels the on-screen keyboard covers at the bottom of the layout viewport.
+	const [keyboardInset, setKeyboardInset] = createSignal(0);
 
 	let editorParent!: HTMLDivElement;
 	let terminalParent!: HTMLDivElement;
 	let lineInput: HTMLInputElement | undefined;
+	let runButton: HTMLButtonElement | undefined;
+	/// The user pressed Stop and the run has not ended yet.
+	let stopping = false;
 	let editor: RunnerEditor | null = null;
 	let editorLoading: Promise<void> | null = null;
 	let terminal: RunnerTerminal | null = null;
@@ -170,6 +184,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	let startedAt = 0;
 	let reading = false;
 
+	/// Digits of the largest line number, to size the static view's gutter.
+	const digits = () => String(props.code.split("\n").length).length;
 	const readOnly = () => props.mode !== "answer" && !editing();
 	const blocked = () => BLOCKED.has(state().phase);
 	const running = () => isBusy(state());
@@ -188,6 +204,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			language: props.language,
 			readOnly: readOnly(),
 			label: props.label,
+			tabHint: m.runner_editor_tab_hint(),
 			onChange: (value) => {
 				setCode(value);
 				prepare();
@@ -236,7 +253,10 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const ensureTerminal = (): Promise<RunnerTerminal> => {
 		if (terminal) return Promise.resolve(terminal);
 		setTerminalShown(true);
-		terminalLoading ??= createTerminal(terminalParent).then(
+		terminalLoading ??= createTerminal(
+			terminalParent,
+			props.compact ? { autoHeight: { minRows: 3, maxRows: 10 } } : {},
+		).then(
 			(created) => {
 				if (disposed) {
 					created.dispose();
@@ -275,6 +295,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		if (!canRun(state()) || props.runnerOrigin === null) return;
 		const token = {};
 		current = token;
+		stopping = false;
 		startedAt = performance.now();
 		dispatch({ type: "run-requested" });
 		const finish = (exit: RunExit) => {
@@ -288,6 +309,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				exit,
 				elapsedMs: performance.now() - startedAt,
 			});
+			returnFocusToRun();
 		};
 		try {
 			const term = await ensureTerminal();
@@ -337,7 +359,15 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		}
 	};
 
+	/// Puts the focus back on Run once a run the user stopped has ended, since the Stop button that had it is gone.
+	const returnFocusToRun = () => {
+		if (!stopping) return;
+		stopping = false;
+		runButton?.focus();
+	};
+
 	const stop = () => {
+		stopping = true;
 		if (active) {
 			active.stop();
 			return;
@@ -351,6 +381,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				elapsedMs: performance.now() - startedAt,
 			});
 		}
+		returnFocusToRun();
 	};
 
 	const sendLine = (event: SubmitEvent) => {
@@ -375,6 +406,31 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		editor?.destroy();
 	});
 
+	createEffect(() => {
+		const viewport = window.visualViewport;
+		if (!viewport || !coarse() || state().phase !== "waiting-input") return;
+		const update = () =>
+			setKeyboardInset(
+				Math.max(0, window.innerHeight - viewport.offsetTop - viewport.height),
+			);
+		update();
+		viewport.addEventListener("resize", update);
+		viewport.addEventListener("scroll", update);
+		onCleanup(() => {
+			viewport.removeEventListener("resize", update);
+			viewport.removeEventListener("scroll", update);
+		});
+	});
+
+	createEffect(() => {
+		if (state().phase !== "preparing") {
+			setSlowPreparing(false);
+			return;
+		}
+		const timer = setTimeout(() => setSlowPreparing(true), SLOW_PREPARING_MS);
+		onCleanup(() => clearTimeout(timer));
+	});
+
 	createEffect(
 		on(
 			() => state().phase,
@@ -392,7 +448,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		}
 	};
 
-	const statusText = () => phaseText(state().phase, state().lastExit);
+	const statusText = () =>
+		phaseText(state().phase, state().lastExit, slowPreparing());
 	const duration = () => {
 		const exit = state().lastExit;
 		return state().phase === "done" && exit
@@ -475,6 +532,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						when={running()}
 						fallback={
 							<button
+								ref={runButton}
 								type="button"
 								class="btn btn-soft btn-success btn-sm"
 								data-action="run"
@@ -570,14 +628,29 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						<Show
 							when={props.highlightedHtml}
 							fallback={
-								<pre class="m-0 p-3 whitespace-pre">
-									<code>{props.code}</code>
+								<pre
+									class="m-0 px-0 py-2 whitespace-pre"
+									data-line-numbers
+									style={{ "--digits": digits() }}
+								>
+									<code>
+										<For each={props.code.split("\n")}>
+											{(line) => (
+												<>
+													<span class="line">{line}</span>
+													{"\n"}
+												</>
+											)}
+										</For>
+									</code>
 								</pre>
 							}
 						>
 							{/* Server-highlighted HTML of the code (Shiki), trusted. */}
 							<div
-								class="[&_pre]:m-0 [&_pre]:overflow-visible [&_pre]:bg-transparent [&_pre]:p-3"
+								class="[&_pre]:m-0 [&_pre]:overflow-visible [&_pre]:bg-transparent [&_pre]:px-0 [&_pre]:py-2"
+								data-line-numbers
+								style={{ "--digits": digits() }}
 								innerHTML={props.highlightedHtml}
 							/>
 						</Show>
@@ -656,13 +729,15 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						ref={terminalParent}
 						role="group"
 						aria-label={m.runner_terminal_label()}
-						class={`overflow-hidden px-2 py-1 ${props.compact ? "h-40" : "h-56"}`}
+						class={`overflow-hidden px-2 py-1 ${props.compact ? "h-20" : "h-56"}`}
 						data-terminal
 					/>
 				</div>
 				<Show when={coarse() && state().phase === "waiting-input"}>
+					<div class="h-14" aria-hidden="true" />
 					<form
-						class="sticky bottom-0 flex gap-2 border-t border-[#3c3c3c] bg-[#252526] p-2"
+						class="fixed inset-x-0 z-50 flex gap-2 border-t border-[#3c3c3c] bg-[#252526] p-2"
+						style={{ bottom: `${keyboardInset()}px` }}
 						onSubmit={sendLine}
 					>
 						<input

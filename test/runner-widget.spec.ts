@@ -103,6 +103,17 @@ test("Stop ends a loop in under 2 seconds", async ({ page }) => {
 	expect(Date.now() - start).toBeLessThan(2000);
 });
 
+test("after Stop the focus returns to Run", async ({ page }) => {
+	await open(page);
+	const w = widget(page, 0);
+	await setCode(w, "while (true) {}");
+	await run(w);
+	await expect(w).toHaveAttribute("data-phase", "running");
+	await w.locator("[data-action=stop]").click();
+	await expect(w).toHaveAttribute("data-phase", "stopped", { timeout: 3000 });
+	await expect(w.locator("[data-action=run]")).toBeFocused();
+});
+
 test("Ctrl+C in the terminal stops the run", async ({ page }) => {
 	await open(page);
 	const w = widget(page, 0);
@@ -141,6 +152,19 @@ test("an exception shows the stack and the exit code", async ({ page }) => {
 	await expect(w).toHaveAttribute("data-phase", "error");
 	await expect(terminalText(w)).toContainText("boom");
 	await expect(w.locator("[data-status]")).toContainText(/\d/);
+});
+
+test("the stack points at the user's file and line, not at the runner", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, '\n\nthrow new Error("boom");');
+	await run(w);
+	await expect(w).toHaveAttribute("data-phase", "error");
+	await expect(terminalText(w)).toContainText("main.js:3");
+	await expect(terminalText(w)).not.toContainText("worker.js");
+	await expect(terminalText(w)).not.toContainText("http");
 });
 
 test("Edit, change and Run uses the new code; Reset brings the original back", async ({
@@ -183,6 +207,54 @@ test("Try again retries one widget without recreating the iframe or stopping ano
 	await expect(busy).toHaveAttribute("data-phase", "running");
 	await expect(frames(page)).toHaveCount(1);
 	await expect(frames(page)).toHaveAttribute("data-marker", "first");
+});
+
+test("preparing for more than 3 seconds says it is still loading, with Cancel", async ({
+	page,
+}) => {
+	await open(page);
+	await page.route("**/runner/frame*", () => {});
+	const w = widget(page, 1);
+	await run(w);
+	await expect(w).toHaveAttribute("data-phase", "preparing");
+	const status = w.locator("[data-status]");
+	await expect(status).toContainText(/Preparing|Preparando/);
+	await expect(status).toContainText(/Still loading|Ainda carregando/, {
+		timeout: 5000,
+	});
+	await w.locator("[data-action=stop]").click();
+	await expect(w).toHaveAttribute("data-phase", "stopped");
+});
+
+test("Tab indents, and Esc then Tab leaves the editor, as the editor says", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	await setCode(w, "x");
+	const content = w.locator(".cm-content");
+	await content.press("Control+Home");
+	await content.press("Tab");
+	await expect(content).toHaveText(/^\s+x$/);
+	const hint = await content.getAttribute("aria-describedby");
+	expect(hint).toBeTruthy();
+	await expect(page.locator(`#${hint}`)).toContainText(/Esc/);
+	await content.press("Escape");
+	await page.keyboard.press("Tab");
+	await expect(content).not.toBeFocused();
+	expect(
+		await page.evaluate(() => !document.activeElement?.closest(".cm-editor")),
+	).toBe(true);
+});
+
+test("the editor and the static view show line numbers", async ({ page }) => {
+	await open(page);
+	const w = widget(page, 0);
+	await expect(
+		w.locator("[data-editor-static] [data-line-numbers]"),
+	).toBeVisible();
+	await w.locator("[data-action=edit]").click();
+	await expect(w.locator(".cm-lineNumbers")).toBeVisible();
 });
 
 test.describe("output is text", () => {
@@ -286,6 +358,14 @@ test.describe("touch screens", () => {
 		await expect(w).toHaveAttribute("data-phase", "waiting-input");
 		const field = w.locator("[data-line-input]");
 		await expect(field).toBeVisible();
+		const viewport = page.viewportSize();
+		const box = await field.boundingBox();
+		expect(box && viewport && box.y + box.height).toBeGreaterThan(
+			(viewport?.height ?? 0) - 24,
+		);
+		expect(box && viewport && box.y + box.height).toBeLessThanOrEqual(
+			(viewport?.height ?? 0) + 1,
+		);
 		await field.fill("Ada");
 		await w.locator("[data-action=send]").tap();
 		await expect(terminalText(w)).toContainText("Ada");

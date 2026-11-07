@@ -31,6 +31,8 @@ export interface CreateEditorOptions {
 	readOnly: boolean;
 	/// Accessible name of the editor.
 	label: string;
+	/// Description announced with the editor: how Tab works and how to leave.
+	tabHint: string;
 	/// Called with the full source after each edit.
 	onChange(code: string): void;
 	/// Called by Ctrl/Cmd+Enter.
@@ -38,6 +40,9 @@ export interface CreateEditorOptions {
 	/// Called each time the editor receives focus.
 	onFocus(): void;
 }
+
+/// Gives each editor's hint element its own id.
+let hints = 0;
 
 /**
  * Creates the editor in `options.parent`.
@@ -59,7 +64,13 @@ export async function createEditor(
 			import("@codemirror/lang-javascript"),
 		]);
 	const { Compartment, EditorState, Prec } = state;
-	const { EditorView, keymap, drawSelection, highlightActiveLine } = view;
+	const {
+		EditorView,
+		keymap,
+		drawSelection,
+		highlightActiveLine,
+		lineNumbers,
+	} = view;
 	const { tags } = lezer;
 
 	/// Marks changes made by `setCode`, which do not reach `onChange`.
@@ -112,10 +123,26 @@ export async function createEditor(
 			".cm-activeLine": { backgroundColor: "#ffffff0a" },
 			"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
 				{ backgroundColor: "#264f78" },
+			".cm-gutters": {
+				backgroundColor: "#1e1e1e",
+				color: "#858585",
+				border: "none",
+			},
+			".cm-activeLineGutter": {
+				backgroundColor: "transparent",
+				color: "#c6c6c6",
+			},
 			".cm-panels": { backgroundColor: "#252526", color: "#d4d4d4" },
 		},
 		{ dark: true },
 	);
+
+	const hintId = `runner-editor-hint-${++hints}`;
+	const hint = document.createElement("span");
+	hint.id = hintId;
+	hint.className = "sr-only";
+	hint.textContent = options.tabHint;
+	options.parent.append(hint);
 
 	const languageSupport =
 		options.language === "javascript" ? [javascript.javascript()] : [];
@@ -145,7 +172,11 @@ export async function createEditor(
 				theme,
 				languageSupport,
 				readOnly.of(readOnlyExtensions(options.readOnly)),
-				EditorView.contentAttributes.of({ "aria-label": options.label }),
+				EditorView.contentAttributes.of({
+					"aria-label": options.label,
+					"aria-describedby": hintId,
+				}),
+				lineNumbers(),
 				EditorView.updateListener.of((update) => {
 					if (
 						update.docChanged &&
@@ -181,6 +212,7 @@ export async function createEditor(
 		},
 		destroy() {
 			editor.destroy();
+			hint.remove();
 		},
 	};
 }

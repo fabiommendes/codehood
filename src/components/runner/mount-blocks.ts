@@ -5,7 +5,7 @@
 import { createComponent } from "solid-js";
 import { render } from "solid-js/web";
 import { m } from "@/i18n";
-import { runnerLanguage } from "@/runner/languages";
+import { defaultFilename, runnerLanguage } from "@/runner/languages";
 import CodeRunner from "./CodeRunner";
 
 /// Class the Markdown renderer gives the wrapper of a block fenced with `run`
@@ -17,6 +17,14 @@ export const CODE_RUNNER_BLOCK_CLASS = "code-runner-block";
 /// driver: the code stays static, followed by a discreet "code execution is
 /// not available for this language" note rendered on the server.
 export const CODE_RUNNER_UNAVAILABLE_CLASS = "code-runner-unavailable";
+
+/// File name of the `number`th block of a note: `block-1.js`.
+function blockFilename(
+	language: NonNullable<ReturnType<typeof runnerLanguage>>,
+	number: number,
+): string {
+	return defaultFilename(language).replace(/^main/, `block-${number}`);
+}
 
 /**
  * Mounts a `CodeRunner` (mode `snippet`, `compact`) on each
@@ -51,6 +59,7 @@ export function mountCodeRunners(
 					compact: true,
 					language,
 					code,
+					filename: blockFilename(language, number),
 					highlightedHtml,
 					label: m.runner_block_label({ number }),
 					runnerOrigin,

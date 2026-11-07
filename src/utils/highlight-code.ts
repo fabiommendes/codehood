@@ -8,8 +8,8 @@ import { CODE_THEMES } from "./code-themes";
  * it cannot pretty-print it. Renders both themes' colors as CSS variables
  * (`src/styles/global.css` switches between them on the site's `data-theme`
  * toggle) so this never re-runs on a theme change. With `theme: "vscode"`,
- * it uses VS Code's `light-plus`/`dark-plus` instead, to match the code
- * editor of the runner widget.
+ * it uses VS Code's `dark-plus` in both site themes, to match the dark
+ * code editor of the runner widget.
  */
 export async function highlightCode(
 	code: string,
@@ -23,7 +23,7 @@ export async function highlightCode(
 		lang: known ? key : "plaintext",
 		themes:
 			options.theme === "vscode"
-				? { light: "light-plus", dark: "dark-plus" }
+				? { light: "dark-plus", dark: "dark-plus" }
 				: CODE_THEMES,
 		defaultColor: false,
 	});

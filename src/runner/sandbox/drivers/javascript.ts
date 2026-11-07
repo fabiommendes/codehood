@@ -16,6 +16,7 @@
 
 import type { Driver, RunContext } from "../driver";
 import { StdinCancelled } from "../stdin/types";
+import { cleanStack } from "./javascript-stack";
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (
 	source: string,
@@ -126,11 +127,22 @@ function formatArgs(args: unknown[]): string {
 	return args.map((a) => (typeof a === "string" ? a : inspect(a))).join(" ");
 }
 
-/// Describes an uncaught throw: the stack of an `Error`, else `Uncaught <value>`.
-function describeThrown(error: unknown): string {
-	return error instanceof Error
-		? (error.stack ?? String(error))
-		: `Uncaught ${inspect(error)}`;
+/// Lines the engine adds before the body of an `AsyncFunction`.
+const WRAPPER_LINES = 2;
+
+/// Describes an uncaught throw: the stack of an `Error` in terms of the
+/// user's `file`, else `Uncaught <value>`.
+function describeThrown(
+	error: unknown,
+	file: string,
+	lineOffset: number,
+): string {
+	if (!(error instanceof Error)) return `Uncaught ${inspect(error)}`;
+	const header = String(error);
+	const stack = error.stack ?? "";
+	// Some engines leave the message out of the stack.
+	const full = stack.includes(header) ? stack : `${header}\n${stack}`;
+	return cleanStack(full, file, lineOffset);
 }
 
 /// Replaces `console`, `prompt` and `alert` of the Worker global with ones that write to `ctx`.
@@ -225,7 +237,7 @@ async function runScript(ctx: RunContext): Promise<number> {
 	try {
 		main = new AsyncFunction(ctx.files[ctx.entry] ?? "");
 	} catch (error) {
-		ctx.stderr(`${describeThrown(error)}\n`);
+		ctx.stderr(`${describeThrown(error, ctx.entry, WRAPPER_LINES)}\n`);
 		return 1;
 	}
 	const timers = trackTimers();
@@ -237,7 +249,7 @@ async function runScript(ctx: RunContext): Promise<number> {
 	const failure = await Promise.race([finished, nextUncaught()]);
 	if (!failure) return 0;
 	if (failure.error instanceof StdinCancelled) throw failure.error;
-	ctx.stderr(`${describeThrown(failure.error)}\n`);
+	ctx.stderr(`${describeThrown(failure.error, ctx.entry, WRAPPER_LINES)}\n`);
 	return 1;
 }
 
@@ -251,7 +263,7 @@ async function runRepl(ctx: RunContext): Promise<number> {
 			if (value !== undefined) ctx.stdout(`${inspect(value)}\n`);
 		} catch (error) {
 			if (error instanceof StdinCancelled) throw error;
-			ctx.stderr(`${describeThrown(error)}\n`);
+			ctx.stderr(`${describeThrown(error, "<repl>", 0)}\n`);
 		}
 	}
 	return 0;

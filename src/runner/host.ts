@@ -93,6 +93,8 @@ interface FrameState {
 	iframe: HTMLIFrameElement;
 	ready: Promise<RunnerCapabilities>;
 	settled: boolean;
+	/// No `ready` came in time: the frame never became usable.
+	timedOut: boolean;
 	timer: ReturnType<typeof setTimeout> | undefined;
 	resolve(capabilities: RunnerCapabilities): void;
 	reject(error: RunnerUnavailable): void;
@@ -158,9 +160,16 @@ export class RunnerHost {
 	/**
 	 * Adds the iframe if needed and waits for its `ready`.
 	 *
+	 * A frame that timed out never became ready, so no run depends on it: it
+	 * is replaced by a new one instead of reused.
+	 *
 	 * @throws {RunnerUnavailable} when the frame does not become ready or cannot run code.
 	 */
 	ready(): Promise<RunnerCapabilities> {
+		if (this.frame?.timedOut) {
+			this.frame.iframe.remove();
+			this.frame = null;
+		}
 		return (this.frame ?? this.createFrame()).ready;
 	}
 
@@ -300,6 +309,7 @@ export class RunnerHost {
 		const state: FrameState = {
 			iframe,
 			settled: false,
+			timedOut: false,
 			timer: undefined,
 			ready: Promise.resolve({ stdin: "none", languages: [] }),
 			resolve: () => {},
@@ -319,10 +329,10 @@ export class RunnerHost {
 		});
 		// A caller that never awaits `ready()` must not cause an unhandled rejection.
 		state.ready.catch(() => {});
-		state.timer = setTimeout(
-			() => state.reject(new RunnerUnavailable("timeout")),
-			READY_TIMEOUT_MS,
-		);
+		state.timer = setTimeout(() => {
+			state.timedOut = true;
+			state.reject(new RunnerUnavailable("timeout"));
+		}, READY_TIMEOUT_MS);
 		this.frame = state;
 		document.body.append(iframe);
 		return state;
