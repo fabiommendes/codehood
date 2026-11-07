@@ -124,6 +124,21 @@ chat log, explains that the file was removed rather than answering a bare 404
 that looks like the site is broken.
 
 
+### Run a code example
+
+    status: implemented
+    url: /[discipline]/[course]/resources/[slug]
+
+Student opens a JavaScript code example in the course resources and runs it
+right there, without installing anything. The output appears in a terminal under
+the code. When the program asks for input, they type a line in the terminal and
+the program carries on. They can change the code and run it again, or go back to
+the original. Nothing they do is saved.
+
+Examples in a language that cannot run in the page stay plain text, with no Run
+button.
+
+
 ### Follow the course schedule
 
     status: implemented

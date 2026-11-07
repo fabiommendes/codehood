@@ -360,6 +360,94 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	// Runnable JavaScript, one resource per state of the code runner widget.
+	const jsLinksCode = 'console.log("Docs: https://developer.mozilla.org/");\n';
+	const runnableCode = [
+		{
+			slug: "js-hello",
+			title: "hello.js",
+			description: "Reads a name with prompt() and greets it.",
+			content:
+				'const name = prompt("What is your name?");\nconsole.log("Hello, " + name + "!");\n',
+		},
+		{
+			slug: "js-forever",
+			title: "forever.js",
+			description: "Never ends: use Stop.",
+			content: "while (true) {}\n",
+		},
+		{
+			slug: "js-flood",
+			title: "flood.js",
+			description: "Prints more than the output limit allows.",
+			content:
+				'const line = "x".repeat(1023);\nfor (let i = 0; i < 4096; i++) console.log(line);\n',
+		},
+		{
+			slug: "js-throws",
+			title: "throws.js",
+			description: "Throws an exception: the stack goes to the terminal.",
+			content: 'function fail() {\n  throw new Error("boom");\n}\nfail();\n',
+		},
+		{
+			slug: "js-links",
+			title: "links.js",
+			description: "Prints a URL: clicking it asks for confirmation.",
+			content: jsLinksCode,
+		},
+	];
+	for (const { slug, title, description, content } of runnableCode) {
+		await db.resource.create(
+			{
+				course: cs101.id,
+				slug,
+				title,
+				description,
+				data: { type: "CODE", language: "javascript", content },
+				rev: `demo-${slug}-v1`,
+			},
+			FULL_ACCESS,
+		);
+	}
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "js-notes",
+			title: "JavaScript notes",
+			description: "Runnable blocks, a static one and one without a driver.",
+			data: {
+				type: "MD",
+				content: [
+					"Run these two blocks, they share one runner:",
+					"",
+					"```js run",
+					"let total = 0;",
+					"for (let i = 1; i <= 10; i++) total += i;",
+					"console.log(total);",
+					"```",
+					"",
+					"```js run",
+					'console.log("squares:", [1, 2, 3].map((n) => n * n));',
+					"```",
+					"",
+					"This one is only code:",
+					"",
+					"```js",
+					"console.log('not runnable');",
+					"```",
+					"",
+					"No driver for this language yet:",
+					"",
+					"```haskell run",
+					'main = putStrLn "hello"',
+					"```",
+				].join("\n"),
+			},
+			rev: "demo-js-notes-v1",
+		},
+		FULL_ACCESS,
+	);
+
 	// cs201 gets its own small set, themed for data structures rather than a
 	// copy of cs101's — an empty second course would leave /admin/courses
 	// looking like resources only ever land on the first one seeded.

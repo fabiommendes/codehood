@@ -1,10 +1,12 @@
 ---
 import CourseHeader from "@/components/CourseHeader.astro";
+import CodeRunner from "@/components/runner/CodeRunner";
 import Badge from "@/components/ui/Badge";
 import { RUNNER_ORIGIN } from "@/core/constants";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { runnerLanguage } from "@/runner/languages";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
@@ -41,11 +43,22 @@ if (resource.data.type === "LINK") {
 }
 const data = resource.data;
 
+// A CODE resource whose language has a runner driver gets the runnable
+// widget, but only where code execution is configured.
+const runLanguage =
+	data.type === "CODE" && RUNNER_ORIGIN !== null
+		? runnerLanguage(data.language)
+		: null;
+
 // The CODE branch never interprets its text, only highlights it.
 const bodyHtml =
 	data.type === "MD"
 		? await highlightRunnerBlocks(renderMarkdownBody(data.content))
-		: await highlightCode(data.content, data.language);
+		: await highlightCode(
+				data.content,
+				data.language,
+				runLanguage ? { theme: "vscode" } : {},
+			);
 ---
 
 <AppLayout title={m.courses_resource_page_title({ resource: resource.title, discipline: course.discipline.name })}
@@ -91,6 +104,18 @@ const bodyHtml =
               set:html={bodyHtml}
             />
           </div>
+        </div>
+      ) : data.type === "CODE" && runLanguage ? (
+        <div class="mt-6">
+          <CodeRunner
+            client:load
+            mode="snippet"
+            language={runLanguage}
+            code={data.content}
+            highlightedHtml={bodyHtml}
+            runnerOrigin={RUNNER_ORIGIN}
+            label={resource.title}
+          />
         </div>
       ) : (
         <div

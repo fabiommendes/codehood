@@ -261,6 +261,57 @@ test("student: browse course resources", async ({ page }) => {
 	});
 });
 
+test("student: run a code example", async ({ page }) => {
+	const student = await seedUser({ role: "STUDENT" });
+	const course = await persistedCourseFactory.create();
+	await enroll(course.id, student.username);
+	await persistedResourceFactory.create({
+		course: course.id,
+		slug: "run-greet",
+		title: "greet.js",
+		data: {
+			type: "CODE",
+			language: "javascript",
+			content:
+				'const name = prompt("Name?");\nconsole.log("Hello, " + name + "!");\n',
+		},
+	});
+	await persistedResourceFactory.create({
+		course: course.id,
+		slug: "run-static",
+		title: "static.py",
+		data: { type: "CODE", language: "python", content: "print('hi')\n" },
+	});
+	await logInAs(page, student);
+
+	const widget = page.locator("[data-code-runner]");
+
+	await test.step("opening the example creates no runner iframe", async () => {
+		await page.goto(`${hrefOf(course)}/resources/run-greet`);
+		await expect(widget).toBeVisible();
+		await page.waitForLoadState("networkidle");
+		await expect(page.locator("iframe[data-runner-frame]")).toHaveCount(0);
+	});
+
+	await test.step("running it, typing a line and seeing the output", async () => {
+		await widget.locator("[data-action=run]").click();
+		await expect(widget).toHaveAttribute("data-phase", "waiting-input");
+		await page.keyboard.type("Ada");
+		await page.keyboard.press("Enter");
+		await expect(
+			widget.locator("[data-terminal] .xterm-accessibility-tree"),
+		).toContainText("Hello, Ada!");
+		await expect(widget).toHaveAttribute("data-phase", "done");
+	});
+
+	await test.step("an example in a language without a runner stays plain text", async () => {
+		await page.goto(`${hrefOf(course)}/resources/run-static`);
+		await expect(page.getByText("print('hi')")).toBeVisible();
+		await expect(widget).toHaveCount(0);
+		await expect(page.locator("[data-action=run]")).toHaveCount(0);
+	});
+});
+
 test("student: follow the course schedule", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create();

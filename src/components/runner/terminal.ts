@@ -233,6 +233,22 @@ export class LineEditor {
 	}
 }
 
+/// Adds xterm's stylesheet to the page once. It is fetched by URL because a
+/// dynamically imported CSS module is inlined into the server bundle by the
+/// build, leaving the client chunk pointing at a file that does not exist.
+async function loadXtermStyles(): Promise<void> {
+	const { default: href } = await import("@xterm/xterm/css/xterm.css?url");
+	if (document.querySelector(`link[href="${href}"]`)) return;
+	await new Promise<void>((resolve) => {
+		const link = document.createElement("link");
+		link.rel = "stylesheet";
+		link.href = href;
+		link.onload = () => resolve();
+		link.onerror = () => resolve();
+		document.head.append(link);
+	});
+}
+
 /**
  * Creates a terminal in `container`, loading xterm.js and its links addon
  * with dynamic `import()` on the first call; never imported statically.
@@ -246,7 +262,7 @@ export async function createTerminal(
 		import("@xterm/xterm"),
 		import("@xterm/addon-web-links"),
 		import("@xterm/addon-fit"),
-		import("@xterm/xterm/css/xterm.css"),
+		loadXtermStyles(),
 	]);
 
 	const terminal = new Terminal({
