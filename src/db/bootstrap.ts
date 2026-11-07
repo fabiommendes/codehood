@@ -1067,6 +1067,12 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
+	await seedRubricExam(
+		cs101.id,
+		ada,
+		{ hopper, hamilton, liskov, bob },
+		cohort,
+	);
 	await seedOpenQuiz(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
@@ -2193,6 +2199,316 @@ async function seedCodeExam(
 		{ status: "COMPLETED" },
 		FULL_ACCESS,
 	);
+}
+
+/**
+ * Closes an exam with released grades, where one question is graded with a rubric.
+ *
+ * The code question carries an initial rubric in its question version and no
+ * pass uses it yet. The essay question's rubric is in use: group leaves three
+ * levels deep, two standalone items (one negative) and an item that was split,
+ * which Liskov's pass still applies. Hopper's pass is a group leaf plus an
+ * item, Hamilton's adds an adjustment, and the bot `runner` graded Bob. Three
+ * answers are left pending, two of them the same text up to whitespace.
+ */
+async function seedRubricExam(
+	course: Course["id"],
+	instructor: User,
+	students: { hopper: User; hamilton: User; liskov: User; bob: User },
+	cohort: User[],
+): Promise<void> {
+	const exam = "test-07";
+	const code = "prolog-comprimento-de-lista";
+	const essay = "prolog-caso-base";
+	const [knuth, ritchie, thompson, backus] = cohort;
+	if (!knuth || !ritchie || !thompson || !backus) {
+		throw new Error("The seeded cohort is too small.");
+	}
+
+	const rubric = [
+		{
+			id: "vazia",
+			path: "Recursão/Caso base",
+			value: "0.3",
+			text: "Trata a lista vazia",
+			comment: "Basta a cláusula comprimento([], 0).",
+			feedback: "Sua solução trata a lista vazia corretamente.",
+		},
+		{
+			id: "passo",
+			path: "Recursão/Passo",
+			value: "0.5",
+			text: "Passo recursivo correto",
+			feedback: "O passo recursivo soma um ao comprimento da cauda.",
+		},
+		{
+			id: "length",
+			value: "-0.5",
+			text: "Usa length/2",
+			comment: "O enunciado proíbe o predicado embutido.",
+		},
+	];
+	await db.question.create(
+		{
+			course,
+			slug: code,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Comprimento de uma lista em Prolog",
+				stem: "Defina `comprimento(Lista, N)` de modo que `N` seja o número de elementos de `Lista`. Não use `length/2`.",
+				tags: ["prolog"],
+				content: "code",
+				highlight: "prolog",
+			},
+		},
+		FULL_ACCESS,
+	);
+	// The question document has no rubric field, so the initial rubric is
+	// written into the stored version the way a pushed question carries it.
+	const stored = await prisma.questionData.findFirstOrThrow({
+		where: { versionHash: "v1", ref: { courseId: course, slug: code } },
+	});
+	await prisma.questionData.update({
+		where: { id: stored.id },
+		data: {
+			privatePayload: {
+				...(stored.privatePayload as Record<string, unknown>),
+				rubric,
+			},
+		},
+	});
+	await db.question.create(
+		{
+			course,
+			slug: essay,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "O caso base da recursão em Prolog",
+				stem: "Por que um predicado recursivo em Prolog precisa de uma cláusula para o caso base? O que acontece com `comprimento/2` sem ela?",
+				tags: ["prolog", "recursion"],
+				content: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 7: rubrics",
+			description: "Grades out, one question graded with a rubric.",
+			tags: ["prolog"],
+			questions: [
+				{ slug: code, version: "v1" },
+				{ slug: essay, version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+
+	const pk = { course, exam, question: essay };
+	await db.rubric.update(pk, { base: "0" }, FULL_ACCESS);
+	const items = [
+		{
+			key: "correta",
+			group: "Recursão",
+			text: "Correta",
+			value: "0.5",
+			comment: "Cita a parada da recursão e o que ela garante.",
+			feedback: "Você explicou bem por que a recursão termina.",
+		},
+		{
+			key: "esqueceu",
+			group: "Recursão/Errada/Caso base",
+			text: "Esqueceu o caso base",
+			value: "0.2",
+			feedback: "Sem caso base a recursão não para; faltou dizer isso.",
+		},
+		{
+			key: "inacessivel",
+			group: "Recursão/Errada/Caso base",
+			text: "Caso base inacessível",
+			value: "0.3",
+			comment: "A cláusula existe, mas fica depois de uma que sempre casa.",
+			feedback:
+				"O caso base precisa vir antes da cláusula recursiva, ou a busca nunca chega nele.",
+		},
+		{
+			key: "errado",
+			group: "Recursão/Errada",
+			text: "Caso base errado",
+			value: "0.1",
+			feedback: "O caso base que você citou não cobre a lista vazia.",
+		},
+		{
+			key: "pilha",
+			group: null,
+			text: "Descreve o estouro de pilha sem o caso base",
+			value: "0.4",
+			feedback: "Boa descrição do estouro de pilha.",
+		},
+		{
+			key: "is-livre",
+			group: null,
+			text: "Usa is com variável livre",
+			value: "-0.1",
+			comment: "Exemplo com `X is Y + 1` sem Y instanciado.",
+			feedback: "O `is` exige o lado direito instanciado.",
+		},
+		{
+			key: "vaga",
+			group: null,
+			text: "Explicação vaga",
+			value: "0.2",
+			comment: "Diz que precisa parar, sem dizer como.",
+		},
+	];
+	for (const item of items) {
+		await db.rubric.createItem({ ...pk }, item, FULL_ACCESS);
+	}
+
+	const text = {
+		hopper:
+			"Sem o caso base, `comprimento/2` chama a si mesmo sem parar e a pilha estoura. A cláusula `comprimento([], 0)` encerra a recursão.",
+		hamilton:
+			"O caso base deveria ser `comprimento([_], 1)`, mas assim a lista vazia nunca casa. Sem ele a pilha de chamadas cresce até estourar.",
+		liskov: "Precisa para a recursão parar em algum momento.",
+		bob: "Se a lista vazia ficar sem cláusula, a consulta falha ou entra em laço. O caso base fica antes da recursiva e usa `[]`.",
+		same: "Sem a cláusula do caso base a recursão não tem onde parar, e o Prolog continua tentando até acabar a memória.",
+		other:
+			"O caso base é a resposta que não depende de chamada recursiva. Ele ancora a definição indutiva do predicado.",
+	};
+	const answer = (student: User, solution: string, essayText: string) =>
+		answerExam(course, exam, student, { [code]: solution, [essay]: essayText });
+	const listing = (...lines: string[]) => lines.join("\n");
+
+	const hopper = await answer(
+		students.hopper,
+		listing(
+			"comprimento([], 0).",
+			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+		),
+		text.hopper,
+	);
+	const hamilton = await answer(
+		students.hamilton,
+		listing(
+			"comprimento([_], 1).",
+			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+		),
+		text.hamilton,
+	);
+	const liskov = await answer(students.liskov, "length(L, N).", text.liskov);
+	const bob = await answer(
+		students.bob,
+		listing(
+			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+			"comprimento([], 0).",
+		),
+		text.bob,
+	);
+	await answer(
+		knuth,
+		listing(
+			"comprimento([], 0).",
+			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+		),
+		text.same,
+	);
+	await answer(
+		ritchie,
+		listing(
+			"comprimento([], 0).",
+			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+		),
+		`  ${text.same.replace(", e o", ",   e o")}\n`,
+	);
+	await answer(thompson, "comprimento(L, N) :- length(L, N).", text.other);
+
+	const graded = (student: Record<string, string>) => ({
+		publicId: student[essay] ?? "",
+	});
+	const as = { actor: instructor };
+	await db.feedback.create(
+		{
+			submission: graded(hopper),
+			ref: "rubric-1",
+			rubric: ["correta", "pilha"],
+			feedback: "Resposta completa.",
+		},
+		as,
+	);
+	await db.feedback.create(
+		{
+			submission: graded(hamilton),
+			ref: "rubric-1",
+			rubric: ["errado", "pilha"],
+			adjustment: "0.2",
+			feedback: "O caso base está errado, mas o resto está bem explicado.",
+		},
+		as,
+	);
+	await db.feedback.create(
+		{
+			submission: graded(liskov),
+			ref: "rubric-1",
+			rubric: ["vaga", "is-livre"],
+		},
+		as,
+	);
+	await db.feedback.create(
+		{
+			submission: graded(bob),
+			ref: "auto-1",
+			bot: "runner",
+			rubric: ["inacessivel", "pilha"],
+			notes: "Cláusulas na ordem trocada; o caso base nunca é alcançado.",
+		},
+		FULL_ACCESS,
+	);
+
+	await db.rubric.splitItem(
+		{ ...pk, key: "vaga" },
+		{
+			children: [
+				{
+					key: "so-parada",
+					group: "Explicação vaga",
+					text: "Fala só da parada",
+					value: "0.2",
+				},
+				{
+					key: "sem-motivo",
+					group: "Explicação vaga",
+					text: "Não diz por que a pilha estoura",
+					value: "0.1",
+				},
+			],
+		},
+		FULL_ACCESS,
+	);
+
+	await db.exam.update(
+		{ course, slug: exam },
+		{
+			status: "COMPLETED",
+			scheduledAt: new Date(Date.now() - 2 * 24 * 3600 * 1000),
+			duration: { hours: 1 },
+		},
+		FULL_ACCESS,
+	);
+	// `releaseGrades` refuses while answers wait for a grade, and this exam
+	// keeps some on purpose, so the release is stamped directly.
+	await prisma.exam.updateMany({
+		where: { courseId: course, slug: exam },
+		data: { gradesReleasedAt: new Date() },
+	});
 }
 
 /**
