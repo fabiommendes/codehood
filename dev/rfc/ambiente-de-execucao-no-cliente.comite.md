@@ -546,3 +546,7 @@ rascunho de quem teve a sessão expirada no meio da prova e reabre `/login`.
   servidor ou vencidos (14 dias); rascunho não confirmado fica até outro
   usuário entrar (`clearOthers`) ou vencer. Presidente: sim; o risco
   residual (devtools sem login) é só de edição que o servidor não recebeu.
+
+Votos da rodada 14: **R1 unânime.** Em página sem usuário, só rascunhos
+vencidos são apagados (os confirmados já saem na confirmação);
+`clearOthers` roda também no `CenteredLayout`.
