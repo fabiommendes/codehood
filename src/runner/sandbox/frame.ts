@@ -282,8 +282,7 @@ export function startFrame(config: FrameConfig): void {
 				slot.loaded = true;
 				begin(slot);
 			} else if (message?.type === "exit" && message.reason === "load-failed") {
-				if (run) finish(run, "load-failed", null, message.message);
-				else dropSlot(slot);
+				void confirmStale(slot, message.message ?? "the Worker failed");
 			} else {
 				fail(slot, "the Worker broke the load protocol");
 			}
@@ -316,9 +315,11 @@ export function startFrame(config: FrameConfig): void {
 		}
 	}
 
-	/// The `error` event has no status: fetches the Worker script to tell a
-	/// 404 (the server dropped this bundle version) from any other failure.
-	async function confirmStale(slot: Slot): Promise<void> {
+	/// Fetches the Worker script to tell a 404 (the server dropped this bundle
+	/// version) from any other failure; `reason` is the message of the latter.
+	/// A cached script can load while a chunk it imports is gone, so this runs
+	/// for the `error` event and for a driver `load-failed` alike.
+	async function confirmStale(slot: Slot, reason: string): Promise<void> {
 		let stale = false;
 		try {
 			const response = await fetch(`${config.bundleBase}worker.js`, {
@@ -331,7 +332,7 @@ export function startFrame(config: FrameConfig): void {
 		}
 		if (slot.dead) return;
 		if (!stale) {
-			fail(slot, "the Worker failed");
+			fail(slot, reason);
 			return;
 		}
 		if (slot.run) {
@@ -373,7 +374,7 @@ export function startFrame(config: FrameConfig): void {
 				fail(slot, "the Worker failed");
 				return;
 			}
-			void confirmStale(slot);
+			void confirmStale(slot, "the Worker failed");
 		});
 		worker.addEventListener("messageerror", () => {
 			if (!slot.dead)

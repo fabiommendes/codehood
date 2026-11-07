@@ -613,6 +613,25 @@ test.describe("bundle served no more", () => {
 		expect(result.exit.message).toBeTruthy();
 	});
 
+	test("a cached Worker script with a 404 driver chunk exits stale-bundle", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page);
+		let workerRequests = 0;
+		// The first request is the Worker itself (served from the HTTP cache in
+		// the field); later ones are the frame's own check, which reaches the server.
+		await page.route(WORKER, (route) =>
+			++workerRequests === 1
+				? route.continue()
+				: route.fulfill({ status: 404 }),
+		);
+		await page.route(/\/runner\/[^/]+\/javascript-[^/]+\.js$/, (route) =>
+			route.fulfill({ status: 404 }),
+		);
+		const result = await run(h, "out hi", "javascript");
+		expect(result.exit).toMatchObject({ reason: "stale-bundle", code: null });
+	});
+
 	test("another failure of the Worker stays load-failed", async ({ page }) => {
 		const h = await loadFrame(page);
 		await page.route(WORKER, (route) => route.fulfill({ status: 500 }));
