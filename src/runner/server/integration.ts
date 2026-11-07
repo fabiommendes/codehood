@@ -16,7 +16,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
-import { RUNTIMES, runtimeDir, SWIPL_MODULE_SUFFIX } from "../sandbox/runtimes";
+import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
 import { BUNDLE_DIR_NAME, DEV_BUNDLE_DIR, MANIFEST_NAME } from "./assets";
 
 /// Whether `file` may be part of the bundle: the sandbox, its entries,
@@ -75,7 +75,7 @@ function listFiles(dir: string): string[] {
 }
 
 /// Copies the files of `RUNTIMES` from `node_modules` into `<staging>/rt/`,
-/// checking the installed version, and gives `swipl-web.js` its module export.
+/// checking the installed version, and wraps the glue that is not an ES module.
 function copyRuntimes(root: string, staging: string): void {
 	for (const runtime of Object.values(RUNTIMES)) {
 		const pkgDir = join(root, "node_modules", runtime.pkg);
@@ -90,10 +90,13 @@ function copyRuntimes(root: string, staging: string): void {
 		const target = join(staging, "rt", runtimeDir(runtime));
 		mkdirSync(target, { recursive: true });
 		for (const [from, to] of Object.entries(runtime.files)) {
-			if (to === "swipl-web.js") {
+			const wrap = runtime.wrap?.[to];
+			if (wrap) {
 				writeFileSync(
 					join(target, to),
-					readFileSync(join(pkgDir, from), "utf8") + SWIPL_MODULE_SUFFIX,
+					(wrap.prefix ?? "") +
+						readFileSync(join(pkgDir, from), "utf8") +
+						(wrap.suffix ?? ""),
 				);
 			} else {
 				copyFileSync(join(pkgDir, from), join(target, to));

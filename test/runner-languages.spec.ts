@@ -22,6 +22,14 @@ test("Python tags map to python, which starts in script mode", () => {
 	expect(defaultRunMode("python")).toBe("script");
 });
 
+test("Lua tags map to lua, which starts in script mode", () => {
+	for (const tag of ["lua", "Lua"]) {
+		expect(runnerLanguage(tag)).toBe("lua");
+	}
+	expect(defaultFilename("lua")).toBe("main.lua");
+	expect(defaultRunMode("lua")).toBe("script");
+});
+
 test("JavaScript aliases map to javascript", () => {
 	for (const tag of ["javascript", "js", "mjs", "node"]) {
 		expect(runnerLanguage(tag)).toBe("javascript");
@@ -45,7 +53,7 @@ test("the fake driver is never reachable from a tag", () => {
 });
 
 test("languages without a driver map to null", () => {
-	for (const tag of ["haskell", "typescript", "lua"]) {
+	for (const tag of ["haskell", "typescript"]) {
 		expect(runnerLanguage(tag)).toBeNull();
 	}
 });

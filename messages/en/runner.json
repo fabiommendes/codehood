@@ -11,6 +11,7 @@
 	"runner_editor_label_read_only": "{label}, {filename}, {language} code, read-only",
 	"runner_editor_tab_hint": "Press Tab to indent. To leave the editor, press Esc and then Tab.",
 	"runner_language_javascript": "JavaScript",
+	"runner_language_lua": "Lua",
 	"runner_language_prolog": "Prolog",
 	"runner_language_python": "Python",
 	"runner_prolog_restarts": "Run restarts Prolog",

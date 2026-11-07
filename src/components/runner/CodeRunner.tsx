@@ -91,6 +91,7 @@ const BLOCKED: ReadonlySet<IdePhase> = new Set([
 
 const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
 	javascript: () => m.runner_language_javascript(),
+	lua: () => m.runner_language_lua(),
 	prolog: () => m.runner_language_prolog(),
 	python: () => m.runner_language_python(),
 	fake: () => "fake",

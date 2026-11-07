@@ -36,7 +36,13 @@ export const FILES_LIMIT_BYTES = 1024 * 1024;
 export const STDIN_LINE_MAX_BYTES = 64 * 1024;
 
 /** Languages with a driver in the sandbox bundle. */
-export const languageId = z.enum(["javascript", "prolog", "python", "fake"]);
+export const languageId = z.enum([
+	"javascript",
+	"lua",
+	"prolog",
+	"python",
+	"fake",
+]);
 export type LanguageId = z.infer<typeof languageId>;
 
 /** How a driver runs the files: once from the entry file, or as a read-eval-print loop. */

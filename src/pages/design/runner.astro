@@ -56,6 +56,7 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
               <span class="label-text mb-1 text-sm">Driver</span>
               <select id="language" class="select select-bordered select-sm">
                 <option value="javascript">javascript</option>
+                <option value="lua">lua</option>
                 <option value="prolog">prolog</option>
                 <option value="python">python</option>
                 <option value="fake">fake</option>
@@ -172,6 +173,10 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
       javascript: {
         entry: "main.js",
         code: 'const name = prompt("Name?");\nconsole.log(`Hello, ${name}!`);\n',
+      },
+      lua: {
+        entry: "main.lua",
+        code: 'io.write("Name? ")\nlocal name = io.read("l")\nprint("Hello, " .. name .. "!")\n',
       },
       prolog: {
         entry: "main.pl",

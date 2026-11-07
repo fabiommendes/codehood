@@ -210,6 +210,8 @@ test.describe("runtime files", () => {
 			[runtimePath(RUNTIMES.pyodide, "pyodide.mjs"), "text/javascript"],
 			[runtimePath(RUNTIMES.pyodide, "python_stdlib.zip"), "application/zip"],
 			[runtimePath(RUNTIMES.pyodide, "pyodide-lock.json"), "application/json"],
+			[runtimePath(RUNTIMES.wasmoon, "wasmoon.js"), "text/javascript"],
+			[runtimePath(RUNTIMES.wasmoon, "glue.wasm"), "application/wasm"],
 		] as const) {
 			const response = await rt(path);
 			expect(response.status, path).toBe(200);
@@ -254,6 +256,14 @@ test.describe("runtime files", () => {
 			await rt(runtimePath(RUNTIMES.swipl, "swipl-web.js"))
 		).text();
 		expect(text.trimEnd().endsWith("export default SWIPL;")).toBe(true);
+	});
+
+	test("wasmoon.js is wrapped to export the UMD exports object", async () => {
+		const text = await (
+			await rt(runtimePath(RUNTIMES.wasmoon, "wasmoon.js"))
+		).text();
+		expect(text.startsWith("const exports = {}, module = {};")).toBe(true);
+		expect(text.trimEnd().endsWith("export default exports;")).toBe(true);
 	});
 });
 

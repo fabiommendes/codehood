@@ -12,13 +12,17 @@ export interface RuntimePackage {
 	/// Files copied from the package, relative to its root, and the path
 	/// each gets under `/runner/rt/<pkg>@<version>/`.
 	files: Record<string, string>;
+	/// Text put before and after a file (keyed by its destination path) at
+	/// build, for glue that is a classic script or UMD and has to become an
+	/// ES module the Worker can import.
+	wrap?: Record<string, { prefix?: string; suffix?: string }>;
 }
 
-/// Appended to `swipl-web.js` at build: it is a classic script, and the
-/// module Worker imports it as an ES module.
-export const SWIPL_MODULE_SUFFIX = "\nexport default SWIPL;\n";
-
-export const RUNTIMES: { swipl: RuntimePackage; pyodide: RuntimePackage } = {
+export const RUNTIMES: {
+	swipl: RuntimePackage;
+	pyodide: RuntimePackage;
+	wasmoon: RuntimePackage;
+} = {
 	swipl: {
 		pkg: "swipl-wasm",
 		version: "8.2.6",
@@ -27,6 +31,7 @@ export const RUNTIMES: { swipl: RuntimePackage; pyodide: RuntimePackage } = {
 			"dist/swipl/swipl-web.wasm": "swipl-web.wasm",
 			"dist/swipl/swipl-web.data": "swipl-web.data",
 		},
+		wrap: { "swipl-web.js": { suffix: "\nexport default SWIPL;\n" } },
 	},
 	pyodide: {
 		pkg: "pyodide",
@@ -37,6 +42,21 @@ export const RUNTIMES: { swipl: RuntimePackage; pyodide: RuntimePackage } = {
 			"pyodide.asm.wasm": "pyodide.asm.wasm",
 			"python_stdlib.zip": "python_stdlib.zip",
 			"pyodide-lock.json": "pyodide-lock.json",
+		},
+	},
+	wasmoon: {
+		pkg: "wasmoon",
+		version: "1.16.0",
+		files: {
+			"dist/index.js": "wasmoon.js",
+			"dist/glue.wasm": "glue.wasm",
+		},
+		// UMD: with `exports` and `module` defined it fills `exports` instead of a global.
+		wrap: {
+			"wasmoon.js": {
+				prefix: "const exports = {}, module = {};\n",
+				suffix: "\nexport default exports;\n",
+			},
 		},
 	},
 };
