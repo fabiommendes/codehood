@@ -583,3 +583,35 @@ test.describe("Worker output is cut inside the Worker", () => {
 		expect(max).toBeLessThanOrEqual(2000);
 	});
 });
+
+test.describe("bundle served no more", () => {
+	const WORKER = "**/runner/*/worker.js";
+
+	test("a run whose Worker script is 404 exits stale-bundle", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page);
+		await page.route(WORKER, (route) => route.fulfill({ status: 404 }));
+		const result = await run(h, "out hi");
+		expect(result.exit).toMatchObject({ reason: "stale-bundle", code: null });
+		expect(result.exit.message).toBeTruthy();
+	});
+
+	test("another failure of the Worker stays load-failed", async ({ page }) => {
+		const h = await loadFrame(page);
+		await page.route(WORKER, (route) => route.fulfill({ status: 500 }));
+		const result = await run(h, "out hi");
+		expect(result.exit.reason).toBe("load-failed");
+	});
+
+	test("a reserve with the same failure tells the app", async ({ page }) => {
+		const h = await loadFrame(page);
+		await page.route(WORKER, (route) => route.fulfill({ status: 404 }));
+		await send(h, { type: "prepare", language: "fake" });
+		await page.waitForFunction(() =>
+			(
+				window as unknown as { __runnerMessages: { type: string }[] }
+			).__runnerMessages.some((m) => m.type === "stale-bundle"),
+		);
+	});
+});

@@ -68,7 +68,9 @@ export type RunState = z.infer<typeof runState>;
  * itself failed while running. `load-failed`: the runtime could not be
  * downloaded or started. `stopped`: the app sent `stop`. `output-limit`: the
  * program wrote more than `maxOutputBytes` or its Worker posted more than
- * `OUTPUT_MESSAGES_LIMIT` messages.
+ * `OUTPUT_MESSAGES_LIMIT` messages. `stale-bundle`: the server no longer serves
+ * the bundle version this frame was loaded with (a deploy happened), so the
+ * Worker script answers 404; reloading the frame fixes it.
  */
 export const exitReason = z.enum([
 	"exited",
@@ -76,6 +78,7 @@ export const exitReason = z.enum([
 	"load-failed",
 	"stopped",
 	"output-limit",
+	"stale-bundle",
 ]);
 export type ExitReason = z.infer<typeof exitReason>;
 
@@ -212,8 +215,19 @@ export const exitMessage = z.object({
 	message: z.string().max(2000).optional(),
 });
 
+/**
+ * A reserve Worker failed because its script answers 404: the frame is stale.
+ *
+ * Runs report the same failure as `exit { reason: "stale-bundle" }`; this
+ * message covers the case with no run to carry it.
+ */
+export const staleBundleMessage = z.object({
+	type: z.literal("stale-bundle"),
+});
+
 export const runnerToAppMessage = z.discriminatedUnion("type", [
 	readyMessage,
+	staleBundleMessage,
 	statusMessage,
 	progressMessage,
 	outputMessage,

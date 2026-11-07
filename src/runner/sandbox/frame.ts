@@ -79,6 +79,10 @@ export const STORAGE_CLEANUP_TIMEOUT_MS = 2000;
  * `exit` the Worker posts (student code can forge one); later messages from
  * that Worker are dropped. A `run` with a `runId` already used in this frame
  * load is ignored. Each accepted run ends with exactly one `exit`.
+ *
+ * A Worker that fails before `loaded` makes the frame fetch its script: on
+ * 404 the run ends with `stale-bundle` (a reserve posts `stale-bundle`
+ * instead), on anything else with `load-failed`.
  */
 export function startFrame(config: FrameConfig): void {
 	void clearOriginStorage(STORAGE_CLEANUP_TIMEOUT_MS);
@@ -312,6 +316,37 @@ export function startFrame(config: FrameConfig): void {
 		}
 	}
 
+	/// The `error` event has no status: fetches the Worker script to tell a
+	/// 404 (the server dropped this bundle version) from any other failure.
+	async function confirmStale(slot: Slot): Promise<void> {
+		let stale = false;
+		try {
+			const response = await fetch(`${config.bundleBase}worker.js`, {
+				cache: "no-store",
+			});
+			void response.body?.cancel();
+			stale = response.status === 404;
+		} catch {
+			// Network failure: report a plain load failure.
+		}
+		if (slot.dead) return;
+		if (!stale) {
+			fail(slot, "the Worker failed");
+			return;
+		}
+		if (slot.run) {
+			finish(
+				slot.run,
+				"stale-bundle",
+				null,
+				"the runner bundle changed after this page loaded",
+			);
+		} else {
+			dropSlot(slot);
+			post({ type: "stale-bundle" });
+		}
+	}
+
 	function createSlot(
 		language: LanguageId,
 		program?: LoadMessage["program"],
@@ -333,7 +368,12 @@ export function startFrame(config: FrameConfig): void {
 		);
 		worker.addEventListener("error", (event) => {
 			event.preventDefault();
-			if (!slot.dead) fail(slot, "the Worker failed");
+			if (slot.dead) return;
+			if (slot.loaded || slot.started) {
+				fail(slot, "the Worker failed");
+				return;
+			}
+			void confirmStale(slot);
 		});
 		worker.addEventListener("messageerror", () => {
 			if (!slot.dead)

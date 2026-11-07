@@ -41,11 +41,20 @@ export interface RunHandlers {
 	onOutput?(stream: "stdout" | "stderr", text: string): void;
 }
 
-/** How a run ended, as the `exit` message said. */
-export type RunExit = Pick<ExitMessage, "reason" | "code" | "message">;
+/**
+ * How a run ended, as the `exit` message said.
+ *
+ * `reloaded` is added by the host: the page's frame was replaced because its
+ * bundle went stale while this run was active. The run did not fail by
+ * itself; the UI should tell the user to run it again.
+ */
+export type RunExit = Pick<ExitMessage, "code" | "message"> & {
+	reason: ExitMessage["reason"] | "reloaded";
+};
 
 /** A run in progress. */
 export interface RunHandle {
+	/// Changes when the host repeats the run after a stale bundle.
 	readonly runId: string;
 
 	/** Sends one line of input, without its newline. */
@@ -177,6 +186,12 @@ export class RunnerHost {
 	/**
 	 * Starts a run with a fresh `runId`.
 	 *
+	 * When the frame reports `stale-bundle` (a deploy replaced the bundle it
+	 * was loaded with), the host reloads the frame and repeats the run once
+	 * with a new `runId`; `handle.runId` follows. Other runs of the page end
+	 * with `reloaded`. A second `stale-bundle` is reported as the exit. The
+	 * host keeps the request only until the run ends.
+	 *
 	 * @throws {RunnerUnavailable} as `ready()` does.
 	 */
 	async run(request: RunRequest, handlers: RunHandlers): Promise<RunHandle> {
@@ -186,34 +201,60 @@ export class RunnerHost {
 			for (const [runId] of previous) this.post({ type: "stop", runId });
 			await Promise.all(previous.map(([, run]) => run.done));
 		}
-		const runId = crypto.randomUUID();
-		let finish: (exit: RunExit) => void = () => {};
+		let current = "";
+		let resolveDone: (exit: RunExit) => void = () => {};
 		const done = new Promise<RunExit>((resolve) => {
-			finish = resolve;
+			resolveDone = resolve;
 		});
-		this.runs.set(runId, { handlers, done, finish });
-		this.post({
-			type: "run",
-			runId,
-			language: request.language,
-			mode: request.mode,
-			files: request.files,
-			entry: request.entry,
-			...(request.maxOutputBytes === undefined
-				? {}
-				: { maxOutputBytes: request.maxOutputBytes }),
-		});
+		const launch = (retried: boolean): void => {
+			const runId = crypto.randomUUID();
+			current = runId;
+			this.runs.set(runId, {
+				handlers,
+				done,
+				finish: (exit) => {
+					if (exit.reason !== "stale-bundle" || retried) {
+						resolveDone(exit);
+						return;
+					}
+					this.reloadFrame("reloaded").then(
+						() => launch(true),
+						() => resolveDone(exit),
+					);
+				},
+			});
+			this.post({
+				type: "run",
+				runId,
+				language: request.language,
+				mode: request.mode,
+				files: request.files,
+				entry: request.entry,
+				...(request.maxOutputBytes === undefined
+					? {}
+					: { maxOutputBytes: request.maxOutputBytes }),
+			});
+		};
+		launch(false);
 		return {
-			runId,
+			get runId() {
+				return current;
+			},
 			done,
 			sendLine: (line) => {
-				if (this.runs.has(runId)) this.post({ type: "stdin", runId, line });
+				if (this.runs.has(current)) {
+					this.post({ type: "stdin", runId: current, line });
+				}
 			},
 			sendEof: () => {
-				if (this.runs.has(runId)) this.post({ type: "stdin-eof", runId });
+				if (this.runs.has(current)) {
+					this.post({ type: "stdin-eof", runId: current });
+				}
 			},
 			stop: () => {
-				if (this.runs.has(runId)) this.post({ type: "stop", runId });
+				if (this.runs.has(current)) {
+					this.post({ type: "stop", runId: current });
+				}
 			},
 		};
 	}
@@ -226,10 +267,17 @@ export class RunnerHost {
 	 * @throws {RunnerUnavailable} as `ready()` does.
 	 */
 	reload(): Promise<RunnerCapabilities> {
+		return this.reloadFrame("stopped");
+	}
+
+	/// Replaces the iframe; the runs in progress end with `reason`.
+	private reloadFrame(
+		reason: "stopped" | "reloaded",
+	): Promise<RunnerCapabilities> {
 		const old = this.frame;
 		for (const [runId, run] of [...this.runs]) {
 			this.runs.delete(runId);
-			run.finish({ reason: "stopped", code: null });
+			run.finish({ reason, code: null });
 		}
 		const fresh = this.createFrame();
 		if (old) {
@@ -309,6 +357,12 @@ export class RunnerHost {
 	}
 
 	private dispatch(frame: FrameState, message: RunnerToAppMessage): void {
+		if (message.type === "stale-bundle") {
+			// Runs in progress already loaded their Worker; the next one that
+			// fails will report `stale-bundle` and trigger the reload itself.
+			if (this.runs.size === 0) this.reloadFrame("reloaded").catch(() => {});
+			return;
+		}
 		if (message.type === "ready") {
 			if (frame.settled) return;
 			if (message.stdin === "none") {

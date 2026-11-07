@@ -262,3 +262,111 @@ test.describe("RunnerHost", () => {
 		expect(states).toEqual(["running"]);
 	});
 });
+
+test.describe("frame loaded before a deploy", () => {
+	/// Serves 404 for the Worker script while `stale` is set, as a server that
+	/// dropped the bundle version the loaded frame was built for. Unless
+	/// `always`, the next frame load clears it.
+	async function routeBundle(
+		page: Page,
+		{ stale = true, always = false } = {},
+	) {
+		const state = { stale, frameLoads: 0 };
+		await page.route("**/runner/*/worker.js", (route) =>
+			state.stale ? route.fulfill({ status: 404 }) : route.continue(),
+		);
+		await page.route("**/runner/frame*", (route) => {
+			state.frameLoads++;
+			if (state.frameLoads > 1 && !always) state.stale = false;
+			return route.continue();
+		});
+		return state;
+	}
+
+	const request = (source: string) => ({
+		language: "fake" as const,
+		mode: "script" as const,
+		files: { "main.fake": source },
+		entry: "main.fake",
+	});
+
+	test("reloads the frame and repeats the run once with a new runId", async ({
+		page,
+	}) => {
+		const state = await routeBundle(page);
+		await openPage(page);
+		const result = await page.evaluate(
+			async ({ origin, req }) => {
+				const host = window.__runner.RunnerHost.shared(origin);
+				let out = "";
+				const run = await host.run(req, {
+					onOutput: (_, text) => {
+						out += text;
+					},
+				});
+				const first = run.runId;
+				const exit = await run.done;
+				return { first, last: run.runId, exit: exit.reason, out };
+			},
+			{ origin: TEST_RUNNER_ORIGIN, req: request("out again") },
+		);
+		expect(result.exit).toBe("exited");
+		expect(result.out).toBe("again\n");
+		expect(result.last).not.toBe(result.first);
+		expect(state.frameLoads).toBe(2);
+		await expect(frames(page)).toHaveCount(1);
+	});
+
+	test("does not loop when the bundle is still missing after the reload", async ({
+		page,
+	}) => {
+		const state = await routeBundle(page, { always: true });
+		await openPage(page);
+		const reason = await page.evaluate(
+			async ({ origin, req }) => {
+				const host = window.__runner.RunnerHost.shared(origin);
+				return (await (await host.run(req, {})).done).reason;
+			},
+			{ origin: TEST_RUNNER_ORIGIN, req: request("out x") },
+		);
+		expect(reason).toBe("stale-bundle");
+		await page.waitForTimeout(1000);
+		expect(state.frameLoads).toBe(2);
+	});
+
+	test("other runs of the page end as reloaded", async ({ page }) => {
+		const state = await routeBundle(page, { stale: false });
+		await openPage(page);
+		await page.evaluate(
+			async ({ origin, other }) => {
+				const host = window.__runner.RunnerHost.shared(origin);
+				let started: () => void = () => {};
+				const isRunning = new Promise<void>((resolve) => {
+					started = resolve;
+				});
+				const running = await host.run(other, {
+					onStatus: (state) => state === "running" && started(),
+				});
+				(window as unknown as { __other: typeof running }).__other = running;
+				// The Worker of this run must load before the bundle goes away.
+				await isRunning;
+			},
+			{ origin: TEST_RUNNER_ORIGIN, other: request("loop") },
+		);
+		state.stale = true;
+		const result = await page.evaluate(
+			async ({ origin, req }) => {
+				const host = window.__runner.RunnerHost.shared(origin);
+				const exit = await (await host.run(req, {})).done;
+				const other = (
+					window as unknown as {
+						__other: { done: Promise<{ reason: string }> };
+					}
+				).__other;
+				return { exit: exit.reason, other: (await other.done).reason };
+			},
+			{ origin: TEST_RUNNER_ORIGIN, req: request("out ok") },
+		);
+		expect(result).toEqual({ exit: "exited", other: "reloaded" });
+	});
+});
