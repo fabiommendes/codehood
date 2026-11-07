@@ -117,14 +117,18 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 		setChecked(true);
 	});
 
-	// Once the server holds the current code, the local copy has no use.
+	// Once the server holds the current code, the local copy has no use, unless
+	// another tab of the same exam wrote different code to it meanwhile.
+	let lastEdit: string | null = null;
 	createEffect(() => {
 		if (checked() && conflict() === null && props.save.state === "saved") {
-			store?.remove(props.draft);
+			const stored = store?.read(props.draft, serverNow());
+			if (stored && stored.code === lastEdit) store?.remove(props.draft);
 		}
 	});
 
 	function edited(code: string): void {
+		lastEdit = code;
 		store?.write(props.draft, { code, savedAt: serverNow() });
 		props.onChange(code);
 	}

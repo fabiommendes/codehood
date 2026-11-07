@@ -261,6 +261,29 @@ test("a draft the server confirms is removed from the browser", async ({
 		.toBeNull();
 });
 
+test("a save confirmed in one tab keeps the draft another tab wrote with different code", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	const other = await page.context().newPage();
+	await other.route(ANSWER_ACTION, (route) => route.abort());
+	await page.goto(s.url);
+	await other.goto(s.url);
+
+	await page.bringToFront();
+	await editor(page).fill("console.log('tab A')");
+	await other.bringToFront();
+	await editor(other).fill("console.log('tab B')");
+	await expect.poll(() => savedCode(s)).toBe("console.log('tab A')");
+	await expect(footer(page)).toContainText(/Saved at/);
+
+	const stored = await page.evaluate(
+		(key) => localStorage.getItem(key),
+		s.draftKey(),
+	);
+	expect(JSON.parse(stored ?? "null").code).toBe("console.log('tab B')");
+});
+
 test("the save answers with the server's clock, so the page can measure its offset", async ({
 	page,
 }) => {
