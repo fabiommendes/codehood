@@ -1132,6 +1132,211 @@ real: tempo de Rodar até `running` com reserva pronta, com reserva ainda
 carregando e sem reserva, desktop e CPU 4x. Se algum caso de Python passar
 de 3 s, medir o snapshot (plano B) e levar os números ao comitê.
 
+## Contratos da E4
+
+Escrito pelo `architect`. Modo `review` (J3): o professor roda a resposta de
+código do aluno na tela de correção. Stub: `src/components/runner/review-host.ts`.
+
+### Onde entra
+
+- A correção é por questão: `src/pages/[discipline]/[course]/exams/[slug]/grading/[question].astro`
+  lista todas as respostas da questão, um card por resposta, anônimo
+  ("Resposta N") salvo com "Mostrar nomes" (spec `web-grading`, R4 e R5).
+  O protótipo (`modes.astro`) mostra uma submissão por vez com ‹ ›; a E4
+  mantém a lista e põe a navegação no próprio widget (ver votação).
+- Hoje a resposta de essay vira `<p class="whitespace-pre-wrap">` no
+  servidor (`Answer.astro` + `displayAnswer`), sem olhar `content` nem
+  `highlight`. A E4 muda `Answer.astro`: essay com `content: "code"` mostra
+  o código com Shiki (`light-plus`/`dark-plus`) e, se
+  `runnerLanguage(highlight)` não for null e `RUNNER_ORIGIN` existir, um
+  `CodeRunner` em `mode="review"`. Vale para a página da questão e para a
+  tentativa inteira de um aluno (`attempts/[username].astro`), que usam o
+  mesmo `Answer.astro`.
+- Montagem com `client:visible` (a página pode listar 150 respostas). Antes
+  de rodar ou editar, o widget é o `highlightedHtml` do servidor; CodeMirror e
+  xterm só carregam no uso (contrato da E2).
+
+### Sandbox por submissão
+
+- `runForSubmission(runnerOrigin, submission, request, handlers)`: um
+  `RunnerHost.exclusive` por página, criado no primeiro uso; um run por vez na
+  página inteira (o run novo para o anterior, de qualquer card); `reload()`
+  do frame sempre que a submissão muda. `submission` é o id público da
+  resposta (o mesmo do `id="answer-..."` do card).
+- `CodeRunner` ganha a prop `submission?: string`. Com `mode="review"`, ele
+  roda por `runForSubmission` em vez de `RunnerHost.shared`. `prepare` em
+  `review` é chamado depois de cada `reload()`, não no foco.
+- Nada é compartilhado com widgets `shared` da mesma página (não há, mas o
+  host exclusivo é outro iframe).
+
+### Cópia do professor (U2)
+
+- O código da submissão é só leitura. "Editar cópia" torna o editor
+  editável; a cópia vive só na memória do widget: sem `onChange`, sem
+  rascunho, sem `localStorage`, sem requisição nenhuma.
+- Com a cópia diferente do original: selo "modificado", dica "Uma cópia na
+  memória; a submissão não muda." e botão "Voltar à submissão", que descarta a
+  cópia. O botão Rodar continua "Rodar submissão".
+- Saída de um run da cópia: o terminal escreve antes uma linha de aviso
+  "saída da cópia modificada" (pelo `notice` do `RunnerTerminal`), e o
+  status mostra o selo. Saída do original não tem marca.
+- Trocar de card ou recarregar a página perde a cópia, por desenho.
+
+### Navegação
+
+- Barra do widget (`toolbar`): ‹ › levam ao card anterior/seguinte com
+  resposta de código na página (âncora `#answer-<id>`, foco no botão Rodar
+  do destino), "N de M" e o rótulo do card ("Resposta N", ou o nome com
+  "Mostrar nomes"). Dica fixa: "Sandbox novo a cada submissão. Rodar nunca
+  mexe na nota."
+- Ir para outro card não roda nada; o primeiro Rodar lá recarrega o frame.
+
+### O que nunca acontece
+
+O widget não importa nem chama `actions.grading.*`, `actions.regrade.*`
+nem `actions.gradeColumn.*`, e não toca no `GradeForm`. Nota e comentário só
+mudam pelos formulários de sempre, com ação explícita do professor. A saída
+do terminal não é copiada para o comentário.
+
+## Tarefas da E4
+
+| Tarefa | Depende de | Paralela com |
+| :----- | :--------- | :----------- |
+| E4.1 `runForSubmission` e modo `review` no `CodeRunner` | — | E4.2 |
+| E4.2 Código na tela de correção | — | E4.1 |
+| E4.3 Navegação, seed e story | E4.1, E4.2 | — |
+
+**E4.1 `runForSubmission` e modo `review`.**
+
+- Implementação: `src/components/runner/review-host.ts`; em
+  `CodeRunner.tsx`, prop `submission`, "Editar cópia", selo, "Voltar à
+  submissão", aviso na saída da cópia; mensagens.
+- Testes: `test/runner-review.spec.ts`, numa seção nova da página
+  `src/pages/design/runner.astro` com três widgets `review` de submissões
+  diferentes.
+- Testes esperados: primeiro Rodar cria um iframe `exclusive`; rodar outra
+  submissão troca o iframe (elemento novo) e para o run anterior; rodar a
+  mesma de novo não troca o iframe; dois runs nunca simultâneos; global
+  definido pelo código de uma submissão (`globalThis.x = 1`) não existe no
+  run da seguinte; editar a cópia mostra o selo e "Voltar à submissão"
+  devolve o original; a saída da cópia tem o aviso; editar e rodar a cópia
+  não gera requisição à origem da app (`page.on("request")`) nem escreve no
+  `localStorage`.
+
+**E4.2 Código na tela de correção.**
+
+- Implementação: `src/components/grading/Answer.astro` e
+  `src/components/grading/answer-text.ts` (tipo novo `code` com língua),
+  `client:visible`.
+- Testes: `test/grading-code-answer.spec.ts`.
+- Testes esperados: essay de código aparece realçado na página da questão e
+  na tentativa do aluno; com língua sem driver, realçado sem Rodar; essay de
+  texto continua como hoje; a página da questão com muitas respostas não
+  cria iframe nem baixa CodeMirror antes de um clique; rodar e editar não
+  mudam nota nem comentário (contagem de passes igual antes e depois).
+
+**E4.3 Navegação, seed e story.**
+
+- Implementação: barra ‹ › e "N de M" no `toolbar` do widget; seed com o
+  exam de código JavaScript da E3a respondido por quatro alunos (uma
+  resposta certa, uma com exceção, uma com laço infinito, uma que lê
+  entrada); story nova em `docs/user-stories/instructor.md`: "Run a
+  student's code while grading" (`status: implemented`).
+- Testes: navegação (‹ › movem foco e âncora, anônimo sem "Mostrar nomes",
+  com nome quando ligado); story
+  `instructor: run a student's code while grading` em
+  `test/stories/instructor-grading.test.ts`, pela UI, inclusive Parar no
+  laço infinito.
+
+## Contratos da E5
+
+Escrito pelo `architect`. Drivers Lua e TypeScript. Sem stubs no código
+(`src/runner/**` tem implementers ativos); os nomes abaixo são o contrato.
+
+### Lua: wasmoon
+
+Escolha: `wasmoon` 1.16.0, não `fengari`.
+
+| | wasmoon 1.16.0 | fengari 0.1.5 |
+| :- | :- | :- |
+| Lua | 5.4, a implementação de referência compilada para WASM | 5.3 reescrito em JS |
+| Tamanho | ~460 KB no pacote (glue + wasm) | ~1,6 MB no pacote |
+| Velocidade | nativa do WASM | interpretador em JS, várias vezes mais lento |
+| Manutenção | 1.16.0 de 12/2023; 2.0 em pré-lançamento | sem release desde 2019 (0.1.4) |
+| Dependências | só tipos | várias |
+
+A 1.16.0 é madura para o `minimumReleaseAge` e não usa a 2.0-next.
+`fengari` daria Lua 5.3, que diverge do que o aluno instala hoje.
+
+- `RUNTIMES.wasmoon` (em `src/runner/sandbox/runtimes.ts`): o glue e o
+  `.wasm` do pacote, servidos em `/runner/rt/wasmoon@1.16.0/`.
+- `drivers/lua.ts`, `modes: ["script", "repl"]`. `load`: `LuaFactory` com a
+  URL do `.wasm` de `runtimeUrl`, cria o motor uma vez. `run`: grava `files`
+  no FS em memória (`/work/`), troca `print`, `io.write` e `io.stderr:write`
+  por funções que chamam `stdout`/`stderr`, e `io.read` (formatos `"l"`,
+  `"L"`, `"n"`, `"a"`) por leitura síncrona sobre `readLine`. Script: roda a
+  entrada com `doFileSync`, nome `main.lua` nas mensagens de erro, código 1
+  em erro não tratado, `os.exit(n)` dá `n`. REPL: lê linha, tenta
+  `return <linha>` e depois a linha, imprime o resultado.
+- Bibliotecas: a padrão do Lua. Sem `require` de módulos fora de `files`.
+- `languageId` ganha `lua`; aliases `lua`.
+
+### TypeScript: transpilar e entregar ao driver JS
+
+- `drivers/typescript.ts`, `modes: ["script"]` (como na tabela do
+  "Decidido"). `run`: transpila a entrada e entrega o resultado ao
+  `javascriptDriver.run` com os mesmos `files`, `entry` e contexto, para o
+  aluno ter exatamente o JavaScript da E1 (console, `prompt`, stack
+  limpo). Tipos não são verificados: só removidos.
+- Transpilador: o "Decidido" diz `esbuild-wasm`. Duas coisas pesam e vão
+  para votação:
+  - `esbuild-wasm` 0.28.2 (mesma versão do `esbuild` que a app já usa) tem
+    ~14,5 MB no pacote, com o `.wasm` de ~11 MB baixado no primeiro Rodar.
+    Ele reimprime o código, então as linhas do stack não batem com o `.ts`
+    sem source map; o `cleanStack` da E1 teria de aplicar o mapa.
+  - `sucrase` 3.35.1 tem ~1 MB no pacote, é JS puro (sem `.wasm`) e
+    preserva as linhas do arquivo por desenho: o stack aponta a linha certa
+    do `.ts` sem source map.
+- Se `esbuild-wasm`: `load` chama `esbuild.initialize({ wasmURL, worker:
+  false })`. `worker: false` é obrigatório: o padrão cria um Worker
+  aninhado, que `lockDownWorkerScope` remove.
+- `languageId` ganha `typescript`; aliases `ts`, `typescript`, `mts`.
+- CodeMirror: `@codemirror/lang-javascript` com `typescript: true`;
+  `@codemirror/legacy-modes` (modo `lua`) para Lua, versão exata.
+
+## Tarefas da E5
+
+| Tarefa | Depende de | Paralela com |
+| :----- | :--------- | :----------- |
+| E5.1 Driver Lua | — | E5.2 |
+| E5.2 Driver TypeScript | voto do transpilador | E5.1 |
+| E5.3 Seed, smoke e editor | E5.1, E5.2 | — |
+
+Os dois mexem em `protocol.ts`, `drivers/index.ts`, `runtimes.ts` e
+`languages.ts`; quem chegar depois rebaseia. Testes de runtime real seguem a
+regra da E3b: dois por runtime na suíte padrão, o resto em `test/runtimes/`.
+
+**E5.1 Driver Lua.** `package.json` (`wasmoon` 1.16.0 exato),
+`runtimes.ts`, `drivers/lua.ts`, `drivers/index.ts`, `protocol.ts`,
+`languages.ts`. Testes em `test/runtimes/lua.spec.ts`: `print` e
+`io.write`; `io.read("l")` e `io.read("n")` do terminal; erro com
+`main.lua:3:`; `os.exit(2)`; REPL com expressão e EOF; Parar em
+`while true do end`; `FS.mount` de IDBFS falha; com `prepare`, vai direto a
+`running`.
+
+**E5.2 Driver TypeScript.** Dependência escolhida, com versão exata;
+`drivers/typescript.ts`, `drivers/index.ts`, `protocol.ts`,
+`languages.ts`; uma exportação em `drivers/javascript.ts` se o driver TS
+precisar. Testes em `test/runtimes/typescript.spec.ts`: anotações, `enum` e
+`interface` rodam; erro de tipo não impede a execução; exceção na linha 7
+do `.ts` aparece como `main.ts:7`; `prompt()`; `import` de outro arquivo
+falha com mensagem clara; com `prepare`, vai direto a `running`.
+
+**E5.3 Seed, smoke e editor.** `CODE` Lua e TypeScript em cs101; uma
+questão `essay` de código em TypeScript no `practice-js`;
+`test/runner-smoke.spec.ts` ganha os dois casos por runtime; modos do
+CodeMirror. Testes: os de smoke; o resource Lua abre no editor com realce.
+
 ## Em aberto
 
 - Firefox e Safari (inclusive janela privada) não testados: issue

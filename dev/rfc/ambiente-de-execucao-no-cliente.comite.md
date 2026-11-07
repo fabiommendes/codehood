@@ -480,3 +480,19 @@ Votos da rodada 12: **W1 unânime.** Trava concreta (breaker): a branch não
 entra em `main` enquanto a issue `runner-firefox-safari` estiver aberta;
 recomendação ao humano no relatório final. A validação do WebKit pelo
 humano roda também os testes de isolamento da E1.5 (security).
+
+### Rodada 13: contratos da E4 e E5
+
+Seções "Contratos/Tarefas da E4" e "Contratos/Tarefas da E5" no RFC; stub
+`src/components/runner/review-host.ts`. E5: Lua com `wasmoon` 1.16.0 (Lua
+5.4, ~460 KB) em vez de `fengari` (5.3, sem release desde 2019).
+
+- **E4-D1.** Navegação no `review`: (a) manter a lista do spec
+  `web-grading` (todas as respostas da questão) com ‹ › no widget; um host
+  `exclusive` por página, frame recarregado ao mudar de submissão; (b) uma
+  submissão por vez, como o protótipo. Presidente: (a).
+- **E5-D2.** Transpilador de TypeScript: (a) `esbuild-wasm` (~11 MB de wasm
+  no primeiro Rodar; linhas do stack só com source map); (b) `sucrase`
+  (~1 MB, JS puro, preserva as linhas do `.ts`). O `esbuild-wasm` entrou no
+  RFC como sugestão do presidente, não como escolha explícita do humano.
+  Presidente: (b), registrado como mudança no relatório final.
