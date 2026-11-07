@@ -2,7 +2,35 @@ import { defineMiddleware, sequence } from "astro:middleware";
 import { hasPerm } from "@/auth/permissions";
 import { db } from "@/db";
 import * as env from "./core/constants";
-import { SESSION_COOKIE } from "./core/constants";
+import { RUNNER_ORIGIN, SESSION_COOKIE } from "./core/constants";
+import { APP_CSP, requestSide } from "./runner/server/routing";
+
+/**
+ * Answers 404 for `/runner/` paths on the app origin and for anything but
+ * `/runner/` on the runner origin, and adds `APP_CSP` to app responses.
+ */
+export const runnerOriginMiddleware = defineMiddleware(
+	async (context, next) => {
+		const side = requestSide(context.url, RUNNER_ORIGIN);
+		if (side === "not-found") return new Response("Not found", { status: 404 });
+		if (side === "runner") return next();
+
+		const response = await next();
+		try {
+			response.headers.set("Content-Security-Policy", APP_CSP);
+			return response;
+		} catch {
+			// Headers of a `fetch()` or redirect response are immutable.
+			const headers = new Headers(response.headers);
+			headers.set("Content-Security-Policy", APP_CSP);
+			return new Response(response.body, {
+				status: response.status,
+				statusText: response.statusText,
+				headers,
+			});
+		}
+	},
+);
 
 /**
  * The session middleware is responsible for validating the session cookie and populating
@@ -135,6 +163,7 @@ export const bufferHtmlMiddleware = defineMiddleware(async (_context, next) => {
 });
 
 const COMMON_MIDDLEWARES = [
+	runnerOriginMiddleware,
 	sessionMiddleware,
 	apiKeyMiddleware,
 	originMiddleware,

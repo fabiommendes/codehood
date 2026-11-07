@@ -72,6 +72,7 @@ Then use one of the following, depending on what you want to do:
 | `LOG_ENV`                | no       | `false`              | Echo the resolved environment at startup. Set by `pnpm run dev`. |
 | `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in.                         |
 | `PUBLIC_URL`             | no       | none                 | Build time. Address of a deployed instance, see [Deploying](#deploying). |
+| `RUNNER_ORIGIN`          | no       | dev: `PUBLIC_URL` on the other loopback name | Origin of the code runner, see [Deploying](#deploying). Unset in production turns code execution off. |
 | `CODEHOOD_LOCALE`        | no       | base locale (`en`)   | Build time. Locale the build compiles for; must be one of `project.inlang/settings.json` `locales`. |
 
 `ENVIRONMENT` deliberately has no default, and an empty value counts as
@@ -145,6 +146,42 @@ environment or from `.env`. `pnpm run package` checks `CODEHOOD_LOCALE` before
 building and records it in `RELEASE`. The server trusts the proxy's
 `X-Forwarded-*` headers only for the `PUBLIC_URL` host; without it, form posts fail
 Astro's origin check and every client has the proxy's IP.
+
+### Code runner origin
+
+The browser runs student code in a frame served from its own origin, so that
+code never shares cookies or storage with the app. The same Node process
+serves it, under `/runner/`, at the host given by `RUNNER_ORIGIN`
+(e.g. `https://runner.example.net`).
+
+- A separate registrable domain is the recommended default. A subdomain of the
+  app's domain also works, but only with the `__Host-session` cookie, which
+  production already uses.
+- `RUNNER_ORIGIN` must be https, differ from `PUBLIC_URL` and is read at both
+  build and run time. Unset in production, code execution is off: `/runner/`
+  answers 404.
+- The reverse proxy **must** restrict the runner host to `/runner/`. Files of
+  `public/` and `/_astro/` are answered before the middleware, on any host, so
+  only the proxy can keep the runner origin from serving the app's assets.
+- The proxy must pass `Host` or `X-Forwarded-Host` with the runner's host;
+  without it the server cannot tell the two origins apart.
+
+```nginx
+server {
+    server_name runner.example.net;
+    # TLS as for the app
+    location /runner/ {
+        proxy_pass http://127.0.0.1:4321;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location / { return 404; }
+}
+```
+
+In development and tests the app runs on `localhost` and the runner on
+`127.0.0.1`, which are different sites on the same process.
 
 Migrations are written only at release time. Development keeps using
 `prisma db push`, so the history holds one migration per release instead of

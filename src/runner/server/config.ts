@@ -18,9 +18,42 @@
  * origin as `publicUrl`, or is not https in production.
  */
 export function resolveRunnerOrigin(
-	_runnerOriginEnv: string | undefined,
-	_publicUrl: string,
-	_environment: "dev" | "prod",
+	runnerOriginEnv: string | undefined,
+	publicUrl: string,
+	environment: "dev" | "prod",
 ): string | null {
-	throw new Error("not implemented");
+	const app = new URL(publicUrl);
+	if (runnerOriginEnv === undefined || runnerOriginEnv.trim() === "") {
+		if (environment !== "dev") return null;
+		const swap: Record<string, string> = {
+			localhost: "127.0.0.1",
+			"127.0.0.1": "localhost",
+		};
+		const host = swap[app.hostname];
+		if (host === undefined) return null;
+		const url = new URL(app.origin);
+		url.hostname = host;
+		return url.origin;
+	}
+
+	let url: URL;
+	try {
+		url = new URL(runnerOriginEnv.trim());
+	} catch {
+		throw new Error(`RUNNER_ORIGIN is not a valid URL: "${runnerOriginEnv}".`);
+	}
+	if (url.protocol !== "http:" && url.protocol !== "https:") {
+		throw new Error(
+			`RUNNER_ORIGIN must be an http(s) URL, got "${runnerOriginEnv}".`,
+		);
+	}
+	if (url.origin === app.origin) {
+		throw new Error(
+			"RUNNER_ORIGIN must differ from PUBLIC_URL: the runner needs its own origin.",
+		);
+	}
+	if (environment === "prod" && url.protocol !== "https:") {
+		throw new Error("RUNNER_ORIGIN must be https in production.");
+	}
+	return url.origin;
 }

@@ -9,6 +9,7 @@ import solidJs from "@astrojs/solid-js";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
+import { resolveRunnerOrigin } from "@/runner/server/config";
 import { localeDefine, paraglidePlugin } from "./scripts/lib/paraglide";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -22,6 +23,26 @@ const publicUrl = process.env.PUBLIC_URL
 	? new URL(process.env.PUBLIC_URL)
 	: null;
 
+/// Origin of the runner frame, resolved as the server does at runtime.
+const environment = /^(prod|production)$/.test(process.env.ENVIRONMENT ?? "")
+	? "prod"
+	: "dev";
+const runnerOrigin = publicUrl
+	? resolveRunnerOrigin(
+			process.env.RUNNER_ORIGIN,
+			publicUrl.origin,
+			environment,
+		)
+	: null;
+
+/// Hosts the server trusts `Host`/`X-Forwarded-Host` for: the app and the runner.
+const allowedDomains = [publicUrl, runnerOrigin ? new URL(runnerOrigin) : null]
+	.filter((url) => url !== null)
+	.map((url) => ({
+		protocol: url.protocol.slice(0, -1),
+		hostname: url.hostname,
+	}));
+
 // https://astro.build/config
 export default defineConfig({
 	output: "server",
@@ -34,15 +55,11 @@ export default defineConfig({
 		checkOrigin: false,
 		// A report carries up to 3 images of 2 MiB each, plus room for the multipart framing.
 		actionBodySizeLimit: 8 * 1024 * 1024,
-		allowedDomains: publicUrl
-			? [
-					{
-						protocol: publicUrl.protocol.slice(0, -1),
-						hostname: publicUrl.hostname,
-					},
-				]
-			: [],
+		allowedDomains,
 	},
+	// A development instance answers on `localhost` and, for the runner origin,
+	// on `127.0.0.1`: one address serves both names.
+	server: environment === "dev" ? { host: "127.0.0.1" } : {},
 	adapter: node({ mode: "standalone" }),
 	integrations: [solidJs(), dynamicRouterHook()],
 	vite: {

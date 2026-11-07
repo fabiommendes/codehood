@@ -18,6 +18,10 @@ export const TEST_PORT: number = Number(
 
 export const TEST_BASE_URL = `http://localhost:${TEST_PORT}`;
 
+/// The runner frame's origin: same process and port, but `127.0.0.1` is a
+/// different site from `localhost`, so the session cookie never reaches it.
+export const TEST_RUNNER_ORIGIN = `http://127.0.0.1:${TEST_PORT}`;
+
 /// One directory per port, wiped by `test/run.ts` before and after each run.
 const TEST_TMP_DIR = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),

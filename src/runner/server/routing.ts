@@ -28,10 +28,14 @@ export type RequestSide = "app" | "runner" | "not-found";
  * the reverse proxy must restrict the runner host to `/runner/`.
  */
 export function requestSide(
-	_url: URL,
-	_runnerOrigin: string | null,
+	url: URL,
+	runnerOrigin: string | null,
 ): RequestSide {
-	throw new Error("not implemented");
+	const isRunnerPath = url.pathname.startsWith("/runner/");
+	if (runnerOrigin !== null && url.origin === runnerOrigin) {
+		return isRunnerPath ? "runner" : "not-found";
+	}
+	return isRunnerPath ? "not-found" : "app";
 }
 
 /**

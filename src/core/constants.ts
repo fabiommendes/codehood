@@ -3,6 +3,7 @@
  */
 
 import type { Role } from "@/db/client";
+import { resolveRunnerOrigin } from "@/runner/server/config";
 import type { ArrayToUnion } from "@/typing";
 import { parseByteSize } from "@/utils/format-bytes";
 
@@ -112,10 +113,18 @@ export const PUBLIC_URL = new URL(
 	readEnv("PUBLIC_URL", "http://localhost:4321"),
 ).origin;
 
+/// Origin the runner frame is served from, or null when code execution is off.
+export const RUNNER_ORIGIN: string | null = resolveRunnerOrigin(
+	process.env.RUNNER_ORIGIN,
+	PUBLIC_URL,
+	ENVIRONMENT,
+);
+
 // =============================================================================
 //  						    SESSION
 // =============================================================================
-export const SESSION_COOKIE = "session";
+/// `__Host-` requires `Secure`, which only exists in production (HTTP in dev and tests).
+export const SESSION_COOKIE = PRODUCTION ? "__Host-session" : "session";
 
 /// The attributes every session cookie is written with, wherever it is set.
 ///

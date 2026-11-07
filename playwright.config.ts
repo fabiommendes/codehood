@@ -5,6 +5,7 @@ import {
 	TEST_DIST_DIR,
 	TEST_PORT,
 	TEST_RESOURCE_ROOT,
+	TEST_RUNNER_ORIGIN,
 } from "./test/env";
 
 export default defineConfig({
@@ -38,7 +39,9 @@ export default defineConfig({
 			ENVIRONMENT: "dev",
 			// Clone URLs are built from it, so a test can `git clone` what the API returns.
 			PUBLIC_URL: TEST_BASE_URL,
-			HOST: "localhost",
+			// One address answers as `localhost` (app) and `127.0.0.1` (runner).
+			HOST: "127.0.0.1",
+			RUNNER_ORIGIN: TEST_RUNNER_ORIGIN,
 			PORT: String(TEST_PORT),
 		},
 	},
