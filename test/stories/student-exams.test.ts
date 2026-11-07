@@ -800,3 +800,98 @@ test("student: Answer an exam with the extra time I was granted", async ({
 		);
 	});
 });
+
+test("student: run my code answer before submitting", async ({ page }) => {
+	const student = await seedUser({ role: "STUDENT", username: "coder" });
+	const course = await persistedCourseFactory.create();
+	await db.enrollment.create(
+		{ course: course.id, username: student.username },
+		FULL_ACCESS,
+	);
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	await db.question.create(
+		{
+			status: "PUBLISHED",
+			version: "1",
+			course: course.id,
+			slug: "sum-two",
+			question: {
+				type: "essay",
+				content: "code",
+				highlight: "javascript",
+				stem: "Print the sum of 1 and 2.",
+				tags: [],
+			},
+		},
+		FULL_ACCESS,
+	);
+	const questions = [{ slug: "sum-two" }];
+	const practice = await persistedExamFactory.create({
+		course: course.id,
+		slug: "practice-code",
+		type: "PRACTICE",
+		status: "ONGOING",
+		questions,
+	});
+	const quiz = await persistedExamFactory.create({
+		course: course.id,
+		slug: "quiz-code",
+		type: "QUIZ",
+		status: "ONGOING",
+		questions,
+	});
+	const savedCode = async (exam: string) => {
+		const [attempt] = await db.response.findMany(
+			{ course: course.id, exam, author: student.username },
+			FULL_ACCESS,
+		);
+		return attempt?.submissions.at(-1)?.payload ?? null;
+	};
+	const editor = page.locator("[data-code-runner] .cm-content");
+
+	await logInAs(page, student);
+
+	await test.step("a practice exam gives an editor and Run, and the output shows under the code", async () => {
+		await page.goto(`${href}/exams/${practice.slug}`);
+		await page.getByRole("button", { name: /^Start/ }).click();
+
+		await expect(editor).toBeVisible();
+		await editor.fill("console.log(1 + 2)");
+		await page.getByRole("button", { name: "Run" }).click();
+
+		await expect(
+			page.locator("[data-code-runner] .xterm-accessibility-tree"),
+		).toContainText("3");
+	});
+
+	await test.step("only the code is saved, with the time of the save under the editor", async () => {
+		await expect
+			.poll(() => savedCode(practice.slug))
+			.toBe("console.log(1 + 2)");
+		await expect(page.locator("[data-code-footer]")).toContainText(
+			/Saved at \d\d:\d\d/,
+		);
+	});
+
+	await test.step("reopening the page brings the saved code back", async () => {
+		await page.reload();
+
+		await expect(editor).toContainText("console.log(1 + 2)");
+	});
+
+	await test.step("a quiz does not run code by default, and the answer is still written and saved", async () => {
+		await page.goto(`${href}/exams/${quiz.slug}`);
+		await page.getByRole("button", { name: /^Start/ }).click();
+
+		await expect(
+			page.getByText("The professor disabled code execution in this exam."),
+		).toBeVisible();
+		await expect(page.getByRole("button", { name: "Run" })).toBeDisabled();
+		await editor.fill("console.log(3)");
+		await expect.poll(() => savedCode(quiz.slug)).toBe("console.log(3)");
+	});
+});

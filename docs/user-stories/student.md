@@ -229,6 +229,23 @@ they press "Submit exam", and a confirmation warns that the answers cannot be
 changed afterwards. Once the exam closes it stops accepting submissions.
 
 
+### Run my code answer before submitting
+
+    status: implemented
+    url: /<discipline>/<course>/exams/<exam>
+
+Student answers a code question in an editor and presses Run to see what the
+program prints, as many times as they like, before submitting. Running never
+turns the code into an answer: only the text in the editor is saved, as they
+type, with the time of the last save under it. Practice exams run code by
+default; quizzes and exams do not, unless the instructor turned it on, and then
+the student sees that the instructor disabled code execution and still writes
+and submits the answer. When the browser could not reach the server, the footer
+says since when, and the code stays in a draft in that browser. If they reopen
+the exam and the draft differs from what the server has, they see both versions
+side by side and pick the one to continue from.
+
+
 ### Answer an exam with the extra time I was granted
 
     status: implemented
