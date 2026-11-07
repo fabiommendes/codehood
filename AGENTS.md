@@ -175,6 +175,11 @@ rtk pnpm exec tsx test/run.ts test/foo.spec.ts  # one file
 rtk pnpm test -- --reporter=line                # name each test as it runs
 ```
 
+`TEST_BROWSERS=cross` adds Firefox and WebKit projects that run only the
+`runner-*` specs; the default suite stays on Chromium. Install them with
+`pnpm exec playwright install firefox webkit`, then pass `--project=firefox`
+or `--project=webkit` to the test script.
+
 `--rtk` runs Playwright through `rtk playwright` instead. Reach for it only on a
 suite expected to pass: it reduces a green run to a single `PASS (n) FAIL (0)`
 line, but its parser gives up on a red one and passes through 2000 characters of

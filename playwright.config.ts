@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import {
 	TEST_BASE_URL,
 	TEST_DATABASE_URL,
@@ -8,8 +8,38 @@ import {
 	TEST_RUNNER_ORIGIN,
 } from "./test/env";
 
+/// `TEST_BROWSERS=cross` adds Firefox and WebKit projects, limited to the
+/// `runner-*` specs. Without it only Chromium runs.
+/// Specs that exercise a browser. The pure ones run no page, so one browser is enough.
+const CROSS_BROWSER_SPECS = /runner-.*\.spec\.ts/;
+const PURE_SPECS = /runner-(terminal|ide-state|languages)\.spec\.ts/;
+const crossBrowser = process.env.TEST_BROWSERS === "cross";
+
 export default defineConfig({
 	testDir: "./test",
+	// Real-runtime specs are slow; `test/run.ts test/runtimes` runs them.
+	testIgnore: process.argv.some((arg) => arg.includes("test/runtimes"))
+		? []
+		: ["**/runtimes/**"],
+	projects: [
+		{ name: "chromium", use: { ...devices["Desktop Chrome"] } },
+		...(crossBrowser
+			? [
+					{
+						name: "firefox",
+						testMatch: CROSS_BROWSER_SPECS,
+						testIgnore: PURE_SPECS,
+						use: { ...devices["Desktop Firefox"] },
+					},
+					{
+						name: "webkit",
+						testMatch: CROSS_BROWSER_SPECS,
+						testIgnore: PURE_SPECS,
+						use: { ...devices["Desktop Safari"] },
+					},
+				]
+			: []),
+	],
 	fullyParallel: false,
 	workers: 1,
 	// Refuses to run against the wrong database — see the file for why that is

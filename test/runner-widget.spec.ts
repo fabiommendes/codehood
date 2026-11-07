@@ -330,7 +330,11 @@ test.describe("links", () => {
 test("OSC 52 in the output does not touch the clipboard", async ({
 	page,
 	context,
-}) => {
+}, testInfo) => {
+	test.skip(
+		testInfo.project.name !== "chromium",
+		"Playwright grants clipboard permissions on Chromium only",
+	);
 	await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 	await open(page);
 	await page.evaluate(() => navigator.clipboard.writeText("sentinel"));
@@ -351,7 +355,11 @@ test.describe("touch screens", () => {
 		isMobile: true,
 	});
 
-	test("input goes through the fixed field", async ({ page }) => {
+	test("input goes through the fixed field", async ({ page, browserName }) => {
+		test.skip(
+			browserName === "firefox",
+			"Playwright cannot emulate a mobile viewport on Firefox",
+		);
 		await open(page);
 		const w = widget(page, 0);
 		await w.locator("[data-action=run]").tap();

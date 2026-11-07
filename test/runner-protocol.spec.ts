@@ -30,7 +30,11 @@ test.describe("ready", () => {
 	for (const [kind, query] of TRANSPORTS) {
 		test(`announces protocol 1, the ${kind} transport and both drivers`, async ({
 			page,
-		}) => {
+		}, testInfo) => {
+			test.skip(
+				kind === "sab" && testInfo.project.name !== "chromium",
+				"cross-origin isolation through Document-Isolation-Policy is Chromium only",
+			);
 			const h = await loadFrame(page, query);
 			expect(h.ready).toEqual({
 				type: "ready",
@@ -505,6 +509,10 @@ async function stopServiceWorker(page: Page): Promise<void> {
 }
 
 test.describe("service worker restarted during a run (sw transport)", () => {
+	test.skip(
+		({ browserName }) => browserName !== "chromium",
+		"stopping the service worker needs the Chromium DevTools protocol",
+	);
 	test.setTimeout(60_000);
 
 	const SLEEP_THEN_PROMPT = `await new Promise((r) => setTimeout(r, 2500));
@@ -676,6 +684,10 @@ test.describe("stdin channel table: resync", () => {
 });
 
 test.describe("service worker restarted while the frame is busy (sw transport)", () => {
+	test.skip(
+		({ browserName }) => browserName !== "chromium",
+		"stopping the service worker needs the Chromium DevTools protocol",
+	);
 	test.setTimeout(60_000);
 
 	test("the Worker retries after a resync that expired", async ({ page }) => {
