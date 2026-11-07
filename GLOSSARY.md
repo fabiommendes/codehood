@@ -428,15 +428,6 @@ or [Student](#student) — fixed when the account is created, by its
 [Invite](#invite) or by the admin who created it. Per-course authority is
 decided by ownership and [Enrollment](#enrollment).
 
-## Runner
-
-Type: platform
-
-The `chalk codehood autograde` command, run on the instructor's machine. It
-grades each answer to a question with a [Grader](#grader) in chalk's sandbox
-and writes the score through the [REST API](#rest-api) as a
-[Grading bot](#grading-bot).
-
 ## Roll call
 
 Type: domain
@@ -453,6 +444,31 @@ The [JSON-RPC 2.0](https://www.jsonrpc.org/specification) surface for verb-shape
 operations the [REST API](#rest-api) would have to invent a resource for. Methods
 are authenticated the same way as everything else and are thin wrappers over
 [Services](#service). Described by [OpenRPC](#openrpc).
+
+## Rubric
+
+Type: domain
+
+Grading criteria of one [Question](#question) in one [Exam](#exam), made of
+[Rubric items](#rubric-item). Copied from the question's initial rubric when
+grading starts; later pushes do not change it. A grade is the rubric's base
+plus the values of the applied items, clamped to [0, 1].
+
+## Rubric item
+
+Type: domain
+
+One criterion of a [Rubric](#rubric): text, signed value, a private comment
+and feedback for the student. Items under a group exclude each other.
+
+## Runner
+
+Type: platform
+
+The `chalk codehood autograde` command, run on the instructor's machine. It
+grades each answer to a question with a [Grader](#grader) in chalk's sandbox
+and writes the score through the [REST API](#rest-api) as a
+[Grading bot](#grading-bot).
 
 ## Service
 
