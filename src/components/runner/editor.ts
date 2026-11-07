@@ -152,6 +152,12 @@ export async function createEditor(
 	} else if (options.language === "lua") {
 		const { lua } = await import("@codemirror/legacy-modes/mode/lua");
 		languageSupport.push(language.StreamLanguage.define(lua));
+	} else if (options.language === "python") {
+		const { python } = await import("@codemirror/legacy-modes/mode/python");
+		languageSupport.push(language.StreamLanguage.define(python));
+	} else if (options.language === "prolog") {
+		const { prolog } = await import("./prolog-mode");
+		languageSupport.push(language.StreamLanguage.define(prolog));
 	}
 
 	const editor = new EditorView({

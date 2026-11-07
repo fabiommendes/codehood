@@ -5,7 +5,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { courseHref } from "@/urls";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
-// The editor of a CODE resource highlights Lua and TypeScript.
+// The editor of a CODE resource highlights every language with a driver.
 
 test.beforeEach(resetDatabase);
 
@@ -13,6 +13,8 @@ const SOURCES = {
 	lua: 'local greeting = "hi" -- comment\nprint(greeting, 42)\n',
 	typescript:
 		'const greeting: string = "hi"; // comment\nconsole.log(greeting, 42);\n',
+	python: 'def greeting(): return "hi"  # comment\nprint(greeting(), 42)\n',
+	prolog: "greeting(X) :- X = 'hi', !. % comment\n:- initialization(main).\n",
 } as const;
 
 for (const [language, content] of Object.entries(SOURCES)) {
