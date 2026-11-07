@@ -356,3 +356,11 @@ Votos da rodada 8: **P1 aprovado por unanimidade**, com condições:
   `dev/issues/runner-frame-apos-deploy.md`, para votação.
 - Issue `dev/issues/stories-falhando-em-main.md` (3 stories já falham na
   base 2bfdd24), para votação.
+
+Votos das issues: **as duas aprovadas por unanimidade.** Condições para
+`runner-frame-apos-deploy`: motivo legível por código
+(`exitReason: "stale-bundle"`), 404 confirmado com `fetch` da URL do
+Worker, reserva com a mesma falha também dispara a recarga, uma única
+repetição com `runId` novo, código e rascunho preservados, e os outros runs
+da página encerrados por causa da recarga avisam o aluno. Alternativa do
+breaker (servir versões anteriores do bundle) registrada como plano B.
