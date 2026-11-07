@@ -1,0 +1,23 @@
+---
+interface Props {
+	/// The signed-in user, if any.
+	username?: string;
+}
+
+const { username } = Astro.props;
+---
+
+<div hidden data-draft-user={username ?? ""}></div>
+
+<script>
+  import { browserDraftStore } from "@/components/exam/code-draft";
+
+  // Code drafts live in the browser, so they must not outlive the session
+  // they were written in: a page opened by another user removes the previous
+  // user's, and a page opened without a user removes all of them.
+  const drafts = browserDraftStore();
+  const username = document.querySelector<HTMLElement>("[data-draft-user]")
+    ?.dataset.draftUser;
+  if (username) drafts.clearOthers(username, Date.now());
+  else drafts.clearAll();
+</script>

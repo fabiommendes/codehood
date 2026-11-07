@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import DraftSession from "@/components/exam/DraftSession.astro";
 import { locale } from "@/i18n";
 
 interface Props {
@@ -51,6 +52,7 @@ const { title = "Codehood" } = Astro.props;
 	</head>
 	<body>
 		<slot />
+		<DraftSession username={Astro.locals.actor?.username} />
 	</body>
 </html>
 

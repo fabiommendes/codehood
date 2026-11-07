@@ -50,6 +50,49 @@ test("logging out everywhere from the profile removes the drafts", async ({
 	expect(keys.filter((k) => k.startsWith("codehood:code-draft:"))).toEqual([]);
 });
 
+const draftKeys = (page: import("@playwright/test").Page) =>
+	page.evaluate(() =>
+		Object.keys(localStorage).filter((k) =>
+			k.startsWith("codehood:code-draft:"),
+		),
+	);
+
+test("a page opened without a user removes every draft", async ({ page }) => {
+	await page.goto("/login");
+	await page.evaluate(
+		([k, v]) => localStorage.setItem(k as string, v as string),
+		[key("ada"), value],
+	);
+	await page.goto("/login");
+	await expect.poll(() => draftKeys(page)).toEqual([]);
+
+	await page.evaluate(
+		([k, v]) => localStorage.setItem(k as string, v as string),
+		[key("ada"), value],
+	);
+	await page.goto("/this-page-does-not-exist");
+	await expect.poll(() => draftKeys(page)).toEqual([]);
+});
+
+test("a centered page opened by another user removes the previous user's drafts", async ({
+	page,
+}) => {
+	const student = await seedUser({ role: "STUDENT" });
+	await logInAs(page, student);
+	await page.goto("/courses");
+	await page.evaluate(
+		([a, b, v]) => {
+			localStorage.setItem(a as string, v as string);
+			localStorage.setItem(b as string, v as string);
+		},
+		[key(student.username), key("someone-else"), value],
+	);
+	await page.goto("/check-in");
+	await expect
+		.poll(() => draftKeys(page))
+		.toEqual([key(student.username)]);
+});
+
 test("a page raises no script error when the browser blocks localStorage", async ({
 	page,
 }) => {
