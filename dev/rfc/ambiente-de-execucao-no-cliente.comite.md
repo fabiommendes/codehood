@@ -364,3 +364,48 @@ Worker, reserva com a mesma falha também dispara a recarga, uma única
 repetição com `runId` novo, código e rascunho preservados, e os outros runs
 da página encerrados por causa da recarga avisam o aluno. Alternativa do
 breaker (servir versões anteriores do bundle) registrada como plano B.
+
+### Rodada 9: contratos da E2
+
+Seções "Contratos da E2" e "Tarefas da E2" no RFC; stubs em
+`src/runner/languages.ts` e `src/components/runner/`.
+
+- **E2-D1.** 10 dependências novas: CodeMirror 6 (5 pacotes),
+  `@replit/codemirror-vscode-keymap`, `@xterm/xterm` + 2 addons,
+  `xterm-readline`.
+- **E2-D2.** Tema do editor: (a) tema do VS Code, como combinado com o
+  humano; (b) temas do Codehood (cerrado/forest, os mesmos do Shiki), sem
+  troca de cor entre visualização e edição, claro/escuro de graça
+  (recomendação do architect). Presidente: (a). O tema do VS Code foi
+  decisão tomada com o humano; o comitê não a reverte. Se (b) vencer, vira
+  proposta ao humano no relatório final, e a E2 sai com (a).
+- **E2-D3.** Bloco executável em notas `MD`: ` ```js run `.
+- **E2-J1.** Resource com linguagem sem driver, ou instância sem
+  `RUNNER_ORIGIN`, continua estático, sem widget.
+
+Votos da rodada 9: **E2-D1, E2-D3, E2-J1 unânimes. E2-D2: (a) com 4 votos;
+usuario votou (b) mas aceitou (a) por ser decisão do humano**, sem pedir
+nova rodada. A E2 sai com o tema do VS Code; (b) vai como proposta ao humano
+no relatório final. Condições:
+
+- Visualização Shiki antes de o editor montar usa `light-plus`/`dark-plus`
+  (architect).
+- Supply chain (security): trocar `xterm-readline` por editor de linha
+  próprio e mínimo; versões exatas; `minimumReleaseAge` de 7 dias em
+  `pnpm-workspace.yaml`.
+- CodeMirror e xterm por `import()` no primeiro foco, nunca estático
+  (breaker).
+- Atalho Ctrl+Enter com `Prec.highest` (breaker B7).
+- "Tentar de novo" vale só para o widget, nunca `reload()` do host
+  compartilhado (breaker B8).
+- `confirm` de link mostra a URL real (security B1); saída só por
+  `RunnerTerminal.write`, eco do campo de celular por `textContent`
+  (security B2); `data-language` só de `runnerLanguage()`.
+- Bloco marcado `run` com linguagem sem driver mostra aviso discreto
+  "execução não disponível para esta linguagem" (usuario); demais blocos
+  continuam estáticos.
+
+Revisão do f1c3872 (breaker): resync não atinge outro canal. Furos minor
+B5 (resync disparado antes da checagem de token; amplificação para todas as
+janelas) e B6 (prazo de 1 s do resync curto no celular; Worker deve tentar
+de novo após o resync) vão para correção após a issue de bundle.
