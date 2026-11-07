@@ -801,8 +801,12 @@ Bloqueada para sair (não para implementar) pela issue
   null (volta ao padrão do tipo); ausente não mexe no valor.
 - `src/db/services/exam.service.ts`: `fromDb` e as escritas de create,
   update e upsert levam o campo. O `returns: examSchema` já o deixa sair.
-- `src/services/code-run.ts`: `canRunCode({ type, allowCodeRun })`, regra na
-  docstring. É a única leitura da flag; nenhuma página compara `type`.
+- `src/services/code-run.ts`: `effectiveCodeRun({ type, allowCodeRun })`
+  devolve `{ allowed, source }` e `canRunCode` é o seu `allowed`. É a única
+  leitura da flag; nenhuma página compara `type`.
+- A página do exam mostra o valor efetivo e de onde vem, para professor e
+  aluno: "Execução de código: ligada (padrão de PRACTICE)" ou "desligada
+  (definida no exam)", conforme `source`.
 - REST: `examApi` em `src/api/index.ts` deriva do schema; o snapshot do
   OpenAPI muda.
 
@@ -816,8 +820,10 @@ O CLI ainda não envia exams: `cli/dev/specs/to-do/push-exams.md` está em
   `ExamCreate`/`Exam`;
 - acrescentar ao spec `push-exams.md` o mapeamento do campo. O schema de exam
   do mdq tem `additionalProperties: false`, mas aceita `meta` livre; a
-  proposta é `meta: { codeRun: true | false }` no frontmatter, que vira
-  `allowCodeRun` (ausente: o campo não é enviado). Ver ponto para votação.
+  mapeamento aprovado (rodada 10) é `meta: { codeRun: true | false }` no
+  frontmatter, que vira `allowCodeRun`. Sem `meta.codeRun`, o CLI envia
+  `allowCodeRun: null` (ADR 0012: o repositório é dono do campo; apagar a
+  chave do frontmatter volta ao padrão do tipo).
 
 Até o push de exams existir, a flag só é definida pela API e pelo seed; o
 padrão por tipo (`null`) cobre o caso comum.
@@ -832,14 +838,22 @@ padrão por tipo (`null`) cobre o caso comum.
   `CodeEssayAnswer`; o resto segue no `Essay` do mdq. Questões de código em
   linguagem sem driver (Prolog até a E3b) continuam no `<textarea>`.
 - `CodeEssayAnswer` reproduz o que o `Essay` mostra em volta do campo
-  (`.mdq-stem` com o `Markdown` exportado pelo mdq-js, `.mdq-epilogue`), com
-  as mesmas classes, e põe `CodeRunner` (`mode="answer"`, `compact`) no
-  lugar do `<textarea>`. Modos `readonly` e `review` do aluno não mudam.
+  (`.mdq-stem` e `.mdq-epilogue`, pelo mesmo `Markdown` exportado pelo
+  mdq-js, sem nenhum outro caminho que gere HTML), com as mesmas classes, e
+  põe `CodeRunner` (`mode="answer"`, `compact`) no lugar do `<textarea>`. Modos `readonly` e `review` do aluno não mudam.
 - Página `src/pages/[discipline]/[course]/exams/[slug].astro`: a island
   `ExamAttempt` ganha as props `codeRun: boolean` (`canRunCode(exam)`),
   `runnerOrigin: string | null` (`RUNNER_ORIGIN`), `username` (chave do
   rascunho) e `answeredAt: Record<slug, string>` (ISO, hora em que o servidor
-  gravou cada resposta, para o painel de conflito).
+  gravou cada resposta, para o painel de conflito). A diferença entre o
+  relógio do servidor (`now`, que a island já recebe) e o do navegador vira
+  `clockOffsetMs`; toda hora de rascunho é gravada e comparada no relógio do
+  servidor.
+- Conflito e envio: `CodeEssayAnswer.onConflict` informa ao `ExamAttempt` as
+  questões com conflito não resolvido. O diálogo de envio as lista, como já
+  lista as não respondidas. No envio automático por tempo esgotado,
+  `ExamAttempt` fica com a versão mais recente (`newer`): se for o rascunho,
+  grava-o antes do `flush`.
 - `ExamAttempt` passa a guardar, por questão, `savedAt` (hora da última
   gravação confirmada) e `failingSince` (primeira falha da sequência atual),
   além do que já guarda; monta `CodeAnswerSaveState` a partir disso. O
@@ -853,8 +867,14 @@ padrão por tipo (`null`) cobre o caso comum.
 
 - `code-draft.ts`: chave
   `codehood:code-draft:<username>:<curso>:<exam>:<questão>`, valor
-  `{ code, savedAt }`. Escrito a cada edição. Removido quando o servidor
-  confirma uma gravação igual ao rascunho.
+  `{ code, savedAt }` (`savedAt` no relógio do servidor). Escrito a cada
+  edição. Removido quando o servidor confirma uma gravação igual ao
+  rascunho.
+- Limpeza: todos os rascunhos do exam do usuário (`clearExam`) quando ele
+  envia ou o exam encerra; em toda página autenticada, `clearOthers(username)`
+  apaga rascunhos de outros usuários e os vencidos (`DRAFT_TTL_MS`, 14 dias),
+  por um `<script>` em `AppLayout`; leitura de rascunho vencido devolve
+  null.
 - Ao abrir a questão: `compareDraft(rascunho, resposta do servidor)`.
   `conflict` mostra as duas versões lado a lado, texto puro, com a hora de
   cada uma ("Este navegador / editado às…", "Servidor / salvo às…"); Rodar e
@@ -917,7 +937,8 @@ rascunho depende do `localStorage` e não tem seed: os testes o montam.
   OpenAPI.
 - Testes: `test/code-run.spec.ts` (Node), e casos novos em
   `test/api-exam.spec.ts`.
-- Testes esperados: `canRunCode` nas 9 combinações de tipo × flag; criar
+- Testes esperados: `effectiveCodeRun` e `canRunCode` nas 9 combinações de
+  tipo × flag, com `source`; criar
   sem o campo dá `null`; criar e atualizar com `true`/`false`; atualizar com
   `null` volta a `null`; atualizar sem o campo não muda o valor; o campo
   aparece no GET e no OpenAPI.
@@ -927,7 +948,8 @@ rascunho depende do `localStorage` e não tem seed: os testes o montam.
 
 - Implementação: `resources/openapi/codehood.json`,
   `codehood/api/generated.py` regerado, `dev/specs/to-do/push-exams.md`
-  (mapeamento `meta.codeRun` → `allowCodeRun`).
+  (mapeamento `meta.codeRun` → `allowCodeRun`; sem a chave, envia
+  `allowCodeRun: null`).
 - Testes: os existentes de `tests/test_api_generated.py` passam; um caso
   novo afirma `allow_code_run` em `ExamCreate`. `ruff`, `mypy`, `pytest`
   limpos.
@@ -939,10 +961,14 @@ rascunho depende do `localStorage` e não tem seed: os testes o montam.
 - Testes: `test/code-draft.spec.ts` (Node, `Storage` falso) e um caso de
   navegador em `test/code-draft-logout.spec.ts`.
 - Testes esperados: `draftKey` codifica as partes (usuário com `:`);
-  `compareDraft` nos três casos, inclusive servidor vazio e rascunho vazio;
+  `compareDraft` nos três casos, inclusive servidor vazio e rascunho vazio,
+  e `newer` pelos dois relógios; rascunho vencido some na leitura e em
+  `clearOthers`; `clearOthers` mantém os do usuário atual; `clearExam` só
+  apaga o exam pedido;
   `draftStore` engole `QuotaExceededError` e storage que lança no acesso;
   `clearAll` apaga só as chaves do prefixo (o tema continua); logout pelo
-  menu e "sair de todos os lugares" apagam os rascunhos.
+  menu e "sair de todos os lugares" apagam os rascunhos; abrir uma página
+  logado como outro usuário apaga os rascunhos do primeiro.
 
 **E3a.4 `CodeEssayAnswer` na prova.**
 
@@ -958,7 +984,12 @@ rascunho depende do `localStorage` e não tem seed: os testes o montam.
   de abrir mostra o conflito, Rodar desligado, e cada escolha leva ao
   resultado certo no servidor; Rodar não chama a action de resposta; a
   resposta enviada é o código do editor; questão de código Prolog continua
-  `<textarea>`.
+  `<textarea>`; o DOM de enunciado e epílogo de `CodeEssayAnswer` é igual ao
+  do `Essay` do mdq-js para a mesma questão (Markdown com link, código e
+  HTML escapado); o diálogo de envio lista a questão em conflito; envio
+  automático no fim do tempo com rascunho mais novo grava o rascunho; enviar
+  apaga os rascunhos do exam; a página mostra "ligada (padrão de PRACTICE)"
+  e "desligada (definida no exam)".
 
 **E3a.5 Seed e story.**
 
@@ -1069,19 +1100,28 @@ content type certo; arquivo não listado, outra versão e `..` dão 404;
 versões de `RUNTIMES` iguais às do `package.json` instalado;
 `swipl-web.js` servido termina com `export default SWIPL`.
 
+Testes de runtime real: na suíte padrão, dois por runtime
+(`test/runner-smoke.spec.ts`): carregar e ler uma linha de entrada; erro com
+número de linha. Os demais casos de E3b.2 e E3b.3 ficam em
+`test/runtimes/*.spec.ts`, fora da suíte padrão, rodados por
+`pnpm exec tsx test/run.ts test/runtimes` antes de cada commit dessas
+tarefas.
+
 **E3b.2 Driver Prolog.** `protocol.ts` (`prolog`), `drivers/index.ts`,
 `drivers/prolog.ts`, `languages.ts` (aliases, `defaultRunMode`), aviso no
-`CodeRunner`. Testes em `test/runner-prolog.spec.ts`, pelo harness da E1.3:
+`CodeRunner`. Testes em `test/runtimes/prolog.spec.ts`, pelo harness da E1.3:
 consult + consulta `factorial(5, F).` dá `F = 120`; erro de sintaxe na linha
 3 aparece como `main.pl:3`; `read/1` lê do terminal; `halt.` e EOF encerram;
-Parar no meio de recursão infinita; o essay `prolog-factorial-with-is` do
-seed passa a abrir no editor.
+Parar no meio de recursão infinita; `FS.mount(IDBFS, ...)` a partir do
+programa falha; o essay `prolog-factorial-with-is` do seed passa a abrir no
+editor.
 
 **E3b.3 Driver Python.** `protocol.ts` (`python`), `drivers/index.ts`,
-`drivers/python.ts`, `languages.ts`. Testes em `test/runner-python.spec.ts`:
+`drivers/python.ts`, `languages.ts`. Testes em `test/runtimes/python.spec.ts`:
 `print`/`input()`; traceback com `main.py` e código 1; `sys.exit(3)`;
 `import numpy` falha sem requisição de rede fora de `/runner/rt/`; modo
-`repl` com EOF; com `prepare`, o run vai direto a `running`.
+`repl` com EOF; com `prepare`, o run vai direto a `running`; montar IDBFS
+pelo `pyodide.FS` a partir do programa falha.
 
 **E3b.4 Seed e stories.** Os `CODE` Python do seed passam a rodar; um
 `CODE` Prolog novo em cs101; a story "Run a code example" ganha um passo em

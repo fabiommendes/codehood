@@ -26,8 +26,11 @@ export interface CodeEssayAnswerProps {
 	language: LanguageId;
 	/// The server's saved answer; `""` when there is none.
 	value: string;
-	/// When the server saved `value`; null when there is no answer.
+	/// When the server saved `value`, on the server's clock; null when there is no answer.
 	valueSavedAt: Date | null;
+	/// `serverNow - clientNow` in milliseconds, measured when the page loaded;
+	/// added to client times so drafts compare on the server's clock.
+	clockOffsetMs: number;
 	/// Called with the full code after each edit; `ExamAttempt` debounces and saves.
 	onChange: (code: string) => void;
 	save: CodeAnswerSaveState;
@@ -35,6 +38,14 @@ export interface CodeEssayAnswerProps {
 	codeRun: boolean;
 	runnerOrigin: string | null;
 	draft: DraftRef;
+	/// Called when an unresolved draft conflict appears (with the comparison)
+	/// and when the student resolves it (with null). `ExamAttempt` lists the
+	/// questions in conflict in the submit dialog and, on the automatic
+	/// submission at the deadline, keeps the `newer` version: when it is the
+	/// draft, it saves `draftCode` before submitting.
+	onConflict: (
+		conflict: { newer: "draft" | "server"; draftCode: string } | null,
+	) => void;
 	/// Code the editor starts with when there is no answer and no draft.
 	/// Reserved for starter code from the question; nothing sets it yet.
 	starterCode?: string;
@@ -42,6 +53,10 @@ export interface CodeEssayAnswerProps {
 
 /**
  * Renders the stem, the code editor and the epilogue.
+ *
+ * Stem and epilogue go through the `Markdown` component of mdq-js, inside
+ * `.mdq-stem` and `.mdq-epilogue`, exactly as mdq's `Essay` renders them: no
+ * other path turns question text into HTML.
  *
  * On mount it reads the local draft and compares it with `value`
  * (`compareDraft`). `same` drops the draft; `conflict` shows both versions
