@@ -57,11 +57,52 @@ export type IdeEvent =
  * `unconfigured` without a runner origin, `disabled` when the exam turned
  * running off, `idle` otherwise.
  */
-export function initialIdeState(_options: {
+export function initialIdeState(options: {
 	runnerOrigin: string | null;
 	runDisabled: boolean;
 }): IdeState {
-	throw new Error("not implemented");
+	const phase: IdePhase =
+		options.runnerOrigin === null
+			? "unconfigured"
+			: options.runDisabled
+				? "disabled"
+				: "idle";
+	return { phase, progress: null, lastExit: null };
+}
+
+/// Phases from which Run starts a new run.
+const RUNNABLE: ReadonlySet<IdePhase> = new Set([
+	"idle",
+	"done",
+	"error",
+	"stopped",
+	"truncated",
+	"load-failed",
+]);
+
+/// Phases of a run in progress.
+const BUSY: ReadonlySet<IdePhase> = new Set([
+	"preparing",
+	"running",
+	"waiting-input",
+]);
+
+/// The phase an exit leads to.
+function exitPhase(exit: RunExit): IdePhase {
+	switch (exit.reason) {
+		case "exited":
+			return exit.code === 0 ? "done" : "error";
+		case "crashed":
+			return "error";
+		case "stopped":
+		case "reloaded":
+			return "stopped";
+		case "output-limit":
+			return "truncated";
+		case "load-failed":
+		case "stale-bundle":
+			return "load-failed";
+	}
 }
 
 /**
@@ -75,16 +116,49 @@ export function initialIdeState(_options: {
  * (a `status` after `exit`, `run-requested` while running, anything while
  * `disabled`, `unsupported` or `unconfigured`) leave the state unchanged.
  */
-export function reduceIde(_state: IdeState, _event: IdeEvent): IdeState {
-	throw new Error("not implemented");
+export function reduceIde(state: IdeState, event: IdeEvent): IdeState {
+	const { phase } = state;
+	switch (event.type) {
+		case "run-requested":
+			return RUNNABLE.has(phase)
+				? { ...state, phase: "preparing", progress: null }
+				: state;
+		case "status":
+			// `loading` only makes sense before the program starts, where it
+			// changes nothing: the phase is already `preparing`.
+			if (!BUSY.has(phase) || event.state === "loading") return state;
+			return { ...state, phase: event.state, progress: null };
+		case "progress":
+			return phase === "preparing"
+				? {
+						...state,
+						progress: { loaded: event.loaded, total: event.total },
+					}
+				: state;
+		case "exit":
+			return BUSY.has(phase)
+				? {
+						phase: exitPhase(event.exit),
+						progress: null,
+						lastExit: { ...event.exit, elapsedMs: event.elapsedMs },
+					}
+				: state;
+		case "unavailable":
+			if (phase !== "idle" && phase !== "preparing") return state;
+			return {
+				...state,
+				phase: event.reason === "timeout" ? "load-failed" : "unsupported",
+				progress: null,
+			};
+	}
 }
 
 /** Whether the Run button is enabled. */
-export function canRun(_state: IdeState): boolean {
-	throw new Error("not implemented");
+export function canRun(state: IdeState): boolean {
+	return RUNNABLE.has(state.phase);
 }
 
 /** Whether a run is in progress, so the Stop button shows in place of Run. */
-export function isBusy(_state: IdeState): boolean {
-	throw new Error("not implemented");
+export function isBusy(state: IdeState): boolean {
+	return BUSY.has(state.phase);
 }

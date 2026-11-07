@@ -7,6 +7,20 @@
 
 import type { LanguageId } from "./protocol";
 
+/// Tags that map to a driver. `fake` is deliberately absent.
+const ALIASES: Record<string, LanguageId | undefined> = {
+	javascript: "javascript",
+	js: "javascript",
+	mjs: "javascript",
+	node: "javascript",
+};
+
+/// File extension of each language's source files.
+const EXTENSIONS: Record<LanguageId, string> = {
+	javascript: "js",
+	fake: "fake",
+};
+
 /**
  * The runner language for a tag, or null when no driver runs it.
  *
@@ -20,12 +34,15 @@ import type { LanguageId } from "./protocol";
  * runnerLanguage("haskell"); // null
  */
 export function runnerLanguage(
-	_tag: string | null | undefined,
+	tag: string | null | undefined,
 ): LanguageId | null {
-	throw new Error("not implemented");
+	if (!tag) return null;
+	return Object.hasOwn(ALIASES, tag.trim().toLowerCase())
+		? (ALIASES[tag.trim().toLowerCase()] ?? null)
+		: null;
 }
 
 /** Default file name for a program in `language` (`main.js`). */
-export function defaultFilename(_language: LanguageId): string {
-	throw new Error("not implemented");
+export function defaultFilename(language: LanguageId): string {
+	return `main.${EXTENSIONS[language]}`;
 }
