@@ -475,3 +475,8 @@ bibliotecas de sistema (`sudo playwright install-deps`), ação só do humano.
 - **W1.** Implementar a E3a agora, com Chromium e Firefox validados, e
   manter a issue aberta: a E3a não é considerada pronta para uso em prova
   até o WebKit (Safari/iPhone) ser validado pelo humano. Presidente: sim.
+
+Votos da rodada 12: **W1 unânime.** Trava concreta (breaker): a branch não
+entra em `main` enquanto a issue `runner-firefox-safari` estiver aberta;
+recomendação ao humano no relatório final. A validação do WebKit pelo
+humano roda também os testes de isolamento da E1.5 (security).
