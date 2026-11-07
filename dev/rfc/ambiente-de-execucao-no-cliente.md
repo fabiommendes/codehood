@@ -556,6 +556,233 @@ novo. Valores em ms.
   swipl-wasm e na recarga, cujo tempo varia muito nesse modo. Com o período
   padrão de 100 ms: Pyodide 8789/9392, swipl-wasm 1702/2301, recarga 494/498.
 
+## Contratos da E2
+
+Escrito pelo `architect`. Stubs em `src/components/runner/` e
+`src/runner/languages.ts`; as docstrings são a fonte de verdade.
+
+### Módulos
+
+```
+src/runner/languages.ts           runnerLanguage(tag), defaultFilename(lang)
+src/components/runner/
+  CodeRunner.tsx                  o componente (três modos, slots toolbar/footer)
+  ide-state.ts                    reducer puro: IdePhase, reduceIde, canRun, isBusy
+  terminal.ts                     RunnerTerminal sobre xterm.js; openOutputLink
+  mount-blocks.ts                 (E2.4) monta CodeRunner nos blocos de notas MD
+```
+
+`CodeRunner` não conhece resource, questão nem exam: recebe código,
+linguagem e `runnerOrigin` por props. Quem sabe de onde vem o código é a
+página. O que muda entre os modos fica em props (`mode`, `runDisabled`,
+`onChange`, `starterCode`) e em dois slots: `toolbar` (navegação de
+submissões no `review`) e `footer` (autosave e conflito de rascunho no
+`answer`). A E3a e a E4 preenchem os slots sem mexer no núcleo.
+
+### Estados
+
+`ide-state.ts` traduz os eventos do `RunnerHost` para as fases que o
+protótipo (`_Ide.astro`) desenha:
+
+| Fase | Vem de | UI |
+| :--- | :----- | :- |
+| `idle` | início | Rodar |
+| `preparing` | Rodar antes da reserva pronta (`status: loading`), `progress` | "preparando…", barra se `total` conhecido, Cancelar |
+| `running`, `waiting-input` | `status` | Parar; entrada de linha em `waiting-input` |
+| `done` | `exit exited` código 0 | Rodar, duração |
+| `error` | `exit exited` código ≠ 0, `crashed` | Rodar, código de saída |
+| `stopped` | `exit stopped` | Rodar |
+| `truncated` | `exit output-limit` | aviso de saída cortada |
+| `load-failed` | `exit load-failed`, `RunnerUnavailable("timeout")` | "tentar de novo" |
+| `unsupported` | `RunnerUnavailable("unsupported" \| "protocol")` | "navegador não suportado" |
+| `unconfigured` | `runnerOrigin` null | "execução desligada nesta instância" |
+| `disabled` | `runDisabled` (E3a) | "O professor desativou a execução de código nesta prova." |
+
+### Uso do `RunnerHost`
+
+- Um `RunnerHost` por página: todo widget chama
+  `RunnerHost.shared(runnerOrigin)`. "Tentar de novo" dispara um run novo só
+  daquele widget e nunca chama `reload()` no host compartilhado (pararia os
+  runs dos outros widgets). Se o frame da página não respondeu (`timeout`), o
+  widget volta a `load-failed`; recuperar o frame da página fica para a
+  recarga da página. As islands Solid de uma página
+  compartilham o módulo `src/runner/host.ts`, então o mapa de hosts é um só.
+  O `review` (E4) usa `RunnerHost.exclusive`.
+- O iframe só é criado no primeiro foco ou edição de um widget
+  (`prepare(language)`) ou no primeiro Rodar; carregar a página não cria
+  iframe nem baixa runtime.
+- Rodar: `host.run({ language, mode: runMode, files: { [filename]: code },
+  entry: filename }, handlers)`. Os handlers alimentam `reduceIde` e o
+  terminal. Parar e Ctrl+C: `handle.stop()`. Ctrl+D: `handle.sendEof()`.
+- Rodar não grava nada no servidor; a saída do terminal não é guardada.
+
+### Editor e terminal
+
+- Editor: CodeMirror 6 com `@replit/codemirror-vscode-keymap`, tema do VS
+  Code e o pacote de linguagem de cada `LanguageId` (na E2,
+  `@codemirror/lang-javascript`). Carregado por `import()` dinâmico e
+  montado no primeiro foco ou "Editar" (no `answer`, ao montar); nunca
+  importado estaticamente. Antes disso, e na renderização no servidor, o
+  widget mostra `highlightedHtml`: Shiki com os temas `light-plus` e
+  `dark-plus`, para o código não mudar de cor ao virar editor. Assim uma
+  lista de snippets não monta dezenas de editores.
+- Ctrl/Cmd+Enter roda, registrado com `Prec.highest` para o keymap do VS
+  Code não o capturar.
+- Terminal: xterm.js por `import()` no primeiro Rodar, com
+  `@xterm/addon-web-links`. Edição de linha própria e mínima, sem addon
+  (`terminal.ts`): caracteres, Backspace, setas, Home/End, histórico do
+  widget, Enter, Ctrl+C, Ctrl+D. Sem addon de clipboard (S4). Links, URLs
+  simples e OSC 8, passam por `openOutputLink`: só `http(s)`; o `confirm`
+  mostra a URL real (`new URL(url).href`), não o texto do link; nova aba com
+  `noopener,noreferrer`. `screenReaderMode` ligado.
+- Saída do programa só entra na página por `RunnerTerminal.write`. Texto que
+  o widget põe no DOM por conta própria (eco do campo de celular, avisos) vai
+  por `textContent`, nunca `innerHTML`.
+- Celular (U1): com `pointer: coarse`, layout empilhado; em
+  `waiting-input`, um campo de texto fixo acima do teclado envia a linha
+  (`handle.sendLine`) e o terminal só mostra o eco. No desktop a linha é
+  digitada no próprio terminal.
+- Textos da UI pelo Paraglide (`messages/`), como o resto da app.
+
+### Ligação com resources `CODE` (J2)
+
+`src/pages/[discipline]/[course]/resources/[slug].astro`: quando
+`runnerLanguage(resource.language)` não é null, a página monta
+`<CodeRunner client:load mode="snippet" ... highlightedHtml={bodyHtml}
+runnerOrigin={RUNNER_ORIGIN} label={title} />` no lugar do bloco Shiki. Com
+linguagem sem driver, ou `RUNNER_ORIGIN` null, a página fica como hoje (o
+snippet não mostra um widget que não roda). A linguagem continua texto livre
+no schema; nada muda no banco nem no CLI.
+
+### Blocos executáveis em notas `MD` (E2.4)
+
+- Marcação: bloco cercado com `run` na info string, depois da linguagem:
+  ` ```js run `. Sem `run`, o bloco é só código, como hoje.
+- `src/utils/markdown.ts`: a regra `fence` de markdown-it emite, para blocos
+  com `run` e `runnerLanguage(lang)` não null,
+  `<div class="code-runner-block" data-language="javascript"><pre><code>…</code></pre></div>`.
+  O texto continua escapado; nenhum HTML do autor passa. `data-language`
+  vem sempre de `runnerLanguage()`, nunca da info string crua.
+- Bloco com `run` e linguagem sem driver: `<pre>` estático dentro de
+  `.code-runner-unavailable`, seguido de um aviso discreto "execução não
+  disponível para esta linguagem", renderizado no servidor. Blocos sem `run`
+  continuam como hoje.
+- `mount-blocks.ts`: `mountCodeRunners(root: HTMLElement, runnerOrigin:
+  string): void` monta um `CodeRunner` (modo `snippet`, `compact`) em cada
+  `.code-runner-block`, lendo o código do `textContent` do `<pre>`. A página
+  de resource chama em um `<script>` quando o resource é `MD` e
+  `RUNNER_ORIGIN` não é null. Outros lugares que renderizam Markdown
+  (preâmbulo de exam, enunciado) não chamam: lá o bloco fica estático.
+
+### Seed
+
+`src/db/bootstrap.ts`, curso cs101 (as stories do aluno usam esse curso):
+
+| Slug | Tipo | Estado que alcança |
+| :--- | :--- | :----------------- |
+| `js-hello` | CODE, `javascript` | `done`, entrada com `prompt()` (`waiting-input`) |
+| `js-forever` | CODE, `javascript` | `while (true) {}`: Parar, `stopped` |
+| `js-flood` | CODE, `javascript` | saída acima do limite: `truncated` |
+| `js-throws` | CODE, `javascript` | exceção: `error` com stack em stderr |
+| `js-links` | CODE, `javascript` | imprime uma URL: confirmação ao clicar |
+| `js-notes` | MD com dois blocos ` ```js run `, um ` ```js ` e um ` ```haskell run ` | executáveis, estático e o aviso de linguagem sem driver na mesma nota |
+
+Os `CODE` em Python que já existem continuam estáticos até a E3b: é o caso
+"linguagem sem driver". `unconfigured` só aparece em produção sem
+`RUNNER_ORIGIN`; `unsupported` só num navegador sem SAB nem SW.
+
+## Tarefas da E2
+
+Novas dependências (aprovadas na rodada 9): `@codemirror/state`,
+`@codemirror/view`, `@codemirror/commands`, `@codemirror/language`,
+`@codemirror/lang-javascript`, `@replit/codemirror-vscode-keymap`,
+`@xterm/xterm`, `@xterm/addon-web-links`, `@xterm/addon-fit`. Sem
+`xterm-readline`. Versões exatas no `package.json` (sem `^`), e
+`minimumReleaseAge: 10080` (7 dias, em minutos) em `pnpm-workspace.yaml`.
+Cada tarefa termina com `pnpm run lint` e `pnpm test` verdes.
+
+| Tarefa | Depende de | Paralela com |
+| :----- | :--------- | :----------- |
+| E2.1 Lógica pura e terminal | — | testes de todas |
+| E2.2 Componente `CodeRunner` | E2.1 | — |
+| E2.3 Resource `CODE`, seed e story | E2.2 | E2.4 |
+| E2.4 Blocos executáveis em notas `MD` | E2.2 | E2.3 |
+| E2.5 Revisão de UI, celular e leitor de tela | E2.3 | E2.4 |
+
+**E2.1 Lógica pura e terminal.**
+
+- Implementação: `src/runner/languages.ts`, `src/components/runner/ide-state.ts`,
+  `src/components/runner/terminal.ts` (inclui o editor de linha próprio);
+  instala as dependências com versão exata e põe `minimumReleaseAge` em
+  `pnpm-workspace.yaml`.
+- Testes: `test/runner-ide-state.spec.ts`, `test/runner-languages.spec.ts`
+  (Node, sem navegador).
+- Testes esperados: a tabela de fases acima, evento a evento; eventos fora
+  de hora não mudam o estado; `canRun`/`isBusy` em cada fase;
+  `runnerLanguage` com aliases, maiúsculas, null, `fake` e linguagem sem
+  driver; `openOutputLink` com `confirm` e `open` injetados: recusa
+  `javascript:` e `data:`, não abre sem confirmação, abre com
+  `noopener,noreferrer`, e a mensagem do `confirm` contém a URL normalizada
+  (ex.: `https://exemplo.com.evil.test/` aparece inteira). Editor de linha
+  (navegador, terminal montado numa página de teste): Backspace, setas,
+  histórico, Ctrl+C, Ctrl+D.
+
+**E2.2 Componente `CodeRunner`.**
+
+- Implementação: `src/components/runner/CodeRunner.tsx`, mensagens em
+  `messages/`. Base visual: `src/pages/design/playground/client-runner/`.
+- Testes: `test/runner-widget.spec.ts`, numa página de teste que não fica
+  no playground: `src/pages/design/runner.astro` ganha uma seção com dois
+  `CodeRunner` em modo `snippet` (a página já existe e não é removida no
+  release).
+- Testes esperados: carregar a página não cria iframe; foco no editor cria
+  um só iframe para os dois widgets; Rodar mostra a saída; Ctrl+Enter roda;
+  `prompt()` com linha digitada no terminal; Parar num laço termina em menos
+  de 2 s; saída grande dá aviso de cortada; exceção mostra stack e código;
+  antes do primeiro foco, nenhum chunk de CodeMirror ou xterm foi baixado
+  (`page.on("request")`); Ctrl+Enter roda mesmo com o cursor no editor;
+  "tentar de novo" num widget não recria o iframe nem para o run de outro
+  widget; saída com `<img src=x onerror=...>` e linha de entrada com HTML
+  aparecem como texto;
+  Editar, mudar e Rodar usa o código novo; Reset volta ao original; clique
+  em link pede confirmação e não abre sem ela; sequência OSC 52 na saída não
+  altera o clipboard; em viewport de celular com `hasTouch`, a entrada vai
+  pelo campo fixo.
+
+**E2.3 Resource `CODE`, seed e story.**
+
+- Implementação: `src/pages/[discipline]/[course]/resources/[slug].astro`,
+  opção de tema em `src/utils/highlight-code.ts` (`light-plus`/`dark-plus`
+  para o widget; o resto do app segue com os temas atuais),
+  `src/db/bootstrap.ts` (seed da tabela acima), story nova em
+  `docs/user-stories/student.md`, seção "Finding course material": "Run a
+  code example" (`status: implemented`, `url` da página de resource).
+- Testes: `test/stories/student-finding-course-material.test.ts`, teste
+  `student: run a code example`, pela UI.
+- Testes esperados: aluno abre um `CODE` em JavaScript, roda, digita uma
+  linha e vê a saída; um `CODE` em Python continua estático, sem Rodar; a
+  página de resource sem foco no widget não cria iframe.
+
+**E2.4 Blocos executáveis em notas `MD`.**
+
+- Implementação: regra `fence` em `src/utils/markdown.ts`,
+  `src/components/runner/mount-blocks.ts`, `<script>` na página de resource.
+- Testes: `test/runner-markdown-blocks.spec.ts`.
+- Testes esperados: HTML da regra (Node): ` ```js run ` vira
+  `.code-runner-block` com `data-language`; ` ```js ` fica `<pre>`;
+  ` ```haskell run ` fica `<pre>` em `.code-runner-unavailable` com o aviso;
+  `<script>` no bloco sai escapado; info string ` ```js" onload="x run ` não
+  vaza para atributo. Pela página: na nota `js-notes`, os dois blocos `run`
+  rodam e compartilham um iframe; o bloco sem `run` não tem botão; o bloco
+  Haskell mostra o aviso e não tem botão.
+
+**E2.5 Revisão de UI, celular e leitor de tela** (`ui-reviewer`, sem
+código salvo para correções que ele apontar).
+
+- Contra o protótipo e U1/S4: estados, densidade de lista, tema claro e
+  escuro, teclado na tela (iOS/Android emulados), foco e anúncios
+  (`aria-live` do status), editor com leitor de tela.
+
 ## Em aberto
 
 - Firefox e Safari (inclusive janela privada) não testados: issue
