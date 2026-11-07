@@ -427,3 +427,23 @@ stubs `src/services/code-run.ts`, `src/components/exam/code-draft.ts`,
   localmente; ~2 s por teste de Python), revertendo o item 9 da rodada 2.
   Presidente: sim, limitado a poucos testes de fumaça por runtime; o resto
   fica fora da suíte padrão.
+
+Votos da rodada 10: **E3-D1 (a), E3-D2 (a), E3-D3 sim: unânimes.**
+Condições:
+
+- E3-D1: sem `meta.codeRun`, o CLI envia `allowCodeRun: null` (ADR 0012;
+  apagar do frontmatter volta ao padrão) (breaker).
+- E3-D2: enunciado/epílogo pelo mesmo `Markdown` do mdq-js, sem caminho
+  novo de HTML (security); teste que compara o DOM de `CodeEssayAnswer`
+  com o de `Essay` (breaker).
+- E3-D3: dois testes de fumaça por runtime na suíte padrão (carregar e ler
+  entrada; erro com número de linha); E3b.2/E3b.3 testam que
+  `FS.mount(IDBFS)` falha.
+- Tela do exam mostra o valor efetivo: "ligada (padrão de PRACTICE)" ou
+  "desligada (definido pelo professor)" (usuario).
+- Rascunho (security B1, breaker B10): a cada página autenticada, apagar
+  rascunhos de outros usuários; apagar rascunhos do exam ao enviar ou
+  encerrar; prazo de validade.
+- Conflito no envio (breaker B9): o envio aponta questões em conflito;
+  envio automático por tempo esgotado usa a versão mais recente.
+- Horas do conflito comparadas pelo relógio do servidor (breaker B11).
