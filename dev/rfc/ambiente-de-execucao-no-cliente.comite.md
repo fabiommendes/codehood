@@ -447,3 +447,20 @@ Condições:
 - Conflito no envio (breaker B9): o envio aponta questões em conflito;
   envio automático por tempo esgotado usa a versão mais recente.
 - Horas do conflito comparadas pelo relógio do servidor (breaker B11).
+
+### Rodada 11: versão do swipl-wasm
+
+`swipl-wasm@8.3.0` (medido na E1.6) foi publicado em 2026-11-06 e só passa
+no `minimumReleaseAge` de 7 dias em 2026-11-13. `pyodide@314.0.7` passa.
+O Pyodide 314.0.7 traz `pyodide.asm.mjs` (não `.js`); `RUNTIMES` lista o
+`.mjs`.
+
+- **V1.** (a) esperar até 13/11; (b) usar `swipl-wasm@8.2.6` (maduro, não
+  medido; os testes de fumaça e o de APIs bloqueadas da E3b.2 cobrem a
+  compatibilidade, e a E3b.5 mede); (c) exceção em
+  `minimumReleaseAgeExclude` para 8.3.0. Presidente: (b). (c) desfaz a
+  salvaguarda pedida pelo security na rodada 9.
+
+Votos da rodada 11: **V1 (b) unânime.** `swipl-wasm@8.2.6` agora; trocar
+por 8.3.0 depois de 2026-11-13 num commit separado. A E3b.1 verifica que o
+8.2.6 é build sem pthreads e aceita o patch `export default SWIPL`.
