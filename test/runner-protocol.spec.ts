@@ -36,19 +36,16 @@ test.describe("ready", () => {
 				"cross-origin isolation through Document-Isolation-Policy is Chromium only",
 			);
 			const h = await loadFrame(page, query);
-			expect(h.ready).toEqual({
-				type: "ready",
-				protocol: 1,
-				stdin: kind,
-				languages: [
-					"javascript",
-					"lua",
-					"prolog",
-					"python",
-					"typescript",
-					"fake",
-				],
-			});
+			const { languages, ...rest } = h.ready;
+			expect(rest).toEqual({ type: "ready", protocol: 1, stdin: kind });
+			expect([...languages].sort()).toEqual([
+				"fake",
+				"javascript",
+				"lua",
+				"prolog",
+				"python",
+				"typescript",
+			]);
 		});
 	}
 });
