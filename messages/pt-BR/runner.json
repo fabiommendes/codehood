@@ -32,5 +32,7 @@
 	"runner_input_label": "Entrada do programa",
 	"runner_input_placeholder": "Digite uma linha e envie",
 	"runner_send": "Enviar",
-	"runner_confirm_link": "Abrir este link em uma nova aba?\n\n{url}"
+	"runner_confirm_link": "Abrir este link em uma nova aba?\n\n{url}",
+	"runner_block_unavailable": "Execução não disponível para esta linguagem",
+	"runner_block_label": "Exemplo de código {number}"
 }

@@ -32,5 +32,7 @@
 	"runner_input_label": "Program input",
 	"runner_input_placeholder": "Type a line and send it",
 	"runner_send": "Send",
-	"runner_confirm_link": "Open this link in a new tab?\n\n{url}"
+	"runner_confirm_link": "Open this link in a new tab?\n\n{url}",
+	"runner_block_unavailable": "Code execution is not available for this language",
+	"runner_block_label": "Code example {number}"
 }
