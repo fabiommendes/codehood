@@ -206,7 +206,7 @@ function gradedHeading(page: Page) {
 }
 
 async function openQuestion(page: Page, href: string) {
-	const url = `${href}/exams/midterm/grading/q-short`;
+	const url = `${href}/exams/midterm/grading/q-short?view=list`;
 	await page.goto(url);
 	await expect(page).toHaveURL(url);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();

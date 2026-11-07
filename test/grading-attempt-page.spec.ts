@@ -513,7 +513,7 @@ test("names: a question page opens with names hidden, the switch off and nobody 
 	const { teacher, href } = await namedSitting("nm1");
 	await logInAs(page, teacher);
 
-	await openGrading(page, `${href}/exams/midterm/grading/q-one`);
+	await openGrading(page, `${href}/exams/midterm/grading/q-one?view=list`);
 
 	await expect(namesSwitch(page)).toHaveAttribute("aria-checked", "false");
 	await expect(page.getByRole("article")).toHaveCount(2);
@@ -531,12 +531,12 @@ test("names: the switch shows each answer's author, and the next question, the b
 	const { teacher, href } = await namedSitting("nm2");
 	await logInAs(page, teacher);
 	const grading = `${href}/exams/midterm/grading`;
-	await openGrading(page, `${grading}/q-one`);
+	await openGrading(page, `${grading}/q-one?view=list`);
 
 	await test.step("turning names on", async () => {
 		await namesSwitch(page).click();
 
-		await expect(page).toHaveURL(`${grading}/q-one?names=1`);
+		await expect(page).toHaveURL(`${grading}/q-one?view=list&names=1`);
 		await expect(namesSwitch(page)).toHaveAttribute("aria-checked", "true");
 		for (const person of PEOPLE) {
 			await expect(answerArticle(page, person.first)).toContainText(
@@ -553,7 +553,7 @@ test("names: the switch shows each answer's author, and the next question, the b
 			.getByRole("link", { name: "Next question", exact: true })
 			.click();
 
-		await expect(page).toHaveURL(`${grading}/q-two?names=1`);
+		await expect(page).toHaveURL(`${grading}/q-two?view=list&names=1`);
 		await expect(
 			page.getByRole("heading", { level: 2, name: "Title two", exact: true }),
 		).toBeVisible();
@@ -586,8 +586,8 @@ test("names: turning the switch off again drops the parameter and hides the name
 }) => {
 	const { teacher, href } = await namedSitting("nm3");
 	await logInAs(page, teacher);
-	const url = `${href}/exams/midterm/grading/q-one`;
-	await openGrading(page, `${url}?names=1`);
+	const url = `${href}/exams/midterm/grading/q-one?view=list`;
+	await openGrading(page, `${url}&names=1`);
 	await expect(namesSwitch(page)).toHaveAttribute("aria-checked", "true");
 	await expect(answerArticle(page, PEOPLE[0]?.first ?? "")).toContainText(
 		PEOPLE[0]?.name ?? "",
@@ -608,7 +608,7 @@ test("names: saving a grade keeps the parameter in the URL and the names on the 
 }) => {
 	const { teacher, href } = await namedSitting("nm4");
 	await logInAs(page, teacher);
-	const url = `${href}/exams/midterm/grading/q-one?names=1`;
+	const url = `${href}/exams/midterm/grading/q-one?view=list&names=1`;
 	await openGrading(page, url);
 	const article = answerArticle(page, PEOPLE[0]?.first ?? "");
 	await expect(article).toContainText(PEOPLE[0]?.name ?? "");
@@ -631,9 +631,9 @@ test("names: each answer article has the id answer-<submission id>, with or with
 }) => {
 	const { teacher, href, ids } = await namedSitting("nm5");
 	await logInAs(page, teacher);
-	const url = `${href}/exams/midterm/grading/q-one`;
+	const url = `${href}/exams/midterm/grading/q-one?view=list`;
 
-	for (const suffix of ["", "?names=1"]) {
+	for (const suffix of ["", "&names=1"]) {
 		await openGrading(page, `${url}${suffix}`);
 
 		for (const person of PEOPLE) {

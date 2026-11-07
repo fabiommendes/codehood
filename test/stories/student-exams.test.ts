@@ -188,7 +188,7 @@ test("student: take an exam", async ({ page }) => {
 
 		const dialog = page.getByRole("dialog");
 		await expect(dialog).toBeVisible();
-		await expect(dialog).toContainText(/can['’]t/);
+		await expect(dialog).toContainText(/(can|won)['’]t/);
 		await dialog.getByRole("button", { name: /cancel/i }).click();
 
 		await expect(dialog).toBeHidden();

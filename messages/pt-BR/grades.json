@@ -177,5 +177,81 @@
 			}
 		}
 	],
-	"grades_regrade_home_resolved": "Respostas a pedidos de revisão"
+	"grades_regrade_home_resolved": "Respostas a pedidos de revisão",
+	"grades_queue_review": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} para rever",
+				"countPlural=other": "{count} para rever"
+			}
+		}
+	],
+	"grades_rubric_items_label": "Itens da rubrica",
+	"grades_rubric_private_comment": "Nota do corretor",
+	"grades_rubric_student_feedback": "Feedback para o aluno",
+	"grades_grader_progress": "Progresso",
+	"grades_grader_answer_of": "Resposta {index} de {total}",
+	"grades_grader_answer": "Resposta",
+	"grades_grader_to_review": "Para rever",
+	"grades_grader_retired": "Aposentado",
+	"grades_grader_rubric": "Rubrica",
+	"grades_grader_empty_rubric": "A rubrica ainda não tem itens. Tecle n para criar um.",
+	"grades_grader_adjustment": "Ajuste",
+	"grades_grader_adjustment_hint": "Um decimal, como 0.05 ou -0.1",
+	"grades_grader_comment": "Comentário",
+	"grades_grader_score": "Nota",
+	"grades_grader_save_next": "Salvar e próxima",
+	"grades_grader_questions": "Enunciado e gabarito",
+	"grades_grader_edit": "Editar rubrica",
+	"grades_grader_done_editing": "Concluir edição",
+	"grades_grader_help": "Atalhos de teclado",
+	"grades_grader_help_digit": "1-9: escolhe um grupo ou alterna um item solto",
+	"grades_grader_help_letter": "a, b, c: escolhe uma opção do grupo escolhido",
+	"grades_grader_help_enter": "Enter: salva e vai à próxima resposta pendente",
+	"grades_grader_help_move": "j / k: próxima / anterior",
+	"grades_grader_help_new": "n: novo item, aplicado a esta resposta",
+	"grades_grader_help_edit": "e: edita a rubrica",
+	"grades_grader_new_item": "Novo item",
+	"grades_grader_text": "Texto",
+	"grades_grader_value": "Valor",
+	"grades_grader_group": "Grupo",
+	"grades_grader_add_item": "Adicionar item",
+	"grades_grader_text_required": "Escreva o texto do item.",
+	"grades_grader_value_invalid": "O valor deve ser um número de -1 a 1, como 0.25 ou -0.1.",
+	"grades_grader_base": "Base",
+	"grades_grader_split": "Dividir",
+	"grades_grader_delete": "Apagar",
+	"grades_grader_undo_delete": "Manter",
+	"grades_grader_will_delete": "Será apagado",
+	"grades_grader_details": "Detalhes",
+	"grades_grader_split_item": "Dividir item",
+	"grades_grader_children": "Filhos",
+	"grades_grader_add_child": "Adicionar filho",
+	"grades_grader_apply": "Aplicar mudanças",
+	"grades_grader_confirm": "Confirmar",
+	"grades_grader_change_warning": [
+		{
+			"declarations": [
+				"input count",
+				"input released",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Muda a nota de {count} resposta, {released} já liberadas.",
+				"countPlural=other": "Muda a nota de {count} respostas, {released} já liberadas."
+			}
+		}
+	],
+	"grades_grader_rename_group": "Renomear grupo",
+	"grades_grader_rename_from": "Grupo a renomear",
+	"grades_grader_rename_to": "Novo nome",
+	"grades_grader_rename": "Renomear",
+	"grades_grader_renamed": "{count} itens renomeados.",
+	"grades_grader_done_back": "Voltar à fila",
+	"grades_grader_keep_reviewing": "Continuar revendo",
+	"grades_question_view_list": "Ver em lista",
+	"grades_question_view_one": "Uma resposta por vez"
 }

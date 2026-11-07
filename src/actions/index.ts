@@ -12,6 +12,7 @@ import { regrade } from "./regrade";
 import { report } from "./report";
 import { repository } from "./repository";
 import { rollCall } from "./roll-call";
+import { rubric } from "./rubric";
 
 installErrorMap();
 
@@ -28,5 +29,6 @@ export const server = {
 	report,
 	repository,
 	rollCall,
+	rubric,
 	checkIn,
 };

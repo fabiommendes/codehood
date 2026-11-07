@@ -15,7 +15,7 @@ export type ResultFeedback = Pick<
 	Feedback,
 	"submission" | "score" | "feedback" | "updatedAt"
 > &
-	Partial<Pick<Feedback, "blanks">>;
+	Partial<Pick<Feedback, "blanks" | "rubricItems">>;
 
 export type QuestionOutcomeStatus =
 	| "graded"
@@ -73,6 +73,8 @@ export interface QuestionOutcome {
 	score: number | null;
 	/// The blank grades of the current verdict, when the instructor graded the blanks one by one.
 	blanks?: Feedback["blanks"];
+	/// The rubric items the current verdict applies, in rubric order. A student reads only what the feedback they may see carries.
+	rubricItems?: NonNullable<Feedback["rubricItems"]>;
 	/// Every non-empty written comment on the answer, newest first.
 	comments: string[];
 }
@@ -162,6 +164,7 @@ function outcomeOf(
 		status: "graded",
 		score: verdict,
 		...(passes[0]?.blanks ? { blanks: passes[0].blanks } : {}),
+		...(passes[0]?.rubricItems ? { rubricItems: passes[0].rubricItems } : {}),
 		comments,
 	};
 }

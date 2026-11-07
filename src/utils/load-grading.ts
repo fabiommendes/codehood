@@ -64,27 +64,45 @@ export async function loadGrading(
 	// biome-ignore lint/style/noNonNullAssertion: loadCourse already redirected an anonymous visitor.
 	const actor = Astro.locals.actor!;
 
+	const loaded = await loadExamGrading(course.id, examSlug, actor);
+	if (!loaded) return { redirect: await Astro.rewrite("/404") };
+
+	return { course, href, ...loaded };
+}
+
+/// What the grading of one exam reads, without the course it belongs to.
+export type ExamGrading = Omit<
+	Extract<LoadGradingResult, { exam: Exam }>,
+	"course" | "href"
+>;
+
+/**
+ * Loads the exam's attempts, grading passes and counting answers, or `null` for an exam that does not exist or is a practice exam.
+ *
+ * Does not check who `actor` is: the services it reads through do.
+ */
+export async function loadExamGrading(
+	course: Parameters<typeof db.examException.findMany>[0]["course"],
+	examSlug: string | undefined,
+	actor: UserActor,
+): Promise<ExamGrading | null> {
 	const exam = examSlug
-		? await db.exam.findOne({ course: course.id, slug: examSlug }, { actor })
+		? await db.exam.findOne({ course, slug: examSlug }, { actor })
 		: null;
-	if (!exam || exam.type === "PRACTICE") {
-		return { redirect: await Astro.rewrite("/404") };
-	}
+	if (!exam || exam.type === "PRACTICE") return null;
 
 	const [attempts, feedback, courseExceptions] = await Promise.all([
 		db.response.findMany(
-			{ course: course.id, exam: exam.slug, practice: false },
+			{ course, exam: exam.slug, practice: false },
 			{ actor },
 		),
-		db.feedback.findMany({ course: course.id, exam: exam.slug }, { actor }),
-		loadCourseExceptions(course.id),
+		db.feedback.findMany({ course, exam: exam.slug }, { actor }),
+		loadCourseExceptions(course),
 	]);
 	const exceptions = courseExceptions.get(exam.slug) ?? new Map();
 	const questions = exam.questions.map((question) => question.slug);
 
 	return {
-		course,
-		href,
 		exam,
 		questions,
 		answers: countingAnswers(

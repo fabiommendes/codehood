@@ -12,6 +12,7 @@ import {
 	Switch,
 } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
+import AppliedItems from "@/components/grading/AppliedItems";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
@@ -997,6 +998,7 @@ function Outcome(props: {
 							</Match>
 						</Switch>
 					</p>
+					<AppliedItems items={outcome().rubricItems ?? []} />
 					<For each={outcome().comments}>
 						{(comment) => (
 							<p class="mt-1 whitespace-pre-wrap text-sm text-base-content/70">

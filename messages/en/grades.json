@@ -177,5 +177,81 @@
 			}
 		}
 	],
-	"grades_regrade_home_resolved": "Regrade answers"
+	"grades_regrade_home_resolved": "Regrade answers",
+	"grades_queue_review": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} to review",
+				"countPlural=other": "{count} to review"
+			}
+		}
+	],
+	"grades_rubric_items_label": "Rubric items",
+	"grades_rubric_private_comment": "Grader note",
+	"grades_rubric_student_feedback": "Student feedback",
+	"grades_grader_progress": "Progress",
+	"grades_grader_answer_of": "Answer {index} of {total}",
+	"grades_grader_answer": "Answer",
+	"grades_grader_to_review": "To review",
+	"grades_grader_retired": "Retired",
+	"grades_grader_rubric": "Rubric",
+	"grades_grader_empty_rubric": "The rubric has no items yet. Press n to add one.",
+	"grades_grader_adjustment": "Adjustment",
+	"grades_grader_adjustment_hint": "A decimal such as 0.05 or -0.1",
+	"grades_grader_comment": "Comment",
+	"grades_grader_score": "Score",
+	"grades_grader_save_next": "Save and next",
+	"grades_grader_questions": "Statement and answer key",
+	"grades_grader_edit": "Edit rubric",
+	"grades_grader_done_editing": "Done editing",
+	"grades_grader_help": "Keyboard shortcuts",
+	"grades_grader_help_digit": "1-9: choose a group or toggle a loose item",
+	"grades_grader_help_letter": "a, b, c: choose an option of the chosen group",
+	"grades_grader_help_enter": "Enter: save and go to the next pending answer",
+	"grades_grader_help_move": "j / k: next / previous answer",
+	"grades_grader_help_new": "n: new item, applied to this answer",
+	"grades_grader_help_edit": "e: edit the rubric",
+	"grades_grader_new_item": "New item",
+	"grades_grader_text": "Text",
+	"grades_grader_value": "Value",
+	"grades_grader_group": "Group",
+	"grades_grader_add_item": "Add item",
+	"grades_grader_text_required": "Write the text of the item.",
+	"grades_grader_value_invalid": "The value must be a number from -1 to 1, such as 0.25 or -0.1.",
+	"grades_grader_base": "Base",
+	"grades_grader_split": "Split",
+	"grades_grader_delete": "Delete",
+	"grades_grader_undo_delete": "Keep",
+	"grades_grader_will_delete": "Will be deleted",
+	"grades_grader_details": "Details",
+	"grades_grader_split_item": "Split item",
+	"grades_grader_children": "Children",
+	"grades_grader_add_child": "Add child",
+	"grades_grader_apply": "Apply changes",
+	"grades_grader_confirm": "Confirm",
+	"grades_grader_change_warning": [
+		{
+			"declarations": [
+				"input count",
+				"input released",
+				"local countPlural = count: plural"
+			],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "Changes the score of {count} answer, {released} already released.",
+				"countPlural=other": "Changes the score of {count} answers, {released} already released."
+			}
+		}
+	],
+	"grades_grader_rename_group": "Rename group",
+	"grades_grader_rename_from": "Group to rename",
+	"grades_grader_rename_to": "New name",
+	"grades_grader_rename": "Rename",
+	"grades_grader_renamed": "{count} items renamed.",
+	"grades_grader_done_back": "Back to the queue",
+	"grades_grader_keep_reviewing": "Keep reviewing",
+	"grades_question_view_list": "List view",
+	"grades_question_view_one": "One answer at a time"
 }

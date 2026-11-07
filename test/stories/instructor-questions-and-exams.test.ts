@@ -234,7 +234,7 @@ test("instructor: Let a bot grade for me", async ({ page, request }) => {
 	await test.step("the instructor issues a key of kind Bot", async () => {
 		await page.goto("/profile");
 		await openTab(page, "API keys");
-		await fillField(page, "Key name", "grading bot");
+		await fillField(page, "Key name", "grading-bot");
 		await page
 			.getByRole("group", { name: "Kind", exact: true })
 			.getByRole("combobox")
