@@ -6,8 +6,34 @@
  * page share one runner iframe through `RunnerHost.shared(runnerOrigin)`.
  */
 
-import type { JSX } from "solid-js";
+import {
+	createEffect,
+	createSignal,
+	type JSX,
+	on,
+	onCleanup,
+	onMount,
+	Show,
+} from "solid-js";
+import { m } from "@/i18n";
+import {
+	type RunExit,
+	type RunHandle,
+	RunnerHost,
+	RunnerUnavailable,
+} from "@/runner/host";
+import { defaultFilename } from "@/runner/languages";
 import type { LanguageId, RunMode } from "@/runner/protocol";
+import { createEditor, type RunnerEditor } from "./editor";
+import {
+	canRun,
+	type IdeEvent,
+	type IdePhase,
+	initialIdeState,
+	isBusy,
+	reduceIde,
+} from "./ide-state";
+import { createTerminal, type RunnerTerminal } from "./terminal";
 
 /**
  * Where the widget is used.
@@ -52,6 +78,44 @@ export interface CodeRunnerProps {
 	footer?: JSX.Element;
 }
 
+/// Phases where running is impossible rather than merely paused.
+const BLOCKED: ReadonlySet<IdePhase> = new Set([
+	"disabled",
+	"unsupported",
+	"unconfigured",
+]);
+
+const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
+	javascript: () => m.runner_language_javascript(),
+	fake: () => "fake",
+};
+
+/// Text of the terminal header's status for a phase, or null when it has none.
+function phaseText(phase: IdePhase, lastExit: RunExit | null): string | null {
+	switch (phase) {
+		case "preparing":
+			return m.runner_preparing();
+		case "running":
+			return m.runner_status_running();
+		case "waiting-input":
+			return m.runner_status_waiting_input();
+		case "done":
+			return m.runner_status_done();
+		case "error":
+			return lastExit?.reason === "crashed"
+				? m.runner_status_crashed()
+				: m.runner_status_error({ code: String(lastExit?.code ?? "?") });
+		case "stopped":
+			return lastExit?.reason === "reloaded"
+				? m.runner_status_reloaded()
+				: m.runner_status_stopped();
+		case "truncated":
+			return m.runner_status_truncated();
+		default:
+			return null;
+	}
+}
+
 /**
  * Renders the widget.
  *
@@ -74,8 +138,557 @@ export interface CodeRunnerProps {
  * is echoed through `RunnerTerminal.echoInput`, and any text the widget puts
  * in the DOM itself goes through `textContent`, never `innerHTML`.
  */
-export function CodeRunner(_props: CodeRunnerProps): JSX.Element {
-	throw new Error("not implemented");
+export function CodeRunner(props: CodeRunnerProps): JSX.Element {
+	const filename = () => props.filename ?? defaultFilename(props.language);
+	const [state, setState] = createSignal(
+		initialIdeState({
+			runnerOrigin: props.runnerOrigin,
+			runDisabled: props.runDisabled ?? false,
+		}),
+	);
+	const dispatch = (event: IdeEvent) =>
+		setState((current) => reduceIde(current, event));
+	const [code, setCode] = createSignal(props.code);
+	const [editing, setEditing] = createSignal(props.mode === "answer");
+	const [editorReady, setEditorReady] = createSignal(false);
+	const [terminalShown, setTerminalShown] = createSignal(!props.compact);
+	const [terminalReady, setTerminalReady] = createSignal(false);
+	const [coarse, setCoarse] = createSignal(false);
+
+	let editorParent!: HTMLDivElement;
+	let terminalParent!: HTMLDivElement;
+	let lineInput: HTMLInputElement | undefined;
+	let editor: RunnerEditor | null = null;
+	let editorLoading: Promise<void> | null = null;
+	let terminal: RunnerTerminal | null = null;
+	let terminalLoading: Promise<RunnerTerminal> | null = null;
+	let disposed = false;
+	let prepared = false;
+	/// Identifies the run in progress; events of any other are ignored.
+	let current: object | null = null;
+	let active: RunHandle | null = null;
+	let startedAt = 0;
+	let reading = false;
+
+	const readOnly = () => props.mode !== "answer" && !editing();
+	const blocked = () => BLOCKED.has(state().phase);
+	const running = () => isBusy(state());
+
+	/// Asks the runner for a reserve Worker, once, on the first focus or edit.
+	const prepare = () => {
+		if (prepared || blocked() || props.runnerOrigin === null) return;
+		prepared = true;
+		RunnerHost.shared(props.runnerOrigin).prepare(props.language);
+	};
+
+	const ensureEditor = (focus: boolean): Promise<void> => {
+		editorLoading ??= createEditor({
+			parent: editorParent,
+			doc: code(),
+			language: props.language,
+			readOnly: readOnly(),
+			label: props.label,
+			onChange: (value) => {
+				setCode(value);
+				prepare();
+				props.onChange?.(value);
+			},
+			onRun: () => void run(),
+			onFocus: prepare,
+		}).then(
+			(created) => {
+				if (disposed) {
+					created.destroy();
+					return;
+				}
+				editor = created;
+				editor.setReadOnly(readOnly());
+				setEditorReady(true);
+			},
+			() => {
+				editorLoading = null;
+			},
+		);
+		return editorLoading.then(() => {
+			if (focus) editor?.focus();
+		});
+	};
+
+	const activate = () => {
+		prepare();
+		void ensureEditor(true);
+	};
+
+	const edit = () => {
+		setEditing(true);
+		prepare();
+		void ensureEditor(true).then(() => editor?.setReadOnly(false));
+	};
+
+	const reset = () => {
+		const original =
+			props.mode === "answer" ? (props.starterCode ?? "") : props.code;
+		setCode(original);
+		editor?.setCode(original);
+		if (props.mode === "answer") props.onChange?.(original);
+	};
+
+	const ensureTerminal = (): Promise<RunnerTerminal> => {
+		if (terminal) return Promise.resolve(terminal);
+		setTerminalShown(true);
+		terminalLoading ??= createTerminal(terminalParent).then(
+			(created) => {
+				if (disposed) {
+					created.dispose();
+					return created;
+				}
+				terminal = created;
+				created.onInterrupt(() => active?.stop());
+				setTerminalReady(true);
+				return created;
+			},
+			(error: unknown) => {
+				terminalLoading = null;
+				throw error;
+			},
+		);
+		return terminalLoading;
+	};
+
+	/// Reads the next line typed in the terminal and sends it to the program.
+	const startRead = () => {
+		const term = terminal;
+		const handle = active;
+		const token = current;
+		if (!term || !handle || reading || coarse()) return;
+		reading = true;
+		term.focus();
+		void term.readLine().then((line) => {
+			if (current !== token) return;
+			reading = false;
+			if (line === null) handle.sendEof();
+			else handle.sendLine(line);
+		});
+	};
+
+	const run = async () => {
+		if (!canRun(state()) || props.runnerOrigin === null) return;
+		const token = {};
+		current = token;
+		startedAt = performance.now();
+		dispatch({ type: "run-requested" });
+		const finish = (exit: RunExit) => {
+			if (current !== token) return;
+			current = null;
+			active = null;
+			reading = false;
+			terminal?.cancelRead();
+			dispatch({
+				type: "exit",
+				exit,
+				elapsedMs: performance.now() - startedAt,
+			});
+		};
+		try {
+			const term = await ensureTerminal();
+			if (current !== token) return;
+			term.clear();
+			const entry = filename();
+			const handle = await RunnerHost.shared(props.runnerOrigin).run(
+				{
+					language: props.language,
+					mode: props.runMode ?? "script",
+					files: { [entry]: code() },
+					entry,
+				},
+				{
+					onStatus: (value) => {
+						if (current !== token) return;
+						dispatch({ type: "status", state: value });
+						if (value === "waiting-input") startRead();
+					},
+					onProgress: (loaded, total) => {
+						if (current === token)
+							dispatch({ type: "progress", loaded, total });
+					},
+					onOutput: (stream, text) => {
+						if (current === token) terminal?.write(stream, text);
+					},
+				},
+			);
+			if (current !== token) {
+				handle.stop();
+				return;
+			}
+			active = handle;
+			finish(await handle.done);
+		} catch (error) {
+			if (current !== token) return;
+			if (error instanceof RunnerUnavailable) {
+				current = null;
+				dispatch({ type: "unavailable", reason: error.reason });
+			} else {
+				finish({
+					reason: "load-failed",
+					code: null,
+					message: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+	};
+
+	const stop = () => {
+		if (active) {
+			active.stop();
+			return;
+		}
+		if (current !== null) {
+			// Still preparing: nothing runs yet, so there is nothing to wait for.
+			current = null;
+			dispatch({
+				type: "exit",
+				exit: { reason: "stopped", code: null },
+				elapsedMs: performance.now() - startedAt,
+			});
+		}
+	};
+
+	const sendLine = (event: SubmitEvent) => {
+		event.preventDefault();
+		if (!lineInput || !active) return;
+		const line = lineInput.value;
+		lineInput.value = "";
+		terminal?.echoInput(line);
+		active.sendLine(line);
+	};
+
+	onMount(() => {
+		setCoarse(window.matchMedia("(pointer: coarse)").matches);
+		if (props.mode === "answer") void ensureEditor(false);
+	});
+
+	onCleanup(() => {
+		disposed = true;
+		current = null;
+		active?.stop();
+		terminal?.dispose();
+		editor?.destroy();
+	});
+
+	createEffect(
+		on(
+			() => state().phase,
+			(phase) => {
+				if (phase === "waiting-input" && coarse()) lineInput?.focus();
+			},
+			{ defer: true },
+		),
+	);
+
+	const onStaticKeyDown = (event: KeyboardEvent) => {
+		if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+			event.preventDefault();
+			void run();
+		}
+	};
+
+	const statusText = () => phaseText(state().phase, state().lastExit);
+	const duration = () => {
+		const exit = state().lastExit;
+		return state().phase === "done" && exit
+			? m.runner_duration({ seconds: (exit.elapsedMs / 1000).toFixed(1) })
+			: null;
+	};
+	const percent = () => {
+		const progress = state().progress;
+		return progress?.total
+			? Math.round((progress.loaded / progress.total) * 100)
+			: null;
+	};
+	const blockedMessage = () => {
+		switch (state().phase) {
+			case "disabled":
+				return m.runner_disabled();
+			case "unsupported":
+				return m.runner_unsupported();
+			case "unconfigured":
+				return m.runner_unconfigured();
+			default:
+				return null;
+		}
+	};
+
+	return (
+		<div
+			class="overflow-hidden rounded-box border border-base-300 bg-base-100"
+			data-code-runner
+			data-mode={props.mode}
+			data-phase={state().phase}
+		>
+			<div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/50 px-3 py-1.5">
+				{props.toolbar}
+				<span class="font-mono text-xs">{filename()}</span>
+				<span class="badge badge-ghost badge-xs">
+					{LANGUAGE_LABELS[props.language]()}
+				</span>
+				<Show when={readOnly()}>
+					<span class="badge badge-ghost badge-xs">{m.runner_read_only()}</span>
+					<span class="hidden text-xs text-muted sm:inline">
+						{m.runner_edit_hint()}
+					</span>
+				</Show>
+				<div class="ml-auto flex items-center gap-1.5">
+					<Show when={props.mode !== "answer" && !editing()}>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm"
+							data-action="edit"
+							onClick={edit}
+						>
+							{m.runner_edit()}
+						</button>
+					</Show>
+					<Show when={props.mode !== "answer" && editing()}>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm"
+							data-action="reset"
+							onClick={reset}
+						>
+							{m.runner_reset()}
+						</button>
+					</Show>
+					<Show
+						when={props.mode === "answer" && props.starterCode !== undefined}
+					>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm"
+							data-action="reset"
+							title={m.runner_reset_starter()}
+							onClick={reset}
+						>
+							{m.runner_reset()}
+						</button>
+					</Show>
+					<Show
+						when={running()}
+						fallback={
+							<button
+								type="button"
+								class="btn btn-soft btn-success btn-sm"
+								data-action="run"
+								disabled={!canRun(state())}
+								onClick={() => void run()}
+							>
+								<svg
+									viewBox="0 0 16 16"
+									class="size-3 fill-current"
+									aria-hidden="true"
+								>
+									<path d="M4 2.5v11l9-5.5z" />
+								</svg>
+								{m.runner_run()}
+							</button>
+						}
+					>
+						<button
+							type="button"
+							class="btn btn-soft btn-error btn-sm"
+							data-action="stop"
+							onClick={stop}
+						>
+							<Show
+								when={state().phase === "preparing"}
+								fallback={
+									<span
+										class="inline-block size-2.5 bg-current"
+										aria-hidden="true"
+									/>
+								}
+							>
+								<span class="loading loading-spinner loading-xs" />
+							</Show>
+							{state().phase === "preparing"
+								? m.runner_cancel()
+								: m.runner_stop()}
+						</button>
+					</Show>
+				</div>
+			</div>
+
+			<Show when={state().phase === "preparing" && state().progress}>
+				<div class="flex items-center gap-3 border-b border-base-300 bg-base-200/30 px-3 py-2 text-xs">
+					<span class="shrink-0">{m.runner_downloading()}</span>
+					<progress
+						class="progress progress-primary h-1.5 flex-1"
+						value={state().progress?.loaded}
+						max={state().progress?.total ?? undefined}
+					/>
+					<Show when={percent() !== null}>
+						<span class="shrink-0 tabular-nums text-muted">{percent()}%</span>
+					</Show>
+				</div>
+			</Show>
+
+			<Show when={blockedMessage()}>
+				{(message) => (
+					<p
+						role="status"
+						class="flex items-center gap-2 border-b border-base-300 bg-base-200/30 px-3 py-2 text-xs text-base-content/70"
+					>
+						{message()}
+					</p>
+				)}
+			</Show>
+
+			<div
+				class={`relative overflow-auto bg-[#1e1e1e] font-mono text-[13px] leading-5 text-[#d4d4d4] ${props.compact ? "max-h-56" : "max-h-96"}`}
+			>
+				<Show when={!editorReady()}>
+					{/* biome-ignore lint/a11y/useSemanticElements: a read-only code view, replaced by the editor on first focus */}
+					<div
+						role="group"
+						tabindex="0"
+						aria-label={
+							readOnly()
+								? m.runner_editor_label_read_only({
+										label: props.label,
+										filename: filename(),
+										language: LANGUAGE_LABELS[props.language](),
+									})
+								: m.runner_editor_label({
+										label: props.label,
+										filename: filename(),
+										language: LANGUAGE_LABELS[props.language](),
+									})
+						}
+						data-editor-static
+						onFocus={activate}
+						onKeyDown={onStaticKeyDown}
+					>
+						<Show
+							when={props.highlightedHtml}
+							fallback={
+								<pre class="m-0 p-3 whitespace-pre">
+									<code>{props.code}</code>
+								</pre>
+							}
+						>
+							{/* Server-highlighted HTML of the code (Shiki), trusted. */}
+							<div
+								class="[&_pre]:m-0 [&_pre]:overflow-visible [&_pre]:bg-transparent [&_pre]:p-3"
+								innerHTML={props.highlightedHtml}
+							/>
+						</Show>
+					</div>
+				</Show>
+				<div
+					ref={editorParent}
+					class={editorReady() ? "" : "hidden"}
+					data-editor
+				/>
+			</div>
+
+			<div
+				class={`border-t border-[#3c3c3c] bg-[#181818] font-mono text-[13px] leading-5 ${terminalShown() ? "" : "hidden"}`}
+			>
+				<div class="flex items-center gap-2 bg-[#252526] px-3 py-1 text-[11px] tracking-wide text-[#a0a0a0] uppercase">
+					<span>{m.runner_terminal()}</span>
+					<span
+						role="status"
+						aria-live="polite"
+						class="ml-auto flex items-center gap-1.5 tracking-normal normal-case"
+						data-status
+					>
+						<Show when={statusText()}>
+							{(text) => (
+								<span
+									class={`flex items-center gap-1.5 ${
+										state().phase === "running"
+											? "text-[#89d185]"
+											: state().phase === "waiting-input" ||
+													state().phase === "truncated"
+												? "text-[#e5c07b]"
+												: state().phase === "error"
+													? "text-[#f48771]"
+													: "text-[#858585]"
+									}`}
+								>
+									<Show when={running()}>
+										<span class="loading loading-spinner loading-xs" />
+									</Show>
+									{text()}
+								</span>
+							)}
+						</Show>
+						<Show when={duration()}>
+							{(text) => <span class="text-[#858585]">· {text()}</span>}
+						</Show>
+					</span>
+				</div>
+				<Show when={state().phase === "load-failed"}>
+					<div class="p-3">
+						<div
+							role="alert"
+							class="flex flex-wrap items-center gap-3 rounded-box border border-[#f48771]/40 bg-[#f48771]/10 px-3 py-2 text-sm text-[#f48771]"
+						>
+							<span class="flex-1">{m.runner_load_failed()}</span>
+							<button
+								type="button"
+								class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
+								data-action="retry"
+								onClick={() => void run()}
+							>
+								{m.runner_try_again()}
+							</button>
+						</div>
+					</div>
+				</Show>
+				<div class="relative">
+					<Show when={!terminalReady()}>
+						<p class="absolute inset-x-0 top-0 px-3 py-2 text-[#858585] italic">
+							{m.runner_terminal_empty()}
+						</p>
+					</Show>
+					{/* biome-ignore lint/a11y/useSemanticElements: xterm.js owns this element */}
+					<div
+						ref={terminalParent}
+						role="group"
+						aria-label={m.runner_terminal_label()}
+						class={`overflow-hidden px-2 py-1 ${props.compact ? "h-40" : "h-56"}`}
+						data-terminal
+					/>
+				</div>
+				<Show when={coarse() && state().phase === "waiting-input"}>
+					<form
+						class="sticky bottom-0 flex gap-2 border-t border-[#3c3c3c] bg-[#252526] p-2"
+						onSubmit={sendLine}
+					>
+						<input
+							ref={lineInput}
+							class="input input-sm flex-1 border-[#3c3c3c] bg-[#1e1e1e] font-mono text-[#d4d4d4]"
+							aria-label={m.runner_input_label()}
+							placeholder={m.runner_input_placeholder()}
+							autocomplete="off"
+							autocapitalize="off"
+							spellcheck={false}
+							data-line-input
+						/>
+						<button
+							type="submit"
+							class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
+							data-action="send"
+						>
+							{m.runner_send()}
+						</button>
+					</form>
+				</Show>
+			</div>
+
+			{props.footer}
+		</div>
+	);
 }
 
 export default CodeRunner;

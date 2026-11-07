@@ -26,6 +26,7 @@
 			"./messages/{locale}/questions.json",
 			"./messages/{locale}/schedule.json",
 			"./messages/{locale}/repositories.json",
+			"./messages/{locale}/runner.json",
 			"./messages/{locale}/time.json"
 		]
 	}

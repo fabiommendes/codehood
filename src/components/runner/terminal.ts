@@ -12,6 +12,8 @@
  * current widget, Enter, Ctrl+C and Ctrl+D.
  */
 
+import { m } from "@/i18n";
+
 /** What the widget needs from a terminal. */
 export interface RunnerTerminal {
 	/** Writes program output; stderr is shown in the error color. */
@@ -49,7 +51,6 @@ const SGR = {
 	error: "\x1b[38;2;244;135;113m",
 	input: "\x1b[38;2;156;220;254m",
 	dim: "\x1b[2;38;2;133;133;133m",
-	clear: "\x1b[2J\x1b[3J\x1b[H",
 };
 
 /// The result of feeding input to a `LineEditor`.
@@ -319,7 +320,7 @@ export async function createTerminal(
 		clear() {
 			settle(null);
 			editor.reset();
-			terminal.write(SGR.clear);
+			terminal.reset();
 		},
 		readLine() {
 			settle(null);
@@ -368,7 +369,7 @@ export function openOutputLink(
 		return false;
 	}
 	if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-	if (!confirm(`Open this link in a new tab?\n\n${parsed.href}`)) return false;
+	if (!confirm(m.runner_confirm_link({ url: parsed.href }))) return false;
 	open(parsed.href, "_blank", "noopener,noreferrer");
 	return true;
 }

@@ -55,6 +55,7 @@
 		"@inlang/paraglide-js": "^2.29.1",
 		"@inlang/plugin-message-format": "^4.5.4",
 		"@inquirer/prompts": "^8.6.0",
+		"@lezer/highlight": "1.2.5",
 		"@node-rs/argon2": "^2.1.0",
 		"@prisma/adapter-better-sqlite3": "^7.9.1",
 		"@prisma/client": "^7.9.1",

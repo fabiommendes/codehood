@@ -3,14 +3,19 @@
 // stdin, run and stop it, and watch status, output, the stdin transport in use
 // and timings. Meant for developers; the real editor and terminal come later.
 import PageKicker from "@/components/PageKicker.astro";
+import CodeRunner from "@/components/runner/CodeRunner";
 import { RUNNER_ORIGIN } from "@/core/constants";
 import AppLayout from "@/layouts/AppLayout.astro";
 
 export const prerender = false;
+
+// `?view=widgets` shows the CodeRunner widgets instead of the diagnostics: the
+// diagnostics create the runner iframe on load, and the widgets must not.
+const widgetsView = Astro.url.searchParams.get("view") === "widgets";
 ---
 
 <AppLayout title="Runner">
-  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={RUNNER_ORIGIN ?? ""}>
+  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={widgetsView ? undefined : (RUNNER_ORIGIN ?? "")}>
     <div class="mb-6">
       <PageKicker text="Diagnostics" />
       <h1 class="text-3xl font-bold">Runner</h1>
@@ -21,7 +26,26 @@ export const prerender = false;
     </div>
 
     {
-      RUNNER_ORIGIN === null ? (
+      widgetsView ? (
+        <div class="flex flex-col gap-6" id="widgets">
+          <CodeRunner
+            client:load
+            mode="snippet"
+            language="javascript"
+            label="First example"
+            runnerOrigin={RUNNER_ORIGIN}
+            code={`const name = prompt("Name?");\nconsole.log(\`Hello, \${name}!\`);\n`}
+          />
+          <CodeRunner
+            client:load
+            mode="snippet"
+            language="javascript"
+            label="Second example"
+            runnerOrigin={RUNNER_ORIGIN}
+            code={`console.log("second");\n`}
+          />
+        </div>
+      ) : RUNNER_ORIGIN === null ? (
         <div role="alert" class="alert alert-warning" id="runner-off">
           A execução de código está desligada: esta instância não tem RUNNER_ORIGIN.
         </div>
