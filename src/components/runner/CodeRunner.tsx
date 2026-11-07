@@ -23,7 +23,7 @@ import {
 	RunnerHost,
 	RunnerUnavailable,
 } from "@/runner/host";
-import { defaultFilename } from "@/runner/languages";
+import { defaultFilename, defaultRunMode } from "@/runner/languages";
 import type { LanguageId, RunMode } from "@/runner/protocol";
 import { createEditor, type RunnerEditor } from "./editor";
 import {
@@ -91,6 +91,7 @@ const BLOCKED: ReadonlySet<IdePhase> = new Set([
 
 const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
 	javascript: () => m.runner_language_javascript(),
+	prolog: () => m.runner_language_prolog(),
 	fake: () => "fake",
 };
 
@@ -319,7 +320,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			const handle = await RunnerHost.shared(props.runnerOrigin).run(
 				{
 					language: props.language,
-					mode: props.runMode ?? "script",
+					mode: props.runMode ?? defaultRunMode(props.language),
 					files: { [entry]: code() },
 					entry,
 				},
@@ -571,6 +572,11 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 								? m.runner_cancel()
 								: m.runner_stop()}
 						</button>
+					</Show>
+					<Show when={props.language === "prolog"}>
+						<span class="text-xs text-base-content/60" data-role="restart-note">
+							{m.runner_prolog_restarts()}
+						</span>
 					</Show>
 				</div>
 			</div>

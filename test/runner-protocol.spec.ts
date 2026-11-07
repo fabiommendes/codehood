@@ -28,7 +28,7 @@ const TRANSPORTS = [
 
 test.describe("ready", () => {
 	for (const [kind, query] of TRANSPORTS) {
-		test(`announces protocol 1, the ${kind} transport and both drivers`, async ({
+		test(`announces protocol 1, the ${kind} transport and its drivers`, async ({
 			page,
 		}, testInfo) => {
 			test.skip(
@@ -40,7 +40,7 @@ test.describe("ready", () => {
 				type: "ready",
 				protocol: 1,
 				stdin: kind,
-				languages: ["javascript", "fake"],
+				languages: ["javascript", "prolog", "fake"],
 			});
 		});
 	}

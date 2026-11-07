@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { defaultFilename, runnerLanguage } from "@/runner/languages";
+import {
+	defaultFilename,
+	defaultRunMode,
+	runnerLanguage,
+} from "@/runner/languages";
+
+test("Prolog tags map to prolog, which starts in repl mode", () => {
+	for (const tag of ["pl", "prolog", "SWIPL"]) {
+		expect(runnerLanguage(tag)).toBe("prolog");
+	}
+	expect(defaultFilename("prolog")).toBe("main.pl");
+	expect(defaultRunMode("prolog")).toBe("repl");
+	expect(defaultRunMode("javascript")).toBe("script");
+});
 
 test("JavaScript aliases map to javascript", () => {
 	for (const tag of ["javascript", "js", "mjs", "node"]) {
@@ -24,7 +37,7 @@ test("the fake driver is never reachable from a tag", () => {
 });
 
 test("languages without a driver map to null", () => {
-	for (const tag of ["python", "haskell", "prolog", "typescript", "lua"]) {
+	for (const tag of ["python", "haskell", "typescript", "lua"]) {
 		expect(runnerLanguage(tag)).toBeNull();
 	}
 });

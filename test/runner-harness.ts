@@ -15,7 +15,7 @@ interface RunnerWindow extends Window {
 	__runnerMessages: Record<string, unknown>[];
 }
 
-export type Language = "javascript" | "fake";
+export type Language = "javascript" | "prolog" | "fake";
 
 /// A frame loaded into an app page, plus the page that hosts it.
 export interface Harness {
@@ -136,7 +136,7 @@ export function runMessage(
 	mode: "script" | "repl" = "script",
 	extra: Record<string, unknown> = {},
 ) {
-	const entry = language === "javascript" ? "main.js" : "main.fake";
+	const entry = `main.${{ javascript: "js", prolog: "pl", fake: "fake" }[language]}`;
 	return {
 		type: "run",
 		runId,
