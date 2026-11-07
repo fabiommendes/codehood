@@ -12,6 +12,7 @@ import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
 import QuestionStatsTable from "@/components/grading/QuestionStats.astro";
 import ReleasedScore from "@/components/ReleasedScore.astro";
+import { RUNNER_ORIGIN } from "@/core/constants";
 import type { ExamExceptionView, Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 import { m } from "@/i18n";
@@ -374,8 +375,10 @@ const showQuestions =
 	state.kind === "submitted" ||
 	state.kind === "results";
 const latestAnswers: Record<string, AnswerPayload> = {};
+const answeredAt: Record<string, string> = {};
 for (const submission of attempt?.submissions ?? []) {
 	latestAnswers[submission.question] = submission.payload as AnswerPayload;
+	answeredAt[submission.question] = submission.createdAt.toISOString();
 }
 ---
 
@@ -496,6 +499,10 @@ for (const submission of attempt?.submissions ?? []) {
             result={examOutcome}
             reviews={reviews}
             regrades={questionRegrades}
+            codeRun={codeRun.allowed}
+            runnerOrigin={RUNNER_ORIGIN}
+            username={actor.username}
+            answeredAt={answeredAt}
           />
         </section>
       )

@@ -218,5 +218,21 @@
 	"exams_detail_code_run_on_default": "Code execution: on ({type} default)",
 	"exams_detail_code_run_off_default": "Code execution: off ({type} default)",
 	"exams_detail_code_run_on_exam": "Code execution: on (set in the exam)",
-	"exams_detail_code_run_off_exam": "Code execution: off (set in the exam)"
+	"exams_detail_code_run_off_exam": "Code execution: off (set in the exam)",
+	"exams_attempt_code_badge": "Code runs in your browser",
+	"exams_attempt_submit_conflict": "Two versions of the answer in {numbers}. Submitting now sends the server's version.",
+	"exams_code_answer_label": "Code answer",
+	"exams_code_saved_at": "Saved at {time}",
+	"exams_code_save_failing": "The server has not received your changes since {time}. The draft stays in this browser.",
+	"exams_code_run_off_hint": "You can still write and submit your answer.",
+	"exams_code_conflict_title": "Two versions of this answer",
+	"exams_code_conflict_body": "This browser kept a draft that differs from what the server has. Pick the one to continue from; the other is discarded.",
+	"exams_code_conflict_browser": "This browser",
+	"exams_code_conflict_browser_time": "edited at {time}",
+	"exams_code_conflict_server": "Server",
+	"exams_code_conflict_server_time": "saved at {time}",
+	"exams_code_conflict_server_empty": "no saved answer",
+	"exams_code_keep_draft": "Keep this browser's draft",
+	"exams_code_use_server": "Use the server's version",
+	"exams_code_pick_first": "Pick a version first"
 }

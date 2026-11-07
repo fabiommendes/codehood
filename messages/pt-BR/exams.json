@@ -218,5 +218,21 @@
 	"exams_detail_code_run_on_default": "Execução de código: ligada (padrão de {type})",
 	"exams_detail_code_run_off_default": "Execução de código: desligada (padrão de {type})",
 	"exams_detail_code_run_on_exam": "Execução de código: ligada (definida no exam)",
-	"exams_detail_code_run_off_exam": "Execução de código: desligada (definida no exam)"
+	"exams_detail_code_run_off_exam": "Execução de código: desligada (definida no exam)",
+	"exams_attempt_code_badge": "O código roda no seu navegador",
+	"exams_attempt_submit_conflict": "Duas versões da resposta em {numbers}. Se você enviar agora, vale a versão do servidor.",
+	"exams_code_answer_label": "Resposta em código",
+	"exams_code_saved_at": "Salvo às {time}",
+	"exams_code_save_failing": "O servidor não recebe suas alterações desde {time}. O rascunho fica neste navegador.",
+	"exams_code_run_off_hint": "Você ainda pode escrever e enviar sua resposta.",
+	"exams_code_conflict_title": "Duas versões desta resposta",
+	"exams_code_conflict_body": "Este navegador guardou um rascunho diferente do que o servidor tem. Escolha a versão para continuar; a outra é descartada.",
+	"exams_code_conflict_browser": "Este navegador",
+	"exams_code_conflict_browser_time": "editado às {time}",
+	"exams_code_conflict_server": "Servidor",
+	"exams_code_conflict_server_time": "salvo às {time}",
+	"exams_code_conflict_server_empty": "nenhuma resposta salva",
+	"exams_code_keep_draft": "Manter o rascunho deste navegador",
+	"exams_code_use_server": "Usar a versão do servidor",
+	"exams_code_pick_first": "Escolha uma versão primeiro"
 }

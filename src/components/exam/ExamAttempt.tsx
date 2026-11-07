@@ -16,6 +16,8 @@ import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { locale, m } from "@/i18n";
+import { runnerLanguage } from "@/runner/languages";
+import type { LanguageId } from "@/runner/protocol";
 import {
 	type ExamResult,
 	formatScore,
@@ -31,6 +33,8 @@ import {
 	isTextEntry,
 	toSaved,
 } from "./answer-payload";
+import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
+import { draftStore } from "./code-draft";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { questionList, unansweredWarning } from "./unanswered-warning";
 
@@ -55,6 +59,14 @@ export interface ExamAttemptProps {
 	reviews?: Record<string, ReviewResult>;
 	/// What the student may do about the regrade of each question's answer, by question slug.
 	regrades?: Record<string, QuestionRegrade>;
+	/// Whether students may run code in this exam (`canRunCode`).
+	codeRun?: boolean;
+	/// Origin of the runner iframe; null when the server has none.
+	runnerOrigin?: string | null;
+	/// The viewing student, which keys their local code drafts.
+	username?: string;
+	/// When the server saved each answer, by question slug (ISO), for the draft conflict panel.
+	answeredAt?: Record<string, string>;
 }
 
 /// The box every state sentence of an attempt sits in.
@@ -62,6 +74,9 @@ const NOTICE = "rounded-box border border-info bg-info/5 p-4 text-sm";
 
 /// How long a save may take before it shows as "Saving…".
 const SLOW_SAVE_MS = 400;
+
+/// How long before the deadline a newer local draft is saved for the student.
+const DRAFT_SAVE_LEAD_SECONDS = 10;
 
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
@@ -122,6 +137,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const [confirmed, setConfirmed] = createSignal<ReadonlySet<string>>(
 		new Set(Object.keys(props.answers)),
 	);
+	// When the server last confirmed a save of each question, and since when its saves fail.
+	const [savedAt, setSavedAt] = createSignal<Record<string, Date>>({});
+	const [failingSince, setFailingSince] = createSignal<Record<string, Date>>(
+		{},
+	);
+	// Code questions whose local draft and saved answer still disagree.
+	const [conflicts, setConflicts] = createSignal<
+		Record<string, { newer: "draft" | "server"; draftCode: string }>
+	>({});
 	let dialog: HTMLDialogElement | undefined;
 
 	// An ordering question shows its lines before the student touches them, so
@@ -139,6 +163,17 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		props.questions.flatMap((entry, index) =>
 			isAnswered(entry.question.type, answers()[entry.slug]) ? [] : [index + 1],
 		);
+
+	/// The numbers of the code questions whose local draft and saved answer disagree.
+	const conflictNumbers = () =>
+		props.questions.flatMap((entry, index) =>
+			conflicts()[entry.slug] ? [index + 1] : [],
+		);
+
+	/// Whether some question runs code in the browser, which the attempt bar says.
+	const runsCode = () =>
+		(props.codeRun ?? false) &&
+		props.questions.some((entry) => codeLanguageOf(entry.question) !== null);
 
 	// Weights show only when some question weighs other than the default 1.
 	const weighted = () =>
@@ -226,6 +261,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				);
 			if (message === null) {
 				setSaveError(slug, null);
+				setSavedAt((current) => ({ ...current, [slug]: serverNow() }));
+				setFailingSince(({ [slug]: _ok, ...rest }) => rest);
 				setConfirmed((current) => new Set(current).add(slug));
 				if (!pending.has(slug)) markUnsaved(slug, false);
 				return;
@@ -234,6 +271,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			// A newer answer typed meanwhile supersedes the failed one.
 			if (!pending.has(slug)) pending.set(slug, payload);
 			setSaveError(slug, message);
+			setFailingSince((current) => ({
+				...current,
+				[slug]: current[slug] ?? serverNow(),
+			}));
 		});
 	}
 
@@ -262,6 +303,63 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		);
 	}
 
+	/// The key of a code question's local draft.
+	const draftRef = (question: string) => ({
+		username: props.username ?? "",
+		course: `${props.discipline}/${props.course}`,
+		exam: props.exam,
+		question,
+	});
+
+	/// Removes this exam's local code drafts, once the attempt is over.
+	function clearDrafts(): void {
+		if (!props.username) return;
+		try {
+			const { question: _question, ...exam } = draftRef("");
+			draftStore(window.localStorage).clearExam(exam);
+		} catch {
+			// Storage unavailable: there is nothing to clear.
+		}
+	}
+
+	/// Saves the draft of every code question whose draft is newer than its saved answer.
+	function keepNewerDrafts(): void {
+		for (const [slug, found] of Object.entries(conflicts())) {
+			if (found.newer === "draft") change(slug, "essay", found.draftCode);
+		}
+		setConflicts({});
+	}
+
+	/// What `AnswerField` needs to show `question` as a code answer, or undefined when it is not one.
+	function codeContext(
+		slug: string,
+		question: QuestionPublic["question"],
+		status: { failed: boolean; slow: boolean; unsaved: boolean },
+	): CodeAnswerContext | undefined {
+		const language = codeLanguageOf(question);
+		if (language === null || !props.username) return undefined;
+		const saved = props.answers[slug];
+		const at = props.answeredAt?.[slug];
+		return {
+			language,
+			codeRun: props.codeRun ?? false,
+			runnerOrigin: props.runnerOrigin ?? null,
+			draft: draftRef(slug),
+			value: typeof saved === "string" ? saved : "",
+			valueSavedAt: at ? new Date(at) : null,
+			clockOffsetMs: skew,
+			save: {
+				state: status.slow ? "saving" : status.unsaved ? "unsaved" : "saved",
+				savedAt: savedAt()[slug] ?? null,
+				failingSince: failingSince()[slug] ?? null,
+			},
+			onConflict: (found) =>
+				setConflicts(({ [slug]: _old, ...rest }) =>
+					found ? { ...rest, [slug]: found } : rest,
+				),
+		};
+	}
+
 	async function start(): Promise<void> {
 		setBusy(true);
 		setFailure(null);
@@ -284,7 +382,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			const { error } = await actions.exam.finish(target);
 			if (error) setFailure(errorMessage(error));
 			// The server decides what follows: awaiting grading, or the results.
-			else window.location.reload();
+			else {
+				clearDrafts();
+				window.location.reload();
+			}
 		}
 		dialog?.close();
 		setBusy(false);
@@ -293,9 +394,21 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	onMount(() => {
 		const interval = setInterval(() => setNow(serverNow()), 1000);
 		onCleanup(() => clearInterval(interval));
+		if (kind() !== "in-progress") clearDrafts();
 	});
 	onCleanup(() => {
 		for (const timer of timers.values()) clearTimeout(timer);
+	});
+
+	// The server refuses answers once the deadline passes, so a draft newer than
+	// the saved answer is saved while there is still time for it to land.
+	createEffect(() => {
+		const limit = deadline();
+		if (kind() !== "in-progress" || !limit) return;
+		if (secondsLeft(limit, now()) > DRAFT_SAVE_LEAD_SECONDS) return;
+		if (Object.keys(conflicts()).length === 0) return;
+		keepNewerDrafts();
+		void flush();
 	});
 
 	// Once the deadline passes the server refuses further answers: save what
@@ -303,7 +416,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	createEffect(() => {
 		const limit = deadline();
 		if (kind() !== "in-progress" || !limit || now() <= limit) return;
-		void flush().then(() => setKind("submitted"));
+		keepNewerDrafts();
+		void flush().then((saved) => {
+			setKind("submitted");
+			if (saved) clearDrafts();
+		});
 	});
 
 	return (
@@ -385,6 +502,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 									: waterLevel(weightOf(entry.question), remainingMean()),
 							}))}
 							current={current()}
+							runsCode={runsCode()}
 							saving={unsaved().size > 0}
 							busy={busy()}
 							onSubmit={() => dialog?.showModal()}
@@ -401,6 +519,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 								<Show
 									when={
 										kind() === "in-progress" &&
+										codeLanguageOf(entry.question) === null &&
 										(answers()[entry.slug] ?? null) !== null
 									}
 								>
@@ -525,6 +644,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 												onChange={(payload) =>
 													change(entry.slug, entry.question.type, payload)
 												}
+												code={
+													kind() === "in-progress"
+														? codeContext(entry.slug, entry.question, {
+																failed: failed(),
+																slow: slowSave(),
+																unsaved: unsaved().has(entry.slug),
+															})
+														: undefined
+												}
 											/>
 											<div class="self-end sm:hidden">{clearButton()}</div>
 											<Show when={kind() === "results" && props.result}>
@@ -565,6 +693,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							<Show when={unansweredNumbers().length > 0}>
 								<p role="alert" class="alert alert-warning mt-3 text-sm">
 									{unansweredWarning(unansweredNumbers())}
+								</p>
+							</Show>
+							<Show when={conflictNumbers().length > 0}>
+								<p role="alert" class="alert alert-warning mt-3 text-sm">
+									{m.exams_attempt_submit_conflict({
+										numbers: questionList(conflictNumbers()),
+									})}
 								</p>
 							</Show>
 							<Show when={unsortedNumbers().length > 0}>
@@ -617,6 +752,8 @@ interface AttemptBarProps {
 	}[];
 	/// The number of the question in view, if any.
 	current: number | null;
+	/// Whether some question runs code in the browser, which the bar says next to the clock.
+	runsCode: boolean;
 	/// Whether some change still waits for the server.
 	saving: boolean;
 	busy: boolean;
@@ -714,6 +851,11 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 						total: props.questions.length,
 					})}
 				</span>
+				<Show when={props.runsCode}>
+					<span class="badge badge-soft badge-success badge-sm" data-code-badge>
+						{m.exams_attempt_code_badge()}
+					</span>
+				</Show>
 				<span class="hidden sm:inline">{saveStatus()}</span>
 			</div>
 			<div class="mt-2 flex items-center gap-1 sm:items-start sm:gap-3">
@@ -1028,19 +1170,79 @@ interface AnswerFieldProps {
 	/// The answer's marks and feedback, shown in `review` mode; the score is the outcome's, below.
 	review?: ReviewResult;
 	onChange: (payload: AnswerPayload) => void;
+	/// Set for a code question being answered: it gets the editor instead of the textarea.
+	code?: CodeAnswerContext;
+}
+
+/// What a code question in answer mode needs besides the question itself.
+type CodeAnswerContext = Pick<
+	CodeEssayAnswerProps,
+	| "language"
+	| "value"
+	| "valueSavedAt"
+	| "clockOffsetMs"
+	| "save"
+	| "codeRun"
+	| "runnerOrigin"
+	| "draft"
+	| "onConflict"
+>;
+
+/// The runner language of an essay question whose answer is code a driver runs, or null.
+function codeLanguageOf(
+	question: QuestionPublic["question"],
+): LanguageId | null {
+	return question.type === "essay" && question.content === "code"
+		? runnerLanguage(question.highlight)
+		: null;
 }
 
 /// One question in answer mode, frozen on the student's saved answer, or reviewed with its marks.
 function AnswerField(props: AnswerFieldProps): JSX.Element {
 	return (
-		<AnyQuestionView
-			question={props.question}
-			value={props.payload ?? null}
-			onChange={props.onChange}
-			mode={props.review ? "review" : props.readonly ? "readonly" : "answer"}
-			result={props.review}
-			hideScore
-			messages={mdqMessages}
-		/>
+		<Show
+			when={
+				props.code &&
+				!props.readonly &&
+				!props.review &&
+				props.question.type === "essay"
+					? props.code
+					: undefined
+			}
+			fallback={
+				<AnyQuestionView
+					question={props.question}
+					value={props.payload ?? null}
+					onChange={props.onChange}
+					mode={
+						props.review ? "review" : props.readonly ? "readonly" : "answer"
+					}
+					result={props.review}
+					hideScore
+					messages={mdqMessages}
+				/>
+			}
+		>
+			{(code) => (
+				<CodeEssayAnswer
+					stem={props.question.type === "essay" ? props.question.stem : ""}
+					epilogue={
+						props.question.type === "essay"
+							? props.question.epilogue
+							: undefined
+					}
+					language={code().language}
+					value={code().value}
+					valueSavedAt={code().valueSavedAt}
+					clockOffsetMs={code().clockOffsetMs}
+					onChange={props.onChange}
+					save={code().save}
+					codeRun={code().codeRun}
+					runnerOrigin={code().runnerOrigin}
+					draft={code().draft}
+					onConflict={code().onConflict}
+				/>
+			)}
+		</Show>
 	);
 }
