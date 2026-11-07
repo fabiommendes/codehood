@@ -76,6 +76,9 @@ export const rubricItemCreate = z.object({
 	feedback: z.string().nullish(),
 });
 
+/// The whole item under a key the caller chose, for an idempotent create or replace.
+export const rubricItemPut = rubricItemCreate.omit({ key: true });
+
 export const rubricItemUpdate = rubricItemCreate.omit({ key: true }).partial();
 
 export const rubricSplit = z.object({

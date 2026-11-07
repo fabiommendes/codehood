@@ -16,6 +16,7 @@ import {
 	rubricChange,
 	rubricItemCreate,
 	rubricItemPK,
+	rubricItemPut,
 	rubricItemSchema,
 	rubricItemUpdate,
 	rubricPK,
@@ -55,6 +56,7 @@ export type RubricPK = z.infer<typeof rubricPK>;
 export type RubricItemPK = z.infer<typeof rubricItemPK>;
 export type RubricUpdate = z.infer<typeof rubricUpdate>;
 export type RubricItemCreate = z.infer<typeof rubricItemCreate>;
+export type RubricItemPut = z.infer<typeof rubricItemPut>;
 export type RubricItemUpdate = z.infer<typeof rubricItemUpdate>;
 export type RubricSplit = z.infer<typeof rubricSplit>;
 export type RubricRenameGroup = z.infer<typeof rubricRenameGroup>;
@@ -218,6 +220,61 @@ export const makeRubricService = defineService()(() => {
 				},
 			});
 			if (patch.value !== undefined) await recomputeRubricPasses(tx, rubric.id);
+
+			const standing = await rubricStanding(
+				tx,
+				target.examId,
+				target.questionRefId,
+			);
+			return toItem(row, standing.uses.get(row.id) ?? 0);
+		},
+	});
+
+	/**
+	 * Creates the item under `pk.key`, or replaces its fields when it exists.
+	 *
+	 * Replacing clears the optional fields left out, and a changed value
+	 * recomputes the passes as in `updateItem`.
+	 *
+	 * @throws {@link NotFound} If the course, the exam or the question does not exist.
+	 * @throws {@link NotAllowed} If `actor` lacks `rubric.write` on the course.
+	 * @throws {@link InvalidData} If a field is invalid.
+	 */
+	const upsertItem = op({
+		args: [rubricItemPK, rubricItemPut],
+		returns: rubricItemSchema,
+		run: async (
+			tx: PrismaTx,
+			pk: RubricItemPK,
+			input: RubricItemPut,
+			opts: ServiceOptsWithoutTx,
+		): Promise<RubricItem> => {
+			const target = await resolveTarget(tx, pk, opts, "rubric.write");
+			const rubric = await materializeRubric(
+				tx,
+				target.examId,
+				target.questionRefId,
+			);
+			const existing = rubric.items.find((item) => item.key === pk.key);
+			if (!existing) {
+				const row = await tx.rubricItem.create({
+					data: itemData(rubric.id, pk.key, nextPosition(rubric.items), input),
+				});
+				return toItem(row, 0);
+			}
+
+			const row = await tx.rubricItem.update({
+				where: { id: existing.id },
+				data: {
+					group: input.group ?? null,
+					text: input.text,
+					value: input.value,
+					comment: input.comment ?? null,
+					feedback: input.feedback ?? null,
+				},
+			});
+			if (row.value !== existing.value)
+				await recomputeRubricPasses(tx, rubric.id);
 
 			const standing = await rubricStanding(
 				tx,
@@ -417,6 +474,7 @@ export const makeRubricService = defineService()(() => {
 		update,
 		createItem,
 		updateItem,
+		upsertItem,
 		deleteItem,
 		splitItem,
 		renameGroup,

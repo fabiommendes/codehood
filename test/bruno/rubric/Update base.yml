@@ -1,0 +1,22 @@
+info:
+  name: Update base
+  type: http
+  seq: 2
+
+http:
+  method: PATCH
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/quiz-02/question/loop-invariants/rubric
+  body:
+    type: json
+    data: |-
+      {
+          "base": "0.2"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -727,3 +727,117 @@ export const userApi = {
 		service: db.user,
 	}),
 };
+
+const rubricTags = ["Rubrics"];
+const rubricPath =
+	"/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric";
+
+/// The rubric of the question a rubric path addresses.
+function rubricKeyOf(params: Record<string, string>) {
+	return {
+		course: parseCourseParams(params),
+		exam: params.slug as string,
+		question: params.question as string,
+	};
+}
+
+/// The rubric item a rubric item path addresses.
+function rubricItemKeyOf(params: Record<string, string>) {
+	return { ...rubricKeyOf(params), key: params.key as string };
+}
+
+const rubricItemEntity = schema.rubricItemSchema.openapi("RubricItem");
+
+export const rubricApi = {
+	read: GET(rubricPath, {
+		out: schema.rubricSchema.openapi("Rubric"),
+		summary: "Read the grading rubric of a question in an exam.",
+		description:
+			"Without a stored rubric, answers the question's initial rubric flagged `initial`, and writes nothing.",
+		operationId: "rubricRead",
+		tags: rubricTags,
+		handler: async ({ actor, params }) =>
+			db.rubric.findOne(rubricKeyOf(params), { actor }),
+	}),
+	update: PATCH(rubricPath, {
+		in: schema.rubricUpdate.openapi("RubricUpdate"),
+		out: schema.rubricSchema.openapi("Rubric"),
+		summary: "Set the base score of a rubric.",
+		operationId: "rubricUpdate",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.update(rubricKeyOf(params), body, { actor }),
+	}),
+	createItem: POST(`${rubricPath}/item`, {
+		in: schema.rubricItemCreate.openapi("RubricItemCreate"),
+		out: rubricItemEntity,
+		summary: "Add an item to a rubric.",
+		operationId: "rubricItemCreate",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.createItem(rubricKeyOf(params), body, { actor }),
+	}),
+	updateItem: PATCH(`${rubricPath}/item/[key]`, {
+		in: schema.rubricItemUpdate.openapi("RubricItemUpdate"),
+		out: rubricItemEntity,
+		summary: "Change some fields of a rubric item.",
+		operationId: "rubricItemUpdate",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.updateItem(rubricItemKeyOf(params), body, { actor }),
+	}),
+	putItem: PUT(`${rubricPath}/item/[key]`, {
+		in: schema.rubricItemPut.openapi("RubricItemPut"),
+		out: rubricItemEntity,
+		summary: "Create or replace a rubric item under the given key.",
+		description:
+			"Idempotent. Optional fields left out are cleared; a changed value recomputes the passes that apply the item.",
+		operationId: "rubricItemPut",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.upsertItem(rubricItemKeyOf(params), body, { actor }),
+	}),
+	deleteItem: DELETE(`${rubricPath}/item/[key]`, {
+		out: z.object({ deleted: z.boolean() }).openapi("RubricItemDeleted"),
+		summary: "Delete a rubric item.",
+		description:
+			"Also removes the item from every pass that applied it and recomputes them. Resolves when the item is already gone.",
+		operationId: "rubricItemDelete",
+		tags: rubricTags,
+		handler: async ({ actor, params }) => {
+			await db.rubric.deleteItem(rubricItemKeyOf(params), { actor });
+			return { deleted: true };
+		},
+	}),
+	splitItem: POST(`${rubricPath}/item/[key]/split`, {
+		in: schema.rubricSplit.openapi("RubricSplit"),
+		out: rubricItemEntity.array(),
+		summary: "Split a rubric item into finer items.",
+		description:
+			"The item is retired, not removed: passes that applied it keep their score.",
+		operationId: "rubricItemSplit",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.splitItem(rubricItemKeyOf(params), body, { actor }),
+	}),
+	renameGroup: POST(`${rubricPath}/rename-group`, {
+		in: schema.rubricRenameGroup.openapi("RubricRenameGroup"),
+		out: schema.rubricRenameResult.openapi("RubricRenameResult"),
+		summary: "Rename a group of rubric items.",
+		operationId: "rubricRenameGroup",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.renameGroup(rubricKeyOf(params), body, { actor }),
+	}),
+	preview: POST(`${rubricPath}/preview`, {
+		in: schema.rubricChange.openapi("RubricChange"),
+		out: schema.rubricPreview.openapi("RubricPreview"),
+		summary: "Count the passes a rubric change would move.",
+		description:
+			"Writes nothing. `released` counts the passes students already read.",
+		operationId: "rubricPreview",
+		tags: rubricTags,
+		handler: async ({ actor, body, params }) =>
+			db.rubric.preview(rubricKeyOf(params), body, { actor }),
+	}),
+};

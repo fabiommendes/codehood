@@ -102,6 +102,45 @@
 		]
 	},
 	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric",
+		"methods": [
+			"get",
+			"patch"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric/item",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric/item/[key]",
+		"methods": [
+			"delete",
+			"patch",
+			"put"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric/item/[key]/split",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric/preview",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/course/[discipline]/[course]/exam/[slug]/question/[question]/rubric/rename-group",
+		"methods": [
+			"post"
+		]
+	},
+	{
 		"pattern": "/api/course/[discipline]/[course]/grade-column",
 		"methods": [
 			"get",

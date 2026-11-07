@@ -1,0 +1,7 @@
+info:
+  name: rubric
+  type: folder
+  seq: 20
+
+request:
+  auth: inherit

@@ -1,0 +1,23 @@
+info:
+  name: Put item
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: http://localhost:4321/api/course/cs101/ada_{{edition}}/exam/quiz-02/question/loop-invariants/rubric/item/base-case
+  body:
+    type: json
+    data: |-
+      {
+          "text": "Handles the base case and the empty input",
+          "value": "0.25"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
