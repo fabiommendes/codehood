@@ -1,8 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { RUNTIMES, runtimeDir, runtimePath } from "@/runner/sandbox/runtimes";
 import { buildRunnerBundle } from "@/runner/server/integration";
 import { requestSide, runnerHeaders } from "@/runner/server/routing";
 import { TEST_BASE_URL, TEST_RUNNER_ORIGIN } from "./env";
@@ -187,6 +194,66 @@ test.describe("bundle files", () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get("cache-control")).toBe("no-cache");
 		expect(response.headers.get("content-type")).toContain("text/javascript");
+	});
+});
+
+test.describe("runtime files", () => {
+	const rt = (path: string) => get(TEST_RUNNER_ORIGIN, `/runner/rt/${path}`);
+
+	test("a listed file is served immutable with its content type", async () => {
+		for (const [path, type] of [
+			[runtimePath(RUNTIMES.swipl, "swipl-web.wasm"), "application/wasm"],
+			[
+				runtimePath(RUNTIMES.swipl, "swipl-web.data"),
+				"application/octet-stream",
+			],
+			[runtimePath(RUNTIMES.pyodide, "pyodide.mjs"), "text/javascript"],
+			[runtimePath(RUNTIMES.pyodide, "python_stdlib.zip"), "application/zip"],
+			[runtimePath(RUNTIMES.pyodide, "pyodide-lock.json"), "application/json"],
+		] as const) {
+			const response = await rt(path);
+			expect(response.status, path).toBe(200);
+			expect(response.headers.get("cache-control")).toContain("immutable");
+			expect(response.headers.get("content-type")).toContain(type);
+			await response.arrayBuffer();
+		}
+	});
+
+	test("an unlisted file, another version and `..` are 404", async () => {
+		const dir = runtimeDir(RUNTIMES.pyodide);
+		for (const path of [
+			`${dir}/package.json`,
+			`${dir}/pyodide.mjs.map`,
+			"pyodide@1.0.0/pyodide.mjs",
+			`${dir}/../../manifest.json`,
+			`${dir}/%2e%2e/%2e%2e/manifest.json`,
+			"../manifest.json",
+			`${dir}/..%2fmanifest.json`,
+		]) {
+			expect(
+				await rawStatus(TEST_RUNNER_ORIGIN, `/runner/rt/${path}`),
+				path,
+			).toBe(404);
+		}
+	});
+
+	test("the versions match the installed packages", () => {
+		const declared = JSON.parse(readFileSync("package.json", "utf8"))
+			.dependencies as Record<string, string>;
+		for (const runtime of Object.values(RUNTIMES)) {
+			const installed = JSON.parse(
+				readFileSync(join("node_modules", runtime.pkg, "package.json"), "utf8"),
+			);
+			expect(installed.version).toBe(runtime.version);
+			expect(declared[runtime.pkg]).toBe(runtime.version);
+		}
+	});
+
+	test("swipl-web.js ends with the module export", async () => {
+		const text = await (
+			await rt(runtimePath(RUNTIMES.swipl, "swipl-web.js"))
+		).text();
+		expect(text.trimEnd().endsWith("export default SWIPL;")).toBe(true);
 	});
 });
 

@@ -4,6 +4,7 @@
 
 import { createHash } from "node:crypto";
 import {
+	copyFileSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
@@ -15,6 +16,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
+import { RUNTIMES, runtimeDir, SWIPL_MODULE_SUFFIX } from "../sandbox/runtimes";
 import { BUNDLE_DIR_NAME, DEV_BUNDLE_DIR, MANIFEST_NAME } from "./assets";
 
 /// Whether `file` may be part of the bundle: the sandbox, its entries,
@@ -72,12 +74,41 @@ function listFiles(dir: string): string[] {
 		.sort();
 }
 
+/// Copies the files of `RUNTIMES` from `node_modules` into `<staging>/rt/`,
+/// checking the installed version, and gives `swipl-web.js` its module export.
+function copyRuntimes(root: string, staging: string): void {
+	for (const runtime of Object.values(RUNTIMES)) {
+		const pkgDir = join(root, "node_modules", runtime.pkg);
+		const installed = JSON.parse(
+			readFileSync(join(pkgDir, "package.json"), "utf8"),
+		).version;
+		if (installed !== runtime.version) {
+			throw new Error(
+				`${runtime.pkg} ${installed} is installed but RUNTIMES lists ${runtime.version}.`,
+			);
+		}
+		const target = join(staging, "rt", runtimeDir(runtime));
+		mkdirSync(target, { recursive: true });
+		for (const [from, to] of Object.entries(runtime.files)) {
+			if (to === "swipl-web.js") {
+				writeFileSync(
+					join(target, to),
+					readFileSync(join(pkgDir, from), "utf8") + SWIPL_MODULE_SUFFIX,
+				);
+			} else {
+				copyFileSync(join(pkgDir, from), join(target, to));
+			}
+		}
+	}
+}
+
 /**
  * Builds the sandbox bundle for `root` into `outDir`, replacing what is there.
  *
  * Writes `frame.js`, `worker.js` (ES modules sharing chunks), `sw.js` (one
  * self-contained script, since it is not served from the versioned directory)
- * and `manifest.json` with the content hash and the file list.
+ * and `manifest.json` with the content hash and the file list. Runtime files
+ * go to `rt/`, outside both: their own path carries the version.
  *
  * @throws {Error} when the bundle imports anything outside the allowed set.
  */
@@ -126,6 +157,7 @@ export async function buildRunnerBundle(
 			join(staging, MANIFEST_NAME),
 			JSON.stringify({ version, files }),
 		);
+		copyRuntimes(root, staging);
 		rmSync(outDir, { recursive: true, force: true });
 		mkdirSync(dirname(outDir), { recursive: true });
 		renameSync(staging, outDir);

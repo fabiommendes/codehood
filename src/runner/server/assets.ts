@@ -12,7 +12,7 @@
  * | `/runner/frame`              | `frame`   | `renderFramePage(...)`           |
  * | `/runner/sw.js`              | `sw`      | service worker                   |
  * | `/runner/<version>/<file>`   | `bundle`  | `frame.js`, `worker.js`, chunks  |
- * | `/runner/rt/<pkg>@<ver>/...` | `runtime` | runtime files (later deliveries) |
+ * | `/runner/rt/<pkg>@<ver>/...` | `runtime` | files listed in `RUNTIMES`       |
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -20,6 +20,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FrameConfig } from "../sandbox/frame";
+import { RUNTIMES, runtimePath } from "../sandbox/runtimes";
 import type { RunnerAssetKind } from "./routing";
 
 /// Name of the directory that holds a built bundle, next to the server build.
@@ -67,9 +68,33 @@ function manifest(): { dir: string; version: string; files: Set<string> } {
 
 const CONTENT_TYPES: Record<string, string> = {
 	".js": "text/javascript; charset=utf-8",
+	".mjs": "text/javascript; charset=utf-8",
+	".zip": "application/zip",
+	".json": "application/json",
+	".data": "application/octet-stream",
 	".wasm": "application/wasm",
 	".map": "application/json",
 };
+
+/// Prefix of runtime files on the runner origin.
+const RUNTIME_PREFIX = "/runner/rt/";
+
+/// Content type from the file extension.
+function contentType(name: string): string {
+	return (
+		CONTENT_TYPES[name.slice(name.lastIndexOf("."))] ??
+		"application/octet-stream"
+	);
+}
+
+/// Every runtime file `RUNTIMES` lists, as `<pkg>@<version>/<file>`.
+function runtimeFiles(): Set<string> {
+	return new Set(
+		Object.values(RUNTIMES).flatMap((runtime) =>
+			Object.values(runtime.files).map((file) => runtimePath(runtime, file)),
+		),
+	);
+}
 
 /** Content hash of the current sandbox bundle; the `<version>` segment of its URLs. */
 export function runnerVersion(): string {
@@ -88,6 +113,15 @@ export async function readRunnerAsset(
 	const { dir, version, files } = manifest();
 	let name: string;
 	let kind: RunnerAssetKind;
+	if (pathname.startsWith(RUNTIME_PREFIX)) {
+		const rel = pathname.slice(RUNTIME_PREFIX.length);
+		if (!runtimeFiles().has(rel)) return null;
+		return {
+			kind: "runtime",
+			contentType: contentType(rel),
+			body: await readFile(join(dir, "rt", rel)),
+		};
+	}
 	if (pathname === "/runner/sw.js") {
 		name = "sw.js";
 		kind = "sw";
@@ -100,10 +134,9 @@ export async function readRunnerAsset(
 	}
 	// Only names the build listed are served, so no path can leave the directory.
 	if (!files.has(name)) return null;
-	const ext = name.slice(name.lastIndexOf("."));
 	return {
 		kind,
-		contentType: CONTENT_TYPES[ext] ?? "application/octet-stream",
+		contentType: contentType(name),
 		body: await readFile(join(dir, name)),
 	};
 }
