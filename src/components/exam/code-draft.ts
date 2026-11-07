@@ -66,6 +66,9 @@ export function compareDraft(
 ): DraftComparison {
 	if (draft === null) return { kind: "none" };
 	if (draft.code === serverCode) return { kind: "same" };
+	if (serverSavedAt === null && serverCode === "" && draft.code.trim() === "") {
+		return { kind: "same" };
+	}
 	const draftIsNewer = serverSavedAt === null || draft.savedAt > serverSavedAt;
 	return { kind: "conflict", newer: draftIsNewer ? "draft" : "server" };
 }

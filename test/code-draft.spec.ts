@@ -77,6 +77,14 @@ test("compareDraft: no draft, same code, and conflicts decided by the server clo
 	});
 });
 
+test("compareDraft: a whitespace-only draft against no answer is not a conflict", () => {
+	expect(compareDraft(draft("  \n\t", 5), "", null)).toEqual({ kind: "same" });
+	expect(compareDraft(draft("  ", 5), "", 3)).toEqual({
+		kind: "conflict",
+		newer: "draft",
+	});
+});
+
 test("read returns what was written; an expired draft reads as null and is removed", () => {
 	const storage = new FakeStorage();
 	const store = draftStore(storage);
