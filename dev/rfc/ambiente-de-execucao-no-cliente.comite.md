@@ -342,3 +342,17 @@ Votos da rodada 8: **P1 aprovado por unanimidade**, com condições:
   execução está desligada (`allowCodeRun` falso, sem `RUNNER_ORIGIN`).
 - UI mostra "preparando…" se Rodar chegar antes da reserva.
 - Plano B na E3b: medir snapshot de memória do Pyodide.
+
+### Revisões de entrega E1.1 a E1.3
+
+- E1.1 (272d596): security aprovou; bug de logout do `__Host-session`
+  corrigido em 5c5517f.
+- E1.2 (53a9ac1) e E1.3 (f967851): security aprovou. breaker achou B1 (SW
+  perde canais de stdin após ~30 s ocioso; REPL fica pendurado), B2 (Worker
+  posta saída sem limite), B3 (`status` forjado fora do lote), B4 (frame
+  aberto antes de deploy quebra) e `navigator.locks` como canal entre runs.
+  B1..B3 e `locks` são correções dentro do desenho aprovado (implementer
+  delegado; `locks` estende a lista do D1'). B4 virou a issue
+  `dev/issues/runner-frame-apos-deploy.md`, para votação.
+- Issue `dev/issues/stories-falhando-em-main.md` (3 stories já falham na
+  base 2bfdd24), para votação.
