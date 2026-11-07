@@ -556,6 +556,62 @@ novo. Valores em ms.
   swipl-wasm e na recarga, cujo tempo varia muito nesse modo. Com o período
   padrão de 100 ms: Pyodide 8789/9392, swipl-wasm 1702/2301, recarga 494/498.
 
+### E3b.5
+
+Bundle real (dev server do worktree, app em `localhost:4350`, runner em
+`127.0.0.1:4350`), drivers `python` (modo `script`, `input()` + `print`) e
+`prolog` (modo `repl`, consult + `fact(5, F).`). Tempo do `run` postado pela
+app até `status: running`, cache HTTP quente, 10 runs depois de 2 de
+aquecimento. Valores em ms.
+
+| Cenário | Desktop mediana | Desktop p90 | CPU 4x mediana | CPU 4x p90 |
+| :------ | --------------: | ----------: | -------------: | ---------: |
+| Python, reserva pronta | 2 | 2 | 23 | 91 |
+| Python, reserva carregando | 1717 | 1816 | 8295 | 9094 |
+| Python, sem reserva | 1592 | 1781 | 7978 | 8440 |
+| Prolog, reserva pronta | 2 | 2 | 2 | 26 |
+| Prolog, reserva carregando | 161 | 198 | 1980 | 2329 |
+| Prolog, sem reserva | 176 | 208 | 1834 | 1980 |
+| Recarga do frame (até `ready`) | 37 | 56 | 280 | 310 |
+
+- Com reserva pronta, nenhum caso passa de 3 s: o pior run com CPU 4x foi
+  283 ms (Python). Sem reserva, Python com CPU 4x fica em 8 s, como na
+  E1.6; é o caso do primeiro Rodar sem foco prévio no editor e do primeiro
+  Rodar depois da recarga em `review` (a recarga descarta a reserva).
+- Reserva carregando: `prepare` e, 20 ms depois, `run`. Custa o mesmo que
+  sem reserva; o ganho da reserva depende do tempo entre o foco no editor e o
+  Rodar.
+- Reserva pronta: `prepare`, espera de 3x o maior tempo sem reserva da série,
+  `run`. Nenhum desses runs reportou `loading`.
+- Montagem: página da app é um arquivo estático da origem da app (sem o
+  cliente do Vite, que recarregava a página quando outros agentes editavam o
+  worktree); o iframe de `/runner/frame` e as mensagens do protocolo são
+  postados direto, sem `RunnerHost`. Chromium 156.0.8078.79 headless,
+  Pyodide 314.0.7, swipl-wasm 8.2.6.
+- CPU 4x: cgroup como na E1.6 (`CPUQuota=25%`, período de 10 ms). Laço de
+  calibração na página: 649 ms sem limite, 2703 ms com o limite.
+
+**Plano B (snapshot do Pyodide).** Bancada fora do produto: uma origem, um
+Worker de módulo novo por medição, `loadPyodide({ indexURL })` contra
+`loadPyodide({ indexURL, _loadSnapshot })`, com o snapshot gerado no próprio
+navegador por `loadPyodide({ _makeSnapshot: true })` +
+`makeMemorySnapshot()` e buscado por `fetch` com cache `immutable`. Tempo do
+início do Worker até `loadPyodide` resolver; depois dele, `input()` e
+`print` rodam normalmente nos dois casos.
+
+| `loadPyodide` | Desktop mediana | Desktop p90 | CPU 4x mediana | CPU 4x p90 |
+| :------------ | --------------: | ----------: | -------------: | ---------: |
+| Sem snapshot | 1464 | 1509 | 7144 | 9743 |
+| Com snapshot | 193 | 203 | 1484 | 1727 |
+
+- Ganho de cerca de 7x no desktop e 5x com CPU 4x; com snapshot, Python sem
+  reserva fica abaixo de 3 s com CPU 4x.
+- Custo: o snapshot tem 30 MiB (31457408 bytes) sem compressão, 5,8 MiB com
+  gzip -9 e 3,9 MiB com brotli -q 11, além dos 9,6 MB do
+  `pyodide.asm.wasm` que continuam sendo baixados. A API é privada
+  (`@private`/`@ignore` nos tipos da 314.0.7) e o snapshot fica preso à
+  versão exata do Pyodide.
+
 ## Contratos da E2
 
 Escrito pelo `architect`. Stubs em `src/components/runner/` e
