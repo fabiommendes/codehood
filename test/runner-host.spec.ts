@@ -419,4 +419,133 @@ test.describe("frame loaded before a deploy", () => {
 		);
 		expect(result).toEqual({ exit: "exited", other: "reloaded" });
 	});
+
+	/// Like `routeBundle`, but the `holdLoad`-th frame load of the page (the
+	/// diagnostics page loads the first) waits for `release()`, which holds
+	/// the retry of a stale run inside its reload.
+	async function routeWithHeldReload(page: Page, holdLoad = 2) {
+		const state = {
+			stale: true,
+			frameLoads: 0,
+			release: () => {},
+		};
+		const gate = new Promise<void>((resolve) => {
+			state.release = resolve;
+		});
+		await page.route("**/runner/*/worker.js", (route) =>
+			state.stale ? route.fulfill({ status: 404 }) : route.continue(),
+		);
+		await page.route("**/runner/frame*", async (route) => {
+			state.frameLoads++;
+			if (state.frameLoads >= holdLoad) state.stale = false;
+			if (state.frameLoads === holdLoad) await gate;
+			await route.continue().catch(() => {});
+		});
+		return state;
+	}
+
+	test("Stop during the reload of a stale run ends it as stopped without repeating it", async ({
+		page,
+	}) => {
+		const state = await routeWithHeldReload(page);
+		await openPage(page);
+		await page.evaluate(
+			async ({ origin, req }) => {
+				const host = window.__runner.RunnerHost.shared(origin);
+				let out = "";
+				const run = await host.run(req, {
+					onOutput: (_, text) => {
+						out += text;
+					},
+				});
+				Object.assign(window, {
+					__run: run,
+					__out: () => out,
+				});
+			},
+			{ origin: TEST_RUNNER_ORIGIN, req: request("out again") },
+		);
+		await expect.poll(() => state.frameLoads).toBe(2);
+		await page.evaluate(() => {
+			(window as unknown as { __run: { stop(): void } }).__run.stop();
+		});
+		state.release();
+		const result = await page.evaluate(async () => {
+			const w = window as unknown as {
+				__run: { done: Promise<{ reason: string }> };
+				__out: () => string;
+			};
+			return { reason: (await w.__run.done).reason, out: w.__out() };
+		});
+		expect(result).toEqual({ reason: "stopped", out: "" });
+	});
+
+	test("a run of another submission that takes the host during the reload is not disturbed by the retry", async ({
+		page,
+	}) => {
+		const state = await routeWithHeldReload(page, 3);
+		await openPage(page);
+		await page.evaluate(
+			({ origin, first, second }) => {
+				const host = window.__runner.RunnerHost.exclusive(origin);
+				const outputs = { first: "", second: "" };
+				const w = window as unknown as Record<string, unknown>;
+				w.__outputs = outputs;
+				w.__first = host.run(first, {
+					onOutput: (_, text) => {
+						outputs.first += text;
+					},
+				});
+				w.__host = host;
+				w.__second = async () => {
+					void host.reload();
+					return host.run(second, {
+						onOutput: (_, text) => {
+							outputs.second += text;
+						},
+					});
+				};
+			},
+			{
+				origin: TEST_RUNNER_ORIGIN,
+				first: request("out first"),
+				second: request("out second"),
+			},
+		);
+		await expect.poll(() => state.frameLoads).toBe(3);
+		await page.evaluate(() => {
+			(window as unknown as { __second: () => void }).__second();
+		});
+		state.release();
+		const result = await page.evaluate(async () => {
+			const w = window as unknown as {
+				__first: Promise<{ done: Promise<{ reason: string }> }>;
+				__outputs: { first: string; second: string };
+				__second: () => Promise<{ done: Promise<{ reason: string }> }>;
+			};
+			const first = await (await w.__first).done;
+			await new Promise((resolve) => setTimeout(resolve, 1500));
+			return { first: first.reason, outputs: w.__outputs };
+		});
+		expect(result.first).toBe("stopped");
+		expect(result.outputs.first).toBe("");
+	});
+
+	test("a stale reserve reloads the frame once, not on every report", async ({
+		page,
+	}) => {
+		const state = await routeBundle(page, { always: true });
+		await openPage(page);
+		for (let attempt = 0; attempt < 4; attempt++) {
+			await page.evaluate(
+				async ({ origin }) => {
+					const host = window.__runner.RunnerHost.shared(origin);
+					host.prepare("fake");
+				},
+				{ origin: TEST_RUNNER_ORIGIN },
+			);
+			await page.waitForTimeout(600);
+		}
+		expect(state.frameLoads).toBe(2);
+	});
 });

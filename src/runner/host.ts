@@ -124,6 +124,10 @@ export class RunnerHost {
 	private readonly isExclusive: boolean;
 	private frame: FrameState | null = null;
 	private readonly runs = new Map<string, ActiveRun>();
+	/// Counts the `run` and `reload` calls, to tell a retry that another one took the frame.
+	private takeovers = 0;
+	/// A stale reserve already reloaded the frame and no run has worked since.
+	private reserveReloaded = false;
 
 	private constructor(runnerOrigin: string, exclusive: boolean) {
 		this.origin = new URL(runnerOrigin).origin;
@@ -204,6 +208,7 @@ export class RunnerHost {
 	 * @throws {RunnerUnavailable} as `ready()` does.
 	 */
 	async run(request: RunRequest, handlers: RunHandlers): Promise<RunHandle> {
+		const takeover = ++this.takeovers;
 		await this.ready();
 		if (this.isExclusive) {
 			const previous = [...this.runs.entries()];
@@ -215,6 +220,12 @@ export class RunnerHost {
 		const done = new Promise<RunExit>((resolve) => {
 			resolveDone = resolve;
 		});
+		/// Stop was pressed between the stale exit and the repeat.
+		let cancelled = false;
+		/// Whether the repeat must not happen: stopped, or (exclusive) another run or reload took the frame.
+		const displaced = () =>
+			cancelled || (this.isExclusive && this.takeovers !== takeover);
+		const abandon = () => resolveDone({ reason: "stopped", code: null });
 		const launch = (retried: boolean): void => {
 			const runId = crypto.randomUUID();
 			current = runId;
@@ -223,11 +234,16 @@ export class RunnerHost {
 				done,
 				finish: (exit) => {
 					if (exit.reason !== "stale-bundle" || retried) {
+						if (exit.reason !== "stale-bundle") this.reserveReloaded = false;
 						resolveDone(exit);
 						return;
 					}
+					if (displaced()) {
+						abandon();
+						return;
+					}
 					this.reloadFrame("reloaded").then(
-						() => launch(true),
+						() => (displaced() ? abandon() : launch(true)),
 						() => resolveDone(exit),
 					);
 				},
@@ -263,6 +279,9 @@ export class RunnerHost {
 			stop: () => {
 				if (this.runs.has(current)) {
 					this.post({ type: "stop", runId: current });
+				} else {
+					cancelled = true;
+					abandon();
 				}
 			},
 		};
@@ -276,6 +295,7 @@ export class RunnerHost {
 	 * @throws {RunnerUnavailable} as `ready()` does.
 	 */
 	reload(): Promise<RunnerCapabilities> {
+		this.takeovers++;
 		return this.reloadFrame("stopped");
 	}
 
@@ -370,7 +390,10 @@ export class RunnerHost {
 		if (message.type === "stale-bundle") {
 			// Runs in progress already loaded their Worker; the next one that
 			// fails will report `stale-bundle` and trigger the reload itself.
-			if (this.runs.size === 0) this.reloadFrame("reloaded").catch(() => {});
+			if (this.runs.size === 0 && !this.reserveReloaded) {
+				this.reserveReloaded = true;
+				this.reloadFrame("reloaded").catch(() => {});
+			}
 			return;
 		}
 		if (message.type === "ready") {
