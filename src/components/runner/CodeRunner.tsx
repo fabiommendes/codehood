@@ -20,6 +20,7 @@ import { m } from "@/i18n";
 import {
 	type RunExit,
 	type RunHandle,
+	type RunHandlers,
 	RunnerHost,
 	RunnerUnavailable,
 } from "@/runner/host";
@@ -34,6 +35,7 @@ import {
 	isBusy,
 	reduceIde,
 } from "./ide-state";
+import { runForSubmission } from "./review-host";
 import { createTerminal, type RunnerTerminal } from "./terminal";
 
 /**
@@ -71,6 +73,9 @@ export interface CodeRunnerProps {
 	onChange?: (code: string) => void;
 	/// Answer mode: the starting code "back to the starter code" restores.
 	starterCode?: string;
+	/// Review mode: the public id of the submission, as `runForSubmission`
+	/// takes it. A run of another submission gets a new sandbox.
+	submission?: string;
 	/// Shorter editor and terminal hidden until the first run (lists, exams).
 	compact?: boolean;
 	/// Extra controls at the start of the toolbar (review: submission navigation).
@@ -78,6 +83,10 @@ export interface CodeRunnerProps {
 	/// Content under the terminal (answer: autosave status, draft conflict).
 	footer?: JSX.Element;
 }
+
+/// Counts the Run clicks of review widgets on this page, so a click made
+/// while an earlier one still loads the terminal wins over it.
+let reviewClicks = 0;
 
 /// How long "Preparing…" shows before it becomes "Still loading…".
 const SLOW_PREPARING_MS = 3000;
@@ -163,6 +172,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const [code, setCode] = createSignal(props.code);
 	const [editing, setEditing] = createSignal(props.mode === "answer");
 	const [editorReady, setEditorReady] = createSignal(false);
+	/// The last run started from a modified copy (review mode).
+	const [runModified, setRunModified] = createSignal(false);
 	const [terminalShown, setTerminalShown] = createSignal(!props.compact);
 	const [terminalReady, setTerminalReady] = createSignal(false);
 	const [coarse, setCoarse] = createSignal(false);
@@ -193,10 +204,14 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const readOnly = () => props.mode !== "answer" && !editing();
 	const blocked = () => BLOCKED.has(state().phase);
 	const running = () => isBusy(state());
+	const review = () => props.mode === "review";
+	/// Review mode: the copy in memory differs from the submission.
+	const modified = () => review() && code() !== props.code;
 
 	/// Asks the runner for a reserve Worker, once, on the first focus or edit.
 	const prepare = () => {
-		if (prepared || blocked() || props.runnerOrigin === null) return;
+		if (review() || prepared || blocked() || props.runnerOrigin === null)
+			return;
 		prepared = true;
 		RunnerHost.shared(props.runnerOrigin).prepare(props.language);
 	};
@@ -212,7 +227,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			onChange: (value) => {
 				setCode(value);
 				prepare();
-				props.onChange?.(value);
+				if (!review()) props.onChange?.(value);
 			},
 			onRun: () => void run(),
 			onFocus: prepare,
@@ -252,6 +267,14 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		setCode(original);
 		editor?.setCode(original);
 		if (props.mode === "answer") props.onChange?.(original);
+	};
+
+	/// Review mode: discards the copy and shows the submission again, read-only.
+	const backToSubmission = () => {
+		setCode(props.code);
+		setEditing(false);
+		editor?.setCode(props.code);
+		editor?.setReadOnly(true);
 	};
 
 	const ensureTerminal = (): Promise<RunnerTerminal> => {
@@ -301,6 +324,9 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		current = token;
 		stopping = false;
 		startedAt = performance.now();
+		const click = review() ? ++reviewClicks : 0;
+		const copy = modified();
+		setRunModified(copy);
 		dispatch({ type: "run-requested" });
 		const finish = (exit: RunExit) => {
 			if (current !== token) return;
@@ -318,30 +344,40 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		try {
 			const term = await ensureTerminal();
 			if (current !== token) return;
+			if (review() && click !== reviewClicks) {
+				finish({ reason: "stopped", code: null });
+				return;
+			}
 			term.clear();
+			if (copy) term.notice(m.runner_modified_output());
 			const entry = filename();
-			const handle = await RunnerHost.shared(props.runnerOrigin).run(
-				{
-					language: props.language,
-					mode: props.runMode ?? defaultRunMode(props.language),
-					files: { [entry]: code() },
-					entry,
+			const request = {
+				language: props.language,
+				mode: props.runMode ?? defaultRunMode(props.language),
+				files: { [entry]: code() },
+				entry,
+			};
+			const handlers: RunHandlers = {
+				onStatus: (value) => {
+					if (current !== token) return;
+					dispatch({ type: "status", state: value });
+					if (value === "waiting-input") startRead();
 				},
-				{
-					onStatus: (value) => {
-						if (current !== token) return;
-						dispatch({ type: "status", state: value });
-						if (value === "waiting-input") startRead();
-					},
-					onProgress: (loaded, total) => {
-						if (current === token)
-							dispatch({ type: "progress", loaded, total });
-					},
-					onOutput: (stream, text) => {
-						if (current === token) terminal?.write(stream, text);
-					},
+				onProgress: (loaded, total) => {
+					if (current === token) dispatch({ type: "progress", loaded, total });
 				},
-			);
+				onOutput: (stream, text) => {
+					if (current === token) terminal?.write(stream, text);
+				},
+			};
+			const handle = await (review()
+				? runForSubmission(
+						props.runnerOrigin,
+						props.submission ?? "",
+						request,
+						handlers,
+					)
+				: RunnerHost.shared(props.runnerOrigin).run(request, handlers));
 			if (current !== token) {
 				handle.stop();
 				return;
@@ -494,8 +530,18 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				</span>
 				<Show when={readOnly()}>
 					<span class="badge badge-ghost badge-xs">{m.runner_read_only()}</span>
-					<span class="hidden text-xs text-muted sm:inline">
-						{m.runner_edit_hint()}
+					<Show when={!review()}>
+						<span class="hidden text-xs text-muted sm:inline">
+							{m.runner_edit_hint()}
+						</span>
+					</Show>
+				</Show>
+				<Show when={modified()}>
+					<span class="badge badge-warning badge-xs" data-role="modified">
+						{m.runner_modified()}
+					</span>
+					<span class="text-xs text-muted" data-role="copy-hint">
+						{m.runner_copy_hint()}
 					</span>
 				</Show>
 				<div class="ml-auto flex items-center gap-1.5">
@@ -506,10 +552,20 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 							data-action="edit"
 							onClick={edit}
 						>
-							{m.runner_edit()}
+							{review() ? m.runner_edit_copy() : m.runner_edit()}
 						</button>
 					</Show>
-					<Show when={props.mode !== "answer" && editing()}>
+					<Show when={modified()}>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm"
+							data-action="back"
+							onClick={backToSubmission}
+						>
+							{m.runner_back_to_submission()}
+						</button>
+					</Show>
+					<Show when={props.mode !== "answer" && !review() && editing()}>
 						<button
 							type="button"
 							class="btn btn-ghost btn-sm"
@@ -550,7 +606,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 								>
 									<path d="M4 2.5v11l9-5.5z" />
 								</svg>
-								{m.runner_run()}
+								{review() ? m.runner_run_submission() : m.runner_run()}
 							</button>
 						}
 					>
@@ -682,7 +738,17 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 						aria-live="polite"
 						class="ml-auto flex items-center gap-1.5 tracking-normal normal-case"
 						data-status
+						data-exit-code={
+							state().phase === "done" || state().phase === "error"
+								? String(state().lastExit?.code ?? "")
+								: undefined
+						}
 					>
+						<Show when={review() && runModified() && state().phase !== "idle"}>
+							<span class="badge badge-warning badge-xs" data-run-modified>
+								{m.runner_modified()}
+							</span>
+						</Show>
 						<Show when={statusText()}>
 							{(text) => (
 								<span

@@ -41,5 +41,11 @@
 	"runner_send": "Enviar",
 	"runner_confirm_link": "Abrir este link em uma nova aba?\n\n{url}",
 	"runner_block_unavailable": "Execução não disponível para esta linguagem",
-	"runner_block_label": "Exemplo de código {number}"
+	"runner_block_label": "Exemplo de código {number}",
+	"runner_edit_copy": "Editar cópia",
+	"runner_run_submission": "Executar submissão",
+	"runner_back_to_submission": "Voltar à submissão",
+	"runner_modified": "modificado",
+	"runner_copy_hint": "Uma cópia na memória; a submissão não muda.",
+	"runner_modified_output": "saída da cópia modificada"
 }

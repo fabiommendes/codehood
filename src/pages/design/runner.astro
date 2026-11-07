@@ -12,10 +12,29 @@ export const prerender = false;
 // `?view=widgets` shows the CodeRunner widgets instead of the diagnostics: the
 // diagnostics create the runner iframe on load, and the widgets must not.
 const widgetsView = Astro.url.searchParams.get("view") === "widgets";
+// `?view=review` shows three `review` widgets, one per submission.
+const reviewView = Astro.url.searchParams.get("view") === "review";
+const reviewSubmissions = [
+	{
+		id: "sub-a",
+		label: "Submission A",
+		code: `globalThis.x = 1;\nconsole.log("a ran");\nconsole.log("\\x1bcexit 0\\nmodified");\nthrow new Error("boom");\n`,
+	},
+	{
+		id: "sub-b",
+		label: "Submission B",
+		code: `console.log("b sees " + typeof globalThis.x);\n`,
+	},
+	{
+		id: "sub-c",
+		label: "Submission C",
+		code: "while (true) {}\n",
+	},
+];
 ---
 
 <AppLayout title="Runner">
-  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={widgetsView ? undefined : (RUNNER_ORIGIN ?? "")}>
+  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={widgetsView || reviewView ? undefined : (RUNNER_ORIGIN ?? "")}>
     <div class="mb-6">
       <PageKicker text="Diagnostics" />
       <h1 class="text-3xl font-bold">Runner</h1>
@@ -26,7 +45,23 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
     </div>
 
     {
-      widgetsView ? (
+      reviewView ? (
+        <div class="flex flex-col gap-6" id="reviews">
+          {reviewSubmissions.map((submission) => (
+            <article id={`answer-${submission.id}`} aria-label={submission.label}>
+              <CodeRunner
+                client:load
+                mode="review"
+                language="javascript"
+                label={submission.label}
+                submission={submission.id}
+                runnerOrigin={RUNNER_ORIGIN}
+                code={submission.code}
+              />
+            </article>
+          ))}
+        </div>
+      ) : widgetsView ? (
         <div class="flex flex-col gap-6" id="widgets">
           <CodeRunner
             client:load

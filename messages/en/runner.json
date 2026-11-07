@@ -41,5 +41,11 @@
 	"runner_send": "Send",
 	"runner_confirm_link": "Open this link in a new tab?\n\n{url}",
 	"runner_block_unavailable": "Code execution is not available for this language",
-	"runner_block_label": "Code example {number}"
+	"runner_block_label": "Code example {number}",
+	"runner_edit_copy": "Edit copy",
+	"runner_run_submission": "Run submission",
+	"runner_back_to_submission": "Back to submission",
+	"runner_modified": "modified",
+	"runner_copy_hint": "A copy in memory; the submission does not change.",
+	"runner_modified_output": "output of the modified copy"
 }
