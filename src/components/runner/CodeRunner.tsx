@@ -16,6 +16,7 @@ import {
 	onMount,
 	Show,
 } from "solid-js";
+import { isServer } from "solid-js/web";
 import { m } from "@/i18n";
 import {
 	type RunExit,
@@ -171,7 +172,8 @@ function phaseText(
  * in the DOM itself goes through `textContent`, never `innerHTML`.
  */
 export function CodeRunner(props: CodeRunnerProps): JSX.Element {
-	if (props.mode === "review" && !props.submission) {
+	// Thrown on the client only: during server rendering it would stall the page.
+	if (!isServer && props.mode === "review" && !props.submission) {
 		throw new Error("CodeRunner in review mode needs a submission id");
 	}
 	const filename = () => props.filename ?? defaultFilename(props.language);

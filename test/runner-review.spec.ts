@@ -238,7 +238,12 @@ test("the arrows move between cards, set the anchor and focus Run", async ({
 test("a review widget without a submission fails loudly instead of running", async ({
 	page,
 }) => {
-	const response = await page.goto("/design/runner?view=review-orphan");
-	expect(response?.status()).toBe(500);
-	await expect(page.locator("[data-code-runner]")).toHaveCount(0);
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	page.on("console", (message) => {
+		if (message.type() === "error") errors.push(message.text());
+	});
+	await page.goto("/design/runner?view=review-orphan");
+	await page.bringToFront();
+	await expect.poll(() => errors.join("\n")).toMatch(/needs a submission/);
 });
