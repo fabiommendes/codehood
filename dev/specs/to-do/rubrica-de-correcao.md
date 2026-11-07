@@ -96,7 +96,8 @@ spec:
   (`transaction: false`). Cada item traz `uses`, e a rubrica traz `review`
   (quantas correções vigentes estão em "rever").
 - R15. `update(pk, {base})`, `createItem(pk, item)` (chave opcional; a
-  gerada é `i<n>` com o menor `n` livre), `updateItem(itemPK, patch)`,
+  gerada é `i<n>`, um acima do maior `i<n>` existente, arquivados
+  incluídos; uma chave apagada só volta se o chamador a mandar), `updateItem(itemPK, patch)`,
   `deleteItem(itemPK)` (repetir não falha).
 - R16. `splitItem(itemPK, {children})`, com R10.
 - R17. `renameGroup(pk, {from, to})`: troca o prefixo `from` por `to` em
@@ -110,7 +111,17 @@ spec:
   grava `rubricId`; mandar `score` junto é 400. Chave inexistente,
   arquivada, ou dois itens no mesmo grupo de primeiro nível (R6): 400. Sem
   `rubric`, nada muda em relação a hoje. `rubric: []` é uma correção pela
-  rubrica sem itens (nota = base + ajuste).
+  rubrica sem itens (nota = base + ajuste). Só a chave arquivada que a
+  correção ainda não tinha é recusada: reenviar uma que ela já aplica é
+  aceito. Um `update` com `score` numa correção pela rubrica a torna
+  manual: limpa `rubricId`, itens e `adjustment`. Um `update` só com
+  `adjustment` ou `feedback` mantém os itens e recalcula.
+- R19a. A nota calculada é racional exata: sai como decimal quando o
+  denominador só tem fatores 2 e 5 (`0.35`), senão como `n/d` reduzida
+  (`2/3`).
+- R19b. "Rever" e as contagens de R14 consideram só o veredito (a
+  correção mais nova por `updatedAt`) da resposta que conta, como em
+  `src/services/grading.ts`.
 - R20. A saída do feedback traz `rubric` (chaves), `adjustment` e `review`.
   Para o aluno (só depois da liberação, como hoje), traz os itens aplicados
   com `group`, `text`, `value` e `feedback`, sem `comment` e sem os itens
