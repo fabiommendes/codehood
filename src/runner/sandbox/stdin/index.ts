@@ -34,11 +34,14 @@ export async function detectStdinKind(): Promise<StdinKind> {
 		}
 		const container = navigator.serviceWorker;
 		if (!container) return "none";
-		await container.register(SW_SCRIPT_URL, {
+		const registration = await container.register(SW_SCRIPT_URL, {
 			scope: SW_SCOPE,
 			updateViaCache: "none",
 		});
 		if (!container.controller) {
+			// Firefox leaves a frame loaded after the worker activated without a
+			// controller (only the activation's `claim()` reaches it).
+			registration.active?.postMessage({ type: "claim" });
 			await new Promise<void>((resolve) => {
 				const done = () => {
 					clearTimeout(timer);

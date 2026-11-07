@@ -321,6 +321,11 @@ test.describe("links", () => {
 		page.removeAllListeners("dialog");
 		page.on("dialog", (dialog) => void dialog.accept());
 		const popup = context.waitForEvent("page");
+		// A dialog drops the hover state in Firefox, and xterm only activates a
+		// link under a hover, so hover again before the click.
+		await page.mouse.move(box.x + 60, box.y + 8);
+		await page.mouse.move(box.x + 30, box.y + 8);
+		await page.waitForTimeout(200);
 		await page.mouse.click(box.x + 30, box.y + 8);
 		const opener = await popup;
 		expect(opener.url()).toMatch(/^https:\/\/example\.com\/page|^about:blank/);

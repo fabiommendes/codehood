@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { RunnerHost, RunnerUnavailable } from "@/runner/host";
 import { TEST_RUNNER_ORIGIN } from "./env";
+import { loadFrame } from "./runner-harness";
 
 /**
  * `RunnerHost` through the diagnostic page, which exposes the class on
@@ -29,6 +30,21 @@ async function openPage(page: Page) {
 }
 
 const frames = (page: Page) => page.locator("iframe[data-runner-frame]");
+
+test("every frame replaced in the same page announces the sw channel", async ({
+	page,
+}) => {
+	const kinds: string[] = [];
+	const h = await loadFrame(page, "?isolation=off");
+	kinds.push(h.ready.stdin);
+	for (let i = 0; i < 3; i++) {
+		kinds.push(
+			(await loadFrame(page, "?isolation=off", { navigate: false })).ready
+				.stdin,
+		);
+	}
+	expect(kinds).toEqual(["sw", "sw", "sw", "sw"]);
+});
 
 test.describe("page controls", () => {
 	test("run prints the program output", async ({ page }) => {
@@ -69,7 +85,12 @@ test.describe("page controls", () => {
 	}) => {
 		await openPage(page);
 		await page.locator("#language").selectOption("fake");
-		await page.locator("#code").fill("load-delay 1500\nout x");
+		// `fill` would focus the editor and prepare a program-less reserve, which
+		// loads at once; set the value without focus so the run itself loads.
+		await page.evaluate(() => {
+			(document.getElementById("code") as HTMLTextAreaElement).value =
+				"load-delay 1500\nout x";
+		});
 		await page.locator("#run").click();
 		await expect(page.locator("#status")).toHaveText("preparando…");
 		await expect(page.locator("#exit")).toHaveText(/exited/);

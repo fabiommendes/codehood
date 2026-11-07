@@ -4,7 +4,7 @@
  * Answers only `GET ${SW_STDIN_PATH}<runId>` requests (see `stdin/sw.ts`) and
  * lets every other request go to the network untouched. Never uses Cache
  * Storage. On `install` it calls `skipWaiting()`, on `activate`
- * `clients.claim()`. Accepts `FrameToSwMessage`s only from `window` clients.
+ * `clients.claim()`, and again on a `claim` message. Accepts `FrameToSwMessage`s only from `window` clients.
  * Drops the channels of a window client that no longer exists. A request for a
  * channel it does not know (the browser restarted it) is first offered to the
  * window clients with `stdin-resync`.
@@ -91,6 +91,9 @@ export function startServiceWorker(): void {
 				);
 				break;
 			case "keepalive":
+				break;
+			case "claim":
+				event.waitUntil(scope.clients.claim());
 				break;
 			case "stdin-line":
 				channels.line(message.runId, message.line, sender.id);

@@ -72,7 +72,8 @@ export const SW_KEEPALIVE_MS = 10_000;
  * The service worker accepts them only from a `window` client of its own
  * origin, never from a Worker. `stdin-open` may carry the `lines` not yet
  * consumed and `eof`, to rebuild a channel the service worker lost.
- * `keepalive` only wakes the service worker.
+ * `keepalive` only wakes the service worker. `claim` asks it to take control
+ * of the window clients that no service worker controls yet.
  */
 export const frameToSwMessage = z.discriminatedUnion("type", [
 	z.object({
@@ -83,6 +84,7 @@ export const frameToSwMessage = z.discriminatedUnion("type", [
 		eof: z.boolean().optional(),
 	}),
 	z.object({ type: z.literal("keepalive") }),
+	z.object({ type: z.literal("claim") }),
 	z.object({
 		type: z.literal("stdin-line"),
 		runId: z.uuid(),

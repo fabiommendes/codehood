@@ -33,7 +33,7 @@ worker" (janela privada) em qualquer navegador.
 | Navegador | stdin (sw) | Isolamento (E1) | Parar | "Não suportado" |
 | :-------- | :--------- | :-------------- | :---- | :-------------- |
 | Chromium  | ok | ok | ok | ok (simulado) |
-| Firefox   | ok no 1o frame da página; **falha a partir do 2o** (bug 1) | ok, salvo wipe de storage e probe após recarga (bug 1) | ok | ok (simulado) |
+| Firefox   | ok (bug 1 corrigido) | ok | ok | ok (simulado) |
 | WebKit    | não rodou | não rodou | não rodou | não rodou |
 
 WebKit: o host não tem as dependências do sistema (`libicu74 libxml2
@@ -47,21 +47,21 @@ o transporte é `sw` (o teste `sab` só vale no Chromium); `newCDPSession`,
 pulados fora do Chromium). Os specs puros (`terminal`, `ide-state`,
 `languages`) ficam só no Chromium.
 
-### Bugs reais
+### Bugs reais (corrigidos)
 
-1. Firefox: ao substituir o iframe do runner na mesma página (`host.reload()`,
-   `exclusive()`, recarga do frame), `detectStdinKind` devolve `none` nas
-   cargas seguintes (`container.controller` não aparece nos 5 s de
-   `SW_READY_TIMEOUT_MS`) e o host rejeita com `unsupported`. Medido:
-   `sw,none,none,none,none,none` em 3 de 3 tentativas. Falham os testes de
-   reload e de bundle antigo em `runner-host.spec.ts` e as de isolamento
-   567 e 596 (probe termina `crashed`, storage não é limpo). Arquivo
-   provável: `src/runner/sandbox/stdin/index.ts` (`detectStdinKind`), com
-   `src/runner/sandbox/sw.ts` (falta `clients.claim()`?). Não confirmado se
-   é a partição de storage de iframe de terceiros do Firefox.
-2. Não classificado: Firefox, `runner-widget.spec.ts` "a click asks first":
-   o clique no link do terminal não abre a janela após confirmar. Pode ser
-   limitação do Playwright; investigar em `src/components/runner`.
+1. Firefox: um iframe carregado depois da ativação do service worker fica sem
+   `navigator.serviceWorker.controller`, embora haja registro ativo (só o
+   `clients.claim()` da ativação alcançava o 1o frame). Causa: nada pedia o
+   claim de novo. Correção: `detectStdinKind` envia `{type: "claim"}` ao worker
+   ativo quando não há controller, e `sw.ts` responde com `clients.claim()`.
+   Teste de regressão: "every frame replaced in the same page announces the sw
+   channel" em `test/runner-host.spec.ts` (falhava com `sw,none,none,none`).
+   Com isso passam no Firefox as specs host, isolation e no-channel.
+2. Era do teste, não do produto: `window.open` após `confirm` funciona no
+   Firefox (verificado isolado). Depois de um diálogo o Firefox perde o hover,
+   e o xterm só ativa o link sob hover. O teste agora move o mouse antes do
+   segundo clique. Uma execução na bateria completa mostrou o terminal vazio
+   uma vez (flaky sob carga, não reproduzida em 3 rodadas).
 
 Falhas da rodada que não são do runner: `src/generated/paraglide` sem `en.js`
 e `prolog` em `languages` (trabalho concorrente de outros agentes).
