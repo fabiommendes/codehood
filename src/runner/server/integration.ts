@@ -15,7 +15,7 @@ import {
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AstroIntegration } from "astro";
-import { type BuildOptions, build, buildSync, type Plugin } from "esbuild";
+import { type BuildOptions, build, type Plugin } from "esbuild";
 import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
 import { BUNDLE_DIR_NAME, DEV_BUNDLE_DIR, MANIFEST_NAME } from "./assets";
 
@@ -32,7 +32,11 @@ function isAllowed(root: string, file: string): boolean {
 }
 
 /// esbuild plugin that fails the build on any import outside the allowed set.
-function restrictImports(root: string): Plugin {
+function restrictImports(
+	root: string,
+	allowed: (file: string) => boolean = (file) => isAllowed(root, file),
+	allowedText = "src/runner/sandbox/**, src/runner/protocol.ts and zod",
+): Plugin {
 	return {
 		name: "runner-restrict-imports",
 		setup(b) {
@@ -45,11 +49,11 @@ function restrictImports(root: string): Plugin {
 					pluginData: { skip: true },
 				});
 				if (result.errors.length > 0) return result;
-				if (!isAllowed(root, result.path)) {
+				if (!allowed(result.path)) {
 					return {
 						errors: [
 							{
-								text: `The runner bundle may import only src/runner/sandbox/**, src/runner/protocol.ts and zod; got "${args.path}" (${result.path}).`,
+								text: `The runner bundle may import only ${allowedText}; got "${args.path}" (${result.path}).`,
 							},
 						],
 					};
@@ -74,9 +78,27 @@ function listFiles(dir: string): string[] {
 		.sort();
 }
 
-/// Bundles `exports` of the module `source` into the ES module `outfile`, minified.
-function buildModule(source: string, exports: string[], outfile: string): void {
-	buildSync({
+/// Packages whose files a runtime module may bundle: sucrase and the
+/// dependencies its `transform` reaches (not its CLI ones: commander, glob, mz).
+const MODULE_PACKAGES = [
+	"sucrase",
+	"ts-interface-checker",
+	"lines-and-columns",
+	"@jridgewell",
+];
+
+/**
+ * Bundles `exports` of the module `source` into the ES module `outfile`, minified.
+ *
+ * Fails on any import that is not a file of `MODULE_PACKAGES`.
+ */
+export async function buildModule(
+	root: string,
+	source: string,
+	exports: string[],
+	outfile: string,
+): Promise<void> {
+	await build({
 		stdin: {
 			contents: `export { ${exports.join(", ")} } from ${JSON.stringify(source)};`,
 			resolveDir: dirname(source),
@@ -88,12 +110,20 @@ function buildModule(source: string, exports: string[], outfile: string): void {
 		target: "es2022",
 		minify: true,
 		logLevel: "silent",
+		plugins: [
+			restrictImports(root, (file) =>
+				MODULE_PACKAGES.some((pkg) =>
+					file.includes(`${sep}node_modules${sep}${pkg}${sep}`),
+				),
+				MODULE_PACKAGES.join(", "),
+			),
+		],
 	});
 }
 
 /// Copies the files of `RUNTIMES` from `node_modules` into `<staging>/rt/`,
 /// checking the installed version, and wraps the glue that is not an ES module.
-function copyRuntimes(root: string, staging: string): void {
+async function copyRuntimes(root: string, staging: string): Promise<void> {
 	for (const runtime of Object.values(RUNTIMES)) {
 		const pkgDir = join(root, "node_modules", runtime.pkg);
 		const installed = JSON.parse(
@@ -110,7 +140,7 @@ function copyRuntimes(root: string, staging: string): void {
 			const wrap = runtime.wrap?.[to];
 			const only = runtime.bundle?.[to];
 			if (only) {
-				buildModule(join(pkgDir, from), only, join(target, to));
+				await buildModule(root, join(pkgDir, from), only, join(target, to));
 			} else if (wrap) {
 				writeFileSync(
 					join(target, to),
@@ -180,7 +210,7 @@ export async function buildRunnerBundle(
 			join(staging, MANIFEST_NAME),
 			JSON.stringify({ version, files }),
 		);
-		copyRuntimes(root, staging);
+		await copyRuntimes(root, staging);
 		rmSync(outDir, { recursive: true, force: true });
 		mkdirSync(dirname(outDir), { recursive: true });
 		renameSync(staging, outDir);
