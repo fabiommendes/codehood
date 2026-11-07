@@ -14,6 +14,7 @@
 	"runner_language_lua": "Lua",
 	"runner_language_prolog": "Prolog",
 	"runner_language_python": "Python",
+	"runner_language_typescript": "TypeScript",
 	"runner_prolog_restarts": "Run restarts Prolog",
 	"runner_preparing": "Preparing…",
 	"runner_preparing_slow": "Still loading…",

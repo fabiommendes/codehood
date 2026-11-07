@@ -94,6 +94,7 @@ const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
 	lua: () => m.runner_language_lua(),
 	prolog: () => m.runner_language_prolog(),
 	python: () => m.runner_language_python(),
+	typescript: () => m.runner_language_typescript(),
 	fake: () => "fake",
 };
 

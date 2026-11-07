@@ -14,6 +14,7 @@
 	"runner_language_lua": "Lua",
 	"runner_language_prolog": "Prolog",
 	"runner_language_python": "Python",
+	"runner_language_typescript": "TypeScript",
 	"runner_prolog_restarts": "Rodar reinicia o Prolog",
 	"runner_preparing": "Preparando…",
 	"runner_preparing_slow": "Ainda carregando…",

@@ -16,12 +16,17 @@ export interface RuntimePackage {
 	/// build, for glue that is a classic script or UMD and has to become an
 	/// ES module the Worker can import.
 	wrap?: Record<string, { prefix?: string; suffix?: string }>;
+	/// Destination files the build bundles into one ES module from the source
+	/// file in `files`, keeping only the listed exports: for packages whose
+	/// entry drags in code the Worker has no use for.
+	bundle?: Record<string, string[]>;
 }
 
 export const RUNTIMES: {
 	swipl: RuntimePackage;
 	pyodide: RuntimePackage;
 	wasmoon: RuntimePackage;
+	sucrase: RuntimePackage;
 } = {
 	swipl: {
 		pkg: "swipl-wasm",
@@ -58,6 +63,12 @@ export const RUNTIMES: {
 				suffix: "\nexport default exports;\n",
 			},
 		},
+	},
+	sucrase: {
+		pkg: "sucrase",
+		version: "3.35.1",
+		files: { "dist/esm/index.js": "sucrase.mjs" },
+		bundle: { "sucrase.mjs": ["transform"] },
 	},
 };
 

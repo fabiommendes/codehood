@@ -15,7 +15,7 @@ import {
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AstroIntegration } from "astro";
-import { type BuildOptions, build, type Plugin } from "esbuild";
+import { type BuildOptions, build, buildSync, type Plugin } from "esbuild";
 import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
 import { BUNDLE_DIR_NAME, DEV_BUNDLE_DIR, MANIFEST_NAME } from "./assets";
 
@@ -74,6 +74,23 @@ function listFiles(dir: string): string[] {
 		.sort();
 }
 
+/// Bundles `exports` of the module `source` into the ES module `outfile`, minified.
+function buildModule(source: string, exports: string[], outfile: string): void {
+	buildSync({
+		stdin: {
+			contents: `export { ${exports.join(", ")} } from ${JSON.stringify(source)};`,
+			resolveDir: dirname(source),
+		},
+		outfile,
+		bundle: true,
+		format: "esm",
+		platform: "browser",
+		target: "es2022",
+		minify: true,
+		logLevel: "silent",
+	});
+}
+
 /// Copies the files of `RUNTIMES` from `node_modules` into `<staging>/rt/`,
 /// checking the installed version, and wraps the glue that is not an ES module.
 function copyRuntimes(root: string, staging: string): void {
@@ -91,7 +108,10 @@ function copyRuntimes(root: string, staging: string): void {
 		mkdirSync(target, { recursive: true });
 		for (const [from, to] of Object.entries(runtime.files)) {
 			const wrap = runtime.wrap?.[to];
-			if (wrap) {
+			const only = runtime.bundle?.[to];
+			if (only) {
+				buildModule(join(pkgDir, from), only, join(target, to));
+			} else if (wrap) {
 				writeFileSync(
 					join(target, to),
 					(wrap.prefix ?? "") +

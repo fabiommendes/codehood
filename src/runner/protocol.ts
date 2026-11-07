@@ -41,6 +41,7 @@ export const languageId = z.enum([
 	"lua",
 	"prolog",
 	"python",
+	"typescript",
 	"fake",
 ]);
 export type LanguageId = z.infer<typeof languageId>;

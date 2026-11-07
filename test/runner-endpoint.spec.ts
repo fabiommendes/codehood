@@ -212,6 +212,7 @@ test.describe("runtime files", () => {
 			[runtimePath(RUNTIMES.pyodide, "pyodide-lock.json"), "application/json"],
 			[runtimePath(RUNTIMES.wasmoon, "wasmoon.js"), "text/javascript"],
 			[runtimePath(RUNTIMES.wasmoon, "glue.wasm"), "application/wasm"],
+			[runtimePath(RUNTIMES.sucrase, "sucrase.mjs"), "text/javascript"],
 		] as const) {
 			const response = await rt(path);
 			expect(response.status, path).toBe(200);
@@ -256,6 +257,43 @@ test.describe("runtime files", () => {
 			await rt(runtimePath(RUNTIMES.swipl, "swipl-web.js"))
 		).text();
 		expect(text.trimEnd().endsWith("export default SWIPL;")).toBe(true);
+	});
+
+	test("sucrase.mjs carries the transform and no CLI dependency", async () => {
+		const text = await (
+			await rt(runtimePath(RUNTIMES.sucrase, "sucrase.mjs"))
+		).text();
+		expect(text).toMatch(/export\s*\{[^}]*\btransform\b/);
+		expect(text).toContain("Unexpected token, expected");
+		for (const name of ["commander", "mz", "tinyglobby", "glob"]) {
+			expect(text, name).not.toMatch(
+				new RegExp(`(from|require\\()\\s*["']${name}["']`),
+			);
+		}
+		expect(text).not.toMatch(/["'](node:)?(fs|path|child_process)["']/);
+	});
+
+	test("the sandbox bundle does not contain sucrase", async () => {
+		const version = await currentVersion();
+		const worker = await (
+			await get(TEST_RUNNER_ORIGIN, `/runner/${version}/worker.js`)
+		).text();
+		const chunks = new Set(worker.match(/\.\/[\w-]+\.js/g) ?? []);
+		const seen = new Set<string>();
+		const queue = [...chunks];
+		let total = worker;
+		while (queue.length > 0) {
+			const name = queue.pop() as string;
+			if (seen.has(name)) continue;
+			seen.add(name);
+			const text = await (
+				await get(TEST_RUNNER_ORIGIN, `/runner/${version}/${name.slice(2)}`)
+			).text();
+			total += text;
+			queue.push(...(text.match(/\.\/[\w-]+\.js/g) ?? []));
+		}
+		expect(seen.size).toBeGreaterThan(1);
+		expect(total).not.toContain("Unexpected token, expected");
 	});
 
 	test("wasmoon.js is wrapped to export the UMD exports object", async () => {

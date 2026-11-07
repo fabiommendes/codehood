@@ -40,7 +40,14 @@ test.describe("ready", () => {
 				type: "ready",
 				protocol: 1,
 				stdin: kind,
-				languages: ["javascript", "lua", "prolog", "python", "fake"],
+				languages: [
+					"javascript",
+					"lua",
+					"prolog",
+					"python",
+					"typescript",
+					"fake",
+				],
 			});
 		});
 	}

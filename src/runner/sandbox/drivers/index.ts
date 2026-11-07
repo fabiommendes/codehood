@@ -11,6 +11,7 @@ const DRIVERS: Record<LanguageId, () => Promise<Driver>> = {
 	javascript: async () => (await import("./javascript")).javascriptDriver,
 	lua: async () => (await import("./lua")).luaDriver,
 	prolog: async () => (await import("./prolog")).prologDriver,
+	typescript: async () => (await import("./typescript")).typescriptDriver,
 	python: async () => (await import("./python")).pythonDriver,
 	fake: async () => (await import("./fake")).fakeDriver,
 };

@@ -59,6 +59,7 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
                 <option value="lua">lua</option>
                 <option value="prolog">prolog</option>
                 <option value="python">python</option>
+                <option value="typescript">typescript</option>
                 <option value="fake">fake</option>
               </select>
             </label>
@@ -181,6 +182,10 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
       prolog: {
         entry: "main.pl",
         code: "main :- read(X), format(\"Hello, ~w!~n\", [X]).\n",
+      },
+      typescript: {
+        entry: "main.ts",
+        code: 'const name: string = prompt("Name? ") ?? "";\nconsole.log(`Hello, ${name}!`);\n',
       },
       python: {
         entry: "main.py",
