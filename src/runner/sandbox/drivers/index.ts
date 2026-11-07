@@ -10,6 +10,7 @@ import type { Driver } from "../driver";
 const DRIVERS: Record<LanguageId, () => Promise<Driver>> = {
 	javascript: async () => (await import("./javascript")).javascriptDriver,
 	prolog: async () => (await import("./prolog")).prologDriver,
+	python: async () => (await import("./python")).pythonDriver,
 	fake: async () => (await import("./fake")).fakeDriver,
 };
 

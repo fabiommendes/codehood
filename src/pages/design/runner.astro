@@ -57,6 +57,7 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
               <select id="language" class="select select-bordered select-sm">
                 <option value="javascript">javascript</option>
                 <option value="prolog">prolog</option>
+                <option value="python">python</option>
                 <option value="fake">fake</option>
               </select>
             </label>
@@ -175,6 +176,10 @@ const widgetsView = Astro.url.searchParams.get("view") === "widgets";
       prolog: {
         entry: "main.pl",
         code: "main :- read(X), format(\"Hello, ~w!~n\", [X]).\n",
+      },
+      python: {
+        entry: "main.py",
+        code: 'name = input("Name? ")\nprint(f"Hello, {name}!")\n',
       },
       fake: {
         entry: "main.fake",

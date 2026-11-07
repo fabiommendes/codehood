@@ -40,7 +40,7 @@ test.describe("ready", () => {
 				type: "ready",
 				protocol: 1,
 				stdin: kind,
-				languages: ["javascript", "prolog", "fake"],
+				languages: ["javascript", "prolog", "python", "fake"],
 			});
 		});
 	}
@@ -371,7 +371,7 @@ test.describe("reserve Worker", () => {
 		page,
 	}) => {
 		const h = await loadFrame(page);
-		await send(h, { type: "prepare", language: "python" });
+		await send(h, { type: "prepare", language: "haskell" });
 		await page.waitForTimeout(500);
 		expect(fakeWorkers(page)).toBe(0);
 	});

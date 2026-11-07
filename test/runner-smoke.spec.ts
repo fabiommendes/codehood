@@ -33,3 +33,26 @@ test.describe("prolog smoke", () => {
 		expect(result.stderr).toMatch(/main\.pl:3:\d+/);
 	});
 });
+
+test.describe("python smoke", () => {
+	test("loads and reads a line", async ({ page }) => {
+		const h = await loadFrame(page);
+		const id = await start(h, "print('got', input())\n", "python");
+		await send(h, { type: "stdin", runId: id, line: "hello" });
+		const result = await collect(h, id, 60_000);
+		expect(result.stdout).toContain("got hello");
+		expect(result.exit).toMatchObject({ reason: "exited", code: 0 });
+	});
+
+	test("an error carries its line number", async ({ page }) => {
+		const h = await loadFrame(page);
+		const id = await start(
+			h,
+			"x = 1\ny = 2\nraise ValueError('boom')\n",
+			"python",
+		);
+		const result = await collect(h, id, 60_000);
+		expect(result.stderr).toContain('File "main.py", line 3');
+		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
+	});
+});

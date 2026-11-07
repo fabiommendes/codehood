@@ -12,6 +12,7 @@
 	"runner_editor_tab_hint": "Tab indenta. Para sair do editor, pressione Esc e depois Tab.",
 	"runner_language_javascript": "JavaScript",
 	"runner_language_prolog": "Prolog",
+	"runner_language_python": "Python",
 	"runner_prolog_restarts": "Rodar reinicia o Prolog",
 	"runner_preparing": "Preparando…",
 	"runner_preparing_slow": "Ainda carregando…",

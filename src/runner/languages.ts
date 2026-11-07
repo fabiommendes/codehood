@@ -16,12 +16,16 @@ const ALIASES: Record<string, LanguageId | undefined> = {
 	pl: "prolog",
 	prolog: "prolog",
 	swipl: "prolog",
+	py: "python",
+	python: "python",
+	python3: "python",
 };
 
 /// File extension of each language's source files.
 const EXTENSIONS: Record<LanguageId, string> = {
 	javascript: "js",
 	prolog: "pl",
+	python: "py",
 	fake: "fake",
 };
 
@@ -29,7 +33,7 @@ const EXTENSIONS: Record<LanguageId, string> = {
  * The runner language for a tag, or null when no driver runs it.
  *
  * Case-insensitive; accepts the usual aliases (`js`, `mjs`, `javascript`,
- * `node` for JavaScript; `pl`, `prolog`, `swipl` for Prolog). Never returns `fake`: that driver is reachable only
+ * `node` for JavaScript; `pl`, `prolog`, `swipl` for Prolog; `py`, `python`, `python3` for Python). Never returns `fake`: that driver is reachable only
  * from tests. A language whose driver arrives in a later delivery maps to
  * null until its id is in `languageId`.
  *

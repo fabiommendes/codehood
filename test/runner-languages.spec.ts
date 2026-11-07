@@ -14,6 +14,14 @@ test("Prolog tags map to prolog, which starts in repl mode", () => {
 	expect(defaultRunMode("javascript")).toBe("script");
 });
 
+test("Python tags map to python, which starts in script mode", () => {
+	for (const tag of ["py", "python", "Python3"]) {
+		expect(runnerLanguage(tag)).toBe("python");
+	}
+	expect(defaultFilename("python")).toBe("main.py");
+	expect(defaultRunMode("python")).toBe("script");
+});
+
 test("JavaScript aliases map to javascript", () => {
 	for (const tag of ["javascript", "js", "mjs", "node"]) {
 		expect(runnerLanguage(tag)).toBe("javascript");
@@ -37,7 +45,7 @@ test("the fake driver is never reachable from a tag", () => {
 });
 
 test("languages without a driver map to null", () => {
-	for (const tag of ["python", "haskell", "typescript", "lua"]) {
+	for (const tag of ["haskell", "typescript", "lua"]) {
 		expect(runnerLanguage(tag)).toBeNull();
 	}
 });

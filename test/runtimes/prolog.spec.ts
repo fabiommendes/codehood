@@ -100,18 +100,24 @@ test.describe("prolog driver", () => {
 		expect((await collect(h, next, 60_000)).stdout).toContain("X = 42");
 	});
 
-	test("a program cannot mount a persistent file system", async ({ page }) => {
+	test("a program has no way to reach the persistent file systems", async ({
+		page,
+	}) => {
+		// The only door from Prolog to the JavaScript side is the `:=` bridge of
+		// library(wasm). Its `eval` starts from `window`, which a Worker does not
+		// have, so every call fails before it can touch `indexedDB`. This test
+		// pins that; whether `indexedDB` itself is blocked is settled by the
+		// Python test, where the program reaches the same Emscripten `FS`.
 		const { result } = await runWithInput(
 			page,
 			[
 				":- use_module(library(wasm)).",
-				":- catch(( _ := eval(\"Module.FS.mount(Module.FS.filesystems.IDBFS, {}, '/work')\"),",
-				"           write(mounted) ),",
-				"           _, write(mount_failed)).",
+				":- _ := eval(\"Module.FS.mount(Module.FS.filesystems.IDBFS, {}, '/work')\"),",
+				"   write(mounted).",
 			].join("\n"),
 			[],
 		);
-		expect(result.stdout).toContain("mount_failed");
+		expect(result.stderr).toContain("window is not defined");
 		expect(result.stdout).not.toContain("mounted");
 	});
 
