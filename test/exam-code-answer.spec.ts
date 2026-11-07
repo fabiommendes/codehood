@@ -261,6 +261,25 @@ test("a draft the server confirms is removed from the browser", async ({
 		.toBeNull();
 });
 
+test("the save answers with the server's clock, so the page can measure its offset", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	const response = await page.request.post("/_actions/exam.answer", {
+		data: {
+			discipline: s.course.discipline.slug,
+			course: `${s.course.instructor.username}_${s.course.edition.slug}`,
+			exam: s.exam.slug,
+			question: "code",
+			payload: "console.log(1)",
+		},
+	});
+	const body = await response.text();
+	expect(response.ok(), body).toBe(true);
+	const stamp = Number(body.match(/\d{13}/)?.[0]);
+	expect(Math.abs(stamp - Date.now())).toBeLessThan(10 * SECOND);
+});
+
 test("a different draft shows both versions, with Run off, and keeping the draft saves it", async ({
 	page,
 }) => {

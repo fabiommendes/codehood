@@ -34,7 +34,7 @@ import {
 	toSaved,
 } from "./answer-payload";
 import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
-import { draftStore } from "./code-draft";
+import { browserDraftStore, measureClockOffset } from "./code-draft";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { questionList, unansweredWarning } from "./unanswered-warning";
 
@@ -120,8 +120,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		exam: props.exam,
 	};
 
-	const skew = props.now.getTime() - Date.now();
-	const serverNow = () => new Date(Date.now() + skew);
+	// `serverNow - clientNow`. The first value includes the page's load time;
+	// each confirmed save replaces it with a measure taken around the request.
+	const [skew, setSkew] = createSignal(props.now.getTime() - Date.now());
+	const serverNow = () => new Date(Date.now() + skew());
 
 	const [kind, setKind] = createSignal(props.state.kind);
 	const [now, setNow] = createSignal(props.now);
@@ -253,10 +255,16 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		queue = queue.then(async () => {
 			// A dropped connection throws rather than returning an error; catching
 			// it keeps the queue alive for the saves that follow.
+			const sentAt = Date.now();
 			const message = await actions.exam
 				.answer({ ...target, question: slug, payload })
 				.then(
-					({ error }) => (error ? errorMessage(error) : null),
+					({ data, error }) => {
+						if (data) {
+							setSkew(measureClockOffset(data.serverNow, sentAt, Date.now()));
+						}
+						return error ? errorMessage(error) : null;
+					},
 					() => m.exams_attempt_connection_failed(),
 				);
 			if (message === null) {
@@ -314,12 +322,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	/// Removes this exam's local code drafts, once the attempt is over.
 	function clearDrafts(): void {
 		if (!props.username) return;
-		try {
-			const { question: _question, ...exam } = draftRef("");
-			draftStore(window.localStorage).clearExam(exam);
-		} catch {
-			// Storage unavailable: there is nothing to clear.
-		}
+		const { question: _question, ...exam } = draftRef("");
+		browserDraftStore().clearExam(exam);
 	}
 
 	/// Saves the draft of every code question whose draft is newer than its saved answer.
@@ -347,7 +351,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			draft: draftRef(slug),
 			value: typeof saved === "string" ? saved : "",
 			valueSavedAt: at ? new Date(at) : null,
-			clockOffsetMs: skew,
+			clockOffsetMs: skew(),
 			save: {
 				state: status.slow ? "saving" : status.unsaved ? "unsaved" : "saved",
 				savedAt: savedAt()[slug] ?? null,

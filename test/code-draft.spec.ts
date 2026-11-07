@@ -7,6 +7,7 @@ import {
 	type DraftRef,
 	draftKey,
 	draftStore,
+	measureClockOffset,
 } from "@/components/exam/code-draft";
 
 /// An in-memory `Storage`; `fail` makes operations throw.
@@ -158,4 +159,10 @@ test("the store swallows quota errors and storage that throws on access", () => 
 	expect(() =>
 		store.clearExam({ username: "ada", course: "c", exam: "e" }),
 	).not.toThrow();
+});
+
+test("measureClockOffset takes the midpoint of the round trip, free of the page load time", () => {
+	// Client clock 5 s behind the server; the request took 400 ms.
+	expect(measureClockOffset(105_200, 100_000, 100_400)).toBe(5_000);
+	expect(measureClockOffset(100_200, 100_000, 100_400)).toBe(0);
 });

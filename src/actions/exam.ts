@@ -41,6 +41,8 @@ export const exam = {
 				},
 				{ actor },
 			);
+			// The page measures its clock offset from this stamp.
+			return { serverNow: Date.now() };
 		}),
 	}),
 

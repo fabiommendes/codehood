@@ -201,3 +201,16 @@ export function browserDraftStore(): DraftStore {
 		return NO_DRAFTS;
 	}
 }
+
+/**
+ * The offset `serverNow - clientNow` implied by a request: the server stamped
+ * `serverMs` somewhere between `sentMs` and `receivedMs` on the client's
+ * clock, so the midpoint is the best guess, off by at most half the round trip.
+ */
+export function measureClockOffset(
+	serverMs: number,
+	sentMs: number,
+	receivedMs: number,
+): number {
+	return serverMs - (sentMs + receivedMs) / 2;
+}
