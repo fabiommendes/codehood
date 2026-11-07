@@ -514,3 +514,24 @@ final e é reversível. Condições:
 - Corrigir o texto sobre a cópia ao trocar de card no modo lista (B13).
 - Registrar custo: trocar de submissão perde a reserva (Pyodide frio a cada
   troca); o snapshot do plano B vale também para a correção.
+
+### Revisão final E3–E5
+
+security: aprovado, com B1 (rascunho fica em páginas sem login:
+`clearOthers` no `CenteredLayout` e `clearAll` em página sem usuário), B2
+(`restrictImports` no build do `sucrase`), B3 (`stale-bundle` da reserva
+recarrega sem limite: um reload por versão), B4 (`submission` obrigatório
+em `review`).
+
+breaker: B14 major (`draftStore(localStorage)` sem `try` em `AppLayout`
+quebra o script da página inteira se o storage for bloqueado), B15 major
+(retry de `stale-bundle` roda no frame de outra submissão em `review`), B16
+(`skew` inclui tempo de carga e adianta `savedAt`; rascunho pode ser
+apagado), B17 (logout apaga rascunho não salvo quando offline), B18 (duas
+abas da mesma prova: save numa apaga rascunho da outra), Parar ignorado na
+janela do retry, conflito falso com rascunho só de espaços.
+
+Decisão do presidente para B17, dentro do desenho aprovado (rascunho limpo
+no logout): se houver rascunho não confirmado pelo servidor, o logout pede
+confirmação dizendo que o rascunho será apagado. Todos os itens vão para um
+lote de correção.
