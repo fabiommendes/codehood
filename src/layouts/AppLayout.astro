@@ -162,12 +162,12 @@ const reportContentPage =
 </Layout>
 
 <script>
-  import { draftStore } from "@/components/exam/code-draft";
+  import { browserDraftStore } from "@/components/exam/code-draft";
 
   // Code drafts live in the browser, so they must not outlive the session
   // they were written in: logout removes all of them, and a page opened by
   // another user removes the previous user's.
-  const drafts = draftStore(localStorage);
+  const drafts = browserDraftStore();
   const draftUser = document.querySelector<HTMLElement>("[data-draft-user]");
   if (draftUser?.dataset.draftUser) {
     drafts.clearOthers(draftUser.dataset.draftUser, Date.now());

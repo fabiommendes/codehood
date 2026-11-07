@@ -176,3 +176,25 @@ export function draftStore(storage: Storage): DraftStore {
 		},
 	};
 }
+
+/// A store that holds nothing, for browsers that block `localStorage`.
+const NO_DRAFTS: DraftStore = {
+	read: () => null,
+	write: () => {},
+	remove: () => {},
+	clearExam: () => {},
+	clearOthers: () => {},
+	clearAll: () => {},
+};
+
+/**
+ * A `DraftStore` over `window.localStorage`, or one that keeps nothing when
+ * the browser blocks the access (the autosave then stands alone).
+ */
+export function browserDraftStore(): DraftStore {
+	try {
+		return draftStore(window.localStorage);
+	} catch {
+		return NO_DRAFTS;
+	}
+}

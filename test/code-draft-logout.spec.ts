@@ -50,6 +50,26 @@ test("logging out everywhere from the profile removes the drafts", async ({
 	expect(keys.filter((k) => k.startsWith("codehood:code-draft:"))).toEqual([]);
 });
 
+test("a page raises no script error when the browser blocks localStorage", async ({
+	page,
+}) => {
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	await page.addInitScript(() => {
+		Object.defineProperty(window, "localStorage", {
+			get() {
+				throw new DOMException("blocked", "SecurityError");
+			},
+		});
+	});
+	const student = await seedUser({ role: "STUDENT" });
+	await logInAs(page, student);
+	await page.goto("/courses");
+	await page.waitForLoadState("load");
+
+	expect(errors).toEqual([]);
+});
+
 test("opening a page as another user removes the previous user's drafts", async ({
 	page,
 }) => {
