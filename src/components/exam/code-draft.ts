@@ -48,8 +48,9 @@ export type DraftComparison =
 	| { kind: "conflict"; newer: "draft" | "server" };
 
 /** The `localStorage` key of the draft for `ref`. Each part is URI-encoded. */
-export function draftKey(_ref: DraftRef): string {
-	throw new Error("not implemented");
+export function draftKey(ref: DraftRef): string {
+	const parts = [ref.username, ref.course, ref.exam, ref.question];
+	return DRAFT_KEY_PREFIX + parts.map(encodeURIComponent).join(":");
 }
 
 /**
@@ -59,11 +60,14 @@ export function draftKey(_ref: DraftRef): string {
  * @params serverSavedAt epoch milliseconds of the server's save; null when there is none.
  */
 export function compareDraft(
-	_draft: CodeDraft | null,
-	_serverCode: string,
-	_serverSavedAt: number | null,
+	draft: CodeDraft | null,
+	serverCode: string,
+	serverSavedAt: number | null,
 ): DraftComparison {
-	throw new Error("not implemented");
+	if (draft === null) return { kind: "none" };
+	if (draft.code === serverCode) return { kind: "same" };
+	const draftIsNewer = serverSavedAt === null || draft.savedAt > serverSavedAt;
+	return { kind: "conflict", newer: draftIsNewer ? "draft" : "server" };
 }
 
 /** Reads, writes and removes drafts; storage errors (quota, privacy mode) are swallowed. */
@@ -81,6 +85,94 @@ export interface DraftStore {
 }
 
 /** A `DraftStore` over `storage` (`window.localStorage` in the browser). */
-export function draftStore(_storage: Storage): DraftStore {
-	throw new Error("not implemented");
+export function draftStore(storage: Storage): DraftStore {
+	/// Runs `action`, returning `fallback` if the storage throws.
+	function safely<T>(action: () => T, fallback: T): T {
+		try {
+			return action();
+		} catch {
+			return fallback;
+		}
+	}
+
+	/// Every storage key that belongs to this module.
+	function ownKeys(): string[] {
+		const keys: string[] = [];
+		for (let i = 0; i < storage.length; i++) {
+			const key = storage.key(i);
+			if (key?.startsWith(DRAFT_KEY_PREFIX)) keys.push(key);
+		}
+		return keys;
+	}
+
+	/// The draft stored under `key`, or null when absent or malformed.
+	function parse(key: string): CodeDraft | null {
+		const raw = storage.getItem(key);
+		if (raw === null) return null;
+		try {
+			const value: unknown = JSON.parse(raw);
+			if (
+				typeof value === "object" &&
+				value !== null &&
+				"code" in value &&
+				"savedAt" in value &&
+				typeof value.code === "string" &&
+				typeof value.savedAt === "number"
+			) {
+				return { code: value.code, savedAt: value.savedAt };
+			}
+		} catch {}
+		return null;
+	}
+
+	const isExpired = (draft: CodeDraft, now: number) =>
+		now - draft.savedAt > DRAFT_TTL_MS;
+
+	/// Removes the own keys for which `doomed(key, draft)` holds.
+	function removeWhere(
+		doomed: (key: string, draft: CodeDraft | null) => boolean,
+	): void {
+		safely(() => {
+			for (const key of ownKeys()) {
+				if (doomed(key, parse(key))) storage.removeItem(key);
+			}
+		}, undefined);
+	}
+
+	return {
+		read(ref, now) {
+			return safely(() => {
+				const key = draftKey(ref);
+				const draft = parse(key);
+				if (draft === null || isExpired(draft, now)) {
+					storage.removeItem(key);
+					return null;
+				}
+				return draft;
+			}, null);
+		},
+		write(ref, draft) {
+			safely(
+				() => storage.setItem(draftKey(ref), JSON.stringify(draft)),
+				undefined,
+			);
+		},
+		remove(ref) {
+			safely(() => storage.removeItem(draftKey(ref)), undefined);
+		},
+		clearExam(ref) {
+			const prefix = draftKey({ ...ref, question: "" });
+			removeWhere((key) => key.startsWith(prefix));
+		},
+		clearOthers(username, now) {
+			const own = `${DRAFT_KEY_PREFIX}${encodeURIComponent(username)}:`;
+			removeWhere(
+				(key, draft) =>
+					!key.startsWith(own) || draft === null || isExpired(draft, now),
+			);
+		},
+		clearAll() {
+			removeWhere(() => true);
+		},
+	};
 }

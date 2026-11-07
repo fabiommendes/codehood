@@ -157,10 +157,30 @@ const reportContentPage =
       </div>
     </div>
   </div>
+  {user && <div hidden data-draft-user={user.username}></div>}
   {user && <ReportDialog client:load course={reportContext} contentPage={reportContentPage} />}
 </Layout>
 
 <script>
+  import { draftStore } from "@/components/exam/code-draft";
+
+  // Code drafts live in the browser, so they must not outlive the session
+  // they were written in: logout removes all of them, and a page opened by
+  // another user removes the previous user's.
+  const drafts = draftStore(localStorage);
+  const draftUser = document.querySelector<HTMLElement>("[data-draft-user]");
+  if (draftUser?.dataset.draftUser) {
+    drafts.clearOthers(draftUser.dataset.draftUser, Date.now());
+  }
+  document.addEventListener("submit", (event) => {
+    if (
+      event.target instanceof HTMLFormElement &&
+      event.target.matches("form[data-clear-drafts]")
+    ) {
+      drafts.clearAll();
+    }
+  });
+
   // Generic opener for any <dialog> on the page: a trigger carries
   // data-open-dialog="<id>" and this wires it up, so pages (and the
   // components they render, like Table-driven admin lists) don't each
