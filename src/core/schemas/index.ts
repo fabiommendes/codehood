@@ -62,6 +62,7 @@ export * from "./repository";
 export * from "./resource";
 export * from "./response";
 export * from "./roll-call";
+export * from "./rubric";
 export * from "./session";
 export * from "./submission";
 export * from "./time-slot";

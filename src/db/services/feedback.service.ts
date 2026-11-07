@@ -12,7 +12,12 @@ import type { z } from "zod";
 import { type Actor, SYSTEM } from "@/auth/actor";
 import type { FeedbackTarget, ResponseWithCourse } from "@/auth/permissions";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
-import { InvalidData, NotAllowed, NotFound } from "@/core/error";
+import {
+	ImproperBehavior,
+	InvalidData,
+	NotAllowed,
+	NotFound,
+} from "@/core/error";
 import type { CourseRef, FeedbackId } from "@/core/schemas";
 import {
 	feedbackCreate,
@@ -25,6 +30,7 @@ import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { released } from "@/services/exam-state";
+import { needsReview } from "@/services/rubric";
 import { DbNull, type Prisma, type PrismaTx } from "../client";
 import {
 	courseRefMatch,
@@ -33,6 +39,7 @@ import {
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
+import { gradeWithRubric } from "./rubric-store";
 import { examTimingFromDb, examTimingSelect } from "./submission.service";
 
 export type { FeedbackId };
@@ -48,7 +55,7 @@ export type FeedbackUpdate = z.infer<typeof feedbackUpdate>;
 
 /// The relations needed to compute the exam's release, shared by every query
 /// that has to resolve a submission's course and release rule.
-function examReleaseSelect() {
+export function examReleaseSelect() {
 	return {
 		...examTimingSelect,
 		gradesReleasedAt: true,
@@ -84,10 +91,11 @@ type DbSubmission = Prisma.SubmissionGetPayload<{
 }>;
 
 /// The relations a feedback row needs to answer both "who may read this" and
-/// "has the exam released it".
+/// "has the exam released it", plus the rubric items it applies.
 function feedbackInclude() {
 	return {
 		submission: { include: submissionReleaseInclude() },
+		rubricItems: { include: { item: true } },
 	} satisfies Prisma.FeedbackInclude;
 }
 
@@ -142,12 +150,13 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			);
 
 			const { graderId, botId } = resolveGrader(input, opts.actor);
+			const grade = await resolveNewGrade(tx, submission, input);
 
 			const row = await invalidIfExists(tx.feedback.create, {
 				data: {
 					submissionId: submission.id,
 					ref: input.ref,
-					score: input.score,
+					...newGradeData(grade),
 					graderId,
 					botId,
 					feedback: input.feedback ?? null,
@@ -292,10 +301,17 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				"feedback.update",
 			);
 
+			const grade = await resolveGrade(
+				tx,
+				feedback.submission,
+				fields,
+				feedback,
+			);
+
 			const row = await tx.feedback.update({
 				where: { id: feedback.id },
 				data: {
-					...(fields.score !== undefined ? { score: fields.score } : {}),
+					...(grade ? gradeData(grade) : {}),
 					...(fields.feedback !== undefined
 						? { feedback: fields.feedback }
 						: {}),
@@ -350,6 +366,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				where: {
 					submissionId_ref: { submissionId: submission.id, ref: input.ref },
 				},
+				include: feedbackInclude(),
 			});
 
 			if (existing) {
@@ -357,10 +374,19 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				if (input.grader != null || input.bot != null) {
 					resolveGrader(input, opts.actor);
 				}
+				if (input.score === undefined && input.rubric === undefined) {
+					throw invalidGrade("score", m.errors_feedback_score_required());
+				}
+				const grade = await resolveGrade(
+					tx,
+					submission,
+					{ ...input, adjustment: input.adjustment ?? null },
+					existing,
+				);
 				const row = await tx.feedback.update({
 					where: { id: existing.id },
 					data: {
-						score: input.score,
+						...(grade ? gradeData(grade) : {}),
 						feedback: input.feedback ?? null,
 						notes: input.notes ?? null,
 						blanks: input.blanks ?? DbNull,
@@ -371,11 +397,12 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			}
 
 			const { graderId, botId } = resolveGrader(input, opts.actor);
+			const grade = await resolveNewGrade(tx, submission, input);
 			const row = await invalidIfExists(tx.feedback.create, {
 				data: {
 					submissionId: submission.id,
 					ref: input.ref,
-					score: input.score,
+					...newGradeData(grade),
 					graderId,
 					botId,
 					feedback: input.feedback ?? null,
@@ -427,7 +454,7 @@ export type FeedbackService = ReturnType<typeof makeFeedbackService>;
 // Private utilities -----------------------------------------------------------
 
 /// Whether `exam` has released its grades to its students as of `now`, see {@link released}.
-function releasedToStudents(exam: ExamRelease, now: Date): boolean {
+export function releasedToStudents(exam: ExamRelease, now: Date): boolean {
 	return released(
 		exceptionSchedule(
 			{ ...examTimingFromDb(exam), gradesReleasedAt: exam.gradesReleasedAt },
@@ -664,13 +691,132 @@ async function writableFeedback(
 	return row;
 }
 
+/// The score of a pass and the rubric bookkeeping that goes with it.
+interface Grade {
+	score: string;
+	rubricId: number | null;
+	adjustment: string | null;
+	/// Ids of the rubric items the pass applies; none for a score set by hand.
+	itemIds: number[];
+}
+
+/// The `data` fields that write `grade` on a new pass.
+function newGradeData(grade: Grade) {
+	return {
+		score: grade.score,
+		rubricId: grade.rubricId,
+		adjustment: grade.adjustment,
+		rubricItems: { create: grade.itemIds.map((itemId) => ({ itemId })) },
+	};
+}
+
+/// The `data` fields that write `grade` over an existing pass, replacing the items it applied.
+function gradeData(grade: Grade) {
+	const { rubricItems, ...fields } = newGradeData(grade);
+	return { ...fields, rubricItems: { deleteMany: {}, ...rubricItems } };
+}
+
+/// The fields of a write that decide the score.
+interface GradeFields {
+	score?: string;
+	rubric?: string[];
+	adjustment?: string | null;
+}
+
+/// Refuses a grade whose fields contradict each other, keyed on `field`.
+function invalidGrade(field: string, message: string): InvalidData {
+	return new InvalidData({ [field]: [{ code: "invalid", message }] });
+}
+
+/// The grade of a new pass, which `resolveGrade` always decides.
+async function resolveNewGrade(
+	tx: PrismaTx,
+	submission: Pick<DbSubmission, "questionId" | "response">,
+	fields: GradeFields,
+): Promise<Grade> {
+	const grade = await resolveGrade(tx, submission, fields, null);
+	if (grade === null) throw new ImproperBehavior("a new pass has no grade");
+	return grade;
+}
+
+/**
+ * Decides the score of a write: set by hand, computed from the rubric items,
+ * or (for a revision of `existing` that only moves other fields) left alone,
+ * in which case the result is `null`.
+ *
+ * Revising with only `adjustment` recomputes the items the pass already
+ * applies; a retired item is accepted only if the pass already applied it.
+ *
+ * @throws {@link InvalidData}
+ * If `score` comes with `rubric`, a new pass has neither, `adjustment` goes
+ * to a pass not graded with the rubric, or the rubric refuses the items.
+ */
+async function resolveGrade(
+	tx: PrismaTx,
+	submission: Pick<DbSubmission, "questionId" | "response">,
+	fields: GradeFields,
+	existing: DbFeedback | null,
+): Promise<Grade | null> {
+	if (fields.score !== undefined && fields.rubric !== undefined) {
+		throw invalidGrade("score", m.errors_feedback_score_and_rubric());
+	}
+
+	const adjustment = fields.adjustment ?? null;
+	if (fields.rubric === undefined && fields.score !== undefined) {
+		if (adjustment !== null) {
+			throw invalidGrade(
+				"adjustment",
+				m.errors_feedback_adjustment_needs_rubric(),
+			);
+		}
+		return {
+			score: fields.score,
+			rubricId: null,
+			adjustment: null,
+			itemIds: [],
+		};
+	}
+
+	const applied = existing?.rubricItems ?? [];
+	const target = {
+		examId: submission.response.examId,
+		questionRefId: submission.questionId,
+	};
+	if (fields.rubric !== undefined) {
+		return gradeWithRubric(tx, target, {
+			keys: fields.rubric,
+			adjustment:
+				fields.adjustment !== undefined
+					? adjustment
+					: (existing?.adjustment ?? null),
+			alreadyApplied: new Set(applied.map((link) => link.itemId)),
+		});
+	}
+
+	if (existing !== null && fields.adjustment === undefined) return null;
+	if (existing === null || existing.rubricId === null) {
+		throw existing === null
+			? invalidGrade("score", m.errors_feedback_score_required())
+			: invalidGrade("adjustment", m.errors_feedback_adjustment_needs_rubric());
+	}
+	return gradeWithRubric(tx, target, {
+		keys: applied.map((link) => link.item.key),
+		adjustment,
+		alreadyApplied: new Set(applied.map((link) => link.itemId)),
+	});
+}
+
 /// The minimal relation `fromDb` needs to fill in the pass's public reference
-/// to the submission it grades.
+/// to the submission it grades, and the rubric items it applies.
 type FeedbackFromDbRow = Prisma.FeedbackGetPayload<{
-	include: { submission: { select: { publicId: true } } };
+	include: {
+		submission: { select: { publicId: true } };
+		rubricItems: { include: { item: true } };
+	};
 }>;
 
-/// The entity `actor` may see: `notes` is dropped unless they can grade the submission.
+/// The entity `actor` may see: whoever can grade the submission reads it whole;
+/// anybody else loses `notes`, the rubric keys, `review` and the private comment of each item.
 function present(actor: Actor, row: DbFeedback): Feedback {
 	const feedback = fromDb(row);
 	const canGrade = hasPerm(
@@ -679,18 +825,51 @@ function present(actor: Actor, row: DbFeedback): Feedback {
 		responseTargetFrom(row.submission.response),
 	);
 	if (canGrade) return feedback;
-	const { notes: _notes, ...visible } = feedback;
-	return visible;
+
+	const {
+		notes: _notes,
+		rubric: _rubric,
+		review: _review,
+		...visible
+	} = feedback;
+	return {
+		...visible,
+		rubricItems:
+			feedback.rubricItems?.map(({ group, text, value, feedback }) => ({
+				group,
+				text,
+				value,
+				feedback,
+			})) ?? null,
+	};
 }
 
-/** Converts a database row into the feedback entity, notes included. */
+/** Converts a database row into the feedback entity, notes and private rubric fields included. */
 export function fromDb(row: FeedbackFromDbRow): Feedback {
+	const applied =
+		row.rubricId === null
+			? null
+			: [...row.rubricItems]
+					.map((link) => link.item)
+					.sort((a, b) => a.position - b.position);
 	return {
 		id: row.id as Feedback["id"],
 		ref: row.ref as Feedback["ref"],
 		submissionId: row.submissionId as Feedback["submissionId"],
 		submission: row.submission.publicId,
 		score: row.score,
+		adjustment: row.adjustment,
+		rubric: applied?.map((item) => item.key) ?? null,
+		review: applied !== null && needsReview(applied),
+		rubricItems:
+			applied?.map((item) => ({
+				key: item.key,
+				group: item.group,
+				text: item.text,
+				value: item.value,
+				comment: item.comment,
+				feedback: item.feedback,
+			})) ?? null,
 		grader: row.graderId as Feedback["grader"],
 		bot: row.botId,
 		feedback: row.feedback,

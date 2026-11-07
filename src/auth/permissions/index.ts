@@ -55,6 +55,8 @@ type ExtraPerms =
 	| "report.triage"
 	| "roll-call.manage"
 	| "exam.manage-exceptions"
+	| "rubric.read"
+	| "rubric.write"
 	| "api-key.manage"
 	| "calendar-feed.manage"
 	| "session.manage"
@@ -439,6 +441,15 @@ const PERMISSIONS = {
 			(target.author.username === actor.username && target.released),
 		audit: auditResponse,
 	} satisfies PermDef<FeedbackTarget>,
+
+	// RUBRIC ---------------------------------------------------------------------
+	// Rule: the course's instructor reads and writes the grading rubrics; SYSTEM
+	// writes on a bot's behalf. No admin branch and no student branch, matching
+	// `feedback.create`: a rubric holds the private comment of each item.
+	"rubric.read | rubric.write": {
+		other: (actor, target) => isCourseOwner(actor, target),
+		audit: auditCourse,
+	} satisfies PermDef<CourseTarget>,
 
 	// REGRADE --------------------------------------------------------------------
 	// Rule: the author of the attempt asks for a regrade of their own answer

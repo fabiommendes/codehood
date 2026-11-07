@@ -149,5 +149,13 @@
 	"errors_invite_classroom_course_required": "Um convite de turma precisa de um curso.",
 	"errors_invite_classroom_no_email": "Um convite de turma não é endereçado a um e-mail.",
 	"errors_invite_personal_email_required": "Um convite pessoal precisa de um e-mail.",
-	"errors_invite_personal_single_use": "Um convite pessoal é de uso único: maxUses deve ser 1."
+	"errors_invite_personal_single_use": "Um convite pessoal é de uso único: maxUses deve ser 1.",
+	"errors_rubric_key_exists": "O item de rubrica \"{key}\" já existe",
+	"errors_rubric_key_unknown": "A rubrica desta questão não tem o item \"{key}\"",
+	"errors_rubric_key_retired": "O item \"{key}\" está arquivado e não pode ser aplicado",
+	"errors_rubric_group_conflict": "Os itens {keys} dividem o grupo \"{group}\"; aplique só um deles",
+	"errors_rubric_group_lookalike": "O grupo \"{to}\" difere do grupo existente \"{existing}\" só por maiúsculas ou espaços",
+	"errors_feedback_score_and_rubric": "Envie `score` ou `rubric`, não os dois",
+	"errors_feedback_score_required": "`score` ou `rubric` é obrigatório",
+	"errors_feedback_adjustment_needs_rubric": "`adjustment` exige uma correção feita pela rubrica"
 }

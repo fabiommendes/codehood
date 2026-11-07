@@ -149,5 +149,13 @@
 	"errors_invite_classroom_course_required": "A classroom invite needs a course.",
 	"errors_invite_classroom_no_email": "A classroom invite is not addressed to an email.",
 	"errors_invite_personal_email_required": "A personal invite needs an email.",
-	"errors_invite_personal_single_use": "A personal invite is single-use: maxUses must be 1."
+	"errors_invite_personal_single_use": "A personal invite is single-use: maxUses must be 1.",
+	"errors_rubric_key_exists": "Rubric item \"{key}\" already exists",
+	"errors_rubric_key_unknown": "The rubric of this question has no item \"{key}\"",
+	"errors_rubric_key_retired": "Item \"{key}\" is retired and cannot be applied",
+	"errors_rubric_group_conflict": "Items {keys} share the group \"{group}\"; apply only one of them",
+	"errors_rubric_group_lookalike": "Group \"{to}\" differs from the existing group \"{existing}\" only by case or spaces",
+	"errors_feedback_score_and_rubric": "Send either `score` or `rubric`, not both",
+	"errors_feedback_score_required": "Either `score` or `rubric` is required",
+	"errors_feedback_adjustment_needs_rubric": "`adjustment` needs a pass graded with the rubric"
 }

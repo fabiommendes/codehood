@@ -82,5 +82,7 @@
 	"forms_schema_repository_path_duplicate": "\"{path}\" appears more than once in the tree.",
 	"forms_schema_repository_path_case": "\"{path}\" differs from \"{other}\" only in letter case.",
 	"forms_schema_repository_path_prefix": "\"{path}\" is a file and also a directory of \"{other}\".",
-	"forms_schema_git_sha_invalid": "Not a git object name: expected 40 lowercase hex digits."
+	"forms_schema_git_sha_invalid": "Not a git object name: expected 40 lowercase hex digits.",
+	"forms_schema_rubric_group": "Group path: segments separated by '/', none empty and none containing ':'.",
+	"forms_schema_rubric_base": "The base must be a number between 0 and 1."
 }

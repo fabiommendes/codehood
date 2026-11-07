@@ -36,6 +36,23 @@ import { makeRepositoryService } from "./services/repository.service";
 import { makeResourceService } from "./services/resource.service";
 import { makeResponseService } from "./services/response.service";
 import { makeRollCallService } from "./services/roll-call.service";
+
+export type {
+	Rubric,
+	RubricChange,
+	RubricItem,
+	RubricItemCreate,
+	RubricItemPK,
+	RubricItemUpdate,
+	RubricPK,
+	RubricPreview,
+	RubricRenameGroup,
+	RubricRenameResult,
+	RubricSplit,
+	RubricUpdate,
+} from "./services/rubric.service";
+
+import { makeRubricService } from "./services/rubric.service";
 import {
 	makeSessionService,
 	validateSession,
@@ -289,6 +306,7 @@ export const db = {
 	resource: makeResourceService(attachmentService),
 	response: makeResponseService(),
 	rollCall: makeRollCallService(),
+	rubric: makeRubricService(),
 	session: { ...makeSessionService(), validate: validateSession },
 	submission: makeSubmissionService(),
 	timeSlot: makeTimeSlotService(),

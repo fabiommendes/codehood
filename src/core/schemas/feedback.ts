@@ -35,6 +35,21 @@ export const blankGrade = z.object({
 });
 export type BlankGrade = z.infer<typeof blankGrade>;
 
+/// What a student reads of a rubric item applied to their answer.
+export const rubricAppliedPublic = z.object({
+	group: z.string().nullable(),
+	text: z.string(),
+	value: score,
+	feedback: z.string().nullable(),
+});
+
+/// A rubric item applied in a pass, as the course's instructor reads it.
+export const rubricApplied = rubricAppliedPublic.extend({
+	key: z.string(),
+	/// Private to the people who grade; absent from what a student reads.
+	comment: z.string().nullable(),
+});
+
 export const feedbackSchema = z.object({
 	id: feedbackId,
 
@@ -49,6 +64,18 @@ export const feedbackSchema = z.object({
 	submission: publicId,
 
 	score: score,
+
+	/// Free extra credit added after the rubric items, `null` outside a pass graded with the rubric.
+	adjustment: score.nullable(),
+
+	/// The keys of the rubric items applied, or `null` when the score was set by hand. Absent from what a student reads.
+	rubric: z.array(z.string()).nullable().optional(),
+
+	/// Whether the pass applies a retired rubric item and should be graded again. Absent from what a student reads.
+	review: z.boolean().optional(),
+
+	/// The rubric items applied, ordered as in the rubric, or `null` when the score was set by hand.
+	rubricItems: z.array(rubricApplied.or(rubricAppliedPublic)).nullable(),
 
 	/// The user who graded, or `null` when a bot did.
 	grader: username.nullable(),
@@ -75,10 +102,20 @@ export const feedbackCreate = feedbackSchema
 		submission: true,
 		createdAt: true,
 		updatedAt: true,
+		rubric: true,
+		review: true,
+		rubricItems: true,
 	})
 	.extend({
 		/// The submission being graded.
 		submission: submissionRef,
+
+		/// Sent instead of `rubric`; the rubric computes the score otherwise.
+		score: score.optional(),
+
+		/// The keys of the rubric items applied. The server computes the score from them.
+		rubric: z.array(z.string()).optional(),
+		adjustment: score.nullish(),
 
 		/// Defaults to the actor, who is the only grader a user may write.
 		grader: username.nullish(),
@@ -92,6 +129,10 @@ export const feedbackCreate = feedbackSchema
 /// Re-grading appends another pass; only the verdict moves on an existing one.
 export const feedbackUpdate = feedbackSchema
 	.pick({ score: true, feedback: true, notes: true, blanks: true })
+	.extend({
+		rubric: z.array(z.string()).optional(),
+		adjustment: score.nullish(),
+	})
 	.partial();
 
 export const feedbackPK = z.union([

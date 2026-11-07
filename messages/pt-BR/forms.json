@@ -82,5 +82,7 @@
 	"forms_schema_repository_path_duplicate": "\"{path}\" aparece mais de uma vez na árvore.",
 	"forms_schema_repository_path_case": "\"{path}\" difere de \"{other}\" só na caixa das letras.",
 	"forms_schema_repository_path_prefix": "\"{path}\" é um arquivo e também um diretório de \"{other}\".",
-	"forms_schema_git_sha_invalid": "Não é um nome de objeto git: esperados 40 dígitos hexadecimais minúsculos."
+	"forms_schema_git_sha_invalid": "Não é um nome de objeto git: esperados 40 dígitos hexadecimais minúsculos.",
+	"forms_schema_rubric_group": "Caminho do grupo: segmentos separados por '/', nenhum vazio e nenhum com ':'.",
+	"forms_schema_rubric_base": "A base deve ser um número entre 0 e 1."
 }
