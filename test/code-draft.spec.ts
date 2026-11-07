@@ -111,6 +111,23 @@ test("clearOthers keeps the current user's drafts and drops other users' and exp
 	);
 });
 
+test("clearExpired drops expired drafts of every user and keeps the rest", () => {
+	const storage = new FakeStorage();
+	const store = draftStore(storage);
+	store.write(REF, draft("mine", NOW));
+	store.write(
+		{ ...REF, username: "bob" },
+		draft("old", NOW - DRAFT_TTL_MS - 1),
+	);
+	storage.setItem("theme", "dark");
+
+	store.clearExpired(NOW);
+
+	expect([...storage.data.keys()].sort()).toEqual(
+		[draftKey(REF), "theme"].sort(),
+	);
+});
+
 test("clearExam removes only the drafts of that exam and user", () => {
 	const storage = new FakeStorage();
 	const store = draftStore(storage);
@@ -155,6 +172,7 @@ test("the store swallows quota errors and storage that throws on access", () => 
 	expect(store.read(REF, NOW)).toBeNull();
 	expect(() => store.remove(REF)).not.toThrow();
 	expect(() => store.clearAll()).not.toThrow();
+	expect(() => store.clearExpired(NOW)).not.toThrow();
 	expect(() => store.clearOthers("ada", NOW)).not.toThrow();
 	expect(() =>
 		store.clearExam({ username: "ada", course: "c", exam: "e" }),

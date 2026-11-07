@@ -112,20 +112,47 @@ const draftKeys = (page: import("@playwright/test").Page) =>
 		),
 	);
 
-test("a page opened without a user removes every draft", async ({ page }) => {
+test("a page opened without a user removes only expired drafts", async ({
+	page,
+}) => {
+	const expired = JSON.stringify({
+		code: "x",
+		savedAt: Date.now() - 15 * 24 * 60 * 60 * 1000,
+	});
 	await page.goto("/login");
 	await page.evaluate(
-		([k, v]) => localStorage.setItem(k as string, v as string),
-		[key("ada"), value],
+		([a, b, v, e]) => {
+			localStorage.setItem(a as string, v as string);
+			localStorage.setItem(b as string, e as string);
+		},
+		[key("ada"), key("bob"), value, expired],
 	);
 	await page.goto("/login");
-	await expect.poll(() => draftKeys(page)).toEqual([]);
-
-	await page.evaluate(
-		([k, v]) => localStorage.setItem(k as string, v as string),
-		[key("ada"), value],
-	);
+	await expect.poll(() => draftKeys(page)).toEqual([key("ada")]);
 	await page.goto("/this-page-does-not-exist");
+	await page.waitForLoadState("load");
+	expect(await draftKeys(page)).toEqual([key("ada")]);
+});
+
+test("a draft survives the session expiring, until another user signs in", async ({
+	page,
+}) => {
+	const first = await seedUser({ role: "STUDENT" });
+	const second = await seedUser({ role: "STUDENT" });
+	await logInAs(page, first);
+	await page.goto("/courses");
+	await page.evaluate(
+		([k, v]) => localStorage.setItem(k as string, v as string),
+		[key(first.username), value],
+	);
+
+	await page.context().clearCookies();
+	await page.goto("/login");
+	await page.waitForLoadState("load");
+	expect(await draftKeys(page)).toEqual([key(first.username)]);
+
+	await logInAs(page, second);
+	await page.goto("/courses");
 	await expect.poll(() => draftKeys(page)).toEqual([]);
 });
 

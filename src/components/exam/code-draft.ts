@@ -83,6 +83,8 @@ export interface DraftStore {
 	clearExam(ref: Omit<DraftRef, "question">): void;
 	/** Removes the drafts of every user but `username`, and every expired draft. */
 	clearOthers(username: string, now: number): void;
+	/** Removes every expired draft, of every user (page without a signed-in user). */
+	clearExpired(now: number): void;
 	/** Removes every key starting with `DRAFT_KEY_PREFIX`, for every user (logout). */
 	clearAll(): void;
 	/** Whether any draft is stored: one the server has not confirmed, since confirmed drafts are removed. */
@@ -176,6 +178,9 @@ export function draftStore(storage: Storage): DraftStore {
 					!key.startsWith(own) || draft === null || isExpired(draft, now),
 			);
 		},
+		clearExpired(now) {
+			removeWhere((_, draft) => draft === null || isExpired(draft, now));
+		},
 		clearAll() {
 			removeWhere(() => true);
 		},
@@ -192,6 +197,7 @@ const NO_DRAFTS: DraftStore = {
 	remove: () => {},
 	clearExam: () => {},
 	clearOthers: () => {},
+	clearExpired: () => {},
 	clearAll: () => {},
 	hasAny: () => false,
 };
