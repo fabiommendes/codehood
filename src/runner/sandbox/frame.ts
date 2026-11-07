@@ -72,8 +72,8 @@ export const STORAGE_CLEANUP_TIMEOUT_MS = 2000;
  * `loaded`, sends `start`. The next reserve for that language is created
  * only after this run ends, and only if the app sent `prepare` for it since
  * the last reserve was consumed or dropped. It forwards Worker messages that parse: output
- * in batches every `OUTPUT_FLUSH_MS`, a `status` only when the state
- * changes. It counts output bytes and every message the Worker posts after
+ * and `status` in batches every `OUTPUT_FLUSH_MS` (a `status` goes out at once only if none did in the last interval, the rest collapse into one per batch, and only when the state
+ * changes). It counts output bytes and every message the Worker posts after
  * `start` (dropped ones included), and terminates the
  * Worker on `stop`, when either output limit is passed, or on the first
  * `exit` the Worker posts (student code can forge one); later messages from
@@ -109,9 +109,16 @@ export function startFrame(config: FrameConfig): void {
 		ended: boolean;
 		bytes: number;
 		messages: number;
+		/// Last state posted to the app.
 		lastState: RunState | null;
-		pending: { stream: "stdout" | "stderr"; text: string }[];
+		/// Output and status waiting for the next flush, in order; at most one status.
+		pending: (
+			| { kind: "output"; stream: "stdout" | "stderr"; text: string }
+			| { kind: "status"; state: RunState }
+		)[];
 		flushTimer: ReturnType<typeof setTimeout> | null;
+		/// Open for `OUTPUT_FLUSH_MS` after a Worker status went out at once.
+		statusWindow: ReturnType<typeof setTimeout> | null;
 	}
 
 	const usedRunIds = new Set<string>();
@@ -137,15 +144,41 @@ export function startFrame(config: FrameConfig): void {
 		run.flushTimer = null;
 		const pending = run.pending;
 		run.pending = [];
-		for (const { stream, text } of pending) {
-			post({ type: "output", runId: run.runId, stream, text });
+		for (const item of pending) {
+			if (item.kind === "output") {
+				post({
+					type: "output",
+					runId: run.runId,
+					stream: item.stream,
+					text: item.text,
+				});
+			} else if (item.state !== run.lastState) {
+				run.lastState = item.state;
+				post({ type: "status", runId: run.runId, state: item.state });
+			}
 		}
 	}
 
+	/// Posts a Worker status at once if none went out in the last `OUTPUT_FLUSH_MS`;
+	/// otherwise queues it for the next flush, replacing the one already queued.
+	function queueStatus(run: Run, state: RunState): void {
+		if (run.statusWindow === null) {
+			run.statusWindow = setTimeout(() => {
+				run.statusWindow = null;
+			}, OUTPUT_FLUSH_MS);
+			emitStatus(run, state);
+			return;
+		}
+		run.pending = run.pending.filter((item) => item.kind !== "status");
+		run.pending.push({ kind: "status", state });
+		run.flushTimer ??= setTimeout(() => flushOutput(run), OUTPUT_FLUSH_MS);
+	}
+
+	/// Posts a status of the frame itself at once, after the output queued before it.
 	function emitStatus(run: Run, state: RunState): void {
+		flushOutput(run);
 		if (run.lastState === state) return;
 		run.lastState = state;
-		flushOutput(run);
 		post({ type: "status", runId: run.runId, state });
 	}
 
@@ -158,8 +191,8 @@ export function startFrame(config: FrameConfig): void {
 		}
 		// Batches keep the order of the two streams: only neighbors of the same stream merge.
 		const last = run.pending[run.pending.length - 1];
-		if (last && last.stream === stream) last.text += text;
-		else run.pending.push({ stream, text });
+		if (last?.kind === "output" && last.stream === stream) last.text += text;
+		else run.pending.push({ kind: "output", stream, text });
 		run.flushTimer ??= setTimeout(() => flushOutput(run), OUTPUT_FLUSH_MS);
 	}
 
@@ -173,6 +206,7 @@ export function startFrame(config: FrameConfig): void {
 		if (run.ended) return;
 		run.ended = true;
 		flushOutput(run);
+		if (run.statusWindow !== null) clearTimeout(run.statusWindow);
 		runs.delete(run.runId);
 		if (run.slot) {
 			run.slot.dead = true;
@@ -224,6 +258,7 @@ export function startFrame(config: FrameConfig): void {
 			files: run.files,
 			entry: run.entry,
 			stdin: run.writer.transport,
+			maxOutputBytes: run.maxOutputBytes,
 		};
 		slot.worker.postMessage(message);
 	}
@@ -261,7 +296,7 @@ export function startFrame(config: FrameConfig): void {
 		switch (message.type) {
 			case "status":
 				if (message.state === "waiting-input") run.writer.readerWaiting();
-				emitStatus(run, message.state);
+				queueStatus(run, message.state);
 				break;
 			case "output":
 				emitOutput(run, message.stream, message.text);
@@ -396,6 +431,7 @@ export function startFrame(config: FrameConfig): void {
 			bytes: 0,
 			messages: 0,
 			lastState: null,
+			statusWindow: null,
 			pending: [],
 			flushTimer: null,
 		};

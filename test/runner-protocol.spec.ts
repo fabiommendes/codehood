@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { OUTPUT_MESSAGES_LIMIT, STDIN_LINE_MAX_BYTES } from "@/runner/protocol";
 import {
 	collect,
@@ -317,6 +317,26 @@ test.describe("concurrency", () => {
 	});
 });
 
+test.describe("status batching", () => {
+	test("alternating forged statuses reach the app batched, not one by one", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page);
+		const result = await run(
+			h,
+			`const states = ["waiting-input", "running"];
+			for (let i = 0; i < 2000; i++) {
+				postMessage({ type: "status", state: states[i % 2] });
+			}
+			console.log("done");`,
+			"javascript",
+		);
+		const statuses = result.messages.filter((m) => m.type === "status");
+		expect(statuses.length).toBeLessThanOrEqual(5);
+		expect(result.exit).toMatchObject({ reason: "exited", code: 0 });
+	});
+});
+
 test.describe("reserve Worker", () => {
 	const fakeWorkers = (page: Harness["page"]) => page.workers().length;
 
@@ -471,5 +491,95 @@ test.describe("JavaScript driver", () => {
 		expect(result.stdout).toBe("42\n's'\n");
 		expect(result.stderr).toContain("ReferenceError");
 		expect(result.exit).toMatchObject({ reason: "exited", code: 0 });
+	});
+});
+
+/// Stops the runner's service worker, as the browser does when it is idle: it
+/// restarts on the next request with no state.
+async function stopServiceWorker(page: Page): Promise<void> {
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send("ServiceWorker.enable");
+	await cdp.send("ServiceWorker.stopAllWorkers");
+	await cdp.detach();
+}
+
+test.describe("service worker restarted during a run (sw transport)", () => {
+	test.setTimeout(60_000);
+
+	const SLEEP_THEN_PROMPT = `await new Promise((r) => setTimeout(r, 2500));
+		console.log("got:" + prompt());`;
+
+	test("the run keeps its channel and the queued line", async ({ page }) => {
+		const h = await loadFrame(page, "?isolation=off");
+		const id = await start(h, SLEEP_THEN_PROMPT, "javascript");
+		await waitFor(h, id, "status", "running");
+		await send(h, { type: "stdin", runId: id, line: "kept" });
+		await stopServiceWorker(page);
+		const result = await collect(h, id, 20_000);
+		expect(result.stdout).toBe("got:kept\n");
+		expect(result.exit).toMatchObject({ reason: "exited", code: 0 });
+	});
+
+	test("when the frame cannot rebuild the channel the run crashes instead of hanging", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page, "?isolation=off");
+		await h.frame.evaluate(() => {
+			navigator.serviceWorker.addEventListener = () => {};
+		});
+		const id = await start(h, SLEEP_THEN_PROMPT, "javascript");
+		await waitFor(h, id, "status", "running");
+		await stopServiceWorker(page);
+		const result = await collect(h, id, 20_000);
+		expect(result.exit).toMatchObject({ reason: "crashed", code: null });
+		expect(result.exit.message).toContain("stdin");
+	});
+
+	test("a REPL whose channel is lost ends with crashed", async ({ page }) => {
+		const h = await loadFrame(page, "?isolation=off");
+		await h.frame.evaluate(() => {
+			navigator.serviceWorker.addEventListener = () => {};
+		});
+		const id = await start(h, "", "javascript", { mode: "repl" });
+		await waitFor(h, id, "status", "waiting-input");
+		await stopServiceWorker(page);
+		await send(h, { type: "stdin", runId: id, line: "prompt()" });
+		const result = await collect(h, id, 20_000);
+		expect(result.exit).toMatchObject({ reason: "crashed", code: null });
+	});
+});
+
+test.describe("Worker output is cut inside the Worker", () => {
+	test("a huge print posts at most the budget to the frame", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page);
+		await h.frame.evaluate(() => {
+			const w = window as unknown as { __maxText: number };
+			w.__maxText = 0;
+			const Original = window.Worker;
+			window.Worker = class extends Original {
+				constructor(url: string | URL, options?: WorkerOptions) {
+					super(url, options);
+					this.addEventListener("message", (event) => {
+						const text = event.data?.text;
+						if (typeof text === "string") {
+							w.__maxText = Math.max(w.__maxText, text.length);
+						}
+					});
+				}
+			};
+		});
+		const result = await run(
+			h,
+			'console.log("x".repeat(50_000_000));',
+			"javascript",
+			{ extra: { maxOutputBytes: 1000 } },
+		);
+		expect(result.exit).toMatchObject({ reason: "output-limit", code: null });
+		const max = await h.frame.evaluate(
+			() => (window as unknown as { __maxText: number }).__maxText,
+		);
+		expect(max).toBeLessThanOrEqual(2000);
 	});
 });

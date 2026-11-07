@@ -15,6 +15,7 @@
  */
 
 import type { Driver, RunContext } from "../driver";
+import { StdinCancelled } from "../stdin/types";
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (
 	source: string,
@@ -235,6 +236,7 @@ async function runScript(ctx: RunContext): Promise<number> {
 	})().catch((error: unknown) => ({ error }));
 	const failure = await Promise.race([finished, nextUncaught()]);
 	if (!failure) return 0;
+	if (failure.error instanceof StdinCancelled) throw failure.error;
 	ctx.stderr(`${describeThrown(failure.error)}\n`);
 	return 1;
 }
@@ -248,6 +250,7 @@ async function runRepl(ctx: RunContext): Promise<number> {
 			if (value instanceof Promise) value = await value;
 			if (value !== undefined) ctx.stdout(`${inspect(value)}\n`);
 		} catch (error) {
+			if (error instanceof StdinCancelled) throw error;
 			ctx.stderr(`${describeThrown(error)}\n`);
 		}
 	}

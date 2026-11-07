@@ -41,22 +41,35 @@ export const STDIN_TOKEN_HEADER = "X-Stdin-Token";
 /// Header that says what a 200 answer holds: `line` or `eof`.
 export const STDIN_KIND_HEADER = "X-Stdin";
 
-/// How long a request for an unknown channel waits for its `stdin-open`,
-/// which travels by another path and may arrive after the request.
-export const UNKNOWN_CHANNEL_GRACE_MS = 300;
+/// Header with the number of lines the Worker has consumed from the channel.
+export const STDIN_CONSUMED_HEADER = "X-Stdin-Consumed";
+
+/// How long a request for an unknown channel waits for a `stdin-open`, which
+/// travels by another path and may arrive after the request, or answers the
+/// service worker's `stdin-resync`.
+export const UNKNOWN_CHANNEL_GRACE_MS = 1000;
+
+/// Interval at which the frame pings the service worker while a run uses the
+/// `sw` transport, so the browser does not stop it for being idle.
+export const SW_KEEPALIVE_MS = 10_000;
 
 /**
  * Messages the frame posts to the service worker.
  *
  * The service worker accepts them only from a `window` client of its own
- * origin, never from a Worker.
+ * origin, never from a Worker. `stdin-open` may carry the `lines` not yet
+ * consumed and `eof`, to rebuild a channel the service worker lost.
+ * `keepalive` only wakes the service worker.
  */
 export const frameToSwMessage = z.discriminatedUnion("type", [
 	z.object({
 		type: z.literal("stdin-open"),
 		runId: z.uuid(),
 		token: z.uuid(),
+		lines: z.array(z.string()).optional(),
+		eof: z.boolean().optional(),
 	}),
+	z.object({ type: z.literal("keepalive") }),
 	z.object({
 		type: z.literal("stdin-line"),
 		runId: z.uuid(),
@@ -66,6 +79,18 @@ export const frameToSwMessage = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("stdin-cancel"), runId: z.uuid() }),
 ]);
 export type FrameToSwMessage = z.infer<typeof frameToSwMessage>;
+
+/**
+ * Message the service worker posts to its window clients when a Worker asks
+ * for a channel it does not know: the frame that owns `runId` answers with a
+ * `stdin-open` that replays the lines after the first `consumed`.
+ */
+export const swToFrameMessage = z.object({
+	type: z.literal("stdin-resync"),
+	runId: z.uuid(),
+	consumed: z.int().nonnegative(),
+});
+export type SwToFrameMessage = z.infer<typeof swToFrameMessage>;
 
 /** What the service worker answers to one stdin request. */
 export interface StdinReply {
@@ -95,14 +120,20 @@ export class StdinChannels {
 	private openWaiters = new Map<string, Set<() => void>>();
 
 	/** Registers a channel owned by window client `owner`; ignored when `runId` already has one. */
-	open(runId: string, token: string, owner: string): void {
+	open(
+		runId: string,
+		token: string,
+		owner: string,
+		lines: string[] = [],
+		eof = false,
+	): void {
 		if (this.channels.has(runId)) return;
 		this.channels.set(runId, {
 			token,
 			owner,
 			reader: null,
-			lines: [],
-			eof: false,
+			lines: [...lines],
+			eof,
 			waiter: null,
 		});
 		for (const wake of [...(this.openWaiters.get(runId) ?? [])]) wake();
@@ -139,14 +170,17 @@ export class StdinChannels {
 	/**
 	 * Answers a request of Worker client `clientId`: a queued line, end of
 	 * input, "nothing yet" after `SW_POLL_MS`, 403 for a wrong token or
-	 * client, 410 for an unknown or cancelled channel.
+	 * client, 410 for an unknown or cancelled channel. For an unknown one it
+	 * first calls `resync`, so the owner can rebuild the channel.
 	 */
 	async read(
 		runId: string,
 		token: string | null,
 		clientId: string,
+		resync?: () => void,
 	): Promise<StdinReply> {
-		const channel = this.channels.get(runId) ?? (await this.waitForOpen(runId));
+		const channel =
+			this.channels.get(runId) ?? (await this.waitForOpen(runId, resync));
 		if (!channel || this.channels.get(runId) !== channel) {
 			return { status: 410 };
 		}
@@ -192,7 +226,10 @@ export class StdinChannels {
 		channel?.waiter?.answer({ status: 410 });
 	}
 
-	private waitForOpen(runId: string): Promise<Channel | null> {
+	private waitForOpen(
+		runId: string,
+		resync?: () => void,
+	): Promise<Channel | null> {
 		return new Promise((resolve) => {
 			const waiters = this.openWaiters.get(runId) ?? new Set<() => void>();
 			this.openWaiters.set(runId, waiters);
@@ -204,6 +241,7 @@ export class StdinChannels {
 			};
 			const timer = setTimeout(done, UNKNOWN_CHANNEL_GRACE_MS);
 			waiters.add(done);
+			resync?.();
 		});
 	}
 }
@@ -215,11 +253,34 @@ export class StdinChannels {
  * @throws {Error} when no service worker controls the frame.
  */
 export function createSwWriter(runId: string): StdinWriter {
-	const controller = navigator.serviceWorker?.controller;
-	if (!controller) throw new Error("no service worker controls the frame");
+	const container = navigator.serviceWorker;
+	if (!container?.controller) {
+		throw new Error("no service worker controls the frame");
+	}
 	const token = crypto.randomUUID();
-	const post = (message: FrameToSwMessage) => controller.postMessage(message);
+	/// Every line written, kept to rebuild the channel in a restarted service worker.
+	const history: string[] = [];
+	let ended = false;
+	// Always the current controller: a service worker that restarted is a new object.
+	const post = (message: FrameToSwMessage) =>
+		container.controller?.postMessage(message);
 	post({ type: "stdin-open", runId, token });
+	const onMessage = (event: MessageEvent) => {
+		const parsed = swToFrameMessage.safeParse(event.data);
+		if (!parsed.success || parsed.data.runId !== runId) return;
+		post({
+			type: "stdin-open",
+			runId,
+			token,
+			lines: history.slice(parsed.data.consumed),
+			eof: ended,
+		});
+	};
+	container.addEventListener("message", onMessage);
+	const keepalive = setInterval(
+		() => post({ type: "keepalive" }),
+		SW_KEEPALIVE_MS,
+	);
 	return {
 		transport: { kind: "sw", runId, token },
 		writeLine(line) {
@@ -228,12 +289,17 @@ export function createSwWriter(runId: string): StdinWriter {
 					`stdin line exceeds ${STDIN_LINE_MAX_BYTES} bytes`,
 				);
 			}
+			history.push(line);
 			post({ type: "stdin-line", runId, line });
 		},
 		end() {
+			ended = true;
 			post({ type: "stdin-eof", runId });
 		},
 		cancel() {
+			clearInterval(keepalive);
+			container.removeEventListener("message", onMessage);
+			history.length = 0;
 			post({ type: "stdin-cancel", runId });
 		},
 		readerWaiting() {},
@@ -243,6 +309,7 @@ export function createSwWriter(runId: string): StdinWriter {
 /** Opens the Worker's end of an `sw` channel; each `readLine` polls with synchronous XHR. */
 export function openSwReader(runId: string, token: string): StdinReader {
 	let ended = false;
+	let consumed = 0;
 	return {
 		readLine() {
 			if (ended) return null;
@@ -250,6 +317,7 @@ export function openSwReader(runId: string, token: string): StdinReader {
 				const request = new XMLHttpRequest();
 				request.open("GET", `${SW_STDIN_PATH}${runId}`, false);
 				request.setRequestHeader(STDIN_TOKEN_HEADER, token);
+				request.setRequestHeader(STDIN_CONSUMED_HEADER, String(consumed));
 				request.send();
 				if (request.status === 204) continue;
 				if (request.status === 410) throw new StdinCancelled();
@@ -260,6 +328,7 @@ export function openSwReader(runId: string, token: string): StdinReader {
 					ended = true;
 					return null;
 				}
+				consumed++;
 				return request.responseText;
 			}
 		},

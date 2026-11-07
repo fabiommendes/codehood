@@ -371,7 +371,7 @@ test.describe("the Worker scope is locked down", () => {
 			`const report = {};
 			const targets = [
 				["self", self, ${JSON.stringify(LOCKED_GLOBALS)}],
-				["navigator", navigator, ["storage", "serviceWorker"]],
+				["navigator", navigator, ["storage", "serviceWorker", "locks"]],
 			];
 			for (const [label, root, names] of targets) {
 				for (const name of names) {
@@ -401,7 +401,7 @@ test.describe("the Worker scope is locked down", () => {
 		for (const name of LOCKED_GLOBALS) {
 			expect(report[`self.${name}`], name).toEqual(expected);
 		}
-		for (const name of ["storage", "serviceWorker"]) {
+		for (const name of ["storage", "serviceWorker", "locks"]) {
 			expect(report[`navigator.${name}`], name).toEqual(expected);
 		}
 	});
@@ -416,7 +416,7 @@ test.describe("the Worker scope is locked down", () => {
 		}>(
 			h,
 			`const GLOBALS = ${JSON.stringify(LOCKED_GLOBALS)};
-			const NAV = ["storage", "serviceWorker"];
+			const NAV = ["storage", "serviceWorker", "locks"];
 			const chain = (o) => {
 				const r = [];
 				for (let p = o; p; p = Object.getPrototypeOf(p)) r.push(p);

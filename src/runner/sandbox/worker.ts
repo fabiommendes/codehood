@@ -13,6 +13,7 @@ import type { Driver } from "./driver";
 import { loadDriver } from "./drivers";
 import { openStdinReader } from "./stdin";
 import { StdinCancelled } from "./stdin/types";
+import { utf8Length } from "./utf8";
 import type {
 	FrameToWorkerMessage,
 	LoadMessage,
@@ -31,8 +32,8 @@ export const LOCKED_GLOBALS = [
 	"BroadcastChannel",
 ] as const;
 
-/// Properties removed from `navigator` for the same reason (`storage` gives OPFS).
-export const LOCKED_NAVIGATOR = ["storage", "serviceWorker"] as const;
+/// Properties removed from `navigator` for the same reason (`storage` gives OPFS, `locks` is a channel between runs).
+export const LOCKED_NAVIGATOR = ["storage", "serviceWorker", "locks"] as const;
 
 /**
  * Removes `LOCKED_GLOBALS` and `LOCKED_NAVIGATOR` from the Worker.
@@ -116,13 +117,27 @@ export function startWorker(): void {
 		const current = driver;
 		const reader = openStdinReader(message.stdin);
 		post({ type: "status", state: "running" });
+		let left = message.maxOutputBytes;
+		/// Posts `text` cut to the remaining budget plus one byte, so the frame
+		/// still sees the limit passed; anything after that is dropped.
+		const emit = (stream: "stdout" | "stderr", text: string) => {
+			if (left < 0) return;
+			const size = utf8Length(text);
+			if (size > left) {
+				text = text.slice(0, left + 1);
+				left = -1;
+			} else {
+				left -= size;
+			}
+			post({ type: "output", stream, text });
+		};
 		try {
 			const code = await current.run({
 				files: message.files,
 				entry: message.entry,
 				mode: message.mode,
-				stdout: (text) => post({ type: "output", stream: "stdout", text }),
-				stderr: (text) => post({ type: "output", stream: "stderr", text }),
+				stdout: (text) => emit("stdout", text),
+				stderr: (text) => emit("stderr", text),
 				readLine() {
 					post({ type: "status", state: "waiting-input" });
 					try {
@@ -138,12 +153,16 @@ export function startWorker(): void {
 				code: Number.isInteger(code) ? code : 0,
 			});
 		} catch (error) {
-			if (error instanceof StdinCancelled) return;
+			// A stop is decided by the frame, which terminates the Worker first:
+			// a cancelled read that reaches this point means the channel was lost.
 			post({
 				type: "exit",
 				reason: "crashed",
 				code: null,
-				message: describe(error),
+				message:
+					error instanceof StdinCancelled
+						? "stdin channel lost"
+						: describe(error),
 			});
 		}
 	}

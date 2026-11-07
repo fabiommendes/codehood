@@ -5,14 +5,18 @@
  * lets every other request go to the network untouched. Never uses Cache
  * Storage. On `install` it calls `skipWaiting()`, on `activate`
  * `clients.claim()`. Accepts `FrameToSwMessage`s only from `window` clients.
- * Drops the channels of a window client that no longer exists.
+ * Drops the channels of a window client that no longer exists. A request for a
+ * channel it does not know (the browser restarted it) is first offered to the
+ * window clients with `stdin-resync`.
  */
 
 import {
 	frameToSwMessage,
+	STDIN_CONSUMED_HEADER,
 	STDIN_KIND_HEADER,
 	STDIN_TOKEN_HEADER,
 	StdinChannels,
+	type SwToFrameMessage,
 } from "./stdin/sw";
 import { SW_STDIN_PATH } from "./stdin/types";
 
@@ -21,6 +25,7 @@ import { SW_STDIN_PATH } from "./stdin/types";
 interface SwClient {
 	id: string;
 	type: string;
+	postMessage(message: unknown): void;
 }
 
 interface SwScope {
@@ -69,7 +74,13 @@ export function startServiceWorker(): void {
 		const message = parsed.data;
 		switch (message.type) {
 			case "stdin-open":
-				channels.open(message.runId, message.token, sender.id);
+				channels.open(
+					message.runId,
+					message.token,
+					sender.id,
+					message.lines,
+					message.eof,
+				);
 				event.waitUntil(
 					scope.clients
 						.matchAll({ type: "window" })
@@ -77,6 +88,8 @@ export function startServiceWorker(): void {
 							channels.retainOwners(new Set(windows.map((w) => w.id))),
 						),
 				);
+				break;
+			case "keepalive":
 				break;
 			case "stdin-line":
 				channels.line(message.runId, message.line, sender.id);
@@ -101,8 +114,19 @@ export function startServiceWorker(): void {
 		}
 		const runId = url.pathname.slice(SW_STDIN_PATH.length);
 		const token = event.request.headers.get(STDIN_TOKEN_HEADER);
+		const consumed = Number(event.request.headers.get(STDIN_CONSUMED_HEADER));
+		const resync = () => {
+			const message: SwToFrameMessage = {
+				type: "stdin-resync",
+				runId,
+				consumed: Number.isInteger(consumed) && consumed >= 0 ? consumed : 0,
+			};
+			void scope.clients.matchAll({ type: "window" }).then((windows) => {
+				for (const client of windows) client.postMessage(message);
+			});
+		};
 		event.respondWith(
-			channels.read(runId, token, event.clientId).then((reply) => {
+			channels.read(runId, token, event.clientId, resync).then((reply) => {
 				const headers = new Headers({ "Cache-Control": "no-store" });
 				if (reply.kind) headers.set(STDIN_KIND_HEADER, reply.kind);
 				if (reply.body !== undefined) {

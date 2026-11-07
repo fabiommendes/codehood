@@ -40,6 +40,8 @@ export interface StartMessage {
 	files: Record<string, string>;
 	entry: z.infer<typeof sourcePath>;
 	stdin: StdinTransport;
+	/** Output budget of the run; the Worker cuts what it posts at this size. */
+	maxOutputBytes: number;
 }
 
 export type FrameToWorkerMessage = LoadMessage | StartMessage;
