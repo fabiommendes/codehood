@@ -10,9 +10,19 @@
   uses one to grade code answers in a sandbox from the course's `graders/`.
 - Feedback `notes`: text for the instructor only, such as signs of tampering
   found by a bot. The grading page shows them with a "suspicious" badge.
+- Code runs in the browser: an editor (CodeMirror, VS Code keys) with a
+  terminal and a Run button, for JavaScript, TypeScript, Lua, Python
+  (Pyodide) and Prolog (SWI-Prolog). Code resources and `run` blocks in
+  markdown notes are runnable; code essay answers can be tested before
+  submitting (`allowCodeRun` on the exam, on by default only in PRACTICE);
+  the grading page runs a student's submission. Student code runs in a
+  Worker on a separate origin (`RUNNER_ORIGIN`, unset turns it off), never
+  on the server. Design: `dev/rfc/ambiente-de-execucao-no-cliente.md`.
 
 ### Changed
 
+- The session cookie is `__Host-session` in production (logs everyone out
+  once on upgrade).
 - The exam submit dialog warns about unanswered questions: it lists them
   ("Q1, Q4 and Q5") up to five, and gives only the count above that. Its
   text now says the student can no longer change the answers, since the
