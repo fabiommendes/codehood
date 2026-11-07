@@ -234,3 +234,11 @@ test("the arrows move between cards, set the anchor and focus Run", async ({
 	// Moving runs nothing and creates no frame.
 	await expect(frames(page)).toHaveCount(0);
 });
+
+test("a review widget without a submission fails loudly instead of running", async ({
+	page,
+}) => {
+	const response = await page.goto("/design/runner?view=review-orphan");
+	expect(response?.status()).toBe(500);
+	await expect(page.locator("[data-code-runner]")).toHaveCount(0);
+});

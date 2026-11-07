@@ -171,6 +171,9 @@ function phaseText(
  * in the DOM itself goes through `textContent`, never `innerHTML`.
  */
 export function CodeRunner(props: CodeRunnerProps): JSX.Element {
+	if (props.mode === "review" && !props.submission) {
+		throw new Error("CodeRunner in review mode needs a submission id");
+	}
 	const filename = () => props.filename ?? defaultFilename(props.language);
 	const [state, setState] = createSignal(
 		initialIdeState({
@@ -399,7 +402,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			const handle = await (review()
 				? runForSubmission(
 						props.runnerOrigin,
-						props.submission ?? "",
+						props.submission as string,
 						request,
 						handlers,
 					)

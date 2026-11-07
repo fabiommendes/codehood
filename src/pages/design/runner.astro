@@ -14,6 +14,8 @@ export const prerender = false;
 const widgetsView = Astro.url.searchParams.get("view") === "widgets";
 // `?view=review` shows three `review` widgets, one per submission.
 const reviewView = Astro.url.searchParams.get("view") === "review";
+// `?view=review-orphan` renders a `review` widget with no submission, which must fail.
+const orphanView = Astro.url.searchParams.get("view") === "review-orphan";
 const reviewSubmissions = [
 	{
 		id: "sub-a",
@@ -34,7 +36,7 @@ const reviewSubmissions = [
 ---
 
 <AppLayout title="Runner">
-  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={widgetsView || reviewView ? undefined : (RUNNER_ORIGIN ?? "")}>
+  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={widgetsView || reviewView || orphanView ? undefined : (RUNNER_ORIGIN ?? "")}>
     <div class="mb-6">
       <PageKicker text="Diagnostics" />
       <h1 class="text-3xl font-bold">Runner</h1>
@@ -45,7 +47,15 @@ const reviewSubmissions = [
     </div>
 
     {
-      reviewView ? (
+      orphanView ? (
+        <CodeRunner
+          client:load
+          mode="review"
+          language="javascript"
+          runnerOrigin={RUNNER_ORIGIN}
+          code="console.log(1)"
+        />
+      ) : reviewView ? (
         <div class="flex flex-col gap-6" id="reviews">
           {reviewSubmissions.map((submission) => (
             <article id={`answer-${submission.id}`} aria-label={submission.label}>
