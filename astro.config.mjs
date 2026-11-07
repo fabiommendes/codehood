@@ -10,6 +10,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, envField, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
 import { resolveRunnerOrigin } from "@/runner/server/config";
+import { runnerBundle } from "@/runner/server/integration";
 import { localeDefine, paraglidePlugin } from "./scripts/lib/paraglide";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -61,7 +62,7 @@ export default defineConfig({
 	// on `127.0.0.1`: one address serves both names.
 	server: environment === "dev" ? { host: "127.0.0.1" } : {},
 	adapter: node({ mode: "standalone" }),
-	integrations: [solidJs(), dynamicRouterHook()],
+	integrations: [solidJs(), dynamicRouterHook(), runnerBundle()],
 	vite: {
 		plugins: [tailwindcss(), paraglidePlugin(root)],
 		// Fixes the locale the build compiles for (`CODEHOOD_LOCALE`).

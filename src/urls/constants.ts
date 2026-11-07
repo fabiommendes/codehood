@@ -41,6 +41,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
 	"manifest",
 	"profile",
 	"rpc",
+	"runner",
 	"sw",
 	"about",
 	"docs",

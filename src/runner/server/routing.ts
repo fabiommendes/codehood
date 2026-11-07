@@ -31,11 +31,28 @@ export function requestSide(
 	url: URL,
 	runnerOrigin: string | null,
 ): RequestSide {
-	const isRunnerPath = url.pathname.startsWith("/runner/");
+	const isRunnerPath = decodedPathname(url).startsWith("/runner/");
 	if (runnerOrigin !== null && url.origin === runnerOrigin) {
 		return isRunnerPath ? "runner" : "not-found";
 	}
 	return isRunnerPath ? "not-found" : "app";
+}
+
+/// Path as the router sees it: percent-escapes decoded until stable (a
+/// double-encoded `/runner/` must not slip past) and repeated slashes folded.
+function decodedPathname(url: URL): string {
+	let path = url.pathname;
+	for (let i = 0; i < 5; i++) {
+		let next: string;
+		try {
+			next = decodeURIComponent(path);
+		} catch {
+			break;
+		}
+		if (next === path) break;
+		path = next;
+	}
+	return path.replace(/\/{2,}/g, "/");
 }
 
 /**
@@ -56,12 +73,36 @@ export type RunnerAssetKind = "frame" | "sw" | "bundle" | "runtime";
  * `base-uri 'none'`, `form-action 'none'` and `frame-ancestors <appOrigin>`.
  * `bundle` and `runtime` add `'unsafe-eval' 'wasm-unsafe-eval'` to
  * `script-src`, since a Worker's CSP comes from its script; `frame` does not.
+ * `Cache-Control` is `no-cache` for `frame` and `sw`, `immutable` otherwise.
  */
 export function runnerHeaders(
-	_kind: RunnerAssetKind,
-	_appOrigin: string,
+	kind: RunnerAssetKind,
+	appOrigin: string,
 ): Headers {
-	throw new Error("not implemented");
+	const scriptSrc =
+		kind === "bundle" || kind === "runtime"
+			? "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'"
+			: "script-src 'self'";
+	const csp = [
+		"default-src 'self'",
+		scriptSrc,
+		"connect-src 'self'",
+		"worker-src 'self'",
+		"object-src 'none'",
+		"base-uri 'none'",
+		"form-action 'none'",
+		`frame-ancestors ${appOrigin}`,
+	].join("; ");
+	const headers = new Headers({
+		"Document-Isolation-Policy": "isolate-and-credentialless",
+		"X-Content-Type-Options": "nosniff",
+		"Content-Security-Policy": csp,
+		"Cache-Control":
+			kind === "bundle" || kind === "runtime"
+				? "public, max-age=31536000, immutable"
+				: "no-cache",
+	});
+	return headers;
 }
 
 /// CSP every app response carries: no other site may frame the app.
