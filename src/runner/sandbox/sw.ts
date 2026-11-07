@@ -14,6 +14,7 @@ import {
 	frameToSwMessage,
 	STDIN_CONSUMED_HEADER,
 	STDIN_KIND_HEADER,
+	STDIN_RETRY_HEADER,
 	STDIN_TOKEN_HEADER,
 	StdinChannels,
 	type SwToFrameMessage,
@@ -115,6 +116,21 @@ export function startServiceWorker(): void {
 		const runId = url.pathname.slice(SW_STDIN_PATH.length);
 		const token = event.request.headers.get(STDIN_TOKEN_HEADER);
 		const consumed = Number(event.request.headers.get(STDIN_CONSUMED_HEADER));
+		const owner = channels.ack(runId, token, consumed);
+		if (owner !== null) {
+			const message: SwToFrameMessage = {
+				type: "stdin-consumed",
+				runId,
+				consumed,
+			};
+			event.waitUntil(
+				scope.clients.matchAll({ type: "window" }).then((windows) => {
+					for (const client of windows) {
+						if (client.id === owner) client.postMessage(message);
+					}
+				}),
+			);
+		}
 		const resync = () => {
 			const message: SwToFrameMessage = {
 				type: "stdin-resync",
@@ -129,6 +145,7 @@ export function startServiceWorker(): void {
 			channels.read(runId, token, event.clientId, resync).then((reply) => {
 				const headers = new Headers({ "Cache-Control": "no-store" });
 				if (reply.kind) headers.set(STDIN_KIND_HEADER, reply.kind);
+				if (reply.retry) headers.set(STDIN_RETRY_HEADER, "1");
 				if (reply.body !== undefined) {
 					headers.set("Content-Type", "text/plain; charset=utf-8");
 				}

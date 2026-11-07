@@ -643,7 +643,7 @@ test.describe("stdin channel is bound to its Worker (sw transport)", () => {
 			console.log(JSON.stringify({ owner: get(${JSON.stringify(owner)}), unknown: get(${JSON.stringify(randomUUID())}) }));`,
 		);
 		expect([403, 410]).toContain(other.owner);
-		expect(other.unknown).toBe(410);
+		expect(other.unknown).toBe(403);
 
 		// The owner's channel survived all of that.
 		await send(h, { type: "stdin", runId: owner, line: "for-the-owner" });

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { OUTPUT_MESSAGES_LIMIT, STDIN_LINE_MAX_BYTES } from "@/runner/protocol";
+import { StdinChannels } from "@/runner/sandbox/stdin/sw";
 import {
 	collect,
 	type Harness,
@@ -613,5 +614,135 @@ test.describe("bundle served no more", () => {
 				window as unknown as { __runnerMessages: { type: string }[] }
 			).__runnerMessages.some((m) => m.type === "stale-bundle"),
 		);
+	});
+});
+
+test.describe("stdin channel table: resync", () => {
+	const TOKEN = "11111111-1111-4111-8111-111111111111";
+	const RUN = "22222222-2222-4222-8222-222222222222";
+
+	test("a request without a token for an unknown channel gets 403 with no resync", async () => {
+		const channels = new StdinChannels();
+		let resyncs = 0;
+		const reply = await channels.read(RUN, null, "worker", () => resyncs++);
+		expect(reply.status).toBe(403);
+		expect(resyncs).toBe(0);
+	});
+
+	test("a malformed token for an unknown channel gets 403 with no resync", async () => {
+		const channels = new StdinChannels();
+		let resyncs = 0;
+		const reply = await channels.read(RUN, "x", "worker", () => resyncs++);
+		expect(reply.status).toBe(403);
+		expect(resyncs).toBe(0);
+	});
+
+	test("concurrent requests for the same unknown run cause one resync", async () => {
+		const channels = new StdinChannels();
+		let resyncs = 0;
+		const first = channels.read(RUN, TOKEN, "worker", () => resyncs++);
+		const second = channels.read(RUN, TOKEN, "worker", () => resyncs++);
+		channels.open(RUN, TOKEN, "frame", ["a"]);
+		expect(resyncs).toBe(1);
+		const replies = await Promise.all([first, second]);
+		expect(replies.map((r) => r.status)).toEqual([200, 204]);
+	});
+
+	test("an expired resync answers 410 marked as retryable", async () => {
+		const channels = new StdinChannels();
+		const reply = await channels.read(RUN, TOKEN, "worker", () => {});
+		expect(reply).toMatchObject({ status: 410, retry: true });
+	});
+
+	test("a cancelled channel answers 410 that is not retryable", async () => {
+		const channels = new StdinChannels();
+		channels.open(RUN, TOKEN, "frame");
+		const pending = channels.read(RUN, TOKEN, "worker");
+		channels.cancel(RUN, "frame");
+		const reply = await pending;
+		expect(reply.status).toBe(410);
+		expect(reply.retry).toBeUndefined();
+	});
+
+	test("acknowledges consumed lines to the owner only when they advance", () => {
+		const channels = new StdinChannels();
+		channels.open(RUN, TOKEN, "frame");
+		expect(channels.ack(RUN, "bad", 3)).toBeNull();
+		expect(channels.ack(RUN, TOKEN, 0)).toBeNull();
+		expect(channels.ack(RUN, TOKEN, 3)).toBe("frame");
+		expect(channels.ack(RUN, TOKEN, 3)).toBeNull();
+		expect(channels.ack(RUN, TOKEN, 4)).toBe("frame");
+	});
+});
+
+test.describe("service worker restarted while the frame is busy (sw transport)", () => {
+	test.setTimeout(60_000);
+
+	test("the Worker retries after a resync that expired", async ({ page }) => {
+		const h = await loadFrame(page, "?isolation=off");
+		const id = await start(
+			h,
+			`await new Promise((r) => setTimeout(r, 2500));
+			console.log("got:" + prompt());`,
+			"javascript",
+		);
+		await waitFor(h, id, "status", "running");
+		await send(h, { type: "stdin", runId: id, line: "kept" });
+		await stopServiceWorker(page);
+		// Keep the frame's main thread busy past the old 1 s resync deadline.
+		void h.frame.evaluate(() => {
+			const end = Date.now() + 4000;
+			while (Date.now() < end);
+		});
+		const result = await collect(h, id, 30_000);
+		expect(result.stdout).toBe("got:kept\n");
+		expect(result.exit).toMatchObject({ reason: "exited", code: 0 });
+	});
+
+	test("lines consumed before the restart are not replayed", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page, "?isolation=off");
+		const id = await start(
+			h,
+			`const a = prompt();
+			await new Promise((r) => setTimeout(r, 2500));
+			console.log(a + "," + prompt());`,
+			"javascript",
+		);
+		await waitFor(h, id, "status", "running");
+		await send(h, { type: "stdin", runId: id, line: "one" });
+		await page.waitForTimeout(800);
+		await send(h, { type: "stdin", runId: id, line: "two" });
+		await stopServiceWorker(page);
+		const result = await collect(h, id, 30_000);
+		expect(result.stdout).toBe("one,two\n");
+	});
+
+	test("the frame is told how many lines the Worker consumed", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page, "?isolation=off");
+		await h.frame.evaluate(() => {
+			const w = window as unknown as { __consumed: number[] };
+			w.__consumed = [];
+			navigator.serviceWorker.addEventListener("message", (event) => {
+				if (event.data?.type === "stdin-consumed") {
+					w.__consumed.push(event.data.consumed);
+				}
+			});
+		});
+		const id = await start(
+			h,
+			`prompt(); prompt(); console.log("done");`,
+			"javascript",
+		);
+		await send(h, { type: "stdin", runId: id, line: "a" });
+		await send(h, { type: "stdin", runId: id, line: "b" });
+		await collect(h, id, 20_000);
+		const seen = await h.frame.evaluate(
+			() => (window as unknown as { __consumed: number[] }).__consumed,
+		);
+		expect(Math.max(...seen)).toBeGreaterThanOrEqual(1);
 	});
 });

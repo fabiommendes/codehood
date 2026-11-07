@@ -12,6 +12,7 @@
  * | 200    | `eof`            | end of input                             |
  * | 204    |                  | nothing yet; ask again                   |
  * | 410    |                  | channel cancelled or unknown             |
+ * | 410    | `X-Stdin-Retry`  | unknown after the resync deadline; ask again |
  * | 403    |                  | wrong or missing token, or a client that does not own the channel |
  *
  * The channel is bound to its owner when the frame creates it, before any
@@ -44,10 +45,22 @@ export const STDIN_KIND_HEADER = "X-Stdin";
 /// Header with the number of lines the Worker has consumed from the channel.
 export const STDIN_CONSUMED_HEADER = "X-Stdin-Consumed";
 
+/// Header on a 410 that says the channel was unknown only because no
+/// `stdin-open` arrived in time, so the Worker may ask again.
+export const STDIN_RETRY_HEADER = "X-Stdin-Retry";
+
+/// How many times the Worker asks again after such a 410 before giving up.
+export const STDIN_RETRIES = 2;
+
 /// How long a request for an unknown channel waits for a `stdin-open`, which
 /// travels by another path and may arrive after the request, or answers the
-/// service worker's `stdin-resync`.
-export const UNKNOWN_CHANNEL_GRACE_MS = 1000;
+/// service worker's `stdin-resync`. Long enough for a busy frame (a phone).
+export const UNKNOWN_CHANNEL_GRACE_MS = 5000;
+
+/// Shape of a channel token (`crypto.randomUUID()`); cheap filter for requests
+/// that cannot belong to any channel.
+const TOKEN_SHAPE =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /// Interval at which the frame pings the service worker while a run uses the
 /// `sw` transport, so the browser does not stop it for being idle.
@@ -81,15 +94,25 @@ export const frameToSwMessage = z.discriminatedUnion("type", [
 export type FrameToSwMessage = z.infer<typeof frameToSwMessage>;
 
 /**
- * Message the service worker posts to its window clients when a Worker asks
- * for a channel it does not know: the frame that owns `runId` answers with a
+ * Messages the service worker posts to its window clients.
+ *
+ * `stdin-resync` goes to every window when a Worker asks for a channel the
+ * service worker does not know: the frame that owns `runId` answers with a
  * `stdin-open` that replays the lines after the first `consumed`.
+ * `stdin-consumed` goes to the owner only, so it can forget those lines.
  */
-export const swToFrameMessage = z.object({
-	type: z.literal("stdin-resync"),
-	runId: z.uuid(),
-	consumed: z.int().nonnegative(),
-});
+export const swToFrameMessage = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("stdin-resync"),
+		runId: z.uuid(),
+		consumed: z.int().nonnegative(),
+	}),
+	z.object({
+		type: z.literal("stdin-consumed"),
+		runId: z.uuid(),
+		consumed: z.int().nonnegative(),
+	}),
+]);
 export type SwToFrameMessage = z.infer<typeof swToFrameMessage>;
 
 /** What the service worker answers to one stdin request. */
@@ -97,6 +120,8 @@ export interface StdinReply {
 	status: 200 | 204 | 403 | 410;
 	kind?: "line" | "eof";
 	body?: string;
+	/// Set on a 410 for a channel that was unknown, not cancelled.
+	retry?: true;
 }
 
 interface Channel {
@@ -107,6 +132,8 @@ interface Channel {
 	reader: string | null;
 	lines: string[];
 	eof: boolean;
+	/// Highest consumed count already reported to the owner.
+	acked: number;
 	waiter: { answer: (reply: StdinReply) => void } | null;
 }
 
@@ -134,6 +161,7 @@ export class StdinChannels {
 			reader: null,
 			lines: [...lines],
 			eof,
+			acked: 0,
 			waiter: null,
 		});
 		for (const wake of [...(this.openWaiters.get(runId) ?? [])]) wake();
@@ -168,10 +196,24 @@ export class StdinChannels {
 	}
 
 	/**
+	 * Records that the reader holding `token` consumed `consumed` lines;
+	 * returns the owner's client id when that is news, else null.
+	 */
+	ack(runId: string, token: string | null, consumed: number): string | null {
+		const channel = this.channels.get(runId);
+		if (!channel || token !== channel.token) return null;
+		if (!Number.isInteger(consumed) || consumed <= channel.acked) return null;
+		channel.acked = consumed;
+		return channel.owner;
+	}
+
+	/**
 	 * Answers a request of Worker client `clientId`: a queued line, end of
 	 * input, "nothing yet" after `SW_POLL_MS`, 403 for a wrong token or
-	 * client, 410 for an unknown or cancelled channel. For an unknown one it
-	 * first calls `resync`, so the owner can rebuild the channel.
+	 * client, 410 for an unknown or cancelled channel. A request for an unknown
+	 * channel needs a token of the right shape (403 otherwise, with no resync);
+	 * it then calls `resync` once per run at a time, so the owner can rebuild
+	 * the channel, and a 410 after the deadline is marked `retry`.
 	 */
 	async read(
 		runId: string,
@@ -179,11 +221,13 @@ export class StdinChannels {
 		clientId: string,
 		resync?: () => void,
 	): Promise<StdinReply> {
-		const channel =
-			this.channels.get(runId) ?? (await this.waitForOpen(runId, resync));
-		if (!channel || this.channels.get(runId) !== channel) {
-			return { status: 410 };
+		let channel = this.channels.get(runId) ?? null;
+		if (!channel) {
+			if (token === null || !TOKEN_SHAPE.test(token)) return { status: 403 };
+			channel = await this.waitForOpen(runId, resync);
+			if (!channel) return { status: 410, retry: true };
 		}
+		if (this.channels.get(runId) !== channel) return { status: 410 };
 		if (token !== channel.token) return { status: 403 };
 		if (channel.reader === null) channel.reader = clientId;
 		else if (channel.reader !== clientId) return { status: 403 };
@@ -232,6 +276,7 @@ export class StdinChannels {
 	): Promise<Channel | null> {
 		return new Promise((resolve) => {
 			const waiters = this.openWaiters.get(runId) ?? new Set<() => void>();
+			const resyncing = waiters.size > 0;
 			this.openWaiters.set(runId, waiters);
 			const done = () => {
 				clearTimeout(timer);
@@ -241,7 +286,7 @@ export class StdinChannels {
 			};
 			const timer = setTimeout(done, UNKNOWN_CHANNEL_GRACE_MS);
 			waiters.add(done);
-			resync?.();
+			if (!resyncing) resync?.();
 		});
 	}
 }
@@ -260,6 +305,8 @@ export function createSwWriter(runId: string): StdinWriter {
 	const token = crypto.randomUUID();
 	/// Every line written, kept to rebuild the channel in a restarted service worker.
 	const history: string[] = [];
+	/// How many lines were dropped from the front of `history` as consumed.
+	let forgotten = 0;
 	let ended = false;
 	// Always the current controller: a service worker that restarted is a new object.
 	const post = (message: FrameToSwMessage) =>
@@ -268,11 +315,17 @@ export function createSwWriter(runId: string): StdinWriter {
 	const onMessage = (event: MessageEvent) => {
 		const parsed = swToFrameMessage.safeParse(event.data);
 		if (!parsed.success || parsed.data.runId !== runId) return;
+		const { consumed } = parsed.data;
+		if (parsed.data.type === "stdin-consumed") {
+			history.splice(0, Math.max(0, consumed - forgotten));
+			forgotten = Math.max(forgotten, consumed);
+			return;
+		}
 		post({
 			type: "stdin-open",
 			runId,
 			token,
-			lines: history.slice(parsed.data.consumed),
+			lines: history.slice(Math.max(0, consumed - forgotten)),
 			eof: ended,
 		});
 	};
@@ -310,6 +363,7 @@ export function createSwWriter(runId: string): StdinWriter {
 export function openSwReader(runId: string, token: string): StdinReader {
 	let ended = false;
 	let consumed = 0;
+	let retries = 0;
 	return {
 		readLine() {
 			if (ended) return null;
@@ -320,6 +374,14 @@ export function openSwReader(runId: string, token: string): StdinReader {
 				request.setRequestHeader(STDIN_CONSUMED_HEADER, String(consumed));
 				request.send();
 				if (request.status === 204) continue;
+				if (
+					request.status === 410 &&
+					request.getResponseHeader(STDIN_RETRY_HEADER) !== null &&
+					retries < STDIN_RETRIES
+				) {
+					retries++;
+					continue;
+				}
 				if (request.status === 410) throw new StdinCancelled();
 				if (request.status !== 200) {
 					throw new Error(`stdin request failed: ${request.status}`);
@@ -329,6 +391,7 @@ export function openSwReader(runId: string, token: string): StdinReader {
 					return null;
 				}
 				consumed++;
+				retries = 0;
 				return request.responseText;
 			}
 		},
