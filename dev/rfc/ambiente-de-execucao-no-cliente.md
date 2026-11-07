@@ -783,6 +783,315 @@ código salvo para correções que ele apontar).
   escuro, teclado na tela (iOS/Android emulados), foco e anúncios
   (`aria-live` do status), editor com leitor de tela.
 
+## Contratos da E3a
+
+Escrito pelo `architect`. Modo `answer` (J1) em questões `essay` com
+`content: "code"`. Stubs: `src/services/code-run.ts`,
+`src/components/exam/code-draft.ts`, `src/components/exam/CodeEssayAnswer.tsx`.
+Bloqueada para sair (não para implementar) pela issue
+`dev/issues/runner-firefox-safari.md`.
+
+### Flag no exam
+
+- `prisma/schema.prisma`, `model Exam`: `allowCodeRun Boolean?` (texto na
+  seção "Exam (E3a)" acima).
+- `src/core/schemas/exam.ts`: `examSchema` ganha
+  `allowCodeRun: z.boolean().nullable()`; `examCreate` e, por herança,
+  `examUpdate` ganham `allowCodeRun: z.boolean().nullish()`. `null` grava
+  null (volta ao padrão do tipo); ausente não mexe no valor.
+- `src/db/services/exam.service.ts`: `fromDb` e as escritas de create,
+  update e upsert levam o campo. O `returns: examSchema` já o deixa sair.
+- `src/services/code-run.ts`: `canRunCode({ type, allowCodeRun })`, regra na
+  docstring. É a única leitura da flag; nenhuma página compara `type`.
+- REST: `examApi` em `src/api/index.ts` deriva do schema; o snapshot do
+  OpenAPI muda.
+
+### CLI
+
+O CLI ainda não envia exams: `cli/dev/specs/to-do/push-exams.md` está em
+`to-do` e nada em `cli/codehood/` lê `exams/`. Portanto a E3a no CLI é só:
+
+- atualizar `resources/openapi/codehood.json` (`scripts/copy-openapi.py`) e
+  regerar `codehood/api/generated.py`, que ganha `allowCodeRun` em
+  `ExamCreate`/`Exam`;
+- acrescentar ao spec `push-exams.md` o mapeamento do campo. O schema de exam
+  do mdq tem `additionalProperties: false`, mas aceita `meta` livre; a
+  proposta é `meta: { codeRun: true | false }` no frontmatter, que vira
+  `allowCodeRun` (ausente: o campo não é enviado). Ver ponto para votação.
+
+Até o push de exams existir, a flag só é definida pela API e pelo seed; o
+padrão por tipo (`null`) cobre o caso comum.
+
+### Onde o widget entra
+
+- O campo de resposta do aluno é o `Essay` do mdq-js
+  (`AnyQuestionView` em `AnswerField`, `src/components/exam/ExamAttempt.tsx`),
+  que só tem `<textarea>` e nenhum ponto de troca. `AnswerField` passa a
+  desviar: questão `essay` com `content: "code"` e
+  `runnerLanguage(highlight)` não null em modo `answer` renderiza
+  `CodeEssayAnswer`; o resto segue no `Essay` do mdq. Questões de código em
+  linguagem sem driver (Prolog até a E3b) continuam no `<textarea>`.
+- `CodeEssayAnswer` reproduz o que o `Essay` mostra em volta do campo
+  (`.mdq-stem` com o `Markdown` exportado pelo mdq-js, `.mdq-epilogue`), com
+  as mesmas classes, e põe `CodeRunner` (`mode="answer"`, `compact`) no
+  lugar do `<textarea>`. Modos `readonly` e `review` do aluno não mudam.
+- Página `src/pages/[discipline]/[course]/exams/[slug].astro`: a island
+  `ExamAttempt` ganha as props `codeRun: boolean` (`canRunCode(exam)`),
+  `runnerOrigin: string | null` (`RUNNER_ORIGIN`), `username` (chave do
+  rascunho) e `answeredAt: Record<slug, string>` (ISO, hora em que o servidor
+  gravou cada resposta, para o painel de conflito).
+- `ExamAttempt` passa a guardar, por questão, `savedAt` (hora da última
+  gravação confirmada) e `failingSince` (primeira falha da sequência atual),
+  além do que já guarda; monta `CodeAnswerSaveState` a partir disso. O
+  debounce, a fila e o `flush` no envio continuam os mesmos: o widget só
+  chama `onChange`.
+- Barra fixa da prova: com alguma questão de código e `codeRun`, um selo
+  "o código roda no seu navegador" ao lado do relógio (protótipo
+  `exam.astro`).
+
+### Rascunho local
+
+- `code-draft.ts`: chave
+  `codehood:code-draft:<username>:<curso>:<exam>:<questão>`, valor
+  `{ code, savedAt }`. Escrito a cada edição. Removido quando o servidor
+  confirma uma gravação igual ao rascunho.
+- Ao abrir a questão: `compareDraft(rascunho, resposta do servidor)`.
+  `conflict` mostra as duas versões lado a lado, texto puro, com a hora de
+  cada uma ("Este navegador / editado às…", "Servidor / salvo às…"); Rodar e
+  edição ficam desligados até o aluno escolher. Escolher o rascunho chama
+  `onChange` com ele (vai para o autosave); escolher o servidor apaga o
+  rascunho.
+- Logout: os formulários de "Sair" (`src/components/nav/UserMenu.astro`) e
+  "Sair de todos os lugares" (`src/pages/profile.astro`) chamam
+  `draftStore(localStorage).clearAll()` no `submit`, antes do POST. Apaga os
+  rascunhos de todos os usuários do navegador. Sessão que expira sem logout
+  deixa os rascunhos; a chave por usuário impede que outro usuário os veja
+  pela UI.
+
+### Código inicial (J4, futuro)
+
+`CodeEssayAnswer.starterCode` e `CodeRunner.starterCode` já existem e nada os
+preenche na E3a; o botão "voltar ao código inicial" só aparece com
+`starterCode`. Quando J4 trouxer o campo, `isAnswered`
+(`src/components/exam/answer-payload.ts`) precisa tratar resposta igual ao
+código inicial como não respondida.
+
+### Mensagens
+
+As do protótipo (`src/pages/design/playground/client-runner/_Ide.astro`,
+`exam.astro`), em `messages/`: "Salvo às {hora}", "Salvando…", "O servidor
+não recebe suas alterações desde {hora}. O rascunho fica neste navegador.",
+"Duas versões desta resposta", explicação do conflito, "Manter o rascunho
+deste navegador", "Usar a versão do servidor", "Escolha uma versão primeiro",
+"O professor desativou a execução de código nesta prova. Você ainda pode
+escrever e enviar sua resposta.", e o selo da barra.
+
+### Seed
+
+`src/db/bootstrap.ts`, cs101, questões `essay` `content: "code"`,
+`highlight: "javascript"`:
+
+| Exam | Tipo | `allowCodeRun` | Estado que alcança |
+| :--- | :--- | :------------- | :----------------- |
+| `practice-js` | PRACTICE | null | roda (padrão do tipo) |
+| `quiz-js` | QUIZ | null | "O professor desativou…" |
+| `test-js` | EXAM | true | roda numa prova valendo nota |
+
+Todos `ONGOING`, para o aluno de demonstração abrir na hora. O conflito de
+rascunho depende do `localStorage` e não tem seed: os testes o montam.
+
+## Tarefas da E3a
+
+| Tarefa | Depende de | Paralela com |
+| :----- | :--------- | :----------- |
+| E3a.1 Flag no servidor | — | E3a.3 |
+| E3a.2 Snapshot e spec no CLI | E3a.1 | E3a.3, E3a.4 |
+| E3a.3 Rascunho local e logout | — | E3a.1 |
+| E3a.4 `CodeEssayAnswer` na prova | E3a.1, E3a.3 | E3a.2 |
+| E3a.5 Seed e story | E3a.4 | — |
+
+**E3a.1 Flag no servidor.**
+
+- Implementação: `prisma/schema.prisma`, `src/core/schemas/exam.ts`,
+  `src/db/services/exam.service.ts`, `src/services/code-run.ts`, snapshot do
+  OpenAPI.
+- Testes: `test/code-run.spec.ts` (Node), e casos novos em
+  `test/api-exam.spec.ts`.
+- Testes esperados: `canRunCode` nas 9 combinações de tipo × flag; criar
+  sem o campo dá `null`; criar e atualizar com `true`/`false`; atualizar com
+  `null` volta a `null`; atualizar sem o campo não muda o valor; o campo
+  aparece no GET e no OpenAPI.
+
+**E3a.2 Snapshot e spec no CLI** (dentro de `cli/`, regras de
+`cli/CLAUDE.md`).
+
+- Implementação: `resources/openapi/codehood.json`,
+  `codehood/api/generated.py` regerado, `dev/specs/to-do/push-exams.md`
+  (mapeamento `meta.codeRun` → `allowCodeRun`).
+- Testes: os existentes de `tests/test_api_generated.py` passam; um caso
+  novo afirma `allow_code_run` em `ExamCreate`. `ruff`, `mypy`, `pytest`
+  limpos.
+
+**E3a.3 Rascunho local e logout.**
+
+- Implementação: `src/components/exam/code-draft.ts`; `<script>` nos
+  formulários de logout de `UserMenu.astro` e `profile.astro`.
+- Testes: `test/code-draft.spec.ts` (Node, `Storage` falso) e um caso de
+  navegador em `test/code-draft-logout.spec.ts`.
+- Testes esperados: `draftKey` codifica as partes (usuário com `:`);
+  `compareDraft` nos três casos, inclusive servidor vazio e rascunho vazio;
+  `draftStore` engole `QuotaExceededError` e storage que lança no acesso;
+  `clearAll` apaga só as chaves do prefixo (o tema continua); logout pelo
+  menu e "sair de todos os lugares" apagam os rascunhos.
+
+**E3a.4 `CodeEssayAnswer` na prova.**
+
+- Implementação: `src/components/exam/CodeEssayAnswer.tsx`, desvio em
+  `AnswerField` e estado `savedAt`/`failingSince` em `ExamAttempt.tsx`,
+  props novas na página do exam, selo na barra, mensagens.
+- Testes: `test/exam-code-answer.spec.ts`.
+- Testes esperados: questão JS em PRACTICE mostra o editor e roda; em QUIZ
+  com `null` o Rodar some e a mensagem do professor aparece, e a resposta
+  ainda salva; editar dispara o autosave de sempre e o rodapé mostra "Salvo
+  às"; com a action de resposta falhando (`page.route`) aparece o aviso com
+  a hora e o rascunho fica no `localStorage`; rascunho diferente posto antes
+  de abrir mostra o conflito, Rodar desligado, e cada escolha leva ao
+  resultado certo no servidor; Rodar não chama a action de resposta; a
+  resposta enviada é o código do editor; questão de código Prolog continua
+  `<textarea>`.
+
+**E3a.5 Seed e story.**
+
+- Implementação: seed da tabela acima; story nova em
+  `docs/user-stories/student.md`, seção "Exams and practice": "Run my code
+  answer before submitting" (`status: implemented`).
+- Testes: `test/stories/student-exams.test.ts`, teste
+  `student: run my code answer before submitting`, pela UI.
+
+## Contratos da E3b
+
+Escrito pelo `architect`. Drivers Prolog (primeiro) e Python. Sem stubs no
+código: `src/runner/**` está em implementação; os nomes abaixo são o
+contrato.
+
+### Runtimes self-host
+
+- Dependências com versão exata: `swipl-wasm` 8.3.0 e `pyodide` 314.0.7 (as
+  da E1.6), sujeitas ao `minimumReleaseAge`.
+- `src/runner/sandbox/runtimes.ts`, importável pelo sandbox e pelo build:
+
+  ```ts
+  /** A runtime package copied into the runner bundle. */
+  export interface RuntimePackage {
+  	/// npm package name and exact version, as in package.json.
+  	pkg: string;
+  	version: string;
+  	/// Files copied from the package, relative to its root, and the path
+  	/// each gets under `/runner/rt/<pkg>@<version>/`.
+  	files: Record<string, string>;
+  }
+  export const RUNTIMES: { swipl: RuntimePackage; pyodide: RuntimePackage };
+  /** Path of a runtime file under `/runner/rt/`, e.g. `pyodide@314.0.7/pyodide.mjs`. */
+  export function runtimePath(runtime: RuntimePackage, file: string): string;
+  ```
+
+- `runnerBundle()` copia esses arquivos para `<bundle>/rt/`. Pyodide: só o
+  núcleo (`pyodide.mjs`, `pyodide.asm.js`, `pyodide.asm.wasm`,
+  `python_stdlib.zip`, `pyodide-lock.json`), nenhum pacote extra.
+  swipl-wasm: o build `swipl-web` sem pthreads; `swipl-web.js` é script
+  clássico e o build acrescenta `export default SWIPL` para o Worker de
+  módulo importá-lo (como na E1.6).
+- `readRunnerAsset` passa a servir `/runner/rt/<pkg>@<versão>/<arquivo>`
+  (tipo `runtime`, `immutable`) só para arquivos listados em `RUNTIMES`;
+  tipos `.mjs`, `.zip`, `.json`, `.data` entram nos content types.
+- `languageId` ganha `prolog` e `python`; `runnerLanguage` ganha os aliases
+  (`pl`, `prolog`, `swipl`; `py`, `python`, `python3`). Novo em
+  `src/runner/languages.ts`:
+
+  ```ts
+  /** How Run starts `language`: `repl` for Prolog (consult + toplevel), `script` otherwise. */
+  export function defaultRunMode(language: LanguageId): RunMode;
+  ```
+
+  `CodeRunner` usa `defaultRunMode` quando `runMode` não vem por prop.
+
+### Driver Prolog (`src/runner/sandbox/drivers/prolog.ts`)
+
+- `modes: ["repl"]`. `load`: importa `swipl-web.js` de
+  `runtimeUrl(...)` e cria a instância com `stdin` ligado a `readLine` (um
+  caractere por vez a partir da linha, `null` = EOF), `print`/`printErr`
+  ligados a `stdout`/`stderr`.
+- `run`: grava `files` em `/work/` no FS em memória do Emscripten, faz
+  `consult` da entrada e abre o toplevel no terminal. Erros e avisos do
+  `consult` saem com o caminho reescrito de `/work/main.pl:3:` para
+  `main.pl:3:`. `halt.` ou EOF encerram com código 0 (ou o de `halt(N)`).
+- `CodeRunner` com `language: "prolog"` mostra ao lado do Rodar "Rodar
+  reinicia o Prolog" (U3).
+
+### Driver Python (`src/runner/sandbox/drivers/python.ts`)
+
+- `modes: ["script", "repl"]`. `load`: `loadPyodide({ indexURL })` com a URL
+  de `RUNTIMES.pyodide`, sem `loadPackage`; `stdin` por `setStdin` com
+  callback síncrono sobre `readLine`; `stdout`/`stderr` por `setStdout` e
+  `setStderr` em modo `write`.
+- `run` em `script`: grava `files` em `/work/`, roda a entrada como
+  `__main__` com nome de arquivo `main.py` no traceback; exceção não tratada
+  imprime o traceback e dá código 1; `SystemExit(n)` dá `n`. `import` de
+  pacote fora da biblioteca padrão falha com `ModuleNotFoundError`, sem
+  tentar baixar.
+- `run` em `repl`: roda a entrada e abre `code.interact()` (como
+  `python -i`), lendo por `input()`.
+- Reserva pré-aquecida (P1): nada novo; `Driver.load` é o que a reserva
+  executa. Com a reserva pronta, Python vai direto a `running`.
+
+### Plano B (snapshot do Pyodide)
+
+Se, com reserva, o tempo de Rodar até `running` no Python passar de 3 s
+com CPU 4x em algum caso que a reserva não cobre (primeiro Rodar logo depois
+de abrir a página, recarga em `review`), medir `makeMemorySnapshot` +
+`loadPyodide({ _loadSnapshot })` gerado no build. É API experimental do
+Pyodide; a decisão de adotar volta ao comitê com os números.
+
+## Tarefas da E3b
+
+| Tarefa | Depende de | Paralela com |
+| :----- | :--------- | :----------- |
+| E3b.1 Runtimes self-host | — (depois da issue de bundle) | — |
+| E3b.2 Driver Prolog | E3b.1 | E3b.4 |
+| E3b.3 Driver Python | E3b.2 (mesmos arquivos de registro) | E3b.4 |
+| E3b.4 Seed e stories | E3b.2 para Prolog, E3b.3 para Python | — |
+| E3b.5 Medição com reserva e plano B | E3b.3 | — |
+
+**E3b.1 Runtimes self-host.** `package.json`, `runtimes.ts`, cópia em
+`integration.ts`, rota `rt/` em `assets.ts`. Testes em
+`test/runner-endpoint.spec.ts`: arquivo listado responde `immutable` com
+content type certo; arquivo não listado, outra versão e `..` dão 404;
+versões de `RUNTIMES` iguais às do `package.json` instalado;
+`swipl-web.js` servido termina com `export default SWIPL`.
+
+**E3b.2 Driver Prolog.** `protocol.ts` (`prolog`), `drivers/index.ts`,
+`drivers/prolog.ts`, `languages.ts` (aliases, `defaultRunMode`), aviso no
+`CodeRunner`. Testes em `test/runner-prolog.spec.ts`, pelo harness da E1.3:
+consult + consulta `factorial(5, F).` dá `F = 120`; erro de sintaxe na linha
+3 aparece como `main.pl:3`; `read/1` lê do terminal; `halt.` e EOF encerram;
+Parar no meio de recursão infinita; o essay `prolog-factorial-with-is` do
+seed passa a abrir no editor.
+
+**E3b.3 Driver Python.** `protocol.ts` (`python`), `drivers/index.ts`,
+`drivers/python.ts`, `languages.ts`. Testes em `test/runner-python.spec.ts`:
+`print`/`input()`; traceback com `main.py` e código 1; `sys.exit(3)`;
+`import numpy` falha sem requisição de rede fora de `/runner/rt/`; modo
+`repl` com EOF; com `prepare`, o run vai direto a `running`.
+
+**E3b.4 Seed e stories.** Os `CODE` Python do seed passam a rodar; um
+`CODE` Prolog novo em cs101; a story "Run a code example" ganha um passo em
+Python. Sem mudança nas tabelas de seed da E2 e da E3a.
+
+**E3b.5 Medição com reserva e plano B.** Como a E1.6, agora com o bundle
+real: tempo de Rodar até `running` com reserva pronta, com reserva ainda
+carregando e sem reserva, desktop e CPU 4x. Se algum caso de Python passar
+de 3 s, medir o snapshot (plano B) e levar os números ao comitê.
+
 ## Em aberto
 
 - Firefox e Safari (inclusive janela privada) não testados: issue

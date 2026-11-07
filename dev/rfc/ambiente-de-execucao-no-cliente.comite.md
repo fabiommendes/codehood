@@ -409,3 +409,21 @@ Revisão do f1c3872 (breaker): resync não atinge outro canal. Furos minor
 B5 (resync disparado antes da checagem de token; amplificação para todas as
 janelas) e B6 (prazo de 1 s do resync curto no celular; Worker deve tentar
 de novo após o resync) vão para correção após a issue de bundle.
+
+### Rodada 10: contratos da E3a e E3b
+
+Seções "Contratos/Tarefas da E3a" e "Contratos/Tarefas da E3b" no RFC;
+stubs `src/services/code-run.ts`, `src/components/exam/code-draft.ts`,
+`src/components/exam/CodeEssayAnswer.tsx`. O CLI ainda não envia exams
+(`push-exams.md` em `to-do`): até lá a flag vem da API e do seed.
+
+- **E3-D1.** Declaração da flag no repositório: (a) `meta: { codeRun }` no
+  frontmatter do exam, sem mudar o mdq; (b) campo novo no schema do mdq
+  (outro repositório). Presidente: (a).
+- **E3-D2.** Troca do campo de resposta: (a) `CodeEssayAnswer` desvia no
+  `AnswerField` e repete enunciado/epílogo do mdq-js; (b) slot no `Essay`
+  do mdq-js (outro repositório). Presidente: (a).
+- **E3-D3.** Testes de Prolog e Python na suíte padrão (runtimes servidos
+  localmente; ~2 s por teste de Python), revertendo o item 9 da rodada 2.
+  Presidente: sim, limitado a poucos testes de fumaça por runtime; o resto
+  fica fora da suíte padrão.
