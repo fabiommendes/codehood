@@ -496,3 +496,21 @@ Seções "Contratos/Tarefas da E4" e "Contratos/Tarefas da E5" no RFC; stub
   (~1 MB, JS puro, preserva as linhas do `.ts`). O `esbuild-wasm` entrou no
   RFC como sugestão do presidente, não como escolha explícita do humano.
   Presidente: (b), registrado como mudança no relatório final.
+
+Votos da rodada 13: **E4-D1 (a) e E5-D2 (b) unânimes.** O architect votou
+(b) mas propôs manter `esbuild-wasm` até o humano decidir; o presidente
+decide adotar `sucrase` já, porque o `esbuild-wasm` foi sugestão do
+presidente e não escolha explícita do humano; a mudança vai no relatório
+final e é reversível. Condições:
+
+- `sucrase` entra como arquivo de `rt/` ou exceção explícita e estreita na
+  allowlist do bundle; dependências de CLI (`commander`, `mz`,
+  `tinyglobby`) fora do bundle (security).
+- Selo "modificado" e código de saída na barra de status do widget, fora do
+  terminal; teste de que `ESC c` e textos falsos na saída não os alteram
+  (security J4).
+- `runForSubmission` processa um pedido por vez; o último clique vence
+  (breaker B12).
+- Corrigir o texto sobre a cópia ao trocar de card no modo lista (B13).
+- Registrar custo: trocar de submissão perde a reserva (Pyodide frio a cada
+  troca); o snapshot do plano B vale também para a correção.
