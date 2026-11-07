@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [grading, rubric, exams, instructor, cli]
 relatedTo: [web-grading, runner-de-correcao, revisao-por-lacuna, regrade-requests, chaves-de-api-com-escopo]
 ---
