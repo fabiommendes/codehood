@@ -762,6 +762,7 @@ model QuestionRef {
   questionTags       QuestionTags[]
   questionsForExams  QuestionsForExam[]
   questionForCourses QuestionForCourse[]
+  rubrics            Rubric[]
   group              Group?              @relation(fields: [groupId], references: [id])
   groupId            Int?
   submissions        Submission[]
@@ -928,7 +929,101 @@ model Feedback {
   /// The regrade request this pass answered, when it was written to accept one.
   regradeRequest RegradeRequest?
 
+  /// Set when this pass was graded with the rubric: its score is derived from
+  /// the rubric's base, the applied items and `adjustment`, and is recomputed
+  /// whenever the rubric changes.
+  rubricId Int?
+  rubric   Rubric? @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+
+  /// Free extra credit added after the rubric items, a signed decimal string.
+  adjustment String?
+
+  rubricItems FeedbackRubricItem[]
+
   @@unique([submissionId, ref])
+}
+
+/// Grading criteria of one question in one exam. Copied from the question's
+/// initial rubric when grading starts; pushes never change it afterwards.
+/// Keyed by exam and question rather than `QuestionsForExam`, whose rows are
+/// rewritten by every exam push.
+model Rubric {
+  id Int @id @default(autoincrement())
+
+  examId Int
+  exam   Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  questionRefId Int
+  questionRef   QuestionRef @relation(fields: [questionRefId], references: [id], onDelete: Cascade)
+
+  /// Score before any item applies, a decimal string in [0, 1]: "0" when the
+  /// items add credit, "1" when they deduct it.
+  base String @default("0")
+
+  /// Question version the rubric was copied from. Null when it started empty.
+  sourceVersion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     RubricItem[]
+  feedbacks Feedback[]
+
+  @@unique([examId, questionRefId])
+}
+
+/// One criterion of a rubric. Items sharing the first segment of `group`
+/// exclude each other: a pass applies at most one of them.
+model RubricItem {
+  id Int @id @default(autoincrement())
+
+  rubricId Int
+  rubric   Rubric @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+
+  /// Natural key within the rubric, never reassigned. REST and CLI address
+  /// items by it.
+  key String
+
+  /// Group path, segments joined by "/", e.g. "Recursion/Wrong/Base case".
+  /// Null for a standalone item.
+  group String?
+
+  /// The criterion, shown to graders and to the student.
+  text String
+
+  /// Signed decimal string, a fraction of the question score.
+  value String
+
+  /// For authors and graders only, never shown to students.
+  comment String?
+
+  /// Shown to the student when the item applies to their answer.
+  feedback String?
+
+  position Int @default(0)
+
+  /// Set when the item was split or retired. Passes that applied it keep
+  /// their score and are flagged for review; new passes cannot apply it.
+  retiredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications FeedbackRubricItem[]
+
+  @@unique([rubricId, key])
+}
+
+/// A rubric item applied in one grading pass.
+model FeedbackRubricItem {
+  feedbackId Int
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  itemId Int
+  item   RubricItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([feedbackId, itemId])
+  @@index([itemId])
 }
 
 enum RegradeStatus {
@@ -1058,6 +1153,7 @@ model Exam {
   questionsForExams QuestionsForExam[]
   responses         Response[]
   exceptions        ExamException[]
+  rubrics           Rubric[]
 
   @@unique([courseId, slug])
 }
