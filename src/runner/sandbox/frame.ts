@@ -12,6 +12,32 @@
  * `/_astro/` or `public/`.
  */
 
+import {
+	type AppToRunnerMessage,
+	appToRunnerMessage,
+	type ExitReason,
+	FILES_LIMIT_BYTES,
+	type LanguageId,
+	OUTPUT_FLUSH_MS,
+	OUTPUT_LIMIT_BYTES,
+	OUTPUT_MESSAGES_LIMIT,
+	RUNNER_PROTOCOL_VERSION,
+	type RunMessage,
+	type RunMode,
+	type RunnerToAppMessage,
+	type RunState,
+	type StdinKind,
+} from "../protocol";
+import { availableLanguages } from "./drivers";
+import { createStdinWriter, detectStdinKind } from "./stdin";
+import type { StdinWriter } from "./stdin/types";
+import { utf8Length } from "./utf8";
+import {
+	type LoadMessage,
+	type StartMessage,
+	workerToFrameMessage,
+} from "./worker-protocol";
+
 /** Settings the server writes into the frame page. */
 export interface FrameConfig {
 	/// Origin of the app allowed to drive this frame (`PUBLIC_URL`).
@@ -54,8 +80,395 @@ export const STORAGE_CLEANUP_TIMEOUT_MS = 2000;
  * that Worker are dropped. A `run` with a `runId` already used in this frame
  * load is ignored. Each accepted run ends with exactly one `exit`.
  */
-export function startFrame(_config: FrameConfig): void {
-	throw new Error("not implemented");
+export function startFrame(config: FrameConfig): void {
+	void clearOriginStorage(STORAGE_CLEANUP_TIMEOUT_MS);
+	const languages = availableLanguages(config.withFake);
+	const runtimeBase = new URL("/runner/rt/", location.origin).href;
+	let stdinKind: StdinKind = "none";
+
+	/// A Worker, either a reserve (`run` is null) or the one of a run.
+	interface Slot {
+		language: LanguageId;
+		worker: Worker;
+		loaded: boolean;
+		started: boolean;
+		dead: boolean;
+		progress: { loaded: number; total: number | null } | null;
+		run: Run | null;
+	}
+
+	interface Run {
+		runId: string;
+		language: LanguageId;
+		mode: RunMode;
+		files: Record<string, string>;
+		entry: string;
+		maxOutputBytes: number;
+		writer: StdinWriter;
+		slot: Slot | null;
+		ended: boolean;
+		bytes: number;
+		messages: number;
+		lastState: RunState | null;
+		pending: { stream: "stdout" | "stderr"; text: string }[];
+		flushTimer: ReturnType<typeof setTimeout> | null;
+	}
+
+	const usedRunIds = new Set<string>();
+	const runs = new Map<string, Run>();
+	const reserves = new Map<LanguageId, Slot>();
+	/// Languages the app asked a reserve for since the last one was consumed or dropped.
+	const wanted = new Set<LanguageId>();
+
+	function post(message: RunnerToAppMessage): void {
+		if (window.parent !== window) {
+			window.parent.postMessage(message, config.appOrigin);
+		}
+	}
+
+	function activeRuns(language: LanguageId): number {
+		let count = 0;
+		for (const run of runs.values()) if (run.language === language) count++;
+		return count;
+	}
+
+	function flushOutput(run: Run): void {
+		if (run.flushTimer !== null) clearTimeout(run.flushTimer);
+		run.flushTimer = null;
+		const pending = run.pending;
+		run.pending = [];
+		for (const { stream, text } of pending) {
+			post({ type: "output", runId: run.runId, stream, text });
+		}
+	}
+
+	function emitStatus(run: Run, state: RunState): void {
+		if (run.lastState === state) return;
+		run.lastState = state;
+		flushOutput(run);
+		post({ type: "status", runId: run.runId, state });
+	}
+
+	function emitOutput(run: Run, stream: "stdout" | "stderr", text: string) {
+		if (text === "") return;
+		run.bytes += utf8Length(text);
+		if (run.bytes > run.maxOutputBytes) {
+			finish(run, "output-limit", null);
+			return;
+		}
+		// Batches keep the order of the two streams: only neighbors of the same stream merge.
+		const last = run.pending[run.pending.length - 1];
+		if (last && last.stream === stream) last.text += text;
+		else run.pending.push({ stream, text });
+		run.flushTimer ??= setTimeout(() => flushOutput(run), OUTPUT_FLUSH_MS);
+	}
+
+	/// Ends `run` with its one `exit`, terminating its Worker and stdin channel.
+	function finish(
+		run: Run,
+		reason: ExitReason,
+		code: number | null,
+		message?: string,
+	): void {
+		if (run.ended) return;
+		run.ended = true;
+		flushOutput(run);
+		runs.delete(run.runId);
+		if (run.slot) {
+			run.slot.dead = true;
+			run.slot.worker.terminate();
+		}
+		run.writer.cancel();
+		post({
+			type: "exit",
+			runId: run.runId,
+			reason,
+			code,
+			...(message === undefined ? {} : { message: message.slice(0, 2000) }),
+		});
+		if (
+			wanted.has(run.language) &&
+			!reserves.has(run.language) &&
+			activeRuns(run.language) === 0
+		) {
+			createReserve(run.language);
+		}
+	}
+
+	function dropSlot(slot: Slot): void {
+		slot.dead = true;
+		slot.worker.terminate();
+		if (reserves.get(slot.language) === slot) {
+			reserves.delete(slot.language);
+			wanted.delete(slot.language);
+		}
+	}
+
+	/// A Worker that broke the protocol or failed: ends its run, or drops the reserve.
+	function fail(slot: Slot, message: string): void {
+		if (slot.run) {
+			finish(slot.run, slot.started ? "crashed" : "load-failed", null, message);
+		} else {
+			dropSlot(slot);
+		}
+	}
+
+	/// Sends `start` to a loaded Worker that a run owns.
+	function begin(slot: Slot): void {
+		const run = slot.run;
+		if (!run || slot.started || run.ended) return;
+		slot.started = true;
+		const message: StartMessage = {
+			type: "start",
+			mode: run.mode,
+			files: run.files,
+			entry: run.entry,
+			stdin: run.writer.transport,
+		};
+		slot.worker.postMessage(message);
+	}
+
+	function onWorkerMessage(slot: Slot, data: unknown): void {
+		if (slot.dead) return;
+		const run = slot.run;
+		if (!slot.started) {
+			const parsed = workerToFrameMessage.safeParse(data);
+			const message = parsed.success ? parsed.data : null;
+			if (message?.type === "progress") {
+				slot.progress = { loaded: message.loaded, total: message.total };
+				if (run) {
+					post({ type: "progress", runId: run.runId, ...slot.progress });
+				}
+			} else if (message?.type === "loaded") {
+				slot.loaded = true;
+				begin(slot);
+			} else if (message?.type === "exit" && message.reason === "load-failed") {
+				if (run) finish(run, "load-failed", null, message.message);
+				else dropSlot(slot);
+			} else {
+				fail(slot, "the Worker broke the load protocol");
+			}
+			return;
+		}
+		if (!run || run.ended) return;
+		if (++run.messages > OUTPUT_MESSAGES_LIMIT) {
+			finish(run, "output-limit", null);
+			return;
+		}
+		const parsed = workerToFrameMessage.safeParse(data);
+		if (!parsed.success) return;
+		const message = parsed.data;
+		switch (message.type) {
+			case "status":
+				if (message.state === "waiting-input") run.writer.readerWaiting();
+				emitStatus(run, message.state);
+				break;
+			case "output":
+				emitOutput(run, message.stream, message.text);
+				break;
+			case "exit":
+				finish(
+					run,
+					message.reason,
+					message.reason === "exited" ? message.code : null,
+					message.message,
+				);
+				break;
+		}
+	}
+
+	function createSlot(
+		language: LanguageId,
+		program?: LoadMessage["program"],
+	): Slot {
+		const worker = new Worker(`${config.bundleBase}worker.js`, {
+			type: "module",
+		});
+		const slot: Slot = {
+			language,
+			worker,
+			loaded: false,
+			started: false,
+			dead: false,
+			progress: null,
+			run: null,
+		};
+		worker.addEventListener("message", (event) =>
+			onWorkerMessage(slot, event.data),
+		);
+		worker.addEventListener("error", (event) => {
+			event.preventDefault();
+			if (!slot.dead) fail(slot, "the Worker failed");
+		});
+		worker.addEventListener("messageerror", () => {
+			if (!slot.dead)
+				fail(slot, "the Worker sent a message that cannot be read");
+		});
+		const load: LoadMessage = { type: "load", language, runtimeBase, program };
+		worker.postMessage(load);
+		return slot;
+	}
+
+	function createReserve(language: LanguageId): void {
+		if (document.visibilityState === "hidden") return;
+		try {
+			reserves.set(language, createSlot(language));
+		} catch {
+			wanted.delete(language);
+		}
+	}
+
+	/// Hands `run` the reserve of its language, or a new Worker.
+	function claimWorker(run: Run): void {
+		const reserve = reserves.get(run.language);
+		let slot: Slot;
+		if (reserve) {
+			reserves.delete(run.language);
+			slot = reserve;
+		} else {
+			slot = createSlot(run.language, {
+				files: run.files,
+				entry: run.entry,
+			});
+		}
+		wanted.delete(run.language);
+		slot.run = run;
+		run.slot = slot;
+		if (slot.loaded) {
+			begin(slot);
+			return;
+		}
+		emitStatus(run, "loading");
+		if (slot.progress) {
+			post({ type: "progress", runId: run.runId, ...slot.progress });
+		}
+	}
+
+	function onRun(message: RunMessage): void {
+		if (usedRunIds.has(message.runId)) return;
+		usedRunIds.add(message.runId);
+		const { runId, language } = message;
+		const crashed = (why: string) =>
+			post({
+				type: "exit",
+				runId,
+				reason: "crashed",
+				code: null,
+				message: why,
+			});
+		let size = 0;
+		for (const text of Object.values(message.files)) size += utf8Length(text);
+		const refusal =
+			stdinKind === "none"
+				? "this browser cannot run code"
+				: !languages.includes(language)
+					? "language not available"
+					: config.exclusive && runs.size > 0
+						? "another run is active in this frame"
+						: size > FILES_LIMIT_BYTES
+							? "files are too large"
+							: message.entry in message.files
+								? null
+								: "entry is not a file";
+		if (refusal !== null) {
+			crashed(refusal);
+			return;
+		}
+
+		void clearOriginStorage(STORAGE_CLEANUP_TIMEOUT_MS);
+		let writer: StdinWriter;
+		try {
+			writer = createStdinWriter(stdinKind, runId);
+		} catch (error) {
+			crashed(error instanceof Error ? error.message : "stdin failed");
+			return;
+		}
+		const run: Run = {
+			runId,
+			language,
+			mode: message.mode,
+			files: message.files,
+			entry: message.entry,
+			maxOutputBytes: message.maxOutputBytes ?? OUTPUT_LIMIT_BYTES,
+			writer,
+			slot: null,
+			ended: false,
+			bytes: 0,
+			messages: 0,
+			lastState: null,
+			pending: [],
+			flushTimer: null,
+		};
+		runs.set(runId, run);
+		try {
+			claimWorker(run);
+		} catch (error) {
+			finish(
+				run,
+				"load-failed",
+				null,
+				error instanceof Error ? error.message : "",
+			);
+		}
+	}
+
+	function onPrepare(language: LanguageId): void {
+		if (stdinKind === "none" || !languages.includes(language)) return;
+		if (reserves.has(language)) return;
+		wanted.add(language);
+		if (activeRuns(language) === 0) createReserve(language);
+	}
+
+	function onMessage(message: AppToRunnerMessage): void {
+		switch (message.type) {
+			case "prepare":
+				onPrepare(message.language);
+				return;
+			case "run":
+				onRun(message);
+				return;
+			case "stdin":
+				try {
+					runs.get(message.runId)?.writer.writeLine(message.line);
+				} catch {
+					// A line over the limit is refused; the run goes on.
+				}
+				return;
+			case "stdin-eof":
+				runs.get(message.runId)?.writer.end();
+				return;
+			case "stop": {
+				const run = runs.get(message.runId);
+				if (run) finish(run, "stopped", null);
+			}
+		}
+	}
+
+	document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState !== "hidden") return;
+		for (const slot of [...reserves.values()]) dropSlot(slot);
+	});
+
+	void detectStdinKind().then((kind) => {
+		stdinKind = kind;
+		window.addEventListener("message", (event) => {
+			if (
+				window.parent === window ||
+				event.source !== window.parent ||
+				event.origin !== config.appOrigin
+			) {
+				return;
+			}
+			const parsed = appToRunnerMessage.safeParse(event.data);
+			if (parsed.success) onMessage(parsed.data);
+		});
+		post({
+			type: "ready",
+			protocol: RUNNER_PROTOCOL_VERSION,
+			stdin: kind,
+			languages,
+		});
+	});
 }
 
 /**
@@ -66,6 +479,48 @@ export function startFrame(_config: FrameConfig): void {
  * A database another context keeps open is left for a later cleanup instead
  * of being waited on. The service worker registration stays. Never rejects.
  */
-export async function clearOriginStorage(_timeoutMs: number): Promise<void> {
-	throw new Error("not implemented");
+export async function clearOriginStorage(timeoutMs: number): Promise<void> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const deadline = new Promise<void>((resolve) => {
+		timer = setTimeout(resolve, timeoutMs);
+	});
+	const work = Promise.allSettled([
+		clearDatabases(),
+		clearCaches(),
+		clearOpfs(),
+	]);
+	await Promise.race([work, deadline]);
+	clearTimeout(timer);
+}
+
+async function clearDatabases(): Promise<void> {
+	const databases = await indexedDB.databases();
+	await Promise.all(
+		databases.map(
+			(db) =>
+				new Promise<void>((resolve) => {
+					if (db.name === undefined) return resolve();
+					const request = indexedDB.deleteDatabase(db.name);
+					request.onsuccess = request.onerror = () => resolve();
+					// Another context holds it open: the delete finishes on its own later.
+					request.onblocked = () => resolve();
+				}),
+		),
+	);
+}
+
+async function clearCaches(): Promise<void> {
+	await Promise.all((await caches.keys()).map((name) => caches.delete(name)));
+}
+
+async function clearOpfs(): Promise<void> {
+	const root =
+		(await navigator.storage.getDirectory()) as FileSystemDirectoryHandle & {
+			keys(): AsyncIterable<string>;
+		};
+	const names: string[] = [];
+	for await (const name of root.keys()) names.push(name);
+	await Promise.all(
+		names.map((name) => root.removeEntry(name, { recursive: true })),
+	);
 }

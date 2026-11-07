@@ -16,6 +16,16 @@ export interface LoadContext {
 
 	/** Reports download progress; `total` is null when unknown. */
 	progress(loaded: number, total: number | null): void;
+
+	/**
+	 * The program, only when the Worker was created for a run that found no
+	 * reserve; absent for a reserve. Only the `fake` driver reads it, to
+	 * script its load.
+	 */
+	readonly program?: {
+		readonly files: Readonly<Record<string, string>>;
+		readonly entry: string;
+	};
 }
 
 /** What a driver may use while running the program. */

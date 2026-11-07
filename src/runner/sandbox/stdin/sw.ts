@@ -25,7 +25,25 @@
  */
 
 import { z } from "zod";
-import type { StdinReader, StdinWriter } from "./types";
+import { STDIN_LINE_MAX_BYTES } from "../../protocol";
+import { utf8Length } from "../utf8";
+import {
+	StdinCancelled,
+	type StdinReader,
+	type StdinWriter,
+	SW_POLL_MS,
+	SW_STDIN_PATH,
+} from "./types";
+
+/// Header that carries the channel token on stdin requests.
+export const STDIN_TOKEN_HEADER = "X-Stdin-Token";
+
+/// Header that says what a 200 answer holds: `line` or `eof`.
+export const STDIN_KIND_HEADER = "X-Stdin";
+
+/// How long a request for an unknown channel waits for its `stdin-open`,
+/// which travels by another path and may arrive after the request.
+export const UNKNOWN_CHANNEL_GRACE_MS = 300;
 
 /**
  * Messages the frame posts to the service worker.
@@ -49,17 +67,201 @@ export const frameToSwMessage = z.discriminatedUnion("type", [
 ]);
 export type FrameToSwMessage = z.infer<typeof frameToSwMessage>;
 
+/** What the service worker answers to one stdin request. */
+export interface StdinReply {
+	status: 200 | 204 | 403 | 410;
+	kind?: "line" | "eof";
+	body?: string;
+}
+
+interface Channel {
+	token: string;
+	/// Id of the frame's window client, the only one allowed to feed the channel.
+	owner: string;
+	/// Id of the Worker client that made the first valid request.
+	reader: string | null;
+	lines: string[];
+	eof: boolean;
+	waiter: { answer: (reply: StdinReply) => void } | null;
+}
+
+/**
+ * The service worker's table of stdin channels, one per run.
+ *
+ * Holds no browser objects, so it runs the same in Node.
+ */
+export class StdinChannels {
+	private channels = new Map<string, Channel>();
+	private openWaiters = new Map<string, Set<() => void>>();
+
+	/** Registers a channel owned by window client `owner`; ignored when `runId` already has one. */
+	open(runId: string, token: string, owner: string): void {
+		if (this.channels.has(runId)) return;
+		this.channels.set(runId, {
+			token,
+			owner,
+			reader: null,
+			lines: [],
+			eof: false,
+			waiter: null,
+		});
+		for (const wake of [...(this.openWaiters.get(runId) ?? [])]) wake();
+	}
+
+	/** Queues a line from `sender`; ignored unless `sender` owns the channel. */
+	line(runId: string, line: string, sender: string): void {
+		const channel = this.owned(runId, sender);
+		if (!channel || channel.eof) return;
+		channel.lines.push(line);
+		this.wake(channel);
+	}
+
+	/** Marks end of input from `sender`; ignored unless `sender` owns the channel. */
+	eof(runId: string, sender: string): void {
+		const channel = this.owned(runId, sender);
+		if (!channel) return;
+		channel.eof = true;
+		this.wake(channel);
+	}
+
+	/** Drops the channel on `sender`'s request, releasing a pending read with 410. */
+	cancel(runId: string, sender: string): void {
+		if (this.owned(runId, sender)) this.drop(runId);
+	}
+
+	/** Drops the channels whose owner is not among `liveOwners`. */
+	retainOwners(liveOwners: ReadonlySet<string>): void {
+		for (const [runId, channel] of [...this.channels]) {
+			if (!liveOwners.has(channel.owner)) this.drop(runId);
+		}
+	}
+
+	/**
+	 * Answers a request of Worker client `clientId`: a queued line, end of
+	 * input, "nothing yet" after `SW_POLL_MS`, 403 for a wrong token or
+	 * client, 410 for an unknown or cancelled channel.
+	 */
+	async read(
+		runId: string,
+		token: string | null,
+		clientId: string,
+	): Promise<StdinReply> {
+		const channel = this.channels.get(runId) ?? (await this.waitForOpen(runId));
+		if (!channel || this.channels.get(runId) !== channel) {
+			return { status: 410 };
+		}
+		if (token !== channel.token) return { status: 403 };
+		if (channel.reader === null) channel.reader = clientId;
+		else if (channel.reader !== clientId) return { status: 403 };
+
+		channel.waiter?.answer({ status: 204 });
+		const ready = this.take(channel);
+		if (ready) return ready;
+		return new Promise<StdinReply>((resolve) => {
+			const answer = (reply: StdinReply) => {
+				clearTimeout(timer);
+				if (channel.waiter?.answer === answer) channel.waiter = null;
+				resolve(reply);
+			};
+			const timer = setTimeout(() => answer({ status: 204 }), SW_POLL_MS);
+			channel.waiter = { answer };
+		});
+	}
+
+	private owned(runId: string, sender: string): Channel | null {
+		const channel = this.channels.get(runId);
+		return channel && channel.owner === sender ? channel : null;
+	}
+
+	private take(channel: Channel): StdinReply | null {
+		const line = channel.lines.shift();
+		if (line !== undefined) return { status: 200, kind: "line", body: line };
+		if (channel.eof) return { status: 200, kind: "eof" };
+		return null;
+	}
+
+	private wake(channel: Channel): void {
+		if (!channel.waiter) return;
+		const reply = this.take(channel);
+		if (reply) channel.waiter.answer(reply);
+	}
+
+	private drop(runId: string): void {
+		const channel = this.channels.get(runId);
+		this.channels.delete(runId);
+		channel?.waiter?.answer({ status: 410 });
+	}
+
+	private waitForOpen(runId: string): Promise<Channel | null> {
+		return new Promise((resolve) => {
+			const waiters = this.openWaiters.get(runId) ?? new Set<() => void>();
+			this.openWaiters.set(runId, waiters);
+			const done = () => {
+				clearTimeout(timer);
+				waiters.delete(done);
+				if (waiters.size === 0) this.openWaiters.delete(runId);
+				resolve(this.channels.get(runId) ?? null);
+			};
+			const timer = setTimeout(done, UNKNOWN_CHANNEL_GRACE_MS);
+			waiters.add(done);
+		});
+	}
+}
+
 /**
  * Creates the frame's end of an `sw` channel with a fresh token and posts
  * `stdin-open` to the controlling service worker.
  *
  * @throws {Error} when no service worker controls the frame.
  */
-export function createSwWriter(_runId: string): StdinWriter {
-	throw new Error("not implemented");
+export function createSwWriter(runId: string): StdinWriter {
+	const controller = navigator.serviceWorker?.controller;
+	if (!controller) throw new Error("no service worker controls the frame");
+	const token = crypto.randomUUID();
+	const post = (message: FrameToSwMessage) => controller.postMessage(message);
+	post({ type: "stdin-open", runId, token });
+	return {
+		transport: { kind: "sw", runId, token },
+		writeLine(line) {
+			if (utf8Length(line) > STDIN_LINE_MAX_BYTES) {
+				throw new RangeError(
+					`stdin line exceeds ${STDIN_LINE_MAX_BYTES} bytes`,
+				);
+			}
+			post({ type: "stdin-line", runId, line });
+		},
+		end() {
+			post({ type: "stdin-eof", runId });
+		},
+		cancel() {
+			post({ type: "stdin-cancel", runId });
+		},
+		readerWaiting() {},
+	};
 }
 
 /** Opens the Worker's end of an `sw` channel; each `readLine` polls with synchronous XHR. */
-export function openSwReader(_runId: string, _token: string): StdinReader {
-	throw new Error("not implemented");
+export function openSwReader(runId: string, token: string): StdinReader {
+	let ended = false;
+	return {
+		readLine() {
+			if (ended) return null;
+			for (;;) {
+				const request = new XMLHttpRequest();
+				request.open("GET", `${SW_STDIN_PATH}${runId}`, false);
+				request.setRequestHeader(STDIN_TOKEN_HEADER, token);
+				request.send();
+				if (request.status === 204) continue;
+				if (request.status === 410) throw new StdinCancelled();
+				if (request.status !== 200) {
+					throw new Error(`stdin request failed: ${request.status}`);
+				}
+				if (request.getResponseHeader(STDIN_KIND_HEADER) === "eof") {
+					ended = true;
+					return null;
+				}
+				return request.responseText;
+			}
+		},
+	};
 }

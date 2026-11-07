@@ -3,6 +3,8 @@
  */
 
 import type { StdinKind } from "../../protocol";
+import { createSabWriter, openSabReader } from "./sab";
+import { createSwWriter, openSwReader } from "./sw";
 import type { StdinReader, StdinTransport, StdinWriter } from "./types";
 
 /// Path of the runner's service worker script. Fixed across releases; its
@@ -23,7 +25,35 @@ export const SW_READY_TIMEOUT_MS = 5000;
  * Registers the service worker only on the `sw` path. Never rejects.
  */
 export async function detectStdinKind(): Promise<StdinKind> {
-	throw new Error("not implemented");
+	try {
+		if (
+			globalThis.crossOriginIsolated &&
+			typeof SharedArrayBuffer !== "undefined"
+		) {
+			return "sab";
+		}
+		const container = navigator.serviceWorker;
+		if (!container) return "none";
+		await container.register(SW_SCRIPT_URL, {
+			scope: SW_SCOPE,
+			updateViaCache: "none",
+		});
+		if (!container.controller) {
+			await new Promise<void>((resolve) => {
+				const done = () => {
+					clearTimeout(timer);
+					container.removeEventListener("controllerchange", done);
+					resolve();
+				};
+				const timer = setTimeout(done, SW_READY_TIMEOUT_MS);
+				container.addEventListener("controllerchange", done);
+				if (container.controller) done();
+			});
+		}
+		return container.controller ? "sw" : "none";
+	} catch {
+		return "none";
+	}
 }
 
 /**
@@ -31,14 +61,20 @@ export async function detectStdinKind(): Promise<StdinKind> {
  *
  * @throws {Error} when `kind` is `none`.
  */
-export function createStdinWriter(
-	_kind: StdinKind,
-	_runId: string,
-): StdinWriter {
-	throw new Error("not implemented");
+export function createStdinWriter(kind: StdinKind, runId: string): StdinWriter {
+	switch (kind) {
+		case "sab":
+			return createSabWriter();
+		case "sw":
+			return createSwWriter(runId);
+		case "none":
+			throw new Error("this browser cannot run code: no stdin channel");
+	}
 }
 
 /** Opens the Worker's end of the channel described by `transport`. */
-export function openStdinReader(_transport: StdinTransport): StdinReader {
-	throw new Error("not implemented");
+export function openStdinReader(transport: StdinTransport): StdinReader {
+	return transport.kind === "sab"
+		? openSabReader(transport.buffer)
+		: openSwReader(transport.runId, transport.token);
 }

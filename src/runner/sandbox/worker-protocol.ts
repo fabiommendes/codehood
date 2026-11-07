@@ -24,6 +24,8 @@ export interface LoadMessage {
 	type: "load";
 	language: z.infer<typeof languageId>;
 	runtimeBase: string;
+	/** Set only when a run is already waiting for this Worker (see `LoadContext.program`). */
+	program?: { files: Record<string, string>; entry: string };
 }
 
 /**
