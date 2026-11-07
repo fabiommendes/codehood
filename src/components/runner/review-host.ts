@@ -16,6 +16,15 @@ import type { RunHandle, RunHandlers, RunRequest } from "@/runner/host";
  * next. Running the same submission again, original or modified copy, reuses
  * the frame; each run still gets a new Worker.
  *
+ * Calls are handled one at a time, in order, and the last one wins: a call
+ * made while an earlier one is still waiting (for `reload()` or for the run
+ * to start) supersedes it. A superseded call never starts a run; it resolves
+ * with a handle whose `done` is `{ reason: "stopped", code: null }` and whose
+ * other methods do nothing.
+ *
+ * Reloading the frame also drops its reserve Workers, so the first run of
+ * each submission loads its runtime cold (seconds for Python).
+ *
  * @throws {RunnerUnavailable} as `RunnerHost.run` does.
  */
 export async function runForSubmission(

@@ -1161,7 +1161,12 @@ código do aluno na tela de correção. Stub: `src/components/runner/review-host
 - `runForSubmission(runnerOrigin, submission, request, handlers)`: um
   `RunnerHost.exclusive` por página, criado no primeiro uso; um run por vez na
   página inteira (o run novo para o anterior, de qualquer card); `reload()`
-  do frame sempre que a submissão muda. `submission` é o id público da
+  do frame sempre que a submissão muda. Pedidos são processados um por vez e
+  o último clique vence: um pedido ainda esperando `reload()` é substituído
+  pelo seguinte e nunca roda (contrato no stub).
+- Custo registrado: `reload()` descarta as reservas, então o primeiro run de
+  cada submissão carrega o runtime a frio (Pyodide: ~2 s no desktop, ~8 s com
+  CPU 4x). O snapshot do plano B da E3b, se adotado, vale também aqui. `submission` é o id público da
   resposta (o mesmo do `id="answer-..."` do card).
 - `CodeRunner` ganha a prop `submission?: string`. Com `mode="review"`, ele
   roda por `runForSubmission` em vez de `RunnerHost.shared`. `prepare` em
@@ -1177,10 +1182,15 @@ código do aluno na tela de correção. Stub: `src/components/runner/review-host
 - Com a cópia diferente do original: selo "modificado", dica "Uma cópia na
   memória; a submissão não muda." e botão "Voltar à submissão", que descarta a
   cópia. O botão Rodar continua "Rodar submissão".
-- Saída de um run da cópia: o terminal escreve antes uma linha de aviso
-  "saída da cópia modificada" (pelo `notice` do `RunnerTerminal`), e o
-  status mostra o selo. Saída do original não tem marca.
-- Trocar de card ou recarregar a página perde a cópia, por desenho.
+- O selo "modificado" de um run e o código de saída ficam na barra de status
+  do widget, fora do terminal, escritos por `textContent`. A saída do
+  programa não os alcança: `ESC c`, limpar a tela ou imprimir "exit 0" ou
+  "modified" no terminal não muda a barra. O terminal só ganha, antes da
+  saída da cópia, uma linha `notice` "saída da cópia modificada".
+- A cópia fica na memória do widget enquanto a página estiver aberta: rodar
+  outra submissão ou ir para outro card não a apaga (os cards continuam
+  montados). Ela se perde ao recarregar a página, o que inclui salvar uma
+  nota (a página recarrega, spec `web-grading` R6).
 
 ### Navegação
 
@@ -1221,7 +1231,10 @@ do terminal não é copiada para o comentário.
   run da seguinte; editar a cópia mostra o selo e "Voltar à submissão"
   devolve o original; a saída da cópia tem o aviso; editar e rodar a cópia
   não gera requisição à origem da app (`page.on("request")`) nem escreve no
-  `localStorage`.
+  `localStorage`; programa que imprime `\x1bc`, "exit 0" e "modified" não
+  muda o selo nem o código de saída da barra; três cliques rápidos em Rodar
+  de submissões diferentes terminam com um só run, o do último; a cópia de
+  um card continua depois de rodar outro card.
 
 **E4.2 Código na tela de correção.**
 
@@ -1288,8 +1301,8 @@ A 1.16.0 é madura para o `minimumReleaseAge` e não usa a 2.0-next.
   `javascriptDriver.run` com os mesmos `files`, `entry` e contexto, para o
   aluno ter exatamente o JavaScript da E1 (console, `prompt`, stack
   limpo). Tipos não são verificados: só removidos.
-- Transpilador: o "Decidido" diz `esbuild-wasm`. Duas coisas pesam e vão
-  para votação:
+- Transpilador: `sucrase` 3.35.1 (rodada 13, decisão do presidente; muda a
+  sugestão de `esbuild-wasm` e vai ao relatório final, reversível). Motivos:
   - `esbuild-wasm` 0.28.2 (mesma versão do `esbuild` que a app já usa) tem
     ~14,5 MB no pacote, com o `.wasm` de ~11 MB baixado no primeiro Rodar.
     Ele reimprime o código, então as linhas do stack não batem com o `.ts`
@@ -1297,9 +1310,18 @@ A 1.16.0 é madura para o `minimumReleaseAge` e não usa a 2.0-next.
   - `sucrase` 3.35.1 tem ~1 MB no pacote, é JS puro (sem `.wasm`) e
     preserva as linhas do arquivo por desenho: o stack aponta a linha certa
     do `.ts` sem source map.
-- Se `esbuild-wasm`: `load` chama `esbuild.initialize({ wasmURL, worker:
-  false })`. `worker: false` é obrigatório: o padrão cria um Worker
-  aninhado, que `lockDownWorkerScope` remove.
+- Empacotamento: o build gera um arquivo ESM só com a função `transform` do
+  `sucrase` (esbuild, entrada que importa só `transform`) e o serve como
+  runtime em `/runner/rt/sucrase@3.35.1/sucrase.mjs`, listado em
+  `RUNTIMES.sucrase`. Não entra no bundle do sandbox, cuja allowlist de
+  imports não muda. As dependências de CLI do pacote (`commander`, `mz`,
+  `tinyglobby`, `glob`) ficam fora do arquivo.
+- `load`: `import()` de `runtimeUrl("sucrase.mjs")`. `run`: `transform(code,
+  { transforms: ["typescript"], filePath: entry })` e entrega ao driver JS.
+  Linhas preservadas: o stack aponta a linha do `.ts` sem source map.
+- Se o humano reverter para `esbuild-wasm`: `esbuild.initialize({ wasmURL,
+  worker: false })` (o padrão cria Worker aninhado, que o bloqueio remove) e
+  source map aplicado no `cleanStack`.
 - `languageId` ganha `typescript`; aliases `ts`, `typescript`, `mts`.
 - CodeMirror: `@codemirror/lang-javascript` com `typescript: true`;
   `@codemirror/legacy-modes` (modo `lua`) para Lua, versão exata.
@@ -1309,7 +1331,7 @@ A 1.16.0 é madura para o `minimumReleaseAge` e não usa a 2.0-next.
 | Tarefa | Depende de | Paralela com |
 | :----- | :--------- | :----------- |
 | E5.1 Driver Lua | — | E5.2 |
-| E5.2 Driver TypeScript | voto do transpilador | E5.1 |
+| E5.2 Driver TypeScript | — | E5.1 |
 | E5.3 Seed, smoke e editor | E5.1, E5.2 | — |
 
 Os dois mexem em `protocol.ts`, `drivers/index.ts`, `runtimes.ts` e
@@ -1324,13 +1346,17 @@ regra da E3b: dois por runtime na suíte padrão, o resto em `test/runtimes/`.
 `while true do end`; `FS.mount` de IDBFS falha; com `prepare`, vai direto a
 `running`.
 
-**E5.2 Driver TypeScript.** Dependência escolhida, com versão exata;
+**E5.2 Driver TypeScript.** `sucrase` 3.35.1 exato; geração de
+`sucrase.mjs` no `runnerBundle()` e entrada em `RUNTIMES`;
 `drivers/typescript.ts`, `drivers/index.ts`, `protocol.ts`,
 `languages.ts`; uma exportação em `drivers/javascript.ts` se o driver TS
 precisar. Testes em `test/runtimes/typescript.spec.ts`: anotações, `enum` e
 `interface` rodam; erro de tipo não impede a execução; exceção na linha 7
 do `.ts` aparece como `main.ts:7`; `prompt()`; `import` de outro arquivo
-falha com mensagem clara; com `prepare`, vai direto a `running`.
+falha com mensagem clara; com `prepare`, vai direto a `running`. Em
+`test/runner-endpoint.spec.ts`: `sucrase.mjs` servido como `runtime`
+`immutable` e sem `commander`, `mz`, `tinyglobby` no conteúdo; o bundle do
+sandbox não contém `sucrase`.
 
 **E5.3 Seed, smoke e editor.** `CODE` Lua e TypeScript em cs101; uma
 questão `essay` de código em TypeScript no `practice-js`;
