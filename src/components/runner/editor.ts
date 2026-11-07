@@ -144,8 +144,15 @@ export async function createEditor(
 	hint.textContent = options.tabHint;
 	options.parent.append(hint);
 
-	const languageSupport =
-		options.language === "javascript" ? [javascript.javascript()] : [];
+	const languageSupport = [];
+	if (options.language === "javascript" || options.language === "typescript") {
+		languageSupport.push(
+			javascript.javascript({ typescript: options.language === "typescript" }),
+		);
+	} else if (options.language === "lua") {
+		const { lua } = await import("@codemirror/legacy-modes/mode/lua");
+		languageSupport.push(language.StreamLanguage.define(lua));
+	}
 
 	const editor = new EditorView({
 		parent: options.parent,

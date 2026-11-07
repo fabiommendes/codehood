@@ -401,6 +401,46 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "lua-greet",
+			title: "greet.lua",
+			description: "Reads a name with io.read and greets it.",
+			data: {
+				type: "CODE",
+				language: "lua",
+				content:
+					'io.write("What is your name? ")\nlocal name = io.read("l")\nprint("Hello, " .. name .. "!")\n',
+			},
+			rev: "demo-lua-greet-v1",
+		},
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "ts-greet",
+			title: "greet.ts",
+			description: "Types are removed, not checked; prompt() reads a name.",
+			data: {
+				type: "CODE",
+				language: "typescript",
+				content: [
+					"interface Greeting {",
+					"  name: string;",
+					"}",
+					"",
+					'const who: Greeting = { name: prompt("What is your name?") ?? "" };',
+					"console.log('Hello, ' + who.name + '!');",
+					"",
+				].join("\n"),
+			},
+			rev: "demo-ts-greet-v1",
+		},
+		FULL_ACCESS,
+	);
+
 	// Runnable JavaScript, one resource per state of the code runner widget.
 	const jsLinksCode = 'console.log("Docs: https://developer.mozilla.org/");\n';
 	const runnableCode = [
@@ -2005,6 +2045,24 @@ async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+	await db.question.create(
+		{
+			course,
+			slug: "ts-sum-of-squares",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Sum of squares, typed",
+				stem: "Write a TypeScript function `sumOfSquares(n: number): number` and print `sumOfSquares(10)`.",
+				epilogue: "Print only the number.",
+				tags: ["typescript"],
+				content: "code",
+				highlight: "typescript",
+			},
+		},
+		FULL_ACCESS,
+	);
 	const questions = [{ slug: "js-sum-of-evens", version: "v1" }];
 	await db.exam.create(
 		{
@@ -2015,7 +2073,7 @@ async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 			title: "Practice: JavaScript loops",
 			description: "Code runs in the browser by the practice default.",
 			tags: ["javascript", "practice"],
-			questions,
+			questions: [...questions, { slug: "ts-sum-of-squares", version: "v1" }],
 		},
 		FULL_ACCESS,
 	);
