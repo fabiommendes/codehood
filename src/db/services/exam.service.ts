@@ -135,6 +135,7 @@ export const makeExamService = defineService<ExamT>()(() => {
 					format: input.format ?? "MARKDOWN",
 					scheduledAt: input.scheduledAt ?? null,
 					durationMs: toMs(input.duration) ?? null,
+					allowCodeRun: input.allowCodeRun ?? null,
 					rev: input.rev,
 					authorId:
 						opts.actor === SYSTEM
@@ -339,6 +340,7 @@ export const makeExamService = defineService<ExamT>()(() => {
 					format: fields.format,
 					scheduledAt: fields.scheduledAt,
 					durationMs: toMs(fields.duration),
+					allowCodeRun: fields.allowCodeRun,
 					rev: fields.rev,
 					// The column is not nullable: no extra time is stored as zero.
 					extraTimeMs: fields.extraTime === null ? 0 : toMs(fields.extraTime),
@@ -727,6 +729,7 @@ function fromDb(row: DbExam): Exam {
 		format: row.format,
 		scheduledAt: row.scheduledAt,
 		duration: fromMs(row.durationMs),
+		allowCodeRun: row.allowCodeRun,
 		extraTime: fromMs(row.extraTimeMs),
 		author: row.authorId,
 		gradesReleasedAt: row.gradesReleasedAt,

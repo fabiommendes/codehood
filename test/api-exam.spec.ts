@@ -254,6 +254,51 @@ test("service findMany narrows by exams within a course given by id", async () =
 	expect(found.map((e) => e.slug)).toEqual(["two"]);
 });
 
+test("allowCodeRun is null on creation without it, and true or false when given", async ({
+	request,
+}) => {
+	const { url, headers } = await makeCourse(request);
+
+	const bare = await request.post(url, {
+		headers,
+		data: { slug: "bare", title: "Bare" },
+	});
+	expect((await bare.json()).allowCodeRun).toBeNull();
+
+	for (const [slug, value] of [
+		["on", true],
+		["off", false],
+	] as const) {
+		const res = await request.post(url, {
+			headers,
+			data: { slug, title: slug, allowCodeRun: value },
+		});
+		expect((await res.json()).allowCodeRun).toBe(value);
+		const read = await request.get(`${url}/${slug}`, { headers });
+		expect((await read.json()).allowCodeRun).toBe(value);
+	}
+});
+
+test("PATCH changes allowCodeRun, null resets it and an absent field keeps it", async ({
+	request,
+}) => {
+	const { url, headers } = await makeCourse(request);
+	await request.post(url, { headers, data: { slug: "e", title: "E" } });
+	const patch = async (data: object) =>
+		(await (await request.patch(`${url}/e`, { headers, data })).json())
+			.allowCodeRun;
+
+	expect(await patch({ allowCodeRun: true })).toBe(true);
+	expect(await patch({ title: "Renamed" })).toBe(true);
+	expect(await patch({ allowCodeRun: false })).toBe(false);
+	expect(await patch({ allowCodeRun: null })).toBeNull();
+});
+
+test("OpenAPI documents allowCodeRun on the exam", async ({ request }) => {
+	const doc = await (await request.get("/openapi.json")).json();
+	expect(JSON.stringify(doc.components.schemas)).toContain("allowCodeRun");
+});
+
 test("OpenAPI list operation documents exams but no course keys", async ({
 	request,
 }) => {

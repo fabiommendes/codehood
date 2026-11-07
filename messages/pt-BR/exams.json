@@ -214,5 +214,9 @@
 	"exams_attempt_edit_exception": "Editar exceção",
 	"exams_attempt_reopen": "Reabrir tentativa",
 	"exams_detail_duration_personal": "Duração: {duration} + {extra} para você",
-	"exams_detail_new_date": "Nova data: {date}"
+	"exams_detail_new_date": "Nova data: {date}",
+	"exams_detail_code_run_on_default": "Execução de código: ligada (padrão de {type})",
+	"exams_detail_code_run_off_default": "Execução de código: desligada (padrão de {type})",
+	"exams_detail_code_run_on_exam": "Execução de código: ligada (definida no exam)",
+	"exams_detail_code_run_off_exam": "Execução de código: desligada (definida no exam)"
 }

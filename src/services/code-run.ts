@@ -33,8 +33,11 @@ export interface EffectiveCodeRun {
  * effectiveCodeRun({ type: "PRACTICE", allowCodeRun: null }); // { allowed: true, source: "default" }
  * effectiveCodeRun({ type: "EXAM", allowCodeRun: true }); // { allowed: true, source: "exam" }
  */
-export function effectiveCodeRun(_exam: CodeRunSetting): EffectiveCodeRun {
-	throw new Error("not implemented");
+export function effectiveCodeRun(exam: CodeRunSetting): EffectiveCodeRun {
+	if (exam.allowCodeRun !== null) {
+		return { allowed: exam.allowCodeRun, source: "exam" };
+	}
+	return { allowed: exam.type === "PRACTICE", source: "default" };
 }
 
 /**
@@ -43,6 +46,6 @@ export function effectiveCodeRun(_exam: CodeRunSetting): EffectiveCodeRun {
  * Only answer mode asks: an instructor reviewing submissions can always run
  * them. Same as `effectiveCodeRun(exam).allowed`.
  */
-export function canRunCode(_exam: CodeRunSetting): boolean {
-	throw new Error("not implemented");
+export function canRunCode(exam: CodeRunSetting): boolean {
+	return effectiveCodeRun(exam).allowed;
 }

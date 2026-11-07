@@ -60,6 +60,9 @@ export const examSchema = z.object({
 	duration: duration.nullable(),
 	extraTime: duration.nullable(),
 
+	/// Whether students may run code in answer mode. Null follows the exam type.
+	allowCodeRun: z.boolean().nullable(),
+
 	/// When the instructor released an `EXAM`'s grades. Read-only here.
 	gradesReleasedAt: z.date().nullable(),
 
@@ -93,6 +96,7 @@ export const examCreate = examSchema
 		preamble: z.string().nullish(),
 		scheduledAt: instant.nullish(),
 		duration: examDuration.nullish(),
+		allowCodeRun: z.boolean().nullish(),
 		rev: rev.nullish(),
 
 		tags: z.array(z.string().min(1)).optional(),

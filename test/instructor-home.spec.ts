@@ -46,6 +46,7 @@ function exam(overrides: Partial<Exam> = {}): Exam {
 		scheduledAt: null,
 		duration: null,
 		extraTime: null,
+		allowCodeRun: null,
 		gradesReleasedAt: null,
 		author: "instructor",
 		rev: null,

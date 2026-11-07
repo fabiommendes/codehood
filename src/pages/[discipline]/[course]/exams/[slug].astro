@@ -17,6 +17,7 @@ import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { shufflePool } from "@/mdq/shuffle";
+import { effectiveCodeRun } from "@/services/code-run";
 import { examResult } from "@/services/exam-result";
 import {
 	attemptOf,
@@ -238,6 +239,16 @@ const pendingAnswers = resultRows.reduce((sum, row) => sum + row.pending, 0);
 // The student's own extra time, which the exam's line shows next to its duration.
 const personalExtra = ownException?.extraTime ?? null;
 
+const codeRun = effectiveCodeRun(exam);
+const codeRunLabel =
+	codeRun.source === "exam"
+		? codeRun.allowed
+			? m.exams_detail_code_run_on_exam()
+			: m.exams_detail_code_run_off_exam()
+		: codeRun.allowed
+			? m.exams_detail_code_run_on_default({ type: exam.type })
+			: m.exams_detail_code_run_off_default({ type: exam.type });
+
 // One line under the title: what the exam is, when, and how long.
 const meta = [
 	examTypeLabels[exam.type],
@@ -380,6 +391,7 @@ for (const submission of attempt?.submissions ?? []) {
       <div>
         <h2 class="text-2xl font-bold">{exam.title}</h2>
         <p class="mt-1 text-sm text-muted">{meta.join(" · ")}</p>
+        <p class="mt-1 text-sm text-muted" data-testid="code-run-setting">{codeRunLabel}</p>
       </div>
       <span class:list={["badge badge-sm mt-1.5 shrink-0", badge.className]}>{badge.label}</span>
     </div>

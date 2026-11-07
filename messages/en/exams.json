@@ -214,5 +214,9 @@
 	"exams_attempt_edit_exception": "Edit exception",
 	"exams_attempt_reopen": "Reopen attempt",
 	"exams_detail_duration_personal": "Duration: {duration} + {extra} for you",
-	"exams_detail_new_date": "New date: {date}"
+	"exams_detail_new_date": "New date: {date}",
+	"exams_detail_code_run_on_default": "Code execution: on ({type} default)",
+	"exams_detail_code_run_off_default": "Code execution: off ({type} default)",
+	"exams_detail_code_run_on_exam": "Code execution: on (set in the exam)",
+	"exams_detail_code_run_off_exam": "Code execution: off (set in the exam)"
 }

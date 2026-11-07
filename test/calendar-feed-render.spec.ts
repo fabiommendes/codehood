@@ -78,6 +78,7 @@ function examEntry(overrides: Partial<Exam> = {}): CalendarEntry {
 		scheduledAt: START,
 		duration: { hours: 1, minutes: 30 },
 		extraTime: null,
+		allowCodeRun: null,
 		gradesReleasedAt: null,
 		author: "ada",
 		rev: null,

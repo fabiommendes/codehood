@@ -1130,6 +1130,9 @@ model Exam {
 
   scheduledAt DateTime?
   durationMs  Int?
+  /// Whether students may run code in answer mode. Null follows the exam
+  /// type: on for PRACTICE, off for QUIZ and EXAM. Review mode ignores it.
+  allowCodeRun Boolean?
   /// Extra time granted on top of durationMs, extending the window for every
   /// student alike (src/services/exam-state.ts). Server-side state the course
   /// repository must not set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
