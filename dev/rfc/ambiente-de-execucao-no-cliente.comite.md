@@ -464,3 +464,14 @@ O Pyodide 314.0.7 traz `pyodide.asm.mjs` (não `.js`); `RUNTIMES` lista o
 Votos da rodada 11: **V1 (b) unânime.** `swipl-wasm@8.2.6` agora; trocar
 por 8.3.0 depois de 2026-11-13 num commit separado. A E3b.1 verifica que o
 8.2.6 é build sem pthreads e aceita o patch `export default SWIPL`.
+
+### Rodada 12: E3a com WebKit pendente
+
+Validação cross-browser (ef8a1eb, issue `runner-firefox-safari`): Chromium
+ok; Firefox ok exceto dois bugs (stdin `none` a partir do 2º frame; link do
+terminal não abre), em correção. WebKit não roda neste host: faltam
+bibliotecas de sistema (`sudo playwright install-deps`), ação só do humano.
+
+- **W1.** Implementar a E3a agora, com Chromium e Firefox validados, e
+  manter a issue aberta: a E3a não é considerada pronta para uso em prova
+  até o WebKit (Safari/iPhone) ser validado pelo humano. Presidente: sim.
