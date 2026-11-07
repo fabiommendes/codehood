@@ -228,10 +228,9 @@ Chromium do Playwright 1.62.1 (151) suporta `Document-Isolation-Policy`.
   0011/0012) ou UI web. Presidente: seguir a mesma via dos demais campos de
   configuração do exam hoje, sem criar caminho novo.
 
-Observação do presidente: `tsc` acusa 57 erros de tipos branded em
-`src/db/services/` já no `HEAD` de `main` (1acec21), fora deste trabalho.
-Linha de base: entregas não podem aumentar a contagem nem tocar esses
-arquivos sem necessidade.
+Observação do presidente: os 57 erros de `tsc` vistos no worktree eram
+ambientais (faltava `scripts/brand-generated-types.ts` depois do
+`prisma generate`); corrigido, `tsc` zera.
 
 Votos da rodada 5: **D2 unânime (sim). D3 unânime**: o campo
 `allowCodeRun` só existe no repositório (CLI, `examCreate`/`examUpdate`),
