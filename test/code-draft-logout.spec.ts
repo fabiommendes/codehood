@@ -143,9 +143,7 @@ test("a centered page opened by another user removes the previous user's drafts"
 		[key(student.username), key("someone-else"), value],
 	);
 	await page.goto("/check-in");
-	await expect
-		.poll(() => draftKeys(page))
-		.toEqual([key(student.username)]);
+	await expect.poll(() => draftKeys(page)).toEqual([key(student.username)]);
 });
 
 test("a page raises no script error when the browser blocks localStorage", async ({

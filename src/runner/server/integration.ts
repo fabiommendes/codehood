@@ -111,10 +111,12 @@ export async function buildModule(
 		minify: true,
 		logLevel: "silent",
 		plugins: [
-			restrictImports(root, (file) =>
-				MODULE_PACKAGES.some((pkg) =>
-					file.includes(`${sep}node_modules${sep}${pkg}${sep}`),
-				),
+			restrictImports(
+				root,
+				(file) =>
+					MODULE_PACKAGES.some((pkg) =>
+						file.includes(`${sep}node_modules${sep}${pkg}${sep}`),
+					),
 				MODULE_PACKAGES.join(", "),
 			),
 		],
