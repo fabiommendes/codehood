@@ -279,8 +279,18 @@ test("student: run a code example", async ({ page }) => {
 	await persistedResourceFactory.create({
 		course: course.id,
 		slug: "run-static",
-		title: "static.py",
-		data: { type: "CODE", language: "python", content: "print('hi')\n" },
+		title: "static.hs",
+		data: { type: "CODE", language: "haskell", content: "main = print 1\n" },
+	});
+	await persistedResourceFactory.create({
+		course: course.id,
+		slug: "run-greet-py",
+		title: "greet.py",
+		data: {
+			type: "CODE",
+			language: "python",
+			content: 'name = input("Name? ")\nprint("Hello, " + name + "!")\n',
+		},
 	});
 	await logInAs(page, student);
 
@@ -304,9 +314,23 @@ test("student: run a code example", async ({ page }) => {
 		await expect(widget).toHaveAttribute("data-phase", "done");
 	});
 
+	await test.step("a Python example runs the same way", async () => {
+		await page.goto(`${hrefOf(course)}/resources/run-greet-py`);
+		await widget.locator("[data-action=run]").click();
+		await expect(widget).toHaveAttribute("data-phase", "waiting-input", {
+			timeout: 60_000,
+		});
+		await page.keyboard.type("Grace");
+		await page.keyboard.press("Enter");
+		await expect(
+			widget.locator("[data-terminal] .xterm-accessibility-tree"),
+		).toContainText("Hello, Grace!");
+		await expect(widget).toHaveAttribute("data-phase", "done");
+	});
+
 	await test.step("an example in a language without a runner stays plain text", async () => {
 		await page.goto(`${hrefOf(course)}/resources/run-static`);
-		await expect(page.getByText("print('hi')")).toBeVisible();
+		await expect(page.getByText("main = print 1")).toBeVisible();
 		await expect(widget).toHaveCount(0);
 		await expect(page.locator("[data-action=run]")).toHaveCount(0);
 	});

@@ -129,7 +129,7 @@ that looks like the site is broken.
     status: implemented
     url: /[discipline]/[course]/resources/[slug]
 
-Student opens a JavaScript code example in the course resources and runs it
+Student opens a JavaScript or Python code example in the course resources and runs it
 right there, without installing anything. The output appears in a terminal under
 the code. When the program asks for input, they type a line in the terminal and
 the program carries on. They can change the code and run it again, or go back to

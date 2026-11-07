@@ -353,9 +353,50 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 				type: "CODE",
 				language: "python",
 				content:
-					"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n",
+					"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)\n\n\nprint(factorial(5))\n",
 			},
 			rev: "demo-factorial-v1",
+		},
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "prolog-factorial",
+			title: "factorial.pl",
+			description: "Consulted on Run; then query it at the Prolog prompt.",
+			data: {
+				type: "CODE",
+				language: "prolog",
+				content: [
+					"factorial(0, 1).",
+					"factorial(N, F) :-",
+					"    N > 0,",
+					"    M is N - 1,",
+					"    factorial(M, G),",
+					"    F is N * G.",
+					"",
+					":- factorial(5, F), format('5! = ~w~n', [F]).",
+					"",
+				].join("\n"),
+			},
+			rev: "demo-prolog-factorial-v1",
+		},
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "python-greet",
+			title: "greet.py",
+			description: "Reads a name with input() and greets it.",
+			data: {
+				type: "CODE",
+				language: "python",
+				content:
+					'name = input("What is your name? ")\nprint("Hello, " + name + "!")\n',
+			},
+			rev: "demo-python-greet-v1",
 		},
 		FULL_ACCESS,
 	);
@@ -1162,6 +1203,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		cohort,
 	);
 	await seedOpenQuiz(cs101.id);
+	await seedCodeAnswerExams(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
 		hopper,
@@ -1931,6 +1973,78 @@ async function seedReleasedQuiz(
 				3,
 				14 * 60,
 			),
+		},
+		FULL_ACCESS,
+	);
+}
+
+/**
+ * Seeds three open exams with the same JavaScript code question, one per way
+ * the code-run setting can come out.
+ *
+ * `practice-js` runs code by the PRACTICE default, `quiz-js` does not run it
+ * by the QUIZ default, and `test-js` is an EXAM that turns it on explicitly.
+ */
+async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
+	await db.question.create(
+		{
+			course,
+			slug: "js-sum-of-evens",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Sum of the even numbers",
+				stem: "Write a program that prints the sum of the even numbers from 1 to 100.\n\nStart from [the loop reference](https://developer.mozilla.org/docs/Web/JavaScript/Guide/Loops_and_iteration).",
+				epilogue:
+					"Print only the number. Anything else on the output is ignored.",
+				tags: ["javascript"],
+				content: "code",
+				highlight: "javascript",
+			},
+		},
+		FULL_ACCESS,
+	);
+	const questions = [{ slug: "js-sum-of-evens", version: "v1" }];
+	await db.exam.create(
+		{
+			course,
+			slug: "practice-js",
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Practice: JavaScript loops",
+			description: "Code runs in the browser by the practice default.",
+			tags: ["javascript", "practice"],
+			questions,
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: "quiz-js",
+			type: "QUIZ",
+			status: "ONGOING",
+			title: "Quiz: JavaScript loops",
+			description: "Running code is off by the quiz default.",
+			duration: { minutes: 30 },
+			tags: ["javascript"],
+			questions,
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: "test-js",
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test: JavaScript loops",
+			description: "A graded exam that allows running code.",
+			duration: { hours: 1 },
+			allowCodeRun: true,
+			tags: ["javascript"],
+			questions,
 		},
 		FULL_ACCESS,
 	);
