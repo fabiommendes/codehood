@@ -1236,6 +1236,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
+	await seedRunnableCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
 	await seedRubricExam(
 		cs101.id,
 		ada,
@@ -2453,6 +2454,96 @@ async function seedCodeExam(
 		},
 		FULL_ACCESS,
 	);
+
+	await db.exam.update(
+		{ course, slug: exam },
+		{ status: "COMPLETED" },
+		FULL_ACCESS,
+	);
+}
+
+/**
+ * Closes an exam with a JavaScript and a Python code question, so the grading
+ * page can run every kind of answer.
+ *
+ * JavaScript, one answer per student: correct, throws, loops forever, reads a
+ * line with `prompt`. Python: correct, a `NameError`, a long output, a loop
+ * that never ends. All of them wait for a grade.
+ */
+async function seedRunnableCodeExam(
+	course: Course["id"],
+	students: { hopper: User; hamilton: User; liskov: User; bob: User },
+): Promise<void> {
+	const exam = "test-runnable";
+	const js = "js-double-it";
+	const py = "py-count-up";
+
+	for (const question of [
+		{
+			slug: js,
+			title: "Double the number",
+			stem: "Read a number and print its double.",
+			language: "javascript",
+		},
+		{
+			slug: py,
+			title: "Count up",
+			stem: "Print the numbers from 1 to `n`, one per line, where `n` is read from the input.",
+			language: "python",
+		},
+	]) {
+		await db.question.create(
+			{
+				course,
+				slug: question.slug,
+				status: "PUBLISHED",
+				version: "v1",
+				question: {
+					type: "essay",
+					title: question.title,
+					stem: question.stem,
+					tags: [question.language],
+					content: "code",
+					highlight: question.language,
+				},
+			},
+			FULL_ACCESS,
+		);
+	}
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 8: runnable answers",
+			description:
+				"Code answers the grader can run: they work, fail, loop and ask for input.",
+			tags: ["javascript", "python"],
+			questions: [
+				{ slug: js, version: "v1" },
+				{ slug: py, version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+
+	await answerExam(course, exam, students.hopper, {
+		[js]: 'const n = Number(prompt("Number?"));\nconsole.log(n * 2);',
+		[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(i)",
+	});
+	await answerExam(course, exam, students.hamilton, {
+		[js]: 'const n = Number(prompt("Number?"));\nconsole.log(doubled(n));',
+		[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(j)",
+	});
+	await answerExam(course, exam, students.liskov, {
+		[js]: "let n = 1;\nwhile (true) {\n  n = n * 2;\n}",
+		[py]: "n = int(input())\nfor i in range(1, 200000):\n    print(f'line {i}: ' + 'x' * 40)",
+	});
+	await answerExam(course, exam, students.bob, {
+		[js]: 'console.log(Number(prompt("Number?")) * 2);',
+		[py]: "n = int(input())\ni = 1\nwhile True:\n    i += 1",
+	});
 
 	await db.exam.update(
 		{ course, slug: exam },

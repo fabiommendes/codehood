@@ -24,9 +24,11 @@ interface Props {
 	result?: ReviewResult;
 	/// The public id of the answer's submission; a code answer runs only with it.
 	submission?: string;
+	/// What the answer's card is called when moving between code answers; none hides it.
+	reviewLabel?: string;
 }
 
-const { question, payload, result, submission } = Astro.props;
+const { question, payload, result, submission, reviewLabel } = Astro.props;
 const shown = displayAnswer(
 	question.type,
 	payload,
@@ -64,6 +66,7 @@ const codeHtml =
       highlightedHtml={codeHtml}
       runnerOrigin={RUNNER_ORIGIN}
       submission={submission}
+      reviewLabel={reviewLabel}
       label={m.grades_answer_code_label()}
       compact
     />

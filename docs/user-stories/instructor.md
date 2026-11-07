@@ -288,6 +288,19 @@ the deadline they mark will-not-grade, which is distinct from a zero and from
 still being pending.
 
 
+### Run a student's code while grading
+
+    status: implemented
+
+Instructor grades a code question and does not want to run each answer by hand.
+The grading page shows the code highlighted, with a Run button when the
+language has a runner. The answer runs in the browser in a sandbox of its own,
+and moving to another answer replaces it. If the program asks for input, they
+type it in the terminal; a loop that never ends is cut with Stop. They can edit a
+copy to test a fix: it is marked as modified, lives only in the page and goes
+away with Back to submission. Running never changes the grade or the comment.
+
+
 ### Answer regrade requests
 
     status: implemented

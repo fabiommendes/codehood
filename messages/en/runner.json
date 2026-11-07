@@ -47,5 +47,9 @@
 	"runner_back_to_submission": "Back to submission",
 	"runner_modified": "modified",
 	"runner_copy_hint": "A copy in memory; the submission does not change.",
-	"runner_modified_output": "output of the modified copy"
+	"runner_modified_output": "output of the modified copy",
+	"runner_review_previous": "Previous answer with code",
+	"runner_review_next": "Next answer with code",
+	"runner_review_position": "{n} of {total}",
+	"runner_review_hint": "New sandbox for each submission. Running never changes the grade."
 }

@@ -212,3 +212,25 @@ test("the copy of a card stays after running another card", async ({
 	await run(first);
 	await expect(terminalText(first)).toContainText("kept");
 });
+
+test("the arrows move between cards, set the anchor and focus Run", async ({
+	page,
+}) => {
+	await open(page);
+	const first = widget(page, 0);
+	await expect(first.locator("[data-role=position]")).toHaveText("1 of 3");
+	await expect(first.locator("[data-role=review-label]")).toHaveText(
+		"Submission A",
+	);
+	await expect(first.locator("[data-action=previous]")).toBeDisabled();
+	await first.locator("[data-action=next]").click();
+	await expect(page).toHaveURL(/#answer-sub-b$/);
+	await expect(widget(page, 1).locator("[data-action=run]")).toBeFocused();
+	await widget(page, 1).locator("[data-action=next]").click();
+	await expect(page).toHaveURL(/#answer-sub-c$/);
+	await expect(widget(page, 2).locator("[data-action=next]")).toBeDisabled();
+	await widget(page, 2).locator("[data-action=previous]").click();
+	await expect(widget(page, 1).locator("[data-action=run]")).toBeFocused();
+	// Moving runs nothing and creates no frame.
+	await expect(frames(page)).toHaveCount(0);
+});

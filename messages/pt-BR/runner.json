@@ -47,5 +47,9 @@
 	"runner_back_to_submission": "Voltar à submissão",
 	"runner_modified": "modificado",
 	"runner_copy_hint": "Uma cópia na memória; a submissão não muda.",
-	"runner_modified_output": "saída da cópia modificada"
+	"runner_modified_output": "saída da cópia modificada",
+	"runner_review_previous": "Resposta anterior com código",
+	"runner_review_next": "Próxima resposta com código",
+	"runner_review_position": "{n} de {total}",
+	"runner_review_hint": "Sandbox novo a cada submissão. Executar nunca mexe na nota."
 }

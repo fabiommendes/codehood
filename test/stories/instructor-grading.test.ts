@@ -990,3 +990,170 @@ test("instructor: answer regrade requests", async ({ page }) => {
 		await expect(page.getByText("Regrade accepted")).toBeVisible();
 	});
 });
+
+test("instructor: run a student's code while grading", async ({ page }) => {
+	const teacher = await seedUser({ role: "INSTRUCTOR", username: "run-prof" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	await db.question.create(
+		{
+			course: course.id,
+			slug: "q-double",
+			status: "PUBLISHED",
+			version: "1",
+			question: {
+				type: "essay",
+				title: "Double it",
+				stem: "Read a number and print its double.",
+				content: "code",
+				highlight: "javascript",
+			},
+		},
+		FULL_ACCESS,
+	);
+	const exam = await persistedExamFactory.create({
+		course: course.id,
+		slug: "run-exam",
+		title: "Run exam",
+		type: "EXAM",
+		status: "ONGOING",
+		questions: [{ slug: "q-double" }],
+	});
+	const programs = {
+		correct: 'console.log(Number(prompt("Number?")) * 2); // correct',
+		crash: 'throw new Error("boom"); // crash',
+		loop: "while (true) {} // loop",
+		reads: 'console.log(prompt("Name?")); // reads',
+	};
+	for (const [i, code] of Object.values(programs).entries()) {
+		const student = await seedUser({
+			role: "STUDENT",
+			username: `run-student-${i + 1}`,
+			name: `Runner Student ${i + 1}`,
+		});
+		await db.enrollment.create(
+			{ course: course.id, username: student.username },
+			FULL_ACCESS,
+		);
+		await db.response.submit(
+			{
+				course: course.id,
+				exam: exam.slug,
+				question: "q-double",
+				payload: code,
+			},
+			{ actor: student },
+		);
+		await db.response.finish(
+			{ course: course.id, exam: exam.slug },
+			{ actor: student },
+		);
+	}
+	await prisma.exam.update({
+		where: { id: exam.id },
+		data: { status: "COMPLETED" },
+	});
+	await logInAs(page, teacher);
+	const widgets = page.locator("[data-code-runner][data-mode=review]");
+	const widgetOf = (marker: string) => widgets.filter({ hasText: marker });
+	const terminal = (marker: string) =>
+		widgetOf(marker).locator("[data-terminal] .xterm-accessibility-tree");
+
+	await test.step("the grading page shows each answer highlighted, named by number", async () => {
+		await page.goto(`${href}/exams/${exam.slug}/grading/q-double`);
+
+		await expect(widgets).toHaveCount(4);
+		await expect(page.getByText("Runner Student 1")).toHaveCount(0);
+		await expect(widgetOf("// correct").locator(".shiki")).toBeVisible();
+	});
+
+	await test.step("a program that asks for input gets it from the terminal", async () => {
+		const widget = widgetOf("// correct");
+		await widget.scrollIntoViewIfNeeded();
+		await expect(
+			widget.locator("xpath=ancestor::astro-island"),
+		).not.toHaveAttribute("ssr", "");
+		await widget.locator("[data-action=run]").click();
+		await expect(widget).toHaveAttribute("data-phase", "waiting-input");
+		await page.keyboard.type("21");
+		await page.keyboard.press("Enter");
+		await expect(terminal("// correct")).toContainText("42");
+		await expect(widget).toHaveAttribute("data-phase", "done");
+	});
+
+	await test.step("an answer that throws shows its error, without touching the others", async () => {
+		const widget = widgetOf("// crash");
+		await widget.scrollIntoViewIfNeeded();
+		await widget.locator("[data-action=run]").click();
+		await expect(widget).toHaveAttribute("data-phase", "error");
+		await expect(terminal("// crash")).toContainText("boom");
+	});
+
+	await test.step("a loop that never ends is cut with Stop", async () => {
+		const widget = widgetOf("// loop");
+		await widget.scrollIntoViewIfNeeded();
+		await widget.locator("[data-action=run]").click();
+		await expect(widget).toHaveAttribute("data-phase", "running");
+		await widget.locator("[data-action=stop]").click();
+		await expect(widget).toHaveAttribute("data-phase", "stopped", {
+			timeout: 5000,
+		});
+	});
+
+	await test.step("an edited copy is marked modified and goes away with Back to submission", async () => {
+		// The filter by text stops matching once the copy is edited, so pin the widget by its submission.
+		const id = await widgetOf("// crash").getAttribute("data-submission");
+		const widget = page.locator(`[data-code-runner][data-submission="${id}"]`);
+		await widget.scrollIntoViewIfNeeded();
+		await widget.locator("[data-action=edit]").click();
+		await widget.locator(".cm-content").fill('console.log("fixed");');
+		await expect(widget.locator("[data-role=modified]")).toBeVisible();
+		await widget.locator("[data-action=run]").click();
+		await expect(
+			widget.locator("[data-status] [data-run-modified]"),
+		).toBeVisible();
+		await expect(
+			widget.locator("[data-terminal] .xterm-accessibility-tree"),
+		).toContainText("fixed");
+		await widget.locator("[data-action=back]").click();
+		await expect(widget.locator("[data-role=modified]")).toHaveCount(0);
+		await expect(widget.locator(".cm-content")).toContainText("boom");
+	});
+
+	await test.step("the arrows move to the next answer with code and focus its Run button", async () => {
+		const first = widgets.first();
+		await first.scrollIntoViewIfNeeded();
+		await expect(first.locator("[data-role=position]")).toHaveText("1 of 4");
+		await expect(first.locator("[data-role=review-label]")).toHaveText(
+			/^Answer \d$/,
+		);
+		await first.locator("[data-action=next]").click();
+
+		await expect(widgets.nth(1).locator("[data-action=run]")).toBeFocused();
+		await expect(page).toHaveURL(/#answer-/);
+		await expect(widgets.nth(1).locator("[data-role=position]")).toHaveText(
+			"2 of 4",
+		);
+		await widgets.nth(1).locator("[data-action=previous]").click();
+		await expect(first.locator("[data-action=run]")).toBeFocused();
+	});
+
+	await test.step("showing names labels the answers with the students", async () => {
+		await page.getByRole("switch", { name: "Show names" }).click();
+
+		await expect(widgets).toHaveCount(4);
+		await expect(
+			widgets.first().locator("[data-role=review-label]"),
+		).toHaveText(/^Runner Student \d$/);
+	});
+
+	await test.step("nothing was graded by running", async () => {
+		expect(await prisma.feedback.count()).toBe(0);
+	});
+});

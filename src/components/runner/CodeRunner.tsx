@@ -76,6 +76,8 @@ export interface CodeRunnerProps {
 	/// Review mode: the public id of the submission, as `runForSubmission`
 	/// takes it. A run of another submission gets a new sandbox.
 	submission?: string;
+	/// Review mode: what the card is called in the navigation, "Answer 3" or a student's name.
+	reviewLabel?: string;
 	/// Shorter editor and terminal hidden until the first run (lists, exams).
 	compact?: boolean;
 	/// Extra controls at the start of the toolbar (review: submission navigation).
@@ -87,6 +89,15 @@ export interface CodeRunnerProps {
 /// Counts the Run clicks of review widgets on this page, so a click made
 /// while an earlier one still loads the terminal wins over it.
 let reviewClicks = 0;
+
+/// The review widgets of the page, in document order.
+function reviewWidgets(): HTMLElement[] {
+	return [
+		...document.querySelectorAll<HTMLElement>(
+			"[data-code-runner][data-mode=review]",
+		),
+	];
+}
 
 /// How long "Preparing…" shows before it becomes "Still loading…".
 const SLOW_PREPARING_MS = 3000;
@@ -174,6 +185,11 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const [editorReady, setEditorReady] = createSignal(false);
 	/// The last run started from a modified copy (review mode).
 	const [runModified, setRunModified] = createSignal(false);
+	/// Review mode: position among the review widgets of the page, known once mounted.
+	const [position, setPosition] = createSignal<{
+		index: number;
+		total: number;
+	} | null>(null);
 	const [terminalShown, setTerminalShown] = createSignal(!props.compact);
 	const [terminalReady, setTerminalReady] = createSignal(false);
 	const [coarse, setCoarse] = createSignal(false);
@@ -181,6 +197,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	/// Pixels the on-screen keyboard covers at the bottom of the layout viewport.
 	const [keyboardInset, setKeyboardInset] = createSignal(0);
 
+	let root!: HTMLDivElement;
 	let editorParent!: HTMLDivElement;
 	let terminalParent!: HTMLDivElement;
 	let lineInput: HTMLInputElement | undefined;
@@ -267,6 +284,15 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		setCode(original);
 		editor?.setCode(original);
 		if (props.mode === "answer") props.onChange?.(original);
+	};
+
+	/// Review mode: scrolls to the card of the previous or next review widget and focuses its Run button.
+	const go = (step: -1 | 1) => {
+		const target = reviewWidgets()[(position()?.index ?? 0) + step];
+		const card = target?.closest<HTMLElement>("[id^=answer-]");
+		if (!target || !card) return;
+		location.hash = card.id;
+		target.querySelector<HTMLButtonElement>("[data-action=run]")?.focus();
 	};
 
 	/// Review mode: discards the copy and shows the submission again, read-only.
@@ -435,6 +461,10 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 
 	onMount(() => {
 		setCoarse(window.matchMedia("(pointer: coarse)").matches);
+		if (review()) {
+			const widgets = reviewWidgets();
+			setPosition({ index: widgets.indexOf(root), total: widgets.length });
+		}
 		if (props.mode === "answer") void ensureEditor(false);
 	});
 
@@ -517,13 +547,62 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 
 	return (
 		<div
+			ref={root}
 			class="overflow-hidden rounded-box border border-base-300 bg-base-100"
 			data-code-runner
+			data-submission={props.submission}
 			data-mode={props.mode}
 			data-phase={state().phase}
 		>
 			<div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/50 px-3 py-1.5">
 				{props.toolbar}
+				<Show when={position()}>
+					{(at) => (
+						<Show when={at().total > 1}>
+							<div class="flex items-center gap-1" data-review-nav>
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs"
+									data-action="previous"
+									aria-label={m.runner_review_previous()}
+									disabled={at().index <= 0}
+									onClick={() => go(-1)}
+								>
+									‹
+								</button>
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs"
+									data-action="next"
+									aria-label={m.runner_review_next()}
+									disabled={at().index >= at().total - 1}
+									onClick={() => go(1)}
+								>
+									›
+								</button>
+								<span class="text-xs tabular-nums" data-role="position">
+									{m.runner_review_position({
+										n: String(at().index + 1),
+										total: String(at().total),
+									})}
+								</span>
+								<Show when={props.reviewLabel}>
+									<span class="text-xs font-semibold" data-role="review-label">
+										{props.reviewLabel}
+									</span>
+								</Show>
+							</div>
+						</Show>
+					)}
+				</Show>
+				<Show when={review()}>
+					<span
+						class="hidden text-xs text-muted lg:inline"
+						data-role="review-hint"
+					>
+						{m.runner_review_hint()}
+					</span>
+				</Show>
 				<span class="font-mono text-xs">{filename()}</span>
 				<span class="badge badge-ghost badge-xs">
 					{LANGUAGE_LABELS[props.language]()}
