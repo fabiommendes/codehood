@@ -7,12 +7,16 @@
  * `runnerToAppMessage`.
  */
 
-import type {
-	ExitMessage,
-	LanguageId,
-	RunMode,
-	RunState,
-	StdinKind,
+import {
+	type AppToRunnerMessage,
+	type ExitMessage,
+	type LanguageId,
+	RUNNER_PROTOCOL_VERSION,
+	type RunMode,
+	type RunnerToAppMessage,
+	type RunState,
+	runnerToAppMessage,
+	type StdinKind,
 } from "./protocol";
 
 /** What the runner frame of this page can do, from its `ready` message. */
@@ -72,6 +76,26 @@ export class RunnerUnavailable extends Error {
 /// How long the host waits for the frame's `ready`.
 export const READY_TIMEOUT_MS = 15_000;
 
+/// Hosts created by `RunnerHost.shared`, one per runner origin of this page.
+const sharedHosts = new Map<string, RunnerHost>();
+
+/// One iframe load: its element and the outcome of waiting for its `ready`.
+interface FrameState {
+	iframe: HTMLIFrameElement;
+	ready: Promise<RunnerCapabilities>;
+	settled: boolean;
+	timer: ReturnType<typeof setTimeout> | undefined;
+	resolve(capabilities: RunnerCapabilities): void;
+	reject(error: RunnerUnavailable): void;
+}
+
+/// A run the host sent and has not seen exit.
+interface ActiveRun {
+	handlers: RunHandlers;
+	done: Promise<RunExit>;
+	finish(exit: RunExit): void;
+}
+
 /**
  * The page's runner iframe and its runs.
  *
@@ -84,13 +108,31 @@ export const READY_TIMEOUT_MS = 15_000;
  * const exit = await run.done;
  */
 export class RunnerHost {
+	/// Origin of the runner, normalized.
+	private readonly origin: string;
+	private readonly isExclusive: boolean;
+	private frame: FrameState | null = null;
+	private readonly runs = new Map<string, ActiveRun>();
+
+	private constructor(runnerOrigin: string, exclusive: boolean) {
+		this.origin = new URL(runnerOrigin).origin;
+		this.isExclusive = exclusive;
+		window.addEventListener("message", (event) => this.onMessage(event));
+	}
+
 	/**
 	 * Returns the page's host for `runnerOrigin`, creating it on first call.
 	 *
 	 * Creating it appends nothing yet: the iframe is added on the first `ready()` or `run()`.
 	 */
-	static shared(_runnerOrigin: string): RunnerHost {
-		throw new Error("not implemented");
+	static shared(runnerOrigin: string): RunnerHost {
+		const origin = new URL(runnerOrigin).origin;
+		let host = sharedHosts.get(origin);
+		if (!host) {
+			host = new RunnerHost(origin, false);
+			sharedHosts.set(origin, host);
+		}
+		return host;
 	}
 
 	/**
@@ -100,8 +142,8 @@ export class RunnerHost {
 	 * progress before starting the next, and the frame refuses a second
 	 * concurrent run on its own.
 	 */
-	static exclusive(_runnerOrigin: string): RunnerHost {
-		throw new Error("not implemented");
+	static exclusive(runnerOrigin: string): RunnerHost {
+		return new RunnerHost(runnerOrigin, true);
 	}
 
 	/**
@@ -110,7 +152,7 @@ export class RunnerHost {
 	 * @throws {RunnerUnavailable} when the frame does not become ready or cannot run code.
 	 */
 	ready(): Promise<RunnerCapabilities> {
-		throw new Error("not implemented");
+		return (this.frame ?? this.createFrame()).ready;
 	}
 
 	/**
@@ -121,8 +163,15 @@ export class RunnerHost {
 	 * the iframe if needed; does nothing when the runner is unavailable.
 	 * Never throws.
 	 */
-	prepare(_language: LanguageId): void {
-		throw new Error("not implemented");
+	prepare(language: LanguageId): void {
+		try {
+			this.ready().then(
+				() => this.post({ type: "prepare", language }),
+				() => {},
+			);
+		} catch {
+			// Nothing to prepare without an iframe.
+		}
 	}
 
 	/**
@@ -130,8 +179,43 @@ export class RunnerHost {
 	 *
 	 * @throws {RunnerUnavailable} as `ready()` does.
 	 */
-	run(_request: RunRequest, _handlers: RunHandlers): Promise<RunHandle> {
-		throw new Error("not implemented");
+	async run(request: RunRequest, handlers: RunHandlers): Promise<RunHandle> {
+		await this.ready();
+		if (this.isExclusive) {
+			const previous = [...this.runs.entries()];
+			for (const [runId] of previous) this.post({ type: "stop", runId });
+			await Promise.all(previous.map(([, run]) => run.done));
+		}
+		const runId = crypto.randomUUID();
+		let finish: (exit: RunExit) => void = () => {};
+		const done = new Promise<RunExit>((resolve) => {
+			finish = resolve;
+		});
+		this.runs.set(runId, { handlers, done, finish });
+		this.post({
+			type: "run",
+			runId,
+			language: request.language,
+			mode: request.mode,
+			files: request.files,
+			entry: request.entry,
+			...(request.maxOutputBytes === undefined
+				? {}
+				: { maxOutputBytes: request.maxOutputBytes }),
+		});
+		return {
+			runId,
+			done,
+			sendLine: (line) => {
+				if (this.runs.has(runId)) this.post({ type: "stdin", runId, line });
+			},
+			sendEof: () => {
+				if (this.runs.has(runId)) this.post({ type: "stdin-eof", runId });
+			},
+			stop: () => {
+				if (this.runs.has(runId)) this.post({ type: "stop", runId });
+			},
+		};
 	}
 
 	/**
@@ -142,6 +226,118 @@ export class RunnerHost {
 	 * @throws {RunnerUnavailable} as `ready()` does.
 	 */
 	reload(): Promise<RunnerCapabilities> {
-		throw new Error("not implemented");
+		const old = this.frame;
+		for (const [runId, run] of [...this.runs]) {
+			this.runs.delete(runId);
+			run.finish({ reason: "stopped", code: null });
+		}
+		const fresh = this.createFrame();
+		if (old) {
+			clearTimeout(old.timer);
+			old.iframe.remove();
+			// Callers still waiting on the old frame get the new one's outcome.
+			if (!old.settled) fresh.ready.then(old.resolve, old.reject);
+		}
+		return fresh.ready;
+	}
+
+	private createFrame(): FrameState {
+		const iframe = document.createElement("iframe");
+		iframe.src = `${this.origin}/runner/frame${this.isExclusive ? "?exclusive=1" : ""}`;
+		iframe.title = "runner";
+		iframe.hidden = true;
+		iframe.tabIndex = -1;
+		iframe.setAttribute("aria-hidden", "true");
+		iframe.dataset.runnerFrame = this.isExclusive ? "exclusive" : "shared";
+		const state: FrameState = {
+			iframe,
+			settled: false,
+			timer: undefined,
+			ready: Promise.resolve({ stdin: "none", languages: [] }),
+			resolve: () => {},
+			reject: () => {},
+		};
+		state.ready = new Promise<RunnerCapabilities>((resolve, reject) => {
+			state.resolve = (capabilities) => {
+				state.settled = true;
+				clearTimeout(state.timer);
+				resolve(capabilities);
+			};
+			state.reject = (error) => {
+				state.settled = true;
+				clearTimeout(state.timer);
+				reject(error);
+			};
+		});
+		// A caller that never awaits `ready()` must not cause an unhandled rejection.
+		state.ready.catch(() => {});
+		state.timer = setTimeout(
+			() => state.reject(new RunnerUnavailable("timeout")),
+			READY_TIMEOUT_MS,
+		);
+		this.frame = state;
+		document.body.append(iframe);
+		return state;
+	}
+
+	private post(message: AppToRunnerMessage): void {
+		this.frame?.iframe.contentWindow?.postMessage(message, this.origin);
+	}
+
+	private onMessage(event: MessageEvent): void {
+		const frame = this.frame;
+		if (
+			!frame ||
+			event.origin !== this.origin ||
+			event.source === null ||
+			event.source !== frame.iframe.contentWindow
+		) {
+			return;
+		}
+		const data: unknown = event.data;
+		if (
+			typeof data === "object" &&
+			data !== null &&
+			(data as { type?: unknown }).type === "ready" &&
+			(data as { protocol?: unknown }).protocol !== RUNNER_PROTOCOL_VERSION
+		) {
+			if (!frame.settled) frame.reject(new RunnerUnavailable("protocol"));
+			return;
+		}
+		const parsed = runnerToAppMessage.safeParse(data);
+		if (parsed.success) this.dispatch(frame, parsed.data);
+	}
+
+	private dispatch(frame: FrameState, message: RunnerToAppMessage): void {
+		if (message.type === "ready") {
+			if (frame.settled) return;
+			if (message.stdin === "none") {
+				frame.reject(new RunnerUnavailable("unsupported"));
+			} else {
+				frame.resolve({ stdin: message.stdin, languages: message.languages });
+			}
+			return;
+		}
+		const run = this.runs.get(message.runId);
+		if (!run) return;
+		switch (message.type) {
+			case "status":
+				run.handlers.onStatus?.(message.state);
+				break;
+			case "progress":
+				run.handlers.onProgress?.(message.loaded, message.total);
+				break;
+			case "output":
+				run.handlers.onOutput?.(message.stream, message.text);
+				break;
+			case "exit":
+				this.runs.delete(message.runId);
+				run.finish({
+					reason: message.reason,
+					code: message.code,
+					message: message.message,
+				});
+				break;
+		}
 	}
 }

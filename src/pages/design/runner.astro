@@ -1,0 +1,275 @@
+---
+// Diagnostic page of the client-side runner: pick a driver, write code and
+// stdin, run and stop it, and watch status, output, the stdin transport in use
+// and timings. Meant for developers; the real editor and terminal come later.
+import PageKicker from "@/components/PageKicker.astro";
+import { RUNNER_ORIGIN } from "@/core/constants";
+import AppLayout from "@/layouts/AppLayout.astro";
+
+export const prerender = false;
+---
+
+<AppLayout title="Runner">
+  <main class="mx-auto max-w-4xl px-4 py-10" data-runner-origin={RUNNER_ORIGIN ?? ""}>
+    <div class="mb-6">
+      <PageKicker text="Diagnostics" />
+      <h1 class="text-3xl font-bold">Runner</h1>
+      <p class="mt-2 text-base-content/70">
+        Runs code in the sandboxed frame of the runner origin. Nothing here is
+        saved.
+      </p>
+    </div>
+
+    {
+      RUNNER_ORIGIN === null ? (
+        <div role="alert" class="alert alert-warning" id="runner-off">
+          A execução de código está desligada: esta instância não tem RUNNER_ORIGIN.
+        </div>
+      ) : (
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="form-control">
+              <span class="label-text mb-1 text-sm">Driver</span>
+              <select id="language" class="select select-bordered select-sm">
+                <option value="javascript">javascript</option>
+                <option value="fake">fake</option>
+              </select>
+            </label>
+            <label class="form-control">
+              <span class="label-text mb-1 text-sm">Mode</span>
+              <select id="mode" class="select select-bordered select-sm">
+                <option value="script">script</option>
+                <option value="repl">repl</option>
+              </select>
+            </label>
+            <button id="run" type="button" class="btn btn-primary btn-sm">
+              Run
+            </button>
+            <button id="stop" type="button" class="btn btn-sm" disabled>
+              Stop
+            </button>
+            <button id="reload" type="button" class="btn btn-ghost btn-sm">
+              Reload frame
+            </button>
+          </div>
+
+          <label class="form-control">
+            <span class="label-text mb-1 text-sm">Code</span>
+            <textarea
+              id="code"
+              class="textarea textarea-bordered h-48 w-full font-mono text-sm"
+              spellcheck="false"
+            />
+          </label>
+
+          <form id="stdin-form" class="flex items-end gap-2">
+            <label class="form-control grow">
+              <span class="label-text mb-1 text-sm">Stdin line</span>
+              <input
+                id="stdin"
+                type="text"
+                class="input input-bordered input-sm w-full font-mono"
+                autocomplete="off"
+                disabled
+              />
+            </label>
+            <button id="send" type="submit" class="btn btn-sm" disabled>
+              Send
+            </button>
+            <button id="eof" type="button" class="btn btn-sm" disabled>
+              EOF
+            </button>
+          </form>
+
+          <section>
+            <h2 class="mb-1 text-sm font-semibold">Output</h2>
+            <pre
+              id="output"
+              class="min-h-24 overflow-x-auto rounded-box border border-base-300 bg-base-200 p-3 font-mono text-sm whitespace-pre-wrap"
+              aria-live="polite"
+            />
+          </section>
+
+          <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
+            <dt class="text-base-content/60">Status</dt>
+            <dd id="status">idle</dd>
+            <dt class="text-base-content/60">Exit</dt>
+            <dd id="exit">-</dd>
+            <dt class="text-base-content/60">Stdin transport</dt>
+            <dd id="transport">connecting…</dd>
+            <dt class="text-base-content/60">Languages</dt>
+            <dd id="languages">-</dd>
+            <dt class="text-base-content/60">Frame ready</dt>
+            <dd id="t-ready">-</dd>
+            <dt class="text-base-content/60">Click to first status</dt>
+            <dd id="t-first">-</dd>
+            <dt class="text-base-content/60">Click to running</dt>
+            <dd id="t-running">-</dd>
+            <dt class="text-base-content/60">Click to exit</dt>
+            <dd id="t-exit">-</dd>
+          </dl>
+        </div>
+      )
+    }
+  </main>
+</AppLayout>
+
+<script>
+  import type { LanguageId, RunState } from "@/runner/protocol";
+  import {
+    type RunHandle,
+    RunnerHost,
+    RunnerUnavailable,
+  } from "@/runner/host";
+
+  const root = document.querySelector<HTMLElement>("[data-runner-origin]");
+  const origin = root?.dataset.runnerOrigin;
+
+  if (origin) {
+    const $ = <T extends HTMLElement>(id: string) =>
+      document.getElementById(id) as T;
+    const language = $<HTMLSelectElement>("language");
+    const mode = $<HTMLSelectElement>("mode");
+    const code = $<HTMLTextAreaElement>("code");
+    const stdin = $<HTMLInputElement>("stdin");
+    const output = $<HTMLPreElement>("output");
+    const runButton = $<HTMLButtonElement>("run");
+    const stopButton = $<HTMLButtonElement>("stop");
+    const sendButton = $<HTMLButtonElement>("send");
+    const eofButton = $<HTMLButtonElement>("eof");
+    const set = (id: string, text: string) => {
+      $(id).textContent = text;
+    };
+    const ms = (from: number) => `${Math.round(performance.now() - from)} ms`;
+
+    const samples: Record<LanguageId, { entry: string; code: string }> = {
+      javascript: {
+        entry: "main.js",
+        code: 'const name = prompt("Name?");\nconsole.log(`Hello, ${name}!`);\n',
+      },
+      fake: {
+        entry: "main.fake",
+        code: "out hello\nread\nerr oops\nexit 3\n",
+      },
+    };
+    const current = () => language.value as LanguageId;
+    code.value = samples[current()].code;
+
+    const host = RunnerHost.shared(origin);
+    const pageStart = performance.now();
+    host.ready().then(
+      (capabilities) => {
+        set("transport", capabilities.stdin);
+        set("languages", capabilities.languages.join(", "));
+        set("t-ready", ms(pageStart));
+        for (const option of [...language.options]) {
+          option.disabled = !capabilities.languages.includes(
+            option.value as LanguageId,
+          );
+        }
+      },
+      (error: unknown) => {
+        const reason = error instanceof RunnerUnavailable ? error.reason : "?";
+        set("transport", `unavailable (${reason})`);
+        runButton.disabled = true;
+      },
+    );
+
+    // The reserve is requested on the first focus of the editor, and again
+    // when the language changes afterwards, never on page load.
+    let focused = false;
+    code.addEventListener("focus", () => {
+      focused = true;
+      host.prepare(current());
+    });
+    language.addEventListener("change", () => {
+      code.value = samples[current()].code;
+      if (focused) host.prepare(current());
+    });
+    $("reload").addEventListener("click", () => {
+      const start = performance.now();
+      set("t-ready", "reloading…");
+      host.reload().then(
+        () => {
+          set("t-ready", ms(start));
+          if (focused) host.prepare(current());
+        },
+        () => set("t-ready", "unavailable"),
+      );
+    });
+
+    let active: RunHandle | null = null;
+    const setRunning = (running: boolean) => {
+      runButton.disabled = running;
+      stopButton.disabled = !running;
+      stdin.disabled = sendButton.disabled = eofButton.disabled = !running;
+    };
+    const label = (state: RunState) =>
+      state === "loading" ? "preparando…" : state;
+
+    runButton.addEventListener("click", async () => {
+      const click = performance.now();
+      output.replaceChildren();
+      for (const id of ["t-first", "t-running", "t-exit"]) set(id, "-");
+      set("exit", "-");
+      set("status", "starting");
+      setRunning(true);
+      let first = true;
+      try {
+        const entry = samples[current()].entry;
+        const run = await host.run(
+          {
+            language: current(),
+            mode: mode.value as "script" | "repl",
+            files: { [entry]: code.value },
+            entry,
+          },
+          {
+            onStatus(state) {
+              set("status", label(state));
+              if (first) set("t-first", ms(click));
+              first = false;
+              if (state === "running") set("t-running", ms(click));
+              if (state === "waiting-input") stdin.focus();
+            },
+            onProgress(loaded, total) {
+              set("status", `loading ${loaded}/${total ?? "?"}`);
+            },
+            onOutput(stream, text) {
+              const span = document.createElement("span");
+              if (stream === "stderr") span.className = "text-error";
+              span.textContent = text;
+              output.append(span);
+            },
+          },
+        );
+        active = run;
+        const exit = await run.done;
+        set("t-exit", ms(click));
+        set("status", "idle");
+        set(
+          "exit",
+          `${exit.reason}${exit.code === null ? "" : ` (code ${exit.code})`}${exit.message ? `: ${exit.message}` : ""}`,
+        );
+      } catch (error) {
+        set("status", "idle");
+        set(
+          "exit",
+          error instanceof RunnerUnavailable ? error.message : String(error),
+        );
+      } finally {
+        active = null;
+        setRunning(false);
+      }
+    });
+    stopButton.addEventListener("click", () => active?.stop());
+    eofButton.addEventListener("click", () => active?.sendEof());
+    $("stdin-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      active?.sendLine(stdin.value);
+      stdin.value = "";
+    });
+
+    Object.assign(window, { __runner: { RunnerHost, RunnerUnavailable } });
+  }
+</script>
