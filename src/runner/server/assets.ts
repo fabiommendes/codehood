@@ -32,11 +32,22 @@ export const DEV_BUNDLE_DIR = join(".astro", BUNDLE_DIR_NAME);
 /// Name of the manifest inside a bundle directory: `{ version, files }`.
 export const MANIFEST_NAME = "manifest.json";
 
-/// One file to serve.
+/// Copies the production build writes next to each file that compresses
+/// well, in the order the endpoint prefers them.
+export const PRECOMPRESSED = [
+	{ encoding: "br", extension: ".br" },
+	{ encoding: "gzip", extension: ".gz" },
+] as const;
+
+/// A `Content-Encoding` the endpoint may send.
+export type ContentEncoding = (typeof PRECOMPRESSED)[number]["encoding"];
+
+/// One file to serve; `encoding` is set when `body` is a compressed copy.
 export interface RunnerAsset {
 	kind: RunnerAssetKind;
 	contentType: string;
 	body: Uint8Array;
+	encoding?: ContentEncoding;
 }
 
 /// Bundle directory: the nearest `runner-bundle/` up from this module (the
@@ -101,14 +112,38 @@ export function runnerVersion(): string {
 	return manifest().version;
 }
 
+/// Reads `path`, or the first of its compressed copies that `accepted`
+/// allows and that exists.
+async function readBody(
+	path: string,
+	accepted: (offered: readonly ContentEncoding[]) => ContentEncoding | null,
+): Promise<Pick<RunnerAsset, "body" | "encoding">> {
+	const copies = PRECOMPRESSED.filter(({ extension }) =>
+		existsSync(path + extension),
+	);
+	const encoding = accepted(copies.map((copy) => copy.encoding));
+	const copy = copies.find((c) => c.encoding === encoding);
+	if (!copy) return { body: await readFile(path) };
+	return {
+		body: await readFile(path + copy.extension),
+		encoding: copy.encoding,
+	};
+}
+
 /**
  * Resolves a path under `/runner/` to the file to serve.
+ *
+ * `accepted` picks, among the compressed copies that exist, the one to send
+ * (see `pickEncoding`); by default none is.
  *
  * @returns `null` for anything that is not a file of the current bundle,
  * including another `<version>` and any path that escapes the bundle directory.
  */
 export async function readRunnerAsset(
 	pathname: string,
+	accepted: (
+		offered: readonly ContentEncoding[],
+	) => ContentEncoding | null = () => null,
 ): Promise<RunnerAsset | null> {
 	const { dir, version, files } = manifest();
 	let name: string;
@@ -119,7 +154,7 @@ export async function readRunnerAsset(
 		return {
 			kind: "runtime",
 			contentType: contentType(rel),
-			body: await readFile(join(dir, "rt", rel)),
+			...(await readBody(join(dir, "rt", rel), accepted)),
 		};
 	}
 	if (pathname === "/runner/sw.js") {
@@ -137,7 +172,7 @@ export async function readRunnerAsset(
 	return {
 		kind,
 		contentType: contentType(name),
-		body: await readFile(join(dir, name)),
+		...(await readBody(join(dir, name), accepted)),
 	};
 }
 

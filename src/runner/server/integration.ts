@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 import {
 	copyFileSync,
+	existsSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
@@ -14,10 +15,18 @@ import {
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { brotliCompress, gzip, constants as zlib } from "node:zlib";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
 import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
-import { BUNDLE_DIR_NAME, DEV_BUNDLE_DIR, MANIFEST_NAME } from "./assets";
+import {
+	BUNDLE_DIR_NAME,
+	type ContentEncoding,
+	DEV_BUNDLE_DIR,
+	MANIFEST_NAME,
+	PRECOMPRESSED,
+} from "./assets";
 
 /// Whether `file` may be part of the bundle: the sandbox, its entries,
 /// the shared protocol, zod and acorn (to locate JavaScript syntax errors).
@@ -158,20 +167,86 @@ async function copyRuntimes(root: string, staging: string): Promise<void> {
 	}
 }
 
+/// Files smaller than this are sent as they are.
+const MIN_COMPRESS_SIZE = 1024;
+
+/// A compressed copy is kept only when it is at most this fraction of the
+/// original; archives such as `python_stdlib.zip` barely shrink.
+const MAX_COMPRESS_RATIO = 0.9;
+
+/// Compresses `data` as `encoding` at the highest level.
+async function compress(
+	data: Buffer,
+	encoding: ContentEncoding,
+): Promise<Buffer> {
+	if (encoding === "gzip") return promisify(gzip)(data, { level: 9 });
+	return promisify(brotliCompress)(data, {
+		params: {
+			[zlib.BROTLI_PARAM_QUALITY]: zlib.BROTLI_MAX_QUALITY,
+			[zlib.BROTLI_PARAM_SIZE_HINT]: data.length,
+		},
+	});
+}
+
+/**
+ * Writes a `.br` and a `.gz` copy next to each file under `dir` that
+ * compresses well, for the runner endpoint to send to clients that accept them.
+ *
+ * Brotli at its highest quality takes about 25 s for the runtimes, so each
+ * copy is cached in `cacheDir` under the hash of the original; a build with
+ * the same runtimes reuses them.
+ */
+export async function precompress(
+	dir: string,
+	cacheDir: string,
+): Promise<void> {
+	mkdirSync(cacheDir, { recursive: true });
+	await Promise.all(
+		listFiles(dir).map(async (file) => {
+			const path = join(dir, file);
+			const data = readFileSync(path);
+			if (data.length < MIN_COMPRESS_SIZE) return;
+			const hash = createHash("sha256").update(data).digest("hex");
+			for (const { encoding, extension } of PRECOMPRESSED) {
+				const cached = join(cacheDir, hash + extension);
+				let out: Buffer;
+				if (existsSync(cached)) {
+					out = readFileSync(cached);
+				} else {
+					out = await compress(data, encoding);
+					writeFileSync(`${cached}.tmp`, out);
+					renameSync(`${cached}.tmp`, cached);
+				}
+				if (out.length <= data.length * MAX_COMPRESS_RATIO) {
+					writeFileSync(path + extension, out);
+				}
+			}
+		}),
+	);
+}
+
+/** How `buildRunnerBundle` builds. */
+export interface BundleOptions {
+	minify: boolean;
+	/// Where `precompress` caches its output; without it, nothing is compressed.
+	compressCache?: string;
+}
+
 /**
  * Builds the sandbox bundle for `root` into `outDir`, replacing what is there.
  *
  * Writes `frame.js`, `worker.js` (ES modules sharing chunks), `sw.js` (one
  * self-contained script, since it is not served from the versioned directory)
  * and `manifest.json` with the content hash and the file list. Runtime files
- * go to `rt/`, outside both: their own path carries the version.
+ * go to `rt/`, outside both: their own path carries the version. With
+ * `compressCache`, each file also gets its `precompress` copies.
  *
  * @throws {Error} when the bundle imports anything outside the allowed set.
  */
 export async function buildRunnerBundle(
 	root: string,
 	outDir: string,
-	minify: boolean,
+	{ minify, compressCache }: BundleOptions,
 ): Promise<void> {
 	const entries = join(root, "src", "runner", "server", "entries");
 	const staging = `${outDir}.tmp`;
@@ -214,6 +289,7 @@ export async function buildRunnerBundle(
 			JSON.stringify({ version, files }),
 		);
 		await copyRuntimes(root, staging);
+		if (compressCache) await precompress(staging, compressCache);
 		rmSync(outDir, { recursive: true, force: true });
 		mkdirSync(dirname(outDir), { recursive: true });
 		renameSync(staging, outDir);
@@ -246,7 +322,7 @@ export function runnerBundle(): AstroIntegration {
 				const target = join(root, DEV_BUNDLE_DIR);
 				const rebuild = async () => {
 					try {
-						await buildRunnerBundle(root, target, false);
+						await buildRunnerBundle(root, target, { minify: false });
 					} catch (error) {
 						logger.error(
 							`Runner bundle: ${error instanceof Error ? error.message : error}`,
@@ -270,7 +346,10 @@ export function runnerBundle(): AstroIntegration {
 				server.watcher.on("unlink", onChange);
 			},
 			"astro:build:done": async () => {
-				await buildRunnerBundle(root, join(outDir, BUNDLE_DIR_NAME), true);
+				await buildRunnerBundle(root, join(outDir, BUNDLE_DIR_NAME), {
+					minify: true,
+					compressCache: join(root, "node_modules", ".cache", "runner-bundle"),
+				});
 			},
 		},
 	};

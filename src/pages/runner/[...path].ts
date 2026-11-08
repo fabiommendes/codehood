@@ -1,12 +1,16 @@
 import type { APIRoute } from "astro";
 import { PRODUCTION, PUBLIC_URL, RUNNER_ORIGIN } from "@/core/constants";
 import { readRunnerAsset, renderFramePage } from "@/runner/server/assets";
-import { requestSide, runnerHeaders } from "@/runner/server/routing";
+import {
+	pickEncoding,
+	requestSide,
+	runnerHeaders,
+} from "@/runner/server/routing";
 
 const notFound = () => new Response("Not found", { status: 404 });
 
 /// Serves the runner frame page and the sandbox bundle on the runner origin.
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, request }) => {
 	// The middleware already decided; checked again so a routing quirk cannot
 	// expose the runner on the app origin.
 	if (requestSide(url, RUNNER_ORIGIN) !== "runner") return notFound();
@@ -26,9 +30,13 @@ export const GET: APIRoute = async ({ url }) => {
 		return new Response(html, { headers });
 	}
 
-	const asset = await readRunnerAsset(url.pathname);
+	const asset = await readRunnerAsset(url.pathname, (offered) =>
+		pickEncoding(request.headers.get("Accept-Encoding"), offered),
+	);
 	if (asset === null) return notFound();
 	const headers = runnerHeaders(asset.kind, PUBLIC_URL);
 	headers.set("Content-Type", asset.contentType);
+	headers.set("Vary", "Accept-Encoding");
+	if (asset.encoding) headers.set("Content-Encoding", asset.encoding);
 	return new Response(asset.body as BodyInit, { headers });
 };

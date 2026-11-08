@@ -105,5 +105,32 @@ export function runnerHeaders(
 	return headers;
 }
 
+/**
+ * The first of `offered` that the `Accept-Encoding` header accepts, or `null`
+ * to send the file as it is.
+ *
+ * A coding is accepted when listed with a q-value above 0; `*` stands for any
+ * coding not listed. q-values only exclude: the order of `offered` decides.
+ *
+ * @example
+ * pickEncoding("gzip, deflate, br", ["br", "gzip"]); // "br"
+ * pickEncoding("br;q=0, *", ["br", "gzip"]); // "gzip"
+ */
+export function pickEncoding<T extends string>(
+	header: string | null,
+	offered: readonly T[],
+): T | null {
+	const quality = new Map<string, number>();
+	for (const part of (header ?? "").toLowerCase().split(",")) {
+		const [name, ...params] = part.split(";").map((s) => s.trim());
+		if (!name) continue;
+		const q = params.find((p) => p.startsWith("q="));
+		const value = q === undefined ? 1 : Number(q.slice(2));
+		quality.set(name, Number.isNaN(value) ? 0 : value);
+	}
+	const any = quality.get("*") ?? 0;
+	return offered.find((coding) => (quality.get(coding) ?? any) > 0) ?? null;
+}
+
 /// CSP every app response carries: no other site may frame the app.
 export const APP_CSP = "frame-ancestors 'self'";
