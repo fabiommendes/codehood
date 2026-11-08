@@ -75,7 +75,7 @@ test("grading the pending blank stores its grade and the combined score, and the
 }) => {
 	const { teacher, student, exam, href, submission } = await sitting();
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/plateau`);
+	await page.goto(`${href}/exams/midterm/grading/plateau?view=list`);
 
 	const article = page.getByRole("article", { name: "Answer 1", exact: true });
 	const blank = article.getByRole("group", { name: "Blank plateau" });

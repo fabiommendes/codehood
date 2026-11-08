@@ -301,6 +301,44 @@ copy to test a fix: it is marked as modified, lives only in the page and goes
 away with Back to submission. Running never changes the grade or the comment.
 
 
+### Grade an exam question with a rubric
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/grading/<question>
+
+Instructor opens a question from the grading queue and lands on the first
+pending answer, with a header saying which answer of how many it is, how many
+are pending and how many are to review. They grade from the keyboard: a digit
+picks a group of the rubric or toggles a loose item, a letter picks the option
+inside the group, and Enter saves and moves to the next pending answer. The
+score is computed live from the items applied and the adjustment. Typing in the
+comment field never fires a shortcut, and an item with no text or a value that
+is not a number is refused when they create one.
+
+Answers that differ only in whitespace sit next to each other, so the same
+remark is applied in a row. When an answer shows something the rubric did not
+foresee, they press `n` and create an item that is already applied to it and
+available to every later answer. The list view of the question still shows every
+answer with the items applied.
+
+
+### Change the rubric while grading
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>/grading/<question>
+
+Instructor realizes mid-grading that an item is worth more or less than they
+thought. In edit mode they change its value, and before anything is written the
+page says how many grades change and how many of them students already read.
+Cancelling leaves every grade as it was; confirming recomputes them all, so the
+class is graded by one rule rather than by what the rubric said that morning.
+
+When one item turns out to lump together two different mistakes, they split it.
+Answers that applied it keep their score and are marked to review, the grading
+queue says how many are to review in each question, and regrading one with the
+new items clears its mark.
+
+
 ### Answer regrade requests
 
     status: implemented

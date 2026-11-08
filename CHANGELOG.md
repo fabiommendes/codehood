@@ -18,6 +18,21 @@
   the grading page runs a student's submission. Student code runs in a
   Worker on a separate origin (`RUNNER_ORIGIN`, unset turns it off), never
   on the server. Design: `dev/rfc/ambiente-de-execucao-no-cliente.md`.
+- Grading rubrics: each question of an exam gets a rubric of items with a
+  signed value, a private comment and feedback for the student. Items sharing
+  a top-level group path (`Recursion/Wrong: ...`) exclude each other. The
+  score is the base plus the applied items plus an adjustment, clamped to
+  [0, 1], and changing the rubric recomputes the grades already given, with a
+  warning that counts the released ones. Splitting an item flags its answers
+  "to review". The rubric starts from the question's `privatePayload.rubric`
+  when grading begins and is editable over REST, so the CLI and bots can
+  apply items too.
+- One-answer-at-a-time grading: `grading/<question>` shows one answer with
+  the rubric panel and keyboard shortcuts (digits and letters pick items,
+  Enter saves and moves on, `n` adds an item, `e` edits the rubric).
+  Identical answers come in a row. The old list is at `?view=list`.
+  Students see the applied items and their feedback once grades are
+  released.
 
 ### Changed
 

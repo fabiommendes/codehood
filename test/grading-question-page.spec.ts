@@ -236,10 +236,14 @@ test("question page: pending answers come first, then Graded, each in submission
 	await grade(teacher, submissions[3] ?? "", "0.25");
 	await logInAs(page, teacher);
 
-	const response = await page.goto(`${href}/exams/midterm/grading/q-short`);
+	const response = await page.goto(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 
 	expect(response?.status()).toBe(200);
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();
 	await expect(page.getByRole("article")).toHaveCount(5);
 
@@ -290,9 +294,11 @@ test("question page: a student who submitted twice shows only the newest submiss
 	await complete(exam.id);
 	await logInAs(page, teacher);
 
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
 
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();
 	await expect(page.getByRole("article")).toHaveCount(1);
 	await expectShows(answerArticle(page, 1), "Final reply");
@@ -309,13 +315,17 @@ test("question page: a question outside the exam gets 404", async ({
 	await complete(exam.id);
 	await logInAs(page, teacher);
 
-	const found = await page.goto(`${href}/exams/midterm/grading/q-in`);
+	const found = await page.goto(`${href}/exams/midterm/grading/q-in?view=list`);
 	expect(found?.status()).toBe(200);
 
-	const outside = await page.goto(`${href}/exams/midterm/grading/q-out`);
+	const outside = await page.goto(
+		`${href}/exams/midterm/grading/q-out?view=list`,
+	);
 	expect(outside?.status()).toBe(404);
 
-	const unknown = await page.goto(`${href}/exams/midterm/grading/q-unknown`);
+	const unknown = await page.goto(
+		`${href}/exams/midterm/grading/q-unknown?view=list`,
+	);
 	expect(unknown?.status()).toBe(404);
 });
 
@@ -335,10 +345,14 @@ test("question page: a question of the exam nobody answered says there is nothin
 	await complete(exam.id);
 	await logInAs(page, teacher);
 
-	const response = await page.goto(`${href}/exams/midterm/grading/q-silent`);
+	const response = await page.goto(
+		`${href}/exams/midterm/grading/q-silent?view=list`,
+	);
 
 	expect(response?.status()).toBe(200);
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-silent`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-silent?view=list`,
+	);
 	await expect(titleHeading(page, "Silent one")).toBeVisible();
 	await expect(page.getByText("No answers to grade.")).toBeVisible();
 	await expect(page.getByRole("article")).toHaveCount(0);
@@ -366,30 +380,36 @@ test("question page: the middle question links to both neighbours, the ends to o
 	const next = page.getByRole("link", { name: "Next question", exact: true });
 
 	await test.step("the middle question has both", async () => {
-		await page.goto(`${grading}/q-two`);
+		await page.goto(`${grading}/q-two?view=list`);
 
-		await expect(page).toHaveURL(`${grading}/q-two`);
+		await expect(page).toHaveURL(`${grading}/q-two?view=list`);
 		await expect(titleHeading(page, "Second title")).toBeVisible();
-		await expect(previous).toHaveAttribute("href", `${grading}/q-one`);
-		await expect(next).toHaveAttribute("href", `${grading}/q-three`);
+		await expect(previous).toHaveAttribute(
+			"href",
+			`${grading}/q-one?view=list`,
+		);
+		await expect(next).toHaveAttribute("href", `${grading}/q-three?view=list`);
 	});
 
 	await test.step("the first has no previous", async () => {
-		await page.goto(`${grading}/q-one`);
+		await page.goto(`${grading}/q-one?view=list`);
 
-		await expect(page).toHaveURL(`${grading}/q-one`);
+		await expect(page).toHaveURL(`${grading}/q-one?view=list`);
 		await expect(titleHeading(page, "First title")).toBeVisible();
 		await expect(previous).toHaveCount(0);
-		await expect(next).toHaveAttribute("href", `${grading}/q-two`);
+		await expect(next).toHaveAttribute("href", `${grading}/q-two?view=list`);
 	});
 
 	await test.step("the last has no next", async () => {
-		await page.goto(`${grading}/q-three`);
+		await page.goto(`${grading}/q-three?view=list`);
 
-		await expect(page).toHaveURL(`${grading}/q-three`);
+		await expect(page).toHaveURL(`${grading}/q-three?view=list`);
 		await expect(titleHeading(page, "Third title")).toBeVisible();
 		await expect(next).toHaveCount(0);
-		await expect(previous).toHaveAttribute("href", `${grading}/q-two`);
+		await expect(previous).toHaveAttribute(
+			"href",
+			`${grading}/q-two?view=list`,
+		);
 	});
 
 	await test.step("the back-link leads to the queue", async () => {
@@ -433,9 +453,11 @@ test("question page: a correct answer is shown under a Correct answer heading, f
 		["q-short", "Typed capital"],
 		["q-choice", "Chosen capital"],
 	] as const) {
-		await page.goto(`${href}/exams/midterm/grading/${slug}`);
+		await page.goto(`${href}/exams/midterm/grading/${slug}?view=list`);
 
-		await expect(page).toHaveURL(`${href}/exams/midterm/grading/${slug}`);
+		await expect(page).toHaveURL(
+			`${href}/exams/midterm/grading/${slug}?view=list`,
+		);
 		await expect(titleHeading(page, title)).toBeVisible();
 		await expect(
 			page.getByRole("heading", {
@@ -484,9 +506,11 @@ test("question page: no student name, username or email appears on the page", as
 	await grade(teacher, submissions[1] ?? "", "1");
 	await logInAs(page, teacher);
 
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
 
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(page.getByRole("article")).toHaveCount(2);
 	const main = page.locator("main");
 	for (const person of people) {
@@ -502,7 +526,9 @@ test("question page: a student of the course gets 403", async ({ page }) => {
 	const student = await enrolledStudent(course, "qp7-other");
 	await logInAs(page, student);
 
-	const response = await page.goto(`${href}/exams/midterm/grading/q-short`);
+	const response = await page.goto(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 
 	expect(response?.status()).toBe(403);
 });
@@ -520,8 +546,10 @@ test("saving a grade records one pass by the instructor, moves the answer under 
 		"Bravo reply",
 	]);
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();
 
 	const article = articleWith(page, "Alpha reply");
@@ -570,8 +598,10 @@ for (const [label, typed] of [
 		);
 		const { submissions } = await closedSitting("sg2", course, ["Alpha reply"]);
 		await logInAs(page, teacher);
-		await page.goto(`${href}/exams/midterm/grading/q-short`);
-		await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+		await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
+		await expect(page).toHaveURL(
+			`${href}/exams/midterm/grading/q-short?view=list`,
+		);
 		await expect(titleHeading(page, "Typed capital")).toBeVisible();
 
 		const article = answerArticle(page, 1);
@@ -595,7 +625,7 @@ test("an invalid score is refused on the client, under the score field, without 
 	const { teacher, course, href } = await setup("sg3");
 	await closedSitting("sg3", course, ["Alpha reply"]);
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
 	const article = answerArticle(page, 1);
 	const calls: string[] = [];
 	await page.route(/\/_actions\/grading\.grade/, (route) => {
@@ -622,7 +652,7 @@ test("a score that only the server refuses is shown under the score field", asyn
 	const { teacher, course, href } = await setup("sg4");
 	const { submissions } = await closedSitting("sg4", course, ["Alpha reply"]);
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
 	const article = answerArticle(page, 1);
 	await page.route(/\/_actions\/grading\.grade/, (route) => {
 		const body = JSON.parse(route.request().postData() ?? "{}");
@@ -646,8 +676,10 @@ test("a comment of only spaces saves a pass with no feedback", async ({
 	const { teacher, course, href } = await setup("sg3");
 	const { submissions } = await closedSitting("sg3", course, ["Alpha reply"]);
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();
 
 	await saveGrade(answerArticle(page, 1), "50", "   ");
@@ -669,8 +701,10 @@ test("after saving, the score field of the first remaining pending answer has fo
 		"Charlie reply",
 	]);
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();
 
 	await saveGrade(articleWith(page, "Alpha reply"), "80", "Fine");
@@ -687,7 +721,7 @@ test("two tabs grading the same answer both record a pass, and the later one is 
 	const { teacher, course, href } = await setup("sg5");
 	const { submissions } = await closedSitting("sg5", course, ["Alpha reply"]);
 	await logInAs(page, teacher);
-	const url = `${href}/exams/midterm/grading/q-short`;
+	const url = `${href}/exams/midterm/grading/q-short?view=list`;
 	const second = await page.context().newPage();
 
 	await page.goto(url);
@@ -729,8 +763,10 @@ test("grades stay hidden from the student while the exam's grades are not releas
 			.gradesReleasedAt,
 	).toBeNull();
 	await logInAs(page, teacher);
-	await page.goto(`${href}/exams/midterm/grading/q-short`);
-	await expect(page).toHaveURL(`${href}/exams/midterm/grading/q-short`);
+	await page.goto(`${href}/exams/midterm/grading/q-short?view=list`);
+	await expect(page).toHaveURL(
+		`${href}/exams/midterm/grading/q-short?view=list`,
+	);
 	await expect(titleHeading(page, "Typed capital")).toBeVisible();
 
 	await saveGrade(articleWith(page, "Alpha reply"), "80", "Well argued");

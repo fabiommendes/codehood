@@ -40,6 +40,16 @@ export interface GradingPass {
 	bot: string | null;
 	/// Whether the pass marked the answer will-not-grade, rather than scoring it.
 	willNotGrade: boolean;
+	/// The pass's own reference within the submission, when the source carries it.
+	ref?: string;
+	/// The keys of the rubric items the pass applies. Absent when its score was set by hand.
+	rubric?: string[];
+	/// The rubric items the pass applies, with the instructor's private comment. Absent when its score was set by hand.
+	rubricItems?: NonNullable<Feedback["rubricItems"]>;
+	/// Free credit added after the rubric items. Absent when there is none.
+	adjustment?: string;
+	/// Set when the pass applies a retired rubric item.
+	review?: true;
 	updatedAt: Date;
 }
 
@@ -61,6 +71,8 @@ export interface CountingAnswer {
 	verdict: number | null;
 	/// The blank grades of the newest pass, when it graded the blanks one by one.
 	blanks?: Feedback["blanks"];
+	/// Set when the newest pass applies a retired rubric item, so the answer should be graded again.
+	review?: true;
 	/// Every pass on this submission, newest first (by `updatedAt`).
 	passes: GradingPass[];
 }
@@ -72,6 +84,8 @@ export interface QueueEntry {
 	pending: number;
 	graded: number;
 	notGraded: number;
+	/// How many of the `graded` answers apply a retired rubric item. Absent means none.
+	review?: number;
 }
 
 /// The part of an attempt the grading rules read.
@@ -85,7 +99,18 @@ export type GradingFeedback = Pick<
 	Feedback,
 	"submission" | "score" | "feedback" | "grader" | "bot" | "updatedAt"
 > &
-	Partial<Pick<Feedback, "ref" | "blanks" | "notes">>;
+	Partial<
+		Pick<
+			Feedback,
+			| "ref"
+			| "blanks"
+			| "notes"
+			| "rubric"
+			| "rubricItems"
+			| "adjustment"
+			| "review"
+		>
+	>;
 
 /**
  * The counting answers of every closed attempt at `exam`, in submission order.
@@ -164,6 +189,9 @@ export function countingAnswers(
 					...(verdict !== null && newestPass?.blanks
 						? { blanks: newestPass.blanks }
 						: {}),
+					...(state === "graded" && newestPass?.review === true
+						? { review: true as const }
+						: {}),
 					passes: passes.map(toGradingPass),
 				},
 			});
@@ -188,6 +216,11 @@ function toGradingPass(pass: GradingFeedback): GradingPass {
 		grader: pass.grader,
 		bot: pass.bot,
 		willNotGrade: pass.ref?.startsWith(WILL_NOT_GRADE_REF) ?? false,
+		...(pass.ref !== undefined ? { ref: pass.ref } : {}),
+		...(pass.rubric ? { rubric: pass.rubric } : {}),
+		...(pass.rubricItems ? { rubricItems: pass.rubricItems } : {}),
+		...(pass.adjustment ? { adjustment: pass.adjustment } : {}),
+		...(pass.review ? { review: true as const } : {}),
 		updatedAt: pass.updatedAt,
 	};
 }
@@ -206,8 +239,10 @@ export function gradingQueue(
 		for (const answer of answers) {
 			if (answer.question !== question) continue;
 			if (answer.state === "pending") entry.pending++;
-			else if (answer.state === "graded") entry.graded++;
-			else entry.notGraded++;
+			else if (answer.state === "graded") {
+				entry.graded++;
+				if (answer.review) entry.review = (entry.review ?? 0) + 1;
+			} else entry.notGraded++;
 		}
 		return entry;
 	});
@@ -230,6 +265,38 @@ export function answersTo(
 		pending: own.filter((answer) => answer.state === "pending"),
 		resolved: own.filter((answer) => answer.state !== "pending"),
 	};
+}
+
+/// The text of an answer with runs of whitespace collapsed and the ends trimmed, the key that makes identical answers adjacent.
+function normalizedAnswer(payload: unknown): string {
+	const text = typeof payload === "string" ? payload : JSON.stringify(payload);
+	return (text ?? "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The answers to one question in the order a grader goes through them: pending, then to review, then the rest.
+ *
+ * Within each block, answers with the same normalized text sit together, and
+ * the groups follow the submission order of the first answer of each.
+ *
+ * @params answers The answers to a single question, oldest submission first.
+ */
+export function gradingOrder(answers: CountingAnswer[]): CountingAnswer[] {
+	const blockOf = (answer: CountingAnswer): number =>
+		answer.state === "pending" ? 0 : answer.review ? 1 : 2;
+	const blocks: Map<string, CountingAnswer[]>[] = [
+		new Map(),
+		new Map(),
+		new Map(),
+	];
+	for (const answer of answers) {
+		const groups = blocks[blockOf(answer)] as Map<string, CountingAnswer[]>;
+		const key = normalizedAnswer(answer.payload);
+		const group = groups.get(key);
+		if (group) group.push(answer);
+		else groups.set(key, [answer]);
+	}
+	return blocks.flatMap((groups) => [...groups.values()].flat());
 }
 
 /**

@@ -118,6 +118,7 @@ test("instructor: grade submissions by hand", async ({ page }) => {
 			.click();
 
 		await expect(page).toHaveURL(`${grading}/q-short`);
+		await page.goto(`${grading}/q-short?view=list`);
 		await expect(
 			page.getByRole("heading", {
 				level: 2,
@@ -178,9 +179,9 @@ test("instructor: grade submissions by hand", async ({ page }) => {
 	await test.step("the instructor marks one remaining answer will-not-grade, with a comment for the student", async () => {
 		await page.context().clearCookies();
 		await logInAs(page, teacher);
-		await page.goto(`${grading}/q-short`);
+		await page.goto(`${grading}/q-short?view=list`);
 
-		await expect(page).toHaveURL(`${grading}/q-short`);
+		await expect(page).toHaveURL(`${grading}/q-short?view=list`);
 		await expect(
 			page.getByRole("heading", {
 				level: 2,
@@ -794,7 +795,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 			.getByRole("link", { name: "Best fruit", exact: true })
 			.click();
 
-		await expect(page).toHaveURL(`${href}/exams/final/grading/fruit`);
+		await expect(page).toHaveURL(`${href}/exams/final/grading/fruit?view=list`);
 		await expect(
 			distribution().getByRole("heading", { name: "Answer distribution" }),
 		).toBeVisible();
@@ -810,7 +811,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 	});
 
 	await test.step("the true-false question shows true, false and abstained per statement", async () => {
-		await page.goto(`${href}/exams/final/grading/protocols`);
+		await page.goto(`${href}/exams/final/grading/protocols?view=list`);
 
 		const rows = distribution().getByRole("listitem");
 		await expect(rows).toHaveCount(2);
@@ -827,7 +828,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 	});
 
 	await test.step("a question without a distribution shows none", async () => {
-		await page.goto(`${href}/exams/final/grading/trick`);
+		await page.goto(`${href}/exams/final/grading/trick?view=list`);
 
 		await expect(
 			page.getByRole("heading", { level: 2, name: "Trick question" }),
@@ -854,7 +855,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 			FULL_ACCESS,
 		);
 
-		await page.goto(`${href}/exams/final/grading/fruit`);
+		await page.goto(`${href}/exams/final/grading/fruit?view=list`);
 
 		await expect(page.getByText("Pick the best fruit.").first()).toBeVisible();
 		await expect(
@@ -878,7 +879,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 			data: { version: "ghost" },
 		});
 
-		await page.goto(`${href}/exams/final/grading/fruit`);
+		await page.goto(`${href}/exams/final/grading/fruit?view=list`);
 
 		await expect(page.getByRole("alert")).toContainText(
 			'This exam pins version "ghost", which this question does not have. Showing the latest version instead.',
@@ -965,7 +966,9 @@ test("instructor: answer regrade requests", async ({ page }) => {
 	});
 
 	await test.step("the grading page marks only the answer whose request is still open", async () => {
-		await page.goto(`${world.href}/exams/${world.exam.slug}/grading/q-short`);
+		await page.goto(
+			`${world.href}/exams/${world.exam.slug}/grading/q-short?view=list`,
+		);
 
 		await expect(page.getByText("Regrade requested")).toHaveCount(1);
 		await expect(
@@ -1066,7 +1069,8 @@ test("instructor: run a student's code while grading", async ({ page }) => {
 		widgetOf(marker).locator("[data-terminal] .xterm-accessibility-tree");
 
 	await test.step("the grading page shows each answer highlighted, named by number", async () => {
-		await page.goto(`${href}/exams/${exam.slug}/grading/q-double`);
+		// The list view shows every answer; the default view shows one at a time.
+		await page.goto(`${href}/exams/${exam.slug}/grading/q-double?view=list`);
 
 		await expect(widgets).toHaveCount(4);
 		await expect(page.getByText("Runner Student 1")).toHaveCount(0);

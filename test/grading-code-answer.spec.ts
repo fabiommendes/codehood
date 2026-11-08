@@ -140,7 +140,7 @@ test("a language without a driver is highlighted with no Run", async ({
 	page,
 }) => {
 	const sitting = await closedSitting(page, ["1"]);
-	await page.goto(`${sitting.href}/grading/hs`);
+	await page.goto(`${sitting.href}/grading/hs?view=list`);
 	const card = page.locator("article").first();
 	await expect(card.locator("[data-answer-code] .shiki")).toContainText(
 		"putStrLn",
@@ -153,7 +153,7 @@ test("a language without a driver is highlighted with no Run", async ({
 
 test("a text essay is still plain text", async ({ page }) => {
 	const sitting = await closedSitting(page, ["1"]);
-	await page.goto(`${sitting.href}/grading/prose`);
+	await page.goto(`${sitting.href}/grading/prose?view=list`);
 	const card = page.locator("article").first();
 	await expect(card.locator("p.whitespace-pre-wrap")).toHaveText(
 		"Prose of code-student-1",
@@ -194,7 +194,8 @@ test("running and editing a code answer changes no grade or comment", async ({
 	const passes = () =>
 		prisma.feedback.count({ where: { submission: { publicId: submission } } });
 	const before = await passes();
-	await page.goto(`${sitting.href}/grading/code`);
+	// The list view keeps each answer's comment field inside its card.
+	await page.goto(`${sitting.href}/grading/code?view=list`);
 	const widget = page.locator(`#answer-${submission} [data-code-runner]`);
 	await widget.locator("[data-action=run]").click();
 	await expect(widget.locator("[data-terminal]")).toContainText("hello");

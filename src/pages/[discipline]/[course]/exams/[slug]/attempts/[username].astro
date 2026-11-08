@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import ReopenAttempt from "@/components/exam/ReopenAttempt";
 import Answer from "@/components/grading/Answer.astro";
+import AppliedItems from "@/components/grading/AppliedItems";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
 import { db } from "@/db";
 import { m } from "@/i18n";
@@ -181,6 +182,7 @@ const stateLabel = (status: string, score: number | null): string => {
                 <>
                   <Answer question={asked} payload={counting.payload as AnswerPayload} result={review} submission={counting.publicId} />
                   <p class="mt-4 font-semibold">{stateLabel(outcome.status, outcome.score)}</p>
+                  <AppliedItems items={outcome.rubricItems ?? []} />
                   {outcome.comments.map((comment) => (
                     <p class="whitespace-pre-wrap text-sm text-base-content/70">{comment}</p>
                   ))}

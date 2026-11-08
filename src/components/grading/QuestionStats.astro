@@ -55,7 +55,7 @@ const anyAnswer = stats.some((entry) => entry.answered > 0);
             {stats.map((entry) => (
               <tr>
                 <td>
-                  <a href={`${href}/grading/${entry.question}`} class="link">
+                  <a href={`${href}/grading/${entry.question}?view=list`} class="link">
                     {titles.get(entry.question) ?? entry.question}
                   </a>
                 </td>

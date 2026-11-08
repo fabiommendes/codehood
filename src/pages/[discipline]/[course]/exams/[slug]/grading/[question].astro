@@ -5,16 +5,19 @@ import Answer from "@/components/grading/Answer.astro";
 import AnswerControls from "@/components/grading/AnswerControls";
 import AnswerDistributionSection from "@/components/grading/AnswerDistribution.astro";
 import AnswerKey from "@/components/grading/AnswerKey";
+import AppliedItems from "@/components/grading/AppliedItems";
+import RubricGrader from "@/components/grading/RubricGrader";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
 import { formatScore } from "@/services/exam-result";
-import { answersTo } from "@/services/grading";
+import { answersTo, gradingOrder } from "@/services/grading";
 import { answerDistribution } from "@/services/question-stats";
 import { pendingBlanks, reviewResult } from "@/services/review";
 import { breadcrumbs } from "@/utils/breadcrumbs";
-import { gradingHref, wantsNames } from "@/utils/grading-urls";
+import { graderState } from "@/utils/grader-state";
+import { gradingHref, wantsList, wantsNames } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
 import { renderMarkdown } from "@/utils/markdown";
 
@@ -94,12 +97,25 @@ const openRegrades = new Map(
 );
 const regradesHref = `${href}/exams/${exam.slug}/regrades`;
 
+const listView = wantsList(Astro.url);
+
 const { pending, resolved } = answersTo(questionSlug, answers);
+const ownAnswers = answers.filter((answer) => answer.question === questionSlug);
+// The rubric is read for the one-at-a-time view only; the list never starts one.
+const rubric = listView
+	? null
+	: await db.rubric.findOne(
+			{ course: course.id, exam: exam.slug, question: questionSlug },
+			{ actor },
+		);
+const grader = rubric && graderState(ownAnswers, rubric, actor.username);
 const distribution = answerDistribution(
 	doc,
 	answers.filter((answer) => answer.question === questionSlug),
 );
-const shown = [...pending, ...resolved].map((answer, index) => ({
+const shown = (
+	listView ? [...pending, ...resolved] : gradingOrder(ownAnswers)
+).map((answer, index) => ({
 	answer,
 	label: m.grades_question_answer_n({ n: index + 1 }),
 	isPending: answer.state === "pending",
@@ -118,7 +134,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
 <AppLayout title={m.grades_question_title({ question: title, exam: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, question: title })}
 >
-  <main class="mx-auto max-w-4xl px-4 py-10">
+  <main class:list={["mx-auto px-4 py-10", listView ? "max-w-4xl" : "max-w-6xl"]}>
     <CourseHeader course={course} active="exams" />
 
     <a href={gradingHref(queueHref, { names })} class="text-sm text-muted hover:text-primary">← {m.grades_question_back()}</a>
@@ -126,9 +142,10 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
     <h2 class="mt-2 text-2xl font-bold">{title}</h2>
 
     <nav class="mt-3 flex gap-4 text-sm">
-      {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names })} class="link">{m.grades_question_previous()}</a>}
-      {next && <a href={gradingHref(`${queueHref}/${next}`, { names })} class="link">{m.grades_question_next()}</a>}
-      <a href={gradingHref(here, { names: !names })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
+      {previous && <a href={gradingHref(`${queueHref}/${previous}`, { names, list: listView })} class="link">{m.grades_question_previous()}</a>}
+      {next && <a href={gradingHref(`${queueHref}/${next}`, { names, list: listView })} class="link">{m.grades_question_next()}</a>}
+      <a href={gradingHref(here, { names, list: !listView })} class="link">{listView ? m.grades_question_view_one() : m.grades_question_view_list()}</a>
+      <a href={gradingHref(here, { names: !names, list: listView })} role="switch" aria-checked={names ? "true" : "false"} class="link ml-auto">{m.grades_question_show_names()}</a>
     </nav>
 
     {versionMissing && (
@@ -138,26 +155,81 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
     )}
 
     {
-      hasKey ? (
-        <section class="mt-6">
-          <h3 class="text-lg font-semibold">{m.grades_question_correct_answer()}</h3>
-          <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
-            <AnswerKey client:load question={doc} />
-          </div>
-        </section>
+      listView ? (
+        hasKey ? (
+          <section class="mt-6">
+            <h3 class="text-lg font-semibold">{m.grades_question_correct_answer()}</h3>
+            <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
+              <AnswerKey client:load question={doc} />
+            </div>
+          </section>
+        ) : (
+          <section
+            aria-label={m.grades_question_statement()}
+            class="prose prose-sm mt-6 max-w-none rounded-box border border-base-300 bg-base-100 p-6"
+            set:html={statementHtml}
+          />
+        )
       ) : (
-        <section
-          aria-label={m.grades_question_statement()}
-          class="prose prose-sm mt-6 max-w-none rounded-box border border-base-300 bg-base-100 p-6"
-          set:html={statementHtml}
-        />
+        <details class="mt-4 rounded-box border border-base-300 bg-base-100">
+          <summary class="cursor-pointer px-4 py-2 text-sm font-medium">{m.grades_grader_questions()}</summary>
+          <div class="p-4">
+            {hasKey ? (
+              <AnswerKey client:load question={doc} />
+            ) : (
+              <div class="prose prose-sm max-w-none" set:html={statementHtml} />
+            )}
+          </div>
+        </details>
       )
     }
 
-    {distribution && <AnswerDistributionSection distribution={distribution} />}
+    {listView && distribution && <AnswerDistributionSection distribution={distribution} />}
 
     {shown.length === 0 && <p class="mt-8 text-base-content/70">{m.grades_question_no_answers()}</p>}
 
+    {
+      !listView && grader && shown.length > 0 && (
+        <div class="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <section aria-label={m.grades_grader_answer()} class="card card-border bg-base-100">
+            <div class="card-body">
+              {shown.map(({ answer, result }, position) => (
+                <div id={`answer-${answer.submission}`} hidden={position !== 0}>
+                  {openRegrades.has(answer.submission) && (
+                    <a href={`${regradesHref}#regrade-${openRegrades.get(answer.submission)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
+                  )}
+                  {answer.passes.some((pass) => pass.notes !== undefined) && (
+                    <span class="badge badge-error badge-sm">{m.grades_question_suspicious()}</span>
+                  )}
+                  {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
+                  <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} />
+                  {answer.passes
+                    .filter((pass) => pass.bot !== null)
+                    .slice(0, 1)
+                    .map((pass) => (
+                      <div role="note" class="alert alert-info alert-soft mt-4 block text-sm">
+                        <p class="font-semibold">{m.grades_question_auto()}: {pass.bot}</p>
+                        <p>{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</p>
+                        {pass.comment && <p class="mt-1 whitespace-pre-wrap">{pass.comment}</p>}
+                        {pass.notes && <p class="mt-1 whitespace-pre-wrap">{pass.notes}</p>}
+                        <AppliedItems items={pass.rubricItems ?? []} />
+                      </div>
+                    ))}
+                </div>
+              ))}
+            </div>
+          </section>
+          <RubricGrader
+            client:load
+            target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
+            initial={grader}
+            queueHref={gradingHref(queueHref, { names })}
+          />
+        </div>
+      )
+    }
+
+    {listView && (
     <div class="mt-8 flex flex-col gap-6">
       {
         shown.map(({ answer, label, isPending, result, blanks }, index) => (
@@ -192,6 +264,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
                             <span class="font-medium">{pass.willNotGrade ? m.grades_question_not_graded() : pass.score === null ? m.grades_question_no_score() : formatScore(pass.score)}</span>
                             <span class="text-muted"> · {graderName(pass)}</span>
                           </p>
+                          <AppliedItems items={pass.rubricItems ?? []} />
                           {pass.comment && <p class="mt-1 whitespace-pre-wrap text-base-content/70">{pass.comment}</p>}
                           {pass.notes && (
                             <div role="note" aria-label={m.grades_question_notes()} class="alert alert-warning alert-soft mt-2 block text-sm">
@@ -221,6 +294,7 @@ const shown = [...pending, ...resolved].map((answer, index) => ({
         ))
       }
     </div>
+    )}
   </main>
 </AppLayout>
 

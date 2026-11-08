@@ -279,6 +279,18 @@ question, the total, and whatever written feedback the instructor or grading bot
 left. A submission still waiting to be graded says so rather than showing a zero.
 
 
+### See which rubric items shaped my grade
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>
+
+Student opens an exam whose grades were released and sees, under each answer
+graded with a rubric, the items that applied to it with their value and the
+feedback written for them, followed by the instructor's free comment. Items that
+did not apply, and the notes the instructor kept for themselves on each item,
+are not shown. Before the release they see none of it.
+
+
 ### Ask for a regrade
 
     status: implemented

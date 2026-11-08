@@ -7,8 +7,10 @@ import { InvalidData, NotFound } from "@/core/error";
 import {
 	answerGrade,
 	answerGradeBlanks,
+	answerGradeRubric,
 	type answerRef,
 	answerWillNotGrade,
+	gradingQuestion,
 } from "@/core/schemas";
 import { SCORE_ERROR } from "@/core/score";
 import { db } from "@/db";
@@ -18,6 +20,8 @@ import { NotAutoGradable, type QuestionDocument, ResponseError } from "@/mdq";
 import { parsePercentScore, WILL_NOT_GRADE_REF } from "@/services/grading";
 import { blanksScore } from "@/services/review";
 import { type CourseNaturalKey, parseCourseParams } from "@/urls";
+import { graderState } from "@/utils/grader-state";
+import { loadExamGrading } from "@/utils/load-grading";
 import { withServiceErrors } from "./helpers";
 
 export const grading = {
@@ -37,6 +41,57 @@ export const grading = {
 
 			const course = await checkedAnswer(input, actor);
 			await recordPass(input.submission, course, score, input.comment, actor);
+		}),
+	}),
+
+	/**
+	 * Saves the grade of one answer from the rubric items applied to it (instructor only).
+	 *
+	 * The server computes the score from the items and the adjustment. With the
+	 * `ref` of a pass the actor wrote, that pass is revised; otherwise a new pass
+	 * is recorded. A comment of only whitespace is stored as no comment.
+	 */
+	gradeRubric: defineAction({
+		input: answerGradeRubric,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			const course = await checkedAnswer(input, actor);
+			const text = input.comment?.trim();
+			await db.feedback.upsert(
+				{
+					submission: { publicId: input.submission, course },
+					ref: input.ref ?? `web-${randomUUID()}`,
+					rubric: input.rubric,
+					adjustment: input.adjustment ?? null,
+					feedback: text ? text : null,
+				},
+				{ actor },
+			);
+		}),
+	}),
+
+	/**
+	 * Reads the rubric and the answers of one question as the one-at-a-time grading view shows them (instructor only).
+	 */
+	state: defineAction({
+		input: gradingQuestion,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			const course = parseCourseParams({
+				discipline: input.discipline,
+				course: input.course,
+			});
+			const rubric = await db.rubric.findOne(
+				{ course, exam: input.exam, question: input.question },
+				{ actor },
+			);
+			const loaded = await loadExamGrading(course, input.exam, actor);
+			if (!loaded) throw new NotFound("exam", { id: input.exam });
+			return graderState(
+				loaded.answers.filter((answer) => answer.question === input.question),
+				rubric,
+				actor.username,
+			);
 		}),
 	}),
 

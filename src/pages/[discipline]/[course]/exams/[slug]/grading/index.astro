@@ -31,6 +31,8 @@ const rows = queue.map((entry) => {
 	const doc = bySlug.get(entry.question);
 	const counts = [
 		entry.pending > 0 && m.grades_queue_pending({ count: entry.pending }),
+		(entry.review ?? 0) > 0 &&
+			m.grades_queue_review({ count: entry.review ?? 0 }),
 		entry.graded > 0 && m.grades_queue_graded({ count: entry.graded }),
 		entry.notGraded > 0 &&
 			m.grades_queue_not_graded({ count: entry.notGraded }),
