@@ -65,6 +65,12 @@ Concluídos no núcleo: pausas, tempos inválidos/iguais/regressivos, valores va
 
 A API concreta está nos módulos `codec.ts` e `monitor.ts`. Não há DOM, Solid, storage ou rede na classe. `checkpoint.ts` é interno e não deve ser importado por consumidores externos à pasta.
 
+## Ciclo 4: armazenamento browser
+
+Contrato em `storage.ts`: owner obrigatório, CAS por campo e geração, TTL de 14 dias, registro limitado a 2 MiB UTF-8. IndexedDB valida checkpoint/replay, texto e outbox antes do commit atômico. Fallback conserva somente texto e metadados de lacuna. Revogar invalida o handle, aborta transações pendentes e limpa apenas o namespace do owner.
+
+TDD full com workers separados. RED reproduzido pelo orquestrador: `pnpm exec tsx test/run.ts test/answer-edit-storage.spec.ts`, três falhas funcionais `Not implemented`. GREEN pelo mesmo comando: três testes passaram em 14,6 s. Logs `/tmp/input-monitor-storage-{red,green}.log`. Estes três testes usam Chromium, IndexedDB e localStorage reais, módulo empacotado pelo esbuild existente no harness de teste. Incluem CAS concorrente, abort, corrupção, limite multibyte, vazio, TTL e callbacks após revoke. Não provam integração com editores ou logout da aplicação. O namespace não enumera dados de outros owners.
+
 ## Pendências
 
 Persistência/coordenador, IndexedDB, fallback de rascunho sem dois donos, isolamento por usuário/TTL/logout, recuperação após prazo, adaptadores textarea/CodeMirror, servidor/banco, entrega e integração real ainda não implementados. Todos os corner cases dessas fatias permanecem pendentes, incluindo rollback, concorrência entre abas, autorização, quotas, teardown de componente e teste de carga.
