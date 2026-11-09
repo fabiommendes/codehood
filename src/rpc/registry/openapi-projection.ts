@@ -31,7 +31,7 @@ export function buildRpcOpenApiDocument() {
 			title: "Codehood RPC",
 			version: pkg.version,
 			description:
-				"JSON-RPC 2.0 interface for operations that do not fit the REST CRUD surface.\n\nEvery operation below posts to the single `/rpc` endpoint; the `#method` in each path exists only to keep them apart in this document. The machine-readable description of this API is [OpenRPC](/openrpc.json).\n\nUse a session cookie OR Bearer, never both. Foreign-Origin mutations require validated Bearer; form-like requests without Bearer require local Origin.\n\nErrors arrive as HTTP 200 with an `error` object. A non-200 means the body was not a JSON-RPC message at all.",
+				"JSON-RPC 2.0 interface for operations that do not fit the REST CRUD surface.\n\nEvery operation below posts to the single `/rpc` endpoint; the `#method` in each path exists only to keep them apart in this document. The machine-readable description of this API is [OpenRPC](/openrpc.json).\n\nUse a session cookie OR Bearer, never both. Foreign-Origin mutations require validated Bearer; form-like requests without Bearer require local Origin. HTTP bodies are limited to 1 MiB and batches to 50 calls.\n\nErrors arrive as HTTP 200 with an `error` object. A non-200 means the body was not a JSON-RPC message at all.",
 		},
 		servers: [{ url: "/", description: "Same origin as the web app" }],
 		security: [{ BearerAuth: [] }, { SessionCookie: [] }],

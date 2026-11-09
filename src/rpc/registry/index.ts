@@ -1,9 +1,12 @@
+import type { APIContext } from "astro";
 import { type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import type { ErrorResponse } from "@/core/error-response";
 import { responseFromException } from "@/core/error-server";
 import { m } from "@/i18n";
+
+export { readEnvelope } from "./read-envelope";
 
 /// Actor = User? or User depending if the method is public or not.
 type MaybeActor<IsPublic> = IsPublic extends false
@@ -25,6 +28,7 @@ export type MethodOptions<In, Out, IsPublic extends boolean = false> = {
 	tags: string[];
 	handler: (args: {
 		actor: MaybeActor<IsPublic>;
+		context?: APIContext;
 		body: In extends { [key: string]: unknown } ? In : undefined;
 	}) => Promise<Out>;
 };
@@ -40,6 +44,7 @@ export type RpcMethod = {
 	tags: string[];
 	handler: (args: {
 		actor: UserActor | undefined;
+		context?: APIContext;
 		body: unknown;
 	}) => Promise<unknown>;
 };
@@ -131,6 +136,7 @@ const requestSchema = z.object({
 export async function dispatch(
 	payload: unknown,
 	actor: UserActor | undefined,
+	context?: APIContext,
 ): Promise<RpcResponse | null> {
 	const request = requestSchema.safeParse(payload);
 	if (!request.success) {
@@ -176,7 +182,9 @@ export async function dispatch(
 		});
 
 	try {
-		return respond({ result: await run(method, request.data.params, actor) });
+		return respond({
+			result: await run(method, request.data.params, { actor, context }),
+		});
 	} catch (error) {
 		return respond({ error: errorObject(error) });
 	}
@@ -186,7 +194,7 @@ export async function dispatch(
 async function run(
 	method: RpcMethod,
 	params: unknown,
-	actor: UserActor | undefined,
+	credentials: { actor: UserActor | undefined; context?: APIContext },
 ): Promise<unknown> {
 	// Every handler validates against a Zod object, and there is no stable
 	// argument order to map an array onto, so by-position params are refused
@@ -204,12 +212,12 @@ async function run(
 			{ message: m.errors_rpc_positional_params() },
 		);
 
-	if (!method.in) return method.handler({ actor, body: undefined });
+	if (!method.in) return method.handler({ ...credentials, body: undefined });
 
 	const validated = method.in.safeParse(params ?? {});
 	if (validated.error)
 		throw InvalidData.fromZodError(validated.error, validated.data);
-	return method.handler({ actor, body: validated.data });
+	return method.handler({ ...credentials, body: validated.data });
 }
 
 /**

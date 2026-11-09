@@ -94,6 +94,7 @@ type HandlerFunction<In, Out, Actor> = (
 export type Route<In, Out, Actor> = HandlerFunction<In, Out, Actor> & {
 	action: (input: In, context: ActionAPIContext) => unknown;
 	view: (ctx: APIContext) => Promise<Response>;
+	batchable: boolean;
 };
 
 /**
@@ -244,9 +245,11 @@ export function route<In, Out, IsPublic extends boolean = false>(
 			const value = await thunk();
 			return { value, isError: false };
 		} catch (error) {
-			return { error: responseFromException(error), isError: true };
+			return { error: responseFromException(error, true), isError: true };
 		}
 	};
+
+	result.batchable = !options.inMultipart && !path.startsWith("/api/auth/");
 
 	result.action = async (_input: In, _context: ActionAPIContext) => {
 		throw new Error("not implemented");

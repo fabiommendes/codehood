@@ -10,3 +10,4 @@
 export * as cli from "./cli";
 export * as debug from "./debug";
 export * as health from "./health";
+export * as rest from "./rest";

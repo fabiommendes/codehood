@@ -33,7 +33,7 @@ function handler(method: keyof HttpMethods) {
 			// JSON error `responseFromException` builds.
 			return await route.view(context);
 		} catch (err) {
-			const response = responseFromException(err);
+			const response = responseFromException(err, true);
 			return Response.json(response, { status: response.status });
 		}
 	};

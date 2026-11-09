@@ -31,6 +31,10 @@ com 401 no REST ou erro de autenticação JSON-RPC.
   Conteúdos enviáveis por formulário e corpos sem Content-Type exigem Origin
   local quando não há Bearer válido. REST e `/rpc` compartilham a regra, então
   trocar um REST direto por um envelope RPC não a contorna.
+- `rest.batch` exige autenticação mesmo para chamar uma rota REST pública.
+  Reutiliza os wrappers de rota, inclusive schemas e autorização, sem HTTP
+  interno. Não aceita cabeçalhos ou credenciais por item. Rotas de autenticação,
+  multipart e páginas fora do registro não entram na ponte.
 
 ## Consequências
 
@@ -38,4 +42,6 @@ Clientes que fazem login e conservam o cookie devem usar esse cookie sozinho
 ou omiti-lo explicitamente ao enviar Bearer. A resposta de login continua
 emitindo as duas credenciais para clientes distintos; enviá-las juntas é erro.
 
-Um novo endpoint permanece protegido por padrão.
+Um novo endpoint permanece protegido por padrão e só entra na ponte quando
+registrado como JSON no registro REST. Detalhes e limites do contrato estão em
+`dev/specs/to-review/rest-batch.md`.

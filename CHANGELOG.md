@@ -27,6 +27,10 @@
   O coordenador nunca bloqueia o campo: abre sempre com um handle, reconcilia
   com o servidor em segundo plano e, em divergência, adota nova base com lacuna
   registrada em vez de exigir escolha do aluno.
+- Ponte JSON-RPC `rest.batch` para operações REST JSON com verbo homogêneo,
+  execução sequencial e resultados individuais, sem HTTP interno ou transação
+  global. Reutiliza schemas, handlers e autorização do REST e limita tamanho
+  do envelope, quantidade de operações e payload por item.
 - Grading bots: a request authenticated by a `BOT` API key writes feedback
   under the key's name (a slug), never as a human, so the submission reads
   "Graded automatically". `chalk codehood autograde` (in the chalk project)

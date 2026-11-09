@@ -1,6 +1,12 @@
 import type { APIRoute } from "astro";
 import type { UserActor } from "@/auth/actor";
-import { dispatch, RPC_ERROR, type RpcResponse } from "@/rpc/registry";
+import { InvalidData } from "@/core/error";
+import {
+	dispatch,
+	RPC_ERROR,
+	type RpcResponse,
+	readEnvelope,
+} from "@/rpc/registry";
 
 // Importing the method index is what registers the methods.
 import "@/rpc";
@@ -19,13 +25,26 @@ export const prerender = false;
  * method errors — a non-200 here means the body is not a JSON-RPC message at
  * all.
  */
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async (context) => {
+	const { request, locals } = context;
 	const actor = locals.actor as UserActor | undefined;
 
 	let payload: unknown;
 	try {
-		payload = await request.json();
-	} catch {
+		payload = await readEnvelope(request);
+	} catch (error) {
+		if (error instanceof InvalidData)
+			return Response.json(
+				{
+					jsonrpc: "2.0",
+					id: null,
+					error: {
+						code: RPC_ERROR.invalidRequest,
+						message: "RPC envelope exceeds 1 MiB.",
+					},
+				},
+				{ status: 413 },
+			);
 		return Response.json(
 			{
 				jsonrpc: "2.0",
@@ -37,14 +56,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
 	}
 
 	if (Array.isArray(payload)) {
-		if (payload.length === 0)
+		if (payload.length === 0 || payload.length > 50)
 			return Response.json(
 				{
 					jsonrpc: "2.0",
 					id: null,
 					error: {
 						code: RPC_ERROR.invalidRequest,
-						message: "A batch must contain at least one request.",
+						message: "A batch must contain 1 to 50 requests.",
 					},
 				},
 				{ status: 200 },
@@ -55,7 +74,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 		// them as separate requests.
 		const responses: RpcResponse[] = [];
 		for (const item of payload) {
-			const response = await dispatch(item, actor);
+			const response = await dispatch(item, actor, context);
 			if (response) responses.push(response);
 		}
 		return responses.length === 0
@@ -63,7 +82,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 			: Response.json(responses);
 	}
 
-	const response = await dispatch(payload, actor);
+	const response = await dispatch(payload, actor, context);
 	return response
 		? Response.json(response)
 		: new Response(null, { status: 204 });

@@ -13,6 +13,11 @@ The REST API lives under `/api/*` and is addressed as described in
   Unsafe API requests with a foreign Origin are refused unless authenticated
   with Bearer; form-like requests without Bearer require a local Origin.
 
+`rest.batch` on `/rpc` dispatches JSON-only operations through the same REST
+views, in order, without internal HTTP or a global transaction. It excludes
+login/logout, multipart and pages outside the registry. See
+[the contract](../../dev/specs/to-review/rest-batch.md) for limits and examples.
+
 This file maps where each piece lives.
 
 ## Where things live
