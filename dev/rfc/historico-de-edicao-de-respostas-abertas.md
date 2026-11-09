@@ -470,6 +470,100 @@ Não criar impressão de precisão que os dados não suportam.
 - Dados de desenvolvimento que alcancem edição normal, recuperação, conflito e
   histórico incompleto quando a funcionalidade entrar na interface real.
 
+## Casos de borda obrigatórios para o agente testador
+
+Cada cenário abaixo precisa de teste explícito quando sua fatia for implementada.
+Escrever primeiro o teste contra o contrato público, comprovar falha pelo motivo
+correto e somente depois implementar. Trabalhar em lotes de até três critérios;
+não produzir toda a suíte antecipadamente. Registrar comandos e resultados red e
+green por lote. Testes ainda não aplicáveis ficam assinalados como pendentes, não
+como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
+
+### Monitor e codec
+
+- Pausas de 999, 1.000 e 1.001 ms com limite 1.000: somente a pausa estritamente
+  maior fecha por inatividade. Coleta explícita fecha independentemente da pausa.
+- Tempo inválido, negativo, não finito ou regressivo é rejeitado sem mutação
+  parcial; timestamps iguais são válidos e produzem intervalos zero observados.
+- Campo vazio, inserção no início/fim, seleção total substituída, exclusão total,
+  operação sem efeito e ida de texto não vazio para vazio. Nenhuma mudança pode
+  desaparecer por tratar string vazia como ausência de valor.
+- Emoji fora do BMP, acento combinante, texto RTL e quebras de linha: replay
+  preserva exatamente as unidades UTF-16; nenhuma normalização implícita.
+- Posição negativa, exclusão além do documento, frações e substituições
+  sobrepostas: erro sem aplicar parte da transação. Múltiplas substituições
+  válidas em coordenadas pré-transação produzem o documento esperado.
+- Uma intenção ligada a várias substituições conta uma vez nas estatísticas.
+  Intenção sem mudança, seleção e teclas de navegação não criam edits. Repetição
+  inválida de identificador de entrada não duplica amostras silenciosamente.
+- Zero, um e vários intervalos; intervalos constantes e variáveis com média e M2
+  conhecidos. Pausa que abre outro edit não contamina a variância interna.
+- Exportar checkpoint durante um edit não altera seu agrupamento. Serializar e
+  restaurar preserva o replay; versões desconhecidas e checkpoints corrompidos
+  são recusados sem apagar o rascunho original.
+- Primeiro delta de cada lote usa a origem da sessão, inclusive a partir do
+  segundo lote. Testar replay sem consultar o último timestamp do lote anterior.
+
+### Coleta, confirmação e concorrência
+
+- `collect` sem mudanças retorna null. Coletas repetidas de um lote pendente
+  mantêm identificador, snapshot e conteúdo. Editar durante envio não modifica
+  esse lote e aparece no seguinte após confirmação.
+- ACK perdido após commit no servidor seguido de retry não cria outra revisão.
+  Mesmo batchId com conteúdo diferente é recusado. ACK repetido idêntico é
+  inofensivo; ACK de outro lote ou sequência/revisão divergente não apaga dados.
+- Duas abas enviando a mesma revisão base: no máximo uma vence; a outra conserva
+  texto e histórico para reconciliação explícita.
+- Falha de um campo num lote da prova não impede confirmação de outro. Retry
+  não reenvia campo já confirmado como se fosse uma alteração nova.
+- Campo desmontado durante requisição ou durante edit aberto conserva pendências.
+  Registrar novamente o mesmo campo não cria dois donos ativos ou dois envios.
+- Reload com lote antigo pendente e relógio monotônico reiniciado: replay antigo
+  continua válido e novas entradas usam sessão nova sem intervalos negativos.
+
+### Persistência e recuperação
+
+- Digitação contínua, sem pausa de 1 segundo e sem evento de unload: gravações
+  locais respeitam a espera máxima e recuperam o último checkpoint concluído.
+- Gravações assíncronas finalizando fora de ordem não fazem um snapshot antigo
+  substituir o novo. Abort de transação não deixa texto e outbox incompatíveis.
+- Quota excedida, IndexedDB indisponível e fallback localStorage também falhando:
+  edição continua, aviso é observável e resposta não é declarada salva localmente.
+- Fallback recupera texto vazio e texto não vazio; indica lacuna, sem inventar
+  cadência. Histórico não confirmado sobrevive mesmo se texto já igual ao servidor.
+- Logout, troca de usuário e TTL não expõem rascunho de outra conta. Callback
+  assíncrono antigo após logout não recria dados removidos da sessão encerrada.
+- Rascunho local divergente do servidor exige escolha explícita, não vitória pelo
+  timestamp do navegador. Após prazo encerrado, recuperação não reabre a entrega.
+
+### Adaptadores e integração
+
+- IME iniciado e cancelado, composição confirmada, autocorreção, ditado e teclado
+  virtual: uma mudança efetiva por operação, sem teclas fictícias nem texto perdido.
+- Colagem extensa, corte, undo/redo e mudança de cursor no meio da digitação:
+  replay correto, causa adequada e agrupamento encerrado quando necessário.
+- Atualização de valor controlado e eco de `onChange` não registram o mesmo texto
+  duas vezes. Aceitar um rascunho diferente é uma mudança explícita.
+- Readonly não captura alterações de usuário. Instâncias montadas/desmontadas
+  repetidamente não acumulam listeners ou callbacks de coleta.
+- Textarea e CodeMirror equivalentes produzem o mesmo texto por replay, sem
+  exigir que transações nativas diferentes tenham segmentação idêntica.
+- Quando rich text for definido, alteração somente de formatação deve aparecer
+  no documento recuperado; sanitização rejeita conteúdo executável no replay.
+
+### Servidor e entrega
+
+- Acesso a tentativa ou campo de outro aluno, questão fora da prova, sequência
+  inconsistente e snapshot divergente não gravam lote nem alteram estado atual.
+- Falha entre inserção do lote e atualização do estado faz rollback de ambos.
+  O teste deve observar a garantia por leitura pública, não por detalhes SQL.
+- Fronteira exata do prazo segue a regra existente do service. Entrega concorrente
+  com autosave não aceita alteração posterior nem vincula revisão incorreta.
+- Limites exatamente no máximo e um acima para bytes UTF-8, edits e crescimento
+  acumulado. Muitos caracteres multibyte não contornam limite contado por bytes.
+- Falta de histórico ou limite atingido preserva recuperação explícita da resposta
+  válida, mas nunca produz indicação falsa de histórico completo.
+
 ## Perguntas abertas
 
 - Q1. Qual biblioteca de rich text e qual representação canônica preservam o
