@@ -28,6 +28,16 @@ RED real: 54 falhas funcionais com `Error: Not implemented`, 156 testes de rejei
 
 Transações com posições repetidas são recusadas para eliminar ordem ambígua; intervalos adjacentes com posições distintas são aceitos. O implementer recebeu somente critérios e stubs, sem acesso aos testes.
 
+## Ciclo 2: monitor independente
+
+Contrato concreto em `src/services/answer-edits/monitor.ts`, preservando os métodos conceituais. `PendingEditBatch` acrescenta `timeOriginMs`, que faltava na assinatura conceitual, mas já era exigido pelo envelope descrito no RFC. Origem capturada por `now()` na criação; timestamps fornecidos estão nesse mesmo relógio. IDs de lote são determinísticos por sessão e primeira sequência. A sessão inicial precisa ser única por campo; `restore` aceita `createSessionId` injetável, com UUID como padrão, para criar uma sessão nova sem comparar relógios antigos.
+
+Refinamentos de agrupamento: inserções puras contíguas de digitação e exclusões puras contíguas podem agrupar se preservarem replay. Undo, redo, paste, composition e transações com múltiplos patches ficam isolados. Sem observação associada, mudança não inventa amostras de cadência. Observação consumida não pode ser reutilizada. Mudança sem efeito não gera edit. Estatísticas em transações de vários patches ficam só no primeiro edit sequencial; não repetir o mesmo intervalo em cada patch. `hasPendingChanges` inclui operações em trânsito e retidas. ACK válido incrementa revisão exatamente uma vez e confirma a última sequência do lote.
+
+Lote 1: validação atômica/replay de mudanças; fronteiras de agrupamento; observações e Welford sem contagem duplicada. RED: `pnpm exec tsx test/run.ts test/answer-edit-monitor-input.spec.ts`, 70 falhas funcionais no stub. Primeiro GREEN teve 69 aprovados e uma falha legítima: intervalo atravessando pausa contaminava timing do edit seguinte. Corrigido no implementer sem ler teste, com diagnóstico público. GREEN final: `pnpm exec tsx test/run.ts test/answer-edit-codec.spec.ts test/answer-edit-monitor-input.spec.ts`, 280 aprovados em 13 s. O tester corrigiu separadamente seis erros de acesso indexado possivelmente indefinido, sem alterar expectativas. Logs `/tmp/input-monitor-input-{red,green}.log`.
+
+Lote 2: coleta imutável/ACK e lifecycle. Lote 3: checkpoint e restore com sessão nova. Nenhum teste de lotes futuros será antecipado.
+
 ## Pendências
 
 Monitor, coleta/ACK/checkpoint, persistência/coordenador, adaptadores, servidor, entrega e integração real ainda não implementados. Todos os corner cases dessas fatias permanecem pendentes. Rich text e seam externa MDQ precisam das decisões já descritas no RFC. Não há interface nova nem estados novos para seed nesta fatia puramente funcional.
