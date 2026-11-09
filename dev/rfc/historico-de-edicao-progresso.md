@@ -38,8 +38,37 @@ Lote 1: validação atômica/replay de mudanças; fronteiras de agrupamento; obs
 
 Lote 2: coleta imutável/ACK e lifecycle. RED: `pnpm exec tsx test/run.ts test/answer-edit-monitor-batches.spec.ts`, 32 falhas funcionais e quatro aprovados. GREEN acumulado: `pnpm exec tsx test/run.ts test/answer-edit-codec.spec.ts test/answer-edit-monitor-input.spec.ts test/answer-edit-monitor-batches.spec.ts`, 316 aprovados em 10,6 s. Logs `/tmp/input-monitor-batches-{red,green}.log`. Notificações são síncronas; dispose é idempotente, mantém estado consultável e rejeita novas operações mutáveis.
 
-Lote 3: checkpoint e restore com sessão nova. Nenhum teste de lotes futuros será antecipado.
+Lote 3: checkpoint e restore com sessão nova. RED: `pnpm exec tsx test/run.ts test/answer-edit-monitor-checkpoint.spec.ts`, 31 falhas funcionais no stub. GREEN acumulado dos quatro arquivos: 347 aprovados em 11,3 s. A primeira execução encontrou 11 falhas na mesma expectativa parametrizada do teste: ele chamava `collect` com edit aberto durante envio e esperava agrupamento posterior. O RFC exige fechamento nessa chamada. O tester corrigiu a expectativa para dois edits, sem alterar o contrato para acomodar implementação. Logs `/tmp/input-monitor-checkpoint-{red,green}.log`.
+
+Checkpoint é opaco, versionado, validado integralmente por schema Zod e invariantes de replay no módulo interno `checkpoint.ts`. Exportação copia e congela sem fechar edit. Restore preserva inflight, transforma pendências antigas em segmentos fechados, mantém fila por sessão, receipts históricos e sequências globais; cria sessão nova com UUID injetável e origem nova. Lotes de sessões antigas são coletados antes da sessão nova. O snapshot de cada segmento é o daquele instante, não o texto mais recente.
+
+## Ciclo 3: regressões encontradas em revisão independente
+
+Um worker revisor, somente leitura, identificou dois bugs antes da entrega. O tester recebeu reproduções e critérios, não a implementação:
+
+1. Tempos finitos extremos e pausa configurada grande podiam transbordar M2 para Infinity, tornando o checkpoint irrestaurável. O limite de representação numérica agora fecha o edit anterior e inicia outro, preservando texto e sem fabricar intervalo.
+2. Uma observação atrasada em relação à alteração podia incluir pausa observada maior que o limite no timing interno. Agrupamento agora exige tanto gap entre mudanças quanto intervalo observado dentro do limite; igualdade continua válida.
+
+RED: `pnpm exec tsx test/run.ts test/answer-edit-monitor-boundaries.spec.ts`, quatro falhas comportamentais e dois aprovados. GREEN acumulado: `pnpm exec tsx test/run.ts test/answer-edit-codec.spec.ts test/answer-edit-monitor-input.spec.ts test/answer-edit-monitor-batches.spec.ts test/answer-edit-monitor-checkpoint.spec.ts test/answer-edit-monitor-boundaries.spec.ts`, 353 aprovados em 10,1 s. Logs `/tmp/input-monitor-boundaries-{red,green}.log`. São seis regressões adicionais, com fronteiras de pausa observada 999/1000/1001 ms.
+
+## Validação da entrega parcial
+
+- `pnpm exec biome check --write .`: exit 0, 792 arquivos, um corrigido automaticamente.
+- `pnpm run lint`: exit 0, incluindo i18n, TypeScript, Astro com zero erros e catálogo de stories.
+- Suíte relevante completa: 353 testes aprovados. Propriedades fast-check com sementes fixas nos testes de codec, replay, mudanças e checkpoint.
+- `pnpm test`: suíte de 3.350 testes iniciada, interrompida por timeout externo de 300 s, sem resumo final. Não conta como suíte completa aprovada. Log `/tmp/input-monitor-full-suite.log`. O processo de servidor restante desta execução foi encerrado pelo PID exato; processos de outras worktrees não foram tocados.
+- Nenhuma alteração de schema, migration, endpoint, dependência ou contrato CLI. Não houve seed novo porque nenhuma interface foi introduzida e o núcleo não consulta banco.
+
+## Cobertura e limites
+
+Concluídos no núcleo: pausas, tempos inválidos/iguais/regressivos, valores vazios e Unicode, transações multipatch e rejeição atômica, associação de intenção única, Welford, export não invasivo, versão/corrupção estrutural, origens independentes de lote e sessão, coletas imutáveis, edição durante envio, ACK divergente/repetido e múltiplos reloads com fila pendente. Os casos de ACK perdido são locais e não provam idempotência no banco.
+
+A API concreta está nos módulos `codec.ts` e `monitor.ts`. Não há DOM, Solid, storage ou rede na classe. `checkpoint.ts` é interno e não deve ser importado por consumidores externos à pasta.
 
 ## Pendências
 
-Monitor, coleta/ACK/checkpoint, persistência/coordenador, adaptadores, servidor, entrega e integração real ainda não implementados. Todos os corner cases dessas fatias permanecem pendentes. Rich text e seam externa MDQ precisam das decisões já descritas no RFC. Não há interface nova nem estados novos para seed nesta fatia puramente funcional.
+Persistência/coordenador, IndexedDB, fallback de rascunho sem dois donos, isolamento por usuário/TTL/logout, recuperação após prazo, adaptadores textarea/CodeMirror, servidor/banco, entrega e integração real ainda não implementados. Todos os corner cases dessas fatias permanecem pendentes, incluindo rollback, concorrência entre abas, autorização, quotas, teardown de componente e teste de carga.
+
+Próxima fatia: contratos de scheduler/storage/transporte injetáveis e coordenador por tentativa; gravação com espera máxima de aproximadamente 1 s e outbox persistida antes do envio de 55 a 65 s. Antes de integrar o fallback, inspecionar o rascunho de código atual para manter dono único. Depois, adaptadores independentes e servidor com seus próprios lotes RED/GREEN. O autosave real não foi alterado nem duplicado.
+
+Rich text e seam externa MDQ precisam das decisões já descritas no RFC. Também continuam abertas retenção, acesso ao histórico, limites de volume por tentativa e política de checkpoints do servidor. Nada foi editado em MDQ ou node_modules, além da instalação normal de dependências no worktree. Sem push. O recurso completo não está pronto.

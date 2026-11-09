@@ -4,6 +4,11 @@
 
 ### Added
 
+- Núcleo independente de histórico de edição de respostas: codec de tuplas
+  versionadas, replay UTF-16, agrupamento com estatísticas Welford, lotes
+  imutáveis, ACK idempotente e checkpoints recuperáveis entre sessões de relógio.
+  Entrega parcial, ainda sem persistência no navegador, adaptadores ou integração
+  com o salvamento de provas.
 - Grading bots: a request authenticated by a `BOT` API key writes feedback
   under the key's name (a slug), never as a human, so the submission reads
   "Graded automatically". `chalk codehood autograde` (in the chalk project)

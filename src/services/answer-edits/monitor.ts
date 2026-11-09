@@ -1,3 +1,4 @@
+import { frozenCopy, type PendingSegment, parseCheckpoint } from "./checkpoint";
 import {
 	type AnswerEdit,
 	applyReplacements,
@@ -84,6 +85,11 @@ export class AnswerEditMonitor implements MonitorHandle {
 	private readonly timeOriginMs: number;
 	private readonly pauseMs: number;
 	private text: string;
+	private confirmedText: string;
+	private initialRevision: number;
+	private initialSeq: number;
+	private sessions: Set<string>;
+	private queue: PendingSegment[] = [];
 	private lastAtMs: number;
 	private readonly observations = new Map<string, InputObservation>();
 	private readonly consumedInputs = new Set<string>();
@@ -123,19 +129,63 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.timeOriginMs = origin;
 		this.lastAtMs = origin;
 		this.text = options.initialText;
+		this.confirmedText = options.initialText;
+		this.initialRevision = options.baseRevision;
+		this.initialSeq = options.firstSeq;
+		this.sessions = new Set([options.sessionId]);
 	}
 
 	/**
 	 * Restore a saved monitor in a new clock session.
 	 *
-	 * @throws {Error} Checkpoint restoration is not implemented.
+	 * @throws {TypeError} If the checkpoint, new clock or session identifier is invalid.
 	 */
-	static restore(_options: {
+	static restore(options: {
 		checkpoint: MonitorCheckpoint;
 		now: () => number;
 		createSessionId?: () => string;
 	}): AnswerEditMonitor {
-		throw new Error("Not implemented");
+		requireRecord(options, "options");
+		const state = parseCheckpoint(options.checkpoint);
+		const createSessionId =
+			options.createSessionId === undefined
+				? () => crypto.randomUUID()
+				: options.createSessionId;
+		if (typeof createSessionId !== "function")
+			throw new TypeError("createSessionId must be a function");
+		const sessionId = createSessionId();
+		requireId(sessionId, "sessionId");
+		if (state.sessions.includes(sessionId))
+			throw new TypeError("Restored session id must be new");
+		const monitor = new AnswerEditMonitor({
+			initialText: state.text,
+			sessionId,
+			baseRevision: state.baseRevision,
+			firstSeq: state.firstSeq,
+			pauseMs: state.pauseMs,
+			now: options.now,
+		});
+		monitor.initialRevision = state.initialRevision;
+		monitor.initialSeq = state.initialSeq;
+		monitor.confirmedText = state.confirmedText;
+		monitor.sessions = new Set([...state.sessions, sessionId]);
+		monitor.inFlight = frozenCopy(state.inFlight);
+		monitor.queue = state.queue;
+		const active = state.active;
+		const edits = active.openEdit
+			? [...active.edits, active.openEdit.edit]
+			: active.edits;
+		if (edits.length > 0) {
+			monitor.queue.push({
+				sessionId: active.sessionId,
+				timeOriginMs: active.timeOriginMs,
+				edits,
+				snapshot: state.text,
+			});
+		}
+		for (const receipt of state.receipts)
+			monitor.receipts.set(receipt.batchId, frozenCopy(receipt));
+		return monitor;
 	}
 
 	/**
@@ -237,6 +287,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 			text: this.text,
 			hasPendingChanges:
 				this.inFlight !== null ||
+				this.queue.length > 0 ||
 				this.edits.length > 0 ||
 				this.openEdit !== null,
 			hasUnacknowledgedBatch: this.inFlight !== null,
@@ -251,12 +302,21 @@ export class AnswerEditMonitor implements MonitorHandle {
 	 */
 	collect(): Readonly<PendingEditBatch> | null {
 		this.requireActive();
-		if (this.inFlight) return this.inFlight;
-		const pending = this.openEdit
-			? [...this.edits, this.openEdit.edit]
-			: this.edits;
+		if (this.inFlight) {
+			if (this.openEdit) {
+				this.finalizeEdit();
+				this.notify();
+			}
+			return this.inFlight;
+		}
+		const segment = this.queue[0];
+		const pending =
+			segment?.edits ??
+			(this.openEdit ? [...this.edits, this.openEdit.edit] : this.edits);
 		if (pending.length === 0) return null;
-		const envelope = encodeEdits(pending, this.timeOriginMs);
+		const timeOriginMs = segment?.timeOriginMs ?? this.timeOriginMs;
+		const sessionId = segment?.sessionId ?? this.sessionId;
+		const envelope = encodeEdits(pending, timeOriginMs);
 		requireInteger(this.baseRevision + 1, "next revision");
 		requireInteger(this.firstSeq + envelope.edits.length, "next sequence");
 		for (const tuple of envelope.edits) {
@@ -266,14 +326,19 @@ export class AnswerEditMonitor implements MonitorHandle {
 		Object.freeze(envelope.edits);
 		this.inFlight = Object.freeze({
 			...envelope,
-			batchId: `${this.sessionId}:${this.firstSeq}`,
-			sessionId: this.sessionId,
+			batchId: `${sessionId}:${this.firstSeq}`,
+			sessionId,
 			baseRevision: this.baseRevision,
 			firstSeq: this.firstSeq,
-			snapshot: this.text,
+			snapshot: segment?.snapshot ?? this.text,
 		});
-		this.edits = [];
-		this.openEdit = null;
+		if (segment) {
+			this.queue.shift();
+			this.finalizeEdit();
+		} else {
+			this.edits = [];
+			this.openEdit = null;
+		}
 		const batch = this.inFlight;
 		this.notify();
 		return batch;
@@ -322,6 +387,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 		);
 		this.baseRevision = nextRevision;
 		this.firstSeq = nextSeq;
+		this.confirmedText = batch.snapshot;
 		this.inFlight = null;
 		this.notify();
 	}
@@ -329,10 +395,34 @@ export class AnswerEditMonitor implements MonitorHandle {
 	/**
 	 * Export the document, pending edits and session metadata for persistence.
 	 *
-	 * @throws {Error} Checkpoint export is not implemented.
 	 */
 	exportCheckpoint(): Readonly<MonitorCheckpoint> {
-		throw new Error("Not implemented");
+		return frozenCopy({
+			version: 1,
+			state: {
+				initialRevision: this.initialRevision,
+				initialSeq: this.initialSeq,
+				baseRevision: this.baseRevision,
+				firstSeq: this.firstSeq,
+				pauseMs: this.pauseMs,
+				confirmedText: this.confirmedText,
+				text: this.text,
+				sessions: [...this.sessions],
+				receipts: [...this.receipts.values()],
+				inFlight: this.inFlight,
+				queue: this.queue,
+				active: {
+					sessionId: this.sessionId,
+					timeOriginMs: this.timeOriginMs,
+					lastAtMs: this.lastAtMs,
+					previousCadenceMs: this.previousCadenceMs,
+					observations: [...this.observations.values()],
+					consumedInputs: [...this.consumedInputs],
+					edits: this.edits,
+					openEdit: this.openEdit,
+				},
+			},
+		});
 	}
 
 	/**
@@ -413,7 +503,12 @@ export class AnswerEditMonitor implements MonitorHandle {
 
 	private appendEdit(edit: AnswerEdit, isolated: boolean): void {
 		const open = this.openEdit;
-		if (!isolated && open && edit.startMs - open.lastAtMs <= this.pauseMs) {
+		if (
+			!isolated &&
+			open &&
+			edit.startMs - open.lastAtMs <= this.pauseMs &&
+			(edit.timing === null || edit.timing[1] <= this.pauseMs)
+		) {
 			const merged = mergeEdits(open.edit, edit);
 			if (merged) {
 				this.openEdit = { edit: merged, lastAtMs: edit.startMs };
@@ -499,25 +594,31 @@ function mergeEdits(previous: AnswerEdit, next: AnswerEdit): AnswerEdit | null {
 	} else {
 		return null;
 	}
+	const timing = mergeTiming(previous.timing, next.timing);
+	if (timing === undefined) return null;
 	return {
 		...previous,
 		...replacement,
 		durationMs: next.startMs - previous.startMs,
-		timing: mergeTiming(previous.timing, next.timing),
+		timing,
 	};
 }
 
 function mergeTiming(
 	previous: EditTiming | null,
 	next: EditTiming | null,
-): EditTiming | null {
+): EditTiming | null | undefined {
 	if (!previous) return next;
 	if (!next) return previous;
 	const count = previous[0] + next[0];
+	if (!Number.isSafeInteger(count)) return undefined;
 	const delta = next[1] - previous[1];
-	return [
-		count,
-		previous[1] + (delta * next[0]) / count,
-		previous[2] + next[2] + (delta * delta * previous[0] * next[0]) / count,
-	];
+	const nextWeight = next[0] / count;
+	const mean = previous[1] + delta * nextWeight;
+	/// Apply the weight before squaring to avoid unnecessary intermediate overflow.
+	const correction = delta * (delta * (previous[0] * nextWeight));
+	const m2 = previous[2] + next[2] + correction;
+	/// An unrepresentable statistic closes the group without inventing a sample.
+	if (!Number.isFinite(mean) || !Number.isFinite(m2)) return undefined;
+	return [count, mean, m2];
 }
