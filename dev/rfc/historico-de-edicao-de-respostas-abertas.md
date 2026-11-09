@@ -289,8 +289,8 @@ declare class AnswerEditMonitor implements MonitorHandle {
 - `snapshot` serve para comparação e recuperação no transporte. Não é copiado
   para toda linha histórica no banco.
 - `exportCheckpoint` inclui texto, operações ainda abertas/pendentes, lote em
-  trânsito e metadados suficientes para reenvio idempotente. Exportar fecha ou
-  copia coerentemente o edit aberto, sem descartá-lo. IndexedDB é responsabilidade
+  trânsito e metadados suficientes para reenvio idempotente. Exportar copia
+  coerentemente o edit aberto, sem fechá-lo ou descartá-lo. IndexedDB é responsabilidade
   do coordenador.
 - Recarregar a página cria outra origem de relógio monotônico. `restore` preserva
   os lotes antigos, fecha a sessão temporal anterior e estabelece uma nova sessão
@@ -332,6 +332,45 @@ Se isso gerar diffs excessivos ou perder estrutura, definir outra versão de
 operações de documento. Não forçar rich text a texto puro para caber no codec.
 Renderização e sanitização de conteúdo continuam obrigatórias; histórico nunca
 pode ser interpretado como HTML confiável.
+
+## Recuperação local após falha do navegador ou da máquina
+
+Persistência local é independente do intervalo de envio ao servidor. Esperar um
+minuto para gravar no navegador deixaria justamente o último trecho vulnerável a
+reinício, travamento ou fechamento inesperado.
+
+Usar IndexedDB como armazenamento principal de texto, checkpoint do monitor e
+outbox. Gravar uma visão coerente desses dados em uma transação. O coordenador
+agenda gravações durante a edição, com coalescência e espera máxima inicial de
+1 segundo, sem depender apenas de debounce de inatividade. A política e a latência
+real devem ser medidas; há uma janela residual de perda e o navegador não garante
+durabilidade contra toda falha de energia. Exportar checkpoint não fecha o edit:
+a frequência de persistência não deve alterar os agrupamentos de digitação.
+
+`localStorage` pode ser fallback de recuperação somente do texto mais recente e
+de metadados mínimos, não do histórico inteiro. É síncrono, tem quota limitada e
+reescrever JSON crescente bloquearia a interface. Falha de IndexedDB não autoriza
+truncar o histórico silenciosamente: indicar captura incompleta. Antes de adotar o
+fallback, integrar a política ao rascunho de código existente; não manter dois
+rascunhos concorrentes para o mesmo campo. Se a gravação local também falhar, avisar
+explicitamente que a recuperação depende do último salvamento no servidor.
+
+Identificar registros por usuário, tentativa, questão e campo. Isolar contas,
+estabelecer TTL e remover dados locais no logout e após entrega confirmada, de
+acordo com a política de sessão. Armazenamento do navegador não é criptografia nem
+barreira contra XSS ou acesso ao mesmo perfil do sistema operacional. Navegação
+privada, limpeza de dados, quota e eviction podem remover registros.
+
+Ao reabrir, autenticar e consultar o estado do servidor antes de reenviar. Texto
+igual ao servidor não implica histórico confirmado: preservar lotes sem recibo
+até reconciliar seus identificadores. Se revisão e recibos forem compatíveis,
+restaurar e reenviar idempotentemente. Se houver divergência com outro dispositivo
+ou aba, oferecer recuperação explícita sem sobrescrever silenciosamente a resposta
+remota. Timestamp local isolado não decide qual versão vence.
+
+Quando só o texto puder ser recuperado, preservá-lo como rascunho e registrar uma
+lacuna no histórico. A recuperação não estende o prazo de entrega: depois do
+encerramento, apresentar o texto e o status sem contornar a regra do servidor.
 
 ## Coordenador, persistência e envio
 
@@ -421,6 +460,9 @@ Não criar impressão de precisão que os dados não suportam.
   zero, um e vários intervalos e sem duplicação por transação.
 - Coleta repetida, edição durante envio, perda de ACK, retry, reload, desmontagem,
   falha de armazenamento e confirmação fora de ordem sem perda de dados.
+- Recuperação após encerramento abrupto sem eventos de unload, gravação durante
+  digitação contínua, fallback sem histórico, troca de usuário, expiração e
+  reabertura após o prazo. Preservar texto não significa autorizar nova entrega.
 - Autorização, prazo, reuso malicioso de batchId, limites e conflito entre abas.
 - Replay com checkpoint, histórico incompleto e vínculo exato da entrega final.
 - Teste de carga com turma simultânea, medindo requisições, latência, contenção de
