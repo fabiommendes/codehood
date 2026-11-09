@@ -12,6 +12,7 @@ import {
 	type FieldRef,
 	LOCAL_EDIT_TTL_MS,
 	type LocalEditRecord,
+	type TextRecovery,
 	type TextRecoveryStore,
 } from "./storage";
 
@@ -62,6 +63,11 @@ export interface FieldStatus extends AttemptField {
 }
 export type FieldRecovery =
 	| {
+			readonly kind: "unavailable";
+			readonly server: ServerFieldState;
+			readonly reason: string;
+	  }
+	| {
 			readonly kind: "ready";
 			readonly handle: ObservableMonitorHandle;
 			readonly canWrite: boolean;
@@ -101,6 +107,7 @@ interface RegisteredField {
 	attached: boolean;
 	owned: boolean;
 	canWrite: boolean;
+	principalReadError: string | null;
 	generation: number | null;
 	version: number;
 	attemptedVersion: number;
@@ -109,6 +116,8 @@ interface RegisteredField {
 
 const MAX_FIELDS = 128;
 const PERSIST_DELAY_MS = 1000;
+const INITIAL_RETRY_MS = 1000;
+const MAX_RETRY_MS = 60_000;
 
 /**
  * Own local durability and aggregate delivery for one authenticated attempt.
@@ -116,6 +125,9 @@ const PERSIST_DELAY_MS = 1000;
 export class AnswerEditCoordinator {
 	private readonly fields = new Map<string, RegisteredField>();
 	private readonly registering = new Set<string>();
+	private readonly recoveryStatuses = new Map<string, FieldStatus>();
+	private retryBaseMs = 0;
+	private deliveryFailed = false;
 	private readonly options: CoordinatorOptions;
 	private cancelPersist: (() => void) | null = null;
 	private cancelDelivery: (() => void) | null = null;
@@ -169,8 +181,10 @@ export class AnswerEditCoordinator {
 	 * Return status of the last completed local commit, not an optimistic save promise.
 	 */
 	getStatus(field: AttemptField): Readonly<FieldStatus> | null {
-		const entry = this.fields.get(fieldKey(field));
-		return entry ? Object.freeze({ ...entry.status }) : null;
+		const key = fieldKey(field);
+		const status =
+			this.recoveryStatuses.get(key) ?? this.fields.get(key)?.status;
+		return status ? Object.freeze({ ...status }) : null;
 	}
 
 	/**
@@ -204,6 +218,8 @@ export class AnswerEditCoordinator {
 		this.cancelDelivery = null;
 		this.delivery = this.sendPending().finally(() => {
 			this.delivery = null;
+			this.cancelDelivery?.();
+			this.cancelDelivery = null;
 			this.scheduleDelivery();
 		});
 		return this.delivery;
@@ -216,7 +232,7 @@ export class AnswerEditCoordinator {
 		while (!this.stopped && !this.revoked) {
 			const before = this.progressKey();
 			await this.flush();
-			if (before === this.progressKey()) return;
+			if (this.deliveryFailed || before === this.progressKey()) return;
 		}
 	}
 
@@ -266,7 +282,12 @@ export class AnswerEditCoordinator {
 		const previous = this.fields.get(key);
 		if (previous?.attached || this.registering.has(key))
 			throw new Error("Field already has an active handle");
-		if (!previous && this.fields.size + this.registering.size >= MAX_FIELDS)
+		const knownKeys = new Set([
+			...this.fields.keys(),
+			...this.recoveryStatuses.keys(),
+			...this.registering,
+		]);
+		if (!knownKeys.has(key) && knownKeys.size >= MAX_FIELDS)
 			throw new RangeError("Too many registered fields");
 		this.registering.add(key);
 		try {
@@ -274,21 +295,42 @@ export class AnswerEditCoordinator {
 			const server = await this.options.transport.inspect(ref);
 			this.requireActive();
 			let local: LocalEditRecord | null = null;
+			let readError: string | null = null;
 			try {
 				local = await this.options.store.read(ref, this.options.now());
-			} catch {
-				/// Text recovery remains usable when the principal store cannot be read.
+			} catch (error) {
+				readError = errorMessage(error);
 			}
 			this.requireActive();
-			if (!previous && !local && !handle) {
-				const fallback = this.options.fallback.read(ref, this.options.now());
-				if (fallback)
-					return {
-						kind: "text-only",
-						localText: fallback.text,
-						server,
-						historyGap: true,
-					};
+			let fallback: TextRecovery | null = null;
+			let fallbackUnavailable = false;
+			try {
+				fallback = this.options.fallback.read(ref, this.options.now());
+			} catch (error) {
+				fallbackUnavailable = true;
+				if (readError) readError += `; ${errorMessage(error)}`;
+			}
+			if (
+				!previous &&
+				fallback &&
+				(!local || fallback.savedAt >= local.savedAt)
+			) {
+				this.blockRecovery(
+					field,
+					"text-only",
+					fallback.text,
+					"Only text recovery is available",
+				);
+				return {
+					kind: "text-only",
+					localText: fallback.text,
+					server,
+					historyGap: true,
+				};
+			}
+			if (!previous && !local && readError && fallbackUnavailable) {
+				this.blockRecovery(field, "unavailable", null, readError);
+				return { kind: "unavailable", server, reason: readError };
 			}
 			const checkpoint =
 				previous?.handle.exportCheckpoint() ?? local?.checkpoint;
@@ -349,6 +391,7 @@ export class AnswerEditCoordinator {
 				attached: true,
 				owned: !handle,
 				canWrite: server.canWrite,
+				principalReadError: previous?.principalReadError ?? readError,
 				generation: previous?.generation ?? local?.generation ?? null,
 				version: 1,
 				attemptedVersion: 0,
@@ -365,6 +408,7 @@ export class AnswerEditCoordinator {
 					error: null,
 				},
 			};
+			this.recoveryStatuses.delete(key);
 			this.fields.set(key, entry);
 			this.listen(entry);
 			this.publish(entry);
@@ -382,18 +426,37 @@ export class AnswerEditCoordinator {
 		server: ServerFieldState,
 		reason: string,
 	): FieldRecovery {
+		this.blockRecovery(field, "conflict", localText, reason);
+		return { kind: "conflict", localText, server, reason };
+	}
+
+	private blockRecovery(
+		field: AttemptField,
+		durability: "conflict" | "text-only" | "unavailable",
+		localText: string | null,
+		reason: string,
+	): void {
 		const entry = this.fields.get(fieldKey(field));
 		if (entry) {
 			entry.canWrite = false;
 			entry.status = {
 				...entry.status,
-				durability: "conflict",
+				durability,
 				delivery: "blocked",
 				error: reason,
 			};
 			this.publish(entry);
 		}
-		return { kind: "conflict", localText, server, reason };
+		const status: FieldStatus = {
+			...field,
+			durability,
+			delivery: "blocked",
+			savedText: localText,
+			historyGap: durability !== "conflict",
+			error: reason,
+		};
+		this.recoveryStatuses.set(fieldKey(field), status);
+		this.publishStatus(status);
 	}
 
 	private restore(
@@ -456,6 +519,7 @@ export class AnswerEditCoordinator {
 			outbox: state.inFlight,
 		};
 		try {
+			if (entry.principalReadError) throw new Error(entry.principalReadError);
 			await this.options.store.commit(
 				this.ref(entry.field),
 				record,
@@ -463,11 +527,18 @@ export class AnswerEditCoordinator {
 			);
 			if (this.revoked) return;
 			entry.generation = record.generation;
+			let cleanupError: string | null = null;
+			try {
+				this.options.fallback.remove(this.ref(entry.field));
+			} catch (error) {
+				cleanupError = errorMessage(error);
+			}
 			entry.status = {
 				...entry.status,
 				durability: version === entry.version ? "durable" : "pending",
 				savedText: record.text,
-				error: null,
+				historyGap: cleanupError !== null,
+				error: cleanupError,
 			};
 		} catch (error) {
 			if (this.revoked) return;
@@ -500,6 +571,7 @@ export class AnswerEditCoordinator {
 	}
 
 	private async sendPending(): Promise<void> {
+		this.deliveryFailed = false;
 		const pending: { entry: RegisteredField; batch: PendingEditBatch }[] = [];
 		for (const entry of this.fields.values()) {
 			if (!entry.canWrite || entry.status.durability === "conflict") continue;
@@ -568,9 +640,17 @@ export class AnswerEditCoordinator {
 					};
 				this.publish(entry);
 			}
+			this.deliveryFailed = durable.some(
+				({ entry }) =>
+					entry.status.delivery === "pending" && entry.status.error !== null,
+			);
+			/// A reachable server's per-field retry stays on the aggregate cadence.
+			this.updateRetry(false);
 			await this.persist();
 		} catch (error) {
 			if (this.stopped || this.revoked) return;
+			this.deliveryFailed = true;
+			this.updateRetry();
 			for (const { entry } of durable) {
 				entry.status = {
 					...entry.status,
@@ -580,6 +660,14 @@ export class AnswerEditCoordinator {
 				this.publish(entry);
 			}
 		}
+	}
+
+	private updateRetry(failed = this.deliveryFailed): void {
+		this.retryBaseMs = failed
+			? this.retryBaseMs === 0
+				? INITIAL_RETRY_MS
+				: Math.min(MAX_RETRY_MS, this.retryBaseMs * 2)
+			: 0;
 	}
 
 	private schedulePersistence(): void {
@@ -604,7 +692,9 @@ export class AnswerEditCoordinator {
 		)
 			return;
 		this.cancelDelivery = this.options.scheduler.schedule(
-			55_000 + this.options.random() * 10_000,
+			this.retryBaseMs > 0
+				? this.retryBaseMs * (0.5 + this.options.random())
+				: 55_000 + this.options.random() * 10_000,
 			() => {
 				this.cancelDelivery = null;
 				if (!this.stopped && !this.revoked) void this.flush();
@@ -630,9 +720,13 @@ export class AnswerEditCoordinator {
 	}
 
 	private publish(entry: RegisteredField): void {
+		this.publishStatus(entry.status);
+	}
+
+	private publishStatus(status: FieldStatus): void {
 		if (this.revoked) return;
 		try {
-			this.options.onStatus?.(Object.freeze({ ...entry.status }));
+			this.options.onStatus?.(Object.freeze({ ...status }));
 		} catch {
 			/// Status consumers must not interrupt the editor's synchronous notification.
 		}

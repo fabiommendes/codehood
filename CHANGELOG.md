@@ -50,6 +50,11 @@
 
 ### Changed
 
+- Coordenador do histórico de respostas retenta falhas de transporte com backoff
+  exponencial e jitter, expõe conflitos desde a primeira recuperação e consulta
+  o fallback de texto mesmo quando há um checkpoint principal mais antigo.
+  Commits principais removem o fallback anterior, e checkpoints ilegíveis não
+  são sobrescritos durante a recuperação.
 - A question of the new mdq `code` type is refused with a validation error
   ("Question type "code" is not supported yet.") until Codehood can answer and
   grade it. See `dev/issues/suporte-ao-tipo-code-do-mdq.md`.
