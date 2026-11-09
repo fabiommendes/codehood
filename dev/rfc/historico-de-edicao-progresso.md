@@ -71,6 +71,14 @@ Contrato em `storage.ts`: owner obrigatório, CAS por campo e geração, TTL de 
 
 TDD full com workers separados. RED reproduzido pelo orquestrador: `pnpm exec tsx test/run.ts test/answer-edit-storage.spec.ts`, três falhas funcionais `Not implemented`. GREEN pelo mesmo comando: três testes passaram em 14,6 s. Logs `/tmp/input-monitor-storage-{red,green}.log`. Estes três testes usam Chromium, IndexedDB e localStorage reais, módulo empacotado pelo esbuild existente no harness de teste. Incluem CAS concorrente, abort, corrupção, limite multibyte, vazio, TTL e callbacks após revoke. Não provam integração com editores ou logout da aplicação. O namespace não enumera dados de outros owners.
 
+## Ciclo 5: coordenador por tentativa
+
+Lote 1, três critérios: durabilidade durante edição contínua com espera máxima inicial de 1 s; degradação explícita para texto ou indisponível; ownership/detach/dispose/logout. Contrato `AnswerEditCoordinator` em `coordinator.ts`, com storage, scheduler, relógios, aleatoriedade e transporte injetados. Até 128 campos por tentativa. A montagem de storage deve usar o mesmo owner autenticado do coordenador. `register` e `recover` consultam a base do servidor antes de aceitar o campo. Detach fecha e transfere um clone antes do dispose do adaptador. Dispose não apaga pendências, logout revoga os stores.
+
+RED pelo orquestrador: `pnpm exec tsx test/run.ts test/answer-edit-coordinator-local.spec.ts`, 16 falhas funcionais. Primeiro GREEN do implementer encontrou 15 aprovados e uma regressão de retry local: persist explícito não repetia uma gravação fracassada sem nova edição. Corrigido a partir do diagnóstico, sem ler fonte dos testes. GREEN: 16 aprovados. Logs `/tmp/input-monitor-coordinator-local-red.log` e `/tmp/coordinator-local-green.log`. Tests usam monitor real e doubles somente nas fronteiras storage/scheduler/transporte. `pnpm run lint` passou após auto-fix global.
+
+Lote 2 em andamento: envio agregado, backoff e reconciliação ampliada. RED: `pnpm exec tsx test/run.ts test/answer-edit-coordinator-delivery.spec.ts test/answer-edit-coordinator-recovery.spec.ts`, 13 falhas funcionais e 28 aprovados. Gaps identificados: ausência de backoff, status observável de conflito na recuperação inicial, fallback recente ignorado quando checkpoint antigo ainda legível. Log `/tmp/input-monitor-coordinator-delivery-red.log`. Comportamentos já verdes incluem lote estável em retry, ACK perdido compatível, confirmação parcial e bloqueio após prazo. A evidência é contra transporte double, não servidor real.
+
 ## Pendências
 
 Persistência/coordenador, IndexedDB, fallback de rascunho sem dois donos, isolamento por usuário/TTL/logout, recuperação após prazo, adaptadores textarea/CodeMirror, servidor/banco, entrega e integração real ainda não implementados. Todos os corner cases dessas fatias permanecem pendentes, incluindo rollback, concorrência entre abas, autorização, quotas, teardown de componente e teste de carga.
