@@ -79,8 +79,8 @@ const INPUT_KINDS: readonly InputKind[] = [
  */
 export class AnswerEditMonitor implements MonitorHandle {
 	private readonly sessionId: string;
-	private readonly baseRevision: number;
-	private readonly firstSeq: number;
+	private baseRevision: number;
+	private firstSeq: number;
 	private readonly timeOriginMs: number;
 	private readonly pauseMs: number;
 	private text: string;
@@ -91,6 +91,11 @@ export class AnswerEditMonitor implements MonitorHandle {
 	private openEdit: OpenEdit | null = null;
 	private edits: AnswerEdit[] = [];
 	private inFlight: Readonly<PendingEditBatch> | null = null;
+	private readonly receipts = new Map<string, Readonly<BatchReceipt>>();
+	private readonly listeners = new Set<
+		(state: Readonly<MonitorState>) => void
+	>();
+	private disposed = false;
 
 	/**
 	 * Start a session using the supplied clock's current time as its origin.
@@ -120,6 +125,11 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.text = options.initialText;
 	}
 
+	/**
+	 * Restore a saved monitor in a new clock session.
+	 *
+	 * @throws {Error} Checkpoint restoration is not implemented.
+	 */
 	static restore(_options: {
 		checkpoint: MonitorCheckpoint;
 		now: () => number;
@@ -132,8 +142,10 @@ export class AnswerEditMonitor implements MonitorHandle {
 	 * Register an input intention without changing the document or emitting an edit.
 	 *
 	 * @throws {TypeError} If the observation is invalid, duplicated or out of order.
+	 * @throws {Error} If the monitor is disposed.
 	 */
 	observeInput(input: InputObservation): void {
+		this.requireActive();
 		requireRecord(input, "input");
 		requireId(input.id, "input.id");
 		requireKind(input.kind);
@@ -146,14 +158,17 @@ export class AnswerEditMonitor implements MonitorHandle {
 			kind: input.kind,
 		});
 		this.lastAtMs = input.atMs;
+		this.notify();
 	}
 
 	/**
 	 * Validate and apply an entire canonical transaction before recording its edits.
 	 *
 	 * @throws {TypeError} If the transaction, time or input association is invalid.
+	 * @throws {Error} If the monitor is disposed.
 	 */
 	recordChange(change: DocumentChange): void {
+		this.requireActive();
 		requireRecord(change, "change");
 		requireKind(change.kind);
 		this.validateTime(change.atMs);
@@ -169,15 +184,20 @@ export class AnswerEditMonitor implements MonitorHandle {
 			)
 			.map((replacement) => ({ ...replacement }));
 
+		const metadataChanged =
+			this.lastAtMs !== change.atMs || observation !== undefined;
 		this.lastAtMs = change.atMs;
 		if (observation) this.consumedInputs.add(observation.id);
-		if (nextText === this.text) return;
+		if (nextText === this.text) {
+			if (metadataChanged) this.notify();
+			return;
+		}
 
 		const interval = this.cadenceInterval(observation);
 		const isolated =
 			change.replacements.length !== 1 ||
 			!isGroupable(change.kind, replacements[0]);
-		if (isolated) this.closeEdit();
+		if (isolated) this.finalizeEdit();
 		let timing: EditTiming | null = interval === null ? null : [1, interval, 0];
 		for (const replacement of replacements.reverse()) {
 			this.appendEdit(
@@ -193,16 +213,20 @@ export class AnswerEditMonitor implements MonitorHandle {
 			timing = null;
 		}
 		this.text = nextText;
-		if (isolated) this.closeEdit();
+		if (isolated) this.finalizeEdit();
+		this.notify();
 	}
 
 	/**
 	 * Finalize any open edit without collecting a batch.
+	 *
+	 * @throws {Error} If the monitor is disposed.
 	 */
 	closeEdit(): void {
+		this.requireActive();
 		if (!this.openEdit) return;
-		this.edits.push(this.openEdit.edit);
-		this.openEdit = null;
+		this.finalizeEdit();
+		this.notify();
 	}
 
 	/**
@@ -221,12 +245,20 @@ export class AnswerEditMonitor implements MonitorHandle {
 
 	/**
 	 * Freeze the next batch, or return the same unacknowledged batch on retries.
+	 *
+	 * @throws {TypeError} If the next revision or sequence would overflow.
+	 * @throws {Error} If the monitor is disposed.
 	 */
 	collect(): Readonly<PendingEditBatch> | null {
-		this.closeEdit();
+		this.requireActive();
 		if (this.inFlight) return this.inFlight;
-		if (this.edits.length === 0) return null;
-		const envelope = encodeEdits(this.edits, this.timeOriginMs);
+		const pending = this.openEdit
+			? [...this.edits, this.openEdit.edit]
+			: this.edits;
+		if (pending.length === 0) return null;
+		const envelope = encodeEdits(pending, this.timeOriginMs);
+		requireInteger(this.baseRevision + 1, "next revision");
+		requireInteger(this.firstSeq + envelope.edits.length, "next sequence");
 		for (const tuple of envelope.edits) {
 			if (tuple[6]) Object.freeze(tuple[6]);
 			Object.freeze(tuple);
@@ -241,20 +273,106 @@ export class AnswerEditMonitor implements MonitorHandle {
 			snapshot: this.text,
 		});
 		this.edits = [];
-		return this.inFlight;
+		this.openEdit = null;
+		const batch = this.inFlight;
+		this.notify();
+		return batch;
 	}
 
-	acknowledge(_receipt: BatchReceipt): void {
-		throw new Error("Not implemented");
+	/**
+	 * Confirm the in-flight batch atomically, accepting identical past receipts as retries.
+	 *
+	 * @throws {TypeError} If the receipt is invalid, conflicting or unknown, or counters overflow.
+	 * @throws {Error} If the monitor is disposed.
+	 */
+	acknowledge(receipt: BatchReceipt): void {
+		this.requireActive();
+		requireRecord(receipt, "receipt");
+		requireId(receipt.batchId, "receipt.batchId");
+		requireInteger(receipt.revision, "receipt.revision");
+		requireInteger(receipt.lastSeq, "receipt.lastSeq");
+		const known = this.receipts.get(receipt.batchId);
+		if (known) {
+			if (
+				known.revision !== receipt.revision ||
+				known.lastSeq !== receipt.lastSeq
+			)
+				throw new TypeError("Receipt conflicts with an acknowledged batch");
+			return;
+		}
+		const batch = this.inFlight;
+		if (!batch || receipt.batchId !== batch.batchId)
+			throw new TypeError("Receipt does not identify the in-flight batch");
+		const nextRevision = batch.baseRevision + 1;
+		const nextSeq = batch.firstSeq + batch.edits.length;
+		requireInteger(nextRevision, "next revision");
+		requireInteger(nextSeq, "next sequence");
+		if (receipt.revision !== nextRevision || receipt.lastSeq !== nextSeq - 1)
+			throw new TypeError(
+				"Receipt revision or last sequence does not match the batch",
+			);
+
+		this.receipts.set(
+			receipt.batchId,
+			Object.freeze({
+				batchId: receipt.batchId,
+				revision: receipt.revision,
+				lastSeq: receipt.lastSeq,
+			}),
+		);
+		this.baseRevision = nextRevision;
+		this.firstSeq = nextSeq;
+		this.inFlight = null;
+		this.notify();
 	}
+
+	/**
+	 * Export the document, pending edits and session metadata for persistence.
+	 *
+	 * @throws {Error} Checkpoint export is not implemented.
+	 */
 	exportCheckpoint(): Readonly<MonitorCheckpoint> {
 		throw new Error("Not implemented");
 	}
-	subscribe(_listener: (state: Readonly<MonitorState>) => void): () => void {
-		throw new Error("Not implemented");
+
+	/**
+	 * Register synchronous immutable state notifications and return an unsubscribe function.
+	 *
+	 * @throws {TypeError} If the listener is not a function.
+	 * @throws {Error} If the monitor is disposed.
+	 */
+	subscribe(listener: (state: Readonly<MonitorState>) => void): () => void {
+		this.requireActive();
+		if (typeof listener !== "function")
+			throw new TypeError("listener must be a function");
+		this.listeners.add(listener);
+		return () => {
+			this.listeners.delete(listener);
+		};
 	}
+
+	/**
+	 * Stop accepting changes and clear listeners without discarding document or pending work.
+	 */
 	dispose(): void {
-		throw new Error("Not implemented");
+		if (this.disposed) return;
+		this.disposed = true;
+		this.listeners.clear();
+	}
+
+	private requireActive(): void {
+		if (this.disposed) throw new Error("Monitor is disposed");
+	}
+
+	private notify(): void {
+		const state = this.getState();
+		for (const listener of this.listeners) listener(state);
+	}
+
+	private finalizeEdit(): void {
+		if (!this.openEdit) return;
+		this.edits.push(this.openEdit.edit);
+		this.openEdit = null;
 	}
 
 	private validateTime(atMs: number): void {
@@ -302,7 +420,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 				return;
 			}
 		}
-		this.closeEdit();
+		this.finalizeEdit();
 		this.openEdit = {
 			edit: { ...edit, timing: null },
 			lastAtMs: edit.startMs,
