@@ -1,6 +1,7 @@
 /**
- * The code editor of the runner widget: CodeMirror 6 with the VS Code theme
- * and keymap, behind a small interface.
+ * The code editor of the runner widget: CodeMirror 6 with the VS Code keymap
+ * and Shiki's `dark-plus` colors (the ones of the read-only view), behind a
+ * small interface.
  *
  * Everything from CodeMirror is loaded with dynamic `import()` inside
  * `createEditor`; no other module imports it, so a page with a list of
@@ -63,16 +64,18 @@ let hints = 0;
 export async function createEditor(
 	options: CreateEditorOptions,
 ): Promise<RunnerEditor> {
-	const [state, view, commands, language, lezer, vscode, javascript, lint] =
+	const [state, view, commands, language, vscode, javascript, lint, colors] =
 		await Promise.all([
 			import("@codemirror/state"),
 			import("@codemirror/view"),
 			import("@codemirror/commands"),
 			import("@codemirror/language"),
-			import("@lezer/highlight"),
 			import("@replit/codemirror-vscode-keymap"),
 			import("@codemirror/lang-javascript"),
 			import("@codemirror/lint"),
+			import("./shiki-highlight").then((shiki) =>
+				shiki.shikiHighlighting(options.language),
+			),
 		]);
 	const { Compartment, EditorState, Prec } = state;
 	const {
@@ -82,7 +85,6 @@ export async function createEditor(
 		highlightActiveLine,
 		lineNumbers,
 	} = view;
-	const { tags } = lezer;
 
 	/// Marks changes made by `setCode`, which do not reach `onChange`.
 	const external = state.Annotation.define<boolean>();
@@ -92,44 +94,22 @@ export async function createEditor(
 		EditorView.contentAttributes.of({ "aria-readonly": String(value) }),
 	];
 
-	const highlight = language.HighlightStyle.define([
-		{ tag: [tags.keyword, tags.controlKeyword], color: "#569cd6" },
-		{ tag: [tags.moduleKeyword, tags.operatorKeyword], color: "#c586c0" },
-		{ tag: [tags.string, tags.special(tags.string)], color: "#ce9178" },
-		{ tag: [tags.number, tags.bool, tags.null], color: "#b5cea8" },
-		{ tag: tags.regexp, color: "#d16969" },
-		{
-			tag: [tags.comment, tags.lineComment, tags.blockComment],
-			color: "#6a9955",
-		},
-		{
-			tag: [tags.function(tags.variableName), tags.function(tags.propertyName)],
-			color: "#dcdcaa",
-		},
-		{
-			tag: [tags.definition(tags.variableName), tags.variableName],
-			color: "#9cdcfe",
-		},
-		{ tag: tags.propertyName, color: "#9cdcfe" },
-		{ tag: [tags.typeName, tags.className], color: "#4ec9b0" },
-		{ tag: [tags.operator, tags.punctuation], color: "#d4d4d4" },
-	]);
-
 	const theme = EditorView.theme(
 		{
 			"&": {
 				backgroundColor: "#1e1e1e",
 				color: "#d4d4d4",
-				fontSize: "13px",
+				fontSize: "inherit",
 			},
 			".cm-scroller": {
-				fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+				fontFamily: "inherit",
 				lineHeight: "1.25rem",
 				overflow: "auto",
 			},
 			".cm-content": { caretColor: "#aeafad", padding: "0.5rem 0" },
 			".cm-line": { padding: "0 0.75rem" },
-			"&.cm-focused": { outline: "2px solid #007acc", outlineOffset: "-2px" },
+			// The focus ring is drawn by the widget, above the sticky gutter.
+			"&.cm-focused": { outline: "none" },
 			".cm-cursor, .cm-dropCursor": { borderLeftColor: "#aeafad" },
 			".cm-activeLine": { backgroundColor: "#ffffff0a" },
 			"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
@@ -201,7 +181,7 @@ export async function createEditor(
 				drawSelection(),
 				highlightActiveLine(),
 				language.bracketMatching(),
-				language.syntaxHighlighting(highlight),
+				colors,
 				theme,
 				languageSupport,
 				readOnly.of(readOnlyExtensions(options.readOnly)),
@@ -210,7 +190,6 @@ export async function createEditor(
 					"aria-describedby": hintId,
 				}),
 				lineNumbers(),
-				lint.lintGutter(),
 				EditorView.updateListener.of((update) => {
 					if (
 						update.docChanged &&

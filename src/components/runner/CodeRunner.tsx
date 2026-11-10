@@ -758,67 +758,71 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				)}
 			</Show>
 
-			<div
-				class={`relative overflow-auto bg-[#1e1e1e] font-mono text-[13px] leading-5 text-[#d4d4d4] ${props.compact ? "max-h-56" : "max-h-96"}`}
-			>
-				<Show when={!editorReady()}>
-					{/* biome-ignore lint/a11y/useSemanticElements: a read-only code view, replaced by the editor on first focus */}
-					<div
-						role="group"
-						tabindex="0"
-						aria-label={
-							readOnly()
-								? m.runner_editor_label_read_only({
-										label: props.label,
-										filename: filename(),
-										language: LANGUAGE_LABELS[props.language](),
-									})
-								: m.runner_editor_label({
-										label: props.label,
-										filename: filename(),
-										language: LANGUAGE_LABELS[props.language](),
-									})
-						}
-						data-editor-static
-						onFocus={activate}
-						onKeyDown={onStaticKeyDown}
-					>
-						<Show
-							when={props.highlightedHtml}
-							fallback={
-								<pre
-									class="m-0 px-0 py-2 whitespace-pre"
+			{/* The focus ring is an overlay of this wrapper: an outline on the
+			    scrolling box would be painted under the editor's sticky gutter. */}
+			<div class="relative after:pointer-events-none after:absolute after:inset-0 after:z-[300] after:transition-shadow after:content-[''] focus-within:after:shadow-[inset_0_0_0_1px_#569cd666,inset_0_0_14px_#569cd633]">
+				<div
+					class={`relative overflow-auto bg-[#1e1e1e] font-mono text-[13px] leading-5 text-[#d4d4d4] ${props.compact ? "max-h-56" : "max-h-96"}`}
+				>
+					<Show when={!editorReady()}>
+						{/* biome-ignore lint/a11y/useSemanticElements: a read-only code view, replaced by the editor on first focus */}
+						<div
+							role="group"
+							tabindex="0"
+							aria-label={
+								readOnly()
+									? m.runner_editor_label_read_only({
+											label: props.label,
+											filename: filename(),
+											language: LANGUAGE_LABELS[props.language](),
+										})
+									: m.runner_editor_label({
+											label: props.label,
+											filename: filename(),
+											language: LANGUAGE_LABELS[props.language](),
+										})
+							}
+							data-editor-static
+							onFocus={activate}
+							onKeyDown={onStaticKeyDown}
+						>
+							<Show
+								when={props.highlightedHtml}
+								fallback={
+									<pre
+										class="m-0 px-0 py-2 whitespace-pre"
+										data-line-numbers
+										style={{ "--digits": digits() }}
+									>
+										<code>
+											<For each={props.code.split("\n")}>
+												{(line) => (
+													<>
+														<span class="line">{line}</span>
+														{"\n"}
+													</>
+												)}
+											</For>
+										</code>
+									</pre>
+								}
+							>
+								{/* Server-highlighted HTML of the code (Shiki), trusted. */}
+								<div
+									class="[&_pre]:m-0 [&_pre]:overflow-visible [&_pre]:bg-transparent [&_pre]:px-0 [&_pre]:py-2"
 									data-line-numbers
 									style={{ "--digits": digits() }}
-								>
-									<code>
-										<For each={props.code.split("\n")}>
-											{(line) => (
-												<>
-													<span class="line">{line}</span>
-													{"\n"}
-												</>
-											)}
-										</For>
-									</code>
-								</pre>
-							}
-						>
-							{/* Server-highlighted HTML of the code (Shiki), trusted. */}
-							<div
-								class="[&_pre]:m-0 [&_pre]:overflow-visible [&_pre]:bg-transparent [&_pre]:px-0 [&_pre]:py-2"
-								data-line-numbers
-								style={{ "--digits": digits() }}
-								innerHTML={props.highlightedHtml}
-							/>
-						</Show>
-					</div>
-				</Show>
-				<div
-					ref={editorParent}
-					class={editorReady() ? "" : "hidden"}
-					data-editor
-				/>
+									innerHTML={props.highlightedHtml}
+								/>
+							</Show>
+						</div>
+					</Show>
+					<div
+						ref={editorParent}
+						class={editorReady() ? "" : "hidden"}
+						data-editor
+					/>
+				</div>
 			</div>
 
 			<div
