@@ -594,22 +594,18 @@ const SAVED_FIELDS = [
 ] as const;
 
 for (const field of SAVED_FIELDS) {
-	// The essay textarea reaches the page as `<textarea value="...">`, which
-	// the browser ignores, and hydration does not set the property.
-	const run = field.name === "essay" ? test.fixme : test;
-	run(
-		`a saved ${field.name} answer shows in its field after a reload`,
-		async ({ page }) => {
-			const others = field.question
-				? { [field.slug]: { ...field.question } }
-				: undefined;
-			const s = await setup({ page, others });
-			await seedAnswer(s, field.slug, field.payload);
-			await openHydrated(page, s.url);
+	test(`a saved ${field.name} answer shows in its field after a reload`, async ({
+		page,
+	}) => {
+		const others = field.question
+			? { [field.slug]: { ...field.question } }
+			: undefined;
+		const s = await setup({ page, others });
+		await seedAnswer(s, field.slug, field.payload);
+		await openHydrated(page, s.url);
 
-			await expect(page.locator(field.selector).first()).toHaveValue(
-				field.payload,
-			);
-		},
-	);
+		await expect(page.locator(field.selector).first()).toHaveValue(
+			field.payload,
+		);
+	});
 }

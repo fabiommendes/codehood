@@ -111,6 +111,8 @@
   instead of leaving the page busy.
 - Opening a submitted or closed exam no longer deletes a local code draft that
   differs from the saved answer.
+- A saved essay answer shows in its text field when the exam page loads (mdq-js
+  `Essay` sent it as a `value` attribute, which a `<textarea>` ignores).
 
 ## 0.3.2 (2026-11-05)
 
