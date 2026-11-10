@@ -319,6 +319,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				setSavedAt((current) => ({ ...current, [slug]: serverNow() }));
 				setFailingSince(({ [slug]: _ok, ...rest }) => rest);
 				setConfirmed((current) => new Set(current).add(slug));
+				settleDraft(slug, payload);
 				if (!pending.has(slug)) markUnsaved(slug, false);
 				return;
 			}
@@ -386,6 +387,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	function change(slug: string, type: string, edited: AnswerPayload): void {
 		if (closing()) return;
 		const payload = toSaved(type, edited);
+		keepDraft(slug, type, edited);
 		setAnswers((current) => ({ ...current, [slug]: payload }));
 		pending.set(slug, payload);
 		markUnsaved(slug, true);
@@ -402,7 +404,68 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		);
 	}
 
-	/// The key of a code question's local draft.
+	/// The text each question's draft was last written with, so a confirmed save removes only the draft this page wrote.
+	const draftWrites = new Map<string, string>();
+
+	/// Whether a typed answer to `slug` has its draft kept by this component; code answers keep their own in `CodeEssayAnswer`.
+	function keepsOwnDraft(slug: string, type: string): boolean {
+		const entry = props.questions.find((it) => it.slug === slug);
+		return (
+			!!props.username &&
+			isTextEntry(type) &&
+			!(entry && codeLanguageOf(entry.question) !== null)
+		);
+	}
+
+	/// Writes the local draft of a typed answer, so a reload or a crash before the server confirms it loses nothing.
+	function keepDraft(slug: string, type: string, edited: AnswerPayload): void {
+		if (typeof edited !== "string" || !keepsOwnDraft(slug, type)) return;
+		draftWrites.set(slug, edited);
+		browserDraftStore().write(draftRef(slug), {
+			code: edited,
+			savedAt: serverNow().getTime(),
+		});
+	}
+
+	/// Removes the draft of `slug` once the server confirmed `payload`, if that is still the answer and the draft is this page's last write.
+	function settleDraft(slug: string, payload: AnswerPayload): void {
+		const written = draftWrites.get(slug);
+		if (written === undefined) return;
+		if (JSON.stringify(answers()[slug] ?? null) !== JSON.stringify(payload)) {
+			return;
+		}
+		const store = browserDraftStore();
+		const ref = draftRef(slug);
+		if (store.read(ref, serverNow().getTime())?.code === written) {
+			store.remove(ref);
+		}
+		draftWrites.delete(slug);
+	}
+
+	/// Restores the typed answers whose draft is newer than the saved answer, and drops the drafts the server already holds.
+	function restoreDrafts(): void {
+		if (!props.username) return;
+		const store = browserDraftStore();
+		for (const entry of props.questions) {
+			const type = entry.question.type;
+			if (!keepsOwnDraft(entry.slug, type)) continue;
+			const ref = draftRef(entry.slug);
+			const draft = store.read(ref, serverNow().getTime());
+			const saved = props.answers[entry.slug];
+			const at = props.answeredAt?.[entry.slug];
+			const found = compareDraft(
+				draft,
+				typeof saved === "string" ? saved : saved == null ? "" : String(saved),
+				at ? new Date(at).getTime() : null,
+			);
+			if (found.kind === "same") store.remove(ref);
+			else if (found.kind === "conflict" && found.newer === "draft" && draft) {
+				change(entry.slug, type, draft.code);
+			}
+		}
+	}
+
+	/// The key of a typed answer's local draft.
 	const draftRef = (question: string) => ({
 		username: props.username ?? "",
 		course: `${props.discipline}/${props.course}`,
@@ -410,7 +473,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		question,
 	});
 
-	/// Removes this exam's local code drafts, once the attempt is over.
+	/// Removes this exam's local drafts, once the attempt is over.
 	function clearDrafts(): void {
 		if (!props.username) return;
 		const { question: _question, ...exam } = draftRef("");
@@ -533,6 +596,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			window.removeEventListener("online", retryNow);
 		});
 		if (kind() !== "in-progress") clearSettledDrafts();
+		else restoreDrafts();
 	});
 	onCleanup(() => {
 		for (const timer of timers.values()) clearTimeout(timer);

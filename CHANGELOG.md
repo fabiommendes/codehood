@@ -92,6 +92,10 @@
   (`EXAM_ANSWER_GRACE_MS`), and the page keeps resending until the grace ends.
   The student's countdown is unchanged. The attempt page of the instructor
   flags an answer recorded after the deadline.
+- Exam attempt: every typed answer (short answer, essay, numeric text) keeps
+  a local draft in the browser, not only code. After a reload, crash or closed
+  tab during an outage, the text is restored and sent when it is newer than the
+  saved answer; the draft goes away once the server holds the same text.
 - Exam answers that fail to save are retried by themselves (backoff up to
   30 s, with jitter) and at once when the browser comes back online. A save
   that gets no reply in 15 s counts as a lost connection, so one hung request

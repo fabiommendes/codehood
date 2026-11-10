@@ -438,3 +438,96 @@ test("an old request that lands late does not replace the newer answer", async (
 	await expect.poll(() => history(s)).toContain("old");
 	await expect.poll(() => saved(s), { timeout: 10 * SECOND }).toBe("new");
 });
+
+const readDraft = (page: Page, key: string) =>
+	page.evaluate((k) => localStorage.getItem(k), key);
+
+test("typed text survives a reload during an outage and reaches the server later", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	let offline = true;
+	await page.route(ANSWER_ACTION, (route) =>
+		offline ? route.abort() : route.continue(),
+	);
+	await page.goto(s.url);
+	await answerBox(page).fill("typed while offline");
+	await expect(page.getByText("Not saved").first()).toBeVisible();
+	expect(await saved(s)).toBeNull();
+
+	await page.reload();
+	await expect(answerBox(page)).toHaveValue("typed while offline");
+
+	offline = false;
+	await page.evaluate(() => window.dispatchEvent(new Event("online")));
+	await expect.poll(() => saved(s)).toBe("typed while offline");
+	await expect.poll(() => readDraft(page, s.draftKey("text"))).toBeNull();
+});
+
+test("the draft is removed once the server confirms the text", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	await page.goto(s.url);
+	await answerBox(page).fill("confirmed");
+	await expect.poll(() => saved(s)).toBe("confirmed");
+	await expect.poll(() => readDraft(page, s.draftKey("text"))).toBeNull();
+});
+
+test("a draft of another attempt is not restored", async ({ page }) => {
+	const s = await setup({ page });
+	await page.goto("/login");
+	await page.evaluate(
+		(key) =>
+			localStorage.setItem(
+				key,
+				JSON.stringify({ code: "someone else", savedAt: Date.now() }),
+			),
+		draftKey({
+			username: s.student.username,
+			course: "other/course/teacher",
+			exam: s.exam.slug,
+			question: "text",
+		}),
+	);
+
+	await page.goto(s.url);
+	await expect(answerBox(page)).toHaveValue("");
+});
+
+test("a draft equal to the saved text is dropped on open", async ({ page }) => {
+	const s = await setup({ page });
+	await seedAnswer(s, "text", "same");
+	await page.goto("/login");
+	await page.evaluate(
+		(key) =>
+			localStorage.setItem(
+				key,
+				JSON.stringify({ code: "same", savedAt: Date.now() }),
+			),
+		s.draftKey("text"),
+	);
+
+	await page.goto(s.url);
+	await expect.poll(() => readDraft(page, s.draftKey("text"))).toBeNull();
+});
+
+test("clearing the text during an outage is kept across a reload", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	await seedAnswer(s, "text", "old answer");
+	let offline = true;
+	await page.route(ANSWER_ACTION, (route) =>
+		offline ? route.abort() : route.continue(),
+	);
+	await page.goto(s.url);
+	await answerBox(page).fill("typed");
+	await answerBox(page).fill("");
+	await page.reload();
+	await expect(answerBox(page)).toHaveValue("");
+
+	offline = false;
+	await page.evaluate(() => window.dispatchEvent(new Event("online")));
+	await expect.poll(() => saved(s)).toBeNull();
+});
