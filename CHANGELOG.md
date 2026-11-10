@@ -54,6 +54,11 @@
 
 ### Changed
 
+- Fallback do histórico de respostas compensa escritas que retornam após logout
+  e repete a limpeza de gerações conhecidas com prova de revogação, preservando
+  outros owners e gerações não revogadas. Falhas de limpeza continuam explícitas.
+  Não há garantia de apagamento físico completo: perda concorrente de entradas
+  do índice e rotação tardia de token permanecem na issue de logout.
 - Coordenador do histórico de respostas retenta falhas de transporte com backoff
   exponencial e jitter, expõe conflitos desde a primeira recuperação e consulta
   o fallback de texto mesmo quando há um checkpoint principal mais antigo.
