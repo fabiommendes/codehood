@@ -263,6 +263,22 @@ test("Tab indents, and Esc then Tab leaves the editor, as the editor says", asyn
 	).toBe(true);
 });
 
+test("the terminal shows on Run and folds away with its button", async ({
+	page,
+}) => {
+	await open(page);
+	const w = widget(page, 1);
+	const terminal = w.locator("[data-terminal]");
+	await expect(terminal).not.toBeInViewport();
+	await run(w);
+	await expect(terminalText(w)).toContainText("second");
+	await expect(terminal).toBeInViewport();
+	await w.locator("[data-action=hide-terminal]").click();
+	await expect(terminal).not.toBeInViewport();
+	await run(w);
+	await expect(terminal).toBeInViewport();
+});
+
 test("the editor and the static view show line numbers", async ({ page }) => {
 	await open(page);
 	const w = widget(page, 0);
@@ -307,6 +323,8 @@ test.describe("links", () => {
 		await context.route("https://example.com/**", (route) =>
 			route.fulfill({ body: "ok" }),
 		);
+		// The terminal slides open; without the motion its box is final at once.
+		await page.emulateMedia({ reducedMotion: "reduce" });
 		await open(page);
 		const w = widget(page, 1);
 		await setCode(w, URL_CODE);

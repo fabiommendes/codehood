@@ -22,6 +22,7 @@
 	"runner_preparing_slow": "Ainda carregando…",
 	"runner_downloading": "Baixando o ambiente de execução",
 	"runner_terminal": "Terminal",
+	"runner_hide_terminal": "Recolher terminal",
 	"runner_terminal_label": "Saída do programa",
 	"runner_terminal_empty": "Execute para ver a saída aqui.",
 	"runner_status_running": "Executando",

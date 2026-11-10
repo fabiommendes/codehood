@@ -196,7 +196,12 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		index: number;
 		total: number;
 	} | null>(null);
-	const [terminalShown, setTerminalShown] = createSignal(!props.compact);
+	/// Course material: no toolbar, code in a window frame, a round Run under
+	/// it, and the terminal hidden until the first run.
+	const minimal = props.mode === "snippet";
+	const [terminalShown, setTerminalShown] = createSignal(
+		!props.compact && !minimal,
+	);
 	const [terminalReady, setTerminalReady] = createSignal(false);
 	const [coarse, setCoarse] = createSignal(false);
 	const [slowPreparing, setSlowPreparing] = createSignal(false);
@@ -360,6 +365,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		const copy = modified();
 		setRunModified(copy);
 		dispatch({ type: "run-requested" });
+		if (terminal) setTerminalShown(true);
 		editor?.showDiagnostics([]);
 		const finish = (exit: RunExit) => {
 			if (current !== token) return;
@@ -459,6 +465,13 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		returnFocusToRun();
 	};
 
+	/// Snippet mode: stops the run, if any, and folds the terminal away.
+	const hideTerminal = () => {
+		if (running()) stop();
+		setTerminalShown(false);
+		runButton?.focus();
+	};
+
 	const sendLine = (event: SubmitEvent) => {
 		event.preventDefault();
 		if (!lineInput || !active) return;
@@ -554,213 +567,290 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		}
 	};
 
+	const restartNote = () =>
+		props.language === "prolog"
+			? m.runner_prolog_restarts()
+			: props.language === "elm"
+				? m.runner_elm_restarts()
+				: null;
+
+	const progressBar = () => (
+		<Show when={state().phase === "preparing" && state().progress}>
+			<div
+				class={`flex items-center gap-3 px-3 py-2 text-xs ${minimal ? "" : "border-b border-base-300 bg-base-200/30"}`}
+			>
+				<span class="shrink-0">{m.runner_downloading()}</span>
+				<progress
+					class="progress progress-primary h-1.5 flex-1"
+					value={state().progress?.loaded}
+					max={state().progress?.total ?? undefined}
+				/>
+				<Show when={percent() !== null}>
+					<span class="shrink-0 tabular-nums text-muted">{percent()}%</span>
+				</Show>
+			</div>
+		</Show>
+	);
+
+	const blockedNotice = () => (
+		<Show when={blockedMessage()}>
+			{(message) => (
+				<p
+					role="status"
+					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${minimal ? "justify-center" : "border-b border-base-300 bg-base-200/30"}`}
+				>
+					{message()}
+				</p>
+			)}
+		</Show>
+	);
+
 	return (
 		<div
 			ref={root}
-			class="overflow-hidden rounded-box border border-base-300 bg-base-100"
+			class={
+				minimal
+					? `flex flex-col transition-[padding] duration-300 ${terminalShown() ? "" : "pb-5"}`
+					: "overflow-hidden rounded-box border border-base-300 bg-base-100"
+			}
 			data-code-runner
 			data-submission={props.submission}
 			data-mode={props.mode}
 			data-phase={state().phase}
 		>
-			<div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/50 px-3 py-1.5">
-				{props.toolbar}
-				<Show when={position()}>
-					{(at) => (
-						<Show when={at().total > 1}>
-							<div class="flex items-center gap-1" data-review-nav>
-								<button
-									type="button"
-									class="btn btn-ghost btn-xs"
-									data-action="previous"
-									aria-label={m.runner_review_previous()}
-									disabled={at().index <= 0}
-									onClick={() => go(-1)}
-								>
-									‹
-								</button>
-								<button
-									type="button"
-									class="btn btn-ghost btn-xs"
-									data-action="next"
-									aria-label={m.runner_review_next()}
-									disabled={at().index >= at().total - 1}
-									onClick={() => go(1)}
-								>
-									›
-								</button>
-								<span class="text-xs tabular-nums" data-role="position">
-									{m.runner_review_position({
-										n: String(at().index + 1),
-										total: String(at().total),
-									})}
-								</span>
-								<Show when={props.reviewLabel}>
-									<span class="text-xs font-semibold" data-role="review-label">
-										{props.reviewLabel}
+			<Show when={!minimal}>
+				<div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/50 px-3 py-1.5">
+					{props.toolbar}
+					<Show when={position()}>
+						{(at) => (
+							<Show when={at().total > 1}>
+								<div class="flex items-center gap-1" data-review-nav>
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs"
+										data-action="previous"
+										aria-label={m.runner_review_previous()}
+										disabled={at().index <= 0}
+										onClick={() => go(-1)}
+									>
+										‹
+									</button>
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs"
+										data-action="next"
+										aria-label={m.runner_review_next()}
+										disabled={at().index >= at().total - 1}
+										onClick={() => go(1)}
+									>
+										›
+									</button>
+									<span class="text-xs tabular-nums" data-role="position">
+										{m.runner_review_position({
+											n: String(at().index + 1),
+											total: String(at().total),
+										})}
 									</span>
-								</Show>
-							</div>
-						</Show>
-					)}
-				</Show>
-				<Show when={review()}>
-					<span
-						class="hidden text-xs text-muted lg:inline"
-						data-role="review-hint"
-					>
-						{m.runner_review_hint()}
-					</span>
-				</Show>
-				<span class="font-mono text-xs">{filename()}</span>
-				<span class="badge badge-ghost badge-xs">
-					{LANGUAGE_LABELS[props.language]()}
-				</span>
-				<Show when={readOnly()}>
-					<span class="badge badge-ghost badge-xs">{m.runner_read_only()}</span>
-					<Show when={!review()}>
-						<span class="hidden text-xs text-muted sm:inline">
-							{m.runner_edit_hint()}
+									<Show when={props.reviewLabel}>
+										<span
+											class="text-xs font-semibold"
+											data-role="review-label"
+										>
+											{props.reviewLabel}
+										</span>
+									</Show>
+								</div>
+							</Show>
+						)}
+					</Show>
+					<Show when={review()}>
+						<span
+							class="hidden text-xs text-muted lg:inline"
+							data-role="review-hint"
+						>
+							{m.runner_review_hint()}
 						</span>
 					</Show>
-				</Show>
-				<Show when={modified()}>
-					<span class="badge badge-warning badge-xs" data-role="modified">
-						{m.runner_modified()}
+					<span class="font-mono text-xs">{filename()}</span>
+					<span class="badge badge-ghost badge-xs">
+						{LANGUAGE_LABELS[props.language]()}
 					</span>
-					<span class="text-xs text-muted" data-role="copy-hint">
-						{m.runner_copy_hint()}
-					</span>
-				</Show>
-				<div class="ml-auto flex items-center gap-1.5">
-					<Show when={props.mode !== "answer" && !editing()}>
-						<button
-							type="button"
-							class="btn btn-ghost btn-sm"
-							data-action="edit"
-							onClick={edit}
-						>
-							{review() ? m.runner_edit_copy() : m.runner_edit()}
-						</button>
+					<Show when={readOnly()}>
+						<span class="badge badge-ghost badge-xs">
+							{m.runner_read_only()}
+						</span>
+						<Show when={!review()}>
+							<span class="hidden text-xs text-muted sm:inline">
+								{m.runner_edit_hint()}
+							</span>
+						</Show>
 					</Show>
 					<Show when={modified()}>
-						<button
-							type="button"
-							class="btn btn-ghost btn-sm"
-							data-action="back"
-							onClick={backToSubmission}
-						>
-							{m.runner_back_to_submission()}
-						</button>
+						<span class="badge badge-warning badge-xs" data-role="modified">
+							{m.runner_modified()}
+						</span>
+						<span class="text-xs text-muted" data-role="copy-hint">
+							{m.runner_copy_hint()}
+						</span>
 					</Show>
-					<Show when={props.mode !== "answer" && !review() && editing()}>
-						<button
-							type="button"
-							class="btn btn-ghost btn-sm"
-							data-action="reset"
-							onClick={reset}
-						>
-							{m.runner_reset()}
-						</button>
-					</Show>
-					<Show
-						when={props.mode === "answer" && props.starterCode !== undefined}
-					>
-						<button
-							type="button"
-							class="btn btn-ghost btn-sm"
-							data-action="reset"
-							title={m.runner_reset_starter()}
-							onClick={reset}
-						>
-							{m.runner_reset()}
-						</button>
-					</Show>
-					<Show
-						when={running()}
-						fallback={
+					<div class="ml-auto flex items-center gap-1.5">
+						<Show when={props.mode !== "answer" && !editing()}>
 							<button
-								ref={runButton}
 								type="button"
-								class="btn btn-soft btn-success btn-sm"
-								data-action="run"
-								disabled={!canRun(state())}
-								onClick={() => void run()}
+								class="btn btn-ghost btn-sm"
+								data-action="edit"
+								onClick={edit}
 							>
-								<svg
-									viewBox="0 0 16 16"
-									class="size-3 fill-current"
-									aria-hidden="true"
-								>
-									<path d="M4 2.5v11l9-5.5z" />
-								</svg>
-								{review() ? m.runner_run_submission() : m.runner_run()}
+								{review() ? m.runner_edit_copy() : m.runner_edit()}
 							</button>
-						}
-					>
-						<button
-							type="button"
-							class="btn btn-soft btn-error btn-sm"
-							data-action="stop"
-							onClick={stop}
-						>
-							<Show
-								when={state().phase === "preparing"}
-								fallback={
-									<span
-										class="inline-block size-2.5 bg-current"
-										aria-hidden="true"
-									/>
-								}
+						</Show>
+						<Show when={modified()}>
+							<button
+								type="button"
+								class="btn btn-ghost btn-sm"
+								data-action="back"
+								onClick={backToSubmission}
 							>
-								<span class="loading loading-spinner loading-xs" />
-							</Show>
-							{state().phase === "preparing"
-								? m.runner_cancel()
-								: m.runner_stop()}
-						</button>
-					</Show>
-					<Show when={props.language === "prolog"}>
-						<span class="text-xs text-base-content/60" data-role="restart-note">
-							{m.runner_prolog_restarts()}
-						</span>
-					</Show>
-					<Show when={props.language === "elm"}>
-						<span class="text-xs text-base-content/60" data-role="restart-note">
-							{m.runner_elm_restarts()}
-						</span>
-					</Show>
+								{m.runner_back_to_submission()}
+							</button>
+						</Show>
+						<Show when={props.mode !== "answer" && !review() && editing()}>
+							<button
+								type="button"
+								class="btn btn-ghost btn-sm"
+								data-action="reset"
+								onClick={reset}
+							>
+								{m.runner_reset()}
+							</button>
+						</Show>
+						<Show
+							when={props.mode === "answer" && props.starterCode !== undefined}
+						>
+							<button
+								type="button"
+								class="btn btn-ghost btn-sm"
+								data-action="reset"
+								title={m.runner_reset_starter()}
+								onClick={reset}
+							>
+								{m.runner_reset()}
+							</button>
+						</Show>
+						<Show
+							when={running()}
+							fallback={
+								<button
+									ref={runButton}
+									type="button"
+									class="btn btn-soft btn-success btn-sm"
+									data-action="run"
+									disabled={!canRun(state())}
+									onClick={() => void run()}
+								>
+									<svg
+										viewBox="0 0 16 16"
+										class="size-3 fill-current"
+										aria-hidden="true"
+									>
+										<path d="M4 2.5v11l9-5.5z" />
+									</svg>
+									{review() ? m.runner_run_submission() : m.runner_run()}
+								</button>
+							}
+						>
+							<button
+								type="button"
+								class="btn btn-soft btn-error btn-sm"
+								data-action="stop"
+								onClick={stop}
+							>
+								<Show
+									when={state().phase === "preparing"}
+									fallback={
+										<span
+											class="inline-block size-2.5 bg-current"
+											aria-hidden="true"
+										/>
+									}
+								>
+									<span class="loading loading-spinner loading-xs" />
+								</Show>
+								{state().phase === "preparing"
+									? m.runner_cancel()
+									: m.runner_stop()}
+							</button>
+						</Show>
+						<Show when={props.language === "prolog"}>
+							<span
+								class="text-xs text-base-content/60"
+								data-role="restart-note"
+							>
+								{m.runner_prolog_restarts()}
+							</span>
+						</Show>
+						<Show when={props.language === "elm"}>
+							<span
+								class="text-xs text-base-content/60"
+								data-role="restart-note"
+							>
+								{m.runner_elm_restarts()}
+							</span>
+						</Show>
+					</div>
 				</div>
-			</div>
 
-			<Show when={state().phase === "preparing" && state().progress}>
-				<div class="flex items-center gap-3 border-b border-base-300 bg-base-200/30 px-3 py-2 text-xs">
-					<span class="shrink-0">{m.runner_downloading()}</span>
-					<progress
-						class="progress progress-primary h-1.5 flex-1"
-						value={state().progress?.loaded}
-						max={state().progress?.total ?? undefined}
-					/>
-					<Show when={percent() !== null}>
-						<span class="shrink-0 tabular-nums text-muted">{percent()}%</span>
-					</Show>
-				</div>
-			</Show>
-
-			<Show when={blockedMessage()}>
-				{(message) => (
-					<p
-						role="status"
-						class="flex items-center gap-2 border-b border-base-300 bg-base-200/30 px-3 py-2 text-xs text-base-content/70"
-					>
-						{message()}
-					</p>
-				)}
+				{progressBar()}
+				{blockedNotice()}
 			</Show>
 
 			{/* The focus ring is an overlay of this wrapper: an outline on the
-			    scrolling box would be painted under the editor's sticky gutter. */}
-			<div class="relative after:pointer-events-none after:absolute after:inset-0 after:z-[300] after:transition-shadow after:content-[''] focus-within:after:shadow-[inset_0_0_0_1px_#569cd666,inset_0_0_14px_#569cd633]">
+			    scrolling box would be painted under the editor's sticky gutter.
+			    In a snippet the wrapper is daisyUI's code mockup, with its dots
+			    and without the gap it puts before each `pre`. */}
+			<div
+				class={`relative after:pointer-events-none after:absolute after:inset-0 after:z-[300] after:rounded-[inherit] after:transition-shadow after:content-[''] focus-within:after:shadow-[inset_0_0_0_1px_#569cd666,inset_0_0_14px_#569cd633] ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code overflow-hidden bg-[#1e1e1e] pt-3 pb-1 text-[#d4d4d4] before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
+			>
+				<Show when={minimal}>
+					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
+						<Show when={!editing()}>
+							<button
+								type="button"
+								class="btn btn-ghost btn-xs btn-square text-[#a0a0a0] hover:bg-[#ffffff14] hover:text-[#d4d4d4]"
+								data-action="edit"
+								aria-label={m.runner_edit()}
+								title={m.runner_edit_hint()}
+								onClick={edit}
+							>
+								<svg
+									viewBox="0 0 24 24"
+									class="size-3.5 fill-none stroke-current stroke-2"
+									aria-hidden="true"
+								>
+									<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+								</svg>
+							</button>
+						</Show>
+						<Show when={editing()}>
+							<button
+								type="button"
+								class="btn btn-ghost btn-xs btn-square text-[#a0a0a0] hover:bg-[#ffffff14] hover:text-[#d4d4d4]"
+								data-action="reset"
+								aria-label={m.runner_reset()}
+								title={m.runner_reset()}
+								onClick={reset}
+							>
+								<svg
+									viewBox="0 0 24 24"
+									class="size-3.5 fill-none stroke-current stroke-2"
+									aria-hidden="true"
+								>
+									<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" />
+								</svg>
+							</button>
+						</Show>
+					</div>
+				</Show>
 				<div
 					class={`relative overflow-auto bg-[#1e1e1e] font-mono text-[13px] leading-5 text-[#d4d4d4] ${props.compact ? "max-h-56" : "max-h-96"}`}
 				>
@@ -825,112 +915,204 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				</div>
 			</div>
 
-			<div
-				class={`border-t border-[#3c3c3c] bg-[#181818] font-mono text-[13px] leading-5 ${terminalShown() ? "" : "hidden"}`}
-			>
-				<div class="flex items-center gap-2 bg-[#252526] px-3 py-1 text-[11px] tracking-wide text-[#a0a0a0] uppercase">
-					<span>{m.runner_terminal()}</span>
-					<span
-						role="status"
-						aria-live="polite"
-						class="ml-auto flex items-center gap-1.5 tracking-normal normal-case"
-						data-status
-						data-exit-code={
-							state().phase === "done" || state().phase === "error"
-								? String(state().lastExit?.code ?? "")
-								: undefined
-						}
+			<Show when={minimal}>
+				{/* No height of its own: the button hangs over the bottom edge of
+				    the code, or over the seam with the terminal once it shows. */}
+				<div class="relative z-[310] flex h-0 justify-center">
+					<div
+						class={`-mt-5 h-10 ${restartNote() ? "tooltip tooltip-right" : ""}`}
+						data-tip={restartNote() ?? undefined}
 					>
-						<Show when={review() && runModified() && state().phase !== "idle"}>
-							<span class="badge badge-warning badge-xs" data-run-modified>
-								{m.runner_modified()}
-							</span>
-						</Show>
-						<Show when={statusText()}>
-							{(text) => (
-								<span
-									class={`flex items-center gap-1.5 ${
-										state().phase === "running"
-											? "text-[#89d185]"
-											: state().phase === "waiting-input" ||
-													state().phase === "truncated"
-												? "text-[#e5c07b]"
-												: state().phase === "error"
-													? "text-[#f48771]"
-													: "text-[#858585]"
-									}`}
+						<Show
+							when={running()}
+							fallback={
+								<button
+									ref={runButton}
+									type="button"
+									class="btn btn-circle btn-success shadow-md"
+									data-action="run"
+									aria-label={m.runner_run()}
+									disabled={!canRun(state())}
+									onClick={() => void run()}
 								>
-									<Show when={running()}>
-										<span class="loading loading-spinner loading-xs" />
-									</Show>
-									{text()}
-								</span>
-							)}
-						</Show>
-						<Show when={duration()}>
-							{(text) => <span class="text-[#858585]">· {text()}</span>}
-						</Show>
-					</span>
-				</div>
-				<Show when={state().phase === "load-failed"}>
-					<div class="p-3">
-						<div
-							role="alert"
-							class="flex flex-wrap items-center gap-3 rounded-box border border-[#f48771]/40 bg-[#f48771]/10 px-3 py-2 text-sm text-[#f48771]"
+									<svg
+										viewBox="0 0 16 16"
+										class="ml-0.5 size-4 fill-current"
+										aria-hidden="true"
+									>
+										<path d="M4 2.5v11l9-5.5z" />
+									</svg>
+								</button>
+							}
 						>
-							<span class="flex-1">{m.runner_load_failed()}</span>
 							<button
 								type="button"
-								class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
-								data-action="retry"
-								onClick={() => void run()}
+								class="btn btn-circle btn-error shadow-md"
+								data-action="stop"
+								aria-label={
+									state().phase === "preparing"
+										? m.runner_cancel()
+										: m.runner_stop()
+								}
+								onClick={stop}
 							>
-								{m.runner_try_again()}
+								<Show
+									when={state().phase === "preparing"}
+									fallback={
+										<span
+											class="inline-block size-3 rounded-[2px] bg-current"
+											aria-hidden="true"
+										/>
+									}
+								>
+									<span class="loading loading-spinner loading-sm" />
+								</Show>
 							</button>
-						</div>
+						</Show>
 					</div>
-				</Show>
-				<div class="relative">
-					<Show when={!terminalReady()}>
-						<p class="absolute inset-x-0 top-0 px-3 py-2 text-[#858585] italic">
-							{m.runner_terminal_empty()}
-						</p>
-					</Show>
-					{/* biome-ignore lint/a11y/useSemanticElements: xterm.js owns this element */}
-					<div
-						ref={terminalParent}
-						role="group"
-						aria-label={m.runner_terminal_label()}
-						class={`overflow-hidden px-2 py-1 ${props.compact ? "h-20" : "h-56"}`}
-						data-terminal
-					/>
 				</div>
-				<Show when={coarse() && state().phase === "waiting-input"}>
-					<div class="h-14" aria-hidden="true" />
-					<form
-						class="fixed inset-x-0 z-50 flex gap-2 border-t border-[#3c3c3c] bg-[#252526] p-2"
-						style={{ bottom: `${keyboardInset()}px` }}
-						onSubmit={sendLine}
-					>
-						<input
-							ref={lineInput}
-							class="input input-sm flex-1 border-[#3c3c3c] bg-[#1e1e1e] font-mono text-[#d4d4d4]"
-							aria-label={m.runner_input_label()}
-							placeholder={m.runner_input_placeholder()}
-							autocomplete="off"
-							autocapitalize="off"
-							spellcheck={false}
-							data-line-input
-						/>
-						<button
-							type="submit"
-							class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
-							data-action="send"
+				{progressBar()}
+				{blockedNotice()}
+			</Show>
+
+			<div
+				class={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${terminalShown() ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+				inert={!terminalShown()}
+			>
+				<div
+					class={`min-h-0 overflow-hidden bg-[#181818] font-mono text-[13px] leading-5 ${minimal ? "rounded-b-box" : ""} border-t border-[#3c3c3c]`}
+				>
+					<div class="flex items-center gap-2 bg-[#252526] px-3 py-1 text-[11px] tracking-wide text-[#a0a0a0] uppercase">
+						<span>{m.runner_terminal()}</span>
+						<span
+							role="status"
+							aria-live="polite"
+							class="ml-auto flex items-center gap-1.5 tracking-normal normal-case"
+							data-status
+							data-exit-code={
+								state().phase === "done" || state().phase === "error"
+									? String(state().lastExit?.code ?? "")
+									: undefined
+							}
 						>
-							{m.runner_send()}
-						</button>
-					</form>
-				</Show>
+							<Show
+								when={review() && runModified() && state().phase !== "idle"}
+							>
+								<span class="badge badge-warning badge-xs" data-run-modified>
+									{m.runner_modified()}
+								</span>
+							</Show>
+							<Show when={statusText()}>
+								{(text) => (
+									<span
+										class={`flex items-center gap-1.5 ${
+											state().phase === "running"
+												? "text-[#89d185]"
+												: state().phase === "waiting-input" ||
+														state().phase === "truncated"
+													? "text-[#e5c07b]"
+													: state().phase === "error"
+														? "text-[#f48771]"
+														: "text-[#858585]"
+										}`}
+									>
+										{/* Not while waiting for input: the program waits on
+										    the user, and a spinner would say the opposite. */}
+										<Show
+											when={
+												state().phase === "running" ||
+												state().phase === "preparing"
+											}
+										>
+											<span class="loading loading-spinner loading-xs" />
+										</Show>
+										{text()}
+									</span>
+								)}
+							</Show>
+							<Show when={duration()}>
+								{(text) => <span class="text-[#858585]">· {text()}</span>}
+							</Show>
+						</span>
+						<Show when={minimal}>
+							<button
+								type="button"
+								class="btn btn-ghost btn-xs btn-square -my-1 -mr-2 text-[#a0a0a0] hover:bg-[#ffffff14] hover:text-[#d4d4d4]"
+								data-action="hide-terminal"
+								aria-label={m.runner_hide_terminal()}
+								title={m.runner_hide_terminal()}
+								onClick={hideTerminal}
+							>
+								<svg
+									viewBox="0 0 24 24"
+									class="size-3.5 fill-none stroke-current stroke-2"
+									aria-hidden="true"
+								>
+									<path d="m6 15 6-6 6 6" />
+								</svg>
+							</button>
+						</Show>
+					</div>
+					<Show when={state().phase === "load-failed"}>
+						<div class="p-3">
+							<div
+								role="alert"
+								class="flex flex-wrap items-center gap-3 rounded-box border border-[#f48771]/40 bg-[#f48771]/10 px-3 py-2 text-sm text-[#f48771]"
+							>
+								<span class="flex-1">{m.runner_load_failed()}</span>
+								<button
+									type="button"
+									class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
+									data-action="retry"
+									onClick={() => void run()}
+								>
+									{m.runner_try_again()}
+								</button>
+							</div>
+						</div>
+					</Show>
+					<div class="relative">
+						<Show when={!terminalReady()}>
+							<p class="absolute inset-x-0 top-0 px-3 py-2 text-[#858585] italic">
+								{m.runner_terminal_empty()}
+							</p>
+						</Show>
+						{/* biome-ignore lint/a11y/useSemanticElements: xterm.js owns this element */}
+						<div
+							ref={terminalParent}
+							role="group"
+							aria-label={m.runner_terminal_label()}
+							class={`overflow-hidden px-2 py-1 ${props.compact ? "h-20" : "h-56"}`}
+							data-terminal
+						/>
+					</div>
+					<Show when={coarse() && state().phase === "waiting-input"}>
+						<div class="h-14" aria-hidden="true" />
+						<form
+							class="fixed inset-x-0 z-50 flex gap-2 border-t border-[#3c3c3c] bg-[#252526] p-2"
+							style={{ bottom: `${keyboardInset()}px` }}
+							onSubmit={sendLine}
+						>
+							<input
+								ref={lineInput}
+								class="input input-sm flex-1 border-[#3c3c3c] bg-[#1e1e1e] font-mono text-[#d4d4d4]"
+								aria-label={m.runner_input_label()}
+								placeholder={m.runner_input_placeholder()}
+								autocomplete="off"
+								autocapitalize="off"
+								spellcheck={false}
+								data-line-input
+							/>
+							<button
+								type="submit"
+								class="btn btn-outline btn-sm border-[#d4d4d4]/60 text-[#d4d4d4]"
+								data-action="send"
+							>
+								{m.runner_send()}
+							</button>
+						</form>
+					</Show>
+				</div>
 			</div>
 
 			{props.footer}

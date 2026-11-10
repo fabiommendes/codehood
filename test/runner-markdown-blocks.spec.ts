@@ -119,8 +119,12 @@ test.describe("page", () => {
 
 		// Each block has its own file name, the terminal fits its output, and
 		// the widgets do not touch.
-		await expect(widgets.nth(0)).toContainText("block-1.js");
-		await expect(widgets.nth(1)).toContainText("block-2.js");
+		await expect(
+			widgets.nth(0).locator("[data-editor-static]"),
+		).toHaveAttribute("aria-label", /block-1\.js/);
+		await expect(
+			widgets.nth(1).locator("[data-editor-static]"),
+		).toHaveAttribute("aria-label", /block-2\.js/);
 		const terminalBox = await widgets
 			.nth(0)
 			.locator("[data-terminal]")

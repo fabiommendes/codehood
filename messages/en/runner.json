@@ -22,6 +22,7 @@
 	"runner_preparing_slow": "Still loading…",
 	"runner_downloading": "Downloading the runtime",
 	"runner_terminal": "Terminal",
+	"runner_hide_terminal": "Hide terminal",
 	"runner_terminal_label": "Program output",
 	"runner_terminal_empty": "Run to see the output here.",
 	"runner_status_running": "Running",
