@@ -276,7 +276,14 @@ export class AnswerEditCoordinator {
 		} catch (error) {
 			fallback = Promise.reject(error);
 		}
-		this.revocation = Promise.all([principal, fallback]).then(() => undefined);
+		this.revocation = Promise.all([principal, fallback]).then(
+			() => undefined,
+			(error: unknown) => {
+				/// A failed cleanup must be retryable by calling logout again.
+				this.revocation = null;
+				throw error;
+			},
+		);
 		return this.revocation;
 	}
 

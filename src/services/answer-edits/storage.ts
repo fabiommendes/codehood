@@ -92,7 +92,14 @@ export function openIndexedDbEditStore(options: {
 	});
 }
 
-/** Keep only bounded text and gap metadata when durable history is unavailable. */
+/**
+ * Keep only bounded text and gap metadata when durable history is unavailable.
+ *
+ * Records live under a key derived from the owner's current token. Revoking rotates
+ * the token and removes the old key; a writer that finds the token changed after its
+ * `setItem` removes its own write and fails. A writer suspended past that check and
+ * killed before compensating leaves text under the old key that no new session reads.
+ */
 export function createTextRecoveryStore(options: {
 	ownerId: string;
 	storage: Storage;
@@ -104,45 +111,17 @@ export function createTextRecoveryStore(options: {
 	);
 	const { storage } = options;
 	const tokenKey = JSON.stringify([key, REVOCATION_KEY]);
-	const indexKey = JSON.stringify([key, "revoked-generations", 1]);
-	const token = storage.getItem(tokenKey);
-	/// Three-part metadata keys cannot collide with data keys or the token slot.
-	const revocationKey = (generation: string | null): string =>
-		JSON.stringify([key, "revoked-generation", generation]);
-	const isRevoked = (generation: string | null): boolean =>
-		storage.getItem(revocationKey(generation)) === "1";
-	/// Before the first revocation, keep reading the original pre-token records.
-	const generationKey = (generation: string | null): string =>
-		generation === null ? key : JSON.stringify([key, generation]);
-	const dataKey = generationKey(token);
+	let token = storage.getItem(tokenKey);
+	if (token === null) {
+		token = crypto.randomUUID();
+		storage.setItem(tokenKey, token);
+	}
+	if (token === "" || token === REVOCATION_KEY)
+		throw new TypeError("Invalid text recovery token");
+	const dataKey = JSON.stringify([key, token]);
 	let revoked = false;
-	const revokedGenerations = (): Set<string | null> => {
-		const json = storage.getItem(indexKey);
-		const generations: unknown = json === null ? [] : JSON.parse(json);
-		if (
-			!Array.isArray(generations) ||
-			generations.some(
-				(generation) =>
-					generation !== null &&
-					(typeof generation !== "string" || generation === REVOCATION_KEY),
-			)
-		)
-			throw new TypeError("Invalid text recovery revocation index");
-		return new Set(generations);
-	};
-	const reconcile = (): void => {
-		const generations = revokedGenerations();
-		/// The original handle can repair erasure even if its index entry was lost.
-		generations.add(token);
-		for (const generation of generations) {
-			/// The index is only a hint; individual proofs authorize physical erasure.
-			if (generation !== REVOCATION_KEY && isRevoked(generation))
-				storage.removeItem(generationKey(generation));
-		}
-	};
 	const requireActive = (): void => {
-		reconcile();
-		if (revoked || isRevoked(token) || storage.getItem(tokenKey) !== token) {
+		if (revoked || storage.getItem(tokenKey) !== token) {
 			revoked = true;
 			throw new Error("Text recovery store is revoked");
 		}
@@ -150,13 +129,10 @@ export function createTextRecoveryStore(options: {
 	const save = (records: Record<string, TextRecovery>): void => {
 		requireActive();
 		storage.setItem(dataKey, JSON.stringify(records));
-		/// Storage cannot fence a suspended writer atomically. Compensate when it
-		/// resumes; reconciliation retries erasure if storage is temporarily failing.
-		if (revoked || isRevoked(token) || storage.getItem(tokenKey) !== token) {
+		/// Storage cannot fence a suspended writer, so compensate when it resumes.
+		if (storage.getItem(tokenKey) !== token) {
 			revoked = true;
-			/// A delayed rotation can invalidate an unrevoked generation logically;
-			/// only its persistent revocation proof permits physical erasure.
-			if (isRevoked(token)) storage.removeItem(dataKey);
+			storage.removeItem(dataKey);
 			throw new Error("Text recovery store is revoked");
 		}
 	};
@@ -166,14 +142,12 @@ export function createTextRecoveryStore(options: {
 			? {}
 			: (object(JSON.parse(json)) as Record<string, TextRecovery>);
 	};
-	reconcile();
 	return {
 		read(ref, now) {
 			requireActive();
 			requireFinite(now, "now");
 			const id = fieldKey(ref);
 			const records = entries();
-			requireActive();
 			if (!Object.hasOwn(records, id)) return null;
 			const recovery = textRecovery(records[id]);
 			if (recovery.expiresAt <= now) {
@@ -200,22 +174,11 @@ export function createTextRecoveryStore(options: {
 		},
 		revoke() {
 			revoked = true;
-			/// Keep this text-free proof after cleanup: a suspended writer may return.
-			/// Repeated calls must mark the original generation even after rotation.
-			storage.setItem(revocationKey(token), "1");
-			/// Concurrent read-modify-writes can lose index entries, but never proofs.
-			/// Repeating revocation repairs this generation's discovery hint.
-			const generations = revokedGenerations();
-			generations.add(token);
-			storage.setItem(indexKey, JSON.stringify([...generations]));
-			if (storage.getItem(tokenKey) === token) {
-				/// Retain the token after erasure so old handles stay fenced across pages.
-				/// Without CAS, a suspended rotation can still replace a newer token.
+			/// Rotate before erasing so a late writer fails its post-write check. A
+			/// repeated call only retries the erasure and never rotates a newer token.
+			if (storage.getItem(tokenKey) === token)
 				storage.setItem(tokenKey, crypto.randomUUID());
-			}
-			/// Always retry cleanup, even if an earlier revocation failed or a newer
-			/// session already rotated the token.
-			reconcile();
+			storage.removeItem(dataKey);
 		},
 	};
 }

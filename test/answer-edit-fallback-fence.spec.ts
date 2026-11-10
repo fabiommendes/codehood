@@ -69,3 +69,30 @@ test("a fallback write interrupted by peer logout cannot resurrect old text or e
 	old.revoke();
 	expect(fresh.read(REF, EPOCH)).toEqual(freshDraft);
 });
+
+test("a handle opened before a revoke is fenced while fresh handles and other owners keep working", () => {
+	const storage = new HookedStorage();
+	const open = (ownerId: string) =>
+		createTextRecoveryStore({ ownerId, storage, keyPrefix: "fallback-fence" });
+	const draft = (text: string): TextRecovery => ({
+		version: 1,
+		savedAt: EPOCH,
+		expiresAt: EPOCH + 60_000,
+		text,
+		historyGap: true,
+	});
+	const old = open("owner");
+	const peer = open("owner");
+	const other = open("other");
+	old.write(REF, draft("old text"));
+	other.write(REF, draft("other text"));
+	peer.revoke();
+	expect(() => old.read(REF, EPOCH)).toThrow();
+	expect(() => old.write(REF, draft("late"))).toThrow();
+	expect(() => old.remove(REF)).toThrow();
+	const fresh = open("owner");
+	expect(fresh.read(REF, EPOCH)).toBeNull();
+	fresh.write(REF, draft("fresh text"));
+	expect(fresh.read(REF, EPOCH)?.text).toBe("fresh text");
+	expect(other.read(REF, EPOCH)?.text).toBe("other text");
+});

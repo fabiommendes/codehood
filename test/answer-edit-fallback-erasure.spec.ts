@@ -146,40 +146,6 @@ async function install(page: Page) {
 	);
 }
 
-async function seedOrphans(page: Page) {
-	await page.evaluate(
-		({ ref, privateText, freshText, bob, independent }) => {
-			const fixture = window.erasure;
-			/// Capture real serialized generations, without depending on their key format.
-			for (let generation = 0; generation < 2; generation++) {
-				const handle = generation === 0 ? fixture.old : fixture.open();
-				handle.write(ref, fixture.draft(`${privateText}-${generation}`));
-				fixture.orphanEntries.push(...fixture.physicalText(privateText));
-				handle.revoke();
-			}
-			fixture.fresh = fixture.open();
-			fixture.fresh.write(ref, fixture.draft(freshText));
-			fixture.bob.write(ref, fixture.draft(bob));
-			fixture.independent.write(ref, fixture.draft(independent));
-			/// Model persisted writes left by a writer that died before compensation.
-			fixture.restoreOrphans();
-		},
-		{
-			ref: REF,
-			privateText: PRIVATE,
-			freshText: FRESH,
-			bob: BOB,
-			independent: INDEPENDENT,
-		},
-	);
-	expect(
-		await page.evaluate(
-			(text) => window.erasure.physicalText(text).length,
-			PRIVATE,
-		),
-	).toBeGreaterThan(0);
-}
-
 async function assertCleanAndPreserved(page: Page) {
 	const result = await page.evaluate(
 		({ ref, now, privateText }) => {
@@ -272,105 +238,6 @@ for (const operation of ["write", "remove", "expiry"] as const) {
 			outcome,
 			"the writer crossed the final native setItem boundary after revoke",
 		).toBe(1);
-		await assertCleanAndPreserved(page);
-	});
-}
-
-for (const operation of [
-	"create",
-	"read",
-	"write",
-	"remove",
-	"revoke",
-] as const) {
-	test(`fallback ${operation} reconciles orphan generations idempotently without erasing other sessions`, async ({
-		page,
-	}) => {
-		await install(page);
-		await seedOrphans(page);
-		await page.evaluate(
-			({ operation, ref, now }) => {
-				const fixture = window.erasure;
-				const fresh = fixture.fresh;
-				if (!fresh) throw new Error("Missing current session");
-				for (let repeat = 0; repeat < 2; repeat++) {
-					if (operation === "create") fixture.open();
-					else if (operation === "read") fresh.read(ref, now);
-					else if (operation === "write")
-						fresh.write(
-							{ ...ref, field: "unrelated" },
-							fixture.draft("new field"),
-						);
-					else if (operation === "remove")
-						fresh.remove({ ...ref, field: "unrelated" });
-					else fixture.old.revoke();
-				}
-			},
-			{ operation, ref: REF, now: NOW },
-		);
-		await assertCleanAndPreserved(page);
-	});
-}
-
-for (const operation of ["create", "read", "revoke"] as const) {
-	test(`fallback ${operation} reports cleanup failure and permits retry after storage recovers`, async ({
-		page,
-	}) => {
-		await install(page);
-		await seedOrphans(page);
-		const failure = await page.evaluate(
-			({ operation, ref, now }) => {
-				const fixture = window.erasure;
-				const nativeRemove = Storage.prototype.removeItem;
-				Storage.prototype.removeItem = function (key) {
-					if (
-						this === localStorage &&
-						fixture.orphanEntries.some(([oldKey]) => key === oldKey)
-					)
-						throw new DOMException(
-							"Storage temporarily denied",
-							"SecurityError",
-						);
-					nativeRemove.call(this, key);
-				};
-				let errorName: string | null = null;
-				try {
-					if (operation === "create") fixture.open();
-					else if (operation === "read") fixture.fresh?.read(ref, now);
-					else fixture.old.revoke();
-				} catch (error) {
-					errorName = error instanceof Error ? error.name : String(error);
-				} finally {
-					Storage.prototype.removeItem = nativeRemove;
-				}
-				return {
-					errorName,
-					retained: fixture.physicalText("PRIVATE-REVOKED-GENERATION").length,
-				};
-			},
-			{ operation, ref: REF, now: NOW },
-		);
-		expect
-			.soft(
-				failure.errorName,
-				"storage failure must not be reported as successful cleanup",
-			)
-			.not.toBeNull();
-		expect(
-			failure.retained,
-			"the injected failure really left data to retry",
-		).toBeGreaterThan(0);
-		await page.evaluate(
-			({ operation, ref, now }) => {
-				const fixture = window.erasure;
-				for (let repeat = 0; repeat < 2; repeat++) {
-					if (operation === "create") fixture.open();
-					else if (operation === "read") fixture.fresh?.read(ref, now);
-					else fixture.old.revoke();
-				}
-			},
-			{ operation, ref: REF, now: NOW },
-		);
 		await assertCleanAndPreserved(page);
 	});
 }
@@ -469,8 +336,6 @@ test("a real second page revokes a writer suspended at native setItem and resume
 
 test("concurrent fallback token rotations never physically erase the fresh peer session", () => {
 	const { storage, open, draft } = injectedFixture();
-	/// Persist a token so both revokers start from the same stored generation.
-	open().revoke();
 	const first = open();
 	const peer = open();
 	first.write(REF, draft(PRIVATE));
@@ -542,12 +407,14 @@ test("fallback operations never enumerate or clear origin Storage", () => {
 		storage.beforeWrite = null;
 	}
 	expect(storage.physicalText(PRIVATE)).toEqual([]);
+	/// A writer killed before compensating leaves text no new session can read.
 	for (const [key, value] of orphanEntries) storage.setItem(key, value);
 	const fresh = open();
-	expect(storage.physicalText(PRIVATE)).toEqual([]);
+	expect(fresh.read(REF, NOW)).toBeNull();
 	fresh.write(REF, draft(FRESH));
 	old.revoke();
 	old.revoke();
+	expect(storage.physicalText(PRIVATE)).toEqual([]);
 	expect(fresh.read(REF, NOW)?.text).toBe(FRESH);
 	expect(storage.getItem("unrelated-origin-key")).toBe(
 		"unrelated-origin-value",
@@ -558,85 +425,17 @@ test("fallback operations never enumerate or clear origin Storage", () => {
 	).toEqual([]);
 });
 
-test("lost revocation-index update leaves an orphan invisible to new sessions until its original handle retries", () => {
-	const { storage, open, draft } = injectedFixture();
-	let indexKey: string | undefined;
-	/// Discover the index through public Storage writes, not its private key format.
-	storage.beforeWrite = (key, value) => {
-		if (value.startsWith("[") && Array.isArray(JSON.parse(value)))
-			indexKey = key;
-	};
-	open().revoke();
-	storage.beforeWrite = null;
-	expect(indexKey, "a revocation persisted a generation index").toBeDefined();
-	const first = open();
-	const peer = open();
-	let survivor: TextRecoveryStore | undefined;
-	let orphanEntries: [string, string][] = [];
-	let interrupted = false;
-	let nestedIndex: string | null = null;
-	storage.beforeWrite = (key) => {
-		if (key !== indexKey) return;
-		storage.beforeWrite = null;
-		interrupted = true;
-		/// A pauses after reading the index; B rotates it and revokes a newer generation.
-		peer.revoke();
-		survivor = open();
-		survivor.write(REF, draft(PRIVATE));
-		orphanEntries = storage.physicalText(PRIVATE);
-		survivor.revoke();
-		nestedIndex = storage.getItem(key);
-		/// A suspended writer persists after revoke and dies before compensation.
-		for (const [orphanKey, value] of orphanEntries)
-			storage.setItem(orphanKey, value);
-	};
-	try {
-		first.revoke();
-	} finally {
-		storage.beforeWrite = null;
-	}
-	expect(interrupted).toBe(true);
-	expect(orphanEntries).toHaveLength(1);
-	expect(
-		storage.getItem(indexKey as string),
-		"A overwrote B's newer index",
-	).not.toBe(nestedIndex);
-	const fresh = open();
-	expect(
-		fresh.read(REF, NOW),
-		"the orphan is not readable by the new session",
-	).toBeNull();
-	fresh.write(REF, draft(FRESH));
-	fresh.remove(REMOVE_REF);
-	open();
-	expect(
-		storage.physicalText(PRIVATE),
-		"new handles cannot discover the lost generation",
-	).toEqual(orphanEntries);
-	expect(survivor).toBeDefined();
-	survivor?.revoke();
-	expect(
-		storage.physicalText(PRIVATE),
-		"only the surviving handle retains the generation to clean",
-	).toEqual([]);
-	expect(fresh.read(REF, NOW)?.text).toBe(FRESH);
-	/// If that handle dies too, physical erasure is not guaranteed.
-});
-
-test("repeating a rejected coordinator logout does not retry fallback cleanup", async () => {
+test("repeating a rejected coordinator logout retries fallback cleanup", async () => {
 	const h = rig();
 	const failure = new DOMException("Cleanup denied", "SecurityError");
 	let cleanupCalls = 0;
 	h.fallback.revoke = () => {
 		cleanupCalls++;
-		throw failure;
+		if (cleanupCalls === 1) throw failure;
 	};
 	await expect(h.coordinator.logout()).rejects.toBe(failure);
-	await expect(h.coordinator.logout()).rejects.toBe(failure);
-	expect(
-		cleanupCalls,
-		"logout retains its rejected result, not a cleanup retry",
-	).toBe(1);
+	await h.coordinator.logout();
+	expect(cleanupCalls).toBe(2);
 	await h.coordinator.dispose();
 });
 
