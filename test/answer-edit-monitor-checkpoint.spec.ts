@@ -15,6 +15,7 @@ function monitor() {
 		baseRevision: 4,
 		firstSeq: 12,
 		now: () => 10_000,
+		retentionNow: () => 1_800_000_000_000,
 	});
 }
 
@@ -25,6 +26,7 @@ function append(target: AnswerEditMonitor, text: string, atMs: number) {
 		atMs,
 		kind: "typing",
 		inputId,
+		inputAtMs: atMs,
 		replacements: [
 			{
 				position: target.getState().text.length,
@@ -58,6 +60,7 @@ function restore(target: AnswerEditMonitor, sessionId: string, origin = 0) {
 	return AnswerEditMonitor.restore({
 		checkpoint: jsonCheckpoint(target),
 		now: () => origin,
+		retentionNow: () => 1_800_000_000_000,
 		createSessionId: () => sessionId,
 	});
 }
@@ -113,7 +116,7 @@ test.describe("answer edit monitor checkpoints: export", () => {
 		append(target, "b", 10_020);
 		const checkpoint = target.exportCheckpoint();
 		const serialized = JSON.stringify(checkpoint);
-		expect(checkpoint.version).toBe(1);
+		expect(checkpoint.version).toBe(2);
 		expect(JSON.parse(serialized)).toEqual(checkpoint);
 		expectDeepFrozen(checkpoint);
 		expect(Reflect.set(checkpoint, "version", 99)).toBe(false);
@@ -125,6 +128,7 @@ test.describe("answer edit monitor checkpoints: export", () => {
 		const restored = AnswerEditMonitor.restore({
 			checkpoint: JSON.parse(serialized),
 			now: () => 0,
+			retentionNow: () => 1_800_000_000_000,
 			createSessionId: () => "detached-session",
 		});
 		expect(restored.getState().text).toBe("seedab");
@@ -181,6 +185,7 @@ test.describe("answer edit monitor checkpoints: export", () => {
 			target.recordChange({
 				atMs: 10_080,
 				inputId: "delayed",
+				inputAtMs: 10_030,
 				kind: "typing",
 				replacements: [{ position: 5, deleteCount: 0, insertedText: "b" }],
 			});
@@ -223,7 +228,7 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 		["null checkpoint", () => null],
 		["missing state", () => ({ version: 1 })],
 		["missing version", (checkpoint) => ({ state: checkpoint.state })],
-		["unknown version", (checkpoint) => ({ ...checkpoint, version: 2 })],
+		["unknown version", (checkpoint) => ({ ...checkpoint, version: 99 })],
 		["string version", (checkpoint) => ({ ...checkpoint, version: "1" })],
 		["null state", (checkpoint) => ({ ...checkpoint, state: null })],
 		["truncated state", (checkpoint) => ({ ...checkpoint, state: {} })],
@@ -248,6 +253,7 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 				AnswerEditMonitor.restore({
 					checkpoint: candidate as MonitorCheckpoint,
 					now: () => 0,
+					retentionNow: () => 1_800_000_000_000,
 					createSessionId: () => "rejected-session",
 				}),
 			).toThrow();
@@ -283,6 +289,7 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 				AnswerEditMonitor.restore({
 					checkpoint,
 					now: () => now,
+					retentionNow: () => 1_800_000_000_000,
 					createSessionId: () => "invalid-clock",
 				}),
 			).toThrow();
@@ -306,6 +313,7 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 				AnswerEditMonitor.restore({
 					checkpoint,
 					now: () => 0,
+					retentionNow: () => 1_800_000_000_000,
 					createSessionId: () => sessionId,
 				}),
 			).toThrow();
@@ -322,6 +330,7 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 		const restored = AnswerEditMonitor.restore({
 			checkpoint,
 			now: () => 0,
+			retentionNow: () => 1_800_000_000_000,
 			createSessionId: () => "detached-input",
 		});
 		expect(checkpoint).toEqual(before);
@@ -619,6 +628,7 @@ test.describe("answer edit monitor checkpoints: reload and delivery", () => {
 			target = AnswerEditMonitor.restore({
 				checkpoint: jsonCheckpoint(target),
 				now: () => 0,
+				retentionNow: () => 1_800_000_000_000,
 			});
 			append(target, "x", 0);
 			const batch = collect(target);

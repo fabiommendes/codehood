@@ -14,6 +14,7 @@ function monitor(pauseMs = 1000) {
 		firstSeq: 0,
 		pauseMs,
 		now: () => 0,
+		retentionNow: () => 1_800_000_000_000,
 	});
 }
 
@@ -30,6 +31,7 @@ function append(
 		atMs: changedAtMs,
 		kind: "typing",
 		inputId,
+		inputAtMs: observedAtMs,
 		replacements: [{ position, deleteCount: 0, insertedText: text }],
 	});
 }
@@ -55,6 +57,7 @@ function restore(target: AnswerEditMonitor, sessionId: string) {
 	return AnswerEditMonitor.restore({
 		checkpoint: json,
 		now: () => 0,
+		retentionNow: () => 1_800_000_000_000,
 		createSessionId: () => sessionId,
 	});
 }

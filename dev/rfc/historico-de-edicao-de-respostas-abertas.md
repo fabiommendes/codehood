@@ -302,6 +302,71 @@ declare class AnswerEditMonitor implements MonitorHandle {
 - Conflitos entre abas não se resolvem com `reset` silencioso. A reconciliação é
   externa e inicia uma nova base explícita, preservando evidência de lacuna.
 
+## Retenção local dos controles do monitor
+
+Contrato aprovado para a compactação local, independente da retenção do histórico
+aceito no servidor e do TTL de rascunhos/logout. O backend REST ainda não existe;
+nesta camada a confirmação é o ACK validado do transporte injetado.
+
+- `metadataTtlMs` é configurável, finito e positivo, com padrão 1.800.000 ms.
+  Não usar LRU. Expira exatamente quando `agora - registradoEm >= TTL`.
+  A configuração integra o checkpoint v2 e é preservada no restore quando não
+  houver override explícito. V1 usa o padrão ou override da migração.
+- `retentionNow`, padrão `Date.now`, fornece milissegundos de época. `now` continua
+  monotônico e restrito à sessão de edição. Nunca comparar origens monotônicas de
+  páginas diferentes. O maior tempo de retenção observado é persistido; relógio
+  de parede regressivo é limitado por esse máximo. Isso pode atrasar expiração,
+  mas nunca remove trabalho não confirmado. Avanço de parede expira só controles.
+- Limpeza acontece nas operações públicas e na exportação para persistência, sem
+  timer por edit e sem esperar inatividade. Após restore, limpar antes de aceitar
+  novos eventos. Ausência de operações não exige execução em background.
+- ACK válido remove imediatamente o batch em memória; a outbox durável fica sem
+  esse batch no commit coerente seguinte. Falha nesse commit conserva a cópia
+  durável anterior para retry/reconciliação, nunca declara durabilidade falsa.
+- Recibos confirmados ficam por TTL a partir da confirmação. Repetição idêntica
+  antes da fronteira é inofensiva; divergência é erro. Após expiração, ACK antigo
+  é desconhecido e rejeitado, sem modificar inflight novo, revisão ou sequência.
+  Batch ainda não confirmado não expira: ACK perdido e retry funcionam também
+  depois de 30 minutos. O TTL do recibo só começa no ACK local válido.
+- Observação não consumida expira pelo instante de observação no relógio de
+  retenção. `recordChange` com associação expirada falha atomicamente; o chamador
+  pode registrar mudança sem associação e sem timing inventado. Ao consumir,
+  remover o payload da observação imediatamente e reter apenas ID e vencimento
+  por TTL a partir do consumo. Dados de replay já estão nos edits, não dependem
+  da observação original. Cadência escalar expirada não gera novo intervalo.
+- ID duplicado é recusado dentro da janela, consumido ou não. Depois dela pode
+  ser observado de novo. `DocumentChange.inputAtMs` passa a ser obrigatório junto
+  com `inputId` e deve ser exatamente o `atMs` da observação. Este vínculo evita
+  associar uma mudança antiga a uma nova observação com o mesmo ID. Timestamps
+  de observações de mesmo ID não podem ser reutilizados. Para garantir isso sem
+  tombstones eternos, ao podar qualquer input o monitor avança um watermark
+  monotônico escalar até o último evento da sessão. Novas observações precisam
+  ter `atMs` estritamente maior que esse watermark. Antes de qualquer poda,
+  timestamps iguais continuam válidos. Observações ainda retidas continuam
+  associáveis. O watermark integra o checkpoint e não cruza a nova sessão no
+  restore. IDs únicos aleatórios são recomendados aos futuros adaptadores. Evento antigo com token expirado
+  não pode usar timestamp novo para obter associação.
+- Sessões concluídas também têm janela de reconhecimento, sem lista eterna.
+  Sessão ativa e sessões referenciadas por inflight/queue nunca são podadas.
+  Novos sessionIds devem ser UUIDs ou namespace único gerado pelo chamador;
+  duplicatas conhecidas são recusadas. Reuso arbitrário além da janela não é
+  garantido. IDs de batch incluem sessão e sequência global crescente.
+- Checkpoint v2 mantém base confirmada, revisão e sequência globais como âncora
+  independente de recibos. Recibos recentes não precisam reconstruir uma cadeia
+  até a origem da tentativa. Replay valida somente pendências contra essa base.
+  Checkpoint v1 é validado pelo contrato antigo antes de migrar para v2; controles
+  antigos sem timestamp recebem a hora da migração e vencem após uma janela.
+  Não inventar hora antiga nem descartar pendências. Versões desconhecidas ou
+  corrupção continuam rejeitadas, com recuperação externa explícita texto+lacuna.
+  Restore cria sessão monotônica nova e não transfere associações de input entre
+  sessões, mas conserva todos os edits e batches antigos.
+
+TTL limita duração, não bytes sob vazão ilimitada. Memória e checkpoint devem ser
+proporcionais aos controles da janela, texto atual e pendências, não à duração
+total da tentativa. Pendências offline continuam podendo exceder 2 MiB e a
+política existente sinaliza degradação em vez de truncar. Medir simulação longa
+com texto pequeno, lotes confirmados e reloads, sem aumentar o limite do storage.
+
 ## Responsabilidades dos adaptadores
 
 ### Textarea

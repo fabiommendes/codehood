@@ -81,11 +81,51 @@ const checkpoint = z.strictObject({
 	}),
 });
 
-export type CheckpointState = z.infer<typeof checkpoint>["state"];
+type LegacyState = z.infer<typeof checkpoint>["state"];
+const checkpointV2 = z.strictObject({
+	version: z.literal(2),
+	state: checkpoint.shape.state
+		.omit({ initialRevision: true, initialSeq: true })
+		.extend({
+			retentionMaxMs: time,
+			metadataTtlMs: time.positive(),
+			sessions: z
+				.array(z.strictObject({ sessionId: id, registeredAtMs: time }))
+				.min(1),
+			receipts: z.array(receipt.extend({ confirmedAtMs: time })),
+			active: active.extend({
+				inputWatermarkMs: time.nullable(),
+				previousCadenceRetentionMs: time.nullable(),
+				observations: z.array(
+					z.strictObject({ id, atMs: time, kind, observedAtMs: time }),
+				),
+				consumedInputs: z.array(z.strictObject({ id, consumedAtMs: time })),
+			}),
+		}),
+});
+
+export type CheckpointState = z.infer<typeof checkpointV2>["state"];
 export type PendingSegment = z.infer<typeof segment>;
 
 /// Parse a detached checkpoint and verify counters, session boundaries and exact replay.
-export function parseCheckpoint(value: unknown): CheckpointState {
+export function parseCheckpoint(
+	value: unknown,
+	migrationNow = Date.now(),
+): CheckpointState {
+	if (
+		typeof value === "object" &&
+		value !== null &&
+		"version" in value &&
+		value.version === 2
+	) {
+		const parsed = checkpointV2.safeParse(value);
+		if (!parsed.success)
+			throw new TypeError("Invalid monitor checkpoint", {
+				cause: parsed.error,
+			});
+		validateV2(parsed.data.state);
+		return parsed.data.state;
+	}
 	const parsed = checkpoint.safeParse(value);
 	if (!parsed.success)
 		throw new TypeError("Invalid monitor checkpoint", { cause: parsed.error });
@@ -93,7 +133,35 @@ export function parseCheckpoint(value: unknown): CheckpointState {
 	validateReceipts(state);
 	validateActive(state);
 	validateReplay(state);
-	return state;
+	check(Number.isFinite(migrationNow) && migrationNow >= 0, "migration clock");
+	const { initialRevision: _revision, initialSeq: _seq, ...base } = state;
+	const consumed = new Set(state.active.consumedInputs);
+	return {
+		...base,
+		retentionMaxMs: migrationNow,
+		metadataTtlMs: 1_800_000,
+		sessions: state.sessions.map((sessionId) => ({
+			sessionId,
+			registeredAtMs: migrationNow,
+		})),
+		receipts: state.receipts.map((item) => ({
+			...item,
+			confirmedAtMs: migrationNow,
+		})),
+		active: {
+			...state.active,
+			inputWatermarkMs: null,
+			previousCadenceRetentionMs:
+				state.active.previousCadenceMs === null ? null : migrationNow,
+			observations: state.active.observations
+				.filter((input) => !consumed.has(input.id))
+				.map((input) => ({ ...input, observedAtMs: migrationNow })),
+			consumedInputs: state.active.consumedInputs.map((id) => ({
+				id,
+				consumedAtMs: migrationNow,
+			})),
+		},
+	};
 }
 
 /// Copy JSON-compatible state before freezing so exports never freeze live monitor data.
@@ -101,6 +169,119 @@ export function frozenCopy<T>(value: T): T {
 	const copy: T = structuredClone(value);
 	freezeTree(copy);
 	return copy;
+}
+
+function validateV2(state: CheckpointState): void {
+	const sessions = state.sessions.map((session) => session.sessionId);
+	check(new Set(sessions).size === sessions.length, "duplicate sessions");
+	check(
+		sessions.at(-1) === state.active.sessionId,
+		"active session must be newest",
+	);
+	const timestamp = (value: number): void => {
+		check(value <= state.retentionMaxMs, "retention timestamp exceeds maximum");
+	};
+	for (const session of state.sessions) timestamp(session.registeredAtMs);
+	const ids = new Set<string>();
+	let revision = -1;
+	let lastSeq = -1;
+	for (const receipt of state.receipts) {
+		timestamp(receipt.confirmedAtMs);
+		check(!ids.has(receipt.batchId), "duplicate receipts");
+		ids.add(receipt.batchId);
+		const separator = receipt.batchId.lastIndexOf(":");
+		const firstSeq = Number(receipt.batchId.slice(separator + 1));
+		check(
+			separator > 0 &&
+				Number.isSafeInteger(firstSeq) &&
+				firstSeq >= 0 &&
+				receipt.batchId.slice(separator + 1) === String(firstSeq),
+			"receipt batch id",
+		);
+		check(
+			receipt.revision > revision &&
+				receipt.revision <= state.baseRevision &&
+				receipt.lastSeq >= firstSeq &&
+				firstSeq > lastSeq &&
+				receipt.lastSeq < state.firstSeq,
+			"receipt counters",
+		);
+		revision = receipt.revision;
+		lastSeq = receipt.lastSeq;
+	}
+	const batch = state.inFlight;
+	if (batch) {
+		check(
+			batch.baseRevision === state.baseRevision &&
+				batch.firstSeq === state.firstSeq,
+			"in-flight counters",
+		);
+		check(
+			batch.batchId === `${batch.sessionId}:${state.firstSeq}` &&
+				!ids.has(batch.batchId),
+			"in-flight batch id",
+		);
+		check(
+			Number.isSafeInteger(state.baseRevision + 1) &&
+				Number.isSafeInteger(state.firstSeq + batch.edits.length),
+			"in-flight counter overflow",
+		);
+	}
+	const active = state.active;
+	if (active.inputWatermarkMs !== null) {
+		check(
+			active.inputWatermarkMs >= active.timeOriginMs &&
+				active.inputWatermarkMs <= active.lastAtMs,
+			"input watermark clock",
+		);
+	}
+	const inputs = new Set<string>();
+	let previous = active.timeOriginMs;
+	for (const input of active.observations) {
+		timestamp(input.observedAtMs);
+		check(!inputs.has(input.id), "duplicate input observations");
+		inputs.add(input.id);
+		check(
+			input.atMs >= previous && input.atMs <= active.lastAtMs,
+			"input clock order",
+		);
+		previous = input.atMs;
+	}
+	for (const input of active.consumedInputs) {
+		timestamp(input.consumedAtMs);
+		check(!inputs.has(input.id), "duplicate consumed inputs");
+		inputs.add(input.id);
+	}
+	check(
+		(active.previousCadenceMs === null) ===
+			(active.previousCadenceRetentionMs === null),
+		"cadence retention pair",
+	);
+	if (active.previousCadenceMs !== null) {
+		check(
+			active.previousCadenceMs >= active.timeOriginMs &&
+				active.previousCadenceMs <= active.lastAtMs,
+			"cadence clock",
+		);
+	}
+	if (active.previousCadenceRetentionMs !== null)
+		timestamp(active.previousCadenceRetentionMs);
+	/// Pending replay depends only on the confirmed anchor, never on retained receipts.
+	const replayState: LegacyState = {
+		...state,
+		initialRevision: state.baseRevision,
+		initialSeq: state.firstSeq,
+		sessions,
+		receipts: [],
+		active: {
+			...active,
+			previousCadenceMs: null,
+			observations: [],
+			consumedInputs: [],
+		},
+	};
+	validateActive(replayState);
+	validateReplay(replayState);
 }
 
 function freezeTree(value: unknown): void {
@@ -113,7 +294,7 @@ function check(condition: boolean, message: string): asserts condition {
 	if (!condition) throw new TypeError(`Invalid monitor checkpoint: ${message}`);
 }
 
-function validateReceipts(state: CheckpointState): void {
+function validateReceipts(state: LegacyState): void {
 	check(
 		new Set(state.sessions).size === state.sessions.length,
 		"duplicate sessions",
@@ -166,7 +347,7 @@ function validateReceipts(state: CheckpointState): void {
 	}
 }
 
-function validateActive(state: CheckpointState): void {
+function validateActive(state: LegacyState): void {
 	const active = state.active;
 	check(active.lastAtMs >= active.timeOriginMs, "active clock before origin");
 	const observations = new Map(
@@ -221,7 +402,7 @@ function validateActive(state: CheckpointState): void {
 	}
 }
 
-function validateReplay(state: CheckpointState): void {
+function validateReplay(state: LegacyState): void {
 	let text = state.confirmedText;
 	const lastReceipt = state.receipts.at(-1);
 	let sessionIndex = lastReceipt

@@ -19,6 +19,7 @@ function monitor(initialText = "", options: Partial<MonitorOptions> = {}) {
 		baseRevision: 0,
 		firstSeq: 0,
 		now: () => 0,
+		retentionNow: () => 1_800_000_000_000,
 		...options,
 	});
 }
@@ -47,7 +48,11 @@ function inputChange(
 	kind: InputKind = "typing",
 ) {
 	target.observeInput({ id, atMs, kind });
-	target.recordChange({ ...change(atMs, [replacement], kind), inputId: id });
+	target.recordChange({
+		...change(atMs, [replacement], kind),
+		inputId: id,
+		inputAtMs: atMs,
+	});
 }
 
 function collect(target: AnswerEditMonitor) {
@@ -103,6 +108,7 @@ test.describe("answer edit monitor input: atomic validation and replay", () => {
 					atMs: 100,
 					kind: "typing",
 					inputId: "second",
+					inputAtMs: 20,
 					replacements,
 				}),
 			).toThrow();
@@ -110,6 +116,7 @@ test.describe("answer edit monitor input: atomic validation and replay", () => {
 				target.recordChange({
 					...change(20, [patch(7, 0, "h")]),
 					inputId: "second",
+					inputAtMs: 20,
 				});
 			}
 			expect(collect(actual)).toEqual(collect(control));
@@ -153,6 +160,7 @@ test.describe("answer edit monitor input: atomic validation and replay", () => {
 			target.recordChange({
 				...change(20, [patch(0, 0, "ok")]),
 				inputId: "intent",
+				inputAtMs: 20,
 			});
 			expect(collect(target).snapshot).toBe("ok");
 		});
@@ -175,6 +183,7 @@ test.describe("answer edit monitor input: atomic validation and replay", () => {
 						? ("delete" as const)
 						: ("typing" as const),
 				inputId: association === "unknown" ? "missing" : "known",
+				inputAtMs: 20,
 				replacements: [patch(0, 0, "bad")],
 			};
 			expect(() => actual.recordChange(invalid)).toThrow();
@@ -182,6 +191,7 @@ test.describe("answer edit monitor input: atomic validation and replay", () => {
 				target.recordChange({
 					...change(20, [patch(0, 0, "ok")]),
 					inputId: "known",
+					inputAtMs: 20,
 				});
 			expect(collect(actual)).toEqual(collect(control));
 		});
@@ -391,6 +401,7 @@ test.describe("answer edit monitor input: intentions and timing", () => {
 				target.recordChange({
 					...change(0, [patch(0, 0, "a")]),
 					inputId: "unique",
+					inputAtMs: 0,
 				});
 			expect(() =>
 				target.observeInput({ id: "unique", atMs: 10, kind: "typing" }),
@@ -405,6 +416,7 @@ test.describe("answer edit monitor input: intentions and timing", () => {
 			target.recordChange({
 				...change(10, [patch(1, 0, "bad")]),
 				inputId: "used",
+				inputAtMs: 0,
 			}),
 		).toThrow();
 		inputChange(target, "fresh", 10, patch(1, 0, "b"));
@@ -452,11 +464,13 @@ test.describe("answer edit monitor input: intentions and timing", () => {
 		target.recordChange({
 			...change(40, [patch(0, 0, "a")]),
 			inputId: "first",
+			inputAtMs: 0,
 		});
 		target.observeInput({ id: "second", atMs: 100, kind: "typing" });
 		target.recordChange({
 			...change(190, [patch(1, 0, "b")]),
 			inputId: "second",
+			inputAtMs: 100,
 		});
 		expect(expectDefined(edits(target)[0]).timing).toEqual([1, 100, 0]);
 	});
@@ -466,7 +480,11 @@ test.describe("answer edit monitor input: intentions and timing", () => {
 		inputChange(target, "first", 0, patch(0, 0, "a"));
 		target.observeInput({ id: "unapplied", atMs: 20, kind: "typing" });
 		target.observeInput({ id: "noop", atMs: 30, kind: "typing" });
-		target.recordChange({ ...change(30, [patch(1)]), inputId: "noop" });
+		target.recordChange({
+			...change(30, [patch(1)]),
+			inputId: "noop",
+			inputAtMs: 30,
+		});
 		inputChange(target, "last", 100, patch(1, 0, "b"));
 		expect(expectDefined(edits(target)[0]).timing).toEqual([1, 100, 0]);
 	});
@@ -520,6 +538,7 @@ test.describe("answer edit monitor input: intentions and timing", () => {
 		target.recordChange({
 			...change(100, [patch(0, 1, "A"), patch(2, 1, "C"), patch(4, 1, "E")]),
 			inputId: "transaction",
+			inputAtMs: 100,
 		});
 		inputChange(target, "last", 200, patch(7, 0, "!"));
 		const decoded = edits(target);

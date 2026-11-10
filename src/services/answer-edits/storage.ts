@@ -441,7 +441,7 @@ function localRecord(value: unknown): LocalEditRecord {
 	return bounded({
 		...base,
 		generation: data.generation,
-		checkpoint: { version: 1, state },
+		checkpoint: { version: 2, state },
 		outbox: state.inFlight,
 	});
 }

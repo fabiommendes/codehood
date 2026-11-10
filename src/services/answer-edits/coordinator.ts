@@ -98,6 +98,7 @@ export interface CoordinatorOptions {
 	readonly createSessionId: () => string;
 	readonly onStatus?: (status: Readonly<FieldStatus>) => void;
 	readonly ttlMs?: number;
+	readonly metadataTtlMs?: number;
 }
 
 interface RegisteredField {
@@ -402,6 +403,8 @@ export class AnswerEditCoordinator {
 							firstSeq: server.nextSeq,
 							sessionId: this.options.createSessionId(),
 							now: this.options.monotonicNow,
+							retentionNow: this.options.now,
+							metadataTtlMs: this.options.metadataTtlMs,
 						}));
 			if (reconciled?.receipt) monitor.acknowledge(reconciled.receipt);
 			previous?.unsubscribe();
@@ -486,6 +489,8 @@ export class AnswerEditCoordinator {
 		return AnswerEditMonitor.restore({
 			checkpoint,
 			now: this.options.monotonicNow,
+			retentionNow: this.options.now,
+			metadataTtlMs: this.options.metadataTtlMs,
 			createSessionId: this.options.createSessionId,
 		});
 	}

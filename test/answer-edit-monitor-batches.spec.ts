@@ -15,6 +15,7 @@ function monitor(initialText = "", options: Partial<MonitorOptions> = {}) {
 		baseRevision: 4,
 		firstSeq: 12,
 		now: () => 100,
+		retentionNow: () => 1_800_000_000_000,
 		...options,
 	});
 }
@@ -86,6 +87,7 @@ test.describe("answer edit monitor batches: collection and replay", () => {
 				atMs,
 				kind: "typing",
 				inputId: id,
+				inputAtMs: atMs,
 				replacements: [{ position, deleteCount: 0, insertedText }],
 			});
 		}

@@ -26,6 +26,7 @@ function record(text: string, generation = 1): LocalEditRecord {
 		baseRevision: 0,
 		firstSeq: 1,
 		now: () => 0,
+		retentionNow: () => SAVED_AT,
 	});
 	monitor.recordChange({
 		atMs: 1,
@@ -62,6 +63,7 @@ function sizedRecord(bytes: number, generation: number): LocalEditRecord {
 			baseRevision: 0,
 			firstSeq: 1,
 			now: () => 0,
+			retentionNow: () => SAVED_AT,
 		});
 		return {
 			version: 1,
@@ -188,7 +190,7 @@ test("IndexedDB atomically roundtrips text, checkpoint and outbox; rejects stale
 				["invalid checkpoint", { checkpoint: { version: 1, state: {} } }],
 				[
 					"unknown checkpoint version",
-					{ checkpoint: { ...empty.checkpoint, version: 2 } },
+					{ checkpoint: { ...empty.checkpoint, version: 99 } },
 				],
 				["checkpoint text mismatch", { text: "not the checkpoint text" }],
 				["missing inflight outbox", { outbox: null }],
