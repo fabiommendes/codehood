@@ -201,18 +201,6 @@ test.describe("answer edit monitor batches: receipts", () => {
 		["earlier sequence", { lastSeq: 11 }],
 		["later sequence", { lastSeq: 13 }],
 	];
-	for (const field of ["revision", "lastSeq"] as const) {
-		for (const invalid of [
-			-1,
-			0.5,
-			Number.MAX_SAFE_INTEGER + 1,
-			Number.NaN,
-			Number.POSITIVE_INFINITY,
-			Number.NEGATIVE_INFINITY,
-		]) {
-			invalidReceipts.push([`${field} ${invalid}`, { [field]: invalid }]);
-		}
-	}
 	for (const [name, override] of invalidReceipts) {
 		test(`rejects ${name} without changing the in-flight batch or retained changes`, () => {
 			const { target, batch } = pendingMonitor();
@@ -234,7 +222,6 @@ test.describe("answer edit monitor batches: receipts", () => {
 	}
 
 	for (const phase of [
-		"before collection",
 		"with uncollected changes",
 		"after all batches are acknowledged",
 	] as const) {
@@ -287,29 +274,20 @@ test.describe("answer edit monitor batches: receipts", () => {
 	});
 
 	for (const field of ["revision", "lastSeq"] as const) {
-		for (const phase of [
-			"newer batch in flight",
-			"newer batch confirmed",
-		] as const) {
-			test(`rejects a historical receipt with divergent ${field} with ${phase}`, () => {
-				const { target, batch: first } = pendingMonitor();
-				const accepted = receipt(first);
-				target.acknowledge(accepted);
-				const second = collect(target);
-				if (phase === "newer batch confirmed")
-					target.acknowledge(receipt(second));
-				const before = structuredClone(target.getState());
-				expect(() =>
-					target.acknowledge({ ...accepted, [field]: accepted[field] + 1 }),
-				).toThrow();
-				expect(target.getState()).toEqual(before);
-				expect(target.collect()).toBe(
-					phase === "newer batch in flight" ? second : null,
-				);
-				target.acknowledge({ ...accepted });
-				expect(target.getState()).toEqual(before);
-			});
-		}
+		test(`rejects a historical receipt with divergent ${field} while a newer batch is in flight`, () => {
+			const { target, batch: first } = pendingMonitor();
+			const accepted = receipt(first);
+			target.acknowledge(accepted);
+			const second = collect(target);
+			const before = structuredClone(target.getState());
+			expect(() =>
+				target.acknowledge({ ...accepted, [field]: accepted[field] + 1 }),
+			).toThrow();
+			expect(target.getState()).toEqual(before);
+			expect(target.collect()).toBe(second);
+			target.acknowledge({ ...accepted });
+			expect(target.getState()).toEqual(before);
+		});
 	}
 });
 

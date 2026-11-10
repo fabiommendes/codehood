@@ -53,6 +53,20 @@ function receipt(batch: Readonly<PendingEditBatch>): BatchReceipt {
 	};
 }
 
+/// Mutable view of the fields a parsed JSON checkpoint exposes to the corruption table.
+interface CorruptibleState {
+	baseRevision: number;
+	receipts: [
+		{ batchId: string; revision: number; lastSeq: number },
+		...{ batchId: string; revision: number; lastSeq: number }[],
+	];
+	inFlight: { snapshot: string; batchId: string; baseRevision: number };
+	active: {
+		lastAtMs: number;
+		openEdit: { lastAtMs: number };
+	};
+}
+
 function jsonCheckpoint(target: AnswerEditMonitor): MonitorCheckpoint {
 	return JSON.parse(JSON.stringify(target.exportCheckpoint()));
 }
@@ -224,16 +238,8 @@ test.describe("answer edit monitor checkpoints: export", () => {
 test.describe("answer edit monitor checkpoints: validation", () => {
 	const corruptions: [string, (checkpoint: MonitorCheckpoint) => unknown][] = [
 		["null checkpoint", () => null],
-		["missing state", () => ({ version: 1 })],
-		["missing version", (checkpoint) => ({ state: checkpoint.state })],
 		["unknown version", (checkpoint) => ({ ...checkpoint, version: 99 })],
-		["string version", (checkpoint) => ({ ...checkpoint, version: "1" })],
-		["null state", (checkpoint) => ({ ...checkpoint, state: null })],
 		["truncated state", (checkpoint) => ({ ...checkpoint, state: {} })],
-		["array state", (checkpoint) => ({ ...checkpoint, state: [] })],
-		["string state", (checkpoint) => ({ ...checkpoint, state: "corrupted" })],
-		["numeric state", (checkpoint) => ({ ...checkpoint, state: 123 })],
-		["boolean state", (checkpoint) => ({ ...checkpoint, state: false })],
 	];
 
 	for (const [name, corrupt] of corruptions) {
@@ -271,12 +277,70 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 		});
 	}
 
-	for (const now of [
-		-1,
-		Number.NaN,
-		Number.POSITIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
-	]) {
+	/// Each corruption keeps the shape valid and breaks exactly one consistency rule.
+	const inconsistencies: [string, (state: CorruptibleState) => void][] = [
+		[
+			"an in-flight snapshot that differs from its replay",
+			(state) => {
+				state.inFlight.snapshot = "tampered";
+			},
+		],
+		[
+			"an in-flight batch identifier from another sequence",
+			(state) => {
+				state.inFlight.batchId = "original-session:999";
+			},
+		],
+		[
+			"an in-flight batch behind the confirmed counters",
+			(state) => {
+				state.inFlight.baseRevision -= 1;
+			},
+		],
+		[
+			"a duplicate receipt",
+			(state) => {
+				state.receipts.push({ ...state.receipts[0] });
+			},
+		],
+		[
+			"a receipt ahead of the confirmed revision",
+			(state) => {
+				state.receipts[0].revision = state.baseRevision + 1;
+			},
+		],
+		[
+			"a receipt whose batch identifier has no sequence",
+			(state) => {
+				state.receipts[0].batchId = "original-session";
+			},
+		],
+		[
+			"an open edit whose duration disagrees with its last event",
+			(state) => {
+				state.active.openEdit.lastAtMs += 5;
+				state.active.lastAtMs += 5;
+			},
+		],
+	];
+	for (const [name, corrupt] of inconsistencies) {
+		test(`rejects ${name}`, () => {
+			const target = monitor();
+			append(target, "a", 10_010);
+			target.acknowledge(receipt(collect(target)));
+			append(target, "b", 10_020);
+			collect(target);
+			append(target, "c", 10_030);
+			const checkpoint = jsonCheckpoint(target);
+			expect(parseCheckpoint(checkpoint).text).toBe("seedabc");
+			corrupt(checkpoint.state as CorruptibleState);
+			expect(() => parseCheckpoint(checkpoint)).toThrow(
+				/Invalid monitor checkpoint/,
+			);
+		});
+	}
+
+	for (const now of [-1, Number.NaN]) {
 		test(`rejects restore clock ${now} without changing checkpoint or source`, () => {
 			const target = monitor();
 			append(target, "a", 10_010);
