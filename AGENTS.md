@@ -173,7 +173,14 @@ which test is currently running, or `--reporter=list` for the full log.
 rtk pnpm test                                   # whole suite, dot reporter
 rtk pnpm exec tsx test/run.ts test/foo.spec.ts  # one file
 rtk pnpm test -- --reporter=line                # name each test as it runs
+rtk pnpm exec tsx test/run.ts --only-changed=main  # specs touched since main
 ```
+
+Prefer `--only-changed` (against `main`, or `HEAD` for uncommitted work) while
+iterating. Playwright selects specs by their import graph, and specs drive the
+app through HTTP, so a change in `src/pages/`, `src/db/` or an endpoint selects
+no spec on its own. Add the specs for the screens you touched by path, and run
+the whole suite once before calling a task done.
 
 `TEST_BROWSERS=cross` adds Firefox and WebKit projects that run only the
 `runner-*` specs; the default suite stays on Chromium. Install them with
