@@ -442,6 +442,17 @@ test("an old request that lands late does not replace the newer answer", async (
 const readDraft = (page: Page, key: string) =>
 	page.evaluate((k) => localStorage.getItem(k), key);
 
+/// The text of the draft stored under `key`, or null.
+const draftText = async (page: Page, key: string) =>
+	JSON.parse((await readDraft(page, key)) ?? "null")?.code ?? null;
+
+/// Opens `url` and waits for the attempt island to hydrate, since input typed before that is lost.
+async function openHydrated(page: Page, url: string, reload = false) {
+	if (reload) await page.reload();
+	else await page.goto(url);
+	await expect(page.locator("astro-island[ssr]")).toHaveCount(0);
+}
+
 test("typed text survives a reload during an outage and reaches the server later", async ({
 	page,
 }) => {
@@ -450,12 +461,15 @@ test("typed text survives a reload during an outage and reaches the server later
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
 	);
-	await page.goto(s.url);
+	await openHydrated(page, s.url);
 	await answerBox(page).fill("typed while offline");
+	await expect
+		.poll(() => draftText(page, s.draftKey("text")))
+		.toBe("typed while offline");
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 	expect(await saved(s)).toBeNull();
 
-	await page.reload();
+	await openHydrated(page, s.url, true);
 	await expect(answerBox(page)).toHaveValue("typed while offline");
 
 	offline = false;
@@ -468,7 +482,7 @@ test("the draft is removed once the server confirms the text", async ({
 	page,
 }) => {
 	const s = await setup({ page });
-	await page.goto(s.url);
+	await openHydrated(page, s.url);
 	await answerBox(page).fill("confirmed");
 	await expect.poll(() => saved(s)).toBe("confirmed");
 	await expect.poll(() => readDraft(page, s.draftKey("text"))).toBeNull();
@@ -521,11 +535,12 @@ test("clearing the text during an outage is kept across a reload", async ({
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
 	);
-	await page.goto(s.url);
+	await openHydrated(page, s.url);
 	await answerBox(page).fill("typed");
 	await answerBox(page).fill("");
-	await page.reload();
-	await expect(answerBox(page)).toHaveValue("");
+	await expect.poll(() => draftText(page, s.draftKey("text"))).toBe("");
+	await openHydrated(page, s.url, true);
+	await expect.poll(() => draftText(page, s.draftKey("text"))).toBe("");
 
 	offline = false;
 	await page.evaluate(() => window.dispatchEvent(new Event("online")));
