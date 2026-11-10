@@ -367,8 +367,19 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 			text: "expired",
 			historyGap: true,
 		});
-		const result = ready(await h.coordinator.recover(FIELD));
-		expect(result.handle.getState().text).toBe("");
+		const result = await h.coordinator.recover(FIELD);
+		expect(result).toMatchObject({
+			kind: "unavailable",
+			server: h.transport.server,
+		});
+		expect("handle" in result).toBe(false);
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			durability: "unavailable",
+			savedText: null,
+		});
+		await h.coordinator.flushDelivery();
+		expect(h.transport.requests).toHaveLength(0);
+		expect(h.store.commits).toHaveLength(0);
 		await h.coordinator.dispose();
 	});
 

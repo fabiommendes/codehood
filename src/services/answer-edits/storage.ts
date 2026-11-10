@@ -47,6 +47,14 @@ export interface TextRecoveryStore {
 export const LOCAL_EDIT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export const MAX_LOCAL_RECORD_BYTES = 2 * 1024 * 1024;
 
+/// Field keys are JSON arrays, so this metadata key cannot collide with a field.
+const REVOCATION_KEY = "revocation-token";
+interface SessionFence {
+	readonly token: unknown;
+	invalidate(): void;
+}
+const sessionFences = new WeakMap<IDBFactory, Map<string, Set<SessionFence>>>();
+
 /** Open only this owner's IndexedDB namespace, with injectable browser APIs. */
 export function openIndexedDbEditStore(options: {
 	ownerId: string;
@@ -63,7 +71,24 @@ export function openIndexedDbEditStore(options: {
 			request.result.createObjectStore("records");
 		};
 		request.onerror = () => reject(request.error);
-		request.onsuccess = () => resolve(indexedDbHandle(request.result));
+		request.onsuccess = () => {
+			const database = request.result;
+			const transaction = database.transaction("records", "readonly");
+			const tokenRequest = transaction
+				.objectStore("records")
+				.get(REVOCATION_KEY);
+			transaction.onabort = () => {
+				database.close();
+				reject(transaction.error ?? new Error("Cannot read revocation token"));
+			};
+			transaction.oncomplete = () =>
+				resolve(
+					indexedDbHandle(database, {
+						token: tokenRequest.result,
+						peers: namespaceFences(options.indexedDB, name),
+					}),
+				);
+		};
 	});
 }
 
@@ -78,9 +103,14 @@ export function createTextRecoveryStore(options: {
 		options.ownerId,
 	);
 	const { storage } = options;
+	const tokenKey = JSON.stringify([key, REVOCATION_KEY]);
+	const token = storage.getItem(tokenKey);
 	let revoked = false;
 	const requireActive = (): void => {
-		if (revoked) throw new Error("Text recovery store is revoked");
+		if (revoked || storage.getItem(tokenKey) !== token) {
+			revoked = true;
+			throw new Error("Text recovery store is revoked");
+		}
 	};
 	const entries = (): Record<string, TextRecovery> => {
 		const json = storage.getItem(key);
@@ -94,6 +124,7 @@ export function createTextRecoveryStore(options: {
 			requireFinite(now, "now");
 			const id = fieldKey(ref);
 			const records = entries();
+			requireActive();
 			if (!Object.hasOwn(records, id)) return null;
 			const recovery = textRecovery(records[id]);
 			if (recovery.expiresAt <= now) {
@@ -117,19 +148,36 @@ export function createTextRecoveryStore(options: {
 			const id = fieldKey(ref);
 			const records = entries();
 			delete records[id];
+			requireActive();
 			storage.setItem(key, JSON.stringify(records));
 		},
 		revoke() {
+			if (revoked) return;
 			revoked = true;
+			if (storage.getItem(tokenKey) !== token) return;
+			/// Retain the token after erasure so old handles stay fenced across pages.
+			storage.setItem(tokenKey, crypto.randomUUID());
 			storage.removeItem(key);
 		},
 	};
 }
 
-function indexedDbHandle(database: IDBDatabase): EditStore {
+function indexedDbHandle(
+	database: IDBDatabase,
+	session: { token: unknown; peers: Set<SessionFence> },
+): EditStore {
 	let revoked = false;
 	let revocation: Promise<void> | undefined;
 	const pending = new Set<IDBTransaction>();
+	const fence: SessionFence = {
+		token: session.token,
+		invalidate() {
+			revoked = true;
+			session.peers.delete(fence);
+			for (const transaction of pending) transaction.abort();
+		},
+	};
+	session.peers.add(fence);
 	const requireActive = (): void => {
 		if (revoked) throw new Error("Edit store is revoked");
 	};
@@ -165,11 +213,21 @@ function indexedDbHandle(database: IDBDatabase): EditStore {
 					transaction.abort();
 				}
 			};
-			if (key === null) apply(undefined);
-			else {
-				const request = store.get(key);
-				request.onsuccess = () => apply(request.result);
-			}
+			/// The fence check and the record mutation share one serial transaction.
+			const tokenRequest = store.get(REVOCATION_KEY);
+			tokenRequest.onsuccess = () => {
+				if (tokenRequest.result !== session.token) {
+					if (clearing) return;
+					failure = new Error("Edit store is revoked");
+					transaction.abort();
+					return;
+				}
+				if (key === null) apply(undefined);
+				else {
+					const request = store.get(key);
+					request.onsuccess = () => apply(request.result);
+				}
+			};
 		});
 	};
 	return {
@@ -213,18 +271,35 @@ function indexedDbHandle(database: IDBDatabase): EditStore {
 		},
 		revoke() {
 			if (revocation) return revocation;
+			for (const peer of session.peers) {
+				if (peer.token === session.token) peer.invalidate();
+			}
 			revoked = true;
-			for (const transaction of pending) transaction.abort();
 			revocation = run(
 				null,
 				(_current, store) => {
 					store.clear();
+					store.put(crypto.randomUUID(), REVOCATION_KEY);
 				},
 				true,
 			).finally(() => database.close());
 			return revocation;
 		},
 	};
+}
+
+function namespaceFences(factory: IDBFactory, name: string): Set<SessionFence> {
+	let namespaces = sessionFences.get(factory);
+	if (!namespaces) {
+		namespaces = new Map();
+		sessionFences.set(factory, namespaces);
+	}
+	let peers = namespaces.get(name);
+	if (!peers) {
+		peers = new Set();
+		namespaces.set(name, peers);
+	}
+	return peers;
 }
 
 function namespace(prefix: string, ownerId: string): string {

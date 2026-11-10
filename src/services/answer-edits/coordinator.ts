@@ -312,11 +312,9 @@ export class AnswerEditCoordinator {
 			}
 			this.requireActive();
 			let fallback: TextRecovery | null = null;
-			let fallbackUnavailable = false;
 			try {
 				fallback = this.options.fallback.read(ref, this.options.now());
 			} catch (error) {
-				fallbackUnavailable = true;
 				if (readError) readError += `; ${errorMessage(error)}`;
 			}
 			if (
@@ -339,7 +337,7 @@ export class AnswerEditCoordinator {
 					historyGap: true,
 				};
 			}
-			if (!previous && !local && readError && fallbackUnavailable) {
+			if (!previous && !local && readError) {
 				this.blockRecovery(field, "unavailable", null, readError);
 				return { kind: "unavailable", server, reason: readError };
 			}
