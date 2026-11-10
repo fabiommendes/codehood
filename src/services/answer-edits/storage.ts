@@ -1,4 +1,4 @@
-import { parseCheckpoint } from "./checkpoint";
+import { validCheckpointState } from "./checkpoint";
 import type { MonitorCheckpoint, PendingEditBatch } from "./monitor";
 
 export interface FieldRef {
@@ -396,7 +396,7 @@ function localRecord(value: unknown): LocalEditRecord {
 	const data = object(value);
 	const base = metadata(data);
 	requireGeneration(data.generation);
-	const state = parseCheckpoint(data.checkpoint);
+	const state = validCheckpointState(data.checkpoint);
 	if (state.text !== base.text)
 		throw new TypeError("Checkpoint text differs from record text");
 	if (!equalJson(data.outbox, state.inFlight))

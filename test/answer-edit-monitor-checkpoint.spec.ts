@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
-import { parseCheckpoint } from "@/services/answer-edits/checkpoint";
+import {
+	parseCheckpoint,
+	validCheckpointState,
+} from "@/services/answer-edits/checkpoint";
 import { decodeEdits, replayEdits } from "@/services/answer-edits/codec";
 import {
 	AnswerEditMonitor,
@@ -737,5 +740,22 @@ test.describe("answer edit monitor checkpoints: reload and delivery", () => {
 		const batch = collect(target);
 		expect(batch.timeOriginMs).toBe(10);
 		expect(batch.edits.map((tuple) => tuple[0])).toEqual([1]);
+	});
+
+	test("a checkpoint already validated and frozen is not validated again, but tampered copies are", () => {
+		const target = monitor();
+		append(target, "a", 10_010);
+		const exported = target.exportCheckpoint() as {
+			version: 2;
+			state: { text: string };
+		};
+		const state = parseCheckpoint(exported);
+		expect(state.text).toBe("seeda");
+		expect(validCheckpointState(exported)).toBe(exported.state);
+		const clone = JSON.parse(JSON.stringify(exported));
+		clone.state.text = "tampered";
+		expect(() => validCheckpointState(clone)).toThrow(TypeError);
+		const unvalidated = JSON.parse(JSON.stringify(exported));
+		expect(validCheckpointState(unvalidated)).not.toBe(unvalidated.state);
 	});
 });

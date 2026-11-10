@@ -173,6 +173,46 @@ test.describe("answer edit coordinator local: durability", () => {
 	});
 });
 
+test.describe("answer edit coordinator local: persistence cost", () => {
+	test("a successful commit does not rewrite the fallback when none is stored", async () => {
+		const h = await registered();
+		let removals = 0;
+		const remove = h.fallback.remove.bind(h.fallback);
+		h.fallback.remove = (ref) => {
+			removals++;
+			remove(ref);
+		};
+		h.append("typed");
+		await h.coordinator.persist();
+		expect(removals).toBe(0);
+		h.fallback.write(REF, {
+			version: 1,
+			savedAt: EPOCH,
+			expiresAt: EPOCH + 60_000,
+			text: "typed again",
+			historyGap: true,
+		});
+		h.append(" again");
+		await h.coordinator.persist();
+		expect(removals).toBe(1);
+		expect(h.fallback.read(REF, EPOCH)).toBeNull();
+		await h.coordinator.dispose();
+	});
+
+	test("an idle delivery loop does not export checkpoints to measure progress", async () => {
+		const h = await registered();
+		let exports = 0;
+		const exported = h.monitor.exportCheckpoint.bind(h.monitor);
+		h.monitor.exportCheckpoint = () => {
+			exports++;
+			return exported();
+		};
+		await h.coordinator.flushDelivery();
+		expect(exports).toBe(0);
+		await h.coordinator.dispose();
+	});
+});
+
 test.describe("answer edit coordinator local: storage degradation", () => {
 	for (const text of ["draft", ""]) {
 		test(`principal failure recovers ${text === "" ? "empty" : "nonempty"} text with an explicit history gap`, async () => {

@@ -130,6 +130,8 @@ export class AnswerEditCoordinator {
 	private readonly recoveryStatuses = new Map<string, FieldStatus>();
 	private retryBaseMs = 0;
 	private deliveryFailed = false;
+	/// Batches acknowledged so far; `flushDelivery` stops when a round adds none.
+	private acknowledged = 0;
 	private readonly options: CoordinatorOptions;
 	private cancelPersist: (() => void) | null = null;
 	private cancelDelivery: (() => void) | null = null;
@@ -237,9 +239,9 @@ export class AnswerEditCoordinator {
 	 */
 	async flushDelivery(): Promise<void> {
 		while (!this.stopped && !this.revoked) {
-			const before = this.progressKey();
+			const before = this.acknowledged;
 			await this.flush();
-			if (this.deliveryFailed || before === this.progressKey()) return;
+			if (this.deliveryFailed || before === this.acknowledged) return;
 		}
 	}
 
@@ -588,7 +590,7 @@ export class AnswerEditCoordinator {
 				/// A different text may belong to another writer that lost the CAS.
 				if (fallback && fallback.text !== record.text)
 					cleanupError = "Divergent text recovery retained";
-				else this.options.fallback.remove(this.ref(entry.field));
+				else if (fallback) this.options.fallback.remove(this.ref(entry.field));
 			} catch (error) {
 				cleanupError = errorMessage(error);
 			}
@@ -684,6 +686,7 @@ export class AnswerEditCoordinator {
 				if (result?.kind === "accepted") {
 					try {
 						entry.handle.acknowledge(result.receipt);
+						this.acknowledged++;
 						this.changed(entry);
 					} catch (error) {
 						entry.status = {
@@ -777,15 +780,6 @@ export class AnswerEditCoordinator {
 				this.cancelDelivery = null;
 				if (!this.stopped && !this.revoked) this.flush().catch(ignoreScheduled);
 			},
-		);
-	}
-
-	private progressKey(): string {
-		return JSON.stringify(
-			[...this.fields.values()].map((entry) => {
-				const state = parseCheckpoint(entry.handle.exportCheckpoint());
-				return [state.baseRevision, state.firstSeq];
-			}),
 		);
 	}
 

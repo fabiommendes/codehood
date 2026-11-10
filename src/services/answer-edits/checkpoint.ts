@@ -78,6 +78,9 @@ const checkpoint = z.strictObject({
 export type CheckpointState = z.infer<typeof checkpoint>["state"];
 export type PendingSegment = z.infer<typeof segment>;
 
+/// Deeply frozen checkpoints that passed `parseCheckpoint`; immutable, so validity cannot change.
+const validated = new WeakSet<object>();
+
 /// Parse a detached checkpoint and verify counters, session boundaries and exact replay.
 export function parseCheckpoint(value: unknown): CheckpointState {
 	const parsed = checkpoint.safeParse(value);
@@ -87,7 +90,15 @@ export function parseCheckpoint(value: unknown): CheckpointState {
 	validateReceipts(state);
 	validateActive(state);
 	validateReplay(state);
+	if (isDeeplyFrozen(value)) validated.add(value);
 	return state;
+}
+
+/// State of a checkpoint, skipping validation for one that `parseCheckpoint` already accepted and froze.
+export function validCheckpointState(value: unknown): CheckpointState {
+	if (value !== null && typeof value === "object" && validated.has(value))
+		return (value as { state: CheckpointState }).state;
+	return parseCheckpoint(value);
 }
 
 /// Session that produced a batch, read from its `<session>:<firstSeq>` identifier.
@@ -100,6 +111,11 @@ export function frozenCopy<T>(value: T): T {
 	const copy: T = structuredClone(value);
 	freezeTree(copy);
 	return copy;
+}
+
+function isDeeplyFrozen(value: unknown): value is object {
+	if (value === null || typeof value !== "object") return true;
+	return Object.isFrozen(value) && Object.values(value).every(isDeeplyFrozen);
 }
 
 function freezeTree(value: unknown): void {
