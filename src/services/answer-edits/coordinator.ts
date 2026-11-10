@@ -125,6 +125,8 @@ const MAX_RETRY_MS = 60_000;
 export class AnswerEditCoordinator {
 	private readonly fields = new Map<string, RegisteredField>();
 	private readonly registering = new Set<string>();
+	private readonly handoffs = new Map<string, Promise<void>>();
+	private readonly commits = new Map<RegisteredField, Promise<void>>();
 	private readonly recoveryStatuses = new Map<string, FieldStatus>();
 	private retryBaseMs = 0;
 	private deliveryFailed = false;
@@ -164,8 +166,9 @@ export class AnswerEditCoordinator {
 	 */
 	async detach(field: AttemptField): Promise<void> {
 		this.requireActive();
-		const entry = this.fields.get(fieldKey(field));
-		if (!entry?.attached) return;
+		const key = fieldKey(field);
+		const entry = this.fields.get(key);
+		if (!entry?.attached) return this.handoffs.get(key);
 		entry.handle.closeEdit();
 		const clone = this.restore(entry.handle.exportCheckpoint());
 		entry.unsubscribe();
@@ -174,7 +177,11 @@ export class AnswerEditCoordinator {
 		entry.owned = true;
 		this.listen(entry);
 		this.changed(entry);
-		await this.persist();
+		const handoff = this.persistField(entry).finally(() => {
+			if (this.handoffs.get(key) === handoff) this.handoffs.delete(key);
+		});
+		this.handoffs.set(key, handoff);
+		await handoff;
 	}
 
 	/**
@@ -291,6 +298,8 @@ export class AnswerEditCoordinator {
 			throw new RangeError("Too many registered fields");
 		this.registering.add(key);
 		try {
+			await this.handoffs.get(key);
+			this.requireActive();
 			const ref = this.ref(field);
 			const server = await this.options.transport.inspect(ref);
 			this.requireActive();
@@ -313,7 +322,9 @@ export class AnswerEditCoordinator {
 			if (
 				!previous &&
 				fallback &&
-				(!local || fallback.savedAt >= local.savedAt)
+				(!local ||
+					fallback.text !== local.text ||
+					fallback.savedAt >= local.savedAt)
 			) {
 				this.blockRecovery(
 					field,
@@ -500,7 +511,20 @@ export class AnswerEditCoordinator {
 				(entry) => entry.version !== entry.attemptedVersion,
 			);
 			if (dirty.length === 0) return;
-			await Promise.all(dirty.map((entry) => this.commit(entry)));
+			await Promise.all(dirty.map((entry) => this.persistField(entry)));
+		}
+	}
+
+	private async persistField(entry: RegisteredField): Promise<void> {
+		while (!this.revoked && entry.version !== entry.attemptedVersion) {
+			let commit = this.commits.get(entry);
+			if (!commit) {
+				commit = this.commit(entry).finally(() => {
+					this.commits.delete(entry);
+				});
+				this.commits.set(entry, commit);
+			}
+			await commit;
 		}
 	}
 
@@ -529,7 +553,14 @@ export class AnswerEditCoordinator {
 			entry.generation = record.generation;
 			let cleanupError: string | null = null;
 			try {
-				this.options.fallback.remove(this.ref(entry.field));
+				const fallback = this.options.fallback.read(
+					this.ref(entry.field),
+					this.options.now(),
+				);
+				/// A different text may belong to another writer that lost the CAS.
+				if (fallback && fallback.text !== record.text)
+					cleanupError = "Divergent text recovery retained";
+				else this.options.fallback.remove(this.ref(entry.field));
 			} catch (error) {
 				cleanupError = errorMessage(error);
 			}
@@ -644,8 +675,7 @@ export class AnswerEditCoordinator {
 				({ entry }) =>
 					entry.status.delivery === "pending" && entry.status.error !== null,
 			);
-			/// A reachable server's per-field retry stays on the aggregate cadence.
-			this.updateRetry(false);
+			this.updateRetry();
 			await this.persist();
 		} catch (error) {
 			if (this.stopped || this.revoked) return;

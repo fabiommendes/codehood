@@ -90,6 +90,8 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 	test("randomness changes the network deadline rather than the persistence deadline", async () => {
 		const early = await registered(0);
 		const late = await registered(0.999999);
+		respond(early, async (request) => accepted(request));
+		respond(late, async (request) => accepted(request));
 		early.append("early");
 		late.append("late");
 		await early.scheduler.advance(1000);
@@ -108,6 +110,7 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 
 	test("one request aggregates dirty fields and omits registered clean fields", async () => {
 		const h = await registered();
+		respond(h, async (request) => accepted(request));
 		const second = { questionId: "second", field: "code" };
 		const other = new AnswerEditMonitor({
 			initialText: "",

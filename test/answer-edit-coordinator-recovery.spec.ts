@@ -315,13 +315,13 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 		});
 	}
 
-	test("an older fallback does not replace a newer coherent checkpoint", async () => {
+	test("an older matching fallback permits recovery of a newer coherent checkpoint", async () => {
 		const { h } = await seed({ savedAt: EPOCH + 2 });
 		h.fallback.write(REF, {
 			version: 1,
 			savedAt: EPOCH,
 			expiresAt: EPOCH + 60_000,
-			text: "stale fallback",
+			text: "old",
 			historyGap: true,
 		});
 		const reopened = new AnswerEditCoordinator({
