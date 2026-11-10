@@ -93,10 +93,34 @@ RED real reproduzido pelo orquestrador: `pnpm exec tsx test/run.ts test/answer-e
 
 GREEN: storage original, revogação e recuperação do coordenador, 27 aprovados em `/tmp/revocation-tester-final.log`; Biome global e lint completo exit 0 em `/tmp/revocation-tester-lint.log`. Revisão independente seguinte identificou corrida adicional entre último check e escrita no localStorage, remount durante commit de ACK e falha de leitura somente do fallback. Essas garantias ainda não estão fechadas neste commit.
 
-## Pendências
+## Ciclo 7: ownership durante ACK e fencing lógico do fallback
 
-Persistência/coordenador, IndexedDB, fallback de rascunho sem dois donos, isolamento por usuário/TTL/logout, recuperação após prazo, adaptadores textarea/CodeMirror, servidor/banco, entrega e integração real ainda não implementados. Todos os corner cases dessas fatias permanecem pendentes, incluindo rollback, concorrência entre abas, autorização, quotas, teardown de componente e teste de carga.
+Três critérios, sem novas assinaturas públicas:
 
-Próxima fatia: contratos de scheduler/storage/transporte injetáveis e coordenador por tentativa; gravação com espera máxima de aproximadamente 1 s e outbox persistida antes do envio de 55 a 65 s. Antes de integrar o fallback, inspecionar o rascunho de código atual para manter dono único. Depois, adaptadores independentes e servidor com seus próprios lotes RED/GREEN. O autosave real não foi alterado nem duplicado.
+1. Recuperação/remount durante commit de ACK não copia geração CAS antiga para o novo dono.
+2. Falha apenas na leitura do fallback não é tratada como ausência de rascunho, mesmo com principal legível e vazio.
+3. Escrita de fallback interrompida por revoke de outro handle não reaparece na recuperação de sessão nova.
 
-Rich text e seam externa MDQ precisam das decisões já descritas no RFC. Também continuam abertas retenção, acesso ao histórico, limites de volume por tentativa e política de checkpoints do servidor. Nada foi editado em MDQ ou node_modules, além da instalação normal de dependências no worktree. Sem push. O recurso completo não está pronto.
+Tester separado escreveu `test/answer-edit-coordinator-ownership.spec.ts` e `test/answer-edit-fallback-fence.spec.ts` a partir do contrato e das reproduções públicas, sem ler implementação. RED reproduzido pelo orquestrador: `pnpm exec tsx test/run.ts test/answer-edit-coordinator-ownership.spec.ts test/answer-edit-fallback-fence.spec.ts`, três falhas funcionais. Log `/tmp/input-monitor-ownership-red.log`. Implementer recebeu critérios e arquivos permitidos, sem fonte dos testes. GREEN do mesmo comando: três aprovados, `/tmp/input-monitor-ownership-green.log`.
+
+Recuperação aguarda entrega e persistência do dono anterior antes de copiar geração; entrega pula campos em registro. Falha de leitura do fallback retorna unavailable sem fabricar handle. Após revogação, fallback usa chave de dados por geração; compatibilidade de leitura anterior ao primeiro token é preservada. Isso impede recuperação de escrita tardia, não garante apagamento físico. Uma requisição pendente pode atrasar recuperação, inclusive de outro campo; inspeção anterior a ACK pode gerar conflito conservador, nunca sobrescrita automática.
+
+Revisão independente final confirmou os três reparos sem encontrar regressão concreta. Crescimento de metadados e remoção física de dados órfãos continuam abertos, registrados em `dev/issues/monitor-metadados-e-limite-de-checkpoint.md` e `dev/issues/monitor-fallback-erasure-apos-logout.md`. Não houve poda silenciosa de evidência para esconder o limite de 2 MiB.
+
+## Validação da retomada
+
+- Todos os `test/answer-edit-*.spec.ts`: 431 aprovados, incluindo os 353 testes originais de codec/monitor. Log `/tmp/input-monitor-all-green.log`.
+- `pnpm test`: 3.428 aprovados em 11 minutos, exit 0. Log `/tmp/input-monitor-resumed-full-suite.log`. Esta execução terminou, ao contrário do timeout registrado na primeira entrega.
+- Validação final do orquestrador: `pnpm exec biome check --write .` exit 0, 805 arquivos, sem alterações; `pnpm run lint` exit 0, incluindo i18n, TypeScript, Astro com zero erros e stories. Seis warnings não bloqueantes. Logs `/tmp/input-monitor-final-biome.log` e `/tmp/input-monitor-final-lint.log`.
+- Storage browser real cobre IndexedDB, localStorage, falhas e revogação entre páginas. Coordenação e entrega continuam validadas contra transporte injetado, não contra backend do histórico.
+- Sem alteração de schema, migrations, dependências ou MDQ externa. Sem seed novo: nenhuma interface nem estado de banco da aplicação foi introduzido. O recurso ainda não é exercitável pela interface dev.
+
+## Pendências e próxima fatia
+
+Implementados e testados: storage principal transacional com CAS/TTL por owner e campo, fallback somente texto incluindo vazio, lacunas/avisos observáveis, persistência com espera máxima de 1 s durante edição contínua, outbox antes da rede, coordenação por tentativa, cadência de 55 a 65 s, retry com jitter/backoff, ACKs, resultados parciais, recuperação com sessão nova e reconciliação, detach/dispose e fencing de callbacks. Isso não fecha toda a camada de persistência/coordenação: os dois problemas registrados acima exigem decisão e testes próprios.
+
+Ainda ausentes: adaptadores textarea e CodeMirror, integração do fallback com o rascunho atual sem duplicar fonte de verdade, integração com componentes e logout reais, transporte HTTP/backend, schema/services do histórico, idempotência e concorrência no servidor, autorização, quotas por tentativa, vínculo com entrega final, replay/revisão na interface, seeds de todos os estados e carga. O autosave real não foi alterado nem duplicado. Montagem/desmontagem foi testada pelo contrato de handles, não por componente montado no browser.
+
+Próxima fatia prioritária: contrato de limites/compactação e limpeza de gerações locais. Depois, adaptadores independentes e backend em lotes separados, lendo as convenções CLI/ADRs antes de qualquer contrato externo. Rich text e seam externa MDQ continuam dependendo das decisões do RFC. Retenção, acesso ao histórico, limites de volume por tentativa e checkpoints do servidor também permanecem abertos.
+
+Commits recuperados na retomada: `6cdc735`, `d829065`, `36e5807`. Incrementos desta retomada: `6743069`, `a47ccd2` e o commit que inclui esta atualização. Branch exclusiva `input-monitor`, sem push e sem alteração em outras worktrees. O recurso completo não está pronto.

@@ -302,6 +302,10 @@ export class AnswerEditCoordinator {
 			this.requireActive();
 			const ref = this.ref(field);
 			const server = await this.options.transport.inspect(ref);
+			/// Delivery retains the detached entry through its ACK commit.
+			/// Do not copy its CAS generation until that owner has finished writing.
+			await this.delivery;
+			if (previous) await this.persistField(previous);
 			this.requireActive();
 			let local: LocalEditRecord | null = null;
 			let readError: string | null = null;
@@ -312,10 +316,18 @@ export class AnswerEditCoordinator {
 			}
 			this.requireActive();
 			let fallback: TextRecovery | null = null;
+			let fallbackReadError: string | null = null;
 			try {
 				fallback = this.options.fallback.read(ref, this.options.now());
 			} catch (error) {
-				if (readError) readError += `; ${errorMessage(error)}`;
+				fallbackReadError = errorMessage(error);
+			}
+			if (fallbackReadError) {
+				const reason = [readError, fallbackReadError]
+					.filter(Boolean)
+					.join("; ");
+				this.blockRecovery(field, "unavailable", null, reason);
+				return { kind: "unavailable", server, reason };
 			}
 			if (
 				!previous &&
@@ -603,7 +615,12 @@ export class AnswerEditCoordinator {
 		this.deliveryFailed = false;
 		const pending: { entry: RegisteredField; batch: PendingEditBatch }[] = [];
 		for (const entry of this.fields.values()) {
-			if (!entry.canWrite || entry.status.durability === "conflict") continue;
+			if (
+				this.registering.has(fieldKey(entry.field)) ||
+				!entry.canWrite ||
+				entry.status.durability === "conflict"
+			)
+				continue;
 			const batch = entry.handle.collect();
 			if (batch) {
 				/// Retried frozen batches must also have a successful principal commit.

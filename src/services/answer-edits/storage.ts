@@ -105,6 +105,12 @@ export function createTextRecoveryStore(options: {
 	const { storage } = options;
 	const tokenKey = JSON.stringify([key, REVOCATION_KEY]);
 	const token = storage.getItem(tokenKey);
+	/// Before the first revocation, keep reading the original pre-token records.
+	/// Later sessions use generation-specific keys: a write racing revocation can
+	/// recreate an old key physically, but no fresh session can reach that key.
+	/// localStorage has no atomic check-and-write, so erasure of late old-generation
+	/// writes cannot be guaranteed, only their exclusion from recovery.
+	const dataKey = token === null ? key : JSON.stringify([key, token]);
 	let revoked = false;
 	const requireActive = (): void => {
 		if (revoked || storage.getItem(tokenKey) !== token) {
@@ -113,7 +119,7 @@ export function createTextRecoveryStore(options: {
 		}
 	};
 	const entries = (): Record<string, TextRecovery> => {
-		const json = storage.getItem(key);
+		const json = storage.getItem(dataKey);
 		return json === null
 			? {}
 			: (object(JSON.parse(json)) as Record<string, TextRecovery>);
@@ -129,7 +135,7 @@ export function createTextRecoveryStore(options: {
 			const recovery = textRecovery(records[id]);
 			if (recovery.expiresAt <= now) {
 				delete records[id];
-				storage.setItem(key, JSON.stringify(records));
+				storage.setItem(dataKey, JSON.stringify(records));
 				return null;
 			}
 			return recovery;
@@ -141,7 +147,7 @@ export function createTextRecoveryStore(options: {
 			const records = entries();
 			records[id] = record;
 			requireActive();
-			storage.setItem(key, JSON.stringify(records));
+			storage.setItem(dataKey, JSON.stringify(records));
 		},
 		remove(ref) {
 			requireActive();
@@ -149,7 +155,7 @@ export function createTextRecoveryStore(options: {
 			const records = entries();
 			delete records[id];
 			requireActive();
-			storage.setItem(key, JSON.stringify(records));
+			storage.setItem(dataKey, JSON.stringify(records));
 		},
 		revoke() {
 			if (revoked) return;
@@ -157,7 +163,7 @@ export function createTextRecoveryStore(options: {
 			if (storage.getItem(tokenKey) !== token) return;
 			/// Retain the token after erasure so old handles stay fenced across pages.
 			storage.setItem(tokenKey, crypto.randomUUID());
-			storage.removeItem(key);
+			storage.removeItem(dataKey);
 		},
 	};
 }
