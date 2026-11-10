@@ -32,7 +32,7 @@ Transações com posições repetidas são recusadas para eliminar ordem ambígu
 
 Contrato concreto em `src/services/answer-edits/monitor.ts`, preservando os métodos conceituais. `PendingEditBatch` acrescenta `timeOriginMs`, que faltava na assinatura conceitual, mas já era exigido pelo envelope descrito no RFC. Origem capturada por `now()` na criação; timestamps fornecidos estão nesse mesmo relógio. IDs de lote são determinísticos por sessão e primeira sequência. A sessão inicial precisa ser única por campo; `restore` aceita `createSessionId` injetável, com UUID como padrão, para criar uma sessão nova sem comparar relógios antigos.
 
-Refinamentos de agrupamento: inserções puras contíguas de digitação e exclusões puras contíguas podem agrupar se preservarem replay. Undo, redo, paste, composition e transações com múltiplos patches ficam isolados. Sem observação associada, mudança não inventa amostras de cadência. Observação consumida não pode ser reutilizada. Mudança sem efeito não gera edit. Estatísticas em transações de vários patches ficam só no primeiro edit sequencial; não repetir o mesmo intervalo em cada patch. `hasPendingChanges` inclui operações em trânsito e retidas. ACK válido incrementa revisão exatamente uma vez e confirma a última sequência do lote.
+Refinamentos de agrupamento: inserções puras contíguas de digitação e exclusões puras contíguas podem agrupar se preservarem replay. Undo, redo, paste, composition e transações com múltiplos patches ficam isolados. Sem observação associada, mudança não inventa amostras de cadência. Observação consumida não pode ser reutilizada. Mudança sem efeito não gera edit. Transações de vários patches ficam isoladas e não carregam estatística de cadência; a intenção conta uma vez no intervalo seguinte. `hasPendingChanges` inclui operações em trânsito e retidas. ACK válido incrementa revisão exatamente uma vez e confirma a última sequência do lote.
 
 Lote 1: validação atômica/replay de mudanças; fronteiras de agrupamento; observações e Welford sem contagem duplicada. RED: `pnpm exec tsx test/run.ts test/answer-edit-monitor-input.spec.ts`, 70 falhas funcionais no stub. Primeiro GREEN teve 69 aprovados e uma falha legítima: intervalo atravessando pausa contaminava timing do edit seguinte. Corrigido no implementer sem ler teste, com diagnóstico público. GREEN final: `pnpm exec tsx test/run.ts test/answer-edit-codec.spec.ts test/answer-edit-monitor-input.spec.ts`, 280 aprovados em 13 s. O tester corrigiu separadamente seis erros de acesso indexado possivelmente indefinido, sem alterar expectativas. Logs `/tmp/input-monitor-input-{red,green}.log`.
 
@@ -125,161 +125,16 @@ A compactação local foi concluída no ciclo 9 abaixo. Limpeza completa de gera
 
 Commits recuperados na retomada: `6cdc735`, `d829065`, `36e5807`. Incrementos desta retomada: `6743069`, `a47ccd2` e o commit que inclui esta atualização. Branch exclusiva `input-monitor`, sem push e sem alteração em outras worktrees. O recurso completo não está pronto.
 
-## Ciclo 8: compensação física após logout, correção parcial
+## Ciclo 8: apagamento do fallback após logout
 
-Retomado HEAD `b01783f` na mesma branch, preservando o diff herdado de `storage.ts` e o arquivo não rastreado `test/answer-edit-fallback-erasure.spec.ts`. Escopo exclusivo da issue de logout. A issue `monitor-metadados-e-limite-de-checkpoint.md` e o contrato de retenção de IDs, observações e ACKs não foram alterados.
+`createTextRecoveryStore` guarda um token por owner e grava os dados sob uma chave derivada dele. `revoke()` rotaciona o token e remove a chave atual. Depois de cada `setItem`, o escritor relê o token e, se mudou, remove a própria escrita e lança erro. Sem provas de revogação, sem índice e sem enumerar o origin.
 
-Contrato antes dos testes: as assinaturas existentes de `TextRecoveryStore` e `AnswerEditCoordinator` bastam; nenhum novo método ou stub. Lote 1 com três critérios: compensação pós-write concorrente com revoke; reconciliação repetível após falha; preservação física da geração atual e outros owners. Lote 2 com callbacks antigos bloqueados e falhas de cleanup observáveis. Workers separados de tester e implementer, com briefing de papel, sem leitura dos testes pelo implementer. A ferramenta não oferece continuidade de agente nem seleção de modelo por chamada.
+Limite aceito: escritor suspenso entre a checagem e o `setItem` que morre antes de compensar deixa texto órfão que sessões novas não leem. Duas rotações simultâneas podem invalidar a sessão mais nova sem apagar seu texto. Detalhes e pendência do retry do IndexedDB em `dev/issues/monitor-fallback-erasure-apos-logout.md`. Testes: `test/answer-edit-fallback-erasure.spec.ts` (Chromium real com duas páginas e Storage injetado), `test/answer-edit-fallback-fence.spec.ts`, `test/answer-edit-coordinator-logout.spec.ts`.
 
-O progresso herdado já continha implementação e testes. Para não descartá-lo, o tester reproduziu RED empacotando temporariamente `git show HEAD:src/services/answer-edits/storage.ts` com plugin esbuild. Não substituiu produção. Comando `pnpm exec tsx test/run.ts test/tmp-head-fallback.spec.ts --grep 'compensates|reconciles|reports cleanup|real second page'`: 12 falhas funcionais em `/tmp/fallback-head-red.log`. Cópia temporária removida. GREEN do arquivo herdado contra implementação herdada: 14 aprovados em `/tmp/fallback-working.log`. Este é um RED/GREEN retrospectivo de retomada, não um novo teste escrito antes do diff herdado.
+## Ciclo 9: controles do monitor limitados por contagem
 
-O tester acrescentou dois casos de callback após logout e três caracterizações de limites. Eles nasceram verdes, portanto não contam como RED de defeito novo. Comando final dos dois arquivos `pnpm exec tsx test/run.ts test/answer-edit-fallback-erasure.spec.ts test/answer-edit-coordinator-logout.spec.ts`: 19 aprovados. A primeira execução da caracterização do índice encontrou erro de fixture que interpretava token como JSON; o tester corrigiu a observação, não uma expectativa de produto.
+`observeInput` devolve um token opaco emitido pelo monitor e `DocumentChange.input` o consome. Não há `inputId` do chamador, detecção de duplicata, tombstones, watermark nem TTL de observações. Observações não consumidas ficam limitadas a 16 (a mais antiga cai) e recibos aos 32 últimos. Sessões deixam de ser registradas: o monitor as deriva dos recibos retidos, do lote em voo, da fila e da sessão ativa, e `restore` recusa um `sessionId` já visto nesse conjunto. Não há relógio de parede no monitor.
 
-Implementação concreta: provas text-free por geração e índice no namespace do owner; compensação após qualquer gravação de texto, inclusive remoção e expiração; reconciliação na criação e operações; `revoke()` do store repetível. Exclusão física exige prova individual, não apenas entrada no índice. Erros de storage propagam. Não há `Storage.clear()` ou enumeração do origin.
+O checkpoint (`version: 2`, única versão aceita) guarda texto, pendências, recibos e a sessão ativa. Observações e cadência não são persistidos, porque `restore` abre outra sessão e não transfere associações. Seu tamanho depende do texto e das pendências, não das teclas recentes: no envelope de referência (10 entradas/s por 90 minutos com lotes confirmados) o checkpoint ficou em cerca de 2 KiB, contra 921 KiB antes. Testes de carga em `test/answer-edit-load.spec.ts`.
 
-Revisão independente encontrou um limite do índice não transacional: atualizações concorrentes podem perder a referência a uma geração. O implementer propôs descoberta por enumeração de nomes; o orquestrador retirou essa mudança por violar a restrição de não varrer o origin. O teste de lost update demonstra que uma sessão nova pode concluir operações sem apagar o órfão desconhecido, enquanto o handle original sobrevivente consegue limpá-lo. Outro teste faz `length`, `key()` e `clear()` lançarem, comprovando que as operações não tentam varredura global. Não houve implementação nova sem RED incorporada após essa revisão.
-
-A issue de logout continua aberta. Também documenta que repetir `coordinator.logout()` rejeitado não repete cleanup; a repetição testada pertence ao store. Uma rotação de token suspensa pode invalidar logicamente uma sessão nova sem apagar seu texto. Preservação física não implica continuidade ou recuperabilidade dessa sessão. Falha ao persistir prova/índice pode interromper revoke antes de remover texto.
-
-Garantia limitada: gerações conhecidas pelo índice ou pelo próprio handle, com prova de revogação, têm seu destino removido após reconciliação bem-sucedida. Compensação exige que o escritor retome e que storage aceite remoção. Não há garantia global de apagamento eventual, muito menos imediato, com página encerrada/suspensa ou storage inacessível. Segurança de leitura da sessão nova e apagamento físico são resultados distintos.
-
-### Evidência final desta fatia
-
-- `pnpm exec tsx test/run.ts test/answer-edit-`: 450 aprovados em 27,1 s, exit 0. Log `/tmp/input-monitor-logout-monitor-final.log`.
-- `pnpm test`: 3.447 aprovados em 10,9 minutos, exit 0, sem timeout. Log `/tmp/input-monitor-logout-full-suite.log`.
-- Chromium real com localStorage e duas páginas do mesmo contexto. Barreira CDP pausa a primeira antes do setItem nativo enquanto a outra revoga e grava a geração atual. Nenhum sleep. Firefox/WebKit não executados. Falhas específicas, rotações e lost update também usam Storage injetado; coordenador usa doubles de storage/transporte/scheduler. Sem prova de integração com logout real ou backend.
-- `pnpm exec biome check --write .`: exit 0, 807 arquivos, sem alterações automáticas e seis warnings preexistentes. `pnpm run lint`: exit 0, incluindo i18n, TypeScript, Astro com zero erros e stories. Executados pelo orquestrador após a documentação. Logs `/tmp/input-monitor-logout-final-biome.log` e `/tmp/input-monitor-logout-final-lint.log`.
-- Sem alteração de schema, migrations, dependências, adaptadores, rich text, MDQ ou outra worktree. Sem seed novo, pois nenhuma interface ou estado de banco foi introduzido. Sem push. A fatia é mitigação parcial verde, não encerramento da issue nem conclusão do recurso.
-
-
-## Ciclo 9: retenção local de controles por 30 minutos
-
-Retomada em `0c9d60a`, na branch exclusiva `input-monitor`, com diff herdado em
-monitor/checkpoint/storage/coordenador, RFC e testes, inclusive três arquivos novos
-de retenção. Nenhum reset, stash ou substituição desse trabalho. O contrato autorizado
-já estava documentado na RFC e nas assinaturas públicas herdadas; não houve nova seam
-ou stub nesta retomada. O núcleo foi registrado em `9145c24` após validação verde.
-
-### Política implementada
-
-- `metadataTtlMs`: padrão de 1.800.000 ms, positivo e configurável, salvo no checkpoint
-  v2. Restore conserva a configuração, salvo override explícito. V1 usa o padrão ou
-  override. Expiração inclusiva em `retentionMaxMs - registradoEm >= metadataTtlMs`.
-- `retentionNow`: relógio de parede injetável, padrão `Date.now`. O maior valor visto
-  é persistido e limita regressões, inclusive após reload. `now` permanece monotônico
-  por sessão, sem comparar origens de páginas diferentes.
-- ACK validado remove imediatamente o batch em memória. O commit principal seguinte
-  persiste checkpoint e outbox nula juntos. Falha de commit não declara durabilidade
-  e conserva a versão durável anterior para reconciliação. O transporte é injetado;
-  nenhum endpoint REST de histórico foi criado ou simulado como existente.
-- Recibos e IDs consumidos expiram a partir da confirmação/consumo. Payload de
-  observação consumida sai imediatamente; observações não consumidas e cadência
-  expiram sem fabricar intervalos. Batch inflight, fila, edits e dados de replay não
-  expiram por esse TTL, inclusive com ACK perdido por mais de 30 minutos.
-- ACK histórico expirado é desconhecido e rejeitado sem alterar outro inflight.
-  Duplicatas de IDs são recusadas dentro da janela. Depois dela, ID pode ser observado
-  novamente, com timestamp novo. `inputAtMs` é obrigatório junto com `inputId` para
-  vincular a alteração à observação certa. Ao podar inputs, watermark escalar avança
-  até o último evento da sessão; observações novas precisam superá-lo. Observações
-  ainda retidas continuam associáveis. Não há coleção eterna de tombstones.
-- Sessão ativa e sessões referenciadas por pendências ficam protegidas; sessões sem
-  referências expiram. Chamador deve produzir sessionIds únicos, preferencialmente
-  UUIDs. Depois da janela não se promete detecção de todo reuso arbitrário de sessão.
-  Batch IDs continuam combinando sessão e sequência global crescente.
-- V2 valida replay contra a base confirmada, revisão e sequência, sem exigir cadeia
-  completa de recibos. V1 é validado pelo contrato anterior antes de migrar; controles
-  sem hora recebem a hora da migração. Pendências são preservadas. Corrupção/versão
-  desconhecida não é convertida silenciosamente em histórico completo. Restore inicia
-  outra sessão e não transfere associações de input entre sessões.
-- Cleanup nas operações públicas e exportação, sem timer por edit. O TTL do rascunho
-  e a retenção no servidor são separados. A issue de fallback após logout não foi
-  alterada nem resolvida por esta fatia.
-
-### Método e RED/GREEN reproduzidos nesta retomada
-
-Workers separados com briefings de tester e implementer. A ferramenta não mantém
-agente persistente nem oferece seleção de modelo por chamada. Implementer recebeu
-contrato, critérios e diagnósticos públicos, sem ler fontes dos testes. Não atribuímos
-RED anterior ao diff herdado: ele já existia quando esta retomada começou.
-
-Primeiro, o tester rodou todos os testes do histórico. Comando
-`pnpm exec tsx test/run.ts 'test/answer-edit-.*\.spec\.ts'`: 472 aprovados e quatro
-falhas funcionais. Após acrescentar três caracterizações browser, repetiu o comando:
-475 aprovados e as mesmas quatro falhas. Logs `/tmp/answer-edit-audit-inherited.log`
-e `/tmp/answer-edit-audit-final.log`. O RED veio de testes de segurança herdados,
-antes da correção desta retomada, não de um stub reconstruído ou versão antiga.
-
-Lote corretivo, até três critérios: preservar TTL configurado em restore v2; bloquear
-reuso de ID+timestamp expirado, consumido ou não; avançar watermark até o último evento
-sem invalidar observações retidas. O implementer corrigiu somente `monitor.ts` e
-`checkpoint.ts`. GREEN: `pnpm exec tsx test/run.ts test/answer-edit-retention-safety.spec.ts`,
-nove aprovados. Logs `/tmp/answer-edit-implementer-safety.log` e
-`/tmp/answer-edit-implementer-retention.log`. Não foi alterada expectativa para passar.
-
-Os testes antigos receberam mudança explícita de contrato no diff herdado:
-`inputAtMs` nas associações, versão exportada 2 e versão desconhecida 99 em vez de 2.
-Relógios de retenção foram fixados nos fixtures para manter determinismo. Isso não é
-uma correção de expectativa para acomodar o bug. Os 450 testes anteriores continuam
-na regressão.
-
-Lote browser, três critérios: outbox durável nula após ACK e página nova; abort real
-no commit pós-ACK conserva batch durável e não declara durabilidade; crash real do
-renderer conserva batch não confirmado para inspeção autenticada e retry após TTL,
-com relógio monotônico reiniciado. Três testes passaram de primeira funcionalmente,
-portanto são caracterização, não RED. Chromium real, IndexedDB e localStorage reais;
-`Page.crash` via CDP não simula falta de energia nem queda do processo inteiro do
-browser. Transporte, relógios e scheduler injetados. Log
-`/tmp/answer-edit-audit-browser-crash.log`.
-
-Lote de carga, dois critérios: envelope realista com TTL padrão e saturação honesta
-com pendências grandes. Dois testes novos também são caracterização. A primeira
-execução encontrou comparação JSON sensível à ordem de propriedades no teste;
-foi corrigida para igualdade estrutural, sem mudar produção. Comando
-`pnpm exec tsx test/run.ts test/answer-edit-retention-load.spec.ts --workers=1 --reporter=line`:
-dois aprovados em 42,8 s. Log `/tmp/answer-edit-retention-load.log`.
-
-### Medições e limites
-
-- Long-run curto de retenção: 1.200 batches confirmados, 60 restores. Na execução
-  final, checkpoint de 1.498 bytes aos 120 lotes e 1.530 aos 1.200; 856 bytes após
-  drenagem das pendências. Os novos campos TTL/watermark explicam diferença para as
-  medições anteriores à correção.
-- Envelope de referência: um campo, IDs curtos, texto pequeno, 10 inputs/s, 600 edits
-  por minuto, TTL padrão, 90 minutos simulados e reload aos 60 minutos. 54.000 edits
-  confirmados, 90 batches, revisão/sequência/replay conferidos. Checkpoint UTF-8 de
-  921.282 bytes aos 30 minutos, 921.332 aos 60 e 921.335 aos 90. Pico amostrado antes
-  de ACK de 935.798 bytes; após mais um TTL, 508 bytes. Clock determinístico, sem sleeps.
-- Saturação browser: 20 substituições de 128 KiB em dois segundos e resposta final
-  pequena. Checkpoint de 2.622.659 bytes, acima dos 2 MiB mantidos. Duas tentativas
-  de flush não enviaram; estado `text-only`, `historyGap`, resposta no fallback,
-  principal anterior intacto e 21 operações pendentes preservadas, com replay/restore.
-- Medimos bytes serializados, não heap, latência real ou throughput de servidor.
-  TTL limita duração dos controles concluídos, não vazão arbitrária, texto ou backlog
-  offline. Cleanup percorre a janela. Não há promessa de memória constante nem quota
-  nova de inputs/s. Se a persistência falha, trabalho apenas em memória ainda pode
-  ser perdido num crash; o aviso de lacuna não transforma fallback em histórico.
-
-Revisor independente somente leitura não encontrou blocker reproduzível. Executou
-simulação determinística de 10.000 passos de edição/ACK/restore e variações do relógio,
-validando checkpoint a cada passo. Isso é evidência adicional, não substitui os testes
-versionados nem valida backend.
-
-### Validação final da fatia
-
-- `pnpm exec tsx test/run.ts 'test/answer-edit-.*\.spec\.ts'`: **481 aprovados em 1,1
-  minuto**, exit 0, incluindo os 450 anteriores. Log `/tmp/input-monitor-ttl-all-green.log`.
-- `pnpm test`: **3.476 aprovados em 11,3 minutos**, terminou sem timeout. Log
-  `/tmp/input-monitor-ttl-full-suite.log`. A descoberta dessa execução ocorreu antes
-  dos dois novos testes de carga; estes passaram separadamente e na regressão de 481.
-- `pnpm exec biome check --write .` e `pnpm run lint`: exit 0, 812 arquivos, sem fixes,
-  seis warnings preexistentes. TypeScript, Astro com zero erros e catálogo de stories
-  passaram. Repetidos após a documentação e remoção da issue, também exit 0. Logs
-  `/tmp/input-monitor-ttl-final-biome.log` e `/tmp/input-monitor-ttl-final-lint.log`.
-- Testes do núcleo são baratos, sem browser; browser real cobre storage, abort, crash
-  e saturação. Não foram executados Firefox/WebKit. Nenhuma evidência de idempotência
-  ou retenção do backend, pois ele permanece ausente.
-- A issue de crescimento de metadados foi corrigida e removida nesta fatia. A issue
-  `dev/issues/monitor-fallback-erasure-apos-logout.md` permanece aberta e intocada.
-  Sem schema, migration, endpoint, dependência, adaptador, rich text ou mudança MDQ.
-  Sem seed novo: a fatia não introduziu interface nem estado de banco, e o recurso
-  ainda não está montado na aplicação dev. Sem push nem alteração em outra worktree.
+Ainda sem schema, migration, endpoint, adaptador de editor ou integração na aplicação, portanto sem seed novo.

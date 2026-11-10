@@ -189,12 +189,12 @@ interface MonitorOptions {
   firstSeq: number;
   pauseMs?: number;
   now: () => number;
-  retentionNow?: () => number;
-  metadataTtlMs?: number;
 }
 
+// Opaque, issued by observeInput, valid only in the session that issued it.
+type InputToken = string;
+
 interface InputObservation {
-  id: string;
   atMs: number;
   kind: InputKind;
 }
@@ -207,8 +207,7 @@ interface TextReplacement {
 
 interface DocumentChange {
   atMs: number;
-  inputId?: string;
-  inputAtMs?: number; // Required together with inputId.
+  input?: InputToken;
   kind: InputKind;
   replacements: readonly TextReplacement[];
 }
@@ -236,7 +235,8 @@ interface MonitorState {
 }
 
 interface MonitorCheckpoint {
-  // Versioned opaque state, validated by the codec when restored.
+  version: 2; // Only version accepted.
+  state: unknown; // Validated by the codec when restored.
 }
 
 interface MonitorHandle {
@@ -252,12 +252,10 @@ declare class AnswerEditMonitor implements MonitorHandle {
   static restore(options: {
     checkpoint: MonitorCheckpoint;
     now: () => number;
-    retentionNow?: () => number;
-    metadataTtlMs?: number;
     createSessionId?: () => string;
   }): AnswerEditMonitor;
 
-  observeInput(input: InputObservation): void;
+  observeInput(input: InputObservation): InputToken;
   recordChange(change: DocumentChange): void;
   closeEdit(): void;
 
@@ -274,7 +272,9 @@ declare class AnswerEditMonitor implements MonitorHandle {
 
 - `observeInput` observa intenção de entrada; não altera texto. `recordChange`
   registra a alteração efetiva. Um `keydown` sem alteração não gera edit.
-- `inputId` associa observação e mudança sem duplicar contagem. Uma intenção pode
+- `observeInput` devolve um token; `DocumentChange.input` o consome. Token
+  desconhecido, já consumido, de outra sessão ou de `kind` incompatível falha sem
+  mutação. Uma intenção pode
   gerar várias substituições; seus intervalos entram nas estatísticas uma única
   vez. Entrada sem correspondência e composição não viram teclas fictícias.
 - A classe não armazena teclas físicas nem referências a eventos DOM. Os
@@ -308,98 +308,46 @@ declare class AnswerEditMonitor implements MonitorHandle {
 - Conflitos entre abas não se resolvem com `reset` silencioso. A reconciliação é
   externa e inicia uma nova base explícita, preservando evidência de lacuna.
 
-## Retenção local dos controles do monitor
+## Controles do monitor limitados por contagem
 
-Contrato aprovado para a compactação local, independente da retenção do histórico
-aceito no servidor e do TTL de rascunhos/logout. O backend REST ainda não existe;
-nesta camada a confirmação é o ACK validado do transporte injetado.
+O monitor não usa relógio de parede nem TTL. O que fica retido tem limite fixo:
 
-- `metadataTtlMs` é configurável, finito e positivo, com padrão 1.800.000 ms.
-  Não usar LRU. Expira exatamente quando `agora - registradoEm >= TTL`.
-  A configuração integra o checkpoint v2 e é preservada no restore quando não
-  houver override explícito. V1 usa o padrão ou override da migração.
-- `retentionNow`, padrão `Date.now`, fornece milissegundos de época. `now` continua
-  monotônico e restrito à sessão de edição. Nunca comparar origens monotônicas de
-  páginas diferentes. O maior tempo de retenção observado é persistido; relógio
-  de parede regressivo é limitado por esse máximo. Isso pode atrasar expiração,
-  mas nunca remove trabalho não confirmado. Avanço de parede expira só controles.
-- Limpeza acontece nas operações públicas e na exportação para persistência, sem
-  timer por edit e sem esperar inatividade. Após restore, limpar antes de aceitar
-  novos eventos. Ausência de operações não exige execução em background.
+- Observações não consumidas: as 16 mais recentes; a mais antiga cai quando entra
+  uma nova e seu token passa a ser desconhecido. Consumir um token remove a
+  observação. Não há tombstones nem watermark: tokens vêm de um contador por
+  sessão e não se repetem, e timestamps iguais são sempre válidos.
+- Recibos: os 32 últimos. Repetição idêntica de um recibo retido é inofensiva;
+  divergência é erro; recibo mais antigo é desconhecido e rejeitado sem tocar o
+  lote em trânsito. Lote não confirmado nunca é descartado: ACK perdido e retry
+  funcionam por qualquer duração.
+- Sessões: não há registro próprio. O conjunto é derivado dos recibos retidos, do
+  lote em trânsito, da fila e da sessão ativa. `restore` recusa um `sessionId`
+  desse conjunto. `sessionId` deve ser UUID ou namespace único gerado pelo
+  chamador; reuso de sessão já esquecida não é detectado. IDs de batch combinam
+  sessão e sequência global crescente.
+- Checkpoint (`version: 2`, única versão aceita; outra versão ou corrupção é
+  rejeitada e a recuperação é externa, texto mais lacuna) guarda base confirmada,
+  revisão e sequência globais, texto, pendências, recibos e a sessão ativa.
+  Observações e cadência não entram: `restore` cria sessão nova com relógio
+  monotônico novo e não transfere associações de input, mas conserva todos os
+  edits e batches pendentes. Replay valida só as pendências contra a base.
 - ACK válido remove imediatamente o batch em memória; a outbox durável fica sem
   esse batch no commit coerente seguinte. Falha nesse commit conserva a cópia
   durável anterior para retry/reconciliação, nunca declara durabilidade falsa.
-- Recibos confirmados ficam por TTL a partir da confirmação. Repetição idêntica
-  antes da fronteira é inofensiva; divergência é erro. Após expiração, ACK antigo
-  é desconhecido e rejeitado, sem modificar inflight novo, revisão ou sequência.
-  Batch ainda não confirmado não expira: ACK perdido e retry funcionam também
-  depois de 30 minutos. O TTL do recibo só começa no ACK local válido.
-- Observação não consumida expira pelo instante de observação no relógio de
-  retenção. `recordChange` com associação expirada falha atomicamente; o chamador
-  pode registrar mudança sem associação e sem timing inventado. Ao consumir,
-  remover o payload da observação imediatamente e reter apenas ID e vencimento
-  por TTL a partir do consumo. Dados de replay já estão nos edits, não dependem
-  da observação original. Cadência escalar expirada não gera novo intervalo.
-- ID duplicado é recusado dentro da janela, consumido ou não. Depois dela pode
-  ser observado de novo. `DocumentChange.inputAtMs` passa a ser obrigatório junto
-  com `inputId` e deve ser exatamente o `atMs` da observação. Este vínculo evita
-  associar uma mudança antiga a uma nova observação com o mesmo ID. Timestamps
-  de observações de mesmo ID não podem ser reutilizados. Para garantir isso sem
-  tombstones eternos, ao podar qualquer input o monitor avança um watermark
-  monotônico escalar até o último evento da sessão. Novas observações precisam
-  ter `atMs` estritamente maior que esse watermark. Antes de qualquer poda,
-  timestamps iguais continuam válidos. Observações ainda retidas continuam
-  associáveis. O watermark integra o checkpoint e não cruza a nova sessão no
-  restore. IDs únicos aleatórios são recomendados aos futuros adaptadores. Evento antigo com token expirado
-  não pode usar timestamp novo para obter associação.
-- Sessões concluídas também têm janela de reconhecimento, sem lista eterna.
-  Sessão ativa e sessões referenciadas por inflight/queue nunca são podadas.
-  Novos sessionIds devem ser UUIDs ou namespace único gerado pelo chamador;
-  duplicatas conhecidas são recusadas. Reuso arbitrário além da janela não é
-  garantido. IDs de batch incluem sessão e sequência global crescente.
-- Checkpoint v2 mantém base confirmada, revisão e sequência globais como âncora
-  independente de recibos. Recibos recentes não precisam reconstruir uma cadeia
-  até a origem da tentativa. Replay valida somente pendências contra essa base.
-  Checkpoint v1 é validado pelo contrato antigo antes de migrar para v2; controles
-  antigos sem timestamp recebem a hora da migração e vencem após uma janela.
-  Não inventar hora antiga nem descartar pendências. Versões desconhecidas ou
-  corrupção continuam rejeitadas, com recuperação externa explícita texto+lacuna.
-  Restore cria sessão monotônica nova e não transfere associações de input entre
-  sessões, mas conserva todos os edits e batches antigos.
 
-TTL limita duração, não bytes sob vazão ilimitada. Memória e checkpoint devem ser
-proporcionais aos controles da janela, texto atual e pendências, não à duração
-total da tentativa. Pendências offline continuam podendo exceder 2 MiB e a
-política existente sinaliza degradação em vez de truncar. Medir simulação longa
-com texto pequeno, lotes confirmados e reloads, sem aumentar o limite do storage.
+O tamanho do checkpoint depende do texto e das pendências, não do número de
+teclas recentes. Referência: um campo, texto de um caractere, 10 inputs/s por
+90 minutos em lotes de 600 operações confirmados, com reload aos 60 minutos:
+54.000 operações em 90 lotes e checkpoint de cerca de 2 KiB após cada ACK (pico
+de 17 KiB com o lote de 600 operações pendente). A medição cobre JSON serializado,
+não heap nem latência de edição.
 
-### Envelope medido e saturação
-
-Referência de dimensionamento local, não quota de captura nem promessa de memória
-constante: um campo, IDs curtos, texto de um caractere, até 10 inputs consumidos/s,
-lotes de 600 operações por minuto e TTL padrão de 30 minutos. A simulação de
-90 minutos confirmou 54.000 operações em 90 lotes, com reload aos 60 minutos.
-Checkpoint UTF-8 após ACK: 921.282 bytes aos 30 minutos, 921.332 aos 60 e
-921.335 aos 90. Pico amostrado antes de ACK: 935.798 bytes; após mais um TTL sem
-entrada: 508 bytes. A medição cobre JSON serializado, não heap, latência de edição
-real ou capacidade do servidor. A limpeza percorre os controles retidos em cada
-operação; vazões maiores exigem nova medição de custo e espaço.
-
-O registro principal inteiro continua limitado a 2 MiB, incluindo texto, checkpoint
-e outbox. IDs maiores, texto grande, mais campos ou mais operações dentro da janela
-mudam esse envelope. Não há limite arbitrário novo de inputs/s nem descarte para
-caber na quota. Um ensaio browser de 20 substituições de 128 KiB em dois segundos,
-seguido de resposta final pequena, produziu checkpoint de 2.622.659 bytes. A gravação
-principal foi recusada, o registro anterior ficou intacto, as 21 operações pendentes
-preservaram replay e restore, o fallback salvou a resposta com `text-only` e
-`historyGap`, e nenhum lote foi enviado. Isso não recupera histórico que nunca foi
-gravado antes de um crash; é uma degradação explícita, não durabilidade completa.
-
-A compactação resolve o crescimento pela duração dos controles concluídos.
-Pendências offline, tráfego arbitrariamente alto dentro da janela e o tamanho do
-texto ainda podem saturar storage. O TTL de 14 dias do registro de rascunho é outra
-política e pode apagar o registro inteiro; a proteção das pendências descrita aqui
-se refere somente ao TTL de metadados de 30 minutos.
+O registro principal inteiro continua limitado a 2 MiB, incluindo texto,
+checkpoint e outbox. Pendências offline grandes não são truncadas: a gravação
+principal é recusada, o fallback salva a resposta com `text-only` e `historyGap`
+e nenhum lote é enviado. Um ensaio browser de 20 substituições de 128 KiB em dois
+segundos, seguido de resposta final pequena, produziu checkpoint de 2,6 MB e esse
+comportamento. O TTL de 14 dias do registro de rascunho é outra política.
 
 ## Responsabilidades dos adaptadores
 
