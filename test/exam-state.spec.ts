@@ -3,6 +3,7 @@ import fc from "fast-check";
 import type { ExamResult, QuestionOutcomeStatus } from "@/services/exam-result";
 import {
 	type AttemptTiming,
+	answeredAfterDeadline,
 	attemptDeadline,
 	attemptOf,
 	attemptState,
@@ -1202,4 +1203,13 @@ test("resultsReleased: a personal timing is refused by the type checker", () => 
 	const personal = personalTiming(timed(), extra(10));
 	// @ts-expect-error resultsReleased takes the exam's own timing, never a personal one.
 	expect(resultsReleased(personal, at(0))).toBe(false);
+});
+
+test("answeredAfterDeadline: only an answer strictly after the deadline is late", () => {
+	const deadline = new Date("2030-01-01T10:00:00Z");
+	expect(
+		answeredAfterDeadline(deadline, new Date(deadline.getTime() + 1)),
+	).toBe(true);
+	expect(answeredAfterDeadline(deadline, deadline)).toBe(false);
+	expect(answeredAfterDeadline(null, deadline)).toBe(false);
 });

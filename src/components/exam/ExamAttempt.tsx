@@ -252,8 +252,8 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	// Failed saves in a row, which sets the wait before the next retry.
 	let failures = 0;
 	let retryTimer: ReturnType<typeof setTimeout> | undefined;
-	// Set once the deadline passed and the last send was tried.
-	let closing = false;
+	// Set once the deadline passed: answers are locked while the last send is retried.
+	const [closing, setClosing] = createSignal(false);
 	// The question numbers whose answers never reached the server at the deadline.
 	const [undelivered, setUndelivered] = createSignal<number[]>([]);
 
@@ -384,6 +384,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	}
 
 	function change(slug: string, type: string, edited: AnswerPayload): void {
+		if (closing()) return;
 		const payload = toSaved(type, edited);
 		setAnswers((current) => ({ ...current, [slug]: payload }));
 		pending.set(slug, payload);
@@ -555,9 +556,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	// reach the server.
 	createEffect(() => {
 		const limit = deadline();
-		if (kind() !== "in-progress" || !limit || now() <= limit || closing) return;
-		closing = true;
+		if (kind() !== "in-progress" || !limit || now() <= limit || closing())
+			return;
 		keepNewerDrafts();
+		setClosing(true);
 		void flushUntilGraceEnds(limit).then((saved) => {
 			if (saved) clearDrafts();
 			else setUndelivered(unsavedNumbers());
@@ -656,6 +658,12 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							busy={busy()}
 							onSubmit={() => dialog?.showModal()}
 						/>
+					</Show>
+
+					<Show when={closing() && kind() === "in-progress"}>
+						<p role="status" class={NOTICE}>
+							{m.exams_attempt_sending_last()}
+						</p>
 					</Show>
 
 					<For each={props.questions}>
@@ -784,7 +792,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 											<AnswerField
 												question={entry.question}
 												payload={answers()[entry.slug]}
-												readonly={kind() !== "in-progress"}
+												readonly={kind() !== "in-progress" || closing()}
 												review={
 													kind() === "results"
 														? props.reviews?.[entry.slug]

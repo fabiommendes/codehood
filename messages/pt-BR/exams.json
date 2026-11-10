@@ -110,6 +110,7 @@
 			}
 		}
 	],
+	"exams_attempt_sending_last": "O tempo acabou. Enviando suas últimas respostas.",
 	"exams_attempt_submitted_waiting": "Enviado. Os resultados ainda não foram liberados.",
 	"exams_attempt_question_short": "Q{number}",
 	"exams_attempt_submit_short": "Entregar",

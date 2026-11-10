@@ -293,6 +293,35 @@ test("an answer that only gets through just after the deadline is still saved", 
 	await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+test("typing after the deadline is locked, and the answer sent in the grace is the one from the deadline", async ({
+	page,
+}) => {
+	const s = await setup({ page, secondsLeft: 3 });
+	let offline = true;
+	await page.route(ANSWER_ACTION, (route) =>
+		offline ? route.abort() : route.continue(),
+	);
+	await page.goto(s.url);
+	await answerBox(page).fill("at the deadline");
+	await expect(page.getByText("Not saved").first()).toBeVisible();
+
+	await expect(page.getByText(/Sending your last answers/)).toBeVisible({
+		timeout: 10 * SECOND,
+	});
+	// The answer is shown read-only: there is no field left to type in.
+	await expect(page.getByRole("textbox")).toHaveCount(0);
+	await expect(page.getByText("at the deadline")).toBeVisible();
+	offline = false;
+
+	await expect
+		.poll(() => saved(s), { timeout: 8 * SECOND })
+		.toBe("at the deadline");
+	await expect(page.getByText("Submitted").first()).toBeVisible({
+		timeout: 20 * SECOND,
+	});
+	expect(await saved(s)).toBe("at the deadline");
+});
+
 test("when time runs out with answers the server never got, the page says which", async ({
 	page,
 }) => {

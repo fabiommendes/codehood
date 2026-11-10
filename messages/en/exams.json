@@ -110,6 +110,7 @@
 			}
 		}
 	],
+	"exams_attempt_sending_last": "Time is up. Sending your last answers.",
 	"exams_attempt_submitted_waiting": "Submitted. Results are not out yet.",
 	"exams_attempt_question_short": "Q{number}",
 	"exams_attempt_submit_short": "Submit",
