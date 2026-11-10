@@ -15,7 +15,6 @@ function monitor(initialText = "", options: Partial<MonitorOptions> = {}) {
 		baseRevision: 4,
 		firstSeq: 12,
 		now: () => 100,
-		retentionNow: () => 1_800_000_000_000,
 		...options,
 	});
 }
@@ -66,7 +65,7 @@ function pendingMonitor() {
 test.describe("answer edit monitor batches: collection and replay", () => {
 	test("collect without document changes returns null and leaves a clean state", () => {
 		const target = monitor("unchanged");
-		target.observeInput({ id: "intent", atMs: 110, kind: "typing" });
+		target.observeInput({ atMs: 110, kind: "typing" });
 		target.closeEdit();
 		expect(target.collect()).toBeNull();
 		expect(target.getState()).toEqual({
@@ -78,16 +77,15 @@ test.describe("answer edit monitor batches: collection and replay", () => {
 
 	test("retry preserves the deeply frozen batch, including cadence, while text changes", () => {
 		const target = monitor();
-		for (const [id, atMs, position, insertedText] of [
-			["first", 110, 0, "a"],
-			["second", 130, 1, "b"],
+		for (const [atMs, position, insertedText] of [
+			[110, 0, "a"],
+			[130, 1, "b"],
 		] as const) {
-			target.observeInput({ id, atMs, kind: "typing" });
+			const input = target.observeInput({ atMs, kind: "typing" });
 			target.recordChange({
 				atMs,
 				kind: "typing",
-				inputId: id,
-				inputAtMs: atMs,
+				input,
 				replacements: [{ position, deleteCount: 0, insertedText }],
 			});
 		}
@@ -372,7 +370,7 @@ test.describe("answer edit monitor batches: subscriptions and disposal", () => {
 			expect(() => {
 				switch (operation) {
 					case "observeInput":
-						target.observeInput({ id: "disposed", atMs: 130, kind: "typing" });
+						target.observeInput({ atMs: 130, kind: "typing" });
 						break;
 					case "recordChange":
 						append(target, "bad", 130);

@@ -225,7 +225,6 @@ export function rig(
 		baseRevision: 0,
 		firstSeq: 1,
 		now: () => monotonic,
-		retentionNow: options.now,
 	});
 	return {
 		coordinator,
@@ -238,12 +237,10 @@ export function rig(
 		options,
 		append(text: string, interval = 100) {
 			monotonic += interval;
-			const id = `input-${monotonic}`;
-			monitor.observeInput({ id, atMs: monotonic, kind: "typing" });
+			const input = monitor.observeInput({ atMs: monotonic, kind: "typing" });
 			monitor.recordChange({
 				atMs: monotonic,
-				inputId: id,
-				inputAtMs: monotonic,
+				input,
 				kind: "typing",
 				replacements: [
 					{
@@ -275,7 +272,6 @@ export function restoreRecord(record: LocalEditRecord) {
 	return AnswerEditMonitor.restore({
 		checkpoint: record.checkpoint,
 		now: () => 0,
-		retentionNow: () => EPOCH,
 		createSessionId: () => "reader-session",
 	});
 }

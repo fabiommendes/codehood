@@ -15,18 +15,15 @@ function monitor() {
 		baseRevision: 4,
 		firstSeq: 12,
 		now: () => 10_000,
-		retentionNow: () => 1_800_000_000_000,
 	});
 }
 
 function append(target: AnswerEditMonitor, text: string, atMs: number) {
-	const inputId = `input-${atMs}-${target.getState().text.length}`;
-	target.observeInput({ id: inputId, atMs, kind: "typing" });
+	const input = target.observeInput({ atMs, kind: "typing" });
 	target.recordChange({
 		atMs,
 		kind: "typing",
-		inputId,
-		inputAtMs: atMs,
+		input,
 		replacements: [
 			{
 				position: target.getState().text.length,
@@ -60,7 +57,6 @@ function restore(target: AnswerEditMonitor, sessionId: string, origin = 0) {
 	return AnswerEditMonitor.restore({
 		checkpoint: jsonCheckpoint(target),
 		now: () => origin,
-		retentionNow: () => 1_800_000_000_000,
 		createSessionId: () => sessionId,
 	});
 }
@@ -128,7 +124,6 @@ test.describe("answer edit monitor checkpoints: export", () => {
 		const restored = AnswerEditMonitor.restore({
 			checkpoint: JSON.parse(serialized),
 			now: () => 0,
-			retentionNow: () => 1_800_000_000_000,
 			createSessionId: () => "detached-session",
 		});
 		expect(restored.getState().text).toBe("seedab");
@@ -176,16 +171,15 @@ test.describe("answer edit monitor checkpoints: export", () => {
 	test("export between observation and change does not consume an intention or reset cadence", () => {
 		const actual = monitor();
 		const control = monitor();
-		for (const target of [actual, control]) {
+		const tokens = [actual, control].map((target) => {
 			append(target, "a", 10_010);
-			target.observeInput({ id: "delayed", atMs: 10_030, kind: "typing" });
-		}
+			return target.observeInput({ atMs: 10_030, kind: "typing" });
+		});
 		actual.exportCheckpoint();
-		for (const target of [actual, control]) {
+		for (const [index, target] of [actual, control].entries()) {
 			target.recordChange({
 				atMs: 10_080,
-				inputId: "delayed",
-				inputAtMs: 10_030,
+				input: tokens[index],
 				kind: "typing",
 				replacements: [{ position: 5, deleteCount: 0, insertedText: "b" }],
 			});
@@ -253,7 +247,6 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 				AnswerEditMonitor.restore({
 					checkpoint: candidate as MonitorCheckpoint,
 					now: () => 0,
-					retentionNow: () => 1_800_000_000_000,
 					createSessionId: () => "rejected-session",
 				}),
 			).toThrow();
@@ -289,7 +282,6 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 				AnswerEditMonitor.restore({
 					checkpoint,
 					now: () => now,
-					retentionNow: () => 1_800_000_000_000,
 					createSessionId: () => "invalid-clock",
 				}),
 			).toThrow();
@@ -313,7 +305,6 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 				AnswerEditMonitor.restore({
 					checkpoint,
 					now: () => 0,
-					retentionNow: () => 1_800_000_000_000,
 					createSessionId: () => sessionId,
 				}),
 			).toThrow();
@@ -321,6 +312,54 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 			expect(jsonCheckpoint(middle)).toEqual(before);
 		});
 	}
+
+	test("restore does not transfer pending observations to the new session", () => {
+		const original = monitor();
+		append(original, "a", 10_010);
+		const token = original.observeInput({ atMs: 10_020, kind: "typing" });
+		const restored = restore(original, "restored-session", 10_020);
+		expect(() =>
+			restored.recordChange({
+				atMs: 10_030,
+				kind: "typing",
+				input: token,
+				replacements: [{ position: 5, deleteCount: 0, insertedText: "b" }],
+			}),
+		).toThrow();
+		expect(restored.getState().text).toBe("seeda");
+		const fresh = restored.observeInput({ atMs: 10_030, kind: "typing" });
+		expect(fresh).not.toBe(token);
+	});
+
+	test("checkpoint carries only text, pending work and a bounded receipt list", () => {
+		let target = monitor();
+		for (let index = 1; index <= 200; index++) {
+			append(target, "x", 10_000 + index);
+			const batch = collect(target);
+			target.acknowledge(receipt(batch));
+			if (index % 50 === 0)
+				target = restore(target, `session-${index}`, 10_000);
+		}
+		const state = JSON.stringify(target.exportCheckpoint());
+		expect(state).not.toContain("observations");
+		expect(state.length).toBeLessThan(8192);
+		expect(target.collect()).toBeNull();
+	});
+
+	test("an acknowledgement older than the retained receipts is no longer a retry", () => {
+		const target = monitor();
+		const receipts: BatchReceipt[] = [];
+		for (let index = 1; index <= 40; index++) {
+			append(target, "x", 10_000 + index);
+			const batch = collect(target);
+			receipts.push(receipt(batch));
+			target.acknowledge(receipts.at(-1) as BatchReceipt);
+		}
+		expect(() =>
+			target.acknowledge(receipts[39] as BatchReceipt),
+		).not.toThrow();
+		expect(() => target.acknowledge(receipts[0] as BatchReceipt)).toThrow();
+	});
 
 	test("restore does not freeze or retain the caller's mutable JSON object", () => {
 		const original = monitor();
@@ -330,7 +369,6 @@ test.describe("answer edit monitor checkpoints: validation", () => {
 		const restored = AnswerEditMonitor.restore({
 			checkpoint,
 			now: () => 0,
-			retentionNow: () => 1_800_000_000_000,
 			createSessionId: () => "detached-input",
 		});
 		expect(checkpoint).toEqual(before);
@@ -628,7 +666,6 @@ test.describe("answer edit monitor checkpoints: reload and delivery", () => {
 			target = AnswerEditMonitor.restore({
 				checkpoint: jsonCheckpoint(target),
 				now: () => 0,
-				retentionNow: () => 1_800_000_000_000,
 			});
 			append(target, "x", 0);
 			const batch = collect(target);

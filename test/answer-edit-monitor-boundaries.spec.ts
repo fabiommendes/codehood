@@ -14,7 +14,6 @@ function monitor(pauseMs = 1000) {
 		firstSeq: 0,
 		pauseMs,
 		now: () => 0,
-		retentionNow: () => 1_800_000_000_000,
 	});
 }
 
@@ -25,13 +24,11 @@ function append(
 	changedAtMs = observedAtMs,
 ) {
 	const position = target.getState().text.length;
-	const inputId = `input-${position}`;
-	target.observeInput({ id: inputId, atMs: observedAtMs, kind: "typing" });
+	const input = target.observeInput({ atMs: observedAtMs, kind: "typing" });
 	target.recordChange({
 		atMs: changedAtMs,
 		kind: "typing",
-		inputId,
-		inputAtMs: observedAtMs,
+		input,
 		replacements: [{ position, deleteCount: 0, insertedText: text }],
 	});
 }
@@ -57,7 +54,6 @@ function restore(target: AnswerEditMonitor, sessionId: string) {
 	return AnswerEditMonitor.restore({
 		checkpoint: json,
 		now: () => 0,
-		retentionNow: () => 1_800_000_000_000,
 		createSessionId: () => sessionId,
 	});
 }

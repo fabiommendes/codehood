@@ -26,7 +26,6 @@ function record(text: string, generation = 1): LocalEditRecord {
 		baseRevision: 0,
 		firstSeq: 1,
 		now: () => 0,
-		retentionNow: () => SAVED_AT,
 	});
 	monitor.recordChange({
 		atMs: 1,
@@ -63,7 +62,6 @@ function sizedRecord(bytes: number, generation: number): LocalEditRecord {
 			baseRevision: 0,
 			firstSeq: 1,
 			now: () => 0,
-			retentionNow: () => SAVED_AT,
 		});
 		return {
 			version: 1,

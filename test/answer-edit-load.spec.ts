@@ -4,16 +4,14 @@ import { build } from "esbuild";
 import { replayEdits } from "@/services/answer-edits/codec";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 
-const EPOCH = 1_800_000_000_000;
 const MINUTE_MS = 60_000;
-const DEFAULT_TTL_MS = 30 * MINUTE_MS;
 const STORAGE_LIMIT_BYTES = 2 * 1024 * 1024;
 
 function checkpointBytes(monitor: AnswerEditMonitor) {
 	return Buffer.byteLength(JSON.stringify(monitor.exportCheckpoint()), "utf8");
 }
 
-test("default retention bounds 10 inputs per second across 90 minutes, delivery and reload", () => {
+test("checkpoint stays small at 10 inputs per second across 90 minutes, delivery and reload", () => {
 	test.setTimeout(180_000);
 	let elapsed = 0;
 	let monitor = new AnswerEditMonitor({
@@ -22,7 +20,6 @@ test("default retention bounds 10 inputs per second across 90 minutes, delivery 
 		baseRevision: 0,
 		firstSeq: 1,
 		now: () => elapsed,
-		retentionNow: () => EPOCH + elapsed,
 	});
 	let deliveredText = "é";
 	let deliveredEdits = 0;
@@ -34,12 +31,10 @@ test("default retention bounds 10 inputs per second across 90 minutes, delivery 
 	for (let minute = 1; minute <= 90; minute++) {
 		for (let input = 0; input < 600; input++) {
 			elapsed = (minute - 1) * MINUTE_MS + (input + 1) * 100;
-			const id = `input-${String((minute - 1) * 600 + input).padStart(6, "0")}`;
-			monitor.observeInput({ id, atMs: elapsed, kind: "typing" });
+			const token = monitor.observeInput({ atMs: elapsed, kind: "typing" });
 			monitor.recordChange({
 				atMs: elapsed,
-				inputId: id,
-				inputAtMs: elapsed,
+				input: token,
 				kind: "typing",
 				replacements: [
 					{ position: 0, deleteCount: 1, insertedText: input % 2 ? "é" : "ç" },
@@ -67,35 +62,27 @@ test("default retention bounds 10 inputs per second across 90 minutes, delivery 
 			monitor = AnswerEditMonitor.restore({
 				checkpoint: JSON.parse(JSON.stringify(monitor.exportCheckpoint())),
 				now: () => elapsed,
-				retentionNow: () => EPOCH + elapsed,
 				createSessionId: () => "load-reloaded",
 			});
 		}
 	}
-	const plateauBytes = samples[0]?.bytes ?? 0;
-	expect(plateauBytes).toBeGreaterThan(100_000);
-	for (const sample of samples) {
-		expect(sample.bytes).toBeLessThanOrEqual(plateauBytes + 8192);
-		expect(sample.bytes).toBeGreaterThanOrEqual(plateauBytes - 8192);
-	}
-	elapsed += DEFAULT_TTL_MS;
-	const expiredBytes = checkpointBytes(monitor);
-	expect(expiredBytes).toBeLessThan(8192);
+	for (const sample of samples) expect(sample.bytes).toBeLessThan(8192);
+	const settledBytes = checkpointBytes(monitor);
+	expect(settledBytes).toBeLessThan(8192);
 	expect(monitor.getState().text).toBe("é");
 	expect(monitor.collect()).toBeNull();
 	expect(deliveredBatches).toBe(90);
 	expect(deliveredEdits).toBe(54_000);
 	console.log(
-		"retention realistic load",
+		"checkpoint load",
 		JSON.stringify({
 			inputsPerSecond: 10,
-			ttlMs: DEFAULT_TTL_MS,
 			simulatedMinutes: 90,
 			deliveredBatches,
 			deliveredEdits,
 			peakBytes,
 			samples,
-			expiredBytes,
+			settledBytes,
 		}),
 	);
 });
@@ -184,7 +171,6 @@ test("oversized pending history preserves text and replay but cannot send withou
 			baseRevision: 0,
 			firstSeq: 1,
 			now: () => atMs,
-			retentionNow: () => epoch + atMs,
 		});
 		await coordinator.register(field, monitor);
 		await coordinator.persist();
@@ -227,7 +213,6 @@ test("oversized pending history preserves text and replay but cannot send withou
 		const restored = api.AnswerEditMonitor.restore({
 			checkpoint: JSON.parse(JSON.stringify(monitor.exportCheckpoint())),
 			now: () => 0,
-			retentionNow: () => epoch + atMs,
 			createSessionId: () => "saturation-restored",
 		});
 		const outcome = {
@@ -272,7 +257,7 @@ test("oversized pending history preserves text and replay but cannot send withou
 	expect(result.replay).toBe("Resposta final é 🙂");
 	expect(result.text).toBe(result.replay);
 	console.log(
-		"retention saturation",
+		"oversized pending saturation",
 		JSON.stringify({
 			checkpointBytes: result.bytes,
 			insertedUtf8Bytes: result.insertedUtf8Bytes,

@@ -123,8 +123,6 @@ async function startSession(mode: "accepted" | "abort-ack" | "lost-ack") {
 		baseRevision: 0,
 		firstSeq: 1,
 		now: () => 900_000,
-		retentionNow: () => epoch,
-		metadataTtlMs: 100,
 	});
 	window.retentionLive = {
 		coordinator,
@@ -221,7 +219,7 @@ test("aborted browser ACK commit preserves the durable batch without claiming du
 	expect(result.status?.durability).not.toBe("durable");
 });
 
-test("renderer crash preserves an unacknowledged outbox beyond metadata TTL for authenticated recovery", async ({
+test("renderer crash preserves an unacknowledged outbox for authenticated recovery", async ({
 	page,
 	context,
 }) => {

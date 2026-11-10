@@ -3,6 +3,7 @@ import {
 	frozenCopy,
 	type PendingSegment,
 	parseCheckpoint,
+	receiptSessionId,
 } from "./checkpoint";
 import {
 	type AnswerEdit,
@@ -21,20 +22,16 @@ export interface MonitorOptions {
 	readonly firstSeq: number;
 	readonly pauseMs?: number;
 	readonly now: () => number;
-	/// Epoch milliseconds for retention, independent of the editing clock.
-	readonly retentionNow?: () => number;
-	readonly metadataTtlMs?: number;
 }
+/// Opaque handle issued by `observeInput`; valid only in the session that issued it.
+export type InputToken = string;
 export interface InputObservation {
-	readonly id: string;
 	readonly atMs: number;
 	readonly kind: InputKind;
 }
 export interface DocumentChange {
 	readonly atMs: number;
-	readonly inputId?: string;
-	/// Required with inputId; binds the association to that observation's timestamp.
-	readonly inputAtMs?: number;
+	readonly input?: InputToken;
 	readonly kind: InputKind;
 	readonly replacements: readonly TextReplacement[];
 }
@@ -59,7 +56,7 @@ export interface MonitorState {
 	readonly hasUnacknowledgedBatch: boolean;
 }
 export interface MonitorCheckpoint {
-	readonly version: 1 | 2;
+	readonly version: 2;
 	readonly state: unknown;
 }
 export interface MonitorHandle {
@@ -75,7 +72,10 @@ interface OpenEdit {
 }
 
 const DEFAULT_PAUSE_MS = 1000;
-const DEFAULT_METADATA_TTL_MS = 1_800_000;
+/// Acknowledged batches remembered so a repeated receipt is recognised as a retry.
+const MAX_RECEIPTS = 32;
+/// Unconsumed observations kept; the oldest is dropped when a new one overflows.
+const MAX_OBSERVATIONS = 16;
 const INPUT_KINDS: readonly InputKind[] = [
 	"typing",
 	"paste",
@@ -97,20 +97,11 @@ export class AnswerEditMonitor implements MonitorHandle {
 	private readonly pauseMs: number;
 	private text: string;
 	private confirmedText: string;
-	private readonly retentionNow: () => number;
-	private readonly metadataTtlMs: number;
-	private retentionMaxMs: number;
-	private sessions: Map<string, number>;
 	private queue: PendingSegment[] = [];
 	private lastAtMs: number;
-	private inputWatermarkMs: number | null = null;
-	private readonly observations = new Map<
-		string,
-		CheckpointState["active"]["observations"][number]
-	>();
-	private readonly consumedInputs = new Map<string, number>();
+	private nextInput = 0;
+	private readonly observations = new Map<InputToken, InputObservation>();
 	private previousCadenceMs: number | null = null;
-	private previousCadenceRetentionMs: number | null = null;
 	private openEdit: OpenEdit | null = null;
 	private edits: AnswerEdit[] = [];
 	private inFlight: Readonly<PendingEditBatch> | null = null;
@@ -140,22 +131,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 		requireTime(pauseMs, "pauseMs");
 		if (typeof options.now !== "function")
 			throw new TypeError("now must be a function");
-		const metadataTtlMs =
-			options.metadataTtlMs === undefined
-				? DEFAULT_METADATA_TTL_MS
-				: options.metadataTtlMs;
-		requireTime(metadataTtlMs, "metadataTtlMs");
-		if (metadataTtlMs === 0)
-			throw new TypeError("metadataTtlMs must be positive");
-		const retentionNow =
-			options.retentionNow === undefined ? Date.now : options.retentionNow;
-		if (typeof retentionNow !== "function")
-			throw new TypeError("retentionNow must be a function");
-		const retentionTime = retentionNow();
-		requireTime(retentionTime, "retentionNow");
-		this.retentionNow = retentionNow;
-		this.metadataTtlMs = metadataTtlMs;
-		this.retentionMaxMs = retentionTime;
 		const origin = options.now();
 		requireTime(origin, "timeOriginMs");
 		this.sessionId = options.sessionId;
@@ -166,7 +141,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.lastAtMs = origin;
 		this.text = options.initialText;
 		this.confirmedText = options.initialText;
-		this.sessions = new Map([[options.sessionId, retentionTime]]);
 	}
 
 	/**
@@ -178,17 +152,9 @@ export class AnswerEditMonitor implements MonitorHandle {
 		checkpoint: MonitorCheckpoint;
 		now: () => number;
 		createSessionId?: () => string;
-		retentionNow?: () => number;
-		metadataTtlMs?: number;
 	}): AnswerEditMonitor {
 		requireRecord(options, "options");
-		const retentionNow =
-			options.retentionNow === undefined ? Date.now : options.retentionNow;
-		if (typeof retentionNow !== "function")
-			throw new TypeError("retentionNow must be a function");
-		const migrationNow = retentionNow();
-		requireTime(migrationNow, "retentionNow");
-		const state = parseCheckpoint(options.checkpoint, migrationNow);
+		const state = parseCheckpoint(options.checkpoint);
 		const createSessionId =
 			options.createSessionId === undefined
 				? () => crypto.randomUUID()
@@ -197,6 +163,14 @@ export class AnswerEditMonitor implements MonitorHandle {
 			throw new TypeError("createSessionId must be a function");
 		const sessionId = createSessionId();
 		requireId(sessionId, "sessionId");
+		const knownSessions = new Set([
+			state.active.sessionId,
+			...state.queue.map((segment) => segment.sessionId),
+			...state.receipts.map((receipt) => receiptSessionId(receipt.batchId)),
+		]);
+		if (state.inFlight) knownSessions.add(state.inFlight.sessionId);
+		if (knownSessions.has(sessionId))
+			throw new TypeError("Restored session id must be new");
 
 		const monitor = new AnswerEditMonitor({
 			initialText: state.text,
@@ -205,23 +179,8 @@ export class AnswerEditMonitor implements MonitorHandle {
 			firstSeq: state.firstSeq,
 			pauseMs: state.pauseMs,
 			now: options.now,
-			retentionNow,
-			metadataTtlMs:
-				options.metadataTtlMs === undefined
-					? state.metadataTtlMs
-					: options.metadataTtlMs,
 		});
-		monitor.retentionMaxMs = Math.max(
-			monitor.retentionMaxMs,
-			state.retentionMaxMs,
-		);
 		monitor.confirmedText = state.confirmedText;
-		monitor.sessions = new Map(
-			state.sessions.map((session) => [
-				session.sessionId,
-				session.registeredAtMs,
-			]),
-		);
 		monitor.inFlight = frozenCopy(state.inFlight);
 		monitor.queue = state.queue;
 		const active = state.active;
@@ -238,39 +197,31 @@ export class AnswerEditMonitor implements MonitorHandle {
 		}
 		for (const receipt of state.receipts)
 			monitor.receipts.set(receipt.batchId, frozenCopy(receipt));
-		/// The outgoing active session's recognition window starts when it closes.
-		monitor.sessions.set(active.sessionId, monitor.retentionMaxMs);
-		monitor.cleanup();
-		if (monitor.sessions.has(sessionId))
-			throw new TypeError("Restored session id must be new");
-		monitor.sessions.set(sessionId, monitor.retentionMaxMs);
 		return monitor;
 	}
 
 	/**
-	 * Register an input intention without changing the document or emitting an edit.
+	 * Register an input intention and return the token that associates it with a later change.
 	 *
-	 * @throws {TypeError} If the observation is invalid, duplicated or out of order.
+	 * Only the latest 16 unconsumed observations are kept; older tokens become unknown.
+	 *
+	 * @throws {TypeError} If the observation is invalid or out of order.
 	 * @throws {Error} If the monitor is disposed.
 	 */
-	observeInput(input: InputObservation): void {
+	observeInput(input: InputObservation): InputToken {
 		this.requireActive();
 		requireRecord(input, "input");
-		requireId(input.id, "input.id");
 		requireKind(input.kind);
 		this.validateTime(input.atMs);
-		if (this.inputWatermarkMs !== null && input.atMs <= this.inputWatermarkMs)
-			throw new TypeError("Input time must exceed the pruned input watermark");
-		if (this.observations.has(input.id) || this.consumedInputs.has(input.id))
-			throw new TypeError("Input id already observed");
-		this.observations.set(input.id, {
-			id: input.id,
-			atMs: input.atMs,
-			kind: input.kind,
-			observedAtMs: this.retentionMaxMs,
-		});
+		const token = `${this.sessionId}#${this.nextInput++}`;
+		this.observations.set(token, { atMs: input.atMs, kind: input.kind });
+		if (this.observations.size > MAX_OBSERVATIONS) {
+			const oldest = this.observations.keys().next().value;
+			if (oldest !== undefined) this.observations.delete(oldest);
+		}
 		this.lastAtMs = input.atMs;
 		this.notify();
+		return token;
 	}
 
 	/**
@@ -299,10 +250,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 		const metadataChanged =
 			this.lastAtMs !== change.atMs || observation !== undefined;
 		this.lastAtMs = change.atMs;
-		if (observation) {
-			this.observations.delete(observation.id);
-			this.consumedInputs.set(observation.id, this.retentionMaxMs);
-		}
+		if (change.input !== undefined) this.observations.delete(change.input);
 		if (nextText === this.text) {
 			if (metadataChanged) this.notify();
 			return;
@@ -313,7 +261,9 @@ export class AnswerEditMonitor implements MonitorHandle {
 			change.replacements.length !== 1 ||
 			!isGroupable(change.kind, replacements[0]);
 		if (isolated) this.finalizeEdit();
-		let timing: EditTiming | null = interval === null ? null : [1, interval, 0];
+		/// Only a lone groupable replacement can merge, so isolated edits carry no timing.
+		const timing: EditTiming | null =
+			isolated || interval === null ? null : [1, interval, 0];
 		for (const replacement of replacements.reverse()) {
 			this.appendEdit(
 				{
@@ -325,7 +275,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 				},
 				isolated,
 			);
-			timing = null;
 		}
 		this.text = nextText;
 		if (isolated) this.finalizeEdit();
@@ -348,7 +297,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 	 * Return an immutable view of the document and pending work.
 	 */
 	getState(): Readonly<MonitorState> {
-		this.cleanup();
 		return Object.freeze({
 			text: this.text,
 			hasPendingChanges:
@@ -449,37 +397,31 @@ export class AnswerEditMonitor implements MonitorHandle {
 				batchId: receipt.batchId,
 				revision: receipt.revision,
 				lastSeq: receipt.lastSeq,
-				confirmedAtMs: this.retentionMaxMs,
 			}),
 		);
+		if (this.receipts.size > MAX_RECEIPTS) {
+			const oldest = this.receipts.keys().next().value;
+			if (oldest !== undefined) this.receipts.delete(oldest);
+		}
 		this.baseRevision = nextRevision;
 		this.firstSeq = nextSeq;
 		this.confirmedText = batch.snapshot;
-		this.sessions.set(batch.sessionId, this.retentionMaxMs);
 		this.inFlight = null;
 		this.notify();
 	}
 
 	/**
-	 * Export the document, pending edits and session metadata for persistence.
-	 *
+	 * Export the document, pending edits and recent receipts for persistence.
 	 */
 	exportCheckpoint(): Readonly<MonitorCheckpoint> {
-		this.cleanup();
 		return frozenCopy({
 			version: 2,
 			state: {
-				retentionMaxMs: this.retentionMaxMs,
-				metadataTtlMs: this.metadataTtlMs,
 				baseRevision: this.baseRevision,
 				firstSeq: this.firstSeq,
 				pauseMs: this.pauseMs,
 				confirmedText: this.confirmedText,
 				text: this.text,
-				sessions: [...this.sessions].map(([sessionId, registeredAtMs]) => ({
-					sessionId,
-					registeredAtMs,
-				})),
 				receipts: [...this.receipts.values()],
 				inFlight: this.inFlight,
 				queue: this.queue,
@@ -487,13 +429,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 					sessionId: this.sessionId,
 					timeOriginMs: this.timeOriginMs,
 					lastAtMs: this.lastAtMs,
-					inputWatermarkMs: this.inputWatermarkMs,
-					previousCadenceMs: this.previousCadenceMs,
-					previousCadenceRetentionMs: this.previousCadenceRetentionMs,
-					observations: [...this.observations.values()],
-					consumedInputs: [...this.consumedInputs].map(
-						([id, consumedAtMs]) => ({ id, consumedAtMs }),
-					),
 					edits: this.edits,
 					openEdit: this.openEdit,
 				},
@@ -521,7 +456,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 	 * Stop accepting changes and clear listeners without discarding document or pending work.
 	 */
 	dispose(): void {
-		this.cleanup();
 		if (this.disposed) return;
 		this.disposed = true;
 		this.listeners.clear();
@@ -529,45 +463,6 @@ export class AnswerEditMonitor implements MonitorHandle {
 
 	private requireActive(): void {
 		if (this.disposed) throw new Error("Monitor is disposed");
-		this.cleanup();
-	}
-
-	private cleanup(): void {
-		const now = this.retentionNow();
-		requireTime(now, "retentionNow");
-		this.retentionMaxMs = Math.max(this.retentionMaxMs, now);
-		const expired = (atMs: number): boolean =>
-			this.retentionMaxMs - atMs >= this.metadataTtlMs;
-		for (const [id, input] of this.observations) {
-			if (expired(input.observedAtMs)) {
-				this.observations.delete(id);
-				this.inputWatermarkMs = this.lastAtMs;
-			}
-		}
-		for (const [id, atMs] of this.consumedInputs) {
-			if (expired(atMs)) {
-				this.consumedInputs.delete(id);
-				this.inputWatermarkMs = this.lastAtMs;
-			}
-		}
-		for (const [id, receipt] of this.receipts) {
-			if (expired(receipt.confirmedAtMs)) this.receipts.delete(id);
-		}
-		if (
-			this.previousCadenceRetentionMs !== null &&
-			expired(this.previousCadenceRetentionMs)
-		) {
-			this.previousCadenceMs = null;
-			this.previousCadenceRetentionMs = null;
-		}
-		const protectedSessions = new Set([
-			this.sessionId,
-			...this.queue.map((segment) => segment.sessionId),
-		]);
-		if (this.inFlight) protectedSessions.add(this.inFlight.sessionId);
-		for (const [id, atMs] of this.sessions) {
-			if (!protectedSessions.has(id) && expired(atMs)) this.sessions.delete(id);
-		}
 	}
 
 	private notify(): void {
@@ -590,16 +485,11 @@ export class AnswerEditMonitor implements MonitorHandle {
 	private associatedInput(
 		change: DocumentChange,
 	): InputObservation | undefined {
-		if (change.inputId === undefined) return undefined;
-		requireId(change.inputId, "inputId");
-		const observation = this.observations.get(change.inputId);
-		if (!observation || this.consumedInputs.has(change.inputId))
+		if (change.input === undefined) return undefined;
+		const observation = this.observations.get(change.input);
+		if (!observation)
 			throw new TypeError("Input must be observed and unconsumed");
-		if (
-			observation.kind !== change.kind ||
-			observation.atMs > change.atMs ||
-			change.inputAtMs !== observation.atMs
-		)
+		if (observation.kind !== change.kind || observation.atMs > change.atMs)
 			throw new TypeError("Input kind and time must match the change");
 		return observation;
 	}
@@ -612,12 +502,10 @@ export class AnswerEditMonitor implements MonitorHandle {
 			(observation.kind !== "typing" && observation.kind !== "delete")
 		) {
 			this.previousCadenceMs = null;
-			this.previousCadenceRetentionMs = null;
 			return null;
 		}
 		const previous = this.previousCadenceMs;
 		this.previousCadenceMs = observation.atMs;
-		this.previousCadenceRetentionMs = this.retentionMaxMs;
 		return previous === null || observation.atMs < previous
 			? null
 			: observation.atMs - previous;
