@@ -212,6 +212,19 @@ export function attemptDeadline(
 }
 
 /**
+ * Whether an answer recorded at `answeredAt` came after `deadline`.
+ *
+ * The server keeps accepting answers for a short grace window after the
+ * deadline; this is how staff tell those answers apart.
+ */
+export function answeredAfterDeadline(
+	deadline: Date | null,
+	answeredAt: Date,
+): boolean {
+	return deadline !== null && answeredAt > deadline;
+}
+
+/**
  * What the student holding `attempt` (or no attempt yet) may do with `exam` at `now`.
  *
  * - `upcoming` exam: `not-open`, with `opensAt` set to `scheduledAt`.

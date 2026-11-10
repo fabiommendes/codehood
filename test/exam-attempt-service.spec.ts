@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
+import { EXAM_ANSWER_GRACE_MS } from "@/core/constants";
 import { InvalidData, NotFound } from "@/core/error";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
@@ -7,6 +8,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
+import { answeredAfterDeadline } from "@/services/exam-state";
 
 // Random suffix, not an incrementing counter: slugs would otherwise collide
 // with the ones sibling spec files draw from the shared test database.
@@ -335,6 +337,98 @@ test("response.submit() counts extra time toward the attempt's deadline", async 
 	);
 
 	await expect(submit()).resolves.toMatchObject({ acceptingSubmissions: true });
+});
+
+const SECOND_IN_MINUTES = 1 / 60;
+
+test("response.submit() accepts an answer 5 seconds past the deadline and records it as late", async () => {
+	const { submit, response } = await startedAgo(30 + 5 * SECOND_IN_MINUTES, {
+		status: "ONGOING",
+		duration: { minutes: 30 },
+	});
+
+	const updated = await submit();
+	expect(updated.submissions).toHaveLength(1);
+	const stored = await prisma.response.findUniqueOrThrow({
+		where: { id: response.id },
+		include: { submissions: true },
+	});
+	expect(
+		answeredAfterDeadline(
+			new Date(stored.createdAt.getTime() + 30 * MINUTE),
+			stored.submissions[0]?.createdAt ?? new Date(0),
+		),
+	).toBe(true);
+});
+
+test("response.submit() refuses an answer past the grace window", async () => {
+	const { submit, response } = await startedAgo(
+		30 + (EXAM_ANSWER_GRACE_MS / 1000 + 1) * SECOND_IN_MINUTES,
+		{ status: "ONGOING", duration: { minutes: 30 } },
+	);
+
+	await expect(submit()).rejects.toBeInstanceOf(InvalidData);
+	expect(
+		await prisma.submission.count({ where: { responseId: response.id } }),
+	).toBe(0);
+});
+
+test("response.submit() applies the grace on top of the student's extra time", async () => {
+	const { submit, course, exam } = await startedAgo(
+		40 + 5 * SECOND_IN_MINUTES,
+		{ status: "ONGOING", duration: { minutes: 30 } },
+	);
+	await db.exam.update(
+		{ course: course.id, slug: exam.slug },
+		{ extraTime: { minutes: 10 } },
+		FULL_ACCESS,
+	);
+	await expect(submit()).resolves.toMatchObject({ acceptingSubmissions: true });
+
+	await prisma.response.updateMany({
+		where: { exam: { slug: exam.slug } },
+		data: { createdAt: fromNow(-(40 + 11 * SECOND_IN_MINUTES)) },
+	});
+	await expect(submit()).rejects.toBeInstanceOf(InvalidData);
+});
+
+test("response.submit() accepts an answer just after a scheduled exam's window ends", async () => {
+	const { course, student, question } = await setup();
+	const created = await makeExam(course.id, question.slug, {
+		status: "ONGOING",
+		scheduledAt: fromNow(-30 - 5 * SECOND_IN_MINUTES),
+		duration: { minutes: 30 },
+	});
+	const submit = () =>
+		db.response.submit(
+			{
+				course: course.id,
+				exam: created.slug,
+				question: question.slug,
+				payload: null,
+			},
+			{ actor: student },
+		);
+	await expect(submit()).resolves.toMatchObject({ acceptingSubmissions: true });
+
+	await prisma.exam.update({
+		where: { id: created.id },
+		data: { scheduledAt: fromNow(-30 - 11 * SECOND_IN_MINUTES) },
+	});
+	await expect(submit()).rejects.toBeInstanceOf(InvalidData);
+});
+
+test("response.submit() still refuses an exam completed by status, grace or not", async () => {
+	const { submit, exam } = await startedAgo(1, {
+		status: "ONGOING",
+		duration: { minutes: 30 },
+	});
+	await prisma.exam.update({
+		where: { id: exam.id },
+		data: { status: "COMPLETED" },
+	});
+
+	await expect(submit()).rejects.toBeInstanceOf(InvalidData);
 });
 
 test("response.submit() has no deadline on an untimed exam, however old the attempt", async () => {

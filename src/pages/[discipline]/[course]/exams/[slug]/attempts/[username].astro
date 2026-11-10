@@ -10,7 +10,12 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
 import { examResult, formatScore } from "@/services/exam-result";
-import { canReopenAttempt } from "@/services/exam-state";
+import {
+	answeredAfterDeadline,
+	attemptDeadline,
+	canReopenAttempt,
+	personalTiming,
+} from "@/services/exam-state";
 import { attemptRows } from "@/services/grading";
 import { reviewResult } from "@/services/review";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -64,6 +69,7 @@ const canReopen =
 	closed &&
 	!attempt.acceptingSubmissions &&
 	canReopenAttempt(exam, exception, attempt, now);
+const deadline = attemptDeadline(personalTiming(exam, exception), attempt);
 // Open regrade requests of this student, by the submission they contest.
 const openRegrades = new Map(
 	(
@@ -175,6 +181,9 @@ const stateLabel = (status: string, score: number | null): string => {
           <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <h3 class="text-lg font-semibold">{title}</h3>
+              {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
+                <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>
+              )}
               {counting && openRegrades.has(counting.publicId) && (
                 <a href={`${href}/exams/${exam.slug}/regrades#regrade-${openRegrades.get(counting.publicId)}`} class="badge badge-warning badge-sm">{m.grades_regrade_requested()}</a>
               )}

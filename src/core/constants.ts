@@ -220,3 +220,12 @@ logEnvVariables([
 	["storage.quota.student", BLOB_QUOTA_BY_ROLE.STUDENT],
 	["instance.schoolIdPattern", SCHOOL_ID_PATTERN],
 ]);
+
+/**
+ * How long after an attempt's deadline the server still accepts an answer.
+ *
+ * It absorbs network latency, client retries and clock skew, so an answer typed
+ * in time is not lost for being delivered a few seconds late. It is never shown
+ * to students: their countdown still ends at the deadline.
+ */
+export const EXAM_ANSWER_GRACE_MS = 10_000;

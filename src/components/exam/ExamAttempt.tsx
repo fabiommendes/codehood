@@ -73,6 +73,8 @@ export interface ExamAttemptProps {
 	username?: string;
 	/// When the server saved each answer, by question slug (ISO), for the draft conflict panel.
 	answeredAt?: Record<string, string>;
+	/// How long after the deadline the server still accepts an answer, which the last resend uses.
+	graceMs?: number;
 }
 
 /// The box every state sentence of an attempt sits in.
@@ -342,6 +344,17 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		return pending.size === 0;
 	}
 
+	/// Sends what is pending, and again every second while the server may still accept it after `limit`; resolves to whether every answer is saved.
+	async function flushUntilGraceEnds(limit: Date): Promise<boolean> {
+		const lastChance = limit.getTime() + (props.graceMs ?? 0);
+		let saved = await flush();
+		while (!saved && serverNow().getTime() < lastChance) {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			saved = await flush();
+		}
+		return saved;
+	}
+
 	/// Sends the question's current answer again when an abandoned request carrying a different one lands, since the server keeps the last to arrive.
 	function landedLate(slug: string, payload: AnswerPayload): void {
 		const current = answers()[slug] ?? null;
@@ -537,15 +550,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		void flush();
 	});
 
-	// Once the deadline passes the server refuses further answers: try the last
-	// send and show the attempt as submitted, saying which answers did not
+	// Once the deadline passes the server refuses further answers after a short
+	// grace: keep trying the last send until the grace ends and show the attempt as submitted, saying which answers did not
 	// reach the server.
 	createEffect(() => {
 		const limit = deadline();
 		if (kind() !== "in-progress" || !limit || now() <= limit || closing) return;
 		closing = true;
 		keepNewerDrafts();
-		void flush().then((saved) => {
+		void flushUntilGraceEnds(limit).then((saved) => {
 			if (saved) clearDrafts();
 			else setUndelivered(unsavedNumbers());
 			setKind("submitted");

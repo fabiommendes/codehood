@@ -55,6 +55,7 @@
 	"exams_detail_grade_answers": "Corrigir respostas",
 	"exams_detail_questions_heading": "Questões",
 	"exams_detail_no_questions": "Nenhuma questão fixada ainda.",
+	"exams_attempt_answered_late": "Respondida {seconds} s após o prazo",
 	"exams_attempt_dropped": "desistente",
 	"exams_attempt_started": "Início",
 	"exams_attempt_submitted": "Envio",

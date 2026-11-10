@@ -14,6 +14,7 @@ import {
 	type ResponseWithCourse,
 } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
+import { EXAM_ANSWER_GRACE_MS } from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { CourseRef, ExamId, SubmissionId } from "@/core/schemas";
 import {
@@ -485,15 +486,22 @@ async function writableSubmission(
 /**
  * Refuses a write against an exam that is not open at `now`, for the student holding `exception`.
  *
- * @throws {@link InvalidData} Unless the exam's phase is `open`.
+ * @throws {@link InvalidData} Unless the exam's phase is `open`, or its window ended within the last `graceMs`.
  */
 export function assertExamOpen(
 	exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>,
 	now: Date,
 	exception: ExceptionTiming | null = null,
+	graceMs = 0,
 ): void {
 	const timing = viewerTiming(examTimingFromDb(exam), exception);
-	if (examPhase(timing, now) !== "open") {
+	// The grace only extends a window that ran out: an exam closed by status stays closed.
+	const phase = examPhase(timing, now);
+	const lateButGraced =
+		phase === "closed" &&
+		graceMs > 0 &&
+		examPhase(timing, new Date(now.getTime() - graceMs)) === "open";
+	if (phase !== "open" && !lateButGraced) {
 		throw new InvalidData({
 			exam: [{ code: "invalid", message: m.errors_exam_not_open() }],
 		});
@@ -502,7 +510,7 @@ export function assertExamOpen(
 
 /**
  * Refuses a submission against a closed response, an exam that is not open,
- * or a response whose deadline has passed.
+ * or a response whose deadline passed more than {@link EXAM_ANSWER_GRACE_MS} ago.
  *
  * @throws {@link InvalidData}
  */
@@ -525,13 +533,13 @@ export function assertAcceptingSubmissions(
 			],
 		});
 	}
-	assertExamOpen(response.exam, now, exception);
+	assertExamOpen(response.exam, now, exception, EXAM_ANSWER_GRACE_MS);
 
 	const deadline = attemptDeadline(
 		viewerTiming(examTimingFromDb(response.exam), exception),
 		response,
 	);
-	if (deadline && now > deadline) {
+	if (deadline && now.getTime() > deadline.getTime() + EXAM_ANSWER_GRACE_MS) {
 		throw new InvalidData({
 			response: [
 				{

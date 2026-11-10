@@ -87,6 +87,11 @@
 
 ### Fixed
 
+- Exam answers delivered a few seconds after the deadline are no longer lost:
+  the server accepts `exam.answer` for 10 s past the attempt's deadline
+  (`EXAM_ANSWER_GRACE_MS`), and the page keeps resending until the grace ends.
+  The student's countdown is unchanged. The attempt page of the instructor
+  flags an answer recorded after the deadline.
 - Exam answers that fail to save are retried by themselves (backoff up to
   30 s, with jitter) and at once when the browser comes back online. A save
   that gets no reply in 15 s counts as a lost connection, so one hung request

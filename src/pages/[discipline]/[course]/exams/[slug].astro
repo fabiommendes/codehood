@@ -12,7 +12,7 @@ import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
 import QuestionStatsTable from "@/components/grading/QuestionStats.astro";
 import ReleasedScore from "@/components/ReleasedScore.astro";
-import { RUNNER_ORIGIN } from "@/core/constants";
+import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
 import type { ExamExceptionView, Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 import { m } from "@/i18n";
@@ -503,6 +503,7 @@ for (const submission of attempt?.submissions ?? []) {
             runnerOrigin={RUNNER_ORIGIN}
             username={actor.username}
             answeredAt={answeredAt}
+            graceMs={EXAM_ANSWER_GRACE_MS}
           />
         </section>
       )

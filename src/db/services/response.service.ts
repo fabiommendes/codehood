@@ -16,7 +16,10 @@ import {
 	simplifyTarget,
 } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
-import { PRACTICE_SESSION_WINDOW_MS } from "@/core/constants";
+import {
+	EXAM_ANSWER_GRACE_MS,
+	PRACTICE_SESSION_WINDOW_MS,
+} from "@/core/constants";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { ResponseId } from "@/core/schemas";
 import {
@@ -764,6 +767,7 @@ async function resolveOrCreateAttempt(
 			exam,
 			new Date(),
 			await loadExceptionTiming(tx, exam.id, authorId),
+			perm === "response.submit" ? EXAM_ANSWER_GRACE_MS : 0,
 		);
 	}
 

@@ -55,6 +55,7 @@
 	"exams_detail_grade_answers": "Grade answers",
 	"exams_detail_questions_heading": "Questions",
 	"exams_detail_no_questions": "No questions pinned yet.",
+	"exams_attempt_answered_late": "Answered {seconds} s after the deadline",
 	"exams_attempt_dropped": "dropped",
 	"exams_attempt_started": "Started",
 	"exams_attempt_submitted": "Submitted",

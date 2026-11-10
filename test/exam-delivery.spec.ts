@@ -270,6 +270,29 @@ test("an answer still failing as the deadline nears is sent before it", async ({
 	await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+test("an answer that only gets through just after the deadline is still saved", async ({
+	page,
+}) => {
+	const s = await setup({ page, secondsLeft: 3 });
+	let offline = true;
+	await page.route(ANSWER_ACTION, (route) =>
+		offline ? route.abort() : route.continue(),
+	);
+	await page.goto(s.url);
+	await answerBox(page).fill("just after");
+	await expect(page.getByText("Not saved").first()).toBeVisible();
+
+	// Heals once the countdown has run out, inside the server's grace.
+	await page.waitForTimeout(5 * SECOND);
+	offline = false;
+
+	await expect.poll(() => saved(s), { timeout: 8 * SECOND }).toBe("just after");
+	await expect(page.getByText("Submitted").first()).toBeVisible({
+		timeout: 20 * SECOND,
+	});
+	await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
 test("when time runs out with answers the server never got, the page says which", async ({
 	page,
 }) => {
