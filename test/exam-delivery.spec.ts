@@ -23,6 +23,8 @@ interface Setup {
 	secondsLeft?: number;
 	/// Slugs of code essays to add after the text essay `text`.
 	codes?: string[];
+	/// Further questions of other kinds, by slug, added after the code essays.
+	others?: Record<string, Record<string, unknown>>;
 }
 
 /// A student in an open attempt at an exam with a text essay, `text`, and the code essays asked for.
@@ -66,6 +68,19 @@ async function setup(options: Setup) {
 			FULL_ACCESS,
 		);
 	}
+	for (const [slug, question] of Object.entries(options.others ?? {})) {
+		await db.question.create(
+			{
+				status: "PUBLISHED",
+				version: "1",
+				course: course.id,
+				slug,
+				// biome-ignore lint/suspicious/noExplicitAny: question variants are checked by the service
+				question: { ...question, tags: [] } as any,
+			},
+			FULL_ACCESS,
+		);
+	}
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: "delivery-exam",
@@ -75,6 +90,7 @@ async function setup(options: Setup) {
 		questions: [
 			{ slug: "text" },
 			...(options.codes ?? []).map((slug) => ({ slug })),
+			...Object.keys(options.others ?? {}).map((slug) => ({ slug })),
 		],
 	});
 	const attempt = await db.response.create(
@@ -546,3 +562,54 @@ test("clearing the text during an outage is kept across a reload", async ({
 	await page.evaluate(() => window.dispatchEvent(new Event("online")));
 	await expect.poll(() => saved(s)).toBeNull();
 });
+
+// A saved text answer must show in its field after a reload.
+
+const SAVED_FIELDS = [
+	{
+		name: "short-answer",
+		slug: "short",
+		question: {
+			type: "short-answer",
+			stem: "Capital?",
+			accept: [{ pattern: "Brasilia" }],
+		},
+		payload: "Brasilia",
+		selector: "input.mdq-input",
+	},
+	{
+		name: "essay",
+		slug: "text",
+		question: undefined,
+		payload: "saved essay",
+		selector: "textarea.mdq-textarea",
+	},
+	{
+		name: "numeric",
+		slug: "num",
+		question: { type: "numeric", stem: "How many?", answer: 42 },
+		payload: "42",
+		selector: ".mdq-question[data-type=numeric] input",
+	},
+] as const;
+
+for (const field of SAVED_FIELDS) {
+	// The essay textarea reaches the page as `<textarea value="...">`, which
+	// the browser ignores, and hydration does not set the property.
+	const run = field.name === "essay" ? test.fixme : test;
+	run(
+		`a saved ${field.name} answer shows in its field after a reload`,
+		async ({ page }) => {
+			const others = field.question
+				? { [field.slug]: { ...field.question } }
+				: undefined;
+			const s = await setup({ page, others });
+			await seedAnswer(s, field.slug, field.payload);
+			await openHydrated(page, s.url);
+
+			await expect(page.locator(field.selector).first()).toHaveValue(
+				field.payload,
+			);
+		},
+	);
+}
