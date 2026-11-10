@@ -30,7 +30,7 @@ async function tokenFor(request: APIRequestContext, username: string) {
 	});
 	expect(login.ok(), await login.text()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 /// A course's instructor needs a known password to log in through — unlike
@@ -77,7 +77,7 @@ async function adminHeaders(request: APIRequestContext) {
 	});
 	expect(login.ok(), await login.text()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 test("course.addStudent enrolls an existing account in the discipline/course it names", async ({

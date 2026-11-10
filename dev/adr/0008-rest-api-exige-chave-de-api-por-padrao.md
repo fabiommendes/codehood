@@ -1,35 +1,41 @@
 ---
 type: adr
 status: accepted
-tags: [api, rest, auth]
+tags: [api, rest, rpc, auth]
 created: 2026-11-03
 decided: 2026-09-02
 creator: claude
 ---
 
-# REST API exige chave de API por padrão
+# REST e RPC exigem autenticação por padrão
 
-Toda rota da REST API exige uma chave de API (CLI ou bot) no cabeçalho
-`Authorization: Bearer`, a menos que a declaração diga `isPublic: true`.
-Esquecer a flag falha fechado: a rota responde 401.
-
-## Contexto
-
-O documento OpenAPI declara `security: [{ BearerAuth: [] }]` no topo
-(`src/api/registry/openapi-document.ts:61`), e `route.view` lança `NotAllowed`
-(401) quando `locals.actor` está vazio (`src/api/registry/route.ts:216`). A
-flag `isPublic` aparece no commit `26d8181` (2026-09-02); o motivo do padrão
-fechado está em `src/api/README.md`.
+Toda rota REST e método RPC exige um actor autenticado, salvo declaração
+`isPublic: true`. Sessão por cookie e chave `Authorization: Bearer` são
+alternativas para UI e CLI/bots, respectivamente. Esquecer a flag falha fechado
+com 401 no REST ou erro de autenticação JSON-RPC.
 
 ## Decisão
 
-- O padrão é exigir chave. `isPublic: true` faz duas coisas: emite
-  `security: []` no documento e pula o 401.
-- Só duas rotas são públicas: `GET /api/health` (um probe ainda não tem chave)
-  e `POST /api/auth/login` (que é como se obtém uma). `POST /api/auth/logout`
-  não é pública: precisa de uma sessão para encerrar.
+- O padrão histórico descrito como "exigir chave" já aceitava `locals.actor`
+  de sessão. A política agora é explícita e o OpenAPI declara as duas alternativas.
+- Presença simultânea do esquema Bearer e do cookie `SESSION_COOKIE` produz
+  HTTP 400 antes de validar qualquer credencial ou renovar sessão. Inclui valores
+  vazios, inválidos e credenciais do mesmo usuário. Cookies alheios não conflitam.
+- O guard de conflito vale centralmente para todas as portas da aplicação,
+  antes dos middlewares de sessão e chave. Não existe precedência ou fallback.
+- `isPublic: true` remove a exigência de actor e emite `security: []`.
+  REST público: `GET /api/health` e `POST /api/auth/login`.
+  `POST /api/auth/logout` exige autenticação.
+- Em mutações REST e `/rpc`, Origin explicitamente externo falha 403,
+  inclusive JSON, exceto com Bearer validado. Sem Origin, JSON continua aceito.
+  Conteúdos enviáveis por formulário e corpos sem Content-Type exigem Origin
+  local quando não há Bearer válido. REST e `/rpc` compartilham a regra, então
+  trocar um REST direto por um envelope RPC não a contorna.
 
 ## Consequências
 
-- Uma rota nova sem a flag fica protegida e aparece como protegida no OpenAPI.
-- Tornar uma rota pública é uma mudança visível no diff de `src/api/`.
+Clientes que fazem login e conservam o cookie devem usar esse cookie sozinho
+ou omiti-lo explicitamente ao enviar Bearer. A resposta de login continua
+emitindo as duas credenciais para clientes distintos; enviá-las juntas é erro.
+
+Um novo endpoint permanece protegido por padrão.

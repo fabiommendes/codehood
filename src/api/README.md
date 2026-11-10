@@ -8,7 +8,10 @@ The REST API lives under `/api/*` and is addressed as described in
   derives validation, routing and the OpenAPI document from that declaration,
   and `CRUD()` turns a Service into up to six routes.
 - [ADR 0008](../../dev/adr/0008-rest-api-exige-chave-de-api-por-padrao.md):
-  every route requires an API key unless declared `isPublic: true`.
+  every route requires a session cookie OR a Bearer key unless declared
+  `isPublic: true`. Sending both is rejected before credential validation.
+  Unsafe API requests with a foreign Origin are refused unless authenticated
+  with Bearer; form-like requests without Bearer require a local Origin.
 
 This file maps where each piece lives.
 

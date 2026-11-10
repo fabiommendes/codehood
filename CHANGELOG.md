@@ -36,6 +36,9 @@
 
 ### Changed
 
+- REST e RPC documentam sessão OU Bearer. Credenciais simultâneas são
+  rejeitadas antes da validação; cookies alheios não conflitam. Mutações JSON
+  em `/api/` e `/rpc` com Origin externo também exigem Bearer válido.
 - The session cookie is `__Host-session` in production (logs everyone out
   once on upgrade).
 - The exam submit dialog warns about unanswered questions: it lists them

@@ -53,19 +53,17 @@ async function tokenFor(request: APIRequestContext, username: string) {
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
-/// Every request in this file that needs an admin uses this session, since a
-/// second `tokenFor` call in the same `request` context would overwrite the
-/// bearer-outranking session cookie a prior login left behind.
+/// Admin requests use an isolated Bearer credential without login's session cookie.
 async function adminHeaders(request: APIRequestContext) {
 	const login = await request.post("/api/auth/login", {
 		data: { login: "admin", password: "admin" },
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 /**

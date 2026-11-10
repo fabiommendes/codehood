@@ -131,8 +131,11 @@ listing page, and it is on the reserved list, so nothing collides.
 
 ## API, RPC and actions
 
-REST endpoints for the CLI and grading bots live under `/api/`, authenticated
-with `Authorization: Bearer <key>`. The live set of paths is
+REST endpoints for the UI, CLI and grading bots live under `/api/`, authenticated
+with a session cookie OR `Authorization: Bearer <key>`, never both. Unsafe
+REST and RPC requests with a foreign Origin require a validated Bearer key;
+form-like requests without Bearer require the server's own Origin. JSON without
+Origin remains accepted. The live set of paths is
 `src/api/registry/route-patterns.json`, generated from the route registry;
 `src/api/README.md` covers how they are declared.
 

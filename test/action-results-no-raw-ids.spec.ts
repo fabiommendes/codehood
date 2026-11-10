@@ -26,7 +26,7 @@ async function adminHeaders(request: APIRequestContext) {
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 /// Posts a form-accepting action the way a browser form submit does, and

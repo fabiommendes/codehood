@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
+import { SESSION_COOKIE } from "@/core/constants";
 import { db } from "@/db";
-import { userFactory } from "@/fixtures/user.factory";
+import { persistedUserFactory, userFactory } from "@/fixtures/user.factory";
+import { TEST_BASE_URL } from "./env";
 
 // `POST /api/auth/login` is the CLI's way in, not the browser's — the web app
 // uses the `auth.login` action and a session cookie. These stay API-level
@@ -24,7 +26,7 @@ test("cli-login issues a bearer token that authenticates API-key middleware", as
 	// "/" reads context.locals.user, which the api-key middleware populates from
 	// the Authorization header when there's no session cookie.
 	const authed = await request.get("/", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 	});
 	expect(authed.status()).toBe(200);
 });
@@ -86,9 +88,7 @@ test("the web login action refuses a JSON body", async ({ request }) => {
 	expect(asForm.ok()).toBe(true);
 });
 
-// A caller that holds a session cookie and also sends a bearer token asked for
-// the token's identity explicitly, so the cookie must not override it.
-test("a bearer token outranks a session cookie on the same request", async ({
+test("a bearer token and session cookie are rejected before credential validation", async ({
 	request,
 }) => {
 	const first = userFactory.build({ role: "STUDENT" });
@@ -110,14 +110,102 @@ test("a bearer token outranks a session cookie on the same request", async ({
 	const me = await request.get("/api/user/me", {
 		headers: { Authorization: `Bearer ${firstToken}` },
 	});
-	expect(me.status()).toBe(200);
-	expect((await me.json()).username).toBe(first.username);
+	expect(me.status()).toBe(400);
+	expect((await me.json()).code).toBe("ambiguous-credentials");
 
 	const bogus = await request.get("/api/user/me", {
 		headers: { Authorization: "Bearer not-a-real-token" },
 	});
-	expect(bogus.status()).toBe(401);
+	expect(bogus.status()).toBe(400);
 
 	const cookieOnly = await request.get("/api/user/me");
 	expect((await cookieOnly.json()).username).toBe(second.username);
+});
+
+async function bearerCredentials() {
+	const user = await persistedUserFactory.create({
+		role: "ADMIN",
+		password: "correct-horse-battery-staple",
+	});
+	const key = await db.apiKey.create(
+		{
+			name: "auth-test",
+			kind: "CLI",
+			createdBy: { username: user.username, name: user.name },
+		},
+		{ actor: user },
+	);
+	return {
+		user,
+		headers: { Authorization: `Bearer ${key.token}`, Cookie: "" },
+	};
+}
+
+test("REST and RPC reject conflicting credentials before validation, even invalid or empty cookies", async ({
+	request,
+}) => {
+	const { headers } = await bearerCredentials();
+	for (const token of [headers.Authorization, "bearer invalid", "Bearer"]) {
+		for (const cookie of [`${SESSION_COOKIE}=invalid`, `${SESSION_COOKIE}=`]) {
+			const response = await request.post("/rpc", {
+				headers: { Authorization: token, Cookie: cookie },
+				data: { invalid: true },
+			});
+			expect(response.status()).toBe(400);
+			expect((await response.json()).code).toBe("ambiguous-credentials");
+			expect(response.headers()["set-cookie"]).toBeUndefined();
+			const rest = await request.get("/api/user/me", {
+				headers: { Authorization: token, Cookie: cookie },
+			});
+			expect(rest.status()).toBe(400);
+		}
+	}
+	const unrelated = await request.get("/api/user/me", {
+		headers: { ...headers, Cookie: "theme=dark" },
+	});
+	expect(unrelated.status()).toBe(200);
+});
+
+test("REST and RPC share session and origin protection, and allow isolated Bearer", async ({
+	playwright,
+}) => {
+	const request = await playwright.request.newContext({
+		baseURL: TEST_BASE_URL,
+		extraHTTPHeaders: {},
+	});
+	const { user, headers } = await bearerCredentials();
+	const login = await request.post("/api/auth/login", {
+		data: { login: user.username, password: "correct-horse-battery-staple" },
+	});
+	expect(login.status()).toBe(200);
+	const sameUserConflict = await request.get("/api/user/me", {
+		headers: { Authorization: headers.Authorization },
+	});
+	expect(sameUserConflict.status()).toBe(400);
+	const cookieOnly = await request.get("/api/user/me");
+	expect((await cookieOnly.json()).username).toBe(user.username);
+	for (const path of ["/api/user/me/change-password", "/rpc"]) {
+		const foreign = await request.post(path, {
+			headers: { Origin: "https://evil.example" },
+			data: {},
+		});
+		expect(foreign.status()).toBe(403);
+		const form = await request.post(path, {
+			data: Buffer.from("{}"),
+			headers: { "content-type": "text/plain" },
+		});
+		expect(form.status(), `${path}: ${await form.text()}`).toBe(403);
+	}
+	for (const path of ["/rpc/", "/%72pc"]) {
+		const response = await request.post(path, {
+			headers: { Origin: "https://evil.example" },
+			data: { jsonrpc: "2.0", id: 1, method: "health.check" },
+		});
+		expect([403, 404]).toContain(response.status());
+	}
+	const bearer = await request.get("/api/user/me", {
+		headers: { ...headers, Origin: "https://evil.example" },
+	});
+	expect((await bearer.json()).username).toBe(user.username);
+	await request.dispose();
 });

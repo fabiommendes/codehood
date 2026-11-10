@@ -73,7 +73,7 @@ async function tokenOf(
 	});
 	expect(login.ok(), await login.text()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 function post(

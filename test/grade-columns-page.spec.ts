@@ -271,7 +271,7 @@ test("a student who posts the release action directly cannot release, while the 
 		});
 		expect(login.ok()).toBe(true);
 		const { token } = await login.json();
-		return { Authorization: `Bearer ${token}` };
+		return { Authorization: `Bearer ${token}`, Cookie: "" };
 	}
 
 	const asTeacher = await request.post("/_actions/gradeColumn.release", {

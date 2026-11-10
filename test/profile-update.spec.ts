@@ -18,7 +18,7 @@ async function headersOf(
 	});
 	expect(login.ok(), await login.text()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 test("an instructor without GitHub or school id can save the profile", async ({

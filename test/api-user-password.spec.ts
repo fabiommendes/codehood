@@ -36,7 +36,7 @@ test("PATCH /api/user/me cannot reset the password", async ({ request }) => {
 	const before = await storedHash(user.username);
 
 	const patch = await request.patch("/api/user/me", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 		data: { password: "hijacked-by-a-stolen-key" },
 	});
 
@@ -53,7 +53,7 @@ test("PATCH /api/user/me still edits the profile fields it owns", async ({
 	const { token } = await seedAndLogin(request);
 
 	const patch = await request.patch("/api/user/me", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 		data: { name: "Renamed Person" },
 	});
 
@@ -71,7 +71,7 @@ test("POST /api/user/me/change-password swaps the password and revokes every ses
 	);
 
 	const changed = await request.post("/api/user/me/change-password", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 		data: { currentPassword: user.password, newPassword: NEW_PASSWORD },
 	});
 	expect(changed.status()).toBe(200);
@@ -103,7 +103,7 @@ test("POST /api/user/me/change-password refuses a wrong current password", async
 	const before = await storedHash(user.username);
 
 	const refused = await request.post("/api/user/me/change-password", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 		data: { currentPassword: "not-the-password", newPassword: NEW_PASSWORD },
 	});
 
@@ -118,7 +118,7 @@ test("POST /api/user/me/change-password refuses a weak new password", async ({
 	const before = await storedHash(user.username);
 
 	const refused = await request.post("/api/user/me/change-password", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 		data: { currentPassword: user.password, newPassword: "12345678" },
 	});
 

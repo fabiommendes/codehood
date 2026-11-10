@@ -5,6 +5,7 @@ import {
 import type { APIContext, AstroCookies } from "astro";
 import { type ZodObject, type ZodType, z } from "zod";
 import type { UserActor } from "@/auth/actor";
+import { SESSION_COOKIE } from "@/core/constants";
 import { InvalidData, NotAllowed, TooManyRequests } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
 import { buffer } from "@/core/schemas/base";
@@ -394,6 +395,14 @@ const ROUTES: Record<
 
 // Registry is used internally and to generate the OpenAPI document.
 export const registry = new OpenAPIRegistry();
+
+registry.registerComponent("securitySchemes", "SessionCookie", {
+	type: "apiKey",
+	in: "cookie",
+	name: SESSION_COOKIE,
+	description:
+		"Browser session. Mutually exclusive with Bearer authentication.",
+});
 
 registry.registerComponent("securitySchemes", "BearerAuth", {
 	type: "http",

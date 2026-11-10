@@ -44,7 +44,7 @@ async function tokenFor(request: APIRequestContext, username: string) {
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 /// Two courses taught by one instructor; the graded work lives in `home`.

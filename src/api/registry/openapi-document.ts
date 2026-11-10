@@ -55,10 +55,10 @@ export function buildOpenApiDocument() {
 			title: "Codehood API",
 			version: pkg.version,
 			description:
-				"REST API for the Codehood CLI and grading bots. Authenticated with `Authorization: Bearer <key>`, except where noted — see src/urls/README.md.",
+				"REST API for the UI, CLI and grading bots. Use a session cookie OR Authorization: Bearer <key>, never both. Unsafe requests with a foreign Origin are rejected unless authenticated by Bearer. Form-like requests require a local Origin without Bearer. See src/urls/README.md.",
 		},
 		servers: [{ url: "/", description: "Same origin as the web app" }],
-		security: [{ BearerAuth: [] }],
+		security: [{ BearerAuth: [] }, { SessionCookie: [] }],
 	});
 	stripFormMeta(document);
 	examplesToExample(document);

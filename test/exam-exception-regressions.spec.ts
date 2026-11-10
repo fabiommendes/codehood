@@ -215,7 +215,7 @@ test("REST feedback of a QUIZ does not reach the student while a makeup is pendi
 		data: { login: ctx.student.username, password: PASSWORD },
 	});
 	const { token } = await login.json();
-	const headers = { Authorization: `Bearer ${token}` };
+	const headers = { Authorization: `Bearer ${token}`, Cookie: "" };
 	const url = `/api/course/${ctx.course.discipline.slug}/${ctx.instructor.username}_${ctx.course.edition.slug}/submission/${submission.publicId}/feedback`;
 	const body = async (r: APIRequestContext) =>
 		(await r.get(url, { headers })).text();

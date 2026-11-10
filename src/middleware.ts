@@ -34,6 +34,29 @@ export const runnerOriginMiddleware = defineMiddleware(
 );
 
 /**
+ * Rejects ambiguous credentials before either credential is validated.
+ */
+export const credentialConflictMiddleware = defineMiddleware(
+	(context, next) => {
+		const authorization = context.request.headers.get("authorization") ?? "";
+		const hasBearer = /^Bearer(?:\s|$)/i.test(authorization);
+		const hasSession = (context.request.headers.get("cookie") ?? "")
+			.split(";")
+			.some((cookie) => cookie.split("=", 1)[0]?.trim() === SESSION_COOKIE);
+		if (hasBearer && hasSession)
+			return Response.json(
+				{
+					code: "ambiguous-credentials",
+					status: 400,
+					message: "Use a session cookie or Bearer, not both.",
+				},
+				{ status: 400 },
+			);
+		return next();
+	},
+);
+
+/**
  * The session middleware is responsible for validating the session cookie and populating
  * `context.locals.actor`.
  *
@@ -81,15 +104,12 @@ export const adminMiddleware = defineMiddleware((context, next) => {
 /**
  * Authenticates a request from its `Authorization: Bearer` API key.
  *
- * A bearer token replaces whatever actor the session cookie resolved, and an
- * invalid token leaves the request unauthenticated rather than falling back to
- * the cookie.
+ * Conflicting session credentials have already been rejected; an invalid key
+ * leaves the request unauthenticated.
  */
 export const apiKeyMiddleware = defineMiddleware(async (context, next) => {
 	const header = context.request.headers.get("authorization");
-	const token = header?.startsWith("Bearer ")
-		? header.slice("Bearer ".length)
-		: null;
+	const token = header?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
 	if (!token) return next();
 
 	context.locals.actor = undefined;
@@ -115,18 +135,27 @@ const FORM_CONTENT_TYPES = [
 ];
 
 /**
- * Refuses a cross-site form submission: an unsafe request whose `Origin`
- * differs from the server's and whose content type a browser form can send.
+ * Refuses unsafe cross-site forms and explicitly foreign-Origin API mutations.
  *
- * This is Astro's own `checkOrigin` rule, minus the requests authenticated by
- * an API key. A page cannot set `Authorization` on a form post, so a bearer
- * request is not a forged one, and the CLI sends no `Origin` at all.
+ * Validated Bearer requests are exempt because forms cannot set Authorization.
+ * JSON without Origin remains available to non-browser clients; browser JSON
+ * requests require preflight. REST and RPC share this rule so tunneling a verb
+ * through an RPC envelope cannot weaken the origin check.
  */
 export const originMiddleware = defineMiddleware((context, next) => {
 	const { request } = context;
 	if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return next();
 	if (context.locals.apiKey) return next();
 	if (request.headers.get("origin") === context.url.origin) return next();
+
+	const origin = request.headers.get("origin");
+	const isApi =
+		/^\/rpc\/*$/.test(context.url.pathname) ||
+		context.url.pathname.startsWith("/api/");
+	if (isApi && origin !== null)
+		return new Response("Cross-site API mutations are forbidden", {
+			status: 403,
+		});
 
 	const type = request.headers.get("content-type");
 	const formLike =
@@ -165,6 +194,7 @@ export const bufferHtmlMiddleware = defineMiddleware(async (_context, next) => {
 
 const COMMON_MIDDLEWARES = [
 	runnerOriginMiddleware,
+	credentialConflictMiddleware,
 	sessionMiddleware,
 	apiKeyMiddleware,
 	originMiddleware,

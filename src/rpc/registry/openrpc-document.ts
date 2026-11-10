@@ -56,7 +56,7 @@ export function buildOpenRpcDocument() {
 			title: "Codehood RPC",
 			version: pkg.version,
 			description:
-				"JSON-RPC 2.0 interface for operations that do not fit the REST CRUD surface. Authenticated with `Authorization: Bearer <key>` or a session cookie, except where noted.",
+				"JSON-RPC 2.0 interface for operations that do not fit the REST CRUD surface. Authenticated with `Authorization: Bearer <key>` OR a session cookie, never both, except where noted. Unsafe requests with a foreign Origin require validated Bearer; form-like requests without Bearer require local Origin.",
 		},
 		servers: [{ name: "default", url: "/rpc" }],
 		methods: [...getMethods().values()]

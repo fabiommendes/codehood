@@ -235,7 +235,11 @@ async function restCourse(request: APIRequestContext) {
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
 	const url = `/api/course/${course.discipline.slug}/${instructor.username}_${course.edition.slug}/exam`;
-	return { course, url, headers: { Authorization: `Bearer ${token}` } };
+	return {
+		course,
+		url,
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
+	};
 }
 
 test("REST: an exam carries gradesReleasedAt, null by default", async ({

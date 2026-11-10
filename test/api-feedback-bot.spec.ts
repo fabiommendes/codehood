@@ -42,7 +42,7 @@ async function loginHeaders(request: APIRequestContext, username: string) {
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 async function keyHeaders(
@@ -54,7 +54,7 @@ async function keyHeaders(
 		{ name, kind, createdBy: { username: owner.username, name: owner.name } },
 		{ actor: owner },
 	);
-	return { Authorization: `Bearer ${key.token}` };
+	return { Authorization: `Bearer ${key.token}`, Cookie: "" };
 }
 
 /// A course with one student's pending submission, and the feedback URL for it.

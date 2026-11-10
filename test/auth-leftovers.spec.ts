@@ -113,7 +113,7 @@ test("API login does the same hashing work for an unknown user", async ({
 
 test("POST /api/user refuses a weak password", async ({ request }) => {
 	const token = await adminToken(request);
-	const headers = { Authorization: `Bearer ${token}` };
+	const headers = { Authorization: `Bearer ${token}`, Cookie: "" };
 
 	const weak = userFactory.build({ role: "INSTRUCTOR", password: "short" });
 	const refused = await request.post("/api/user", { headers, data: weak });
@@ -142,7 +142,7 @@ test("deleting an unknown API key is a NotFound, not a 403", async ({
 	// The generic REST delete is idempotent: NotFound answers 200 `deleted: false`.
 	const token = await adminToken(request);
 	const res = await request.delete("/api/api-key/does-not-exist", {
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 	});
 	expect(res.status()).toBe(200);
 	expect((await res.json()).deleted).toBe(false);
@@ -150,7 +150,7 @@ test("deleting an unknown API key is a NotFound, not a 403", async ({
 
 test("logging out with a Bearer key revokes that key", async ({ request }) => {
 	const token = await adminToken(request);
-	const headers = { Authorization: `Bearer ${token}` };
+	const headers = { Authorization: `Bearer ${token}`, Cookie: "" };
 
 	const out = await request.post("/api/auth/logout", { headers });
 	expect(out.status()).toBe(200);

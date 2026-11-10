@@ -20,7 +20,7 @@ async function adminToken(
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { admin, headers: { Authorization: `Bearer ${token}` } };
+	return { admin, headers: { Authorization: `Bearer ${token}`, Cookie: "" } };
 }
 
 test("JS path: a schema error on the slug is an input error with fields.slug", async ({

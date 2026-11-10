@@ -61,7 +61,7 @@ test("a non-public method with a bearer token reaches its handler", async ({
 
 	const res = await request.post("/rpc", {
 		data: { jsonrpc: "2.0", method: "debug.whoami", id: 1 },
-		headers: { Authorization: `Bearer ${token}` },
+		headers: { Authorization: `Bearer ${token}`, Cookie: "" },
 	});
 	expect((await res.json()).result).toEqual({
 		username: user.username,

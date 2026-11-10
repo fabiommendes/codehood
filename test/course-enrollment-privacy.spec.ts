@@ -105,7 +105,7 @@ test("GET /api/course/... as an enrolled student does not carry the roster over 
 
 	const res = await request.get(
 		`/api/course/${disciplineSlug}/${instructor.username}_2026-1`,
-		{ headers: { Authorization: `Bearer ${token}` } },
+		{ headers: { Authorization: `Bearer ${token}`, Cookie: "" } },
 	);
 
 	expect(res.ok()).toBe(true);

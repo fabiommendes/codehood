@@ -55,7 +55,7 @@ async function adminToken(
 }
 
 function authHeader(token: string) {
-	return { Authorization: `Bearer ${token}` };
+	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
 for (const resource of OPTIONAL_FILTER_RESOURCES) {
