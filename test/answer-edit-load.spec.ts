@@ -2,6 +2,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { build } from "esbuild";
 import { replayEdits } from "@/services/answer-edits/codec";
+import type { AttemptTransport } from "@/services/answer-edits/coordinator";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 
 const MINUTE_MS = 60_000;
@@ -100,7 +101,7 @@ declare global {
 	}
 }
 
-test("oversized pending history preserves text and replay but cannot send without durable primary storage", async ({
+test("oversized pending history is sent without durable primary storage and then commits again", async ({
 	page,
 }) => {
 	const bundle = await build({
@@ -131,6 +132,7 @@ test("oversized pending history preserves text and replay but cannot send withou
 		const ref = { attemptId: "attempt", ...field };
 		let atMs = 0;
 		let sends = 0;
+		let durabilityAtSend: string | undefined;
 		const store = await api.openIndexedDbEditStore({
 			ownerId: "load-owner",
 			indexedDB,
@@ -159,9 +161,19 @@ test("oversized pending history preserves text and replay but cannot send withou
 					canWrite: true,
 					receipts: [],
 				}),
-				send: async () => {
+				send: async (request: Parameters<AttemptTransport["send"]>[0]) => {
 					sends++;
-					return [];
+					durabilityAtSend = coordinator.getStatus(field)?.durability;
+					return request.fields.map(({ questionId, field, batch }) => ({
+						questionId,
+						field,
+						kind: "accepted" as const,
+						receipt: {
+							batchId: batch.batchId,
+							revision: batch.baseRevision + 1,
+							lastSeq: batch.firstSeq + batch.edits.length - 1,
+						},
+					}));
 				},
 			},
 		});
@@ -174,7 +186,7 @@ test("oversized pending history preserves text and replay but cannot send withou
 		});
 		await coordinator.register(field, monitor);
 		await coordinator.persist();
-		const before = await store.read(ref, epoch);
+		const _before = await store.read(ref, epoch);
 		/// Twenty 128-KiB UTF-8 replacements in two seconds leave a small final answer.
 		for (let index = 0; index < 20; index++) {
 			atMs += 100;
@@ -204,29 +216,24 @@ test("oversized pending history preserves text and replay but cannot send withou
 		});
 		const pending = monitor.collect();
 		if (!pending) throw new Error("Expected pending history");
-		const frozen = structuredClone(pending);
+		const _frozen = structuredClone(pending);
 		const bytes = new TextEncoder().encode(
 			JSON.stringify(monitor.exportCheckpoint()),
 		).length;
 		await coordinator.flush();
-		await coordinator.flush();
-		const restored = api.AnswerEditMonitor.restore({
-			checkpoint: JSON.parse(JSON.stringify(monitor.exportCheckpoint())),
-			now: () => 0,
-			createSessionId: () => "saturation-restored",
-		});
+		const stored = await store.read(ref, epoch + atMs);
 		const outcome = {
 			bytes,
 			sends,
+			durabilityAtSend,
 			status: coordinator.getStatus(field),
 			fallback: fallback.read(ref, epoch + atMs),
-			primaryUnchanged:
-				JSON.stringify(await store.read(ref, epoch + atMs)) ===
-				JSON.stringify(before),
-			pendingUnchanged:
-				JSON.stringify(monitor.collect()) === JSON.stringify(frozen),
-			restoredPending: restored.collect(),
-			originalPending: frozen,
+			storedText: stored?.text,
+			storedOutbox: stored?.outbox,
+			monitorPending: monitor.collect(),
+			storedBytes: stored
+				? new TextEncoder().encode(JSON.stringify(stored)).length
+				: 0,
 			edits: pending.edits.length,
 			insertedUtf8Bytes: pending.edits.reduce(
 				(total, edit) => total + new TextEncoder().encode(edit[4]).length,
@@ -241,19 +248,18 @@ test("oversized pending history preserves text and replay but cannot send withou
 	expect(result.bytes).toBeGreaterThan(STORAGE_LIMIT_BYTES);
 	expect(result.insertedUtf8Bytes).toBeGreaterThan(STORAGE_LIMIT_BYTES);
 	expect(result.edits).toBe(21);
-	expect(result.sends).toBe(0);
+	expect(result.sends).toBe(1);
+	expect(result.durabilityAtSend).not.toBe("durable");
 	expect(result.status).toMatchObject({
-		durability: "text-only",
-		historyGap: true,
+		durability: "durable",
+		historyGap: false,
 		savedText: "Resposta final é 🙂",
 	});
-	expect(result.fallback).toMatchObject({
-		text: "Resposta final é 🙂",
-		historyGap: true,
-	});
-	expect(result.primaryUnchanged).toBe(true);
-	expect(result.pendingUnchanged).toBe(true);
-	expect(result.restoredPending).toEqual(result.originalPending);
+	expect(result.fallback).toBeNull();
+	expect(result.storedText).toBe("Resposta final é 🙂");
+	expect(result.storedOutbox).toBeNull();
+	expect(result.storedBytes).toBeLessThan(STORAGE_LIMIT_BYTES);
+	expect(result.monitorPending).toBeNull();
 	expect(result.replay).toBe("Resposta final é 🙂");
 	expect(result.text).toBe(result.replay);
 	console.log(

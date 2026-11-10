@@ -344,10 +344,17 @@ não heap nem latência de edição.
 
 O registro principal inteiro continua limitado a 2 MiB, incluindo texto,
 checkpoint e outbox. Pendências offline grandes não são truncadas: a gravação
-principal é recusada, o fallback salva a resposta com `text-only` e `historyGap`
-e nenhum lote é enviado. Um ensaio browser de 20 substituições de 128 KiB em dois
-segundos, seguido de resposta final pequena, produziu checkpoint de 2,6 MB e esse
-comportamento. O TTL de 14 dias do registro de rascunho é outra política.
+principal é recusada e o fallback salva a resposta com `text-only` e `historyGap`.
+O envio não depende da gravação principal: o coordenador tenta persistir e envia
+o lote congelado mesmo se o commit falhar (teto, IndexedDB indisponível, quota),
+sem declarar durabilidade local enquanto isso. Depois do ACK o checkpoint encolhe
+e a nova tentativa de commit pode voltar a `durable`. Após um crash nesse intervalo
+a reconciliação com os recibos do servidor cobre o lote. Campos em `conflict`, sem
+`canWrite` ou em recuperação continuam sem enviar. Não há teto de bytes por lote
+(pendência: um lote muito grande ainda vai inteiro em um envio). Um ensaio browser
+de 20 substituições de 128 KiB em dois segundos, seguido de resposta final
+pequena, produziu checkpoint de 2,6 MB: o lote é enviado e, confirmado, o campo
+volta a gravar. O TTL de 14 dias do registro de rascunho é outra política.
 
 ## Responsabilidades dos adaptadores
 

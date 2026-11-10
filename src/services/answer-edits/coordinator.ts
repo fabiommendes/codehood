@@ -654,28 +654,29 @@ export class AnswerEditCoordinator {
 				continue;
 			const batch = entry.handle.collect();
 			if (batch) {
-				/// Retried frozen batches must also have a successful principal commit.
+				/// Retried frozen batches are committed again before sending, when storage allows it.
 				this.changed(entry);
 				pending.push({ entry, batch });
 			}
 		}
 		await this.persist();
 		if (this.stopped || this.revoked) return;
-		const durable = pending.filter(
-			({ entry }) => entry.status.durability === "durable",
+		/// A failed primary commit does not hold the batch back: the server is the most durable store left.
+		const sendable = pending.filter(
+			({ entry }) => entry.canWrite && entry.status.durability !== "conflict",
 		);
-		if (durable.length === 0) return;
-		for (const { entry } of durable) {
+		if (sendable.length === 0) return;
+		for (const { entry } of sendable) {
 			entry.status = { ...entry.status, delivery: "sending" };
 			this.publish(entry);
 		}
 		try {
 			const results = await this.options.transport.send({
 				attemptId: this.options.attemptId,
-				fields: durable.map(({ entry, batch }) => ({ ...entry.field, batch })),
+				fields: sendable.map(({ entry, batch }) => ({ ...entry.field, batch })),
 			});
 			if (this.stopped || this.revoked) return;
-			for (const { entry } of durable) {
+			for (const { entry } of sendable) {
 				const matches = results.filter(
 					(result) => fieldKey(result) === fieldKey(entry.field),
 				);
@@ -717,7 +718,7 @@ export class AnswerEditCoordinator {
 					};
 				this.publish(entry);
 			}
-			this.deliveryFailed = durable.some(
+			this.deliveryFailed = sendable.some(
 				({ entry }) =>
 					entry.status.delivery === "pending" && entry.status.error !== null,
 			);
@@ -727,7 +728,7 @@ export class AnswerEditCoordinator {
 			if (this.stopped || this.revoked) return;
 			this.deliveryFailed = true;
 			this.updateRetry();
-			for (const { entry } of durable) {
+			for (const { entry } of sendable) {
 				entry.status = {
 					...entry.status,
 					delivery: "pending",

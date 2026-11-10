@@ -64,11 +64,72 @@ function sentBatch(h: Rig, requestIndex = 0, fieldIndex = 0) {
 	return batch;
 }
 
+function requestAt(h: Rig, index: number) {
+	const request = h.transport.requests.at(index);
+	if (!request) throw new Error("Expected an outgoing request");
+	return request;
+}
+
 async function saved(h: Rig) {
 	const record = await h.store.read(REF, EPOCH);
 	if (!record) throw new Error("Expected durable checkpoint");
 	return record;
 }
+
+test.describe("answer edit coordinator delivery: permanent commit failure", () => {
+	test("sends the frozen batch, reports the truth while sending and returns to durable after the ACK", async () => {
+		const h = await registered();
+		h.append("before");
+		await h.coordinator.persist();
+		h.append(" after");
+		h.store.failCommit = true;
+		respond(h, async (request) => accepted(request));
+		await h.coordinator.flush();
+		expect(h.transport.requests).toHaveLength(1);
+		const sending = h.statuses.filter(
+			(status) => status.delivery === "sending",
+		);
+		expect(sending.length).toBeGreaterThan(0);
+		for (const status of sending) {
+			expect(status.durability).not.toBe("durable");
+			expect(status.historyGap).toBe(true);
+		}
+		expect(h.monitor.getState().hasUnacknowledgedBatch).toBe(false);
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			durability: "text-only",
+			historyGap: true,
+		});
+		h.store.failCommit = false;
+		await h.coordinator.persist();
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			durability: "durable",
+			historyGap: false,
+			savedText: "before after",
+		});
+		expect((await saved(h)).outbox).toBeNull();
+		await h.coordinator.dispose();
+	});
+
+	test("conflicted fields are still not sent after a commit failure", async () => {
+		const h = await registered();
+		h.append("x");
+		await h.coordinator.persist();
+		respond(h, async (request) =>
+			request.fields.map(({ questionId, field }) => ({
+				questionId,
+				field,
+				kind: "conflict" as const,
+			})),
+		);
+		await h.coordinator.flush();
+		expect(h.transport.requests).toHaveLength(1);
+		h.append("y");
+		h.store.failCommit = true;
+		await h.coordinator.flush();
+		expect(h.transport.requests).toHaveLength(1);
+		await h.coordinator.dispose();
+	});
+});
 
 test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 	for (const random of [0, 0.5, 0.999999]) {
@@ -170,7 +231,7 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 		expect(h.transport.requests).toHaveLength(1);
 		expect(sentBatch(h)).toEqual(frozen);
 		expect((await saved(h)).text).toBe("first second");
-		response.resolve(accepted(h.transport.requests[0]!));
+		response.resolve(accepted(requestAt(h, 0)));
 		await Promise.all([first, concurrent]);
 		respond(h, async (request) => accepted(request));
 		await h.coordinator.flushDelivery();
@@ -228,7 +289,7 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 			expect(h.transport.requests).toHaveLength(index + 2);
 			expect(sentBatch(h, index + 1)).toEqual(sentBatch(h));
 		}
-		gate.resolve(accepted(h.transport.requests.at(-1)!));
+		gate.resolve(accepted(requestAt(h, -1)));
 		await initial;
 		await drain();
 		gate = deferred<readonly FieldResult[]>();
@@ -246,7 +307,7 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 		expect(h.transport.requests).toHaveLength(10);
 		await h.scheduler.advance(1);
 		expect(h.transport.requests).toHaveLength(11);
-		gate.resolve(accepted(h.transport.requests[10]!));
+		gate.resolve(accepted(requestAt(h, 10)));
 		await drain();
 		await h.coordinator.dispose();
 	});
@@ -269,7 +330,7 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 			expect(h.transport.requests).toHaveLength(random === 0 ? 2 : 1);
 			await h.scheduler.advance(500);
 			expect(h.transport.requests).toHaveLength(2);
-			hold.resolve(accepted(h.transport.requests[1]!));
+			hold.resolve(accepted(requestAt(h, 1)));
 			await drain();
 			await h.coordinator.dispose();
 		});
@@ -289,7 +350,7 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 			respond(h, async (request) => {
 				const results = accepted(request);
 				const result = results[0];
-				if (!result || result.kind !== "accepted")
+				if (result?.kind !== "accepted")
 					throw new Error("Missing fixture receipt");
 				switch (response) {
 					case "omitted":
@@ -466,7 +527,7 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 		h.append(" after send");
 		await h.coordinator.detach(FIELD);
 		h.monitor.dispose();
-		response.resolve(accepted(h.transport.requests[0]!));
+		response.resolve(accepted(requestAt(h, 0)));
 		await flush;
 		respond(h, async (request) => accepted(request));
 		await h.coordinator.flushDelivery();

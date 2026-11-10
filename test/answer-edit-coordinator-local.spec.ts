@@ -143,7 +143,7 @@ test.describe("answer edit coordinator local: durability", () => {
 		await h.coordinator.dispose();
 	});
 
-	test("failed atomic outbox commit retains the previous checkpoint and never sends the unpersisted batch", async () => {
+	test("failed atomic outbox commit retains the previous checkpoint and still sends the frozen batch without claiming durability", async () => {
 		const h = await registered();
 		h.append("before");
 		await h.coordinator.persist();
@@ -151,7 +151,14 @@ test.describe("answer edit coordinator local: durability", () => {
 		h.append(" after");
 		h.store.failCommit = true;
 		await h.coordinator.flush();
-		expect(h.transport.requests).toHaveLength(0);
+		expect(h.transport.requests).toHaveLength(1);
+		expect(h.transport.requests[0]?.fields[0]?.batch.snapshot).toBe(
+			"before after",
+		);
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			durability: "text-only",
+			historyGap: true,
+		});
 		expect(await saved(h)).toEqual(previous);
 		expect(restoreRecord(previous).getState().text).toBe("before");
 		h.store.failCommit = false;
@@ -225,7 +232,8 @@ test.describe("answer edit coordinator local: storage degradation", () => {
 				`${previous ?? ""} unsaved still editable`,
 			);
 			await h.coordinator.flush();
-			expect(h.transport.requests).toHaveLength(0);
+			expect(h.transport.requests).toHaveLength(1);
+			expect(h.coordinator.getStatus(FIELD)?.durability).toBe("unavailable");
 			await h.coordinator.dispose();
 		});
 	}
