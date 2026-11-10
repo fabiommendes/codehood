@@ -39,6 +39,7 @@ test.describe("ready", () => {
 			const { languages, ...rest } = h.ready;
 			expect(rest).toEqual({ type: "ready", protocol: 1, stdin: kind });
 			expect([...languages].sort()).toEqual([
+				"elm",
 				"fake",
 				"javascript",
 				"lua",

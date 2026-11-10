@@ -9,6 +9,7 @@ import type { LanguageId, RunMode } from "./protocol";
 
 /// Tags that map to a driver. `fake` is deliberately absent.
 const ALIASES: Record<string, LanguageId | undefined> = {
+	elm: "elm",
 	javascript: "javascript",
 	js: "javascript",
 	mjs: "javascript",
@@ -27,6 +28,7 @@ const ALIASES: Record<string, LanguageId | undefined> = {
 
 /// File extension of each language's source files.
 const EXTENSIONS: Record<LanguageId, string> = {
+	elm: "elm",
 	javascript: "js",
 	lua: "lua",
 	prolog: "pl",
@@ -39,7 +41,7 @@ const EXTENSIONS: Record<LanguageId, string> = {
  * The runner language for a tag, or null when no driver runs it.
  *
  * Case-insensitive; accepts the usual aliases (`js`, `mjs`, `javascript`,
- * `node` for JavaScript; `pl`, `prolog`, `swipl` for Prolog; `py`, `python`, `python3` for Python; `lua` for Lua; `ts`, `mts`, `typescript` for TypeScript). Never returns `fake`: that driver is reachable only
+ * `node` for JavaScript; `pl`, `prolog`, `swipl` for Prolog; `py`, `python`, `python3` for Python; `lua` for Lua; `ts`, `mts`, `typescript` for TypeScript; `elm` for Elm). Never returns `fake`: that driver is reachable only
  * from tests. A language whose driver arrives in a later delivery maps to
  * null until its id is in `languageId`.
  *
@@ -56,12 +58,19 @@ export function runnerLanguage(
 		: null;
 }
 
-/** How Run starts `language`: `repl` for Prolog (consult + toplevel), `script` otherwise. */
+/**
+ * How Run starts `language`: `repl` for Prolog (consult + toplevel) and Elm
+ * (tests + REPL), `script` otherwise.
+ */
 export function defaultRunMode(language: LanguageId): RunMode {
-	return language === "prolog" ? "repl" : "script";
+	return language === "prolog" || language === "elm" ? "repl" : "script";
 }
 
-/** Default file name for a program in `language` (`main.js`). */
+/**
+ * Default file name for a program in `language` (`main.js`).
+ *
+ * `Main.elm` for Elm, whose file names must match their module names.
+ */
 export function defaultFilename(language: LanguageId): string {
-	return `main.${EXTENSIONS[language]}`;
+	return language === "elm" ? "Main.elm" : `main.${EXTENSIONS[language]}`;
 }

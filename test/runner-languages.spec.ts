@@ -14,6 +14,14 @@ test("Prolog tags map to prolog, which starts in repl mode", () => {
 	expect(defaultRunMode("javascript")).toBe("script");
 });
 
+test("Elm tags map to elm, which starts in repl mode with Main.elm", () => {
+	for (const tag of ["elm", "Elm"]) {
+		expect(runnerLanguage(tag)).toBe("elm");
+	}
+	expect(defaultFilename("elm")).toBe("Main.elm");
+	expect(defaultRunMode("elm")).toBe("repl");
+});
+
 test("Python tags map to python, which starts in script mode", () => {
 	for (const tag of ["py", "python", "Python3"]) {
 		expect(runnerLanguage(tag)).toBe("python");

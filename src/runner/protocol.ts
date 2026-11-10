@@ -37,6 +37,7 @@ export const STDIN_LINE_MAX_BYTES = 64 * 1024;
 
 /** Languages with a driver in the sandbox bundle. */
 export const languageId = z.enum([
+	"elm",
 	"javascript",
 	"lua",
 	"prolog",

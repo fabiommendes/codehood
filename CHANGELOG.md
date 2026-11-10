@@ -18,6 +18,15 @@
   the grading page runs a student's submission. Student code runs in a
   Worker on a separate origin (`RUNNER_ORIGIN`, unset turns it off), never
   on the server. Design: `dev/rfc/ambiente-de-execucao-no-cliente.md`.
+- Elm in the client runner, with no DOM: Run compiles the files with the
+  Guida compiler (Elm 0.19.1, in JavaScript), runs the entry module's
+  `tests : Test` with an `elm-test` style report, then opens the Elm REPL
+  with the module imported (`value : Type`). Script mode stops after the
+  tests (exit 2 when one fails). Type errors are underlined in the editor.
+  Packages are fixed (`elm/core`, `json`, `random`, `parser`, `regex`,
+  `time`, `bytes`, `elm-explorations/test`), compiled at build time from
+  sources under `src/runner/elm/packages/`; a run never touches the network.
+  Spec: `dev/specs/to-review/runner-elm.md`.
 - Grading rubrics: each question of an exam gets a rubric of items with a
   signed value, a private comment and feedback for the student. Items sharing
   a top-level group path (`Recursion/Wrong: ...`) exclude each other. The

@@ -8,6 +8,7 @@ import type { Driver } from "../driver";
 /// Lazy loaders, one per language. A new language is one entry here and one
 /// module next to this file.
 const DRIVERS: Record<LanguageId, () => Promise<Driver>> = {
+	elm: async () => (await import("./elm")).elmDriver,
 	javascript: async () => (await import("./javascript")).javascriptDriver,
 	lua: async () => (await import("./lua")).luaDriver,
 	prolog: async () => (await import("./prolog")).prologDriver,

@@ -440,6 +440,104 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "elm-lists",
+			title: "Lists.elm",
+			description:
+				"Run compiles it and runs `tests` (one fails on purpose), then opens the REPL.",
+			data: {
+				type: "CODE",
+				language: "elm",
+				content: [
+					"module Main exposing (..)",
+					"",
+					"import Expect",
+					"import Test exposing (Test, describe, test)",
+					"",
+					"",
+					"sumList : List Int -> Int",
+					"sumList =",
+					"    List.foldl (+) 0",
+					"",
+					"",
+					"lastOf : List a -> Maybe a",
+					"lastOf xs =",
+					"    List.head xs",
+					"",
+					"",
+					"tests : Test",
+					"tests =",
+					'    describe "lists"',
+					'        [ test "sumList adds" (\\_ -> Expect.equal 6 (sumList [ 1, 2, 3 ]))',
+					'        , test "lastOf takes the last" (\\_ -> Expect.equal (Just 3) (lastOf [ 1, 2, 3 ]))',
+					"        ]",
+					"",
+				].join("\n"),
+			},
+			rev: "demo-elm-lists-v1",
+		},
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "elm-repl",
+			title: "Shapes.elm",
+			description: "No tests: Run opens the REPL with these definitions.",
+			data: {
+				type: "CODE",
+				language: "elm",
+				content: [
+					"module Main exposing (..)",
+					"",
+					"",
+					"type Shape",
+					"    = Circle Float",
+					"    | Rect Float Float",
+					"",
+					"",
+					"area : Shape -> Float",
+					"area shape =",
+					"    case shape of",
+					"        Circle r ->",
+					"            pi * r * r",
+					"",
+					"        Rect w h ->",
+					"            w * h",
+					"",
+				].join("\n"),
+			},
+			rev: "demo-elm-repl-v1",
+		},
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			course: cs101.id,
+			slug: "elm-notes",
+			title: "Elm notes",
+			description: "A runnable Elm block in a note.",
+			data: {
+				type: "MD",
+				content: [
+					"Run the block, then try `List.map square [1, 2, 3]` in the REPL:",
+					"",
+					"```elm run",
+					"module Main exposing (..)",
+					"",
+					"",
+					"square : Int -> Int",
+					"square n =",
+					"    n * n",
+					"```",
+				].join("\n"),
+			},
+			rev: "demo-elm-notes-v1",
+		},
+		FULL_ACCESS,
+	);
 
 	// Runnable JavaScript, one resource per state of the code runner widget.
 	const jsLinksCode = 'console.log("Docs: https://developer.mozilla.org/");\n';

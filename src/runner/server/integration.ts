@@ -11,6 +11,7 @@ import {
 	readFileSync,
 	renameSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
@@ -19,6 +20,8 @@ import { promisify } from "node:util";
 import { brotliCompress, gzip, constants as zlib } from "node:zlib";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
+import { buildElmCache } from "../elm/cache";
+import { ELM_CACHE_FILE } from "../sandbox/drivers/elm/project";
 import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
 import {
 	BUNDLE_DIR_NAME,
@@ -225,6 +228,44 @@ export async function precompress(
 	);
 }
 
+/// Inputs of the Elm package cache, relative to the root: the compiler, the
+/// package sources, the support modules and the code that builds the cache.
+const ELM_CACHE_INPUTS = [
+	join("node_modules", "guida", "bin", "guida.min.js"),
+	join("src", "runner", "elm"),
+	join("src", "runner", "sandbox", "drivers", "elm"),
+];
+
+/**
+ * Writes the Elm package cache to `file`.
+ *
+ * Building it takes seconds, so the result is kept in `cacheDir` under the
+ * hash of its inputs and reused while they do not change.
+ */
+async function writeElmCache(
+	root: string,
+	file: string,
+	cacheDir: string,
+): Promise<void> {
+	const hash = createHash("sha256");
+	for (const input of ELM_CACHE_INPUTS) {
+		const path = join(root, input);
+		const files = statSync(path).isDirectory()
+			? listFiles(path).map((f) => join(path, f))
+			: [path];
+		for (const f of files) {
+			hash.update(f.slice(root.length)).update(readFileSync(f));
+		}
+	}
+	const cached = join(cacheDir, `${hash.digest("hex")}.bin`);
+	if (!existsSync(cached)) {
+		mkdirSync(cacheDir, { recursive: true });
+		writeFileSync(`${cached}.tmp`, await buildElmCache(root));
+		renameSync(`${cached}.tmp`, cached);
+	}
+	copyFileSync(cached, file);
+}
+
 /** How `buildRunnerBundle` builds. */
 export interface BundleOptions {
 	minify: boolean;
@@ -236,8 +277,9 @@ export interface BundleOptions {
  * Builds the sandbox bundle for `root` into `outDir`, replacing what is there.
  *
  * Writes `frame.js`, `worker.js` (ES modules sharing chunks), `sw.js` (one
- * self-contained script, since it is not served from the versioned directory)
- * and `manifest.json` with the content hash and the file list. Runtime files
+ * self-contained script, since it is not served from the versioned directory),
+ * the Elm package cache (`ELM_CACHE_FILE`, versioned with the code that reads
+ * it) and `manifest.json` with the content hash and the file list. Runtime files
  * go to `rt/`, outside both: their own path carries the version. With
  * `compressCache`, each file also gets its `precompress` copies.
  *
@@ -277,6 +319,11 @@ export async function buildRunnerBundle(
 			outfile: join(staging, "sw.js"),
 			format: "iife",
 		});
+		await writeElmCache(
+			root,
+			join(staging, ELM_CACHE_FILE),
+			join(root, "node_modules", ".cache", "runner-elm"),
+		);
 		const files = listFiles(staging);
 		const hash = createHash("sha256");
 		for (const file of files) {

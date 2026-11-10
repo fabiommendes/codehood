@@ -16,6 +16,7 @@ interface RunnerWindow extends Window {
 }
 
 export type Language =
+	| "elm"
 	| "javascript"
 	| "lua"
 	| "prolog"
@@ -142,7 +143,10 @@ export function runMessage(
 	mode: "script" | "repl" = "script",
 	extra: Record<string, unknown> = {},
 ) {
-	const entry = `main.${{ javascript: "js", lua: "lua", prolog: "pl", python: "py", typescript: "ts", fake: "fake" }[language]}`;
+	const entry =
+		language === "elm"
+			? "Main.elm"
+			: `main.${{ javascript: "js", lua: "lua", prolog: "pl", python: "py", typescript: "ts", fake: "fake" }[language]}`;
 	return {
 		type: "run",
 		runId,

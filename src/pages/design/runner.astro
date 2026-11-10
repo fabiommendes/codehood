@@ -103,6 +103,7 @@ const reviewSubmissions = [
               <span class="label-text mb-1 text-sm">Driver</span>
               <select id="language" class="select select-bordered select-sm">
                 <option value="javascript">javascript</option>
+                <option value="elm">elm</option>
                 <option value="lua">lua</option>
                 <option value="prolog">prolog</option>
                 <option value="python">python</option>
@@ -218,6 +219,10 @@ const reviewSubmissions = [
     const ms = (from: number) => `${Math.round(performance.now() - from)} ms`;
 
     const samples: Record<LanguageId, { entry: string; code: string }> = {
+      elm: {
+        entry: "Main.elm",
+        code: 'module Main exposing (..)\n\n\ngreet : String -> String\ngreet name =\n    "Hello, " ++ name ++ "!"\n',
+      },
       javascript: {
         entry: "main.js",
         code: 'const name = prompt("Name?");\nconsole.log(`Hello, ${name}!`);\n',

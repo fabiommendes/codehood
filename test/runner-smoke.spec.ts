@@ -116,3 +116,32 @@ test.describe("typescript smoke", () => {
 		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
 	});
 });
+
+test.describe("elm smoke", () => {
+	test("loads and evaluates a line in the REPL", async ({ page }) => {
+		const h = await loadFrame(page);
+		const id = await start(
+			h,
+			"module Main exposing (..)\n\n\ndouble n =\n    2 * n\n",
+			"elm",
+			{ mode: "repl" },
+		);
+		await send(h, { type: "stdin", runId: id, line: "double 21" });
+		await send(h, { type: "stdin-eof", runId: id });
+		const result = await collect(h, id, 60_000);
+		expect(result.stdout).toContain("42");
+		expect(result.exit).toMatchObject({ reason: "exited", code: 0 });
+	});
+
+	test("a type error carries its line number", async ({ page }) => {
+		const h = await loadFrame(page);
+		const id = await start(
+			h,
+			'module Main exposing (..)\n\n\nx = 1 + "a"\n',
+			"elm",
+		);
+		const result = await collect(h, id, 60_000);
+		expect(result.stderr).toContain('4| x = 1 + "a"');
+		expect(result.exit).toMatchObject({ reason: "exited", code: 1 });
+	});
+});

@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [runner, elm]
 relatedTo: [ambiente-de-execucao-no-cliente, runner-de-correcao]
 ---
@@ -55,8 +55,10 @@ licença, parado desde 2024) e o do guide.elm-lang.org (compila no servidor).
 - **R2.** O driver aceita os modos `repl` e `script`. `defaultRunMode("elm")`
   é `repl`, como em Prolog.
 - **R3.** `defaultFilename("elm")` é `Main.elm`. O Elm exige que o nome do
-  arquivo bata com o do módulo, e um arquivo sem cabeçalho `module` vale como
-  `module Main exposing (..)`.
+  arquivo bata com o do módulo. O arquivo de entrada precisa do cabeçalho
+  `module`: como o REPL e os testes importam o módulo, o compilador recusa um
+  arquivo sem ele (`MODULE NAME MISSING`), e o driver não o acrescenta por
+  conta própria, para não deslocar os números de linha dos erros.
 - **R4.** O editor destaca Elm com o modo legado
   `@codemirror/legacy-modes/mode/elm`.
 
@@ -100,8 +102,10 @@ licença, parado desde 2024) e o do guide.elm-lang.org (compila no servidor).
   vai para `ctx.stdout`. Uma exceção na avaliação (ex.: `Debug.todo`) vai
   para o stderr, e o REPL continua.
 - **R12.** Nenhuma requisição sai do Worker. O servidor XHR falso responde
-  `[]` a `all-packages/since/*` e 404 a qualquer outra URL fora dos endpoints
-  do Guida, escrevendo no stderr `elm: network access is disabled (<url>)`.
+  `[]` a `all-packages/since/*`. Qualquer outra URL fora dos endpoints do
+  Guida recebe corpo vazio, e o stderr ganha
+  `elm: network access is disabled (<url>)`. O status é sempre 200, como no
+  launcher do Guida: ele trata qualquer outro status como falha interna.
 
 ### Pacotes e cache
 
@@ -114,10 +118,16 @@ licença, parado desde 2024) e o do guide.elm-lang.org (compila no servidor).
 - **R14.** O cache de pacotes do Guida (`~/.guida/1.0.0/packages/`, com
   `registry.dat` e `artifacts.dat` de cada pacote) e o cache do projeto
   (`guida-stuff/1.0.0/`, com `d.dat`, `i.dat` e `o.dat`) são gerados no
-  build, sem rede. Os dois vão num arquivo só (`elm-cache.bin`), servido em
-  `/runner/rt/` como os outros runtimes e montado no FS em memória no `load`.
-  Sem o cache do projeto, o Guida tenta resolver as dependências de novo e
-  faz requisições.
+  build, sem rede. Os dois vão num arquivo só (`elm-cache.bin`), montado no
+  FS em memória no `load`. Sem o cache do projeto, o Guida tenta resolver as
+  dependências de novo e faz requisições. O arquivo fica dentro do bundle
+  versionado (`/runner/<versão>/elm-cache.bin`), não em `/runner/rt/`: a
+  versão do bundle é o hash do conteúdo, então a URL muda junto com o cache,
+  sem lista à parte no servidor. O build guarda o resultado em
+  `node_modules/.cache/runner-elm/`, pelo hash das entradas, e o `astro dev`
+  não refaz o cache a cada mudança no sandbox. Os fontes, `docs.json` e
+  `README.md` dos pacotes ficam fora do arquivo, porque a compilação lê só
+  `artifacts.dat`. Medido: 5,1 MB sem compressão, 220 KB em brotli.
 - **R15.** Os fontes dos pacotes de R13 ficam no repositório, em
   `src/runner/elm/packages/<autor>/<nome>/<versão>/`, com o `elm.json`, o
   `LICENSE` e o `src/` de cada um. Um script
@@ -127,19 +137,30 @@ licença, parado desde 2024) e o do guide.elm-lang.org (compila no servidor).
   FS em memória. O XHR falso responde ao registry a partir dos fontes de R15
   (`all-packages` só com eles, o `elm.json` e o `endpoint.json` de cada um,
   e um zip montado em memória no lugar do `zipball` do GitHub).
-  Rodar o build duas vezes sem mudar nada gera o mesmo arquivo.
+  O `elm.json` do projeto e os módulos de suporte usam a mesma data de
+  modificação fixa no build e no driver, e o relógio do build é um contador.
+  Assim, rodar o build duas vezes sem mudar nada gera o mesmo arquivo, e o
+  driver reaproveita os artefatos sem tentar resolver as dependências de novo.
 
 ### Runtime e build
 
 - **R17.** O Guida entra em `RUNTIMES` (`src/runner/sandbox/runtimes.ts`)
   com versão fixa. `bin/guida.min.js` é um script clássico que espera um
   `XMLHttpRequest` global e define `Elm` em `this`, então ganha o `wrap`
-  necessário para virar um módulo ES. `mock-xmlhttprequest` entra no bundle
-  do driver; a lista de pacotes que o bundle pode importar
-  (`src/runner/server/integration.ts`) passa a aceitá-lo.
+  necessário para virar um módulo ES. O servidor de requisições é um
+  `XMLHttpRequest` falso próprio (`drivers/elm/host.ts`), sem
+  `mock-xmlhttprequest`; assim a lista de pacotes que o bundle pode importar
+  não muda.
 - **R18.** O driver instala o servidor XHR falso só dentro do seu Worker
-  (cada run tem o seu). O `load` monta o FS e carrega o Guida sem compilar
-  nada, para a reserva criada por `prepare` ficar pronta.
+  (cada run tem o seu), e só enquanto um comando do Guida roda. O `load`
+  carrega o Guida e o cache sem compilar nada, para a reserva criada por
+  `prepare` ficar pronta.
+- **R20.** O relatório de testes usa o formatador do `node-test-runner`
+  (BSD-3, copiado pelo Guida em `libraries/test`), com os módulos renomeados
+  para `Codehood.Test.*` em `src/runner/elm/support/`. O módulo
+  `Codehood.Test.Runner` espera a semente por um port de entrada (`start`)
+  em vez de rodar no `init`: um comando de port enviado no `init` sai antes
+  de o JavaScript conseguir assinar o port.
 
 ### Dados de dev
 
@@ -163,7 +184,7 @@ licença, parado desde 2024) e o do guide.elm-lang.org (compila no servidor).
 | T  | Descrição | Arquivos | Requisitos | Depende de | Modelo |
 | :- | :-------- | :------- | :--------- | :--------- | :----- |
 | T1 | Fontes dos pacotes e script de download | `scripts/fetch-elm-packages.ts`, `src/runner/elm/packages/` | R13, R15 | — | sonnet |
-| T2 | FS em memória e servidor XHR falso do Guida, compartilhados por build e driver | `src/runner/sandbox/drivers/elm/host.ts`, `fs.ts` | R11, R12, R18 | — | sonnet |
+| T2 | FS em memória e servidor XHR falso do Guida, compartilhados por build e driver | `src/runner/sandbox/drivers/elm/host.ts`, `fs.ts` | R11, R12, R18, R20 | — | sonnet |
 | T3 | Geração de `elm-cache.bin` no build e entrada em `RUNTIMES` | `src/runner/server/integration.ts`, `src/runner/sandbox/runtimes.ts`, `package.json` | R14, R16, R17 | T1, T2 | sonnet |
 | T4 | Driver: compilação, diagnósticos, testes, REPL | `src/runner/sandbox/drivers/elm/index.ts`, `drivers/index.ts`, `protocol.ts`, `languages.ts` | R1 a R3, R5 a R11 | T2, T3 | sonnet |
 | T5 | Destaque no editor | `src/components/runner/editor.ts` | R4 | T4 (id) | haiku |

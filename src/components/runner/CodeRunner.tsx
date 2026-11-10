@@ -111,6 +111,7 @@ const BLOCKED: ReadonlySet<IdePhase> = new Set([
 ]);
 
 const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
+	elm: () => m.runner_language_elm(),
 	javascript: () => m.runner_language_javascript(),
 	lua: () => m.runner_language_lua(),
 	prolog: () => m.runner_language_prolog(),
@@ -722,6 +723,11 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 					<Show when={props.language === "prolog"}>
 						<span class="text-xs text-base-content/60" data-role="restart-note">
 							{m.runner_prolog_restarts()}
+						</span>
+					</Show>
+					<Show when={props.language === "elm"}>
+						<span class="text-xs text-base-content/60" data-role="restart-note">
+							{m.runner_elm_restarts()}
 						</span>
 					</Show>
 				</div>

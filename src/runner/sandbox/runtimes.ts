@@ -27,6 +27,7 @@ export const RUNTIMES: {
 	pyodide: RuntimePackage;
 	wasmoon: RuntimePackage;
 	sucrase: RuntimePackage;
+	guida: RuntimePackage;
 } = {
 	swipl: {
 		pkg: "swipl-wasm",
@@ -69,6 +70,18 @@ export const RUNTIMES: {
 		version: "3.35.1",
 		files: { "dist/esm/index.js": "sucrase.mjs" },
 		bundle: { "sucrase.mjs": ["transform"] },
+	},
+	guida: {
+		pkg: "guida",
+		version: "1.0.0-beta.2",
+		files: { "bin/guida.min.js": "guida.mjs" },
+		// A classic script that defines `Elm` on its `this`.
+		wrap: {
+			"guida.mjs": {
+				prefix: "const scope = {};\n(function () {\n",
+				suffix: "\n}).call(scope);\nexport default scope.Elm;\n",
+			},
+		},
 	},
 };
 

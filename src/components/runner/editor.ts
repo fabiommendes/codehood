@@ -175,6 +175,9 @@ export async function createEditor(
 	} else if (options.language === "prolog") {
 		const { prolog } = await import("./prolog-mode");
 		languageSupport.push(language.StreamLanguage.define(prolog));
+	} else if (options.language === "elm") {
+		const { elm } = await import("@codemirror/legacy-modes/mode/elm");
+		languageSupport.push(language.StreamLanguage.define(elm));
 	}
 
 	const editor = new EditorView({
