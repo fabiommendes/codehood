@@ -121,7 +121,7 @@ Implementados e testados: storage principal transacional com CAS/TTL por owner e
 
 Ainda ausentes: adaptadores textarea e CodeMirror, integração do fallback com o rascunho atual sem duplicar fonte de verdade, integração com componentes e logout reais, transporte HTTP/backend, schema/services do histórico, idempotência e concorrência no servidor, autorização, quotas por tentativa, vínculo com entrega final, replay/revisão na interface, seeds de todos os estados e carga. O autosave real não foi alterado nem duplicado. Montagem/desmontagem foi testada pelo contrato de handles, não por componente montado no browser.
 
-Próxima fatia prioritária: contrato de limites/compactação e limpeza de gerações locais. Depois, adaptadores independentes e backend em lotes separados, lendo as convenções CLI/ADRs antes de qualquer contrato externo. Rich text e seam externa MDQ continuam dependendo das decisões do RFC. Retenção, acesso ao histórico, limites de volume por tentativa e checkpoints do servidor também permanecem abertos.
+A compactação local foi concluída no ciclo 9 abaixo. Limpeza completa de gerações locais continua pendente na issue de logout. Depois, adaptadores independentes e backend em lotes separados, lendo as convenções CLI/ADRs antes de qualquer contrato externo. Rich text e seam externa MDQ continuam dependendo das decisões do RFC. Retenção do histórico no servidor, acesso, limites de volume por tentativa e checkpoints do servidor permanecem abertos.
 
 Commits recuperados na retomada: `6cdc735`, `d829065`, `36e5807`. Incrementos desta retomada: `6743069`, `a47ccd2` e o commit que inclui esta atualização. Branch exclusiva `input-monitor`, sem push e sem alteração em outras worktrees. O recurso completo não está pronto.
 
@@ -150,3 +150,136 @@ Garantia limitada: gerações conhecidas pelo índice ou pelo próprio handle, c
 - Chromium real com localStorage e duas páginas do mesmo contexto. Barreira CDP pausa a primeira antes do setItem nativo enquanto a outra revoga e grava a geração atual. Nenhum sleep. Firefox/WebKit não executados. Falhas específicas, rotações e lost update também usam Storage injetado; coordenador usa doubles de storage/transporte/scheduler. Sem prova de integração com logout real ou backend.
 - `pnpm exec biome check --write .`: exit 0, 807 arquivos, sem alterações automáticas e seis warnings preexistentes. `pnpm run lint`: exit 0, incluindo i18n, TypeScript, Astro com zero erros e stories. Executados pelo orquestrador após a documentação. Logs `/tmp/input-monitor-logout-final-biome.log` e `/tmp/input-monitor-logout-final-lint.log`.
 - Sem alteração de schema, migrations, dependências, adaptadores, rich text, MDQ ou outra worktree. Sem seed novo, pois nenhuma interface ou estado de banco foi introduzido. Sem push. A fatia é mitigação parcial verde, não encerramento da issue nem conclusão do recurso.
+
+
+## Ciclo 9: retenção local de controles por 30 minutos
+
+Retomada em `0c9d60a`, na branch exclusiva `input-monitor`, com diff herdado em
+monitor/checkpoint/storage/coordenador, RFC e testes, inclusive três arquivos novos
+de retenção. Nenhum reset, stash ou substituição desse trabalho. O contrato autorizado
+já estava documentado na RFC e nas assinaturas públicas herdadas; não houve nova seam
+ou stub nesta retomada. O núcleo foi registrado em `9145c24` após validação verde.
+
+### Política implementada
+
+- `metadataTtlMs`: padrão de 1.800.000 ms, positivo e configurável, salvo no checkpoint
+  v2. Restore conserva a configuração, salvo override explícito. V1 usa o padrão ou
+  override. Expiração inclusiva em `retentionMaxMs - registradoEm >= metadataTtlMs`.
+- `retentionNow`: relógio de parede injetável, padrão `Date.now`. O maior valor visto
+  é persistido e limita regressões, inclusive após reload. `now` permanece monotônico
+  por sessão, sem comparar origens de páginas diferentes.
+- ACK validado remove imediatamente o batch em memória. O commit principal seguinte
+  persiste checkpoint e outbox nula juntos. Falha de commit não declara durabilidade
+  e conserva a versão durável anterior para reconciliação. O transporte é injetado;
+  nenhum endpoint REST de histórico foi criado ou simulado como existente.
+- Recibos e IDs consumidos expiram a partir da confirmação/consumo. Payload de
+  observação consumida sai imediatamente; observações não consumidas e cadência
+  expiram sem fabricar intervalos. Batch inflight, fila, edits e dados de replay não
+  expiram por esse TTL, inclusive com ACK perdido por mais de 30 minutos.
+- ACK histórico expirado é desconhecido e rejeitado sem alterar outro inflight.
+  Duplicatas de IDs são recusadas dentro da janela. Depois dela, ID pode ser observado
+  novamente, com timestamp novo. `inputAtMs` é obrigatório junto com `inputId` para
+  vincular a alteração à observação certa. Ao podar inputs, watermark escalar avança
+  até o último evento da sessão; observações novas precisam superá-lo. Observações
+  ainda retidas continuam associáveis. Não há coleção eterna de tombstones.
+- Sessão ativa e sessões referenciadas por pendências ficam protegidas; sessões sem
+  referências expiram. Chamador deve produzir sessionIds únicos, preferencialmente
+  UUIDs. Depois da janela não se promete detecção de todo reuso arbitrário de sessão.
+  Batch IDs continuam combinando sessão e sequência global crescente.
+- V2 valida replay contra a base confirmada, revisão e sequência, sem exigir cadeia
+  completa de recibos. V1 é validado pelo contrato anterior antes de migrar; controles
+  sem hora recebem a hora da migração. Pendências são preservadas. Corrupção/versão
+  desconhecida não é convertida silenciosamente em histórico completo. Restore inicia
+  outra sessão e não transfere associações de input entre sessões.
+- Cleanup nas operações públicas e exportação, sem timer por edit. O TTL do rascunho
+  e a retenção no servidor são separados. A issue de fallback após logout não foi
+  alterada nem resolvida por esta fatia.
+
+### Método e RED/GREEN reproduzidos nesta retomada
+
+Workers separados com briefings de tester e implementer. A ferramenta não mantém
+agente persistente nem oferece seleção de modelo por chamada. Implementer recebeu
+contrato, critérios e diagnósticos públicos, sem ler fontes dos testes. Não atribuímos
+RED anterior ao diff herdado: ele já existia quando esta retomada começou.
+
+Primeiro, o tester rodou todos os testes do histórico. Comando
+`pnpm exec tsx test/run.ts 'test/answer-edit-.*\.spec\.ts'`: 472 aprovados e quatro
+falhas funcionais. Após acrescentar três caracterizações browser, repetiu o comando:
+475 aprovados e as mesmas quatro falhas. Logs `/tmp/answer-edit-audit-inherited.log`
+e `/tmp/answer-edit-audit-final.log`. O RED veio de testes de segurança herdados,
+antes da correção desta retomada, não de um stub reconstruído ou versão antiga.
+
+Lote corretivo, até três critérios: preservar TTL configurado em restore v2; bloquear
+reuso de ID+timestamp expirado, consumido ou não; avançar watermark até o último evento
+sem invalidar observações retidas. O implementer corrigiu somente `monitor.ts` e
+`checkpoint.ts`. GREEN: `pnpm exec tsx test/run.ts test/answer-edit-retention-safety.spec.ts`,
+nove aprovados. Logs `/tmp/answer-edit-implementer-safety.log` e
+`/tmp/answer-edit-implementer-retention.log`. Não foi alterada expectativa para passar.
+
+Os testes antigos receberam mudança explícita de contrato no diff herdado:
+`inputAtMs` nas associações, versão exportada 2 e versão desconhecida 99 em vez de 2.
+Relógios de retenção foram fixados nos fixtures para manter determinismo. Isso não é
+uma correção de expectativa para acomodar o bug. Os 450 testes anteriores continuam
+na regressão.
+
+Lote browser, três critérios: outbox durável nula após ACK e página nova; abort real
+no commit pós-ACK conserva batch durável e não declara durabilidade; crash real do
+renderer conserva batch não confirmado para inspeção autenticada e retry após TTL,
+com relógio monotônico reiniciado. Três testes passaram de primeira funcionalmente,
+portanto são caracterização, não RED. Chromium real, IndexedDB e localStorage reais;
+`Page.crash` via CDP não simula falta de energia nem queda do processo inteiro do
+browser. Transporte, relógios e scheduler injetados. Log
+`/tmp/answer-edit-audit-browser-crash.log`.
+
+Lote de carga, dois critérios: envelope realista com TTL padrão e saturação honesta
+com pendências grandes. Dois testes novos também são caracterização. A primeira
+execução encontrou comparação JSON sensível à ordem de propriedades no teste;
+foi corrigida para igualdade estrutural, sem mudar produção. Comando
+`pnpm exec tsx test/run.ts test/answer-edit-retention-load.spec.ts --workers=1 --reporter=line`:
+dois aprovados em 42,8 s. Log `/tmp/answer-edit-retention-load.log`.
+
+### Medições e limites
+
+- Long-run curto de retenção: 1.200 batches confirmados, 60 restores. Na execução
+  final, checkpoint de 1.498 bytes aos 120 lotes e 1.530 aos 1.200; 856 bytes após
+  drenagem das pendências. Os novos campos TTL/watermark explicam diferença para as
+  medições anteriores à correção.
+- Envelope de referência: um campo, IDs curtos, texto pequeno, 10 inputs/s, 600 edits
+  por minuto, TTL padrão, 90 minutos simulados e reload aos 60 minutos. 54.000 edits
+  confirmados, 90 batches, revisão/sequência/replay conferidos. Checkpoint UTF-8 de
+  921.282 bytes aos 30 minutos, 921.332 aos 60 e 921.335 aos 90. Pico amostrado antes
+  de ACK de 935.798 bytes; após mais um TTL, 508 bytes. Clock determinístico, sem sleeps.
+- Saturação browser: 20 substituições de 128 KiB em dois segundos e resposta final
+  pequena. Checkpoint de 2.622.659 bytes, acima dos 2 MiB mantidos. Duas tentativas
+  de flush não enviaram; estado `text-only`, `historyGap`, resposta no fallback,
+  principal anterior intacto e 21 operações pendentes preservadas, com replay/restore.
+- Medimos bytes serializados, não heap, latência real ou throughput de servidor.
+  TTL limita duração dos controles concluídos, não vazão arbitrária, texto ou backlog
+  offline. Cleanup percorre a janela. Não há promessa de memória constante nem quota
+  nova de inputs/s. Se a persistência falha, trabalho apenas em memória ainda pode
+  ser perdido num crash; o aviso de lacuna não transforma fallback em histórico.
+
+Revisor independente somente leitura não encontrou blocker reproduzível. Executou
+simulação determinística de 10.000 passos de edição/ACK/restore e variações do relógio,
+validando checkpoint a cada passo. Isso é evidência adicional, não substitui os testes
+versionados nem valida backend.
+
+### Validação final da fatia
+
+- `pnpm exec tsx test/run.ts 'test/answer-edit-.*\.spec\.ts'`: **481 aprovados em 1,1
+  minuto**, exit 0, incluindo os 450 anteriores. Log `/tmp/input-monitor-ttl-all-green.log`.
+- `pnpm test`: **3.476 aprovados em 11,3 minutos**, terminou sem timeout. Log
+  `/tmp/input-monitor-ttl-full-suite.log`. A descoberta dessa execução ocorreu antes
+  dos dois novos testes de carga; estes passaram separadamente e na regressão de 481.
+- `pnpm exec biome check --write .` e `pnpm run lint`: exit 0, 812 arquivos, sem fixes,
+  seis warnings preexistentes. TypeScript, Astro com zero erros e catálogo de stories
+  passaram. Repetidos após a documentação e remoção da issue, também exit 0. Logs
+  `/tmp/input-monitor-ttl-final-biome.log` e `/tmp/input-monitor-ttl-final-lint.log`.
+- Testes do núcleo são baratos, sem browser; browser real cobre storage, abort, crash
+  e saturação. Não foram executados Firefox/WebKit. Nenhuma evidência de idempotência
+  ou retenção do backend, pois ele permanece ausente.
+- A issue de crescimento de metadados foi corrigida e removida nesta fatia. A issue
+  `dev/issues/monitor-fallback-erasure-apos-logout.md` permanece aberta e intocada.
+  Sem schema, migration, endpoint, dependência, adaptador, rich text ou mudança MDQ.
+  Sem seed novo: a fatia não introduziu interface nem estado de banco, e o recurso
+  ainda não está montado na aplicação dev. Sem push nem alteração em outra worktree.

@@ -11,8 +11,8 @@
   por tentativa com envio agregado, retry, reconciliação, transferência de
   ownership e fallback de texto com lacuna explícita. Validados com transporte
   injetado e storage browser real, sem endpoint ou integração com o salvamento
-  de provas. Adaptadores ainda ausentes. Permanecem limites de crescimento de
-  metadados e remoção física de fallback concorrente com logout.
+  de provas. Adaptadores ainda ausentes. Remoção física completa de fallback
+  concorrente com logout permanece pendente.
 - Grading bots: a request authenticated by a `BOT` API key writes feedback
   under the key's name (a slug), never as a human, so the submission reads
   "Graded automatically". `chalk codehood autograde` (in the chalk project)
@@ -54,6 +54,14 @@
 
 ### Changed
 
+- Controles locais do histórico de respostas expiram após 30 minutos configuráveis,
+  sem expirar batches pendentes. ACK validado libera o batch, e o commit coerente
+  remove sua outbox durável. Checkpoint v2 preserva base confirmada sem cadeia eterna
+  de recibos e migra v1 validado. Relógio de retenção persiste entre reloads;
+  observações consumidas perdem o payload e associações expiradas são recusadas.
+  Carga de 54.000 operações confirmou estabilização do checkpoint dentro da janela.
+  Vazão alta ou pendências offline ainda podem exceder 2 MiB, com recuperação textual
+  e lacuna explícitas, sem truncar a resposta. Sem mudança na retenção do servidor.
 - Fallback do histórico de respostas compensa escritas que retornam após logout
   e repete a limpeza de gerações conhecidas com prova de revogação, preservando
   outros owners e gerações não revogadas. Falhas de limpeza continuam explícitas.

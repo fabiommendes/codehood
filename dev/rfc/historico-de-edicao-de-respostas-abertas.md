@@ -189,6 +189,8 @@ interface MonitorOptions {
   firstSeq: number;
   pauseMs?: number;
   now: () => number;
+  retentionNow?: () => number;
+  metadataTtlMs?: number;
 }
 
 interface InputObservation {
@@ -206,6 +208,7 @@ interface TextReplacement {
 interface DocumentChange {
   atMs: number;
   inputId?: string;
+  inputAtMs?: number; // Required together with inputId.
   kind: InputKind;
   replacements: readonly TextReplacement[];
 }
@@ -249,6 +252,9 @@ declare class AnswerEditMonitor implements MonitorHandle {
   static restore(options: {
     checkpoint: MonitorCheckpoint;
     now: () => number;
+    retentionNow?: () => number;
+    metadataTtlMs?: number;
+    createSessionId?: () => string;
   }): AnswerEditMonitor;
 
   observeInput(input: InputObservation): void;
@@ -366,6 +372,34 @@ proporcionais aos controles da janela, texto atual e pendências, não à duraç
 total da tentativa. Pendências offline continuam podendo exceder 2 MiB e a
 política existente sinaliza degradação em vez de truncar. Medir simulação longa
 com texto pequeno, lotes confirmados e reloads, sem aumentar o limite do storage.
+
+### Envelope medido e saturação
+
+Referência de dimensionamento local, não quota de captura nem promessa de memória
+constante: um campo, IDs curtos, texto de um caractere, até 10 inputs consumidos/s,
+lotes de 600 operações por minuto e TTL padrão de 30 minutos. A simulação de
+90 minutos confirmou 54.000 operações em 90 lotes, com reload aos 60 minutos.
+Checkpoint UTF-8 após ACK: 921.282 bytes aos 30 minutos, 921.332 aos 60 e
+921.335 aos 90. Pico amostrado antes de ACK: 935.798 bytes; após mais um TTL sem
+entrada: 508 bytes. A medição cobre JSON serializado, não heap, latência de edição
+real ou capacidade do servidor. A limpeza percorre os controles retidos em cada
+operação; vazões maiores exigem nova medição de custo e espaço.
+
+O registro principal inteiro continua limitado a 2 MiB, incluindo texto, checkpoint
+e outbox. IDs maiores, texto grande, mais campos ou mais operações dentro da janela
+mudam esse envelope. Não há limite arbitrário novo de inputs/s nem descarte para
+caber na quota. Um ensaio browser de 20 substituições de 128 KiB em dois segundos,
+seguido de resposta final pequena, produziu checkpoint de 2.622.659 bytes. A gravação
+principal foi recusada, o registro anterior ficou intacto, as 21 operações pendentes
+preservaram replay e restore, o fallback salvou a resposta com `text-only` e
+`historyGap`, e nenhum lote foi enviado. Isso não recupera histórico que nunca foi
+gravado antes de um crash; é uma degradação explícita, não durabilidade completa.
+
+A compactação resolve o crescimento pela duração dos controles concluídos.
+Pendências offline, tráfego arbitrariamente alto dentro da janela e o tamanho do
+texto ainda podem saturar storage. O TTL de 14 dias do registro de rascunho é outra
+política e pode apagar o registro inteiro; a proteção das pendências descrita aqui
+se refere somente ao TTL de metadados de 30 minutos.
 
 ## Responsabilidades dos adaptadores
 
