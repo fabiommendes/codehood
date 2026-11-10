@@ -13,6 +13,9 @@
   injetado e storage browser real, sem endpoint ou integração com o salvamento
   de provas. Adaptadores ainda ausentes. Remoção física completa de fallback
   concorrente com logout permanece pendente.
+  O coordenador nunca bloqueia o campo: abre sempre com um handle, reconcilia
+  com o servidor em segundo plano e, em divergência, adota nova base com lacuna
+  registrada em vez de exigir escolha do aluno.
 - Grading bots: a request authenticated by a `BOT` API key writes feedback
   under the key's name (a slug), never as a human, so the submission reads
   "Graded automatically". `chalk codehood autograde` (in the chalk project)

@@ -23,37 +23,28 @@ async function saved(h: Rig) {
 
 async function registered() {
 	const h = rig();
-	const result = await h.coordinator.register(FIELD, h.monitor);
-	expect(result.kind).toBe("ready");
+	await h.coordinator.register(FIELD, h.monitor);
 	await h.coordinator.persist();
 	return h;
 }
 
 test.describe("answer edit coordinator local: durability", () => {
 	for (const mode of ["register", "recover"] as const) {
-		test(`${mode} inspects the authenticated field before accepting a fresh editor`, async () => {
+		test(`${mode} opens without waiting for the authenticated inspection`, async () => {
 			const h = rig();
 			const inspection = deferred<typeof h.transport.server>();
 			h.transport.inspectionGate = inspection;
-			let accepted = false;
-			const pending = Promise.resolve()
-				.then(() =>
-					mode === "register"
-						? h.coordinator.register(FIELD, h.monitor)
-						: h.coordinator.recover(FIELD),
-				)
-				.then((result) => {
-					accepted = true;
-					return result;
-				});
+			const result = await (mode === "register"
+				? h.coordinator.register(FIELD, h.monitor)
+				: h.coordinator.recover(FIELD, ""));
+			expect(result.handle.getState().text).toBe("");
 			await drain();
 			expect(h.transport.inspections).toEqual([REF]);
-			expect(accepted).toBe(false);
 			inspection.resolve(h.transport.server);
-			const result = await pending;
-			expect(result.kind).toBe("ready");
-			if (result.kind !== "ready") throw new Error("Expected ready editor");
-			expect(result.handle.getState().text).toBe("");
+			await drain();
+			expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+				historyGap: false,
+			});
 			await h.coordinator.dispose();
 		});
 	}
@@ -232,13 +223,10 @@ test.describe("answer edit coordinator local: storage degradation", () => {
 			});
 			h.store.failRead = true;
 			const reopened = new AnswerEditCoordinator(h.options);
-			const recovery = await reopened.recover(FIELD);
-			expect(recovery).toMatchObject({
-				kind: "text-only",
-				localText: text,
-				historyGap: true,
-			});
-			expect("handle" in recovery).toBe(false);
+			const recovery = await reopened.recover(FIELD, "");
+			expect(recovery.handle.getState().text).toBe(text);
+			await drain();
+			expect(reopened.getStatus(FIELD)).toMatchObject({ historyGap: true });
 			expect(h.transport.inspections).toEqual([REF, REF]);
 			await reopened.dispose();
 			await h.coordinator.dispose();
@@ -284,12 +272,11 @@ test.describe("answer edit coordinator local: ownership", () => {
 		const h = rig();
 		for (let index = 0; index < 128; index++) {
 			const field = { questionId: `question-${index}`, field: "answer" };
-			const recovery = await h.coordinator.recover(field);
-			expect(recovery.kind).toBe("ready");
+			await h.coordinator.recover(field, "");
 		}
 		await expect(
 			Promise.resolve().then(() =>
-				h.coordinator.recover({ questionId: "overflow", field: "answer" }),
+				h.coordinator.recover({ questionId: "overflow", field: "answer" }, ""),
 			),
 		).rejects.toThrow();
 		expect(

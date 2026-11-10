@@ -83,7 +83,7 @@ function partial(request: Request, failure: PartialFailure): FieldResult[] {
 }
 
 test.describe("answer edit coordinator races: divergent fallback ownership", () => {
-	test("a successful writer preserves another coordinator's divergent fallback and requires explicit recovery", async () => {
+	test("a successful writer preserves another coordinator's divergent fallback, and a later open adopts it with a gap", async () => {
 		let now = EPOCH;
 		const h = rig({ now: () => now });
 		const other = new AnswerEditCoordinator({
@@ -120,15 +120,13 @@ test.describe("answer edit coordinator races: divergent fallback ownership", () 
 			createSessionId: () => "reopened-session",
 		});
 		const server = structuredClone(h.transport.server);
-		const recovery = await reopened.recover(FIELD);
-		expect(["conflict", "text-only"]).toContain(recovery.kind);
-		expect("handle" in recovery).toBe(false);
-		await reopened.persist();
+		const recovery = await reopened.recover(FIELD, "");
+		expect(recovery.handle.getState().text).toBe("B-unique");
+		await drain();
+		expect(reopened.getStatus(FIELD)).toMatchObject({ historyGap: true });
 		await reopened.flushDelivery();
 		expect(h.transport.requests).toHaveLength(0);
 		expect(h.transport.server).toEqual(server);
-		expect((await h.store.read(REF, now))?.text).toBe("A2");
-		expect(h.fallback.read(REF, now)).toEqual(fallback);
 		await reopened.dispose();
 		await other.dispose();
 		await h.coordinator.dispose();
@@ -136,7 +134,7 @@ test.describe("answer edit coordinator races: divergent fallback ownership", () 
 });
 
 test.describe("answer edit coordinator races: detach handoff", () => {
-	test("recovery waits for a held detach commit and its new editor can persist and deliver", async () => {
+	test("recovery does not wait for a held detach commit and its new editor can persist and deliver", async () => {
 		const h = rig();
 		await h.coordinator.register(FIELD, h.monitor);
 		await h.coordinator.persist();
@@ -147,7 +145,7 @@ test.describe("answer edit coordinator races: detach handoff", () => {
 		await drain();
 		expect(h.store.commits).toHaveLength(commits + 1);
 		let recovered = false;
-		const recovery = h.coordinator.recover(FIELD).then((result) => {
+		const recovery = h.coordinator.recover(FIELD, "").then((result) => {
 			recovered = true;
 			return result;
 		});
@@ -156,13 +154,9 @@ test.describe("answer edit coordinator races: detach handoff", () => {
 		// Release before awaiting recovery so the handoff can finish.
 		gate.resolve();
 		const [, result] = await Promise.all([detach, recovery]);
-		expect(finishedBeforeCommit).toBe(false);
+		expect(finishedBeforeCommit).toBe(true);
 		h.monitor.dispose();
-		expect(result.kind).toBe("ready");
-		if (
-			result.kind !== "ready" ||
-			!(result.handle instanceof AnswerEditMonitor)
-		)
+		if (!(result.handle instanceof AnswerEditMonitor))
 			throw new Error("Expected editable recovered monitor");
 		expect(result.handle.getState().text).toBe("before handoff");
 		append(result.handle, " after handoff");
@@ -245,7 +239,6 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 	test("a remounted editor can durably edit and deliver after an overlapping accepted ACK commit", async () => {
 		const h = rig();
 		const send = deferred<readonly FieldResult[]>();
-		const inspection = deferred<ServerFieldState>();
 		h.transport.sendGate = send;
 		await h.coordinator.register(FIELD, h.monitor);
 		h.append("A");
@@ -260,33 +253,18 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 
 		await h.coordinator.detach(FIELD);
 		h.monitor.dispose();
-		h.transport.inspectionGate = inspection;
-		const inspections = h.transport.inspections.length;
-		const recovery = h.coordinator.recover(FIELD);
+		const recovery = h.coordinator.recover(FIELD, "");
 		await drain();
-		expect(h.transport.inspections).toHaveLength(inspections + 1);
 
 		const commits = h.store.commits.length;
 		const ackCommit = h.store.holdNextCommit();
 		send.resolve(results);
 		await drain();
 		expect(h.store.commits).toHaveLength(commits + 1);
-		inspection.resolve({
-			text: "A",
-			revision: result.receipt.revision,
-			nextSeq: result.receipt.lastSeq + 1,
-			canWrite: true,
-			receipts: [result.receipt],
-		});
 		await drain();
-		// Recovery may wait for the commit or return an editor before it finishes.
 		ackCommit.resolve();
 		const [recovered] = await Promise.all([recovery, flush]);
-		expect(recovered.kind).toBe("ready");
-		if (
-			recovered.kind !== "ready" ||
-			!(recovered.handle instanceof AnswerEditMonitor)
-		)
+		if (!(recovered.handle instanceof AnswerEditMonitor))
 			throw new Error("Expected recovered editable monitor");
 		expect(recovered.handle.getState().text).toBe("A");
 		recovered.handle.recordChange({
@@ -320,7 +298,7 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 		await h.coordinator.dispose();
 	});
 
-	test("recovery of a detached field waits for its in-flight delivery to settle", async () => {
+	test("recovery of a detached field does not wait for its in-flight delivery and sees its ACK", async () => {
 		const h = rig();
 		const send = deferred<readonly FieldResult[]>();
 		h.transport.sendGate = send;
@@ -343,16 +321,9 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 			canWrite: true,
 			receipts: [result.receipt],
 		};
-		let settled = false;
-		const recovery = h.coordinator.recover(FIELD).then((value) => {
-			settled = true;
-			return value;
-		});
-		await drain();
-		expect(settled).toBe(false);
+		const recovered = await h.coordinator.recover(FIELD, "");
 		send.resolve(results);
-		const [recovered] = await Promise.all([recovery, flush]);
-		if (recovered.kind !== "ready") throw new Error("Expected ready editor");
+		await flush;
 		expect(recovered.handle.getState()).toEqual({
 			text: "A",
 			hasPendingChanges: false,
@@ -368,9 +339,7 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 		await h.coordinator.dispose();
 	});
 
-	/// Known defect: the inspection predates the ACK, so the baseline it reports is
-	/// already stale when the delivery settles and recovery declares a false conflict.
-	test.fixme("recovery inspected before an ACK that lands during it stays ready", async () => {
+	test("remounting during an in-flight delivery stays ready without recording a gap", async () => {
 		const h = rig();
 		const send = deferred<readonly FieldResult[]>();
 		h.transport.sendGate = send;
@@ -380,20 +349,35 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 		await drain();
 		const request = h.transport.requests[0];
 		if (!request) throw new Error("Expected held delivery");
+		const results = accepted(request);
+		const result = results[0];
+		if (result?.kind !== "accepted") throw new Error("Expected ACK fixture");
 		await h.coordinator.detach(FIELD);
 		h.monitor.dispose();
-		const recovery = h.coordinator.recover(FIELD);
+		const recovery = h.coordinator.recover(FIELD, "");
 		await drain();
-		send.resolve(accepted(request));
+		h.transport.server = {
+			text: "A",
+			revision: result.receipt.revision,
+			nextSeq: result.receipt.lastSeq + 1,
+			canWrite: true,
+			receipts: [result.receipt],
+		};
+		send.resolve(results);
 		const [recovered] = await Promise.all([recovery, flush]);
-		expect(recovered.kind).toBe("ready");
+		await drain();
+		expect(recovered.handle.getState().hasUnacknowledgedBatch).toBe(false);
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			historyGap: false,
+			delivery: "idle",
+		});
 		await h.coordinator.dispose();
 	});
 });
 
 test.describe("answer edit coordinator races: logout", () => {
 	for (const cleanupFails of [false, true]) {
-		test(`an inspection returned after ${cleanupFails ? "failed cleanup at" : "successful"} logout cannot restore an editor or saved status`, async () => {
+		test(`an inspection returned after ${cleanupFails ? "failed cleanup at" : "successful"} logout cannot change the field or its status`, async () => {
 			const h = rig();
 			h.fallback.write(REF, {
 				version: 1,
@@ -413,10 +397,7 @@ test.describe("answer edit coordinator races: logout", () => {
 				h.fallback.revoke = () => {
 					throw cleanupError;
 				};
-			const recovery = h.coordinator.recover(FIELD).then(
-				(value) => ({ value, error: null }),
-				(error: unknown) => ({ value: null, error }),
-			);
+			await h.coordinator.recover(FIELD, "");
 			await entered.promise;
 			const logout = h.coordinator.logout();
 			if (cleanupFails) await expect(logout).rejects.toBe(cleanupError);
@@ -424,11 +405,7 @@ test.describe("answer edit coordinator races: logout", () => {
 			const statuses = structuredClone(h.statuses);
 			const commits = h.store.commits.length;
 			inspection.resolve(h.transport.server);
-			const outcome = await recovery;
 			await drain();
-			expect.soft(outcome.value?.kind).not.toBe("ready");
-			expect.soft(outcome.value?.kind).not.toBe("text-only");
-			expect.soft(outcome.value && "handle" in outcome.value).toBeFalsy();
 			expect.soft(h.statuses).toEqual(statuses);
 			await h.coordinator.persist();
 			await h.coordinator.flushDelivery();

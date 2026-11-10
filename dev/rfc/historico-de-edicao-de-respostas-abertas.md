@@ -72,17 +72,34 @@ Nenhum aluno perde a prova por problema técnico do monitor.
   lança em toda chamada, o storage falha e o transporte fica pendurado ou devolve
   erro, e mesmo assim o aluno digita, salva e entrega.
 
-### Consequências para o código existente
+### Contrato do coordenador
 
-Nada disto é implementado por este RFC.
+Implementado em `src/services/answer-edits/coordinator.ts`.
 
-- O `AnswerEditCoordinator` atual tem estados sem saída (`conflict`, `closed`,
-  `text-only`, `unavailable` não devolvem handle) e espera `transport.inspect`
-  antes de liberar o campo. Ambos precisam virar "rebasear com lacuna" antes da
-  integração.
-- O fallback de texto em `localStorage` do monitor pode perder a razão de existir
-  se o rascunho local de respostas passar a cobrir todas as questões de texto.
-  Decisão em aberto.
+- `recover(field, initialText)` e `register(field, handle)` devolvem sempre
+  `{ handle }`. Não há estado sem handle: nem conflito, nem texto apenas, nem
+  indisponível. O texto vem do estado local (checkpoint ou fallback) e, na falta
+  dele, de `initialText`, que o chamador tira do canal da resposta. Com `register`
+  o texto do editor vale mais que o estado guardado.
+- Nenhum `open` espera rede. Falha de leitura de storage vira lacuna, não exceção.
+  Só lançam erro de programação: campo já ativo, mais de 128 campos, coordenador
+  parado por logout.
+- A reconciliação com o servidor roda em segundo plano, depois que qualquer
+  entrega em curso termina (um ACK durante a inspeção não pode virar divergência).
+  Enquanto não termina, ou se `inspect` falha ou pendura, o campo edita e persiste
+  localmente e não envia histórico; o ciclo de entrega tenta a inspeção de novo.
+- Divergência (base, recibo ou texto) ou resultado `conflict` do envio rebaseiam:
+  `AnswerEditMonitor.rebase` adota o texto atual como nova base na revisão e
+  sequência do servidor e descarta a história pendente. `FieldStatus.historyGap`
+  fica `true`, exceto quando nada se perdeu (sem pendências e texto igual ao do
+  servidor). A lacuna é visível ao cliente por esse status; o servidor a enxerga
+  porque o primeiro lote após a nova base não reproduz o texto que ele guardava.
+  Um marcador explícito no lote fica para o endpoint.
+- Sobram `closed`/`canWrite: false` (prazo): o campo continua editável e salvo
+  localmente, só não envia.
+
+Pendência: o fallback de texto em `localStorage` pode perder a razão de existir se
+o rascunho local de respostas cobrir todas as questões de texto. Decisão em aberto.
 
 ## Estado atual
 

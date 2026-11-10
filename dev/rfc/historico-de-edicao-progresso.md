@@ -138,3 +138,7 @@ Limite aceito: escritor suspenso entre a checagem e o `setItem` que morre antes 
 O checkpoint (`version: 2`, única versão aceita) guarda texto, pendências, recibos e a sessão ativa. Observações e cadência não são persistidos, porque `restore` abre outra sessão e não transfere associações. Seu tamanho depende do texto e das pendências, não das teclas recentes: no envelope de referência (10 entradas/s por 90 minutos com lotes confirmados) o checkpoint ficou em cerca de 2 KiB, contra 921 KiB antes. Testes de carga em `test/answer-edit-load.spec.ts`.
 
 Ainda sem schema, migration, endpoint, adaptador de editor ou integração na aplicação, portanto sem seed novo.
+
+## Ciclo 8: coordenador rebaseia com lacuna
+
+Contrato novo em `dev/rfc/historico-de-edicao-de-respostas-abertas.md`, seção "Contrato do coordenador". `recover(field, initialText)` e `register` devolvem sempre `{ handle }`; a inspeção do servidor passou para segundo plano e divergência ou `conflict` do envio rebaseiam com `historyGap`. Removidos os resultados `conflict`, `text-only` e `unavailable` da abertura, a durabilidade `conflict` e o bloqueio por conflito no envio. `AnswerEditMonitor.rebase` é novo. O bug de conflito falso ao remontar durante envio deixa de existir: o campo reabre o mesmo monitor desanexado e a inspeção só ocorre depois da entrega em curso.

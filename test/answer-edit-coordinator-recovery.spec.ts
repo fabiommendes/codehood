@@ -3,7 +3,6 @@ import { replayEdits } from "@/services/answer-edits/codec";
 import {
 	AnswerEditCoordinator,
 	type AttemptTransport,
-	type FieldRecovery,
 	type ServerFieldState,
 } from "@/services/answer-edits/coordinator";
 import {
@@ -44,9 +43,10 @@ function acceptRequests(h: Rig) {
 	};
 }
 
-function ready(result: FieldRecovery) {
-	expect(result.kind).toBe("ready");
-	if (result.kind !== "ready") throw new Error("Expected recoverable history");
+/// Recover, then give the background reconciliation time to settle.
+async function opened(coordinator: AnswerEditCoordinator, text = "") {
+	const result = await coordinator.recover(FIELD, text);
+	await drain();
 	return result;
 }
 
@@ -87,21 +87,20 @@ async function record(h: Rig) {
 }
 
 test.describe("answer edit coordinator recovery: server authority and history", () => {
-	test("recovery waits for authenticated inspection before resending an existing outbox", async () => {
+	test("an existing outbox is resent only after the background inspection settles", async () => {
 		const { h, batch } = await seed();
 		const inspection = deferred<ServerFieldState>();
 		h.transport.inspectionGate = inspection;
 		const reopened = new AnswerEditCoordinator(h.options);
-		const recovery = reopened.recover(FIELD);
-		await drain();
-		const flush = reopened.flushDelivery();
+		const recovery = await reopened.recover(FIELD, "");
+		expect(recovery.handle.getState().text).toBe("old");
+		await reopened.flush();
 		await h.scheduler.advance(130_000);
 		expect(h.transport.inspections).toEqual([REF]);
 		expect(h.transport.requests).toHaveLength(0);
 		expect((await record(h)).outbox).toEqual(batch);
 		inspection.resolve(h.transport.server);
-		ready(await recovery);
-		await flush;
+		await drain();
 		await reopened.flush();
 		expect(h.transport.requests.length).toBeGreaterThanOrEqual(1);
 		expect(h.transport.requests[0]?.fields[0]?.batch).toEqual(batch);
@@ -111,7 +110,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 	test("server still at the compatible base permits byte-for-byte retry of the stored batch", async () => {
 		const { h, batch } = await seed();
 		const reopened = new AnswerEditCoordinator(h.options);
-		const result = ready(await reopened.recover(FIELD));
+		const result = await opened(reopened);
 		expect(result.handle.getState().text).toBe("old");
 		await reopened.flush();
 		expect(h.transport.requests).toHaveLength(1);
@@ -124,7 +123,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 		const { h, batch } = await seed({ empty: true });
 		expect(batch.snapshot).toBe("");
 		const reopened = new AnswerEditCoordinator(h.options);
-		ready(await reopened.recover(FIELD));
+		await opened(reopened);
 		await reopened.flush();
 		expect(h.transport.requests[0]?.fields[0]?.batch).toEqual(batch);
 		expect((await record(h)).outbox).toEqual(batch);
@@ -138,7 +137,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 			...h.options,
 			monotonicNow: () => 7,
 		});
-		const result = ready(await reopened.recover(FIELD));
+		const result = await opened(reopened);
 		const handle = result.handle;
 		if (!(handle instanceof AnswerEditMonitor))
 			throw new Error("Expected editable monitor");
@@ -186,7 +185,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 		};
 		acceptRequests(h);
 		const reopened = new AnswerEditCoordinator(h.options);
-		const result = ready(await reopened.recover(FIELD));
+		const result = await opened(reopened);
 		expect(result.handle.getState().text).toBe("old queued");
 		await reopened.flushDelivery();
 		expect(h.transport.requests).toHaveLength(1);
@@ -207,7 +206,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 		"wrong next sequence",
 		"divergent base text",
 	] as const) {
-		test(`${mismatch} produces explicit conflict without replacing either version`, async () => {
+		test(`${mismatch} rebases with a recorded gap and keeps the field writable`, async () => {
 			const { h, batch } = await seed({ savedAt: EPOCH + 10_000_000 });
 			const exact = receipt(batch);
 			let server: ServerFieldState = {
@@ -247,24 +246,28 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 					break;
 			}
 			h.transport.server = structuredClone(server);
-			const before = await record(h);
+			acceptRequests(h);
 			const reopened = new AnswerEditCoordinator(h.options);
-			const result = await reopened.recover(FIELD);
-			expect(result).toMatchObject({
-				kind: "conflict",
-				localText: "old",
-				server,
+			const result = await opened(reopened);
+			expect(result.handle.getState().text).toBe("old");
+			expect(reopened.getStatus(FIELD)).toMatchObject({
+				historyGap: true,
+				delivery: "idle",
 			});
-			if (result.kind !== "conflict")
-				throw new Error("Expected explicit conflict");
-			expect(result.reason).toBeTruthy();
-			expect(reopened.getStatus(FIELD)?.delivery).toBe("blocked");
+			const handle = result.handle;
+			if (!(handle instanceof AnswerEditMonitor))
+				throw new Error("Expected editable monitor");
+			handle.recordChange({
+				atMs: 20_000,
+				kind: "paste",
+				replacements: [{ position: 3, deleteCount: 0, insertedText: "!" }],
+			});
 			await reopened.flushDelivery();
-			expect(h.transport.requests).toHaveLength(0);
-			expect(await record(h)).toMatchObject({
-				text: before.text,
-				checkpoint: before.checkpoint,
-				outbox: before.outbox,
+			expect(h.transport.requests).toHaveLength(1);
+			expect(h.transport.requests[0]?.fields[0]?.batch).toMatchObject({
+				baseRevision: server.revision,
+				firstSeq: server.nextSeq,
+				snapshot: "old!",
 			});
 			expect(h.transport.server).toEqual(server);
 			await reopened.dispose();
@@ -287,32 +290,21 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 				...h.options,
 				now: () => EPOCH + 2,
 			});
-			const result = await reopened.recover(FIELD);
-			expect(result).toMatchObject({
-				kind: "text-only",
-				localText: text,
-				historyGap: true,
-				server: h.transport.server,
-			});
-			expect("handle" in result).toBe(false);
+			const result = await opened(reopened);
+			expect(result.handle.getState().text).toBe(text);
 			expect(reopened.getStatus(FIELD)).toMatchObject({
-				durability: "text-only",
-				savedText: text,
+				savedText: "old",
 				historyGap: true,
 			});
 			await reopened.flushDelivery();
 			expect(h.transport.requests).toHaveLength(0);
-			// Choosing a text-only recovery must not rewrite old evidence as invented keystrokes.
-			expect((await record(h)).text).toBe("old");
+			expect((await record(h)).text).toBe(text);
 			await reopened.dispose();
 		});
 	}
 
-	for (const [fallbackAge, kind] of [
-		["older", "ready"],
-		["equally old", "text-only"],
-	] as const) {
-		test(`an ${fallbackAge} fallback with the checkpoint's text recovers as ${kind}`, async () => {
+	for (const fallbackAge of ["older", "equally old"] as const) {
+		test(`an ${fallbackAge} fallback with the checkpoint's text keeps the checkpoint text`, async () => {
 			const { h } = await seed({ savedAt: EPOCH + 2 });
 			h.fallback.write(REF, {
 				version: 1,
@@ -325,10 +317,8 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 				...h.options,
 				now: () => EPOCH + 3,
 			});
-			const result = await reopened.recover(FIELD);
-			expect(result.kind).toBe(kind);
-			if (result.kind === "ready")
-				expect(result.handle.getState().text).toBe("old");
+			const result = await opened(reopened);
+			expect(result.handle.getState().text).toBe("old");
 			await reopened.dispose();
 		});
 	}
@@ -348,9 +338,7 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 			...h.options,
 			now: () => EPOCH + 2000,
 		});
-		expect(ready(await reopened.recover(FIELD)).handle.getState().text).toBe(
-			"",
-		);
+		expect((await opened(reopened)).handle.getState().text).toBe("");
 		await reopened.flushDelivery();
 		expect(h.transport.requests).toHaveLength(0);
 		await reopened.dispose();
@@ -366,23 +354,16 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 			text: "expired",
 			historyGap: true,
 		});
-		const result = await h.coordinator.recover(FIELD);
-		expect(result).toMatchObject({
-			kind: "unavailable",
-			server: h.transport.server,
-		});
-		expect("handle" in result).toBe(false);
+		const result = await opened(h.coordinator, "from the answer");
+		expect(result.handle.getState().text).toBe("from the answer");
 		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-			durability: "unavailable",
+			historyGap: true,
 			savedText: null,
 		});
-		await h.coordinator.flushDelivery();
-		expect(h.transport.requests).toHaveLength(0);
-		expect(h.store.commits).toHaveLength(0);
 		await h.coordinator.dispose();
 	});
 
-	test("an unreadable fallback is unavailable even when the primary has no record", async () => {
+	test("an unreadable fallback still yields a handle, with a gap and no fallback writes", async () => {
 		const h = rig();
 		let fallbackWrites = 0;
 		h.fallback.read = () => {
@@ -392,30 +373,23 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 			fallbackWrites++;
 		};
 		try {
-			expect(await h.store.read(REF, EPOCH)).toBeNull();
-			const result = await h.coordinator.recover(FIELD);
-			expect.soft(result).toMatchObject({ kind: "unavailable" });
-			expect.soft("handle" in result).toBe(false);
-			expect.soft(h.coordinator.getStatus(FIELD)).toMatchObject({
-				durability: "unavailable",
-				savedText: null,
+			const result = await opened(h.coordinator, "draft");
+			expect(result.handle.getState().text).toBe("draft");
+			expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+				historyGap: true,
 			});
 			await h.coordinator.persist();
-			await h.coordinator.flushDelivery();
-			expect.soft(h.store.commits).toHaveLength(0);
-			expect.soft(fallbackWrites).toBe(0);
-			expect.soft(h.transport.requests).toHaveLength(0);
+			expect(fallbackWrites).toBe(0);
 		} finally {
 			await h.coordinator.dispose();
 		}
 	});
 
-	test("post-deadline recovery preserves local history but returns canWrite false and blocks every send", async () => {
+	test("post-deadline recovery preserves local history and blocks every send", async () => {
 		const { h, batch } = await seed({ queue: true });
 		h.transport.server = { ...h.transport.server, canWrite: false };
 		const reopened = new AnswerEditCoordinator(h.options);
-		const result = ready(await reopened.recover(FIELD));
-		expect(result.canWrite).toBe(false);
+		const result = await opened(reopened);
 		expect(result.handle.getState().text).toBe("old queued");
 		expect(reopened.getStatus(FIELD)?.delivery).toBe("blocked");
 		await reopened.flush();
@@ -430,9 +404,8 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 	test("canWrite false on registration still saves local typing without starting delivery", async () => {
 		const h = rig();
 		h.transport.server = { ...h.transport.server, canWrite: false };
-		expect(ready(await h.coordinator.register(FIELD, h.monitor)).canWrite).toBe(
-			false,
-		);
+		await h.coordinator.register(FIELD, h.monitor);
+		await drain();
 		h.append("local only");
 		await h.coordinator.flushDelivery();
 		await h.scheduler.advance(130_000);

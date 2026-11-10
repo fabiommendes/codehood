@@ -274,12 +274,10 @@ test("renderer crash preserves an unacknowledged outbox for authenticated recove
 					},
 				},
 			});
-			const recovery = await coordinator.recover({
-				questionId: ref.questionId,
-				field: ref.field,
-			});
-			if (recovery.kind !== "ready")
-				throw new Error(`Unexpected recovery: ${recovery.kind}`);
+			const recovery = await coordinator.recover(
+				{ questionId: ref.questionId, field: ref.field },
+				"",
+			);
 			await coordinator.flush();
 			return {
 				inspections,

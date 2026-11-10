@@ -2,6 +2,7 @@ import { parseCheckpoint } from "./checkpoint";
 import {
 	AnswerEditMonitor,
 	type BatchReceipt,
+	type MonitorCheckpoint,
 	type MonitorHandle,
 	type MonitorState,
 	type PendingEditBatch,
@@ -19,6 +20,7 @@ import {
 export type AttemptField = Omit<FieldRef, "attemptId">;
 export interface ObservableMonitorHandle extends MonitorHandle {
 	closeEdit(): void;
+	rebase(base: { baseRevision: number; firstSeq: number }): void;
 	subscribe(listener: (state: Readonly<MonitorState>) => void): () => void;
 }
 export interface ServerFieldState {
@@ -50,40 +52,16 @@ export interface CoordinatorScheduler {
 	schedule(delayMs: number, callback: () => void): () => void;
 }
 export interface FieldStatus extends AttemptField {
-	readonly durability:
-		| "pending"
-		| "durable"
-		| "text-only"
-		| "unavailable"
-		| "conflict";
+	readonly durability: "pending" | "durable" | "text-only" | "unavailable";
 	readonly savedText: string | null;
 	readonly historyGap: boolean;
 	readonly delivery: "idle" | "pending" | "sending" | "blocked";
 	readonly error: string | null;
 }
-export type FieldRecovery =
-	| {
-			readonly kind: "unavailable";
-			readonly server: ServerFieldState;
-			readonly reason: string;
-	  }
-	| {
-			readonly kind: "ready";
-			readonly handle: ObservableMonitorHandle;
-			readonly canWrite: boolean;
-	  }
-	| {
-			readonly kind: "conflict";
-			readonly localText: string;
-			readonly server: ServerFieldState;
-			readonly reason: string;
-	  }
-	| {
-			readonly kind: "text-only";
-			readonly localText: string;
-			readonly server: ServerFieldState;
-			readonly historyGap: true;
-	  };
+/// Every open yields a usable handle; storage and server problems degrade it instead.
+export interface FieldRecovery {
+	readonly handle: ObservableMonitorHandle;
+}
 export interface CoordinatorOptions {
 	readonly ownerId: string;
 	readonly attemptId: string;
@@ -107,6 +85,9 @@ interface RegisteredField {
 	attached: boolean;
 	owned: boolean;
 	canWrite: boolean;
+	/// Whether the baseline was checked against the server; deliveries wait for it.
+	reconciled: boolean;
+	reconciling: Promise<void> | null;
 	principalReadError: string | null;
 	generation: number | null;
 	version: number;
@@ -127,7 +108,6 @@ export class AnswerEditCoordinator {
 	private readonly registering = new Set<string>();
 	private readonly handoffs = new Map<string, Promise<void>>();
 	private readonly commits = new Map<RegisteredField, Promise<void>>();
-	private readonly recoveryStatuses = new Map<string, FieldStatus>();
 	private retryBaseMs = 0;
 	private deliveryFailed = false;
 	/// Batches acknowledged so far; `flushDelivery` stops when a round adds none.
@@ -147,20 +127,27 @@ export class AnswerEditCoordinator {
 	}
 
 	/**
-	 * Inspect the server before restoring a checkpoint or creating a new field.
+	 * Return a coordinator-owned handle restored from local state, or from `initialText` when there is none.
+	 *
+	 * Never waits for the server: the baseline is reconciled in the background.
 	 */
-	async recover(field: AttemptField): Promise<FieldRecovery> {
-		return this.open(field);
+	async recover(
+		field: AttemptField,
+		initialText: string,
+	): Promise<FieldRecovery> {
+		return this.open(field, { initialText });
 	}
 
 	/**
-	 * Register an editor-owned handle after reconciling its base with the server.
+	 * Register an editor-owned handle; its text wins over any stored state.
+	 *
+	 * Never waits for the server: the baseline is reconciled in the background.
 	 */
 	async register(
 		field: AttemptField,
 		handle: ObservableMonitorHandle,
 	): Promise<FieldRecovery> {
-		return this.open(field, handle);
+		return this.open(field, { handle });
 	}
 
 	/**
@@ -191,8 +178,7 @@ export class AnswerEditCoordinator {
 	 */
 	getStatus(field: AttemptField): Readonly<FieldStatus> | null {
 		const key = fieldKey(field);
-		const status =
-			this.recoveryStatuses.get(key) ?? this.fields.get(key)?.status;
+		const status = this.fields.get(key)?.status;
 		return status ? Object.freeze({ ...status }) : null;
 	}
 
@@ -291,31 +277,26 @@ export class AnswerEditCoordinator {
 
 	private async open(
 		field: AttemptField,
-		handle?: ObservableMonitorHandle,
+		source: { handle?: ObservableMonitorHandle; initialText?: string },
 	): Promise<FieldRecovery> {
 		this.requireActive();
 		const key = fieldKey(field);
 		const previous = this.fields.get(key);
 		if (previous?.attached || this.registering.has(key))
 			throw new Error("Field already has an active handle");
-		const knownKeys = new Set([
-			...this.fields.keys(),
-			...this.recoveryStatuses.keys(),
-			...this.registering,
-		]);
-		if (!knownKeys.has(key) && knownKeys.size >= MAX_FIELDS)
+		if (previous && !source.handle) {
+			previous.attached = true;
+			this.publish(previous);
+			if (!previous.reconciled) void this.reconcile(previous);
+			return { handle: previous.handle };
+		}
+		if (!previous && this.fields.size + this.registering.size >= MAX_FIELDS)
 			throw new RangeError("Too many registered fields");
 		this.registering.add(key);
 		try {
-			await this.handoffs.get(key);
-			this.requireActive();
-			const ref = this.ref(field);
-			const server = await this.options.transport.inspect(ref);
-			/// Delivery retains the detached entry through its ACK commit.
-			/// Do not copy its CAS generation until that owner has finished writing.
-			await this.delivery;
 			if (previous) await this.persistField(previous);
 			this.requireActive();
+			const ref = this.ref(field);
 			let local: LocalEditRecord | null = null;
 			let readError: string | null = null;
 			try {
@@ -325,102 +306,45 @@ export class AnswerEditCoordinator {
 			}
 			this.requireActive();
 			let fallback: TextRecovery | null = null;
-			let fallbackReadError: string | null = null;
+			let gap = (previous?.status.historyGap ?? false) || readError !== null;
 			try {
 				fallback = this.options.fallback.read(ref, this.options.now());
-			} catch (error) {
-				fallbackReadError = errorMessage(error);
+			} catch {
+				gap = true;
 			}
-			if (fallbackReadError) {
-				const reason = [readError, fallbackReadError]
-					.filter(Boolean)
-					.join("; ");
-				this.blockRecovery(field, "unavailable", null, reason);
-				return { kind: "unavailable", server, reason };
+			let restored: AnswerEditMonitor | null = null;
+			if (local && !source.handle) {
+				try {
+					restored = this.restore(local.checkpoint);
+				} catch {
+					gap = true;
+				}
 			}
-			if (
-				!previous &&
+			let monitor: ObservableMonitorHandle;
+			if (source.handle) {
+				monitor = source.handle;
+				if (local && hasPendingEvidence(local.checkpoint))
+					gap ||= !sameEvidence(local.checkpoint, monitor.exportCheckpoint());
+			} else if (
 				fallback &&
-				(!local ||
-					fallback.text !== local.text ||
-					fallback.savedAt >= local.savedAt)
+				(!restored ||
+					fallback.text !== local?.text ||
+					fallback.savedAt >= (local?.savedAt ?? 0))
 			) {
-				this.blockRecovery(
-					field,
-					"text-only",
-					fallback.text,
-					"Only text recovery is available",
-				);
-				return {
-					kind: "text-only",
-					localText: fallback.text,
-					server,
-					historyGap: true,
-				};
+				gap = true;
+				monitor = this.fresh(fallback.text);
+			} else {
+				monitor = restored ?? this.fresh(source.initialText ?? "");
 			}
-			if (!previous && !local && readError) {
-				this.blockRecovery(field, "unavailable", null, readError);
-				return { kind: "unavailable", server, reason: readError };
-			}
-			const checkpoint =
-				previous?.handle.exportCheckpoint() ?? local?.checkpoint;
-			if (
-				previous &&
-				handle &&
-				!equivalentCheckpoints(
-					previous.handle.exportCheckpoint(),
-					handle.exportCheckpoint(),
-				)
-			)
-				return this.conflict(
-					field,
-					handle.getState().text,
-					server,
-					"Detached pending history diverged",
-				);
-			const candidate = handle?.exportCheckpoint() ?? checkpoint;
-			const reconciled = candidate
-				? reconcileCheckpoint(candidate, server)
-				: null;
-			if (reconciled?.reason)
-				return this.conflict(
-					field,
-					reconciled.state.text,
-					server,
-					reconciled.reason,
-				);
-			if (
-				handle &&
-				local &&
-				!previous &&
-				!equivalentCheckpoints(local.checkpoint, handle.exportCheckpoint())
-			)
-				return this.conflict(
-					field,
-					local.text,
-					server,
-					"Stored pending history diverged",
-				);
-			const monitor =
-				handle ??
-				(candidate
-					? this.restore(candidate)
-					: new AnswerEditMonitor({
-							initialText: server.text,
-							baseRevision: server.revision,
-							firstSeq: server.nextSeq,
-							sessionId: this.options.createSessionId(),
-							now: this.options.monotonicNow,
-						}));
-			if (reconciled?.receipt) monitor.acknowledge(reconciled.receipt);
-			previous?.unsubscribe();
 			const entry: RegisteredField = {
 				field: { ...field },
 				handle: monitor,
 				unsubscribe: () => {},
 				attached: true,
-				owned: !handle,
-				canWrite: server.canWrite,
+				owned: !source.handle,
+				canWrite: true,
+				reconciled: false,
+				reconciling: null,
 				principalReadError: previous?.principalReadError ?? readError,
 				generation: previous?.generation ?? local?.generation ?? null,
 				version: 1,
@@ -429,64 +353,95 @@ export class AnswerEditCoordinator {
 					...field,
 					durability: "pending",
 					savedText: previous?.status.savedText ?? local?.text ?? null,
-					historyGap: previous?.status.historyGap ?? false,
-					delivery: !server.canWrite
-						? "blocked"
-						: monitor.getState().hasPendingChanges
-							? "pending"
-							: "idle",
+					historyGap: gap,
+					delivery: monitor.getState().hasPendingChanges ? "pending" : "idle",
 					error: null,
 				},
 			};
-			this.recoveryStatuses.delete(key);
+			previous?.unsubscribe();
 			this.fields.set(key, entry);
 			this.listen(entry);
 			this.publish(entry);
 			this.schedulePersistence();
 			this.scheduleDelivery();
-			return { kind: "ready", handle: monitor, canWrite: server.canWrite };
+			void this.reconcile(entry);
+			return { handle: monitor };
 		} finally {
 			this.registering.delete(key);
 		}
 	}
 
-	private conflict(
-		field: AttemptField,
-		localText: string,
-		server: ServerFieldState,
-		reason: string,
-	): FieldRecovery {
-		this.blockRecovery(field, "conflict", localText, reason);
-		return { kind: "conflict", localText, server, reason };
+	/// A monitor whose baseline is unknown until the first reconciliation.
+	private fresh(text: string): AnswerEditMonitor {
+		return new AnswerEditMonitor({
+			initialText: text,
+			baseRevision: 0,
+			firstSeq: 0,
+			sessionId: this.options.createSessionId(),
+			now: this.options.monotonicNow,
+		});
 	}
 
-	private blockRecovery(
-		field: AttemptField,
-		durability: "conflict" | "text-only" | "unavailable",
-		localText: string | null,
-		reason: string,
-	): void {
-		const entry = this.fields.get(fieldKey(field));
-		if (entry) {
-			entry.canWrite = false;
-			entry.status = {
-				...entry.status,
-				durability,
-				delivery: "blocked",
-				error: reason,
-			};
-			this.publish(entry);
+	/// Check the entry's baseline against the server in the background, rebasing on divergence.
+	private reconcile(entry: RegisteredField, force = false): Promise<void> {
+		if (entry.reconciling) return entry.reconciling;
+		entry.reconciling = this.inspectAndAdopt(entry, force)
+			.catch(ignoreScheduled)
+			.finally(() => {
+				entry.reconciling = null;
+				this.scheduleDelivery();
+			});
+		return entry.reconciling;
+	}
+
+	private async inspectAndAdopt(
+		entry: RegisteredField,
+		force: boolean,
+	): Promise<void> {
+		let server: ServerFieldState;
+		/// Inspect only while no delivery runs, or its ACK could land after the snapshot.
+		do {
+			await this.delivery?.catch(ignoreScheduled);
+			if (!this.isCurrent(entry)) return;
+			server = await this.options.transport.inspect(this.ref(entry.field));
+			if (!this.isCurrent(entry)) return;
+		} while (this.delivery);
+		entry.canWrite = server.canWrite;
+		const reconciled = reconcileCheckpoint(
+			entry.handle.exportCheckpoint(),
+			server,
+		);
+		if (reconciled.receipt) entry.handle.acknowledge(reconciled.receipt);
+		if (force || reconciled.reason) {
+			const state = entry.handle.getState();
+			const lossless = !state.hasPendingChanges && state.text === server.text;
+			entry.handle.rebase({
+				baseRevision: server.revision,
+				firstSeq: server.nextSeq,
+			});
+			if (!lossless) entry.status = { ...entry.status, historyGap: true };
+			entry.version++;
+			this.schedulePersistence();
 		}
-		const status: FieldStatus = {
-			...field,
-			durability,
-			delivery: "blocked",
-			savedText: localText,
-			historyGap: durability !== "conflict",
-			error: reason,
+		entry.reconciled = true;
+		entry.status = {
+			...entry.status,
+			delivery: !entry.canWrite
+				? "blocked"
+				: entry.handle.getState().hasPendingChanges
+					? "pending"
+					: "idle",
 		};
-		this.recoveryStatuses.set(fieldKey(field), status);
-		this.publishStatus(status);
+		this.publish(entry);
+		this.scheduleDelivery();
+	}
+
+	private isCurrent(entry: RegisteredField): boolean {
+		return (
+			!this.stopped &&
+			!this.revoked &&
+			this.fields.get(fieldKey(entry.field)) === entry
+		);
 	}
 
 	private restore(
@@ -646,12 +601,14 @@ export class AnswerEditCoordinator {
 
 	private async sendPending(): Promise<void> {
 		this.deliveryFailed = false;
+		for (const entry of this.fields.values())
+			if (!entry.reconciled) void this.reconcile(entry);
 		const pending: { entry: RegisteredField; batch: PendingEditBatch }[] = [];
 		for (const entry of this.fields.values()) {
 			if (
 				this.registering.has(fieldKey(entry.field)) ||
 				!entry.canWrite ||
-				entry.status.durability === "conflict"
+				!entry.reconciled
 			)
 				continue;
 			const batch = entry.handle.collect();
@@ -665,7 +622,7 @@ export class AnswerEditCoordinator {
 		if (this.stopped || this.revoked) return;
 		/// A failed primary commit does not hold the batch back: the server is the most durable store left.
 		const sendable = pending.filter(
-			({ entry }) => entry.canWrite && entry.status.durability !== "conflict",
+			({ entry }) => entry.canWrite && entry.reconciled,
 		);
 		if (sendable.length === 0) return;
 		for (const { entry } of sendable) {
@@ -695,16 +652,21 @@ export class AnswerEditCoordinator {
 							error: errorMessage(error),
 						};
 					}
-				} else if (result?.kind === "conflict" || result?.kind === "closed") {
+				} else if (result?.kind === "closed") {
 					entry.canWrite = false;
 					entry.status = {
 						...entry.status,
 						delivery: "blocked",
 						error: result.message ?? result.kind,
-						...(result.kind === "conflict"
-							? { durability: "conflict" as const }
-							: {}),
 					};
+				} else if (result?.kind === "conflict") {
+					entry.reconciled = false;
+					entry.status = {
+						...entry.status,
+						delivery: "pending",
+						error: result.message ?? result.kind,
+					};
+					void this.reconcile(entry, true);
 				} else {
 					entry.status = {
 						...entry.status,
@@ -768,7 +730,9 @@ export class AnswerEditCoordinator {
 			return;
 		if (
 			![...this.fields.values()].some(
-				(entry) => entry.canWrite && entry.handle.getState().hasPendingChanges,
+				(entry) =>
+					(!entry.reconciled && !entry.reconciling) ||
+					(entry.canWrite && entry.handle.getState().hasPendingChanges),
 			)
 		)
 			return;
@@ -819,6 +783,33 @@ function fieldKey(field: AttemptField): string {
 
 /// Scheduled runs have no caller to reject to; failures are already reflected in field statuses.
 function ignoreScheduled(): void {}
+
+/// Whether a checkpoint holds history the server has not acknowledged; unreadable counts as yes.
+function hasPendingEvidence(checkpoint: MonitorCheckpoint): boolean {
+	try {
+		const state = parseCheckpoint(checkpoint);
+		return (
+			state.inFlight !== null ||
+			state.queue.length > 0 ||
+			state.active.edits.length > 0 ||
+			state.active.openEdit !== null
+		);
+	} catch {
+		return true;
+	}
+}
+
+/// Equivalence that treats an unparseable checkpoint as different.
+function sameEvidence(
+	left: MonitorCheckpoint,
+	right: MonitorCheckpoint,
+): boolean {
+	try {
+		return equivalentCheckpoints(left, right);
+	} catch {
+		return false;
+	}
+}
 
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);

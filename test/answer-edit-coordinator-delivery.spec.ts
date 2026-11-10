@@ -369,7 +369,7 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 		});
 	}
 
-	test("a conflict blocks only that field while another field is durably acknowledged and omitted from retry", async () => {
+	test("a conflict rebases only that field with a gap while another field is durably acknowledged", async () => {
 		const h = await registered();
 		const blocked = { questionId: "blocked", field: "code" };
 		const other = new AnswerEditMonitor({
@@ -400,12 +400,17 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 			),
 		);
 		await h.coordinator.flush();
+		await drain();
 		expect(restoreRecord(await saved(h)).collect()).toBeNull();
-		expect(h.coordinator.getStatus(FIELD)?.delivery).toBe("idle");
-		expect(h.coordinator.getStatus(blocked)?.delivery).toBe("blocked");
-		const conflict = await h.store.read({ ...REF, ...blocked }, EPOCH);
-		expect(conflict?.text).toBe("conflicting");
-		expect(conflict?.outbox?.snapshot).toBe("conflicting");
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			delivery: "idle",
+			historyGap: false,
+		});
+		expect(h.coordinator.getStatus(blocked)).toMatchObject({
+			delivery: "idle",
+			historyGap: true,
+		});
+		expect(other.getState().text).toBe("conflicting");
 		await h.coordinator.flushDelivery();
 		expect(h.transport.requests).toHaveLength(1);
 		h.append(" more");
@@ -478,11 +483,9 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 			monotonicNow: () => 0,
 			onStatus: () => {},
 		});
-		const recovered = await replacement.recover(FIELD);
-		if (
-			recovered.kind !== "ready" ||
-			!(recovered.handle instanceof AnswerEditMonitor)
-		)
+		const recovered = await replacement.recover(FIELD, "");
+		await drain();
+		if (!(recovered.handle instanceof AnswerEditMonitor))
 			throw new Error("Expected restored editor");
 		recovered.handle.recordChange({
 			atMs: 1,

@@ -409,6 +409,27 @@ export class AnswerEditMonitor implements MonitorHandle {
 	}
 
 	/**
+	 * Adopt a new server baseline for the current text, discarding all pending history.
+	 *
+	 * @throws {TypeError} If a counter is invalid.
+	 * @throws {Error} If the monitor is disposed.
+	 */
+	rebase(base: { baseRevision: number; firstSeq: number }): void {
+		this.requireActive();
+		requireInteger(base.baseRevision, "baseRevision");
+		requireInteger(base.firstSeq, "firstSeq");
+		this.baseRevision = base.baseRevision;
+		this.firstSeq = base.firstSeq;
+		this.confirmedText = this.text;
+		this.queue = [];
+		this.edits = [];
+		this.openEdit = null;
+		this.inFlight = null;
+		this.receipts.clear();
+		this.notify();
+	}
+
+	/**
 	 * Export the document, pending edits and recent receipts for persistence.
 	 */
 	exportCheckpoint(): Readonly<MonitorCheckpoint> {
