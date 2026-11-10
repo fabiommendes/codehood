@@ -72,6 +72,8 @@ export default defineConfig({
 			// One address answers as `localhost` (app) and `127.0.0.1` (runner).
 			HOST: "127.0.0.1",
 			RUNNER_ORIGIN: TEST_RUNNER_ORIGIN,
+			// Reads the values above from the environment.
+			CODEHOOD_CONFIG: "test/codehood.config.ts",
 			PORT: String(TEST_PORT),
 		},
 	},

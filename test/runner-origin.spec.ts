@@ -72,7 +72,7 @@ test.describe("resolveRunnerOrigin", () => {
 		).toThrow(/https/);
 		expect(() =>
 			resolveRunnerOrigin("not a url", "http://localhost:4321", "dev"),
-		).toThrow(/RUNNER_ORIGIN/);
+		).toThrow(/runner\.origin/);
 		expect(() =>
 			resolveRunnerOrigin("ftp://runner.test", "http://localhost:4321", "dev"),
 		).toThrow(/http/);

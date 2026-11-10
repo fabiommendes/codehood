@@ -5,13 +5,17 @@
  *
  * Only `dependencies` stay external and load from `node_modules`, the only
  * packages a production install has; everything else (the linked `mdq`, for
- * one) is bundled in. `astro:env/client` is
- * resolved here the same way Astro bakes it into the server build: from the
- * build-time `SERVER_TZ`, falling back to the schema default.
+ * one) is bundled in. `codehood:config` and `codehood:build` resolve as in
+ * the Astro build: to the configuration file (`CODEHOOD_CONFIG`), evaluated
+ * again when the CLI starts, and to the build-time constants it holds.
  */
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
-import { SERVER_TZ } from "../test/astro-env-client";
+import { loadConfig } from "../src/config/integration";
+import { configPath } from "../src/config/path";
+
+const configFile = configPath(process.cwd(), process.env);
+const config = await loadConfig(configFile);
 
 /// What `pnpm install --prod` puts in `node_modules`; subpaths follow.
 const dependencies = Object.keys(
@@ -30,16 +34,22 @@ await build({
 	logLevel: "warning",
 	plugins: [
 		{
-			name: "astro-env-client",
+			name: "codehood-config",
 			setup(pluginBuild) {
-				pluginBuild.onResolve({ filter: /^astro:env\/client$/ }, () => ({
-					path: "astro:env/client",
-					namespace: "astro-env",
+				pluginBuild.onResolve({ filter: /^codehood:config$/ }, () => ({
+					path: configFile,
 				}));
-				pluginBuild.onLoad({ filter: /.*/, namespace: "astro-env" }, () => ({
-					contents: `export const SERVER_TZ = ${JSON.stringify(process.env.SERVER_TZ || SERVER_TZ)};`,
-					loader: "js",
+				pluginBuild.onResolve({ filter: /^codehood:build$/ }, () => ({
+					path: "codehood:build",
+					namespace: "codehood-build",
 				}));
+				pluginBuild.onLoad(
+					{ filter: /.*/, namespace: "codehood-build" },
+					() => ({
+						contents: `export const timeZone = ${JSON.stringify(config.instance.timeZone)};`,
+						loader: "js",
+					}),
+				);
 			},
 		},
 	],

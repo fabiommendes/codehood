@@ -5,7 +5,7 @@
 /**
  * Resolves the origin the runner frame is served from.
  *
- * With `RUNNER_ORIGIN` set, returns its origin. Unset, a development instance
+ * With `runner.origin` set, returns its origin. Unset, a development instance
  * whose `publicUrl` host is `localhost` gets the same URL on `127.0.0.1`, and
  * the other way round, so app and runner are different sites on one process;
  * any other instance gets `null`, meaning code execution is off.
@@ -14,16 +14,16 @@
  * resolveRunnerOrigin(undefined, "http://localhost:4321", "dev"); // "http://127.0.0.1:4321"
  * resolveRunnerOrigin(undefined, "https://codehood.example", "prod"); // null
  *
- * @throws {Error} when `RUNNER_ORIGIN` is not an http(s) URL, has the same
+ * @throws {Error} when `runner.origin` is not an http(s) URL, has the same
  * origin as `publicUrl`, or is not https in production.
  */
 export function resolveRunnerOrigin(
-	runnerOriginEnv: string | undefined,
+	configured: string | undefined,
 	publicUrl: string,
 	environment: "dev" | "prod",
 ): string | null {
 	const app = new URL(publicUrl);
-	if (runnerOriginEnv === undefined || runnerOriginEnv.trim() === "") {
+	if (configured === undefined || configured.trim() === "") {
 		if (environment !== "dev") return null;
 		const swap: Record<string, string> = {
 			localhost: "127.0.0.1",
@@ -38,22 +38,22 @@ export function resolveRunnerOrigin(
 
 	let url: URL;
 	try {
-		url = new URL(runnerOriginEnv.trim());
+		url = new URL(configured.trim());
 	} catch {
-		throw new Error(`RUNNER_ORIGIN is not a valid URL: "${runnerOriginEnv}".`);
+		throw new Error(`runner.origin is not a valid URL: "${configured}".`);
 	}
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
 		throw new Error(
-			`RUNNER_ORIGIN must be an http(s) URL, got "${runnerOriginEnv}".`,
+			`runner.origin must be an http(s) URL, got "${configured}".`,
 		);
 	}
 	if (url.origin === app.origin) {
 		throw new Error(
-			"RUNNER_ORIGIN must differ from PUBLIC_URL: the runner needs its own origin.",
+			"runner.origin must differ from instance.publicUrl: the runner needs its own origin.",
 		);
 	}
 	if (environment === "prod" && url.protocol !== "https:") {
-		throw new Error("RUNNER_ORIGIN must be https in production.");
+		throw new Error("runner.origin must be https in production.");
 	}
 	return url.origin;
 }

@@ -58,22 +58,60 @@ Then use one of the following, depending on what you want to do:
 | `pnpm run db:seed:cli` | Push the `pyxel101` course with `ch push` |
 | `pnpm run clear`     | Reset the project to a freshly-cloned state |
 
+### Configuration
+
+An instance is described by `codehood.config.ts` at the root, validated by
+`defineConfig` from `src/config/`. A deployment keeps its own file and points
+`CODEHOOD_CONFIG` at it instead of editing this one.
+
+| Key                           | Default               | Meaning                                                                 |
+| :---------------------------- | :-------------------- | :---------------------------------------------------------------------- |
+| `instance.publicUrl`          | `http://localhost:4321` | Build-time constant. Address of the instance, see [Deploying](#deploying). |
+| `instance.locale`             | `en`                  | Build-time constant. One of the `locales` of `project.inlang/settings.json`. |
+| `instance.timeZone`           | `America/Sao_Paulo`   | Build-time constant. Zone every instant is rendered in.                  |
+| `instance.schoolIdPattern`    | empty (any id)        | Regex over the whole school id, e.g. `[0-9]{9}`.                         |
+| `storage.resourceRoot`        | `./storage/resources` | Where resource blobs are written.                                        |
+| `storage.attachmentLinkMode`  | `symlink`             | `symlink`, `hardlink` or `copy`.                                         |
+| `storage.quota.instructor`    | `1gb`                 | Upload quota per instructor.                                             |
+| `storage.quota.student`       | `200mb`               | Upload quota per student.                                                |
+| `runner.origin`               | null                  | Build-time constant. Origin of the code runner, see [Code runner origin](#code-runner-origin). |
+
+Build-time constants are baked into the build: a changed value takes effect
+with the next `pnpm run build`, and the dev server restarts by itself when the
+file changes. The default file writes them as literals. The other keys are
+read again at every boot, so the default file takes them from the
+environment with `env("NAME", fallback)`, which treats a blank variable as
+unset (`SCHOOL_ID_PATTERN`, `RESOURCE_ROOT`, `ATTACHMENT_LINK_MODE`,
+`BLOB_QUOTA_INSTRUCTOR`, `BLOB_QUOTA_STUDENT`).
+
+The time zone is not read from `TZ`: that variable also changes the Node
+process's own default zone, for anything that skips an explicit `timeZone`.
+
+A dev server on another port needs its own address. Write a file that
+extends the default, and point `CODEHOOD_CONFIG` at it:
+
+```ts
+// tmp/codehood.4331.config.ts
+import { defineConfig } from "@/config";
+import base from "../codehood.config";
+
+export default defineConfig({
+	...base,
+	instance: { ...base.instance, publicUrl: "http://localhost:4331" },
+});
+```
+
 ### Environment variables
 
-| Variable                 | Required | Default              | Meaning                                                       |
-| :----------------------- | :------- | :------------------- | :------------------------------------------------------------ |
-| `ENVIRONMENT`            | yes      | none                 | `dev`/`development` or `prod`/`production`. The server refuses to boot without it. |
-| `DATABASE_URL`           | yes      | `file:./dev.db`      | SQLite database to open.                                       |
-| `RESOURCE_ROOT`          | no       | `./storage/resources`| Where resource blobs are written.                              |
-| `ATTACHMENT_LINK_MODE`   | no       | `symlink`            | `symlink`, `hardlink` or `copy`.                               |
-| `BLOB_QUOTA_INSTRUCTOR`  | no       | `1gb`                | Upload quota per instructor.                                   |
-| `BLOB_QUOTA_STUDENT`     | no       | `200mb`              | Upload quota per student.                                      |
-| `DEBUG`                  | no       | `false`              | Verbose error output.                                          |
-| `LOG_ENV`                | no       | `false`              | Echo the resolved environment at startup. Set by `pnpm run dev`. |
-| `SERVER_TZ`              | no       | `America/Sao_Paulo`  | Time zone every instant is rendered in.                         |
-| `PUBLIC_URL`             | no       | none                 | Build time. Address of a deployed instance, see [Deploying](#deploying). |
-| `RUNNER_ORIGIN`          | no       | dev: `PUBLIC_URL` on the other loopback name | Origin of the code runner, see [Deploying](#deploying). Unset in production turns code execution off. |
-| `CODEHOOD_LOCALE`        | no       | base locale (`en`)   | Build time. Locale the build compiles for; must be one of `project.inlang/settings.json` `locales`. |
+Only process settings and secrets stay in the environment.
+
+| Variable          | Required | Default              | Meaning                                                       |
+| :---------------- | :------- | :------------------- | :------------------------------------------------------------ |
+| `ENVIRONMENT`     | yes      | none                 | `dev`/`development` or `prod`/`production`. The server refuses to boot without it. |
+| `DATABASE_URL`    | yes      | `file:./dev.db`      | SQLite database to open.                                       |
+| `CODEHOOD_CONFIG` | no       | `codehood.config.ts` | Configuration file, relative to the root.                     |
+| `DEBUG`           | no       | `false`              | Verbose error output.                                          |
+| `LOG_ENV`         | no       | `false`              | Echo the resolved settings at startup. Set by `pnpm run dev`. |
 
 `ENVIRONMENT` deliberately has no default, and an empty value counts as
 unset. It decides two things a deployment cannot afford to get wrong by
@@ -84,19 +122,6 @@ else fails at startup with a message naming the variable.
 
 An `.env` created before this variable existed will not have it. Add
 `ENVIRONMENT="dev"` to it, or copy `.env.example` over.
-
-`SERVER_TZ` is declared through `astro:env` (`astro.config.mjs`), not read
-directly from `process.env`, because `src/utils/schedule-time.ts` runs both
-server-side and inside hydrated islands (`ExamsTable`, `QuestionsTable`) —
-`astro:env/client` is the one mechanism that is safe to read on both sides. It
-is deliberately not called `TZ`: that name is a Node special that also
-changes the process's own default time zone for anything that skips an
-explicit `timeZone` argument, not just this module, so a deployment that used
-to rely on `process.env.TZ` here must set `SERVER_TZ` explicitly — `TZ` alone
-no longer does anything for this. It is also baked into the build rather than
-read from the running process's environment: a changed `SERVER_TZ` takes
-effect on the next `pnpm run build`, not the next restart, and the build
-machine's value is what ships, not the deployed machine's.
 
 Demo accounts are never created by a request. They come from
 `pnpm run db:seed` (and the test runner), and only when `ENVIRONMENT=dev`.
@@ -122,8 +147,8 @@ built on the server, so a small one (1 vCPU, 1 GB) is enough.
 ```
 pnpm run release minor                         # migrations, gate, bump, tag
 git push origin main v0.2.0
-PUBLIC_URL=https://codehood.example.org \
-  pnpm run package v0.2.0 --out build/ [--rehearse prod-copy.db]
+pnpm run package v0.2.0 --out build/ --config deploy/codehood.config.ts \
+  [--rehearse prod-copy.db]
 ```
 
 - `pnpm run release <patch|minor|major|x.y.z>` writes the migration for the
@@ -132,7 +157,8 @@ PUBLIC_URL=https://codehood.example.org \
   changelog's "Unreleased" section, then commits and tags `vX.Y.Z`. It stops
   when a migration drops tables or columns; edit the migration to keep the
   data, or pass `--allow-data-loss`.
-- `pnpm run package <tag>` builds the tag from a clean export. `--rehearse`
+- `pnpm run package <tag>` builds the tag from a clean export, with the
+  instance's configuration file (`--config`) in place of the tag's own. `--rehearse`
   applies the migrations to a copy of a database first, so a migration that
   breaks on real data fails here instead of on the server.
 - On the server: unpack, `pnpm install --prod --frozen-lockfile`,
@@ -141,25 +167,26 @@ PUBLIC_URL=https://codehood.example.org \
   `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`. Management
   commands run as `node dist/manage.mjs <command>`.
 
-`PUBLIC_URL`, `CODEHOOD_LOCALE` and `SERVER_TZ` are read at build time, from the
-environment or from `.env`. `pnpm run package` checks `CODEHOOD_LOCALE` before
-building and records it in `RELEASE`. The server trusts the proxy's
-`X-Forwarded-*` headers only for the `PUBLIC_URL` host; without it, form posts fail
-Astro's origin check and every client has the proxy's IP.
+`pnpm run package` checks `instance.locale` before building and records the
+address, locale and time zone in `RELEASE`. Tags older than
+`codehood.config.ts` still read `PUBLIC_URL`, `CODEHOOD_LOCALE` and
+`SERVER_TZ` from the environment; for newer tags those variables make it
+fail. The server trusts the proxy's `X-Forwarded-*` headers only for the
+`instance.publicUrl` host; with a wrong one, form posts fail Astro's origin
+check and every client has the proxy's IP.
 
 ### Code runner origin
 
 The browser runs student code in a frame served from its own origin, so that
 code never shares cookies or storage with the app. The same Node process
-serves it, under `/runner/`, at the host given by `RUNNER_ORIGIN`
+serves it, under `/runner/`, at the host given by `runner.origin`
 (e.g. `https://runner.example.net`).
 
 - A separate registrable domain is the recommended default. A subdomain of the
   app's domain also works, but only with the `__Host-session` cookie, which
   production already uses.
-- `RUNNER_ORIGIN` must be https, differ from `PUBLIC_URL` and is read at both
-  build and run time. Unset in production, code execution is off: `/runner/`
-  answers 404.
+- `runner.origin` must be https and differ from `instance.publicUrl`. Null
+  in production, code execution is off: `/runner/` answers 404.
 - The reverse proxy **must** restrict the runner host to `/runner/`. Files of
   `public/` and `/_astro/` are answered before the middleware, on any host, so
   only the proxy can keep the runner origin from serving the app's assets.

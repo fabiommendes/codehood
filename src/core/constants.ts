@@ -1,7 +1,9 @@
 /**
- * Environment variables and configuration constants for the application.
+ * Settings of the running instance, from the environment and
+ * `codehood.config.ts`, and other configuration constants.
  */
 
+import config from "codehood:config";
 import type { Role } from "@/db/client";
 import { resolveRunnerOrigin } from "@/runner/server/config";
 import type { ArrayToUnion } from "@/typing";
@@ -109,13 +111,11 @@ export const PRODUCTION = ENVIRONMENT === "prod";
 /// Public address of this instance, the origin of absolute URLs the server
 /// hands out of a request context, such as a repository's clone URL. Also
 /// read at build time by `astro.config.mjs`.
-export const PUBLIC_URL = new URL(
-	readEnv("PUBLIC_URL", "http://localhost:4321"),
-).origin;
+export const PUBLIC_URL = config.instance.publicUrl;
 
 /// Origin the runner frame is served from, or null when code execution is off.
 export const RUNNER_ORIGIN: string | null = resolveRunnerOrigin(
-	process.env.RUNNER_ORIGIN,
+	config.runner.origin ?? undefined,
 	PUBLIC_URL,
 	ENVIRONMENT,
 );
@@ -145,7 +145,7 @@ export const SESSION_COOKIE_OPTIONS = {
 /// The format this institution gives school ids, as a regex matched against the
 /// whole id (e.g. `[0-9]{9}`). Unset accepts any id the schema allows. An
 /// invalid regex fails the boot.
-export const SCHOOL_ID_PATTERN = wholeMatch(readEnv("SCHOOL_ID_PATTERN", ""));
+export const SCHOOL_ID_PATTERN = wholeMatch(config.instance.schoolIdPattern);
 
 // =============================================================================
 //  							RESOURCES
@@ -159,7 +159,7 @@ export const SCHOOL_ID_PATTERN = wholeMatch(readEnv("SCHOOL_ID_PATTERN", ""));
  * volume and have its reverse proxy `try_files` that path before falling back
  * to the app, which answers for tombstoned blobs.
  */
-export const RESOURCE_ROOT = readEnv("RESOURCE_ROOT", "./storage/resources");
+export const RESOURCE_ROOT = config.storage.resourceRoot;
 
 /**
  * How a blob's per-attachment names are materialised next to its bytes.
@@ -169,10 +169,7 @@ export const RESOURCE_ROOT = readEnv("RESOURCE_ROOT", "./storage/resources");
  * symlinks do not; `copy` exists for filesystems supporting neither, at the
  * cost of storing the bytes once per distinct filename.
  */
-export const ATTACHMENT_LINK_MODE = assertIn(
-	readEnv("ATTACHMENT_LINK_MODE", "symlink"),
-	["symlink", "hardlink", "copy"],
-);
+export const ATTACHMENT_LINK_MODE = config.storage.attachmentLinkMode;
 export type AttachmentLinkMode = typeof ATTACHMENT_LINK_MODE;
 
 /**
@@ -183,8 +180,8 @@ export type AttachmentLinkMode = typeof ATTACHMENT_LINK_MODE;
  */
 export const BLOB_QUOTA_BY_ROLE: Record<Role, number | null> = {
 	ADMIN: null,
-	INSTRUCTOR: parseByteSize(readEnv("BLOB_QUOTA_INSTRUCTOR", "1gb")),
-	STUDENT: parseByteSize(readEnv("BLOB_QUOTA_STUDENT", "200mb")),
+	INSTRUCTOR: parseByteSize(config.storage.quota.instructor),
+	STUDENT: parseByteSize(config.storage.quota.student),
 };
 
 /** How long an unattached blob survives before garbage collection may take it. */
@@ -215,10 +212,11 @@ function logEnvVariables(vars: [string, unknown][]): void {
 logEnvVariables([
 	["DEBUG", DEBUG],
 	["ENVIRONMENT", ENVIRONMENT],
-	["PUBLIC_URL", PUBLIC_URL],
-	["RESOURCE_ROOT", RESOURCE_ROOT],
-	["ATTACHMENT_LINK_MODE", ATTACHMENT_LINK_MODE],
-	["BLOB_QUOTA_INSTRUCTOR", BLOB_QUOTA_BY_ROLE.INSTRUCTOR],
-	["BLOB_QUOTA_STUDENT", BLOB_QUOTA_BY_ROLE.STUDENT],
-	["SCHOOL_ID_PATTERN", SCHOOL_ID_PATTERN],
+	["instance.publicUrl", PUBLIC_URL],
+	["runner.origin", RUNNER_ORIGIN],
+	["storage.resourceRoot", RESOURCE_ROOT],
+	["storage.attachmentLinkMode", ATTACHMENT_LINK_MODE],
+	["storage.quota.instructor", BLOB_QUOTA_BY_ROLE.INSTRUCTOR],
+	["storage.quota.student", BLOB_QUOTA_BY_ROLE.STUDENT],
+	["instance.schoolIdPattern", SCHOOL_ID_PATTERN],
 ]);

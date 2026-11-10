@@ -45,6 +45,11 @@
 
 ### Changed
 
+- The instance is configured in `codehood.config.ts` (or the file
+  `CODEHOOD_CONFIG` points at). Address, locale, time zone and runner origin
+  are build-time constants there; `PUBLIC_URL`, `CODEHOOD_LOCALE`,
+  `SERVER_TZ` and `RUNNER_ORIGIN` no longer reach the build. `pnpm run
+  package` takes the instance's file with `--config`.
 - REST e RPC documentam sessão OU Bearer. Credenciais simultâneas são
   rejeitadas antes da validação; cookies alheios não conflitam. Mutações JSON
   em `/api/` e `/rpc` com Origin externo também exigem Bearer válido.
