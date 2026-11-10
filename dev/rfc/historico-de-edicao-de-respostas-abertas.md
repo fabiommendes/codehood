@@ -619,8 +619,10 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
   O identificador de campo permite ambos, mas o escopo inicial ainda será fechado.
 - Q3. Qual retenção, quem pode consultar e como o aluno acessa o próprio histórico?
 - Q4. Quais limites por edit, lote e tentativa e qual frequência de checkpoints?
-- Q5. Qual precisão dos tempos e acumuladores será serializada? Não registrar
-  precisão maior que a oferecida pelo navegador.
+- Q5. Respondida: tempos são milissegundos inteiros. O monitor arredonda com
+  `Math.round` a origem da sessão e todo `atMs` recebido (função monótona, então
+  ordem e empates se preservam); o codec e o checkpoint exigem inteiros seguros.
+  Média e M2 dos intervalos continuam em ponto flutuante.
 - Q6. Qual UX de reconciliação entre abas e dispositivos, e como comunicar que
   uma resposta foi salva mas parte do histórico não foi recuperada?
 - Q7. Quais props finais de injeção de editores serão aceitas pela biblioteca MDQ?

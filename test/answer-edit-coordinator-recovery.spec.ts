@@ -415,3 +415,22 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 		await h.coordinator.dispose();
 	});
 });
+
+test("an invalid checkpoint becomes a visible text-only status instead of a rejection", async () => {
+	const h = rig();
+	await h.coordinator.register(FIELD, h.monitor);
+	await h.coordinator.persist();
+	const exported = h.monitor.exportCheckpoint.bind(h.monitor);
+	let broken = false;
+	h.monitor.exportCheckpoint = () =>
+		broken ? ({ version: 2, state: null } as never) : exported();
+	h.append("typed");
+	broken = true;
+	await h.coordinator.persist();
+	await h.coordinator.flush();
+	const status = h.coordinator.getStatus(FIELD);
+	expect(status?.durability).toBe("text-only");
+	expect(status?.historyGap).toBe(true);
+	expect(status?.error).toMatch(/checkpoint/i);
+	await h.coordinator.dispose();
+});

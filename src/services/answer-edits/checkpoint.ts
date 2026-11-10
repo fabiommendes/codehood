@@ -18,14 +18,14 @@ const edit = z.strictObject({
 	position: integer,
 	deleteCount: integer,
 	insertedText: z.string(),
-	startMs: time,
-	durationMs: time,
+	startMs: integer,
+	durationMs: integer,
 	kind,
 	timing,
 });
 const tuple = z.tuple([
-	time,
-	time,
+	integer,
+	integer,
 	integer,
 	integer,
 	z.string(),
@@ -36,7 +36,7 @@ const batch = z.strictObject({
 	version: z.literal(1),
 	batchId: id,
 	sessionId: id,
-	timeOriginMs: time,
+	timeOriginMs: integer,
 	baseRevision: integer,
 	firstSeq: integer,
 	edits: z.array(tuple).min(1),
@@ -44,7 +44,7 @@ const batch = z.strictObject({
 });
 const segment = z.strictObject({
 	sessionId: id,
-	timeOriginMs: time,
+	timeOriginMs: integer,
 	edits: z.array(edit).min(1),
 	snapshot: z.string(),
 });
@@ -55,10 +55,10 @@ const receipt = z.strictObject({
 });
 const active = z.strictObject({
 	sessionId: id,
-	timeOriginMs: time,
-	lastAtMs: time,
+	timeOriginMs: integer,
+	lastAtMs: integer,
 	edits: z.array(edit),
-	openEdit: z.strictObject({ edit, lastAtMs: time }).nullable(),
+	openEdit: z.strictObject({ edit, lastAtMs: integer }).nullable(),
 });
 const checkpoint = z.strictObject({
 	version: z.literal(2),

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
+import { parseCheckpoint } from "@/services/answer-edits/checkpoint";
 import { decodeEdits, replayEdits } from "@/services/answer-edits/codec";
 import {
 	AnswerEditMonitor,
@@ -599,16 +600,16 @@ test.describe("answer edit monitor checkpoints: reload and delivery", () => {
 				previous = receipt(collect(target));
 				target.acknowledge(previous);
 			}
-			const restored = restore(target, "clean-session", 0.5);
+			const restored = restore(target, "clean-session", 1);
 			expect(restored.collect()).toBeNull();
 			expect(restored.getState()).toEqual(target.getState());
 			if (previous) restored.acknowledge({ ...previous });
-			append(restored, "!", 1.5);
+			append(restored, "!", 2);
 			const batch = collect(restored);
 			expectBatch(batch, {
 				sessionId: "clean-session",
-				origin: 0.5,
-				start: 1.5,
+				origin: 1,
+				start: 2,
 				baseRevision: acknowledged ? 5 : 4,
 				firstSeq: acknowledged ? 13 : 12,
 				before: acknowledged ? "seeda" : "seed",
@@ -676,5 +677,65 @@ test.describe("answer edit monitor checkpoints: reload and delivery", () => {
 			sessions.add(batch.sessionId);
 			target.acknowledge(receipt(batch));
 		}
+	});
+
+	test("fractional clocks far from the origin survive collect, export, parse and restore", () => {
+		fc.assert(
+			fc.property(
+				fc.double({ min: 300, max: 2300, noNaN: true }),
+				fc.array(
+					fc.record({
+						gap: fc.double({ min: 0, max: 600_000, noNaN: true }),
+						text: fc.constantFrom("a", "bc", "d"),
+					}),
+					{ minLength: 1, maxLength: 12 },
+				),
+				(origin, steps) => {
+					const target = new AnswerEditMonitor({
+						initialText: "",
+						sessionId: "fractional-session",
+						baseRevision: 0,
+						firstSeq: 1,
+						now: () => origin,
+					});
+					let atMs = origin + 60_000;
+					for (const step of steps) {
+						atMs += step.gap;
+						append(target, step.text, atMs);
+					}
+					const text = target.getState().text;
+					const batch = collect(target);
+					const state = parseCheckpoint(jsonCheckpoint(target));
+					expect(state.text).toBe(text);
+					expect(Number.isSafeInteger(state.active.timeOriginMs)).toBe(true);
+					for (const tuple of batch.edits)
+						expect(Number.isSafeInteger(tuple[0])).toBe(true);
+					const restored = AnswerEditMonitor.restore({
+						checkpoint: jsonCheckpoint(target),
+						now: () => 0,
+						createSessionId: () => "fractional-restored",
+					});
+					expect(restored.getState().text).toBe(text);
+					expect(restored.collect()).toEqual(batch);
+				},
+			),
+			{ seed: 20261110, numRuns: 500 },
+		);
+	});
+
+	test("rounding keeps event order and ties valid", () => {
+		const target = new AnswerEditMonitor({
+			initialText: "",
+			sessionId: "rounding-session",
+			baseRevision: 0,
+			firstSeq: 1,
+			now: () => 10.4,
+		});
+		append(target, "a", 10.6);
+		append(target, "b", 10.6);
+		append(target, "c", 11.4);
+		const batch = collect(target);
+		expect(batch.timeOriginMs).toBe(10);
+		expect(batch.edits.map((tuple) => tuple[0])).toEqual([1]);
 	});
 });

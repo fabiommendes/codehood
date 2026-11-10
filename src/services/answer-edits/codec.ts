@@ -52,7 +52,7 @@ const INPUT_KINDS: readonly InputKind[] = [
 ];
 
 /**
- * Encode absolute session times as independently decodable compact tuples.
+ * Encode absolute session times, in whole milliseconds, as independently decodable compact tuples.
  *
  * @throws {TypeError} If an edit or the time origin is invalid.
  */
@@ -60,7 +60,7 @@ export function encodeEdits(
 	edits: readonly AnswerEdit[],
 	timeOriginMs: number,
 ): EditEnvelope {
-	const origin = nonnegativeNumber(timeOriginMs, "timeOriginMs");
+	const origin = nonnegativeInteger(timeOriginMs, "timeOriginMs");
 	if (!Array.isArray(edits)) throw new TypeError("edits must be an array");
 
 	const tuples: EditTuple[] = [];
@@ -68,12 +68,12 @@ export function encodeEdits(
 	for (const value of edits) {
 		const edit = record(value, "edit");
 		const replacement = parseReplacement(edit);
-		const startMs = nonnegativeNumber(edit.startMs, "startMs");
+		const startMs = nonnegativeInteger(edit.startMs, "startMs");
 		if (startMs < previousStartMs)
 			throw new TypeError(
 				"Edit start times must not regress or precede the origin",
 			);
-		const durationMs = nonnegativeNumber(edit.durationMs, "durationMs");
+		const durationMs = nonnegativeInteger(edit.durationMs, "durationMs");
 		const kindCode = INPUT_KINDS.indexOf(edit.kind as InputKind);
 		if (kindCode < 0) throw new TypeError("Invalid input kind");
 		const timing = parseTiming(edit.timing);
@@ -100,19 +100,19 @@ export function decodeEdits(envelope: unknown): readonly AnswerEdit[] {
 	const data = record(envelope, "envelope");
 	if (data.version !== 1)
 		throw new TypeError("Unsupported edit envelope version");
-	let previousStartMs = nonnegativeNumber(data.timeOriginMs, "timeOriginMs");
+	let previousStartMs = nonnegativeInteger(data.timeOriginMs, "timeOriginMs");
 	if (!Array.isArray(data.edits)) throw new TypeError("edits must be an array");
 
 	const edits: AnswerEdit[] = [];
 	for (const tuple of data.edits) {
 		if (!Array.isArray(tuple) || tuple.length !== 7)
 			throw new TypeError("An edit tuple must have seven fields");
-		const deltaMs = nonnegativeNumber(tuple[0], "startDeltaMs");
-		const startMs = nonnegativeNumber(
+		const deltaMs = nonnegativeInteger(tuple[0], "startDeltaMs");
+		const startMs = nonnegativeInteger(
 			previousStartMs + deltaMs,
 			"accumulated startMs",
 		);
-		const durationMs = nonnegativeNumber(tuple[1], "durationMs");
+		const durationMs = nonnegativeInteger(tuple[1], "durationMs");
 		const replacement = parseReplacement({
 			position: tuple[2],
 			deleteCount: tuple[3],

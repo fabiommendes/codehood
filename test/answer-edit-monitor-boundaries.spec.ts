@@ -3,7 +3,6 @@ import { decodeEdits, replayEdits } from "@/services/answer-edits/codec";
 import {
 	AnswerEditMonitor,
 	type MonitorCheckpoint,
-	type PendingEditBatch,
 } from "@/services/answer-edits/monitor";
 
 function monitor(pauseMs = 1000) {
@@ -46,7 +45,7 @@ function expectFiniteNumbers(value: unknown) {
 		for (const nested of Object.values(value)) expectFiniteNumbers(nested);
 }
 
-function restore(target: AnswerEditMonitor, sessionId: string) {
+function _restore(target: AnswerEditMonitor, sessionId: string) {
 	const checkpoint = target.exportCheckpoint();
 	expectFiniteNumbers(checkpoint);
 	const json: MonitorCheckpoint = JSON.parse(JSON.stringify(checkpoint));
@@ -58,54 +57,14 @@ function restore(target: AnswerEditMonitor, sessionId: string) {
 	});
 }
 
-function expectOverflowSafeBatch(batch: Readonly<PendingEditBatch>) {
-	expectFiniteNumbers(batch);
-	const edits = decodeEdits(batch);
-	expectFiniteNumbers(edits);
-	expect(edits.length).toBeGreaterThanOrEqual(2);
-	expect(batch.snapshot).toBe("xxx");
-	expect(replayEdits("", batch)).toBe("xxx");
-	expect(edits.map((edit) => edit.insertedText).join("")).toBe("xxx");
-	expect(
-		edits.reduce((samples, edit) => samples + (edit.timing?.[0] ?? 0), 0),
-	).toBe(3 - edits.length);
-	for (const edit of edits) {
-		expect(edit.kind).toBe("typing");
-		if (edit.timing !== null) {
-			expect(edit.timing[0]).toBe(1);
-			expect([0, 1e200]).toContain(edit.timing[1]);
-			expect(edit.timing[2]).toBe(0);
-		}
-	}
-}
-
 test.describe("answer edit monitor boundaries: finite cadence", () => {
-	test("finite timestamps split an overflowing accumulator without losing typing or inventing samples", () => {
+	test("timestamps beyond the safe integer range are rejected before they reach a checkpoint", () => {
 		const target = monitor(1e200);
-		for (const atMs of [0, 0, 1e200]) append(target, "x", atMs);
-		expect(target.getState().text).toBe("xxx");
-		expectOverflowSafeBatch(collect(target));
-	});
-
-	test("overflow remains replayable through JSON checkpoints before collection and with an in-flight batch", () => {
-		const target = monitor(1e200);
-		for (const atMs of [0, 0, 1e200]) append(target, "x", atMs);
-		const restored = restore(target, "before-collection-reload");
-		expect(restored.getState().text).toBe("xxx");
-		const batch = collect(restored);
-		expectOverflowSafeBatch(batch);
-		const retried = restore(restored, "in-flight-reload");
-		expect(retried.getState().text).toBe("xxx");
-		const retry = collect(retried);
-		expect(retry).toEqual(batch);
-		expectOverflowSafeBatch(retry);
-		retried.acknowledge({
-			batchId: retry.batchId,
-			revision: retry.baseRevision + 1,
-			lastSeq: retry.firstSeq + retry.edits.length - 1,
-		});
-		expect(retried.collect()).toBeNull();
-		expect(retried.getState().text).toBe("xxx");
+		expect(() => append(target, "x", 1e200)).toThrow(/safe integer/);
+		expect(target.getState().text).toBe("");
+		expect(() =>
+			target.observeInput({ atMs: 2 ** 53, kind: "typing" }),
+		).toThrow(/safe integer/);
 	});
 });
 

@@ -131,8 +131,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 		requireTime(pauseMs, "pauseMs");
 		if (typeof options.now !== "function")
 			throw new TypeError("now must be a function");
-		const origin = options.now();
-		requireTime(origin, "timeOriginMs");
+		const origin = wholeMs(options.now(), "timeOriginMs");
 		this.sessionId = options.sessionId;
 		this.baseRevision = options.baseRevision;
 		this.firstSeq = options.firstSeq;
@@ -212,14 +211,14 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.requireActive();
 		requireRecord(input, "input");
 		requireKind(input.kind);
-		this.validateTime(input.atMs);
+		const atMs = this.validateTime(input.atMs);
 		const token = `${this.sessionId}#${this.nextInput++}`;
-		this.observations.set(token, { atMs: input.atMs, kind: input.kind });
+		this.observations.set(token, { atMs, kind: input.kind });
 		if (this.observations.size > MAX_OBSERVATIONS) {
 			const oldest = this.observations.keys().next().value;
 			if (oldest !== undefined) this.observations.delete(oldest);
 		}
-		this.lastAtMs = input.atMs;
+		this.lastAtMs = atMs;
 		this.notify();
 		return token;
 	}
@@ -234,8 +233,8 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.requireActive();
 		requireRecord(change, "change");
 		requireKind(change.kind);
-		this.validateTime(change.atMs);
-		const observation = this.associatedInput(change);
+		const atMs = this.validateTime(change.atMs);
+		const observation = this.associatedInput(change, atMs);
 		const nextText = applyReplacements(this.text, change.replacements);
 		const replacements = change.replacements
 			.filter(
@@ -247,9 +246,8 @@ export class AnswerEditMonitor implements MonitorHandle {
 			)
 			.map((replacement) => ({ ...replacement }));
 
-		const metadataChanged =
-			this.lastAtMs !== change.atMs || observation !== undefined;
-		this.lastAtMs = change.atMs;
+		const metadataChanged = this.lastAtMs !== atMs || observation !== undefined;
+		this.lastAtMs = atMs;
 		if (change.input !== undefined) this.observations.delete(change.input);
 		if (nextText === this.text) {
 			if (metadataChanged) this.notify();
@@ -268,7 +266,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 			this.appendEdit(
 				{
 					...replacement,
-					startMs: change.atMs,
+					startMs: atMs,
 					durationMs: 0,
 					kind: change.kind,
 					timing,
@@ -476,20 +474,23 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.openEdit = null;
 	}
 
-	private validateTime(atMs: number): void {
-		requireTime(atMs, "atMs");
-		if (atMs < this.lastAtMs)
+	/// Round an event time to whole milliseconds and check it against the session clock.
+	private validateTime(atMs: number): number {
+		const rounded = wholeMs(atMs, "atMs");
+		if (rounded < this.lastAtMs)
 			throw new TypeError("Event time must not regress or precede the origin");
+		return rounded;
 	}
 
 	private associatedInput(
 		change: DocumentChange,
+		atMs: number,
 	): InputObservation | undefined {
 		if (change.input === undefined) return undefined;
 		const observation = this.observations.get(change.input);
 		if (!observation)
 			throw new TypeError("Input must be observed and unconsumed");
-		if (observation.kind !== change.kind || observation.atMs > change.atMs)
+		if (observation.kind !== change.kind || observation.atMs > atMs)
 			throw new TypeError("Input kind and time must match the change");
 		return observation;
 	}
@@ -546,6 +547,14 @@ function requireId(value: unknown, name: string): void {
 function requireTime(value: unknown, name: string): void {
 	if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
 		throw new TypeError(`${name} must be a finite nonnegative number`);
+}
+
+/// Round a clock reading to whole milliseconds; `Math.round` is monotonic, so order and ties survive.
+function wholeMs(value: unknown, name: string): number {
+	requireTime(value, name);
+	const rounded = Math.round(value as number);
+	requireInteger(rounded, name);
+	return rounded;
 }
 
 function requireInteger(value: unknown, name: string): void {

@@ -547,18 +547,29 @@ export class AnswerEditCoordinator {
 
 	private async commit(entry: RegisteredField): Promise<void> {
 		const version = entry.version;
-		const checkpoint = entry.handle.exportCheckpoint();
-		const state = parseCheckpoint(checkpoint);
 		const savedAt = this.options.now();
-		const record: LocalEditRecord = {
-			version: 1,
-			generation: (entry.generation ?? 0) + 1,
-			savedAt,
-			expiresAt: savedAt + (this.options.ttlMs ?? LOCAL_EDIT_TTL_MS),
-			text: state.text,
-			checkpoint,
-			outbox: state.inFlight,
-		};
+		const expiresAt = savedAt + (this.options.ttlMs ?? LOCAL_EDIT_TTL_MS);
+		let record: LocalEditRecord;
+		try {
+			const checkpoint = entry.handle.exportCheckpoint();
+			const state = parseCheckpoint(checkpoint);
+			record = {
+				version: 1,
+				generation: (entry.generation ?? 0) + 1,
+				savedAt,
+				expiresAt,
+				text: state.text,
+				checkpoint,
+				outbox: state.inFlight,
+			};
+		} catch (error) {
+			this.recordFailure(entry, version, error, {
+				text: entry.handle.getState().text,
+				savedAt,
+				expiresAt,
+			});
+			return;
+		}
 		try {
 			if (entry.principalReadError) throw new Error(entry.principalReadError);
 			await this.options.store.commit(
@@ -590,29 +601,42 @@ export class AnswerEditCoordinator {
 			};
 		} catch (error) {
 			if (this.revoked) return;
-			try {
-				this.options.fallback.write(this.ref(entry.field), {
-					version: 1,
-					savedAt,
-					expiresAt: record.expiresAt,
-					text: record.text,
-					historyGap: true,
-				});
-				entry.status = {
-					...entry.status,
-					durability: version === entry.version ? "text-only" : "pending",
-					savedText: record.text,
-					historyGap: true,
-					error: errorMessage(error),
-				};
-			} catch (fallbackError) {
-				entry.status = {
-					...entry.status,
-					durability: "unavailable",
-					historyGap: true,
-					error: errorMessage(fallbackError),
-				};
-			}
+			this.recordFailure(entry, version, error, record);
+			return;
+		}
+		entry.attemptedVersion = version;
+		this.publish(entry);
+	}
+
+	/// Keep only the text in the fallback store and report why the full record was not saved.
+	private recordFailure(
+		entry: RegisteredField,
+		version: number,
+		error: unknown,
+		record: { text: string; savedAt: number; expiresAt: number },
+	): void {
+		try {
+			this.options.fallback.write(this.ref(entry.field), {
+				version: 1,
+				savedAt: record.savedAt,
+				expiresAt: record.expiresAt,
+				text: record.text,
+				historyGap: true,
+			});
+			entry.status = {
+				...entry.status,
+				durability: version === entry.version ? "text-only" : "pending",
+				savedText: record.text,
+				historyGap: true,
+				error: errorMessage(error),
+			};
+		} catch (fallbackError) {
+			entry.status = {
+				...entry.status,
+				durability: "unavailable",
+				historyGap: true,
+				error: errorMessage(fallbackError),
+			};
 		}
 		entry.attemptedVersion = version;
 		this.publish(entry);
@@ -729,7 +753,8 @@ export class AnswerEditCoordinator {
 			PERSIST_DELAY_MS,
 			() => {
 				this.cancelPersist = null;
-				if (!this.stopped && !this.revoked) void this.persist();
+				if (!this.stopped && !this.revoked)
+					this.persist().catch(ignoreScheduled);
 			},
 		);
 	}
@@ -749,7 +774,7 @@ export class AnswerEditCoordinator {
 				: 55_000 + this.options.random() * 10_000,
 			() => {
 				this.cancelDelivery = null;
-				if (!this.stopped && !this.revoked) void this.flush();
+				if (!this.stopped && !this.revoked) this.flush().catch(ignoreScheduled);
 			},
 		);
 	}
@@ -796,6 +821,9 @@ export class AnswerEditCoordinator {
 function fieldKey(field: AttemptField): string {
 	return JSON.stringify([field.questionId, field.field]);
 }
+
+/// Scheduled runs have no caller to reject to; failures are already reflected in field statuses.
+function ignoreScheduled(): void {}
 
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);

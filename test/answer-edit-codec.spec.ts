@@ -61,18 +61,18 @@ test.describe("answer edit codec", () => {
 	for (const [kind, code] of kindCodes) {
 		for (const timing of [null, [3, 12.5, 7.25] as const]) {
 			test(`${kind} uses code ${code} with ${timing === null ? "no intervals" : "interval statistics"}`, () => {
-				const input = edit({ startMs: 105.5, kind, timing });
+				const input = edit({ startMs: 105, kind, timing });
 				expect(encodeEdits([input], 100)).toEqual({
 					version: 1,
 					timeOriginMs: 100,
-					edits: [[5.5, 0, 0, 0, "", code, timing]],
+					edits: [[5, 0, 0, 0, "", code, timing]],
 				});
 			});
 
 			test(`${kind} decodes code ${code} with ${timing === null ? "no intervals" : "interval statistics"}`, () => {
-				expect(decodeEdits(envelope([5.5, 0, 0, 0, "", code, timing]))).toEqual(
-					[edit({ startMs: 105.5, kind, timing })],
-				);
+				expect(decodeEdits(envelope([5, 0, 0, 0, "", code, timing]))).toEqual([
+					edit({ startMs: 105, kind, timing }),
+				]);
 			});
 		}
 	}
@@ -80,7 +80,7 @@ test.describe("answer edit codec", () => {
 	test("roundtrips ordered edits without changing UTF-16 text or timing", () => {
 		const editArbitrary = fc.record({
 			delta: fc.integer({ min: 0, max: 1000 }),
-			durationMs: fc.integer({ min: 0, max: 1000 }).map((n) => n / 4),
+			durationMs: fc.integer({ min: 0, max: 1000 }),
 			position: fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER }),
 			deleteCount: fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER }),
 			insertedText: utf16Text,
@@ -141,15 +141,34 @@ test.describe("answer edit codec", () => {
 	});
 
 	test("an empty edit list retains its origin", () => {
-		expect(encodeEdits([], 12.5)).toEqual({
+		expect(encodeEdits([], 12)).toEqual({
 			version: 1,
-			timeOriginMs: 12.5,
+			timeOriginMs: 12,
 			edits: [],
 		});
 	});
 
+	test("fractional times are rejected by encode and decode", () => {
+		expect(() => encodeEdits([], 12.5)).toThrow(/safe integer/);
+		expect(() => encodeEdits([edit({ startMs: 100.5 })], 100)).toThrow(
+			/safe integer/,
+		);
+		expect(() => encodeEdits([edit({ durationMs: 0.5 })], 100)).toThrow(
+			/safe integer/,
+		);
+		expect(() =>
+			decodeEdits({ version: 1, timeOriginMs: 12.5, edits: [] }),
+		).toThrow(/safe integer/);
+		expect(() => decodeEdits(envelope([0.5, 0, 0, 0, "", 0, null]))).toThrow(
+			/safe integer/,
+		);
+		expect(() => decodeEdits(envelope([0, 0.5, 0, 0, "", 0, null]))).toThrow(
+			/safe integer/,
+		);
+	});
+
 	test("an empty envelope decodes to no edits", () => {
-		expect(decodeEdits({ version: 1, timeOriginMs: 12.5, edits: [] })).toEqual(
+		expect(decodeEdits({ version: 1, timeOriginMs: 12, edits: [] })).toEqual(
 			[],
 		);
 	});
