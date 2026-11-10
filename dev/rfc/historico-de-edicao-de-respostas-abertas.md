@@ -28,7 +28,7 @@ A primeira entrega não atribui probabilidade de fraude nem aplica penalidades.
 - Um coordenador por tentativa de prova reúne todas as questões alteradas numa
   única chamada. Não criar um timer de rede por editor.
 - Usar tuplas versionadas para os edits, tanto na rede quanto no banco.
-- Separar estado atual, lotes imutáveis e checkpoints ocasionais.
+- Separar âncora de replay, lotes imutáveis e checkpoints ocasionais.
 - Preservar `Submission.payload` e seu contrato MDQ. Não embutir o histórico na
   resposta e não transformar cada evento numa submissão.
 - Agrupar digitação contígua até uma pausa de 1.000 ms, valor inicial configurável.
@@ -43,6 +43,47 @@ A primeira entrega não atribui probabilidade de fraude nem aplica penalidades.
 - Este RFC desenha contratos. Não implementa a classe, os componentes, schema ou
   mudanças na biblioteca MDQ.
 
+## Prioridade: a resposta não depende do monitor
+
+A resposta do aluno chegar ao servidor vale mais que preservar o monitoramento.
+Nenhum aluno perde a prova por problema técnico do monitor.
+
+- R1. `exam.answer`, `exam.finish` e `Submission` ficam como estão e são a
+  autoridade. O histórico vai por endpoint próprio e nunca altera nem bloqueia
+  `Submission`. Divergência entre histórico e resposta salva vira lacuna
+  registrada, nunca recusa da resposta. O "estado atual" do histórico, se
+  existir, é só âncora de replay, não a resposta.
+- R2. O editor é a fonte do texto. O adaptador envolve toda chamada ao monitor em
+  tratamento de erro; qualquer exceção desliga o monitor daquele campo, registra
+  lacuna e rebaseia a partir do texto atual do editor. A resposta enviada nunca é
+  lida do monitor.
+- R3. O editor monta e aceita digitação sem esperar monitor, storage ou rede.
+- R4. O envio final manda as respostas e chama `finish` sem aguardar o histórico.
+  O último lote sai em paralelo, com teto de poucos segundos. O servidor pode
+  aceitar lote de histórico atrasado dentro de uma janela curta, registrando o
+  atraso.
+- R5. Nenhum estado do monitor (conflito, lacuna, storage indisponível) abre
+  diálogo ou bloqueia a prova. No máximo um indicador discreto. Divergência com
+  outra aba ou dispositivo resolve-se sozinha: nova base a partir do texto do
+  editor, com lacuna registrada, sem escolha do aluno.
+- R6. Chave para desligar o monitoramento por prova, utilizável com a prova em
+  andamento.
+- R7. Critério de aceite da integração: teste de injeção de falha em que o monitor
+  lança em toda chamada, o storage falha e o transporte fica pendurado ou devolve
+  erro, e mesmo assim o aluno digita, salva e entrega.
+
+### Consequências para o código existente
+
+Nada disto é implementado por este RFC.
+
+- O `AnswerEditCoordinator` atual tem estados sem saída (`conflict`, `closed`,
+  `text-only`, `unavailable` não devolvem handle) e espera `transport.inspect`
+  antes de liberar o campo. Ambos precisam virar "rebasear com lacuna" antes da
+  integração.
+- O fallback de texto em `localStorage` do monitor pode perder a razão de existir
+  se o rascunho local de respostas passar a cobrir todas as questões de texto.
+  Decisão em aberto.
+
 ## Estado atual
 
 `Response` identifica a tentativa da prova inteira; `Submission` registra uma
@@ -55,8 +96,8 @@ injeção de editores. A dependência local `mdq` fornece hoje um textarea próp
 `src/solid/Essay.tsx`. A extensão deve acontecer no contrato público da biblioteca,
 não por busca de elementos no DOM ou edição dos documentos de questões.
 
-A ponte `rest.batch` permite agrupar chamadas REST. Ela não substitui uma operação
-de domínio que salva histórico e estado atual atomicamente.
+A ponte `rest.batch` permite agrupar chamadas REST. O histórico usa endpoint
+próprio, separado do canal da resposta.
 
 ## Arquitetura proposta
 
@@ -67,7 +108,7 @@ Eventos do editor
   → handle registrado no coordenador da prova
   → outbox persistente no navegador
   → uma chamada por minuto para a tentativa
-  → service valida e grava estado atual + lote na mesma transação
+  → endpoint de histórico valida e grava lote + âncora de replay
 ```
 
 Cada instância da classe pertence a um campo editável de uma questão. O
@@ -306,7 +347,7 @@ declare class AnswerEditMonitor implements MonitorHandle {
 - `dispose` libera listeners e recursos locais. Não confirma lotes nem apaga
   armazenamento persistente. Operações de edição após dispose são inválidas.
 - Conflitos entre abas não se resolvem com `reset` silencioso. A reconciliação é
-  externa e inicia uma nova base explícita, preservando evidência de lacuna.
+  externa: rebaseia a partir do texto do editor e registra a lacuna.
 
 ## Controles do monitor limitados por contagem
 
@@ -349,8 +390,8 @@ O envio não depende da gravação principal: o coordenador tenta persistir e en
 o lote congelado mesmo se o commit falhar (teto, IndexedDB indisponível, quota),
 sem declarar durabilidade local enquanto isso. Depois do ACK o checkpoint encolhe
 e a nova tentativa de commit pode voltar a `durable`. Após um crash nesse intervalo
-a reconciliação com os recibos do servidor cobre o lote. Campos em `conflict`, sem
-`canWrite` ou em recuperação continuam sem enviar. Não há teto de bytes por lote
+a reconciliação com os recibos do servidor cobre o lote. Campos com o monitor
+desligado não enviam histórico, mas a resposta segue seu canal. Não há teto de bytes por lote
 (pendência: um lote muito grande ainda vai inteiro em um envio). Um ensaio browser
 de 20 substituições de 128 KiB em dois segundos, seguido de resposta final
 pequena, produziu checkpoint de 2,6 MB: o lote é enviado e, confirmado, o campo
@@ -419,8 +460,8 @@ Ao reabrir, autenticar e consultar o estado do servidor antes de reenviar. Texto
 igual ao servidor não implica histórico confirmado: preservar lotes sem recibo
 até reconciliar seus identificadores. Se revisão e recibos forem compatíveis,
 restaurar e reenviar idempotentemente. Se houver divergência com outro dispositivo
-ou aba, oferecer recuperação explícita sem sobrescrever silenciosamente a resposta
-remota. Timestamp local isolado não decide qual versão vence.
+ou aba, abrir nova base a partir do texto do editor e registrar lacuna, sem
+diálogo (R5). O histórico nunca decide qual resposta vale.
 
 Quando só o texto puder ser recuperado, preservá-lo como rascunho e registrar uma
 lacuna no histórico. A recuperação não estende o prazo de entrega: depois do
@@ -437,14 +478,14 @@ Uma requisição reúne os lotes da tentativa. Cada campo tem resultado e confir
 independentes; um conflito não apaga o trabalho dos outros. Aplicar backoff com
 jitter e não disparar várias chamadas concorrentes para o mesmo campo.
 
-Perto do prazo e ao entregar a prova, recolher imediatamente. A entrega vincula a
-submissão ao estado de histórico aceito no servidor. Se houver lacuna de captura,
-registrar recuperação por snapshot e informar que aquele trecho não é reproduzível.
-Não fabricar edits para preencher a lacuna nem descartar a resposta válida.
+Perto do prazo e ao entregar a prova, recolher imediatamente e enviar em paralelo
+à entrega (R4). A entrega não consulta o estado do histórico. Se houver lacuna de
+captura, registrar recuperação por snapshot; aquele trecho não é reproduzível.
+Não fabricar edits para preencher a lacuna.
 
 Não depender de `unload` ou `sendBeacon` para correção. Fechar o navegador pode
-impedir qualquer envio. O fluxo novo deve integrar ou substituir o autosave atual,
-não duplicá-lo com outro canal de requisições.
+impedir qualquer envio. O autosave da resposta continua sendo o atual; o
+coordenador de histórico não o integra nem o substitui.
 
 ## Banco de dados
 
@@ -452,19 +493,20 @@ Estrutura conceitual, ainda sem nomes Prisma definitivos:
 
 | Entidade | Responsabilidade |
 | :-- | :-- |
-| Estado atual por tentativa/questão/campo | string canônica, revisão e metadados de sessão |
-| Lote imutável | referência ao estado, revisão, batchId, sequência e edits JSON compactos |
+| Âncora de replay por tentativa/questão/campo | string canônica, revisão e metadados de sessão |
+| Lote imutável | referência à âncora, revisão, batchId, sequência e edits JSON compactos |
 | Checkpoint | snapshot ocasional em revisão conhecida para acelerar replay |
-| Vínculo da submissão final | referência à revisão do estado entregue |
 
-O estado atual não é o histórico: pode ser atualizado a cada lote. Os lotes são
-append-only e não armazenam uma cópia integral da resposta a cada minuto.
+A âncora não é o histórico nem a resposta: pode ser atualizada a cada lote. Os
+lotes são append-only e não armazenam uma cópia integral da resposta a cada
+minuto. Nenhuma entidade aqui referencia ou altera `Submission`.
 
 Criar unicidade por campo e revisão, e por identificador de lote no escopo
 adequado. Retry com o mesmo identificador e conteúdo devolve o mesmo recibo;
 identificador reutilizado com outro conteúdo é erro. Validar operações e snapshot
-contra a revisão base e gravar lote + estado numa transação. Revisões concorrentes
-não podem ambas vencer. Autor, questão, participação na prova e prazo vêm do
+contra a revisão base e gravar lote + âncora numa transação. Lote recusado
+registra lacuna e nunca afeta a resposta. Revisões concorrentes não podem ambas
+vencer. Autor, questão, participação na prova e prazo vêm do
 servidor, não dos metadados fornecidos pelo cliente.
 
 As consultas normais de correção carregam a resposta, não todos os edits. Replay
@@ -518,7 +560,8 @@ Não criar impressão de precisão que os dados não suportam.
   digitação contínua, fallback sem histórico, troca de usuário, expiração e
   reabertura após o prazo. Preservar texto não significa autorizar nova entrega.
 - Autorização, prazo, reuso malicioso de batchId, limites e conflito entre abas.
-- Replay com checkpoint, histórico incompleto e vínculo exato da entrega final.
+- Replay com checkpoint e histórico incompleto.
+- Injeção de falha do monitor, do storage e do transporte sem afetar a resposta (R7).
 - Teste de carga com turma simultânea, medindo requisições, latência, contenção de
   escrita e bytes por aluno-hora. Não prometer capacidade só pela média de RPS.
 - Dados de desenvolvimento que alcancem edição normal, recuperação, conflito e
@@ -566,8 +609,8 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
 - ACK perdido após commit no servidor seguido de retry não cria outra revisão.
   Mesmo batchId com conteúdo diferente é recusado. ACK repetido idêntico é
   inofensivo; ACK de outro lote ou sequência/revisão divergente não apaga dados.
-- Duas abas enviando a mesma revisão base: no máximo uma vence; a outra conserva
-  texto e histórico para reconciliação explícita.
+- Duas abas enviando a mesma revisão base: no máximo uma vence; a outra rebaseia
+  a partir do texto do editor com lacuna registrada, sem diálogo.
 - Falha de um campo num lote da prova não impede confirmação de outro. Retry
   não reenvia campo já confirmado como se fosse uma alteração nova.
 - Campo desmontado durante requisição ou durante edit aberto conserva pendências.
@@ -587,8 +630,9 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
   cadência. Histórico não confirmado sobrevive mesmo se texto já igual ao servidor.
 - Logout, troca de usuário e TTL não expõem rascunho de outra conta. Callback
   assíncrono antigo após logout não recria dados removidos da sessão encerrada.
-- Rascunho local divergente do servidor exige escolha explícita, não vitória pelo
-  timestamp do navegador. Após prazo encerrado, recuperação não reabre a entrega.
+- Rascunho local divergente do servidor resolve-se sem escolha do aluno (nova base,
+  lacuna), nunca por timestamp do navegador. Após prazo encerrado, recuperação não
+  reabre a entrega.
 
 ### Adaptadores e integração
 
@@ -596,6 +640,9 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
   virtual: uma mudança efetiva por operação, sem teclas fictícias nem texto perdido.
 - Colagem extensa, corte, undo/redo e mudança de cursor no meio da digitação:
   replay correto, causa adequada e agrupamento encerrado quando necessário.
+- Monitor que lança em toda chamada, storage falhando e transporte pendurado ou com
+  erro: o aluno digita, salva e entrega (R7). Monitor desligado no meio da prova
+  mantém a digitação e a resposta intactas (R2, R6).
 - Atualização de valor controlado e eco de `onChange` não registram o mesmo texto
   duas vezes. Aceitar um rascunho diferente é uma mudança explícita.
 - Readonly não captura alterações de usuário. Instâncias montadas/desmontadas
@@ -608,15 +655,16 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
 ### Servidor e entrega
 
 - Acesso a tentativa ou campo de outro aluno, questão fora da prova, sequência
-  inconsistente e snapshot divergente não gravam lote nem alteram estado atual.
-- Falha entre inserção do lote e atualização do estado faz rollback de ambos.
+  inconsistente e snapshot divergente não gravam lote nem alteram a âncora, e não
+  afetam `Submission`.
+- Falha entre inserção do lote e atualização da âncora faz rollback de ambos.
   O teste deve observar a garantia por leitura pública, não por detalhes SQL.
-- Fronteira exata do prazo segue a regra existente do service. Entrega concorrente
-  com autosave não aceita alteração posterior nem vincula revisão incorreta.
+- Fronteira exata do prazo segue a regra existente do service. Lote de histórico
+  atrasado é aceito só dentro da janela curta e registra o atraso (R4).
 - Limites exatamente no máximo e um acima para bytes UTF-8, edits e crescimento
   acumulado. Muitos caracteres multibyte não contornam limite contado por bytes.
-- Falta de histórico ou limite atingido preserva recuperação explícita da resposta
-  válida, mas nunca produz indicação falsa de histórico completo.
+- Falta de histórico ou limite atingido não afeta a resposta válida e nunca produz
+  indicação falsa de histórico completo.
 
 ## Perguntas abertas
 
@@ -630,6 +678,9 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
   `Math.round` a origem da sessão e todo `atMs` recebido (função monótona, então
   ordem e empates se preservam); o codec e o checkpoint exigem inteiros seguros.
   Média e M2 dos intervalos continuam em ponto flutuante.
-- Q6. Qual UX de reconciliação entre abas e dispositivos, e como comunicar que
-  uma resposta foi salva mas parte do histórico não foi recuperada?
+- Q6. Qual indicador discreto, se algum, mostra ao aluno que parte do histórico
+  não foi capturada? A reconciliação em si é automática (R5); resta o que o
+  revisor vê e se o aluno é informado.
+- Q8. O `localStorage` do monitor continua necessário se o rascunho local de
+  respostas cobrir todas as questões de texto?
 - Q7. Quais props finais de injeção de editores serão aceitas pela biblioteca MDQ?
