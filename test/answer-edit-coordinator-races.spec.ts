@@ -4,9 +4,11 @@ import {
 	AnswerEditCoordinator,
 	type AttemptTransport,
 	type FieldResult,
+	type ServerFieldState,
 } from "@/services/answer-edits/coordinator";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 import {
+	deferred,
 	drain,
 	EPOCH,
 	FIELD,
@@ -190,51 +192,266 @@ test.describe("answer edit coordinator races: detach handoff", () => {
 });
 
 test.describe("answer edit coordinator races: partial failure backoff", () => {
+	/// Jitter bounds are covered by the delivery spec; a fixed midpoint is enough here.
+	const random = 0.5;
 	for (const failure of ["retry", "missing", "invalid receipt"] as const) {
-		for (const random of [0, 0.5, 0.999999]) {
-			test(`${failure} uses jittered backoff despite another field succeeding, random ${random}`, async () => {
-				const scheduler = new ManualScheduler();
-				const h = rig({
-					scheduler,
-					random: () => random,
-					now: () => EPOCH + scheduler.elapsedMs,
-				});
-				const pendingField = { questionId: "pending", field: "answer" };
-				const pendingEditor = editor("pending-editor-session");
-				await h.coordinator.register(FIELD, h.monitor);
-				await h.coordinator.register(pendingField, pendingEditor);
-				h.append("confirmed");
-				append(pendingEditor, "retry unchanged");
-				h.transport.send = async (request) => {
-					h.transport.requests.push(structuredClone(request));
-					return partial(request, failure);
-				};
-				await h.coordinator.flush();
-				expect(h.transport.requests).toHaveLength(1);
-				const pendingBatch = h.transport.requests[0]?.fields.find(
-					(item) => item.questionId === pendingField.questionId,
-				)?.batch;
-				expect(pendingBatch).toBeDefined();
-				expect(h.coordinator.getStatus(FIELD)?.delivery).toBe("idle");
-				h.transport.send = async (request) => {
-					h.transport.requests.push(structuredClone(request));
-					return accepted(request);
-				};
-
-				// Base 1000ms, multiplied by jitter in [0.5, 1.5].
-				const retryDelay = 1000 * (0.5 + random);
-				await scheduler.advance(Math.floor(retryDelay) - 1);
-				expect(h.transport.requests).toHaveLength(1);
-				await scheduler.advance(2);
-				expect(h.transport.requests).toHaveLength(2);
-				expect(h.transport.requests[1]?.fields).toEqual([
-					{ ...pendingField, batch: pendingBatch },
-				]);
-				expect(h.coordinator.getStatus(pendingField)?.delivery).toBe("idle");
-				await scheduler.advance(130_000);
-				expect(h.transport.requests).toHaveLength(2);
-				await h.coordinator.dispose();
+		test(`${failure} uses jittered backoff despite another field succeeding`, async () => {
+			const scheduler = new ManualScheduler();
+			const h = rig({
+				scheduler,
+				random: () => random,
+				now: () => EPOCH + scheduler.elapsedMs,
 			});
-		}
+			const pendingField = { questionId: "pending", field: "answer" };
+			const pendingEditor = editor("pending-editor-session");
+			await h.coordinator.register(FIELD, h.monitor);
+			await h.coordinator.register(pendingField, pendingEditor);
+			h.append("confirmed");
+			append(pendingEditor, "retry unchanged");
+			h.transport.send = async (request) => {
+				h.transport.requests.push(structuredClone(request));
+				return partial(request, failure);
+			};
+			await h.coordinator.flush();
+			expect(h.transport.requests).toHaveLength(1);
+			const pendingBatch = h.transport.requests[0]?.fields.find(
+				(item) => item.questionId === pendingField.questionId,
+			)?.batch;
+			expect(pendingBatch).toBeDefined();
+			expect(h.coordinator.getStatus(FIELD)?.delivery).toBe("idle");
+			h.transport.send = async (request) => {
+				h.transport.requests.push(structuredClone(request));
+				return accepted(request);
+			};
+
+			// Base 1000ms, multiplied by jitter in [0.5, 1.5].
+			const retryDelay = 1000 * (0.5 + random);
+			await scheduler.advance(Math.floor(retryDelay) - 1);
+			expect(h.transport.requests).toHaveLength(1);
+			await scheduler.advance(2);
+			expect(h.transport.requests).toHaveLength(2);
+			expect(h.transport.requests[1]?.fields).toEqual([
+				{ ...pendingField, batch: pendingBatch },
+			]);
+			expect(h.coordinator.getStatus(pendingField)?.delivery).toBe("idle");
+			await scheduler.advance(130_000);
+			expect(h.transport.requests).toHaveLength(2);
+			await h.coordinator.dispose();
+		});
 	}
+});
+
+test.describe("answer edit coordinator races: remount during an acknowledgement", () => {
+	test("a remounted editor can durably edit and deliver after an overlapping accepted ACK commit", async () => {
+		const h = rig();
+		const send = deferred<readonly FieldResult[]>();
+		const inspection = deferred<ServerFieldState>();
+		h.transport.sendGate = send;
+		await h.coordinator.register(FIELD, h.monitor);
+		h.append("A");
+		const flush = h.coordinator.flush();
+		await drain();
+		expect(h.transport.requests).toHaveLength(1);
+		const request = h.transport.requests[0];
+		if (!request) throw new Error("Expected held delivery");
+		const results = accepted(request);
+		const result = results[0];
+		if (result?.kind !== "accepted") throw new Error("Expected ACK fixture");
+
+		await h.coordinator.detach(FIELD);
+		h.monitor.dispose();
+		h.transport.inspectionGate = inspection;
+		const inspections = h.transport.inspections.length;
+		const recovery = h.coordinator.recover(FIELD);
+		await drain();
+		expect(h.transport.inspections).toHaveLength(inspections + 1);
+
+		const commits = h.store.commits.length;
+		const ackCommit = h.store.holdNextCommit();
+		send.resolve(results);
+		await drain();
+		expect(h.store.commits).toHaveLength(commits + 1);
+		inspection.resolve({
+			text: "A",
+			revision: result.receipt.revision,
+			nextSeq: result.receipt.lastSeq + 1,
+			canWrite: true,
+			receipts: [result.receipt],
+		});
+		await drain();
+		// Recovery may wait for the commit or return an editor before it finishes.
+		ackCommit.resolve();
+		const [recovered] = await Promise.all([recovery, flush]);
+		expect(recovered.kind).toBe("ready");
+		if (
+			recovered.kind !== "ready" ||
+			!(recovered.handle instanceof AnswerEditMonitor)
+		)
+			throw new Error("Expected recovered editable monitor");
+		expect(recovered.handle.getState().text).toBe("A");
+		recovered.handle.recordChange({
+			atMs: 10_200,
+			kind: "paste",
+			replacements: [{ position: 1, deleteCount: 0, insertedText: "B" }],
+		});
+		await h.coordinator.persist();
+		expect.soft(h.coordinator.getStatus(FIELD)).toMatchObject({
+			durability: "durable",
+			savedText: "AB",
+		});
+		expect.soft((await h.store.read(REF, EPOCH))?.text).toBe("AB");
+
+		h.transport.send = async (next) => {
+			h.transport.requests.push(structuredClone(next));
+			return accepted(next);
+		};
+		await h.coordinator.flushDelivery();
+		const laterBatches = h.transport.requests
+			.slice(1)
+			.flatMap((next) => next.fields.map(({ batch }) => batch));
+		expect.soft(laterBatches.length).toBeGreaterThan(0);
+		expect
+			.soft(laterBatches.reduce((text, batch) => replayEdits(text, batch), "A"))
+			.toBe("AB");
+		const saved = await h.store.read(REF, EPOCH);
+		expect.soft(saved?.text).toBe("AB");
+		if (!saved) throw new Error("Expected durable post-remount record");
+		expect.soft(restoreRecord(saved).collect()).toBeNull();
+		await h.coordinator.dispose();
+	});
+
+	test("recovery of a detached field waits for its in-flight delivery to settle", async () => {
+		const h = rig();
+		const send = deferred<readonly FieldResult[]>();
+		h.transport.sendGate = send;
+		await h.coordinator.register(FIELD, h.monitor);
+		h.append("A");
+		const flush = h.coordinator.flush();
+		await drain();
+		const request = h.transport.requests[0];
+		if (!request) throw new Error("Expected held delivery");
+		const results = accepted(request);
+		const result = results[0];
+		if (result?.kind !== "accepted") throw new Error("Expected ACK fixture");
+		await h.coordinator.detach(FIELD);
+		h.monitor.dispose();
+		/// The server already applied the batch, but its response is still in transit.
+		h.transport.server = {
+			text: "A",
+			revision: result.receipt.revision,
+			nextSeq: result.receipt.lastSeq + 1,
+			canWrite: true,
+			receipts: [result.receipt],
+		};
+		let settled = false;
+		const recovery = h.coordinator.recover(FIELD).then((value) => {
+			settled = true;
+			return value;
+		});
+		await drain();
+		expect(settled).toBe(false);
+		send.resolve(results);
+		const [recovered] = await Promise.all([recovery, flush]);
+		if (recovered.kind !== "ready") throw new Error("Expected ready editor");
+		expect(recovered.handle.getState()).toEqual({
+			text: "A",
+			hasPendingChanges: false,
+			hasUnacknowledgedBatch: false,
+		});
+		await h.coordinator.persist();
+		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
+			durability: "durable",
+			savedText: "A",
+		});
+		await h.coordinator.flushDelivery();
+		expect(h.transport.requests).toHaveLength(1);
+		await h.coordinator.dispose();
+	});
+
+	/// Known defect: the inspection predates the ACK, so the baseline it reports is
+	/// already stale when the delivery settles and recovery declares a false conflict.
+	test.fixme("recovery inspected before an ACK that lands during it stays ready", async () => {
+		const h = rig();
+		const send = deferred<readonly FieldResult[]>();
+		h.transport.sendGate = send;
+		await h.coordinator.register(FIELD, h.monitor);
+		h.append("A");
+		const flush = h.coordinator.flush();
+		await drain();
+		const request = h.transport.requests[0];
+		if (!request) throw new Error("Expected held delivery");
+		await h.coordinator.detach(FIELD);
+		h.monitor.dispose();
+		const recovery = h.coordinator.recover(FIELD);
+		await drain();
+		send.resolve(accepted(request));
+		const [recovered] = await Promise.all([recovery, flush]);
+		expect(recovered.kind).toBe("ready");
+		await h.coordinator.dispose();
+	});
+});
+
+test.describe("answer edit coordinator races: logout", () => {
+	for (const cleanupFails of [false, true]) {
+		test(`an inspection returned after ${cleanupFails ? "failed cleanup at" : "successful"} logout cannot restore an editor or saved status`, async () => {
+			const h = rig();
+			h.fallback.write(REF, {
+				version: 1,
+				text: "private fallback",
+				historyGap: true,
+				savedAt: EPOCH,
+				expiresAt: EPOCH + 60_000,
+			});
+			const inspection = deferred<ServerFieldState>();
+			const entered = deferred<void>();
+			h.transport.inspect = async () => {
+				entered.resolve();
+				return inspection.promise;
+			};
+			const cleanupError = new DOMException("Cleanup denied", "SecurityError");
+			if (cleanupFails)
+				h.fallback.revoke = () => {
+					throw cleanupError;
+				};
+			const recovery = h.coordinator.recover(FIELD).then(
+				(value) => ({ value, error: null }),
+				(error: unknown) => ({ value: null, error }),
+			);
+			await entered.promise;
+			const logout = h.coordinator.logout();
+			if (cleanupFails) await expect(logout).rejects.toBe(cleanupError);
+			else await logout;
+			const statuses = structuredClone(h.statuses);
+			const commits = h.store.commits.length;
+			inspection.resolve(h.transport.server);
+			const outcome = await recovery;
+			await drain();
+			expect.soft(outcome.value?.kind).not.toBe("ready");
+			expect.soft(outcome.value?.kind).not.toBe("text-only");
+			expect.soft(outcome.value && "handle" in outcome.value).toBeFalsy();
+			expect.soft(h.statuses).toEqual(statuses);
+			await h.coordinator.persist();
+			await h.coordinator.flushDelivery();
+			await h.scheduler.advance(120_000);
+			expect.soft(h.store.revoked).toBe(true);
+			expect.soft(h.store.commits).toHaveLength(commits);
+			expect.soft(h.transport.requests).toHaveLength(0);
+			expect.soft(h.scheduler.pendingCount).toBe(0);
+			await h.coordinator.dispose();
+		});
+	}
+
+	test("repeating a rejected coordinator logout retries fallback cleanup", async () => {
+		const h = rig();
+		const failure = new DOMException("Cleanup denied", "SecurityError");
+		let cleanupCalls = 0;
+		h.fallback.revoke = () => {
+			cleanupCalls++;
+			if (cleanupCalls === 1) throw failure;
+		};
+		await expect(h.coordinator.logout()).rejects.toBe(failure);
+		await h.coordinator.logout();
+		expect(cleanupCalls).toBe(2);
+		await h.coordinator.dispose();
+	});
 });

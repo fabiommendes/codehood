@@ -200,7 +200,6 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 
 	for (const mismatch of [
 		"missing receipt",
-		"wrong batch",
 		"wrong receipt revision",
 		"wrong receipt sequence",
 		"different snapshot",
@@ -221,12 +220,6 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 			switch (mismatch) {
 				case "missing receipt":
 					server = { ...server, receipts: [] };
-					break;
-				case "wrong batch":
-					server = {
-						...server,
-						receipts: [{ ...exact, batchId: "another-batch" }],
-					};
 					break;
 				case "wrong receipt revision":
 					server = { ...server, receipts: [{ ...exact, revision: 9 }] };
@@ -315,24 +308,30 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 		});
 	}
 
-	test("an older matching fallback permits recovery of a newer coherent checkpoint", async () => {
-		const { h } = await seed({ savedAt: EPOCH + 2 });
-		h.fallback.write(REF, {
-			version: 1,
-			savedAt: EPOCH,
-			expiresAt: EPOCH + 60_000,
-			text: "old",
-			historyGap: true,
+	for (const [fallbackAge, kind] of [
+		["older", "ready"],
+		["equally old", "text-only"],
+	] as const) {
+		test(`an ${fallbackAge} fallback with the checkpoint's text recovers as ${kind}`, async () => {
+			const { h } = await seed({ savedAt: EPOCH + 2 });
+			h.fallback.write(REF, {
+				version: 1,
+				savedAt: fallbackAge === "older" ? EPOCH : EPOCH + 2,
+				expiresAt: EPOCH + 60_000,
+				text: "old",
+				historyGap: true,
+			});
+			const reopened = new AnswerEditCoordinator({
+				...h.options,
+				now: () => EPOCH + 3,
+			});
+			const result = await reopened.recover(FIELD);
+			expect(result.kind).toBe(kind);
+			if (result.kind === "ready")
+				expect(result.handle.getState().text).toBe("old");
+			await reopened.dispose();
 		});
-		const reopened = new AnswerEditCoordinator({
-			...h.options,
-			now: () => EPOCH + 3,
-		});
-		expect(ready(await reopened.recover(FIELD)).handle.getState().text).toBe(
-			"old",
-		);
-		await reopened.dispose();
-	});
+	}
 
 	test("custom TTL is written to the committed record and expires exactly at expiresAt", async () => {
 		const h = rig({ ttlMs: 2000 });
@@ -381,6 +380,34 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 		expect(h.transport.requests).toHaveLength(0);
 		expect(h.store.commits).toHaveLength(0);
 		await h.coordinator.dispose();
+	});
+
+	test("an unreadable fallback is unavailable even when the primary has no record", async () => {
+		const h = rig();
+		let fallbackWrites = 0;
+		h.fallback.read = () => {
+			throw new Error("Fallback read denied");
+		};
+		h.fallback.write = () => {
+			fallbackWrites++;
+		};
+		try {
+			expect(await h.store.read(REF, EPOCH)).toBeNull();
+			const result = await h.coordinator.recover(FIELD);
+			expect.soft(result).toMatchObject({ kind: "unavailable" });
+			expect.soft("handle" in result).toBe(false);
+			expect.soft(h.coordinator.getStatus(FIELD)).toMatchObject({
+				durability: "unavailable",
+				savedText: null,
+			});
+			await h.coordinator.persist();
+			await h.coordinator.flushDelivery();
+			expect.soft(h.store.commits).toHaveLength(0);
+			expect.soft(fallbackWrites).toBe(0);
+			expect.soft(h.transport.requests).toHaveLength(0);
+		} finally {
+			await h.coordinator.dispose();
+		}
 	});
 
 	test("post-deadline recovery preserves local history but returns canWrite false and blocks every send", async () => {

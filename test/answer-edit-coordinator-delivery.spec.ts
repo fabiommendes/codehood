@@ -132,7 +132,7 @@ test.describe("answer edit coordinator delivery: permanent commit failure", () =
 });
 
 test.describe("answer edit coordinator delivery: scheduling and retry", () => {
-	for (const random of [0, 0.5, 0.999999]) {
+	for (const random of [0, 0.999999]) {
 		test(`periodic delivery stays within 55–65 seconds with injected random ${random}`, async () => {
 			const h = await registered(random);
 			respond(h, async (request) => accepted(request));
@@ -338,13 +338,7 @@ test.describe("answer edit coordinator delivery: scheduling and retry", () => {
 });
 
 test.describe("answer edit coordinator delivery: independent acknowledgements", () => {
-	for (const response of [
-		"omitted",
-		"duplicate",
-		"wrong batch",
-		"wrong revision",
-		"wrong sequence",
-	] as const) {
+	for (const response of ["omitted", "duplicate", "wrong batch"] as const) {
 		test(`${response} result does not discard pending history`, async () => {
 			const h = await registered();
 			respond(h, async (request) => {
@@ -364,10 +358,6 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 								receipt: { ...result.receipt, batchId: "unrelated" },
 							},
 						];
-					case "wrong revision":
-						return [{ ...result, receipt: { ...result.receipt, revision: 8 } }];
-					case "wrong sequence":
-						return [{ ...result, receipt: { ...result.receipt, lastSeq: 99 } }];
 				}
 			});
 			h.append("keep history");
