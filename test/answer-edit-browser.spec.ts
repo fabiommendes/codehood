@@ -1,12 +1,15 @@
-import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { build } from "esbuild";
+import { replayEdits } from "@/services/answer-edits/codec";
 import type {
 	AnswerEditCoordinator,
 	AttemptTransport,
 } from "@/services/answer-edits/coordinator";
 import type { AnswerEditMonitor } from "@/services/answer-edits/monitor";
-import type { EditStore } from "@/services/answer-edits/storage";
+import {
+	type EditStore,
+	MAX_LOCAL_RECORD_BYTES,
+} from "@/services/answer-edits/storage";
+import { bundleForBrowser, STORAGE_MODULE } from "./helpers/answer-edit-bundle";
 
 declare global {
 	interface Window {
@@ -33,25 +36,12 @@ const REF = { attemptId: "attempt", questionId: "question", field: "answer" };
 let browserBundle: string;
 
 test.beforeAll(async () => {
-	const bundle = await build({
-		stdin: {
-			contents: [
-				'export * from "@/services/answer-edits/monitor";',
-				'export * from "@/services/answer-edits/coordinator";',
-				'export * from "@/services/answer-edits/storage";',
-				'export { ManualScheduler } from "./test/helpers/answer-edit-coordinator";',
-			].join("\n"),
-			resolveDir: path.resolve("."),
-		},
-		alias: { "@": path.resolve("src") },
-		bundle: true,
-		write: false,
-		platform: "browser",
-		format: "iife",
-		globalName: "retentionBrowser",
-		logLevel: "silent",
-	});
-	browserBundle = bundle.outputFiles[0]?.text ?? "";
+	browserBundle = await bundleForBrowser("retentionBrowser", [
+		'export * from "@/services/answer-edits/monitor";',
+		'export * from "@/services/answer-edits/coordinator";',
+		STORAGE_MODULE,
+		'export { ManualScheduler } from "./test/helpers/answer-edit-coordinator";',
+	]);
 });
 
 /// Use real browser stores and inject only transport, clocks and scheduling.
@@ -305,4 +295,138 @@ test("renderer crash preserves an unacknowledged outbox for authenticated recove
 	expect(result.requests[0]?.fields[0]?.batch).toEqual(sent);
 	expect(result.state.text).toBe("á🙂 محفوظ");
 	expect(result.record?.outbox).toEqual(sent);
+});
+
+test("oversized pending history is sent without durable primary storage and then commits again", async ({
+	page,
+}) => {
+	const result = await page.evaluate(async () => {
+		const api = window.retentionBrowser;
+		const epoch = 1_800_000_000_000;
+		const field = { questionId: "question", field: "answer" };
+		const ref = { attemptId: "attempt", ...field };
+		let atMs = 0;
+		let sends = 0;
+		let durabilityAtSend: string | undefined;
+		const store = await api.openIndexedDbEditStore({
+			ownerId: "load-owner",
+			indexedDB,
+			databasePrefix: "retention-load",
+		});
+		const fallback = api.createTextRecoveryStore({
+			ownerId: "load-owner",
+			storage: localStorage,
+			keyPrefix: "retention-load",
+		});
+		const coordinator = new api.AnswerEditCoordinator({
+			ownerId: "load-owner",
+			attemptId: "attempt",
+			store,
+			fallback,
+			scheduler: new api.ManualScheduler(),
+			createSessionId: () => "saturation-coordinator",
+			now: () => epoch + atMs,
+			monotonicNow: () => atMs,
+			random: () => 0.5,
+			transport: {
+				inspect: async () => ({
+					text: "",
+					revision: 0,
+					nextSeq: 1,
+					canWrite: true,
+					receipts: [],
+				}),
+				send: async (request: Parameters<AttemptTransport["send"]>[0]) => {
+					sends++;
+					durabilityAtSend = coordinator.getStatus(field)?.durability;
+					return request.fields.map(({ questionId, field, batch }) => ({
+						questionId,
+						field,
+						kind: "accepted" as const,
+						receipt: {
+							batchId: batch.batchId,
+							revision: batch.baseRevision + 1,
+							lastSeq: batch.firstSeq + batch.edits.length - 1,
+						},
+					}));
+				},
+			},
+		});
+		const monitor = new api.AnswerEditMonitor({
+			initialText: "",
+			sessionId: "saturation",
+			baseRevision: 0,
+			firstSeq: 1,
+			now: () => atMs,
+		});
+		await coordinator.register(field, monitor);
+		await coordinator.persist();
+		/// Twenty 128-KiB UTF-8 replacements in two seconds leave a small final answer.
+		for (let index = 0; index < 20; index++) {
+			atMs += 100;
+			monitor.recordChange({
+				atMs,
+				kind: "paste",
+				replacements: [
+					{
+						position: 0,
+						deleteCount: monitor.getState().text.length,
+						insertedText: (index % 2 ? "é" : "ç").repeat(65_536),
+					},
+				],
+			});
+		}
+		atMs += 100;
+		monitor.recordChange({
+			atMs,
+			kind: "other",
+			replacements: [
+				{
+					position: 0,
+					deleteCount: monitor.getState().text.length,
+					insertedText: "Resposta final é 🙂",
+				},
+			],
+		});
+		const pending = monitor.collect();
+		if (!pending) throw new Error("Expected pending history");
+		const bytes = new TextEncoder().encode(
+			JSON.stringify(monitor.exportCheckpoint()),
+		).length;
+		await coordinator.flush();
+		const stored = await store.read(ref, epoch + atMs);
+		const outcome = {
+			bytes,
+			sends,
+			durabilityAtSend,
+			status: coordinator.getStatus(field),
+			fallback: fallback.read(ref, epoch + atMs),
+			storedText: stored?.text,
+			storedOutbox: stored?.outbox,
+			monitorPending: monitor.collect(),
+			storedBytes: stored
+				? new TextEncoder().encode(JSON.stringify(stored)).length
+				: 0,
+			pending,
+			text: monitor.getState().text,
+		};
+		await coordinator.dispose();
+		return outcome;
+	});
+	expect(result.bytes).toBeGreaterThan(MAX_LOCAL_RECORD_BYTES);
+	expect(result.pending.edits).toHaveLength(21);
+	expect(result.sends).toBe(1);
+	expect(result.durabilityAtSend).not.toBe("durable");
+	expect(result.status).toMatchObject({
+		durability: "durable",
+		historyGap: false,
+		savedText: "Resposta final é 🙂",
+	});
+	expect(result.fallback).toBeNull();
+	expect(result.storedText).toBe("Resposta final é 🙂");
+	expect(result.storedOutbox).toBeNull();
+	expect(result.storedBytes).toBeLessThan(MAX_LOCAL_RECORD_BYTES);
+	expect(result.monitorPending).toBeNull();
+	expect(replayEdits("", result.pending)).toBe("Resposta final é 🙂");
+	expect(result.text).toBe("Resposta final é 🙂");
 });

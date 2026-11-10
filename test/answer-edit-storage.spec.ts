@@ -1,11 +1,10 @@
-import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { build } from "esbuild";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 import type {
 	LocalEditRecord,
 	TextRecovery,
 } from "@/services/answer-edits/storage";
+import { bundleForBrowser, STORAGE_MODULE } from "./helpers/answer-edit-bundle";
 
 /// Only the public browser module is bundled; the production server need not expose source files.
 declare global {
@@ -101,20 +100,7 @@ function recovery(text: string): TextRecovery {
 
 let browserBundle: string;
 test.beforeAll(async () => {
-	const bundle = await build({
-		stdin: {
-			contents: 'export * from "@/services/answer-edits/storage";',
-			resolveDir: path.resolve("src"),
-		},
-		alias: { "@": path.resolve("src") },
-		bundle: true,
-		write: false,
-		platform: "browser",
-		format: "iife",
-		globalName: "answerEditStorage",
-		logLevel: "silent",
-	});
-	browserBundle = bundle.outputFiles[0]?.text ?? "";
+	browserBundle = await bundleForBrowser("answerEditStorage", [STORAGE_MODULE]);
 });
 
 test.beforeEach(async ({ page }) => {

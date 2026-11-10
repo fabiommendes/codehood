@@ -1,6 +1,4 @@
-import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { build } from "esbuild";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 import type {
 	EditStore,
@@ -8,6 +6,7 @@ import type {
 	TextRecovery,
 	TextRecoveryStore,
 } from "@/services/answer-edits/storage";
+import { bundleForBrowser, STORAGE_MODULE } from "./helpers/answer-edit-bundle";
 
 declare global {
 	interface Window {
@@ -52,20 +51,7 @@ const FALLBACK: TextRecovery = {
 
 let browserBundle: string;
 test.beforeAll(async () => {
-	const bundle = await build({
-		stdin: {
-			contents: 'export * from "@/services/answer-edits/storage";',
-			resolveDir: path.resolve("src"),
-		},
-		alias: { "@": path.resolve("src") },
-		bundle: true,
-		write: false,
-		platform: "browser",
-		format: "iife",
-		globalName: "answerEditStorage",
-		logLevel: "silent",
-	});
-	browserBundle = bundle.outputFiles[0]?.text ?? "";
+	browserBundle = await bundleForBrowser("answerEditStorage", [STORAGE_MODULE]);
 });
 
 for (const backend of ["IndexedDB", "localStorage"] as const) {

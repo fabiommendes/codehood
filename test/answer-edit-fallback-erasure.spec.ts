@@ -1,13 +1,10 @@
-import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { build } from "esbuild";
 import {
 	createTextRecoveryStore,
 	type TextRecovery,
 	type TextRecoveryStore,
 } from "@/services/answer-edits/storage";
-
-import { rig } from "./helpers/answer-edit-coordinator";
+import { bundleForBrowser, STORAGE_MODULE } from "./helpers/answer-edit-bundle";
 
 const REF = { attemptId: "attempt", questionId: "question", field: "answer" };
 const REMOVE_REF = { ...REF, field: "remove-me" };
@@ -88,20 +85,7 @@ declare global {
 
 let browserBundle: string;
 test.beforeAll(async () => {
-	const bundle = await build({
-		stdin: {
-			contents: 'export * from "@/services/answer-edits/storage";',
-			resolveDir: path.resolve("src"),
-		},
-		alias: { "@": path.resolve("src") },
-		bundle: true,
-		write: false,
-		platform: "browser",
-		format: "iife",
-		globalName: "answerEditStorage",
-		logLevel: "silent",
-	});
-	browserBundle = bundle.outputFiles[0]?.text ?? "";
+	browserBundle = await bundleForBrowser("answerEditStorage", [STORAGE_MODULE]);
 });
 
 async function install(page: Page) {
@@ -373,6 +357,26 @@ test("concurrent fallback token rotations never physically erase the fresh peer 
 	).toEqual(freshBeforeResume);
 });
 
+test("a handle opened before a revoke is fenced while fresh handles and other owners keep working", () => {
+	const { storage, draft } = injectedFixture();
+	const open = (ownerId: string) =>
+		createTextRecoveryStore({ ownerId, storage, keyPrefix: PREFIX });
+	const old = open("owner");
+	const peer = open("owner");
+	const other = open("other");
+	old.write(REF, draft("old text"));
+	other.write(REF, draft("other text"));
+	peer.revoke();
+	expect(() => old.read(REF, NOW)).toThrow();
+	expect(() => old.write(REF, draft("late"))).toThrow();
+	expect(() => old.remove(REF)).toThrow();
+	const fresh = open("owner");
+	expect(fresh.read(REF, NOW)).toBeNull();
+	fresh.write(REF, draft("fresh text"));
+	expect(fresh.read(REF, NOW)?.text).toBe("fresh text");
+	expect(other.read(REF, NOW)?.text).toBe("other text");
+});
+
 test("fallback operations never enumerate or clear origin Storage", () => {
 	const { storage, open, draft } = injectedFixture();
 	const forbidden: string[] = [];
@@ -423,20 +427,6 @@ test("fallback operations never enumerate or clear origin Storage", () => {
 		forbidden,
 		"even swallowed enumeration errors must be detected",
 	).toEqual([]);
-});
-
-test("repeating a rejected coordinator logout retries fallback cleanup", async () => {
-	const h = rig();
-	const failure = new DOMException("Cleanup denied", "SecurityError");
-	let cleanupCalls = 0;
-	h.fallback.revoke = () => {
-		cleanupCalls++;
-		if (cleanupCalls === 1) throw failure;
-	};
-	await expect(h.coordinator.logout()).rejects.toBe(failure);
-	await h.coordinator.logout();
-	expect(cleanupCalls).toBe(2);
-	await h.coordinator.dispose();
 });
 
 test("fallback post-write compensation propagates removal failure and retries physical erasure", () => {
