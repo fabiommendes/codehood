@@ -21,6 +21,7 @@ export type AttemptField = Omit<FieldRef, "attemptId">;
 export interface ObservableMonitorHandle extends MonitorHandle {
 	closeEdit(): void;
 	rebase(base: { baseRevision: number; firstSeq: number }): void;
+	adoptBase(base: { baseRevision: number; firstSeq: number }): void;
 	subscribe(listener: (state: Readonly<MonitorState>) => void): () => void;
 }
 export interface ServerFieldState {
@@ -76,6 +77,8 @@ export interface CoordinatorOptions {
 	readonly createSessionId: () => string;
 	readonly onStatus?: (status: Readonly<FieldStatus>) => void;
 	readonly ttlMs?: number;
+	/// Storage calls that outlast this are treated as failed.
+	readonly storageTimeoutMs?: number;
 }
 
 interface RegisteredField {
@@ -88,6 +91,8 @@ interface RegisteredField {
 	/// Whether the baseline was checked against the server; deliveries wait for it.
 	reconciled: boolean;
 	reconciling: Promise<void> | null;
+	/// The coordinator-owned handle this editor handle replaced, used to prove an in-flight batch was not lost.
+	predecessor: ObservableMonitorHandle | null;
 	principalReadError: string | null;
 	generation: number | null;
 	version: number;
@@ -96,6 +101,7 @@ interface RegisteredField {
 }
 
 const MAX_FIELDS = 128;
+const STORAGE_TIMEOUT_MS = 5000;
 const PERSIST_DELAY_MS = 1000;
 const INITIAL_RETRY_MS = 1000;
 const MAX_RETRY_MS = 60_000;
@@ -300,7 +306,9 @@ export class AnswerEditCoordinator {
 			let local: LocalEditRecord | null = null;
 			let readError: string | null = null;
 			try {
-				local = await this.options.store.read(ref, this.options.now());
+				local = await this.bounded(
+					this.options.store.read(ref, this.options.now()),
+				);
 			} catch (error) {
 				readError = errorMessage(error);
 			}
@@ -345,6 +353,7 @@ export class AnswerEditCoordinator {
 				canWrite: true,
 				reconciled: false,
 				reconciling: null,
+				predecessor: previous?.handle ?? null,
 				principalReadError: previous?.principalReadError ?? readError,
 				generation: previous?.generation ?? local?.generation ?? null,
 				version: 1,
@@ -413,16 +422,28 @@ export class AnswerEditCoordinator {
 		);
 		if (reconciled.receipt) entry.handle.acknowledge(reconciled.receipt);
 		if (force || reconciled.reason) {
+			const base = { baseRevision: server.revision, firstSeq: server.nextSeq };
 			const state = entry.handle.getState();
-			const lossless = !state.hasPendingChanges && state.text === server.text;
-			entry.handle.rebase({
-				baseRevision: server.revision,
-				firstSeq: server.nextSeq,
-			});
-			if (!lossless) entry.status = { ...entry.status, historyGap: true };
+			const history = reconciled.state;
+			if (
+				!force &&
+				history.inFlight === null &&
+				(server.text === history.confirmedText ||
+					(server.revision === 0 && history.baseRevision === 0))
+			) {
+				/// The server holds what the history started from: keep every pending edit.
+				entry.handle.adoptBase(base);
+			} else {
+				const lossless =
+					(!state.hasPendingChanges && state.text === server.text) ||
+					this.continuesPredecessor(entry, server);
+				entry.handle.rebase(base);
+				if (!lossless) entry.status = { ...entry.status, historyGap: true };
+			}
 			entry.version++;
 			this.schedulePersistence();
 		}
+		entry.predecessor = null;
 		entry.reconciled = true;
 		entry.status = {
 			...entry.status,
@@ -434,6 +455,36 @@ export class AnswerEditCoordinator {
 		};
 		this.publish(entry);
 		this.scheduleDelivery();
+	}
+
+	/// Whether the editor handle carries the text of an acknowledged predecessor, so the server already holds its history.
+	private continuesPredecessor(
+		entry: RegisteredField,
+		server: ServerFieldState,
+	): boolean {
+		const previous = entry.predecessor;
+		if (!previous) return false;
+		try {
+			const state = previous.getState();
+			return (
+				state.text === entry.handle.getState().text &&
+				!state.hasPendingChanges &&
+				reconcileCheckpoint(previous.exportCheckpoint(), server).reason === null
+			);
+		} catch {
+			return false;
+		}
+	}
+
+	/// Bound a storage call so a hung store degrades like an unavailable one.
+	private bounded<T>(work: Promise<T>): Promise<T> {
+		return new Promise<T>((resolve, reject) => {
+			const cancel = this.options.scheduler.schedule(
+				this.options.storageTimeoutMs ?? STORAGE_TIMEOUT_MS,
+				() => reject(new Error("Storage timed out")),
+			);
+			work.then(resolve, reject).finally(cancel);
+		});
 	}
 
 	private isCurrent(entry: RegisteredField): boolean {
@@ -529,10 +580,12 @@ export class AnswerEditCoordinator {
 		}
 		try {
 			if (entry.principalReadError) throw new Error(entry.principalReadError);
-			await this.options.store.commit(
-				this.ref(entry.field),
-				record,
-				entry.generation,
+			await this.bounded(
+				this.options.store.commit(
+					this.ref(entry.field),
+					record,
+					entry.generation,
+				),
 			);
 			if (this.revoked) return;
 			entry.generation = record.generation;

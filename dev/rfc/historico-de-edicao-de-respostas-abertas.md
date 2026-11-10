@@ -88,6 +88,15 @@ Implementado em `src/services/answer-edits/coordinator.ts`.
   entrega em curso termina (um ACK durante a inspeção não pode virar divergência).
   Enquanto não termina, ou se `inspect` falha ou pendura, o campo edita e persiste
   localmente e não envia histórico; o ciclo de entrega tenta a inspeção de novo.
+- Servidor compatível com o ponto de partida (sem lote em voo e, ou o texto do
+  servidor é o texto confirmado local, ou o campo é novo nos dois lados) não é
+  divergência: `AnswerEditMonitor.adoptBase` aponta a história pendente para a
+  revisão e sequência do servidor sem descartar edições nem marcar lacuna. O mesmo
+  vale para `register(handle)` sobre um campo com entrega em voo, quando o texto
+  do editor é o do campo anterior já confirmado.
+- Chamadas de storage (`read`, `commit`) têm teto (`storageTimeoutMs`, 5 s, pelo
+  agendador injetado). Estourar o teto cai no caminho de storage indisponível:
+  lacuna e fallback de texto.
 - Divergência (base, recibo ou texto) ou resultado `conflict` do envio rebaseiam:
   `AnswerEditMonitor.rebase` adota o texto atual como nova base na revisão e
   sequência do servidor e descarta a história pendente. `FieldStatus.historyGap`

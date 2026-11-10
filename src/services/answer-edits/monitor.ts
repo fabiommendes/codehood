@@ -409,6 +409,26 @@ export class AnswerEditMonitor implements MonitorHandle {
 	}
 
 	/**
+	 * Re-point the pending history at the server's revision and sequence, keeping every edit.
+	 *
+	 * Only valid while no batch is in flight and the server holds the text the history started from.
+	 *
+	 * @throws {TypeError} If a counter is invalid.
+	 * @throws {Error} If the monitor is disposed or a batch is in flight.
+	 */
+	adoptBase(base: { baseRevision: number; firstSeq: number }): void {
+		this.requireActive();
+		if (this.inFlight)
+			throw new Error("Cannot adopt a base with a batch in flight");
+		requireInteger(base.baseRevision, "baseRevision");
+		requireInteger(base.firstSeq, "firstSeq");
+		this.baseRevision = base.baseRevision;
+		this.firstSeq = base.firstSeq;
+		this.receipts.clear();
+		this.notify();
+	}
+
+	/**
 	 * Adopt a new server baseline for the current text, discarding all pending history.
 	 *
 	 * @throws {TypeError} If a counter is invalid.
