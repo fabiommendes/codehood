@@ -343,3 +343,45 @@ test("opening a submitted attempt keeps a draft that differs from the saved answ
 		"console.log('never sent')",
 	);
 });
+
+/// Every payload the server holds for `question`, oldest first.
+async function history(s: Prepared, question = "text"): Promise<unknown[]> {
+	const [attempt] = await db.response.findMany(
+		{ course: s.course.id, exam: s.exam.slug, author: s.student.username },
+		FULL_ACCESS,
+	);
+	return (
+		attempt?.submissions
+			.filter((it) => it.question === question)
+			.map((it) => it.payload) ?? []
+	);
+}
+
+test("an old request that lands late does not replace the newer answer", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	await page.clock.install();
+	let held: Route | undefined;
+	let calls = 0;
+	await page.route(ANSWER_ACTION, (route: Route) => {
+		// The first request hangs until the test lets it through.
+		if (++calls === 1) {
+			held = route;
+			return;
+		}
+		return route.continue();
+	});
+	await page.goto(s.url);
+	await answerBox(page).fill("old");
+	await expect.poll(() => calls).toBe(1);
+	await answerBox(page).fill("new");
+
+	await page.clock.fastForward(16 * SECOND);
+	await expect.poll(() => saved(s)).toBe("new");
+	await held?.continue();
+
+	// The old request is accepted after the new one, and the page notices.
+	await expect.poll(() => history(s)).toContain("old");
+	await expect.poll(() => saved(s), { timeout: 10 * SECOND }).toBe("new");
+});

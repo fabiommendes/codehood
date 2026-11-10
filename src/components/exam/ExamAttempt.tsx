@@ -286,17 +286,30 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			// A dropped or hung connection throws rather than returning an error;
 			// catching it keeps the queue alive for the saves that follow.
 			const sentAt = Date.now();
-			const message = await withTimeout(
-				actions.exam.answer({ ...target, question: slug, payload }),
-				SAVE_TIMEOUT_MS,
-			).then(
+			const request = actions.exam.answer({
+				...target,
+				question: slug,
+				payload,
+			});
+			let gaveUp = false;
+			// A request given up on may still reach the server, after newer ones.
+			request.then(
+				({ error }) => {
+					if (gaveUp && !error) landedLate(slug, payload);
+				},
+				() => {},
+			);
+			const message = await withTimeout(request, SAVE_TIMEOUT_MS).then(
 				({ data, error }) => {
 					if (data) {
 						setSkew(measureClockOffset(data.serverNow, sentAt, Date.now()));
 					}
 					return error ? errorMessage(error) : null;
 				},
-				() => m.exams_attempt_connection_failed(),
+				() => {
+					gaveUp = true;
+					return m.exams_attempt_connection_failed();
+				},
 			);
 			if (message === null) {
 				failures = 0;
@@ -327,6 +340,17 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		for (const slug of [...pending.keys()]) saveNow(slug);
 		await queue;
 		return pending.size === 0;
+	}
+
+	/// Sends the question's current answer again when an abandoned request carrying a different one lands, since the server keeps the last to arrive.
+	function landedLate(slug: string, payload: AnswerPayload): void {
+		const current = answers()[slug] ?? null;
+		if (JSON.stringify(current) === JSON.stringify(payload)) return;
+		pending.set(slug, current);
+		markUnsaved(slug, true);
+		void flush().then((saved) => {
+			if (!saved && kind() === "submitted") setUndelivered(unsavedNumbers());
+		});
 	}
 
 	/// Sends what is still pending after a wait that grows with each failure in a row.
