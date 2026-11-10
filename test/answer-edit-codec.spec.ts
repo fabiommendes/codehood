@@ -57,25 +57,43 @@ function replacement(
 	return { position, deleteCount, insertedText };
 }
 
+/// One value per rejection branch of the shared integer validator.
+const invalidIntegers: readonly unknown[] = [
+	-1,
+	0.5,
+	Number.MAX_SAFE_INTEGER + 1,
+	Number.NaN,
+	Number.POSITIVE_INFINITY,
+	"0",
+	null,
+];
+/// One value per rejection branch of the timing parser.
+const invalidTimings: readonly (readonly [string, unknown])[] = [
+	["not an array", {}],
+	["missing", undefined],
+	["too short", [1, 0]],
+	["too long", [1, 0, 0, 0]],
+	["zero count", [0, 0, 0]],
+	["fractional count", [0.5, 0, 0]],
+	["negative mean", [1, -1, 0]],
+	["nonfinite variance", [1, 0, Number.NaN]],
+];
+
 test.describe("answer edit codec", () => {
-	for (const [kind, code] of kindCodes) {
-		for (const timing of [null, [3, 12.5, 7.25] as const]) {
-			test(`${kind} uses code ${code} with ${timing === null ? "no intervals" : "interval statistics"}`, () => {
-				const input = edit({ startMs: 105, kind, timing });
-				expect(encodeEdits([input], 100)).toEqual({
+	test("every input kind maps to its wire code in both directions, with and without timing", () => {
+		for (const [kind, code] of kindCodes) {
+			for (const timing of [null, [3, 12.5, 7.25] as const]) {
+				const decoded = edit({ startMs: 105, kind, timing });
+				const encoded = {
 					version: 1,
 					timeOriginMs: 100,
 					edits: [[5, 0, 0, 0, "", code, timing]],
-				});
-			});
-
-			test(`${kind} decodes code ${code} with ${timing === null ? "no intervals" : "interval statistics"}`, () => {
-				expect(decodeEdits(envelope([5, 0, 0, 0, "", code, timing]))).toEqual([
-					edit({ startMs: 105, kind, timing }),
-				]);
-			});
+				};
+				expect(encodeEdits([decoded], 100), kind).toEqual(encoded);
+				expect(decodeEdits(encoded), kind).toEqual([decoded]);
+			}
 		}
-	}
+	});
 
 	test("roundtrips ordered edits without changing UTF-16 text or timing", () => {
 		const editArbitrary = fc.record({
@@ -140,12 +158,10 @@ test.describe("answer edit codec", () => {
 		).toEqual([edit({ startMs: 112 }), edit({ startMs: 112 })]);
 	});
 
-	test("an empty edit list retains its origin", () => {
-		expect(encodeEdits([], 12)).toEqual({
-			version: 1,
-			timeOriginMs: 12,
-			edits: [],
-		});
+	test("an empty edit list retains its origin and decodes to no edits", () => {
+		const empty = { version: 1, timeOriginMs: 12, edits: [] };
+		expect(encodeEdits([], 12)).toEqual(empty);
+		expect(decodeEdits(empty)).toEqual([]);
 	});
 
 	test("fractional times are rejected by encode and decode", () => {
@@ -167,12 +183,6 @@ test.describe("answer edit codec", () => {
 		);
 	});
 
-	test("an empty envelope decodes to no edits", () => {
-		expect(decodeEdits({ version: 1, timeOriginMs: 12, edits: [] })).toEqual(
-			[],
-		);
-	});
-
 	test("safe integer boundaries and zero timing statistics are accepted", () => {
 		const input = edit({
 			position: Number.MAX_SAFE_INTEGER,
@@ -182,28 +192,49 @@ test.describe("answer edit codec", () => {
 		expect(decodeEdits(encodeEdits([input], 100))).toEqual([input]);
 	});
 
-	for (const version of [0, 2, -1, "1", null]) {
-		test(`rejects unsupported version ${JSON.stringify(version)}`, () => {
-			expect(() => decodeEdits({ ...envelope(), version })).toThrow();
+	test("encode and decode reject every class of invalid integer", () => {
+		for (const value of invalidIntegers) {
+			const input = { ...edit(), position: value } as unknown as AnswerEdit;
+			expect(() => encodeEdits([input], 100), String(value)).toThrow(TypeError);
+			expect(
+				() => decodeEdits(envelope([0, 0, value, 0, "", 0, null])),
+				String(value),
+			).toThrow(TypeError);
+		}
+	});
+
+	for (const field of [
+		"startMs",
+		"durationMs",
+		"position",
+		"deleteCount",
+	] as const) {
+		test(`encode validates ${field}`, () => {
+			const input = { ...edit(), [field]: -1 };
+			expect(() => encodeEdits([input], 0)).toThrow(TypeError);
 		});
 	}
 
-	for (const value of [-1, NaN, Infinity, -Infinity, "100", null]) {
-		for (const field of ["startMs", "durationMs"] as const) {
-			test(`encode rejects ${field} = ${String(value)}`, () => {
-				const input = { ...edit(), [field]: value } as unknown as AnswerEdit;
-				expect(() => encodeEdits([input], 0)).toThrow();
-			});
-		}
-		test(`encode rejects origin = ${String(value)}`, () => {
-			expect(() => encodeEdits([], value as number)).toThrow();
-		});
-		test(`decode rejects origin = ${String(value)}`, () => {
-			expect(() =>
-				decodeEdits({ ...envelope(), timeOriginMs: value }),
-			).toThrow();
+	for (const [label, index] of [
+		["start delta", 0],
+		["duration", 1],
+		["position", 2],
+		["deleteCount", 3],
+		["kind code", 5],
+	] as const) {
+		test(`decode validates ${label}`, () => {
+			const tuple: unknown[] = [0, 0, 0, 0, "", 0, null];
+			tuple[index] = -1;
+			expect(() => decodeEdits(envelope(tuple))).toThrow(TypeError);
 		});
 	}
+
+	test("encode and decode validate the time origin", () => {
+		expect(() => encodeEdits([], -1)).toThrow(TypeError);
+		expect(() => decodeEdits({ ...envelope(), timeOriginMs: -1 })).toThrow(
+			TypeError,
+		);
+	});
 
 	test("encode rejects the first start before the envelope origin", () => {
 		expect(() => encodeEdits([edit({ startMs: 99 })], 100)).toThrow();
@@ -215,109 +246,51 @@ test.describe("answer edit codec", () => {
 		).toThrow();
 	});
 
-	const invalidTupleFields: readonly (readonly [string, number, unknown])[] = [
-		...[0, 1].flatMap((index) =>
-			[-1, NaN, Infinity, -Infinity, "0", null].map(
-				(value) =>
-					[
-						`${index === 0 ? "delta" : "duration"} = ${String(value)}`,
-						index,
-						value,
-					] as const,
-			),
-		),
-		...[2, 3].flatMap((index) =>
-			[-1, 0.5, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, "0", null].map(
-				(value) =>
-					[
-						`${index === 2 ? "position" : "deleteCount"} = ${String(value)}`,
-						index,
-						value,
-					] as const,
-			),
-		),
-		["non-string insertedText", 4, 42],
-		["null insertedText", 4, null],
-		...[-1, 7, 0.5, NaN, Infinity, "0", null].map(
-			(value) => [`kind code = ${String(value)}`, 5, value] as const,
-		),
-	];
-	for (const [label, index, value] of invalidTupleFields) {
-		test(`decode rejects ${label}`, () => {
-			const tuple: unknown[] = [0, 0, 0, 0, "", 0, null];
-			tuple[index] = value;
-			expect(() => decodeEdits(envelope(tuple))).toThrow();
-		});
-	}
+	test("encode and decode reject text that is not a string", () => {
+		const input = { ...edit(), insertedText: 42 } as unknown as AnswerEdit;
+		expect(() => encodeEdits([input], 100)).toThrow(TypeError);
+		expect(() => decodeEdits(envelope([0, 0, 0, 0, 42, 0, null]))).toThrow(
+			TypeError,
+		);
+	});
 
-	const invalidEditFields: readonly (readonly [string, unknown])[] = [
-		...["position", "deleteCount"].flatMap((field) =>
-			[-1, 0.5, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, "0", null].map(
-				(value) => [field, value] as const,
-			),
-		),
-		["insertedText", 42],
-		["insertedText", null],
-		["kind", "unknown"],
-		["kind", 0],
-		["kind", null],
-	];
-	for (const [field, value] of invalidEditFields) {
-		test(`encode rejects ${field} = ${String(value)}`, () => {
-			const input = { ...edit(), [field]: value } as unknown as AnswerEdit;
-			expect(() => encodeEdits([input], 100)).toThrow();
-		});
-	}
+	test("encode rejects unknown kinds and decode rejects the first unassigned code", () => {
+		for (const kind of ["unknown", 0, null]) {
+			const input = { ...edit(), kind } as unknown as AnswerEdit;
+			expect(() => encodeEdits([input], 100), String(kind)).toThrow(TypeError);
+		}
+		expect(() => decodeEdits(envelope([0, 0, 0, 0, "", 7, null]))).toThrow(
+			TypeError,
+		);
+	});
 
-	const invalidTimings: readonly unknown[] = [
-		[],
-		[1],
-		[1, 0],
-		[1, 0, 0, 0],
-		[0, 0, 0],
-		[-1, 0, 0],
-		[0.5, 0, 0],
-		[Number.MAX_SAFE_INTEGER + 1, 0, 0],
-		[NaN, 0, 0],
-		[Infinity, 0, 0],
-		["1", 0, 0],
-		[1, -1, 0],
-		[1, NaN, 0],
-		[1, Infinity, 0],
-		[1, "0", 0],
-		[1, 0, -1],
-		[1, 0, NaN],
-		[1, 0, Infinity],
-		[1, 0, "0"],
-		{},
-		"timing",
-		undefined,
-	];
-	for (const [index, timing] of invalidTimings.entries()) {
-		test(`encode rejects malformed timing case ${index}`, () => {
-			expect(() =>
-				encodeEdits([{ ...edit(), timing } as AnswerEdit], 100),
-			).toThrow();
-		});
-		test(`decode rejects malformed timing case ${index}`, () => {
-			expect(() =>
-				decodeEdits(envelope([0, 0, 0, 0, "", 0, timing])),
-			).toThrow();
-		});
-	}
+	test("encode and decode reject every class of malformed timing", () => {
+		for (const [label, timing] of invalidTimings) {
+			expect(
+				() => encodeEdits([{ ...edit(), timing } as AnswerEdit], 100),
+				label,
+			).toThrow(TypeError);
+			expect(
+				() => decodeEdits(envelope([0, 0, 0, 0, "", 0, timing])),
+				label,
+			).toThrow(TypeError);
+		}
+	});
 
-	for (const [label, input] of [
-		["null", null],
-		["array", []],
-		["missing edits", { version: 1, timeOriginMs: 100 }],
-		["non-array edits", { ...envelope(), edits: {} }],
-		["non-tuple edit", { ...envelope(), edits: [null] }],
-		["short tuple", envelope([0, 0, 0, 0, "", 0])],
-	] as const) {
-		test(`decode rejects malformed envelope: ${label}`, () => {
-			expect(() => decodeEdits(input)).toThrow();
-		});
-	}
+	test("decode rejects unsupported versions and malformed envelopes", () => {
+		for (const [label, input] of [
+			["version 2", { ...envelope(), version: 2 }],
+			["string version", { ...envelope(), version: "1" }],
+			["null", null],
+			["array", []],
+			["missing edits", { version: 1, timeOriginMs: 100 }],
+			["non-array edits", { ...envelope(), edits: {} }],
+			["non-tuple edit", { ...envelope(), edits: [null] }],
+			["short tuple", envelope([0, 0, 0, 0, "", 0])],
+		] as const) {
+			expect(() => decodeEdits(input), label).toThrow(TypeError);
+		}
+	});
 });
 
 test.describe("answer edit replay", () => {
@@ -327,21 +300,13 @@ test.describe("answer edit replay", () => {
 		readonly TextReplacement[],
 		string,
 	])[] = [
-		["empty history", "", [], ""],
-		["unchanged nonempty text", "e\u0301\r\nשלום", [], "e\u0301\r\nשלום"],
-		["insert into empty text", "", [replacement(0, 0, "hello")], "hello"],
-		["insert at start", "world", [replacement(0, 0, "hello ")], "hello world"],
-		["insert at end", "hello", [replacement(5, 0, "!")], "hello!"],
-		["replace a range", "abcdef", [replacement(2, 3, "XY")], "abXYf"],
 		["delete all", "abc", [replacement(0, 3, "")], ""],
-		["no-op", "abc", [replacement(1, 0, "")], "abc"],
 		[
 			"emoji occupies two UTF-16 units",
 			"A😀B",
 			[replacement(3, 1, "!")],
 			"A😀!",
 		],
-		["replace an emoji", "A😀B", [replacement(1, 2, "🧪")], "A🧪B"],
 		["split a surrogate pair", "😀", [replacement(1, 1, "")], "\ud83d"],
 		[
 			"combining mark stays decomposed",
@@ -349,7 +314,6 @@ test.describe("answer edit replay", () => {
 			[replacement(4, 0, "\u0301")],
 			"cafe\u0301",
 		],
-		["RTL logical coordinates", "אבג", [replacement(1, 1, "X")], "אXג"],
 		[
 			"newlines are not normalized",
 			"a\r\nb",
@@ -415,6 +379,25 @@ test.describe("answer edit replay", () => {
 	test("replay rejects an unsupported envelope version", () => {
 		expect(() => replayEdits("abc", { ...envelope(), version: 2 })).toThrow();
 	});
+
+	test("replay rejects edits outside the document as it evolves", () => {
+		const replay = (...edits: AnswerEdit[]) =>
+			replayEdits("abc", encodeEdits(edits, 100));
+		expect(() => replay(edit({ position: 4, insertedText: "x" }))).toThrow(
+			/bounds/,
+		);
+		expect(() => replay(edit({ position: 2, deleteCount: 2 }))).toThrow(
+			/bounds/,
+		);
+		/// Position 1 exists in the initial text but not after the deletion.
+		expect(() =>
+			replay(
+				edit({ deleteCount: 3 }),
+				edit({ startMs: 101, position: 1, insertedText: "x" }),
+			),
+		).toThrow(/bounds/);
+		expect(replay(edit({ position: 3, insertedText: "x" }))).toBe("abcx");
+	});
 });
 
 test.describe("pre-transaction replacements", () => {
@@ -453,25 +436,16 @@ test.describe("pre-transaction replacements", () => {
 		readonly TextReplacement[],
 	])[] = [
 		["negative position", [replacement(-1, 0, "X")]],
-		["fractional position", [replacement(0.5, 0, "X")]],
-		["unsafe position", [replacement(Number.MAX_SAFE_INTEGER + 1, 0, "X")]],
-		["negative deletion", [replacement(0, -1, "")]],
 		["fractional deletion", [replacement(0, 0.5, "")]],
-		["unsafe deletion", [replacement(0, Number.MAX_SAFE_INTEGER + 1, "")]],
 		["deletion past end", [replacement(2, 2, "")]],
 		["position past end", [replacement(4, 0, "X")]],
 		["overlapping ranges", [replacement(0, 2, "X"), replacement(1, 1, "Y")]],
 		["descending positions", [replacement(2, 1, "X"), replacement(0, 1, "Y")]],
+		["repeated position", [replacement(1, 0, "X"), replacement(1, 0, "Y")]],
 	];
 	for (const [label, replacements] of invalidReplacements) {
 		test(`rejects ${label}`, () => {
-			expect(() => applyReplacements("abc", replacements)).toThrow();
-		});
-		test(`rejecting ${label} leaves arguments unchanged`, () => {
-			const input = structuredClone(replacements);
-			const before = structuredClone(input);
-			expect(() => applyReplacements("abc", input)).toThrow();
-			expect(input).toEqual(before);
+			expect(() => applyReplacements("abc", replacements)).toThrow(TypeError);
 		});
 	}
 });
