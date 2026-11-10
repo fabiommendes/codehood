@@ -83,6 +83,8 @@
 	"exams_attempt_minutes_left": "{minutes} min left",
 	"exams_attempt_connection_failed": "the connection failed",
 	"exams_attempt_save_failed": "Some answers could not be saved. Fix the errors and try again.",
+	"exams_attempt_submit_unreachable": "Could not reach the server to submit. Check your connection and try again.",
+	"exams_attempt_undelivered": "Time ran out and your answers to {numbers} did not reach the server. They are still shown here, but were not saved. Copy them somewhere safe and tell your instructor.",
 	"exams_attempt_not_open_yet": "Not open yet",
 	"exams_attempt_opens": "Opens {when}",
 	"exams_attempt_start": [
@@ -113,7 +115,7 @@
 	"exams_attempt_points": "points: {points}/100",
 	"exams_attempt_points_label": "points",
 	"exams_attempt_points_value": "{points}/100",
-	"exams_attempt_save_error": "Could not save this answer: {message}. It will be retried when you change it or submit.",
+	"exams_attempt_save_error": "Could not save this answer: {message}. It will be retried automatically.",
 	"exams_attempt_submit_title": [
 		{
 			"declarations": ["input type"],

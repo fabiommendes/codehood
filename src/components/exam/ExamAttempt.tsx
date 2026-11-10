@@ -35,8 +35,13 @@ import {
 	toSaved,
 } from "./answer-payload";
 import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
-import { browserDraftStore, measureClockOffset } from "./code-draft";
+import {
+	browserDraftStore,
+	compareDraft,
+	measureClockOffset,
+} from "./code-draft";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
+import { retryDelay } from "./save-retry";
 import { questionList, unansweredWarning } from "./unanswered-warning";
 
 export interface ExamAttemptProps {
@@ -81,6 +86,17 @@ const DRAFT_SAVE_LEAD_SECONDS = 10;
 
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
+
+/// How long a save may stay unanswered before it counts as a failed connection.
+const SAVE_TIMEOUT_MS = 15_000;
+
+/// Rejects when `promise` has not settled after `ms`.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+	return new Promise((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error("timeout")), ms);
+		promise.then(resolve, reject).finally(() => clearTimeout(timer));
+	});
+}
 
 /// Whole seconds from `now` until `deadline`, never negative.
 function secondsLeft(deadline: Date, now: Date): number {
@@ -227,6 +243,17 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const timers = new Map<string, ReturnType<typeof setTimeout>>();
 	// Saves run one after another so an older answer never lands after a newer one.
 	let queue: Promise<void> = Promise.resolve();
+	// The number of the latest save sent for each question: a failed older save
+	// is not retried once a newer one exists.
+	const dispatched = new Map<string, number>();
+	let sends = 0;
+	// Failed saves in a row, which sets the wait before the next retry.
+	let failures = 0;
+	let retryTimer: ReturnType<typeof setTimeout> | undefined;
+	// Set once the deadline passed and the last send was tried.
+	let closing = false;
+	// The question numbers whose answers never reached the server at the deadline.
+	const [undelivered, setUndelivered] = createSignal<number[]>([]);
 
 	function setSaveError(slug: string, message: string | null): void {
 		setSaveErrors((current) => {
@@ -252,23 +279,27 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		const payload = pending.get(slug);
 		if (payload === undefined) return;
 		pending.delete(slug);
+		const send = ++sends;
+		dispatched.set(slug, send);
 
 		queue = queue.then(async () => {
-			// A dropped connection throws rather than returning an error; catching
-			// it keeps the queue alive for the saves that follow.
+			// A dropped or hung connection throws rather than returning an error;
+			// catching it keeps the queue alive for the saves that follow.
 			const sentAt = Date.now();
-			const message = await actions.exam
-				.answer({ ...target, question: slug, payload })
-				.then(
-					({ data, error }) => {
-						if (data) {
-							setSkew(measureClockOffset(data.serverNow, sentAt, Date.now()));
-						}
-						return error ? errorMessage(error) : null;
-					},
-					() => m.exams_attempt_connection_failed(),
-				);
+			const message = await withTimeout(
+				actions.exam.answer({ ...target, question: slug, payload }),
+				SAVE_TIMEOUT_MS,
+			).then(
+				({ data, error }) => {
+					if (data) {
+						setSkew(measureClockOffset(data.serverNow, sentAt, Date.now()));
+					}
+					return error ? errorMessage(error) : null;
+				},
+				() => m.exams_attempt_connection_failed(),
+			);
 			if (message === null) {
+				failures = 0;
 				setSaveError(slug, null);
 				setSavedAt((current) => ({ ...current, [slug]: serverNow() }));
 				setFailingSince(({ [slug]: _ok, ...rest }) => rest);
@@ -277,13 +308,17 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				return;
 			}
 
-			// A newer answer typed meanwhile supersedes the failed one.
-			if (!pending.has(slug)) pending.set(slug, payload);
+			// A newer answer, typed or already sent, supersedes the failed one.
+			if (!pending.has(slug) && dispatched.get(slug) === send) {
+				pending.set(slug, payload);
+			}
 			setSaveError(slug, message);
 			setFailingSince((current) => ({
 				...current,
 				[slug]: current[slug] ?? serverNow(),
 			}));
+			failures++;
+			scheduleRetry();
 		});
 	}
 
@@ -292,6 +327,23 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		for (const slug of [...pending.keys()]) saveNow(slug);
 		await queue;
 		return pending.size === 0;
+	}
+
+	/// Sends what is still pending after a wait that grows with each failure in a row.
+	function scheduleRetry(): void {
+		if (retryTimer !== undefined || pending.size === 0) return;
+		retryTimer = setTimeout(() => {
+			retryTimer = undefined;
+			if (kind() === "in-progress") void flush();
+		}, retryDelay(failures));
+	}
+
+	/// Sends what is pending now, instead of waiting out the retry delay.
+	function retryNow(): void {
+		if (retryTimer !== undefined) clearTimeout(retryTimer);
+		retryTimer = undefined;
+		failures = 0;
+		if (kind() === "in-progress") void flush();
 	}
 
 	function change(slug: string, type: string, edited: AnswerPayload): void {
@@ -327,8 +379,33 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		browserDraftStore().clearExam(exam);
 	}
 
+	/// Removes the local drafts that match the saved answer, and keeps those that differ, which may be the only copy.
+	function clearSettledDrafts(): void {
+		if (!props.username) return;
+		const store = browserDraftStore();
+		for (const entry of props.questions) {
+			const ref = draftRef(entry.slug);
+			const draft = store.read(ref, serverNow().getTime());
+			const saved = props.answers[entry.slug];
+			const at = props.answeredAt?.[entry.slug];
+			const found = compareDraft(
+				draft,
+				typeof saved === "string" ? saved : "",
+				at ? new Date(at).getTime() : null,
+			);
+			if (found.kind === "same") store.remove(ref);
+		}
+	}
+
+	/// The numbers of the questions with a change the server has not confirmed.
+	const unsavedNumbers = () =>
+		props.questions.flatMap((entry, index) =>
+			unsaved().has(entry.slug) ? [index + 1] : [],
+		);
+
 	/// Saves the draft of every code question whose draft is newer than its saved answer.
 	function keepNewerDrafts(): void {
+		if (Object.keys(conflicts()).length === 0) return;
 		for (const [slug, found] of Object.entries(conflicts())) {
 			if (found.newer === "draft") change(slug, "essay", found.draftCode);
 		}
@@ -380,51 +457,74 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	async function submit(): Promise<void> {
 		setBusy(true);
 		setFailure(null);
-		const saved = await flush();
-		if (!saved) {
-			setFailure(m.exams_attempt_save_failed());
-		} else {
-			const { error } = await actions.exam.finish(target);
-			if (error) setFailure(errorMessage(error));
-			// The server decides what follows: awaiting grading, or the results.
-			else {
-				clearDrafts();
-				window.location.reload();
+		try {
+			const saved = await flush();
+			if (!saved) {
+				setFailure(m.exams_attempt_save_failed());
+			} else {
+				const { error } = await actions.exam.finish(target);
+				if (error) setFailure(errorMessage(error));
+				// The server decides what follows: awaiting grading, or the results.
+				else {
+					clearDrafts();
+					window.location.reload();
+				}
 			}
+		} catch {
+			setFailure(m.exams_attempt_submit_unreachable());
+		} finally {
+			dialog?.close();
+			setBusy(false);
 		}
-		dialog?.close();
-		setBusy(false);
+	}
+
+	/// Warns before the page closes while some answer has not reached the server.
+	function warnBeforeUnload(event: BeforeUnloadEvent): void {
+		if (unsaved().size === 0) return;
+		event.preventDefault();
+		event.returnValue = "";
 	}
 
 	onMount(() => {
 		const interval = setInterval(() => setNow(serverNow()), 1000);
 		onCleanup(() => clearInterval(interval));
-		if (kind() !== "in-progress") clearDrafts();
+		window.addEventListener("beforeunload", warnBeforeUnload);
+		window.addEventListener("online", retryNow);
+		onCleanup(() => {
+			window.removeEventListener("beforeunload", warnBeforeUnload);
+			window.removeEventListener("online", retryNow);
+		});
+		if (kind() !== "in-progress") clearSettledDrafts();
 	});
 	onCleanup(() => {
 		for (const timer of timers.values()) clearTimeout(timer);
+		if (retryTimer !== undefined) clearTimeout(retryTimer);
 	});
 
-	// The server refuses answers once the deadline passes, so a draft newer than
-	// the saved answer is saved while there is still time for it to land.
+	// The server refuses answers once the deadline passes, so whatever is still
+	// pending is sent, and a draft newer than the saved answer is saved first,
+	// while there is still time for it to land. Every tick tries again until it
+	// does.
 	createEffect(() => {
 		const limit = deadline();
 		if (kind() !== "in-progress" || !limit) return;
 		if (secondsLeft(limit, now()) > DRAFT_SAVE_LEAD_SECONDS) return;
-		if (Object.keys(conflicts()).length === 0) return;
 		keepNewerDrafts();
 		void flush();
 	});
 
-	// Once the deadline passes the server refuses further answers: save what
-	// is pending and show the attempt as submitted.
+	// Once the deadline passes the server refuses further answers: try the last
+	// send and show the attempt as submitted, saying which answers did not
+	// reach the server.
 	createEffect(() => {
 		const limit = deadline();
-		if (kind() !== "in-progress" || !limit || now() <= limit) return;
+		if (kind() !== "in-progress" || !limit || now() <= limit || closing) return;
+		closing = true;
 		keepNewerDrafts();
 		void flush().then((saved) => {
-			setKind("submitted");
 			if (saved) clearDrafts();
+			else setUndelivered(unsavedNumbers());
+			setKind("submitted");
 		});
 	});
 
@@ -486,6 +586,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 								<p role="status" class={NOTICE}>
 									{m.exams_attempt_submitted_waiting()}
 								</p>
+								<Show when={undelivered().length > 0}>
+									<p role="alert" class="alert alert-warning text-sm">
+										{m.exams_attempt_undelivered({
+											numbers: questionList(undelivered()),
+										})}
+									</p>
+								</Show>
 							</Show>
 						}
 					>
