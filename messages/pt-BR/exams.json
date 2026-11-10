@@ -83,6 +83,8 @@
 	"exams_attempt_minutes_left": "faltam {minutes} min",
 	"exams_attempt_connection_failed": "a conexão falhou",
 	"exams_attempt_save_failed": "Algumas respostas não puderam ser salvas. Corrija os erros e tente de novo.",
+	"exams_attempt_submit_unreachable": "Não foi possível falar com o servidor para enviar. Verifique a conexão e tente de novo.",
+	"exams_attempt_undelivered": "O tempo acabou e suas respostas em {numbers} não chegaram ao servidor. Elas continuam aparecendo aqui, mas não foram salvas. Copie-as para um lugar seguro e avise o professor.",
 	"exams_attempt_not_open_yet": "Ainda não está aberta",
 	"exams_attempt_opens": "Abre {when}",
 	"exams_attempt_start": [
@@ -113,7 +115,7 @@
 	"exams_attempt_points": "pontos: {points}/100",
 	"exams_attempt_points_label": "pontos",
 	"exams_attempt_points_value": "{points}/100",
-	"exams_attempt_save_error": "Não foi possível salvar esta resposta: {message}. Será tentado de novo quando você a alterar ou enviar.",
+	"exams_attempt_save_error": "Não foi possível salvar esta resposta: {message}. Será tentado de novo automaticamente.",
 	"exams_attempt_submit_title": [
 		{
 			"declarations": ["input type"],

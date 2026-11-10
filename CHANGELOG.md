@@ -58,6 +58,24 @@
   line, with arrow keys for the keyboard. The design page of questions shows
   the type.
 
+### Fixed
+
+- Exam answers that fail to save are retried by themselves (backoff up to
+  30 s, with jitter) and at once when the browser comes back online. A save
+  that gets no reply in 15 s counts as a lost connection, so one hung request
+  no longer blocks every question. A failed older save is never resent after a
+  newer one.
+- Near the deadline the page sends every pending answer, trying again each
+  second from 10 s before it. If time runs out with answers the server never
+  received, the page names those questions instead of only saying "Submitted"
+  and keeps their text on screen.
+- The exam page asks for confirmation before closing while an answer is not
+  saved.
+- A submit that cannot reach the server shows an error and can be tried again,
+  instead of leaving the page busy.
+- Opening a submitted or closed exam no longer deletes a local code draft that
+  differs from the saved answer.
+
 ## 0.3.2 (2026-11-05)
 
 ### Fixed
