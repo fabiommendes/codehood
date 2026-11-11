@@ -9,12 +9,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { runnersModule } from "@codehood/runner/registry";
+import { buildRunnerBundle } from "@codehood/runner/server/integration";
 import { defineRunner, type RunnerPluginInput } from "@codehood/runner-api";
 import { expect, test } from "@playwright/test";
 import { defineConfig } from "@/config";
 import { elm, prolog } from "@/runner/plugins";
-import { runnersModule } from "@/runner/registry";
-import { buildRunnerBundle } from "@/runner/server/integration";
 
 /// A minimal valid plugin, with `overrides` on top.
 function plugin(overrides: Partial<RunnerPluginInput> = {}): RunnerPluginInput {
@@ -160,6 +160,7 @@ test.describe("bundle build with plugins", () => {
 			const out = join(root, "out");
 			await buildRunnerBundle(root, out, {
 				minify: false,
+				source: join(root, "src/runner"),
 				plugins: [defineRunner(plugin({ build: "./plugins/demo/build.mjs" }))],
 			});
 			const manifest = JSON.parse(
@@ -187,6 +188,7 @@ test.describe("bundle build with plugins", () => {
 			await expect(
 				buildRunnerBundle(root, join(root, "out"), {
 					minify: false,
+					source: join(root, "src/runner"),
 					plugins: [defineRunner(plugin())],
 				}),
 			).rejects.toThrow(/may import only/);
@@ -217,6 +219,7 @@ test.describe("bundle build with plugins", () => {
 				const out = join(root, "out");
 				await buildRunnerBundle(root, out, {
 					minify: false,
+					source: join(root, "src/runner"),
 					plugins: [defineRunner(plugin())],
 				});
 				const code = readdirSync(out)
@@ -239,6 +242,7 @@ test.describe("bundle build with plugins", () => {
 				await expect(
 					buildRunnerBundle(root, join(root, "out"), {
 						minify: false,
+						source: join(root, "src/runner"),
 						plugins: [defineRunner(plugin())],
 					}),
 				).rejects.toThrow(/may import only/);
@@ -259,6 +263,7 @@ test.describe("bundle build with plugins", () => {
 			await expect(
 				buildRunnerBundle(root, join(root, "out"), {
 					minify: false,
+					source: join(root, "src/runner"),
 					plugins: [
 						defineRunner(plugin({ build: "./plugins/demo/build.mjs" })),
 					],

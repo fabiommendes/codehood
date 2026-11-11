@@ -4,8 +4,8 @@
  */
 
 import config from "codehood:config";
+import { resolveRunnerOrigin } from "@codehood/runner/server/config";
 import type { Role } from "@/db/client";
-import { resolveRunnerOrigin } from "@/runner/server/config";
 import type { ArrayToUnion } from "@/typing";
 import { parseByteSize } from "@/utils/format-bytes";
 

@@ -11,7 +11,7 @@
 			"**",
 			"!public",
 			"!src/generated",
-			"!src/runner/elm/packages",
+			"!src/runner/plugins/elm/packages",
 			"!dist",
 			"!test-results",
 			"!.claude",

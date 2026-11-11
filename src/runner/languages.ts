@@ -7,8 +7,8 @@
  */
 
 import { runners } from "codehood:runners";
-import type { LanguageId, RunMode } from "./protocol";
-import type { RunnerInfo } from "./registry";
+import type { LanguageId, RunMode } from "@codehood/runner/protocol";
+import type { RunnerInfo } from "@codehood/runner/registry";
 
 /// Each language by id.
 const BY_ID = new Map<string, RunnerInfo>(

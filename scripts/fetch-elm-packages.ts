@@ -1,6 +1,6 @@
 /**
  * Downloads the sources of the Elm packages the runner provides into
- * `src/runner/elm/packages/<author>/<name>/<version>/`.
+ * `src/runner/plugins/elm/packages/<author>/<name>/<version>/`.
  *
  * Run by hand after changing `ELM_PACKAGES`; the build never touches the
  * network. Keeps only `elm.json`, `LICENSE` and `src/` of each package.
@@ -19,10 +19,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ELM_PACKAGES } from "../src/runner/sandbox/drivers/elm/project";
+import { ELM_PACKAGES } from "../src/runner/plugins/elm/project";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const TARGET = join(ROOT, "src", "runner", "elm", "packages");
+const TARGET = join(ROOT, "src", "runner", "plugins", "elm", "packages");
 
 /// Files and directories copied from each package.
 const KEEP = ["elm.json", "LICENSE", "src"];

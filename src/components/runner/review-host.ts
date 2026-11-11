@@ -9,7 +9,7 @@ import {
 	type RunHandlers,
 	RunnerHost,
 	type RunRequest,
-} from "@/runner/host";
+} from "@codehood/runner/host";
 
 /// The page's exclusive host for an origin and the submission its frame last ran.
 interface ReviewState {

@@ -1,0 +1,21 @@
+{
+	"name": "@codehood/runner",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"license": "AGPL-3.0-or-later",
+	"description": "The Codehood code runner: sandbox, protocol, host and bundle build.",
+	"exports": {
+		"./package.json": "./package.json",
+		"./*": "./src/*.ts"
+	},
+	"dependencies": {
+		"@codehood/runner-api": "workspace:*"
+	},
+	"peerDependencies": {
+		"astro": "*",
+		"esbuild": "^0.28.2",
+		"tsx": "^4.23.12",
+		"zod": "^4.4.3"
+	}
+}

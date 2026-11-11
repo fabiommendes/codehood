@@ -11,14 +11,17 @@ import { type IncomingHttpHeaders, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
-import { runtimeDir, runtimePath } from "@codehood/runner-api/driver";
-import { RUNTIMES } from "@/runner/sandbox/runtimes";
-import { buildRunnerBundle, precompress } from "@/runner/server/integration";
+import {
+	buildRunnerBundle,
+	precompress,
+} from "@codehood/runner/server/integration";
 import {
 	pickEncoding,
 	requestSide,
 	runnerHeaders,
-} from "@/runner/server/routing";
+} from "@codehood/runner/server/routing";
+import { runtimeDir, runtimePath } from "@codehood/runner-api/driver";
+import { RUNTIMES } from "@/runner/plugins/runtimes";
 import { TEST_BASE_URL, TEST_RUNNER_ORIGIN } from "./env";
 import { expect, test } from "./fixtures";
 
@@ -476,7 +479,10 @@ test.describe("bundle build", () => {
 			writeFileSync(join(entries, "worker.ts"), "export {};");
 			writeFileSync(join(entries, "sw.ts"), "export {};");
 			await expect(
-				buildRunnerBundle(root, join(root, "out"), { minify: false }),
+				buildRunnerBundle(root, join(root, "out"), {
+					minify: false,
+					source: join(root, "src/runner"),
+				}),
 			).rejects.toThrow(/may import only/);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

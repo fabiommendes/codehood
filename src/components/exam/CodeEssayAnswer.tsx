@@ -4,10 +4,10 @@
  * mode, with autosave status and the local draft.
  */
 
+import type { LanguageId } from "@codehood/runner/protocol";
 import { Markdown } from "mdq/solid";
 import { createEffect, createSignal, type JSX, onMount, Show } from "solid-js";
 import { m } from "@/i18n";
-import type { LanguageId } from "@/runner/protocol";
 import { formatDateTime } from "@/utils/schedule-time";
 import { CodeRunner } from "../runner/CodeRunner";
 import {

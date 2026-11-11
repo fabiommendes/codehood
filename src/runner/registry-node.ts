@@ -9,7 +9,7 @@
 import config from "codehood:config";
 import { isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
-import { runnersRegistry } from "./registry";
+import { runnersRegistry } from "@codehood/runner/registry";
 
 const registry = runnersRegistry(
 	config.runner.languages,

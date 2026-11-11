@@ -3,6 +3,7 @@ dist/
 
 # test artifacts
 test/.tmp/
+packages/*/test/.tmp/
 test-results/
 playwright-report/
 coverage/

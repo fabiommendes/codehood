@@ -53,7 +53,14 @@
 - Runner languages are plugins listed in `runner.languages`. Without the
   key an instance runs Python, JavaScript and TypeScript; Lua, Prolog and
   Elm must be listed (`src/runner/plugins/`). The plugin contract is the
-  workspace package `@codehood/runner-api` (`packages/runner-api`).
+  workspace package `@codehood/runner-api` (`packages/runner-api`); the
+  runner core (sandbox, protocol, `RunnerHost`, bundle build) is
+  `@codehood/runner` (`packages/runner`).
+- The runner has suites of its own, outside `pnpm test`: `pnpm run
+  test:runner` for the core and `pnpm run test:plugins` (one project per
+  language) for the plugins, each against a small static server. Every
+  plugin passes the contract of `@codehood/runner/testing/contract`. The
+  main suite keeps the pages, the endpoint and JavaScript.
 - Fonts are served by Codehood itself instead of Google Fonts: no page
   contacts a third-party host, and the first visit no longer waits for one.
 - Tests run in two scopes: `pnpm run test:unit` (no server, spec files in

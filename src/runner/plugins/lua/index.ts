@@ -3,7 +3,7 @@
  */
 
 import { defineRunner } from "@codehood/runner-api";
-import { RUNTIMES } from "../../sandbox/runtimes";
+import { wasmoon } from "./runtime";
 
 export default function lua() {
 	return defineRunner({
@@ -13,9 +13,9 @@ export default function lua() {
 		modes: ["script", "repl"],
 		defaultMode: "script",
 		label: { en: "Lua" },
-		driver: "./src/runner/sandbox/drivers/lua.ts",
+		driver: "./src/runner/plugins/lua/driver.ts",
 		editor: "./src/runner/plugins/lua/editor.ts",
 		grammar: { shiki: "lua" },
-		runtimes: [RUNTIMES.wasmoon],
+		runtimes: [wasmoon],
 	});
 }

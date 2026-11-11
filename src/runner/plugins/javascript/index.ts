@@ -13,7 +13,7 @@ export default function javascript() {
 		modes: ["script", "repl"],
 		defaultMode: "script",
 		label: { en: "JavaScript" },
-		driver: "./src/runner/sandbox/drivers/javascript.ts",
+		driver: "./src/runner/plugins/javascript/driver.ts",
 		editor: "./src/runner/plugins/javascript/editor.ts",
 		grammar: { shiki: "javascript" },
 		sandboxDependencies: ["acorn"],

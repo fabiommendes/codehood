@@ -284,12 +284,13 @@ test("student: run a code example", async ({ page }) => {
 	});
 	await persistedResourceFactory.create({
 		course: course.id,
-		slug: "run-greet-py",
-		title: "greet.py",
+		slug: "run-farewell",
+		title: "farewell.js",
 		data: {
 			type: "CODE",
-			language: "python",
-			content: 'name = input("Name? ")\nprint("Hello, " + name + "!")\n',
+			language: "javascript",
+			content:
+				'const name = prompt("Name?");\nconsole.log("Bye, " + name + "!");\n',
 		},
 	});
 	await logInAs(page, student);
@@ -314,17 +315,15 @@ test("student: run a code example", async ({ page }) => {
 		await expect(widget).toHaveAttribute("data-phase", "done");
 	});
 
-	await test.step("a Python example runs the same way", async () => {
-		await page.goto(`${hrefOf(course)}/resources/run-greet-py`);
+	await test.step("another example runs the same way", async () => {
+		await page.goto(`${hrefOf(course)}/resources/run-farewell`);
 		await widget.locator("[data-action=run]").click();
-		await expect(widget).toHaveAttribute("data-phase", "waiting-input", {
-			timeout: 60_000,
-		});
+		await expect(widget).toHaveAttribute("data-phase", "waiting-input");
 		await page.keyboard.type("Grace");
 		await page.keyboard.press("Enter");
 		await expect(
 			widget.locator("[data-terminal] .xterm-accessibility-tree"),
-		).toContainText("Hello, Grace!");
+		).toContainText("Bye, Grace!");
 		await expect(widget).toHaveAttribute("data-phase", "done");
 	});
 

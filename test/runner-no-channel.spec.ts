@@ -1,10 +1,10 @@
 import { expect, type Page, test } from "./fixtures";
-import { loadFrame } from "./runner-harness";
 
 /**
  * A browser with no stdin channel: no cross-origin isolation (Firefox, Safari)
  * and no service worker (private windows of Firefox and Safari). The spec
  * simulates both in every frame of the context, so it runs on any browser.
+ * The frame side is tested in `packages/runner/test/no-channel.spec.ts`.
  */
 
 test.beforeEach(async ({ context }) => {
@@ -14,13 +14,6 @@ test.beforeEach(async ({ context }) => {
 			get: () => undefined,
 		});
 	});
-});
-
-test("the frame announces stdin none when there is no channel", async ({
-	page,
-}) => {
-	const h = await loadFrame(page);
-	expect(h.ready.stdin).toBe("none");
 });
 
 test("Run says the browser is not supported", async ({

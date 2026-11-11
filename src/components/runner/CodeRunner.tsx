@@ -7,6 +7,14 @@
  */
 
 import {
+	type RunExit,
+	type RunHandle,
+	type RunHandlers,
+	RunnerHost,
+	RunnerUnavailable,
+} from "@codehood/runner/host";
+import type { LanguageId, RunMode } from "@codehood/runner/protocol";
+import {
 	createEffect,
 	createSignal,
 	For,
@@ -19,19 +27,11 @@ import {
 import { isServer } from "solid-js/web";
 import { m } from "@/i18n";
 import {
-	type RunExit,
-	type RunHandle,
-	type RunHandlers,
-	RunnerHost,
-	RunnerUnavailable,
-} from "@/runner/host";
-import {
 	defaultFilename,
 	defaultRunMode,
 	languageLabel,
 	restartNote as languageRestartNote,
 } from "@/runner/languages";
-import type { LanguageId, RunMode } from "@/runner/protocol";
 import { createEditor, type RunnerEditor } from "./editor";
 import {
 	canRun,

@@ -6,11 +6,11 @@
  * Only `createEditor` imports this module, with a dynamic `import()`.
  */
 
+import type { LanguageId } from "@codehood/runner/protocol";
 import type { Extension } from "@codemirror/state";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import type { HighlighterCore, ThemedToken } from "shiki/core";
 import { runnerInfo } from "@/runner/languages";
-import type { LanguageId } from "@/runner/protocol";
 
 const THEME = "dark-plus";
 

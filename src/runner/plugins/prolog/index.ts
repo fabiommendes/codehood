@@ -4,7 +4,7 @@
  */
 
 import { defineRunner } from "@codehood/runner-api";
-import { RUNTIMES } from "../../sandbox/runtimes";
+import { swipl } from "./runtime";
 
 export default function prolog() {
 	return defineRunner({
@@ -21,9 +21,9 @@ export default function prolog() {
 				"pt-BR": "Rodar reinicia o Prolog",
 			},
 		},
-		driver: "./src/runner/sandbox/drivers/prolog.ts",
+		driver: "./src/runner/plugins/prolog/driver.ts",
 		editor: "./src/runner/plugins/prolog/editor.ts",
 		grammar: { shiki: "prolog" },
-		runtimes: [RUNTIMES.swipl],
+		runtimes: [swipl],
 	});
 }

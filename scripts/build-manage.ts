@@ -11,10 +11,10 @@
  * build-time values it holds (the runner registry without its editors).
  */
 import { readFileSync } from "node:fs";
+import { runnersModule } from "@codehood/runner/registry";
 import { build } from "esbuild";
 import { loadConfig } from "../src/config/integration";
 import { configPath } from "../src/config/path";
-import { runnersModule } from "../src/runner/registry";
 
 const configFile = configPath(process.cwd(), process.env);
 const config = await loadConfig(configFile);

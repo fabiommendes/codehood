@@ -1,3 +1,4 @@
+import type { RunExit } from "@codehood/runner/host";
 import { expect, test } from "@playwright/test";
 import {
 	canRun,
@@ -8,7 +9,6 @@ import {
 	isBusy,
 	reduceIde,
 } from "@/components/runner/ide-state";
-import type { RunExit } from "@/runner/host";
 
 const idle = initialIdeState({
 	runnerOrigin: "http://127.0.0.1:1",

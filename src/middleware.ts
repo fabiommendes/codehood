@@ -1,10 +1,10 @@
 import { defineMiddleware, sequence } from "astro:middleware";
+import { APP_CSP, requestSide } from "@codehood/runner/server/routing";
 import { hasPerm } from "@/auth/permissions";
 import { clearSessionCookie } from "@/auth/session-cookie";
 import { db } from "@/db";
 import * as env from "./core/constants";
 import { RUNNER_ORIGIN, SESSION_COOKIE } from "./core/constants";
-import { APP_CSP, requestSide } from "./runner/server/routing";
 
 /**
  * Answers 404 for `/runner/` paths on the app origin and for anything but

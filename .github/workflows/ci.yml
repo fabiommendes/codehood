@@ -120,6 +120,51 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # The runner core and its plugins have suites of their own, outside
+  # `pnpm test`: no database, no app build, a static server per suite.
+  runner:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: codehood
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: codehood
+
+      - uses: actions/checkout@v4
+        with:
+          repository: fabiommendes/mdq-spec
+          path: mdq
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            codehood/pnpm-lock.yaml
+            mdq/mdq-js/pnpm-lock.yaml
+
+      - name: Build mdq
+        working-directory: mdq/mdq-js
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Runner core
+        run: pnpm run test:runner
+
+      - name: Runner plugins
+        run: pnpm run test:plugins
+
   cli:
     runs-on: ubuntu-latest
     steps:

@@ -5,8 +5,8 @@
  * renders from the result. No DOM, no clock: tests drive it with values.
  */
 
-import type { RunExit } from "@/runner/host";
-import type { RunState } from "@/runner/protocol";
+import type { RunExit } from "@codehood/runner/host";
+import type { RunState } from "@codehood/runner/protocol";
 
 /**
  * What the widget shows.

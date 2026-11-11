@@ -4,7 +4,7 @@
  */
 
 import { defineRunner } from "@codehood/runner-api";
-import { RUNTIMES } from "../../sandbox/runtimes";
+import { guida } from "./runtime";
 
 export default function elm() {
 	return defineRunner({
@@ -22,10 +22,10 @@ export default function elm() {
 				"pt-BR": "Rodar reinicia o REPL do Elm",
 			},
 		},
-		driver: "./src/runner/sandbox/drivers/elm/index.ts",
+		driver: "./src/runner/plugins/elm/driver.ts",
 		editor: "./src/runner/plugins/elm/editor.ts",
 		grammar: { shiki: "elm" },
-		runtimes: [RUNTIMES.guida],
+		runtimes: [guida],
 		build: "./src/runner/plugins/elm/build.ts",
 	});
 }

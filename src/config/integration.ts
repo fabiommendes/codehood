@@ -3,8 +3,8 @@
  */
 
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runnersModule } from "@codehood/runner/registry";
 import type { AstroIntegration } from "astro";
-import { runnersModule } from "../runner/registry";
 import type { CodehoodConfig } from ".";
 
 /// Id Vite gives the virtual module of build-time constants.

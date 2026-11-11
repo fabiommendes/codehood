@@ -8,8 +8,8 @@
  * after a rebuild.
  */
 
+import { runnerPlugins } from "@codehood/runner/plugins";
 import { z } from "zod";
-import { runnerPlugins } from "../runner/plugin";
 import { defaultRunners } from "../runner/plugins";
 
 /// IANA time zone accepted by `Intl.DateTimeFormat`.

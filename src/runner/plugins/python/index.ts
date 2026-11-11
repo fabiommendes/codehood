@@ -3,7 +3,7 @@
  */
 
 import { defineRunner } from "@codehood/runner-api";
-import { RUNTIMES } from "../../sandbox/runtimes";
+import { pyodide } from "./runtime";
 
 export default function python() {
 	return defineRunner({
@@ -14,9 +14,9 @@ export default function python() {
 		modes: ["script", "repl"],
 		defaultMode: "script",
 		label: { en: "Python" },
-		driver: "./src/runner/sandbox/drivers/python.ts",
+		driver: "./src/runner/plugins/python/driver.ts",
 		editor: "./src/runner/plugins/python/editor.ts",
 		grammar: { shiki: "python" },
-		runtimes: [RUNTIMES.pyodide],
+		runtimes: [pyodide],
 	});
 }

@@ -234,6 +234,13 @@ rtk pnpm run test:unit --only-changed              # the same, without building 
 `pnpm exec playwright install firefox webkit`, then pass `--project=firefox`
 or `--project=webkit` to the test script.
 
+The runner has two suites outside `pnpm test`, each with its own static
+server (no Astro, no database): `pnpm run test:runner` for the core in
+`packages/runner/test/` (~20 s), and `pnpm run test:plugins` for the
+languages in `src/runner/plugins/<id>/test/` (~1 min; one plugin with
+`--project=<id>`). Run them when you touch `packages/runner` or a plugin.
+`TEST_BROWSERS=cross` works on `test:runner` too.
+
 `--rtk` runs Playwright through `rtk playwright` instead. Reach for it only on a
 suite expected to pass: it reduces a green run to a single `PASS (n) FAIL (0)`
 line, but its parser gives up on a red one and passes through 2000 characters of

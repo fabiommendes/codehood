@@ -1,4 +1,5 @@
 import { actions } from "astro:actions";
+import type { LanguageId } from "@codehood/runner/protocol";
 import {
 	createEffect,
 	createSignal,
@@ -18,7 +19,6 @@ import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { locale, m } from "@/i18n";
 import { runnerLanguage } from "@/runner/languages";
-import type { LanguageId } from "@/runner/protocol";
 import {
 	type ExamResult,
 	formatScore,

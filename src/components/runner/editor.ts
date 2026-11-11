@@ -8,9 +8,9 @@
  * snippets downloads none of it until an editor is focused.
  */
 
+import type { LanguageId } from "@codehood/runner/protocol";
 import type { Extension } from "@codemirror/state";
 import { runnerInfo } from "@/runner/languages";
-import type { LanguageId } from "@/runner/protocol";
 
 /** What the widget needs from an editor. */
 export interface RunnerEditor {

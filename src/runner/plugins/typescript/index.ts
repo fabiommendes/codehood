@@ -3,7 +3,7 @@
  */
 
 import { defineRunner } from "@codehood/runner-api";
-import { RUNTIMES } from "../../sandbox/runtimes";
+import { sucrase } from "./runtime";
 
 export default function typescript() {
 	return defineRunner({
@@ -14,10 +14,10 @@ export default function typescript() {
 		modes: ["script"],
 		defaultMode: "script",
 		label: { en: "TypeScript" },
-		driver: "./src/runner/sandbox/drivers/typescript.ts",
+		driver: "./src/runner/plugins/typescript/driver.ts",
 		editor: "./src/runner/plugins/typescript/editor.ts",
 		grammar: { shiki: "typescript" },
-		runtimes: [RUNTIMES.sucrase],
+		runtimes: [sucrase],
 		sandboxDependencies: ["acorn"],
 	});
 }

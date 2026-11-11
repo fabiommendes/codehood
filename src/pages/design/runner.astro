@@ -191,12 +191,12 @@ const reviewSubmissions = [
 </AppLayout>
 
 <script>
-  import type { LanguageId, RunState } from "@/runner/protocol";
+  import type { LanguageId, RunState } from "@codehood/runner/protocol";
   import {
     type RunHandle,
     RunnerHost,
     RunnerUnavailable,
-  } from "@/runner/host";
+  } from "@codehood/runner/host";
 
   const root = document.querySelector<HTMLElement>("[data-runner-origin]");
   const origin = root?.dataset.runnerOrigin;

@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { buildModule } from "@codehood/runner/server/integration";
 import { expect, test } from "@playwright/test";
-import { buildModule } from "@/runner/server/integration";
 
 /// A runtime module bundle may pull in only its own package and its
 /// dependency, never other code of the repository or of `node_modules`.

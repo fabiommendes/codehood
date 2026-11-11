@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { cleanStack } from "@/runner/sandbox/drivers/javascript-stack";
+import { cleanStack } from "@/runner/plugins/javascript/stack";
 
 const WORKER = "https://runner.example/runner/abc/worker.js";
 

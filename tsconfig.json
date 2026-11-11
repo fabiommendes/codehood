@@ -30,5 +30,5 @@
 		}
 	},
 	"include": [".astro/types.d.ts", "**/*"],
-	"exclude": ["dist", "src/runner/elm/packages"]
+	"exclude": ["dist", "src/runner/plugins/elm/packages"]
 }

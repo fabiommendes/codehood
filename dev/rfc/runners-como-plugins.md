@@ -212,43 +212,53 @@ do JavaScript ficaram no driver, porque só ele e o TypeScript os usam.
 
 ### Kit de contrato
 
-`@codehood/runner-api/testing` exporta `runnerContractTests(plugin, cases)`,
-uma suíte Playwright que sobe o frame real com só aquele plugin e roda:
+`@codehood/runner/testing/contract` exporta `runnerContractTests(contract)`,
+que declara num spec Playwright os testes que todo plugin precisa passar, no
+frame real servido pelo servidor de teste do core:
 
-- hello world com saída em stdout;
-- uma leitura de stdin e o fim da entrada (`null`);
-- um erro do programa: código diferente de zero e stderr;
-- um erro de sintaxe com `diagnose` na linha certa, quando o plugin declara
-  suporte;
-- `stop` durante um laço infinito;
-- os modos declarados.
+- o frame anuncia a linguagem em `ready`;
+- um programa lê a linha `hello` e a imprime (código 0);
+- um erro na linha 3 aparece em stderr apontando essa linha;
+- `stop` encerra um laço infinito, e o frame roda de novo em seguida.
 
-O plugin fornece os programas de cada caso, porque são escritos na linguagem
-dele.
+O plugin fornece os programas, porque são escritos na linguagem dele
+(`src/runner/plugins/<id>/test/contract.spec.ts`). O laço é opcional: o Elm
+não o declara. Diagnósticos do editor e os modos ficam nos casos específicos
+de cada plugin.
 
 ### Testes fora da suíte principal
 
-Os testes de linguagem são caros (baixam e iniciam runtimes de dezenas de MB)
-e quase nunca quebram por mudanças fora do plugin. Por isso:
+Os testes do runner são caros (baixam e iniciam runtimes de dezenas de MB, e
+o protocolo espera tempos de tolerância do service worker) e quase nunca
+quebram por mudanças fora dele. Por isso o core do runner é um pacote do
+workspace, `@codehood/runner` (`packages/runner`), com a própria suíte:
 
-- **Suíte principal** (`test/`): protocolo, host, frame, isolamento, stdin,
-  endpoint e bundle, exercitados com o driver `fake`, mais as três linguagens
-  padrão. Ela não importa nada de `packages/runner-*`.
-- **Suíte de cada plugin** (`packages/runner-<id>/test/`): um
-  `playwright.config.ts` próprio que roda o kit de contrato e os casos
-  específicos do plugin. Ela não sobe o Astro nem o banco. O kit monta um
-  bundle do runner só com aquele plugin
-  (`buildRunnerBundle(root, out, { plugins: [p] })`) e o serve num servidor
-  estático mínimo, junto com uma página que faz o papel do app (o que o
-  `test/runner-harness.ts` faz hoje pela página `/login`).
-- **CI**: um job por plugin, filtrado por caminho. Ele roda quando mudam
-  `packages/runner-<id>/**`, `packages/runner-api/**`, `src/runner/sandbox/**`
-  ou `src/runner/protocol.ts`. A suíte principal ignora `packages/**`.
-- Localmente, `pnpm --filter @codehood/runner-elm test` roda um plugin;
-  `pnpm run test:plugins` roda todos.
+| Pacote                  | Conteúdo                                                        |
+| :---------------------- | :-------------------------------------------------------------- |
+| `@codehood/runner-api`  | contrato dos plugins: descritor, tipos do driver                |
+| `@codehood/runner`      | sandbox (frame, worker, sw, stdin, driver `fake`), protocolo, `RunnerHost`, build do bundle, roteamento e handler da origem do runner, registro gerado, infraestrutura de teste (`testing/`) |
+| app (`src/runner/`)     | plugins internos (descritor, driver, editor, runtime e testes), `languages.ts` e a cola com `codehood:config` |
 
-Até a extração (etapa 5), os specs de Lua, Prolog e Elm continuam em `test/`.
-O servidor de teste do kit nasce na etapa 4, e ali esses specs se mudam.
+| Suíte                     | Comando                  | Conteúdo                                         | Tempo  |
+| :------------------------ | :----------------------- | :----------------------------------------------- | :----- |
+| principal (`test/`)       | `pnpm test`              | endpoint, origem, widget, revisão, blocos e recursos de código, controles de `/design/runner`, cookie de sessão; driver `fake` e JavaScript | parte dos ~3 min do e2e |
+| core (`packages/runner/test/`) | `pnpm run test:runner` | protocolo, host, frame, isolamento e stdin, com `fake` e JavaScript | ~20 s |
+| plugins (`src/runner/plugins/<id>/test/`) | `pnpm run test:plugins` | contrato e casos de cada linguagem | ~1 min |
+
+- O servidor de teste (`@codehood/runner/testing/server`) não usa Astro nem
+  banco: um `node:http` na porta 0 responde como app em `localhost` (uma
+  página que expõe `RunnerHost` em `window.__runner`) e como origem do
+  runner em `127.0.0.1` (`serveRunner`, o mesmo handler da app).
+- `runnerGlobalSetup` monta o bundle, sobe o servidor e passa as origens aos
+  workers. O bundle de teste encurta a tolerância de canal desconhecido do
+  service worker (`stdinGraceMs`, 1,5 s em vez de 5 s).
+- Cada plugin é um projeto Playwright: `pnpm run test:plugins
+  --project=python` monta o bundle só com ele.
+- A história "student: run a code example" roda dois exemplos em JavaScript.
+- `test/scope.ts` só varre `test/`, então nada em `packages/` ou
+  `src/runner/plugins/` entra na suíte principal.
+- **CI**: um job `runner` roda as duas suítes. Sem filtro por caminho: juntas
+  levam menos de dois minutos.
 
 ## Ordem de implementação
 
@@ -260,7 +270,8 @@ O servidor de teste do kit nasce na etapa 4, e ali esses specs se mudam.
    dele. Feito.
 3. **`packages/runner-scheme`**, que importa só `@codehood/runner-api`. Não
    entra no padrão; é instalável.
-4. **Kit de contrato**, aplicado ao Scheme e às seis linguagens internas.
+4. **Kit de contrato**, aplicado às seis linguagens internas, e o core em
+   `packages/runner` com suíte própria. Feito; falta o Scheme.
 5. Mais tarde: mover os runners atuais para `packages/` ou para repositórios
    próprios.
 

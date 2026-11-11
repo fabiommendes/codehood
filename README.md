@@ -196,7 +196,10 @@ A plugin is a `defineRunner({...})` object that points at its driver,
 editor support and optional build step; the build bundles only the listed
 ones. The contract lives in `packages/runner-api` (`@codehood/runner-api`):
 plugins import the descriptor from its root, drivers import
-`@codehood/runner-api/driver` and nothing else from Codehood. The design is in
+`@codehood/runner-api/driver` and nothing else from Codehood. The runner
+itself (sandbox, protocol, host, bundle build) is `packages/runner`
+(`@codehood/runner`); the plugins that ship with Codehood, each with its
+descriptor, driver, editor support and runtime, are in `src/runner/plugins/`. The design is in
 `dev/rfc/runners-como-plugins.md`.
 
 ### Code runner origin

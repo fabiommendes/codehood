@@ -6,13 +6,13 @@ import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import node from "@astrojs/node";
 import solidJs from "@astrojs/solid-js";
+import { resolveRunnerOrigin } from "@codehood/runner/server/config";
+import { runnerBundle } from "@codehood/runner/server/integration";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, logHandlers } from "astro/config";
 import { dynamicRouterHook } from "@/api/registry/hook";
 import { codehoodConfig, loadConfig } from "@/config/integration";
 import { configPath } from "@/config/path";
-import { resolveRunnerOrigin } from "@/runner/server/config";
-import { runnerBundle } from "@/runner/server/integration";
 import { localeDefine, paraglidePlugin } from "./scripts/lib/paraglide";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
