@@ -112,8 +112,7 @@ test.describe("page", () => {
 		await expect(
 			widgets.nth(0).locator("[data-terminal] .xterm-accessibility-tree"),
 		).toContainText("first-out", { timeout: 20_000 });
-		// xterm.js does not render a terminal out of view, and the first
-		// terminal may push the second below the fold.
+		// xterm renders nothing while its terminal is outside the viewport.
 		await widgets.nth(1).scrollIntoViewIfNeeded();
 		await expect(
 			widgets.nth(1).locator("[data-terminal] .xterm-accessibility-tree"),

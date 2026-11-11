@@ -13,7 +13,27 @@ import { currentScope, e2eSpecs } from "./test/scope";
 /// Specs that exercise a browser. The pure ones run no page, so one browser is enough.
 const CROSS_BROWSER_SPECS = /runner-.*\.spec\.ts/;
 const PURE_SPECS = /runner-(terminal|ide-state|languages)\.spec\.ts/;
-const crossBrowser = process.env.TEST_BROWSERS === "cross";
+const BROWSERS = process.env.TEST_BROWSERS ?? "chromium";
+const crossBrowser = BROWSERS === "cross";
+
+const ENGINES = {
+	chromium: devices["Desktop Chrome"],
+	firefox: devices["Desktop Firefox"],
+	webkit: devices["Desktop Safari"],
+};
+
+/// `TEST_BROWSERS=firefox`, or a list such as `firefox,webkit`, runs every
+/// `e2e` spec that is selected on those engines instead of Chromium.
+function engineProjects() {
+	return BROWSERS.split(",").map((name) => {
+		if (!(name in ENGINES)) {
+			throw new Error(
+				`TEST_BROWSERS must be "cross" or a list of chromium, firefox and webkit, got "${BROWSERS}".`,
+			);
+		}
+		return { name, use: { ...ENGINES[name as keyof typeof ENGINES] } };
+	});
+}
 
 /// Real-runtime specs are slow; `test/run.ts test/runtimes` runs them.
 const SLOW_SPECS = process.argv.some((arg) => arg.includes("test/runtimes"))
@@ -55,6 +75,8 @@ const E2E_SERVERS = Array.from({ length: E2E_SERVER_COUNT }, (_, index) => {
 			// One address answers as `localhost` (app) and `127.0.0.1` (runner).
 			HOST: "127.0.0.1",
 			RUNNER_ORIGIN: slot.runnerOrigin,
+			// Reads the values above from the environment.
+			CODEHOOD_CONFIG: "test/codehood.config.ts",
 			PORT: String(slot.port),
 		},
 	};
@@ -67,9 +89,9 @@ const e2eConfig = defineConfig({
 	testMatch: E2E_SPECS,
 	testIgnore: SLOW_SPECS,
 	projects: [
-		{ name: "chromium", use: { ...devices["Desktop Chrome"] } },
 		...(crossBrowser
 			? [
+					{ name: "chromium", use: { ...devices["Desktop Chrome"] } },
 					{
 						name: "firefox",
 						testMatch: CROSS_BROWSER_SPECS,
@@ -83,7 +105,7 @@ const e2eConfig = defineConfig({
 						use: { ...devices["Desktop Safari"] },
 					},
 				]
-			: []),
+			: engineProjects()),
 	],
 	fullyParallel: false,
 	workers: E2E_WORKERS,

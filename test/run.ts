@@ -174,6 +174,9 @@ process.env.NODE_ENV = "test";
 process.env.PUBLIC_URL = TEST_BASE_URL;
 // `ENVIRONMENT` has no default and the test server runs over plain HTTP.
 process.env.ENVIRONMENT = "dev";
+// Specs build dates in the local time of the process and compare them with
+// what the server shows in its own time zone, so the two must be the same.
+process.env.TZ = process.env.SERVER_TZ ?? "America/Sao_Paulo";
 // The server and the workers read the instance settings above from the
 // environment, through the test configuration.
 process.env.CODEHOOD_CONFIG = "test/codehood.config.ts";

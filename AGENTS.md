@@ -187,7 +187,7 @@ An `e2e` spec imports `test` and `expect` from `test/fixtures.ts`, not from
 `reload`, so a click does not land on markup that has no handler yet. A click
 on a link is not covered; wait for something the island renders before acting.
 
-`e2e` runs 4 workers. `TEST_E2E_WORKERS=1` runs one spec file at a time, which
+`e2e` runs one worker for every two cores, at most 4. `TEST_E2E_WORKERS=1` runs one spec file at a time, which
 helps to tell a failure of the code from one of timing on a busy machine. Do not
 pass `--workers`: the servers are started from `TEST_E2E_WORKERS`.
 
@@ -229,10 +229,23 @@ rtk pnpm exec tsx test/run.ts --only-changed=main  # affected since main
 rtk pnpm run test:unit --only-changed              # the same, without building the server
 ```
 
-`TEST_BROWSERS=cross` adds Firefox and WebKit projects that run only the
-`runner-*` specs; the default suite stays on Chromium. Install them with
-`pnpm exec playwright install firefox webkit`, then pass `--project=firefox`
-or `--project=webkit` to the test script.
+The default suite runs on Chromium. `TEST_BROWSERS` changes that:
+
+- `TEST_BROWSERS=firefox`, `webkit`, or a list such as `firefox,webkit`, runs
+  the selected `e2e` specs on those engines instead of Chromium. Use it to
+  repeat a spec on another engine.
+- `TEST_BROWSERS=cross` keeps Chromium and adds Firefox and WebKit projects
+  that run only the `runner-*` specs. Pass `--project=firefox` or
+  `--project=webkit` to run one of them.
+
+```bash
+TEST_BROWSERS=firefox,webkit rtk pnpm exec tsx test/run.ts --scope=e2e test/foo.spec.ts
+```
+
+Install the engines with `pnpm exec playwright install firefox webkit`.
+`playwright install-deps` assumes Ubuntu. On Arch, WebKit also needs
+`libxml2-legacy` and `flite` from the repositories, and `icu74` and
+`playwright-webkit-flite-deps` from the AUR.
 
 The runner has two suites outside `pnpm test`, each with its own static
 server (no Astro, no database): `pnpm run test:runner` for the core in
