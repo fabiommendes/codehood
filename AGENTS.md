@@ -187,7 +187,7 @@ An `e2e` spec imports `test` and `expect` from `test/fixtures.ts`, not from
 `reload`, so a click does not land on markup that has no handler yet. A click
 on a link is not covered; wait for something the island renders before acting.
 
-`e2e` runs 4 workers. `TEST_E2E_WORKERS=1` runs one spec file at a time, which
+`e2e` runs one worker for every two cores, at most 4. `TEST_E2E_WORKERS=1` runs one spec file at a time, which
 helps to tell a failure of the code from one of timing on a busy machine. Do not
 pass `--workers`: the servers are started from `TEST_E2E_WORKERS`.
 
