@@ -387,10 +387,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	function change(slug: string, type: string, edited: AnswerPayload): void {
 		if (closing()) return;
 		const payload = toSaved(type, edited);
-		keepDraft(slug, type, edited);
 		setAnswers((current) => ({ ...current, [slug]: payload }));
 		pending.set(slug, payload);
 		markUnsaved(slug, true);
+		// The draft is a courtesy: queuing the answer never waits on it.
+		keepDraft(slug, type, edited);
 		if (payload === null || !isTextEntry(type)) {
 			saveNow(slug);
 			return;

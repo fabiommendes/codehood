@@ -77,7 +77,8 @@ export function compareDraft(
 export interface DraftStore {
 	/** The draft for `ref`, or null; an expired draft is removed and reads as null. */
 	read(ref: DraftRef, now: number): CodeDraft | null;
-	write(ref: DraftRef, draft: CodeDraft): void;
+	/** Stores `draft`; returns whether it was written. A failed write also drops the previous draft, which is now stale. */
+	write(ref: DraftRef, draft: CodeDraft): boolean;
 	remove(ref: DraftRef): void;
 	/** Removes every draft of one exam for one user (on submit or close). */
 	clearExam(ref: Omit<DraftRef, "question">): void;
@@ -159,10 +160,13 @@ export function draftStore(storage: Storage): DraftStore {
 			}, null);
 		},
 		write(ref, draft) {
-			safely(
-				() => storage.setItem(draftKey(ref), JSON.stringify(draft)),
-				undefined,
-			);
+			const key = draftKey(ref);
+			const written = safely(() => {
+				storage.setItem(key, JSON.stringify(draft));
+				return true;
+			}, false);
+			if (!written) safely(() => storage.removeItem(key), undefined);
+			return written;
 		},
 		remove(ref) {
 			safely(() => storage.removeItem(draftKey(ref)), undefined);
@@ -193,7 +197,7 @@ export function draftStore(storage: Storage): DraftStore {
 /// A store that holds nothing, for browsers that block `localStorage`.
 const NO_DRAFTS: DraftStore = {
 	read: () => null,
-	write: () => {},
+	write: () => false,
 	remove: () => {},
 	clearExam: () => {},
 	clearOthers: () => {},

@@ -140,6 +140,7 @@ async function seedAnswer(s: Prepared, question: string, payload: string) {
 }
 
 const answerBox = (page: Page) => page.getByRole("textbox").first();
+const editor = (page: Page) => page.locator("[data-code-runner] .cm-content");
 
 test("a failed save is retried without another edit", async ({ page }) => {
 	const s = await setup({ page });
@@ -559,4 +560,102 @@ test("a saved essay answer shows in its textarea after a reload", async ({
 	await expect(page.locator("textarea.mdq-textarea")).toHaveValue(
 		"saved essay",
 	);
+});
+
+// Nothing local may stop an answer from reaching the server: the page works
+// the same when the browser's storage refuses, throws or holds garbage.
+
+/// Script that breaks `localStorage`, run before the page's own scripts.
+const STORAGE_FAULTS = {
+	quota: () => {
+		Storage.prototype.setItem = () => {
+			throw new DOMException("full", "QuotaExceededError");
+		};
+	},
+	blocked: () => {
+		Object.defineProperty(window, "localStorage", {
+			get() {
+				throw new DOMException("denied", "SecurityError");
+			},
+		});
+	},
+	"every method throws": () => {
+		const fail = () => {
+			throw new DOMException("denied", "SecurityError");
+		};
+		Storage.prototype.getItem = fail;
+		Storage.prototype.setItem = fail;
+		Storage.prototype.removeItem = fail;
+		Storage.prototype.key = fail;
+		Object.defineProperty(Storage.prototype, "length", { get: fail });
+	},
+} as const;
+
+for (const [fault, breakStorage] of Object.entries(STORAGE_FAULTS)) {
+	test(`answers are saved and submitted when localStorage fails: ${fault}`, async ({
+		page,
+	}) => {
+		const s = await setup({ page, codes: ["code"] });
+		const errors: string[] = [];
+		page.on("pageerror", (error) => errors.push(error.message));
+		await page.addInitScript(breakStorage);
+		await openHydrated(page, s.url);
+
+		await answerBox(page).fill("typed text");
+		await expect.poll(() => saved(s)).toBe("typed text");
+		await editor(page).fill("console.log(1)");
+		await expect.poll(() => saved(s, "code")).toBe("console.log(1)");
+
+		await page
+			.getByRole("button", { name: /^Submit/ })
+			.first()
+			.click();
+		const finished = page.waitForResponse(FINISH_ACTION);
+		await page
+			.getByRole("dialog")
+			.getByRole("button", { name: /submit|confirm/i })
+			.click();
+		expect((await finished).ok()).toBe(true);
+		await expect(page.getByRole("alert")).toHaveCount(0);
+		expect(errors).toEqual([]);
+	});
+}
+
+test("answers are saved when stored drafts are corrupt", async ({ page }) => {
+	const s = await setup({ page, codes: ["code"] });
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	const garbage: Record<string, string> = {
+		[s.draftKey("text")]: "{not json",
+		[s.draftKey("code")]: JSON.stringify({ code: 7, savedAt: "x" }),
+	};
+	await page.addInitScript((items) => {
+		for (const [key, value] of Object.entries(items)) {
+			localStorage.setItem(key, value);
+		}
+	}, garbage);
+	await openHydrated(page, s.url);
+
+	await answerBox(page).fill("typed text");
+	await expect.poll(() => saved(s)).toBe("typed text");
+	await editor(page).fill("console.log(1)");
+	await expect.poll(() => saved(s, "code")).toBe("console.log(1)");
+	expect(errors).toEqual([]);
+});
+
+test("the page still asks before closing when the draft cannot be written", async ({
+	page,
+}) => {
+	const s = await setup({ page });
+	await page.route(ANSWER_ACTION, (route) => route.abort());
+	await page.addInitScript(STORAGE_FAULTS.quota);
+	await openHydrated(page, s.url);
+	await answerBox(page).fill("unsent");
+	await expect(page.getByText("Not saved").first()).toBeVisible();
+	const prevented = await page.evaluate(() => {
+		const event = new Event("beforeunload", { cancelable: true });
+		window.dispatchEvent(event);
+		return event.defaultPrevented;
+	});
+	expect(prevented).toBe(true);
 });

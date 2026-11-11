@@ -197,3 +197,14 @@ test("hasAny sees only well-formed drafts of this module", () => {
 	storage.fail.all = new Error("blocked");
 	expect(store.hasAny()).toBe(false);
 });
+
+test("write reports whether it stored the draft, and a failed write drops the stale one", () => {
+	const storage = new FakeStorage();
+	const store = draftStore(storage);
+	expect(store.write(REF, draft("old", NOW))).toBe(true);
+
+	storage.fail.set = new DOMException("full", "QuotaExceededError");
+	expect(store.write(REF, draft("new", NOW))).toBe(false);
+	storage.fail = {};
+	expect(store.read(REF, NOW)).toBeNull();
+});
