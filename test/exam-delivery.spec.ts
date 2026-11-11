@@ -274,7 +274,9 @@ test("an answer still failing as the deadline nears is sent before it", async ({
 test("an answer that only gets through just after the deadline is still saved", async ({
 	page,
 }) => {
+	// The page's clock is fake and jumps; the server's is real, and decides.
 	const s = await setup({ page, secondsLeft: 3 });
+	await page.clock.install();
 	let offline = true;
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
@@ -283,14 +285,15 @@ test("an answer that only gets through just after the deadline is still saved", 
 	await answerBox(page).fill("just after");
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 
-	// Heals once the countdown has run out, inside the server's grace.
-	await page.waitForTimeout(5 * SECOND);
+	// The page is past the deadline and keeps resending.
+	await page.clock.fastForward(5 * SECOND);
+	await expect(page.getByText(/Sending your last answers/)).toBeVisible();
+	// Real time puts the server 1 s past the deadline, inside its grace.
+	await page.waitForTimeout(4 * SECOND);
 	offline = false;
 
 	await expect.poll(() => saved(s), { timeout: 8 * SECOND }).toBe("just after");
-	await expect(page.getByText("Submitted").first()).toBeVisible({
-		timeout: 20 * SECOND,
-	});
+	await expect(page.getByText("Submitted").first()).toBeVisible();
 	await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -298,6 +301,7 @@ test("typing after the deadline is locked, and the answer sent in the grace is t
 	page,
 }) => {
 	const s = await setup({ page, secondsLeft: 3 });
+	await page.clock.install();
 	let offline = true;
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
@@ -306,9 +310,8 @@ test("typing after the deadline is locked, and the answer sent in the grace is t
 	await answerBox(page).fill("at the deadline");
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 
-	await expect(page.getByText(/Sending your last answers/)).toBeVisible({
-		timeout: 10 * SECOND,
-	});
+	await page.clock.fastForward(5 * SECOND);
+	await expect(page.getByText(/Sending your last answers/)).toBeVisible();
 	// The answer is shown read-only: there is no field left to type in.
 	await expect(page.getByRole("textbox")).toHaveCount(0);
 	await expect(page.getByText("at the deadline")).toBeVisible();
@@ -317,9 +320,7 @@ test("typing after the deadline is locked, and the answer sent in the grace is t
 	await expect
 		.poll(() => saved(s), { timeout: 8 * SECOND })
 		.toBe("at the deadline");
-	await expect(page.getByText("Submitted").first()).toBeVisible({
-		timeout: 20 * SECOND,
-	});
+	await expect(page.getByText("Submitted").first()).toBeVisible();
 	expect(await saved(s)).toBe("at the deadline");
 });
 
@@ -333,8 +334,15 @@ test("when time runs out with answers the server never got, the page says which"
 	await answerBox(page).fill("lost to the network");
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 
+	// Past the deadline but inside the grace the page still resends, and says nothing yet.
 	await page.clock.fastForward(45 * SECOND);
+	await expect(page.getByText(/Sending your last answers/)).toBeVisible();
 	const warning = page.getByRole("alert").filter({ hasText: /Q1/ });
+	await expect(warning).toHaveCount(0);
+
+	// Past the grace the last resend fails and the page gives up. Every request
+	// is refused, so the page's clock alone decides.
+	await page.clock.fastForward(10 * SECOND);
 	await expect(warning).toContainText(/did not reach the server/i);
 	await expect(page.getByText("lost to the network")).toBeVisible();
 	expect(await saved(s)).toBeNull();
@@ -447,13 +455,6 @@ const readDraft = (page: Page, key: string) =>
 const draftText = async (page: Page, key: string) =>
 	JSON.parse((await readDraft(page, key)) ?? "null")?.code ?? null;
 
-/// Opens `url` and waits for the attempt island to hydrate, since input typed before that is lost.
-async function openHydrated(page: Page, url: string, reload = false) {
-	if (reload) await page.reload();
-	else await page.goto(url);
-	await expect(page.locator("astro-island[ssr]")).toHaveCount(0);
-}
-
 test("typed text survives a reload during an outage and reaches the server later", async ({
 	page,
 }) => {
@@ -462,7 +463,7 @@ test("typed text survives a reload during an outage and reaches the server later
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
 	);
-	await openHydrated(page, s.url);
+	await page.goto(s.url);
 	await answerBox(page).fill("typed while offline");
 	await expect
 		.poll(() => draftText(page, s.draftKey("text")))
@@ -470,7 +471,7 @@ test("typed text survives a reload during an outage and reaches the server later
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 	expect(await saved(s)).toBeNull();
 
-	await openHydrated(page, s.url, true);
+	await page.reload();
 	await expect(answerBox(page)).toHaveValue("typed while offline");
 
 	offline = false;
@@ -483,7 +484,7 @@ test("the draft is removed once the server confirms the text", async ({
 	page,
 }) => {
 	const s = await setup({ page });
-	await openHydrated(page, s.url);
+	await page.goto(s.url);
 	await answerBox(page).fill("confirmed");
 	await expect.poll(() => saved(s)).toBe("confirmed");
 	await expect.poll(() => readDraft(page, s.draftKey("text"))).toBeNull();
@@ -536,11 +537,11 @@ test("clearing the text during an outage is kept across a reload", async ({
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
 	);
-	await openHydrated(page, s.url);
+	await page.goto(s.url);
 	await answerBox(page).fill("typed");
 	await answerBox(page).fill("");
 	await expect.poll(() => draftText(page, s.draftKey("text"))).toBe("");
-	await openHydrated(page, s.url, true);
+	await page.reload();
 	await expect.poll(() => draftText(page, s.draftKey("text"))).toBe("");
 
 	offline = false;
@@ -555,7 +556,7 @@ test("a saved essay answer shows in its textarea after a reload", async ({
 }) => {
 	const s = await setup({ page });
 	await seedAnswer(s, "text", "saved essay");
-	await openHydrated(page, s.url);
+	await page.goto(s.url);
 
 	await expect(page.locator("textarea.mdq-textarea")).toHaveValue(
 		"saved essay",
@@ -599,7 +600,7 @@ for (const [fault, breakStorage] of Object.entries(STORAGE_FAULTS)) {
 		const errors: string[] = [];
 		page.on("pageerror", (error) => errors.push(error.message));
 		await page.addInitScript(breakStorage);
-		await openHydrated(page, s.url);
+		await page.goto(s.url);
 
 		await answerBox(page).fill("typed text");
 		await expect.poll(() => saved(s)).toBe("typed text");
@@ -634,7 +635,7 @@ test("answers are saved when stored drafts are corrupt", async ({ page }) => {
 			localStorage.setItem(key, value);
 		}
 	}, garbage);
-	await openHydrated(page, s.url);
+	await page.goto(s.url);
 
 	await answerBox(page).fill("typed text");
 	await expect.poll(() => saved(s)).toBe("typed text");
@@ -649,7 +650,7 @@ test("the page still asks before closing when the draft cannot be written", asyn
 	const s = await setup({ page });
 	await page.route(ANSWER_ACTION, (route) => route.abort());
 	await page.addInitScript(STORAGE_FAULTS.quota);
-	await openHydrated(page, s.url);
+	await page.goto(s.url);
 	await answerBox(page).fill("unsent");
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 	const prevented = await page.evaluate(() => {
