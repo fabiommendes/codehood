@@ -51,7 +51,9 @@ Then use one of the following, depending on what you want to do:
 | `pnpm run init`      | Set the project up from scratch             |
 | `pnpm run dev`       | Start local dev server at `localhost:4321`  |
 | `pnpm run build`     | Build your production site to `./dist/`     |
-| `pnpm run test`      | Run integration tests                       |
+| `pnpm run test:unit` | Run the tests that need no server           |
+| `pnpm run test:e2e`  | Run the tests that drive the server         |
+| `pnpm run test`      | Run both test scopes                        |
 | `pnpm run lint`      | Run linter, typecheck, and story coverage   |
 | `pnpm run manage`    | Run management CLI commands                 |
 | `pnpm run db:reset`  | Reset the dev database and re-seed          |

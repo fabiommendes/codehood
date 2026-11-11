@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { expect, test } from "./fixtures";
 
 /**
  * `courseSchema` used to declare `enrollments: userInfo.array()`, so every

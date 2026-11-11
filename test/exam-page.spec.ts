@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -6,6 +5,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalChoice, fibonacciOrdering } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
+import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // State variations of the exam page that are not stories of their own.

@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { verifyPassword } from "@/auth/password";
 import { db } from "@/db";
 import { userFactory } from "@/fixtures/user.factory";
+import { expect, test } from "./fixtures";
 
 // `PATCH /api/user/me` used to accept `password` straight out of `userUpdate`,
 // so any momentarily captured session or leaked API key could reset it without

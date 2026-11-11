@@ -1,6 +1,6 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * Questions are addressed under their course's natural key, same as

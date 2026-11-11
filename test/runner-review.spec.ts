@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "./fixtures";
 
 /**
  * The `CodeRunner` widget in `review` mode through `/design/runner?view=review`:

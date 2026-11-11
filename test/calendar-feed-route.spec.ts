@@ -1,9 +1,9 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
+import { expect, test } from "./fixtures";
 import { resetDatabase } from "./stories/helpers";
 
 // GET /calendar/<token>.ics against the running test server.

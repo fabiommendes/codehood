@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { userFactory } from "@/fixtures/user.factory";
 import { buildOpenRpcDocument } from "@/rpc/registry/openrpc-document";
+import { expect, test } from "./fixtures";
 
 /** Issues a bearer token the way the CLI does. */
 async function login(request: {

@@ -1,5 +1,5 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { persistedInviteFactory } from "@/fixtures/invite.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 import { parseDevalue } from "./helpers/devalue-lite";
 import { findRawIdOrHashKeys } from "./helpers/raw-ids";
 

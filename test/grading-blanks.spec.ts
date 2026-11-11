@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { scoreValue } from "@/core/schemas/feedback";
 import { db } from "@/db";
@@ -7,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { plateauFillIn } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
+import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // Grading a fill-in answer blank by blank, and what the student sees after release.

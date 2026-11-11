@@ -1,10 +1,10 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedEditionFactory } from "@/fixtures/edition.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { userFactory } from "@/fixtures/user.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * `dev/specs/to-do/actions-no-raw-ids.md`'s "Changes" section: every

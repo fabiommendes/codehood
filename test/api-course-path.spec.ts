@@ -1,4 +1,3 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
@@ -8,6 +7,7 @@ import { persistedFeedbackFactory } from "@/fixtures/feedback.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * Responses, submissions and feedback are addressed by a `publicId` nested

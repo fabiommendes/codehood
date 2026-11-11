@@ -1,9 +1,9 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { courseHref } from "@/urls";
 import { highlightRunnerBlocks, renderMarkdown } from "@/utils/markdown";
+import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.describe("rendering", () => {

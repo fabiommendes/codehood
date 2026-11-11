@@ -6,3 +6,7 @@
  * imported — too early for the runner, which sets `TEST_PORT` itself.
  */
 export const DEFAULT_TEST_PORT = 4322;
+
+/// How many `e2e` workers, and so servers and ports, a run takes unless
+/// `TEST_E2E_WORKERS` says otherwise. Here for the same reason as the port.
+export const DEFAULT_E2E_WORKERS = 4;

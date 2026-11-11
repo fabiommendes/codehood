@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
+import { expect, test } from "./fixtures";
 import { fillField, logInAs, seedUser } from "./stories/helpers";
 
 /**

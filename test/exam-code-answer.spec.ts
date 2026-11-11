@@ -1,4 +1,3 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { draftKey } from "@/components/exam/code-draft";
 import { db } from "@/db";
@@ -6,6 +5,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // The code answer of an exam: the editor in place of the textarea, autosave
@@ -400,15 +400,15 @@ test("when time runs out a newer draft is saved and a newer server version is ke
 		data: { createdAt: new Date(Date.now() - 45 * SECOND) },
 	});
 	await seedDraft(page, s.draftKey(), "console.log('draft')");
+	await page.clock.install();
 	await page.goto(s.url);
 	await expect(page.locator("[data-code-conflict]")).toBeVisible();
 
-	await expect
-		.poll(() => savedCode(s), { timeout: 20 * SECOND })
-		.toBe("console.log('draft')");
-	await expect(page.getByText("Submitted").first()).toBeVisible({
-		timeout: 20 * SECOND,
-	});
+	await page.clock.fastForward(8 * SECOND);
+	await expect.poll(() => savedCode(s)).toBe("console.log('draft')");
+	// The save answered with the server's clock, which undid the jump.
+	await page.clock.fastForward(20 * SECOND);
+	await expect(page.getByText("Submitted").first()).toBeVisible();
 });
 
 test("submitting removes this exam's drafts and no others", async ({

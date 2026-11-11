@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import {
 	actingAs,

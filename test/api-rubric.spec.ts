@@ -1,4 +1,3 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -9,6 +8,7 @@ import {
 	type RubricScenario,
 } from "@/fixtures/rubric-scenario";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * Grading rubrics over HTTP: the routes of the rubric of a question in an

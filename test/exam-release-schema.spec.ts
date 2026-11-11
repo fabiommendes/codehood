@@ -1,8 +1,8 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * `gradesReleasedAt` is set by the release feature, never through the exam's

@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
+import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import {
 	createRepository,

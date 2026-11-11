@@ -54,6 +54,13 @@
   key an instance runs Python, JavaScript and TypeScript; Lua, Prolog and
   Elm must be listed (`src/runner/plugins/`). The plugin contract is the
   workspace package `@codehood/runner-api` (`packages/runner-api`).
+- Fonts are served by Codehood itself instead of Google Fonts: no page
+  contacts a third-party host, and the first visit no longer waits for one.
+- Tests run in two scopes: `pnpm run test:unit` (no server, spec files in
+  parallel, about 30 s) and `pnpm run test:e2e` (spec files in parallel, one
+  server and database per worker, about 3 min). `pnpm test` runs both.
+- Two test runs started together in different checkouts no longer pick the
+  same port: a run reserves its ports with lock files.
 - REST e RPC documentam sessão OU Bearer. Credenciais simultâneas são
   rejeitadas antes da validação; cookies alheios não conflitam. Mutações JSON
   em `/api/` e `/rpc` com Origin externo também exigem Bearer válido.

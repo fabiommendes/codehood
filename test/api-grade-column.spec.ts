@@ -1,7 +1,7 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /// Grade columns and the grades report over HTTP, under the course's natural key.
 

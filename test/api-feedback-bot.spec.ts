@@ -1,4 +1,3 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -8,6 +7,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * Feedback written over HTTP: who it is attributed to when the caller holds a

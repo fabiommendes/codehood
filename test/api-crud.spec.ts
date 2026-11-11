@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
 import { APIS } from "@/api/registry/hook";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { collectSearchParams } from "@/utils/query-coerce";
+import { expect, test } from "./fixtures";
 
 /**
  * HTTP-level tests for the generated CRUD REST API's GET endpoints.

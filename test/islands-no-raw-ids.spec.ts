@@ -1,10 +1,10 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "./fixtures";
 import { decodeIslandProps } from "./helpers/astro-island-props";
 import { findRawIdOrHashKeys } from "./helpers/raw-ids";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";

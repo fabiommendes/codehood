@@ -1,4 +1,3 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hashToken } from "@/auth/token";
 import { db } from "@/db";
@@ -7,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedInviteFactory } from "@/fixtures/invite.factory";
 import { persistedPassphraseFactory } from "@/fixtures/passphrase.factory";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "../fixtures";
 import {
 	fillField,
 	logIn,

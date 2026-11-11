@@ -1,4 +1,3 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
@@ -22,6 +21,7 @@ import {
 	questionStats,
 } from "@/services/question-stats";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // Per-question statistics: the pure computation, and the table on the instructor's exam page.

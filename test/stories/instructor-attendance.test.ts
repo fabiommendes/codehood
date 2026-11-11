@@ -1,4 +1,3 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { type Course, db, type TimeSlot } from "@/db";
 import { prisma } from "@/db/client";
@@ -8,6 +7,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { codeAt } from "@/services/roll-call-code";
 import { courseHref } from "@/urls";
+import { expect, type Locator, type Page, test } from "../fixtures";
 import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
 
 /*
@@ -76,6 +76,9 @@ import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
 test.beforeEach(resetDatabase);
 
 const DAY = 24 * 60 * 60_000;
+
+/// How often the roll call page asks the server who checked in.
+const POLL_MS = 5000;
 
 test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	const instructor = await seedUser({
@@ -190,6 +193,8 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 			codeAt(rollCall.secret, new Date(now)).code,
 			codeAt(rollCall.secret, new Date(now - 15_000)).code,
 		]).toContain(shown);
+		// Lets the steps below jump to the next poll instead of waiting for it.
+		await page.clock.install();
 		await page.goto(manage);
 	});
 
@@ -199,6 +204,7 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	await test.step("students arriving show up without reloading", async () => {
 		await scan(classmate, rollCall, ana);
 		await expect(classmate.getByText("Attendance recorded for")).toBeVisible();
+		await page.clock.fastForward(POLL_MS);
 		await expect(
 			studentRow(page, "Ana Prado").getByRole("checkbox", { name: "Present" }),
 		).toBeChecked({ timeout: 20_000 });
@@ -209,6 +215,8 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 
 	await test.step("two students from the same browser flag each other", async () => {
 		await scan(classmate, rollCall, bia);
+		await expect(classmate.getByText("Attendance recorded for")).toBeVisible();
+		await page.clock.fastForward(POLL_MS);
 		const biaRow = studentRow(page, "Bia Lima");
 		await expect(
 			biaRow.getByText(`Same device as ${ana.username}`),

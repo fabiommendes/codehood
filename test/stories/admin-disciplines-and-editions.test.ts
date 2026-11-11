@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
@@ -10,6 +9,7 @@ import {
 	editionFactory,
 	persistedEditionFactory,
 } from "@/fixtures/edition.factory";
+import { expect, test } from "../fixtures";
 import { fillField, logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);

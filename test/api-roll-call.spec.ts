@@ -1,8 +1,8 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /// Roll calls and the attendance report over HTTP, under the course's natural key.
 

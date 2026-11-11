@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { collect, loadFrame, messagesOf, send, start } from "../runner-harness";
 
 /**

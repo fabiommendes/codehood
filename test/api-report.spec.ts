@@ -1,7 +1,7 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type User } from "@/db";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /// User reports over HTTP: the local triage loop and the attachment route.
 

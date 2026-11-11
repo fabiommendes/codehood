@@ -1,10 +1,10 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { dummyPasswordHash, verifyPassword } from "@/auth/password";
 import { inviteCreate, inviteUpdate } from "@/core/schemas";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { userFactory } from "@/fixtures/user.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 // Regressions for small auth gaps. API-level, no page behind them.
 

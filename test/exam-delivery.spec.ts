@@ -1,4 +1,3 @@
-import { expect, type Page, type Route, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { draftKey } from "@/components/exam/code-draft";
 import { db } from "@/db";
@@ -6,6 +5,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
+import { expect, type Page, type Route, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // Getting an answer to the server through failures: retries, hung requests,
@@ -246,7 +246,8 @@ test("a submit that cannot reach the server says so and can be tried again", asy
 test("an answer still failing as the deadline nears is sent before it", async ({
 	page,
 }) => {
-	const s = await setup({ page, secondsLeft: 14 });
+	const s = await setup({ page, secondsLeft: 40 });
+	await page.clock.install();
 	let offline = true;
 	await page.route(ANSWER_ACTION, (route) =>
 		offline ? route.abort() : route.continue(),
@@ -256,32 +257,32 @@ test("an answer still failing as the deadline nears is sent before it", async ({
 	await expect(page.getByText("Not saved").first()).toBeVisible();
 
 	// Heals when the last seconds begin.
-	await expect(page.getByText(/^\d s left$/).first()).toBeVisible({
-		timeout: 20 * SECOND,
-	});
+	await page.clock.fastForward(32 * SECOND);
+	await expect(page.getByText(/^\d s left$/).first()).toBeVisible();
 	offline = false;
 
 	await expect
 		.poll(() => saved(s), { timeout: 5 * SECOND })
 		.toBe("last minute");
-	await expect(page.getByText("Submitted").first()).toBeVisible({
-		timeout: 20 * SECOND,
-	});
+	// The save answered with the server's clock, which undid the jump.
+	await page.clock.fastForward(45 * SECOND);
+	await expect(page.getByText("Submitted").first()).toBeVisible();
 	await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("when time runs out with answers the server never got, the page says which", async ({
 	page,
 }) => {
-	const s = await setup({ page, secondsLeft: 4 });
+	const s = await setup({ page, secondsLeft: 40 });
+	await page.clock.install();
 	await page.route(ANSWER_ACTION, (route) => route.abort());
 	await page.goto(s.url);
 	await answerBox(page).fill("lost to the network");
+	await expect(page.getByText("Not saved").first()).toBeVisible();
 
+	await page.clock.fastForward(45 * SECOND);
 	const warning = page.getByRole("alert").filter({ hasText: /Q1/ });
-	await expect(warning).toContainText(/did not reach the server/i, {
-		timeout: 20 * SECOND,
-	});
+	await expect(warning).toContainText(/did not reach the server/i);
 	await expect(page.getByText("lost to the network")).toBeVisible();
 	expect(await saved(s)).toBeNull();
 });

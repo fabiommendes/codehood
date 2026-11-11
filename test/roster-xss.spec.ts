@@ -1,9 +1,9 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { courseHref } from "@/urls";
 import { jsonScriptPayload } from "@/utils/json-script";
+import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // The roster embeds its CSV rows in a `<script type="application/json">` via

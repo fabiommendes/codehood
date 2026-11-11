@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import {
-	type BrowserContext,
-	expect,
-	type Frame,
-	type Page,
-	test,
-} from "@playwright/test";
-import {
 	OUTPUT_MESSAGES_LIMIT,
 	type RunnerToAppMessage,
 } from "@/runner/protocol";
 import { SW_STDIN_PATH } from "@/runner/sandbox/stdin/types";
 import { TEST_BASE_URL, TEST_RUNNER_ORIGIN } from "./env";
+import {
+	type BrowserContext,
+	expect,
+	type Frame,
+	type Page,
+	test,
+} from "./fixtures";
 import { logInAs, seedUser } from "./stories/helpers";
 
 /**

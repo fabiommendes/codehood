@@ -1,10 +1,10 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { courseHref } from "@/urls";
+import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);
