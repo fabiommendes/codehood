@@ -25,7 +25,12 @@ import {
 	RunnerHost,
 	RunnerUnavailable,
 } from "@/runner/host";
-import { defaultFilename, defaultRunMode } from "@/runner/languages";
+import {
+	defaultFilename,
+	defaultRunMode,
+	languageLabel,
+	restartNote as languageRestartNote,
+} from "@/runner/languages";
 import type { LanguageId, RunMode } from "@/runner/protocol";
 import { createEditor, type RunnerEditor } from "./editor";
 import {
@@ -109,16 +114,6 @@ const BLOCKED: ReadonlySet<IdePhase> = new Set([
 	"unsupported",
 	"unconfigured",
 ]);
-
-const LANGUAGE_LABELS: Record<LanguageId, () => string> = {
-	elm: () => m.runner_language_elm(),
-	javascript: () => m.runner_language_javascript(),
-	lua: () => m.runner_language_lua(),
-	prolog: () => m.runner_language_prolog(),
-	python: () => m.runner_language_python(),
-	typescript: () => m.runner_language_typescript(),
-	fake: () => "fake",
-};
 
 /// Text of the terminal header's status for a phase, or null when it has none.
 function phaseText(
@@ -567,12 +562,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		}
 	};
 
-	const restartNote = () =>
-		props.language === "prolog"
-			? m.runner_prolog_restarts()
-			: props.language === "elm"
-				? m.runner_elm_restarts()
-				: null;
+	const restartNote = () => languageRestartNote(props.language);
 
 	const progressBar = () => (
 		<Show when={state().phase === "preparing" && state().progress}>
@@ -673,7 +663,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 					</Show>
 					<span class="font-mono text-xs">{filename()}</span>
 					<span class="badge badge-ghost badge-xs">
-						{LANGUAGE_LABELS[props.language]()}
+						{languageLabel(props.language)}
 					</span>
 					<Show when={readOnly()}>
 						<span class="badge badge-ghost badge-xs">
@@ -781,21 +771,15 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 									: m.runner_stop()}
 							</button>
 						</Show>
-						<Show when={props.language === "prolog"}>
-							<span
-								class="text-xs text-base-content/60"
-								data-role="restart-note"
-							>
-								{m.runner_prolog_restarts()}
-							</span>
-						</Show>
-						<Show when={props.language === "elm"}>
-							<span
-								class="text-xs text-base-content/60"
-								data-role="restart-note"
-							>
-								{m.runner_elm_restarts()}
-							</span>
+						<Show when={restartNote()}>
+							{(note) => (
+								<span
+									class="text-xs text-base-content/60"
+									data-role="restart-note"
+								>
+									{note()}
+								</span>
+							)}
 						</Show>
 					</div>
 				</div>
@@ -864,12 +848,12 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 									? m.runner_editor_label_read_only({
 											label: props.label,
 											filename: filename(),
-											language: LANGUAGE_LABELS[props.language](),
+											language: languageLabel(props.language),
 										})
 									: m.runner_editor_label({
 											label: props.label,
 											filename: filename(),
-											language: LANGUAGE_LABELS[props.language](),
+											language: languageLabel(props.language),
 										})
 							}
 							data-editor-static

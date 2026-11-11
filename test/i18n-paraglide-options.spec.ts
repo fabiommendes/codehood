@@ -6,20 +6,18 @@ const ROOT = process.cwd();
 const GLOBAL = "__CODEHOOD_LOCALE__";
 
 test.describe("AC8 localeDefine", () => {
-	test("without CODEHOOD_LOCALE defines the base locale as a JSON string", () => {
-		expect(localeDefine(ROOT, {})).toEqual({ [GLOBAL]: '"en"' });
+	test("without a locale defines the base locale as a JSON string", () => {
+		expect(localeDefine(ROOT, undefined)).toEqual({ [GLOBAL]: '"en"' });
 	});
 
 	test("defines the requested locale as a JSON string", () => {
-		expect(localeDefine(ROOT, { CODEHOOD_LOCALE: "pt-BR" })).toEqual({
+		expect(localeDefine(ROOT, "pt-BR")).toEqual({
 			[GLOBAL]: '"pt-BR"',
 		});
 	});
 
 	test("an unknown locale throws an error listing the available ones", () => {
-		expect(() => localeDefine(ROOT, { CODEHOOD_LOCALE: "xx" })).toThrow(
-			/xx[\s\S]*en[\s\S]*pt-BR/,
-		);
+		expect(() => localeDefine(ROOT, "xx")).toThrow(/xx[\s\S]*en[\s\S]*pt-BR/);
 	});
 });
 

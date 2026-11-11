@@ -2,12 +2,14 @@
  * Builds a release tag into a tarball a server can run after a production
  * `pnpm install`, without building anything itself.
  *
- * Usage: `pnpm run package <tag> --out <dir> [--rehearse <db>]`
+ * Usage: `pnpm run package <tag> --out <dir> --config <file> [--rehearse <db>]`
  *
  * The tag is exported from git into a scratch directory and built there, so
- * uncommitted work never ships. The build bakes in the build environment:
- * `PUBLIC_URL` (required, the address the instance is served at),
- * `CODEHOOD_LOCALE` and `SERVER_TZ` (optional).
+ * uncommitted work never ships. `--config` is the instance's
+ * `codehood.config.ts`: it replaces the tag's own, and its build-time
+ * constants (address, locale, time zone, runner origin) are baked into the
+ * build. Tags older than the configuration file read `PUBLIC_URL` (required),
+ * `CODEHOOD_LOCALE` and `SERVER_TZ` from the environment instead.
  *
  * `--rehearse <db>` applies the release's migrations to a copy of `<db>`,
  * typically a fresh copy of the production database, and aborts if they fail.
@@ -30,6 +32,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { loadConfig } from "../src/config/integration";
 import { loadCatalog, resolveBuildLocale } from "./lib/i18n-catalog";
 
 const SHIPPED = [
@@ -46,6 +49,7 @@ const { values: args, positionals } = parseArgs({
 	allowPositionals: true,
 	options: {
 		out: { type: "string" },
+		config: { type: "string" },
 		rehearse: { type: "string" },
 		keep: { type: "boolean", default: false },
 	},
@@ -74,8 +78,12 @@ function run(
 }
 
 const tag = positionals[0];
-if (!tag || !args.out) fail("Usage: pnpm run package <tag> --out <dir>");
-if (!process.env.PUBLIC_URL) fail("Set PUBLIC_URL to the instance's address.");
+if (!tag || !args.out) {
+	fail("Usage: pnpm run package <tag> --out <dir> --config <file>");
+}
+
+/// Variables that set build-time constants before the configuration file.
+const LEGACY_BUILD_VARS = ["PUBLIC_URL", "CODEHOOD_LOCALE", "SERVER_TZ"];
 
 const commit = spawnSync("git", ["rev-parse", "--verify", `${tag}^{commit}`], {
 	encoding: "utf8",
@@ -94,15 +102,41 @@ try {
 	console.log(`▶ Exporting ${tag} to ${work}`);
 	execSync(`git archive ${tag} -- . ':(exclude)cli' | tar -x -C ${work}`);
 
+	// What gets baked in: the configuration file, or the environment for
+	// tags that predate it.
+	let publicUrl = process.env.PUBLIC_URL ?? "";
+	let timeZone = process.env.SERVER_TZ ?? "";
+	let requestedLocale = process.env.CODEHOOD_LOCALE;
+	if (existsSync(join(work, "codehood.config.ts"))) {
+		if (!args.config) fail(`${tag} needs --config <codehood.config.ts>.`);
+		const stale = LEGACY_BUILD_VARS.filter((name) => process.env[name]);
+		if (stale.length > 0) {
+			fail(
+				`${stale.join(", ")} no longer reach the build; set them in ${args.config} and unset them.`,
+			);
+		}
+		const file = resolve(args.config);
+		let config: Awaited<ReturnType<typeof loadConfig>>;
+		try {
+			config = await loadConfig(file);
+		} catch (error) {
+			fail(error instanceof Error ? error.message : String(error));
+		}
+		copyFileSync(file, join(work, "codehood.config.ts"));
+		publicUrl = config.instance.publicUrl;
+		timeZone = config.instance.timeZone;
+		requestedLocale = config.instance.locale;
+	} else {
+		if (args.config) fail(`${tag} predates codehood.config.ts; drop --config.`);
+		if (!publicUrl) fail("Set PUBLIC_URL to the instance's address.");
+	}
+
 	// Checked against the tag's own catalogue, before the slow install. Tags
 	// older than the translations have no catalogue and build in English.
 	let locale = "en";
 	if (existsSync(join(work, "project.inlang"))) {
 		try {
-			locale = resolveBuildLocale(
-				process.env.CODEHOOD_LOCALE,
-				loadCatalog(work),
-			);
+			locale = resolveBuildLocale(requestedLocale, loadCatalog(work));
 		} catch (error) {
 			fail(error instanceof Error ? error.message : String(error));
 		}
@@ -115,6 +149,8 @@ try {
 		...process.env,
 		ENVIRONMENT: "prod",
 		DATABASE_URL: "file:./build.db",
+		// Blank selects the build's own codehood.config.ts, the copy of --config.
+		CODEHOOD_CONFIG: "",
 	};
 	run("Building mdq", join(scratch, "mdq", "mdq-js"), "pnpm", ["build"], env);
 	run(
@@ -154,8 +190,8 @@ try {
 		[
 			`version=${version}`,
 			`commit=${commit.stdout.trim()}`,
-			`public_url=${process.env.PUBLIC_URL}`,
-			`server_tz=${process.env.SERVER_TZ ?? ""}`,
+			`public_url=${publicUrl}`,
+			`server_tz=${timeZone}`,
 			`locale=${locale}`,
 			`built_at=${new Date().toISOString()}`,
 			"",

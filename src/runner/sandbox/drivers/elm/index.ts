@@ -43,3 +43,5 @@ export const elmDriver: Driver = {
 		return runElm(loaded.elm, loaded.cache, ctx);
 	},
 };
+
+export default elmDriver;

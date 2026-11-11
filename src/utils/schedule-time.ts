@@ -12,23 +12,16 @@
  * `toInstant` is for writers; `formatDateTime`/`formatTime`/`localDateOf`/
  * `weekdayOf` are for readers. Never mix the two.
  */
-import { SERVER_TZ as ENV_SERVER_TZ } from "astro:env/client";
+import { timeZone } from "codehood:build";
 import type { ClockTime, Duration } from "@/core/schemas";
 import type { Weekday } from "@/db/";
 import { locale } from "@/i18n";
 
 // This module is reachable from hydrated islands (e.g. `ExamsTable`), so it
-// runs in the browser too, where a plain `process.env` read would throw —
-// `astro:env/client` (schema in `astro.config.mjs`) is safe on both sides for
-// exactly that reason.
-//
-// Caveat this doesn't solve, only makes legible: `astro:env/client` values
-// are inlined into the bundle at BUILD time, not read from the running
-// process's environment at request time. If `SERVER_TZ` changes without a
-// rebuild, or differs between the machine that built the deployed artifact
-// and the one running it, this stays at whatever value the build saw.
+// runs in the browser too: `codehood:build` holds the zone the build saw
+// (`instance.timeZone`), which is the same on both sides.
 /** The server's configured time zone; instants are stored in UTC and every one is rendered here. */
-export const SERVER_TZ: string = ENV_SERVER_TZ;
+export const SERVER_TZ: string = timeZone;
 
 const WEEKDAY_ORDER: readonly Weekday[] = [
 	"SUNDAY",

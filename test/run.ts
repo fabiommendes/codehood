@@ -174,6 +174,9 @@ process.env.NODE_ENV = "test";
 process.env.PUBLIC_URL = TEST_BASE_URL;
 // `ENVIRONMENT` has no default and the test server runs over plain HTTP.
 process.env.ENVIRONMENT = "dev";
+// The server and the workers read the instance settings above from the
+// environment, through the test configuration.
+process.env.CODEHOOD_CONFIG = "test/codehood.config.ts";
 
 // prisma.config.ts hardcodes its datasource url, so the CLI needs --url to target the
 // test database explicitly. The user has consented (see AskUserQuestion in this session)

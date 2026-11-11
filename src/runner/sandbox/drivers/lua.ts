@@ -311,3 +311,5 @@ export const luaDriver: Driver = {
 		return typeof status === "number" ? status : 0;
 	},
 };
+
+export default luaDriver;

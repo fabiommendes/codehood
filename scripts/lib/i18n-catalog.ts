@@ -164,7 +164,7 @@ export function loadCatalog(root: string): Catalog {
 }
 
 /**
- * The locale a build should compile for, given the value of `CODEHOOD_LOCALE`.
+ * The locale a build should compile for, given `instance.locale`.
  *
  * An unset or empty value selects the base locale.
  *
@@ -178,7 +178,7 @@ export function resolveBuildLocale(
 	if (value === undefined || value === "") return settings.baseLocale;
 	if (settings.locales.includes(value)) return value;
 	throw new Error(
-		`CODEHOOD_LOCALE="${value}" is not a known locale. Available locales: ${settings.locales.join(", ")}`,
+		`instance.locale "${value}" is not a known locale. Available locales: ${settings.locales.join(", ")}`,
 	);
 }
 

@@ -1,19 +1,17 @@
 /**
  * Registry of language drivers, each loaded on demand.
+ *
+ * The drivers are those of the plugins in `runner.languages`, which the
+ * bundle build writes into `codehood:runner-drivers`, plus `fake`.
  */
 
+import drivers from "codehood:runner-drivers";
 import type { LanguageId } from "../../protocol";
 import type { Driver } from "../driver";
 
-/// Lazy loaders, one per language. A new language is one entry here and one
-/// module next to this file.
-const DRIVERS: Record<LanguageId, () => Promise<Driver>> = {
-	elm: async () => (await import("./elm")).elmDriver,
-	javascript: async () => (await import("./javascript")).javascriptDriver,
-	lua: async () => (await import("./lua")).luaDriver,
-	prolog: async () => (await import("./prolog")).prologDriver,
-	typescript: async () => (await import("./typescript")).typescriptDriver,
-	python: async () => (await import("./python")).pythonDriver,
+/// Lazy loaders, one per language.
+const DRIVERS: Readonly<Record<LanguageId, () => Promise<Driver>>> = {
+	...drivers,
 	fake: async () => (await import("./fake")).fakeDriver,
 };
 
@@ -23,12 +21,17 @@ const DRIVERS: Record<LanguageId, () => Promise<Driver>> = {
  * `fake` is announced only when `withFake` is true (any environment but production).
  */
 export function availableLanguages(withFake: boolean): LanguageId[] {
-	return (Object.keys(DRIVERS) as LanguageId[]).filter(
-		(id) => withFake || id !== "fake",
-	);
+	return Object.keys(DRIVERS).filter((id) => withFake || id !== "fake");
 }
 
-/** Imports the driver for `language`. */
+/**
+ * Imports the driver for `language`.
+ *
+ * @throws {Error} when no plugin of this bundle runs `language`.
+ */
 export async function loadDriver(language: LanguageId): Promise<Driver> {
-	return DRIVERS[language]();
+	if (!Object.hasOwn(DRIVERS, language)) {
+		throw new Error(`No driver for "${language}" in this bundle.`);
+	}
+	return (DRIVERS[language] as () => Promise<Driver>)();
 }

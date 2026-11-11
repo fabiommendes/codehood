@@ -65,16 +65,14 @@ export function paraglidePlugin(root: string): Plugin {
 /**
  * The Vite `define` entries that fix the build locale.
  *
- * @throws When `CODEHOOD_LOCALE` is set to a locale the project does not have.
+ * @throws When `locale` is not a locale the project has.
  */
 export function localeDefine(
 	root: string,
-	env: NodeJS.ProcessEnv,
+	locale: string | undefined,
 ): Record<string, string> {
 	const settings = loadCatalog(root);
 	return {
-		[LOCALE_GLOBAL]: JSON.stringify(
-			resolveBuildLocale(env.CODEHOOD_LOCALE, settings),
-		),
+		[LOCALE_GLOBAL]: JSON.stringify(resolveBuildLocale(locale, settings)),
 	};
 }

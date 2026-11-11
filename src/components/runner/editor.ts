@@ -8,6 +8,8 @@
  * snippets downloads none of it until an editor is focused.
  */
 
+import type { Extension } from "@codemirror/state";
+import { runnerInfo } from "@/runner/languages";
 import type { LanguageId } from "@/runner/protocol";
 
 /** What the widget needs from an editor. */
@@ -64,18 +66,24 @@ let hints = 0;
 export async function createEditor(
 	options: CreateEditorOptions,
 ): Promise<RunnerEditor> {
-	const [state, view, commands, language, vscode, javascript, lint, colors] =
+	const loadSupport = runnerInfo(options.language)?.editor;
+	const [state, view, commands, language, vscode, lint, colors, support] =
 		await Promise.all([
 			import("@codemirror/state"),
 			import("@codemirror/view"),
 			import("@codemirror/commands"),
 			import("@codemirror/language"),
 			import("@replit/codemirror-vscode-keymap"),
-			import("@codemirror/lang-javascript"),
 			import("@codemirror/lint"),
 			import("./shiki-highlight").then((shiki) =>
 				shiki.shikiHighlighting(options.language),
 			),
+			// The plugin's language support: indentation, brackets, folding.
+			loadSupport
+				? loadSupport().then(
+						(module) => module.default() as Extension | Promise<Extension>,
+					)
+				: [],
 		]);
 	const { Compartment, EditorState, Prec } = state;
 	const {
@@ -141,25 +149,6 @@ export async function createEditor(
 	hint.textContent = options.tabHint;
 	options.parent.append(hint);
 
-	const languageSupport = [];
-	if (options.language === "javascript" || options.language === "typescript") {
-		languageSupport.push(
-			javascript.javascript({ typescript: options.language === "typescript" }),
-		);
-	} else if (options.language === "lua") {
-		const { lua } = await import("@codemirror/legacy-modes/mode/lua");
-		languageSupport.push(language.StreamLanguage.define(lua));
-	} else if (options.language === "python") {
-		const { python } = await import("@codemirror/legacy-modes/mode/python");
-		languageSupport.push(language.StreamLanguage.define(python));
-	} else if (options.language === "prolog") {
-		const { prolog } = await import("./prolog-mode");
-		languageSupport.push(language.StreamLanguage.define(prolog));
-	} else if (options.language === "elm") {
-		const { elm } = await import("@codemirror/legacy-modes/mode/elm");
-		languageSupport.push(language.StreamLanguage.define(elm));
-	}
-
 	const editor = new EditorView({
 		parent: options.parent,
 		state: EditorState.create({
@@ -183,7 +172,7 @@ export async function createEditor(
 				language.bracketMatching(),
 				colors,
 				theme,
-				languageSupport,
+				support,
 				readOnly.of(readOnlyExtensions(options.readOnly)),
 				EditorView.contentAttributes.of({
 					"aria-label": options.label,

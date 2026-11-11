@@ -2,48 +2,32 @@
  * Maps the language tags the app stores to runner languages.
  *
  * Tags come from a `CODE` resource's `language`, an essay question's
- * `highlight`, and the info string of a fenced code block in a note.
+ * `highlight`, and the info string of a fenced code block in a note. The
+ * languages are those of the plugins in `runner.languages`.
  */
 
+import { runners } from "codehood:runners";
 import type { LanguageId, RunMode } from "./protocol";
+import type { RunnerInfo } from "./registry";
 
-/// Tags that map to a driver. `fake` is deliberately absent.
-const ALIASES: Record<string, LanguageId | undefined> = {
-	elm: "elm",
-	javascript: "javascript",
-	js: "javascript",
-	mjs: "javascript",
-	node: "javascript",
-	lua: "lua",
-	pl: "prolog",
-	prolog: "prolog",
-	swipl: "prolog",
-	mts: "typescript",
-	py: "python",
-	python: "python",
-	python3: "python",
-	ts: "typescript",
-	typescript: "typescript",
-};
+/// Each language by id.
+const BY_ID = new Map<string, RunnerInfo>(
+	runners.map((runner) => [runner.id, runner]),
+);
 
-/// File extension of each language's source files.
-const EXTENSIONS: Record<LanguageId, string> = {
-	elm: "elm",
-	javascript: "js",
-	lua: "lua",
-	prolog: "pl",
-	python: "py",
-	typescript: "ts",
-	fake: "fake",
-};
+/// Each alias to its language. `fake` is deliberately absent.
+const ALIASES = new Map<string, LanguageId>(
+	runners.flatMap((runner) =>
+		runner.aliases.map((alias) => [alias, runner.id] as const),
+	),
+);
 
 /**
  * The runner language for a tag, or null when no driver runs it.
  *
- * Case-insensitive; accepts the usual aliases (`js`, `mjs`, `javascript`,
- * `node` for JavaScript; `pl`, `prolog`, `swipl` for Prolog; `py`, `python`, `python3` for Python; `lua` for Lua; `ts`, `mts`, `typescript` for TypeScript; `elm` for Elm). Never returns `fake`: that driver is reachable only
- * from tests. A language whose driver arrives in a later delivery maps to
- * null until its id is in `languageId`.
+ * Case-insensitive; accepts each plugin's aliases (`js`, `mjs`, `node` for
+ * JavaScript, say). Never returns `fake`: that driver is reachable only from
+ * tests.
  *
  * @example
  * runnerLanguage("JS"); // "javascript"
@@ -53,24 +37,30 @@ export function runnerLanguage(
 	tag: string | null | undefined,
 ): LanguageId | null {
 	if (!tag) return null;
-	return Object.hasOwn(ALIASES, tag.trim().toLowerCase())
-		? (ALIASES[tag.trim().toLowerCase()] ?? null)
-		: null;
+	return ALIASES.get(tag.trim().toLowerCase()) ?? null;
 }
 
-/**
- * How Run starts `language`: `repl` for Prolog (consult + toplevel) and Elm
- * (tests + REPL), `script` otherwise.
- */
+/** What the app knows of `language`, or undefined for `fake` and unknown ids. */
+export function runnerInfo(language: LanguageId): RunnerInfo | undefined {
+	return BY_ID.get(language);
+}
+
+/** How Run starts `language`, as its plugin declares; `script` for `fake`. */
 export function defaultRunMode(language: LanguageId): RunMode {
-	return language === "prolog" || language === "elm" ? "repl" : "script";
+	return BY_ID.get(language)?.defaultMode ?? "script";
 }
 
-/**
- * Default file name for a program in `language` (`main.js`).
- *
- * `Main.elm` for Elm, whose file names must match their module names.
- */
+/** Default file name for a program in `language` (`main.js`, `Main.elm`). */
 export function defaultFilename(language: LanguageId): string {
-	return language === "elm" ? "Main.elm" : `main.${EXTENSIONS[language]}`;
+	return BY_ID.get(language)?.defaultFilename ?? `main.${language}`;
+}
+
+/** Name of `language` shown in the widget; the id for `fake`. */
+export function languageLabel(language: LanguageId): string {
+	return BY_ID.get(language)?.label ?? language;
+}
+
+/** Note shown next to Run when each Run starts `language` over, or null. */
+export function restartNote(language: LanguageId): string | null {
+	return BY_ID.get(language)?.restartNote ?? null;
 }

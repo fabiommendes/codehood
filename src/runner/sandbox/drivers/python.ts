@@ -149,3 +149,5 @@ export const pythonDriver: Driver = {
 		return typeof status === "number" ? status : 0;
 	},
 };
+
+export default pythonDriver;
