@@ -97,8 +97,8 @@ that state, but the shortcut is still not worth taking.
 Two more ways a run goes wrong before a single assertion is reached. `pnpm test
 -- test/stories/` does **not** filter: pnpm eats the `--` and the whole suite
 runs. And `reuseExistingServer` is `false`, so a server left behind by an
-interrupted run fails the next one with "http://localhost:4322 is already used"
-— clear it with `pkill -f "dist/server/entry.mjs"`.
+interrupted run makes the next one skip its ports or, with `TEST_PORT` pinned,
+refuse to start — clear it with `pkill -f "dist/server/entry.mjs"`.
 
 ## Playwright primitives
 

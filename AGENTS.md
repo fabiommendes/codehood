@@ -141,7 +141,9 @@ run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 | :------------------ | :-------------------------------------------- |
 | `pnpm run dev`      | Start dev server at `localhost:4321`          |
 | `pnpm run build`    | Build for production to `./dist/`             |
-| `pnpm run test`     | Run integration tests (Playwright). See below |
+| `pnpm run test:unit`| Run the specs that need no server. See below  |
+| `pnpm run test:e2e` | Run the specs that drive the server under test|
+| `pnpm run test`     | Run both scopes, `unit` first                 |
 | `pnpm run lint`     | Run linter, typecheck, and story coverage     |
 | `pnpm run manage`   | Run management CLI commands                   |
 | `pnpm run db:seed`  | Seed the dev database                         |
@@ -154,16 +156,53 @@ running keeps the old one open and fails every write with "attempt to write a
 readonly database" until it is restarted. Say so when the server is not yours
 to restart.
 
+### Test scopes
+
+The suite has two scopes, and `test/scope.ts` sorts each spec into one by
+reading it: a spec that takes the `page`, `request`, `browser` or `context`
+fixture, or refers to `TEST_BASE_URL` or `TEST_RUNNER_ORIGIN`, is `e2e`.
+Everything else is `unit`.
+
+| Scope  | Specs                                | Runs                                                    | Time   |
+| :----- | :----------------------------------- | :------------------------------------------------------ | :----- |
+| `unit` | services, schemas, pure functions    | spec files in parallel, one database per worker         | ~30 s  |
+| `e2e`  | pages, REST API, user stories        | spec files in parallel, one server and database per worker | ~3 min |
+
+Run them in this order of priority:
+
+1. `rtk pnpm run test:unit` after every change. It is cheap enough to never skip.
+2. The `e2e` specs of what you touched, by file, when the change reaches a page,
+   an endpoint or an action: `rtk pnpm exec tsx test/run.ts --scope=e2e test/foo.spec.ts`.
+3. `rtk pnpm test`, both scopes, once before calling the task done. Not after
+   every edit.
+
+Prefer a `unit` spec for a new test: cover the rule in the service and leave to
+`e2e` only what needs a browser or the HTTP layer. A `unit` spec gets a copy of
+the seeded database per worker, so it must not depend on rows another spec file
+left behind. The same holds for `e2e`: each worker has its own server, database
+and blobs, and the order between spec files is not fixed.
+
+An `e2e` spec imports `test` and `expect` from `test/fixtures.ts`, not from
+`@playwright/test`: its pages wait for the islands to hydrate after `goto` and
+`reload`, so a click does not land on markup that has no handler yet. A click
+on a link is not covered; wait for something the island renders before acting.
+
+`e2e` runs 4 workers. `TEST_E2E_WORKERS=1` runs one spec file at a time, which
+helps to tell a failure of the code from one of timing on a busy machine. Do not
+pass `--workers`: the servers are started from `TEST_E2E_WORKERS`.
+
 ### Test output
 
 `test/run.ts` wipes the test database and pushes the schema before Playwright
 starts, so `playwright test` on its own refuses to run. Everything after the
 script name is forwarded to Playwright.
 
-Runs are isolated from each other: the script takes the first free port at or
-above 4322 and puts that run's database and blobs under `test/.tmp/<port>/`, so
-a second run started while one is going does not wipe the database in use. Set
-`TEST_PORT` to pin it.
+Runs are isolated from each other: the script reserves the first free block of
+ports at or above 4322, one per `e2e` worker, and puts that run's blobs and
+build under `test/.tmp/<port>/`, so a second run started while one is going does
+not wipe the database in use. Set `TEST_PORT` to pin the first port. The
+databases themselves go to `/dev/shm` when it exists, and so do the lock files
+that keep two runs off the same ports (`/dev/shm/codehood-test-ports/`).
 
 It defaults to `--reporter=dot`, which prints one character per test instead of
 one line, and still streams as the suite runs. Pass `--reporter=line` to see
@@ -171,16 +210,24 @@ which test is currently running, or `--reporter=list` for the full log.
 
 ```bash
 rtk pnpm test                                   # whole suite, dot reporter
-rtk pnpm exec tsx test/run.ts test/foo.spec.ts  # one file
+rtk pnpm exec tsx test/run.ts test/foo.spec.ts  # one file, whichever scope it is in
+rtk pnpm exec tsx test/run.ts --scope=unit      # one scope: unit, e2e or all
 rtk pnpm test -- --reporter=line                # name each test as it runs
-rtk pnpm exec tsx test/run.ts --only-changed=main  # specs touched since main
 ```
 
-Prefer `--only-changed` (against `main`, or `HEAD` for uncommitted work) while
-iterating. Playwright selects specs by their import graph, and specs drive the
-app through HTTP, so a change in `src/pages/`, `src/db/` or an endpoint selects
-no spec on its own. Add the specs for the screens you touched by path, and run
-the whole suite once before calling a task done.
+While iterating, `--only-changed` runs only the specs affected by uncommitted
+changes, and `--only-changed=main` those affected since a ref. Selection takes
+about 4 seconds. It follows the imports of each spec, so it covers service and
+pure specs well and misses whatever a spec reaches some other way: pages and
+endpoints called over HTTP, `.astro` files, `prisma/schema.prisma`, seed data.
+An empty selection therefore proves nothing. Run the whole suite before calling
+a task done.
+
+```bash
+rtk pnpm exec tsx test/run.ts --only-changed       # affected by the working tree
+rtk pnpm exec tsx test/run.ts --only-changed=main  # affected since main
+rtk pnpm run test:unit --only-changed              # the same, without building the server
+```
 
 `TEST_BROWSERS=cross` adds Firefox and WebKit projects that run only the
 `runner-*` specs; the default suite stays on Chromium. Install them with
