@@ -1,7 +1,9 @@
 /**
- * Runtime packages the runner bundle carries and serves under `/runner/rt/`.
+ * Runtime packages of the runner plugins that ship with Codehood.
  *
- * Shared by the sandbox (paths) and the build and the asset server (files).
+ * A plugin lists the ones it needs in `runtimes`; the bundle carries and
+ * serves under `/runner/rt/` those of the plugins in `runner.languages`.
+ * Drivers import them here for the paths.
  */
 
 /** A runtime package copied into the runner bundle. */
@@ -22,6 +24,7 @@ export interface RuntimePackage {
 	bundle?: Record<string, string[]>;
 }
 
+/** The runtime packages of the plugins under `src/runner/plugins/`. */
 export const RUNTIMES: {
 	swipl: RuntimePackage;
 	pyodide: RuntimePackage;

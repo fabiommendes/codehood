@@ -11,44 +11,92 @@ import {
 	readFileSync,
 	renameSync,
 	rmSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { brotliCompress, gzip, constants as zlib } from "node:zlib";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
-import { buildElmCache } from "../elm/cache";
-import { ELM_CACHE_FILE } from "../sandbox/drivers/elm/project";
-import { RUNTIMES, runtimeDir } from "../sandbox/runtimes";
+import { tsImport } from "tsx/esm/api";
+import type { BuildStep, RunnerPlugin } from "../plugin";
+import { driversModule, pluginRuntimes, resolveSpecifier } from "../registry";
+import { runtimeDir } from "../sandbox/runtimes";
 import {
 	BUNDLE_DIR_NAME,
 	type ContentEncoding,
 	DEV_BUNDLE_DIR,
 	MANIFEST_NAME,
 	PRECOMPRESSED,
-} from "./assets";
+} from "./layout";
 
-/// Whether `file` may be part of the bundle: the sandbox, its entries,
-/// the shared protocol, zod and acorn (to locate JavaScript syntax errors).
-function isAllowed(root: string, file: string): boolean {
+/// Namespace of the generated `codehood:runner-drivers` module.
+const DRIVERS_NAMESPACE = "runner-drivers";
+
+/// Absolute path of the module a plugin specifier points at.
+function modulePath(root: string, specifier: string): string {
+	const resolved = resolveSpecifier(root, specifier);
+	return isAbsolute(resolved)
+		? resolved
+		: createRequire(join(root, "package.json")).resolve(resolved);
+}
+
+/// Directories a plugin's driver may import from: its own directory, and
+/// each package in `sandboxDependencies`.
+function pluginDirs(root: string, plugin: RunnerPlugin): string[] {
+	return [
+		dirname(modulePath(root, plugin.driver)) + sep,
+		...plugin.sandboxDependencies.map(
+			(pkg) => `${sep}node_modules${sep}${pkg.replaceAll("/", sep)}${sep}`,
+		),
+	];
+}
+
+/// Whether `file` may be part of the bundle: the sandbox, its entries, the
+/// shared protocol, zod, and what each plugin's driver may import.
+function isAllowed(
+	root: string,
+	plugins: readonly RunnerPlugin[],
+): (file: string) => boolean {
 	const rel = resolve(root, "src", "runner");
-	return (
+	const dirs = plugins.flatMap((plugin) => pluginDirs(root, plugin));
+	return (file) =>
 		file.startsWith(join(rel, "sandbox") + sep) ||
 		file.startsWith(join(rel, "server", "entries") + sep) ||
 		file === join(rel, "protocol.ts") ||
 		file.includes(`${sep}node_modules${sep}zod${sep}`) ||
-		file.includes(`${sep}node_modules${sep}acorn${sep}`)
-	);
+		dirs.some((dir) =>
+			dir.startsWith(`${sep}node_modules`)
+				? file.includes(dir)
+				: file.startsWith(dir),
+		);
+}
+
+/// esbuild plugin that serves `codehood:runner-drivers`: a loader of each
+/// plugin's driver.
+function runnerDrivers(root: string, plugins: readonly RunnerPlugin[]): Plugin {
+	return {
+		name: "runner-drivers",
+		setup(b) {
+			b.onResolve({ filter: /^codehood:runner-drivers$/ }, () => ({
+				path: "codehood:runner-drivers",
+				namespace: DRIVERS_NAMESPACE,
+			}));
+			b.onLoad({ filter: /.*/, namespace: DRIVERS_NAMESPACE }, () => ({
+				contents: driversModule(plugins, root),
+				loader: "js",
+				resolveDir: root,
+			}));
+		},
+	};
 }
 
 /// esbuild plugin that fails the build on any import outside the allowed set.
 function restrictImports(
-	root: string,
-	allowed: (file: string) => boolean = (file) => isAllowed(root, file),
-	allowedText = "src/runner/sandbox/**, src/runner/protocol.ts, zod and acorn",
+	allowed: (file: string) => boolean,
+	allowedText: string,
 ): Plugin {
 	return {
 		name: "runner-restrict-imports",
@@ -62,6 +110,7 @@ function restrictImports(
 					pluginData: { skip: true },
 				});
 				if (result.errors.length > 0) return result;
+				if (result.namespace === DRIVERS_NAMESPACE) return result;
 				if (!allowed(result.path)) {
 					return {
 						errors: [
@@ -106,7 +155,6 @@ const MODULE_PACKAGES = [
  * Fails on any import that is not a file of `MODULE_PACKAGES`.
  */
 export async function buildModule(
-	root: string,
 	source: string,
 	exports: string[],
 	outfile: string,
@@ -125,7 +173,6 @@ export async function buildModule(
 		logLevel: "silent",
 		plugins: [
 			restrictImports(
-				root,
 				(file) =>
 					MODULE_PACKAGES.some((pkg) =>
 						file.includes(`${sep}node_modules${sep}${pkg}${sep}`),
@@ -136,17 +183,22 @@ export async function buildModule(
 	});
 }
 
-/// Copies the files of `RUNTIMES` from `node_modules` into `<staging>/rt/`,
-/// checking the installed version, and wraps the glue that is not an ES module.
-async function copyRuntimes(root: string, staging: string): Promise<void> {
-	for (const runtime of Object.values(RUNTIMES)) {
+/// Copies the runtime files of `plugins` from `node_modules` into
+/// `<staging>/rt/`, checking the installed version, and wraps the glue that
+/// is not an ES module.
+async function copyRuntimes(
+	root: string,
+	plugins: readonly RunnerPlugin[],
+	staging: string,
+): Promise<void> {
+	for (const runtime of pluginRuntimes(plugins)) {
 		const pkgDir = join(root, "node_modules", runtime.pkg);
 		const installed = JSON.parse(
 			readFileSync(join(pkgDir, "package.json"), "utf8"),
 		).version;
 		if (installed !== runtime.version) {
 			throw new Error(
-				`${runtime.pkg} ${installed} is installed but RUNTIMES lists ${runtime.version}.`,
+				`${runtime.pkg} ${installed} is installed but a runner plugin lists ${runtime.version}.`,
 			);
 		}
 		const target = join(staging, "rt", runtimeDir(runtime));
@@ -155,7 +207,7 @@ async function copyRuntimes(root: string, staging: string): Promise<void> {
 			const wrap = runtime.wrap?.[to];
 			const only = runtime.bundle?.[to];
 			if (only) {
-				await buildModule(root, join(pkgDir, from), only, join(target, to));
+				await buildModule(join(pkgDir, from), only, join(target, to));
 			} else if (wrap) {
 				writeFileSync(
 					join(target, to),
@@ -228,47 +280,47 @@ export async function precompress(
 	);
 }
 
-/// Inputs of the Elm package cache, relative to the root: the compiler, the
-/// package sources, the support modules and the code that builds the cache.
-const ELM_CACHE_INPUTS = [
-	join("node_modules", "guida", "bin", "guida.min.js"),
-	join("src", "runner", "elm"),
-	join("src", "runner", "sandbox", "drivers", "elm"),
-];
-
-/**
- * Writes the Elm package cache to `file`.
- *
- * Building it takes seconds, so the result is kept in `cacheDir` under the
- * hash of its inputs and reused while they do not change.
- */
-async function writeElmCache(
+/// Runs the `build` step of each plugin that has one, writing what it emits
+/// into `staging`.
+async function runBuildSteps(
 	root: string,
-	file: string,
-	cacheDir: string,
+	plugins: readonly RunnerPlugin[],
+	staging: string,
 ): Promise<void> {
-	const hash = createHash("sha256");
-	for (const input of ELM_CACHE_INPUTS) {
-		const path = join(root, input);
-		const files = statSync(path).isDirectory()
-			? listFiles(path).map((f) => join(path, f))
-			: [path];
-		for (const f of files) {
-			hash.update(f.slice(root.length)).update(readFileSync(f));
+	for (const plugin of plugins) {
+		if (!plugin.build) continue;
+		const module = modulePath(root, plugin.build);
+		const loaded = (await tsImport(
+			pathToFileURL(module).href,
+			import.meta.url,
+		)) as { default?: BuildStep };
+		if (typeof loaded.default !== "function") {
+			throw new Error(
+				`The build module of runner plugin "${plugin.id}" (${module}) must default-export a function.`,
+			);
 		}
+		await loaded.default({
+			root,
+			cacheDir: join(root, "node_modules", ".cache", `runner-${plugin.id}`),
+			emit(name, data) {
+				const target = join(staging, name);
+				if (!target.startsWith(staging + sep)) {
+					throw new Error(
+						`Runner plugin "${plugin.id}" emitted "${name}", outside the bundle.`,
+					);
+				}
+				mkdirSync(dirname(target), { recursive: true });
+				writeFileSync(target, data);
+			},
+		});
 	}
-	const cached = join(cacheDir, `${hash.digest("hex")}.bin`);
-	if (!existsSync(cached)) {
-		mkdirSync(cacheDir, { recursive: true });
-		writeFileSync(`${cached}.tmp`, await buildElmCache(root));
-		renameSync(`${cached}.tmp`, cached);
-	}
-	copyFileSync(cached, file);
 }
 
 /** How `buildRunnerBundle` builds. */
 export interface BundleOptions {
 	minify: boolean;
+	/// Languages the bundle runs, besides `fake`.
+	plugins?: readonly RunnerPlugin[];
 	/// Where `precompress` caches its output; without it, nothing is compressed.
 	compressCache?: string;
 }
@@ -278,8 +330,8 @@ export interface BundleOptions {
  *
  * Writes `frame.js`, `worker.js` (ES modules sharing chunks), `sw.js` (one
  * self-contained script, since it is not served from the versioned directory),
- * the Elm package cache (`ELM_CACHE_FILE`, versioned with the code that reads
- * it) and `manifest.json` with the content hash and the file list. Runtime files
+ * what the plugins' build steps emit (versioned with the code that reads it)
+ * and `manifest.json` with the content hash and the file list. Runtime files
  * go to `rt/`, outside both: their own path carries the version. With
  * `compressCache`, each file also gets its `precompress` copies.
  *
@@ -288,7 +340,7 @@ export interface BundleOptions {
 export async function buildRunnerBundle(
 	root: string,
 	outDir: string,
-	{ minify, compressCache }: BundleOptions,
+	{ minify, compressCache, plugins = [] }: BundleOptions,
 ): Promise<void> {
 	const entries = join(root, "src", "runner", "server", "entries");
 	const staging = `${outDir}.tmp`;
@@ -302,7 +354,13 @@ export async function buildRunnerBundle(
 		minify,
 		tsconfigRaw: "{}",
 		logLevel: "silent",
-		plugins: [restrictImports(root)],
+		plugins: [
+			restrictImports(
+				isAllowed(root, plugins),
+				"src/runner/sandbox/**, src/runner/protocol.ts, zod and the runner plugins' own files and sandboxDependencies",
+			),
+			runnerDrivers(root, plugins),
+		],
 	} satisfies BuildOptions;
 	try {
 		await build({
@@ -319,11 +377,7 @@ export async function buildRunnerBundle(
 			outfile: join(staging, "sw.js"),
 			format: "iife",
 		});
-		await writeElmCache(
-			root,
-			join(staging, ELM_CACHE_FILE),
-			join(root, "node_modules", ".cache", "runner-elm"),
-		);
+		await runBuildSteps(root, plugins, staging);
 		const files = listFiles(staging);
 		const hash = createHash("sha256");
 		for (const file of files) {
@@ -335,7 +389,7 @@ export async function buildRunnerBundle(
 			join(staging, MANIFEST_NAME),
 			JSON.stringify({ version, files }),
 		);
-		await copyRuntimes(root, staging);
+		await copyRuntimes(root, plugins, staging);
 		if (compressCache) await precompress(staging, compressCache);
 		rmSync(outDir, { recursive: true, force: true });
 		mkdirSync(dirname(outDir), { recursive: true });
@@ -351,11 +405,15 @@ export async function buildRunnerBundle(
  * `frame.js`, `worker.js` (module Worker) and `sw.js`, plus driver chunks.
  *
  * `astro build` writes it next to the server build so a packaged release
- * carries it; `astro dev` rebuilds it on change. The bundle may import only
- * `src/runner/protocol.ts`, `src/runner/sandbox/**` and `zod`; the build fails
- * on any other import from `src/`.
+ * carries it; `astro dev` rebuilds it on change. It carries the drivers of
+ * `plugins` (`runner.languages`). The bundle may import only
+ * `src/runner/protocol.ts`, `src/runner/sandbox/**`, `zod` and each plugin's
+ * driver directory and `sandboxDependencies`; the build fails on any other
+ * import.
  */
-export function runnerBundle(): AstroIntegration {
+export function runnerBundle(
+	plugins: readonly RunnerPlugin[],
+): AstroIntegration {
 	let root = "";
 	let outDir = "";
 	return {
@@ -369,7 +427,7 @@ export function runnerBundle(): AstroIntegration {
 				const target = join(root, DEV_BUNDLE_DIR);
 				const rebuild = async () => {
 					try {
-						await buildRunnerBundle(root, target, { minify: false });
+						await buildRunnerBundle(root, target, { minify: false, plugins });
 					} catch (error) {
 						logger.error(
 							`Runner bundle: ${error instanceof Error ? error.message : error}`,
@@ -381,6 +439,11 @@ export function runnerBundle(): AstroIntegration {
 					join(root, "src", "runner", "sandbox") + sep,
 					join(root, "src", "runner", "server", "entries") + sep,
 					join(root, "src", "runner", "protocol.ts"),
+					...plugins.flatMap((plugin) =>
+						[plugin.driver, plugin.build]
+							.filter((module) => module !== undefined)
+							.map((module) => dirname(modulePath(root, module)) + sep),
+					),
 				];
 				let timer: NodeJS.Timeout | undefined;
 				const onChange = (file: string) => {
@@ -395,6 +458,7 @@ export function runnerBundle(): AstroIntegration {
 			"astro:build:done": async () => {
 				await buildRunnerBundle(root, join(outDir, BUNDLE_DIR_NAME), {
 					minify: true,
+					plugins,
 					compressCache: join(root, "node_modules", ".cache", "runner-bundle"),
 				});
 			},

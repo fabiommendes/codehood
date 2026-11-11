@@ -9,6 +9,8 @@
  */
 
 import { z } from "zod";
+import { runnerPlugins } from "../runner/plugin";
+import { defaultRunners } from "../runner/plugins";
 
 /// IANA time zone accepted by `Intl.DateTimeFormat`.
 const timeZone = z.string().refine(
@@ -79,6 +81,8 @@ export const codehoodConfig = z.object({
 			/// Origin of the code runner; null derives one in development and
 			/// turns code execution off in production.
 			origin: z.string().nullable().default(null),
+			/// Languages the runner runs, one plugin each (`defineRunner`).
+			languages: runnerPlugins.default(defaultRunners),
 		})
 		.prefault({}),
 });
@@ -95,6 +99,7 @@ export const BUILD_TIME_KEYS = [
 	"instance.locale",
 	"instance.timeZone",
 	"runner.origin",
+	"runner.languages",
 ] as const;
 
 /**

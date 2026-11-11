@@ -2,12 +2,16 @@
  * Loads `codehood.config.ts` for the Astro build and makes it importable.
  */
 
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { AstroIntegration } from "astro";
+import { runnersModule } from "../runner/registry";
 import type { CodehoodConfig } from ".";
 
 /// Id Vite gives the virtual module of build-time constants.
 const BUILD_MODULE = "\0codehood:build";
+
+/// Id Vite gives the virtual module of the runner registry.
+const RUNNERS_MODULE = "\0codehood:runners";
 
 /**
  * Imports and validates the configuration file at `file`.
@@ -32,7 +36,9 @@ export async function loadConfig(file: string): Promise<CodehoodConfig> {
  * `codehood:config` resolves to `file`, which the server evaluates again at
  * boot, so `env()` reads the running process's environment.
  * `codehood:build` is a module of constants frozen at build, safe to import
- * in the browser. The dev server restarts when `file` changes.
+ * in the browser, and so is `codehood:runners`, the registry of the
+ * languages in `runner.languages`. The dev server restarts when `file`
+ * changes.
  */
 export function codehoodConfig(
 	file: string,
@@ -41,8 +47,9 @@ export function codehoodConfig(
 	return {
 		name: "codehood-config",
 		hooks: {
-			"astro:config:setup": ({ addWatchFile, updateConfig }) => {
+			"astro:config:setup": ({ addWatchFile, config: astro, updateConfig }) => {
 				addWatchFile(file);
+				const root = fileURLToPath(astro.root);
 				updateConfig({
 					vite: {
 						plugins: [
@@ -53,11 +60,21 @@ export function codehoodConfig(
 								resolveId(id: string) {
 									if (id === "codehood:config") return file;
 									if (id === "codehood:build") return BUILD_MODULE;
+									if (id === "codehood:runners") return RUNNERS_MODULE;
 									return null;
 								},
 								load(id: string) {
-									if (id !== BUILD_MODULE) return null;
-									return `export const timeZone = ${JSON.stringify(config.instance.timeZone)};\n`;
+									if (id === BUILD_MODULE) {
+										return `export const timeZone = ${JSON.stringify(config.instance.timeZone)};\n`;
+									}
+									if (id === RUNNERS_MODULE) {
+										return runnersModule(
+											config.runner.languages,
+											config.instance.locale,
+											root,
+										);
+									}
+									return null;
 								},
 							},
 						],

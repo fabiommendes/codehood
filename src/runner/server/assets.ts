@@ -12,35 +12,24 @@
  * | `/runner/frame`              | `frame`   | `renderFramePage(...)`           |
  * | `/runner/sw.js`              | `sw`      | service worker                   |
  * | `/runner/<version>/<file>`   | `bundle`  | `frame.js`, `worker.js`, chunks  |
- * | `/runner/rt/<pkg>@<ver>/...` | `runtime` | files listed in `RUNTIMES`       |
+ * | `/runner/rt/<pkg>@<ver>/...` | `runtime` | files of the runner plugins      |
  */
 
+import { runtimes } from "codehood:runners";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FrameConfig } from "../sandbox/frame";
-import { RUNTIMES, runtimePath } from "../sandbox/runtimes";
+import { runtimePath } from "../sandbox/runtimes";
+import {
+	BUNDLE_DIR_NAME,
+	type ContentEncoding,
+	DEV_BUNDLE_DIR,
+	MANIFEST_NAME,
+	PRECOMPRESSED,
+} from "./layout";
 import type { RunnerAssetKind } from "./routing";
-
-/// Name of the directory that holds a built bundle, next to the server build.
-export const BUNDLE_DIR_NAME = "runner-bundle";
-
-/// Where `astro dev` keeps its bundle, relative to the project root.
-export const DEV_BUNDLE_DIR = join(".astro", BUNDLE_DIR_NAME);
-
-/// Name of the manifest inside a bundle directory: `{ version, files }`.
-export const MANIFEST_NAME = "manifest.json";
-
-/// Copies the production build writes next to each file that compresses
-/// well, in the order the endpoint prefers them.
-export const PRECOMPRESSED = [
-	{ encoding: "br", extension: ".br" },
-	{ encoding: "gzip", extension: ".gz" },
-] as const;
-
-/// A `Content-Encoding` the endpoint may send.
-export type ContentEncoding = (typeof PRECOMPRESSED)[number]["encoding"];
 
 /// One file to serve; `encoding` is set when `body` is a compressed copy.
 export interface RunnerAsset {
@@ -98,10 +87,10 @@ function contentType(name: string): string {
 	);
 }
 
-/// Every runtime file `RUNTIMES` lists, as `<pkg>@<version>/<file>`.
+/// Every runtime file of the runner plugins, as `<pkg>@<version>/<file>`.
 function runtimeFiles(): Set<string> {
 	return new Set(
-		Object.values(RUNTIMES).flatMap((runtime) =>
+		runtimes.flatMap((runtime) =>
 			Object.values(runtime.files).map((file) => runtimePath(runtime, file)),
 		),
 	);

@@ -68,7 +68,7 @@ export default defineConfig({
 		codehoodConfig(configFile, config),
 		solidJs(),
 		dynamicRouterHook(),
-		runnerBundle(),
+		runnerBundle(config.runner.languages),
 	],
 	vite: {
 		plugins: [tailwindcss(), paraglidePlugin(root)],

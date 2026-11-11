@@ -9,18 +9,8 @@
 import type { Extension } from "@codemirror/state";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import type { HighlighterCore, ThemedToken } from "shiki/core";
+import { runnerInfo } from "@/runner/languages";
 import type { LanguageId } from "@/runner/protocol";
-
-/// The Shiki grammar of each runner language.
-const GRAMMARS: Record<LanguageId, (() => Promise<unknown>) | null> = {
-	javascript: () => import("shiki/langs/javascript.mjs"),
-	typescript: () => import("shiki/langs/typescript.mjs"),
-	python: () => import("shiki/langs/python.mjs"),
-	lua: () => import("shiki/langs/lua.mjs"),
-	prolog: () => import("shiki/langs/prolog.mjs"),
-	elm: () => import("shiki/langs/elm.mjs"),
-	fake: null,
-};
 
 const THEME = "dark-plus";
 
@@ -47,12 +37,12 @@ function tokenStyle(token: ThemedToken, foreground: string): string {
 
 /**
  * Returns a CodeMirror extension that colors `language` as Shiki does, or
- * `[]` when Shiki has no grammar for it.
+ * `[]` when its plugin declares no grammar.
  */
 export async function shikiHighlighting(
 	language: LanguageId,
 ): Promise<Extension> {
-	const grammar = GRAMMARS[language];
+	const grammar = runnerInfo(language)?.grammar;
 	if (!grammar) return [];
 	const [core, engine, view, state] = await Promise.all([
 		import("shiki/core"),
@@ -66,9 +56,9 @@ export async function shikiHighlighting(
 		engine: engine.createJavaScriptRegexEngine(),
 	});
 	const shiki = await highlighter;
-	if (!shiki.getLoadedLanguages().includes(language)) {
+	if (!shiki.getLoadedLanguages().includes(grammar.name)) {
 		await shiki.loadLanguage(
-			(await grammar()) as Parameters<HighlighterCore["loadLanguage"]>[0],
+			(await grammar.load()) as Parameters<HighlighterCore["loadLanguage"]>[0],
 		);
 	}
 	const foreground = (shiki.getTheme(THEME).fg ?? "").toLowerCase();
@@ -88,7 +78,7 @@ export async function shikiHighlighting(
 	const decorate = (code: string): DecorationSet => {
 		const builder = new state.RangeSetBuilder<ReturnType<typeof markOf>>();
 		const lines = shiki.codeToTokensBase(code, {
-			lang: language,
+			lang: grammar.name,
 			theme: THEME,
 		});
 		for (const line of lines) {

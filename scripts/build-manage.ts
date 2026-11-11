@@ -5,14 +5,16 @@
  *
  * Only `dependencies` stay external and load from `node_modules`, the only
  * packages a production install has; everything else (the linked `mdq`, for
- * one) is bundled in. `codehood:config` and `codehood:build` resolve as in
- * the Astro build: to the configuration file (`CODEHOOD_CONFIG`), evaluated
- * again when the CLI starts, and to the build-time constants it holds.
+ * one) is bundled in. `codehood:config`, `codehood:build` and
+ * `codehood:runners` resolve as in the Astro build: to the configuration
+ * file (`CODEHOOD_CONFIG`), evaluated again when the CLI starts, and to the
+ * build-time values it holds (the runner registry without its editors).
  */
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 import { loadConfig } from "../src/config/integration";
 import { configPath } from "../src/config/path";
+import { runnersModule } from "../src/runner/registry";
 
 const configFile = configPath(process.cwd(), process.env);
 const config = await loadConfig(configFile);
@@ -47,6 +49,22 @@ await build({
 					{ filter: /.*/, namespace: "codehood-build" },
 					() => ({
 						contents: `export const timeZone = ${JSON.stringify(config.instance.timeZone)};`,
+						loader: "js",
+					}),
+				);
+				pluginBuild.onResolve({ filter: /^codehood:runners$/ }, () => ({
+					path: "codehood:runners",
+					namespace: "codehood-runners",
+				}));
+				pluginBuild.onLoad(
+					{ filter: /.*/, namespace: "codehood-runners" },
+					() => ({
+						contents: runnersModule(
+							config.runner.languages,
+							config.instance.locale,
+							process.cwd(),
+							{ loaders: false },
+						),
 						loader: "js",
 					}),
 				);

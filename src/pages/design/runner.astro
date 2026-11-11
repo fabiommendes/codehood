@@ -218,7 +218,7 @@ const reviewSubmissions = [
     };
     const ms = (from: number) => `${Math.round(performance.now() - from)} ms`;
 
-    const samples: Record<LanguageId, { entry: string; code: string }> = {
+    const samples = {
       elm: {
         entry: "Main.elm",
         code: 'module Main exposing (..)\n\n\ngreet : String -> String\ngreet name =\n    "Hello, " ++ name ++ "!"\n',
@@ -247,8 +247,8 @@ const reviewSubmissions = [
         entry: "main.fake",
         code: "out hello\nread\nerr oops\nexit 3\n",
       },
-    };
-    const current = () => language.value as LanguageId;
+    } satisfies Record<string, { entry: string; code: string }>;
+    const current = () => language.value as keyof typeof samples;
     code.value = samples[current()].code;
 
     const host = RunnerHost.shared(origin);

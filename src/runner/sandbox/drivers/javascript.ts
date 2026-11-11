@@ -290,3 +290,5 @@ export const javascriptDriver: Driver = {
 		return ctx.mode === "repl" ? runRepl(ctx) : runScript(ctx);
 	},
 };
+
+export default javascriptDriver;

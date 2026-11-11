@@ -7,6 +7,7 @@
  */
 
 import { defineConfig, env } from "@/config";
+import { defaultRunners, elm, lua, prolog } from "@/runner/plugins";
 
 export default defineConfig({
 	instance: {
@@ -23,5 +24,8 @@ export default defineConfig({
 			student: env("BLOB_QUOTA_STUDENT"),
 		},
 	},
-	runner: { origin: env("RUNNER_ORIGIN") ?? null },
+	runner: {
+		origin: env("RUNNER_ORIGIN") ?? null,
+		languages: [...defaultRunners(), lua(), prolog(), elm()],
+	},
 });

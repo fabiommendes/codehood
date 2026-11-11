@@ -50,6 +50,9 @@
   are build-time constants there; `PUBLIC_URL`, `CODEHOOD_LOCALE`,
   `SERVER_TZ` and `RUNNER_ORIGIN` no longer reach the build. `pnpm run
   package` takes the instance's file with `--config`.
+- Runner languages are plugins listed in `runner.languages`. Without the
+  key an instance runs Python, JavaScript and TypeScript; Lua, Prolog and
+  Elm must be listed (`src/runner/plugins/`).
 - REST e RPC documentam sessão OU Bearer. Credenciais simultâneas são
   rejeitadas antes da validação; cookies alheios não conflitam. Mutações JSON
   em `/api/` e `/rpc` com Origin externo também exigem Bearer válido.

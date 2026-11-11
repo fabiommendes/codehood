@@ -75,6 +75,7 @@ An instance is described by `codehood.config.ts` at the root, validated by
 | `storage.quota.instructor`    | `1gb`                 | Upload quota per instructor.                                             |
 | `storage.quota.student`       | `200mb`               | Upload quota per student.                                                |
 | `runner.origin`               | null                  | Build-time constant. Origin of the code runner, see [Code runner origin](#code-runner-origin). |
+| `runner.languages`            | `defaultRunners()`    | Build-time constant. Languages the runner runs, see [Runner languages](#runner-languages). |
 
 Build-time constants are baked into the build: a changed value takes effect
 with the next `pnpm run build`, and the dev server restarts by itself when the
@@ -174,6 +175,25 @@ address, locale and time zone in `RELEASE`. Tags older than
 fail. The server trusts the proxy's `X-Forwarded-*` headers only for the
 `instance.publicUrl` host; with a wrong one, form posts fail Astro's origin
 check and every client has the proxy's IP.
+
+### Runner languages
+
+Each language of the code runner is a plugin, listed in `runner.languages`.
+Without that key an instance runs `defaultRunners()`: Python, JavaScript and
+TypeScript. The others ship in `src/runner/plugins/` and are added by name:
+
+```ts
+import { defaultRunners, elm, lua, prolog } from "@/runner/plugins";
+
+export default defineConfig({
+	runner: { languages: [...defaultRunners(), lua(), prolog(), elm()] },
+});
+```
+
+A plugin is a `defineRunner({...})` object (`src/runner/plugin.ts`) that
+points at its driver, editor support and optional build step; the build
+bundles only the listed ones. The design is in
+`dev/rfc/runners-como-plugins.md`.
 
 ### Code runner origin
 

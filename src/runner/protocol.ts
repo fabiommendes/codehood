@@ -35,16 +35,16 @@ export const FILES_LIMIT_BYTES = 1024 * 1024;
 /// Maximum bytes of one stdin line, newline excluded.
 export const STDIN_LINE_MAX_BYTES = 64 * 1024;
 
-/** Languages with a driver in the sandbox bundle. */
-export const languageId = z.enum([
-	"elm",
-	"javascript",
-	"lua",
-	"prolog",
-	"python",
-	"typescript",
-	"fake",
-]);
+/**
+ * Id of a language, as a runner plugin declares it.
+ *
+ * Any well-formed id parses: which ones a frame runs depends on the plugins
+ * its build lists, and the frame announces them in `ready`.
+ */
+export const languageId = z
+	.string()
+	.max(32)
+	.regex(/^[a-z][a-z0-9-]*$/);
 export type LanguageId = z.infer<typeof languageId>;
 
 /** How a driver runs the files: once from the entry file, or as a read-eval-print loop. */

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { expect, test } from "@playwright/test";
 import { defineConfig, env } from "@/config";
 import { configPath } from "@/config/path";
+import { defaultRunners } from "@/runner/plugins";
 
 /// Prints `expression` over `src/core/constants.ts` from a fresh Node process.
 function constantsIn(
@@ -32,8 +33,16 @@ test.describe("defineConfig", () => {
 				attachmentLinkMode: "symlink",
 				quota: { instructor: "1gb", student: "200mb" },
 			},
-			runner: { origin: null },
+			runner: { origin: null, languages: defaultRunners() },
 		});
+	});
+
+	test("the default languages are Python, JavaScript and TypeScript", () => {
+		expect(defineConfig({}).runner.languages.map((p) => p.id)).toEqual([
+			"python",
+			"javascript",
+			"typescript",
+		]);
 	});
 
 	test("the public URL is reduced to its origin", () => {

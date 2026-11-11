@@ -13,7 +13,6 @@ test("the sucrase module bundles with its own files only", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "bundle-"));
 	try {
 		await buildModule(
-			ROOT,
 			join(ROOT, "node_modules/sucrase/dist/esm/index.js"),
 			["transform"],
 			join(dir, "sucrase.mjs"),
@@ -32,7 +31,7 @@ test("a runtime module that imports other code fails the build", async () => {
 			`import { z } from ${JSON.stringify(join(ROOT, "node_modules/zod/index.js"))};\nexport const transform = z;\n`,
 		);
 		await expect(
-			buildModule(ROOT, source, ["transform"], join(dir, "out.mjs")),
+			buildModule(source, ["transform"], join(dir, "out.mjs")),
 		).rejects.toThrow(/may import only sucrase, /);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

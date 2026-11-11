@@ -80,3 +80,5 @@ export const typescriptDriver: Driver = {
 		});
 	},
 };
+
+export default typescriptDriver;

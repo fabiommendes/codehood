@@ -12,6 +12,7 @@
  */
 
 import { defineConfig, env } from "@/config";
+import { defaultRunners, elm, lua, prolog } from "@/runner/plugins";
 
 export default defineConfig({
 	instance: {
@@ -34,5 +35,8 @@ export default defineConfig({
 		// build-time constant. Null: in development, publicUrl on the other
 		// loopback name (localhost <-> 127.0.0.1); in production, no code runner.
 		origin: null,
+		// build-time constant. Without this key, defaultRunners(): Python,
+		// JavaScript and TypeScript.
+		languages: [...defaultRunners(), lua(), prolog(), elm()],
 	},
 });
