@@ -109,6 +109,10 @@ jobs:
       - name: Generate Prisma client
         run: pnpm exec prisma generate
 
+      # `src/generated/` is gitignored, and the seed imports from it.
+      - name: Generate sources
+        run: pnpm run generate
+
       - name: Reset database
         run: pnpm run db:reset
 
