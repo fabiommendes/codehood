@@ -229,10 +229,23 @@ rtk pnpm exec tsx test/run.ts --only-changed=main  # affected since main
 rtk pnpm run test:unit --only-changed              # the same, without building the server
 ```
 
-`TEST_BROWSERS=cross` adds Firefox and WebKit projects that run only the
-`runner-*` specs; the default suite stays on Chromium. Install them with
-`pnpm exec playwright install firefox webkit`, then pass `--project=firefox`
-or `--project=webkit` to the test script.
+The default suite runs on Chromium. `TEST_BROWSERS` changes that:
+
+- `TEST_BROWSERS=firefox`, `webkit`, or a list such as `firefox,webkit`, runs
+  the selected `e2e` specs on those engines instead of Chromium. Use it to
+  repeat a spec on another engine.
+- `TEST_BROWSERS=cross` keeps Chromium and adds Firefox and WebKit projects
+  that run only the `runner-*` specs. Pass `--project=firefox` or
+  `--project=webkit` to run one of them.
+
+```bash
+TEST_BROWSERS=firefox,webkit rtk pnpm exec tsx test/run.ts --scope=e2e test/foo.spec.ts
+```
+
+Install the engines with `pnpm exec playwright install firefox webkit`.
+`playwright install-deps` assumes Ubuntu. On Arch, WebKit also needs
+`libxml2-legacy` and `flite` from the repositories, and `icu74` and
+`playwright-webkit-flite-deps` from the AUR.
 
 `--rtk` runs Playwright through `rtk playwright` instead. Reach for it only on a
 suite expected to pass: it reduces a green run to a single `PASS (n) FAIL (0)`
