@@ -9,9 +9,9 @@
  */
 
 import { resolve } from "node:path";
-import { localizedText, type RunnerPlugin } from "./plugin";
+import type { RunnerPlugin, RuntimePackage } from "@codehood/runner-api";
+import { localizedText } from "./plugin";
 import type { LanguageId, RunMode } from "./protocol";
-import type { RuntimePackage } from "./sandbox/runtimes";
 
 /** What the app knows of a language. */
 export interface RunnerInfo {

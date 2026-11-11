@@ -2,7 +2,7 @@
  * JavaScript: runs in the Worker's own engine.
  */
 
-import { defineRunner } from "../../plugin";
+import { defineRunner } from "@codehood/runner-api";
 
 export default function javascript() {
 	return defineRunner({

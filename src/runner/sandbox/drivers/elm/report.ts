@@ -3,7 +3,7 @@
  * editor diagnostics.
  */
 
-import type { Diagnostic } from "../../../protocol";
+import type { Diagnostic } from "@codehood/runner-api/driver";
 
 /// A piece of a message: plain text or styled text.
 type Chunk =

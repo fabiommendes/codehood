@@ -191,12 +191,24 @@ O `astro dev` observa esses diretórios para refazer o bundle.
   `RuntimePackage`, `RunnerPlugin` e `BuildContext`;
 - `defineRunner`, que valida em tempo de desenvolvimento e devolve o
   descritor;
-- helpers que os drivers atuais já repetem: `runtimeUrl`, escrever os arquivos
-  de trabalho e localizar um erro de sintaxe pela linha e coluna;
-- `StdinCancelled`.
+- `runtimeDir` e `runtimePath`, os caminhos de um runtime sob `/runner/rt/`;
+- `StdinCancelled`;
+- os schemas `languageId` e `runMode`, que o protocolo reaproveita.
 
-Ele não pode importar nada de `src/`. Os drivers internos passam a importar
-dele, e isso prova que a API basta.
+Ele não pode importar nada de `src/`. Os drivers internos importam dele, e
+isso prova que a API basta.
+
+Três entradas, para o sandbox não levar o que não usa:
+
+| Entrada                        | Conteúdo                                         | Sandbox |
+| :----------------------------- | :----------------------------------------------- | :------ |
+| `@codehood/runner-api`         | descritor (`defineRunner`, schema), `BuildStep`  | não     |
+| `@codehood/runner-api/driver`  | tipos do driver, `runtimePath`, `StdinCancelled` | sim     |
+| `@codehood/runner-api/schema`  | `languageId`, `runMode` (zod)                    | sim     |
+
+O `restrictImports` aceita só os arquivos de `./driver` e `./schema`: um
+driver que importa o descritor quebra o build. Os helpers de erro de sintaxe
+do JavaScript ficaram no driver, porque só ele e o TypeScript os usam.
 
 ### Kit de contrato
 
@@ -245,7 +257,7 @@ O servidor de teste do kit nasce na etapa 4, e ali esses specs se mudam.
    pontos da tabela passam a ler o registro gerado. Os testes atuais servem
    de rede, e nada muda para o usuário de uma instância que lista as seis.
 2. **`packages/runner-api`** como workspace pnpm. Os drivers internos importam
-   dele.
+   dele. Feito.
 3. **`packages/runner-scheme`**, que importa só `@codehood/runner-api`. Não
    entra no padrão; é instalável.
 4. **Kit de contrato**, aplicado ao Scheme e às seis linguagens internas.

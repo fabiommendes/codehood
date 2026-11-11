@@ -3,7 +3,7 @@
  * opens the toplevel.
  */
 
-import { defineRunner } from "../../plugin";
+import { defineRunner } from "@codehood/runner-api";
 import { RUNTIMES } from "../../sandbox/runtimes";
 
 export default function prolog() {

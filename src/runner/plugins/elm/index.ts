@@ -3,7 +3,7 @@
  * the files, runs their tests and opens the REPL.
  */
 
-import { defineRunner } from "../../plugin";
+import { defineRunner } from "@codehood/runner-api";
 import { RUNTIMES } from "../../sandbox/runtimes";
 
 export default function elm() {

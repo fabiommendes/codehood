@@ -11,8 +11,9 @@ import { type IncomingHttpHeaders, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
+import { runtimeDir, runtimePath } from "@codehood/runner-api/driver";
 import { expect, test } from "@playwright/test";
-import { RUNTIMES, runtimeDir, runtimePath } from "@/runner/sandbox/runtimes";
+import { RUNTIMES } from "@/runner/sandbox/runtimes";
 import { buildRunnerBundle, precompress } from "@/runner/server/integration";
 import {
 	pickEncoding,

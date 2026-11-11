@@ -2,7 +2,7 @@
  * TypeScript: types stripped by sucrase, then run as JavaScript.
  */
 
-import { defineRunner } from "../../plugin";
+import { defineRunner } from "@codehood/runner-api";
 import { RUNTIMES } from "../../sandbox/runtimes";
 
 export default function typescript() {

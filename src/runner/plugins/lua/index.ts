@@ -2,7 +2,7 @@
  * Lua: Lua 5.4 compiled to WebAssembly (wasmoon).
  */
 
-import { defineRunner } from "../../plugin";
+import { defineRunner } from "@codehood/runner-api";
 import { RUNTIMES } from "../../sandbox/runtimes";
 
 export default function lua() {

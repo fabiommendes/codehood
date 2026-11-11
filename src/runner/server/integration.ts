@@ -9,6 +9,7 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	writeFileSync,
@@ -18,12 +19,15 @@ import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { brotliCompress, gzip, constants as zlib } from "node:zlib";
+import {
+	type BuildStep,
+	type RunnerPlugin,
+	runtimeDir,
+} from "@codehood/runner-api";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
 import { tsImport } from "tsx/esm/api";
-import type { BuildStep, RunnerPlugin } from "../plugin";
 import { driversModule, pluginRuntimes, resolveSpecifier } from "../registry";
-import { runtimeDir } from "../sandbox/runtimes";
 import {
 	BUNDLE_DIR_NAME,
 	type ContentEncoding,
@@ -54,18 +58,31 @@ function pluginDirs(root: string, plugin: RunnerPlugin): string[] {
 	];
 }
 
+/// Files of `@codehood/runner-api` the sandbox may bundle: the entries
+/// `./driver` and `./schema`, not the plugin descriptor. Resolved from
+/// Codehood's own dependencies, which is where `protocol.ts` imports them.
+function apiFiles(): string[] {
+	const require = createRequire(import.meta.url);
+	return ["driver", "schema"].map((entry) =>
+		realpathSync(require.resolve(`@codehood/runner-api/${entry}`)),
+	);
+}
+
 /// Whether `file` may be part of the bundle: the sandbox, its entries, the
-/// shared protocol, zod, and what each plugin's driver may import.
+/// shared protocol, the driver side of the plugin contract, zod, and what
+/// each plugin's driver may import.
 function isAllowed(
 	root: string,
 	plugins: readonly RunnerPlugin[],
 ): (file: string) => boolean {
 	const rel = resolve(root, "src", "runner");
+	const api = apiFiles();
 	const dirs = plugins.flatMap((plugin) => pluginDirs(root, plugin));
 	return (file) =>
 		file.startsWith(join(rel, "sandbox") + sep) ||
 		file.startsWith(join(rel, "server", "entries") + sep) ||
 		file === join(rel, "protocol.ts") ||
+		api.includes(file) ||
 		file.includes(`${sep}node_modules${sep}zod${sep}`) ||
 		dirs.some((dir) =>
 			dir.startsWith(`${sep}node_modules`)
@@ -357,7 +374,7 @@ export async function buildRunnerBundle(
 		plugins: [
 			restrictImports(
 				isAllowed(root, plugins),
-				"src/runner/sandbox/**, src/runner/protocol.ts, zod and the runner plugins' own files and sandboxDependencies",
+				"src/runner/sandbox/**, src/runner/protocol.ts, @codehood/runner-api/driver, zod and the runner plugins' own files and sandboxDependencies",
 			),
 			runnerDrivers(root, plugins),
 		],
@@ -407,7 +424,8 @@ export async function buildRunnerBundle(
  * `astro build` writes it next to the server build so a packaged release
  * carries it; `astro dev` rebuilds it on change. It carries the drivers of
  * `plugins` (`runner.languages`). The bundle may import only
- * `src/runner/protocol.ts`, `src/runner/sandbox/**`, `zod` and each plugin's
+ * `src/runner/protocol.ts`, `src/runner/sandbox/**`,
+ * `@codehood/runner-api/driver`, `zod` and each plugin's
  * driver directory and `sandboxDependencies`; the build fails on any other
  * import.
  */

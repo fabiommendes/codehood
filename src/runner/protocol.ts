@@ -7,10 +7,14 @@
  * only: text, numbers and enums, never HTML, functions or credentials.
  *
  * This module is shared by the app bundle and the sandbox bundle, so it
- * imports nothing from the app besides `zod`.
+ * imports nothing from the app besides `zod` and the plugin contract.
  */
 
+import type * as api from "@codehood/runner-api/driver";
+import { languageId, runMode } from "@codehood/runner-api/schema";
 import { z } from "zod";
+
+export { languageId, runMode };
 
 /// Version of this protocol. The frame announces it in `ready`; the app
 /// refuses a frame that announces another one.
@@ -35,20 +39,7 @@ export const FILES_LIMIT_BYTES = 1024 * 1024;
 /// Maximum bytes of one stdin line, newline excluded.
 export const STDIN_LINE_MAX_BYTES = 64 * 1024;
 
-/**
- * Id of a language, as a runner plugin declares it.
- *
- * Any well-formed id parses: which ones a frame runs depends on the plugins
- * its build lists, and the frame announces them in `ready`.
- */
-export const languageId = z
-	.string()
-	.max(32)
-	.regex(/^[a-z][a-z0-9-]*$/);
 export type LanguageId = z.infer<typeof languageId>;
-
-/** How a driver runs the files: once from the entry file, or as a read-eval-print loop. */
-export const runMode = z.enum(["script", "repl"]);
 export type RunMode = z.infer<typeof runMode>;
 
 /** How the frame delivers blocking stdin to the Worker; `none` means this browser cannot run code. */
@@ -224,6 +215,13 @@ export const diagnostic = z.object({
 	message: z.string().max(500),
 });
 export type Diagnostic = z.infer<typeof diagnostic>;
+
+/// The schema accepts exactly the plugin contract's `Diagnostic`.
+true satisfies Diagnostic extends api.Diagnostic
+	? api.Diagnostic extends Diagnostic
+		? true
+		: false
+	: false;
 
 /**
  * The run ended; no other message for this `runId` follows.

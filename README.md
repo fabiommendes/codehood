@@ -190,9 +190,11 @@ export default defineConfig({
 });
 ```
 
-A plugin is a `defineRunner({...})` object (`src/runner/plugin.ts`) that
-points at its driver, editor support and optional build step; the build
-bundles only the listed ones. The design is in
+A plugin is a `defineRunner({...})` object that points at its driver,
+editor support and optional build step; the build bundles only the listed
+ones. The contract lives in `packages/runner-api` (`@codehood/runner-api`):
+plugins import the descriptor from its root, drivers import
+`@codehood/runner-api/driver` and nothing else from Codehood. The design is in
 `dev/rfc/runners-como-plugins.md`.
 
 ### Code runner origin

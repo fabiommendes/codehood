@@ -2,7 +2,7 @@
  * Python: CPython compiled to WebAssembly (Pyodide).
  */
 
-import { defineRunner } from "../../plugin";
+import { defineRunner } from "@codehood/runner-api";
 import { RUNTIMES } from "../../sandbox/runtimes";
 
 export default function python() {

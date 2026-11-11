@@ -10,8 +10,13 @@
  * reach: there is no DOM.
  */
 
-import type { Driver, LoadContext, RunContext } from "../../driver";
-import { RUNTIMES, runtimePath } from "../../runtimes";
+import {
+	type Driver,
+	type LoadContext,
+	type RunContext,
+	runtimePath,
+} from "@codehood/runner-api/driver";
+import { RUNTIMES } from "../../runtimes";
 import type { GuidaElm } from "./host";
 import { ELM_CACHE_FILE, unpackFiles } from "./project";
 import { runElm } from "./session";

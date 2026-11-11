@@ -74,10 +74,6 @@ export interface StdinWriter {
 	readerWaiting(): void;
 }
 
-/** Thrown by `StdinReader.readLine` when the run was stopped while it waited. */
-export class StdinCancelled extends Error {
-	constructor() {
-		super("stdin cancelled");
-		this.name = "StdinCancelled";
-	}
-}
+/// Thrown by `StdinReader.readLine` when the run was stopped while it waited.
+/// Drivers catch it by identity, so it comes from the plugin contract.
+export { StdinCancelled } from "@codehood/runner-api/driver";

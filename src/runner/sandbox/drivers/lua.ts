@@ -13,8 +13,13 @@
  * mounted.
  */
 
-import type { Driver, LoadContext, RunContext } from "../driver";
-import { RUNTIMES, runtimePath } from "../runtimes";
+import {
+	type Driver,
+	type LoadContext,
+	type RunContext,
+	runtimePath,
+} from "@codehood/runner-api/driver";
+import { RUNTIMES } from "../runtimes";
 
 /// Directory of the program's files in the runtime's file system.
 const WORK_DIR = "/work";

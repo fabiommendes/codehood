@@ -6,23 +6,7 @@
  * Drivers import them here for the paths.
  */
 
-/** A runtime package copied into the runner bundle. */
-export interface RuntimePackage {
-	/// npm package name and exact version, as in package.json.
-	pkg: string;
-	version: string;
-	/// Files copied from the package, relative to its root, and the path
-	/// each gets under `/runner/rt/<pkg>@<version>/`.
-	files: Record<string, string>;
-	/// Text put before and after a file (keyed by its destination path) at
-	/// build, for glue that is a classic script or UMD and has to become an
-	/// ES module the Worker can import.
-	wrap?: Record<string, { prefix?: string; suffix?: string }>;
-	/// Destination files the build bundles into one ES module from the source
-	/// file in `files`, keeping only the listed exports: for packages whose
-	/// entry drags in code the Worker has no use for.
-	bundle?: Record<string, string[]>;
-}
+import type { RuntimePackage } from "@codehood/runner-api/driver";
 
 /** The runtime packages of the plugins under `src/runner/plugins/`. */
 export const RUNTIMES: {
@@ -87,13 +71,3 @@ export const RUNTIMES: {
 		},
 	},
 };
-
-/** Directory of a runtime under `/runner/rt/`, e.g. `pyodide@314.0.7`. */
-export function runtimeDir(runtime: RuntimePackage): string {
-	return `${runtime.pkg}@${runtime.version}`;
-}
-
-/** Path of a runtime file under `/runner/rt/`, e.g. `pyodide@314.0.7/pyodide.mjs`. */
-export function runtimePath(runtime: RuntimePackage, file: string): string {
-	return `${runtimeDir(runtime)}/${file}`;
-}

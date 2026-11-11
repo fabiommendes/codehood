@@ -6,8 +6,7 @@
  */
 
 import drivers from "codehood:runner-drivers";
-import type { LanguageId } from "../../protocol";
-import type { Driver } from "../driver";
+import type { Driver, LanguageId } from "@codehood/runner-api/driver";
 
 /// Lazy loaders, one per language.
 const DRIVERS: Readonly<Record<LanguageId, () => Promise<Driver>>> = {

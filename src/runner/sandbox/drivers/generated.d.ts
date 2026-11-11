@@ -2,7 +2,7 @@
 /// a loader of the driver of each language in `runner.languages`.
 declare module "codehood:runner-drivers" {
 	const drivers: Readonly<
-		Record<string, () => Promise<import("../driver").Driver>>
+		Record<string, () => Promise<import("@codehood/runner-api/driver").Driver>>
 	>;
 	export default drivers;
 }

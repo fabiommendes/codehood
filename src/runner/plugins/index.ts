@@ -5,7 +5,7 @@
  * that key it gets `defaultRunners()`.
  */
 
-import type { RunnerPlugin } from "../plugin";
+import type { RunnerPlugin } from "@codehood/runner-api";
 import elm from "./elm";
 import javascript from "./javascript";
 import lua from "./lua";

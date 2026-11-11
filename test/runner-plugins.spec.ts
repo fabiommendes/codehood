@@ -4,13 +4,14 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { defineRunner, type RunnerPluginInput } from "@codehood/runner-api";
 import { expect, test } from "@playwright/test";
 import { defineConfig } from "@/config";
-import { defineRunner, type RunnerPluginInput } from "@/runner/plugin";
 import { elm, prolog } from "@/runner/plugins";
 import { runnersModule } from "@/runner/registry";
 import { buildRunnerBundle } from "@/runner/server/integration";
@@ -192,6 +193,59 @@ test.describe("bundle build with plugins", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test.describe("a driver and the plugin contract", () => {
+		/// `project()` with `@codehood/runner-api` installed.
+		function projectWithApi(): string {
+			const root = project();
+			mkdirSync(join(root, "node_modules/@codehood"), { recursive: true });
+			symlinkSync(
+				resolve("packages/runner-api"),
+				join(root, "node_modules/@codehood/runner-api"),
+			);
+			return root;
+		}
+
+		test("may import @codehood/runner-api/driver", async () => {
+			const root = projectWithApi();
+			try {
+				writeFileSync(
+					join(root, "plugins/demo/driver.js"),
+					'import { runtimePath } from "@codehood/runner-api/driver";\nexport default { path: runtimePath({ pkg: "demo-rt", version: "1.0.0", files: {} }, "x.js") };',
+				);
+				const out = join(root, "out");
+				await buildRunnerBundle(root, out, {
+					minify: false,
+					plugins: [defineRunner(plugin())],
+				});
+				const code = readdirSync(out)
+					.filter((file) => file.endsWith(".js"))
+					.map((file) => readFileSync(join(out, file), "utf8"))
+					.join("\n");
+				expect(code).toContain("function runtimePath");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		test("may not import the plugin descriptor", async () => {
+			const root = projectWithApi();
+			try {
+				writeFileSync(
+					join(root, "plugins/demo/driver.js"),
+					'import { defineRunner } from "@codehood/runner-api";\nexport default { defineRunner };',
+				);
+				await expect(
+					buildRunnerBundle(root, join(root, "out"), {
+						minify: false,
+						plugins: [defineRunner(plugin())],
+					}),
+				).rejects.toThrow(/may import only/);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
 	});
 
 	test("a build step may not write outside the bundle", async () => {

@@ -52,7 +52,8 @@
   package` takes the instance's file with `--config`.
 - Runner languages are plugins listed in `runner.languages`. Without the
   key an instance runs Python, JavaScript and TypeScript; Lua, Prolog and
-  Elm must be listed (`src/runner/plugins/`).
+  Elm must be listed (`src/runner/plugins/`). The plugin contract is the
+  workspace package `@codehood/runner-api` (`packages/runner-api`).
 - REST e RPC documentam sessão OU Bearer. Credenciais simultâneas são
   rejeitadas antes da validação; cookies alheios não conflitam. Mutações JSON
   em `/api/` e `/rpc` com Origin externo também exigem Bearer válido.

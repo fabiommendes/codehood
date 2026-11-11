@@ -8,8 +8,13 @@
  * `import` of another file fails with a hint, as it does in JavaScript.
  */
 
-import type { Driver, LoadContext, RunContext } from "../driver";
-import { RUNTIMES, runtimePath } from "../runtimes";
+import {
+	type Driver,
+	type LoadContext,
+	type RunContext,
+	runtimePath,
+} from "@codehood/runner-api/driver";
+import { RUNTIMES } from "../runtimes";
 import { javascriptDriver } from "./javascript";
 import { formatSyntaxError } from "./syntax-error";
 

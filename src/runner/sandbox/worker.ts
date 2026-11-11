@@ -9,11 +9,10 @@
  * Worker posts `waiting-input` before blocking and `running` after.
  */
 
+import { type Driver, StdinCancelled } from "@codehood/runner-api/driver";
 import { DIAGNOSTICS_LIMIT, type Diagnostic } from "../protocol";
-import type { Driver } from "./driver";
 import { loadDriver } from "./drivers";
 import { openStdinReader } from "./stdin";
-import { StdinCancelled } from "./stdin/types";
 import { utf8Length } from "./utf8";
 import type {
 	FrameToWorkerMessage,

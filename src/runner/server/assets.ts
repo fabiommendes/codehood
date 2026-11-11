@@ -20,8 +20,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runtimePath } from "@codehood/runner-api/driver";
 import type { FrameConfig } from "../sandbox/frame";
-import { runtimePath } from "../sandbox/runtimes";
 import {
 	BUNDLE_DIR_NAME,
 	type ContentEncoding,

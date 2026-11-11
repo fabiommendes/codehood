@@ -1,0 +1,17 @@
+{
+	"name": "@codehood/runner-api",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"license": "AGPL-3.0-or-later",
+	"description": "Contract between Codehood and its runner plugins.",
+	"exports": {
+		".": "./src/index.ts",
+		"./driver": "./src/driver.ts",
+		"./schema": "./src/schema.ts",
+		"./package.json": "./package.json"
+	},
+	"peerDependencies": {
+		"zod": "^4.4.3"
+	}
+}

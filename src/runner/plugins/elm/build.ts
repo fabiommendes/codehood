@@ -13,8 +13,8 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import type { BuildContext } from "@codehood/runner-api";
 import { buildElmCache } from "../../elm/cache";
-import type { BuildContext } from "../../plugin";
 import { ELM_CACHE_FILE } from "../../sandbox/drivers/elm/project";
 
 /// Inputs of the cache, relative to the root: the compiler, the package

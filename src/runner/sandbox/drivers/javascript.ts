@@ -14,8 +14,11 @@
  * Only the entry file runs; other files in `files` are ignored for now.
  */
 
-import type { Driver, RunContext } from "../driver";
-import { StdinCancelled } from "../stdin/types";
+import {
+	type Driver,
+	type RunContext,
+	StdinCancelled,
+} from "@codehood/runner-api/driver";
 import { cleanStack } from "./javascript-stack";
 import { formatSyntaxError, locateJavaScriptSyntaxError } from "./syntax-error";
 

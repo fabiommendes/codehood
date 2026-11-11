@@ -6,7 +6,7 @@
  * unit tests.
  */
 
-import type { RunContext } from "../../driver";
+import type { RunContext } from "@codehood/runner-api/driver";
 import { MemFs, MOUNTED_MTIME } from "./fs";
 import { type GuidaElm, type GuidaIo, runGuida } from "./host";
 import {

@@ -26,7 +26,11 @@
  * each as a command until end of input.
  */
 
-import type { Driver, LoadContext, RunContext } from "../driver";
+import type {
+	Driver,
+	LoadContext,
+	RunContext,
+} from "@codehood/runner-api/driver";
 
 /// Commands that configure the load; `run` skips them while they lead the file.
 const LOAD_COMMANDS = new Set(["progress", "load-delay", "load-fail"]);
