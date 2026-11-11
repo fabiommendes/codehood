@@ -72,6 +72,46 @@ Nenhum aluno perde a prova por problema técnico do monitor.
   lança em toda chamada, o storage falha e o transporte fica pendurado ou devolve
   erro, e mesmo assim o aluno digita, salva e entrega.
 
+### Estado das regras R1 a R7
+
+| Regra | Estado |
+| :---- | :----- |
+| R1 | Pendente: depende do endpoint do histórico, que não existe. Hoje nada do monitor toca `Submission`. |
+| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Falta ligar a `ExamAttempt.tsx`. |
+| R3 | Implementada e testada: `attach` e `input` nunca esperam e o `open` roda adiado. |
+| R4 | Implementada e testada: `flushFinal` resolve no teto (3 s por padrão). Falta o servidor aceitar lote atrasado. |
+| R5 | Parcial: o coordenador rebaseia sozinho e o adaptador não abre diálogo, mas não há indicador discreto. |
+| R6 | Implementada e testada: `AnswerEditAdapter.disable()` e `enabled: false`. Falta a configuração por prova que decide chamá-los. |
+| R7 | Implementada e testada em `test/answer-edit-isolation.spec.ts` com um `<textarea>` ligado como a página de prova seria. Falta repeti-la contra `ExamAttempt.tsx` quando a integração existir. |
+
+### Contrato do adaptador
+
+Implementado em `src/services/answer-edits/adapter.ts`. É a única coisa que o
+código de UI chama.
+
+- `attach(field, text)`: fire-and-forget. O `open` do coordenador roda adiado e
+  nunca atrasa o chamador.
+- `input(field, text, kind?)`: só guarda o texto do editor. O trabalho do monitor
+  (diff por prefixo e sufixo comuns, `recordChange`) roda num `setTimeout(0)`
+  fora do handler de `input`. Uso documentado: gravar a resposta pelo canal dela
+  primeiro, depois chamar `input`. A ordem errada é inofensiva, pois `input`
+  nunca lê o monitor, não lança e não toca o canal da resposta.
+- `detach(field)`, `isActive(field?)`, `gaps()`.
+- `flushFinal()`: nunca rejeita e resolve no teto (`flushCeilingMs`), seja qual
+  for o comportamento do monitor, do storage e do transporte. O chamador o roda
+  em paralelo com `finish`.
+- `disable(reason?)` é a chave do R6: o adaptador fica inerte e o coordenador é
+  parado com `dispose`, que mantém o trabalho local.
+- Toda chamada a monitor, coordenador e storage é protegida. A primeira exceção
+  ou rejeição desliga o monitoramento do campo, registra a falha em `gaps()` (e
+  `onGap`) e tenta `coordinator.detach` para tirar o estado pendente de um handle
+  quebrado. Erros de programação do `open` (campo ativo, mais de 128 campos,
+  coordenador parado) são engolidos do mesmo jeito.
+- Edições feitas antes de o monitor ficar pronto não são enfileiradas: o texto do
+  editor vale, e o monitor recebe uma única edição coalescida entre o texto do
+  `attach` e o texto atual. O replay reproduz o texto; perde-se só a cadência de
+  digitação do trecho. Custa memória O(1), sem limite de fila a defender.
+
 ### Contrato do coordenador
 
 Implementado em `src/services/answer-edits/coordinator.ts`.

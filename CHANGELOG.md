@@ -11,7 +11,10 @@
   por tentativa com envio agregado, retry, reconciliação, transferência de
   ownership e fallback de texto com lacuna explícita. Validados com transporte
   injetado e storage browser real, sem endpoint ou integração com o salvamento
-  de provas. Adaptadores ainda ausentes. Remoção física completa de fallback
+  de provas. Adaptador de isolamento (`AnswerEditAdapter`): nenhuma falha do
+  monitor, do storage ou do transporte atrasa ou impede digitar, salvar e
+  entregar (teste de injeção de falha no navegador). Ainda sem ligação à prova;
+  adaptadores de editor ausentes. Remoção física completa de fallback
   concorrente com logout permanece pendente.
   O coordenador nunca bloqueia o campo: abre sempre com um handle, reconcilia
   com o servidor em segundo plano e, em divergência, adota nova base com lacuna
