@@ -1,10 +1,10 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // Code answers on the grading pages: highlighted, runnable when the language

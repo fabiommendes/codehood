@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { userFactory } from "@/fixtures/user.factory";
 import { resolveRunnerOrigin } from "@/runner/server/config";
 import { APP_CSP, requestSide } from "@/runner/server/routing";
 import { TEST_BASE_URL, TEST_RUNNER_ORIGIN } from "./env";
+import { expect, test } from "./fixtures";
 
 /// Evaluates `expression` over `src/core/constants.ts` in a fresh Node process.
 function constantsIn(env: Record<string, string>, expression: string): string {

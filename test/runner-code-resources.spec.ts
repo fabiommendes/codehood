@@ -1,8 +1,8 @@
-import { expect, type Locator, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { courseHref } from "@/urls";
+import { expect, type Locator, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // The editor of a CODE resource highlights every language with a driver, with

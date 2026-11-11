@@ -8,11 +8,11 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { inflateSync } from "node:zlib";
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type Repository } from "@/db";
 import { repositoryTree } from "@/fixtures/repository.factory";
 import { TEST_BASE_URL, TEST_RESOURCE_ROOT } from "./env";
+import { expect, test } from "./fixtures";
 
 /// The real `git` binary cloning and pulling from the test server over the
 /// dumb HTTP protocol, and the git routes' error answers.

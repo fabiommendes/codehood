@@ -1,4 +1,3 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
@@ -6,6 +5,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalShortAnswer } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
+import { expect, type Locator, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // Changing a grade, and marking an answer will-not-grade.

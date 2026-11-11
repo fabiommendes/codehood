@@ -29,7 +29,7 @@
  * - `?view=list` lists every answer as an `article` with the applied items, the
  *   score as a percentage and the free comment.
  */
-import { expect, type Page, test } from "@playwright/test";
+
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import {
@@ -38,6 +38,7 @@ import {
 	type ScenarioAnswer,
 } from "@/fixtures/rubric-scenario";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "../fixtures";
 import { logInAs, resetDatabase } from "./helpers";
 
 test.beforeEach(resetDatabase);

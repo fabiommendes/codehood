@@ -1,7 +1,7 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { type Actor, FULL_ACCESS } from "@/auth/actor";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * Calendar events are addressed under their course's natural key, same as

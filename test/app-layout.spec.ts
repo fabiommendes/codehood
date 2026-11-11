@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { expect, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);

@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 import { sendReport, TINY_PNG } from "./report-support";
 

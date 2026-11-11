@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("GET /api/health reports ok with no credentials", async ({ request }) => {
 	const res = await request.get("/api/health");

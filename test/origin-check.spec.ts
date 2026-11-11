@@ -1,7 +1,7 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { TEST_BASE_URL } from "./env";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /// Form-like unsafe requests need the server's own Origin unless an API key
 /// authenticates them; JSON requests are not subject to the rule.

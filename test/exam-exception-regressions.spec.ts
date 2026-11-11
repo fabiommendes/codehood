@@ -1,4 +1,3 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
 import { db, type schema } from "@/db";
@@ -9,6 +8,7 @@ import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 // Rules of exam exceptions that a first implementation got wrong.
 

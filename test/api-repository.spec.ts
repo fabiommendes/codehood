@@ -1,17 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import {
-	type APIRequestContext,
-	expect,
-	type PlaywrightWorkerArgs,
-	test,
-} from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type User } from "@/db";
 import { repositoryTree } from "@/fixtures/repository.factory";
 import { hashBytes } from "@/utils/content-hash";
 import { TEST_BASE_URL, TEST_RESOURCE_ROOT } from "./env";
+import {
+	type APIRequestContext,
+	expect,
+	type PlaywrightWorkerArgs,
+	test,
+} from "./fixtures";
 
 /// Repository routes over HTTP: the push flow, permissions, the zip download
 /// and what the OpenAPI document leaves out.

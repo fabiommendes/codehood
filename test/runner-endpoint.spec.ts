@@ -11,7 +11,6 @@ import { type IncomingHttpHeaders, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
-import { expect, test } from "@playwright/test";
 import { RUNTIMES, runtimeDir, runtimePath } from "@/runner/sandbox/runtimes";
 import { buildRunnerBundle, precompress } from "@/runner/server/integration";
 import {
@@ -20,6 +19,7 @@ import {
 	runnerHeaders,
 } from "@/runner/server/routing";
 import { TEST_BASE_URL, TEST_RUNNER_ORIGIN } from "./env";
+import { expect, test } from "./fixtures";
 
 /// Fetches without cookies or redirects, as the frame's loader would.
 async function get(origin: string, path: string) {

@@ -1,9 +1,9 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { SESSION_COOKIE } from "@/core/constants";
 import { db } from "@/db";
 import { persistedUserFactory, userFactory } from "@/fixtures/user.factory";
 import { TEST_BASE_URL } from "./env";
+import { expect, test } from "./fixtures";
 
 // `POST /api/auth/login` is the CLI's way in, not the browser's — the web app
 // uses the `auth.login` action and a session cookie. These stay API-level

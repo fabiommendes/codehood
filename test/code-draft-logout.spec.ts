@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { logInAs, openTab, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);

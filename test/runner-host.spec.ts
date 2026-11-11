@@ -1,6 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
 import type { RunnerHost, RunnerUnavailable } from "@/runner/host";
 import { TEST_RUNNER_ORIGIN } from "./env";
+import { expect, type Page, test } from "./fixtures";
 import { loadFrame } from "./runner-harness";
 
 /**

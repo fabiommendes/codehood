@@ -1,4 +1,3 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -7,6 +6,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { resourceFactory } from "@/fixtures/resource.factory";
 import { capitalShortAnswer } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);

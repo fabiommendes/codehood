@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type ResourceCreate } from "@/db";
 import { persistedCalendarEventFactory } from "@/fixtures/calendar-event.factory";
@@ -7,6 +6,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { courseHref } from "@/urls";
 import { fileDownloadName } from "@/utils/resource-url";
+import { expect, test } from "./fixtures";
 import {
 	futureDate,
 	logInAs,

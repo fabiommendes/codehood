@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /**
  * Resources are addressed under their course's natural key,

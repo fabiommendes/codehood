@@ -1,4 +1,3 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { scoreValue } from "@/core/schemas/feedback";
 import { db, type schema } from "@/db";
@@ -7,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { capitalChoice, capitalShortAnswer } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
+import { expect, type Locator, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // The page that grades one question of an exam, and what saving a grade does.

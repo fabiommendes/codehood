@@ -1,6 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
 import { OUTPUT_MESSAGES_LIMIT, STDIN_LINE_MAX_BYTES } from "@/runner/protocol";
 import { StdinChannels } from "@/runner/sandbox/stdin/sw";
+import { expect, type Page, test } from "./fixtures";
 import {
 	collect,
 	type Harness,

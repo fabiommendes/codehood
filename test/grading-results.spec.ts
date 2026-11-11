@@ -1,4 +1,3 @@
-import { expect, type Page, test } from "@playwright/test";
 import fc from "fast-check";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db, type schema } from "@/db";
@@ -15,6 +14,7 @@ import {
 	type GradingFeedback,
 } from "@/services/grading";
 import { courseHref } from "@/urls";
+import { expect, type Page, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // The exam's results: the pure rows, and the section of the instructor's exam page that shows them.

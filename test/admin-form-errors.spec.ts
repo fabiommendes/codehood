@@ -1,4 +1,3 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
@@ -6,6 +5,7 @@ import {
 	editionFactory,
 	persistedEditionFactory,
 } from "@/fixtures/edition.factory";
+import { expect, type Locator, type Page, test } from "./fixtures";
 import { fillField, logInAs, seedUser } from "./stories/helpers";
 
 /**

@@ -1,8 +1,8 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
+import { type APIRequestContext, expect, test } from "./fixtures";
 
 /// Exam exceptions over HTTP, under the exam's natural key.
 

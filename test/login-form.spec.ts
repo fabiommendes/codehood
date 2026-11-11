@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { fillField, seedUser } from "./stories/helpers";
 
 test.use({ javaScriptEnabled: false });

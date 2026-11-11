@@ -1,4 +1,3 @@
-import { expect, type Page, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -7,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedPassphraseFactory } from "@/fixtures/passphrase.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { codeAt } from "@/services/roll-call-code";
+import { expect, type Page, test } from "./fixtures";
 import {
 	fillField,
 	futureDate,

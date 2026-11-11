@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
+import { expect, test } from "./fixtures";
 
 test("documents both REST endpoints, unauthenticated", () => {
 	const document = buildOpenApiDocument();

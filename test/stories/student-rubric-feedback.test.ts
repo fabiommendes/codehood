@@ -16,11 +16,12 @@
  * - Before the release none of it is shown (the page already says the results
  *   are not out yet).
  */
-import { expect, test } from "@playwright/test";
+
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { createRubricScenario } from "@/fixtures/rubric-scenario";
 import { courseHref } from "@/urls";
+import { expect, test } from "../fixtures";
 import { logInAs, resetDatabase } from "./helpers";
 
 test.beforeEach(resetDatabase);

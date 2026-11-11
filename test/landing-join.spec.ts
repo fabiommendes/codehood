@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedPassphraseFactory } from "@/fixtures/passphrase.factory";
+import { expect, test } from "./fixtures";
 import { fillField, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);
