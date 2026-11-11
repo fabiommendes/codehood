@@ -1,0 +1,16 @@
+/* The typefaces of the design system, served from this origin: no page load
+   depends on a third-party host. */
+
+/* Display. All four axes: opsz, wght, SOFT and WONK. */
+@import "@fontsource-variable/fraunces/full.css";
+
+/* Body. */
+@import "@fontsource/atkinson-hyperlegible/400.css";
+@import "@fontsource/atkinson-hyperlegible/400-italic.css";
+@import "@fontsource/atkinson-hyperlegible/700.css";
+@import "@fontsource/atkinson-hyperlegible/700-italic.css";
+
+/* Code. */
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";

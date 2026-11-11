@@ -2,6 +2,7 @@
 /// The light (Cerrado) and dark (Forest) themes side by side, rendering the
 /// same screens with the chosen logo, tokens and motifs.
 
+import "@/styles/fonts.css";
 import {
 	along,
 	band,
@@ -244,12 +245,6 @@ const glowIf = (t: Theme, p: Part) =>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>Light and dark themes — Codehood</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..800,0..100,0..1&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap"
-    />
   </head>
   <body>
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -452,7 +447,7 @@ const glowIf = (t: Theme, p: Part) =>
   }
 
   .display {
-    font-family: "Fraunces", serif;
+    font-family: "Fraunces Variable", serif;
     font-weight: 700;
     font-variation-settings:
       "SOFT" 100,

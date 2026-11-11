@@ -45,6 +45,8 @@
 
 ### Changed
 
+- Fonts are served by Codehood itself instead of Google Fonts: no page
+  contacts a third-party host, and the first visit no longer waits for one.
 - REST e RPC documentam sessão OU Bearer. Credenciais simultâneas são
   rejeitadas antes da validação; cookies alheios não conflitam. Mutações JSON
   em `/api/` e `/rpc` com Origin externo também exigem Bearer válido.
