@@ -79,7 +79,9 @@ export default defineConfig({
 		build: { sourcemap: !!process.env.COVERAGE },
 		// `mdq` is linked from a sibling checkout as a dev dependency, so the
 		// server bundle carries it and a production install never needs it.
-		ssr: { noExternal: ["mdq"] },
+		// The `@codehood/*` workspace packages ship TypeScript sources, which
+		// Node cannot load on its own in the dev server.
+		ssr: { noExternal: ["mdq", /^@codehood\//] },
 		// The linked `mdq` has its own node_modules; one copy of each peer.
 		resolve: { dedupe: ["zod", "solid-js"] },
 		// Nothing under these is served by the dev server. `cli/` alone carries a

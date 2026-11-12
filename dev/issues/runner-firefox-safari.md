@@ -47,6 +47,27 @@ o transporte é `sw` (o teste `sab` só vale no Chromium); `newCDPSession`,
 pulados fora do Chromium). Os specs puros (`terminal`, `ide-state`,
 `languages`) ficam só no Chromium.
 
+### Rodada de 2026-11-11 (suíte do core, `packages/runner`)
+
+`TEST_BROWSERS=cross pnpm run test:runner`, já com as bibliotecas do WebKit
+instaladas: 245 passaram, 14 falharam.
+
+- Firefox, 1 falha: "a cached Worker script with a 404 driver chunk exits
+  stale-bundle". O `page.route` do Playwright não intercepta, no Firefox, as
+  requisições feitas de dentro do Worker; o chunk do driver carrega e o
+  programa roda. Provavelmente limite da ferramenta, não do produto.
+- WebKit, 13 falhas (primeira rodada dele):
+  - os 6 de "frame loaded before a deploy" e 3 de "bundle served no more":
+    um Worker cujo script dá 404 termina `load-failed`, não `stale-bundle`;
+  - "without exclusive two concurrent runs work": timeout;
+  - os 2 de "nothing persists between runs": `navigator.storage.getDirectory`
+    (OPFS) não existe no frame;
+  - "the frame does not load inside a page of another origin": o frame
+    carrega.
+
+O último é de segurança e precisa de investigação antes de liberar o runner
+para Safari.
+
 ### Bugs reais (corrigidos)
 
 1. Firefox: um iframe carregado depois da ativação do service worker fica sem
