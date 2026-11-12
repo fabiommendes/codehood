@@ -32,6 +32,8 @@ const tuple = z.tuple([
 	integer.max(6),
 	timing,
 ]);
+const baseReason = z.enum(["start", "rebase"]);
+const base = z.strictObject({ reason: baseReason, text: z.string() });
 const batch = z.strictObject({
 	version: z.literal(1),
 	batchId: id,
@@ -41,6 +43,7 @@ const batch = z.strictObject({
 	firstSeq: integer,
 	edits: z.array(tuple).min(1),
 	snapshot: z.string(),
+	base: base.optional(),
 });
 const segment = z.strictObject({
 	sessionId: id,
@@ -61,12 +64,13 @@ const active = z.strictObject({
 	openEdit: z.strictObject({ edit, lastAtMs: integer }).nullable(),
 });
 const checkpoint = z.strictObject({
-	version: z.literal(2),
+	version: z.literal(3),
 	state: z.strictObject({
 		baseRevision: integer,
 		firstSeq: integer,
 		pauseMs: time,
 		confirmedText: z.string(),
+		baseReason: baseReason.nullable(),
 		text: z.string(),
 		receipts: z.array(receipt),
 		inFlight: batch.nullable(),
@@ -88,6 +92,7 @@ export function parseCheckpoint(value: unknown): CheckpointState {
 		throw new TypeError("Invalid monitor checkpoint", { cause: parsed.error });
 	const state = parsed.data.state;
 	validateReceipts(state);
+	validateBase(state);
 	validateActive(state);
 	validateReplay(state);
 	if (isDeeplyFrozen(value)) validated.add(value);
@@ -173,6 +178,21 @@ function validateReceipts(state: CheckpointState): void {
 			"in-flight counter overflow",
 		);
 	}
+}
+
+/// A pending base mark must be on the in-flight batch exactly, and the base is the confirmed text.
+function validateBase(state: CheckpointState): void {
+	const batch = state.inFlight;
+	if (!batch) return;
+	const base = batch.base;
+	check(
+		state.baseReason === null
+			? base === undefined
+			: base !== undefined &&
+					base.reason === state.baseReason &&
+					base.text === state.confirmedText,
+		"in-flight base",
+	);
 }
 
 function validateActive(state: CheckpointState): void {

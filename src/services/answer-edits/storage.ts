@@ -152,7 +152,7 @@ function indexedDbHandle(
 			const key = fieldKey(ref);
 			return run(key, (current, store) => {
 				if (current === undefined) return null;
-				const record = localRecord(current);
+				const record = storedRecord(current);
 				if (record.expiresAt <= now) {
 					store.delete(key);
 					return null;
@@ -171,7 +171,7 @@ function indexedDbHandle(
 				);
 			return run(key, (current, store) => {
 				const generation =
-					current === undefined ? null : localRecord(current).generation;
+					current === undefined ? null : storedRecord(current).generation;
 				if (generation !== expectedGeneration)
 					throw new Error("Stale edit store generation");
 				store.put(next, key);
@@ -279,6 +279,32 @@ function bounded<T>(record: T): T {
 	return record;
 }
 
+/// Checkpoint versions written before the current one; their pending history cannot be restored.
+const LEGACY_CHECKPOINT_VERSIONS: readonly unknown[] = [2];
+
+/// A record read from disk: the current version, or an older one reduced to its text.
+function storedRecord(value: unknown): LocalEditRecord {
+	const data = object(value);
+	const checkpoint = data.checkpoint;
+	if (
+		checkpoint === null ||
+		typeof checkpoint !== "object" ||
+		!LEGACY_CHECKPOINT_VERSIONS.includes(
+			(checkpoint as { version?: unknown }).version,
+		)
+	)
+		return localRecord(value);
+	/// The restore refuses the checkpoint by its version, which records a gap and keeps the text.
+	const base = metadata(data);
+	requireGeneration(data.generation);
+	return bounded({
+		...base,
+		generation: data.generation,
+		checkpoint: checkpoint as MonitorCheckpoint,
+		outbox: null,
+	});
+}
+
 function localRecord(value: unknown): LocalEditRecord {
 	const data = object(value);
 	const base = metadata(data);
@@ -291,7 +317,7 @@ function localRecord(value: unknown): LocalEditRecord {
 	return bounded({
 		...base,
 		generation: data.generation,
-		checkpoint: { version: 2, state },
+		checkpoint: { version: 3, state },
 		outbox: state.inFlight,
 	});
 }

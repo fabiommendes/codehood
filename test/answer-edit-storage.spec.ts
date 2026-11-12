@@ -239,6 +239,62 @@ test("IndexedDB atomically roundtrips text, checkpoint and outbox; rejects stale
 	expect(result.removed).toBeNull();
 });
 
+test("IndexedDB reads a record whose checkpoint is of the previous version, and a new record can replace it", async ({
+	page,
+}) => {
+	const current = record("written after the upgrade", 2);
+	const old = record("written before the upgrade", 1);
+	const legacy = JSON.parse(JSON.stringify(old));
+	legacy.checkpoint.version = 2;
+	delete legacy.checkpoint.state.baseReason;
+	delete legacy.checkpoint.state.inFlight.base;
+	const result = await page.evaluate(
+		async ({ ref, legacy, current }) => {
+			const options = {
+				ownerId: "alice",
+				indexedDB,
+				databasePrefix: "storage-legacy",
+			};
+			const store =
+				await window.answerEditStorage.openIndexedDbEditStore(options);
+			const name = JSON.stringify([options.databasePrefix, options.ownerId]);
+			await new Promise<void>((resolve, reject) => {
+				const open = indexedDB.open(name, 1);
+				open.onerror = () => reject(open.error);
+				open.onsuccess = () => {
+					const database = open.result;
+					const transaction = database.transaction("records", "readwrite");
+					transaction
+						.objectStore("records")
+						.put(
+							legacy,
+							JSON.stringify([ref.attemptId, ref.questionId, ref.field]),
+						);
+					transaction.oncomplete = () => {
+						database.close();
+						resolve();
+					};
+					transaction.onerror = () => reject(transaction.error);
+				};
+			});
+			const read = await store.read(ref, 1000);
+			let replaced = true;
+			try {
+				await store.commit(ref, current, legacy.generation);
+			} catch {
+				replaced = false;
+			}
+			return { read, replaced, after: await store.read(ref, 1000) };
+		},
+		{ ref: REF, legacy, current },
+	);
+
+	expect(result.read?.text).toBe("written before the upgrade");
+	expect(result.read?.generation).toBe(1);
+	expect(result.replaced).toBe(true);
+	expect(result.after).toEqual(current);
+});
+
 test("IndexedDB isolates owners and fields, expires only own rows, fences concurrent and delayed writes on revoke", async ({
 	page,
 }) => {

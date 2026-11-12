@@ -130,7 +130,7 @@ test.describe("answer edit monitor checkpoints: export", () => {
 		append(target, "b", 10_020);
 		const checkpoint = target.exportCheckpoint();
 		const serialized = JSON.stringify(checkpoint);
-		expect(checkpoint.version).toBe(2);
+		expect(checkpoint.version).toBe(3);
 		expect(JSON.parse(serialized)).toEqual(checkpoint);
 		expectDeepFrozen(checkpoint);
 		expect(Reflect.set(checkpoint, "version", 99)).toBe(false);
@@ -810,7 +810,7 @@ test.describe("answer edit monitor checkpoints: reload and delivery", () => {
 		const target = monitor();
 		append(target, "a", 10_010);
 		const exported = target.exportCheckpoint() as {
-			version: 2;
+			version: 3;
 			state: { text: string };
 		};
 		const state = parseCheckpoint(exported);

@@ -44,7 +44,14 @@ export interface PendingEditBatch {
 	readonly firstSeq: number;
 	readonly edits: readonly EditTuple[];
 	readonly snapshot: string;
+	/// Present on the first batch of a field and on the first after a rebase: the text `edits` start from.
+	readonly base?: BatchBase;
 }
+export interface BatchBase {
+	readonly reason: BaseReason;
+	readonly text: string;
+}
+export type BaseReason = "start" | "rebase";
 export interface BatchReceipt {
 	readonly batchId: string;
 	readonly revision: number;
@@ -56,7 +63,7 @@ export interface MonitorState {
 	readonly hasUnacknowledgedBatch: boolean;
 }
 export interface MonitorCheckpoint {
-	readonly version: 2;
+	readonly version: 3;
 	readonly state: unknown;
 }
 export interface MonitorHandle {
@@ -97,6 +104,8 @@ export class AnswerEditMonitor implements MonitorHandle {
 	private readonly pauseMs: number;
 	private text: string;
 	private confirmedText: string;
+	/// Why the next batch must carry `confirmedText` as its base; cleared when that batch is acknowledged.
+	private pendingBase: BaseReason | null;
 	private queue: PendingSegment[] = [];
 	private lastAtMs: number;
 	private nextInput = 0;
@@ -140,6 +149,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.lastAtMs = origin;
 		this.text = options.initialText;
 		this.confirmedText = options.initialText;
+		this.pendingBase = options.baseRevision === 0 ? "start" : null;
 	}
 
 	/**
@@ -180,6 +190,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 			now: options.now,
 		});
 		monitor.confirmedText = state.confirmedText;
+		monitor.pendingBase = state.baseReason;
 		monitor.inFlight = frozenCopy(state.inFlight);
 		monitor.queue = state.queue;
 		const active = state.active;
@@ -336,8 +347,12 @@ export class AnswerEditMonitor implements MonitorHandle {
 			Object.freeze(tuple);
 		}
 		Object.freeze(envelope.edits);
+		const base = this.pendingBase
+			? Object.freeze({ reason: this.pendingBase, text: this.confirmedText })
+			: null;
 		this.inFlight = Object.freeze({
 			...envelope,
+			...(base ? { base } : {}),
 			batchId: `${sessionId}:${this.firstSeq}`,
 			sessionId,
 			baseRevision: this.baseRevision,
@@ -404,6 +419,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.baseRevision = nextRevision;
 		this.firstSeq = nextSeq;
 		this.confirmedText = batch.snapshot;
+		this.pendingBase = null;
 		this.inFlight = null;
 		this.notify();
 	}
@@ -424,6 +440,9 @@ export class AnswerEditMonitor implements MonitorHandle {
 		requireInteger(base.firstSeq, "firstSeq");
 		this.baseRevision = base.baseRevision;
 		this.firstSeq = base.firstSeq;
+		/// A nonzero revision means the server already holds the text the history started from.
+		if (this.pendingBase === "start" && base.baseRevision !== 0)
+			this.pendingBase = null;
 		this.receipts.clear();
 		this.notify();
 	}
@@ -441,6 +460,7 @@ export class AnswerEditMonitor implements MonitorHandle {
 		this.baseRevision = base.baseRevision;
 		this.firstSeq = base.firstSeq;
 		this.confirmedText = this.text;
+		this.pendingBase = "rebase";
 		this.queue = [];
 		this.edits = [];
 		this.openEdit = null;
@@ -454,12 +474,13 @@ export class AnswerEditMonitor implements MonitorHandle {
 	 */
 	exportCheckpoint(): Readonly<MonitorCheckpoint> {
 		return frozenCopy({
-			version: 2,
+			version: 3,
 			state: {
 				baseRevision: this.baseRevision,
 				firstSeq: this.firstSeq,
 				pauseMs: this.pauseMs,
 				confirmedText: this.confirmedText,
+				baseReason: this.pendingBase,
 				text: this.text,
 				receipts: [...this.receipts.values()],
 				inFlight: this.inFlight,
