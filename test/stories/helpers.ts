@@ -41,9 +41,13 @@ export async function resetDatabase(): Promise<void> {
 
 	await prisma.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
 	try {
-		for (const { name } of tables) {
-			await prisma.$executeRawUnsafe(`DELETE FROM "${name}"`);
-		}
+		// One transaction: a request still in flight on the server must not
+		// read a course whose instructor is already gone.
+		await prisma.$transaction(
+			tables.map(({ name }) =>
+				prisma.$executeRawUnsafe(`DELETE FROM "${name}"`),
+			),
+		);
 	} finally {
 		await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
 	}
