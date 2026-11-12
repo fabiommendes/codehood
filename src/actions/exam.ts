@@ -9,6 +9,7 @@ import {
 	examReopenAttempt,
 } from "@/core/schemas";
 import { db } from "@/db";
+import { readAnswerHistory } from "@/services/answer-history";
 import { parseCourseParams } from "@/urls";
 import { parseLocalDateTime, toDuration } from "@/utils/schedule-time";
 import { withServiceErrors } from "./helpers";
@@ -26,23 +27,31 @@ export const exam = {
 		}),
 	}),
 
-	/** Records the actor's answer to one question of their open attempt. */
+	/**
+	 * Records the actor's answer to one question of their open attempt.
+	 *
+	 * Answers with the server clock and, when it can be read, the exam's
+	 * effective answer-history switch.
+	 */
 	answer: defineAction({
 		input: examAnswer,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			const { payload, question, ...rest } = input;
+			const course = parseCourseParams(rest);
 			await db.response.submit(
-				{
-					course: parseCourseParams(rest),
-					exam: input.exam,
-					question,
-					payload,
-				},
+				{ course, exam: input.exam, question, payload },
 				{ actor },
 			);
+			// Read only after the save, and never allowed to fail it.
+			const answerHistory = await readAnswerHistory(() =>
+				db.exam.findOne({ course, slug: input.exam }, { actor }),
+			);
 			// The page measures its clock offset from this stamp.
-			return { serverNow: Date.now() };
+			return {
+				serverNow: Date.now(),
+				...(answerHistory === undefined ? {} : { answerHistory }),
+			};
 		}),
 	}),
 

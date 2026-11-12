@@ -1,5 +1,6 @@
 import { installErrorMap } from "@/forms/error-map";
 import { admin } from "./admin";
+import { answerHistory } from "./answer-history";
 import { auth } from "./auth";
 import { checkIn } from "./check-in";
 import { course } from "./course";
@@ -20,6 +21,7 @@ export const server = {
 	auth,
 	profile,
 	admin,
+	answerHistory,
 	course,
 	exam,
 	gradeColumn,
