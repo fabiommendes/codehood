@@ -14,6 +14,7 @@ import {
 	rubricScore,
 } from "@/services/rubric";
 import type { PrismaTx } from "../client";
+import { guardedUpdate } from "../conditional-write";
 
 /// A rubric item as a stored row.
 export interface StoredItem {
@@ -196,24 +197,25 @@ export function normalizeScore(score: string): string {
  * Recomputes the score of every pass graded with the rubric and writes the ones that moved.
  *
  * Passes the grader set by hand carry no `rubricId` and are never touched.
+ * Returns the ids of the passes written, which moved their `updatedAt`.
  */
 export async function recomputeRubricPasses(
 	tx: PrismaTx,
 	rubricId: number,
-): Promise<void> {
+): Promise<Set<number>> {
 	const rubric = await tx.rubric.findUniqueOrThrow({
 		where: { id: rubricId },
 		select: { base: true },
 	});
+	const written = new Set<number>();
 	for (const pass of await loadRubricPasses(tx, rubricId)) {
 		const next = scoreUnder(pass, rubric.base);
 		if (next !== normalizeScore(pass.score)) {
-			await tx.feedback.update({
-				where: { id: pass.id },
-				data: { score: next },
-			});
+			await guardedUpdate(tx, "feedback", { id: pass.id }, { score: next }, {});
+			written.add(pass.id);
 		}
 	}
+	return written;
 }
 
 /// How the counting answers of a question stand against its rubric.

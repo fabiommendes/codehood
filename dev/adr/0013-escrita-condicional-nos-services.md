@@ -83,7 +83,26 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
     reescrita.
   - `response.submit`, `submission.create`, `submission.update` (status) e
     `submission.delete`: a resposta (as submissões aparecem no read model);
-  - `attachment.update` de um anexo de relatório: o relatório.
+  - `attachment.update` de um anexo de relatório: o relatório;
+  - `feedback.create` e `feedback.upsert` que criam uma nota, com a
+    submissão mudando de status: a resposta (`accept` de um pedido de revisão
+    também, pois grava uma nota);
+  - `feedback.delete`: o pedido de revisão aceito com essa nota (o
+    `feedbackId` é anulado por cascata);
+  - `rubric.update` (base nova), `rubric.updateItem` (valor novo),
+    `rubric.upsertItem` (valor novo) e `rubric.deleteItem`: as notas da
+    rubrica cuja pontuação muda (`rubric.deleteItem` também as notas que
+    aplicavam o item, mesmo sem mudar a pontuação, pois a lista de itens
+    aplicados muda);
+  - `rubric.splitItem`: os itens que mudam de posição.
+- Filhos possuídos bumpam a mãe: toda escrita de item da rubrica
+  (`createItem`, `updateItem`, `upsertItem`, `deleteItem`, `splitItem`,
+  `renameGroup`) move o `updatedAt` da rubrica. A versão de `updateItem`,
+  `upsertItem`, `deleteItem` e `splitItem` é a do item; a de `update`,
+  `createItem` e `renameGroup` é a da rubrica. Uma rubrica ainda não copiada
+  para o banco não tem linha: um `Date` falha com `null` sem copiá-la. A
+  edição de um item não muda as notas que o aplicam: ele aparece embutido
+  nelas e tem versão própria.
 - O caminho do aluno (`response.submit`, `response.finish`) grava o
   `updatedAt` pelo helper sem expectativa: nunca recebe
   `expectedUpdatedAt` e não falha com 412, mesmo que ele chegue.

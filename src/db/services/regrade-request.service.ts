@@ -29,6 +29,11 @@ import {
 	regradeRequestSchema,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { examResult } from "@/services/exam-result";
@@ -195,20 +200,15 @@ const contestedSelect = {
 	},
 } satisfies Prisma.SubmissionSelect;
 
-/// Moves the request `id` out of `OPEN` with `data`, refusing when someone else resolved it first.
+/// Moves the request `id`, which `openRequest` found `OPEN` in this transaction, out of `OPEN` with `data`.
 async function resolve(
 	tx: PrismaTx,
 	id: RegradeRequestId,
-	data: Prisma.RegradeRequestUncheckedUpdateManyInput,
+	data: Prisma.RegradeRequestUncheckedUpdateInput,
+	opts: ServiceOptsWithoutTx,
 ): Promise<RegradeRequest> {
-	const { count } = await tx.regradeRequest.updateMany({
-		where: { id, status: "OPEN" },
-		data,
-	});
-	if (count === 0) throw resolvedError();
 	return fromDb(
-		await tx.regradeRequest.findFirstOrThrow({
-			where: { id },
+		await guardedUpdate(tx, "regradeRequest", { id }, data, opts, {
 			include: requestInclude,
 		}),
 	);
@@ -230,17 +230,23 @@ function userOf(actor: Actor): string | null {
 async function openRequest(
 	tx: PrismaTx,
 	filter: RegradeRequestPK,
-	actor: Actor,
+	{ actor, expectedUpdatedAt }: ServiceOptsWithoutTx,
 	perm: "regrade.request" | "regrade.resolve",
 ): Promise<DbRegradeRequest> {
 	const row = await tx.regradeRequest.findFirst({
 		where: requestWhere(filter),
 		include: requestInclude,
 	});
-	if (!row || !hasPerm(actor, "regrade.read", targetOf(row))) {
+	if (!row) {
+		checkExpectedUpdatedAt(null, expectedUpdatedAt);
+		throw new NotFound("regrade request");
+	}
+	if (!hasPerm(actor, "regrade.read", targetOf(row))) {
 		throw new NotFound("regrade request");
 	}
 	ensurePerm(actor, perm, targetOf(row));
+	// Before the status: a stale caller sees the 412, not the refusal of a request someone else resolved.
+	checkExpectedUpdatedAt(row.updatedAt, expectedUpdatedAt);
 	if (row.status !== "OPEN") {
 		throw resolvedError();
 	}
@@ -498,13 +504,8 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 				filter: RegradeRequestPK,
 				opts: ServiceOptsWithoutTx,
 			): Promise<void> => {
-				const row = await openRequest(
-					tx,
-					filter,
-					opts.actor,
-					"regrade.request",
-				);
-				await tx.regradeRequest.delete({ where: { id: row.id } });
+				const row = await openRequest(tx, filter, opts, "regrade.request");
+				await guardedDelete(tx, "regradeRequest", { id: row.id }, opts);
 			},
 		});
 
@@ -552,12 +553,7 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 				input: RegradeAccept,
 				opts: ServiceOptsWithoutTx,
 			): Promise<RegradeRequest> => {
-				const row = await openRequest(
-					tx,
-					filter,
-					opts.actor,
-					"regrade.resolve",
-				);
+				const row = await openRequest(tx, filter, opts, "regrade.resolve");
 				const pass = await feedback.create(
 					{
 						submission: { id: row.submissionId },
@@ -565,15 +561,21 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 						score: input.score,
 						feedback: input.reply,
 					},
-					{ ...opts, tx },
+					// The expectation is the request's, not the new pass's.
+					{ ...opts, tx, expectedUpdatedAt: undefined },
 				);
-				return resolve(tx, row.id, {
-					status: "ACCEPTED",
-					reply: input.reply,
-					feedbackId: pass.id,
-					resolvedById: userOf(opts.actor),
-					resolvedAt: new Date(),
-				});
+				return resolve(
+					tx,
+					row.id,
+					{
+						status: "ACCEPTED",
+						reply: input.reply,
+						feedbackId: pass.id,
+						resolvedById: userOf(opts.actor),
+						resolvedAt: new Date(),
+					},
+					opts,
+				);
 			},
 		});
 
@@ -586,18 +588,18 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 				input: RegradeReject,
 				opts: ServiceOptsWithoutTx,
 			): Promise<RegradeRequest> => {
-				const row = await openRequest(
+				const row = await openRequest(tx, filter, opts, "regrade.resolve");
+				return resolve(
 					tx,
-					filter,
-					opts.actor,
-					"regrade.resolve",
+					row.id,
+					{
+						status: "REJECTED",
+						reply: input.reply,
+						resolvedById: userOf(opts.actor),
+						resolvedAt: new Date(),
+					},
+					opts,
 				);
-				return resolve(tx, row.id, {
-					status: "REJECTED",
-					reply: input.reply,
-					resolvedById: userOf(opts.actor),
-					resolvedAt: new Date(),
-				});
 			},
 		});
 

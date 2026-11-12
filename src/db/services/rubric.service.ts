@@ -13,6 +13,7 @@ import { ensurePerm } from "@/auth/permissions";
 import { InvalidData } from "@/core/error";
 import {
 	type CourseRef,
+	type FeedbackId,
 	rubricChange,
 	rubricItemCreate,
 	rubricItemPK,
@@ -28,6 +29,13 @@ import {
 	rubricUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { joinGroupPath, nextItemKey, parseGroupPath } from "@/services/rubric";
@@ -135,15 +143,14 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<Rubric> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
+			const { rubric, created } = await rubricForWrite(tx, target, opts);
+			await guardedUpdate(
 				tx,
-				target.examId,
-				target.questionRefId,
+				"rubric",
+				{ id: rubric.id },
+				{ base: data.base },
+				created ? {} : opts,
 			);
-			await tx.rubric.update({
-				where: { id: rubric.id },
-				data: { base: data.base },
-			});
 			await recomputeRubricPasses(tx, rubric.id);
 			return view(tx, target, await stored(tx, target));
 		},
@@ -169,11 +176,8 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<RubricItem> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
-				tx,
-				target.examId,
-				target.questionRefId,
-			);
+			const { rubric, created } = await rubricForWrite(tx, target, opts);
+			await touch(tx, "rubric", { id: rubric.id }, created ? {} : opts);
 			const keys = rubric.items.map((item) => item.key);
 			const key = input.key ?? nextItemKey(keys);
 			ensureKeyFree(keys, key);
@@ -202,23 +206,23 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<RubricItem> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
-				tx,
-				target.examId,
-				target.questionRefId,
-			);
-			const item = itemOrNotFound(rubric, pk.key);
+			const { rubric } = await rubricForWrite(tx, target, opts);
+			const item = itemOrNotFound(rubric, pk.key, opts);
 
-			const row = await tx.rubricItem.update({
-				where: { id: item.id },
-				data: {
+			const row = await guardedUpdate(
+				tx,
+				"rubricItem",
+				{ id: item.id },
+				{
 					...(patch.group !== undefined ? { group: patch.group } : {}),
 					...(patch.text !== undefined ? { text: patch.text } : {}),
 					...(patch.value !== undefined ? { value: patch.value } : {}),
 					...(patch.comment !== undefined ? { comment: patch.comment } : {}),
 					...(patch.feedback !== undefined ? { feedback: patch.feedback } : {}),
 				},
-			});
+				opts,
+			);
+			await touch(tx, "rubric", { id: rubric.id }, {});
 			if (patch.value !== undefined) await recomputeRubricPasses(tx, rubric.id);
 
 			const standing = await rubricStanding(
@@ -250,29 +254,31 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<RubricItem> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
-				tx,
-				target.examId,
-				target.questionRefId,
-			);
+			const { rubric } = await rubricForWrite(tx, target, opts);
 			const existing = rubric.items.find((item) => item.key === pk.key);
 			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
 				const row = await tx.rubricItem.create({
 					data: itemData(rubric.id, pk.key, nextPosition(rubric.items), input),
 				});
+				await touch(tx, "rubric", { id: rubric.id }, {});
 				return toItem(row, 0);
 			}
 
-			const row = await tx.rubricItem.update({
-				where: { id: existing.id },
-				data: {
+			const row = await guardedUpdate(
+				tx,
+				"rubricItem",
+				{ id: existing.id },
+				{
 					group: input.group ?? null,
 					text: input.text,
 					value: input.value,
 					comment: input.comment ?? null,
 					feedback: input.feedback ?? null,
 				},
-			});
+				opts,
+			);
+			await touch(tx, "rubric", { id: rubric.id }, {});
 			if (row.value !== existing.value)
 				await recomputeRubricPasses(tx, rubric.id);
 
@@ -301,16 +307,27 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
-				tx,
-				target.examId,
-				target.questionRefId,
-			);
+			const { rubric } = await rubricForWrite(tx, target, opts);
 			const item = rubric.items.find((candidate) => candidate.key === pk.key);
-			if (!item) return;
+			if (!item) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return;
+			}
 
-			await tx.rubricItem.delete({ where: { id: item.id } });
-			await recomputeRubricPasses(tx, rubric.id);
+			// The passes lose the application row with the item, so their read
+			// model changes even when the score does not.
+			const applied = await tx.feedbackRubricItem.findMany({
+				where: { itemId: item.id },
+				select: { feedbackId: true },
+			});
+			await guardedDelete(tx, "rubricItem", { id: item.id }, opts);
+			await touch(tx, "rubric", { id: rubric.id }, {});
+			const rescored = await recomputeRubricPasses(tx, rubric.id);
+			for (const { feedbackId } of applied) {
+				if (!rescored.has(feedbackId)) {
+					await touch(tx, "feedback", { id: feedbackId as FeedbackId }, {});
+				}
+			}
 		},
 	});
 
@@ -335,12 +352,9 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<RubricItem[]> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
-				tx,
-				target.examId,
-				target.questionRefId,
-			);
-			const parent = itemOrNotFound(rubric, pk.key);
+			const { rubric } = await rubricForWrite(tx, target, opts);
+			const parent = itemOrNotFound(rubric, pk.key, opts);
+			await checkVersion(tx, "rubricItem", { id: parent.id }, opts);
 
 			const keys = rubric.items.map((item) => item.key);
 			const children = input.children.map((child) => {
@@ -350,16 +364,26 @@ export const makeRubricService = defineService()(() => {
 				return { ...child, key };
 			});
 
-			await tx.rubricItem.updateMany({
-				where: { rubricId: rubric.id, position: { gt: parent.position } },
-				data: { position: { increment: children.length } },
-			});
-			if (parent.retiredAt === null) {
-				await tx.rubricItem.update({
-					where: { id: parent.id },
-					data: { retiredAt: new Date() },
-				});
+			for (const item of rubric.items) {
+				if (item.position <= parent.position) continue;
+				await guardedUpdate(
+					tx,
+					"rubricItem",
+					{ id: item.id },
+					{ position: item.position + children.length },
+					{},
+				);
 			}
+			if (parent.retiredAt === null) {
+				await guardedUpdate(
+					tx,
+					"rubricItem",
+					{ id: parent.id },
+					{ retiredAt: new Date() },
+					opts,
+				);
+			}
+			await touch(tx, "rubric", { id: rubric.id }, {});
 
 			const created: RubricItem[] = [];
 			for (const [index, child] of children.entries()) {
@@ -395,22 +419,23 @@ export const makeRubricService = defineService()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<RubricRenameResult> => {
 			const target = await resolveTarget(tx, pk, opts, "rubric.write");
-			const rubric = await materializeRubric(
-				tx,
-				target.examId,
-				target.questionRefId,
-			);
+			const { rubric, created } = await rubricForWrite(tx, target, opts);
+			if (!created) await checkVersion(tx, "rubric", { id: rubric.id }, opts);
 			const { from, to } = input;
 			const inside = (group: string | null): group is string =>
 				group !== null && (group === from || group.startsWith(`${from}/`));
 
 			const moved = rubric.items.filter((item) => inside(item.group));
 			for (const item of moved) {
-				await tx.rubricItem.update({
-					where: { id: item.id },
-					data: { group: to + (item.group as string).slice(from.length) },
-				});
+				await guardedUpdate(
+					tx,
+					"rubricItem",
+					{ id: item.id },
+					{ group: to + (item.group as string).slice(from.length) },
+					{},
+				);
 			}
+			if (moved.length > 0) await touch(tx, "rubric", { id: rubric.id }, {});
 
 			const warnings = lookalikeGroups(
 				rubric.items.filter((item) => !inside(item.group)),
@@ -527,6 +552,30 @@ async function resolveTarget(
 	};
 }
 
+/**
+ * The stored rubric of `target` for a write, copying the initial one first.
+ *
+ * A rubric not copied yet has no row to satisfy a `Date`, so that is a
+ * PreconditionFailed carrying `null`, thrown before anything is copied.
+ * `created` tells a write on the rubric row itself to drop the expectation:
+ * the row it would guard is the one just made.
+ */
+async function rubricForWrite(
+	tx: PrismaTx,
+	target: Target,
+	opts: ServiceOptsWithoutTx,
+): Promise<{ rubric: StoredRubric; created: boolean }> {
+	const found = await findStoredRubric(tx, target.examId, target.questionRefId);
+	if (found) return { rubric: found, created: false };
+	checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const rubric = await materializeRubric(
+		tx,
+		target.examId,
+		target.questionRefId,
+	);
+	return { rubric, created: true };
+}
+
 /// The rubric just written, read back.
 async function stored(tx: PrismaTx, target: Target): Promise<StoredRubric> {
 	return valueOrNotFound(
@@ -572,13 +621,15 @@ function toItem(row: StoredItem, uses: number): RubricItem {
 	};
 }
 
-/// The item of `rubric` under `key`.
-function itemOrNotFound(rubric: StoredRubric, key: string): StoredItem {
-	return valueOrNotFound(
-		"rubric item",
-		rubric.items.find((item) => item.key === key),
-		{ id: key },
-	);
+/// The item of `rubric` under `key`; a missing one is a 412 with `null` when `expect` is a `Date`, a NotFound otherwise.
+function itemOrNotFound(
+	rubric: StoredRubric,
+	key: string,
+	expect: { expectedUpdatedAt?: Date | null } = {},
+): StoredItem {
+	const found = rubric.items.find((item) => item.key === key);
+	if (!found) checkExpectedUpdatedAt(null, expect.expectedUpdatedAt);
+	return valueOrNotFound("rubric item", found, { id: key });
 }
 
 /// Refuses a key already used by an item of the rubric, retired or not.

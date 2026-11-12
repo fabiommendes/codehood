@@ -42,8 +42,18 @@ PUT".
    `updatedAt` da linha endereçada. Casos já conhecidos que não mudam hoje:
    - `Resource.event` anulado por `onDelete: SetNull` quando o evento é
      apagado;
-   - a conferir: troca de `tags` e `questions` do exame, nova `QuestionData`
-     de uma questão, `repositories` de um evento, `values` de coluna de nota.
+   - feito: `tags` e `questions` do exame, nova `QuestionData` de uma
+     questão, `repositories` de um evento e `values` de coluna de nota
+     bumpam a linha mãe (T2 e T3a);
+   - feito: item de rubrica bumpa a rubrica (`createItem`, `updateItem`,
+     `upsertItem`, `deleteItem`, `splitItem`, `renameGroup`);
+   - feito: recalcular a pontuação das notas da rubrica (`rubric.update`,
+     valor de item) bumpa as notas alteradas; `deleteItem` bumpa as que
+     aplicavam o item;
+   - feito: nota nova que muda o status da submissão bumpa a resposta
+     (`feedback.create`, `feedback.upsert`, `regradeRequest.accept`);
+   - feito: `feedback.delete` bumpa o pedido de revisão aceito com a nota
+     (`feedbackId` anulado por cascata).
 7. `CRUD()` (`src/api/`) lê `If-Match` e `If-None-Match: *` em `PUT`, `PATCH`
    e `DELETE`, e os declara no OpenAPI. Regenerar o snapshot e o cliente da
    CLI com `pnpm run openapi:cli`.

@@ -4,6 +4,8 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
+import { prisma } from "@/db/client";
+import { createRubricScenario } from "@/fixtures/rubric-scenario";
 import {
 	enroll,
 	makeCourse,
@@ -476,11 +478,93 @@ const HONORED: Record<
 			return db.report.delete({ publicId: report.publicId }, opts(report, v));
 		},
 	}))(),
+	feedback: (() => {
+		const row = async () => {
+			const scenario = await createRubricScenario();
+			const answer = await scenario.addAnswer();
+			const input = {
+				submission: { id: answer.submission.id },
+				ref: "pass",
+				score: "0.5",
+			};
+			const pass = await db.feedback.create(input, {
+				actor: scenario.instructor,
+			});
+			const withVersion = (version: Version) => ({
+				actor: scenario.instructor,
+				expectedUpdatedAt: version === "stale" ? STALE : pass.updatedAt,
+			});
+			return { pass, input, withVersion };
+		};
+		return {
+			update: async (v) => {
+				const { pass, withVersion } = await row();
+				return db.feedback.update(
+					{ id: pass.id },
+					{ notes: "x" },
+					withVersion(v),
+				);
+			},
+			upsert: async (v) => {
+				const { input, withVersion } = await row();
+				return db.feedback.upsert(input, withVersion(v));
+			},
+			delete: async (v) => {
+				const { pass, withVersion } = await row();
+				return db.feedback.delete({ id: pass.id }, withVersion(v));
+			},
+		};
+	})(),
+	rubric: (() => ({
+		update: async (v) => {
+			const scenario = await createRubricScenario();
+			await scenario.seedRubric({ items: [{ key: "a", value: "0.5" }] });
+			const rubric = await prisma.rubric.findFirstOrThrow({
+				where: { examId: scenario.exam.id },
+			});
+			return db.rubric.update(
+				scenario.main.pk,
+				{ base: "1" },
+				{
+					actor: scenario.instructor,
+					expectedUpdatedAt: v === "stale" ? STALE : rubric.updatedAt,
+				},
+			);
+		},
+	}))(),
+	regradeRequest: (() => ({
+		delete: async (v) => {
+			const scenario = await createRubricScenario();
+			const answer = await scenario.addAnswer();
+			await db.feedback.create(
+				{ submission: { id: answer.submission.id }, ref: "p", score: "0" },
+				{ actor: scenario.instructor },
+			);
+			await scenario.release();
+			const request = await db.regradeRequest.create(
+				{
+					course: scenario.course.id,
+					submission: answer.submission.publicId,
+					message: "I disagree with how this was graded.",
+				},
+				{ actor: answer.author },
+			);
+			return db.regradeRequest.delete(
+				{ publicId: request.publicId },
+				{
+					actor: answer.author,
+					expectedUpdatedAt: v === "stale" ? STALE : request.updatedAt,
+				},
+			);
+		},
+	}))(),
 };
 
 /// Services with writes on a versioned model that do not honor the option
-/// yet. Remove a name when its service does; the test fails if it stays.
-const PENDING = new Set<string>(["feedback", "regradeRequest", "rubric"]);
+/// yet. Remove a name when its service does; the test fails if it stays. A new
+/// service that ignores the option must be listed here to pass the first test
+/// below, and it fails the next one while it uses no helper.
+const PENDING = new Set<string>();
 
 /// Services outside the rule, with the reason.
 const EXEMPT: Record<string, string> = {

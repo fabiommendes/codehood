@@ -27,6 +27,13 @@ import {
 	feedbackUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { released } from "@/services/exam-state";
@@ -165,7 +172,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				},
 				include: feedbackInclude(),
 			});
-			await markGraded(tx, submission.id, graderId);
+			await markGraded(tx, submission, graderId);
 
 			return present(opts.actor, row);
 		},
@@ -297,9 +304,10 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			const feedback = await writableFeedback(
 				tx,
 				filter,
-				opts.actor,
+				opts,
 				"feedback.update",
 			);
+			await checkVersion(tx, "feedback", { id: feedback.id }, opts);
 
 			const grade = await resolveGrade(
 				tx,
@@ -308,9 +316,11 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				feedback,
 			);
 
-			const row = await tx.feedback.update({
-				where: { id: feedback.id },
-				data: {
+			const row = await guardedUpdate(
+				tx,
+				"feedback",
+				{ id: feedback.id },
+				{
 					...(grade ? gradeData(grade) : {}),
 					...(fields.feedback !== undefined
 						? { feedback: fields.feedback }
@@ -320,8 +330,9 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 						? { blanks: fields.blanks ?? DbNull }
 						: {}),
 				},
-				include: feedbackInclude(),
-			});
+				opts,
+				{ include: feedbackInclude() },
+			);
 
 			return present(opts.actor, row);
 		},
@@ -369,6 +380,11 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				include: feedbackInclude(),
 			});
 
+			checkExpectedUpdatedAt(
+				existing?.updatedAt ?? null,
+				opts.expectedUpdatedAt,
+			);
+
 			if (existing) {
 				// The pass keeps its grader, but naming one still has to be allowed.
 				if (input.grader != null || input.bot != null) {
@@ -383,16 +399,19 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 					{ ...input, adjustment: input.adjustment ?? null },
 					existing,
 				);
-				const row = await tx.feedback.update({
-					where: { id: existing.id },
-					data: {
+				const row = await guardedUpdate(
+					tx,
+					"feedback",
+					{ id: existing.id },
+					{
 						...(grade ? gradeData(grade) : {}),
 						feedback: input.feedback ?? null,
 						notes: input.notes ?? null,
 						blanks: input.blanks ?? DbNull,
 					},
-					include: feedbackInclude(),
-				});
+					opts,
+					{ include: feedbackInclude() },
+				);
 				return present(opts.actor, row);
 			}
 
@@ -411,7 +430,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				},
 				include: feedbackInclude(),
 			});
-			await markGraded(tx, submission.id, graderId);
+			await markGraded(tx, submission, graderId);
 
 			return present(opts.actor, row);
 		},
@@ -437,11 +456,19 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			const feedback = await writableFeedback(
 				tx,
 				filter,
-				opts.actor,
+				opts,
 				"feedback.delete",
 			);
+			await checkVersion(tx, "feedback", { id: feedback.id }, opts);
 
-			await tx.feedback.delete({ where: { id: feedback.id } });
+			// The request that this pass accepted loses its `feedbackId` to the
+			// cascade, which its read model shows.
+			const accepted = await tx.regradeRequest.findUnique({
+				where: { feedbackId: feedback.id },
+				select: { id: true },
+			});
+			if (accepted) await touch(tx, "regradeRequest", { id: accepted.id }, {});
+			await guardedDelete(tx, "feedback", { id: feedback.id }, opts);
 		},
 	});
 
@@ -585,18 +612,20 @@ async function resolveGradableSubmission(
 	return submission;
 }
 
-/// Sets a submission's status to reflect who graded it last: a user or a bot.
+/// Sets a submission's status to reflect who graded it last: a user or a bot, moving the version of the response that shows it.
 async function markGraded(
 	tx: PrismaTx,
-	submissionId: DbSubmission["id"],
+	submission: Pick<DbSubmission, "id" | "responseId" | "status">,
 	graderId: string | null,
 ): Promise<void> {
+	const status = graderId !== null ? "GRADED_MANUALLY" : "GRADED_AUTOMATICALLY";
 	await tx.submission.update({
-		where: { id: submissionId },
-		data: {
-			status: graderId !== null ? "GRADED_MANUALLY" : "GRADED_AUTOMATICALLY",
-		},
+		where: { id: submission.id },
+		data: { status },
 	});
+	if (status !== submission.status) {
+		await touch(tx, "response", { id: submission.responseId }, {});
+	}
 }
 
 /**
@@ -671,14 +700,24 @@ function resolveGrader(
 async function writableFeedback(
 	tx: PrismaTx,
 	filter: FeedbackPK,
-	actor: Actor,
+	{ actor, expectedUpdatedAt }: ServiceOptsWithoutTx,
 	action: "feedback.update" | "feedback.delete",
 ): Promise<DbFeedback> {
 	const row = await tx.feedback.findFirst({
 		where: feedbackWhere(filter),
 		include: feedbackInclude(),
 	});
-	if (!row) throw new NotFound("feedback");
+	if (!row) {
+		// A pass the caller expected to be there is a 412, unless the submission
+		// that makes up its key is missing or unreadable too.
+		if (
+			expectedUpdatedAt instanceof Date &&
+			(await keyHolderReadable(tx, filter, actor))
+		) {
+			checkExpectedUpdatedAt(null, expectedUpdatedAt);
+		}
+		throw new NotFound("feedback");
+	}
 
 	const target = responseTargetFrom(row.submission.response);
 	if (
@@ -689,6 +728,22 @@ async function writableFeedback(
 	}
 	ensurePerm(actor, action, target);
 	return row;
+}
+
+/// Whether the submission in the key of `filter` exists and `actor` may read it; true for a filter by `id`, which has no such part.
+async function keyHolderReadable(
+	tx: PrismaTx,
+	filter: FeedbackPK,
+	actor: Actor,
+): Promise<boolean> {
+	if ("id" in filter) return true;
+	const submission = await tx.submission.findFirst({
+		where: submissionRefWhere(filter.submission),
+		include: submissionReleaseInclude(),
+	});
+	return (
+		submission !== null && hasSubmissionReadAccess(actor, submission.response)
+	);
 }
 
 /// The score of a pass and the rubric bookkeeping that goes with it.
