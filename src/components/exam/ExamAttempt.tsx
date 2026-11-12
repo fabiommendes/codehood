@@ -19,6 +19,7 @@ import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { locale, m } from "@/i18n";
 import { runnerLanguage } from "@/runner/languages";
+import type { AnswerEditAdapter } from "@/services/answer-edits/adapter";
 import {
 	type ExamResult,
 	formatScore,
@@ -91,6 +92,18 @@ const SAVE_DELAY_MS = 500;
 
 /// How long a save may stay unanswered before it counts as a failed connection.
 const SAVE_TIMEOUT_MS = 15_000;
+
+/// The local storage key that turns the edit history of typed answers on; off unless it holds "on".
+const ANSWER_HISTORY_SWITCH = "codehood.answerHistory";
+
+/// Whether the edit history is switched on in this browser; a browser that refuses to say counts as off.
+function answerHistoryEnabled(): boolean {
+	try {
+		return localStorage.getItem(ANSWER_HISTORY_SWITCH) === "on";
+	} catch {
+		return false;
+	}
+}
 
 /// Rejects when `promise` has not settled after `ms`.
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -384,8 +397,102 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		if (kind() === "in-progress") void flush();
 	}
 
+	/// The edit history of typed answers, set once its code has loaded; null while the switch is off, loading or failed.
+	let history: AnswerEditAdapter | null = null;
+	let historyStopped = false;
+
+	/// The questions whose typed answer the history follows.
+	const historyQuestions = () =>
+		props.questions.filter(
+			(entry) =>
+				entry.question.type === "essay" ||
+				entry.question.type === "short-answer",
+		);
+
+	/// Runs `action` on the history adapter, swallowing any failure: the history may lose edits, never hold up an answer.
+	function withHistory(action: (adapter: AnswerEditAdapter) => void): void {
+		const adapter = history;
+		if (!adapter) return;
+		try {
+			action(adapter);
+		} catch {
+			history = null;
+		}
+	}
+
+	/// Tells the history the editor of `slug` now holds `edited`.
+	function recordEdit(slug: string, type: string, edited: AnswerPayload): void {
+		if (!history || (type !== "essay" && type !== "short-answer")) return;
+		const text = edited ?? "";
+		if (typeof text !== "string") return;
+		withHistory((adapter) =>
+			adapter.input({ questionId: slug, field: "answer" }, text),
+		);
+	}
+
+	/// Loads the history monitor in the background when the switch is on; every failure leaves the page as it is without it.
+	function startHistory(): void {
+		if (!props.username || !answerHistoryEnabled()) return;
+		const ownerId = props.username;
+		const attemptId = `${props.discipline}/${props.course}/${props.exam}`;
+		try {
+			import("./answer-edit-session")
+				.then((session) =>
+					session.openAnswerEditSession({ ownerId, attemptId }),
+				)
+				.then((adapter) => {
+					if (historyStopped) {
+						adapter.disable("page closed");
+						return;
+					}
+					history = adapter;
+					for (const entry of historyQuestions()) {
+						const text = answers()[entry.slug];
+						withHistory((it) =>
+							it.attach(
+								{ questionId: entry.slug, field: "answer" },
+								typeof text === "string" ? text : "",
+							),
+						);
+					}
+				})
+				.catch(() => {});
+		} catch {
+			// A browser without dynamic imports simply has no history.
+		}
+	}
+
+	/// Sends the history's pending work without waiting for it, as the page is being hidden or closed.
+	function flushHistoryNow(): void {
+		withHistory((adapter) => void adapter.flushFinal());
+	}
+
+	function onVisibilityChange(): void {
+		if (document.visibilityState === "hidden") flushHistoryNow();
+	}
+
+	/// Waits for the history's last flush, never longer than its own ceiling, and never fails.
+	async function flushHistoryFinal(): Promise<void> {
+		try {
+			await history?.flushFinal();
+		} catch {
+			// The history is best effort.
+		}
+	}
+
 	function change(slug: string, type: string, edited: AnswerPayload): void {
 		if (closing()) return;
+		queueAnswer(slug, type, edited);
+		// Only after the answer and its draft are queued, and it cannot throw.
+		recordEdit(slug, type, edited);
+	}
+
+	/// Queues the answer to be saved and keeps its draft; the edit history never takes part in it.
+	function queueAnswer(
+		slug: string,
+		type: string,
+		edited: AnswerPayload,
+	): void {
 		const payload = toSaved(type, edited);
 		setAnswers((current) => ({ ...current, [slug]: payload }));
 		pending.set(slug, payload);
@@ -564,11 +671,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			if (!saved) {
 				setFailure(m.exams_attempt_save_failed());
 			} else {
+				// The history flushes in parallel and is waited for only up to its own ceiling.
+				const historyFlushed = flushHistoryFinal();
 				const { error } = await actions.exam.finish(target);
 				if (error) setFailure(errorMessage(error));
 				// The server decides what follows: awaiting grading, or the results.
 				else {
 					clearDrafts();
+					await historyFlushed;
 					window.location.reload();
 				}
 			}
@@ -592,14 +702,23 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		onCleanup(() => clearInterval(interval));
 		window.addEventListener("beforeunload", warnBeforeUnload);
 		window.addEventListener("online", retryNow);
+		window.addEventListener("pagehide", flushHistoryNow);
+		document.addEventListener("visibilitychange", onVisibilityChange);
 		onCleanup(() => {
 			window.removeEventListener("beforeunload", warnBeforeUnload);
 			window.removeEventListener("online", retryNow);
+			window.removeEventListener("pagehide", flushHistoryNow);
+			document.removeEventListener("visibilitychange", onVisibilityChange);
 		});
 		if (kind() !== "in-progress") clearSettledDrafts();
-		else restoreDrafts();
+		else {
+			startHistory();
+			restoreDrafts();
+		}
 	});
 	onCleanup(() => {
+		historyStopped = true;
+		withHistory((adapter) => adapter.disable("page closed"));
 		for (const timer of timers.values()) clearTimeout(timer);
 		if (retryTimer !== undefined) clearTimeout(retryTimer);
 	});
@@ -625,6 +744,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			return;
 		keepNewerDrafts();
 		setClosing(true);
+		flushHistoryNow();
 		void flushUntilGraceEnds(limit).then((saved) => {
 			if (saved) clearDrafts();
 			else setUndelivered(unsavedNumbers());
