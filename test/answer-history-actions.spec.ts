@@ -5,6 +5,7 @@ import {
 	historyOf,
 	makeWorld,
 	otherAttempt,
+	send,
 	storedField,
 	T0,
 	type World,
@@ -304,6 +305,26 @@ test.describe("the client cannot set the clock or the identity", () => {
 			reason: "deadline",
 		});
 		expect(await historyOf(world)).toBeNull();
+	});
+
+	test("`now` in the inspect body does not make a closed attempt writable", async ({
+		page,
+	}) => {
+		const world = await makeWorld({ startAtT0: true });
+		// Stored while the window was open, through the service and its injected clock.
+		const inside = new Date(T0.getTime() + 10 * 60_000);
+		await send(world, [textItem(world)], inside);
+		await logInAs(page, world.student);
+		const honest = await callOk(page, "answerHistory.inspect", body(world));
+		expect(honest.fields[0]).toMatchObject({ canWrite: false });
+		for (const now of [inside.toISOString(), inside.getTime()]) {
+			const forged = await callOk(
+				page,
+				"answerHistory.inspect",
+				body(world, { now }),
+			);
+			expect(forged.fields[0]).toMatchObject({ canWrite: false });
+		}
 	});
 
 	test("author and attempt metadata in the body change nothing", async ({

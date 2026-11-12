@@ -4,7 +4,7 @@ import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
-import { expect, type Page, test } from "./fixtures";
+import { expect, type Page, type Request, type Route, test } from "./fixtures";
 import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 // R7 against the real exam page: whatever the answer-edit monitor, its
@@ -505,3 +505,192 @@ test("the page reloads into the finished state when the final history flush neve
 	).toBeVisible();
 	expect(errors).toEqual([]);
 });
+
+//
+// R37: the real transport, with the history endpoints misbehaving.
+//
+
+/// The wire format of a successful action result: `devalue`'s flat array, for plain data.
+function devalueBody(value: unknown): string {
+	const nodes: unknown[] = [];
+	const put = (item: unknown): number => {
+		const index = nodes.length;
+		nodes.push(null);
+		if (Array.isArray(item)) {
+			nodes[index] = item.map((entry) => put(entry));
+		} else if (item !== null && typeof item === "object") {
+			nodes[index] = Object.fromEntries(
+				Object.entries(item).map(([key, entry]) => [key, put(entry)]),
+			);
+		} else {
+			nodes[index] = item;
+		}
+		return index;
+	};
+	put(value);
+	return JSON.stringify(nodes);
+}
+
+type Endpoint = "inspect" | "send";
+
+interface ServerFault {
+	/// The endpoints that misbehave; the others reach the real server.
+	endpoints: Endpoint[];
+	respond(route: Route): Promise<void>;
+}
+
+/// An answer to `send` that gives every item of the request the same result.
+function everyItem(result: Record<string, unknown>): ServerFault["respond"] {
+	return (route) => {
+		const items: { question: string; field: string }[] =
+			route.request().postDataJSON()?.fields ?? [];
+		return route.fulfill({
+			status: 200,
+			contentType: "application/json+devalue",
+			body: devalueBody({
+				enabled: true,
+				results: items.map(({ question, field }) => ({
+					question,
+					field,
+					...result,
+				})),
+			}),
+		});
+	};
+}
+
+const answers500: ServerFault["respond"] = (route) =>
+	route.fulfill({
+		status: 500,
+		contentType: "application/json",
+		body: JSON.stringify({
+			type: "AstroActionError",
+			code: "INTERNAL_SERVER_ERROR",
+			message: "boom",
+		}),
+	});
+
+const answersGarbage: ServerFault["respond"] = (route) =>
+	route.fulfill({
+		status: 200,
+		contentType: "application/json+devalue",
+		body: "<<this is not a result>>",
+	});
+
+/// Takes the request and never answers it.
+const neverAnswers: ServerFault["respond"] = () => new Promise<void>(() => {});
+
+const BOTH: Endpoint[] = ["inspect", "send"];
+const SEND: Endpoint[] = ["send"];
+
+const SERVER_FAULTS: Record<string, ServerFault> = {
+	"500 on inspect and send": { endpoints: BOTH, respond: answers500 },
+	"500 on send": { endpoints: SEND, respond: answers500 },
+	"a request that hangs on inspect and send": {
+		endpoints: BOTH,
+		respond: neverAnswers,
+	},
+	"a request that hangs on send": { endpoints: SEND, respond: neverAnswers },
+	"a malformed body on inspect and send": {
+		endpoints: BOTH,
+		respond: answersGarbage,
+	},
+	"a malformed body on send": { endpoints: SEND, respond: answersGarbage },
+	"closed on every item": {
+		endpoints: SEND,
+		respond: everyItem({ kind: "closed", reason: "deadline" }),
+	},
+	"conflict on every item": {
+		endpoints: SEND,
+		respond: everyItem({ kind: "conflict", reason: "base" }),
+	},
+	"retry on every item, forever": {
+		endpoints: SEND,
+		respond: everyItem({ kind: "retry" }),
+	},
+};
+
+/// Routes the history endpoints through `fault`, counting what the page asks and how many sends overlap.
+async function installServerFault(page: Page, fault: ServerFault) {
+	const hits = { inspect: 0, send: 0 };
+	let inFlight = 0;
+	let overlap = 0;
+	await page.route(/_actions\/answerHistory\.(inspect|send)/, async (route) => {
+		const endpoint: Endpoint = route
+			.request()
+			.url()
+			.includes("answerHistory.send")
+			? "send"
+			: "inspect";
+		hits[endpoint]++;
+		if (fault.endpoints.includes(endpoint)) await fault.respond(route);
+		else await route.continue();
+	});
+	const isSend = (request: Request) =>
+		request.url().includes("answerHistory.send");
+	page.on("request", (request) => {
+		if (!isSend(request)) return;
+		inFlight++;
+		overlap = Math.max(overlap, inFlight);
+	});
+	const settled = (request: Request) => {
+		if (isSend(request)) inFlight--;
+	};
+	page.on("requestfinished", settled);
+	page.on("requestfailed", settled);
+	return { hits, overlap: () => overlap };
+}
+
+/// Hides the page and shows it again: one of the moments the page flushes its history.
+async function flushHistory(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		const state = (value: DocumentVisibilityState) =>
+			Object.defineProperty(document, "visibilityState", {
+				configurable: true,
+				get: () => value,
+			});
+		state("hidden");
+		document.dispatchEvent(new Event("visibilitychange"));
+		state("visible");
+	});
+}
+
+for (const [name, fault] of Object.entries(SERVER_FAULTS)) {
+	test(`the student types, saves and finishes with the history server failing: ${name}`, async ({
+		page,
+	}) => {
+		const s = await setup(page);
+		const errors = watchErrors(page);
+		const probe = await installServerFault(page, fault);
+		try {
+			await page.goto(s.url);
+
+			const typingMs = await typeLikeAStudent(page);
+			expect(typingMs).toBeLessThan(TYPING_BUDGET_MS);
+			await expect.poll(() => saved(s)).toBe(TYPED);
+
+			/// The page really reached the failing endpoint, so the pass means it survived it.
+			await expect
+				.poll(
+					async () => {
+						await flushHistory(page);
+						return fault.endpoints.includes("send")
+							? probe.hits.send
+							: probe.hits.inspect;
+					},
+					{ timeout: 10 * SECOND, intervals: [250, 500, 1000] },
+				)
+				.toBeGreaterThan(0);
+
+			const finishMs = await submit(page);
+			expect(finishMs).toBeLessThan(FINISH_BUDGET_MS);
+			await expect.poll(() => finished(s)).toBe(true);
+			await expect(page.getByRole("alert")).toHaveCount(0);
+			/// R26: never two history requests at once.
+			expect(probe.overlap()).toBeLessThanOrEqual(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.unrouteAll({ behavior: "ignoreErrors" });
+		}
+	});
+}
