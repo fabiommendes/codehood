@@ -598,17 +598,19 @@ export async function loggingAnswerHistoryRemoval<R>(
 		measure: (scope: AnswerHistoryScope, username?: string) => Promise<void>,
 	) => Promise<R>,
 ): Promise<R> {
-	let removal: Record<string, unknown> | null = null;
+	const measured: { removal?: Record<string, unknown> | null } = {};
 	const run = (inner: PrismaTx) =>
 		body(inner, async (scope, username) => {
-			removal = await describeRemoval(inner, scope, username);
+			measured.removal = await describeRemoval(inner, scope, username);
 		});
 	// A transaction client has no `$connect`, the client itself does.
 	const result =
 		"$connect" in tx
 			? await (tx as unknown as PrismaClient).$transaction(run)
 			: await run(tx);
-	if (removal) logEvent("answer-history.removed", { reason, ...removal });
+	if (measured.removal) {
+		logEvent("answer-history.removed", { reason, ...measured.removal });
+	}
 	return result;
 }
 

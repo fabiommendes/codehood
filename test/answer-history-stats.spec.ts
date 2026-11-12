@@ -4,6 +4,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
+import type { ResponseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import {
@@ -29,7 +30,7 @@ function bytes(value: unknown): number {
 }
 
 /// What the stored columns of one attempt weigh, summed by hand.
-async function handCounted(responseId: number) {
+async function handCounted(responseId: ResponseId) {
 	const history = await prisma.answerEditHistory.findUniqueOrThrow({
 		where: { responseId },
 		include: { fields: { include: { batches: true, gaps: true } } },
