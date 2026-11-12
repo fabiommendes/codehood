@@ -4,6 +4,12 @@
 
 ### Added
 
+- Remover uma tentativa registra em log uma linha JSON `answer-history.removed`
+  (curso, prova, tentativas, campos, lotes, edits, `byteCount` e `storedBytes`
+  estimado) quando ela tinha histórico de edição, e `pnpm run manage
+  answer-history-stats <curso> [prova] [--json]` imprime o que o histórico
+  ocupa por prova (tentativas, incompletas, edits, bytes, mediana e máximo por
+  tentativa). Só leitura. O gancho de `Course` (remoção de curso) ainda falta.
 - Núcleo independente de histórico de edição de respostas: codec de tuplas
   versionadas, replay UTF-16, agrupamento com estatísticas Welford, lotes
   imutáveis, ACK idempotente e checkpoints recuperáveis entre sessões de relógio.

@@ -66,3 +66,14 @@ Whenever a new command is created, document it in this file.
   current mdq document and its public form. Versions already current are left
   alone; running it again changes nothing. Exits with 1 when a version cannot
   be converted, naming it.
+
+### Answer edit history
+
+`manage answer-history-stats <course> [exam] [--json]`
+: Prints, for each exam of `<course>` (`discipline/instructor_edition`, e.g.
+  `cs101/ada_2026-2`) or only for `[exam]`, how much edit history of answers it
+  holds: attempts, attempts with history, incomplete ones, edits, the bytes the
+  history counts against its limit (`counted bytes`), the bytes it stores
+  (`stored bytes`, an estimate that leaves out indexes and free space of
+  pages), and the median and maximum of `stored bytes` per attempt. The last
+  line is the total. `--json` prints the same as one line of JSON. Read only.

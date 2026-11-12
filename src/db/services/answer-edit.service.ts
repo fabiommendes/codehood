@@ -8,6 +8,8 @@
  * answer. Decoding, validation, replay and hashing run outside any transaction;
  * the one that writes only compares the revision it saw, inserts and counts.
  */
+
+import { SYSTEM } from "@/auth/actor";
 import { ensurePerm } from "@/auth/permissions";
 import {
 	MAX_ANSWER_HISTORY_ATTEMPT_BYTES,
@@ -17,10 +19,12 @@ import {
 	MAX_ANSWER_HISTORY_REQUEST_BYTES,
 	MAX_ANSWER_HISTORY_TEXT_BYTES,
 } from "@/core/constants";
-import { InvalidData, NotFound } from "@/core/error";
+import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type {
 	AnswerEditFieldId,
 	AnswerEditHistoryId,
+	CourseRef,
+	ExamId,
 	QuestionRefId,
 	ResponseId,
 } from "@/core/schemas";
@@ -63,6 +67,8 @@ import {
 	isHistoryField,
 } from "@/services/answer-history";
 import { attemptDeadline, viewerTiming } from "@/services/exam-state";
+import { courseHref } from "@/urls";
+import { logEvent } from "@/utils/log";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { courseRefMatch } from "../utils";
 import {
@@ -327,8 +333,328 @@ export const makeAnswerEditService = defineService()(() => {
 		},
 	});
 
-	return { inspect, append, summary };
+	/**
+	 * Measures the edit history of a course's exams, one line per exam and a total.
+	 *
+	 * Reads only, and only for `SYSTEM`. Sizes are the estimate of
+	 * {@link measureAnswerHistoryByAttempt}; the median and the maximum are
+	 * over the attempts that have a history.
+	 *
+	 * @throws {@link NotAllowed} If the actor is not `SYSTEM`.
+	 * @throws {@link NotFound} If the course, or the exam named, does not exist.
+	 */
+	const stats = op({
+		transaction: false,
+		run: async (
+			tx: PrismaTx,
+			input: AnswerHistoryStatsRef,
+			opts: ServiceOptsWithoutTx,
+		): Promise<AnswerHistoryReport> => {
+			if (opts.actor !== SYSTEM) throw new NotAllowed("response.read-edits");
+			const course = await tx.course.findFirst({
+				where: courseRefMatch(input.course),
+				select: { id: true },
+			});
+			if (!course) throw new NotFound("course");
+			const exams = await tx.exam.findMany({
+				where: {
+					courseId: course.id,
+					...(input.exam === undefined ? {} : { slug: input.exam }),
+				},
+				orderBy: { slug: "asc" },
+				select: { id: true, slug: true },
+			});
+			if (input.exam !== undefined && exams.length === 0) {
+				throw new NotFound("exam");
+			}
+
+			const lines: AnswerHistoryExamStats[] = [];
+			const every: AnswerHistoryAttemptStats[] = [];
+			let attempts = 0;
+			for (const exam of exams) {
+				const count = await tx.response.count({ where: { examId: exam.id } });
+				const rows = await measureAnswerHistoryByAttempt(tx, {
+					exam: exam.id,
+				});
+				lines.push({ exam: exam.slug, ...summarize(count, rows) });
+				every.push(...rows);
+				attempts += count;
+			}
+			return { exams: lines, total: summarize(attempts, every) };
+		},
+	});
+
+	return { inspect, append, summary, stats };
 });
+
+// Measuring the history ---------------------------------------------------
+
+/// Which attempts to measure: the given ones, every one of a user, or every one at an exam.
+export type AnswerHistoryScope =
+	| { responseIds: ResponseId[] }
+	| { author: string }
+	| { exam: ExamId };
+
+/// What the history of one attempt holds.
+export interface AnswerHistoryAttemptStats {
+	responseId: ResponseId;
+	examId: ExamId;
+	fields: number;
+	batches: number;
+	gaps: number;
+	/// `AnswerEditHistory.editCount`.
+	edits: number;
+	/// `AnswerEditHistory.byteCount`, what the history counts against its limit.
+	countedBytes: number;
+	/// Bytes of the columns the history stores, summed in the database.
+	storedBytes: number;
+	/// True when the attempt or one of its fields reached a limit.
+	incomplete: boolean;
+}
+
+/// The sum of {@link AnswerHistoryAttemptStats} over the attempts of a scope.
+export interface AnswerHistoryStats {
+	/// Attempts that have a history.
+	attempts: number;
+	fields: number;
+	batches: number;
+	gaps: number;
+	edits: number;
+	countedBytes: number;
+	storedBytes: number;
+}
+
+/// What `stats` measures.
+export interface AnswerHistoryStatsRef {
+	course: CourseRef;
+	/// An exam slug; every exam of the course when omitted.
+	exam?: string;
+}
+
+/// The history of one exam.
+export interface AnswerHistoryExamStats {
+	exam: string;
+	/// Every attempt, with or without history.
+	attempts: number;
+	withHistory: number;
+	incomplete: number;
+	fields: number;
+	batches: number;
+	gaps: number;
+	edits: number;
+	countedBytes: number;
+	storedBytes: number;
+	/// Over the attempts that have a history, rounded to a byte.
+	medianStoredBytes: number;
+	maxStoredBytes: number;
+}
+
+/// What `stats` answers: a line per exam and the total.
+export interface AnswerHistoryReport {
+	exams: AnswerHistoryExamStats[];
+	total: Omit<AnswerHistoryExamStats, "exam">;
+}
+
+/// SQL: the bytes of the text and JSON columns of batch `b`.
+const SIZE_OF_BATCH = `LENGTH(CAST(b.edits AS BLOB))
+	+ COALESCE(LENGTH(CAST(b.baseText AS BLOB)), 0)
+	+ COALESCE(LENGTH(CAST(b.gapBefore AS BLOB)), 0)
+	+ LENGTH(CAST(b.contentHash AS BLOB))
+	+ LENGTH(CAST(b.batchId AS BLOB))
+	+ LENGTH(CAST(b.sessionId AS BLOB))`;
+
+/**
+ * Measures, per attempt, the edit history `scope` selects, counting in SQL so no batch is loaded.
+ *
+ * `storedBytes` is an estimate: the bytes of the text and JSON columns of the
+ * batches (`edits`, `baseText`, `gapBefore`, `contentHash`, `batchId`,
+ * `sessionId`) plus the text of the anchors. It leaves out numbers, dates,
+ * indexes and the free space of database pages. Attempts without a history
+ * are not returned.
+ */
+export async function measureAnswerHistoryByAttempt(
+	tx: PrismaTx,
+	scope: AnswerHistoryScope,
+): Promise<AnswerHistoryAttemptStats[]> {
+	let where: string;
+	let params: (string | number)[];
+	if ("responseIds" in scope) {
+		if (scope.responseIds.length === 0) return [];
+		where = `h.responseId IN (${scope.responseIds.map(() => "?").join(", ")})`;
+		params = scope.responseIds;
+	} else if ("author" in scope) {
+		where = "r.authorId = ?";
+		params = [scope.author];
+	} else {
+		where = "r.examId = ?";
+		params = [scope.exam];
+	}
+
+	const rows = await tx.$queryRawUnsafe<Record<string, number | bigint>[]>(
+		`SELECT
+			h.responseId AS responseId,
+			r.examId AS examId,
+			h.editCount AS edits,
+			h.byteCount AS countedBytes,
+			(h.incompleteAt IS NOT NULL OR EXISTS (
+				SELECT 1 FROM AnswerEditField f
+				WHERE f.historyId = h.id AND f.incompleteAt IS NOT NULL
+			)) AS incomplete,
+			(SELECT COUNT(*) FROM AnswerEditField f WHERE f.historyId = h.id) AS fields,
+			(SELECT COUNT(*) FROM AnswerEditBatch b
+				JOIN AnswerEditField f ON f.id = b.fieldId
+				WHERE f.historyId = h.id) AS batches,
+			(SELECT COUNT(*) FROM AnswerEditGap g
+				JOIN AnswerEditField f ON f.id = g.fieldId
+				WHERE f.historyId = h.id) AS gaps,
+			(SELECT COALESCE(SUM(LENGTH(CAST(f.text AS BLOB))), 0)
+				FROM AnswerEditField f WHERE f.historyId = h.id)
+			+ (SELECT COALESCE(SUM(${SIZE_OF_BATCH}), 0) FROM AnswerEditBatch b
+				JOIN AnswerEditField f ON f.id = b.fieldId
+				WHERE f.historyId = h.id) AS storedBytes
+		FROM AnswerEditHistory h
+		JOIN ResponseRef r ON r.id = h.responseId
+		WHERE ${where}
+		ORDER BY h.responseId`,
+		...params,
+	);
+	return rows.map((row) => ({
+		responseId: Number(row.responseId) as ResponseId,
+		examId: Number(row.examId) as ExamId,
+		fields: Number(row.fields),
+		batches: Number(row.batches),
+		gaps: Number(row.gaps),
+		edits: Number(row.edits),
+		countedBytes: Number(row.countedBytes),
+		storedBytes: Number(row.storedBytes),
+		incomplete: Number(row.incomplete) !== 0,
+	}));
+}
+
+/**
+ * Measures the edit history `scope` selects, summed over its attempts.
+ *
+ * An estimate, as in {@link measureAnswerHistoryByAttempt}.
+ */
+export async function measureAnswerHistory(
+	tx: PrismaTx,
+	scope: AnswerHistoryScope,
+): Promise<AnswerHistoryStats> {
+	return totalOf(await measureAnswerHistoryByAttempt(tx, scope));
+}
+
+/// Sums attempts into {@link AnswerHistoryStats}.
+function totalOf(rows: AnswerHistoryAttemptStats[]): AnswerHistoryStats {
+	const sum = (pick: (row: AnswerHistoryAttemptStats) => number) =>
+		rows.reduce((acc, row) => acc + pick(row), 0);
+	return {
+		attempts: rows.length,
+		fields: sum((row) => row.fields),
+		batches: sum((row) => row.batches),
+		gaps: sum((row) => row.gaps),
+		edits: sum((row) => row.edits),
+		countedBytes: sum((row) => row.countedBytes),
+		storedBytes: sum((row) => row.storedBytes),
+	};
+}
+
+/// The line of an exam: `attempts` in all, `rows` the ones with a history.
+function summarize(
+	attempts: number,
+	rows: AnswerHistoryAttemptStats[],
+): Omit<AnswerHistoryExamStats, "exam"> {
+	const sizes = rows.map((row) => row.storedBytes).sort((a, b) => a - b);
+	const middle = Math.floor(sizes.length / 2);
+	let median = sizes[middle] ?? 0;
+	if (sizes.length > 0 && sizes.length % 2 === 0) {
+		median = Math.round(((sizes[middle - 1] ?? 0) + median) / 2);
+	}
+	const { attempts: withHistory, ...totals } = totalOf(rows);
+	return {
+		...totals,
+		attempts,
+		withHistory,
+		incomplete: rows.filter((row) => row.incomplete).length,
+		medianStoredBytes: median,
+		maxStoredBytes: sizes.at(-1) ?? 0,
+	};
+}
+
+/**
+ * Runs `body` in a transaction, measuring the history it is about to remove,
+ * and logs `answer-history.removed` once the transaction has committed.
+ *
+ * `body` calls `measure` before it deletes. Nothing is logged when the scope
+ * held no history. A measurement that fails never stops the removal: the line
+ * carries `error` instead of the numbers. When the caller already holds a
+ * transaction, `body` runs in it and the line is logged when `body` returns,
+ * before that transaction commits.
+ */
+export async function loggingAnswerHistoryRemoval<R>(
+	tx: PrismaTx,
+	reason: "response-delete" | "user-delete",
+	body: (
+		tx: PrismaTx,
+		measure: (scope: AnswerHistoryScope, username?: string) => Promise<void>,
+	) => Promise<R>,
+): Promise<R> {
+	let removal: Record<string, unknown> | null = null;
+	const run = (inner: PrismaTx) =>
+		body(inner, async (scope, username) => {
+			removal = await describeRemoval(inner, scope, username);
+		});
+	// A transaction client has no `$connect`, the client itself does.
+	const result =
+		"$connect" in tx
+			? await (tx as unknown as PrismaClient).$transaction(run)
+			: await run(tx);
+	if (removal) logEvent("answer-history.removed", { reason, ...removal });
+	return result;
+}
+
+/// The fields of the removal line: `null` when there is no history, `{ error }` when the measurement failed.
+async function describeRemoval(
+	tx: PrismaTx,
+	scope: AnswerHistoryScope,
+	username?: string,
+): Promise<Record<string, unknown> | null> {
+	const who = username === undefined ? {} : { username };
+	try {
+		const rows = await measureAnswerHistoryByAttempt(tx, scope);
+		if (rows.length === 0) return null;
+		const exams = await tx.exam.findMany({
+			where: { id: { in: [...new Set(rows.map((row) => row.examId))] } },
+			select: {
+				slug: true,
+				course: {
+					select: {
+						disciplineSlug: true,
+						instructorId: true,
+						editionSlug: true,
+					},
+				},
+			},
+		});
+		const only = exams.length === 1 ? exams[0] : undefined;
+		return {
+			...who,
+			course: only
+				? courseHref({
+						discipline: only.course.disciplineSlug,
+						instructor: only.course.instructorId,
+						edition: only.course.editionSlug,
+					}).slice(1)
+				: null,
+			exam: only?.slug ?? null,
+			...totalOf(rows),
+		};
+	} catch (error) {
+		return {
+			...who,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
 
 // Private utilities -------------------------------------------------------
 
