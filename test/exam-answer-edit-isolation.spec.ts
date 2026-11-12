@@ -226,7 +226,13 @@ async function submit(page: Page): Promise<number> {
 		.getByRole("button", { name: /submit|confirm/i })
 		.click();
 	expect((await response).ok()).toBe(true);
-	return Date.now() - start;
+	const took = Date.now() - start;
+	/// The page reloads on its own after `finish`; ending the test with that request in flight would race the next reset.
+	await expect(page.getByRole("textbox")).toHaveCount(0, {
+		timeout: FINISH_BUDGET_MS,
+	});
+	await page.waitForLoadState("load");
+	return took;
 }
 
 /// The history the page recorded in IndexedDB, as the texts of its records.
