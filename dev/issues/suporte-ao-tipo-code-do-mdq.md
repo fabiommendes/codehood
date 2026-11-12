@@ -37,6 +37,10 @@ continua como está.
   (`dev/rfc/ambiente-de-execucao-no-cliente.md`) precisa produzir esse
   relatório no formato esperado e ele precisa ser gravado com a submissão.
   `scoreResponse` recebe o argumento `grading` para esse tipo.
+- Monitor de edição: o histórico de edição das respostas
+  (`dev/rfc/historico-de-edicao-de-respostas-abertas.md`) segue hoje só questões
+  `essay`. Ao aceitar `code`, a página de prova deve alimentá-lo também com as
+  edições da resposta de código.
 - Correção: a página de correção deve mostrar o gabarito (`referenceSolution`),
   a rubrica completa (`fullRubric`), e deixar o professor marcar os itens
   manuais. Uma resposta sem relatório fica pendente (`NotAutoGradable`).

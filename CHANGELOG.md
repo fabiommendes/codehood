@@ -9,7 +9,7 @@
   imutáveis, ACK idempotente e checkpoints recuperáveis entre sessões de relógio.
   Persistência transacional IndexedDB de texto/checkpoint/outbox e coordenador
   por tentativa com envio agregado, retry, reconciliação, transferência de
-  ownership e fallback de texto com lacuna explícita. Validados com transporte
+  ownership e lacuna explícita. Validados com transporte
   injetado e storage browser real, sem endpoint ou integração com o salvamento
   de provas. Adaptador de isolamento (`AnswerEditAdapter`): nenhuma falha do
   monitor, do storage ou do transporte atrasa ou impede digitar, salvar e
@@ -17,8 +17,10 @@
   atrás de uma chave desligada por padrão (`localStorage["codehood.answerHistory"]
   = "on"`), com carga adiada do código e histórico só local, sem endpoint; a
   mesma injeção de falha roda contra a página real (`exam-answer-edit-isolation`).
-  Adaptadores de editor ausentes. Remoção física completa de fallback
-  concorrente com logout permanece pendente.
+  Adaptadores de editor ausentes. O monitor segue só questões `essay` (inclui a
+  redação de código) e não tem fallback em `localStorage`: o rascunho local da
+  página recupera o texto, e uma queda do navegador perde só histórico ainda não
+  persistido (lacuna). As menções ao fallback nas entradas abaixo ficaram obsoletas.
   O coordenador nunca bloqueia o campo: abre sempre com um handle, reconcilia
   com o servidor em segundo plano e, em divergência, adota nova base com lacuna
   registrada em vez de exigir escolha do aluno.

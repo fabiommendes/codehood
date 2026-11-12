@@ -43,6 +43,39 @@ A primeira entrega não atribui probabilidade de fraude nem aplica penalidades.
 - Este RFC desenha contratos. Não implementa a classe, os componentes, schema ou
   mudanças na biblioteca MDQ.
 
+### Decidido em 2026-11-11
+
+- Escopo (Q2): `essay` e código. Respostas curtas (`short-answer`) e lacunas
+  (`fill-in`) ficam de fora. A página segue só questões `essay`, o que inclui a
+  redação de código de `CodeEssayAnswer`. O tipo `code` do mdq entra no escopo
+  quando o Codehood passar a aceitá-lo.
+- Acesso e retenção (Q3): só quem corrige a prova lê o histórico; o aluno não vê o
+  próprio na primeira versão. O servidor o guarda enquanto a tentativa existir e o
+  apaga com ela. A cópia no navegador do aluno é temporária: apagada quando o
+  servidor a confirma e quando a tentativa é entregue.
+- O sistema não mostra aviso da coleta ao aluno. Informar os alunos é tarefa do
+  instrutor.
+- Indicador (Q6): o aluno não vê nada quando o monitor falha. As lacunas só
+  aparecem para o revisor.
+- Fallback local (Q8): o monitor não tem `localStorage` próprio. O rascunho local
+  da página (`browserDraftStore`) recupera o texto. Uma queda do navegador perde o
+  histórico ainda não persistido, que vira lacuna, nunca a resposta.
+- Chave (R6): só por prova, um campo em `Exam`, ligado por padrão. O instrutor o
+  desliga. Não há chave global do sistema. Desligar com a prova em andamento
+  precisa alcançar as páginas já abertas; proposta: a resposta de
+  `actions.exam.answer` informa a página, que chama `disable()`. O histórico já
+  coletado é mantido.
+- Tela do instrutor, primeira versão: resumo por resposta (tempo ativo, inserções
+  grandes, lacunas, horário da primeira e da última edição), sem replay. Limite:
+  hoje o monitor não distingue colagem de digitação, então uma inserção grande é
+  só um indício.
+- Rich text (Q1): fora do escopo; não existe questão de rich text.
+- Limites (Q4): limites conservadores por lote e por tentativa. Estourar um vira
+  lacuna explícita, nunca erro na resposta. Sem checkpoints na primeira versão.
+- Props de injeção de editor no mdq (Q7): desnecessárias para `essay`, pois a
+  página alimenta o monitor pelo próprio `change()`. Voltam só se quisermos
+  detectar colagem.
+
 ## Prioridade: a resposta não depende do monitor
 
 A resposta do aluno chegar ao servidor vale mais que preservar o monitoramento.
@@ -63,11 +96,11 @@ Nenhum aluno perde a prova por problema técnico do monitor.
   aceitar lote de histórico atrasado dentro de uma janela curta, registrando o
   atraso.
 - R5. Nenhum estado do monitor (conflito, lacuna, storage indisponível) abre
-  diálogo ou bloqueia a prova. No máximo um indicador discreto. Divergência com
+  diálogo, indicador ou bloqueio ao aluno. Divergência com
   outra aba ou dispositivo resolve-se sozinha: nova base a partir do texto do
   editor, com lacuna registrada, sem escolha do aluno.
-- R6. Chave para desligar o monitoramento por prova, utilizável com a prova em
-  andamento.
+- R6. Chave para desligar o monitoramento por prova (campo em `Exam`, ligado por
+  padrão), utilizável com a prova em andamento.
 - R7. Critério de aceite da integração: teste de injeção de falha em que o monitor
   lança em toda chamada, o storage falha e o transporte fica pendurado ou devolve
   erro, e mesmo assim o aluno digita, salva e entrega.
@@ -77,11 +110,11 @@ Nenhum aluno perde a prova por problema técnico do monitor.
 | Regra | Estado |
 | :---- | :----- |
 | R1 | Pendente: depende do endpoint do histórico, que não existe. Hoje nada do monitor toca `Submission`. |
-| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Ligada a `ExamAttempt.tsx` (`recordEdit`) atrás da chave local. |
+| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Ligada a `ExamAttempt.tsx` (`recordEdit`) atrás da chave local, só para questões `essay`. |
 | R3 | Implementada e testada: `attach` e `input` nunca esperam e o `open` roda adiado. |
 | R4 | Implementada e testada: `flushFinal` resolve no teto (3 s por padrão). Falta o servidor aceitar lote atrasado. |
-| R5 | Parcial: o coordenador rebaseia sozinho e o adaptador não abre diálogo, mas não há indicador discreto. |
-| R6 | Implementada e testada: `AnswerEditAdapter.disable()` e `enabled: false`. A página liga o monitor só com `localStorage["codehood.answerHistory"] = "on"`; falta a configuração por prova, que virá do servidor. |
+| R5 | Implementada: o coordenador rebaseia sozinho e nada do monitor aparece para o aluno. A lacuna só é mostrada ao revisor, quando houver tela. |
+| R6 | Implementada e testada: `AnswerEditAdapter.disable()` e `enabled: false`. A página liga o monitor só com `localStorage["codehood.answerHistory"] = "on"`; falta o campo por prova em `Exam` e o aviso às páginas abertas (ver "Decidido em 2026-11-11"). |
 | R7 | Implementada e testada em `test/answer-edit-isolation.spec.ts` com um `<textarea>` ligado como a página de prova seria. Repetida contra a página real em `test/exam-answer-edit-isolation.spec.ts` (IndexedDB que lança, que pendura, cota excedida, exceção no monitor, chunk que não carrega, remontagem do campo no prazo, reload). |
 
 ### Contrato do adaptador
@@ -118,7 +151,7 @@ Implementado em `src/services/answer-edits/coordinator.ts`.
 
 - `recover(field, initialText)` e `register(field, handle)` devolvem sempre
   `{ handle }`. Não há estado sem handle: nem conflito, nem texto apenas, nem
-  indisponível. O texto vem do estado local (checkpoint ou fallback) e, na falta
+  indisponível. O texto vem do estado local (checkpoint) e, na falta
   dele, de `initialText`, que o chamador tira do canal da resposta. Com `register`
   o texto do editor vale mais que o estado guardado.
 - Nenhum `open` espera rede. Falha de leitura de storage vira lacuna, não exceção.
@@ -136,7 +169,7 @@ Implementado em `src/services/answer-edits/coordinator.ts`.
   do editor é o do campo anterior já confirmado.
 - Chamadas de storage (`read`, `commit`) têm teto (`storageTimeoutMs`, 5 s, pelo
   agendador injetado). Estourar o teto cai no caminho de storage indisponível:
-  lacuna e fallback de texto.
+  lacuna (`unavailable`); a resposta não depende disso.
 - Divergência (base, recibo ou texto) ou resultado `conflict` do envio rebaseiam:
   `AnswerEditMonitor.rebase` adota o texto atual como nova base na revisão e
   sequência do servidor e descarta a história pendente. `FieldStatus.historyGap`
@@ -147,8 +180,8 @@ Implementado em `src/services/answer-edits/coordinator.ts`.
 - Sobram `closed`/`canWrite: false` (prazo): o campo continua editável e salvo
   localmente, só não envia.
 
-Pendência: o fallback de texto em `localStorage` pode perder a razão de existir se
-o rascunho local de respostas cobrir todas as questões de texto. Decisão em aberto.
+O monitor não tem armazenamento de texto próprio além do IndexedDB: o texto da
+resposta é recuperado pelo rascunho local da página (`browserDraftStore`).
 
 ## Estado atual
 
@@ -451,7 +484,8 @@ não heap nem latência de edição.
 
 O registro principal inteiro continua limitado a 2 MiB, incluindo texto,
 checkpoint e outbox. Pendências offline grandes não são truncadas: a gravação
-principal é recusada e o fallback salva a resposta com `text-only` e `historyGap`.
+principal é recusada e o campo passa a `unavailable` com `historyGap`; o texto
+continua no rascunho da página.
 O envio não depende da gravação principal: o coordenador tenta persistir e envia
 o lote congelado mesmo se o commit falhar (teto, IndexedDB indisponível, quota),
 sem declarar durabilidade local enquanto isso. Depois do ACK o checkpoint encolhe
@@ -481,6 +515,9 @@ metadados de entrada quando disponíveis sem contar uma mudança duas vezes.
 
 ### Rich text
 
+Fora do escopo (decidido em 2026-11-11): não existe questão de rich text. O que
+segue vale se ela vier a existir.
+
 A escolha de biblioteca e do documento canônico precede sua implementação.
 `textContent` não basta: alterar negrito, links ou listas pode não alterar o texto.
 
@@ -508,13 +545,13 @@ real devem ser medidas; há uma janela residual de perda e o navegador não gara
 durabilidade contra toda falha de energia. Exportar checkpoint não fecha o edit:
 a frequência de persistência não deve alterar os agrupamentos de digitação.
 
-`localStorage` pode ser fallback de recuperação somente do texto mais recente e
-de metadados mínimos, não do histórico inteiro. É síncrono, tem quota limitada e
-reescrever JSON crescente bloquearia a interface. Falha de IndexedDB não autoriza
-truncar o histórico silenciosamente: indicar captura incompleta. Antes de adotar o
-fallback, integrar a política ao rascunho de código existente; não manter dois
-rascunhos concorrentes para o mesmo campo. Se a gravação local também falhar, avisar
-explicitamente que a recuperação depende do último salvamento no servidor.
+O monitor não tem fallback em `localStorage`. A página de prova já guarda um
+rascunho local de cada resposta digitada (`browserDraftStore`, em
+`src/components/exam/code-draft.ts`), que recupera o texto; duplicá-lo no monitor
+criaria dois rascunhos concorrentes para o mesmo campo. Falha de IndexedDB não
+autoriza truncar o histórico silenciosamente: o campo vira lacuna. Consequência
+aceita: uma queda do navegador perde o histórico ainda não persistido (vira
+lacuna), nunca a resposta.
 
 Identificar registros por usuário, tentativa, questão e campo. Isolar contas,
 estabelecer TTL e remover dados locais no logout e após entrega confirmada, de
@@ -529,7 +566,7 @@ restaurar e reenviar idempotentemente. Se houver divergência com outro disposit
 ou aba, abrir nova base a partir do texto do editor e registrar lacuna, sem
 diálogo (R5). O histórico nunca decide qual resposta vale.
 
-Quando só o texto puder ser recuperado, preservá-lo como rascunho e registrar uma
+Quando só o texto puder ser recuperado (pelo rascunho da página), registrar uma
 lacuna no histórico. A recuperação não estende o prazo de entrega: depois do
 encerramento, apresentar o texto e o status sem contornar a regra do servidor.
 
@@ -585,6 +622,10 @@ limite gera estado explícito de histórico incompleto; não truncar silenciosam
 
 ## Integração futura com MDQ
 
+O tipo `code` do mdq ainda é recusado pelo Codehood (ver
+`dev/issues/suporte-ao-tipo-code-do-mdq.md`). Quando passar a ser aceito, o
+monitor deve cobri-lo, como cobre o `essay` de código.
+
 Adicionar pontos de extensão para editores de texto e código arbitrários no
 renderer, preservando os componentes padrão quando nenhuma extensão for passada.
 O renderer conhece somente o contrato de editor; não conhece `AnswerEditMonitor`.
@@ -604,8 +645,11 @@ RFC. A mudança terá plano e testes próprios no repositório da biblioteca.
 
 ## Privacidade e interpretação
 
-Informar a coleta ao aluno, restringir acesso aos responsáveis pela avaliação e
-definir retenção. O histórico pode guardar texto que o aluno apagou. Não coletar
+Só quem corrige a prova lê o histórico; o aluno não vê o próprio na primeira
+versão. O sistema não mostra aviso ao aluno: informar a coleta é tarefa do
+instrutor. O servidor guarda o histórico enquanto a tentativa existir e o apaga
+com ela. A cópia no navegador é temporária: apagada quando o servidor a confirma e
+quando a tentativa é entregue. O histórico pode guardar texto que o aluno apagou. Não coletar
 clipboard geral, outras janelas, teclas fora do campo ou dados de outros sites.
 
 A tela de revisão distingue eventos observados, horários de recebimento e lacunas.
@@ -623,7 +667,7 @@ Não criar impressão de precisão que os dados não suportam.
 - Coleta repetida, edição durante envio, perda de ACK, retry, reload, desmontagem,
   falha de armazenamento e confirmação fora de ordem sem perda de dados.
 - Recuperação após encerramento abrupto sem eventos de unload, gravação durante
-  digitação contínua, fallback sem histórico, troca de usuário, expiração e
+  digitação contínua, troca de usuário, expiração e
   reabertura após o prazo. Preservar texto não significa autorizar nova entrega.
 - Autorização, prazo, reuso malicioso de batchId, limites e conflito entre abas.
 - Replay com checkpoint e histórico incompleto.
@@ -690,10 +734,9 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
   locais respeitam a espera máxima e recuperam o último checkpoint concluído.
 - Gravações assíncronas finalizando fora de ordem não fazem um snapshot antigo
   substituir o novo. Abort de transação não deixa texto e outbox incompatíveis.
-- Quota excedida, IndexedDB indisponível e fallback localStorage também falhando:
-  edição continua, aviso é observável e resposta não é declarada salva localmente.
-- Fallback recupera texto vazio e texto não vazio; indica lacuna, sem inventar
-  cadência. Histórico não confirmado sobrevive mesmo se texto já igual ao servidor.
+- Quota excedida e IndexedDB indisponível: edição continua, a lacuna é observável
+  e o histórico não é declarado salvo localmente.
+- Histórico não confirmado sobrevive mesmo se o texto já for igual ao do servidor.
 - Logout, troca de usuário e TTL não expõem rascunho de outra conta. Callback
   assíncrono antigo após logout não recria dados removidos da sessão encerrada.
 - Rascunho local divergente do servidor resolve-se sem escolha do aluno (nova base,
@@ -734,19 +777,10 @@ como aprovados. Injetar relógio e aleatoriedade; não usar sleeps.
 
 ## Perguntas abertas
 
-- Q1. Qual biblioteca de rich text e qual representação canônica preservam o
-  documento sem amplificação excessiva de diffs?
-- Q2. Monitorar inicialmente somente essays ou também campos curtos e lacunas?
-  O identificador de campo permite ambos, mas o escopo inicial ainda será fechado.
-- Q3. Qual retenção, quem pode consultar e como o aluno acessa o próprio histórico?
-- Q4. Quais limites por edit, lote e tentativa e qual frequência de checkpoints?
 - Q5. Respondida: tempos são milissegundos inteiros. O monitor arredonda com
   `Math.round` a origem da sessão e todo `atMs` recebido (função monótona, então
   ordem e empates se preservam); o codec e o checkpoint exigem inteiros seguros.
   Média e M2 dos intervalos continuam em ponto flutuante.
-- Q6. Qual indicador discreto, se algum, mostra ao aluno que parte do histórico
-  não foi capturada? A reconciliação em si é automática (R5); resta o que o
-  revisor vê e se o aluno é informado.
-- Q8. O `localStorage` do monitor continua necessário se o rascunho local de
-  respostas cobrir todas as questões de texto?
-- Q7. Quais props finais de injeção de editores serão aceitas pela biblioteca MDQ?
+
+As demais perguntas (Q1 a Q4 e Q6 a Q8) foram decididas em 2026-11-11, ver
+"Decidido".
