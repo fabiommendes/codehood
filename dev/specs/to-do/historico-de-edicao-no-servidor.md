@@ -644,6 +644,72 @@ paralelo.
   do maior lote permitido (meta: menos de 50 ms fora da transação) e duração da
   transação de escrita. Se a meta não fechar, baixar os limites de R17 e anotar
   aqui os valores medidos.
+
+  **Resultado (2026-11-12).** Máquina de 12 núcleos, 32 GB, ext4 em NVMe. Os
+  bancos de teste ficam em `/dev/shm` (tmpfs); onde há "disco", o banco ficou
+  em `~/.cache`, com o `fsync` de cada commit. Outro processo (python, uns 12 GB
+  e 2 núcleos) rodou na máquina durante as medições: os valores são pessimistas.
+  `test/answer-edit-load.spec.ts` não existe; os dados vêm de um digitador
+  simulado (semente fixa) que alimenta o `AnswerEditMonitor` real, com envio a
+  cada 55 a 65 s, e que grava pelo `append` real. Script:
+  `scripts/measure-answer-history.ts` (fora de qualquer suíte; ver o cabeçalho).
+  Valores como mediana (p95). `byteCount` é a soma dos lotes como R18 a conta;
+  "páginas" é o que as quatro tabelas e seus índices ocupam no SQLite.
+
+  | Medida | Método | Valor |
+  | :-- | :-- | :-- |
+  | (a) redação de 300 palavras, 38 wpm | 30 sementes | 7,8 min; 128 edits (158); `byteCount` 17,9 KiB (20,8); páginas 12 KiB (16); 138 KiB/h |
+  | (b) código de 60 linhas, 3 colagens | 30 sementes | 15 min; 274 edits (319); `byteCount` 38,7 KiB (49,9); páginas 24 KiB (32); 154 KiB/h |
+  | (c) prova de 88 min, 5 abertas, ativo | 30 sementes | 751 edits (831); `byteCount` 111 KiB (126); páginas 64 KiB (76); 76 KiB/h |
+  | (e) prova pesada (digitação contínua, 30% de revisões, 6% de erros) | 30 sementes | 1.567 edits (1.771); `byteCount` 198 KiB (244); páginas 128 KiB (144); 135 KiB/h |
+  | (d) envelope do RFC (10 edits/s sem agrupar, 90 min) | 3 sementes | 53.990 edits; `byteCount` 3.821 KiB, 93,5% dos 4 MiB; páginas 1.504 KiB |
+  | Turma de 100, `byteCount` (páginas) | extrapolação | (a) 1,8 (1,2) MiB; (b) 3,8 (2,3); (c) 10,9 (6,3); (e) 19,4 (12,5); (d) 373 (147). Para 250 alunos, multiplique por 2,5 |
+  | Parcela da `snapshot` no `byteCount` | 30 sementes | 48% a 56% nos perfis normais, 64% em (d) |
+  | CPU por lote fora da transação, lote típico (17 edits, 2,2 KB) | 164 lotes do perfil (a) x 20 | 0,026 ms (0,046) |
+  | CPU por lote, 5.000 edits de 1 caractere sobre 120 KB (249 a 367 KiB) | 24 lotes x 15 | 64 a 66 ms (68 a 72), 62 deles no replay. **Meta de 50 ms não fecha** |
+  | CPU por lote, 5.000 edits de 50 caracteres sobre 60 KB (434 a 492 KiB) | 18 lotes x 15 | 37 a 38 ms (41 a 44) |
+  | CPU por lote, 5.000 edits de 1 caractere sobre 4 KB | 24 lotes x 15 | 6,9 ms (10) |
+  | `append` inteiro, lote típico | 83 lotes, service | tmpfs 2,9 ms (4,8); disco 4,3 ms (10) |
+  | Transação de `append`, lote típico | idem, do `$transaction` ao commit | tmpfs 1,4 ms (2,4); disco 2,7 ms (5,7) |
+  | Transação de `append`, maior lote | 24 e 18 lotes | tmpfs 19 a 20 ms (22 a 35); disco 21 a 22 ms (28 a 29) |
+  | `exam.answer` com 100 alunos no mesmo instante, com e sem um `append` cada | service, 8 rodadas, tmpfs | 182 ms (344) sem; 270 ms (480) com (+48%). 10 alunos: 22 e 28 ms; 50: 84 e 127; 250: 576 e 784 |
+  | Idem, banco em disco | idem | 100 alunos: 310 ms (904) sem; 387 ms (896) com. 250: 830 e 1.166 |
+  | Idem, por HTTP contra o servidor de teste | 8 rodadas, cliente na mesma máquina | 100 alunos: 286 ms (477) sem; 433 ms (710) com (+52%). 10: 32 e 55; 50: 144 e 208 |
+  | `exam.answer` com tráfego de histórico a 60 vezes o ritmo real | service, 3 x (4 s sem, 4 s com), 250 alunos | tmpfs 3,7 ms (6,5) sem; 4,5 ms (8,2) com. Disco 4,7 e 5,8. Sem efeito mensurável com 10, 50 e 100 |
+  | Todos os alunos voltam de uma queda com 5.000 edits pendentes | service, tmpfs | 100 alunos: 2,7 s para gravar tudo, um `exam.answer` espera 0,8 s; 250: 7,3 s e 2,0 s |
+  | Tempo extra na entrega, monitor ligado, servidor normal | navegador, 10 entregas por condição | 0 ms: do `finish` ao recarregamento 62 ms contra 60 ms sem monitor (clique até o recarregamento 472 ms contra 462) |
+  | Idem, `send` leva 1 s | idem | +1,05 s (1.507 ms do clique ao recarregamento) |
+  | Idem, `send` pendurado ou `inspect` pendurado | idem | teto de 2 s contado do clique: 1.995 ms (2.027 e 2.138), +1,5 s |
+  | Idem, `send` recusado (abort ou 500) | idem | +40 ms (500 ms contra 462) |
+  | `summary` do perfil (c) | service, 50 chamadas | 2,5 ms (6); a leitura dos lotes é 0,8 ms |
+  | `summary` no limite de 4 MiB (32.000 edits de 50 caracteres) e no de bytes com 85.000 edits | service, 15 chamadas | 17 ms (32) e 28 ms (52) |
+  | Página da tentativa do instrutor | HTTP, 15 GETs, histórico gravado por SQL | sem histórico 15 ms; perfil (c) 14,5 ms; 45.000 edits e 3,5 MiB 35 ms (69); 100.000 edits 56 ms (81) |
+
+  O que fecha: R18 "caso normal abaixo de 200 KiB" (perfis (a) a (c), p95 até
+  126 KiB; o (e) passa pouco, 198 KiB, e o gravado de fato não passa de 115 KiB);
+  R10 (a transação típica leva 1,4 a 2,7 ms e a maior 19 a 35 ms; em ritmo real
+  o histórico não altera `exam.answer`); a entrega (nenhum tempo extra no caso
+  normal, teto de 2 s com o servidor do histórico fora). O que não fecha:
+  1. A meta de 50 ms para o maior lote. O replay copia a string a cada edit, e o
+     custo é edits x tamanho do texto (cerca de 0,5 ns por caractere): 5.000 edits
+     sobre 120 KB levam 62 ms. Um texto de 20 KB leva uns 10 ms. Proposta: baixar
+     `MAX_ANSWER_HISTORY_BATCH_EDITS` para 3.000 (estimativa linear: 37 ms no pior
+     caso). O lote típico tem 17 edits (p95 27), então nada realista chega perto.
+  2. A folga de 2x de R18. O `byteCount` soma o `snapshot` de cada lote, que a
+     linha não guarda (só a âncora guarda o último): é metade do total nos casos
+     normais e 64% em (d). O envelope do RFC ocupa 93,5% dos 4 MiB, não 50%, e
+     uma prova de mais de uns 94 min nesse ritmo fecham o histórico. Estimativa do RFC (2
+     MiB) e gravado de fato (1,4 MiB) estão certos, é a conta que está errada.
+     Proposta: contar em `byteCount` só o que a linha guarda (`edits`, `baseText`,
+     `gapBefore`); (d) cai para uns 1,4 MiB, 35% do limite, e os 4 MiB ficam.
+     Alternativa: subir o limite para 8 MiB, que deixa a conta enganosa.
+  3. R19 permite 2 MiB por chamada, uns cinco lotes máximos: até cerca de 330 ms
+     de laço de eventos por chamada (conta, não medido).
+
+  Não medido: Firefox e WebKit; rede real e disco de produção; digitação humana
+  real (só o modelo, com sensibilidade de 500 a 1.200 edits por hora); o custo do
+  monitor por tecla e da persistência local no navegador; o HTML da página do
+  instrutor com histórico criado pelo `append` (foi criado por SQL).
 - T8. Ligar. Remover `ANSWER_HISTORY_SWITCH` de `ExamAttempt.tsx` (a partir daqui a
   única chave é a da prova, R30), atualizar a tabela "Estado das regras" e a
   seção "Decidido" do RFC com as decisões de 2026-11-12, apagar as issues
