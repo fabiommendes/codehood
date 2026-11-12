@@ -273,6 +273,17 @@ files take precedence over this one.
   [mdq-spec](https://github.com/fabiommendes/mdq-spec) next to this repository.
 - Run its tests from `cli/` with `rtk uv run pytest`.
 - Biome skips `cli/`.
+- When a change alters what the REST API returns or accepts (routes, schemas,
+  output fields), regenerate the CLI's OpenAPI snapshot and generated client in
+  the same piece of work and commit them with it:
+
+  ```
+  pnpm run openapi:cli    # writes cli/resources/openapi/codehood.json
+  cd cli && uv run python -m codehood.api.generate resources/openapi/codehood.json
+  ```
+
+  Server-only state (e.g. `Exam.answerHistory`) may appear in the read models,
+  but the CLI never sends it: it must not exist in the create/update bodies.
 - Sync with the standalone repository only when the human asks:
   `git subtree push --prefix=cli git@github.com:fabiommendes/codehood-cli.git main`
   (or `subtree pull` with the same arguments).

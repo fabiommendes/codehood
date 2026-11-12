@@ -22,6 +22,7 @@
 		"generate": "tsx scripts/compile-messages.ts && pnpm run route-patterns",
 		"brand": "tsx scripts/generate-brand.ts",
 		"route-patterns": "tsx scripts/generate-route-patterns.ts",
+		"openapi:cli": "ENVIRONMENT=dev tsx scripts/generate-openapi.ts",
 		"clear": "node scripts/clean.mjs",
 		"init": "node scripts/init.mjs",
 		"db:seed": "prisma db push && prisma db seed",
