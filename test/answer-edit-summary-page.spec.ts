@@ -15,7 +15,7 @@ import {
 	type World,
 } from "./answer-edit-service-support";
 import { expect, type Locator, type Page, test } from "./fixtures";
-import { logInAs, resetDatabase } from "./stories/helpers";
+import { logInAs } from "./stories/helpers";
 
 // R35: the block "Histórico de edição" on the instructor's attempt page.
 //
@@ -36,8 +36,6 @@ import { logInAs, resetDatabase } from "./stories/helpers";
 //
 // Every test id except the first sits inside the `<details>`. The cards are the
 // `article` elements of the page, named "Question N" in the exam's order.
-
-test.beforeEach(resetDatabase);
 
 function attemptHref(world: World) {
 	const course = courseHref({

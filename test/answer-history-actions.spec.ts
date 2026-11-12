@@ -12,12 +12,20 @@ import {
 } from "./answer-edit-service-support";
 import { expect, type Page, test } from "./fixtures";
 import { parseDevalue } from "./helpers/devalue-lite";
-import { logInAs, resetDatabase } from "./stories/helpers";
+import { logInAs } from "./stories/helpers";
 
 // R21 and R22 over the network: session, error codes, body limits, and the
 // guarantee that neither the clock nor the identity is the client's to set.
 
-test.beforeEach(resetDatabase);
+/// Some tests count every history row of the database, so the rows the dev seed
+/// keeps are cleared. The rest of the seed stays: the API specs that share this
+/// worker's database log in as its demo users.
+test.beforeEach(async () => {
+	await prisma.answerEditGap.deleteMany();
+	await prisma.answerEditBatch.deleteMany();
+	await prisma.answerEditField.deleteMany();
+	await prisma.answerEditHistory.deleteMany();
+});
 
 /// A decoded response: loosely typed, the tests assert on what they read.
 // biome-ignore lint/suspicious/noExplicitAny: test-only view of a decoded body

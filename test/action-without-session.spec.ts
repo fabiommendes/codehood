@@ -1,11 +1,8 @@
 import { makeWorld } from "./answer-edit-service-support";
 import { expect, test } from "./fixtures";
-import { resetDatabase } from "./stories/helpers";
 
 /// An action wrapped by `withServiceErrors` must not turn the `UNAUTHORIZED` of
 /// `requireUser` into a `BAD_REQUEST`.
-
-test.beforeEach(resetDatabase);
 
 test("exam.answer without a session answers 401 UNAUTHORIZED", async ({
 	page,
