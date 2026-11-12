@@ -420,6 +420,30 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await db.resource.create(
 		{
 			course: cs101.id,
+			slug: "scheme-greet",
+			title: "greet.scm",
+			description:
+				"Reads a name with read-line; an error reports its top-level form.",
+			data: {
+				type: "CODE",
+				language: "scheme",
+				content: [
+					"(define (greet name)",
+					'  (string-append "Hello, " name "!"))',
+					"",
+					'(display "What is your name? ")',
+					"(display (greet (read-line)))",
+					"(newline)",
+					"",
+				].join("\n"),
+			},
+			rev: "demo-scheme-greet-v1",
+		},
+		FULL_ACCESS,
+	);
+	await db.resource.create(
+		{
+			course: cs101.id,
 			slug: "ts-greet",
 			title: "greet.ts",
 			description: "Types are removed, not checked; prompt() reads a name.",

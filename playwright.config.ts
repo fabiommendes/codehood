@@ -35,18 +35,13 @@ function engineProjects() {
 	});
 }
 
-/// Real-runtime specs are slow; `test/run.ts test/runtimes` runs them.
-const SLOW_SPECS = process.argv.some((arg) => arg.includes("test/runtimes"))
-	? []
-	: ["**/runtimes/**"];
-
 const E2E_SPECS = e2eSpecs();
 
 /// Spec files run side by side, each worker on its own database (see
 /// `test/env.ts`). Tests inside a file keep their order.
 const unitConfig = defineConfig({
 	testDir: "./test",
-	testIgnore: [...SLOW_SPECS, ...E2E_SPECS],
+	testIgnore: E2E_SPECS,
 	projects: [{ name: "unit" }],
 	fullyParallel: false,
 	globalSetup: "./test/global-setup.ts",
@@ -87,7 +82,6 @@ const E2E_SERVERS = Array.from({ length: E2E_SERVER_COUNT }, (_, index) => {
 const e2eConfig = defineConfig({
 	testDir: "./test",
 	testMatch: E2E_SPECS,
-	testIgnore: SLOW_SPECS,
 	projects: [
 		...(crossBrowser
 			? [

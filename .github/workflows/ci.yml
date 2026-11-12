@@ -169,6 +169,9 @@ jobs:
       - name: Runner plugins
         run: pnpm run test:plugins
 
+      - name: Scheme plugin package
+        run: pnpm run test:scheme
+
   cli:
     runs-on: ubuntu-latest
     steps:

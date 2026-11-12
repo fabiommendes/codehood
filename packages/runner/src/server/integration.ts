@@ -22,17 +22,13 @@ import { brotliCompress, gzip, constants as zlib } from "node:zlib";
 import {
 	type BuildStep,
 	type RunnerPlugin,
+	type RuntimePackage,
 	runtimeDir,
 } from "@codehood/runner-api";
 import type { AstroIntegration } from "astro";
 import { type BuildOptions, build, type Plugin } from "esbuild";
 import { tsImport } from "tsx/esm/api";
-import {
-	driverModule,
-	driversModule,
-	pluginRuntimes,
-	resolveSpecifier,
-} from "../registry";
+import { driverModule, driversModule, resolveSpecifier } from "../registry";
 import {
 	BUNDLE_DIR_NAME,
 	type ContentEncoding,
@@ -223,33 +219,60 @@ async function copyRuntimes(
 	plugins: readonly RunnerPlugin[],
 	staging: string,
 ): Promise<void> {
-	for (const runtime of pluginRuntimes(plugins)) {
-		const pkgDir = join(root, "node_modules", runtime.pkg);
-		const installed = JSON.parse(
-			readFileSync(join(pkgDir, "package.json"), "utf8"),
-		).version;
-		if (installed !== runtime.version) {
-			throw new Error(
-				`${runtime.pkg} ${installed} is installed but a runner plugin lists ${runtime.version}.`,
-			);
+	const copied = new Set<string>();
+	for (const plugin of plugins) {
+		for (const runtime of plugin.runtimes) {
+			if (copied.has(runtimeDir(runtime))) continue;
+			copied.add(runtimeDir(runtime));
+			await copyRuntime(root, plugin, runtime, staging);
 		}
-		const target = join(staging, "rt", runtimeDir(runtime));
-		mkdirSync(target, { recursive: true });
-		for (const [from, to] of Object.entries(runtime.files)) {
-			const wrap = runtime.wrap?.[to];
-			const only = runtime.bundle?.[to];
-			if (only) {
-				await buildModule(join(pkgDir, from), only, join(target, to));
-			} else if (wrap) {
-				writeFileSync(
-					join(target, to),
-					(wrap.prefix ?? "") +
-						readFileSync(join(pkgDir, from), "utf8") +
-						(wrap.suffix ?? ""),
-				);
-			} else {
-				copyFileSync(join(pkgDir, from), join(target, to));
-			}
+	}
+}
+
+/// Directory of the installed package `pkg`: resolved from the plugin's
+/// driver, so a plugin installed as a package finds its own dependencies,
+/// or else from the project root.
+function packageDir(root: string, plugin: RunnerPlugin, pkg: string): string {
+	try {
+		const from = createRequire(modulePath(root, plugin.driver));
+		return dirname(realpathSync(from.resolve(`${pkg}/package.json`)));
+	} catch {
+		return join(root, "node_modules", pkg);
+	}
+}
+
+/// Copies the files of one runtime into the bundle's `rt/`.
+async function copyRuntime(
+	root: string,
+	plugin: RunnerPlugin,
+	runtime: RuntimePackage,
+	staging: string,
+): Promise<void> {
+	const pkgDir = packageDir(root, plugin, runtime.pkg);
+	const installed = JSON.parse(
+		readFileSync(join(pkgDir, "package.json"), "utf8"),
+	).version;
+	if (installed !== runtime.version) {
+		throw new Error(
+			`${runtime.pkg} ${installed} is installed but a runner plugin lists ${runtime.version}.`,
+		);
+	}
+	const target = join(staging, "rt", runtimeDir(runtime));
+	mkdirSync(target, { recursive: true });
+	for (const [from, to] of Object.entries(runtime.files)) {
+		const wrap = runtime.wrap?.[to];
+		const only = runtime.bundle?.[to];
+		if (only) {
+			await buildModule(join(pkgDir, from), only, join(target, to));
+		} else if (wrap) {
+			writeFileSync(
+				join(target, to),
+				(wrap.prefix ?? "") +
+					readFileSync(join(pkgDir, from), "utf8") +
+					(wrap.suffix ?? ""),
+			);
+		} else {
+			copyFileSync(join(pkgDir, from), join(target, to));
 		}
 	}
 }

@@ -162,6 +162,9 @@ importers:
       '@codehood/runner-api':
         specifier: workspace:*
         version: link:packages/runner-api
+      '@codehood/runner-scheme':
+        specifier: workspace:*
+        version: link:packages/runner-scheme
       '@faker-js/faker':
         specifier: ^10.6.0
         version: 10.6.0
@@ -252,6 +255,28 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/runner-scheme:
+    dependencies:
+      '@codemirror/language':
+        specifier: '*'
+        version: 6.13.1
+      '@codemirror/legacy-modes':
+        specifier: '*'
+        version: 6.5.5
+      '@codemirror/state':
+        specifier: '*'
+        version: 6.7.6
+      biwascheme:
+        specifier: 0.8.3
+        version: 0.8.3
+    devDependencies:
+      '@codehood/runner':
+        specifier: workspace:*
+        version: link:../runner
+      '@codehood/runner-api':
+        specifier: workspace:*
+        version: link:../runner-api
 
 packages:
 
@@ -2474,6 +2499,10 @@ packages:
   bindings@1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
 
+  biwascheme@0.8.3:
+    resolution: {integrity: sha512-cQq4c5gzW3ymVRON+WR+MJk09RvGXS8WVnD5w5i8AXJy7chQ7tp0Yd6R79xtP7iRsHgpbAz235Xd/xvvhKmEIw==}
+    hasBin: true
+
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
 
@@ -3680,6 +3709,9 @@ packages:
 
   openapi3-ts@4.6.1:
     resolution: {integrity: sha512-XW9MOldkhoICNeXVzzmXzmOW5G73ppOEGmh7fLCqHjgfdEYCGGN+00MlVCeUZgovjjfC56j9tvtDt1zGabNjjA==}
+
+  optparse@1.0.5:
+    resolution: {integrity: sha512-WfnNWLS3vr8omCm8nKYKaRbapuy6pEbx1O0B+eP5sUf/a++sT9/h8PflqBoHsY9N+YdzUT12T8snXigq13QpJg==}
 
   oxc-minify@0.136.0:
     resolution: {integrity: sha512-u9UvPFTYVwQ/i1kpp/c20S/SbvLaLV0Ngzyhgi0YV4B1SlxM7RgnnePl4vY9N3Z9sTRcozL1MRStI3PlUN9RFA==}
@@ -6838,6 +6870,10 @@ snapshots:
     dependencies:
       file-uri-to-path: 1.0.0
 
+  biwascheme@0.8.3:
+    dependencies:
+      optparse: 1.0.5
+
   bl@4.1.0:
     dependencies:
       buffer: 5.7.1
@@ -7966,6 +8002,8 @@ snapshots:
   openapi3-ts@4.6.1:
     dependencies:
       yaml: 2.9.0
+
+  optparse@1.0.5: {}
 
   oxc-minify@0.136.0:
     optionalDependencies:

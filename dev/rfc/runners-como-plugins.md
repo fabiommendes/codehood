@@ -269,9 +269,11 @@ workspace, `@codehood/runner` (`packages/runner`), com a própria suíte:
 2. **`packages/runner-api`** como workspace pnpm. Os drivers internos importam
    dele. Feito.
 3. **`packages/runner-scheme`**, que importa só `@codehood/runner-api`. Não
-   entra no padrão; é instalável.
-4. **Kit de contrato**, aplicado às seis linguagens internas, e o core em
-   `packages/runner` com suíte própria. Feito; falta o Scheme.
+   entra no padrão; é instalável. Feito: a instância de dev o lista, e a
+   suíte dele (`pnpm run test:scheme`) monta o bundle com o próprio pacote
+   como raiz, como uma instância que o instala.
+4. **Kit de contrato**, aplicado às seis linguagens internas e ao Scheme, e
+   o core em `packages/runner` com suíte própria. Feito.
 5. Mais tarde: mover os runners atuais para `packages/` ou para repositórios
    próprios.
 
@@ -299,6 +301,20 @@ O plugin Scheme serve para validar a API. O BiwaScheme basta para isso, e o
 wrap com stubs ainda exercita o `wrap` de runtimes. Se um curso precisar de
 Scheme de verdade (bignum, desempenho, R7RS), o motor muda dentro do plugin
 sem mexer na API.
+
+O que o plugin mostrou:
+
+- O runtime é `release/biwascheme.mjs` com um prefixo que declara `window` e
+  `document` vazios. Basta isso; nenhum sufixo.
+- Como o BiwaScheme não informa posição, o driver lê o arquivo forma por forma
+  (o `Parser` diz onde cada forma termina) e avalia cada uma. Um erro aponta
+  a linha onde começa a forma de topo que falhou: um erro dentro de uma
+  função aparece na linha da chamada. Erros de sintaxe apontam o início da
+  forma que não fecha.
+- A API tinha uma falha: `copyRuntimes` procurava o runtime em
+  `<raiz>/node_modules`, onde o pnpm não põe as dependências de um pacote
+  instalado. Agora resolve o pacote do runtime a partir do driver do plugin,
+  e só depois da raiz.
 
 ## Fora de escopo
 

@@ -1,0 +1,30 @@
+{
+	"name": "@codehood/runner-scheme",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"license": "AGPL-3.0-or-later",
+	"description": "Scheme for the Codehood runner (BiwaScheme).",
+	"exports": {
+		".": "./src/index.ts",
+		"./driver": "./src/driver.ts",
+		"./editor": "./src/editor.ts",
+		"./package.json": "./package.json"
+	},
+	"scripts": {
+		"test": "playwright test"
+	},
+	"dependencies": {
+		"biwascheme": "0.8.3"
+	},
+	"peerDependencies": {
+		"@codehood/runner-api": "workspace:*",
+		"@codemirror/language": "*",
+		"@codemirror/legacy-modes": "*",
+		"@codemirror/state": "*"
+	},
+	"devDependencies": {
+		"@codehood/runner": "workspace:*",
+		"@codehood/runner-api": "workspace:*"
+	}
+}

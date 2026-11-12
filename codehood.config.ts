@@ -11,6 +11,7 @@
  * `DATABASE_URL`, `DEBUG`, `LOG_ENV`.
  */
 
+import scheme from "@codehood/runner-scheme";
 import { defineConfig, env } from "@/config";
 import { defaultRunners, elm, lua, prolog } from "@/runner/plugins";
 
@@ -37,6 +38,6 @@ export default defineConfig({
 		origin: null,
 		// build-time constant. Without this key, defaultRunners(): Python,
 		// JavaScript and TypeScript.
-		languages: [...defaultRunners(), lua(), prolog(), elm()],
+		languages: [...defaultRunners(), lua(), prolog(), elm(), scheme()],
 	},
 });

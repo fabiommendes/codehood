@@ -61,6 +61,10 @@
   language) for the plugins, each against a small static server. Every
   plugin passes the contract of `@codehood/runner/testing/contract`. The
   main suite keeps the pages, the endpoint and JavaScript.
+- Scheme in the client runner, as the installable plugin
+  `@codehood/runner-scheme` (BiwaScheme), not a default language. An error
+  points at the line where its top-level form starts. A plugin installed as
+  a package now finds its runtime among its own dependencies.
 - Fonts are served by Codehood itself instead of Google Fonts: no page
   contacts a third-party host, and the first visit no longer waits for one.
 - Tests run in two scopes: `pnpm run test:unit` (no server, spec files in
