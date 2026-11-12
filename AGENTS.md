@@ -278,9 +278,11 @@ files take precedence over this one.
   the same piece of work and commit them with it:
 
   ```
-  pnpm run openapi:cli    # writes cli/resources/openapi/codehood.json
-  cd cli && uv run python -m codehood.api.generate resources/openapi/codehood.json
+  pnpm run openapi:cli    # writes cli/resources/openapi/codehood.json and regenerates cli/codehood/api/generated.py (needs uv)
   ```
+
+  `test/openapi-snapshot.spec.ts` (unit) fails when the snapshot is stale, and
+  `cli/tests/test_generated_in_sync.py` when the client is.
 
   Server-only state (e.g. `Exam.answerHistory`) may appear in the read models,
   but the CLI never sends it: it must not exist in the create/update bodies.
