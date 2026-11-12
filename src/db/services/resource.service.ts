@@ -12,6 +12,12 @@ import {
 	resourceUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds, Pretty } from "@/typing";
@@ -128,7 +134,7 @@ export function makeResourceService(
 				});
 
 				const eventId = await resolveEventId(tx, course.id, input.event);
-				const row = await tx.resource.create({
+				let row = await tx.resource.create({
 					data: {
 						courseId: course.id,
 						eventId,
@@ -155,17 +161,15 @@ export function makeResourceService(
 					// attachment can't exist before the resource's own id does — link
 					// it back now, or every re-fetch after this one finds no
 					// attachment and falls back to `fillData`'s "corrupted-file" stub.
-					await tx.resource.update({
-						where: { id: row.id },
-						data: { attachmentId: stored.id },
-					});
-
-					row.attachment = {
-						id: stored.id,
-						hash: stored.hash,
-						filename: stored.filename,
-						mimeType: stored.mimeType,
-					};
+					// Reading the row back keeps the `updatedAt` it returns the stored one.
+					row = await guardedUpdate(
+						tx,
+						"resource",
+						{ id: row.id },
+						{ attachmentId: stored.id },
+						{},
+						{ include: resourceInclude },
+					);
 				}
 
 				return fromDb(row);
@@ -258,16 +262,17 @@ export function makeResourceService(
 				fields: ResourceUpdate,
 				opts: ServiceOptsWithoutTx,
 			): Promise<Resource> => {
-				const target = valueOrNotFound(
-					"resource",
-					await readableRow(tx, filter, opts.actor),
-				);
+				const found = await readableRow(tx, filter, opts.actor);
+				if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				const target = valueOrNotFound("resource", found);
 				ensureAllowed({
 					value: target.course,
 					action: "resource.update",
 					pred: (course) =>
 						hasPerm(opts.actor, "course.update-contents", course),
 				});
+				// Before the attachment is stored: a stale caller must not write blobs.
+				await checkVersion(tx, "resource", { id: target.id }, opts);
 
 				// The same bytes and filename come back as the current attachment.
 				const previousId = target.attachmentId;
@@ -277,9 +282,11 @@ export function makeResourceService(
 						: undefined;
 
 				const eventId = await resolveEventId(tx, target.courseId, fields.event);
-				const row = await tx.resource.update({
-					where: { id: target.id },
-					data: {
+				const row = await guardedUpdate(
+					tx,
+					"resource",
+					{ id: target.id },
+					{
 						eventId,
 						type: fields.data?.type,
 						title: fields.title,
@@ -289,8 +296,9 @@ export function makeResourceService(
 						attachmentId,
 						rev: fields.rev,
 					},
-					include: resourceInclude,
-				});
+					opts,
+					{ include: resourceInclude },
+				);
 
 				// Last, so the files it removes stay put if anything above fails.
 				if (
@@ -332,7 +340,10 @@ export function makeResourceService(
 						? error.as("resource.create")
 						: error;
 				}
-				if (!existing) return create(tx, input, opts);
+				if (!existing) {
+					checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+					return create(tx, input, opts);
+				}
 
 				const course = await courseInfo(tx, input.course);
 				if (!hasPerm(opts.actor, "course.update-contents", course)) {
@@ -358,12 +369,15 @@ export function makeResourceService(
 				opts: ServiceOptsWithoutTx,
 			): Promise<void> => {
 				const current = await readableRow(tx, filter, opts.actor);
-				if (!current) throw new NotFound("resource");
+				if (!current) {
+					checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+					throw new NotFound("resource");
+				}
 
 				if (!hasPerm(opts.actor, "course.update-contents", current.course)) {
 					throw new NotAllowed("resource.delete");
 				}
-				await tx.resource.delete({ where: { id: current.id } });
+				await guardedDelete(tx, "resource", { id: current.id }, opts);
 
 				// Last, so the files it removes stay put if anything above fails.
 				if (current.attachmentId) {

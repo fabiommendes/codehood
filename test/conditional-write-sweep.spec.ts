@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { PreconditionFailed } from "@/core/error";
+import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 
 /// Sweep of the registered services for ADR 0013: a service that writes a
@@ -14,6 +15,55 @@ type Write = (typeof WRITES)[number];
 const STALE = new Date(0);
 let seq = 0;
 const uniq = () => `${++seq}-${Math.random().toString(36).slice(2, 7)}`;
+
+/// A course with its own edition, discipline and instructor.
+async function newCourse() {
+	const edition = `${4000 + ++seq}-1`;
+	await db.edition.create(
+		{
+			slug: edition,
+			name: edition,
+			startAt: new Date("2026-01-01"),
+			endAt: new Date("2030-12-31"),
+		},
+		FULL_ACCESS,
+	);
+	const discipline = `sw-c-${uniq()}`;
+	await db.discipline.create(
+		{ slug: discipline, name: discipline },
+		FULL_ACCESS,
+	);
+	const instructor = `sw-i-${uniq()}`;
+	await db.user.create(
+		{
+			email: `${instructor}@codehood.test`,
+			username: instructor,
+			name: instructor,
+			role: "INSTRUCTOR",
+			password: "x",
+			githubId: instructor,
+			schoolId: instructor,
+		},
+		FULL_ACCESS,
+	);
+	const startAt = new Date("2026-02-02T00:00:00Z");
+	const endAt = new Date("2026-06-01T00:00:00Z");
+	const course = await db.course.create(
+		{ discipline, instructor, edition, startAt, endAt },
+		FULL_ACCESS,
+	);
+	return {
+		course,
+		pk: { id: course.id },
+		natural: { discipline, instructor, edition, startAt, endAt },
+	};
+}
+
+/// The service options of a case: the row's own version, or a stale one.
+const opts = (row: { updatedAt: Date }, version: Version) => ({
+	...FULL_ACCESS,
+	expectedUpdatedAt: version === "stale" ? STALE : row.updatedAt,
+});
 
 /// Which version a case sends: one that is no longer the row's, or its own.
 type Version = "stale" | "current";
@@ -54,47 +104,7 @@ const HONORED: Record<
 		};
 	})(),
 	course: (() => {
-		const row = async () => {
-			const edition = `${4000 + ++seq}-1`;
-			await db.edition.create(
-				{
-					slug: edition,
-					name: edition,
-					startAt: new Date("2026-01-01"),
-					endAt: new Date("2030-12-31"),
-				},
-				FULL_ACCESS,
-			);
-			const discipline = `sw-c-${uniq()}`;
-			await db.discipline.create(
-				{ slug: discipline, name: discipline },
-				FULL_ACCESS,
-			);
-			const instructor = `sw-i-${uniq()}`;
-			await db.user.create(
-				{
-					email: `${instructor}@codehood.test`,
-					username: instructor,
-					name: instructor,
-					role: "INSTRUCTOR",
-					password: "x",
-					githubId: instructor,
-					schoolId: instructor,
-				},
-				FULL_ACCESS,
-			);
-			const startAt = new Date("2026-02-02T00:00:00Z");
-			const endAt = new Date("2026-06-01T00:00:00Z");
-			const course = await db.course.create(
-				{ discipline, instructor, edition, startAt, endAt },
-				FULL_ACCESS,
-			);
-			return {
-				course,
-				pk: { id: course.id },
-				natural: { discipline, instructor, edition, startAt, endAt },
-			};
-		};
+		const row = newCourse;
 		const opts = (c: { updatedAt: Date }, version: Version) => ({
 			...FULL_ACCESS,
 			expectedUpdatedAt: version === "stale" ? STALE : c.updatedAt,
@@ -114,12 +124,136 @@ const HONORED: Record<
 			},
 		};
 	})(),
+	timeSlot: (() => {
+		const input = (course: CourseId, slug: string) => ({
+			course,
+			slug,
+			day: "MONDAY" as const,
+			start: { hour: 8, minute: 0 },
+			duration: { hours: 1 },
+		});
+		const row = async () => {
+			const { course } = await newCourse();
+			const slot = await db.timeSlot.create(
+				input(course.id as CourseId, `sw-${uniq()}`),
+				FULL_ACCESS,
+			);
+			return { slot, body: input(course.id as CourseId, slot.slug) };
+		};
+		return {
+			update: async (v) => {
+				const { slot } = await row();
+				return db.timeSlot.update(
+					{ id: slot.id },
+					{ title: "x" },
+					opts(slot, v),
+				);
+			},
+			upsert: async (v) => {
+				const { slot, body } = await row();
+				return db.timeSlot.upsert(body, opts(slot, v));
+			},
+			delete: async (v) => {
+				const { slot } = await row();
+				return db.timeSlot.delete({ id: slot.id }, opts(slot, v));
+			},
+		};
+	})(),
+	calendarEvent: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const slot = await db.timeSlot.create(
+				{
+					course: course.id as CourseId,
+					slug: `sw-${uniq()}`,
+					day: "MONDAY",
+					start: { hour: 8, minute: 0 },
+					duration: { hours: 1 },
+				},
+				FULL_ACCESS,
+			);
+			const body = {
+				course: course.id as CourseId,
+				timeSlot: slot.id,
+				week: 1,
+				title: "Class",
+			};
+			return { event: await db.calendarEvent.create(body, FULL_ACCESS), body };
+		};
+		return {
+			update: async (v) => {
+				const { event } = await row();
+				return db.calendarEvent.update(
+					{ id: event.id },
+					{ title: "x" },
+					opts(event, v),
+				);
+			},
+			upsert: async (v) => {
+				const { event, body } = await row();
+				return db.calendarEvent.upsert(body, opts(event, v));
+			},
+			delete: async (v) => {
+				const { event } = await row();
+				return db.calendarEvent.delete({ id: event.id }, opts(event, v));
+			},
+		};
+	})(),
+	resource: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const body = {
+				course: course.id as CourseId,
+				slug: `sw-${uniq()}`,
+				title: "Link",
+				data: { type: "LINK" as const, url: "https://example.test/a" },
+			};
+			return { resource: await db.resource.create(body, FULL_ACCESS), body };
+		};
+		return {
+			update: async (v) => {
+				const { resource } = await row();
+				return db.resource.update(
+					{ id: resource.id },
+					{ title: "x" },
+					opts(resource, v),
+				);
+			},
+			upsert: async (v) => {
+				const { resource, body } = await row();
+				return db.resource.upsert(body, opts(resource, v));
+			},
+			delete: async (v) => {
+				const { resource } = await row();
+				return db.resource.delete({ id: resource.id }, opts(resource, v));
+			},
+		};
+	})(),
+	repository: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const body = { course: course.id as CourseId, slug: `sw-${uniq()}` };
+			return {
+				repository: await db.repository.create(body, FULL_ACCESS),
+				body,
+			};
+		};
+		return {
+			upsert: async (v) => {
+				const { repository, body } = await row();
+				return db.repository.upsert(body, opts(repository, v));
+			},
+			delete: async (v) => {
+				const { repository, body } = await row();
+				return db.repository.delete(body, opts(repository, v));
+			},
+		};
+	})(),
 };
 
 /// Services with writes on a versioned model that do not honor the option
 /// yet. Remove a name when its service does; the test fails if it stays.
 const PENDING = new Set<string>([
-	"calendarEvent",
 	"exam",
 	"examException",
 	"feedback",
@@ -127,12 +261,9 @@ const PENDING = new Set<string>([
 	"question",
 	"regradeRequest",
 	"report",
-	"repository",
-	"resource",
 	"response",
 	"rollCall",
 	"rubric",
-	"timeSlot",
 ]);
 
 /// Services outside the rule, with the reason.

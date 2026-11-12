@@ -18,6 +18,7 @@ import {
 	type AttachmentId,
 	attachmentSchema,
 	blobHash,
+	type CalendarEventId,
 	type CourseId,
 	MAX_UPLOAD_BYTES,
 	type RepositoryId,
@@ -33,6 +34,13 @@ import {
 	repositorySchema,
 } from "@/core/schemas";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, inTx, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -210,6 +218,9 @@ export function makeRepositoryService(
 	 * Creates the repository if `(course, slug)` is free, or returns the
 	 * existing one unchanged.
 	 *
+	 * An existing repository is not written, so `expectedUpdatedAt` only
+	 * checks it: `null` fails, a `Date` must match.
+	 *
 	 * @throws {@link NotFound} If the course does not exist.
 	 * @throws {@link NotAllowed} `repository.create` if the actor lacks
 	 * `course.update-contents`, whether or not the repository exists.
@@ -230,8 +241,12 @@ export function makeRepositoryService(
 				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
 				include: REPOSITORY_INCLUDE,
 			});
-			if (existing) return toRepository(tx, existing, publicUrl);
-			return insert(tx, course.id, input.slug, publicUrl);
+			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return insert(tx, course.id, input.slug, publicUrl);
+			}
+			await checkVersion(tx, "repository", { id: existing.id }, opts);
+			return toRepository(tx, existing, publicUrl);
 		},
 	});
 
@@ -239,6 +254,8 @@ export function makeRepositoryService(
 	 * Deletes the repository, its git objects and its links to calendar
 	 * events, and detaches its attachments so blobs nothing else uses become
 	 * collectable. A missing repository is a no-op.
+	 *
+	 * Each event that cited it gets a new `updatedAt`.
 	 *
 	 * @throws {@link NotAllowed} `repository.delete` if the actor lacks
 	 * `course.update-contents`.
@@ -254,12 +271,27 @@ export function makeRepositoryService(
 				where: repositoryWhere(filter),
 				include: REPOSITORY_INCLUDE,
 			});
-			if (!row) return;
+			if (!row) return checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
 			if (!hasPerm(opts.actor, "course.update-contents", row.course)) {
 				throw new NotAllowed("repository.delete");
 			}
+			await checkVersion(tx, "repository", { id: row.id }, opts);
+
+			// The links to the events cascade, and each event shows its repositories.
+			const links = await tx.calendarEventRepository.findMany({
+				where: { repositoryId: row.id },
+				select: { eventId: true },
+			});
+			for (const { eventId } of links) {
+				await touch(
+					tx,
+					"calendarEvent",
+					{ id: eventId as CalendarEventId },
+					{},
+				);
+			}
 			await attachmentService.detach("REPOSITORY", row.id, { ...opts, tx });
-			await tx.repository.delete({ where: { id: row.id } });
+			await guardedDelete(tx, "repository", { id: row.id }, opts);
 		},
 	});
 
@@ -287,7 +319,8 @@ export function makeRepositoryService(
 			files: RepositoryFiles,
 			opts: ServiceOptsWithoutTx,
 		): Promise<RepositoryFilesResult> => {
-			const row = await writable(tx, filter, opts.actor, "repository.update");
+			const row = await writable(tx, filter, opts, "repository.update");
+			await checkVersion(tx, "repository", { id: row.id }, opts);
 			const hashes = Object.keys(files);
 			for (const hash of hashes) {
 				const bytes = files[hash as keyof typeof files] as Buffer;
@@ -364,7 +397,8 @@ export function makeRepositoryService(
 			input: RepositoryCommit,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Repository> => {
-			const row = await writable(tx, filter, opts.actor, "repository.update");
+			const row = await writable(tx, filter, opts, "repository.update");
+			await checkVersion(tx, "repository", { id: row.id }, opts);
 			const inner = { ...opts, tx };
 			const owner = { type: "REPOSITORY", id: row.id as RepositoryId } as const;
 
@@ -497,15 +531,18 @@ export function makeRepositoryService(
 
 			await dropAbandoned(tx, attachmentService, row.id, inner);
 
-			const updated = await tx.repository.update({
-				where: { id: row.id },
-				data: {
+			const updated = await guardedUpdate(
+				tx,
+				"repository",
+				{ id: row.id },
+				{
 					head: commitSha,
 					title: await titleOf(blobStore, input.tree, row.slug),
 					zipHash: null,
 				},
-				include: REPOSITORY_INCLUDE,
-			});
+				opts,
+				{ include: REPOSITORY_INCLUDE },
+			);
 			return toRepository(tx, updated, publicUrl);
 		},
 	});
@@ -620,12 +657,15 @@ export function makeRepositoryService(
 			filter: RepositoryPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Repository> => {
-			const row = await writable(tx, filter, opts.actor, "repository.update");
-			const updated = await tx.repository.update({
-				where: { id: row.id },
-				data: { token: newToken() },
-				include: REPOSITORY_INCLUDE,
-			});
+			const row = await writable(tx, filter, opts, "repository.update");
+			const updated = await guardedUpdate(
+				tx,
+				"repository",
+				{ id: row.id },
+				{ token: newToken() },
+				opts,
+				{ include: REPOSITORY_INCLUDE },
+			);
 			return toRepository(tx, updated, publicUrl);
 		},
 	});
@@ -710,10 +750,13 @@ export function makeRepositoryService(
 					},
 					system,
 				);
-				await tx.repository.update({
-					where: { id: plan.id },
-					data: { zipHash: blob.hash },
-				});
+				await guardedUpdate(
+					tx,
+					"repository",
+					{ id: plan.id },
+					{ zipHash: blob.hash },
+					{},
+				);
 			}
 			return blob.hash;
 		},
@@ -905,20 +948,22 @@ async function readable(
 	return row && visible(row, actor) ? row : null;
 }
 
+/// The row `filter` names, refusing an actor who may not write its course. A
+/// missing row is a `NotFound`, unless `opts` expects a version: then it is a
+/// `PreconditionFailed` carrying `null`.
 async function writable(
 	tx: PrismaTx,
 	filter: RepositoryPK,
-	actor: Actor,
+	opts: ServiceOptsWithoutTx,
 	action: "repository.update",
 ): Promise<DbRepository> {
-	const row = valueOrNotFound(
-		"repository",
-		await tx.repository.findFirst({
-			where: repositoryWhere(filter),
-			include: REPOSITORY_INCLUDE,
-		}),
-	);
-	if (!hasPerm(actor, "course.update-contents", row.course)) {
+	const found = await tx.repository.findFirst({
+		where: repositoryWhere(filter),
+		include: REPOSITORY_INCLUDE,
+	});
+	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const row = valueOrNotFound("repository", found);
+	if (!hasPerm(opts.actor, "course.update-contents", row.course)) {
 		throw new NotAllowed(action);
 	}
 	return row;

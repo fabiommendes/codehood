@@ -19,6 +19,13 @@ import {
 	type TimeSlotId,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -256,20 +263,24 @@ export const makeCalendarEventService = defineService<CalendarEventT>()(() => {
 			const current = await writableEvent(
 				tx,
 				filter,
-				opts.actor,
+				opts,
 				"calendar-event.update",
 			);
 
-			const row = await tx.calendarEvent.update({
-				where: { id: current.id },
-				data: {
+			// Always writes, so a change to the repositories alone moves `updatedAt`.
+			const row = await guardedUpdate(
+				tx,
+				"calendarEvent",
+				{ id: current.id },
+				{
 					title: fields.title,
 					description: fields.description,
 					kind: fields.kind,
 					rev: fields.rev,
 				},
-				include: EVENT_INCLUDE,
-			});
+				opts,
+				{ include: EVENT_INCLUDE },
+			);
 			if (fields.repositories == null) return fromDb(row);
 
 			await setRepositories(tx, row.id, current.courseId, fields.repositories);
@@ -338,7 +349,10 @@ export const makeCalendarEventService = defineService<CalendarEventT>()(() => {
 				},
 				select: { id: true },
 			});
-			if (!existing) return create(tx, { ...input, course: course.id }, opts);
+			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return create(tx, { ...input, course: course.id }, opts);
+			}
 
 			const {
 				course: _course,
@@ -358,7 +372,8 @@ export const makeCalendarEventService = defineService<CalendarEventT>()(() => {
 	/**
 	 * Removes the row outright — events are never archived.
 	 *
-	 * A subsequent `findOne` returns `null`.
+	 * A subsequent `findOne` returns `null`. The resources that pointed at the
+	 * event are detached from it and get a new `updatedAt`.
 	 *
 	 * @throws {@link NotAllowed} With status 409 if the event has a roll call.
 	 */
@@ -372,16 +387,26 @@ export const makeCalendarEventService = defineService<CalendarEventT>()(() => {
 			const current = await writableEvent(
 				tx,
 				filter,
-				opts.actor,
+				opts,
 				"calendar-event.delete",
 			);
+			await checkVersion(tx, "calendarEvent", { id: current.id }, opts);
 			if ((await tx.rollCall.count({ where: { eventId: current.id } })) > 0) {
 				throw new NotAllowed("calendar-event.delete", {
 					status: 409,
 					message: m.errors_event_has_roll_call(),
 				});
 			}
-			await tx.calendarEvent.delete({ where: { id: current.id } });
+
+			// The foreign key of each resource of the event is about to be nulled.
+			const resources = await tx.resource.findMany({
+				where: { eventId: current.id },
+				select: { id: true },
+			});
+			for (const resource of resources) {
+				await touch(tx, "resource", { id: resource.id }, {});
+			}
+			await guardedDelete(tx, "calendarEvent", { id: current.id }, opts);
 		},
 	});
 
@@ -469,25 +494,29 @@ async function writableCourse(
 }
 
 /**
- * Finds the event a write targets, refusing an actor who may not write to its course.
+ * Finds the event a write targets, refusing an actor who may not write to its
+ * course.
+ *
+ * A missing event is a `NotFound`, unless `opts` expects a version: then it is
+ * a `PreconditionFailed` carrying `null`.
  */
 async function writableEvent(
 	tx: PrismaTx,
 	filter: CalendarEventPK,
-	actor: ServiceOptsWithoutTx["actor"],
+	opts: ServiceOptsWithoutTx,
 	action: "calendar-event.update" | "calendar-event.delete",
 ) {
-	const event = valueOrNotFound(
-		"calendar-event",
-		await tx.calendarEvent.findFirst({
-			where: await eventWhere(tx, filter),
-			select: {
-				id: true,
-				courseId: true,
-				course: { select: { instructor: { select: { username: true } } } },
-			},
-		}),
-	);
+	const { actor } = opts;
+	const found = await tx.calendarEvent.findFirst({
+		where: await eventWhere(tx, filter),
+		select: {
+			id: true,
+			courseId: true,
+			course: { select: { instructor: { select: { username: true } } } },
+		},
+	});
+	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const event = valueOrNotFound("calendar-event", found);
 
 	if (!hasPerm(actor, "course.update-contents", event.course)) {
 		throw new NotAllowed(action);

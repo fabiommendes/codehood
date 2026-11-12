@@ -18,6 +18,12 @@ import {
 	timeSlotUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -189,7 +195,8 @@ export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 	 * Changes `title`, `day`, `start`, or `duration`. Never `slug`.
 	 *
 	 * The slot's events move with it: their `startAt` and `durationMin` are
-	 * recomputed in the same transaction.
+	 * recomputed in the same transaction, and each one that changes gets a new
+	 * `updatedAt`.
 	 */
 	const update = op({
 		args: [timeSlotPK, timeSlotUpdate],
@@ -200,12 +207,8 @@ export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 			fields: TimeSlotUpdate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<TimeSlot> => {
-			const current = await writableSlot(
-				tx,
-				filter,
-				opts.actor,
-				"time-slot.update",
-			);
+			const current = await writableSlot(tx, filter, opts, "time-slot.update");
+			await checkVersion(tx, "timeSlot", { id: current.id }, opts);
 
 			const day = fields.day ?? current.day;
 			const startMin = fields.start
@@ -219,16 +222,19 @@ export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 				excludeId: current.id,
 			});
 
-			const row = await tx.timeSlot.update({
-				where: { id: current.id },
-				data: {
+			const row = await guardedUpdate(
+				tx,
+				"timeSlot",
+				{ id: current.id },
+				{
 					title: fields.title,
 					day: fields.day,
 					startMin: fields.start ? startMin : undefined,
 					durationMin: fields.duration ? durationMin : undefined,
 				},
-				include: timeSlotInclude,
-			});
+				opts,
+				{ include: timeSlotInclude },
+			);
 			if (fields.day || fields.start || fields.duration) {
 				await recomputeEventTimes(tx, { timeSlotId: current.id });
 			}
@@ -257,7 +263,10 @@ export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
 				select: { id: true },
 			});
-			if (!existing) return create(tx, { ...input, course: course.id }, opts);
+			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return create(tx, { ...input, course: course.id }, opts);
+			}
 
 			const { slug: _slug, course: _course, ...fields } = input;
 			return update(tx, { course: course.id, slug: input.slug }, fields, opts);
@@ -277,12 +286,8 @@ export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 			filter: TimeSlotPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
-			const current = await writableSlot(
-				tx,
-				filter,
-				opts.actor,
-				"time-slot.delete",
-			);
+			const current = await writableSlot(tx, filter, opts, "time-slot.delete");
+			await checkVersion(tx, "timeSlot", { id: current.id }, opts);
 
 			const eventCount = await tx.calendarEvent.count({
 				where: { timeSlotId: current.id },
@@ -296,7 +301,7 @@ export const makeTimeSlotService = defineService<TimeSlotT>()(() => {
 					}),
 				});
 			}
-			await tx.timeSlot.delete({ where: { id: current.id } });
+			await guardedDelete(tx, "timeSlot", { id: current.id }, opts);
 		},
 	});
 
@@ -358,29 +363,33 @@ async function writableCourse(
 }
 
 /**
- * Finds the slot a write targets, refusing an actor who may not write to its course.
+ * Finds the slot a write targets, refusing an actor who may not write to its
+ * course.
+ *
+ * A missing slot is a `NotFound`, unless `opts` expects a version: then it is
+ * a `PreconditionFailed` carrying `null`.
  */
 async function writableSlot(
 	tx: PrismaTx,
 	filter: TimeSlotPK,
-	actor: ServiceOptsWithoutTx["actor"],
+	opts: ServiceOptsWithoutTx,
 	action: "time-slot.update" | "time-slot.delete",
 ) {
-	const slot = valueOrNotFound(
-		"time-slot",
-		await tx.timeSlot.findFirst({
-			where: timeSlotWhere(filter),
-			select: {
-				id: true,
-				courseId: true,
-				slug: true,
-				day: true,
-				startMin: true,
-				durationMin: true,
-				course: { select: { instructor: { select: { username: true } } } },
-			},
-		}),
-	);
+	const { actor } = opts;
+	const found = await tx.timeSlot.findFirst({
+		where: timeSlotWhere(filter),
+		select: {
+			id: true,
+			courseId: true,
+			slug: true,
+			day: true,
+			startMin: true,
+			durationMin: true,
+			course: { select: { instructor: { select: { username: true } } } },
+		},
+	});
+	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const slot = valueOrNotFound("time-slot", found);
 
 	if (!hasPerm(actor, "course.update-contents", slot.course)) {
 		throw new NotAllowed(action);
