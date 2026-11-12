@@ -66,7 +66,11 @@ import {
 	effectiveAnswerHistory,
 	isHistoryField,
 } from "@/services/answer-history";
-import { attemptDeadline, viewerTiming } from "@/services/exam-state";
+import {
+	attemptClosedAt,
+	attemptDeadline,
+	viewerTiming,
+} from "@/services/exam-state";
 import { courseHref } from "@/urls";
 import { logEvent } from "@/utils/log";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
@@ -681,6 +685,7 @@ const attemptSelect = {
 	examId: true,
 	authorId: true,
 	acceptingSubmissions: true,
+	closedAt: true,
 	createdAt: true,
 	updatedAt: true,
 	exam: { select: { ...examTimingSelect, answerHistory: true } },
@@ -731,7 +736,7 @@ async function loadContext(
 			now,
 			accepting,
 			deadline: attemptDeadline(timing, row),
-			closedAt: row.acceptingSubmissions ? null : row.updatedAt,
+			closedAt: attemptClosedAt(row),
 		}),
 	};
 }

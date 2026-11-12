@@ -175,6 +175,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					examId: exam.id,
 					slotKey,
 					acceptingSubmissions: input.acceptingSubmissions ?? true,
+					closedAt: input.acceptingSubmissions === false ? new Date() : null,
 				},
 				include: responseInclude(),
 			});
@@ -318,7 +319,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				tx,
 				"response",
 				{ id: response.id },
-				{ acceptingSubmissions: fields.acceptingSubmissions },
+				{
+					acceptingSubmissions: fields.acceptingSubmissions,
+					closedAt: closedAtAfter(response, fields.acceptingSubmissions),
+				},
 				opts,
 				{ include: responseInclude() },
 			);
@@ -368,7 +372,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				tx,
 				"response",
 				{ id: row.id },
-				{ acceptingSubmissions: input.acceptingSubmissions },
+				{
+					acceptingSubmissions: input.acceptingSubmissions,
+					closedAt: closedAtAfter(row, input.acceptingSubmissions),
+				},
 				{},
 				{ include: responseInclude() },
 			);
@@ -474,7 +481,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				tx,
 				"response",
 				{ id: row.id },
-				{ acceptingSubmissions: false },
+				{ acceptingSubmissions: false, closedAt: new Date() },
 				{},
 				{ include: responseInclude() },
 			);
@@ -873,6 +880,16 @@ async function resolveOrCreateAttempt(
 	});
 }
 
+/// The `closedAt` to write when `row` is set to `accepting`: now on closing an open attempt, `null` on reopening, and `undefined` (untouched) otherwise, so a second close keeps the first instant.
+function closedAtAfter(
+	row: { acceptingSubmissions: boolean },
+	accepting: boolean | undefined,
+): Date | null | undefined {
+	if (accepting === undefined) return undefined;
+	if (accepting) return null;
+	return row.acceptingSubmissions ? new Date() : undefined;
+}
+
 /// `0` for a graded exam's slot, otherwise a unix timestamp in seconds.
 function dateToSlotKey(date: Date): number {
 	return Math.floor(date.getTime() / 1000);
@@ -894,6 +911,7 @@ function fromDb(row: DbResponse): Response {
 		author: row.authorId,
 		practiceSession: slotKeyToDate(row.slotKey),
 		acceptingSubmissions: row.acceptingSubmissions,
+		closedAt: row.closedAt,
 		submissions: row.submissions.map(submissionFromDb),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

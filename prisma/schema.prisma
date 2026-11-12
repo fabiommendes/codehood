@@ -836,6 +836,11 @@ model Response {
   /// If false, new submissions are not accepted.
   acceptingSubmissions Boolean @default(true)
 
+  /// When the attempt was last closed, by server time. Cleared on reopening and
+  /// kept by a second close. Null while open, and on rows closed before the
+  /// column existed. Unlike `updatedAt`, grading does not move it.
+  closedAt DateTime?
+
   authorId String
   author   User   @relation(fields: [authorId], references: [username])
 

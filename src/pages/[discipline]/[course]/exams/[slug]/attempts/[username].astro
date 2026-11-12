@@ -13,6 +13,7 @@ import { publicForm } from "@/mdq";
 import { examResult, formatScore } from "@/services/exam-result";
 import {
 	answeredAfterDeadline,
+	attemptClosedAt,
 	attemptDeadline,
 	canReopenAttempt,
 	personalTiming,
@@ -153,7 +154,7 @@ const stateLabel = (status: string, score: number | null): string => {
       <div>
         <dt class="text-sm text-muted">{m.exams_attempt_submitted()}</dt>
         <dd class="mt-0.5 font-medium">
-          {closed ? formatDateTime(attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
+          {closed ? formatDateTime(attemptClosedAt(attempt) ?? deadline ?? attempt.updatedAt, { year: "numeric" }) : m.exams_attempt_in_progress()}
         </dd>
       </div>
       <div>

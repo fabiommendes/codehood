@@ -45,6 +45,20 @@ export interface AttemptTiming {
 	acceptingSubmissions: boolean;
 }
 
+/**
+ * When `attempt` was closed, or `null` while it takes submissions.
+ *
+ * A closed row from before `closedAt` existed falls back to `updatedAt`.
+ */
+export function attemptClosedAt(attempt: {
+	acceptingSubmissions: boolean;
+	closedAt: Date | null;
+	updatedAt: Date;
+}): Date | null {
+	if (attempt.closedAt) return attempt.closedAt;
+	return attempt.acceptingSubmissions ? null : attempt.updatedAt;
+}
+
 export type ExamPhase = "draft" | "upcoming" | "open" | "closed" | "archived";
 
 /** Human labels for {@link ExamPhase}, as shown on badges and list headings. */

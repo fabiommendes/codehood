@@ -34,6 +34,9 @@ export const responseSchema = z.object({
 
 	acceptingSubmissions: z.boolean(),
 
+	/// When the attempt was closed, or `null` while it is open or when it was closed before the server recorded it. Server state: never written by a client.
+	closedAt: z.date().nullable(),
+
 	/// Every question answered in this attempt, oldest first.
 	submissions: z.array(submissionSchema),
 
@@ -51,6 +54,7 @@ export const responseCreate = responseSchema
 		author: true,
 		practiceSession: true,
 		submissions: true,
+		closedAt: true,
 		createdAt: true,
 		updatedAt: true,
 	})
