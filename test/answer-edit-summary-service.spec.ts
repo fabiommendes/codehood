@@ -22,6 +22,7 @@ import { MAX_ANSWER_HISTORY_TEXT_BYTES } from "@/core/constants";
 import { NotAllowed } from "@/core/error";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import {
 	appendBatch,
@@ -384,5 +385,53 @@ test.describe("R33: the exam's switch", () => {
 		);
 
 		expect((await summaryOf(world)).enabled).toBe(true);
+	});
+});
+
+test.describe("R33: several attempts by the same author", () => {
+	test("reads the first attempt, the one the instructor's attempt page shows", async () => {
+		// A practice exam may be attempted again and again.
+		const world = await makeWorld({ type: "PRACTICE" });
+		await db.exam.setAnswerHistory(
+			{ course: world.course.id, slug: world.exam.slug },
+			true,
+			FULL_ACCESS,
+		);
+		const second = await persistedResponseFactory.create({
+			course: world.course.id,
+			exam: world.exam.slug,
+			author: world.student.username,
+			practiceSession: new Date(Date.now() + 3_600_000),
+		});
+		await prisma.response.update({
+			where: { id: world.attempt.id },
+			data: { createdAt: new Date(Date.now() - 600_000) },
+		});
+		expect(second.publicId).not.toBe(world.attempt.publicId);
+
+		// The first attempt types for 63.9 s; the second only pastes.
+		await seedNormalHistory(world);
+		const later = await db.answerEdit.append(
+			{
+				course: world.course.id,
+				exam: world.exam.slug,
+				attempt: second.publicId,
+				fields: [
+					{
+						question: world.slugs.text,
+						field: "answer",
+						batch: appendBatch("", "second attempt", { batchId: "other-1" }),
+					},
+				],
+			},
+			{ actor: world.student },
+		);
+		receiptOf(later.results[0] as Parameters<typeof receiptOf>[0]);
+
+		const summary = await questionSummary(world);
+
+		expect(summary.activeMs).toBe(63_900);
+		expect(summary.firstAt).toEqual(NORMAL_FIRST_AT);
+		expect(summary.pastes).toEqual({ count: 1, chars: 120 });
 	});
 });

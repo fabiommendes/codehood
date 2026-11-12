@@ -1,10 +1,16 @@
 import { deflateSync } from "node:zlib";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hashToken } from "@/auth/token";
-import { DEVELOPMENT } from "@/core/constants";
+import { DEVELOPMENT, MAX_ANSWER_HISTORY_TEXT_BYTES } from "@/core/constants";
 import { type CalendarEvent, type Course, db, type User } from "@/db";
 import { prisma } from "@/db/client";
+import type { AnswerEditBatchInput } from "@/db/services/answer-edit.service";
 import type { QuestionResponse } from "@/mdq";
+import {
+	encodeEdits,
+	type InputKind,
+	replayEdits,
+} from "@/services/answer-edits/codec";
 import { hashBytes } from "@/utils/content-hash";
 import {
 	courseWeekZero,
@@ -1367,6 +1373,13 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	);
 	await seedOpenQuiz(cs101.id);
 	await seedCodeAnswerExams(cs101.id);
+	await seedAnswerEditHistoryExams(cs101.id, {
+		hopper,
+		hamilton,
+		liskov,
+		bob,
+		practicing: cohort[0] as User,
+	});
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
 		hopper,
@@ -2235,6 +2248,361 @@ async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+}
+
+/// One edit of a seeded history, at `startMs` of its session.
+interface SeededEdit {
+	position: number;
+	deleteCount: number;
+	insertedText: string;
+	startMs: number;
+	durationMs: number;
+	kind?: InputKind;
+}
+
+/**
+ * Sends the batches of one seeded student to the history service, as that student's browser would.
+ *
+ * It follows the revision and sequence the server expects, so a call only
+ * says what was typed. `receivedAt` is when the server saw the batch.
+ */
+class SeededTyping {
+	text = "";
+	private revision = 0;
+	private seq = 0;
+	private count = 0;
+
+	constructor(
+		private readonly student: User,
+		private readonly ref: {
+			course: Course["id"];
+			exam: string;
+			attempt: string;
+		},
+		private readonly question: string,
+	) {}
+
+	/// Sends one batch of `edits` typed in `session`; `base` starts it from another text, as a rebase does.
+	async type(
+		session: string,
+		receivedAt: Date,
+		edits: SeededEdit[],
+		base?: { reason: "start" | "rebase"; text: string },
+	): Promise<void> {
+		const origin = edits[0]?.startMs ?? 0;
+		const envelope = encodeEdits(
+			edits.map((edit) => ({ kind: "typing", timing: null, ...edit })),
+			origin,
+		);
+		/// The first batch of a field says where it starts from.
+		const start =
+			base ??
+			(this.revision === 0
+				? { reason: "start" as const, text: this.text }
+				: undefined);
+		const from = start?.text ?? this.text;
+		const batch: AnswerEditBatchInput = {
+			version: 1,
+			batchId: `${this.question}-${++this.count}`,
+			sessionId: session,
+			timeOriginMs: origin,
+			baseRevision: this.revision,
+			firstSeq: this.seq,
+			edits: envelope.edits,
+			snapshot: replayEdits(from, envelope),
+			...(start ? { base: start } : {}),
+		};
+		await this.send({ batch }, receivedAt);
+		this.revision++;
+		this.seq += edits.length;
+		this.text = batch.snapshot;
+	}
+
+	/// Records that the browser stopped recording, at `receivedAt`.
+	async gap(reason: string, receivedAt: Date): Promise<void> {
+		await this.send(
+			{ gaps: [{ reason, id: `${this.question}-gap` }] },
+			receivedAt,
+		);
+	}
+
+	/// Sends an insertion over the text limit of a field, which the server refuses and marks the field incomplete for.
+	async overflow(receivedAt: Date): Promise<void> {
+		const edit = {
+			position: this.text.length,
+			deleteCount: 0,
+			insertedText: "x".repeat(MAX_ANSWER_HISTORY_TEXT_BYTES),
+			startMs: 0,
+			durationMs: 1,
+		};
+		await this.type("overflow", receivedAt, [edit]);
+	}
+
+	private async send(
+		item: {
+			batch?: AnswerEditBatchInput;
+			gaps?: { reason: string; id: string }[];
+		},
+		now: Date,
+	): Promise<void> {
+		await db.answerEdit.append(
+			{
+				...this.ref,
+				now,
+				fields: [{ question: this.question, field: "answer", ...item }],
+			},
+			{ actor: this.student },
+		);
+	}
+}
+
+/**
+ * Seeds the exams that show every state of the instructor's edit history.
+ *
+ * In `history-essays` (an exam on the default switch, which records), each
+ * student is one situation: hopper typed normally and pasted a block, hamilton
+ * has a marker, a rebase and a final gap, liskov hit a limit, bob answered
+ * with no recorded typing. `history-off` was recorded and then switched off.
+ * `history-practice` is a practice exam on the default, with nothing recorded.
+ */
+async function seedAnswerEditHistoryExams(
+	course: Course["id"],
+	students: {
+		hopper: User;
+		hamilton: User;
+		liskov: User;
+		bob: User;
+		practicing: User;
+	},
+): Promise<void> {
+	const { hopper, hamilton, liskov, bob, practicing } = students;
+	const text = "essay-base-case";
+	const code = "code-factorial";
+	await db.question.create(
+		{
+			course,
+			slug: text,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "The base case",
+				stem: "Explain why a recursive function needs a base case.",
+				tags: ["recursion"],
+				content: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			course,
+			slug: code,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Factorial",
+				stem: "Write a function `factorial(n)` in JavaScript.",
+				tags: ["recursion"],
+				content: "code",
+				highlight: "javascript",
+			},
+		},
+		FULL_ACCESS,
+	);
+	const questions = [
+		{ slug: text, version: "v1" },
+		{ slug: code, version: "v1" },
+	];
+	for (const [slug, title] of [
+		["history-essays", "Edit history: essays"],
+		["history-off", "Edit history: recording switched off"],
+	] as const) {
+		await db.exam.create(
+			{
+				course,
+				slug,
+				type: "EXAM",
+				status: "ONGOING",
+				title,
+				description: "Open answers whose typing the browser records.",
+				duration: { hours: 2 },
+				questions,
+			},
+			FULL_ACCESS,
+		);
+	}
+	await db.exam.create(
+		{
+			course,
+			slug: "history-practice",
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Edit history: practice",
+			description:
+				"A practice exam on the default switch, which does not record.",
+			questions,
+		},
+		FULL_ACCESS,
+	);
+
+	const now = Date.now();
+	/// A time `minutes` before the seed ran.
+	const ago = (minutes: number) => new Date(now - minutes * 60_000);
+	/// Opens an attempt that started `minutes` ago.
+	const attempt = async (exam: string, student: User, minutes: number) => {
+		const opened = await db.response.create(
+			{ course, exam, author: student.username },
+			{ actor: student },
+		);
+		await prisma.response.update({
+			where: { publicId: opened.publicId },
+			data: { createdAt: ago(minutes) },
+		});
+		return { course, exam, attempt: opened.publicId };
+	};
+	const finish = async (exam: string, student: User) => {
+		await db.response.finish({ course, exam }, { actor: student });
+	};
+	const save = async (
+		exam: string,
+		student: User,
+		question: string,
+		payload: string,
+	) => {
+		await db.response.submit(
+			{ course, exam, question, payload },
+			{ actor: student },
+		);
+	};
+	const definition =
+		"A recursive function calls itself, so without a base case it never stops.";
+	/// The edits of typing `insertedText` word by word from `position`, starting at `startMs`.
+	const typing = (
+		startMs: number,
+		insertedText: string,
+		position: number,
+	): SeededEdit[] => {
+		let at = position;
+		let when = startMs;
+		return (insertedText.match(/\S+\s*|\s+/g) ?? []).map((word) => {
+			const edit: SeededEdit = {
+				position: at,
+				deleteCount: 0,
+				insertedText: word,
+				startMs: when,
+				durationMs: 70,
+			};
+			at += word.length;
+			when += 300 + 50 * word.length;
+			return edit;
+		});
+	};
+
+	// Hopper: typed the text, pasted a long block, deleted a few words, then wrote the code.
+	{
+		const ref = await attempt("history-essays", hopper, 50);
+		const essay = new SeededTyping(hopper, ref, text);
+		const pasted =
+			" Every call works on a smaller input until it reaches the smallest case, where the function answers directly and the calls return one by one.";
+		await essay.type("tab-1", ago(44), [
+			...typing(1000, "A recursive function", 0),
+			...typing(
+				9000,
+				" calls itself, so without a base case it never stops.",
+				20,
+			),
+		]);
+		await essay.type("tab-1", ago(40), [
+			{
+				position: definition.length,
+				deleteCount: 0,
+				insertedText: pasted,
+				startMs: 31_000,
+				durationMs: 120,
+				kind: "paste",
+			},
+			{
+				position: 0,
+				deleteCount: 2,
+				insertedText: "",
+				startMs: 140_000,
+				durationMs: 300,
+				kind: "delete",
+			},
+		]);
+		const program = new SeededTyping(hopper, ref, code);
+		await program.type("tab-1", ago(30), [
+			...typing(200_000, "function factorial(n) {", 0),
+			...typing(
+				215_000,
+				"\n  return n <= 1 ? 1 : n * factorial(n - 1);\n}",
+				23,
+			),
+		]);
+		await save("history-essays", hopper, text, essay.text);
+		await save("history-essays", hopper, code, program.text);
+		await finish("history-essays", hopper);
+	}
+
+	// Hamilton: the browser lost input once, restarted from another text, and the saved answer has more.
+	{
+		const ref = await attempt("history-essays", hamilton, 55);
+		const essay = new SeededTyping(hamilton, ref, text);
+		await essay.type("tab-1", ago(48), [
+			...typing(1000, "The base case is the quick way out.", 0),
+		]);
+		await essay.gap("input-lost", ago(42));
+		await essay.type(
+			"tab-2",
+			ago(36),
+			typing(500, " Without it the calls never return.", 34),
+			{ reason: "rebase", text: "The base case is the slow way out." },
+		);
+		await save(
+			"history-essays",
+			hamilton,
+			text,
+			`${essay.text} It also bounds the stack.`,
+		);
+		await finish("history-essays", hamilton);
+	}
+
+	// Liskov: the text outgrew what a field records, so the history stops at the first batch.
+	{
+		const ref = await attempt("history-essays", liskov, 45);
+		const essay = new SeededTyping(liskov, ref, text);
+		await essay.type("tab-1", ago(40), typing(1000, definition, 0));
+		await essay.overflow(ago(35));
+		await save("history-essays", liskov, text, definition);
+		await finish("history-essays", liskov);
+	}
+
+	// Bob: answered, but no typing reached the server.
+	await attempt("history-essays", bob, 30);
+	await save("history-essays", bob, text, definition);
+	await finish("history-essays", bob);
+
+	// Hopper again, on the exam that is switched off afterwards: what was recorded stays.
+	{
+		const ref = await attempt("history-off", hopper, 40);
+		const essay = new SeededTyping(hopper, ref, text);
+		await essay.type("tab-1", ago(30), [
+			...typing(1000, definition, 0),
+			...typing(50_000, " It is the exit.", definition.length),
+		]);
+		await save("history-off", hopper, text, essay.text);
+		await finish("history-off", hopper);
+	}
+	await db.exam.setAnswerHistory(
+		{ course, slug: "history-off" },
+		false,
+		FULL_ACCESS,
+	);
+
+	// A student practices: the default does not record, so nothing is kept.
+	await save("history-practice", practicing, text, definition);
 }
 
 /**

@@ -1,17 +1,41 @@
 /**
  * What the dev seed (`src/db/bootstrap.ts`) holds for the edit history (spec
  * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R36). It reads the
- * seeded database `test/run.ts` prepares, so it looks only at the courses of
- * the seeded instructors: other spec files add courses of their own to the
- * same database.
+ * seeded database `test/run.ts` prepares, from a private copy of it (see
+ * `beforeAll`), and looks only at the courses of the seeded instructors.
  *
  * The spec names no slugs, so each situation is found by what it is, not by
  * where it lives.
  */
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { FULL_ACCESS } from "@/auth/actor";
 import { db } from "@/db";
-import { prisma } from "@/db/client";
+import { PrismaClient } from "@/db/client";
+import { TEST_SEEDED_DB_PATH } from "./env";
+
+/// A copy of the seeded database `test/run.ts` prepares, which no worker writes to.
+/// The worker's own database is shared with the spec files that run before and
+/// after this one, and some of them empty it; the seed is read from here instead.
+let prisma: PrismaClient;
+let scratch: string;
+
+test.beforeAll(() => {
+	scratch = mkdtempSync(path.join(tmpdir(), "codehood-seed-"));
+	const file = path.join(scratch, "seeded.db");
+	copyFileSync(TEST_SEEDED_DB_PATH, file);
+	prisma = new PrismaClient({
+		adapter: new PrismaBetterSqlite3({ url: `file:${file}` }),
+	});
+});
+
+test.afterAll(async () => {
+	await prisma.$disconnect();
+	rmSync(scratch, { recursive: true, force: true });
+});
 
 const SEEDED_INSTRUCTORS = ["ada", "alan", "instructor"];
 
@@ -39,7 +63,7 @@ async function summaryOfHistory(
 			exam: exam.slug,
 			author: history.response.authorId,
 		},
-		FULL_ACCESS,
+		{ ...FULL_ACCESS, tx: prisma },
 	);
 	return { history, exam, summary };
 }
