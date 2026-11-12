@@ -1,0 +1,44 @@
+[project]
+name = "chalk-worker"
+version = "0.1.0"
+description = "Pull worker that grades code answers of a Codehood course on the teacher's machine."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Fábio Macêdo Mendes", email = "fabiomacedomendes@gmail.com" },
+]
+requires-python = ">=3.13"
+dependencies = [
+    "chalk-grader>=0.1.0",
+    "codehood-cli",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+chalk-worker = "chalk_worker.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "ruff>=0.15.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "chalk_worker"
+module-root = ""
+
+# codehood-cli is not on PyPI: the worker lives in the codehood repository,
+# in workers/chalk-worker/, next to cli/.
+[tool.uv.sources]
+codehood-cli = { path = "../../cli", editable = true }
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
