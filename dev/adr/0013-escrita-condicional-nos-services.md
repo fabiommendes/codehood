@@ -83,7 +83,8 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
     reescrita.
   - `response.submit`, `submission.create`, `submission.update` (status) e
     `submission.delete`: a resposta (as submissões aparecem no read model);
-  - `attachment.update` de um anexo de relatório: o relatório;
+  - `attachment.update` e `attachment.delete` de um anexo de relatório: o
+    relatório;
   - `feedback.create` e `feedback.upsert` que criam uma nota, com a
     submissão mudando de status: a resposta (`accept` de um pedido de revisão
     também, pois grava uma nota);
