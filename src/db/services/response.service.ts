@@ -46,6 +46,7 @@ import {
 	invalidIfExists,
 	valueOrNotFound,
 } from "../utils";
+import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
@@ -367,21 +368,30 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	 */
 	const remove = op({
 		args: [responsePK],
-		run: async (
+		transaction: false,
+		run: (
 			tx: PrismaTx,
 			filter: ResponsePK,
 			opts: ServiceOptsWithoutTx,
-		): Promise<void> => {
-			const response = await writableResponse(
+		): Promise<void> =>
+			loggingAnswerHistoryRemoval(
 				tx,
-				filter,
-				opts.actor,
-				"response.delete",
-			);
+				"response-delete",
+				async (inner, measure) => {
+					const response = await writableResponse(
+						inner,
+						filter,
+						opts.actor,
+						"response.delete",
+					);
 
-			await tx.submission.deleteMany({ where: { responseId: response.id } });
-			await tx.response.delete({ where: { id: response.id } });
-		},
+					await measure({ responseIds: [response.id] });
+					await inner.submission.deleteMany({
+						where: { responseId: response.id },
+					});
+					await inner.response.delete({ where: { id: response.id } });
+				},
+			),
 	});
 
 	/**
