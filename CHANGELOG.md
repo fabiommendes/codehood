@@ -4,6 +4,21 @@
 
 ### Added
 
+- Escrita condicional (ADR 0013). Toda escrita de um service cujo modelo tem
+  `updatedAt` aceita `expectedUpdatedAt` e falha com `PreconditionFailed`
+  (412, com o `updatedAt` atual ou `null`) quando a linha mudou ou não existe;
+  sem a opção, segue last-write-wins. O REST traduz `If-Match: "<updatedAt>"`
+  e `If-None-Match: *` (só `PUT`) em `PUT`, `PATCH` e `DELETE`, devolve
+  `ETag` no `GET` e nas escritas de rotas versionadas, aceita os sufixos
+  `-gzip`/`-zstd`/`-br` que o proxy acrescenta e recusa com 400 ETag
+  malformado ou cabeçalho em rota sem versão. O `updatedAt` é estritamente
+  crescente por linha, comparado em ms; escritas em filhos possuídos e
+  escritas derivadas (lista na ADR) movem a versão, cache (`zipHash`) não.
+  Linha oculta ao ator responde como ausente. O caminho do aluno (salvar,
+  entregar, iniciar) nunca checa versão. `Discipline` ganha `updatedAt`;
+  rubrica e itens passam a expô-lo. Snapshot OpenAPI e cliente da CLI
+  regenerados; o cliente gerado agora envia `if_match`. `rest.batch` não
+  repassa os cabeçalhos.
 - Remover uma tentativa registra em log uma linha JSON `answer-history.removed`
   (curso, prova, tentativas, campos, lotes, edits, `byteCount` e `storedBytes`
   estimado) quando ela tinha histórico de edição, e `pnpm run manage
