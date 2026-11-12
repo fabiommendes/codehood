@@ -9,6 +9,7 @@ import {
 	editionUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { rejectExpectedUpdatedAt } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { PrismaTx } from "../client";
@@ -133,6 +134,7 @@ export const makeEditionService = defineService<EditionT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<Edition> => {
 			ensurePerm(opts.actor, "edition.update");
+			rejectExpectedUpdatedAt(opts);
 			const current = await tx.edition.findUnique({
 				where: { slug: filter.slug },
 			});
@@ -169,6 +171,7 @@ export const makeEditionService = defineService<EditionT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<Edition> => {
 			ensurePerm(opts.actor, "edition.create");
+			rejectExpectedUpdatedAt(opts);
 			assertWindow(input.startAt, input.endAt);
 
 			return tx.edition.upsert({
@@ -203,6 +206,7 @@ export const makeEditionService = defineService<EditionT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
 			ensurePerm(opts.actor, "edition.delete");
+			rejectExpectedUpdatedAt(opts);
 			const courses = await tx.course.count({
 				where: { editionSlug: filter.slug },
 			});

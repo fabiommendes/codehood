@@ -1,12 +1,14 @@
 import { slotInstant } from "@/utils/schedule-time";
 import type { Prisma, PrismaClient, PrismaTx } from "./client";
+import { guardRow } from "./conditional-write";
 
 /**
  * Recomputes `startAt` and `durationMin` of the events matching `where` from
  * their course's start, their slot and their week, and returns how many
  * changed.
  *
- * An event's time is always derived from those three; call this whenever one
+ * Each event that changes gets a new `updatedAt`, so a version read before
+ * the recomputation is stale afterwards. An event's time is always derived from those three; call this whenever one
  * of them changes under existing events.
  */
 export async function recomputeEventTimes(
@@ -40,9 +42,14 @@ export async function recomputeEventTimes(
 		) {
 			continue;
 		}
+		const updatedAt = await guardRow(
+			client,
+			{ model: "calendarEvent", where: { id: event.id } },
+			{},
+		);
 		await client.calendarEvent.update({
 			where: { id: event.id },
-			data: { startAt, durationMin },
+			data: { startAt, durationMin, updatedAt },
 		});
 		changed += 1;
 	}

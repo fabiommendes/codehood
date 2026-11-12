@@ -18,6 +18,7 @@ import {
 	courseUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { checkExpectedUpdatedAt, guardRow } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
@@ -189,6 +190,9 @@ const buildCourseService = defineService<CourseT>()(() => {
 
 	/**
 	 * Updates a course's editable fields.
+	 *
+	 * A new `startAt` also recomputes the times of the course's events, each of
+	 * which gets a new `updatedAt`.
 	 */
 	const update = op({
 		args: [coursePK, courseUpdate],
@@ -203,9 +207,14 @@ const buildCourseService = defineService<CourseT>()(() => {
 			if (!hasPerm(opts.actor, "course.update", target))
 				throw new NotAllowed("course.update");
 
+			const updatedAt = await guardRow(
+				tx,
+				{ model: "course", where: { id: target.id } },
+				opts,
+			);
 			const row = await tx.course.update({
 				where: { id: target.id },
-				data: fields,
+				data: { ...fields, updatedAt },
 				include: courseInclude,
 			});
 			// Event times are derived from the course's start.
@@ -249,7 +258,10 @@ const buildCourseService = defineService<CourseT>()(() => {
 			} catch (error) {
 				throw error instanceof NotAllowed ? error.as("course.create") : error;
 			}
-			if (!existing) return create(tx, input, opts);
+			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return create(tx, input, opts);
+			}
 
 			await assertCanCreateCourse(tx, input, opts, {
 				action: "course.create",
@@ -272,6 +284,7 @@ const buildCourseService = defineService<CourseT>()(() => {
 			if (!hasPerm(opts.actor, "course.delete", target))
 				throw new NotAllowed("course.delete");
 
+			await guardRow(tx, { model: "course", where: { id: target.id } }, opts);
 			await tx.course.delete({ where: { id: target.id } });
 		},
 	});

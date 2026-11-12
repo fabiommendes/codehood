@@ -10,6 +10,7 @@ import {
 	disciplineUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { checkExpectedUpdatedAt, guardRow } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
@@ -130,9 +131,14 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 					message: m.errors_discipline_not_found({ slug: filter.slug }),
 				});
 			}
+			const updatedAt = await guardRow(
+				tx,
+				{ model: "discipline", where: { slug: filter.slug } },
+				opts,
+			);
 			return tx.discipline.update({
 				where: { slug: filter.slug },
-				data: { name: fields.name },
+				data: { name: fields.name, updatedAt },
 			});
 		},
 	});
@@ -154,10 +160,23 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<Discipline> => {
 			assertCanWriteDiscipline(opts.actor, input.slug, "discipline.create");
-			return tx.discipline.upsert({
+			const current = await tx.discipline.findUnique({
 				where: { slug: input.slug },
-				update: { name: input.name },
-				create: { slug: input.slug, name: input.name },
+			});
+			if (!current) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return tx.discipline.create({
+					data: { slug: input.slug, name: input.name },
+				});
+			}
+			const updatedAt = await guardRow(
+				tx,
+				{ model: "discipline", where: { slug: input.slug } },
+				opts,
+			);
+			return tx.discipline.update({
+				where: { slug: input.slug },
+				data: { name: input.name, updatedAt },
 			});
 		},
 	});
@@ -178,6 +197,11 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
 			ensurePerm(opts.actor, "discipline.delete");
+			await guardRow(
+				tx,
+				{ model: "discipline", where: { slug: filter.slug } },
+				opts,
+			);
 			const courses = await tx.course.count({
 				where: { disciplineSlug: filter.slug },
 			});
