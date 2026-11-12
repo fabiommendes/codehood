@@ -2214,6 +2214,12 @@ async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
+	// The quiz default records the edit history; this one switches it off, so the toggle shows both states.
+	await db.exam.setAnswerHistory(
+		{ course, slug: "quiz-js" },
+		false,
+		FULL_ACCESS,
+	);
 	await db.exam.create(
 		{
 			course,

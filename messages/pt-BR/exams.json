@@ -223,6 +223,8 @@
 	"exams_detail_code_run_off_default": "Execução de código: desligada (padrão de {type})",
 	"exams_detail_code_run_on_exam": "Execução de código: ligada (definida no exam)",
 	"exams_detail_code_run_off_exam": "Execução de código: desligada (definida no exam)",
+	"exams_answer_history_label": "Registrar histórico de edição",
+	"exams_answer_history_hint": "Desligar mantém o histórico já gravado. As páginas já abertas param de enviá-lo.",
 	"exams_attempt_code_badge": "O código roda no seu navegador",
 	"exams_attempt_submit_conflict": "Duas versões da resposta em {numbers}. Se você enviar agora, vale a versão do servidor.",
 	"exams_code_answer_label": "Resposta em código",

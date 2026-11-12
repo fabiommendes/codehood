@@ -5,7 +5,7 @@
  * (`course.update-contents`) and reads follow `course.read-contents`, with a
  * `DRAFT` or `ARCHIVED` exam visible to its author alone.
  */
-import type { z } from "zod";
+import { z } from "zod";
 import { accessError, examAccess, requireAccess } from "@/auth/access";
 import { SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
@@ -453,6 +453,36 @@ export const makeExamService = defineService<ExamT>()(() => {
 	});
 
 	/**
+	 * Turns the recording of the edit history of an exam on or off.
+	 *
+	 * Stores an explicit `enabled`, which from then on wins over the default of
+	 * the exam type. History already recorded stays where it is. Only whoever
+	 * may write the course's contents can flip it, and it is not a field of
+	 * `update`: the exam files a CLI pushes never carry it.
+	 *
+	 * @throws {@link NotFound} If the exam does not exist or `actor` may not see it.
+	 * @throws {@link NotAllowed} If `actor` may not write the course's contents.
+	 */
+	const setAnswerHistory = op({
+		args: [examPK, z.boolean()],
+		returns: examSchema,
+		run: async (
+			tx: PrismaTx,
+			filter: ExamPK,
+			enabled: boolean,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Exam> => {
+			const exam = await writableExam(tx, filter, opts.actor, "exam.update");
+			const row = await tx.exam.update({
+				where: { id: exam.id },
+				data: { answerHistory: enabled },
+				include: examInclude(),
+			});
+			return fromDb(row);
+		},
+	});
+
+	/**
 	 * Archives an exam rather than removing it.
 	 *
 	 * Responses point at the exam they were written for, so the row stays
@@ -483,6 +513,7 @@ export const makeExamService = defineService<ExamT>()(() => {
 		update,
 		upsert,
 		releaseGrades,
+		setAnswerHistory,
 		delete: remove,
 	};
 });

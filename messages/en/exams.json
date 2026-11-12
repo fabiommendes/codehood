@@ -223,6 +223,8 @@
 	"exams_detail_code_run_off_default": "Code execution: off ({type} default)",
 	"exams_detail_code_run_on_exam": "Code execution: on (set in the exam)",
 	"exams_detail_code_run_off_exam": "Code execution: off (set in the exam)",
+	"exams_answer_history_label": "Record edit history",
+	"exams_answer_history_hint": "Turning it off keeps the history already recorded. Pages already open stop sending it.",
 	"exams_attempt_code_badge": "Code runs in your browser",
 	"exams_attempt_submit_conflict": "Two versions of the answer in {numbers}. Submitting now sends the server's version.",
 	"exams_code_answer_label": "Code answer",

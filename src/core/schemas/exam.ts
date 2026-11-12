@@ -147,6 +147,9 @@ export const examParams = z.object({
 	exam: z.string().min(1),
 });
 
+/// The instructor's switch for the edit history of one exam, addressed by URL segments.
+export const examSetAnswerHistory = examParams.extend({ enabled: z.boolean() });
+
 /// One answer to one question of the actor's open attempt, addressed by URL segments.
 export const examAnswer = examParams.extend({
 	question: z.string().min(1),

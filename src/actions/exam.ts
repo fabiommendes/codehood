@@ -7,9 +7,13 @@ import {
 	examExceptionSave,
 	examParams,
 	examReopenAttempt,
+	examSetAnswerHistory,
 } from "@/core/schemas";
 import { db } from "@/db";
-import { readAnswerHistory } from "@/services/answer-history";
+import {
+	effectiveAnswerHistory,
+	readAnswerHistory,
+} from "@/services/answer-history";
 import { parseCourseParams } from "@/urls";
 import { parseLocalDateTime, toDuration } from "@/utils/schedule-time";
 import { withServiceErrors } from "./helpers";
@@ -65,6 +69,25 @@ export const exam = {
 				{ actor },
 			);
 			return { releasedAt: released.gradesReleasedAt };
+		}),
+	}),
+
+	/**
+	 * Turns the recording of the exam's edit history on or off (instructor only).
+	 *
+	 * Answers with the effective switch after the change.
+	 */
+	setAnswerHistory: defineAction({
+		input: examSetAnswerHistory,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			const { enabled, ...rest } = input;
+			const updated = await db.exam.setAnswerHistory(
+				{ course: parseCourseParams(rest), slug: input.exam },
+				enabled,
+				{ actor },
+			);
+			return { answerHistory: effectiveAnswerHistory(updated) };
 		}),
 	}),
 
