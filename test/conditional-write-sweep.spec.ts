@@ -5,9 +5,12 @@ import { PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { repositoryTree } from "@/fixtures/repository.factory";
 import { createRubricScenario } from "@/fixtures/rubric-scenario";
 import {
+	actorOf,
 	enroll,
+	makeAttempt,
 	makeCourse,
 	makeExam,
 	makeReport,
@@ -26,7 +29,9 @@ import {
 ///   name shared by two models is flagged when either of them has `updatedAt`;
 /// - raw SQL is read from the first string literal after `$executeRaw` or
 ///   `$queryRaw`, so a statement built by concatenation is not;
-/// - a delegate handed to another function (`save(tx.course)`) is not followed.
+/// - a delegate handed to another function (`save(tx.course)`) is not followed;
+/// - an alias of a delegate (`const r = tx.response`) and a destructured one
+///   (`const { response } = inner`) are followed inside their own file only.
 
 const WRITES = ["update", "upsert", "delete"] as const;
 type Write = (typeof WRITES)[number];
@@ -87,13 +92,14 @@ const opts = (row: { updatedAt: Date }, version: Version) => ({
 /// Which version a case sends: one that is no longer the row's, or its own.
 type Version = "stale" | "current";
 
-/// Services that honor the option. Each write creates its own row and runs
-/// with the version asked for: `stale` must reject with `PreconditionFailed`
-/// and `current` must write.
-const HONORED: Record<
-	string,
-	Partial<Record<Write, (version: Version) => Promise<unknown>>>
-> = {
+/// A write of one service run against a row of its own, with the version asked for.
+type Case = (version: Version) => Promise<unknown>;
+
+/// Services that honor the option. Each public write has a case that creates
+/// its own row and runs with the version asked for: `stale` must reject with
+/// `PreconditionFailed` and `current` must write. A public operation with no
+/// case is listed in `UNGUARDED` with the reason, or is a read.
+const HONORED: Record<string, Record<string, Case>> = {
 	discipline: (() => {
 		const row = async () => {
 			const slug = `sw-d-${uniq()}`;
@@ -266,6 +272,21 @@ const HONORED: Record<
 				const { repository, body } = await row();
 				return db.repository.delete(body, opts(repository, v));
 			},
+			addFiles: async (v) => {
+				const { repository, body } = await row();
+				const { files } = repositoryTree({ "a.txt": uniq() });
+				return db.repository.addFiles(body, files, opts(repository, v));
+			},
+			commit: async (v) => {
+				const { repository, body } = await row();
+				const { files, tree } = repositoryTree({ "a.txt": uniq() });
+				await db.repository.addFiles(body, files, FULL_ACCESS);
+				return db.repository.commit(body, { tree }, opts(repository, v));
+			},
+			rotateToken: async (v) => {
+				const { repository, body } = await row();
+				return db.repository.rotateToken(body, opts(repository, v));
+			},
 		};
 	})(),
 	question: (() => {
@@ -340,6 +361,10 @@ const HONORED: Record<
 				const { column } = await row();
 				return db.gradeColumn.delete({ id: column.id }, opts(column, v));
 			},
+			release: async (v) => {
+				const { column } = await row();
+				return db.gradeColumn.release({ id: column.id }, opts(column, v));
+			},
 		};
 	})(),
 	rollCall: (() => {
@@ -379,6 +404,14 @@ const HONORED: Record<
 				const rollCall = await row();
 				return db.rollCall.delete({ id: rollCall.id }, opts(rollCall, v));
 			},
+			open: async (v) => {
+				const rollCall = await row();
+				return db.rollCall.open({ id: rollCall.id }, opts(rollCall, v));
+			},
+			close: async (v) => {
+				const rollCall = await row();
+				return db.rollCall.close({ id: rollCall.id }, opts(rollCall, v));
+			},
 		};
 	})(),
 	exam: (() => {
@@ -401,6 +434,15 @@ const HONORED: Record<
 			delete: async (v) => {
 				const { exam } = await row();
 				return db.exam.delete({ id: exam.id }, opts(exam, v));
+			},
+			releaseGrades: async (v) => {
+				const { course } = await makeCourse();
+				const exam = await makeExam(course.id, { status: "COMPLETED" });
+				return db.exam.releaseGrades({ id: exam.id }, opts(exam, v));
+			},
+			setAnswerHistory: async (v) => {
+				const { exam } = await row();
+				return db.exam.setAnswerHistory({ id: exam.id }, true, opts(exam, v));
 			},
 		};
 	})(),
@@ -515,25 +557,82 @@ const HONORED: Record<
 			},
 		};
 	})(),
-	rubric: (() => ({
-		update: async (v) => {
+	rubric: (() => {
+		/// A scenario with a stored rubric of items `a`, `b` (group `G`) and `c`, and the version of each row.
+		const row = async () => {
 			const scenario = await createRubricScenario();
-			await scenario.seedRubric({ items: [{ key: "a", value: "0.5" }] });
+			const seeded = await scenario.seedRubric({
+				items: [
+					{ key: "a", group: "G/One", value: "0.5" },
+					{ key: "b", group: "G/Two", value: "0.25" },
+					{ key: "c", value: "0.25" },
+				],
+			});
 			const rubric = await prisma.rubric.findFirstOrThrow({
 				where: { examId: scenario.exam.id },
 			});
-			return db.rubric.update(
-				scenario.main.pk,
-				{ base: "1" },
-				{
-					actor: scenario.instructor,
-					expectedUpdatedAt: v === "stale" ? STALE : rubric.updatedAt,
-				},
-			);
-		},
-	}))(),
-	regradeRequest: (() => ({
-		delete: async (v) => {
+			const item = (key: string) =>
+				prisma.rubricItem.findFirstOrThrow({
+					where: { rubricId: rubric.id, key },
+				});
+			const as = (row: { updatedAt: Date }, v: Version) => ({
+				actor: scenario.instructor,
+				expectedUpdatedAt: v === "stale" ? STALE : row.updatedAt,
+			});
+			return { pk: scenario.main.pk, rubric, item, as, seeded };
+		};
+		return {
+			update: async (v) => {
+				const { pk, rubric, as } = await row();
+				return db.rubric.update(pk, { base: "1" }, as(rubric, v));
+			},
+			createItem: async (v) => {
+				const { pk, rubric, as } = await row();
+				return db.rubric.createItem(
+					pk,
+					{ text: "x", value: "0.1" },
+					as(rubric, v),
+				);
+			},
+			updateItem: async (v) => {
+				const { pk, item, as } = await row();
+				return db.rubric.updateItem(
+					{ ...pk, key: "a" },
+					{ text: "x" },
+					as(await item("a"), v),
+				);
+			},
+			upsertItem: async (v) => {
+				const { pk, item, as } = await row();
+				return db.rubric.upsertItem(
+					{ ...pk, key: "a" },
+					{ text: "x", value: "0.5" },
+					as(await item("a"), v),
+				);
+			},
+			deleteItem: async (v) => {
+				const { pk, item, as } = await row();
+				return db.rubric.deleteItem(
+					{ ...pk, key: "c" },
+					as(await item("c"), v),
+				);
+			},
+			splitItem: async (v) => {
+				const { pk, item, as } = await row();
+				return db.rubric.splitItem(
+					{ ...pk, key: "a" },
+					{ children: [{ text: "x", value: "0.1" }] },
+					as(await item("a"), v),
+				);
+			},
+			renameGroup: async (v) => {
+				const { pk, rubric, as } = await row();
+				return db.rubric.renameGroup(pk, { from: "G", to: "H" }, as(rubric, v));
+			},
+		};
+	})(),
+	regradeRequest: (() => {
+		const row = async () => {
 			const scenario = await createRubricScenario();
 			const answer = await scenario.addAnswer();
 			await db.feedback.create(
@@ -549,16 +648,136 @@ const HONORED: Record<
 				},
 				{ actor: answer.author },
 			);
-			return db.regradeRequest.delete(
-				{ publicId: request.publicId },
-				{
-					actor: answer.author,
-					expectedUpdatedAt: v === "stale" ? STALE : request.updatedAt,
-				},
-			);
-		},
-	}))(),
+			const as = (actor: typeof scenario.instructor, v: Version) => ({
+				actor,
+				expectedUpdatedAt: v === "stale" ? STALE : request.updatedAt,
+			});
+			return { scenario, answer, request, as };
+		};
+		return {
+			delete: async (v) => {
+				const { answer, request, as } = await row();
+				return db.regradeRequest.delete(
+					{ publicId: request.publicId },
+					as(answer.author, v),
+				);
+			},
+			accept: async (v) => {
+				const { scenario, request, as } = await row();
+				return db.regradeRequest.accept(
+					{ publicId: request.publicId },
+					{ score: "1", reply: "ok" },
+					as(scenario.instructor, v),
+				);
+			},
+			reject: async (v) => {
+				const { scenario, request, as } = await row();
+				return db.regradeRequest.reject(
+					{ publicId: request.publicId },
+					{ reply: "no" },
+					as(scenario.instructor, v),
+				);
+			},
+		};
+	})(),
 };
+
+/// The student's path through `response`: it never carries an expectation and
+/// never fails on one, so each case sends a stale one and must still write.
+const STUDENT_PATH: Record<string, Record<string, () => Promise<unknown>>> = {
+	response: (() => {
+		const stale = (student: Parameters<typeof actorOf>[0]) => ({
+			...actorOf(student),
+			expectedUpdatedAt: STALE,
+		});
+		return {
+			create: async () => {
+				const { course, exam, student } = await makeAttempt();
+				return db.response.create(
+					{ course: course.id, exam: exam.slug, author: student.username },
+					stale(student),
+				);
+			},
+			submit: async () => {
+				const { course, exam, question, student } = await makeAttempt();
+				return db.response.submit(
+					{
+						course: course.id,
+						exam: exam.slug,
+						question: question.slug,
+						payload: "a",
+					},
+					stale(student),
+				);
+			},
+			finish: async () => {
+				const { course, exam, question, student } = await makeAttempt();
+				const input = { course: course.id, exam: exam.slug };
+				await db.response.submit(
+					{ ...input, question: question.slug, payload: "a" },
+					actorOf(student),
+				);
+				return db.response.finish(input, stale(student));
+			},
+		};
+	})(),
+};
+
+/// Public operations of a honored service that have no case above, with the
+/// reason. `findOne` and `findMany` are reads everywhere.
+const UNGUARDED: Record<string, string> = {
+	...Object.fromEntries(
+		[
+			"discipline",
+			"course",
+			"timeSlot",
+			"calendarEvent",
+			"resource",
+			"repository",
+			"question",
+			"gradeColumn",
+			"rollCall",
+			"exam",
+			"examException",
+			"report",
+			"feedback",
+			"regradeRequest",
+		].map((key) => [
+			`${key}.create`,
+			"creates a row: there is nothing to compare",
+		]),
+	),
+	...Object.fromEntries(
+		[
+			"course.naturalKey",
+			"exam.findManyInCourses",
+			"repository.listDir",
+			"repository.readFile",
+			"repository.readObject",
+			"repository.findByToken",
+			"rollCall.currentCode",
+			"rollCall.courseAttendance",
+			"rollCall.claimTarget",
+			"rollCall.claimInfo",
+			"report.attachment",
+			"report.countOpen",
+			"rubric.preview",
+		].map((op) => [op, "reads"]),
+	),
+	"repository.zip":
+		"fills a cache the read model does not show: keeps the version",
+	"calendarEvent.recomputeTimes":
+		"derived write: moves the version of the events it recomputes, takes no expectation",
+	"question.upgradeLegacyVersions":
+		"derived write: moves the version of the questions it rewrites, takes no expectation",
+	"rollCall.checkIn":
+		"the student's own call: it carries no expectation, and bumps the roll call only when it adds an attendance",
+	"rollCall.checkInClaim":
+		"the student's own call: it carries no expectation, and bumps the roll call only when it adds an attendance",
+};
+
+/// Operations that read in every service.
+const READS = new Set(["findOne", "findMany"]);
 
 /// Services with writes on a versioned model that do not honor the option
 /// yet. Remove a name when its service does; the test fails if it stays. A new
@@ -568,6 +787,10 @@ const PENDING = new Set<string>();
 
 /// Services outside the rule, with the reason.
 const EXEMPT: Record<string, string> = {
+	attachment:
+		"its model has no updatedAt: every write calls rejectExpectedUpdatedAt, and it only touches the owner it belongs to",
+	submission:
+		"its model has no updatedAt: every write calls rejectExpectedUpdatedAt, and it only touches its response",
 	answerEdit:
 		"no public update/upsert/delete; append is a compare-and-swap on AnswerEditField.revision",
 };
@@ -617,7 +840,8 @@ function dbSources(dir = "src/db"): { file: string; text: string }[] {
 type WriteSite = { file: string; model: string; raw: boolean };
 
 /// The write methods of a Prisma delegate.
-const WRITE_METHODS = "update|updateMany|upsert|delete|deleteMany";
+const WRITE_METHODS =
+	"update|updateMany|updateManyAndReturn|createManyAndReturn|upsert|delete|deleteMany";
 
 /// The write operations of a nested relation write.
 const NESTED_WRITES =
@@ -669,6 +893,13 @@ function firstLiteral(text: string): string {
 	return close < 0 ? "" : text.slice(open + 1, close);
 }
 
+/// Whether `text` calls a write method on the identifier `name` (not inside a string, not behind a dot).
+function callsWrite(text: string, name: string): boolean {
+	return new RegExp(
+		`(?<![\\w."'/-])${name}\\s*\\.\\s*(?:${WRITE_METHODS})\\s*[<(]`,
+	).test(text);
+}
+
 /// Every write on a versioned model in `src/db/`, wherever the file is and
 /// whatever the receiver is called: Prisma calls outside the helper (`raw`)
 /// and calls to the helper. A write that bypasses the helper without being a
@@ -687,8 +918,9 @@ function scanWrites(versioned: Set<string>): WriteSite[] {
 		`\\b(?:tx|prisma|client)\\s*\\[\\s*["'](\\w+)["']\\s*\\]\\s*\\.\\s*(?:${WRITE_METHODS})\\b`,
 		"g",
 	);
-	const destructured =
-		/\bconst\s*\{([^}]*)\}\s*=\s*(?:tx|prisma|client|this\.client)\s*;/g;
+	const destructured = /\bconst\s*\{([^}]*)\}\s*=\s*(?:await\s+)?[\w.]+/g;
+	const aliased =
+		/\b(?:const|let|var)\s+(\w+)\s*=\s*(?:tx|prisma|client|this\.client|\w+)\.([a-z]\w*)\s*[;,\n]/g;
 	const nested = new RegExp(
 		`\\b(\\w+)\\s*:\\s*\\{\\s*(?:${NESTED_WRITES})\\b`,
 		"g",
@@ -712,11 +944,14 @@ function scanWrites(versioned: Set<string>): WriteSite[] {
 				const [key = "", alias = key] = entry
 					.split(":")
 					.map((part) => part.trim());
-				const writesIt = new RegExp(
-					`\\b${alias}\\s*\\.\\s*(?:${WRITE_METHODS})\\b`,
-				).test(text);
+				const writesIt = callsWrite(text, alias);
 				if (writesIt) add(upper(key), true);
 			}
+		}
+		for (const taken of text.matchAll(aliased)) {
+			const [, alias = "", delegate = ""] = taken;
+			const writesIt = callsWrite(text, alias);
+			if (writesIt) add(upper(delegate), true);
 		}
 		for (const call of text.matchAll(nested)) {
 			for (const model of relations.get(call[1] ?? "") ?? []) add(model, true);
@@ -773,6 +1008,27 @@ test("every write on a versioned model belongs to an accounted service", () => {
 	).toEqual([]);
 });
 
+/// The key in `db` of a file `src/db/services/<name>.service.ts`, or `null`.
+function serviceKeyOf(file: string): string | null {
+	const name = file.match(/services\/([\w-]+)\.service\.ts$/)?.[1];
+	return name
+		? name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
+		: null;
+}
+
+test("every service that writes a versioned model is honored or exempt", () => {
+	const unaccounted = new Set<string>();
+	for (const { file, model } of scanWrites(versionedModels())) {
+		const key = serviceKeyOf(file);
+		if (key === null || key in HONORED || key in EXEMPT) continue;
+		unaccounted.add(`${key} (writes ${model}, ${file})`);
+	}
+	expect(
+		[...unaccounted],
+		"add the service to HONORED, with a case for each public write, or to EXEMPT with the reason",
+	).toEqual([]);
+});
+
 test("PENDING lists only services that still need the option", () => {
 	const writes = scanWrites(versionedModels());
 	const rotten = [...PENDING].filter(
@@ -785,14 +1041,32 @@ test("PENDING lists only services that still need the option", () => {
 	expect(rotten, "remove these from PENDING").toEqual([]);
 });
 
+const publicOps = (key: string): string[] =>
+	Object.entries((db as Record<string, Record<string, unknown>>)[key] ?? {})
+		.filter(([, member]) => typeof member === "function")
+		.map(([name]) => name);
+
 for (const [key, ops] of Object.entries(HONORED)) {
-	test(`${key}: every write rejects a stale expectedUpdatedAt and takes the current one`, async () => {
+	test(`${key}: every public write rejects a stale expectedUpdatedAt and takes the current one`, async () => {
 		expect(honorsOption(key), "the service source never uses the helper").toBe(
 			true,
 		);
-		expect(Object.keys(ops).sort(), "HONORED must cover each write").toEqual(
-			writeOps(key).sort(),
+		const accounted = new Set([
+			...Object.keys(ops),
+			...Object.keys(STUDENT_PATH[key] ?? {}),
+		]);
+		const unaccounted = publicOps(key).filter(
+			(op) =>
+				!accounted.has(op) && !READS.has(op) && !(`${key}.${op}` in UNGUARDED),
 		);
+		expect(
+			unaccounted,
+			`${key}: give each of these a case in HONORED or STUDENT_PATH, or list it in UNGUARDED`,
+		).toEqual([]);
+		expect(
+			writeOps(key).filter((op) => !(op in ops)),
+			"HONORED must cover update, upsert and delete",
+		).toEqual([]);
 		for (const [op, run] of Object.entries(ops)) {
 			const stale = await run("stale").catch((e: unknown) => e);
 			expect(stale, `${key}.${op} with a stale version`).toBeInstanceOf(
@@ -800,5 +1074,26 @@ for (const [key, ops] of Object.entries(HONORED)) {
 			);
 			await run("current");
 		}
+		for (const [op, run] of Object.entries(STUDENT_PATH[key] ?? {})) {
+			await run().catch((e: unknown) => {
+				expect(e, `${key}.${op} must ignore an expectation`).not.toBeInstanceOf(
+					PreconditionFailed,
+				);
+				throw e;
+			});
+		}
 	});
 }
+
+test("UNGUARDED lists only operations a service still has, and none that has a case", () => {
+	const rotten = Object.keys(UNGUARDED).filter((entry) => {
+		const [key = "", op = ""] = entry.split(".");
+		return (
+			!(key in HONORED) ||
+			!publicOps(key).includes(op) ||
+			op in (HONORED[key] ?? {}) ||
+			op in (STUDENT_PATH[key] ?? {})
+		);
+	});
+	expect(rotten, "remove these from UNGUARDED").toEqual([]);
+});
