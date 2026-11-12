@@ -1,6 +1,6 @@
 import { slotInstant } from "@/utils/schedule-time";
-import type { Prisma, PrismaClient, PrismaTx } from "./client";
-import { guardRow } from "./conditional-write";
+import type { Prisma, PrismaTx } from "./client";
+import { guardedUpdate } from "./conditional-write";
 
 /**
  * Recomputes `startAt` and `durationMin` of the events matching `where` from
@@ -8,14 +8,16 @@ import { guardRow } from "./conditional-write";
  * changed.
  *
  * Each event that changes gets a new `updatedAt`, so a version read before
- * the recomputation is stale afterwards. An event's time is always derived from those three; call this whenever one
+ * the recomputation is stale afterwards.
+ *
+ * An event's time is always derived from those three; call this whenever one
  * of them changes under existing events.
  */
 export async function recomputeEventTimes(
-	client: PrismaTx | PrismaClient,
+	tx: PrismaTx,
 	where: Prisma.CalendarEventWhereInput,
 ): Promise<number> {
-	const events = await client.calendarEvent.findMany({
+	const events = await tx.calendarEvent.findMany({
 		where,
 		select: {
 			id: true,
@@ -42,15 +44,13 @@ export async function recomputeEventTimes(
 		) {
 			continue;
 		}
-		const updatedAt = await guardRow(
-			client,
-			{ model: "calendarEvent", where: { id: event.id } },
+		await guardedUpdate(
+			tx,
+			"calendarEvent",
+			{ id: event.id },
+			{ startAt, durationMin },
 			{},
 		);
-		await client.calendarEvent.update({
-			where: { id: event.id },
-			data: { startAt, durationMin, updatedAt },
-		});
 		changed += 1;
 	}
 	return changed;

@@ -10,7 +10,12 @@ import {
 	disciplineUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
-import { checkExpectedUpdatedAt, guardRow } from "@/db/conditional-write";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
@@ -126,20 +131,19 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 				where: { slug: filter.slug },
 			});
 			if (!current) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
 				throw new NotFound("discipline", {
 					id: filter.slug,
 					message: m.errors_discipline_not_found({ slug: filter.slug }),
 				});
 			}
-			const updatedAt = await guardRow(
+			return guardedUpdate(
 				tx,
-				{ model: "discipline", where: { slug: filter.slug } },
+				"discipline",
+				{ slug: filter.slug },
+				{ name: fields.name },
 				opts,
 			);
-			return tx.discipline.update({
-				where: { slug: filter.slug },
-				data: { name: fields.name, updatedAt },
-			});
 		},
 	});
 
@@ -169,15 +173,13 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 					data: { slug: input.slug, name: input.name },
 				});
 			}
-			const updatedAt = await guardRow(
+			return guardedUpdate(
 				tx,
-				{ model: "discipline", where: { slug: input.slug } },
+				"discipline",
+				{ slug: input.slug },
+				{ name: input.name },
 				opts,
 			);
-			return tx.discipline.update({
-				where: { slug: input.slug },
-				data: { name: input.name, updatedAt },
-			});
 		},
 	});
 
@@ -197,11 +199,8 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
 			ensurePerm(opts.actor, "discipline.delete");
-			await guardRow(
-				tx,
-				{ model: "discipline", where: { slug: filter.slug } },
-				opts,
-			);
+			const where = { slug: filter.slug };
+			await checkVersion(tx, "discipline", where, opts);
 			const courses = await tx.course.count({
 				where: { disciplineSlug: filter.slug },
 			});
@@ -214,7 +213,7 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 					}),
 				});
 			}
-			await tx.discipline.deleteMany({ where: { slug: filter.slug } });
+			await guardedDelete(tx, "discipline", where, opts);
 		},
 	});
 

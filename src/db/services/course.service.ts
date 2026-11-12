@@ -18,7 +18,11 @@ import {
 	courseUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
-import { checkExpectedUpdatedAt, guardRow } from "@/db/conditional-write";
+import {
+	checkExpectedUpdatedAt,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
@@ -203,20 +207,20 @@ const buildCourseService = defineService<CourseT>()(() => {
 			fields: CourseUpdate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Course> => {
-			const target = valueOrNotFound("course", await loadRow(tx, filter, opts));
+			const found = await loadRow(tx, filter, opts);
+			if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+			const target = valueOrNotFound("course", found);
 			if (!hasPerm(opts.actor, "course.update", target))
 				throw new NotAllowed("course.update");
 
-			const updatedAt = await guardRow(
+			const row = await guardedUpdate(
 				tx,
-				{ model: "course", where: { id: target.id } },
+				"course",
+				{ id: target.id },
+				fields,
 				opts,
+				{ include: courseInclude },
 			);
-			const row = await tx.course.update({
-				where: { id: target.id },
-				data: { ...fields, updatedAt },
-				include: courseInclude,
-			});
 			// Event times are derived from the course's start.
 			if (fields.startAt) {
 				await recomputeEventTimes(tx, { courseId: target.id });
@@ -280,12 +284,13 @@ const buildCourseService = defineService<CourseT>()(() => {
 			filter: CoursePK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
-			const target = valueOrNotFound("course", await loadRow(tx, filter, opts));
+			const found = await loadRow(tx, filter, opts);
+			if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+			const target = valueOrNotFound("course", found);
 			if (!hasPerm(opts.actor, "course.delete", target))
 				throw new NotAllowed("course.delete");
 
-			await guardRow(tx, { model: "course", where: { id: target.id } }, opts);
-			await tx.course.delete({ where: { id: target.id } });
+			await guardedDelete(tx, "course", { id: target.id }, opts);
 		},
 	});
 

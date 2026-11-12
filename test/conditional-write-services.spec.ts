@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
-import { InvalidData, PreconditionFailed } from "@/core/error";
+import { InvalidData, NotFound, PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -355,4 +355,72 @@ test("edition refuses expectedUpdatedAt on update, upsert and delete", async () 
 		InvalidData,
 	);
 	expect(await db.edition.findOne({ slug }, FULL_ACCESS)).not.toBeNull();
+});
+
+//
+// A missing row
+//
+
+test("a Date on a missing row is a 412 with null: course and discipline, update and delete", async () => {
+	const at = { ...FULL_ACCESS, expectedUpdatedAt: new Date() };
+	const ghostCourse = { id: 2_000_000_000 as CourseId };
+	const ghostDiscipline = { slug: `cw-ghost-${uniq()}` };
+	const runs: Record<string, () => Promise<unknown>> = {
+		"course.update": () =>
+			db.course.update(ghostCourse, { description: "x" }, at),
+		"course.delete": () => db.course.delete(ghostCourse, at),
+		"discipline.update": () =>
+			db.discipline.update(ghostDiscipline, { name: "x" }, at),
+		"discipline.delete": () => db.discipline.delete(ghostDiscipline, at),
+	};
+	for (const [name, run] of Object.entries(runs)) {
+		const err = await run().catch((e: unknown) => e);
+		expect(err, name).toBeInstanceOf(PreconditionFailed);
+		expect((err as PreconditionFailed).updatedAt, name).toBeNull();
+	}
+});
+
+test("without expectedUpdatedAt a missing row is still NotFound on update and delete", async () => {
+	const ghostCourse = { id: 2_000_000_000 as CourseId };
+	const ghostDiscipline = { slug: `cw-ghost-${uniq()}` };
+	await expect(
+		db.course.update(ghostCourse, { description: "x" }, FULL_ACCESS),
+	).rejects.toBeInstanceOf(NotFound);
+	await expect(
+		db.course.delete(ghostCourse, FULL_ACCESS),
+	).rejects.toBeInstanceOf(NotFound);
+	await expect(
+		db.discipline.update(ghostDiscipline, { name: "x" }, FULL_ACCESS),
+	).rejects.toBeInstanceOf(NotFound);
+	await db.discipline.delete(ghostDiscipline, FULL_ACCESS);
+});
+
+//
+// updatedAt stored in another format, through the services
+//
+
+test("services write rows whose updatedAt was stored as SQLite text or an integer", async () => {
+	const at = new Date("2026-11-12T18:09:20.000Z");
+	const stored = [
+		"2026-11-12 18:09:20",
+		"2026-11-12T18:09:20+00:00",
+		at.getTime(),
+	];
+	for (const value of stored) {
+		const d = await makeDiscipline();
+		await prisma.$executeRaw`UPDATE Discipline SET updatedAt = ${value} WHERE slug = ${d.slug}`;
+		const readModel = await db.discipline.findOne(
+			{ slug: d.slug },
+			FULL_ACCESS,
+		);
+		expect(readModel?.updatedAt.getTime(), String(value)).toBe(at.getTime());
+		await db.discipline.update({ slug: d.slug }, { name: "a" }, FULL_ACCESS);
+		await prisma.$executeRaw`UPDATE Discipline SET updatedAt = ${value} WHERE slug = ${d.slug}`;
+		await db.discipline.update(
+			{ slug: d.slug },
+			{ name: "b" },
+			{ ...FULL_ACCESS, expectedUpdatedAt: at },
+		);
+		await db.discipline.delete({ slug: d.slug }, FULL_ACCESS);
+	}
 });

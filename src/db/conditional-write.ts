@@ -1,33 +1,32 @@
 /**
  * Conditional writes (ADR 0013): the one place that checks
- * `ServiceOpts.expectedUpdatedAt` and hands out the next `updatedAt`.
+ * `ServiceOpts.expectedUpdatedAt` and writes the row's next `updatedAt`.
  *
- * Every service whose model has `updatedAt` goes through {@link guardRow} in
- * each `update`, `upsert` and `delete`, and also when it only changes child
- * rows that the parent's read model shows (tags, questions, repositories):
- * those touch the parent with the same call. A service whose model has no
- * `updatedAt` calls {@link rejectExpectedUpdatedAt} instead.
+ * Every service whose model has `updatedAt` writes through {@link guardedUpdate}
+ * and {@link guardedDelete}, and calls {@link touch} when it only changes child
+ * rows that the parent's read model shows (tags, questions, repositories). The
+ * helpers run on the `tx` of the write, address one row by a unique `where`,
+ * and write the `updatedAt` themselves: there is nothing to forward. A service
+ * whose model has no `updatedAt` calls {@link rejectExpectedUpdatedAt}.
  *
  * ```ts
  * // update
- * const next = await guardRow(tx, { model: "course", where: { id } }, opts);
- * await tx.course.update({ where: { id }, data: { ...fields, updatedAt: next } });
+ * const row = await guardedUpdate(tx, "course", { id }, fields, opts, {
+ *   include: courseInclude,
+ * });
  *
  * // upsert: the row is absent, so there is nothing to guard
  * checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
  * await tx.course.create({ data });
  *
- * // child-only change: touch the parent
- * await guardRow(tx, { model: "exam", where: { id } }, opts);
+ * // delete, and child-only change
+ * await guardedDelete(tx, "course", { id }, opts);
+ * await touch(tx, "exam", { id }, opts);
  * ```
  */
-import {
-	ImproperBehavior,
-	InvalidData,
-	PreconditionFailed,
-} from "@/core/error";
+import { InvalidData, PreconditionFailed } from "@/core/error";
 import { m } from "@/i18n";
-import type { PrismaClient, PrismaTx } from "./client";
+import type { Prisma, PrismaTx } from "./client";
 
 /// Models whose rows have an `updatedAt` column.
 export type VersionedModel = {
@@ -38,16 +37,30 @@ export type VersionedModel = {
 		: never;
 }[keyof PrismaTx & string];
 
-/// The row a {@link guardRow} call addresses: a Prisma delegate name and a
-/// `where` that matches at most one row (a unique key, in practice).
-export type GuardTarget = {
-	model: VersionedModel;
-	where: Record<string, unknown>;
+/// The operations Prisma declares for the model behind a delegate name.
+type Ops<M extends VersionedModel> =
+	Capitalize<M> extends keyof Prisma.TypeMap["model"]
+		? Prisma.TypeMap["model"][Capitalize<M>]["operations"]
+		: never;
+
+/// A `where` that addresses at most one row of `M`: its `WhereUniqueInput`.
+export type UniqueWhere<M extends VersionedModel> =
+	Ops<M>["findUnique"]["args"]["where"];
+
+/// The `data` of an update of `M`, without `updatedAt`: the helper writes it.
+export type GuardedData<M extends VersionedModel> = Omit<
+	Ops<M>["update"]["args"]["data"],
+	"updatedAt"
+>;
+
+/// What {@link guardedUpdate} adds to the update call, as in Prisma.
+type Shape<M extends VersionedModel> = {
+	include?: Ops<M>["update"]["args"] extends { include?: infer I } ? I : never;
+	select?: Ops<M>["update"]["args"] extends { select?: infer S } ? S : never;
 };
 
-/// How many times {@link guardRow} rereads after another writer got in
-/// between its read and its write.
-const MAX_ATTEMPTS = 5;
+/// The `expectedUpdatedAt` of `ServiceOpts`.
+type Expect = { expectedUpdatedAt?: Date | null };
 
 /**
  * The `updatedAt` for a row that last had `previous`: the clock, or one
@@ -65,7 +78,9 @@ export function nextUpdatedAt(previous: Date, now: Date = new Date()): Date {
  * `null` when it does not exist) satisfies `expected`.
  *
  * Pure: use it directly where there is no row to write, e.g. the create branch
- * of an upsert.
+ * of an upsert, or a service that finds its row missing before calling a
+ * guarded write: a `Date` on a missing row is a 412 with `null`, not a
+ * `NotFound`.
  *
  * @throws {@link PreconditionFailed} Carrying `current`.
  */
@@ -84,52 +99,108 @@ export function checkExpectedUpdatedAt(
 }
 
 /**
- * Checks `opts.expectedUpdatedAt` against the row and claims it, returning the
- * `updatedAt` the caller must write with the rest of its change.
+ * Updates the row of `model` addressed by `where`, checking
+ * `opts.expectedUpdatedAt` first and writing the next `updatedAt` with `data`.
  *
- * The claim is a compare-and-swap (`updateMany` filtered by the `updatedAt`
- * that was read), so two writers holding the same version cannot both pass.
- * Run it on the transaction of the write. Always pass the result as
- * `updatedAt` in the row's own update: left to Prisma's `@updatedAt`, the
- * value would be the bare clock and could repeat. Call it for every write the
- * service makes, conditional or not, and for a parent whose children changed
- * (the result is then ignored).
+ * The check and the write run on `tx`, which SQLite serializes, so two writers
+ * holding the same version cannot both pass. The versions are compared in
+ * milliseconds, never as the text stored in the column. With a `Date`
+ * expectation and no row, it throws {@link PreconditionFailed} with `null`;
+ * with none, Prisma's own "record not found" error surfaces, so a service that
+ * wants a `NotFound` looks the row up first. Do not forward `opts` to another
+ * service for a different row: its `expectedUpdatedAt` belongs to this one.
  *
- * With no row, it returns `now` without writing, so the caller's own write
- * decides what a missing row means (usually `NotFound`). Do not forward
- * `opts` to another service for a different row: its `expectedUpdatedAt`
- * belongs to this one.
- *
- * @param now The clock. Tests inject it.
+ * @param extra `include` or `select` for the returned row, and the clock
+ * (`now`), which tests inject.
  * @throws {@link PreconditionFailed} When the row's version is not the expected one.
- * @throws {@link ImproperBehavior} When the claim keeps losing to other writers.
  */
-export async function guardRow(
-	tx: PrismaTx | PrismaClient,
-	target: GuardTarget,
-	opts: { expectedUpdatedAt?: Date | null },
-	now: Date = new Date(),
-): Promise<Date> {
-	const delegate = tx[target.model] as unknown as VersionedDelegate;
-	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-		const row = await delegate.findFirst({
-			where: target.where,
-			select: { updatedAt: true },
-		});
-		checkExpectedUpdatedAt(row?.updatedAt ?? null, opts.expectedUpdatedAt);
-		if (!row) return now;
+export async function guardedUpdate<
+	M extends VersionedModel,
+	S extends Shape<M> = Record<never, never>,
+>(
+	tx: PrismaTx,
+	model: M,
+	where: UniqueWhere<M>,
+	data: GuardedData<M>,
+	opts: Expect,
+	extra?: S & { now?: Date },
+): Promise<
+	Prisma.Result<
+		PrismaTx[M],
+		{ where: UniqueWhere<M>; data: GuardedData<M> } & S,
+		"update"
+	>
+> {
+	const delegate = untyped(tx, model);
+	const updatedAt = await claim(delegate, where, opts, extra?.now);
+	const { now: _now, ...shape } = extra ?? {};
+	return delegate.update({
+		where,
+		data: { ...data, updatedAt },
+		...shape,
+	}) as never;
+}
 
-		const next = nextUpdatedAt(row.updatedAt, now);
-		const { count } = await delegate.updateMany({
-			where: { ...target.where, updatedAt: row.updatedAt },
-			data: { updatedAt: next },
-		});
-		if (count > 0) return next;
-		// Someone wrote in between: reread. A conditional write now fails the
-		// check above; an unconditional one claims the new version.
-	}
-	throw new ImproperBehavior(
-		`${target.model}: could not claim the row after ${MAX_ATTEMPTS} attempts`,
+/**
+ * Deletes the row of `model` addressed by `where`, checking
+ * `opts.expectedUpdatedAt` first.
+ *
+ * A row that is already absent is a no-op unless a `Date` was expected.
+ *
+ * @throws {@link PreconditionFailed} When the row's version is not the expected one.
+ */
+export async function guardedDelete<M extends VersionedModel>(
+	tx: PrismaTx,
+	model: M,
+	where: UniqueWhere<M>,
+	opts: Expect,
+): Promise<void> {
+	const delegate = untyped(tx, model);
+	const current = await readVersion(delegate, where);
+	checkExpectedUpdatedAt(current, opts.expectedUpdatedAt);
+	if (current === null) return;
+	await delegate.delete({ where });
+}
+
+/**
+ * Checks `opts.expectedUpdatedAt` against the row and moves its `updatedAt`
+ * forward, for a write that only changed the row's children.
+ *
+ * Returns the new `updatedAt`.
+ *
+ * @throws {@link PreconditionFailed} When the row's version is not the expected one.
+ */
+export async function touch<M extends VersionedModel>(
+	tx: PrismaTx,
+	model: M,
+	where: UniqueWhere<M>,
+	opts: Expect,
+	now?: Date,
+): Promise<Date> {
+	const delegate = untyped(tx, model);
+	const updatedAt = await claim(delegate, where, opts, now);
+	await delegate.update({ where, data: { updatedAt } });
+	return updatedAt;
+}
+
+/**
+ * Throws {@link PreconditionFailed} unless the row's current version satisfies
+ * `opts.expectedUpdatedAt`, and writes nothing.
+ *
+ * For a service that must run other checks between the version check and its
+ * guarded write (e.g. a 409 that a stale caller should not see).
+ *
+ * @throws {@link PreconditionFailed} When the row's version is not the expected one.
+ */
+export async function checkVersion<M extends VersionedModel>(
+	tx: PrismaTx,
+	model: M,
+	where: UniqueWhere<M>,
+	opts: Expect,
+): Promise<void> {
+	checkExpectedUpdatedAt(
+		await readVersion(untyped(tx, model), where),
+		opts.expectedUpdatedAt,
 	);
 }
 
@@ -139,23 +210,48 @@ export async function guardRow(
  *
  * @throws {@link InvalidData} When the option is set, even as `null`.
  */
-export function rejectExpectedUpdatedAt(opts: {
-	expectedUpdatedAt?: Date | null;
-}): void {
+export function rejectExpectedUpdatedAt(opts: Expect): void {
 	if (opts.expectedUpdatedAt === undefined) return;
 	throw new InvalidData({
 		$: [{ code: "not-allowed", message: m.errors_precondition_unsupported() }],
 	});
 }
 
-/// The slice of a Prisma delegate that {@link guardRow} uses.
+//
+// Utilities
+//
+
+/// The slice of a Prisma delegate that the helpers use.
 type VersionedDelegate = {
-	findFirst(args: {
-		where: Record<string, unknown>;
+	findUnique(args: {
+		where: unknown;
 		select: { updatedAt: true };
 	}): Promise<{ updatedAt: Date } | null>;
-	updateMany(args: {
-		where: Record<string, unknown>;
-		data: { updatedAt: Date };
-	}): Promise<{ count: number }>;
+	update(args: Record<string, unknown>): Promise<unknown>;
+	delete(args: { where: unknown }): Promise<unknown>;
 };
+
+const untyped = (tx: PrismaTx, model: VersionedModel): VersionedDelegate =>
+	tx[model] as unknown as VersionedDelegate;
+
+async function readVersion(
+	delegate: VersionedDelegate,
+	where: unknown,
+): Promise<Date | null> {
+	const row = await delegate.findUnique({ where, select: { updatedAt: true } });
+	return row?.updatedAt ?? null;
+}
+
+/// Checks the expectation and returns the `updatedAt` to write: the clock when
+/// there is no row, so the caller's write decides what a missing row means.
+async function claim(
+	delegate: VersionedDelegate,
+	where: unknown,
+	opts: Expect,
+	now: Date = new Date(),
+): Promise<Date> {
+	const current = await readVersion(delegate, where);
+	checkExpectedUpdatedAt(current, opts.expectedUpdatedAt);
+	if (current === null) return now;
+	return nextUpdatedAt(current, now);
+}

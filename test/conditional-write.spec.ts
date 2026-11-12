@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, PreconditionFailed } from "@/core/error";
 import { responseFromException } from "@/core/error-server";
-import { type Crud, upsert } from "@/db/base-service";
-import { prisma } from "@/db/client";
+import { type PrismaTx, prisma } from "@/db/client";
 import {
 	checkExpectedUpdatedAt,
-	guardRow,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
 	nextUpdatedAt,
 	rejectExpectedUpdatedAt,
+	touch,
 } from "@/db/conditional-write";
 
 let seq = 0;
@@ -27,12 +28,7 @@ const guard = (
 	now?: Date,
 ): Promise<Date> =>
 	prisma.$transaction((tx) =>
-		guardRow(
-			tx,
-			{ model: "discipline", where: { slug } },
-			{ expectedUpdatedAt },
-			now,
-		),
+		touch(tx, "discipline", { slug }, { expectedUpdatedAt }, now),
 	);
 
 test("nextUpdatedAt is the clock when it is ahead, else previous + 1ms", () => {
@@ -72,14 +68,14 @@ test("PreconditionFailed serializes as a 412 with the current updatedAt", () => 
 	).toMatchObject({ status: 412, updatedAt: null });
 });
 
-test("guardRow with the right version moves updatedAt forward", async () => {
+test("touch with the right version moves updatedAt forward", async () => {
 	const row = await makeRow();
 	const next = await guard(row.slug, row.updatedAt);
 	expect(next.getTime()).toBeGreaterThan(row.updatedAt.getTime());
 	expect((await read(row.slug)).updatedAt).toEqual(next);
 });
 
-test("guardRow with a stale version throws and writes nothing", async () => {
+test("touch with a stale version throws and writes nothing", async () => {
 	const row = await makeRow();
 	const err = await guard(row.slug, new Date(0)).catch((e) => e);
 	expect(err).toBeInstanceOf(PreconditionFailed);
@@ -87,21 +83,21 @@ test("guardRow with a stale version throws and writes nothing", async () => {
 	expect((await read(row.slug)).updatedAt).toEqual(row.updatedAt);
 });
 
-test("guardRow without an expectation writes unconditionally", async () => {
+test("touch without an expectation writes unconditionally", async () => {
 	const row = await makeRow();
 	const next = await guard(row.slug);
 	expect(next.getTime()).toBeGreaterThan(row.updatedAt.getTime());
 	expect((await read(row.slug)).updatedAt).toEqual(next);
 });
 
-test("guardRow with null on an existing row throws with its updatedAt", async () => {
+test("touch with null on an existing row throws with its updatedAt", async () => {
 	const row = await makeRow();
 	const err = await guard(row.slug, null).catch((e) => e);
 	expect(err).toBeInstanceOf(PreconditionFailed);
 	expect((err as PreconditionFailed).updatedAt).toEqual(row.updatedAt);
 });
 
-test("guardRow with a Date on a missing row throws with current null", async () => {
+test("touch with a Date on a missing row throws with current null", async () => {
 	const err = await guard("cw-missing-row", new Date()).catch((e) => e);
 	expect(err).toBeInstanceOf(PreconditionFailed);
 	expect((err as PreconditionFailed).updatedAt).toBeNull();
@@ -141,82 +137,143 @@ test("rejectExpectedUpdatedAt refuses any expectation, accepts none", () => {
 });
 
 //
-// Generic upsert
+// guardedUpdate, guardedDelete
 //
 
-type Row = { key: string; updatedAt: Date };
-
-/// A service double that records what `update` and `create` received.
-function fakeService(existing: Row | null) {
-	const calls: { op: string; expected: Date | null | undefined }[] = [];
-	const service = {
-		findOne: async () => existing,
-		update: async (
-			_pk: unknown,
-			_in: unknown,
-			opts: { expectedUpdatedAt?: Date | null },
-		) => {
-			calls.push({ op: "update", expected: opts.expectedUpdatedAt });
-			if (opts.expectedUpdatedAt === null && existing) {
-				throw new PreconditionFailed(existing.updatedAt);
-			}
-			return existing as Row;
-		},
-		create: async (_in: unknown, opts: { expectedUpdatedAt?: Date | null }) => {
-			calls.push({ op: "create", expected: opts.expectedUpdatedAt });
-			return { key: "new", updatedAt: new Date() };
-		},
-	};
-	return { service: service as unknown as Crud<never>, calls };
-}
-
-function runUpsert(
-	existing: Row | null,
-	expectedUpdatedAt: Date | null | undefined,
-) {
-	const { service, calls } = fakeService(existing);
-	const result = upsert(service as never, { key: "k" }, {
-		...FULL_ACCESS,
-		tx: {} as never,
-		client: {} as never,
-		expectedUpdatedAt,
-		pk: (input: { key: string }) => input,
-		action: "course.update",
-	} as never);
-	return { result, calls };
-}
-
-test("upsert: absent expectation updates or creates as before", async () => {
-	const at = new Date(5);
-	const a = runUpsert({ key: "k", updatedAt: at }, undefined);
-	await a.result;
-	expect(a.calls).toEqual([{ op: "update", expected: undefined }]);
-	const b = runUpsert(null, undefined);
-	await b.result;
-	expect(b.calls).toEqual([{ op: "create", expected: undefined }]);
+test("guardedUpdate writes the data and the next updatedAt in one call", async () => {
+	const row = await makeRow();
+	const updated = await prisma.$transaction((tx) =>
+		guardedUpdate(
+			tx,
+			"discipline",
+			{ slug: row.slug },
+			{ name: "renamed" },
+			{ expectedUpdatedAt: row.updatedAt },
+		),
+	);
+	expect(updated.name).toBe("renamed");
+	expect(updated.updatedAt.getTime()).toBeGreaterThan(row.updatedAt.getTime());
+	expect(await read(row.slug)).toEqual(updated);
 });
 
-test("upsert: a Date goes to the update branch and fails on a missing row", async () => {
-	const at = new Date(5);
-	const a = runUpsert({ key: "k", updatedAt: at }, at);
-	await a.result;
-	expect(a.calls).toEqual([{ op: "update", expected: at }]);
-
-	const b = runUpsert(null, at);
-	const err = await b.result.catch((e) => e);
+test("guardedUpdate with a stale version writes nothing", async () => {
+	const row = await makeRow();
+	const err = await prisma
+		.$transaction((tx) =>
+			guardedUpdate(
+				tx,
+				"discipline",
+				{ slug: row.slug },
+				{ name: "renamed" },
+				{ expectedUpdatedAt: new Date(0) },
+			),
+		)
+		.catch((e) => e);
 	expect(err).toBeInstanceOf(PreconditionFailed);
-	expect((err as PreconditionFailed).updatedAt).toBeNull();
-	expect(b.calls).toEqual([]);
+	expect(await read(row.slug)).toEqual(row);
 });
 
-test("upsert: null creates when absent and fails when the row exists", async () => {
-	const a = runUpsert(null, null);
-	await a.result;
-	expect(a.calls).toEqual([{ op: "create", expected: null }]);
+test("guardedDelete with the right version deletes, with a stale one does not", async () => {
+	const row = await makeRow();
+	const del = (expectedUpdatedAt?: Date | null) =>
+		prisma.$transaction((tx) =>
+			guardedDelete(
+				tx,
+				"discipline",
+				{ slug: row.slug },
+				{ expectedUpdatedAt },
+			),
+		);
+	await expect(del(new Date(0))).rejects.toBeInstanceOf(PreconditionFailed);
+	expect(await read(row.slug)).toEqual(row);
+	await del(row.updatedAt);
+	expect(
+		await prisma.discipline.findUnique({ where: { slug: row.slug } }),
+	).toBeNull();
+});
 
-	const at = new Date(5);
-	const b = runUpsert({ key: "k", updatedAt: at }, null);
-	const err = await b.result.catch((e) => e);
-	expect(err).toBeInstanceOf(PreconditionFailed);
-	expect((err as PreconditionFailed).updatedAt).toEqual(at);
+test("checkVersion reads only", async () => {
+	const row = await makeRow();
+	const check = (expectedUpdatedAt?: Date | null) =>
+		prisma.$transaction((tx) =>
+			checkVersion(tx, "discipline", { slug: row.slug }, { expectedUpdatedAt }),
+		);
+	await check(row.updatedAt);
+	await expect(check(new Date(0))).rejects.toBeInstanceOf(PreconditionFailed);
+	expect(await read(row.slug)).toEqual(row);
+});
+
+//
+// updatedAt stored in another format
+//
+
+/// Formats SQLite may hold in `updatedAt`: the migration's
+/// `DEFAULT CURRENT_TIMESTAMP`, an offset suffix, and epoch milliseconds.
+const STORED_FORMATS: [string, (at: Date) => string | number][] = [
+	[
+		"YYYY-MM-DD HH:MM:SS",
+		(at) => at.toISOString().slice(0, 19).replace("T", " "),
+	],
+	["+00:00 suffix", (at) => `${at.toISOString().slice(0, 19)}+00:00`],
+	["epoch milliseconds", (at) => at.getTime()],
+];
+
+async function makeRowStoredAs(value: string | number): Promise<string> {
+	const row = await makeRow();
+	await prisma.$executeRaw`UPDATE Discipline SET updatedAt = ${value} WHERE slug = ${row.slug}`;
+	return row.slug;
+}
+
+for (const [label, format] of STORED_FORMATS) {
+	const at = new Date("2026-11-12T18:09:20.000Z");
+
+	test(`updatedAt stored as ${label}: unconditional update, conditional update and delete work`, async () => {
+		const write = (
+			slug: string,
+			data: { name: string },
+			expectedUpdatedAt?: Date,
+		) =>
+			prisma.$transaction((tx) =>
+				guardedUpdate(tx, "discipline", { slug }, data, { expectedUpdatedAt }),
+			);
+
+		const slug = await makeRowStoredAs(format(at));
+		const first = await write(slug, { name: "one" });
+		expect(first.name).toBe("one");
+		expect(first.updatedAt.getTime()).toBeGreaterThan(at.getTime());
+
+		await prisma.$executeRaw`UPDATE Discipline SET updatedAt = ${format(at)} WHERE slug = ${slug}`;
+		const readModel = await read(slug);
+		expect(readModel.updatedAt.getTime()).toBe(at.getTime());
+		const second = await write(slug, { name: "two" }, readModel.updatedAt);
+		expect(second.name).toBe("two");
+
+		await prisma.$executeRaw`UPDATE Discipline SET updatedAt = ${format(at)} WHERE slug = ${slug}`;
+		const current = await read(slug);
+		await prisma.$transaction((tx) =>
+			guardedDelete(
+				tx,
+				"discipline",
+				{ slug },
+				{ expectedUpdatedAt: current.updatedAt },
+			),
+		);
+		expect(await prisma.discipline.findUnique({ where: { slug } })).toBeNull();
+	});
+}
+
+test("a Date on a missing row is a 412 with null, for update, delete and touch", async () => {
+	const where = { slug: "cw-missing-row" };
+	const opts = { expectedUpdatedAt: new Date() };
+	const runs: ((tx: PrismaTx) => Promise<unknown>)[] = [
+		(tx: PrismaTx) =>
+			guardedUpdate(tx, "discipline", where, { name: "x" }, opts),
+		(tx: PrismaTx) => guardedDelete(tx, "discipline", where, opts),
+		(tx: PrismaTx) => touch(tx, "discipline", where, opts),
+	];
+	for (const run of runs) {
+		const err = await prisma.$transaction(run).catch((e) => e);
+		expect(err).toBeInstanceOf(PreconditionFailed);
+		expect((err as PreconditionFailed).updatedAt).toBeNull();
+	}
 });
