@@ -1359,7 +1359,10 @@ model AnswerEditGap {
   fieldId    Int
   field      AnswerEditField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
   reason     String
+  /// Id the browser gave the marker, so a retried item does not store it twice.
+  clientId   String?
   receivedAt DateTime @default(now())
 
+  @@unique([fieldId, clientId])
   @@index([fieldId])
 }

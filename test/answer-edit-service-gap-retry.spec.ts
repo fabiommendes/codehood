@@ -5,9 +5,8 @@
  * The client resends an item whenever it did not see the answer (R24, R25), so
  * the server meets the same item again.
  *
- * Reading used here, the spec gives gap markers no identity: a gap-only item
- * sent again unchanged is a retry and adds no second row. If the fix gives each
- * marker an id in the wire format, these tests must carry that id.
+ * Each marker carries a client-generated id: a marker whose id is already
+ * stored is skipped, a marker without an id is always stored.
  */
 import { expect, test } from "@playwright/test";
 import {
@@ -22,7 +21,7 @@ test("a gap-only item sent twice stores one gap row", async () => {
 	const item = {
 		question: world.slugs.text,
 		field: "answer",
-		gaps: [{ reason: "storage lost" }],
+		gaps: [{ reason: "storage lost", id: "gap-1" }],
 	};
 
 	const first = await send(world, [item]);
@@ -40,7 +39,7 @@ test("a retried batch with gaps stores the batch and its gaps once", async () =>
 		question: world.slugs.text,
 		field: "answer",
 		batch: appendBatch("", "hello"),
-		gaps: [{ reason: "storage lost" }],
+		gaps: [{ reason: "storage lost", id: "gap-1" }],
 	};
 
 	await send(world, [item]);
@@ -63,5 +62,23 @@ test("two different markers sent one after the other are both stored", async () 
 	expect(stored?.gaps.map((gap) => gap.reason)).toEqual([
 		"storage lost",
 		"exam switch off",
+	]);
+});
+
+test("two distinct gaps with the same reason in separate calls stay two rows", async () => {
+	const world = await makeWorld();
+	const field = { question: world.slugs.text, field: "answer" };
+
+	await send(world, [
+		{ ...field, gaps: [{ reason: "storage lost", id: "gap-1" }] },
+	]);
+	await send(world, [
+		{ ...field, gaps: [{ reason: "storage lost", id: "gap-2" }] },
+	]);
+
+	const stored = await storedField(world);
+	expect(stored?.gaps.map((gap) => gap.reason)).toEqual([
+		"storage lost",
+		"storage lost",
 	]);
 });

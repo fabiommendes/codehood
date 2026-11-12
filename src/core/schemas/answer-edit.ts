@@ -47,6 +47,8 @@ export const answerEditBatchInput = z.object({
 
 export const answerEditGapInput = z.object({
 	reason: z.string().max(MAX_ANSWER_EDIT_GAP_REASON),
+	/// Opaque id the browser generated for the marker; a stored id is skipped.
+	id: z.string().min(1).max(MAX_ID_LENGTH).optional(),
 });
 
 /// The envelope of one item; `batch` and `gaps` are checked on their own.
@@ -179,7 +181,7 @@ export interface AnswerEditFieldInput {
 	question: string;
 	field: string;
 	batch?: AnswerEditBatchInput;
-	gaps?: { reason: string }[];
+	gaps?: { reason: string; id?: string }[];
 }
 
 export type AnswerEditReceipt = z.infer<typeof answerEditReceipt>;

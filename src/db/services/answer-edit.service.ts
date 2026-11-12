@@ -472,10 +472,16 @@ async function appendField(
 		case "conflict":
 			return commitIfAny(tx, ctx, target, gaps, verdict);
 		case "too-large":
-			return commitIfAny(tx, ctx, target, [BATCH_TOO_LARGE, ...gaps], {
-				kind: "conflict",
-				reason: "too-large",
-			});
+			return commitIfAny(
+				tx,
+				ctx,
+				target,
+				[{ reason: BATCH_TOO_LARGE }, ...gaps],
+				{
+					kind: "conflict",
+					reason: "too-large",
+				},
+			);
 		case "text-limit":
 			return commit(tx, ctx, target, {
 				seen,
@@ -497,17 +503,37 @@ async function appendField(
 	}
 }
 
-/// Reads the gap reasons of an item, or `null` when they are malformed.
-function parseGaps(raw: unknown): string[] | null {
+/// A gap marker as received: its reason and the optional id the browser gave it.
+interface GapMarker {
+	reason: string;
+	id?: string;
+}
+
+/// Drops repeated ids within one item, which the unique index would refuse.
+function dedupe(gaps: GapMarker[]): GapMarker[] {
+	const seen = new Set<string>();
+	return gaps.filter((gap) => {
+		if (!gap.id) return true;
+		if (seen.has(gap.id)) return false;
+		seen.add(gap.id);
+		return true;
+	});
+}
+
+/// Reads the gap markers of an item, or `null` when they are malformed.
+function parseGaps(raw: unknown): GapMarker[] | null {
 	if (raw === undefined) return [];
 	if (!Array.isArray(raw)) return null;
-	const reasons: string[] = [];
+	const markers: GapMarker[] = [];
 	for (const gap of raw) {
 		const parsed = answerEditGapInput.safeParse(gap);
 		if (!parsed.success) return null;
-		reasons.push(parsed.data.reason.slice(0, MAX_ANSWER_EDIT_GAP_REASON));
+		markers.push({
+			reason: parsed.data.reason.slice(0, MAX_ANSWER_EDIT_GAP_REASON),
+			id: parsed.data.id,
+		});
 	}
-	return reasons;
+	return markers;
 }
 
 type Verdict =
@@ -577,7 +603,7 @@ async function commitIfAny(
 	tx: PrismaTx,
 	ctx: Context,
 	target: Target,
-	gaps: string[],
+	gaps: GapMarker[],
 	outcome: Outcome,
 ): Promise<Outcome> {
 	if (gaps.length === 0) return outcome;
@@ -592,7 +618,7 @@ interface Commit {
 	/// The revision and sequence the batch was validated against.
 	seen: { revision: number; nextSeq: number };
 	batch?: { input: AnswerEditBatchInput; hash: string; bytes: number };
-	gaps: string[];
+	gaps: GapMarker[];
 	markFieldIncomplete?: boolean;
 	/// The answer when no batch is stored and nothing closed the item.
 	fallback: Outcome;
@@ -706,15 +732,30 @@ async function write(
 	}
 
 	if (work.gaps.length > 0) {
+		const ids = work.gaps.flatMap((gap) => (gap.id ? [gap.id] : []));
+		const known = new Set(
+			ids.length === 0
+				? []
+				: (
+						await tx.answerEditGap.findMany({
+							where: { fieldId: field.id, clientId: { in: ids } },
+							select: { clientId: true },
+						})
+					).map((gap) => gap.clientId),
+		);
+		const fresh = work.gaps.filter((gap) => !gap.id || !known.has(gap.id));
 		const kept = await tx.answerEditGap.count({ where: { fieldId: field.id } });
 		const room = Math.max(0, MAX_GAPS_PER_FIELD - kept);
 		if (room > 0) {
 			await tx.answerEditGap.createMany({
-				data: work.gaps.slice(0, room).map((reason) => ({
-					fieldId: field.id,
-					reason,
-					receivedAt: ctx.now,
-				})),
+				data: dedupe(fresh)
+					.slice(0, room)
+					.map((gap) => ({
+						fieldId: field.id,
+						reason: gap.reason,
+						clientId: gap.id ?? null,
+						receivedAt: ctx.now,
+					})),
 			});
 		}
 	}

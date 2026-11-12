@@ -147,8 +147,11 @@ cliente com doubles) ou **e2e** (Action pela rede, página no navegador).
     fieldId    Int
     field      AnswerEditField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
     reason     String
+    /// Id do marcador, gerado pelo navegador (R12).
+    clientId   String?
     receivedAt DateTime @default(now())
 
+    @@unique([fieldId, clientId])
     @@index([fieldId])
   }
   ```
@@ -246,10 +249,14 @@ Segue `dev/rfc/como-criar-e-escrever-um-service.md` e os ADRs 0004 a 0006:
   para escolher as questões (`historyQuestions` em `ExamAttempt.tsx`). Questão
   fora da prova, de outro tipo ou outro campo: `closed`
   (`reason: "not-tracked"`), nada gravado. Unit.
-- R12. Lacunas sem texto. Cada item de `gaps` é `{ reason }`, `reason` com até
-  200 caracteres. Cada um vira uma linha `AnswerEditGap` (criando a âncora vazia,
-  se preciso), no máximo 50 por campo; acima disso, descartadas sem erro. Lacunas
-  seguem as mesmas regras de prazo e de chave dos lotes. Unit.
+- R12. Lacunas sem texto. Cada item de `gaps` é `{ reason, id? }`, `reason` com
+  até 200 caracteres e `id` uma string opaca de até 200 caracteres, gerada pelo
+  cliente em `reportGap` (R24). Cada um vira uma linha `AnswerEditGap` (criando a
+  âncora vazia, se preciso), no máximo 50 por campo; acima disso, descartadas sem
+  erro. Um `id` já gravado no campo (`clientId`, único com `fieldId`) é ignorado
+  em silêncio: é o reenvio de um item cuja resposta o cliente não viu, e não
+  grava a lacuna duas vezes. Sem `id`, grava como antes. Lacunas seguem as mesmas
+  regras de prazo e de chave dos lotes. Unit.
 - R13. Rebase com perda. Um lote com `base.reason === "rebase"` cujo `base.text`
   difere de `anchor.text` grava `gapBefore = anchor.text`. Igual, não grava
   `gapBefore` (nada se perdeu). Nenhum edit sintético é gravado: a mudança da
@@ -349,7 +356,7 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
         snapshot: string,
         base?: { reason: "start" | "rebase", text: string },
       },
-      gaps?: Array<{ reason: string }>,
+      gaps?: Array<{ reason: string, id?: string }>,
     }>,
   }
   output: { enabled: boolean, results: FieldResult[] }   // R6
@@ -375,8 +382,11 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   lacuna, como hoje). Unit: replay de `base.text` mais edits dá `snapshot` em
   todo lote com `base`.
 - R24. Marcador de lacuna. O coordenador ganha `reportGap(field, reason)`, que
-  guarda em memória (no máximo 50 por campo) e manda os marcadores no próximo
-  envio, no item do campo. O adaptador chama `reportGap` dentro do tratamento de
+  guarda em memória (no máximo 50 por campo, motivo cortado em 200 caracteres) e
+  manda os marcadores no próximo envio, no item do campo. Cada marcador ganha um
+  `id` quando `reportGap` é chamado e o guarda até o envio ser confirmado; um
+  reenvio leva o mesmo `id` (R12). Um item só com `gaps` responde `accepted` sem
+  recibo. O adaptador chama `reportGap` dentro do tratamento de
   erro sempre que desliga um campo (exceção, rejeição, `disable`), sem nunca
   lançar. Marcador perdido numa queda do navegador é aceito: a leitura ainda
   mostra a lacuna pela diferença entre âncora e resposta (R34). Unit.
@@ -389,7 +399,7 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
     (1 s dobrando até 60 s, jitter de 0,5 a 1,5), como já faz;
   - `NOT_FOUND`, `BAD_REQUEST`: rejeita e para de enviar nesta página (o mesmo
     pedido daria o mesmo erro);
-  - `enabled: false` em qualquer resposta: chama o callback `onDisabled` da
+  - `enabled: false` em qualquer resposta, `inspect` incluída: chama o callback `onDisabled` da
     sessão, que a página liga ao `disable()` do adaptador;
   - por item, `accepted`, `conflict`, `closed` e `retry` vão ao coordenador como
     hoje. `conflict` rebaseia com lacuna; `closed` bloqueia o campo.
@@ -412,7 +422,9 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
     recibos (já implementado; o teste passa a fazer parte desta spec);
   - após `finish` com sucesso: a página espera o `flushFinal` (até 2 s, como hoje)
     e chama `adapter.discard()`, que remove os registros de todos os campos da
-    tentativa no IndexedDB, com teto de 2 s;
+    tentativa no IndexedDB, com teto de 2 s. A recarga da página nunca espera
+    mais que esse teto: se `discard` pendura, recarrega assim mesmo. Depois de
+    `discard`, o coordenador fica parado e nada regrava um registro;
   - ao abrir a página de uma tentativa que não está em andamento (entregue, prazo
     vencido), a página remove em segundo plano os registros dessa tentativa.
 

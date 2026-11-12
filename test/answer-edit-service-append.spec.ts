@@ -777,6 +777,7 @@ test.describe("R12: gaps", () => {
 		const gap = stored?.gaps[0];
 		expect(gap?.reason).toBe("editor crashed");
 		expect(Object.keys(gap ?? {}).sort()).toEqual([
+			"clientId",
 			"fieldId",
 			"id",
 			"reason",
