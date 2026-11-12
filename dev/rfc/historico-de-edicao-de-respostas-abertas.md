@@ -201,8 +201,8 @@ Implementado em `src/services/answer-edits/coordinator.ts`.
   sequência do servidor e descarta a história pendente. `FieldStatus.historyGap`
   fica `true`, exceto quando nada se perdeu (sem pendências e texto igual ao do
   servidor). A lacuna é visível ao cliente por esse status; o servidor a enxerga
-  porque o primeiro lote após a nova base não reproduz o texto que ele guardava.
-  Um marcador explícito no lote fica para o endpoint.
+  porque o primeiro lote após a nova base traz `base: { reason: "rebase", text }`
+  (ver "Base do lote").
 - Sobram `closed`/`canWrite: false` (prazo): o campo continua editável e salvo
   localmente, só não envia.
 
@@ -386,6 +386,7 @@ interface PendingEditBatch {
   firstSeq: number;
   edits: readonly EditTuple[];
   snapshot: string;
+  base?: { reason: "start" | "rebase"; text: string }; // Ver "Base do lote".
 }
 
 interface BatchReceipt {
@@ -401,7 +402,7 @@ interface MonitorState {
 }
 
 interface MonitorCheckpoint {
-  version: 2; // Only version accepted.
+  version: 3; // Only version accepted.
   state: unknown; // Validated by the codec when restored.
 }
 
@@ -491,11 +492,22 @@ O monitor não usa relógio de parede nem TTL. O que fica retido tem limite fixo
   desse conjunto. `sessionId` deve ser UUID ou namespace único gerado pelo
   chamador; reuso de sessão já esquecida não é detectado. IDs de batch combinam
   sessão e sequência global crescente.
-- Checkpoint (`version: 2`, única versão aceita; outra versão ou corrupção é
-  rejeitada e a recuperação é externa, texto mais lacuna) guarda base confirmada,
-  revisão e sequência globais, texto, pendências, recibos e a sessão ativa.
-  Observações e cadência não entram: `restore` cria sessão nova com relógio
-  monotônico novo e não transfere associações de input, mas conserva todos os
+- Base do lote. O monitor marca que o próximo lote precisa de base explícita: na
+  criação com `baseRevision === 0` (`"start"`) e em `rebase` (`"rebase"`).
+  Enquanto a marca existe, todo lote coletado (inclusive a retransmissão do lote em
+  trânsito) traz `base: { reason, text }` com o texto confirmado, que é o texto de
+  onde os edits partem; o ACK desse lote remove a marca. `adoptBase` não cria
+  marca e remove a `"start"` quando adota revisão diferente de zero, porque o
+  servidor já guarda o texto de partida. Os demais lotes não têm a chave `base`.
+  Replay de `base.text` mais os edits dá exatamente `snapshot`.
+- Checkpoint (`version: 3`, única versão aceita; outra versão ou corrupção é
+  rejeitada e a recuperação é externa, texto mais lacuna) guarda a marca de base
+  (`baseReason`, `null` quando não há), base confirmada,
+  revisão e sequência globais, texto, pendências, recibos e a sessão ativa. A
+  versão 2 era a anterior: um registro local com ela é lido só pelo texto, a
+  restauração a recusa e o campo registra uma lacuna, sem lançar para a página;
+  o registro é substituído na próxima gravação. Observações e cadência não
+  entram: `restore` cria sessão nova com relógio monotônico novo e não transfere associações de input, mas conserva todos os
   edits e batches pendentes. Replay valida só as pendências contra a base.
 - ACK válido remove imediatamente o batch em memória; a outbox durável fica sem
   esse batch no commit coerente seguinte. Falha nesse commit conserva a cópia
