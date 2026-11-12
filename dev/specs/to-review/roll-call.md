@@ -370,7 +370,7 @@ editar `prisma/schema.prisma` e rodar `pnpm run db:generate` e
   `pnpm run db:reset` sai 0 e cada estado de R34 aparece no dev server.
 - **T10. CLI.** Regenera `cli/codehood/api/generated.py`, adiciona
   `WarnEventHasRollCall`, `DeleteRollCall`, `--drop-roll-calls` e
-  `codehood attendance`. Segue `cli/CLAUDE.md`. Pronto com `uv run pytest`
+  `codehood attendance`. Segue `cli/AGENTS.md`. Pronto com `uv run pytest`
   em `cli/`.
 - **T12. Histórias e e2e.** Escritor de testes `sonnet`, conforme a seção
   "Histórias de usuário e e2e" da skill `new-feature`. Histórias novas nos

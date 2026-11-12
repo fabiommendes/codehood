@@ -266,7 +266,7 @@ whenever something is actually broken.
 conventions. It is a git subtree of
 [codehood-cli](https://github.com/fabiommendes/codehood-cli). Before any work in
 `cli/`, or any server change the CLI depends on (REST endpoints, schemas, the
-OpenAPI spec), read `cli/README.md` and `cli/CLAUDE.md`. Inside `cli/`, those
+OpenAPI spec), read `cli/README.md` and `cli/AGENTS.md`. Inside `cli/`, those
 files take precedence over this one.
 
 - The CLI takes `mdq` from `../../mdq/mdq-py`, a checkout of

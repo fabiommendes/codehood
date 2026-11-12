@@ -533,7 +533,7 @@ traz `lab-calculadora` com dois commits.
 `links.py`, `exclude.py`, `cli/codehood/cli/push.py`, `cli/codehood/repo/`
 (`init`), `cli/pyproject.toml` (`pathspec`), o cliente gerado (regenerar do
 OpenAPI), `cli/README.md`, `cli/GLOSSARY.md`, testes em `cli/tests/`. Cobre
-R25–R32. Depende de T5. Modelo `sonnet`. Lê `cli/CLAUDE.md` e `cli/README.md`.
+R25–R32. Depende de T5. Modelo `sonnet`. Lê `cli/AGENTS.md` e `cli/README.md`.
 Pronto quando `rtk uv run pytest` passa, cobrindo:
 - o `tree_sha` local bate com o `git` real;
 - `.gitignore` aninhado com `!` é respeitado; `.git` ignorado; symlink e

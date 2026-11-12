@@ -157,7 +157,7 @@ Critérios:
 
 ## T9. CLI (R25–R32)
 
-Em `cli/` valem `cli/CLAUDE.md` e `cli/README.md`. Testes: `rtk uv run
+Em `cli/` valem `cli/AGENTS.md` e `cli/README.md`. Testes: `rtk uv run
 pytest` em `cli/`; mypy (`uv run mypy codehood`) tem de ficar limpo. HTTP é
 falsificado com `httpx.MockTransport` (ver `tests/test_push_run.py`) ou com
 um `RepositoryApi` falso. O cliente gerado ainda não tem as rotas de

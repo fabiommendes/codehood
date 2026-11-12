@@ -1000,7 +1000,7 @@ rascunho depende do `localStorage` e não tem seed: os testes o montam.
   aparece no GET e no OpenAPI.
 
 **E3a.2 Snapshot e spec no CLI** (dentro de `cli/`, regras de
-`cli/CLAUDE.md`).
+`cli/AGENTS.md`).
 
 - Implementação: `resources/openapi/codehood.json`,
   `codehood/api/generated.py` regerado, `dev/specs/to-do/push-exams.md`

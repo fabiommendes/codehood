@@ -40,7 +40,7 @@ humano aprovar a atual:
    `dev/rfc/como-criar-e-escrever-um-service.md`.
 3. **REST e permissões**: tabela de rotas e tabela papel × ação.
 4. **Telas e fluxos**: uma linha por tela, com quem acessa e o que faz.
-5. **CLI**: o que muda em `cli/` (leia `cli/CLAUDE.md` antes).
+5. **CLI**: o que muda em `cli/` (leia `cli/AGENTS.md` antes).
 6. **Dados de dev**: o que `src/db/bootstrap.ts` precisa semear para cada
    estado da funcionalidade.
 
@@ -148,7 +148,7 @@ Escolha do modelo por tarefa:
   | rotas e páginas de curso     | `src/urls/README.md`                     |
   | `src/commands/`              | `src/commands/README.md`                 |
   | `test/stories/`              | `test/stories/README.md`                 |
-  | `cli/`                       | `cli/CLAUDE.md` e `cli/README.md`        |
+  | `cli/`                       | `cli/AGENTS.md` e `cli/README.md`        |
 - Rode em paralelo só as tarefas sem dependência entre si e sem arquivos em
   comum. Se precisarem de isolamento, use `isolation: "worktree"`.
 - Ao receber cada resultado, confira o diff e rode o critério de pronto antes
