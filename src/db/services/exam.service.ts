@@ -21,6 +21,11 @@ import {
 	examUpdate,
 } from "@/core/schemas";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { courseAccess } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { courseContentsWhere } from "@/db/services/course.service";
@@ -307,7 +312,9 @@ export const makeExamService = defineService<ExamT>()(() => {
 			fields: ExamUpdate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Exam> => {
-			const exam = await writableExam(tx, filter, opts.actor, "exam.update");
+			const exam = await writableExam(tx, filter, opts, "exam.update");
+			// Before the validation: a stale caller changes nothing and sees no 400.
+			await checkVersion(tx, "exam", { id: exam.id }, opts);
 			const questions = fields.questions
 				? await resolveQuestions(tx, exam.courseId, fields.questions)
 				: undefined;
@@ -329,9 +336,13 @@ export const makeExamService = defineService<ExamT>()(() => {
 				}
 			}
 
-			const row = await tx.exam.update({
-				where: { id: exam.id },
-				data: {
+			// The tags and questions are owned children of the exam: replacing them
+			// is part of this write, which moves the exam's version.
+			const row = await guardedUpdate(
+				tx,
+				"exam",
+				{ id: exam.id },
+				{
 					type: fields.type,
 					status: fields.status,
 					title: fields.title,
@@ -354,8 +365,9 @@ export const makeExamService = defineService<ExamT>()(() => {
 						questionsForExams: { deleteMany: {}, create: questions },
 					}),
 				},
-				include: examInclude(),
-			});
+				opts,
+				{ include: examInclude() },
+			);
 
 			return fromDb(row);
 		},
@@ -385,7 +397,10 @@ export const makeExamService = defineService<ExamT>()(() => {
 				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
 				select: { id: true },
 			});
-			if (!existing) return create(tx, { ...input, course: course.id }, opts);
+			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return create(tx, { ...input, course: course.id }, opts);
+			}
 
 			const { slug: _slug, course: _course, ...fields } = input;
 			return update(tx, { course: course.id, slug: input.slug }, fields, opts);
@@ -413,15 +428,15 @@ export const makeExamService = defineService<ExamT>()(() => {
 			filter: ExamPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Exam> => {
-			const row = valueOrNotFound(
-				"exam",
-				await tx.exam.findFirst({
-					where: examWhere(filter),
-					include: examInclude(),
-				}),
-			);
+			const row = await tx.exam.findFirst({
+				where: examWhere(filter),
+				include: examInclude(),
+			});
+			if (!row) return missingExam(tx, filter, opts.expectedUpdatedAt);
 
 			requireAccess(examAccess(opts.actor, row), "write", "exam.update");
+			// An exam that is already released is returned as it is, but not to a stale caller.
+			await checkVersion(tx, "exam", { id: row.id }, opts);
 
 			const exam = fromDb(row);
 			const now = new Date();
@@ -443,11 +458,14 @@ export const makeExamService = defineService<ExamT>()(() => {
 				});
 			}
 
-			const updated = await tx.exam.update({
-				where: { id: row.id },
-				data: { gradesReleasedAt: new Date() },
-				include: examInclude(),
-			});
+			const updated = await guardedUpdate(
+				tx,
+				"exam",
+				{ id: row.id },
+				{ gradesReleasedAt: new Date() },
+				opts,
+				{ include: examInclude() },
+			);
 			return fromDb(updated);
 		},
 	});
@@ -472,12 +490,15 @@ export const makeExamService = defineService<ExamT>()(() => {
 			enabled: boolean,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Exam> => {
-			const exam = await writableExam(tx, filter, opts.actor, "exam.update");
-			const row = await tx.exam.update({
-				where: { id: exam.id },
-				data: { answerHistory: enabled },
-				include: examInclude(),
-			});
+			const exam = await writableExam(tx, filter, opts, "exam.update");
+			const row = await guardedUpdate(
+				tx,
+				"exam",
+				{ id: exam.id },
+				{ answerHistory: enabled },
+				opts,
+				{ include: examInclude() },
+			);
 			return fromDb(row);
 		},
 	});
@@ -495,13 +516,18 @@ export const makeExamService = defineService<ExamT>()(() => {
 			filter: ExamPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
-			const exam = await writableExam(tx, filter, opts.actor, "exam.delete");
+			const exam = await writableExam(tx, filter, opts, "exam.delete");
+			// An archived exam stays as it is, but a stale caller is still refused.
+			await checkVersion(tx, "exam", { id: exam.id }, opts);
 			if (exam.status === "ARCHIVED") return;
 
-			await tx.exam.update({
-				where: { id: exam.id },
-				data: { status: "ARCHIVED" },
-			});
+			await guardedUpdate(
+				tx,
+				"exam",
+				{ id: exam.id },
+				{ status: "ARCHIVED" },
+				opts,
+			);
 		},
 	});
 
@@ -593,24 +619,49 @@ function examWhere(filter: ExamPK): Prisma.ExamWhereInput {
 async function writableExam(
 	tx: PrismaTx,
 	filter: ExamPK,
-	actor: ServiceOpts["actor"],
+	opts: ServiceOpts,
 	action: "exam.update" | "exam.delete",
 ) {
-	const exam = valueOrNotFound(
-		"exam",
-		await tx.exam.findFirst({
-			where: examWhere(filter),
-			select: {
-				id: true,
-				courseId: true,
-				status: true,
-				course: examInclude().course,
-			},
-		}),
-	);
+	const exam = await tx.exam.findFirst({
+		where: examWhere(filter),
+		select: {
+			id: true,
+			courseId: true,
+			status: true,
+			course: examInclude().course,
+		},
+	});
+	if (!exam) return missingExam(tx, filter, opts.expectedUpdatedAt);
 
-	requireAccess(examAccess(actor, exam), "write", action);
+	requireAccess(examAccess(opts.actor, exam), "write", action);
 	return exam;
+}
+
+/**
+ * Throws for an exam that does not exist: a 412 with no current version when
+ * the caller expected one, a `NotFound` otherwise or when its course is missing.
+ *
+ * @throws {@link PreconditionFailed} If a `Date` was expected.
+ * @throws {@link NotFound} If the exam or its course does not exist.
+ */
+async function missingExam(
+	tx: PrismaTx,
+	filter: ExamPK,
+	expected: Date | null | undefined,
+): Promise<never> {
+	if (expected !== undefined) {
+		if ("course" in filter) {
+			valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(filter.course),
+					select: { id: true },
+				}),
+			);
+		}
+		checkExpectedUpdatedAt(null, expected);
+	}
+	throw new NotFound("exam");
 }
 
 /**

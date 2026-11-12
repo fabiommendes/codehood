@@ -4,6 +4,13 @@ import { FULL_ACCESS } from "@/auth/actor";
 import { PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
+import {
+	enroll,
+	makeCourse,
+	makeExam,
+	makeReport,
+	makeResponse,
+} from "./conditional-write-exam-support";
 
 /// Sweep of the registered services for ADR 0013: a service that writes a
 /// model with `updatedAt` must honor `ServiceOpts.expectedUpdatedAt`, so a new
@@ -372,19 +379,108 @@ const HONORED: Record<
 			},
 		};
 	})(),
+	exam: (() => {
+		const row = async () => {
+			const { course } = await makeCourse();
+			return { course, exam: await makeExam(course.id) };
+		};
+		return {
+			update: async (v) => {
+				const { exam } = await row();
+				return db.exam.update({ id: exam.id }, { title: "x" }, opts(exam, v));
+			},
+			upsert: async (v) => {
+				const { course, exam } = await row();
+				return db.exam.upsert(
+					{ course: course.id, slug: exam.slug, title: "x" },
+					opts(exam, v),
+				);
+			},
+			delete: async (v) => {
+				const { exam } = await row();
+				return db.exam.delete({ id: exam.id }, opts(exam, v));
+			},
+		};
+	})(),
+	examException: (() => {
+		const row = async () => {
+			const { course } = await makeCourse();
+			const student = await enroll(course.id);
+			const exam = await makeExam(course.id, { duration: { minutes: 60 } });
+			const key = {
+				course: course.id,
+				exam: exam.slug,
+				username: student.username,
+			};
+			const exception = await db.examException.create(
+				{ ...key, extraTime: { minutes: 10 } },
+				FULL_ACCESS,
+			);
+			return { key, exception };
+		};
+		return {
+			update: async (v) => {
+				const { key, exception } = await row();
+				return db.examException.update(key, { note: "x" }, opts(exception, v));
+			},
+			upsert: async (v) => {
+				const { key, exception } = await row();
+				return db.examException.upsert(
+					{ ...key, note: "x" },
+					opts(exception, v),
+				);
+			},
+			delete: async (v) => {
+				const { key, exception } = await row();
+				return db.examException.delete(key, opts(exception, v));
+			},
+		};
+	})(),
+	response: (() => ({
+		update: async (v) => {
+			const { response } = await makeResponse();
+			return db.response.update(
+				{ id: response.id },
+				{ acceptingSubmissions: false },
+				opts(response, v),
+			);
+		},
+		upsert: async (v) => {
+			const { response, course, exam, student } = await makeResponse();
+			return db.response.upsert(
+				{
+					course: course.id,
+					exam: exam.slug,
+					author: student.username,
+					acceptingSubmissions: false,
+				},
+				opts(response, v),
+			);
+		},
+		delete: async (v) => {
+			const { response } = await makeResponse();
+			return db.response.delete({ id: response.id }, opts(response, v));
+		},
+	}))(),
+	report: (() => ({
+		update: async (v) => {
+			const { report } = await makeReport();
+			return db.report.update(
+				{ publicId: report.publicId },
+				{ note: "x" },
+				opts(report, v),
+			);
+		},
+		delete: async (v) => {
+			const { report } = await makeReport();
+			return db.report.delete({ publicId: report.publicId }, opts(report, v));
+		},
+	}))(),
 };
 
 /// Services with writes on a versioned model that do not honor the option
 /// yet. Remove a name when its service does; the test fails if it stays.
-const PENDING = new Set<string>([
-	"exam",
-	"examException",
-	"feedback",
-	"regradeRequest",
-	"report",
-	"response",
-	"rubric",
-]);
+const PENDING = new Set<string>(["feedback", "regradeRequest", "rubric"]);
 
 /// Services outside the rule, with the reason.
 const EXEMPT: Record<string, string> = {

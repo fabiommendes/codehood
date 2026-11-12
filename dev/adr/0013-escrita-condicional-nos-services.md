@@ -81,6 +81,12 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
   - `rollCall.checkIn` que cria uma presença: o roll call;
   - `question.upgradeLegacyVersions`: as questões cuja versão mais recente foi
     reescrita.
+  - `response.submit`, `submission.create`, `submission.update` (status) e
+    `submission.delete`: a resposta (as submissões aparecem no read model);
+  - `attachment.update` de um anexo de relatório: o relatório.
+- O caminho do aluno (`response.submit`, `response.finish`) grava o
+  `updatedAt` pelo helper sem expectativa: nunca recebe
+  `expectedUpdatedAt` e não falha com 412, mesmo que ele chegue.
 - `rev` continua opaco e gravado pelo cliente. Ele diz quem escreveu por
   último (CLI ou não); `updatedAt` diz se alguém escreveu.
 - `If-Unmodified-Since` não serve: datas HTTP têm resolução de um segundo.

@@ -27,6 +27,12 @@ import {
 	reportUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { sanitizeFilename } from "@/utils/filename";
@@ -246,8 +252,15 @@ export function makeReportService(
 				input: ReportUpdate,
 				opts: ServiceOptsWithoutTx,
 			): Promise<Report> => {
-				const row = await readableRow(tx, pk, opts.actor);
+				const row = await readableRow(
+					tx,
+					pk,
+					opts.actor,
+					opts.expectedUpdatedAt,
+				);
 				ensurePerm(opts.actor, "report.triage", targetOf(row));
+				// Before the validation: a stale caller sees no 400.
+				await checkVersion(tx, "report", { id: row.id }, opts);
 
 				const kind = input.kind ?? row.kind;
 				if (kind === "CONTENT" && row.courseId === null) {
@@ -272,11 +285,14 @@ export function makeReportService(
 					data.triagedAt = reopened ? null : new Date();
 				}
 
-				const updated = await tx.report.update({
-					where: { id: row.id },
+				const updated = await guardedUpdate(
+					tx,
+					"report",
+					{ id: row.id },
 					data,
-					include: reportInclude,
-				});
+					opts,
+					{ include: reportInclude },
+				);
 				return toReport(tx, updated, opts.actor);
 			},
 		});
@@ -294,10 +310,17 @@ export function makeReportService(
 				pk: ReportPK,
 				opts: ServiceOptsWithoutTx,
 			): Promise<void> => {
-				const row = await readableRow(tx, pk, opts.actor);
+				const row = await readableRow(
+					tx,
+					pk,
+					opts.actor,
+					opts.expectedUpdatedAt,
+				);
 				ensurePerm(opts.actor, "report.delete", targetOf(row));
+				// Before the attachments go: a stale caller loses nothing.
+				await checkVersion(tx, "report", { id: row.id }, opts);
 				await attachments.detach("REPORT", row.id, { ...opts, tx });
-				await tx.report.delete({ where: { id: row.id } });
+				await guardedDelete(tx, "report", { id: row.id }, opts);
 			},
 		});
 
@@ -381,11 +404,14 @@ async function readableRow(
 	tx: PrismaTx,
 	pk: ReportPK,
 	actor: Actor,
+	expected?: Date | null,
 ): Promise<DbReport> {
 	const row = await tx.report.findUnique({
 		where: { publicId: pk.publicId },
 		include: reportInclude,
 	});
+	// A missing row is a 412 for a caller that expected one; one the actor may not read stays a 404.
+	if (!row) checkExpectedUpdatedAt(null, expected);
 	if (!row || !hasPerm(actor, "report.read", targetOf(row))) {
 		throw new NotFound("report", pk.publicId);
 	}

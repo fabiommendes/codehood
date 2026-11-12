@@ -23,6 +23,12 @@ import {
 	examExceptionUpdate,
 } from "@/core/schemas";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { released } from "@/services/exam-state";
@@ -288,23 +294,23 @@ export const makeExamExceptionService = defineService<ExamExceptionT>()(() => {
 		): Promise<ExamException> => {
 			const { course, exam } = await loadCourseAndExam(tx, filter);
 			ensurePerm(opts.actor, "exam.manage-exceptions", course);
-			const existing = valueOrNotFound(
-				"exam exception",
-				await tx.examException.findUnique({
-					where: {
-						examId_username: { examId: exam.id, username: filter.username },
-					},
-				}),
-			);
+			const found = await tx.examException.findUnique({
+				where: {
+					examId_username: { examId: exam.id, username: filter.username },
+				},
+			});
+			// A missing row is a 412 for a caller that expected one, not a 404.
+			if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+			const existing = valueOrNotFound("exam exception", found);
+			// Before the rules: a stale caller changes nothing and sees no 400.
+			await checkVersion(tx, "examException", { id: existing.id }, opts);
 
 			const merged = mergeFields(existing, fields);
 			await checkRules(tx, course.id, await withRelease(tx, exam, course), {
 				username: filter.username,
 				...merged,
 			});
-			return fromDb(
-				await saveRow(tx, exam.id, { username: filter.username, ...merged }),
-			);
+			return fromDb(await saveRow(tx, existing.id, merged, opts));
 		},
 	});
 
@@ -334,13 +340,24 @@ export const makeExamExceptionService = defineService<ExamExceptionT>()(() => {
 				},
 			});
 
+			if (existing) {
+				await checkVersion(tx, "examException", { id: existing.id }, opts);
+			} else {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+			}
+
 			const merged = existing ? mergeFields(existing, input) : input;
-			await checkRules(tx, course.id, await withRelease(tx, exam, course), {
-				username: input.username,
-				...merged,
-			});
+			const data = { username: input.username, ...merged };
+			await checkRules(
+				tx,
+				course.id,
+				await withRelease(tx, exam, course),
+				data,
+			);
 			return fromDb(
-				await saveRow(tx, exam.id, { username: input.username, ...merged }),
+				existing
+					? await saveRow(tx, existing.id, merged, opts)
+					: await createRow(tx, exam.id, data),
 			);
 		},
 	});
@@ -360,16 +377,15 @@ export const makeExamExceptionService = defineService<ExamExceptionT>()(() => {
 		): Promise<void> => {
 			const { course, exam } = await loadCourseAndExam(tx, filter);
 			ensurePerm(opts.actor, "exam.manage-exceptions", course);
-			const existing = valueOrNotFound(
-				"exam exception",
-				await tx.examException.findUnique({
-					where: {
-						examId_username: { examId: exam.id, username: filter.username },
-					},
-					select: { id: true },
-				}),
-			);
-			await tx.examException.delete({ where: { id: existing.id } });
+			const found = await tx.examException.findUnique({
+				where: {
+					examId_username: { examId: exam.id, username: filter.username },
+				},
+				select: { id: true },
+			});
+			if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+			const existing = valueOrNotFound("exam exception", found);
+			await guardedDelete(tx, "examException", { id: existing.id }, opts);
 		},
 	});
 
@@ -513,16 +529,14 @@ function createRow(
 	});
 }
 
-/// Inserts the exception of `data.username` on `examId`, or replaces every field of the existing one.
+/// Replaces every field of exception `id`, checking the caller's expected version.
 function saveRow(
 	tx: PrismaTx,
-	examId: ExamId,
-	data: Parameters<typeof storedFields>[0] & { username: string },
+	id: ExamExceptionId,
+	data: Parameters<typeof storedFields>[0],
+	opts: { expectedUpdatedAt?: Date | null },
 ): Promise<DbExamException> {
-	return invalidIfExists(tx.examException.upsert.bind(tx.examException), {
-		where: { examId_username: { examId, username: data.username } },
-		create: { examId, username: data.username, ...storedFields(data) },
-		update: storedFields(data),
+	return guardedUpdate(tx, "examException", { id }, storedFields(data), opts, {
 		include: examExceptionInclude,
 	});
 }

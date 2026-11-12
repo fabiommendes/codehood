@@ -123,11 +123,20 @@ export function makeAttachmentService(
 
 	/// Moves the version of the resource whose current file is `raw`: its read
 	/// model shows the file's name, and loses the file when it is deleted. A
-	/// resource that already points elsewhere (or is gone) is not touched.
+	/// resource that already points elsewhere (or is gone) is not touched. A
+	/// report lists its files by name too, so a rename moves its version.
 	async function touchResource(
 		tx: PrismaTx,
 		raw: { id: number; attachedToType: string; attachedToId: number },
 	): Promise<void> {
+		if (raw.attachedToType === "REPORT") {
+			const report = await tx.report.findUnique({
+				where: { id: raw.attachedToId as ReportId },
+				select: { id: true },
+			});
+			if (report) await touch(tx, "report", { id: report.id }, {});
+			return;
+		}
 		if (raw.attachedToType !== "RESOURCE") return;
 		const resource = await tx.resource.findFirst({
 			where: { id: raw.attachedToId, attachmentId: raw.id },

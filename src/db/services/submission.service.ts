@@ -25,6 +25,7 @@ import {
 	submissionUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { assertResponse, type QuestionDocument, ResponseError } from "@/mdq";
@@ -211,6 +212,8 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 				},
 				include: submissionInclude(),
 			});
+			// The answers are part of the response, so adding one moves its version.
+			await touch(tx, "response", { id: response.id }, {});
 
 			return fromDb(row);
 		},
@@ -347,6 +350,9 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 				data: { status: fields.status },
 				include: submissionInclude(),
 			});
+			if (fields.status !== undefined && fields.status !== submission.status) {
+				await touch(tx, "response", { id: submission.responseId }, {});
+			}
 
 			return fromDb(row);
 		},
@@ -378,6 +384,7 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 			);
 
 			await tx.submission.delete({ where: { id: submission.id } });
+			await touch(tx, "response", { id: submission.responseId }, {});
 		},
 	});
 

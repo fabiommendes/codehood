@@ -32,6 +32,13 @@ import {
 	responseUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -298,17 +305,23 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				filter,
 				opts.actor,
 				"response.update",
+				opts.expectedUpdatedAt,
 			);
+			// Before the reopen check: a stale caller sees no 400.
+			await checkVersion(tx, "response", { id: response.id }, opts);
 
 			if (fields.acceptingSubmissions === true) {
 				await assertReopenable(tx, response);
 			}
 
-			const row = await tx.response.update({
-				where: { id: response.id },
-				data: { acceptingSubmissions: fields.acceptingSubmissions },
-				include: responseInclude(),
-			});
+			const row = await guardedUpdate(
+				tx,
+				"response",
+				{ id: response.id },
+				{ acceptingSubmissions: fields.acceptingSubmissions },
+				opts,
+				{ include: responseInclude() },
+			);
 
 			return fromDb(row);
 		},
@@ -339,6 +352,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				input,
 				opts.actor,
 				"response.create",
+				opts.expectedUpdatedAt,
 			);
 
 			if (input.acceptingSubmissions === undefined) return fromDb(row);
@@ -349,11 +363,15 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				await assertReopenable(tx, row);
 			}
 
-			const updated = await tx.response.update({
-				where: { id: row.id },
-				data: { acceptingSubmissions: input.acceptingSubmissions },
-				include: responseInclude(),
-			});
+			// The expectation was checked against this very row when it was resolved.
+			const updated = await guardedUpdate(
+				tx,
+				"response",
+				{ id: row.id },
+				{ acceptingSubmissions: input.acceptingSubmissions },
+				{},
+				{ include: responseInclude() },
+			);
 			return fromDb(updated);
 		},
 	});
@@ -383,13 +401,16 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 						filter,
 						opts.actor,
 						"response.delete",
+						opts.expectedUpdatedAt,
 					);
+					// Before anything is measured or deleted: a stale caller loses nothing.
+					await checkVersion(inner, "response", { id: response.id }, opts);
 
 					await measure({ responseIds: [response.id] });
 					await inner.submission.deleteMany({
 						where: { responseId: response.id },
 					});
-					await inner.response.delete({ where: { id: response.id } });
+					await guardedDelete(inner, "response", { id: response.id }, opts);
 				},
 			),
 	});
@@ -448,11 +469,15 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			);
 			if (!row.acceptingSubmissions) return fromDb(row);
 
-			const updated = await tx.response.update({
-				where: { id: row.id },
-				data: { acceptingSubmissions: false },
-				include: responseInclude(),
-			});
+			// The student's own call: it never carries an expectation, and must not fail on one.
+			const updated = await guardedUpdate(
+				tx,
+				"response",
+				{ id: row.id },
+				{ acceptingSubmissions: false },
+				{},
+				{ include: responseInclude() },
+			);
 			return fromDb(updated);
 		},
 	});
@@ -487,6 +512,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				},
 				opts.actor,
 				"response.submit",
+				undefined,
 			);
 
 			assertAcceptingSubmissions(
@@ -512,6 +538,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					automaticallyTriggered: input.automaticallyTriggered ?? false,
 				},
 			});
+
+			// The submissions are part of the response, so appending one moves its
+			// version. A student's save carries no expectation and never fails on one.
+			await touch(tx, "response", { id: row.id }, {});
 
 			const updated = valueOrNotFound(
 				"response",
@@ -646,12 +676,28 @@ async function writableResponse(
 	filter: ResponsePK,
 	actor: Actor,
 	action: "response.update" | "response.delete",
+	expected: Date | null | undefined,
 ): Promise<DbResponse> {
 	const row = await tx.response.findFirst({
 		where: responseWhere(filter),
 		include: responseInclude(),
 	});
-	if (!row) throw new NotFound("response");
+	if (!row) {
+		// A missing row is a 412 for a caller that expected one, unless its course is missing too.
+		if (expected !== undefined) {
+			if ("course" in filter && filter.course !== undefined) {
+				valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(filter.course),
+						select: { id: true },
+					}),
+				);
+			}
+			checkExpectedUpdatedAt(null, expected);
+		}
+		throw new NotFound("response");
+	}
 
 	const target = responseTarget(row);
 	requireAccess(responseAccess(actor, target), "write", action, {
@@ -765,6 +811,7 @@ async function resolveOrCreateAttempt(
 	input: AttemptInput,
 	actor: Actor,
 	perm: "response.create" | "response.submit",
+	expected: Date | null | undefined,
 ): Promise<DbResponse> {
 	const { course, exam, authorId } = await prepareAttempt(
 		tx,
@@ -788,8 +835,12 @@ async function resolveOrCreateAttempt(
 			},
 			include: responseInclude(),
 		});
-		if (existing) return existing;
+		if (existing) {
+			checkExpectedUpdatedAt(existing.updatedAt, expected);
+			return existing;
+		}
 
+		checkExpectedUpdatedAt(null, expected);
 		return invalidIfExists(tx.response.create, {
 			data: { publicId: generateToken(9), authorId, examId: exam.id },
 			include: responseInclude(),
@@ -804,8 +855,12 @@ async function resolveOrCreateAttempt(
 		orderBy: { slotKey: "desc" },
 		include: responseInclude(),
 	});
-	if (existing) return existing;
+	if (existing) {
+		checkExpectedUpdatedAt(existing.updatedAt, expected);
+		return existing;
+	}
 
+	checkExpectedUpdatedAt(null, expected);
 	return invalidIfExists(tx.response.create, {
 		data: {
 			publicId: generateToken(9),
