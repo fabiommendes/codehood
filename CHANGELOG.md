@@ -17,7 +17,10 @@
   atrás de uma chave desligada por padrão (`localStorage["codehood.answerHistory"]
   = "on"`), com carga adiada do código e histórico só local, sem endpoint; a
   mesma injeção de falha roda contra a página real (`exam-answer-edit-isolation`).
-  Adaptadores de editor ausentes. O monitor segue só questões `essay` (inclui a
+  A página registra a causa de cada edit (digitação, colagem, exclusão, desfazer,
+  refazer, composição) a partir do `beforeinput` da textarea e dos user events do
+  CodeMirror, sem mudar o mdq; tipos desconhecidos e arrasto são `other`
+  (`input-kind.ts`, `exam-answer-edit-kind`). O monitor segue só questões `essay` (inclui a
   redação de código) e não tem fallback em `localStorage`: o rascunho local da
   página recupera o texto, e uma queda do navegador perde só histórico ainda não
   persistido (lacuna). As menções ao fallback nas entradas abaixo ficaram obsoletas.

@@ -66,15 +66,40 @@ A primeira entrega não atribui probabilidade de fraude nem aplica penalidades.
   `actions.exam.answer` informa a página, que chama `disable()`. O histórico já
   coletado é mantido.
 - Tela do instrutor, primeira versão: resumo por resposta (tempo ativo, inserções
-  grandes, lacunas, horário da primeira e da última edição), sem replay. Limite:
-  hoje o monitor não distingue colagem de digitação, então uma inserção grande é
-  só um indício.
+  grandes, lacunas, horário da primeira e da última edição), sem replay. O `kind`
+  de cada edit é a causa observada pela página (ver "Causa do edit" abaixo), não
+  uma garantia: uma inserção grande marcada `typing` ainda é só um indício, pois o
+  navegador pode anunciar `insertText` para ditado ou autocompletar.
 - Rich text (Q1): fora do escopo; não existe questão de rich text.
 - Limites (Q4): limites conservadores por lote e por tentativa. Estourar um vira
   lacuna explícita, nunca erro na resposta. Sem checkpoints na primeira versão.
-- Props de injeção de editor no mdq (Q7): desnecessárias para `essay`, pois a
-  página alimenta o monitor pelo próprio `change()`. Voltam só se quisermos
-  detectar colagem.
+- Props de injeção de editor no mdq (Q7): desnecessárias, inclusive para detectar
+  colagem. A página alimenta o monitor pelo próprio `change()` e descobre a causa
+  sem tocar no mdq (ver "Causa do edit").
+
+#### Causa do edit
+
+Implementado em 2026-11-12. A tabela vive em `src/services/answer-edits/input-kind.ts`.
+
+- Textarea (`essay` de texto, renderizado pelo mdq): `beforeinput` borbulha e traz
+  `inputType`. A página escuta no contêiner de cada questão, guarda o `inputType`
+  da questão e o `change()` o consome ao chamar `adapter.input`. O `input` do mdq
+  vem depois do `beforeinput`, na mesma tarefa; um `setTimeout(0)` descarta o que
+  nenhum `input` consumiu (`beforeinput` cancelado). Mudança sem `beforeinput`
+  (valor atribuído por script, botão "limpar") é `other`.
+- Editor de código (CodeMirror): o `updateListener` de `createEditor` passa o
+  user event das transações (`input.paste`, `delete.backward`, `undo`...) como
+  segundo argumento de `onChange`, que sobe por `CodeRunner` e `CodeEssayAnswer`
+  até o `change()`. Dois eventos diferentes no mesmo update viram `other`.
+- `inputType` e user event desconhecidos ou ausentes são `other`, nunca `typing`.
+- `insertFromDrop`, `deleteByDrag`, autocompletar e `insertReplacementText` são
+  `other`: o formato não tem código de arrasto. Acrescentar um é mudança de
+  formato.
+- Com a chave desligada o `beforeinput` só testa `history === null`. Todo o
+  trabalho roda sem esperar e dentro de `try`; falha na leitura da causa deixa o
+  edit como `other` e não toca a resposta (R1 a R7, testado em
+  `exam-answer-edit-isolation`).
+- Edits de causas diferentes dentro do mesmo adiamento do adaptador viram `other`.
 
 ## Prioridade: a resposta não depende do monitor
 
