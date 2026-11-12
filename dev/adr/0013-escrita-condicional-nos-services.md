@@ -94,7 +94,9 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
     rubrica cuja pontuação muda (`rubric.deleteItem` também as notas que
     aplicavam o item, mesmo sem mudar a pontuação, pois a lista de itens
     aplicados muda);
-  - `rubric.splitItem`: os itens que mudam de posição.
+  - `rubric.splitItem`: os itens que mudam de posição. O `review` das notas
+    que aplicavam o item aposentado passa a `true` sem mudar a versão delas:
+    deriva do item embutido, que tem versão própria.
 - Filhos possuídos bumpam a mãe: toda escrita de item da rubrica
   (`createItem`, `updateItem`, `upsertItem`, `deleteItem`, `splitItem`,
   `renameGroup`) move o `updatedAt` da rubrica. A versão de `updateItem`,
