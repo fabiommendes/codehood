@@ -13,9 +13,9 @@ function acceptAll(h: Rig) {
 			field,
 			kind: "accepted" as const,
 			receipt: {
-				batchId: batch.batchId,
-				revision: batch.baseRevision + 1,
-				lastSeq: batch.firstSeq + batch.edits.length - 1,
+				batchId: batch?.batchId ?? "",
+				revision: (batch?.baseRevision ?? 0) + 1,
+				lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 			},
 		}));
 	};
@@ -57,9 +57,9 @@ test.describe("answer edit coordinator rebase: the monitor never blocks the fiel
 				field,
 				kind: "accepted" as const,
 				receipt: {
-					batchId: batch.batchId,
-					revision: batch.baseRevision + 1,
-					lastSeq: batch.firstSeq + batch.edits.length - 1,
+					batchId: batch?.batchId ?? "",
+					revision: (batch?.baseRevision ?? 0) + 1,
+					lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 				},
 			}));
 		};

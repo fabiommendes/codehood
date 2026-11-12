@@ -12,7 +12,13 @@ type InputKind = InputObservation["kind"];
 /// The slice of the coordinator the adapter calls.
 export type CoordinatorPort = Pick<
 	AnswerEditCoordinator,
-	"register" | "detach" | "persist" | "flush" | "dispose"
+	| "register"
+	| "detach"
+	| "persist"
+	| "flush"
+	| "dispose"
+	| "reportGap"
+	| "discard"
 >;
 
 /// A field whose monitoring stopped, with the reason, for an optional discreet indicator.
@@ -55,6 +61,9 @@ interface FieldEntry {
 }
 
 const DEFAULT_FLUSH_CEILING_MS = 3000;
+
+/// Longest `discard` holds its caller.
+const DISCARD_CEILING_MS = 2000;
 
 /**
  * The only entry point UI code uses to record the edit history of text answers.
@@ -231,7 +240,7 @@ export class AnswerEditAdapter {
 					/// Wait for both, so a quick failure of one does not cut the other short.
 					const results = await Promise.allSettled([
 						this.coordinator.persist(),
-						this.coordinator.flush(),
+						this.coordinator.flush({ afterReconciliation: true }),
 					]);
 					for (const result of results)
 						if (result.status === "rejected") throw result.reason;
@@ -249,11 +258,41 @@ export class AnswerEditAdapter {
 		if (this.killed) return;
 		this.killed = true;
 		for (const entry of this.fields.values()) {
+			if (entry.phase === "opening" || entry.phase === "ready")
+				this.reportGap(entry.field, reason);
 			entry.phase = "disabled";
 			entry.monitor = null;
 		}
 		this.record(null, reason);
 		this.guard(() => this.coordinator.dispose(), null);
+	}
+
+	/**
+	 * Erase the local records of the attempt and stop for good, resolving within a ceiling whatever storage does; never rejects.
+	 */
+	discard(): Promise<void> {
+		return new Promise<void>((resolve) => {
+			let done = false;
+			let cancel: (() => void) | null = null;
+			const finish = () => {
+				if (done) return;
+				done = true;
+				try {
+					cancel?.();
+				} catch {
+					/// Nothing to cancel.
+				}
+				resolve();
+			};
+			this.killed = true;
+			try {
+				cancel = this.scheduler.schedule(DISCARD_CEILING_MS, finish);
+			} catch {
+				/// Without a timer the ceiling cannot be enforced, so the caller is not held.
+				return resolve();
+			}
+			this.guard(() => this.coordinator.discard(), null, finish);
+		});
 	}
 
 	/// Whether the adapter as a whole, or one field, is still monitored.
@@ -349,9 +388,22 @@ export class AnswerEditAdapter {
 		entry.phase = "disabled";
 		entry.monitor = null;
 		this.record(entry.field, error);
+		this.reportGap(
+			entry.field,
+			error instanceof Error ? error.message : String(error),
+		);
 		if (wasClosed || this.killed) return;
 		/// Best effort: ownership of whatever is pending moves off the broken handle.
 		this.guard(() => this.coordinator.detach(entry.field), null);
+	}
+
+	/// Tell the coordinator the field's history has a hole, so the server can show it.
+	private reportGap(field: AttemptField, reason: string): void {
+		try {
+			this.coordinator.reportGap(field, reason);
+		} catch {
+			/// Reporting a gap must never break the caller.
+		}
 	}
 
 	private record(field: AttemptField | null, error: unknown): void {

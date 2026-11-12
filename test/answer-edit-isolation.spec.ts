@@ -112,9 +112,9 @@ async function mount(options: { scenario: Scenario; ceilingMs: number }) {
 					field,
 					kind: "accepted" as const,
 					receipt: {
-						batchId: batch.batchId,
-						revision: batch.baseRevision + 1,
-						lastSeq: batch.firstSeq + batch.edits.length - 1,
+						batchId: batch?.batchId ?? "",
+						revision: (batch?.baseRevision ?? 0) + 1,
+						lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 					},
 				}));
 			},

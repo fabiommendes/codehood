@@ -93,9 +93,9 @@ async function startSession(mode: "accepted" | "abort-ack" | "lost-ack") {
 					field,
 					kind: "accepted" as const,
 					receipt: {
-						batchId: batch.batchId,
-						revision: batch.baseRevision + 1,
-						lastSeq: batch.firstSeq + batch.edits.length - 1,
+						batchId: batch?.batchId ?? "",
+						revision: (batch?.baseRevision ?? 0) + 1,
+						lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 					},
 				}));
 			},
@@ -325,9 +325,9 @@ test("oversized pending history is sent without durable primary storage and then
 						field,
 						kind: "accepted" as const,
 						receipt: {
-							batchId: batch.batchId,
-							revision: batch.baseRevision + 1,
-							lastSeq: batch.firstSeq + batch.edits.length - 1,
+							batchId: batch?.batchId ?? "",
+							revision: (batch?.baseRevision ?? 0) + 1,
+							lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 						},
 					}));
 				},

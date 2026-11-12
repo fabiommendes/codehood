@@ -38,7 +38,7 @@ function acceptRequests(h: Rig) {
 			questionId,
 			field,
 			kind: "accepted" as const,
-			receipt: receipt(batch),
+			receipt: receipt(batch as PendingEditBatch),
 		}));
 	};
 }
@@ -150,7 +150,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 		});
 		await reopened.flushDelivery();
 		const batches = h.transport.requests.flatMap((request) =>
-			request.fields.map((field) => field.batch),
+			request.fields.flatMap((field) => (field.batch ? [field.batch] : [])),
 		);
 		expect(batches).toHaveLength(3);
 		expect(batches[0]).toEqual(batch);

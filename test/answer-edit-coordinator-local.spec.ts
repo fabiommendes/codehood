@@ -142,7 +142,7 @@ test.describe("answer edit coordinator local: durability", () => {
 		h.store.failCommit = true;
 		await h.coordinator.flush();
 		expect(h.transport.requests).toHaveLength(1);
-		expect(h.transport.requests[0]?.fields[0]?.batch.snapshot).toBe(
+		expect(h.transport.requests[0]?.fields[0]?.batch?.snapshot).toBe(
 			"before after",
 		);
 		expect(h.coordinator.getStatus(FIELD)).toMatchObject({

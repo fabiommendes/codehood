@@ -249,9 +249,9 @@ async function withRealCoordinator() {
 				field,
 				kind: "accepted",
 				receipt: {
-					batchId: batch.batchId,
-					revision: batch.baseRevision + 1,
-					lastSeq: batch.firstSeq + batch.edits.length - 1,
+					batchId: batch?.batchId ?? "",
+					revision: (batch?.baseRevision ?? 0) + 1,
+					lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 				},
 			}),
 		);
@@ -310,7 +310,7 @@ test.describe("flushFinal and reconciliation", () => {
 
 		expect(h.transport.requests).toHaveLength(1);
 		const [item] = h.transport.requests[0]?.fields ?? [];
-		expect(item?.batch.snapshot).toBe("typed words");
+		expect(item?.batch?.snapshot).toBe("typed words");
 		expect(flushing.settled).toBe(true);
 	});
 

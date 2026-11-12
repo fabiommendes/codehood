@@ -50,9 +50,9 @@ function accepted(request: Request): FieldResult[] {
 		field,
 		kind: "accepted",
 		receipt: {
-			batchId: batch.batchId,
-			revision: batch.baseRevision + 1,
-			lastSeq: batch.firstSeq + batch.edits.length - 1,
+			batchId: batch?.batchId ?? "",
+			revision: (batch?.baseRevision ?? 0) + 1,
+			lastSeq: (batch?.firstSeq ?? 0) + (batch?.edits.length ?? 1) - 1,
 		},
 	}));
 }
@@ -68,7 +68,7 @@ function partial(request: Request, failure: PartialFailure): FieldResult[] {
 					{ questionId: result.questionId, field: result.field, kind: "retry" },
 				];
 			case "invalid receipt":
-				if (result.kind !== "accepted")
+				if (result.kind !== "accepted" || !result.receipt)
 					throw new Error("Expected fixture receipt");
 				return [
 					{
@@ -197,7 +197,8 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 		if (!request) throw new Error("Expected held delivery");
 		const results = accepted(request);
 		const result = results[0];
-		if (result?.kind !== "accepted") throw new Error("Expected ACK fixture");
+		if (result?.kind !== "accepted" || !result.receipt)
+			throw new Error("Expected ACK fixture");
 
 		await h.coordinator.detach(FIELD);
 		h.monitor.dispose();
@@ -258,7 +259,8 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 		if (!request) throw new Error("Expected held delivery");
 		const results = accepted(request);
 		const result = results[0];
-		if (result?.kind !== "accepted") throw new Error("Expected ACK fixture");
+		if (result?.kind !== "accepted" || !result.receipt)
+			throw new Error("Expected ACK fixture");
 		await h.coordinator.detach(FIELD);
 		h.monitor.dispose();
 		/// The server already applied the batch, but its response is still in transit.
@@ -299,7 +301,8 @@ test.describe("answer edit coordinator races: remount during an acknowledgement"
 		if (!request) throw new Error("Expected held delivery");
 		const results = accepted(request);
 		const result = results[0];
-		if (result?.kind !== "accepted") throw new Error("Expected ACK fixture");
+		if (result?.kind !== "accepted" || !result.receipt)
+			throw new Error("Expected ACK fixture");
 		await h.coordinator.detach(FIELD);
 		h.monitor.dispose();
 		const recovery = h.coordinator.recover(FIELD, "");

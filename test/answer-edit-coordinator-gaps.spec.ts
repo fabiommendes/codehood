@@ -31,7 +31,7 @@ interface Sent {
 	questionId: string;
 	field: string;
 	batch?: PendingEditBatch;
-	gaps?: { reason: string }[];
+	gaps?: { reason: string; id: string }[];
 }
 
 type Rig = ReturnType<typeof rig>;
@@ -97,7 +97,7 @@ test.describe("a reported gap travels with the next delivery", () => {
 		await h.scheduler.advance(CADENCE_MS);
 
 		expect(items(h)).toEqual([
-			{ ...FIELD, gaps: [{ reason: "storage lost" }] },
+			{ ...FIELD, gaps: [{ reason: "storage lost", id: expect.any(String) }] },
 		]);
 	});
 
@@ -111,7 +111,9 @@ test.describe("a reported gap travels with the next delivery", () => {
 
 		expect(items(h)).toHaveLength(1);
 		expect(items(h)[0]?.batch?.snapshot).toBe("typed");
-		expect(items(h)[0]?.gaps).toEqual([{ reason: "storage lost" }]);
+		expect(items(h)[0]?.gaps).toEqual([
+			{ reason: "storage lost", id: expect.any(String) },
+		]);
 	});
 
 	test("markers keep the order they were reported in", async () => {
@@ -123,9 +125,11 @@ test.describe("a reported gap travels with the next delivery", () => {
 		await h.coordinator.flush();
 
 		expect(items(h)[0]?.gaps).toEqual([
-			{ reason: "first" },
-			{ reason: "second" },
+			{ reason: "first", id: expect.any(String) },
+			{ reason: "second", id: expect.any(String) },
 		]);
+		const ids = items(h)[0]?.gaps?.map((gap) => gap.id);
+		expect(new Set(ids).size).toBe(2);
 	});
 
 	test("an accepted item clears its markers: they are never sent twice", async () => {
@@ -213,7 +217,10 @@ test.describe("a marker survives a delivery that did not land", () => {
 			await h.scheduler.advance(1500);
 
 			expect(h.transport.requests).toHaveLength(2);
-			expect(items(h)[1]?.gaps).toEqual([{ reason: "storage lost" }]);
+			expect(items(h)[1]?.gaps).toEqual(items(h)[0]?.gaps);
+			expect(items(h)[1]?.gaps).toEqual([
+				{ reason: "storage lost", id: expect.any(String) },
+			]);
 		});
 	}
 });

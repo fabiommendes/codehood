@@ -29,12 +29,20 @@ export interface ServerFieldState {
 	readonly canWrite: boolean;
 	readonly receipts: readonly BatchReceipt[];
 }
+/// A marker that the history of a field has a hole; `id` makes a resent marker harmless.
+export interface GapMarker {
+	readonly reason: string;
+	readonly id: string;
+}
+/// What one field contributes to a request: a batch, gap markers, or both.
 export interface FieldBatch extends AttemptField {
-	readonly batch: PendingEditBatch;
+	readonly batch?: PendingEditBatch;
+	readonly gaps?: readonly GapMarker[];
 }
 export type FieldResult = AttemptField &
+	/// A gap-only item has no receipt.
 	(
-		| { readonly kind: "accepted"; readonly receipt: BatchReceipt }
+		| { readonly kind: "accepted"; readonly receipt?: BatchReceipt }
 		| {
 				readonly kind: "conflict" | "closed" | "retry";
 				readonly message?: string;
@@ -95,6 +103,8 @@ interface RegisteredField {
 	version: number;
 	attemptedVersion: number;
 	status: FieldStatus;
+	/// Markers not yet acknowledged, in the order reported.
+	gaps: GapMarker[];
 }
 
 const MAX_FIELDS = 128;
@@ -102,6 +112,10 @@ const STORAGE_TIMEOUT_MS = 5000;
 const PERSIST_DELAY_MS = 1000;
 const INITIAL_RETRY_MS = 1000;
 const MAX_RETRY_MS = 60_000;
+/// Most markers kept per field; the server keeps no more.
+const MAX_GAPS_PER_FIELD = 50;
+/// Longest marker reason the server accepts.
+const MAX_GAP_REASON = 200;
 
 /**
  * Own local durability and aggregate delivery for one authenticated attempt.
@@ -124,6 +138,8 @@ export class AnswerEditCoordinator {
 	private revocation: Promise<void> | null = null;
 	private stopped = false;
 	private revoked = false;
+	/// Set by `discard`: no record is written from then on.
+	private discarded = false;
 
 	constructor(options: CoordinatorOptions) {
 		this.options = options;
@@ -189,7 +205,7 @@ export class AnswerEditCoordinator {
 	 * Commit the latest view of all dirty fields without closing open edits.
 	 */
 	persist(): Promise<void> {
-		if (this.revoked) return Promise.resolve();
+		if (this.revoked || this.discarded) return Promise.resolve();
 		this.cancelPersist?.();
 		this.cancelPersist = null;
 		if (this.persistence) return this.persistence;
@@ -205,10 +221,20 @@ export class AnswerEditCoordinator {
 
 	/**
 	 * Collect and durably freeze one batch per dirty field before one aggregate request.
+	 *
+	 * With `afterReconciliation`, first waits for the baseline checks in progress, so the batches rest on the server's state.
 	 */
-	flush(): Promise<void> {
+	flush(options: { afterReconciliation?: boolean } = {}): Promise<void> {
 		if (this.stopped || this.revoked) return Promise.resolve();
 		if (this.delivery) return this.delivery;
+		/// Only the final flush waits: a reconciliation that hangs must not hold the periodic ones back.
+		const reconciling = options.afterReconciliation
+			? [...this.fields.values()].flatMap((entry) =>
+					entry.reconciling ? [entry.reconciling] : [],
+				)
+			: [];
+		if (reconciling.length > 0)
+			return Promise.all(reconciling).then(() => this.flush(options));
 		this.cancelDelivery?.();
 		this.cancelDelivery = null;
 		this.delivery = this.sendPending().finally(() => {
@@ -245,6 +271,47 @@ export class AnswerEditCoordinator {
 			}
 		});
 		return this.disposal;
+	}
+
+	/**
+	 * Remember that the history of a field has a hole, to send with the next delivery; never throws.
+	 */
+	reportGap(field: AttemptField, reason: string): void {
+		try {
+			if (this.stopped || this.revoked) return;
+			const entry = this.fields.get(fieldKey(field));
+			if (!entry || entry.gaps.length >= MAX_GAPS_PER_FIELD) return;
+			entry.gaps.push({
+				reason: String(reason).slice(0, MAX_GAP_REASON),
+				/// Any opaque, unique string does; the session id generator is already random.
+				id: this.options.createSessionId(),
+			});
+			this.scheduleDelivery();
+		} catch {
+			/// A marker is best effort: losing it must never reach the caller.
+		}
+	}
+
+	/**
+	 * Remove the local records of every known field and stop for good; never rejects.
+	 *
+	 * Failures are ignored: the records expire on their own.
+	 */
+	async discard(): Promise<void> {
+		this.stopped = true;
+		this.discarded = true;
+		this.stopCallbacks();
+		try {
+			/// A commit already under way would land after its record was removed.
+			await Promise.allSettled([...this.commits.values()]);
+			await Promise.allSettled(
+				[...this.fields.values()].map(async (entry) =>
+					this.bounded(this.options.store.remove(this.ref(entry.field))),
+				),
+			);
+		} catch {
+			/// The records expire on their own.
+		}
 	}
 
 	/**
@@ -330,6 +397,7 @@ export class AnswerEditCoordinator {
 				generation: previous?.generation ?? local?.generation ?? null,
 				version: 1,
 				attemptedVersion: 0,
+				gaps: previous?.gaps ?? [],
 				status: {
 					...field,
 					durability: "pending",
@@ -503,7 +571,7 @@ export class AnswerEditCoordinator {
 	}
 
 	private async persistDirty(): Promise<void> {
-		while (!this.revoked) {
+		while (!this.revoked && !this.discarded) {
 			const dirty = [...this.fields.values()].filter(
 				(entry) => entry.version !== entry.attemptedVersion,
 			);
@@ -513,7 +581,11 @@ export class AnswerEditCoordinator {
 	}
 
 	private async persistField(entry: RegisteredField): Promise<void> {
-		while (!this.revoked && entry.version !== entry.attemptedVersion) {
+		while (
+			!this.revoked &&
+			!this.discarded &&
+			entry.version !== entry.attemptedVersion
+		) {
 			let commit = this.commits.get(entry);
 			if (!commit) {
 				commit = this.commit(entry).finally(() => {
@@ -593,7 +665,11 @@ export class AnswerEditCoordinator {
 		this.deliveryFailed = false;
 		for (const entry of this.fields.values())
 			if (!entry.reconciled) void this.reconcile(entry);
-		const pending: { entry: RegisteredField; batch: PendingEditBatch }[] = [];
+		const pending: {
+			entry: RegisteredField;
+			batch: PendingEditBatch | undefined;
+			gaps: readonly GapMarker[];
+		}[] = [];
 		for (const entry of this.fields.values()) {
 			if (
 				this.registering.has(fieldKey(entry.field)) ||
@@ -601,12 +677,11 @@ export class AnswerEditCoordinator {
 				!entry.reconciled
 			)
 				continue;
-			const batch = entry.handle.collect();
-			if (batch) {
-				/// Retried frozen batches are committed again before sending, when storage allows it.
-				this.changed(entry);
-				pending.push({ entry, batch });
-			}
+			const batch = entry.handle.collect() ?? undefined;
+			/// A retried frozen batch is committed again before sending, when storage allows it.
+			if (batch) this.changed(entry);
+			const gaps = [...entry.gaps];
+			if (batch || gaps.length > 0) pending.push({ entry, batch, gaps });
 		}
 		await this.persist();
 		if (this.stopped || this.revoked) return;
@@ -622,19 +697,29 @@ export class AnswerEditCoordinator {
 		try {
 			const results = await this.options.transport.send({
 				attemptId: this.options.attemptId,
-				fields: sendable.map(({ entry, batch }) => ({ ...entry.field, batch })),
+				fields: sendable.map(({ entry, batch, gaps }) => ({
+					...entry.field,
+					...(batch ? { batch } : {}),
+					...(gaps.length > 0 ? { gaps } : {}),
+				})),
 			});
 			if (this.stopped || this.revoked) return;
-			for (const { entry } of sendable) {
+			for (const { entry, batch, gaps } of sendable) {
 				const matches = results.filter(
 					(result) => fieldKey(result) === fieldKey(entry.field),
 				);
 				const result = matches.length === 1 ? matches[0] : undefined;
 				if (result?.kind === "accepted") {
+					/// The server stored these markers; later ones stay for the next delivery.
+					const sent = new Set(gaps.map((gap) => gap.id));
+					entry.gaps = entry.gaps.filter((gap) => !sent.has(gap.id));
 					try {
-						entry.handle.acknowledge(result.receipt);
-						this.acknowledged++;
-						this.changed(entry);
+						if (batch) {
+							if (!result.receipt) throw new Error("Receipt missing");
+							entry.handle.acknowledge(result.receipt);
+							this.acknowledged++;
+							this.changed(entry);
+						}
 					} catch (error) {
 						entry.status = {
 							...entry.status,
@@ -722,7 +807,9 @@ export class AnswerEditCoordinator {
 			![...this.fields.values()].some(
 				(entry) =>
 					(!entry.reconciled && !entry.reconciling) ||
-					(entry.canWrite && entry.handle.getState().hasPendingChanges),
+					(entry.canWrite &&
+						(entry.gaps.length > 0 ||
+							entry.handle.getState().hasPendingChanges)),
 			)
 		)
 			return;

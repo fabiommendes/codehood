@@ -36,6 +36,8 @@ function setup(
 		dispose: async () => {
 			calls.push("dispose");
 		},
+		reportGap: () => {},
+		discard: async () => {},
 		...overrides,
 	};
 	let clock = 0;

@@ -36,7 +36,7 @@ function accepted(request: Request): FieldResult[] {
 		questionId,
 		field,
 		kind: "accepted",
-		receipt: receipt(batch),
+		receipt: receipt(batch as PendingEditBatch),
 	}));
 }
 
@@ -344,7 +344,7 @@ test.describe("answer edit coordinator delivery: independent acknowledgements", 
 			respond(h, async (request) => {
 				const results = accepted(request);
 				const result = results[0];
-				if (result?.kind !== "accepted")
+				if (result?.kind !== "accepted" || !result.receipt)
 					throw new Error("Missing fixture receipt");
 				switch (response) {
 					case "omitted":
