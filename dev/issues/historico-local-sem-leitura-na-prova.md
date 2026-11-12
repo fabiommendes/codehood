@@ -33,8 +33,13 @@ Decisões de 2026-11-11 (ver `dev/rfc/historico-de-edicao-de-respostas-abertas.m
 - Limites conservadores por lote e por tentativa; estourar vira lacuna explícita,
   nunca erro na resposta. Sem checkpoints na primeira versão.
 - Tela do instrutor: resumo por resposta (tempo ativo, inserções grandes, lacunas,
-  primeira e última edição), sem replay. O monitor vê o editor só por `change()`
-  e não distingue colagem de digitação: inserção grande é só um indício.
+  primeira e última edição), sem replay. A página registra a causa observada de
+  cada edit (colagem, digitação, exclusão...), ver "Causa do edit" no RFC; é um
+  indício, não garantia: uma inserção grande marcada como digitação pode vir de
+  ditado ou autocompletar.
+
+O servidor, a chave por prova e a tela estão especificados em
+`dev/specs/to-do/historico-de-edicao-no-servidor.md`.
 
 Falta: o endpoint, o campo em `Exam`, o aviso às páginas abertas, o envio do
 histórico e da lacuna do monitor, a limpeza local após a confirmação e a entrega, e

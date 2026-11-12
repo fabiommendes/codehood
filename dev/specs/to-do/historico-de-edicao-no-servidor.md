@@ -36,8 +36,11 @@ histórico. Nenhuma falha, recusa, limite ou lentidão do histórico afeta
 Termos: "tentativa" é a [Response](../../../GLOSSARY.md) (uma por aluno numa
 prova graduada, várias numa prova `PRACTICE`); "resposta" é a
 [Submission](../../../GLOSSARY.md). "Campo" é o par questão e nome de campo que o
-cliente já usa (`{ questionId: <slug>, field: "answer" }`). "Lacuna" é um trecho
-do histórico que não é reproduzível.
+cliente já usa (`{ questionId: <slug>, field: "answer" }`).
+[Histórico de edição](../../../GLOSSARY.md) e
+[lacuna de edição](../../../GLOSSARY.md) estão no glossário; no texto abaixo,
+"lacuna" é sempre lacuna de edição. "Chave" é a chave por prova de R30; seu
+valor efetivo depende do tipo da prova.
 
 ## Fora do escopo
 
@@ -150,8 +153,8 @@ cliente com doubles) ou **e2e** (Action pela rede, página no navegador).
   }
   ```
 
-  `Exam` ganha `answerHistory Boolean @default(true)` (ver R30 e o ponto aberto
-  P2). `Response` e `QuestionRef` ganham as relações inversas.
+  `Exam` ganha `answerHistory Boolean?`, como `allowCodeRun`: `null` segue o tipo
+  da prova (R30). `Response` e `QuestionRef` ganham as relações inversas.
 
   Por que a âncora pende de `Response`: o histórico é da tentativa, não de uma
   resposta. Uma tentativa acumula várias `Submission` por questão; o histórico de
@@ -187,7 +190,7 @@ Segue `dev/rfc/como-criar-e-escrever-um-service.md` e os ADRs 0004 a 0006:
   aluno, de outra prova ou inexistente: `NotFound` (mesma resposta nos três
   casos). Instrutor e admin enviando: `NotFound`; só o autor envia. Unit.
 - R5. `inspect({ course, exam, attempt }, { actor })` devolve
-  `{ enabled, fields }`. `enabled` é `Exam.answerHistory`. `fields` traz, para
+  `{ enabled, fields }`. `enabled` é o valor efetivo da chave (R30). `fields` traz, para
   cada campo com âncora: `question`, `field`, `text`, `revision`, `nextSeq`,
   `canWrite` e `receipts` (os recibos dos 32 lotes mais recentes do campo, em
   ordem de revisão). Campo sem âncora não aparece; o cliente o trata como
@@ -275,10 +278,15 @@ Segue `dev/rfc/como-criar-e-escrever-um-service.md` e os ADRs 0004 a 0006:
   de `Response`, acrescenta `closedAt` (sem perda de dados). Unit, com relógio
   injetado: 1 ms antes e depois de `D + grace`, de `C + 30 s`, e entrega antes do
   prazo.
-- R15. Chave desligada. Com `Exam.answerHistory === false`, `append` não grava
+- R15. Chave desligada. Com o valor efetivo da chave falso, `append` não grava
   nada, devolve `enabled: false` e `closed` (`reason: "disabled"`) em todos os
-  itens, exceto retry idêntico de lote já gravado (R8). O histórico já gravado
-  fica. `inspect` devolve `enabled: false` e `canWrite: false`. Unit.
+  itens, exceto retry idêntico de lote já gravado (R8). Isso vale também para
+  lotes e marcadores que a página coletou antes do desligamento e só enviou
+  depois: o servidor não compara o tempo do lote com o instante do desligamento,
+  e o histórico do aluno termina numa lacuna. O histórico gravado antes fica.
+  `inspect` devolve `enabled: false` e `canWrite: false`. Unit: lote enviado
+  depois de desligar é recusado; retry idêntico de lote gravado antes ainda
+  recebe o recibo; linhas gravadas antes continuam iguais.
 
 ### D. Limites
 
@@ -352,7 +360,7 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   `BAD_REQUEST`. Tudo o mais é resultado por item. e2e: uma chamada de cada caso,
   pela rede.
 - R22. `exam.answer` devolve `{ serverNow, answerHistory? }`. `answerHistory` é
-  `Exam.answerHistory`, lido depois que a resposta foi gravada. Se essa leitura
+  o valor efetivo da chave (R30), lido depois que a resposta foi gravada. Se essa leitura
   falhar, o campo é omitido e a resposta segue com sucesso. Nada do histórico é
   lido antes de gravar a resposta. e2e.
 
@@ -410,8 +418,9 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
 
   Falha ao apagar é ignorada; o TTL cobre. Unit (coordenador) e e2e (IndexedDB
   vazio para a tentativa depois de entregar).
-- R29. Página e chave. A página `exams/[slug].astro` passa
-  `answerHistory={exam.answerHistory}` ao `ExamAttempt`. A página só abre o
+- R29. Página e chave. A página `exams/[slug].astro` passa ao `ExamAttempt` o
+  valor efetivo da chave (R30), calculado no servidor; o componente não conhece a
+  regra por tipo. A página só abre o
   monitor com a tentativa em andamento e `answerHistory` verdadeiro. Até T8, exige
   também a chave local `"on"`; T8 remove a chave local
   (`ANSWER_HISTORY_SWITCH`). Com o monitor aberto, `answerHistory: false` na
@@ -421,21 +430,35 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
 
 ### G. Chave por prova (instrutor)
 
-- R30. `Exam.answerHistory` é estado do servidor, como `extraTime`
+- R30. A chave é `Exam.answerHistory Boolean?`, com o mesmo desenho de
+  `allowCodeRun`. Valor efetivo: o valor gravado quando não é `null`; com `null`,
+  ligado em `EXAM` e `QUIZ`, desligado em `PRACTICE`. A regra fica numa função
+  pura única em `src/services/` (ao lado de `code-run.ts`), usada pelo service, pelas
+  Actions e pela página; nenhum outro lugar repete a regra por tipo.
+
+  É estado do servidor, como `extraTime`
   (`dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md`): aparece em
-  `examSchema` (saída, inclusive REST e OpenAPI) e não está em `examCreate` nem
-  `examUpdate`. Muda por uma Action `exam.setAnswerHistory({ discipline, course,
-  exam, enabled })`, sobre `ExamService`, permitida a quem tem
-  `course.update-contents` no curso. Controle na página da prova
-  (`exams/[slug].astro`, bloco `canManage`): um toggle "Registrar histórico de
-  edição" com uma linha explicando que o histórico já coletado fica. Ver P1.
-  Unit (service: dono muda, aluno e admin de fora recebem `NotAllowed`) e e2e
-  (toggle muda o valor).
+  `examSchema` (saída, inclusive REST e OpenAPI, sem quebrar o CLI) e não está em
+  `examCreate` nem `examUpdate`. Não existe no frontmatter da prova e o CLI não a
+  envia nem a lê para nada. Só muda pela Action `exam.setAnswerHistory({
+  discipline, course, exam, enabled })`, sobre `ExamService`, que grava `true` ou
+  `false` explícito e é permitida a quem tem `course.update-contents` no curso.
+
+  Controle na página da prova (`exams/[slug].astro`, bloco `canManage`), em todos
+  os tipos de prova: um toggle "Registrar histórico de edição" que mostra o valor
+  efetivo, com uma linha explicando que desligar não apaga o histórico já gravado
+  e que as páginas abertas param de enviar.
+
+  Unit: valor efetivo nos três tipos com `null`, `true` e `false`; dono muda;
+  aluno e admin que não dá o curso recebem `NotAllowed`; `PATCH` REST com
+  `answerHistory` não muda o valor. e2e: o toggle mostra o padrão do tipo e
+  muda o valor.
 - R31. Desligar com a prova em andamento chega à página aberta. e2e: aluno com a
   página aberta e o monitor ativo; o instrutor desliga; na próxima resposta salva
   (ou no próximo envio do histórico) o monitor é desligado, o aluno continua
-  digitando, salvando e entrega; nenhum lote é gravado depois do desligamento; os
-  lotes de antes continuam lá.
+  digitando, salvando e entrega; nenhum lote é gravado depois do desligamento,
+  nem os que a página coletou antes e enviou depois (R15); os lotes de antes
+  continuam lá.
 
 ### H. Leitura pelo instrutor
 
@@ -447,13 +470,15 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   `incomplete` da tentativa. Lê lotes e lacunas do campo de uma vez (sem
   paginação: o máximo por tentativa é 4 MiB). O cálculo é uma função pura em
   `src/services/answer-edits/summary.ts`, testada sem banco. Unit.
-- R34. Resumo por resposta. Todos os tempos de edição são relativos à sessão do
-  navegador; horários de parede vêm de `receivedAt` (ver P4):
+- R34. Resumo por resposta. Os tempos dos edits são relativos à sessão do
+  navegador e servem só para durações. Todo horário de parede mostrado vem de
+  `receivedAt` do lote, com precisão de um ciclo de envio (cerca de 1 minuto), e
+  a tela o apresenta como horário de recebimento. O monitor não muda para isso:
+  nada de horário de parede na sessão nem no envelope.
   - **tempo ativo**: soma, dentro de cada sessão, dos intervalos entre inícios de
     edits consecutivos, cada um limitado a `ACTIVE_IDLE_MS = 60_000`, mais a
     duração do último edit da sessão;
-  - **primeira e última edição**: `receivedAt` do primeiro e do último lote
-    (precisão de um ciclo de envio, cerca de 1 minuto);
+  - **primeira e última edição**: `receivedAt` do primeiro e do último lote;
   - **colagens**: quantidade de edits `paste` e total de caracteres colados;
   - **inserções grandes**: edits com `insertedText` de 100 unidades UTF-16 ou
     mais, de qualquer causa, com causa, tamanho e `receivedAt` do lote; no máximo
@@ -474,7 +499,8 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   seguida ganha um bloco recolhido "Histórico de edição" com o resumo, renderizado
   só para quem tem `response.read-edits`. Uma linha fixa diz que os dados são
   indícios observados no navegador, não prova de autoria. Prova com a chave
-  desligada mostra "Registro desligado nesta prova" e o que houver de antes.
+  efetiva desligada mostra "Registro desligado nesta prova" e o que houver de
+  antes; prova `PRACTICE` no padrão, sem histórico, mostra só essa linha.
   e2e: o instrutor vê o bloco; o aluno, na mesma página, não vê nada do
   histórico (nem o bloco, nem os dados no HTML).
 
@@ -483,9 +509,10 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
 - R36. `src/db/bootstrap.ts` semeia, numa prova com questões `essay` (texto e
   código), tentativas que alcançam cada estado: histórico normal com colagem e
   inserção grande; lacuna por rebase e por marcador; histórico incompleto por
-  limite; prova com a chave desligada e histórico de antes. Os lotes passam pelo
-  service (`append`), não por Prisma direto. Pronto quando `pnpm run db:reset`
-  roda e as quatro situações aparecem na página da tentativa.
+  limite; prova com a chave desligada pelo toggle e histórico de antes. Além
+  disso, uma prova `PRACTICE` no padrão (chave `null`, sem histórico). Os lotes
+  passam pelo service (`append`), não por Prisma direto. Pronto quando
+  `pnpm run db:reset` roda e as cinco situações aparecem na página da tentativa.
 
 ### J. Isolamento (R7 do RFC)
 
@@ -527,90 +554,77 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   existe.
 - **Checkpoints no servidor.** O RFC os lista na estrutura do banco; a decisão de
   2026-11-11 os tira da primeira versão. A spec segue a decisão.
-- **"Formulário da prova".** As decisões falam em desligar a chave "no
-  formulário da prova", mas não existe formulário web de prova: provas vêm do
+- **"Formulário da prova".** As decisões de 2026-11-11 falam em desligar a chave
+  "no formulário da prova", mas não existe formulário web de prova: provas vêm do
   repositório pelo CLI, e o ADR 0011 proíbe o repositório de gravar estado do
-  servidor. A spec propõe um controle na página da prova (R30) e deixa a escolha
-  em P1.
+  servidor. Decidido em 2026-11-12: toggle na página da prova, estado só do
+  servidor, nada no frontmatter nem no CLI (R30).
+- **Padrão da chave.** O RFC diz "ligada por padrão". Decidido em 2026-11-12:
+  ligada por padrão em `EXAM` e `QUIZ`, desligada em `PRACTICE`, como
+  `allowCodeRun` (R30).
 - **Envio final.** O RFC fala em teto de "poucos segundos"; o código usa 1,5 s no
   adaptador e 2 s na página. A spec mantém os valores do código e cobre o resto
   com a janela de atraso de 30 s no servidor (R14).
 
-## Pontos abertos
-
-- P1. Onde o instrutor desliga a chave.
-  - (a) 🟢 Toggle na página da prova, estado só do servidor (R30). Funciona com a
-    prova em andamento e o push não o desfaz.
-  - (b) Chave no frontmatter da prova, enviada pelo CLI. Exige mudança no CLI e,
-    pelo ADR 0011, não pode ser também alterada pela web; desligar no meio da
-    prova pediria um push.
-- P2. Padrão para provas `PRACTICE`.
-  - (a) Ligado em todos os tipos, como diz a decisão.
-  - (b) 🟢 `Boolean?` como `allowCodeRun`: `null` segue o tipo, ligado em `EXAM` e
-    `QUIZ`, desligado em `PRACTICE`. Treino tem muitas tentativas por aluno e
-    pouco interesse para revisão; evita a maior parte do volume. O instrutor ainda
-    pode ligar.
-- P3. Lotes que chegam depois do desligamento.
-  - (a) 🟢 Recusar (R15). "Histórico já coletado" é o que já está no servidor; o
-    instrutor que desliga espera que a coleta pare já.
-  - (b) Aceitar o que a página tinha coletado até saber do desligamento. Exige
-    marcar o instante do desligamento e comparar com o tempo do lote, que é do
-    cliente.
-- P4. Horário das edições no resumo.
-  - (a) 🟢 Primeira versão com `receivedAt` (precisão de cerca de 1 minuto),
-    sem mudar o monitor.
-  - (b) Gravar na sessão do monitor o horário de parede da origem do relógio
-    monotônico (corrigido pelo desvio que a página já mede), para horários por
-    edit. Muda checkpoint e envelope; melhor junto com o replay.
-
 ## Plano de ação
 
-Cada fatia é implementável, testável e mesclável sozinha, com a chave local
+Não há pontos abertos: as decisões de 2026-11-12 estão nos requisitos (R15, R30,
+R34). Cada fatia é implementável, testável e mesclável sozinha, com a chave local
 desligada, na ordem abaixo. Fatias sem dependência entre si podem correr em
 paralelo.
 
-- T1. Banco e chave no modelo. `prisma/schema.prisma` (R1), `Exam.answerHistory`
-  em `examSchema` (R30, sem a Action), permissão `response.read-edits` (R32),
-  branding dos ids novos, `prisma db push`. Testes: R2, padrão da chave, R32.
-  Depende de nada.
+- T1. Banco e chave no modelo. `prisma/schema.prisma` (R1, com
+  `Exam.answerHistory Boolean?`), `answerHistory` só na saída de `examSchema`, a
+  função pura do valor efetivo por tipo (R30), permissão `response.read-edits`
+  (R32), branding dos ids novos, `prisma db push`. Testes unit: R2, valor efetivo
+  nos três tipos com `null`, `true` e `false`, `PATCH` REST que não muda a chave,
+  R32. Depende de nada.
 - T2. Monitor com base explícita. `monitor.ts`, `checkpoint.ts` (R23). Testes
   unit nos specs `answer-edit-monitor-*`. Depende de nada.
 - T3. Service. `src/core/schemas/answer-edit.ts`,
-  `src/db/services/answer-edit.service.ts`, constantes (R4 a R19, R3). Factory em
-  `src/fixtures/`. Testes unit de cada requisito. Depende de T1. Usa o codec atual;
-  o formato de `base` vem de T2, mas o service não importa o monitor.
-- T4. Actions. `src/actions/answer-history.ts`, `answerHistory` em
-  `exam.answer` (R21, R22). Testes e2e do contrato. Depende de T3.
-- T5. Chave na web. Action `exam.setAnswerHistory` e toggle na página da prova
-  (R30). Testes unit e e2e do toggle. Depende de T1. Se P1 for (b), esta fatia
-  muda.
+  `src/db/services/answer-edit.service.ts`, constantes (R3 a R20). Factory em
+  `src/fixtures/`. Testes unit de cada requisito, incluindo a recusa depois do
+  desligamento (R15). Depende de T1. Usa o codec atual; o formato de `base` vem de
+  T2, mas o service não importa o monitor.
+- T4. Actions. `src/actions/answer-history.ts` e o valor efetivo da chave na
+  resposta de `exam.answer` (R21, R22). Testes e2e do contrato. Depende de T3.
+- T5. Toggle na web. Action `exam.setAnswerHistory` sobre `ExamService` e toggle
+  na página da prova, em todos os tipos, mostrando o valor efetivo (R30). Testes
+  unit da Action e do service, e2e do toggle (padrão do tipo e mudança). Depende
+  de T1. Nada no CLI nem no frontmatter.
 - T6. Cliente. Transporte real, `reportGap`, `discard`, espera de reconciliação no
-  `flushFinal`, prop `attempt` e `answerHistory` em `ExamAttempt`, reação a
+  `flushFinal`, prop `attempt` e valor efetivo da chave em `ExamAttempt`, reação a
   `enabled: false` (R24 a R29). A página continua exigindo a chave local. Testes
-  unit do coordenador e e2e com a chave local ligada, incluindo R31 e R37.
-  Depende de T2, T4 e T5.
+  unit do coordenador e e2e com a chave local ligada, incluindo R31 (desliga pelo
+  toggle de T5) e R37. Depende de T2, T4 e T5.
 - T7. Resumo e tela. `summary.ts`, `AnswerEditService.summary`, bloco na página da
-  tentativa, mensagens i18n (R33 a R35). Seed (R36) na mesma fatia, porque a tela
-  só se vê com dados. Testes unit do resumo e e2e da tela. Depende de T3; o seed
-  depende de T2 só se usar o monitor para gerar lotes (pode montar tuplas à mão).
-- T8. Ligar. Remover `ANSWER_HISTORY_SWITCH` de `ExamAttempt.tsx` (a partir daqui a
-  chave é só `Exam.answerHistory`), atualizar a tabela "Estado das regras" do RFC,
-  apagar as issues resolvidas, registrar no `CHANGELOG.md`, mover esta spec para
-  `to-review/`. Depende de T6 e T7.
+  tentativa com horários de recebimento, mensagens i18n (R33 a R35). Seed (R36) na
+  mesma fatia, porque a tela só se vê com dados. Testes unit do resumo e e2e da
+  tela. Depende de T3 e, para semear a prova com a chave desligada, de T5 (ou
+  grava `false` pelo service de T5). O seed depende de T2 só se usar o monitor
+  para gerar lotes (pode montar tuplas à mão).
 - T9. Medição, depois de T3 e antes de T8: com os dados de
   `test/answer-edit-load.spec.ts`, medir bytes por aluno-hora, tempo de validação
   do maior lote permitido (meta: menos de 50 ms fora da transação) e duração da
   transação de escrita. Se a meta não fechar, baixar os limites de R17 e anotar
   aqui os valores medidos.
+- T8. Ligar. Remover `ANSWER_HISTORY_SWITCH` de `ExamAttempt.tsx` (a partir daqui a
+  única chave é a da prova, R30), atualizar a tabela "Estado das regras" e a
+  seção "Decidido" do RFC com as decisões de 2026-11-12, apagar as issues
+  resolvidas, registrar no `CHANGELOG.md`, mover esta spec para `to-review/`.
+  Depende de T6, T7 e T9.
 
 ## Critérios de aceite
 
-- Com a chave da prova ligada e sem chave local (depois de T8), um aluno digita
-  numa redação no dev server, entrega, e a página da tentativa do instrutor mostra
-  o resumo com tempo ativo, colagens e horários.
+- Numa prova `EXAM` com a chave no padrão e sem chave local (depois de T8), um
+  aluno digita numa redação no dev server, entrega, e a página da tentativa do
+  instrutor mostra o resumo com tempo ativo, colagens e horários de recebimento.
+- Numa prova `PRACTICE` no padrão, nada é coletado nem enviado; o instrutor liga
+  o toggle e a coleta começa nas páginas abertas depois disso.
 - Com o servidor do histórico fora do ar, pendurado ou recusando tudo, o aluno
   salva e entrega como antes (R37).
-- O instrutor desliga a chave com a prova aberta; a página do aluno para de enviar
-  sem aviso e sem erro (R31).
+- O instrutor desliga a chave pelo toggle com a prova aberta; a página do aluno
+  para de enviar sem aviso e sem erro, e nenhum lote chega ao banco depois disso,
+  nem o que a página tinha coletado antes (R15, R31).
 - O aluno não vê o próprio histórico em nenhuma tela nem no HTML.
 - `pnpm run lint` e `pnpm test` saem 0.

@@ -236,6 +236,15 @@ An automated client that grades submissions through the
 and therefore sees everything that instructor sees, but its grades are
 recorded under the key's name instead of the instructor's.
 
+## Histórico de edição
+
+Also: answer edit history
+Type: domain
+
+How a student's open answer was typed in an exam, recorded by the browser and
+sent in batches. Read only by whoever grades the exam; not the answer itself,
+and not proof of authorship.
+
 ## Instructions
 
 Type: domain
@@ -260,6 +269,15 @@ admin can also create one directly, from `/admin/users` or `manage create-user`.
 An invite fixes the [Role](#role) it grants and expires. Redeeming it creates
 the [User](#user). Comes in two kinds: [Personal](#personal-invite) and
 [Classroom](#classroom-invite).
+
+## Lacuna de edição
+
+Also: edit gap
+Type: domain
+
+A stretch of a [Histórico de edição](#histórico-de-edição) that cannot be
+replayed, because the browser stopped recording or its history was rebased.
+Only the text before and after it is known.
 
 ## Management command
 
