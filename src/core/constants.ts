@@ -229,3 +229,24 @@ logEnvVariables([
  * to students: their countdown still ends at the deadline.
  */
 export const EXAM_ANSWER_GRACE_MS = 10_000;
+
+/// How long after an attempt closes the server still stores edit-history batches.
+export const ANSWER_HISTORY_LATE_MS = 30_000;
+
+/// Largest text of one field the edit history keeps: the snapshot, a base text and the anchor, in UTF-8 bytes.
+export const MAX_ANSWER_HISTORY_TEXT_BYTES = 128 * 1024;
+
+/// Most edits one batch may carry.
+export const MAX_ANSWER_HISTORY_BATCH_EDITS = 5000;
+
+/// Largest JSON of one batch item, in UTF-8 bytes.
+export const MAX_ANSWER_HISTORY_BATCH_BYTES = 512 * 1024;
+
+/// Most edits the history of one attempt may hold.
+export const MAX_ANSWER_HISTORY_ATTEMPT_EDITS = 100_000;
+
+/// Most bytes the batches of one attempt may add up to.
+export const MAX_ANSWER_HISTORY_ATTEMPT_BYTES = 4 * 1024 * 1024;
+
+/// Bytes of items one append call processes before it answers `retry` to the rest.
+export const MAX_ANSWER_HISTORY_REQUEST_BYTES = 2 * 1024 * 1024;

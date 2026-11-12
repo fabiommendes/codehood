@@ -5,6 +5,7 @@
  */
 export * as schema from "@/core/schemas";
 
+import { makeAnswerEditService } from "./services/answer-edit.service";
 import { makeApiKeyService } from "./services/api-key.service";
 import { makeAttachmentService } from "./services/attachment.service";
 import { makeBlobService } from "./services/blob.service";
@@ -284,6 +285,7 @@ const feedbackService = makeFeedbackService();
  * All services are accessed through the db namespace in this module.
  */
 export const db = {
+	answerEdit: makeAnswerEditService(),
 	apiKey: makeApiKeyService(),
 	attachment: attachmentService,
 	blob: blobService,
