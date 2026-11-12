@@ -7,13 +7,15 @@ const INPUT_TYPE_KINDS: Readonly<Record<string, InputKind>> = {
 	insertParagraph: "typing",
 	insertFromPaste: "paste",
 	insertFromPasteAsQuotation: "paste",
+	/// Dropped text arrives from outside the typing flow, as a paste does.
+	insertFromDrop: "paste",
 	historyUndo: "undo",
 	historyRedo: "redo",
 	insertCompositionText: "composition",
 	deleteCompositionText: "composition",
 	insertFromComposition: "composition",
 	deleteByComposition: "composition",
-	/// Half of a drag and drop move: the matching insertion is `insertFromDrop`, which is also `other`.
+	/// The removal half of a drag and drop move inside the field.
 	deleteByDrag: "other",
 };
 
@@ -21,7 +23,7 @@ const INPUT_TYPE_KINDS: Readonly<Record<string, InputKind>> = {
 const USER_EVENT_KINDS: readonly (readonly [string, InputKind])[] = [
 	["input.type.compose", "composition"],
 	["input.paste", "paste"],
-	["input.drop", "other"],
+	["input.drop", "paste"],
 	["input.complete", "other"],
 	["input.type", "typing"],
 	["input.indent", "typing"],

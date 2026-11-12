@@ -92,9 +92,10 @@ Implementado em 2026-11-12. A tabela vive em `src/services/answer-edits/input-ki
   segundo argumento de `onChange`, que sobe por `CodeRunner` e `CodeEssayAnswer`
   até o `change()`. Dois eventos diferentes no mesmo update viram `other`.
 - `inputType` e user event desconhecidos ou ausentes são `other`, nunca `typing`.
-- `insertFromDrop`, `deleteByDrag`, autocompletar e `insertReplacementText` são
-  `other`: o formato não tem código de arrasto. Acrescentar um é mudança de
-  formato.
+- Texto solto por arrasto (`insertFromDrop`, `input.drop`) é `paste`: para quem
+  revisa, texto arrastado de fora equivale a texto colado. Um arrasto dentro do
+  próprio campo também aparece assim, acompanhado da remoção `deleteByDrag`.
+- `deleteByDrag`, autocompletar e `insertReplacementText` são `other`.
 - Com a chave desligada o `beforeinput` só testa `history === null`. Todo o
   trabalho roda sem esperar e dentro de `try`; falha na leitura da causa deixa o
   edit como `other` e não toca a resposta (R1 a R7, testado em
