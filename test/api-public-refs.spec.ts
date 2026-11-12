@@ -12,6 +12,7 @@ import { persistedSubmissionFactory } from "@/fixtures/submission.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { type APIRequestContext, expect, test } from "./fixtures";
 import { findRawIdKeys } from "./helpers/raw-ids";
+import { seedUser } from "./stories/helpers";
 
 /**
  * `dev/specs/to-do/api-no-raw-ids.md`, REST-level behavior:
@@ -56,14 +57,20 @@ async function tokenFor(request: APIRequestContext, username: string) {
 	return { Authorization: `Bearer ${token}`, Cookie: "" };
 }
 
-/// Admin requests use an isolated Bearer credential without login's session cookie.
-async function adminHeaders(request: APIRequestContext) {
+/// Logs in a fresh admin, so no seeded account is needed. Its requests use an
+/// isolated Bearer credential without login's session cookie.
+async function adminSession(request: APIRequestContext) {
+	const admin = await seedUser({ role: "ADMIN" });
 	const login = await request.post("/api/auth/login", {
-		data: { login: "admin", password: "admin" },
+		data: { login: admin.username, password: admin.password },
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
-	return { Authorization: `Bearer ${token}`, Cookie: "" };
+	return { admin, headers: { Authorization: `Bearer ${token}`, Cookie: "" } };
+}
+
+async function adminHeaders(request: APIRequestContext) {
+	return (await adminSession(request)).headers;
 }
 
 /**
@@ -225,10 +232,7 @@ test("GET and DELETE /api/invite/<publicId> address the invite; a numeric id in 
 test("POST /api/api-key returns a publicId and a token, never an id", async ({
 	request,
 }) => {
-	const headers = await adminHeaders(request);
-	const admin = (
-		await (await request.get("/api/user?usernames=admin", { headers })).json()
-	)[0];
+	const { admin, headers } = await adminSession(request);
 
 	const res = await request.post("/api/api-key", {
 		headers,
@@ -249,10 +253,7 @@ test("POST /api/api-key returns a publicId and a token, never an id", async ({
 test("GET and DELETE /api/api-key/<publicId> address the key; a numeric id in that segment is a 404", async ({
 	request,
 }) => {
-	const headers = await adminHeaders(request);
-	const admin = (
-		await (await request.get("/api/user?usernames=admin", { headers })).json()
-	)[0];
+	const { admin, headers } = await adminSession(request);
 
 	const created = await request.post("/api/api-key", {
 		headers,

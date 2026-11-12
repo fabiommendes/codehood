@@ -2,6 +2,7 @@ import { persistedInviteFactory } from "@/fixtures/invite.factory";
 import { type APIRequestContext, expect, test } from "./fixtures";
 import { parseDevalue } from "./helpers/devalue-lite";
 import { findRawIdOrHashKeys } from "./helpers/raw-ids";
+import { seedUser } from "./stories/helpers";
 
 /**
  * `dev/specs/to-do/actions-no-raw-ids.md`: `admin.createUser` and
@@ -21,8 +22,9 @@ function tag(prefix: string): string {
 }
 
 async function adminHeaders(request: APIRequestContext) {
+	const admin = await seedUser({ role: "ADMIN" });
 	const login = await request.post("/api/auth/login", {
-		data: { login: "admin", password: "admin" },
+		data: { login: admin.username, password: admin.password },
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();

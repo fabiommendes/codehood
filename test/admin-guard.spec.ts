@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { seedUser } from "./stories/helpers";
 
 /**
  * The admin guard covers `/admin` and the paths under it, and nothing else
@@ -19,8 +20,9 @@ test("an anonymous visitor to /admin or a page under it is sent to /login", asyn
 test("a student on a path that only starts with the letters 'admin' is not sent to /403", async ({
 	request,
 }) => {
+	const student = await seedUser({ role: "STUDENT" });
 	const login = await request.post("/api/auth/login", {
-		data: { login: "student", password: "student" },
+		data: { login: student.username, password: student.password },
 	});
 	expect(login.ok()).toBe(true);
 

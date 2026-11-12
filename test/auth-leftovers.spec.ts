@@ -133,10 +133,12 @@ test("POST /api/user refuses a weak password", async ({ request }) => {
 test("deleting an unknown API key is a NotFound, not a 403", async ({
 	request,
 }) => {
-	const admin = await db.user.findOne({ username: "admin" }, FULL_ACCESS);
+	const admin = await db.user.create(
+		userFactory.build({ role: "ADMIN" }),
+		FULL_ACCESS,
+	);
 	await expect(
-		// biome-ignore lint/style/noNonNullAssertion: seeded admin
-		db.apiKey.delete({ publicId: "does-not-exist" }, { actor: admin! }),
+		db.apiKey.delete({ publicId: "does-not-exist" }, { actor: admin }),
 	).rejects.toMatchObject({ code: "not-found" });
 
 	// The generic REST delete is idempotent: NotFound answers 200 `deleted: false`.

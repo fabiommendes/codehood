@@ -1,7 +1,11 @@
 import { APIS } from "@/api/registry/hook";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
+import { persistedCourseFactory } from "@/fixtures/course.factory";
+import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
+import { persistedEditionFactory } from "@/fixtures/edition.factory";
 import { collectSearchParams } from "@/utils/query-coerce";
 import { expect, test } from "./fixtures";
+import { seedUser } from "./stories/helpers";
 
 /**
  * HTTP-level tests for the generated CRUD REST API's GET endpoints.
@@ -43,15 +47,29 @@ const OPTIONAL_FILTER_RESOURCES = [
 	"user",
 ] as const;
 
+/// Logs in a fresh admin, so the spec depends on no account of the seed.
 async function adminToken(
 	request: import("@playwright/test").APIRequestContext,
 ) {
+	const admin = await seedUser({ role: "ADMIN" });
 	const login = await request.post("/api/auth/login", {
-		data: { login: "admin", password: "admin" },
+		data: { login: admin.username, password: admin.password },
 	});
 	expect(login.ok()).toBe(true);
 	const { token } = await login.json();
 	return token as string;
+}
+
+/// A course with its own discipline, edition and instructor, created once per file.
+let world: Awaited<ReturnType<typeof persistedCourseFactory.create>>;
+
+test.beforeAll(async () => {
+	world = await persistedCourseFactory.create();
+});
+
+/// The `<discipline>/<instructor>_<edition>` path segments of `world`.
+function worldPath(): string {
+	return `${world.discipline.slug}/${world.instructor.username}_${world.edition.slug}`;
 }
 
 function authHeader(token: string) {
@@ -82,14 +100,17 @@ test("GET /api/api-key?createdBy=<username> returns 200 with a JSON array", asyn
 	request,
 }) => {
 	const token = await adminToken(request);
-	const admin = await request.get("/api/user?usernames=admin", {
-		headers: authHeader(token),
-	});
-	expect(admin.status()).toBe(200);
-	const [adminUser] = await admin.json();
+	const instructor = await seedUser({ role: "INSTRUCTOR" });
+	const owner = await request.get(
+		`/api/user?usernames=${instructor.username}`,
+		{ headers: authHeader(token) },
+	);
+	expect(owner.status()).toBe(200);
+	const [ownerUser] = await owner.json();
+	expect(ownerUser.username).toBe(instructor.username);
 
 	const res = await request.get(
-		`/api/api-key?createdBy=${adminUser.username}`,
+		`/api/api-key?createdBy=${ownerUser.username}`,
 		{
 			headers: authHeader(token),
 		},
@@ -194,12 +215,9 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
-	const [discipline] = await (
-		await request.get("/api/discipline", { headers: authHeader(token) })
-	).json();
-	const [edition] = await (
-		await request.get("/api/edition", { headers: authHeader(token) })
-	).json();
+	const discipline = await persistedDisciplineFactory.create();
+	const edition = await persistedEditionFactory.create();
+	const instructor = await seedUser({ role: "INSTRUCTOR" });
 
 	const startAt = "2031-01-06T00:00:00.000Z";
 	const endAt = "2031-06-30T00:00:00.000Z";
@@ -207,7 +225,7 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 		headers: authHeader(token),
 		data: {
 			discipline: discipline.slug,
-			instructor: "ada",
+			instructor: instructor.username,
 			edition: edition.slug,
 			description: "created by api-crud.spec",
 			startAt,
@@ -226,7 +244,7 @@ test("GET /api/course/<discipline>/<course>/calendar-event returns 200 with a JS
 	request,
 }) => {
 	const token = await adminToken(request);
-	const res = await request.get("/api/course/cs101/ada_2026-1/calendar-event", {
+	const res = await request.get(`/api/course/${worldPath()}/calendar-event`, {
 		headers: authHeader(token),
 	});
 	expect(res.status()).toBe(200);
@@ -294,12 +312,14 @@ test("?active=false is honored as false, not truthy — a naive Boolean('false')
 	request,
 }) => {
 	const token = await adminToken(request);
-	// "2026-1" is the seeded demo edition (src/db/bootstrap.ts), fixed safely
-	// in the past so it always reads as inactive — no need to create our own
-	// (editionCreate's `startAt`/`endAt` are `z.date()`, not `z.coerce.date()`,
-	// so a JSON `POST` body can't carry them as strings over HTTP; a separate,
-	// pre-existing gap unrelated to this fix).
-	const slug = "2026-1";
+	// An edition whose window is fixed safely in the past, so it always reads as
+	// inactive. It is created through the service because editionCreate's
+	// `startAt`/`endAt` are `z.date()`, not `z.coerce.date()`, so a JSON `POST`
+	// body can't carry them as strings over HTTP.
+	const { slug } = await persistedEditionFactory.create({
+		startAt: new Date("2001-01-08T00:00:00.000Z"),
+		endAt: new Date("2001-06-30T00:00:00.000Z"),
+	});
 
 	// The edition's window is entirely in the past, so it is not "active"
 	// right now. `active=true` must exclude it...
