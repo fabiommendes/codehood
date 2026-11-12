@@ -50,6 +50,7 @@ type ExtraPerms =
 	| "course.update-contents"
 	| "question.read-public"
 	| "response.submit"
+	| "response.read-edits"
 	| "regrade.request"
 	| "regrade.resolve"
 	| "report.triage"
@@ -418,6 +419,15 @@ const PERMISSIONS = {
 	// Rule: the instructor alone. Closing a slot and re-grading an attempt are
 	// the instructor's calls; a student changes their work by submitting again.
 	"response.update | response.delete | submission.update | submission.delete": {
+		other: (actor, target) => isCourseOwner(actor, target.course),
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
+
+	// Rule: the course's instructor reads how an attempt's open answers were
+	// typed; SYSTEM reads on a bot's behalf. No student branch, the author
+	// included, and no admin branch, matching `feedback.create`: the history
+	// is for whoever grades the attempt.
+	"response.read-edits": {
 		other: (actor, target) => isCourseOwner(actor, target.course),
 		audit: auditResponse,
 	} satisfies PermDef<ResponseWithCourse>,

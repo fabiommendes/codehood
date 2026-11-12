@@ -391,3 +391,30 @@ test("a denied question.read reports the simplified course target", () => {
 		course: { id: 5, instructor: instructor.username },
 	});
 });
+
+test("response.read-edits goes to the course's instructor and SYSTEM, and to nobody else", () => {
+	const response = (author: { username: string }) => ({
+		author,
+		course: courseFixture(),
+	});
+	const own = response(enrolledStudent);
+
+	expect(hasPerm(SYSTEM, "response.read-edits", own)).toBe(true);
+	expect(hasPerm(instructor, "response.read-edits", own)).toBe(true);
+	// The author reads their answers, not the history of how they typed them.
+	expect(hasPerm(enrolledStudent, "response.read-edits", own)).toBe(false);
+	expect(
+		hasPerm(outsiderStudent, "response.read-edits", response(outsiderStudent)),
+	).toBe(false);
+	expect(hasPerm(otherInstructor, "response.read-edits", own)).toBe(false);
+	// No admin branch: an admin who does not teach the course is denied.
+	expect(hasPerm(admin, "response.read-edits", own)).toBe(false);
+	expect(() => ensurePerm(admin, "response.read-edits", own)).toThrow(
+		NotAllowed,
+	);
+
+	// An admin who does teach the course passes, because the rule reads ownership.
+	const teaching = { author: enrolledStudent, course: courseFixture() };
+	teaching.course.instructor = { username: admin.username };
+	expect(hasPerm(admin, "response.read-edits", teaching)).toBe(true);
+});
