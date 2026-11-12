@@ -742,7 +742,8 @@ test.describe("R3: no full text in every batch", () => {
 		stored?.batches.forEach((row, i) => {
 			expect(row.gapBefore).toBeNull();
 			expect(row.baseText).toBe(i === 0 ? "draft" : null);
-			expect(JSON.stringify(row)).not.toContain(" word9 and some more words");
+			// The full text starts with "draft word0"; a batch holds only its own edits.
+			expect(JSON.stringify(row)).not.toContain("draft word0");
 		});
 		// The snapshot of the last batch would show up as a long run of text if it were stored.
 		const last = stored?.batches[9];
@@ -778,8 +779,8 @@ test.describe("R12: gaps", () => {
 		expect(Object.keys(gap ?? {}).sort()).toEqual([
 			"fieldId",
 			"id",
-			"receivedAt",
 			"reason",
+			"receivedAt",
 		]);
 		expect(gap?.receivedAt).toBeInstanceOf(Date);
 	});
