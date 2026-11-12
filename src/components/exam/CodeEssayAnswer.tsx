@@ -41,8 +41,8 @@ export interface CodeEssayAnswerProps {
 	/// `serverNow - clientNow` in milliseconds, measured when the page loaded;
 	/// added to client times so drafts compare on the server's clock.
 	clockOffsetMs: number;
-	/// Called with the full code after each edit; `ExamAttempt` debounces and saves.
-	onChange: (code: string) => void;
+	/// Called with the full code after each edit, and the editor's user event behind it when known; `ExamAttempt` debounces and saves.
+	onChange: (code: string, userEvent?: string) => void;
 	save: CodeAnswerSaveState;
 	/// From `canRunCode(exam)`.
 	codeRun: boolean;
@@ -127,10 +127,10 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 		}
 	});
 
-	function edited(code: string): void {
+	function edited(code: string, userEvent?: string): void {
 		lastEdit = code;
 		store?.write(props.draft, { code, savedAt: serverNow() });
-		props.onChange(code);
+		props.onChange(code, userEvent);
 	}
 
 	function keepDraft(draft: CodeDraft): void {

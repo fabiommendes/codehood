@@ -373,6 +373,47 @@ for (const fault of Object.keys(FAULTS) as Fault[]) {
 	});
 }
 
+test("the student types, saves and finishes when reading the kind of an input throws", async ({
+	page,
+}) => {
+	const s = await setup(page);
+	const errors = watchErrors(page);
+	await page.addInitScript(() => {
+		const hits = { count: 0 };
+		Object.assign(window, { faultHits: hits });
+		Object.defineProperty(InputEvent.prototype, "inputType", {
+			configurable: true,
+			get() {
+				hits.count++;
+				throw new Error("input type boom");
+			},
+		});
+	});
+	await page.goto(s.url);
+
+	await answerBox(page).pressSequentially("first ", { delay: 20 });
+	/// Give the monitor time to load, so the kind detection is on for the next keys.
+	await page.waitForTimeout(500);
+	await answerBox(page).pressSequentially("words", { delay: 20 });
+
+	await expect.poll(() => saved(s)).toBe("first words");
+	/// The fault really happened, so the pass means the page survived it.
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					(window as unknown as { faultHits: { count: number } }).faultHits
+						.count,
+			),
+		)
+		.toBeGreaterThan(0);
+	await expect.poll(() => recordedTexts(page)).toContain("first words");
+
+	expect(await submit(page)).toBeLessThan(FINISH_BUDGET_MS);
+	await expect.poll(() => finished(s)).toBe(true);
+	expect(errors).toEqual([]);
+});
+
 test("the student types, saves and finishes when the monitor chunk fails to load", async ({
 	page,
 }) => {

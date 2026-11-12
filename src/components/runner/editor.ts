@@ -9,7 +9,7 @@
  */
 
 import type { LanguageId } from "@codehood/runner/protocol";
-import type { Extension } from "@codemirror/state";
+import type { AnnotationType, Extension, Transaction } from "@codemirror/state";
 import { runnerInfo } from "@/runner/languages";
 
 /** What the widget needs from an editor. */
@@ -46,8 +46,8 @@ export interface CreateEditorOptions {
 	label: string;
 	/// Description announced with the editor: how Tab works and how to leave.
 	tabHint: string;
-	/// Called with the full source after each edit.
-	onChange(code: string): void;
+	/// Called with the full source after each edit, and the CodeMirror user event behind it when there is a single one (`input.paste`, `undo`, ...).
+	onChange(code: string, userEvent?: string): void;
 	/// Called by Ctrl/Cmd+Enter.
 	onRun(): void;
 	/// Called each time the editor receives focus.
@@ -184,7 +184,10 @@ export async function createEditor(
 						update.docChanged &&
 						!update.transactions.some((t) => t.annotation(external))
 					) {
-						options.onChange(update.state.doc.toString());
+						options.onChange(
+							update.state.doc.toString(),
+							userEventOf(update.transactions, state.Transaction.userEvent),
+						);
 					}
 				}),
 				EditorView.domEventHandlers({
@@ -235,4 +238,21 @@ export async function createEditor(
 			hint.remove();
 		},
 	};
+}
+
+/// The user event shared by every transaction that changed the document, or undefined when there is none or they differ; never throws.
+function userEventOf(
+	transactions: readonly Transaction[],
+	annotation: AnnotationType<string>,
+): string | undefined {
+	try {
+		const events = new Set(
+			transactions
+				.filter((transaction) => transaction.docChanged)
+				.map((transaction) => transaction.annotation(annotation)),
+		);
+		return events.size === 1 ? [...events][0] : undefined;
+	} catch {
+		return undefined;
+	}
 }

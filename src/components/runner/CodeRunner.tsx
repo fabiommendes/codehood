@@ -75,8 +75,8 @@ export interface CodeRunnerProps {
 	highlightedHtml?: string;
 	/// Answer mode: running is off for this exam (`canRunCode` false).
 	runDisabled?: boolean;
-	/// Answer mode: called with the full source after each edit.
-	onChange?: (code: string) => void;
+	/// Answer mode: called with the full source after each edit, and the CodeMirror user event behind it when known.
+	onChange?: (code: string, userEvent?: string) => void;
 	/// Answer mode: the starting code "back to the starter code" restores.
 	starterCode?: string;
 	/// Review mode: the public id of the submission, as `runForSubmission`
@@ -247,10 +247,10 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			readOnly: readOnly(),
 			label: props.label,
 			tabHint: m.runner_editor_tab_hint(),
-			onChange: (value) => {
+			onChange: (value, userEvent) => {
 				setCode(value);
 				prepare();
-				if (!review()) props.onChange?.(value);
+				if (!review()) props.onChange?.(value, userEvent);
 			},
 			onRun: () => void run(),
 			onFocus: prepare,

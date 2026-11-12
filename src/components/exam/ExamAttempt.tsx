@@ -21,6 +21,10 @@ import { locale, m } from "@/i18n";
 import { runnerLanguage } from "@/runner/languages";
 import type { AnswerEditAdapter } from "@/services/answer-edits/adapter";
 import {
+	kindOfInputType,
+	kindOfUserEvent,
+} from "@/services/answer-edits/input-kind";
+import {
 	type ExamResult,
 	formatScore,
 	type QuestionOutcome,
@@ -419,13 +423,46 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		}
 	}
 
-	/// Tells the history the editor of `slug` now holds `edited`.
-	function recordEdit(slug: string, type: string, edited: AnswerPayload): void {
+	/// The `inputType` a textarea announced just before its answer changed, per question; gone once used or once the event has run its course.
+	const announcedInputs = new Map<string, { inputType: string }>();
+
+	/// Remembers what a textarea of `slug` is about to do, so the change that follows is recorded with its cause; never throws.
+	function announceInput(slug: string, event: InputEvent): void {
+		if (!history) return;
+		try {
+			if (!(event.target instanceof HTMLTextAreaElement)) return;
+			const announced = { inputType: event.inputType };
+			announcedInputs.set(slug, announced);
+			// `beforeinput` and the `input` that follows run in the same task.
+			setTimeout(() => {
+				if (announcedInputs.get(slug) === announced)
+					announcedInputs.delete(slug);
+			}, 0);
+		} catch {
+			// The cause stays unknown, which the history records as `other`.
+		}
+	}
+
+	/// Tells the history the editor of `slug` now holds `edited`, with the CodeMirror `userEvent` when the editor gave one.
+	function recordEdit(
+		slug: string,
+		type: string,
+		edited: AnswerPayload,
+		userEvent?: string,
+	): void {
+		const announced = announcedInputs.get(slug);
+		announcedInputs.delete(slug);
 		if (!history || type !== "essay") return;
 		const text = edited ?? "";
 		if (typeof text !== "string") return;
 		withHistory((adapter) =>
-			adapter.input({ questionId: slug, field: "answer" }, text),
+			adapter.input(
+				{ questionId: slug, field: "answer" },
+				text,
+				userEvent !== undefined
+					? kindOfUserEvent(userEvent)
+					: kindOfInputType(announced?.inputType),
+			),
 		);
 	}
 
@@ -483,11 +520,16 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		}
 	}
 
-	function change(slug: string, type: string, edited: AnswerPayload): void {
+	function change(
+		slug: string,
+		type: string,
+		edited: AnswerPayload,
+		userEvent?: string,
+	): void {
 		if (closing()) return;
 		queueAnswer(slug, type, edited);
 		// Only after the answer and its draft are queued, and it cannot throw.
-		recordEdit(slug, type, edited);
+		recordEdit(slug, type, edited, userEvent);
 	}
 
 	/// Queues the answer to be saved and keeps its draft; the edit history never takes part in it.
@@ -976,6 +1018,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										<div
 											class="card-body"
 											onFocusOut={() => saveNow(entry.slug)}
+											onBeforeInput={(event) =>
+												announceInput(entry.slug, event)
+											}
 										>
 											<AnswerField
 												question={entry.question}
@@ -986,8 +1031,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 														? props.reviews?.[entry.slug]
 														: undefined
 												}
-												onChange={(payload) =>
-													change(entry.slug, entry.question.type, payload)
+												onChange={(payload, userEvent) =>
+													change(
+														entry.slug,
+														entry.question.type,
+														payload,
+														userEvent,
+													)
 												}
 												code={
 													kind() === "in-progress"
@@ -1515,7 +1565,7 @@ interface AnswerFieldProps {
 	readonly: boolean;
 	/// The answer's marks and feedback, shown in `review` mode; the score is the outcome's, below.
 	review?: ReviewResult;
-	onChange: (payload: AnswerPayload) => void;
+	onChange: (payload: AnswerPayload, userEvent?: string) => void;
 	/// Set for a code question being answered: it gets the editor instead of the textarea.
 	code?: CodeAnswerContext;
 }
