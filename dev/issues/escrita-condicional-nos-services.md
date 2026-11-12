@@ -28,9 +28,11 @@ PUT".
 2. Erro `PreconditionFailed` em `src/core/error.ts`, serializável, com o
    `updatedAt` atual. Resposta 412 em `src/core/error-response.ts`.
 3. Helper único em `src/db/` que faz a checagem dentro da transação, usado por
-   todos os services. O `upsert` genérico (`src/db/base-service.ts:118`)
-   repassa a opção aos dois ramos: `null` exige o ramo de criação, `Date`
-   exige o de atualização.
+   todos os services (`src/db/conditional-write.ts`: `guardedUpdate`,
+   `guardedDelete`, `touch`). O `upsert` de cada service repassa a opção aos
+   dois ramos: `null` exige o ramo de criação, `Date` exige o de atualização.
+   O `upsert` genérico de `base-service.ts` foi removido (não tinha
+   chamadores).
 4. Todos os services com `update`, `upsert` ou `delete` em
    `src/db/services/` cujo modelo tem `updatedAt` passam a honrar a opção.
 5. `Discipline` ganha `updatedAt` em `prisma/schema.prisma`. `Edition` fica
