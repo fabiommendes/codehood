@@ -18,7 +18,11 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
-import { encodeEdits, replayEdits } from "@/services/answer-edits/codec";
+import {
+	encodeEdits,
+	type InputKind,
+	replayEdits,
+} from "@/services/answer-edits/codec";
 import {
 	AnswerEditMonitor,
 	type PendingEditBatch,
@@ -282,6 +286,12 @@ export interface Step {
 	position: number;
 	deleteCount: number;
 	insertedText: string;
+	/// Session time the edit starts at; defaults to the origin plus its index.
+	startMs?: number;
+	/// Defaults to one millisecond.
+	durationMs?: number;
+	/// Defaults to `typing`.
+	kind?: InputKind;
 }
 
 /**
@@ -305,10 +315,12 @@ export function makeBatch(options: {
 	const origin = options.timeOriginMs ?? 0;
 	const envelope = encodeEdits(
 		options.steps.map((step, i) => ({
-			...step,
-			startMs: origin + i,
-			durationMs: 1,
-			kind: "typing" as const,
+			position: step.position,
+			deleteCount: step.deleteCount,
+			insertedText: step.insertedText,
+			startMs: step.startMs ?? origin + i,
+			durationMs: step.durationMs ?? 1,
+			kind: step.kind ?? ("typing" as const),
 			timing: null,
 		})),
 		origin,
@@ -463,4 +475,181 @@ export function receiptOf(result: AnswerEditFieldResult) {
 		);
 	}
 	return result.receipt;
+}
+
+//
+// Reading the history
+//
+
+/// Sets the arrival time of a stored batch, the only wall-clock time the history keeps.
+export async function stampBatch(
+	world: World,
+	batchId: string,
+	receivedAt: Date,
+	slug = world.slugs.text,
+) {
+	const field = await storedField(world, slug);
+	if (!field) throw new Error(`No stored field for ${slug}`);
+	await prisma.answerEditBatch.updateMany({
+		where: { fieldId: field.id, batchId },
+		data: { receivedAt },
+	});
+}
+
+/// Sets the arrival time of a stored gap marker, found by the id the browser gave it.
+export async function stampGap(
+	world: World,
+	clientId: string,
+	receivedAt: Date,
+	slug = world.slugs.text,
+) {
+	const field = await storedField(world, slug);
+	if (!field) throw new Error(`No stored field for ${slug}`);
+	await prisma.answerEditGap.updateMany({
+		where: { fieldId: field.id, clientId },
+		data: { receivedAt },
+	});
+}
+
+/// The student's saved answer to `question`, through the path the page uses.
+export async function submitAnswer(
+	world: World,
+	question: string,
+	payload: string,
+) {
+	await db.response.submit(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			question,
+			payload,
+		},
+		{ actor: world.student },
+	);
+}
+
+/// The instructor's view of the summary of the world's attempt.
+export function summaryOf(
+	world: World,
+	actor: Parameters<
+		typeof db.answerEdit.summary
+	>[1]["actor"] = world.instructor,
+) {
+	return db.answerEdit.summary(
+		{
+			course: world.course.id,
+			exam: world.exam.slug,
+			author: world.student.username,
+		},
+		{ actor },
+	);
+}
+
+/// When the batches of {@link seedNormalHistory} arrived.
+export const NORMAL_FIRST_AT = new Date("2026-03-01T10:05:00.000Z");
+export const NORMAL_LAST_AT = new Date("2026-03-01T10:20:00.000Z");
+
+/// What the paste of {@link seedNormalHistory} inserted, and nothing else holds it.
+export const PASTED_BLOCK = "ab".repeat(60);
+
+/**
+ * A normal history of the text essay, one session in two batches, saved as the answer.
+ *
+ * Batch 1 (origin 1000): types "Hello" at 1000 (50 ms), types " world" at 4000
+ * (50 ms), pastes {@link PASTED_BLOCK} at 4500 (200 ms). Batch 2 (origin
+ * 70000): deletes the first six characters at 70000 (400 ms).
+ */
+export async function seedNormalHistory(world: World) {
+	const first = makeBatch({
+		batchId: "normal-1",
+		sessionId: "s1",
+		timeOriginMs: 1000,
+		steps: [
+			{
+				position: 0,
+				deleteCount: 0,
+				insertedText: "Hello",
+				startMs: 1000,
+				durationMs: 50,
+			},
+			{
+				position: 5,
+				deleteCount: 0,
+				insertedText: " world",
+				startMs: 4000,
+				durationMs: 50,
+			},
+			{
+				position: 11,
+				deleteCount: 0,
+				insertedText: PASTED_BLOCK,
+				startMs: 4500,
+				durationMs: 200,
+				kind: "paste",
+			},
+		],
+	});
+	const second = makeBatch({
+		batchId: "normal-2",
+		sessionId: "s1",
+		timeOriginMs: 70_000,
+		start: first.snapshot,
+		baseRevision: 1,
+		firstSeq: 3,
+		steps: [
+			{
+				position: 0,
+				deleteCount: 6,
+				insertedText: "",
+				startMs: 70_000,
+				durationMs: 400,
+				kind: "delete",
+			},
+		],
+	});
+	receiptOf(await sendBatch(world, first));
+	receiptOf(await sendBatch(world, second));
+	await stampBatch(world, "normal-1", NORMAL_FIRST_AT);
+	await stampBatch(world, "normal-2", NORMAL_LAST_AT);
+	await submitAnswer(world, world.slugs.text, second.snapshot);
+	return { text: second.snapshot };
+}
+
+/// When the pieces of {@link seedGappedHistory} arrived.
+export const GAPPED_AT = {
+	typed: new Date("2026-03-01T10:01:00.000Z"),
+	marker: new Date("2026-03-01T10:10:00.000Z"),
+	rebase: new Date("2026-03-01T10:30:00.000Z"),
+};
+
+/**
+ * A history of the text essay with the three kinds of gap.
+ *
+ * "The quick brown fox" is typed; a marker is recorded; a rebase starts from
+ * "The slow brown fox" and appends "!"; the saved answer is
+ * "The slow brown fox! Done.", which the anchor does not hold.
+ */
+export async function seedGappedHistory(world: World) {
+	const typed = appendBatch("", "The quick brown fox", { batchId: "gap-1" });
+	receiptOf(await sendBatch(world, typed));
+	await stampBatch(world, "gap-1", GAPPED_AT.typed);
+	await send(world, [
+		{
+			question: world.slugs.text,
+			field: "answer",
+			gaps: [{ reason: "input-lost", id: "marker-1" }],
+		},
+	]);
+	await stampGap(world, "marker-1", GAPPED_AT.marker);
+	const rebased = makeBatch({
+		batchId: "gap-2",
+		start: "The slow brown fox",
+		steps: [{ position: 18, deleteCount: 0, insertedText: "!" }],
+		baseRevision: 1,
+		firstSeq: 19,
+		base: { reason: "rebase", text: "The slow brown fox" },
+	});
+	receiptOf(await sendBatch(world, rebased));
+	await stampBatch(world, "gap-2", GAPPED_AT.rebase);
+	await submitAnswer(world, world.slugs.text, "The slow brown fox! Done.");
 }
