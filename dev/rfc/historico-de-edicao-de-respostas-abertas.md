@@ -77,12 +77,12 @@ Nenhum aluno perde a prova por problema técnico do monitor.
 | Regra | Estado |
 | :---- | :----- |
 | R1 | Pendente: depende do endpoint do histórico, que não existe. Hoje nada do monitor toca `Submission`. |
-| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Falta ligar a `ExamAttempt.tsx`. |
+| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Ligada a `ExamAttempt.tsx` (`recordEdit`) atrás da chave local. |
 | R3 | Implementada e testada: `attach` e `input` nunca esperam e o `open` roda adiado. |
 | R4 | Implementada e testada: `flushFinal` resolve no teto (3 s por padrão). Falta o servidor aceitar lote atrasado. |
 | R5 | Parcial: o coordenador rebaseia sozinho e o adaptador não abre diálogo, mas não há indicador discreto. |
-| R6 | Implementada e testada: `AnswerEditAdapter.disable()` e `enabled: false`. Falta a configuração por prova que decide chamá-los. |
-| R7 | Implementada e testada em `test/answer-edit-isolation.spec.ts` com um `<textarea>` ligado como a página de prova seria. Falta repeti-la contra `ExamAttempt.tsx` quando a integração existir. |
+| R6 | Implementada e testada: `AnswerEditAdapter.disable()` e `enabled: false`. A página liga o monitor só com `localStorage["codehood.answerHistory"] = "on"`; falta a configuração por prova, que virá do servidor. |
+| R7 | Implementada e testada em `test/answer-edit-isolation.spec.ts` com um `<textarea>` ligado como a página de prova seria. Repetida contra a página real em `test/exam-answer-edit-isolation.spec.ts` (IndexedDB que lança, que pendura, cota excedida, exceção no monitor, chunk que não carrega, remontagem do campo no prazo, reload). |
 
 ### Contrato do adaptador
 
