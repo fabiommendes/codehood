@@ -4,8 +4,9 @@
  *
  * Every service whose model has `updatedAt` writes through {@link guardedUpdate}
  * and {@link guardedDelete}, and calls {@link touch} when it only changes child
- * rows that the parent's read model shows (tags, questions, repositories). The
- * helpers run on the `tx` of the write, address one row by a unique `where`,
+ * rows that the parent's read model shows (tags, questions, repositories). A
+ * write that only fills a cache the read model does not show goes through
+ * {@link writeCache}, which keeps the version. The helpers run on the `tx` of the write, address one row by a unique `where`,
  * and write the `updatedAt` themselves: there is nothing to forward. A service
  * whose model has no `updatedAt` calls {@link rejectExpectedUpdatedAt}.
  *
@@ -22,6 +23,9 @@
  * // delete, and child-only change
  * await guardedDelete(tx, "course", { id }, opts);
  * await touch(tx, "exam", { id }, opts);
+ *
+ * // cache: the read model does not change, so neither does the version
+ * await writeCache(tx, "repository", { id }, { zipHash });
  * ```
  */
 import { InvalidData, PreconditionFailed } from "@/core/error";
@@ -160,6 +164,30 @@ export async function guardedDelete<M extends VersionedModel>(
 	checkExpectedUpdatedAt(current, opts.expectedUpdatedAt);
 	if (current === null) return;
 	await delegate.delete({ where });
+}
+
+/**
+ * Updates `data` on the row of `model` addressed by `where` and keeps its
+ * `updatedAt`.
+ *
+ * Only for a value the read model does not return and the writer can derive
+ * again (the cached `zipHash` of a repository): a write that bumped the version
+ * would fail the next conditional write of a client that read nothing new. It
+ * has no expectation to check. Any field that the read model shows goes through
+ * {@link guardedUpdate} instead.
+ */
+export async function writeCache<M extends VersionedModel>(
+	tx: PrismaTx,
+	model: M,
+	where: UniqueWhere<M>,
+	data: GuardedData<M>,
+): Promise<void> {
+	const delegate = untyped(tx, model);
+	const current = await readVersion(delegate, where);
+	await delegate.update({
+		where,
+		data: current ? { ...data, updatedAt: current } : data,
+	});
 }
 
 /**

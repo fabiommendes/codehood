@@ -628,3 +628,17 @@ test("repository.addFiles: stale version throws and stores nothing", async () =>
 	const ok = await db.repository.addFiles(pk, files, at(repository.updatedAt));
 	expect(ok.added).toHaveLength(1);
 });
+
+test("repository.zip caches the archive without moving updatedAt, so the commit's version still matches", async () => {
+	const { pk, tree } = await stagedRepository();
+	const committed = await db.repository.commit(pk, { tree }, FULL_ACCESS);
+	expect(await db.repository.zip(pk, FULL_ACCESS)).not.toBeNull();
+	const stored = await db.repository.findOne(pk, FULL_ACCESS);
+	expect(stored?.updatedAt).toEqual(committed.updatedAt);
+	const again = await db.repository.commit(
+		pk,
+		{ tree },
+		at(committed.updatedAt),
+	);
+	expect(again.head).toBe(committed.head);
+});

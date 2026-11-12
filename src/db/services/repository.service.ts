@@ -40,6 +40,7 @@ import {
 	guardedDelete,
 	guardedUpdate,
 	touch,
+	writeCache,
 } from "@/db/conditional-write";
 import { defineService, inTx, op } from "@/db/define-service";
 import { m } from "@/i18n";
@@ -750,12 +751,11 @@ export function makeRepositoryService(
 					},
 					system,
 				);
-				await guardedUpdate(
+				await writeCache(
 					tx,
 					"repository",
 					{ id: plan.id },
 					{ zipHash: blob.hash },
-					{},
 				);
 			}
 			return blob.hash;
