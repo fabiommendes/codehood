@@ -38,7 +38,15 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
 - Toda escrita que muda o que o read model devolve precisa mudar o `updatedAt`
   dessa linha, inclusive quando só toca em filhos (tags e questões de exame,
   nova versão de questão, repositórios de evento) ou quando uma chave
-  estrangeira é anulada por cascata.
+  estrangeira é anulada por cascata. A regra cobre os campos da própria linha
+  e os filhos que ela possui; entidades relacionadas embutidas no read model
+  (a `discipline` dentro do curso) têm versão própria e não mudam o
+  `updatedAt` de quem as embute.
+- `Date` sobre uma linha que não existe falha com `PreconditionFailed` e
+  `updatedAt: null` (412), em `update`, `upsert` e `delete`, não com
+  `NotFound`.
+- A comparação é feita em milissegundos (`getTime()`), nunca pelo texto
+  gravado no SQLite: linhas antigas podem ter o `updatedAt` em outro formato.
 - A regra vale para todo service cujo modelo tem `updatedAt`. `Discipline`
   ganha a coluna. `Edition` fica sem ela e sem escrita condicional: só o
   administrador a edita.
