@@ -63,6 +63,11 @@ export const examSchema = z.object({
 	/// Whether students may run code in answer mode. Null follows the exam type.
 	allowCodeRun: z.boolean().nullable(),
 
+	/// Whether the browser records the edit history of open answers. Null follows
+	/// the exam type. Server-side state: output only, never written through
+	/// `examCreate` or `examUpdate`.
+	answerHistory: z.boolean().nullable(),
+
 	/// When the instructor released an `EXAM`'s grades. Read-only here.
 	gradesReleasedAt: z.date().nullable(),
 
@@ -81,6 +86,7 @@ export const examCreate = examSchema
 		id: true,
 		author: true,
 		extraTime: true,
+		answerHistory: true,
 		gradesReleasedAt: true,
 		createdAt: true,
 		updatedAt: true,

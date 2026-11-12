@@ -163,6 +163,28 @@ test("POST ignores extraTime: it is only granted on update", async ({
 	expect((await res.json()).extraTime).toBeNull();
 });
 
+test("answerHistory is output only: POST and PATCH cannot set it", async ({
+	request,
+}) => {
+	const { url, headers } = await makeCourse(request);
+
+	const created = await request.post(url, {
+		headers,
+		data: { slug: "quiz-3", title: "Quiz 3", answerHistory: false },
+	});
+	expect(created.status()).toBe(200);
+	expect((await created.json()).answerHistory).toBeNull();
+
+	const patched = await request.patch(`${url}/quiz-3`, {
+		headers,
+		data: { title: "Quiz 3b", answerHistory: true },
+	});
+	expect(patched.status()).toBe(200);
+	const body = await patched.json();
+	expect(body.title).toBe("Quiz 3b");
+	expect(body.answerHistory).toBeNull();
+});
+
 test("PATCH sets and clears duration and extraTime", async ({ request }) => {
 	const { url, headers } = await makeCourse(request);
 	await request.post(url, {

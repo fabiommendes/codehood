@@ -730,6 +730,7 @@ function fromDb(row: DbExam): Exam {
 		scheduledAt: row.scheduledAt,
 		duration: fromMs(row.durationMs),
 		allowCodeRun: row.allowCodeRun,
+		answerHistory: row.answerHistory,
 		extraTime: fromMs(row.extraTimeMs),
 		author: row.authorId,
 		gradesReleasedAt: row.gradesReleasedAt,

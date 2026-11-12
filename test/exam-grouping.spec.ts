@@ -23,6 +23,7 @@ function exam(overrides: Partial<Exam> = {}): Exam {
 		duration: null,
 		extraTime: null,
 		allowCodeRun: null,
+		answerHistory: null,
 		gradesReleasedAt: null,
 		author: "instructor",
 		rev: null,

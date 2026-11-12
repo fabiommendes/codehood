@@ -61,6 +61,7 @@ function exam(slug: string, overrides: Partial<Exam> = {}): Exam {
 		duration: null,
 		extraTime: null,
 		allowCodeRun: null,
+		answerHistory: null,
 		gradesReleasedAt: null,
 		author: "ada",
 		rev: null,
