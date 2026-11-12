@@ -7,6 +7,7 @@
 import {
 	type Diagnostic,
 	type PublicQuestion as MdqPublicQuestion,
+	publicForm as mdqPublicForm,
 	modelDiagnostics,
 	NotAutoGradable,
 	Question,
@@ -53,22 +54,57 @@ export {
 	correctResponses,
 	MissingIdError,
 	NotAutoGradable,
-	publicForm,
 	ResponseError,
 	scoreBlanks,
 	scoreResponse,
 	withIds,
 } from "mdq";
 
-/** A question document of any mdq type. */
-export const questionDocument = Question;
-export type QuestionDocument = Question;
+/// The mdq types this server cannot host yet: no answer UI, runner report or grading for them.
+export const UNSUPPORTED_QUESTION_TYPES = ["code"] as const;
+
+/** A question document of a type this server hosts, which is every mdq type but `code`. */
+export type QuestionDocument = Exclude<
+	Question,
+	{ type: (typeof UNSUPPORTED_QUESTION_TYPES)[number] }
+>;
+
+/** The message of the validation error that refuses a question of an unsupported type. */
+export const UNSUPPORTED_TYPE_MESSAGE =
+	'Question type "code" is not supported yet.';
+
+/**
+ * Validates a question document of any hosted type and refuses an mdq type this
+ * server cannot grade, so none is ever stored.
+ */
+export const questionDocument = Question.refine(
+	(question): question is QuestionDocument =>
+		!(UNSUPPORTED_QUESTION_TYPES as readonly string[]).includes(question.type),
+	{ message: UNSUPPORTED_TYPE_MESSAGE, path: ["type"] },
+);
 
 /** The type of a question document. */
 export type QuestionType = QuestionDocument["type"];
 
 /** The public form of a question document. */
 export type PublicQuestion = MdqPublicQuestion;
+
+/// The public form of a hosted question, which is never a `code` one.
+type HostedPublicQuestion = Exclude<PublicQuestion, { type: "code" }>;
+
+/// The public form matching the type of `Q`, whichever hosted types `Q` covers.
+type PublicFormOf<Q extends QuestionDocument> = Extract<
+	HostedPublicQuestion,
+	{ type: Q["type"] }
+>;
+
+/**
+ * The public form of a question document, as mdq's `publicForm` but typed
+ * without the `code` type, which this server refuses.
+ */
+export const publicForm = mdqPublicForm as <Q extends QuestionDocument>(
+	question: Q,
+) => PublicFormOf<Q>;
 
 /**
  * The rules of the mdq spec that `question` breaks beyond its schema, such as a

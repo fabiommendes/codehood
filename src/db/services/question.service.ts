@@ -608,7 +608,10 @@ function fromDbPublic(row: DbQuestionPublic): QuestionPublic {
 		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
-		question: latest.publicPayload as unknown as PublicQuestion,
+		question: latest.publicPayload as unknown as Exclude<
+			PublicQuestion,
+			{ type: "code" }
+		>,
 	};
 }
 

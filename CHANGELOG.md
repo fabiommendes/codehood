@@ -45,6 +45,16 @@
 
 ### Changed
 
+- A question of the new mdq `code` type is refused with a validation error
+  ("Question type "code" is not supported yet.") until Codehood can answer and
+  grade it. See `dev/issues/suporte-ao-tipo-code-do-mdq.md`.
+- Fonts are served by Codehood itself instead of Google Fonts: no page
+  contacts a third-party host, and the first visit no longer waits for one.
+- Tests run in two scopes: `pnpm run test:unit` (no server, spec files in
+  parallel, about 30 s) and `pnpm run test:e2e` (spec files in parallel, one
+  server and database per worker, about 3 min). `pnpm test` runs both.
+- Two test runs started together in different checkouts no longer pick the
+  same port: a run reserves its ports with lock files.
 - The instance is configured in `codehood.config.ts` (or the file
   `CODEHOOD_CONFIG` points at). Address, locale, time zone and runner origin
   are build-time constants there; `PUBLIC_URL`, `CODEHOOD_LOCALE`,
