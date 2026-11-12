@@ -6,6 +6,10 @@ export * from "./api-key";
 export * from "./attachment";
 // Branded id schemas, `slug` and `buffer` stay internal to the sub-modules.
 export {
+	type AnswerEditBatchId,
+	type AnswerEditFieldId,
+	type AnswerEditGapId,
+	type AnswerEditHistoryId,
 	type ApiKeyId,
 	type AttachmentId,
 	type BlobId,

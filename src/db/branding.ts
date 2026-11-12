@@ -12,6 +12,23 @@
  * Declare mappings from Prisma models to their branded types
  */
 export const BRANDING: Record<string, Record<string, string>[]> = {
+	AnswerEditBatch: [
+		{ field: "id", from: "number", to: "AnswerEditBatchId" },
+		{ field: "fieldId", from: "number", to: "AnswerEditFieldId" },
+	],
+	AnswerEditField: [
+		{ field: "id", from: "number", to: "AnswerEditFieldId" },
+		{ field: "historyId", from: "number", to: "AnswerEditHistoryId" },
+		{ field: "questionId", from: "number", to: "QuestionRefId" },
+	],
+	AnswerEditGap: [
+		{ field: "id", from: "number", to: "AnswerEditGapId" },
+		{ field: "fieldId", from: "number", to: "AnswerEditFieldId" },
+	],
+	AnswerEditHistory: [
+		{ field: "id", from: "number", to: "AnswerEditHistoryId" },
+		{ field: "responseId", from: "number", to: "ResponseId" },
+	],
 	ApiKey: [{ field: "id", from: "number", to: "ApiKeyId" }],
 	Attachment: [{ field: "id", from: "number", to: "AttachmentId" }],
 	Blob: [{ field: "id", from: "number", to: "BlobId" }],

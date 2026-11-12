@@ -17,6 +17,21 @@ export type ApiKeyId = z.infer<typeof apiKeyId>;
 export const attachmentId = z.number().int().brand("AttachmentId");
 export type AttachmentId = z.infer<typeof attachmentId>;
 
+export const answerEditBatchId = z.number().int().brand("AnswerEditBatchId");
+export type AnswerEditBatchId = z.infer<typeof answerEditBatchId>;
+
+export const answerEditFieldId = z.number().int().brand("AnswerEditFieldId");
+export type AnswerEditFieldId = z.infer<typeof answerEditFieldId>;
+
+export const answerEditGapId = z.number().int().brand("AnswerEditGapId");
+export type AnswerEditGapId = z.infer<typeof answerEditGapId>;
+
+export const answerEditHistoryId = z
+	.number()
+	.int()
+	.brand("AnswerEditHistoryId");
+export type AnswerEditHistoryId = z.infer<typeof answerEditHistoryId>;
+
 export const blobId = z.number().int().brand("BlobId");
 export type BlobId = z.infer<typeof blobId>;
 

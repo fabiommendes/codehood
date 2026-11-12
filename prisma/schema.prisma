@@ -766,6 +766,7 @@ model QuestionRef {
   group              Group?              @relation(fields: [groupId], references: [id])
   groupId            Int?
   submissions        Submission[]
+  answerEditFields   AnswerEditField[]
 
   @@unique([slug, courseId])
 }
@@ -853,6 +854,7 @@ model Response {
   updatedAt DateTime @updatedAt
 
   submissions Submission[]
+  editHistory AnswerEditHistory?
 
   @@unique([authorId, examId, slotKey])
   @@map("ResponseRef")
@@ -1133,6 +1135,10 @@ model Exam {
   /// Whether students may run code in answer mode. Null follows the exam
   /// type: on for PRACTICE, off for QUIZ and EXAM. Review mode ignores it.
   allowCodeRun Boolean?
+  /// Whether the browser records the edit history of open answers. Null follows
+  /// the exam type: on for EXAM and QUIZ, off for PRACTICE. Server-side state
+  /// the course repository must not set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
+  answerHistory Boolean?
   /// Extra time granted on top of durationMs, extending the window for every
   /// student alike (src/services/exam-state.ts). Server-side state the course
   /// repository must not set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
@@ -1267,4 +1273,93 @@ model Report {
 
   @@index([status, createdAt])
   @@index([courseId, status])
+}
+
+/// The edit history of one attempt's open answers, for graders only.
+model AnswerEditHistory {
+  id         Int      @id @default(autoincrement())
+  responseId Int      @unique
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  /// Totals over every stored batch and gap, checked against the per-attempt limits.
+  editCount Int @default(0)
+  byteCount Int @default(0)
+  /// When a per-attempt limit was reached; no batch is stored after it.
+  incompleteAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fields AnswerEditField[]
+}
+
+/// Replay anchor of one field: the text after the last stored batch. Not the answer.
+model AnswerEditField {
+  id         Int               @id @default(autoincrement())
+  historyId  Int
+  history    AnswerEditHistory @relation(fields: [historyId], references: [id], onDelete: Cascade)
+  questionId Int
+  question   QuestionRef       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  field      String
+
+  text     String
+  revision Int    @default(0)
+  nextSeq  Int    @default(0)
+  /// When this field stopped taking batches because its text outgrew the limit.
+  incompleteAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  batches AnswerEditBatch[]
+  gaps    AnswerEditGap[]
+
+  @@unique([historyId, questionId, field])
+}
+
+/// One immutable batch of edits, append-only.
+model AnswerEditBatch {
+  id      Int             @id @default(autoincrement())
+  fieldId Int
+  field   AnswerEditField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  batchId      String
+  /// The revision this batch produced: its base revision plus one.
+  revision     Int
+  firstSeq     Int
+  editCount    Int
+  sessionId    String
+  timeOriginMs Int
+  /// Codec version of `edits`.
+  version      Int
+  /// EditTuple[] exactly as received.
+  edits        Json
+  /// sha-256 of the canonical batch, to tell a retry from a reused id.
+  contentHash  String
+  byteCount    Int
+
+  /// Set when the batch starts from a text the anchor did not hold: "start" or "rebase".
+  baseReason String?
+  /// The text the edits start from, only when `baseReason` is set.
+  baseText   String?
+  /// The anchor text the batch replaced, only for a "rebase" whose base differs from it.
+  gapBefore  String?
+
+  /// Milliseconds after the attempt closed, when the batch arrived in the late window.
+  lateMs     Int?
+  receivedAt DateTime @default(now())
+
+  @@unique([fieldId, revision])
+  @@unique([fieldId, batchId])
+}
+
+/// Explicit marker that the browser stopped recording a field.
+model AnswerEditGap {
+  id         Int             @id @default(autoincrement())
+  fieldId    Int
+  field      AnswerEditField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  reason     String
+  receivedAt DateTime @default(now())
+
+  @@index([fieldId])
 }
