@@ -22,7 +22,6 @@ import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
-import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
 import { makeSessionService } from "./session.service";
 
 export type { UserId } from "@/core/schemas";
@@ -265,24 +264,21 @@ export const makeUserService = defineService<UserT>()((client) => {
 	 */
 	const remove = op({
 		args: [userPK],
-		transaction: false,
-		run: (
+		run: async (
 			tx: PrismaTx,
 			filter: UserPK,
 			opts: ServiceOptsWithoutTx,
-		): Promise<void> =>
-			loggingAnswerHistoryRemoval(tx, "user-delete", async (inner, measure) => {
-				if (opts.actor !== SYSTEM) throw new NotAllowed("user.delete");
+		): Promise<void> => {
+			if (opts.actor !== SYSTEM) throw new NotAllowed("user.delete");
 
-				const user = await findOne(inner, filter, opts);
+			const user = await findOne(tx, filter, opts);
 
-				// TODO: define an error for NotFound entities
-				if (!user) throw new Error("user not found");
+			// TODO: define an error for NotFound entities
+			if (!user) throw new Error("user not found");
 
-				await measure({ author: user.username }, user.username);
-				// TODO: delete or soft delete? design decision
-				await inner.user.delete({ where: { username: user.username } });
-			}),
+			// TODO: delete or soft delete? design decision
+			await tx.user.delete({ where: { username: user.username } });
+		},
 	});
 
 	// TODO: this method should be moved to the auth service.
