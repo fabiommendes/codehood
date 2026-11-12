@@ -1,8 +1,8 @@
 ---
 type: issue
-status: backlog
+status: todo
 tags: [exam, grading, questions, student, security]
-kind: feature
+kind: enhancement
 priority: medium
 created: 2026-11-03
 creator: claude

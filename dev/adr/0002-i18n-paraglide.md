@@ -1,9 +1,10 @@
 ---
 type: adr
-status: proposed
+status: accepted
 tags: [i18n, ui, build]
 relatedTo: [specs/to-do/i18n]
 created: 2026-10-20
+decided: 2026-11-06
 deciders: [fabio, claude]
 ---
 
