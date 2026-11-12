@@ -227,8 +227,15 @@ export class AnswerEditAdapter {
 				this.record(null, error);
 			}
 			this.guard(
-				() =>
-					Promise.all([this.coordinator.persist(), this.coordinator.flush()]),
+				async () => {
+					/// Wait for both, so a quick failure of one does not cut the other short.
+					const results = await Promise.allSettled([
+						this.coordinator.persist(),
+						this.coordinator.flush(),
+					]);
+					for (const result of results)
+						if (result.status === "rejected") throw result.reason;
+				},
 				null,
 				finish,
 			);

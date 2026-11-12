@@ -105,6 +105,9 @@ function answerHistoryEnabled(): boolean {
 	}
 }
 
+/// How long the page waits for the history's last flush after a finished attempt, whatever the monitor does.
+const HISTORY_FINAL_WAIT_MS = 2000;
+
 /// Rejects when `promise` has not settled after `ms`.
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 	return new Promise((resolve, reject) => {
@@ -471,10 +474,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		if (document.visibilityState === "hidden") flushHistoryNow();
 	}
 
-	/// Waits for the history's last flush, never longer than its own ceiling, and never fails.
+	/// Waits for the history's last flush, never longer than the page's own bound, and never fails.
 	async function flushHistoryFinal(): Promise<void> {
 		try {
-			await history?.flushFinal();
+			// The page keeps its own bound: it never trusts the monitor to settle.
+			await withTimeout(
+				Promise.resolve(history?.flushFinal()),
+				HISTORY_FINAL_WAIT_MS,
+			);
 		} catch {
 			// The history is best effort.
 		}

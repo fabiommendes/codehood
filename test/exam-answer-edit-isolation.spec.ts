@@ -70,6 +70,34 @@ const FAULTS = {
 			return now();
 		};
 	},
+	"final flush that never settles": () => {
+		const hits = { count: 0 };
+		Object.assign(window, { faultHits: hits });
+		/// The monitor's waits never settle: its ceiling timer is swallowed and so is its own join of persist and flush.
+		const settled = Promise.allSettled.bind(Promise);
+		Promise.allSettled = ((values: Iterable<unknown>) => {
+			if (new Error().stack?.includes("answer-edit-session")) {
+				hits.count++;
+				return new Promise(() => {});
+			}
+			return settled(values);
+		}) as typeof Promise.allSettled;
+		const setTimeoutOriginal = window.setTimeout.bind(window);
+		window.setTimeout = ((
+			callback: TimerHandler,
+			delay?: number,
+			...args: unknown[]
+		) => {
+			if (
+				(delay ?? 0) >= 1000 &&
+				new Error().stack?.includes("answer-edit-session")
+			) {
+				hits.count++;
+				return 0;
+			}
+			return setTimeoutOriginal(callback, delay, ...args);
+		}) as typeof setTimeout;
+	},
 } as const;
 type Fault = keyof typeof FAULTS;
 
@@ -372,3 +400,27 @@ for (const fault of [
 		expect(errors).toEqual([]);
 	});
 }
+
+test("the page reloads into the finished state when the final history flush never settles", async ({
+	page,
+}) => {
+	const s = await setup(page);
+	const errors = watchErrors(page);
+	await page.addInitScript(FAULTS["final flush that never settles"]);
+	await page.goto(s.url);
+	await typeLikeAStudent(page);
+	await expect.poll(() => saved(s)).toBe(TYPED);
+	/// Give the monitor time to open its field, so the final flush has work to hang on.
+	await page.waitForTimeout(500);
+
+	await submit(page);
+	await expect.poll(() => finished(s)).toBe(true);
+	/// The reload happens on the page's own timer, whatever the monitor does.
+	await expect(page.getByRole("textbox")).toHaveCount(0, {
+		timeout: FINISH_BUDGET_MS,
+	});
+	await expect(
+		page.getByText(/submitted|grading|graded/i).first(),
+	).toBeVisible();
+	expect(errors).toEqual([]);
+});
