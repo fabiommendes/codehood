@@ -538,8 +538,8 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
 | Issue | Destino |
 | :-- | :-- |
 | `historico-local-sem-leitura-na-prova.md` | Resolvida pela spec inteira (R5 a R35). Apagar em T8. Seu texto sobre "não distingue colagem de digitação" já estava superado pela seção "Causa do edit" do RFC. |
-| `lacuna-do-monitor-nao-chega-ao-servidor.md` | Resolvida por R12, R13, R23 e R24. |
-| `monitor-envio-final-nao-espera-reconciliacao.md` | Resolvida por R26 (e atenuada por R25: uma inspeção por tentativa). |
+| `lacuna-do-monitor-nao-chega-ao-servidor.md` | Resolvida por R12, R13, R23 e R24. Apagada em T6. |
+| `monitor-envio-final-nao-espera-reconciliacao.md` | Resolvida por R26 (e atenuada por R25: uma inspeção por tentativa). Apagada em T6. |
 | `monitor-fallback-erasure-apos-logout.md` | Fica aberta. O retry de `revoke()` no logout não muda com esta spec; R28 usa `remove` por campo, não `revoke`. |
 | `replay-do-historico-de-edicao.md` | Fica aberta. Depende desta spec; o modelo (lotes imutáveis, `baseText`, `gapBefore`) já permite o replay sem checkpoints. |
 | `suporte-ao-tipo-code-do-mdq.md` | Fica aberta. Quando `code` entrar, basta incluí-lo na função de R11 e alimentar `recordEdit` com o editor dele. |

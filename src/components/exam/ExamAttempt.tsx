@@ -80,6 +80,10 @@ export interface ExamAttemptProps {
 	answeredAt?: Record<string, string>;
 	/// How long after the deadline the server still accepts an answer, which the last resend uses.
 	graceMs?: number;
+	/// The attempt's `publicId`, which keys its local edit history and names it to the history actions.
+	attempt?: string;
+	/// Whether the exam's edit-history switch is on, as the server computed it.
+	answerHistory?: boolean;
 }
 
 /// The box every state sentence of an attempt sits in.
@@ -325,6 +329,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				({ data, error }) => {
 					if (data) {
 						setSkew(measureClockOffset(data.serverNow, sentAt, Date.now()));
+						if (data.answerHistory === false) switchHistoryOff();
 					}
 					return error ? errorMessage(error) : null;
 				},
@@ -468,13 +473,27 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 	/// Loads the history monitor in the background when the switch is on; every failure leaves the page as it is without it.
 	function startHistory(): void {
-		if (!props.username || !answerHistoryEnabled()) return;
+		if (!props.username || !props.attempt || !answerHistoryEnabled()) return;
+		if (!props.answerHistory) return;
 		const ownerId = props.username;
-		const attemptId = `${props.discipline}/${props.course}/${props.exam}`;
+		const attemptId = props.attempt;
+		const exam = {
+			discipline: props.discipline,
+			course: props.course,
+			exam: props.exam,
+		};
 		try {
 			import("./answer-edit-session")
 				.then((session) =>
-					session.openAnswerEditSession({ ownerId, attemptId }),
+					session.openAnswerEditSession({
+						ownerId,
+						attemptId,
+						transport: session.createActionTransport({
+							actions: actions.answerHistory,
+							exam,
+							onDisabled: switchHistoryOff,
+						}),
+					}),
 				)
 				.then((adapter) => {
 					if (historyStopped) {
@@ -498,6 +517,33 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		}
 	}
 
+	/// Stops the history for good, as the server says the exam's switch is off; never throws.
+	function switchHistoryOff(): void {
+		withHistory((adapter) => adapter.disable("exam switch off"));
+	}
+
+	/// Removes the local records of an attempt that is no longer in progress, in the background; never throws.
+	function removeSettledHistory(): void {
+		if (!props.username || !props.attempt || !answerHistoryEnabled()) return;
+		const ownerId = props.username;
+		const attemptId = props.attempt;
+		const questionIds = [
+			...new Set([
+				...historyQuestions().map((entry) => entry.slug),
+				...Object.keys(props.answers),
+			]),
+		];
+		try {
+			import("./answer-edit-session")
+				.then((session) =>
+					session.removeAnswerEditRecords({ ownerId, attemptId, questionIds }),
+				)
+				.catch(() => {});
+		} catch {
+			// The records expire on their own.
+		}
+	}
+
 	/// Sends the history's pending work without waiting for it, as the page is being hidden or closed.
 	function flushHistoryNow(): void {
 		withHistory((adapter) => void adapter.flushFinal());
@@ -505,6 +551,21 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 	function onVisibilityChange(): void {
 		if (document.visibilityState === "hidden") flushHistoryNow();
+	}
+
+	/// Waits for the history's last flush, then erases its local copy, all within one bound; never fails.
+	async function settleHistory(flushed: Promise<void>): Promise<void> {
+		try {
+			await withTimeout(
+				(async () => {
+					await flushed;
+					await history?.discard();
+				})(),
+				HISTORY_FINAL_WAIT_MS,
+			);
+		} catch {
+			// The history is best effort, and its records expire on their own.
+		}
 	}
 
 	/// Waits for the history's last flush, never longer than the page's own bound, and never fails.
@@ -723,7 +784,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				// The server decides what follows: awaiting grading, or the results.
 				else {
 					clearDrafts();
-					await historyFlushed;
+					await settleHistory(historyFlushed);
 					window.location.reload();
 				}
 			}
@@ -755,8 +816,10 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			window.removeEventListener("pagehide", flushHistoryNow);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
 		});
-		if (kind() !== "in-progress") clearSettledDrafts();
-		else {
+		if (kind() !== "in-progress") {
+			clearSettledDrafts();
+			removeSettledHistory();
+		} else {
 			startHistory();
 			restoreDrafts();
 		}

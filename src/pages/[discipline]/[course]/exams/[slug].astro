@@ -520,6 +520,8 @@ for (const submission of attempt?.submissions ?? []) {
             username={actor.username}
             answeredAt={answeredAt}
             graceMs={EXAM_ANSWER_GRACE_MS}
+            attempt={attempt?.publicId}
+            answerHistory={effectiveAnswerHistory(exam)}
           />
         </section>
       )

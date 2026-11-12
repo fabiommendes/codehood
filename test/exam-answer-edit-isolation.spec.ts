@@ -674,9 +674,8 @@ for (const [name, fault] of Object.entries(SERVER_FAULTS)) {
 				.poll(
 					async () => {
 						await flushHistory(page);
-						return fault.endpoints.includes("send")
-							? probe.hits.send
-							: probe.hits.inspect;
+						/// The first endpoint of the fault is the first one the page reaches: no send happens before a baseline check.
+						return probe.hits[fault.endpoints[0] ?? "send"];
 					},
 					{ timeout: 10 * SECOND, intervals: [250, 500, 1000] },
 				)

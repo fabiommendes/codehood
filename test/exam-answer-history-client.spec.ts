@@ -307,6 +307,8 @@ test("the local records are gone once the attempt is delivered, before the page 
 		.poll(async () => (await localRecords(page)).map(([, text]) => text), POLL)
 		.toContain("to be erased");
 	/// Hold the reload that follows `finish`, so only the erasure the page asks for can empty the store.
+	/// A page waiting on a held navigation cannot be inspected, so a second page of the same
+	/// origin, which shares the storage, reads the records meanwhile.
 	let reloadRequested = false;
 	let release: () => void = () => {};
 	const held = new Promise<void>((resolve) => {
@@ -319,11 +321,13 @@ test("the local records are gone once the attempt is delivered, before the page 
 		}
 		await route.continue();
 	});
+	const observer = await page.context().newPage();
+	await observer.goto(new URL("/not-an-app-page", page.url()).href);
 
 	await submit(page);
 	await expect.poll(() => reloadRequested, POLL).toBe(true);
 
-	await expect.poll(() => localRecords(page), POLL).toEqual([]);
+	await expect.poll(() => localRecords(observer), POLL).toEqual([]);
 	release();
 	await expect(page.getByRole("textbox")).toHaveCount(0, {
 		timeout: 10 * SECOND,
