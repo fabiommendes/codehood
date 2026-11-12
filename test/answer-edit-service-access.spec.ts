@@ -1,6 +1,6 @@
 /**
  * `db.answerEdit`: who may send, when the attempt still takes history, and
- * the per-exam switch (spec `dev/specs/to-do/historico-de-edicao-no-servidor.md`,
+ * the per-exam switch (spec `dev/specs/to-review/historico-de-edicao-no-servidor.md`,
  * R4, R5, R14, R15). The clock is injected through `now`; nothing waits.
  */
 import { expect, test } from "@playwright/test";

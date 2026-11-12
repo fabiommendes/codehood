@@ -14,7 +14,6 @@ test.beforeEach(resetDatabase);
 
 const FINISH_ACTION = "**/_actions/exam.finish**";
 const SECOND = 1000;
-const SWITCH_KEY = "codehood.answerHistory";
 const MONITOR_CHUNK = "**/answer-edit-session*";
 /// Longest the page may take to finish with every monitor fault on: the final flush ceiling plus the round trip.
 const FINISH_BUDGET_MS = 6 * SECOND;
@@ -93,12 +92,12 @@ const FAULTS = {
 } as const;
 type Fault = keyof typeof FAULTS;
 
-/// A student in an open attempt at an exam with one text essay, with the history switch on.
+/// A student in an open attempt at an exam with one text essay, with the exam's history switch at its default (on) unless `historyOff`.
 async function setup(
 	page: Page,
 	options: {
 		secondsLeft?: number;
-		switchOn?: boolean;
+		historyOff?: boolean;
 		withShortAnswer?: boolean;
 	} = {},
 ) {
@@ -150,6 +149,11 @@ async function setup(
 			? [{ slug: "text" }, { slug: "short" }]
 			: [{ slug: "text" }],
 	});
+	if (options.historyOff)
+		await prisma.exam.update({
+			where: { id: exam.id },
+			data: { answerHistory: false },
+		});
 	const attempt = await db.response.create(
 		{ course: course.id, exam: exam.slug, author: student.username },
 		FULL_ACCESS,
@@ -168,12 +172,6 @@ async function setup(
 		edition: course.edition.slug,
 	});
 	await logInAs(page, student);
-	if (options.switchOn !== false) {
-		await page.addInitScript(
-			(key) => localStorage.setItem(key, "on"),
-			SWITCH_KEY,
-		);
-	}
 	return { student, course, exam, url: `${href}/exams/${exam.slug}` };
 }
 
@@ -314,10 +312,10 @@ test("the history follows the essay answer and not the short answer", async ({
 	expect(errors).toEqual([]);
 });
 
-test("with the switch off, nothing of the monitor loads or is stored", async ({
+test("with the exam's switch off, nothing of the monitor loads or is stored", async ({
 	page,
 }) => {
-	const s = await setup(page, { switchOn: false });
+	const s = await setup(page, { historyOff: true });
 	const errors = watchErrors(page);
 	const requests: string[] = [];
 	page.on("request", (request) => requests.push(request.url()));

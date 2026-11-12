@@ -1,6 +1,6 @@
 /**
  * The database models of the answer-edit history (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R1 to R3).
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R1 to R3).
  *
  * Rows are arranged through `prisma`: the service that writes them comes
  * later.

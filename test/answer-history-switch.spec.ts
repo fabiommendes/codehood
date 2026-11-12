@@ -1,6 +1,6 @@
 /**
  * The per-exam answer-history switch (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R30): the effective
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R30): the effective
  * value by exam type, and the fact that only the server sets it.
  */
 

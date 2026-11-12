@@ -1,6 +1,6 @@
 /**
  * What the dev seed (`src/db/bootstrap.ts`) holds for the edit history (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R36). It reads the
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R36). It reads the
  * seeded database `test/run.ts` prepares, from a private copy of it (see
  * `beforeAll`), and looks only at the courses of the seeded instructors.
  *

@@ -1,6 +1,6 @@
 /**
  * `db.answerEdit.summary`: what the course owner reads about one attempt (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R32 to R34). The
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R32 to R34). The
  * pure computation is covered in `answer-edit-summary.spec.ts`; here the
  * service feeds it from the stored rows.
  *

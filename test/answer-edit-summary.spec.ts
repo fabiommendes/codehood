@@ -1,6 +1,6 @@
 /**
  * The pure computation behind the instructor's per-answer summary (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R33 and R34). No
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R33 and R34). No
  * database: batches are assembled by hand and every expected number is
  * worked out in a comment, not by the algorithm under test.
  *

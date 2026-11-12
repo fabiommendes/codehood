@@ -1,6 +1,6 @@
 /**
  * `db.answerEdit.append`: which batches are stored, and what comes back
- * (spec `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R3, R6 to R9,
+ * (spec `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R3, R6 to R9,
  * R11 to R13).
  */
 import { expect, test } from "@playwright/test";

@@ -104,18 +104,6 @@ const SAVE_TIMEOUT_MS = 15_000;
 /// The shortest time between two prompt retries triggered by the student coming back to a tab whose session ended.
 const SESSION_KICK_MIN_MS = 5000;
 
-/// The local storage key that turns the edit history of typed answers on; off unless it holds "on".
-const ANSWER_HISTORY_SWITCH = "codehood.answerHistory";
-
-/// Whether the edit history is switched on in this browser; a browser that refuses to say counts as off.
-function answerHistoryEnabled(): boolean {
-	try {
-		return localStorage.getItem(ANSWER_HISTORY_SWITCH) === "on";
-	} catch {
-		return false;
-	}
-}
-
 /// How long the page waits for the history's last flush after a finished attempt, whatever the monitor does.
 const HISTORY_FINAL_WAIT_MS = 2000;
 
@@ -499,10 +487,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		);
 	}
 
-	/// Loads the history monitor in the background when the switch is on; every failure leaves the page as it is without it.
+	/// Loads the history monitor in the background when the exam's switch is on; every failure leaves the page as it is without it.
 	function startHistory(): void {
-		if (!props.username || !props.attempt || !answerHistoryEnabled()) return;
-		if (!props.answerHistory) return;
+		if (!props.username || !props.attempt || !props.answerHistory) return;
 		const ownerId = props.username;
 		const attemptId = props.attempt;
 		const exam = {
@@ -552,7 +539,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 	/// Removes the local records of an attempt that is no longer in progress, in the background; never throws.
 	function removeSettledHistory(): void {
-		if (!props.username || !props.attempt || !answerHistoryEnabled()) return;
+		if (!props.username || !props.attempt || !props.answerHistory) return;
 		const ownerId = props.username;
 		const attemptId = props.attempt;
 		const questionIds = [

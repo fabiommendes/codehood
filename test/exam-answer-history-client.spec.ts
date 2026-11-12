@@ -24,7 +24,6 @@ import { logInAs, resetDatabase } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);
 
-const SWITCH_KEY = "codehood.answerHistory";
 const SECOND = 1000;
 const FINISH_ACTION = "**/_actions/exam.finish**";
 const HISTORY_ACTIONS = /_actions\/answerHistory\.(inspect|send)/;
@@ -46,19 +45,9 @@ function examPath(world: World): string {
 	})}/exams/${world.exam.slug}`;
 }
 
-/// The student's page, signed in, with the development switch on unless told otherwise.
-async function openStudent(
-	page: Page,
-	world: World,
-	options: { switchOn?: boolean } = {},
-) {
+/// The student's page, signed in; whether it records is up to the exam's switch.
+async function openStudent(page: Page, world: World) {
 	await logInAs(page, world.student);
-	if (options.switchOn !== false) {
-		await page.addInitScript(
-			(key) => localStorage.setItem(key, "on"),
-			SWITCH_KEY,
-		);
-	}
 	await page.goto(examPath(world));
 }
 
@@ -248,6 +237,24 @@ test("what the student types reaches the server tables, and the local record is 
 	expect(errors).toEqual([]);
 });
 
+/// The exam's own switch is the only one: a page with no local key at all records.
+test("an EXAM at its default switch, with no local key, records on the server", async ({
+	page,
+}) => {
+	const world = await makeWorld({ type: "EXAM" });
+	const errors = watchErrors(page);
+	await openStudent(page, world);
+	expect(await page.evaluate(() => localStorage.length)).toBe(0);
+
+	await answerBox(page).pressSequentially("no local key", { delay: 20 });
+
+	await expect
+		.poll(() => deliveredText(page, world), POLL)
+		.toBe("no local key");
+	expect((await storedField(world))?.batches.length).toBeGreaterThan(0);
+	expect(errors).toEqual([]);
+});
+
 //
 // R26: the final flush waits for the baseline to be checked
 //
@@ -370,7 +377,7 @@ test("opening the page of an attempt that is not in progress removes its local r
 // R29: the page opens the monitor only when the exam's switch is on
 //
 
-test("with the exam switch off for the type, an open local switch loads and sends nothing", async ({
+test("a PRACTICE exam at its default switch loads and sends nothing", async ({
 	page,
 }) => {
 	const world = await makeWorld({ type: "PRACTICE" });
@@ -384,6 +391,34 @@ test("with the exam switch off for the type, an open local switch loads and send
 
 	await answerBox(page).pressSequentially("practice words", { delay: 20 });
 	await expect.poll(() => savedAnswer(world)).toBe("practice words");
+	await flushHistory(page);
+
+	expect(chunks).toEqual([]);
+	expect(history.all()).toBe(0);
+	expect(
+		await page.evaluate(async () => (await indexedDB.databases()).length),
+	).toBe(0);
+	expect(await storedField(world)).toBeNull();
+	expect(errors).toEqual([]);
+});
+
+test("an EXAM the instructor switched off loads no monitor and sends no batch", async ({
+	page,
+	playwright,
+	baseURL,
+}) => {
+	const world = await makeWorld({ type: "EXAM" });
+	await setSwitch(playwright, baseURL, world, false);
+	const errors = watchErrors(page);
+	const history = watchHistoryRequests(page);
+	const chunks: string[] = [];
+	page.on("request", (request) => {
+		if (request.url().includes("answer-edit")) chunks.push(request.url());
+	});
+	await openStudent(page, world);
+
+	await answerBox(page).pressSequentially("switched off", { delay: 20 });
+	await expect.poll(() => savedAnswer(world)).toBe("switched off");
 	await flushHistory(page);
 
 	expect(chunks).toEqual([]);

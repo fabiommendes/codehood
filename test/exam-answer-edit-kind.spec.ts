@@ -13,7 +13,6 @@ import { logInAs, resetDatabase, seedUser } from "./stories/helpers";
 
 test.beforeEach(resetDatabase);
 
-const SWITCH_KEY = "codehood.answerHistory";
 /// The codes of `inputKind` in the wire format.
 const KINDS: readonly InputKind[] = [
 	"typing",
@@ -81,10 +80,6 @@ async function setup(page: Page) {
 		edition: course.edition.slug,
 	});
 	await logInAs(page, student);
-	await page.addInitScript(
-		(key) => localStorage.setItem(key, "on"),
-		SWITCH_KEY,
-	);
 	return { url: `${href}/exams/${exam.slug}` };
 }
 

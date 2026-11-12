@@ -1,6 +1,6 @@
 /**
  * A retried item must not store its gap markers twice (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`, R8 and R12).
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`, R8 and R12).
  *
  * The client resends an item whenever it did not see the answer (R24, R25), so
  * the server meets the same item again.
