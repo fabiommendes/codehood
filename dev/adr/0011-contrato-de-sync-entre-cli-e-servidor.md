@@ -79,5 +79,6 @@ sobre estado do servidor foi decidida em 2026-11-03. O lado do CLI está em
 
 - `If-Match`/ETag nas escritas. Com um repositório por curso, o conflito que
   isso pegaria é raro, e o CLI já o detecta pelo `rev`. Ficou last-write-wins.
+  Revisto pela ADR 0013 (`0013-escrita-condicional-nos-services.md`).
 - Sync atômico num endpoint único: trocaria a retomada por um rollback de
   tudo a cada falha de rede.
