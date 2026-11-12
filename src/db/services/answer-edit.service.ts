@@ -1,7 +1,7 @@
 /**
  * The edit history of open answers: what a student's browser recorded while
  * typing, stored for the graders (spec
- * `dev/specs/to-do/historico-de-edicao-no-servidor.md`).
+ * `dev/specs/to-review/historico-de-edicao-no-servidor.md`).
  *
  * Nothing here reads or writes `Submission`, and no operation shares a
  * transaction with the answer path: a failure of the history never reaches an
