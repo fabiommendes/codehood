@@ -41,10 +41,14 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
   estrangeira é anulada por cascata. A regra cobre os campos da própria linha
   e os filhos que ela possui; entidades relacionadas embutidas no read model
   (a `discipline` dentro do curso) têm versão própria e não mudam o
-  `updatedAt` de quem as embute.
+  `updatedAt` de quem as embute. Agregados derivados de outras tabelas
+  (`Course.enrollmentCount`) também ficam fora da versão.
+- O inverso também vale: escrita que não muda o read model (cache, como o
+  `zipHash` do repositório) preserva o `updatedAt`.
 - `Date` sobre uma linha que não existe falha com `PreconditionFailed` e
   `updatedAt: null` (412), em `update`, `upsert` e `delete`, não com
-  `NotFound`.
+  `NotFound`. Quando o que falta é a mãe que compõe a chave (o curso de um
+  recurso), a resposta continua `NotFound`.
 - A comparação é feita em milissegundos (`getTime()`), nunca pelo texto
   gravado no SQLite: linhas antigas podem ter o `updatedAt` em outro formato.
 - A regra vale para todo service cujo modelo tem `updatedAt`. `Discipline`
@@ -64,7 +68,13 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
 
 - Uma escrita derivada (recalcular eventos ao mudar o início do curso) muda o
   `updatedAt` e faz uma escrita condicional legítima falhar. O chamador relê e
-  tenta de novo; nunca há sobrescrita silenciosa.
+  tenta de novo; nunca há sobrescrita silenciosa. Escritas que mudam o
+  `updatedAt` de outras linhas:
+  - `course` com `startAt` novo: os eventos do curso cujo horário muda;
+  - `timeSlot` com `day`, `start` ou `duration` novos: os eventos do slot
+    cujo horário muda;
+  - `calendarEvent.delete`: os recursos ligados ao evento;
+  - `repository.delete`: os eventos que citavam o repositório.
 - `rev` continua opaco e gravado pelo cliente. Ele diz quem escreveu por
   último (CLI ou não); `updatedAt` diz se alguém escreveu.
 - `If-Unmodified-Since` não serve: datas HTTP têm resolução de um segundo.
