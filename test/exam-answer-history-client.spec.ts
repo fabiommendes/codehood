@@ -358,7 +358,12 @@ test("opening the page of an attempt that is not in progress removes its local r
 
 	await expect(page.getByRole("textbox")).toHaveCount(0);
 	await expect.poll(() => localRecords(page), POLL).toEqual([]);
-	expect(errors).toEqual([]);
+	/// The reload hides the page, which flushes the pending words; WebKit reports that request, cut off by the navigation, as a page error.
+	expect(
+		errors.filter(
+			(message) => !/answerHistory\.send.*access control/.test(message),
+		),
+	).toEqual([]);
 });
 
 //

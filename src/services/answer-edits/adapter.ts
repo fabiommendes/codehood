@@ -317,6 +317,8 @@ export class AnswerEditAdapter {
 				initialText: entry.latestText,
 				sessionId: this.createSessionId(),
 			});
+			/// Typing before this point happened before the monitor's clock started; it is recorded from here.
+			entry.lastAtMs = Math.max(entry.lastAtMs, this.now());
 		} catch (error) {
 			this.fail(entry, error);
 			return Promise.resolve();
