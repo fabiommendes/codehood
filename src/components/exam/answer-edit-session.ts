@@ -4,10 +4,7 @@ import {
 	type AttemptTransport,
 	browserCoordinatorScheduler,
 } from "@/services/answer-edits/coordinator";
-import {
-	createTextRecoveryStore,
-	openIndexedDbEditStore,
-} from "@/services/answer-edits/storage";
+import { openIndexedDbEditStore } from "@/services/answer-edits/storage";
 
 /// Loaded on demand by the exam page: nothing else imports it, so a page with the monitor off never fetches it.
 
@@ -31,12 +28,10 @@ export async function openAnswerEditSession(options: {
 }): Promise<AnswerEditAdapter> {
 	const { ownerId, attemptId } = options;
 	const store = await openIndexedDbEditStore({ ownerId, indexedDB });
-	const fallback = createTextRecoveryStore({ ownerId, storage: localStorage });
 	const coordinator = new AnswerEditCoordinator({
 		ownerId,
 		attemptId,
 		store,
-		fallback,
 		transport: LOCAL_ONLY,
 		scheduler: browserCoordinatorScheduler(),
 		now: () => Date.now(),

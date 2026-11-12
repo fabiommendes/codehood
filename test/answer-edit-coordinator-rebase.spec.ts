@@ -152,10 +152,6 @@ test.describe("answer edit coordinator rebase: storage failure", () => {
 		const h = rig();
 		h.store.failRead = true;
 		h.store.failCommit = true;
-		h.fallback.failWrite = true;
-		h.fallback.read = () => {
-			throw new Error("localStorage unavailable");
-		};
 		const opened = await h.coordinator.recover(FIELD, "draft");
 		expect(opened.handle.getState().text).toBe("draft");
 		const editor = opened.handle;
@@ -306,17 +302,13 @@ test.describe("answer edit coordinator rebase: hung storage", () => {
 		await h.scheduler.advance(5000);
 		await first;
 		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-			durability: "text-only",
-			savedText: "A",
+			durability: "unavailable",
+			historyGap: true,
 		});
 		h.append("B");
 		const second = h.coordinator.persist();
 		await h.scheduler.advance(5000);
 		await second;
-		expect(
-			h.fallback.read({ attemptId: "attempt", ...FIELD }, 1_800_000_000_000)
-				?.text,
-		).toBe("AB");
 		let delivered = false;
 		const delivery = h.coordinator.flushDelivery().then(() => {
 			delivered = true;

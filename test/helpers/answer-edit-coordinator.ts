@@ -12,8 +12,6 @@ import type {
 	EditStore,
 	FieldRef,
 	LocalEditRecord,
-	TextRecovery,
-	TextRecoveryStore,
 } from "@/services/answer-edits/storage";
 
 export const FIELD = { questionId: "question", field: "answer" };
@@ -136,30 +134,6 @@ export class MemoryEditStore implements EditStore {
 	}
 }
 
-export class MemoryTextStore implements TextRecoveryStore {
-	private readonly records = new Map<string, TextRecovery>();
-	failWrite = false;
-	revoked = false;
-	read(ref: FieldRef, now: number) {
-		const record = this.records.get(key(ref));
-		return this.revoked || !record || record.expiresAt <= now
-			? null
-			: structuredClone(record);
-	}
-	write(ref: FieldRef, recovery: TextRecovery) {
-		if (this.revoked || this.failWrite)
-			throw new Error("Text storage unavailable");
-		this.records.set(key(ref), structuredClone(recovery));
-	}
-	remove(ref: FieldRef) {
-		this.records.delete(key(ref));
-	}
-	revoke() {
-		this.revoked = true;
-		this.records.clear();
-	}
-}
-
 export class LocalTransport implements AttemptTransport {
 	readonly inspections: FieldRef[] = [];
 	readonly requests: Parameters<AttemptTransport["send"]>[0][] = [];
@@ -192,11 +166,10 @@ export class LocalTransport implements AttemptTransport {
 
 export function rig(
 	overrides: Partial<
-		Omit<CoordinatorOptions, "store" | "fallback" | "transport" | "scheduler">
+		Omit<CoordinatorOptions, "store" | "transport" | "scheduler">
 	> & { scheduler?: ManualScheduler } = {},
 ) {
 	const store = new MemoryEditStore();
-	const fallback = new MemoryTextStore();
 	const scheduler = overrides.scheduler ?? new ManualScheduler();
 	const transport = new LocalTransport();
 	const statuses: Readonly<FieldStatus>[] = [];
@@ -206,7 +179,6 @@ export function rig(
 		ownerId: "owner",
 		attemptId: REF.attemptId,
 		store,
-		fallback,
 		scheduler,
 		transport,
 		now: () => EPOCH,
@@ -230,7 +202,6 @@ export function rig(
 		coordinator,
 		monitor,
 		store,
-		fallback,
 		scheduler,
 		transport,
 		statuses,

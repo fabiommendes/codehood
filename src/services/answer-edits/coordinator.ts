@@ -13,8 +13,6 @@ import {
 	type FieldRef,
 	LOCAL_EDIT_TTL_MS,
 	type LocalEditRecord,
-	type TextRecovery,
-	type TextRecoveryStore,
 } from "./storage";
 
 export type AttemptField = Omit<FieldRef, "attemptId">;
@@ -53,7 +51,7 @@ export interface CoordinatorScheduler {
 	schedule(delayMs: number, callback: () => void): () => void;
 }
 export interface FieldStatus extends AttemptField {
-	readonly durability: "pending" | "durable" | "text-only" | "unavailable";
+	readonly durability: "pending" | "durable" | "unavailable";
 	readonly savedText: string | null;
 	readonly historyGap: boolean;
 	readonly delivery: "idle" | "pending" | "sending" | "blocked";
@@ -68,7 +66,6 @@ export interface CoordinatorOptions {
 	readonly attemptId: string;
 	/// The injected stores must be bound exclusively to ownerId.
 	readonly store: EditStore;
-	readonly fallback: TextRecoveryStore;
 	readonly transport: AttemptTransport;
 	readonly scheduler: CoordinatorScheduler;
 	readonly now: () => number;
@@ -197,10 +194,7 @@ export class AnswerEditCoordinator {
 		this.cancelPersist = null;
 		if (this.persistence) return this.persistence;
 		for (const entry of this.fields.values()) {
-			if (
-				entry.status.durability === "text-only" ||
-				entry.status.durability === "unavailable"
-			)
+			if (entry.status.durability === "unavailable")
 				entry.attemptedVersion = -1;
 		}
 		this.persistence = this.persistDirty().finally(() => {
@@ -261,16 +255,8 @@ export class AnswerEditCoordinator {
 		this.revoked = true;
 		this.stopped = true;
 		this.stopCallbacks();
-		/// Both revocations begin synchronously so neither store can be repopulated.
-		const principal = this.options.store.revoke();
-		let fallback: Promise<void>;
-		try {
-			this.options.fallback.revoke();
-			fallback = Promise.resolve();
-		} catch (error) {
-			fallback = Promise.reject(error);
-		}
-		this.revocation = Promise.all([principal, fallback]).then(
+		/// The revocation begins synchronously so the store cannot be repopulated.
+		this.revocation = this.options.store.revoke().then(
 			() => undefined,
 			(error: unknown) => {
 				/// A failed cleanup must be retryable by calling logout again.
@@ -313,13 +299,7 @@ export class AnswerEditCoordinator {
 				readError = errorMessage(error);
 			}
 			this.requireActive();
-			let fallback: TextRecovery | null = null;
 			let gap = (previous?.status.historyGap ?? false) || readError !== null;
-			try {
-				fallback = this.options.fallback.read(ref, this.options.now());
-			} catch {
-				gap = true;
-			}
 			let restored: AnswerEditMonitor | null = null;
 			if (local && !source.handle) {
 				try {
@@ -333,14 +313,6 @@ export class AnswerEditCoordinator {
 				monitor = source.handle;
 				if (local && hasPendingEvidence(local.checkpoint))
 					gap ||= !sameEvidence(local.checkpoint, monitor.exportCheckpoint());
-			} else if (
-				fallback &&
-				(!restored ||
-					fallback.text !== local?.text ||
-					fallback.savedAt >= (local?.savedAt ?? 0))
-			) {
-				gap = true;
-				monitor = this.fresh(fallback.text);
 			} else {
 				monitor = restored ?? this.fresh(source.initialText ?? "");
 			}
@@ -571,11 +543,7 @@ export class AnswerEditCoordinator {
 				outbox: state.inFlight,
 			};
 		} catch (error) {
-			this.recordFailure(entry, version, error, {
-				text: entry.handle.getState().text,
-				savedAt,
-				expiresAt,
-			});
+			this.recordFailure(entry, version, error);
 			return;
 		}
 		try {
@@ -589,65 +557,34 @@ export class AnswerEditCoordinator {
 			);
 			if (this.revoked) return;
 			entry.generation = record.generation;
-			let cleanupError: string | null = null;
-			try {
-				const fallback = this.options.fallback.read(
-					this.ref(entry.field),
-					this.options.now(),
-				);
-				/// A different text may belong to another writer that lost the CAS.
-				if (fallback && fallback.text !== record.text)
-					cleanupError = "Divergent text recovery retained";
-				else if (fallback) this.options.fallback.remove(this.ref(entry.field));
-			} catch (error) {
-				cleanupError = errorMessage(error);
-			}
 			entry.status = {
 				...entry.status,
 				durability: version === entry.version ? "durable" : "pending",
 				savedText: record.text,
-				historyGap: cleanupError !== null,
-				error: cleanupError,
+				historyGap: false,
+				error: null,
 			};
 		} catch (error) {
 			if (this.revoked) return;
-			this.recordFailure(entry, version, error, record);
+			this.recordFailure(entry, version, error);
 			return;
 		}
 		entry.attemptedVersion = version;
 		this.publish(entry);
 	}
 
-	/// Keep only the text in the fallback store and report why the full record was not saved.
+	/// Report why the record was not saved; the history has a gap from here, the answer is unaffected.
 	private recordFailure(
 		entry: RegisteredField,
 		version: number,
 		error: unknown,
-		record: { text: string; savedAt: number; expiresAt: number },
 	): void {
-		try {
-			this.options.fallback.write(this.ref(entry.field), {
-				version: 1,
-				savedAt: record.savedAt,
-				expiresAt: record.expiresAt,
-				text: record.text,
-				historyGap: true,
-			});
-			entry.status = {
-				...entry.status,
-				durability: version === entry.version ? "text-only" : "pending",
-				savedText: record.text,
-				historyGap: true,
-				error: errorMessage(error),
-			};
-		} catch (fallbackError) {
-			entry.status = {
-				...entry.status,
-				durability: "unavailable",
-				historyGap: true,
-				error: errorMessage(fallbackError),
-			};
-		}
+		entry.status = {
+			...entry.status,
+			durability: "unavailable",
+			historyGap: true,
+			error: errorMessage(error),
+		};
 		entry.attemptedVersion = version;
 		this.publish(entry);
 	}

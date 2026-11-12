@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { replayEdits } from "@/services/answer-edits/codec";
-import { AnswerEditCoordinator } from "@/services/answer-edits/coordinator";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 import {
 	deferred,
@@ -147,7 +146,7 @@ test.describe("answer edit coordinator local: durability", () => {
 			"before after",
 		);
 		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-			durability: "text-only",
+			durability: "unavailable",
 			historyGap: true,
 		});
 		expect(await saved(h)).toEqual(previous);
@@ -165,31 +164,6 @@ test.describe("answer edit coordinator local: durability", () => {
 });
 
 test.describe("answer edit coordinator local: persistence cost", () => {
-	test("a successful commit does not rewrite the fallback when none is stored", async () => {
-		const h = await registered();
-		let removals = 0;
-		const remove = h.fallback.remove.bind(h.fallback);
-		h.fallback.remove = (ref) => {
-			removals++;
-			remove(ref);
-		};
-		h.append("typed");
-		await h.coordinator.persist();
-		expect(removals).toBe(0);
-		h.fallback.write(REF, {
-			version: 1,
-			savedAt: EPOCH,
-			expiresAt: EPOCH + 60_000,
-			text: "typed again",
-			historyGap: true,
-		});
-		h.append(" again");
-		await h.coordinator.persist();
-		expect(removals).toBe(1);
-		expect(h.fallback.read(REF, EPOCH)).toBeNull();
-		await h.coordinator.dispose();
-	});
-
 	test("an idle delivery loop does not export checkpoints to measure progress", async () => {
 		const h = await registered();
 		let exports = 0;
@@ -205,40 +179,11 @@ test.describe("answer edit coordinator local: persistence cost", () => {
 });
 
 test.describe("answer edit coordinator local: storage degradation", () => {
-	for (const text of ["draft", ""]) {
-		test(`principal failure recovers ${text === "" ? "empty" : "nonempty"} text with an explicit history gap`, async () => {
-			const h = await registered();
-			h.append("draft");
-			if (text === "") h.clear();
-			h.store.failCommit = true;
-			await h.coordinator.persist();
-			expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-				durability: "text-only",
-				savedText: text,
-				historyGap: true,
-			});
-			expect(h.fallback.read(REF, EPOCH)).toMatchObject({
-				text,
-				historyGap: true,
-			});
-			h.store.failRead = true;
-			const reopened = new AnswerEditCoordinator(h.options);
-			const recovery = await reopened.recover(FIELD, "");
-			expect(recovery.handle.getState().text).toBe(text);
-			await drain();
-			expect(reopened.getStatus(FIELD)).toMatchObject({ historyGap: true });
-			expect(h.transport.inspections).toEqual([REF, REF]);
-			await reopened.dispose();
-			await h.coordinator.dispose();
-		});
-	}
-
 	for (const previous of [null, "earlier"] as const) {
-		test(`both stores failing never claim the current text was saved, with ${previous === null ? "no" : "a prior"} successful save`, async () => {
+		test(`a failing store never claims the current text was saved, with ${previous === null ? "no" : "a prior"} successful save`, async () => {
 			const h = rig();
 			if (previous === null) {
 				h.store.failCommit = true;
-				h.fallback.failWrite = true;
 			}
 			await h.coordinator.register(FIELD, h.monitor);
 			if (previous !== null) {
@@ -246,7 +191,6 @@ test.describe("answer edit coordinator local: storage degradation", () => {
 				await h.coordinator.persist();
 			}
 			h.store.failCommit = true;
-			h.fallback.failWrite = true;
 			expect(() => h.append(" unsaved")).not.toThrow();
 			await h.coordinator.persist();
 			expect(h.coordinator.getStatus(FIELD)).toMatchObject({
@@ -333,7 +277,6 @@ test.describe("answer edit coordinator local: ownership", () => {
 		const record = await saved(h);
 		expect(record.text).toBe("final");
 		expect(h.store.revoked).toBe(false);
-		expect(h.fallback.revoked).toBe(false);
 		expect(h.scheduler.pendingCount).toBe(0);
 		const commits = h.store.commits.length;
 		const statuses = h.statuses.length;
@@ -346,15 +289,8 @@ test.describe("answer edit coordinator local: ownership", () => {
 		expect(h.transport.requests).toHaveLength(0);
 	});
 
-	test("logout revokes both owner stores and fences a commit completing after revocation", async () => {
+	test("logout revokes the owner store and fences a commit completing after revocation", async () => {
 		const h = await registered();
-		h.fallback.write(REF, {
-			version: 1,
-			text: "fallback",
-			historyGap: true,
-			savedAt: EPOCH,
-			expiresAt: EPOCH + 10_000,
-		});
 		const gate = h.store.holdNextCommit();
 		h.append("in flight");
 		const persist = h.coordinator.persist();
@@ -362,14 +298,12 @@ test.describe("answer edit coordinator local: ownership", () => {
 		const logout = h.coordinator.logout();
 		await drain();
 		expect(h.store.revoked).toBe(true);
-		expect(h.fallback.revoked).toBe(true);
 		const statuses = h.statuses.length;
 		gate.resolve();
 		await Promise.all([persist, logout]);
 		h.append(" ignored");
 		await h.scheduler.advance(120_000);
 		expect(await h.store.read(REF, EPOCH)).toBeNull();
-		expect(h.fallback.read(REF, EPOCH)).toBeNull();
 		expect(h.statuses).toHaveLength(statuses);
 		expect(h.scheduler.pendingCount).toBe(0);
 		expect(h.transport.requests).toHaveLength(0);
@@ -409,6 +343,5 @@ test.describe("answer edit coordinator local: ownership", () => {
 		expect(h.store.commits).toHaveLength(commits);
 		expect(h.statuses).toHaveLength(statuses);
 		expect(await h.store.read(REF, EPOCH)).toBeNull();
-		expect(h.fallback.read(REF, EPOCH)).toBeNull();
 	});
 });

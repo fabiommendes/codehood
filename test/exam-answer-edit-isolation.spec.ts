@@ -48,14 +48,6 @@ const FAULTS = {
 			hits.count++;
 			throw quota();
 		};
-		const setItem = Storage.prototype.setItem;
-		Storage.prototype.setItem = function (key, value) {
-			if (String(key).startsWith('["codehood-answer-text"')) {
-				hits.count++;
-				throw quota();
-			}
-			return setItem.call(this, key, value);
-		};
 	},
 	"exception inside the monitor on input": () => {
 		const hits = { count: 0 };

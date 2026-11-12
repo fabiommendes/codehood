@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { replayEdits } from "@/services/answer-edits/codec";
-import {
-	AnswerEditCoordinator,
-	type AttemptTransport,
-	type FieldResult,
-	type ServerFieldState,
+import type {
+	AttemptTransport,
+	FieldResult,
+	ServerFieldState,
 } from "@/services/answer-edits/coordinator";
 import { AnswerEditMonitor } from "@/services/answer-edits/monitor";
 import {
@@ -81,57 +80,6 @@ function partial(request: Request, failure: PartialFailure): FieldResult[] {
 		throw new Error(`Unknown partial failure: ${failure}`);
 	});
 }
-
-test.describe("answer edit coordinator races: divergent fallback ownership", () => {
-	test("a successful writer preserves another coordinator's divergent fallback, and a later open adopts it with a gap", async () => {
-		let now = EPOCH;
-		const h = rig({ now: () => now });
-		const other = new AnswerEditCoordinator({
-			...h.options,
-			createSessionId: () => "other-restored-session",
-		});
-		const otherEditor = editor("other-editor-session");
-		await h.coordinator.register(FIELD, h.monitor);
-		await other.register(FIELD, otherEditor);
-
-		h.append("A");
-		await h.coordinator.persist();
-		now++;
-		append(otherEditor, "B-unique");
-		await other.persist();
-		expect(other.getStatus(FIELD)).toMatchObject({
-			durability: "text-only",
-			savedText: "B-unique",
-			historyGap: true,
-		});
-		const fallback = h.fallback.read(REF, now);
-		expect(fallback).toMatchObject({ text: "B-unique", historyGap: true });
-
-		// A later timestamp does not establish ownership of another tab's draft.
-		now++;
-		h.append("2");
-		await h.coordinator.persist();
-		expect(h.coordinator.getStatus(FIELD)?.durability).toBe("durable");
-		expect((await h.store.read(REF, now))?.text).toBe("A2");
-		expect(h.fallback.read(REF, now)).toEqual(fallback);
-
-		const reopened = new AnswerEditCoordinator({
-			...h.options,
-			createSessionId: () => "reopened-session",
-		});
-		const server = structuredClone(h.transport.server);
-		const recovery = await reopened.recover(FIELD, "");
-		expect(recovery.handle.getState().text).toBe("B-unique");
-		await drain();
-		expect(reopened.getStatus(FIELD)).toMatchObject({ historyGap: true });
-		await reopened.flushDelivery();
-		expect(h.transport.requests).toHaveLength(0);
-		expect(h.transport.server).toEqual(server);
-		await reopened.dispose();
-		await other.dispose();
-		await h.coordinator.dispose();
-	});
-});
 
 test.describe("answer edit coordinator races: detach handoff", () => {
 	test("recovery does not wait for a held detach commit and its new editor can persist and deliver", async () => {
@@ -379,13 +327,6 @@ test.describe("answer edit coordinator races: logout", () => {
 	for (const cleanupFails of [false, true]) {
 		test(`an inspection returned after ${cleanupFails ? "failed cleanup at" : "successful"} logout cannot change the field or its status`, async () => {
 			const h = rig();
-			h.fallback.write(REF, {
-				version: 1,
-				text: "private fallback",
-				historyGap: true,
-				savedAt: EPOCH,
-				expiresAt: EPOCH + 60_000,
-			});
 			const inspection = deferred<ServerFieldState>();
 			const entered = deferred<void>();
 			h.transport.inspect = async () => {
@@ -393,10 +334,13 @@ test.describe("answer edit coordinator races: logout", () => {
 				return inspection.promise;
 			};
 			const cleanupError = new DOMException("Cleanup denied", "SecurityError");
-			if (cleanupFails)
-				h.fallback.revoke = () => {
+			if (cleanupFails) {
+				const revoke = h.store.revoke.bind(h.store);
+				h.store.revoke = async () => {
+					await revoke();
 					throw cleanupError;
 				};
+			}
 			await h.coordinator.recover(FIELD, "");
 			await entered.promise;
 			const logout = h.coordinator.logout();
@@ -418,11 +362,11 @@ test.describe("answer edit coordinator races: logout", () => {
 		});
 	}
 
-	test("repeating a rejected coordinator logout retries fallback cleanup", async () => {
+	test("repeating a rejected coordinator logout retries the store cleanup", async () => {
 		const h = rig();
 		const failure = new DOMException("Cleanup denied", "SecurityError");
 		let cleanupCalls = 0;
-		h.fallback.revoke = () => {
+		h.store.revoke = async () => {
 			cleanupCalls++;
 			if (cleanupCalls === 1) throw failure;
 		};

@@ -17,14 +17,6 @@ export interface LocalEditRecord {
 	readonly outbox: PendingEditBatch | null;
 }
 
-export interface TextRecovery {
-	readonly version: 1;
-	readonly savedAt: number;
-	readonly expiresAt: number;
-	readonly text: string;
-	readonly historyGap: true;
-}
-
 /** A session-scoped store rejects stale CAS writes and all writes after revocation. */
 export interface EditStore {
 	read(ref: FieldRef, now: number): Promise<LocalEditRecord | null>;
@@ -35,13 +27,6 @@ export interface EditStore {
 	): Promise<void>;
 	remove(ref: FieldRef): Promise<void>;
 	revoke(): Promise<void>;
-}
-
-export interface TextRecoveryStore {
-	read(ref: FieldRef, now: number): TextRecovery | null;
-	write(ref: FieldRef, recovery: TextRecovery): void;
-	remove(ref: FieldRef): void;
-	revoke(): void;
 }
 
 export const LOCAL_EDIT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -90,97 +75,6 @@ export function openIndexedDbEditStore(options: {
 				);
 		};
 	});
-}
-
-/**
- * Keep only bounded text and gap metadata when durable history is unavailable.
- *
- * Records live under a key derived from the owner's current token. Revoking rotates
- * the token and removes the old key; a writer that finds the token changed after its
- * `setItem` removes its own write and fails. A writer suspended past that check and
- * killed before compensating leaves text under the old key that no new session reads.
- */
-export function createTextRecoveryStore(options: {
-	ownerId: string;
-	storage: Storage;
-	keyPrefix?: string;
-}): TextRecoveryStore {
-	const key = namespace(
-		options.keyPrefix ?? "codehood-answer-text",
-		options.ownerId,
-	);
-	const { storage } = options;
-	const tokenKey = JSON.stringify([key, REVOCATION_KEY]);
-	let token = storage.getItem(tokenKey);
-	if (token === null) {
-		token = crypto.randomUUID();
-		storage.setItem(tokenKey, token);
-	}
-	if (token === "" || token === REVOCATION_KEY)
-		throw new TypeError("Invalid text recovery token");
-	const dataKey = JSON.stringify([key, token]);
-	let revoked = false;
-	const requireActive = (): void => {
-		if (revoked || storage.getItem(tokenKey) !== token) {
-			revoked = true;
-			throw new Error("Text recovery store is revoked");
-		}
-	};
-	const save = (records: Record<string, TextRecovery>): void => {
-		requireActive();
-		storage.setItem(dataKey, JSON.stringify(records));
-		/// Storage cannot fence a suspended writer, so compensate when it resumes.
-		if (storage.getItem(tokenKey) !== token) {
-			revoked = true;
-			storage.removeItem(dataKey);
-			throw new Error("Text recovery store is revoked");
-		}
-	};
-	const entries = (): Record<string, TextRecovery> => {
-		const json = storage.getItem(dataKey);
-		return json === null
-			? {}
-			: (object(JSON.parse(json)) as Record<string, TextRecovery>);
-	};
-	return {
-		read(ref, now) {
-			requireActive();
-			requireFinite(now, "now");
-			const id = fieldKey(ref);
-			const records = entries();
-			if (!Object.hasOwn(records, id)) return null;
-			const recovery = textRecovery(records[id]);
-			if (recovery.expiresAt <= now) {
-				delete records[id];
-				save(records);
-				return null;
-			}
-			return recovery;
-		},
-		write(ref, recovery) {
-			requireActive();
-			const id = fieldKey(ref);
-			const record = textRecovery(recovery);
-			const records = entries();
-			records[id] = record;
-			save(records);
-		},
-		remove(ref) {
-			requireActive();
-			const id = fieldKey(ref);
-			const records = entries();
-			delete records[id];
-			save(records);
-		},
-		revoke() {
-			revoked = true;
-			/// Rotate before erasing so a late writer fails its post-write check. A
-			/// repeated call only retries the erasure and never rotates a newer token.
-			if (storage.getItem(tokenKey) === token)
-				storage.setItem(tokenKey, crypto.randomUUID());
-			storage.removeItem(dataKey);
-		},
-	};
 }
 
 function indexedDbHandle(
@@ -383,13 +277,6 @@ function bounded<T>(record: T): T {
 	)
 		throw new RangeError("Local record exceeds the byte limit");
 	return record;
-}
-
-function textRecovery(value: unknown): TextRecovery {
-	const data = object(value);
-	if (data.historyGap !== true)
-		throw new TypeError("Text recovery must mark a history gap");
-	return bounded({ ...metadata(data), historyGap: true });
 }
 
 function localRecord(value: unknown): LocalEditRecord {

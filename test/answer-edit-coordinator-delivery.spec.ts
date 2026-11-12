@@ -96,7 +96,7 @@ test.describe("answer edit coordinator delivery: permanent commit failure", () =
 		}
 		expect(h.monitor.getState().hasUnacknowledgedBatch).toBe(false);
 		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-			durability: "text-only",
+			durability: "unavailable",
 			historyGap: true,
 		});
 		h.store.failCommit = false;

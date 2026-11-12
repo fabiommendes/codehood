@@ -54,18 +54,12 @@ async function startSession(mode: "accepted" | "abort-ack" | "lost-ack") {
 		indexedDB,
 		databasePrefix: "retention-browser",
 	});
-	const fallback = api.createTextRecoveryStore({
-		ownerId: "retention-owner",
-		storage: localStorage,
-		keyPrefix: "retention-browser",
-	});
 	const requests: Parameters<AttemptTransport["send"]>[0][] = [];
 	const originalTransaction = IDBDatabase.prototype.transaction;
 	const coordinator = new api.AnswerEditCoordinator({
 		ownerId: "retention-owner",
 		attemptId: "attempt",
 		store,
-		fallback,
 		scheduler: new api.ManualScheduler(),
 		now: () => epoch,
 		monotonicNow: () => 900_000,
@@ -243,11 +237,6 @@ test("renderer crash preserves an unacknowledged outbox for authenticated recove
 				ownerId: "retention-owner",
 				attemptId: ref.attemptId,
 				store,
-				fallback: api.createTextRecoveryStore({
-					ownerId: "retention-owner",
-					storage: localStorage,
-					keyPrefix: "retention-browser",
-				}),
 				scheduler: new api.ManualScheduler(),
 				now: () => now,
 				monotonicNow: () => 0,
@@ -311,16 +300,10 @@ test("oversized pending history is sent without durable primary storage and then
 			indexedDB,
 			databasePrefix: "retention-load",
 		});
-		const fallback = api.createTextRecoveryStore({
-			ownerId: "load-owner",
-			storage: localStorage,
-			keyPrefix: "retention-load",
-		});
 		const coordinator = new api.AnswerEditCoordinator({
 			ownerId: "load-owner",
 			attemptId: "attempt",
 			store,
-			fallback,
 			scheduler: new api.ManualScheduler(),
 			createSessionId: () => "saturation-coordinator",
 			now: () => epoch + atMs,
@@ -398,7 +381,6 @@ test("oversized pending history is sent without durable primary storage and then
 			sends,
 			durabilityAtSend,
 			status: coordinator.getStatus(field),
-			fallback: fallback.read(ref, epoch + atMs),
 			storedText: stored?.text,
 			storedOutbox: stored?.outbox,
 			monitorPending: monitor.collect(),
@@ -420,7 +402,6 @@ test("oversized pending history is sent without durable primary storage and then
 		historyGap: false,
 		savedText: "Resposta final é 🙂",
 	});
-	expect(result.fallback).toBeNull();
 	expect(result.storedText).toBe("Resposta final é 🙂");
 	expect(result.storedOutbox).toBeNull();
 	expect(result.storedBytes).toBeLessThan(MAX_LOCAL_RECORD_BYTES);

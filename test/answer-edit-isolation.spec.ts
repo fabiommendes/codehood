@@ -80,32 +80,10 @@ async function mount(options: { scenario: Scenario; ceilingMs: number }) {
 							: Promise.reject(new Error("IndexedDB is gone")),
 			}) as typeof realStore)
 		: realStore;
-	let failWrites = false;
-	const storage = {
-		get length() {
-			return localStorage.length;
-		},
-		key: (index: number) => localStorage.key(index),
-		clear: () => localStorage.clear(),
-		getItem: (key: string) => localStorage.getItem(key),
-		removeItem: (key: string) => localStorage.removeItem(key),
-		setItem: (key: string, value: string) => {
-			if (failWrites) throw quota();
-			localStorage.setItem(key, value);
-		},
-	} as Storage;
-	const fallback = api.createTextRecoveryStore({
-		ownerId: "owner",
-		storage,
-		keyPrefix: `isolation-${scenario}`,
-	});
-	failWrites = has("store-quota");
-
 	const coordinator = new api.AnswerEditCoordinator({
 		ownerId: "owner",
 		attemptId: "attempt",
 		store,
-		fallback,
 		scheduler: api.browserCoordinatorScheduler(),
 		now: () => Date.now(),
 		monotonicNow: () => performance.now(),

@@ -275,54 +275,7 @@ test.describe("answer edit coordinator recovery: server authority and history", 
 	}
 });
 
-test.describe("answer edit coordinator recovery: fallback, expiry and deadline", () => {
-	for (const text of ["newer fallback", ""]) {
-		test(`newer ${text === "" ? "empty" : "nonempty"} text fallback takes precedence over an older readable checkpoint with an explicit gap`, async () => {
-			const { h } = await seed();
-			h.fallback.write(REF, {
-				version: 1,
-				savedAt: EPOCH + 1,
-				expiresAt: EPOCH + 60_000,
-				text,
-				historyGap: true,
-			});
-			const reopened = new AnswerEditCoordinator({
-				...h.options,
-				now: () => EPOCH + 2,
-			});
-			const result = await opened(reopened);
-			expect(result.handle.getState().text).toBe(text);
-			expect(reopened.getStatus(FIELD)).toMatchObject({
-				savedText: "old",
-				historyGap: true,
-			});
-			await reopened.flushDelivery();
-			expect(h.transport.requests).toHaveLength(0);
-			expect((await record(h)).text).toBe(text);
-			await reopened.dispose();
-		});
-	}
-
-	for (const fallbackAge of ["older", "equally old"] as const) {
-		test(`an ${fallbackAge} fallback with the checkpoint's text keeps the checkpoint text`, async () => {
-			const { h } = await seed({ savedAt: EPOCH + 2 });
-			h.fallback.write(REF, {
-				version: 1,
-				savedAt: fallbackAge === "older" ? EPOCH : EPOCH + 2,
-				expiresAt: EPOCH + 60_000,
-				text: "old",
-				historyGap: true,
-			});
-			const reopened = new AnswerEditCoordinator({
-				...h.options,
-				now: () => EPOCH + 3,
-			});
-			const result = await opened(reopened);
-			expect(result.handle.getState().text).toBe("old");
-			await reopened.dispose();
-		});
-	}
-
+test.describe("answer edit coordinator recovery: expiry and deadline", () => {
 	test("custom TTL is written to the committed record and expires exactly at expiresAt", async () => {
 		const h = rig({ ttlMs: 2000 });
 		await h.coordinator.register(FIELD, h.monitor);
@@ -342,47 +295,6 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 		await reopened.flushDelivery();
 		expect(h.transport.requests).toHaveLength(0);
 		await reopened.dispose();
-	});
-
-	test("expired fallback is ignored even when the principal store is unavailable", async () => {
-		const h = rig();
-		h.store.failRead = true;
-		h.fallback.write(REF, {
-			version: 1,
-			savedAt: EPOCH - 1000,
-			expiresAt: EPOCH,
-			text: "expired",
-			historyGap: true,
-		});
-		const result = await opened(h.coordinator, "from the answer");
-		expect(result.handle.getState().text).toBe("from the answer");
-		expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-			historyGap: true,
-			savedText: null,
-		});
-		await h.coordinator.dispose();
-	});
-
-	test("an unreadable fallback still yields a handle, with a gap and no fallback writes", async () => {
-		const h = rig();
-		let fallbackWrites = 0;
-		h.fallback.read = () => {
-			throw new Error("Fallback read denied");
-		};
-		h.fallback.write = () => {
-			fallbackWrites++;
-		};
-		try {
-			const result = await opened(h.coordinator, "draft");
-			expect(result.handle.getState().text).toBe("draft");
-			expect(h.coordinator.getStatus(FIELD)).toMatchObject({
-				historyGap: true,
-			});
-			await h.coordinator.persist();
-			expect(fallbackWrites).toBe(0);
-		} finally {
-			await h.coordinator.dispose();
-		}
 	});
 
 	test("post-deadline recovery preserves local history and blocks every send", async () => {
@@ -416,7 +328,7 @@ test.describe("answer edit coordinator recovery: fallback, expiry and deadline",
 	});
 });
 
-test("an invalid checkpoint becomes a visible text-only status instead of a rejection", async () => {
+test("an invalid checkpoint becomes a visible unavailable status instead of a rejection", async () => {
 	const h = rig();
 	await h.coordinator.register(FIELD, h.monitor);
 	await h.coordinator.persist();
@@ -429,7 +341,7 @@ test("an invalid checkpoint becomes a visible text-only status instead of a reje
 	await h.coordinator.persist();
 	await h.coordinator.flush();
 	const status = h.coordinator.getStatus(FIELD);
-	expect(status?.durability).toBe("text-only");
+	expect(status?.durability).toBe("unavailable");
 	expect(status?.historyGap).toBe(true);
 	expect(status?.error).toMatch(/checkpoint/i);
 	await h.coordinator.dispose();
