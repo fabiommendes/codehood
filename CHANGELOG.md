@@ -13,10 +13,9 @@
   injetado e storage browser real, sem endpoint ou integração com o salvamento
   de provas. Adaptador de isolamento (`AnswerEditAdapter`): nenhuma falha do
   monitor, do storage ou do transporte atrasa ou impede digitar, salvar e
-  entregar (teste de injeção de falha no navegador). Ligado à página de prova
-  atrás de uma chave desligada por padrão (`localStorage["codehood.answerHistory"]
-  = "on"`), com carga adiada do código e histórico só local, sem endpoint; a
-  mesma injeção de falha roda contra a página real (`exam-answer-edit-isolation`).
+  entregar (teste de injeção de falha no navegador). Ligado à página de prova,
+  com carga adiada do código; a mesma injeção de falha roda contra a página real
+  (`exam-answer-edit-isolation`).
   A página registra a causa de cada edit (digitação, colagem, exclusão, desfazer,
   refazer, composição) a partir do `beforeinput` da textarea e dos user events do
   CodeMirror, sem mudar o mdq; tipos desconhecidos e arrasto são `other`
@@ -27,6 +26,19 @@
   O coordenador nunca bloqueia o campo: abre sempre com um handle, reconcilia
   com o servidor em segundo plano e, em divergência, adota nova base com lacuna
   registrada em vez de exigir escolha do aluno.
+- Histórico de edição de respostas abertas, de ponta a ponta. O navegador envia
+  os lotes do monitor ao servidor (Actions `answerHistory.inspect` e `send`),
+  que os valida por replay e os grava em tabelas próprias, sem tocar em
+  `Submission`, com limites, janela de atraso de 30 s e idempotência; lacunas
+  chegam como marcadores. A chave é por prova (`Exam.answerHistory`): ligada por
+  padrão em `EXAM` e `QUIZ`, desligada em `PRACTICE`, e o instrutor a muda por um
+  toggle na página da prova (`exam.setAnswerHistory`); desligar alcança as páginas
+  abertas e o servidor recusa lotes depois disso. A chave local de
+  desenvolvimento foi removida: sem a chave da prova, nenhum código do monitor é
+  carregado. A página da tentativa do instrutor mostra o resumo por resposta
+  (tempo ativo, colagens, lacunas, horários de recebimento); o aluno não vê o
+  histórico. Nenhuma falha do histórico afeta salvar ou entregar. Spec:
+  `dev/specs/to-review/historico-de-edicao-no-servidor.md`.
 - Ponte JSON-RPC `rest.batch` para operações REST JSON com verbo homogêneo,
   execução sequencial e resultados individuais, sem HTTP interno ou transação
   global. Reutiliza schemas, handlers e autorização do REST e limita tamanho

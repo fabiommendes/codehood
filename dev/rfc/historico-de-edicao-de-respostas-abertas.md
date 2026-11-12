@@ -131,16 +131,33 @@ Nenhum aluno perde a prova por problema técnico do monitor.
   lança em toda chamada, o storage falha e o transporte fica pendurado ou devolve
   erro, e mesmo assim o aluno digita, salva e entrega.
 
+### Decidido em 2026-11-12
+
+- Chave (R6): `Exam.answerHistory Boolean?`, com o desenho de `allowCodeRun`. Valor
+  efetivo: o gravado, ou, com `null`, ligado em `EXAM` e `QUIZ` e desligado em
+  `PRACTICE`. É estado do servidor (ADR 0011): não existe no frontmatter nem no
+  CLI. Só muda pela Action `exam.setAnswerHistory`, pelo toggle da página da prova,
+  para quem tem `course.update-contents`. Não há "formulário da prova".
+- A chave local `localStorage["codehood.answerHistory"]` foi removida. A página
+  recebe o valor efetivo por prop; sem ele, nenhum código do monitor é carregado.
+- Chave desligada: o servidor recusa lotes, inclusive os coletados antes do
+  desligamento e enviados depois, e o histórico do aluno termina numa lacuna. O
+  histórico gravado antes fica.
+- Os limites de lote e de tentativa (R17, R18 da spec) ficam como estão. A conta
+  de `byteCount`, que inclui o `snapshot`, e a meta de 50 ms para o maior lote
+  ficam registradas como conhecidas. Log da remoção do histórico e comando de
+  estatísticas virão em trabalho separado.
+
 ### Estado das regras R1 a R7
 
 | Regra | Estado |
 | :---- | :----- |
-| R1 | Pendente: depende do endpoint do histórico, que não existe. Hoje nada do monitor toca `Submission`. |
-| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Ligada a `ExamAttempt.tsx` (`recordEdit`) atrás da chave local, só para questões `essay`. |
+| R1 | Implementada: o histórico vive em tabelas próprias, gravadas por `AnswerEditService.append`; nada do monitor toca `Submission`. |
+| R2 | Implementada e testada em `adapter.ts` (specs `answer-edit-adapter` e `answer-edit-isolation`). Ligada a `ExamAttempt.tsx` (`recordEdit`) pela chave da prova, só para questões `essay`. |
 | R3 | Implementada e testada: `attach` e `input` nunca esperam e o `open` roda adiado. |
-| R4 | Implementada e testada: `flushFinal` resolve no teto (3 s por padrão). Falta o servidor aceitar lote atrasado. |
+| R4 | Implementada e testada: `flushFinal` resolve no teto (3 s por padrão). O servidor aceita lote atrasado numa janela de 30 s (R14 da spec). |
 | R5 | Implementada: o coordenador rebaseia sozinho e nada do monitor aparece para o aluno. A lacuna só é mostrada ao revisor, quando houver tela. |
-| R6 | Implementada e testada: `AnswerEditAdapter.disable()` e `enabled: false`. A página liga o monitor só com `localStorage["codehood.answerHistory"] = "on"`; falta o campo por prova em `Exam` e o aviso às páginas abertas (ver "Decidido em 2026-11-11"). |
+| R6 | Implementada e testada: `AnswerEditAdapter.disable()`, `enabled: false`, campo `Exam.answerHistory` e aviso às páginas abertas pela resposta de `exam.answer` e pelo histórico. A chave local foi removida; a página só liga o monitor com a chave da prova. |
 | R7 | Implementada e testada em `test/answer-edit-isolation.spec.ts` com um `<textarea>` ligado como a página de prova seria. Repetida contra a página real em `test/exam-answer-edit-isolation.spec.ts` (IndexedDB que lança, que pendura, cota excedida, exceção no monitor, chunk que não carrega, remontagem do campo no prazo, reload). |
 
 ### Contrato do adaptador

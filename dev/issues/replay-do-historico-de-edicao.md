@@ -19,6 +19,6 @@ Lacunas aparecem como trechos não reproduzíveis, sem edições fabricadas. O r
 lê lotes paginados (ver "Banco de dados" no RFC) e não carrega todos os edits na
 consulta normal de correção.
 
-Depende de `dev/issues/historico-local-sem-leitura-na-prova.md` (endpoint e
-resumo). O histórico não prova autoria nem colagem; a tela não deve sugerir
+Depende do endpoint e do resumo do histórico (spec
+`dev/specs/to-review/historico-de-edicao-no-servidor.md`). O histórico não prova autoria nem colagem; a tela não deve sugerir
 precisão que os dados não têm (ver "Privacidade e interpretação" no RFC).

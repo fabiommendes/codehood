@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [exam, answer-edits, grading, monitoring]
 relatedTo: [historico-de-edicao-de-respostas-abertas, historico-de-edicao-progresso, response-service, submission-service, exam-service]
 created: 2026-11-12
@@ -710,6 +710,11 @@ paralelo.
   real (só o modelo, com sensibilidade de 500 a 1.200 edits por hora); o custo do
   monitor por tecla e da persistência local no navegador; o HTML da página do
   instrutor com histórico criado pelo `append` (foi criado por SQL).
+
+  **Decisão (2026-11-12).** Os limites de R17 e R18 ficam como estão por enquanto.
+  A conta de `byteCount`, que inclui o `snapshot`, e a meta de 50 ms para o maior
+  lote ficam registradas como conhecidas, sem mudança. Um log da remoção do
+  histórico e um comando de estatísticas virão em trabalho separado.
 - T8. Ligar. Remover `ANSWER_HISTORY_SWITCH` de `ExamAttempt.tsx` (a partir daqui a
   única chave é a da prova, R30), atualizar a tabela "Estado das regras" e a
   seção "Decidido" do RFC com as decisões de 2026-11-12, apagar as issues
