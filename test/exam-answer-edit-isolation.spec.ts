@@ -104,7 +104,11 @@ type Fault = keyof typeof FAULTS;
 /// A student in an open attempt at an exam with one text essay, with the history switch on.
 async function setup(
 	page: Page,
-	options: { secondsLeft?: number; switchOn?: boolean } = {},
+	options: {
+		secondsLeft?: number;
+		switchOn?: boolean;
+		withShortAnswer?: boolean;
+	} = {},
 ) {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create();
@@ -127,13 +131,32 @@ async function setup(
 		},
 		FULL_ACCESS,
 	);
+	if (options.withShortAnswer) {
+		await db.question.create(
+			{
+				status: "PUBLISHED",
+				version: "1",
+				course: course.id,
+				slug: "short",
+				question: {
+					type: "short-answer",
+					stem: "Name a river.",
+					tags: [],
+					accept: ["Amazon"],
+				},
+			},
+			FULL_ACCESS,
+		);
+	}
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: "isolation-exam",
 		type: "EXAM",
 		status: "ONGOING",
 		duration: options.secondsLeft === undefined ? undefined : { minutes: 1 },
-		questions: [{ slug: "text" }],
+		questions: options.withShortAnswer
+			? [{ slug: "text" }, { slug: "short" }]
+			: [{ slug: "text" }],
 	});
 	const attempt = await db.response.create(
 		{ course: course.id, exam: exam.slug, author: student.username },
@@ -277,6 +300,25 @@ test("with the switch on, the history is recorded in this browser", async ({
 	await expect.poll(() => recordedTexts(page)).toContain(TYPED);
 	await submit(page);
 	await expect.poll(() => finished(s)).toBe(true);
+	expect(errors).toEqual([]);
+});
+
+test("the history follows the essay answer and not the short answer", async ({
+	page,
+}) => {
+	const s = await setup(page, { withShortAnswer: true });
+	const errors = watchErrors(page);
+	await page.goto(s.url);
+	const boxes = page.getByRole("textbox");
+	await expect(boxes).toHaveCount(2);
+	await boxes.nth(1).pressSequentially("Nile short", { delay: 20 });
+	await boxes.nth(0).pressSequentially("essay words", { delay: 20 });
+
+	await expect.poll(() => recordedTexts(page)).toContain("essay words");
+	/// Let the monitor drain whatever else it might have queued.
+	await page.waitForTimeout(500);
+	const texts = await recordedTexts(page);
+	expect(texts.filter((text) => text.includes("Nile"))).toEqual([]);
 	expect(errors).toEqual([]);
 });
 

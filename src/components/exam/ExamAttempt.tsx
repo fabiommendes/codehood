@@ -404,13 +404,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	let history: AnswerEditAdapter | null = null;
 	let historyStopped = false;
 
-	/// The questions whose typed answer the history follows.
+	/// The questions whose typed answer the history follows: essays, which include code essays.
 	const historyQuestions = () =>
-		props.questions.filter(
-			(entry) =>
-				entry.question.type === "essay" ||
-				entry.question.type === "short-answer",
-		);
+		props.questions.filter((entry) => entry.question.type === "essay");
 
 	/// Runs `action` on the history adapter, swallowing any failure: the history may lose edits, never hold up an answer.
 	function withHistory(action: (adapter: AnswerEditAdapter) => void): void {
@@ -425,7 +421,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 	/// Tells the history the editor of `slug` now holds `edited`.
 	function recordEdit(slug: string, type: string, edited: AnswerPayload): void {
-		if (!history || (type !== "essay" && type !== "short-answer")) return;
+		if (!history || type !== "essay") return;
 		const text = edited ?? "";
 		if (typeof text !== "string") return;
 		withHistory((adapter) =>
