@@ -29,7 +29,10 @@ export async function loadCourse(
 ): Promise<LoadCourseResult> {
 	const actor = Astro.locals.actor;
 	if (!actor) {
-		return { redirect: Astro.redirect("/login") };
+		const next = `${Astro.url.pathname}${Astro.url.search}`;
+		return {
+			redirect: Astro.redirect(`/login?next=${encodeURIComponent(next)}`),
+		};
 	}
 
 	const parsed = courseSegment ? parseCourseSegment(courseSegment) : null;

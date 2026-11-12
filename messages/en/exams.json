@@ -118,6 +118,11 @@
 	"exams_attempt_points_label": "points",
 	"exams_attempt_points_value": "{points}/100",
 	"exams_attempt_save_error": "Could not save this answer: {message}. It will be retried automatically.",
+	"exams_attempt_save_error_unknown": "Could not save this answer. It will be retried automatically.",
+	"exams_attempt_session_lost": "Your session ended. Log in again in another tab; your answers stay on this page and will be sent.",
+	"exams_attempt_session_lost_link": "Log in in a new tab",
+	"exams_attempt_copy_unsent": "Copy the unsent answers",
+	"exams_attempt_copy_done": "Copied",
 	"exams_attempt_submit_title": [
 		{
 			"declarations": ["input type"],

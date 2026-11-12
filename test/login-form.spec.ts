@@ -27,3 +27,17 @@ test("wrong credentials without JS: form alert, login kept, password and next ca
 	await page.getByRole("button", { name: "Log in" }).click();
 	await expect(page).toHaveURL(/\/courses$/);
 });
+
+for (const next of [
+	"https://evil.example/",
+	"//evil.example/",
+	"/\\evil.example",
+	"javascript:alert(1)",
+]) {
+	test(`next=${next} is not honoured: the form carries / instead`, async ({
+		page,
+	}) => {
+		await page.goto(`/login?next=${encodeURIComponent(next)}`);
+		await expect(page.locator("input[name=next]")).toHaveValue("/");
+	});
+}

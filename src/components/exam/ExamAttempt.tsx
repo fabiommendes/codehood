@@ -101,6 +101,9 @@ const SAVE_DELAY_MS = 500;
 /// How long a save may stay unanswered before it counts as a failed connection.
 const SAVE_TIMEOUT_MS = 15_000;
 
+/// The shortest time between two prompt retries triggered by the student coming back to a tab whose session ended.
+const SESSION_KICK_MIN_MS = 5000;
+
 /// The local storage key that turns the edit history of typed answers on; off unless it holds "on".
 const ANSWER_HISTORY_SWITCH = "codehood.answerHistory";
 
@@ -280,6 +283,9 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	const [closing, setClosing] = createSignal(false);
 	// The question numbers whose answers never reached the server at the deadline.
 	const [undelivered, setUndelivered] = createSignal<number[]>([]);
+	/// Set while the server refuses saves because the session ended; cleared by the next save that succeeds.
+	const [sessionLost, setSessionLost] = createSignal(false);
+	const [copied, setCopied] = createSignal(false);
 
 	function setSaveError(slug: string, message: string | null): void {
 		setSaveErrors((current) => {
@@ -325,21 +331,29 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 				},
 				() => {},
 			);
-			const message = await withTimeout(request, SAVE_TIMEOUT_MS).then(
+			const outcome = await withTimeout(request, SAVE_TIMEOUT_MS).then(
 				({ data, error }) => {
 					if (data) {
 						setSkew(measureClockOffset(data.serverNow, sentAt, Date.now()));
 						if (data.answerHistory === false) switchHistoryOff();
 					}
-					return error ? errorMessage(error) : null;
+					return {
+						message: error ? errorMessage(error) : null,
+						unauthorized: error?.code === "UNAUTHORIZED",
+					};
 				},
 				() => {
 					gaveUp = true;
-					return m.exams_attempt_connection_failed();
+					return {
+						message: m.exams_attempt_connection_failed(),
+						unauthorized: false,
+					};
 				},
 			);
+			const { message } = outcome;
 			if (message === null) {
 				failures = 0;
+				setSessionLost(false);
 				setSaveError(slug, null);
 				setSavedAt((current) => ({ ...current, [slug]: serverNow() }));
 				setFailingSince(({ [slug]: _ok, ...rest }) => rest);
@@ -353,6 +367,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			if (!pending.has(slug) && dispatched.get(slug) === send) {
 				pending.set(slug, payload);
 			}
+			if (outcome.unauthorized) setSessionLost(true);
 			setSaveError(slug, message);
 			setFailingSince((current) => ({
 				...current,
@@ -406,6 +421,19 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		if (retryTimer !== undefined) clearTimeout(retryTimer);
 		retryTimer = undefined;
 		failures = 0;
+		if (kind() === "in-progress") void flush();
+	}
+
+	/// When the last prompt retry for a lost session ran, which keeps a tab flipping back and forth from retrying in a storm.
+	let lastSessionKick = 0;
+
+	/// Retries the pending saves now when the session is lost and the student returns to this tab, at most once every few seconds.
+	function kickSessionRetry(): void {
+		if (document.visibilityState === "hidden" || !sessionLost()) return;
+		if (Date.now() - lastSessionKick < SESSION_KICK_MIN_MS) return;
+		lastSessionKick = Date.now();
+		if (retryTimer !== undefined) clearTimeout(retryTimer);
+		retryTimer = undefined;
 		if (kind() === "in-progress") void flush();
 	}
 
@@ -551,6 +579,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 
 	function onVisibilityChange(): void {
 		if (document.visibilityState === "hidden") flushHistoryNow();
+		else kickSessionRetry();
 	}
 
 	/// Waits for the history's last flush, then erases its local copy, all within one bound; never fails.
@@ -718,6 +747,27 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			unsaved().has(entry.slug) ? [index + 1] : [],
 		);
 
+	/// Puts the unsent answers on the clipboard as plain text, a question label above each answer.
+	async function copyUnsent(): Promise<void> {
+		const text = props.questions
+			.flatMap((entry, index) => {
+				if (!unsaved().has(entry.slug)) return [];
+				const answer = answers()[entry.slug];
+				const body =
+					typeof answer === "string" ? answer : JSON.stringify(answer ?? "");
+				return [
+					`${m.exams_attempt_question_label({ number: index + 1 })}\n${body}`,
+				];
+			})
+			.join("\n\n");
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+		} catch {
+			setCopied(false);
+		}
+	}
+
 	/// Saves the draft of every code question whose draft is newer than its saved answer.
 	function keepNewerDrafts(): void {
 		if (Object.keys(conflicts()).length === 0) return;
@@ -775,12 +825,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		try {
 			const saved = await flush();
 			if (!saved) {
-				setFailure(m.exams_attempt_save_failed());
+				// A lost session has its own notice; "fix the errors" would mislead.
+				if (!sessionLost()) setFailure(m.exams_attempt_save_failed());
 			} else {
 				// The history flushes in parallel and is waited for only up to its own ceiling.
 				const historyFlushed = flushHistoryFinal();
 				const { error } = await actions.exam.finish(target);
-				if (error) setFailure(errorMessage(error));
+				if (error?.code === "UNAUTHORIZED") setSessionLost(true);
+				else if (error) setFailure(errorMessage(error));
 				// The server decides what follows: awaiting grading, or the results.
 				else {
 					clearDrafts();
@@ -808,11 +860,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		onCleanup(() => clearInterval(interval));
 		window.addEventListener("beforeunload", warnBeforeUnload);
 		window.addEventListener("online", retryNow);
+		window.addEventListener("focus", kickSessionRetry);
 		window.addEventListener("pagehide", flushHistoryNow);
 		document.addEventListener("visibilitychange", onVisibilityChange);
 		onCleanup(() => {
 			window.removeEventListener("beforeunload", warnBeforeUnload);
 			window.removeEventListener("online", retryNow);
+			window.removeEventListener("focus", kickSessionRetry);
 			window.removeEventListener("pagehide", flushHistoryNow);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
 		});
@@ -924,6 +978,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 											numbers: questionList(undelivered()),
 										})}
 									</p>
+									<button
+										type="button"
+										class="btn btn-sm btn-outline self-start"
+										onClick={() => void copyUnsent()}
+									>
+										{copied()
+											? m.exams_attempt_copy_done()
+											: m.exams_attempt_copy_unsent()}
+									</button>
 								</Show>
 							</Show>
 						}
@@ -950,6 +1013,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 							saving={unsaved().size > 0}
 							busy={busy()}
 							onSubmit={() => dialog?.showModal()}
+							notice={
+								<Show when={sessionLost()}>
+									<SessionLostNotice
+										next={`${window.location.pathname}${window.location.search}`}
+									/>
+								</Show>
+							}
 						/>
 					</Show>
 
@@ -1124,14 +1194,20 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 													/>
 												)}
 											</Show>
-											<Show when={saveErrors()[entry.slug]}>
-												{(message) => (
-													<p role="alert" class="text-sm text-error">
-														{m.exams_attempt_save_error({
-															message: message(),
-														})}
-													</p>
-												)}
+											{/* A lost session has its own notice above. */}
+											<Show
+												when={
+													saveErrors()[entry.slug] !== undefined &&
+													!sessionLost()
+												}
+											>
+												<p role="alert" class="text-sm text-error">
+													{saveErrors()[entry.slug]
+														? m.exams_attempt_save_error({
+																message: saveErrors()[entry.slug] ?? "",
+															})
+														: m.exams_attempt_save_error_unknown()}
+												</p>
 											</Show>
 										</div>
 									</div>
@@ -1216,6 +1292,8 @@ interface AttemptBarProps {
 	saving: boolean;
 	busy: boolean;
 	onSubmit: () => void;
+	/// Shown under the bar's controls, inside the part that stays in view.
+	notice?: JSX.Element;
 }
 
 /// The bar that stays in view while answering: time, progress, saving, submit, and a way to each question.
@@ -1398,6 +1476,25 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 				</button>
 			</div>
 			<p class="mt-1 text-xs sm:hidden">{saveStatus()}</p>
+			{props.notice}
+		</div>
+	);
+}
+
+/// The notice that the session ended, with a link to log in again in a new tab and come back to this exam.
+function SessionLostNotice(props: { next: string }): JSX.Element {
+	const href = () => `/login?next=${encodeURIComponent(props.next)}`;
+	return (
+		<div role="alert" class="alert alert-error mt-2 text-sm">
+			<span>{m.exams_attempt_session_lost()}</span>
+			<a
+				href={href()}
+				target="_blank"
+				rel="noopener"
+				class="btn btn-sm btn-primary"
+			>
+				{m.exams_attempt_session_lost_link()}
+			</a>
 		</div>
 	);
 }

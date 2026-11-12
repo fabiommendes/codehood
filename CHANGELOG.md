@@ -135,6 +135,14 @@
 
 ### Fixed
 
+- Exam attempt: when the session ends mid-exam (logout elsewhere, password
+  reset, cookie cleared), the page shows a persistent notice with a link that
+  opens the login in a new tab and returns to the exam; the typed answers stay
+  and are sent once the student logs in again, and the notice goes away by
+  itself. The finish says the same instead of "Fix the errors". A save error
+  without a message no longer renders empty. At the deadline, a button copies
+  the answers that did not reach the server. `loadCourse` redirects a
+  logged-out visitor to `/login?next=<path>`.
 - An action wrapped by `withServiceErrors` (`exam.answer`, `exam.setAnswerHistory`
   and others) answers 401 to a caller without a session, instead of 400.
 - Exam answers delivered a few seconds after the deadline are no longer lost:

@@ -118,6 +118,11 @@
 	"exams_attempt_points_label": "pontos",
 	"exams_attempt_points_value": "{points}/100",
 	"exams_attempt_save_error": "Não foi possível salvar esta resposta: {message}. Será tentado de novo automaticamente.",
+	"exams_attempt_save_error_unknown": "Não foi possível salvar esta resposta. Será tentado de novo automaticamente.",
+	"exams_attempt_session_lost": "Sua sessão terminou. Entre de novo em outra aba; suas respostas continuam aqui e serão enviadas.",
+	"exams_attempt_session_lost_link": "Entrar em uma nova aba",
+	"exams_attempt_copy_unsent": "Copiar as respostas não enviadas",
+	"exams_attempt_copy_done": "Copiado",
 	"exams_attempt_submit_title": [
 		{
 			"declarations": ["input type"],
