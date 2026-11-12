@@ -8,6 +8,7 @@
  * answer. Decoding, validation, replay and hashing run outside any transaction;
  * the one that writes only compares the revision it saw, inserts and counts.
  */
+import { ensurePerm } from "@/auth/permissions";
 import {
 	MAX_ANSWER_HISTORY_ATTEMPT_BYTES,
 	MAX_ANSWER_HISTORY_ATTEMPT_EDITS,
@@ -34,6 +35,8 @@ import {
 	type AnswerEditInspectResult,
 	type AnswerEditReceipt,
 	type AnswerEditServerField,
+	type AnswerEditSummaryRef,
+	type AnswerEditSummaryResult,
 	answerEditAppendArgs,
 	answerEditAppendResult,
 	answerEditAttemptArgs,
@@ -41,15 +44,19 @@ import {
 	answerEditGapInput,
 	answerEditInspectResult,
 	answerEditItemEnvelope,
+	answerEditSummaryArgs,
+	answerEditSummaryResult,
 	INT32_MAX,
 	MAX_ANSWER_EDIT_GAP_REASON,
 } from "@/core/schemas/answer-edit";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
+import type { EditTuple } from "@/services/answer-edits/codec";
 import {
 	batchContentHash,
 	replayBatch,
 } from "@/services/answer-edits/server-batch";
+import { summarizeAnswerEdits } from "@/services/answer-edits/summary";
 import {
 	answerHistoryWindow,
 	effectiveAnswerHistory,
@@ -78,6 +85,8 @@ export type {
 	AnswerEditInspectResult,
 	AnswerEditReceipt,
 	AnswerEditServerField,
+	AnswerEditSummary,
+	AnswerEditSummaryResult,
 } from "@/core/schemas/answer-edit";
 
 /// How many receipts of a field `inspect` returns.
@@ -195,7 +204,130 @@ export const makeAnswerEditService = defineService()(() => {
 		},
 	});
 
-	return { inspect, append };
+	/**
+	 * Summarizes how each followed answer of an attempt was typed, for whoever grades it.
+	 *
+	 * Reads the batches and gap markers of every followed question at once and
+	 * writes nothing. The attempt is the author's first one at the exam, the
+	 * same one the instructor's attempt page shows (a practice exam may hold
+	 * several). The history is kept when the exam's switch goes off, so it is
+	 * read whatever `enabled` says.
+	 *
+	 * @throws {@link NotFound} If the exam does not exist in the course, or the author has no attempt at it.
+	 * @throws {@link NotAllowed} If the actor does not grade the course.
+	 */
+	const summary = op({
+		transaction: false,
+		args: [answerEditSummaryArgs],
+		returns: answerEditSummaryResult,
+		run: async (
+			tx: PrismaTx,
+			input: AnswerEditSummaryRef,
+			opts: ServiceOptsWithoutTx,
+		): Promise<AnswerEditSummaryResult> => {
+			const exam = await tx.exam.findFirst({
+				where: { slug: input.exam, course: courseRefMatch(input.course) },
+				select: {
+					id: true,
+					type: true,
+					answerHistory: true,
+					course: {
+						select: {
+							instructor: { select: { username: true } },
+							enrollments: { select: { username: true } },
+						},
+					},
+				},
+			});
+			if (!exam) throw new NotFound("exam");
+			ensurePerm(opts.actor, "response.read-edits", {
+				author: { username: input.author },
+				course: exam.course,
+			});
+
+			const attempt = await tx.response.findFirst({
+				where: { examId: exam.id, authorId: input.author },
+				orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+				select: { id: true },
+			});
+			if (!attempt) throw new NotFound("attempt");
+
+			const [questions, history, submissions] = await Promise.all([
+				followedQuestions(tx, exam.id),
+				tx.answerEditHistory.findUnique({
+					where: { responseId: attempt.id },
+					select: {
+						incompleteAt: true,
+						fields: {
+							where: { field: "answer" },
+							select: {
+								questionId: true,
+								text: true,
+								incompleteAt: true,
+								batches: {
+									orderBy: { revision: "asc" },
+									select: {
+										sessionId: true,
+										timeOriginMs: true,
+										edits: true,
+										receivedAt: true,
+										baseReason: true,
+										baseText: true,
+										gapBefore: true,
+									},
+								},
+								gaps: {
+									orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
+									select: { reason: true, receivedAt: true },
+								},
+							},
+						},
+					},
+				}),
+				tx.submission.findMany({
+					where: { responseId: attempt.id },
+					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+					select: { questionId: true, payload: true },
+				}),
+			]);
+
+			const answers = new Map<number, string | null>();
+			for (const submission of submissions) {
+				const { payload } = submission;
+				answers.set(
+					submission.questionId,
+					typeof payload === "string" ? payload : null,
+				);
+			}
+			const fields = new Map(
+				(history?.fields ?? []).map((row) => [row.questionId, row]),
+			);
+
+			return {
+				enabled: effectiveAnswerHistory(exam),
+				incomplete: Boolean(history?.incompleteAt),
+				questions: questions.map(({ id, slug }) => {
+					const row = fields.get(id);
+					return {
+						question: slug,
+						summary: summarizeAnswerEdits({
+							batches: (row?.batches ?? []).map((batch) => ({
+								...batch,
+								edits: batch.edits as unknown as EditTuple[],
+								baseReason: batch.baseReason as "start" | "rebase" | null,
+							})),
+							markers: row?.gaps ?? [],
+							anchorText: row?.text ?? null,
+							answerText: answers.get(id) ?? null,
+							incomplete: Boolean(history?.incompleteAt || row?.incompleteAt),
+						}),
+					};
+				}),
+			};
+		},
+	});
+
+	return { inspect, append, summary };
 });
 
 // Private utilities -------------------------------------------------------
@@ -353,6 +485,25 @@ interface FieldItem {
 	batchBytes: number;
 }
 
+/// The type of the version of a question that an exam row pins, or of its latest one.
+async function questionTypeOf(
+	tx: PrismaTx,
+	row: {
+		version: string | null;
+		questionRef: { id: QuestionRefId; latestId: number | null };
+	},
+): Promise<string | undefined> {
+	const { id, latestId } = row.questionRef;
+	const version = await tx.questionData.findFirst({
+		where: row.version
+			? { refId: id, versionHash: row.version }
+			: { id: latestId ?? -1 },
+		select: { publicPayload: true },
+	});
+	const payload = version?.publicPayload as { type?: unknown } | null;
+	return typeof payload?.type === "string" ? payload.type : undefined;
+}
+
 /// The ref id of the question `slug` when the exam carries it and its `field` has a history, otherwise `null`.
 async function trackedQuestion(
 	tx: PrismaTx,
@@ -368,16 +519,30 @@ async function trackedQuestion(
 		},
 	});
 	if (!row) return null;
-	const { id, latestId } = row.questionRef;
-	const version = await tx.questionData.findFirst({
-		where: row.version
-			? { refId: id, versionHash: row.version }
-			: { id: latestId ?? -1 },
-		select: { publicPayload: true },
+	const type = await questionTypeOf(tx, row);
+	return isHistoryField(type, field) ? row.questionRef.id : null;
+}
+
+/// The questions of an exam whose answer field has a history, in the order of the exam.
+async function followedQuestions(
+	tx: PrismaTx,
+	examId: number,
+): Promise<{ id: QuestionRefId; slug: string }[]> {
+	const rows = await tx.questionsForExam.findMany({
+		where: { examId },
+		orderBy: { position: "asc" },
+		select: {
+			version: true,
+			questionRef: { select: { id: true, latestId: true, slug: true } },
+		},
 	});
-	const payload = version?.publicPayload as { type?: unknown } | null;
-	const type = typeof payload?.type === "string" ? payload.type : undefined;
-	return isHistoryField(type, field) ? id : null;
+	const followed: { id: QuestionRefId; slug: string }[] = [];
+	for (const row of rows) {
+		if (isHistoryField(await questionTypeOf(tx, row), "answer")) {
+			followed.push({ id: row.questionRef.id, slug: row.questionRef.slug });
+		}
+	}
+	return followed;
 }
 
 async function appendField(

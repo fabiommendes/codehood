@@ -33,7 +33,7 @@ export type LoadGradingResult =
 			questions: string[];
 			/// The counting answers of every closed attempt, in submission order.
 			answers: CountingAnswer[];
-			/// Every non-practice attempt at the exam.
+			/// Every non-practice attempt at the exam, or every attempt when practice exams are included.
 			attempts: Attempt[];
 			/// Every grading pass on the exam, released or not.
 			feedback: Feedback[];
@@ -47,13 +47,15 @@ export type LoadGradingResult =
  *
  * An anonymous visitor is redirected to `/login`. Anyone but the course's
  * instructor gets the 403 page, before the exam is looked up. The instructor
- * gets the 404 page for an exam that does not exist or is a practice exam.
+ * gets the 404 page for an exam that does not exist or is a practice exam,
+ * unless `options.practice` asks for practice exams too.
  */
 export async function loadGrading(
 	Astro: AstroGlobal,
 	discipline: string | undefined,
 	courseSegment: string | undefined,
 	examSlug: string | undefined,
+	options: { practice?: boolean } = {},
 ): Promise<LoadGradingResult> {
 	const result = await loadCourse(Astro, discipline, courseSegment, {
 		manage: true,
@@ -64,7 +66,7 @@ export async function loadGrading(
 	// biome-ignore lint/style/noNonNullAssertion: loadCourse already redirected an anonymous visitor.
 	const actor = Astro.locals.actor!;
 
-	const loaded = await loadExamGrading(course.id, examSlug, actor);
+	const loaded = await loadExamGrading(course.id, examSlug, actor, options);
 	if (!loaded) return { redirect: await Astro.rewrite("/404") };
 
 	return { course, href, ...loaded };
@@ -79,21 +81,28 @@ export type ExamGrading = Omit<
 /**
  * Loads the exam's attempts, grading passes and counting answers, or `null` for an exam that does not exist or is a practice exam.
  *
+ * With `options.practice` a practice exam loads too, with all of its attempts.
+ *
  * Does not check who `actor` is: the services it reads through do.
  */
 export async function loadExamGrading(
 	course: Parameters<typeof db.examException.findMany>[0]["course"],
 	examSlug: string | undefined,
 	actor: UserActor,
+	options: { practice?: boolean } = {},
 ): Promise<ExamGrading | null> {
 	const exam = examSlug
 		? await db.exam.findOne({ course, slug: examSlug }, { actor })
 		: null;
-	if (!exam || exam.type === "PRACTICE") return null;
+	if (!exam || (exam.type === "PRACTICE" && !options.practice)) return null;
 
 	const [attempts, feedback, courseExceptions] = await Promise.all([
 		db.response.findMany(
-			{ course, exam: exam.slug, practice: false },
+			{
+				course,
+				exam: exam.slug,
+				practice: exam.type === "PRACTICE" ? undefined : false,
+			},
 			{ actor },
 		),
 		db.feedback.findMany({ course, exam: exam.slug }, { actor }),

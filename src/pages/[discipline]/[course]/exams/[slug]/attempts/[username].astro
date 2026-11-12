@@ -3,6 +3,7 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import ReopenAttempt from "@/components/exam/ReopenAttempt";
 import Answer from "@/components/grading/Answer.astro";
+import AnswerEditSummary from "@/components/grading/AnswerEditSummary.astro";
 import AppliedItems from "@/components/grading/AppliedItems";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
 import { db } from "@/db";
@@ -26,7 +27,9 @@ import { durationToMinutes, formatDateTime } from "@/utils/schedule-time";
 export const prerender = false;
 
 const { discipline, course: courseSegment, slug, username } = Astro.params;
-const result = await loadGrading(Astro, discipline, courseSegment, slug);
+const result = await loadGrading(Astro, discipline, courseSegment, slug, {
+	practice: true,
+});
 if ("redirect" in result) return result.redirect;
 const { course, href, exam, questions, attempts, feedback, exceptions } =
 	result;
@@ -84,6 +87,14 @@ const openRegrades = new Map(
 		)
 	).map((request) => [request.submission, request.publicId]),
 );
+// The first attempt of the author, the one `attempt` above holds.
+const edits = await db.answerEdit.summary(
+	{ course: course.id, exam: exam.slug, author: attempt.author },
+	{ actor },
+);
+const editSummaries = new Map(
+	edits.questions.map((entry) => [entry.question, entry.summary]),
+);
 const outcomes = examResult(questions, attempt.submissions, feedback);
 
 const rows = outcomes.questions.map((outcome, index) => {
@@ -103,6 +114,7 @@ const rows = outcomes.questions.map((outcome, index) => {
 		title: doc?.title ?? outcome.question,
 		asked: doc ? publicForm(doc) : null,
 		counting,
+		edits: editSummaries.get(outcome.question),
 		review:
 			doc && counting && counting.payload !== null
 				? reviewResult(doc, counting.payload, {
@@ -177,7 +189,7 @@ const stateLabel = (status: string, score: number | null): string => {
 
     <div class="mt-8 flex flex-col gap-6">
       {
-        rows.map(({ label, outcome, title, asked, counting, review }) => (
+        rows.map(({ label, outcome, title, asked, counting, review, edits: editSummary }) => (
           <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <h3 class="text-lg font-semibold">{title}</h3>
@@ -212,6 +224,7 @@ const stateLabel = (status: string, score: number | null): string => {
               ) : (
                 <p class="text-muted">{m.exams_attempt_not_answered()}</p>
               )}
+              {editSummary && <AnswerEditSummary summary={editSummary} enabled={edits.enabled} />}
             </div>
           </article>
         ))

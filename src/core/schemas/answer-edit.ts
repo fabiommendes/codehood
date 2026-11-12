@@ -155,6 +155,71 @@ export const answerEditInspectResult = z.object({
 	fields: z.array(answerEditServerField),
 });
 
+/// What the instructor reads about how one answer was typed.
+export const answerEditSummary = z.object({
+	state: z.enum(["complete", "incomplete", "none"]),
+	/// Time spent typing, in milliseconds.
+	activeMs: z.number().int().min(0),
+	firstAt: z.date().nullable(),
+	lastAt: z.date().nullable(),
+	/// Edits per input kind.
+	kinds: z.object({
+		typing: z.number().int(),
+		paste: z.number().int(),
+		delete: z.number().int(),
+		undo: z.number().int(),
+		redo: z.number().int(),
+		composition: z.number().int(),
+		other: z.number().int(),
+	}),
+	pastes: z.object({ count: z.number().int(), chars: z.number().int() }),
+	largeInsertions: z.array(
+		z.object({
+			kind: z.enum([
+				"typing",
+				"paste",
+				"delete",
+				"undo",
+				"redo",
+				"composition",
+				"other",
+			]),
+			length: z.number().int(),
+			receivedAt: z.date(),
+		}),
+	),
+	gaps: z.array(
+		z.discriminatedUnion("type", [
+			z.object({
+				type: z.literal("marker"),
+				reason: z.string(),
+				receivedAt: z.date(),
+			}),
+			z.object({
+				type: z.literal("rebase"),
+				removed: z.number().int(),
+				inserted: z.number().int(),
+				receivedAt: z.date(),
+			}),
+			z.object({
+				type: z.literal("final"),
+				removed: z.number().int(),
+				inserted: z.number().int(),
+			}),
+		]),
+	),
+});
+
+export const answerEditSummaryResult = z.object({
+	/// The exam's effective switch: whether the browsers still record.
+	enabled: z.boolean(),
+	/// A limit of the whole attempt was reached.
+	incomplete: z.boolean(),
+	questions: z.array(
+		z.object({ question: z.string(), summary: answerEditSummary }),
+	),
+});
+
 //
 // Types
 //
@@ -191,6 +256,18 @@ export type AnswerEditFieldResult = z.infer<typeof answerEditFieldResult>;
 export type AnswerEditAppendResult = z.infer<typeof answerEditAppendResult>;
 export type AnswerEditServerField = z.infer<typeof answerEditServerField>;
 export type AnswerEditInspectResult = z.infer<typeof answerEditInspectResult>;
+
+export type AnswerEditSummary = z.infer<typeof answerEditSummary>;
+export type AnswerEditSummaryResult = z.infer<typeof answerEditSummaryResult>;
+
+/// The attempt whose history an instructor reads: the author's, in the course's exam.
+export const answerEditSummaryArgs = z.object({
+	course: courseRef,
+	exam: z.string().min(1).max(200),
+	author: z.string().min(1),
+});
+
+export type AnswerEditSummaryRef = z.infer<typeof answerEditSummaryArgs>;
 
 export interface AnswerEditAttemptRef {
 	course: CourseRef;

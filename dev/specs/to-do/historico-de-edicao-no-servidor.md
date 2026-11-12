@@ -502,6 +502,16 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
     última `Submission` da questão;
   - **estado**: `complete`, `incomplete` (limite de R16 ou R18), `none` (questão
     respondida sem nenhum lote).
+  - **contagem por tipo**: o resumo traz `kinds`, a quantidade de edits de cada
+    tipo de entrada.
+  - `incomplete` sem nenhum lote é o estado `incomplete`, não `none`.
+  - A lacuna final só existe com âncora e com resposta enviada; sem um dos dois
+    não há o que comparar.
+  - Os tamanhos de lacuna são em unidades UTF-16; o sufixo comum nunca se
+    sobrepõe ao prefixo comum.
+  - Várias tentativas do mesmo autor (possível em `PRACTICE`): `summary` lê a
+    primeira por `createdAt` (desempate por `id`), a mesma que a página da
+    tentativa mostra (`attempts.find` sobre a lista em ordem de criação).
 
   Unit, com lotes montados à mão: valores exatos de cada item, incluindo
   intervalo de exatamente 60 s, emoji fora do BMP numa inserção grande e lacuna
@@ -516,6 +526,14 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   e2e: o instrutor vê o bloco; o aluno, na mesma página, não vê nada do
   histórico (nem o bloco, nem os dados no HTML).
 
+  - Tentativa sem histórico, com a chave ligada, mostra o bloco com o estado
+    `none`.
+  - A página da tentativa passou a abrir também prova `PRACTICE` (a fila e as
+    demais páginas de correção continuam em 404), para que o bloco apareça nela.
+  - O aviso fixo diz em linguagem simples que o resumo é um indício para quem
+    corrige, não prova de má-fé. Com a chave desligada e nada gravado antes, o
+    bloco mostra só a linha "Registro desligado nesta prova".
+
 ### I. Seed
 
 - R36. `src/db/bootstrap.ts` semeia, numa prova com questões `essay` (texto e
@@ -525,6 +543,12 @@ exige chave de API (ADR 0008). As Actions são camadas finas sobre o service.
   disso, uma prova `PRACTICE` no padrão (chave `null`, sem histórico). Os lotes
   passam pelo service (`append`), não por Prisma direto. Pronto quando
   `pnpm run db:reset` roda e as cinco situações aparecem na página da tentativa.
+
+  Provas semeadas no curso `cs101` de `ada`: `history-essays` (hopper normal com
+  colagem e inserção grande; hamilton com marcador, rebase e lacuna final;
+  liskov incompleto por limite de texto; bob sem digitação registrada),
+  `history-off` (hopper, chave desligada depois de gravar) e `history-practice`
+  (`PRACTICE` no padrão, tentativa de knuth, sem histórico).
 
 ### J. Isolamento (R7 do RFC)
 

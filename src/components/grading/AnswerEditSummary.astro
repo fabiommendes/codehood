@@ -1,0 +1,162 @@
+---
+/**
+ * The instructor's summary of how one answer was typed, in a collapsed block.
+ *
+ * Every time shown is when the server received a batch, never a time of
+ * the student's clock.
+ */
+import type { AnswerEditSummary } from "@/core/schemas/answer-edit";
+import { m } from "@/i18n";
+import { formatDateTime } from "@/utils/schedule-time";
+
+interface Props {
+	summary: AnswerEditSummary;
+	/// The exam's effective switch: whether browsers still record.
+	enabled: boolean;
+}
+
+const { summary, enabled } = Astro.props;
+
+const kindLabels = {
+	typing: m.exams_edits_kind_typing(),
+	paste: m.exams_edits_kind_paste(),
+	delete: m.exams_edits_kind_delete(),
+	undo: m.exams_edits_kind_undo(),
+	redo: m.exams_edits_kind_redo(),
+	composition: m.exams_edits_kind_composition(),
+	other: m.exams_edits_kind_other(),
+};
+const stateLabels = {
+	complete: m.exams_edits_state_complete(),
+	incomplete: m.exams_edits_state_incomplete(),
+	none: m.exams_edits_state_none(),
+};
+
+/// Nothing was ever recorded for this answer.
+const empty =
+	summary.firstAt === null &&
+	summary.gaps.length === 0 &&
+	summary.state === "none";
+/// With the switch off and nothing recorded before, the block only says so.
+const onlyOff = !enabled && empty;
+
+const when = (date: Date) => formatDateTime(date, { year: "numeric" });
+
+function duration(ms: number): string {
+	const total = Math.round(ms / 1000);
+	const hours = Math.floor(total / 3600);
+	const minutes = Math.floor((total % 3600) / 60);
+	const seconds = total % 60;
+	if (hours > 0) return m.exams_edits_hours({ hours, minutes });
+	if (minutes > 0) return m.exams_edits_minutes({ minutes, seconds });
+	return m.exams_edits_seconds({ seconds });
+}
+
+const kinds = Object.entries(summary.kinds).filter(([, count]) => count > 0);
+---
+
+<details class="collapse collapse-arrow mt-4 border border-base-300 bg-base-200" data-testid="answer-edit-history">
+  <summary class="collapse-title text-sm font-semibold">{m.exams_edits_title()}</summary>
+  <div class="collapse-content flex flex-col gap-3 text-sm">
+    {!enabled && <p class="font-medium" data-testid="answer-edit-history-off">{m.exams_edits_off()}</p>}
+    {!onlyOff && <p class="text-base-content/70" data-testid="answer-edit-history-disclaimer">{m.exams_edits_disclaimer()}</p>}
+    {
+      !onlyOff && (
+        <p>
+          <span
+            class:list={["badge badge-sm", summary.state === "incomplete" ? "badge-warning" : "badge-outline"]}
+            data-testid="answer-edit-history-state"
+            data-state={summary.state}
+          >
+            {stateLabels[summary.state]}
+          </span>
+        </p>
+      )
+    }
+    {
+      summary.firstAt && summary.lastAt && (
+        <dl class="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
+          <div>
+            <dt class="text-muted">{m.exams_edits_active()}</dt>
+            <dd class="font-medium" data-testid="answer-edit-history-active" data-ms={summary.activeMs}>
+              {duration(summary.activeMs)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-muted">{m.exams_edits_pastes()}</dt>
+            <dd
+              class="font-medium"
+              data-testid="answer-edit-history-pastes"
+              data-count={summary.pastes.count}
+              data-chars={summary.pastes.chars}
+            >
+              {m.exams_edits_pastes_value({ count: summary.pastes.count, chars: summary.pastes.chars })}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-muted">{m.exams_edits_first()}</dt>
+            <dd class="font-medium" data-testid="answer-edit-history-first" data-at={summary.firstAt.toISOString()}>
+              {when(summary.firstAt)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-muted">{m.exams_edits_last()}</dt>
+            <dd class="font-medium" data-testid="answer-edit-history-last" data-at={summary.lastAt.toISOString()}>
+              {when(summary.lastAt)}
+            </dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-muted">{m.exams_edits_kinds()}</dt>
+            <dd class="font-medium" data-testid="answer-edit-history-kinds">
+              {kinds.map(([kind, count]) => `${kindLabels[kind as keyof typeof kindLabels]} ${count}`).join(" · ")}
+            </dd>
+          </div>
+        </dl>
+      )
+    }
+    {
+      summary.largeInsertions.length > 0 && (
+        <div>
+          <p class="text-muted">{m.exams_edits_large()}</p>
+          <ul class="list-disc pl-5">
+            {summary.largeInsertions.map((entry) => (
+              <li data-testid="answer-edit-history-large" data-kind={entry.kind} data-length={entry.length} data-at={entry.receivedAt.toISOString()}>
+                {m.exams_edits_large_item({ length: entry.length, kind: kindLabels[entry.kind], when: when(entry.receivedAt) })}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+    {
+      summary.gaps.length > 0 && (
+        <div>
+          <p class="text-muted">{m.exams_edits_gaps()}</p>
+          <ul class="list-disc pl-5">
+            {summary.gaps.map((gap) =>
+              gap.type === "marker" ? (
+                <li data-testid="answer-edit-history-gap" data-type="marker" data-reason={gap.reason} data-at={gap.receivedAt.toISOString()}>
+                  {m.exams_edits_gap_marker({ reason: gap.reason, when: when(gap.receivedAt) })}
+                </li>
+              ) : gap.type === "rebase" ? (
+                <li
+                  data-testid="answer-edit-history-gap"
+                  data-type="rebase"
+                  data-removed={gap.removed}
+                  data-inserted={gap.inserted}
+                  data-at={gap.receivedAt.toISOString()}
+                >
+                  {m.exams_edits_gap_rebase({ removed: gap.removed, inserted: gap.inserted, when: when(gap.receivedAt) })}
+                </li>
+              ) : (
+                <li data-testid="answer-edit-history-gap" data-type="final" data-removed={gap.removed} data-inserted={gap.inserted}>
+                  {m.exams_edits_gap_final({ removed: gap.removed, inserted: gap.inserted })}
+                </li>
+              ),
+            )}
+          </ul>
+        </div>
+      )
+    }
+  </div>
+</details>
