@@ -54,7 +54,7 @@ PUT".
      (`feedback.create`, `feedback.upsert`, `regradeRequest.accept`);
    - feito: `feedback.delete` bumpa o pedido de revisão aceito com a nota
      (`feedbackId` anulado por cascata).
-7. `CRUD()` (`src/api/`) lê `If-Match` e `If-None-Match: *` em `PUT`, `PATCH`
+7. Feito: `CRUD()` (`src/api/`) lê `If-Match` e `If-None-Match: *` em `PUT`, `PATCH`
    e `DELETE`, e os declara no OpenAPI. Regenerar o snapshot e o cliente da
    CLI com `pnpm run openapi:cli`.
 8. As Astro Actions que editam uma entidade enviam o `updatedAt` carregado

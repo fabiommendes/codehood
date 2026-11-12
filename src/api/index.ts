@@ -325,6 +325,7 @@ export const repositoryApi = {
 		summary: "Find a single Repository.",
 		operationId: "repositoryRead",
 		tags: repositoryTags,
+		versioned: true,
 		handler: async ({ actor, params }) => {
 			const key = repositoryKey(params);
 			const found = await db.repository.findOne(key, { actor });
@@ -359,10 +360,11 @@ export const repositoryApi = {
 			"Creates the repository if the slug is free, or returns the existing one unchanged.",
 		operationId: "repositoryUpsert",
 		tags: repositoryTags,
-		handler: async ({ actor, body, params }) =>
+		versioned: true,
+		handler: async ({ actor, body, params, precondition }) =>
 			db.repository.upsert(
 				{ ...body, course: parseCourseParams(params) },
-				{ actor },
+				{ actor, ...precondition },
 			),
 	}),
 	delete: DELETE(`${repositoryPath}/[slug]`, {
@@ -370,8 +372,12 @@ export const repositoryApi = {
 		summary: "Delete a single Repository.",
 		operationId: "repositoryDelete",
 		tags: repositoryTags,
-		handler: async ({ actor, params }) => {
-			await db.repository.delete(repositoryKey(params), { actor });
+		versioned: true,
+		handler: async ({ actor, params, precondition }) => {
+			await db.repository.delete(repositoryKey(params), {
+				actor,
+				...precondition,
+			});
 			return { deleted: true };
 		},
 	}),
@@ -765,8 +771,9 @@ export const rubricApi = {
 		summary: "Set the base score of a rubric.",
 		operationId: "rubricUpdate",
 		tags: rubricTags,
-		handler: async ({ actor, body, params }) =>
-			db.rubric.update(rubricKeyOf(params), body, { actor }),
+		versioned: true,
+		handler: async ({ actor, body, params, precondition }) =>
+			db.rubric.update(rubricKeyOf(params), body, { actor, ...precondition }),
 	}),
 	createItem: POST(`${rubricPath}/item`, {
 		in: schema.rubricItemCreate.openapi("RubricItemCreate"),
@@ -783,8 +790,12 @@ export const rubricApi = {
 		summary: "Change some fields of a rubric item.",
 		operationId: "rubricItemUpdate",
 		tags: rubricTags,
-		handler: async ({ actor, body, params }) =>
-			db.rubric.updateItem(rubricItemKeyOf(params), body, { actor }),
+		versioned: true,
+		handler: async ({ actor, body, params, precondition }) =>
+			db.rubric.updateItem(rubricItemKeyOf(params), body, {
+				actor,
+				...precondition,
+			}),
 	}),
 	putItem: PUT(`${rubricPath}/item/[key]`, {
 		in: schema.rubricItemPut.openapi("RubricItemPut"),
@@ -794,8 +805,12 @@ export const rubricApi = {
 			"Idempotent. Optional fields left out are cleared; a changed value recomputes the passes that apply the item.",
 		operationId: "rubricItemPut",
 		tags: rubricTags,
-		handler: async ({ actor, body, params }) =>
-			db.rubric.upsertItem(rubricItemKeyOf(params), body, { actor }),
+		versioned: true,
+		handler: async ({ actor, body, params, precondition }) =>
+			db.rubric.upsertItem(rubricItemKeyOf(params), body, {
+				actor,
+				...precondition,
+			}),
 	}),
 	deleteItem: DELETE(`${rubricPath}/item/[key]`, {
 		out: z.object({ deleted: z.boolean() }).openapi("RubricItemDeleted"),
@@ -804,8 +819,12 @@ export const rubricApi = {
 			"Also removes the item from every pass that applied it and recomputes them. Resolves when the item is already gone.",
 		operationId: "rubricItemDelete",
 		tags: rubricTags,
-		handler: async ({ actor, params }) => {
-			await db.rubric.deleteItem(rubricItemKeyOf(params), { actor });
+		versioned: true,
+		handler: async ({ actor, params, precondition }) => {
+			await db.rubric.deleteItem(rubricItemKeyOf(params), {
+				actor,
+				...precondition,
+			});
 			return { deleted: true };
 		},
 	}),

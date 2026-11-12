@@ -12,6 +12,14 @@ import { buffer } from "@/core/schemas/base";
 import { m } from "@/i18n";
 import { createSlots } from "@/utils/concurrency";
 import { coerceForSchema, collectSearchParams } from "@/utils/query-coerce";
+import {
+	etagOf,
+	etagResponseHeader,
+	type Precondition,
+	preconditionFailedSchema,
+	preconditionHeaders,
+	readPrecondition,
+} from "./conditional";
 import { readJsonMultipart, readMultipart } from "./multipart";
 import { segmentNames, toOpenApiPath } from "./util";
 
@@ -50,6 +58,11 @@ export type RouteOptions<In, Out, IsPublic extends boolean = false> = {
 	errors?: {
 		[status: number]: { description: string; schema: ZodType<unknown> };
 	};
+	/// The route reads or writes one row that has an `updatedAt` (ADR 0013):
+	/// a `PUT`, `PATCH` or `DELETE` reads `If-Match` and `If-None-Match` into
+	/// the handler's `precondition`, and a response that returns the row
+	/// carries its `ETag`. Without it, either header is refused with a 400.
+	versioned?: boolean;
 	handler: HandlerFunction<In, Out, MaybeActor<IsPublic>>;
 };
 
@@ -64,6 +77,8 @@ type HandlerArgs<In, Actor> = Actor extends Actor
 			apiKey?: App.Locals["apiKey"];
 			/// File parts by sha-256, empty unless `inMultipart: "json"`.
 			files: Record<string, Buffer>;
+			/// The `expectedUpdatedAt` the request's headers ask for, if any.
+			precondition: Precondition;
 		}
 	: {
 			actor?: Actor;
@@ -74,6 +89,8 @@ type HandlerArgs<In, Actor> = Actor extends Actor
 			apiKey?: App.Locals["apiKey"];
 			/// File parts by sha-256, empty unless `inMultipart: "json"`.
 			files: Record<string, Buffer>;
+			/// The `expectedUpdatedAt` the request's headers ask for, if any.
+			precondition: Precondition;
 		};
 
 /// The Handler function itself
@@ -178,6 +195,18 @@ function acquireUploadSlot(actor: UserActor | undefined): () => void {
 	return release;
 }
 
+/// The ETag of a response body that is one row with an `updatedAt`.
+function etagOfBody(body: unknown): string | undefined {
+	if (typeof body !== "object" || body === null || Array.isArray(body)) {
+		return undefined;
+	}
+	const { updatedAt } = body as { updatedAt?: unknown };
+	if (updatedAt instanceof Date || typeof updatedAt === "string") {
+		return etagOf(updatedAt);
+	}
+	return undefined;
+}
+
 /// Whether the request declares a `multipart/form-data` body.
 function isMultipart(request: Request): boolean {
 	return (request.headers.get("content-type") ?? "")
@@ -197,7 +226,18 @@ export function route<In, Out, IsPublic extends boolean = false>(
 
 	const readsQueryString = method === "get" || method === "delete";
 	const request = openApiRequest(method, path, options);
-	const requestOpts = request ? { request } : {};
+	const writes = method === "put" || method === "patch" || method === "delete";
+	const conditional = options.versioned && writes;
+	const requestOpts =
+		request || conditional
+			? {
+					request: {
+						...request,
+						...(conditional ? { headers: preconditionHeaders(method) } : {}),
+					},
+				}
+			: {};
+	const returnsEtag = options.versioned && method !== "delete";
 
 	registry.registerPath({
 		method,
@@ -211,10 +251,22 @@ export function route<In, Out, IsPublic extends boolean = false>(
 		responses: {
 			200: {
 				description: "Success",
+				...(returnsEtag ? { headers: etagResponseHeader } : {}),
 				content: {
 					"application/json": { schema: options.out },
 				},
 			},
+			...(conditional
+				? {
+						412: {
+							description:
+								"The row is not at the version the request expected.",
+							content: {
+								"application/json": { schema: preconditionFailedSchema },
+							},
+						},
+					}
+				: {}),
 			// Do it for non-public routes
 			// 401: { schema: ApiError, description: "Invalid credentials" },
 			...Object.fromEntries(
@@ -274,6 +326,12 @@ export function route<In, Out, IsPublic extends boolean = false>(
 				});
 			}
 
+			// Before the body: a refused header must not cost an upload.
+			const precondition = readPrecondition(
+				method,
+				request.headers,
+				options.versioned === true,
+			);
 			let files: Record<string, Buffer> = {};
 			let raw: unknown;
 			let release: (() => void) | undefined;
@@ -304,6 +362,7 @@ export function route<In, Out, IsPublic extends boolean = false>(
 					cookies,
 					apiKey: locals.apiKey,
 					files,
+					precondition,
 				} as any);
 				// biome-ignore-end lint/suspicious/noExplicitAny: ...
 			} finally {
@@ -325,7 +384,11 @@ export function route<In, Out, IsPublic extends boolean = false>(
 			const error = result.error as { status?: number };
 			return Response.json(error, { status: error?.status ?? 400 });
 		}
-		return Response.json(result.value, { status: 200 });
+		const etag = returnsEtag ? etagOfBody(result.value) : undefined;
+		return Response.json(result.value, {
+			status: 200,
+			...(etag ? { headers: { ETag: etag } } : {}),
+		});
 	};
 
 	// We register the route in the global ROUTES object for later use.

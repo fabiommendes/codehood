@@ -21,6 +21,7 @@ import { m } from "@/i18n";
 import { parseCourseParams } from "@/urls";
 import { coerceForSchema } from "@/utils/query-coerce";
 import { slugify } from "@/utils/slugify";
+import { declaresUpdatedAt, type Precondition } from "./conditional";
 import { DELETE, GET, PATCH, POST, PUT } from "./route";
 
 export type CrudRouteOptions<
@@ -225,6 +226,9 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	private pathWithKey: string;
 	private has: { [key: string]: true | undefined };
 	private filterSchema: ZodType<Filter & Scope> | null;
+	/// Whether the entity has an `updatedAt`: its single-row routes then read
+	/// `If-Match`/`If-None-Match` and answer an `ETag` (ADR 0013).
+	private versioned: boolean;
 
 	// Properties
 	get service() {
@@ -278,6 +282,7 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 			filterSchema = filterSchema.extend(this.options.scope?.shape);
 		}
 		this.filterSchema = filterSchema;
+		this.versioned = declaresUpdatedAt(options.entity);
 	}
 
 	/**
@@ -372,6 +377,7 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 					summary: `Find a single ${this.name}.`,
 					tags: this.options.tags,
 					errors: this.errors("read"),
+					versioned: this.versioned,
 					handler: async ({ actor, body, params }) => {
 						return self.findOneHandler({ actor, params, query: body });
 					},
@@ -405,11 +411,13 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 					summary: `Update a single ${this.name}.`,
 					tags: this.options.tags,
 					errors: this.errors("update"),
-					handler: async ({ actor, body, params, files }) => {
+					versioned: this.versioned,
+					handler: async ({ actor, body, params, files, precondition }) => {
 						return self.updateHandler({
 							actor,
 							body: self.withFiles(body, files),
 							params,
+							precondition,
 						});
 					},
 				}),
@@ -424,11 +432,13 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 					summary: `Upsert a single ${this.name}. Creates if it does not exist, update otherwise.`,
 					tags: this.options.tags,
 					errors: this.errors("upsert"),
-					handler: async ({ actor, body, params, files }) => {
+					versioned: this.versioned,
+					handler: async ({ actor, body, params, files, precondition }) => {
 						return self.upsertHandler({
 							actor,
 							body: self.withFiles(body, files),
 							params,
+							precondition,
 						});
 					},
 				}),
@@ -447,8 +457,9 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 					summary: `Delete a single ${this.name} by primary key.`,
 					tags: this.options.tags,
 					errors: this.errors("delete"),
-					handler: async ({ actor, params }) => {
-						return self.deleteHandler({ actor, params });
+					versioned: this.versioned,
+					handler: async ({ actor, params, precondition }) => {
+						return self.deleteHandler({ actor, params, precondition });
 					},
 				}),
 		};
@@ -523,11 +534,15 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 		actor: UserActor;
 		body: Update;
 		params: Record<string, string>;
+		precondition?: Precondition;
 	}): Promise<Entity> {
-		const { actor, body, params } = args;
+		const { actor, body, params, precondition } = args;
 
 		const key = this.parseKey(params);
-		return this.service.update(key, body as Update, { actor });
+		return this.service.update(key, body as Update, {
+			actor,
+			...precondition,
+		});
 	}
 
 	/**
@@ -536,14 +551,15 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	async deleteHandler(args: {
 		actor: UserActor;
 		params: Record<string, string>;
+		precondition?: Precondition;
 	}): Promise<{ success: boolean; message: string; deleted: boolean }> {
-		const { actor, params } = args;
+		const { actor, params, precondition } = args;
 		const key = this.parseKey(params);
 		let deleted = true;
 		let message = m.errors_deleted_successfully({ name: this.name });
 
 		try {
-			await this.service.delete(key, { actor });
+			await this.service.delete(key, { actor, ...precondition });
 		} catch (error) {
 			if (error instanceof NotFound) {
 				await this.assertScopeExists(params);
@@ -581,14 +597,15 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 		actor: UserActor;
 		body: Create;
 		params: Record<string, string>;
+		precondition?: Precondition;
 	}): Promise<Entity> {
-		const { actor, body, params } = args;
+		const { actor, body, params, precondition } = args;
 		const extra = this.parseCreateUrlParams(params);
 
 		// Merge the request body with any extra fields derived from the route parameters.
 		const input = { ...body, ...extra } as Create & CreateExtra;
 
-		return this.service.upsert(input, { actor });
+		return this.service.upsert(input, { actor, ...precondition });
 	}
 
 	// Private helpers

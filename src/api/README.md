@@ -31,6 +31,7 @@ This file maps where each piece lives.
 | `registry/index.ts`            | Re-exports `CRUD` and the verb wrappers        |
 | `registry/route.ts`            | `route()` and the verb wrappers [^route]       |
 | `registry/multipart.ts`        | Multipart readers for `inMultipart` [^mp]      |
+| `registry/conditional.ts`      | `If-Match`/`If-None-Match` and `ETag` [^cond]  |
 | `registry/crud.ts`             | `CRUD()` — one resource into six routes        |
 | `registry/openapi-document.ts` | `buildOpenApiDocument()` [^doc]                |
 | `registry/dynamicHandler.ts`   | The Astro entrypoint every route shares [^dyn] |
@@ -66,6 +67,12 @@ Outside this directory:
     named by its sha-256 and checked against it. `CRUD()` turns it on for the
     write routes when `withFiles` is set: the resource route uses it so a
     `FILE` and its bytes arrive in one request.
+
+[^cond]: ADR 0013. A route declared `versioned` (`CRUD()` sets it when the
+    entity has `updatedAt`) reads `If-Match: "<updatedAt>"` and, on `PUT`,
+    `If-None-Match: *` into the `expectedUpdatedAt` of its write, and answers
+    the row's `ETag`. A weak ETag, a list, `*` in `If-Match`, or either header
+    on a route without version is a 400. `GET` and `POST` ignore them.
 
 [^doc]: Imports `dynamicHandler` for its registration side effects, then turns
     `registry.definitions` into the document. It strips the `form` meta of the
