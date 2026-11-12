@@ -2,6 +2,7 @@
 // every sub-module imports `./base`, which patches zod with `.openapi(...)`.
 
 export * from "./answer";
+export * from "./answer-edit";
 export * from "./api-key";
 export * from "./attachment";
 // Branded id schemas, `slug` and `buffer` stay internal to the sub-modules.
