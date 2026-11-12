@@ -73,7 +73,8 @@ export function withActionErrors<Args extends unknown[], R>(
 
 /**
  * Like {@link withActionErrors}, but also surfaces a plain `Error`'s message
- * as `BAD_REQUEST` instead of letting Astro mask it. Use this where the
+ * as `BAD_REQUEST` instead of letting Astro mask it. An `ActionError` (e.g.
+ * the `UNAUTHORIZED` of `requireUser`) is rethrown untouched. Use this where the
  * service's thrown messages ("2026-01" is not a valid slug", "Passphrase
  * "AB12CD" is already in use") are written for the form they surface in, not
  * for a log.
@@ -86,7 +87,11 @@ export function withServiceErrors<Args extends unknown[], R>(
 			return await handler(...args);
 		} catch (error) {
 			const translated = translateServiceError(error);
-			if (translated === error && error instanceof Error) {
+			if (
+				translated === error &&
+				error instanceof Error &&
+				!(error instanceof ActionError)
+			) {
 				throw new ActionError({ code: "BAD_REQUEST", message: error.message });
 			}
 			throw translated;

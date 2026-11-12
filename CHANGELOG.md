@@ -135,6 +135,8 @@
 
 ### Fixed
 
+- An action wrapped by `withServiceErrors` (`exam.answer`, `exam.setAnswerHistory`
+  and others) answers 401 to a caller without a session, instead of 400.
 - Exam answers delivered a few seconds after the deadline are no longer lost:
   the server accepts `exam.answer` for 10 s past the attempt's deadline
   (`EXAM_ANSWER_GRACE_MS`), and the page keeps resending until the grace ends.

@@ -95,7 +95,7 @@ test("the action refuses a student, a stranger and a call without a session", as
 	const anonymous = await page.request.post("/_actions/exam.setAnswerHistory", {
 		data: body,
 	});
-	expect(anonymous.status()).toBeGreaterThanOrEqual(400);
+	expect(anonymous.status()).toBe(401);
 	expect(await stored()).toBeNull();
 
 	const stranger = await seedUser({ role: "INSTRUCTOR" });
