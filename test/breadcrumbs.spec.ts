@@ -8,16 +8,16 @@ const course: CrumbLabels["course"] = {
 };
 const courseLabel = "cs201 · 2026-1";
 const home = "/cs201/turing_2026-1";
+/// The linked course root, drawn as the course tile.
+const root = { label: courseLabel, href: home, tile: home };
 
 function trail(path: string, labels: CrumbLabels = { course }) {
 	return breadcrumbs(new URL(path, "http://localhost"), labels);
 }
 
 test.describe("course tabs and items", () => {
-	test("course home is a single unlinked crumb", () => {
-		const crumbs = trail(home);
-		expect(crumbs).toEqual([{ label: courseLabel }]);
-		expect(crumbs.at(0)).not.toHaveProperty("href");
+	test("course home has no trail", () => {
+		expect(trail(home)).toEqual([]);
 	});
 
 	const tabs = [
@@ -32,7 +32,7 @@ test.describe("course tabs and items", () => {
 	for (const [segment, label] of tabs) {
 		test(`tab page /${segment} is course then ${label}`, () => {
 			const crumbs = trail(`${home}/${segment}`);
-			expect(crumbs).toEqual([{ label: courseLabel, href: home }, { label }]);
+			expect(crumbs).toEqual([root, { label }]);
 			expect(crumbs.at(1)).not.toHaveProperty("href");
 		});
 	}
@@ -50,7 +50,7 @@ test.describe("course tabs and items", () => {
 				item: title,
 			});
 			expect(crumbs).toEqual([
-				{ label: courseLabel, href: home },
+				root,
 				{ label: tabLabel, href: `${home}/${segment}` },
 				{ label: title },
 			]);
@@ -95,17 +95,14 @@ test.describe("course tabs and items", () => {
 	});
 
 	test("query string does not alter the labels of a tab page", () => {
-		expect(trail(`${home}/exams?page=2#x`)).toEqual([
-			{ label: courseLabel, href: home },
-			{ label: "Exams" },
-		]);
+		expect(trail(`${home}/exams?page=2#x`)).toEqual([root, { label: "Exams" }]);
 	});
 });
 
 test.describe("grading, attempts, admin and other pages", () => {
 	const exam = `${home}/exams/midterm`;
 	const examCrumbs = [
-		{ label: courseLabel, href: home },
+		root,
 		{ label: "Exams", href: `${home}/exams` },
 		{ label: "Midterm", href: exam },
 	];
@@ -219,10 +216,7 @@ test.describe("grading, attempts, admin and other pages", () => {
 	});
 
 	test("item page without labels.item drops the item crumb", () => {
-		expect(trail(`${home}/exams/midterm`)).toEqual([
-			{ label: courseLabel, href: home },
-			{ label: "Exams" },
-		]);
+		expect(trail(`${home}/exams/midterm`)).toEqual([root, { label: "Exams" }]);
 	});
 
 	test("unknown tab segment drops its crumb and unlinks the course", () => {

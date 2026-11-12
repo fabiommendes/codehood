@@ -45,6 +45,7 @@ import {
 	examTypeLabels,
 	formatDuration,
 } from "@/utils/exam-display";
+import { examNav } from "@/utils/exam-nav";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadStudents } from "@/utils/load-grading";
@@ -386,11 +387,21 @@ for (const submission of attempt?.submissions ?? []) {
 
 <AppLayout title={m.exams_detail_page_title({ title: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title })}
+  nav={examNav({
+    href: `${href}/exams/${exam.slug}`,
+    title: exam.title,
+    manage: canManage,
+    pending: canManage ? pendingAnswers : undefined,
+    regrades: canManage ? openRegrades : undefined,
+    sections: [
+      ...(exam.preamble ? [{ id: "instructions", label: m.exams_detail_instructions() }] : []),
+      ...(canManage && exam.type !== "PRACTICE" ? [{ id: "exceptions", label: m.exams_exceptions_heading() }] : []),
+      { id: "questions", label: m.exams_detail_questions_heading() },
+    ],
+  })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
-
-    <a href={`${href}/exams`} class="text-sm text-muted hover:text-primary">{m.exams_detail_back()}</a>
 
     <div class="mt-2 flex items-start justify-between gap-4">
       <div>
@@ -411,7 +422,7 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       exam.preamble && (
-        <section class="mt-6">
+        <section id="instructions" class="mt-6 scroll-mt-20">
           <h2 class="text-lg font-semibold">{m.exams_detail_instructions()}</h2>
           <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
             {preambleHtml ? (
@@ -501,7 +512,7 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       !canManage && (
-        <section class="mt-8">
+        <section id="questions" class="mt-8 scroll-mt-20">
           <ExamAttempt
             client:load
             discipline={discipline!}
@@ -535,7 +546,7 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       canManage && exam.type !== "PRACTICE" && (
-        <section id="exceptions" class="mt-8">
+        <section id="exceptions" class="mt-8 scroll-mt-20">
           <h2 class="text-lg font-semibold">{m.exams_exceptions_heading()}</h2>
           <div class="mt-3">
             <ExamExceptions
@@ -563,7 +574,7 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       canManage && (
-        <section class="mt-8">
+        <section id="questions" class="mt-8 scroll-mt-20">
           <h2 class="text-lg font-semibold">{m.exams_detail_questions_heading()}</h2>
           {staffQuestions.length > 0 ? (
             <div class="mt-3">

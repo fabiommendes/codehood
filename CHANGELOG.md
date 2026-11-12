@@ -4,6 +4,13 @@
 
 ### Added
 
+- Card do curso na sidebar. A página passa `nav` ao `AppLayout` (tipos em
+  `src/utils/course-nav.ts`, no máximo dois níveis) e o card toma o lugar da
+  linha do curso: código, aba, contexto (título da prova) e links em
+  acordeão; o item atual vira texto e os links para a própria página viram
+  âncoras marcadas pelo scroll. Ligado na página da prova (`examNav`), que
+  perde o link "Voltar para avaliações".
+
 - Escrita condicional (ADR 0013). Toda escrita de um service cujo modelo tem
   `updatedAt` aceita `expectedUpdatedAt` e falha com `PreconditionFailed`
   (412, com o `updatedAt` atual ou `null`) quando a linha mudou ou não existe;
@@ -104,6 +111,10 @@
   released.
 
 ### Changed
+
+- O breadcrumb abre o conteúdo da página e, no desktop, sobe para dentro da
+  barra do topo ao rolar (sticky, sem fade). Aparece também no celular. A
+  raiz é o ícone do curso, e a home do curso não tem breadcrumb.
 
 - Controles locais do histórico de respostas expiram após 30 minutos configuráveis,
   sem expirar batches pendentes. ACK validado libera o batch, e o commit coerente

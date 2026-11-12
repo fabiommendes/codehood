@@ -1,14 +1,16 @@
 ---
-// The breadcrumb in AppLayout's top bar. Desktop only. It fades in once the
-// page header has scrolled under the bar, but stays in the layout and in the
-// accessibility tree while faded out, so nothing shifts and keyboard users can
-// still tab into it.
+// The breadcrumb at the top of the page content. On desktop it is sticky
+// above the top bar: as the page scrolls it rises into the middle of the bar,
+// lined up with the page column, and stays there. On phones the bar's middle
+// holds the logo, so it scrolls away with the content. The course root is
+// drawn as the course tile.
+import CourseTile from "@/components/CourseTile.astro";
 import { m } from "@/i18n";
 import type { Crumb } from "@/utils/breadcrumbs";
 
 interface Props {
 	trail: readonly Crumb[];
-	/// Always shown, ignoring the page header, for the design pages.
+	/// Plain, in place, for the design pages.
 	static?: boolean;
 }
 
@@ -21,14 +23,19 @@ const { trail, static: isStatic = false } = Astro.props;
       aria-label={m.nav_breadcrumb()}
       data-breadcrumbs
       data-static={isStatic || undefined}
-      data-shown={isStatic || undefined}
-      class="breadcrumbs hidden min-w-0 flex-1 overflow-hidden pr-4 text-sm text-muted lg:flex"
+      class="breadcrumbs flex h-9 min-w-0 items-center overflow-hidden py-0 text-sm text-muted"
     >
       <ul>
         {trail.map((crumb) => (
           <li>
             {crumb.href ? (
-              <a href={crumb.href}>{crumb.label}</a>
+              crumb.tile ? (
+                <a href={crumb.href} aria-label={crumb.label} title={crumb.label}>
+                  <CourseTile seed={crumb.tile} size={18} class="ring-1 ring-base-300" />
+                </a>
+              ) : (
+                <a href={crumb.href}>{crumb.label}</a>
+              )
             ) : (
               <span aria-current="page" class="text-base-content">
                 {crumb.label}
@@ -43,13 +50,27 @@ const { trail, static: isStatic = false } = Astro.props;
 
 <style>
   /* Lines the first crumb up with the usual page column (`mx-auto max-w-4xl
-     px-4`): the bar's section spans the same width as the content area, less
-     its own 1rem padding on each side. */
-  [data-breadcrumbs] {
-    padding-left: max(0px, calc((100% + 2rem - 56rem) / 2));
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 150ms ease;
+     px-4`) of the content area, and on desktop leaves the right end of the
+     top bar to its controls (`--crumbs-reserve`, measured below). */
+  [data-breadcrumbs]:not([data-static]) {
+    --crumbs-left: max(1rem, calc((100% - 56rem) / 2 + 1rem));
+    position: relative;
+    z-index: 40;
+    width: calc(100% - 2 * var(--crumbs-left));
+    margin: 1rem 0 -1.25rem var(--crumbs-left);
+  }
+  @media (min-width: 64rem) {
+    [data-breadcrumbs]:not([data-static]) {
+      position: sticky;
+      /* Centred in the 4rem bar. */
+      top: 0.875rem;
+      width: calc(100% - var(--crumbs-left) - var(--crumbs-reserve, 12rem));
+      /* Only the links take clicks; the rest of the box lies over the bar. */
+      pointer-events: none;
+    }
+    [data-breadcrumbs]:not([data-static]) a {
+      pointer-events: auto;
+    }
   }
   /* Daisy scrolls the list; here it shrinks. Middle crumbs share the room
      left by the course and the last crumb equally, each capped at its own
@@ -71,6 +92,7 @@ const { trail, static: isStatic = false } = Astro.props;
   }
   [data-breadcrumbs] > ul > li:first-child {
     flex: none;
+    min-width: 0;
   }
   [data-breadcrumbs] > ul > li:last-child {
     flex: none;
@@ -84,33 +106,16 @@ const { trail, static: isStatic = false } = Astro.props;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  [data-breadcrumbs][data-shown],
-  [data-breadcrumbs]:focus-within {
-    opacity: 1;
-    pointer-events: auto;
-  }
 </style>
 
 <script>
-  const nav = document.querySelector<HTMLElement>(
-    "[data-breadcrumbs]:not([data-static])",
-  );
-  if (nav) {
-    const header =
-      document.querySelector("[data-page-header]") ??
-      document.querySelector(".drawer-content h1");
-    if (!header) {
-      nav.dataset.shown = "";
-    } else {
-      // The sticky bar covers the top 4rem, so a header behind it is gone.
-      const bar = nav.closest(".navbar")?.getBoundingClientRect().height ?? 64;
-      new IntersectionObserver(
-        ([entry]) => {
-          if (entry?.isIntersecting) delete nav.dataset.shown;
-          else nav.dataset.shown = "";
-        },
-        { rootMargin: `-${bar}px 0px 0px 0px` },
-      ).observe(header);
-    }
+  // The bar's controls change width with the user's name; keep clear of them.
+  const controls = document.querySelector<HTMLElement>("[data-bar-controls]");
+  if (controls) {
+    const reserve = (): void => {
+      const width = controls.getBoundingClientRect().width;
+      document.documentElement.style.setProperty("--crumbs-reserve", `calc(${width}px + 2rem)`);
+    };
+    new ResizeObserver(reserve).observe(controls);
   }
 </script>

@@ -1,0 +1,140 @@
+---
+// The current course as a card in the sidebar: code and edition, the tab and
+// the entity the page belongs to, then at most two levels of links. An entry
+// with children folds like an accordion, one open at a time. Children sit
+// flush with their parent and are told apart by size, weight and colour.
+import CourseTile from "@/components/CourseTile.astro";
+import type { MarkedEntry, MarkedNav } from "@/utils/course-nav";
+
+interface Props {
+	course: { code: string; edition: string; href: string };
+	/// The tab of the page, when it has one.
+	tab?: string;
+	nav?: MarkedNav;
+}
+
+const { course, tab, nav } = Astro.props;
+
+const row = "flex min-w-0 items-start gap-2 rounded-field px-2";
+const parentTone = (entry: MarkedEntry) =>
+	entry.current
+		? "pencil relative bg-base-100 font-semibold text-primary"
+		: "font-medium text-base-content hover:bg-base-100";
+const child =
+	"text-[0.8125rem] leading-snug text-muted hover:text-base-content aria-[current=page]:font-medium aria-[current=page]:text-primary data-[active]:font-medium data-[active]:text-primary";
+const sections = nav?.sections.filter((s) => s.entries.length > 0) ?? [];
+---
+
+<section
+  aria-label={course.code}
+  class="cut mx-4 mb-4 border border-base-300 bg-base-200/60"
+>
+  <a href={course.href} class="flex items-center gap-2 px-4 pt-3 pb-2 text-sm hover:text-primary">
+    <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
+    <span class="font-mono font-semibold">{course.code}</span>
+    <span class="text-muted">· {course.edition}</span>
+  </a>
+
+  {
+    (tab || nav?.context) && (
+      <div class="border-t border-base-300 px-4 pt-2.5 pb-2">
+        {tab && <p class:list={["text-muted", nav?.context ? "text-xs" : "text-sm font-semibold text-base-content"]}>{tab}</p>}
+        {nav?.context && <p class="mt-0.5 text-sm leading-snug font-semibold text-base-content">{nav.context}</p>}
+      </div>
+    )
+  }
+
+  {
+    sections.length > 0 && (
+      <div class="px-2 pb-2">
+        {sections.map((section) => (
+          <div class="mt-1">
+            {section.label && (
+              <p class="flex justify-between px-2 pt-2 pb-1 text-[0.6875rem] font-medium tracking-wide text-muted uppercase">
+                <span>{section.label}</span>
+                <span class="tabular-nums">{section.meta}</span>
+              </p>
+            )}
+            <ul class="space-y-px">
+              {section.entries.map((entry) => {
+                const Leaf = entry.current ? "span" : "a";
+                return entry.children.length > 0 ? (
+                  <li>
+                    <details name="course-nav" open={entry.open} class="group">
+                      <summary class:list={[row, "cursor-pointer list-none py-1.5 text-sm [&::-webkit-details-marker]:hidden", parentTone(entry)]}>
+                        <span aria-current={entry.current ? "page" : undefined} class="min-w-0 flex-1 leading-snug">
+                          {entry.label}
+                        </span>
+                        {entry.meta !== undefined && <span class="mt-px text-xs font-normal tabular-nums text-muted">{entry.meta}</span>}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="mt-0.5 shrink-0 text-muted transition-transform group-open:rotate-180">
+                          <path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </summary>
+                      <ul class="mt-0.5 mb-1.5">
+                        {entry.children.map((link) => {
+                          const Tag = link.current ? "span" : "a";
+                          return (
+                            <li>
+                              <Tag
+                                href={link.current ? undefined : link.href}
+                                data-spy={link.anchor ? "" : undefined}
+                                aria-current={link.current ? "page" : undefined}
+                                class:list={[row, "py-1", child]}
+                              >
+                                <span class="min-w-0 flex-1">{link.label}</span>
+                                {link.meta !== undefined && <span class="text-xs tabular-nums">{link.meta}</span>}
+                              </Tag>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
+                  </li>
+                ) : (
+                  <li>
+                    <Leaf
+                      href={entry.current ? undefined : entry.href}
+                      data-spy={entry.anchor ? "" : undefined}
+                      aria-current={entry.current ? "page" : undefined}
+                      class:list={[row, "py-1.5 text-sm leading-snug data-[active]:text-primary", parentTone(entry)]}
+                    >
+                      <span class="min-w-0 flex-1">{entry.label}</span>
+                      {entry.meta !== undefined && <span class="mt-px text-xs font-normal tabular-nums text-muted">{entry.meta}</span>}
+                    </Leaf>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  }
+</section>
+
+<script>
+  // Marks the in-page link whose section is at the top of the viewport.
+  const targets = [...document.querySelectorAll<HTMLAnchorElement>("a[data-spy]")]
+    .map((link) => ({ link, section: document.getElementById(link.hash.slice(1)) }))
+    .filter((t): t is { link: HTMLAnchorElement; section: HTMLElement } => t.section !== null);
+  // Below the top bar, with some room to read the heading.
+  const LINE = 96;
+  let frame = 0;
+  const update = (): void => {
+    frame = 0;
+    let active = targets[0];
+    for (const t of targets) if (t.section.getBoundingClientRect().top <= LINE) active = t;
+    for (const t of targets) {
+      const on = t === active;
+      t.link.toggleAttribute("data-active", on);
+      if (on) t.link.setAttribute("aria-current", "location");
+      else t.link.removeAttribute("aria-current");
+    }
+  };
+  if (targets.length > 0) {
+    update();
+    addEventListener("scroll", () => {
+      frame ||= requestAnimationFrame(update);
+    }, { passive: true });
+  }
+</script>

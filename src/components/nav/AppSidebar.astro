@@ -1,10 +1,11 @@
 ---
 // The sidebar of AppLayout: global destinations, the user's courses, and a
 // sketch at the foot chosen by area. The current page or course is outlined
-// in pencil.
+// in pencil. The `course-nav` slot, when filled, replaces the row of the
+// current course (or follows the list when no course is current).
 import Sketch, { type SketchArt } from "@/components/brand/Sketch.astro";
-import CourseTile from "@/components/CourseTile.astro";
 import { m } from "@/i18n";
+import CourseRow from "./CourseRow.astro";
 
 export interface SidebarCourse {
 	code: string;
@@ -17,9 +18,11 @@ interface Props {
 	courses: SidebarCourse[];
 	currentPath: string;
 	admin?: boolean;
+	/// The `course-nav` slot holds the course card.
+	card?: boolean;
 }
 
-const { courses, currentPath, admin = false } = Astro.props;
+const { courses, currentPath, admin = false, card = false } = Astro.props;
 
 const nav = [
 	{
@@ -48,6 +51,11 @@ const nav = [
 		: []),
 ];
 
+// The course card, when the page has one, takes the place of its course's row.
+const cardAt = card ? courses.findIndex((course) => isActive(course.href)) : -1;
+const before = cardAt < 0 ? courses : courses.slice(0, cardAt);
+const after = cardAt < 0 ? [] : courses.slice(cardAt + 1);
+
 function isActive(href: string): boolean {
 	// `/` renders the home page by rewrite, so the request path reads `/home`.
 	if (href === "/") return currentPath === "/" || currentPath === "/home";
@@ -70,7 +78,8 @@ function sketch(): { art: SketchArt; seed?: string } {
 ---
 
 <div class="flex h-full w-64 flex-col border-r border-base-300 bg-base-100">
-  <ul class="menu min-h-0 w-full flex-1 flex-nowrap gap-1 overflow-y-auto p-4">
+  <div class="min-h-0 flex-1 overflow-y-auto">
+  <ul class="menu w-full flex-nowrap gap-1 p-4">
     {
       nav.map((item) => (
         <li>
@@ -107,27 +116,16 @@ function sketch(): { art: SketchArt; seed?: string } {
     }
 
     {courses.length > 0 && <li class="menu-title mt-4">{m.nav_courses()}</li>}
-    {
-      courses.map((course) => (
-        <li>
-          <a
-            href={course.href}
-            aria-current={isActive(course.href) ? "page" : undefined}
-            class:list={[
-              "cut gap-3 text-base-content hover:bg-base-200",
-              isActive(course.href) && "pencil relative font-semibold",
-            ]}
-          >
-            <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
-            <span class="flex-1 truncate">
-              <span class="font-mono">{course.code}</span>
-              <span class="text-muted"> · {course.edition}</span>
-            </span>
-            {course.teaching && <span class="badge badge-ghost badge-xs px-1">{m.nav_teaching()}</span>}
-          </a>
-        </li>
-      ))
-    }
+    {before.map((course) => <CourseRow course={course} active={isActive(course.href)} />)}
   </ul>
+  <slot name="course-nav" />
+  {
+    after.length > 0 && (
+      <ul class="menu w-full flex-nowrap gap-1 px-4 pb-4">
+        {after.map((course) => <CourseRow course={course} active={false} />)}
+      </ul>
+    )
+  }
+  </div>
   <Sketch {...sketch()} class="shrink-0 px-2 pb-2" />
 </div>

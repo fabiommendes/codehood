@@ -12,6 +12,8 @@ import { gradingHref, wantsNames } from "./grading-urls";
 export interface Crumb {
 	label: string;
 	href?: string;
+	/// Seed of the course tile drawn in place of the label (the course root).
+	tile?: string;
 }
 
 /** Labels for the parts of the trail the URL alone cannot spell. */
@@ -46,13 +48,15 @@ interface Step {
 	label: string | undefined;
 	path: string;
 	href?: string;
+	tile?: string;
 }
 
 /**
  * Builds the breadcrumb trail for `url`, upward from the current page.
  *
  * Steps whose label cannot be determined are dropped, and the last remaining
- * crumb is never linked.
+ * crumb is never linked. The course home has no trail, and the course root
+ * carries the seed of its tile.
  */
 export function breadcrumbs(url: URL, labels: CrumbLabels): Crumb[] {
 	const segments = url.pathname.split("/").filter(Boolean);
@@ -66,7 +70,11 @@ export function breadcrumbs(url: URL, labels: CrumbLabels): Crumb[] {
 	);
 	return known.map((step, i) =>
 		i < known.length - 1
-			? { label: step.label, href: step.href ?? step.path }
+			? {
+					label: step.label,
+					href: step.href ?? step.path,
+					...(step.tile ? { tile: step.tile } : {}),
+				}
 			: { label: step.label },
 	);
 }
@@ -80,10 +88,15 @@ function courseSteps(
 	const { discipline, edition } = labels.course ?? {};
 	const home = `/${segments.slice(0, 2).join("/")}`;
 	const steps: Step[] = [
-		{ label: `${discipline?.slug} \u00b7 ${edition?.slug}`, path: home },
+		{
+			label: `${discipline?.slug} \u00b7 ${edition?.slug}`,
+			path: home,
+			tile: home,
+		},
 	];
 	const tab = segments[2];
-	if (tab === undefined) return steps;
+	// The course home is the root itself: it has no trail.
+	if (tab === undefined) return [];
 	if (!Object.hasOwn(COURSE_TAB_LABELS, tab)) return steps;
 	const tabPath = `${home}/${tab}`;
 	steps.push({

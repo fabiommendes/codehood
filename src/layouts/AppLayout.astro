@@ -3,6 +3,7 @@ import Logo from "@/components/Logo.astro";
 import AppFooter from "@/components/nav/AppFooter.astro";
 import AppSidebar from "@/components/nav/AppSidebar.astro";
 import Breadcrumbs from "@/components/nav/Breadcrumbs.astro";
+import CourseCard from "@/components/nav/CourseCard.astro";
 import PencilFilter from "@/components/nav/PencilFilter.astro";
 import UserMenu from "@/components/nav/UserMenu.astro";
 import ReportDialog from "@/components/report/ReportDialog";
@@ -10,7 +11,12 @@ import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import { courseHref } from "@/urls";
-import { breadcrumbs, type Crumb } from "@/utils/breadcrumbs";
+import {
+	breadcrumbs,
+	COURSE_TAB_LABELS,
+	type Crumb,
+} from "@/utils/breadcrumbs";
+import { type CourseNav, markCourseNav } from "@/utils/course-nav";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -18,9 +24,12 @@ interface Props {
 	/// The breadcrumb in the top bar; defaults to the trail built from the URL
 	/// and `title`.
 	trail?: readonly Crumb[];
+	/// Links of a course page for the course card in the sidebar; the course
+	/// and the tab come from the URL. Without it the page has no card.
+	nav?: CourseNav;
 }
 
-const { title, trail } = Astro.props;
+const { title, trail, nav } = Astro.props;
 const crumbs = trail ?? breadcrumbs(Astro.url, { page: title });
 const user = Astro.locals.actor;
 
@@ -71,6 +80,27 @@ const reportContentPage =
 	CONTENT_TABS.has(
 		Astro.url.pathname.slice(reportCourseHref.length).split("/")[1] ?? "",
 	);
+
+// The course card: the course and tab from the URL, the rest from `nav`.
+const tabSegment =
+	reportCourseHref === null
+		? ""
+		: (Astro.url.pathname.slice(reportCourseHref.length).split("/")[1] ?? "");
+const card =
+	nav && reportCourse && reportCourseHref
+		? {
+				course: {
+					code: reportCourse.discipline.slug,
+					edition: reportCourse.edition.slug,
+					href: reportCourseHref,
+				},
+				tab:
+					tabSegment === ""
+						? m.nav_course_tab_home()
+						: (COURSE_TAB_LABELS as Record<string, string>)[tabSegment],
+				nav: markCourseNav(nav, Astro.url),
+			}
+		: null;
 ---
 
 <Layout title={title ? m.nav_page_title({ title }) : undefined}>
@@ -109,8 +139,7 @@ const reportContentPage =
         </a>
       </div>
       <div class="navbar-end w-auto min-w-0 flex-1 gap-2 pr-5.5 pl-4 lg:px-4">
-        <Breadcrumbs trail={crumbs} />
-        <div class="flex shrink-0 items-center gap-2">
+        <div data-bar-controls class="flex shrink-0 items-center gap-2">
           <ThemeToggle class={user ? "hidden lg:inline-flex" : undefined} />
           {
             user ? (
@@ -138,6 +167,7 @@ const reportContentPage =
           class="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 bg-gradient-to-b from-base-200 to-transparent"
         >
         </div>
+        <Breadcrumbs trail={crumbs} />
         <div id="content" tabindex="-1" class="relative z-10 flex-1 outline-none">
           <slot />
         </div>
@@ -153,7 +183,10 @@ const reportContentPage =
           courses={courses}
           currentPath={Astro.url.pathname}
           admin={user?.role === "ADMIN"}
-        />
+          card={card !== null}
+        >
+          {card && <CourseCard slot="course-nav" {...card} />}
+        </AppSidebar>
       </div>
     </div>
   </div>

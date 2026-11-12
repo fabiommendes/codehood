@@ -42,71 +42,68 @@ async function padPage(page: Page) {
 }
 
 test.describe("breadcrumb bar", () => {
-	test("desktop: the trail is in the top bar, linked, with the last crumb current", async ({
+	test("desktop: the trail opens the content, linked, with the course as its tile and the last crumb current", async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width: 1280, height: 800 });
 		const { course, href, url } = await examPage(page, "markup");
 		await page.goto(url);
 
-		const nav = page
-			.locator(".navbar")
-			.getByRole("navigation", { name: "Breadcrumb" });
+		const nav = page.getByRole("navigation", { name: "Breadcrumb" });
 		await expect(nav).toHaveCount(1);
+		await expect(page.locator(".navbar").getByRole("navigation")).toHaveCount(
+			0,
+		);
 
 		const label = `${course.discipline.slug} · ${course.edition.slug}`;
-		await expect(nav.getByRole("link")).toHaveText([label, "Exams"]);
-		await expect(nav.getByRole("link").nth(0)).toHaveAttribute("href", href);
-		await expect(nav.getByRole("link").nth(1)).toHaveAttribute(
-			"href",
-			`${href}/exams`,
-		);
+		const links = nav.getByRole("link");
+		await expect(links).toHaveCount(2);
+		await expect(links.nth(0)).toHaveAccessibleName(label);
+		await expect(links.nth(0).locator("svg")).toBeVisible();
+		await expect(links.nth(0)).toHaveAttribute("href", href);
+		await expect(links.nth(1)).toHaveText("Exams");
+		await expect(links.nth(1)).toHaveAttribute("href", `${href}/exams`);
 
 		const current = nav.locator('[aria-current="page"]');
 		await expect(current).toHaveCount(1);
 		await expect(current).toHaveText("Midterm Exam");
 		await expect(current.locator("xpath=self::a")).toHaveCount(0);
-		await expect(nav.getByRole("link", { name: "Midterm Exam" })).toHaveCount(
-			0,
-		);
 	});
 
-	test("desktop: shown only after the course header scrolls away, without layout shift", async ({
+	test("desktop: shown below the bar, then held inside it once the page scrolls, without moving the bar", async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width: 1280, height: 500 });
-		const { course, url } = await examPage(page, "scroll");
+		const { url } = await examPage(page, "scroll");
 		await page.goto(url);
 		await padPage(page);
 
 		const nav = page.getByRole("navigation", { name: "Breadcrumb" });
-		const header = page.getByRole("heading", {
-			level: 1,
-			name: course.discipline.name,
-		});
+		const bar = page.locator(".navbar");
 		const menu = page.locator(".navbar details.dropdown summary");
-
-		await expect(header).toBeInViewport();
-		await expect(nav).toHaveCSS("opacity", "0");
-		await expect(nav).toHaveCSS("pointer-events", "none");
+		const barBox = await bar.boundingBox();
 		const boxAtTop = await menu.boundingBox();
+
+		await expect(nav).toBeVisible();
+		expect((await nav.boundingBox())?.y).toBeGreaterThanOrEqual(
+			barBox?.height ?? 0,
+		);
 
 		await page.mouse.move(640, 300);
 		await page.mouse.wheel(0, 1500);
-		await expect(header).not.toBeInViewport();
-		await expect(nav).toHaveCSS("opacity", "1");
-		await expect(nav).toHaveCSS("pointer-events", "auto");
+		await expect
+			.poll(async () => (await nav.boundingBox())?.y ?? -1)
+			.toBeLessThan(barBox?.height ?? 0);
+		const held = await nav.boundingBox();
+		expect(held?.y).toBeGreaterThan(0);
+		expect((held?.y ?? 0) + (held?.height ?? 0)).toBeLessThanOrEqual(
+			barBox?.height ?? 0,
+		);
 		await nav.getByRole("link").first().click({ trial: true });
-		expect(await menu.boundingBox()).toEqual(boxAtTop);
-
-		await page.mouse.wheel(0, -5000);
-		await expect(header).toBeInViewport();
-		await expect(nav).toHaveCSS("opacity", "0");
-		await expect(nav).toHaveCSS("pointer-events", "none");
 		expect(await menu.boundingBox()).toEqual(boxAtTop);
 	});
 
-	test("phone: the breadcrumb is not displayed, even after scrolling", async ({
+	test("phone: the breadcrumb opens the content and scrolls away with it", async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width: 390, height: 600 });
@@ -114,12 +111,20 @@ test.describe("breadcrumb bar", () => {
 		await page.goto(url);
 		await padPage(page);
 
-		const nav = page.locator('nav[aria-label="Breadcrumb"]');
+		const nav = page.getByRole("navigation", { name: "Breadcrumb" });
 		await expect(nav.locator("a")).toHaveCount(2);
-		await expect(nav).not.toBeVisible();
+		await expect(nav).toBeInViewport();
 		await page.mouse.move(200, 300);
 		await page.mouse.wheel(0, 1500);
-		await expect(nav).not.toBeVisible();
+		await expect(nav).not.toBeInViewport();
+	});
+
+	test("course home: no breadcrumb", async ({ page }) => {
+		const { href } = await examPage(page, "home");
+		await page.goto(href);
+		await expect(
+			page.getByRole("navigation", { name: "Breadcrumb" }),
+		).toHaveCount(0);
 	});
 });
 
@@ -212,7 +217,7 @@ async function readTrail(page: Page) {
 	const nav = page.locator('nav[aria-label="Breadcrumb"]');
 	const links = await nav.locator("a").evaluateAll((els) =>
 		els.map((el) => ({
-			label: el.textContent?.trim() ?? "",
+			label: el.getAttribute("aria-label") ?? el.textContent?.trim() ?? "",
 			href: el.getAttribute("href"),
 		})),
 	);
@@ -323,7 +328,6 @@ test.describe("long trails", () => {
 		await padPage(page);
 		await page.mouse.move(500, 300);
 		await page.mouse.wheel(0, 1500);
-		await expect(nav).toHaveCSS("opacity", "1");
 
 		const navBox = await nav.boundingBox();
 		const toggleBox = await page
@@ -341,10 +345,10 @@ test.describe("long trails", () => {
 				.getByText(text, { exact: true })
 				.evaluate((el) => el.scrollWidth > el.clientWidth);
 		expect(await truncated(longTitle)).toBe(true);
-		expect(
-			await truncated(
-				`${course.discipline.slug} \u00b7 ${course.edition.slug}`,
-			),
-		).toBe(false);
+		await expect(
+			nav.getByRole("link", {
+				name: `${course.discipline.slug} \u00b7 ${course.edition.slug}`,
+			}),
+		).toBeVisible();
 	});
 });

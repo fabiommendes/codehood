@@ -1,0 +1,31 @@
+---
+// One course row of the sidebar's course list.
+import CourseTile from "@/components/CourseTile.astro";
+import { m } from "@/i18n";
+import type { SidebarCourse } from "./AppSidebar.astro";
+
+interface Props {
+	course: SidebarCourse;
+	active: boolean;
+}
+
+const { course, active } = Astro.props;
+---
+
+<li>
+  <a
+    href={course.href}
+    aria-current={active ? "page" : undefined}
+    class:list={[
+      "cut gap-3 text-base-content hover:bg-base-200",
+      active && "pencil relative font-semibold",
+    ]}
+  >
+    <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
+    <span class="flex-1 truncate">
+      <span class="font-mono">{course.code}</span>
+      <span class="text-muted"> · {course.edition}</span>
+    </span>
+    {course.teaching && <span class="badge badge-ghost badge-xs px-1">{m.nav_teaching()}</span>}
+  </a>
+</li>
