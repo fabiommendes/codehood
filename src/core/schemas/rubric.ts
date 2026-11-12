@@ -42,6 +42,8 @@ export const rubricItemSchema = z.object({
 	retiredAt: z.date().nullable(),
 	/// How many counting answers have the item in their current grade.
 	uses: z.number().int(),
+	/// The item's version for a conditional write; `null` while the rubric is still the initial one.
+	updatedAt: z.date().nullable(),
 });
 
 export const rubricSchema = z.object({
@@ -52,6 +54,8 @@ export const rubricSchema = z.object({
 	initial: z.boolean(),
 	/// How many counting answers apply a retired item.
 	review: z.number().int(),
+	/// The rubric's version for a conditional write; `null` while it is the initial rubric, which has no row.
+	updatedAt: z.date().nullable(),
 	items: z.array(rubricItemSchema),
 });
 

@@ -99,6 +99,10 @@ await writeCache(tx, "repository", { id }, { zipHash }); // cache: mantém a ver
   Se o service procura a linha antes e daria `NotFound`, chame
   `checkExpectedUpdatedAt(null, opts.expectedUpdatedAt)` antes do `NotFound`.
   Sem `expectedUpdatedAt`, o `NotFound` continua.
+- Linha oculta ao ator responde como ausente: com `Date`, 412 com `null`; sem
+  ele, `NotFound`. `requireAccess` recebe o `opts` para isso; num `NotFound`
+  escrito à mão, chame `checkExpectedUpdatedAt(null, opts.expectedUpdatedAt)`
+  antes dele.
 - Precisa de outra checagem entre a versão e a escrita (um 409 que um chamador
   obsoleto não deve ver)? `checkVersion` só confere, sem gravar.
 - Escritas derivadas em outras linhas (como recalcular eventos) também passam

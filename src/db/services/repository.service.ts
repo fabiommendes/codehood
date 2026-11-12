@@ -291,7 +291,11 @@ export function makeRepositoryService(
 					{},
 				);
 			}
-			await attachmentService.detach("REPOSITORY", row.id, { ...opts, tx });
+			await attachmentService.detach("REPOSITORY", row.id, {
+				...opts,
+				tx,
+				expectedUpdatedAt: undefined,
+			});
 			await guardedDelete(tx, "repository", { id: row.id }, opts);
 		},
 	});
@@ -362,7 +366,7 @@ export function makeRepositoryService(
 						buffer: files[hash as keyof typeof files] as Buffer,
 						attachedTo: { type: "REPOSITORY", id: row.id as RepositoryId },
 					},
-					{ ...opts, tx },
+					{ ...opts, tx, expectedUpdatedAt: undefined },
 				);
 			}
 			return { added: hashes };
@@ -400,7 +404,8 @@ export function makeRepositoryService(
 		): Promise<Repository> => {
 			const row = await writable(tx, filter, opts, "repository.update");
 			await checkVersion(tx, "repository", { id: row.id }, opts);
-			const inner = { ...opts, tx };
+			/// For the attachments: their rows have no version, so the expectation stays here.
+			const inner = { ...opts, tx, expectedUpdatedAt: undefined };
 			const owner = { type: "REPOSITORY", id: row.id as RepositoryId } as const;
 
 			// R7: every hash is a blob of this repository or a live blob of the server.

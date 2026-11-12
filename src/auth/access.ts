@@ -8,7 +8,12 @@ import {
 	hasPerm,
 	type ResponseWithCourse,
 } from "@/auth/permissions";
-import { type ActionCode, NotAllowed, NotFound } from "@/core/error";
+import {
+	type ActionCode,
+	NotAllowed,
+	NotFound,
+	PreconditionFailed,
+} from "@/core/error";
 import type { Exam } from "@/db/services/exam.service";
 import { hiddenFromStudents } from "@/services/exam-state";
 import { type QuestionStatus, visibility } from "@/services/question-status";
@@ -44,14 +49,23 @@ export function maxAccess(...levels: Access[]): Access {
  *
  * `opts.target` is recorded on the `NotAllowed`. `none` is `NotFound` of the resource `action` names (`exam.update` is an
  * `exam`); any other shortfall is `NotAllowed(action)`.
+ *
+ * A row the actor cannot see answers as a missing one (ADR 0013): when
+ * `opts.expectedUpdatedAt` is a `Date`, `none` is a {@link PreconditionFailed}
+ * carrying `null`, so the version check does not reveal that the row exists.
  */
 export function accessError(
 	access: Access,
 	needed: "read" | "write",
 	action: ActionCode,
-	opts?: { target?: unknown },
-): NotFound | NotAllowed | undefined {
-	if (access === "none") return new NotFound(action.split(".")[0] ?? action);
+	opts?: { target?: unknown; expectedUpdatedAt?: Date | null },
+): NotFound | NotAllowed | PreconditionFailed | undefined {
+	if (access === "none") {
+		if (opts?.expectedUpdatedAt instanceof Date) {
+			return new PreconditionFailed(null);
+		}
+		return new NotFound(action.split(".")[0] ?? action);
+	}
 	if (rank(access) < rank(needed)) return new NotAllowed(action, opts);
 }
 
@@ -59,13 +73,14 @@ export function accessError(
  * Throws what {@link accessError} returns.
  *
  * @throws {@link NotFound} If `access` is `none`.
+ * @throws {@link PreconditionFailed} If `access` is `none` and `opts.expectedUpdatedAt` is a `Date`.
  * @throws {@link NotAllowed} If `access` is below `needed`.
  */
 export function requireAccess(
 	access: Access,
 	needed: "read" | "write",
 	action: ActionCode,
-	opts?: { target?: unknown },
+	opts?: { target?: unknown; expectedUpdatedAt?: Date | null },
 ): void {
 	const error = accessError(access, needed, action, opts);
 	if (error) throw error;

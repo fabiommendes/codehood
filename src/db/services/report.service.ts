@@ -170,7 +170,7 @@ export function makeReportService(
 							buffer: file.bytes,
 							attachedTo: { type: "REPORT", id: row.id as ReportId },
 						},
-						{ ...opts, tx },
+						{ ...opts, tx, expectedUpdatedAt: undefined },
 					);
 				}
 
@@ -319,7 +319,11 @@ export function makeReportService(
 				ensurePerm(opts.actor, "report.delete", targetOf(row));
 				// Before the attachments go: a stale caller loses nothing.
 				await checkVersion(tx, "report", { id: row.id }, opts);
-				await attachments.detach("REPORT", row.id, { ...opts, tx });
+				await attachments.detach("REPORT", row.id, {
+					...opts,
+					tx,
+					expectedUpdatedAt: undefined,
+				});
 				await guardedDelete(tx, "report", { id: row.id }, opts);
 			},
 		});
@@ -399,7 +403,7 @@ export function makeReportService(
 /** The report service, as built by {@link makeReportService}. */
 export type ReportService = ReturnType<typeof makeReportService>;
 
-/// The report `pk`, or `NotFound` when it does not exist or `actor` may not read it.
+/// The report `pk`, or `NotFound` when it does not exist or `actor` may not read it; a `Date` expectation makes both a 412 with `null`.
 async function readableRow(
 	tx: PrismaTx,
 	pk: ReportPK,
@@ -410,9 +414,9 @@ async function readableRow(
 		where: { publicId: pk.publicId },
 		include: reportInclude,
 	});
-	// A missing row is a 412 for a caller that expected one; one the actor may not read stays a 404.
-	if (!row) checkExpectedUpdatedAt(null, expected);
+	// A row the actor may not read answers as a missing one, so the version check does not reveal it.
 	if (!row || !hasPerm(actor, "report.read", targetOf(row))) {
+		checkExpectedUpdatedAt(null, expected);
 		throw new NotFound("report", pk.publicId);
 	}
 	return row;

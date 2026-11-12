@@ -724,6 +724,8 @@ async function writableFeedback(
 		!hasPerm(actor, action, target) &&
 		!canReadFeedback(actor, row, new Date())
 	) {
+		// Hidden answers as missing: the version check must not reveal the pass.
+		checkExpectedUpdatedAt(null, expectedUpdatedAt);
 		throw new NotFound("feedback");
 	}
 	ensurePerm(actor, action, target);

@@ -27,6 +27,7 @@ export interface StoredItem {
 	feedback: string | null;
 	position: number;
 	retiredAt: Date | null;
+	updatedAt: Date;
 }
 
 /// A stored rubric with its items by position.
@@ -34,12 +35,13 @@ export interface StoredRubric {
 	id: number;
 	base: string;
 	sourceVersion: string | null;
+	updatedAt: Date;
 	items: StoredItem[];
 }
 
 /// The question's initial rubric as read from its stored version.
 export interface InitialRubric {
-	items: Omit<StoredItem, "id" | "retiredAt">[];
+	items: Omit<StoredItem, "id" | "retiredAt" | "updatedAt">[];
 	sourceVersion: string | null;
 }
 
@@ -55,6 +57,7 @@ export async function findStoredRubric(
 			id: true,
 			base: true,
 			sourceVersion: true,
+			updatedAt: true,
 			items: { orderBy: { position: "asc" } },
 		},
 	});
@@ -129,6 +132,7 @@ export async function materializeRubric(
 			id: true,
 			base: true,
 			sourceVersion: true,
+			updatedAt: true,
 			items: { orderBy: { position: "asc" } },
 		},
 	});

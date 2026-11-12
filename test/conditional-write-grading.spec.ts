@@ -13,6 +13,7 @@ import {
 	type ScenarioAnswer,
 	storedScore,
 } from "@/fixtures/rubric-scenario";
+import { persistedUserFactory } from "@/fixtures/user.factory";
 
 /// ADR 0013 for feedback, rubric (with its items) and regradeRequest. Every
 /// scenario creates its own course, exam and users, so no spec depends on the
@@ -773,4 +774,114 @@ test("regradeRequest.accept: the pass it writes moves the response through the s
 	expect(
 		(await responseRow(answer.response.publicId)).updatedAt.getTime(),
 	).toBeGreaterThan(before.updatedAt.getTime());
+});
+
+// rubric read model
+
+test("rubric read model: the rubric and its items carry the version a conditional write needs, null before the first copy", async () => {
+	const { scenario, pk } = await rubricScenario();
+	const row = await rubricRow(scenario.exam.id);
+	const read = await db.rubric.findOne(pk, as(scenario));
+	expect(read.updatedAt?.getTime()).toBe(row.updatedAt.getTime());
+	const item = await prisma.rubricItem.findFirstOrThrow({
+		where: { rubricId: row.id, key: "a" },
+	});
+	expect(
+		read.items.find((entry) => entry.key === "a")?.updatedAt?.getTime(),
+	).toBe(item.updatedAt.getTime());
+
+	const fresh = await createRubricScenario({
+		rubric: [{ value: "0.5", path: "G/One", text: "One" }],
+	});
+	const initial = await db.rubric.findOne(fresh.main.pk, as(fresh));
+	expect(initial.initial).toBe(true);
+	expect(initial.updatedAt).toBeNull();
+	expect(initial.items.length).toBeGreaterThan(0);
+	for (const entry of initial.items) expect(entry.updatedAt).toBeNull();
+
+	// the version read is the one a conditional write accepts
+	await db.rubric.update(pk, { base: "1" }, as(scenario, read.updatedAt));
+});
+
+test("submission refuses an expectation: its rows have no version to check", async () => {
+	const scenario = await createRubricScenario();
+	const answer = await scenario.addAnswer();
+	const submission = { publicId: answer.submission.publicId };
+	for (const expected of [new Date(), null]) {
+		await expect(
+			db.submission.update(
+				submission,
+				{ status: "WILL_NOT_GRADE" },
+				as(scenario, expected),
+			),
+		).rejects.toBeInstanceOf(InvalidData);
+		await expect(
+			db.submission.delete(submission, as(scenario, expected)),
+		).rejects.toBeInstanceOf(InvalidData);
+		await expect(
+			db.submission.create(
+				{
+					response: answer.response,
+					question: scenario.main.pk.question,
+					payload: answer.submission.payload,
+				},
+				as(scenario, expected),
+			),
+		).rejects.toBeInstanceOf(InvalidData);
+	}
+	expect(
+		(await db.submission.findOne(submission, as(scenario)))?.status,
+	).not.toBe("WILL_NOT_GRADE");
+});
+
+// hidden rows answer as missing ones
+
+test("feedback and regradeRequest: a row the actor may not read answers a Date as a missing one does, a 412 with null", async () => {
+	const ctx = await regradeScenario();
+	const stranger = await persistedUserFactory.create({ role: "STUDENT" });
+	const strangerAs = (expected?: Date | null) => ({
+		actor: {
+			username: stranger.username,
+			name: stranger.name,
+			role: stranger.role,
+		},
+		...(expected === undefined ? {} : { expectedUpdatedAt: expected }),
+	});
+	const pass = await prisma.feedback.findFirstOrThrow({
+		where: { submissionId: ctx.answer.submission.id },
+	});
+	const hiddenPass = { id: pass.id as FeedbackId };
+	const absentPass = { id: 2_000_000_000 as FeedbackId };
+	const hiddenRequest = { publicId: ctx.request.publicId };
+	const absentRequest = { publicId: "nope-0000" };
+
+	type Run = (
+		target: "hidden" | "absent",
+		expected?: Date | null,
+	) => Promise<unknown>;
+	const runs: Run[] = [
+		(t, e) =>
+			db.feedback.update(
+				t === "hidden" ? hiddenPass : absentPass,
+				{ notes: "x" },
+				strangerAs(e),
+			),
+		(t, e) =>
+			db.feedback.delete(
+				t === "hidden" ? hiddenPass : absentPass,
+				strangerAs(e),
+			),
+		(t, e) =>
+			db.regradeRequest.reject(
+				t === "hidden" ? hiddenRequest : absentRequest,
+				{ reply: "x" },
+				strangerAs(e),
+			),
+	];
+	for (const run of runs) {
+		expect((await failure(run("hidden", STALE))).updatedAt).toBeNull();
+		expect((await failure(run("absent", STALE))).updatedAt).toBeNull();
+		await expect(run("hidden")).rejects.toBeInstanceOf(NotFound);
+		await expect(run("absent")).rejects.toBeInstanceOf(NotFound);
+	}
 });

@@ -284,13 +284,14 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 				const where = {
 					rollCallId_username: { rollCallId: current.id, username: name },
 				};
+				const existing = await tx.attendance.findUnique({ where });
 				if (entry === null) {
 					const removed = await tx.attendance.deleteMany({
 						where: { rollCallId: current.id, username: name },
 					});
 					changed ||= removed.count > 0;
-				} else if (await tx.attendance.findUnique({ where })) {
-					if (entry.note !== undefined) {
+				} else if (existing) {
+					if (entry.note !== undefined && entry.note !== existing.note) {
 						await tx.attendance.update({
 							where,
 							data: { note: entry.note },
@@ -312,7 +313,10 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 
 			// The attendances are part of the read model, so a change to them moves
 			// the roll call's version even when its own fields stay.
-			if (fields.actsAsInvite !== undefined) {
+			if (
+				fields.actsAsInvite !== undefined &&
+				fields.actsAsInvite !== current.actsAsInvite
+			) {
 				await guardedUpdate(
 					tx,
 					"rollCall",
@@ -707,7 +711,12 @@ async function manageable(
 	// A missing course is a 404 whatever the expectation: `rollCallWhere` throws it.
 	const found = await tx.rollCall.findFirst({
 		where: await rollCallWhere(tx, filter),
-		select: { id: true, secret: true, event: { select: eventSelect } },
+		select: {
+			id: true,
+			secret: true,
+			actsAsInvite: true,
+			event: { select: eventSelect },
+		},
 	});
 	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
 	const row = valueOrNotFound("roll-call", found);

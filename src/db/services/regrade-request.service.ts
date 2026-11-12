@@ -242,6 +242,8 @@ async function openRequest(
 		throw new NotFound("regrade request");
 	}
 	if (!hasPerm(actor, "regrade.read", targetOf(row))) {
+		// Hidden answers as missing: the version check must not reveal the request.
+		checkExpectedUpdatedAt(null, expectedUpdatedAt);
 		throw new NotFound("regrade request");
 	}
 	ensurePerm(actor, perm, targetOf(row));

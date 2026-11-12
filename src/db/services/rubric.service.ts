@@ -117,10 +117,12 @@ export const makeRubricService = defineService()(() => {
 				sourceVersion: initial.sourceVersion,
 				initial: true,
 				review: 0,
+				updatedAt: null,
 				items: initial.items.map((item) => ({
 					...item,
 					retiredAt: null,
 					uses: 0,
+					updatedAt: null,
 				})),
 			};
 		},
@@ -600,6 +602,7 @@ async function view(
 		sourceVersion: rubric.sourceVersion,
 		initial: false,
 		review: standing.review,
+		updatedAt: rubric.updatedAt,
 		items: rubric.items.map((item) =>
 			toItem(item, standing.uses.get(item.id) ?? 0),
 		),
@@ -618,6 +621,7 @@ function toItem(row: StoredItem, uses: number): RubricItem {
 		position: row.position,
 		retiredAt: row.retiredAt,
 		uses,
+		updatedAt: row.updatedAt,
 	};
 }
 

@@ -727,6 +727,7 @@ async function writableRef(
 		questionAccess(actor, ref, await isPinned(tx, ref)),
 		"write",
 		action,
+		opts,
 	);
 	return ref;
 }

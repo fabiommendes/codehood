@@ -4,6 +4,7 @@ import { NotFound, PreconditionFailed } from "@/core/error";
 import type { ExamExceptionId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import {
 	actorOf,
 	at,
@@ -640,4 +641,116 @@ test("renaming a report's attachment bumps the report, which shows the file name
 	);
 	expect(after?.attachments.map((a) => a.filename)).toEqual(["b.png"]);
 	expect(ms(after?.updatedAt ?? STALE)).toBeGreaterThan(ms(report.updatedAt));
+});
+
+//
+// A row hidden from the actor answers as a missing one
+//
+
+test("exam: a draft that the actor may not see answers a Date as a missing exam does, a 412 with null", async () => {
+	const { course } = await makeCourse();
+	const student = await enroll(course.id);
+	const draft = await makeExam(course.id, { status: "DRAFT" });
+	const hidden = { course: course.id, slug: draft.slug };
+	const absent = { course: course.id, slug: tag("nope-") };
+	const as = (expected?: Date | null) => ({
+		...actorOf(student),
+		...(expected === undefined ? {} : { expectedUpdatedAt: expected }),
+	});
+
+	for (const run of [
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.exam.update(filter, { title: "x" }, as(expected)),
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.exam.delete(filter, as(expected)),
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.exam.releaseGrades(filter, as(expected)),
+	]) {
+		const seen = await failure(run(hidden, draft.updatedAt));
+		const missing = await failure(run(absent, draft.updatedAt));
+		expect(seen.updatedAt).toBeNull();
+		expect(missing.updatedAt).toBeNull();
+		await expect(run(hidden)).rejects.toBeInstanceOf(NotFound);
+		await expect(run(absent)).rejects.toBeInstanceOf(NotFound);
+		await expect(run(hidden, null)).rejects.toBeInstanceOf(NotFound);
+	}
+});
+
+test("response: another student's attempt answers a Date as a missing one does, a 412 with null", async () => {
+	const { course, response } = await makeResponse();
+	const other = await enroll(course.id);
+	const hidden = { publicId: response.publicId };
+	const absent = { publicId: tag("nope-") };
+	const as = (expected?: Date | null) => ({
+		...actorOf(other),
+		...(expected === undefined ? {} : { expectedUpdatedAt: expected }),
+	});
+
+	for (const run of [
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.response.update(filter, { acceptingSubmissions: false }, as(expected)),
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.response.delete(filter, as(expected)),
+	]) {
+		const seen = await failure(run(hidden, response.updatedAt));
+		const missing = await failure(run(absent, response.updatedAt));
+		expect(seen.updatedAt).toBeNull();
+		expect(missing.updatedAt).toBeNull();
+		await expect(run(hidden)).rejects.toBeInstanceOf(NotFound);
+		await expect(run(absent)).rejects.toBeInstanceOf(NotFound);
+	}
+	expect(
+		(
+			await prisma.response.findUniqueOrThrow({
+				where: { publicId: response.publicId },
+			})
+		).acceptingSubmissions,
+	).toBe(true);
+});
+
+test("question: a draft that the actor may not see answers a Date as a missing question does, a 412 with null", async () => {
+	const { course } = await makeCourse();
+	const student = await enroll(course.id);
+	const draft = await persistedQuestionFactory.create(
+		{ course: course.id, slug: tag("q-"), status: "DRAFT" },
+		{ transient: { type: "essay" } },
+	);
+	const hidden = { course: course.id, slug: draft.slug };
+	const absent = { course: course.id, slug: tag("nope-") };
+	const as = (expected?: Date | null) => ({
+		...actorOf(student),
+		...(expected === undefined ? {} : { expectedUpdatedAt: expected }),
+	});
+
+	for (const run of [
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.question.delete(filter, as(expected)),
+	]) {
+		expect((await failure(run(hidden, draft.updatedAt))).updatedAt).toBeNull();
+		expect((await failure(run(absent, draft.updatedAt))).updatedAt).toBeNull();
+		await expect(run(hidden)).rejects.toBeInstanceOf(NotFound);
+		await expect(run(absent)).rejects.toBeInstanceOf(NotFound);
+	}
+});
+
+test("report: another student's report answers a Date as a missing one does, a 412 with null", async () => {
+	const { course, report } = await makeReport();
+	const other = await enroll(course.id);
+	const as = (expected?: Date | null) => ({
+		...actorOf(other),
+		...(expected === undefined ? {} : { expectedUpdatedAt: expected }),
+	});
+	const hidden = { publicId: report.publicId };
+	const absent = { publicId: tag("nope-") };
+	for (const run of [
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.report.update(filter, { note: "x" }, as(expected)),
+		(filter: typeof hidden, expected?: Date | null) =>
+			db.report.delete(filter, as(expected)),
+	]) {
+		expect((await failure(run(hidden, STALE))).updatedAt).toBeNull();
+		expect((await failure(run(absent, STALE))).updatedAt).toBeNull();
+		await expect(run(hidden)).rejects.toBeInstanceOf(NotFound);
+		await expect(run(absent)).rejects.toBeInstanceOf(NotFound);
+	}
 });

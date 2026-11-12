@@ -702,6 +702,7 @@ async function writableResponse(
 	const target = responseTarget(row);
 	requireAccess(responseAccess(actor, target), "write", action, {
 		target: simplifyTarget(action, target),
+		expectedUpdatedAt: expected,
 	});
 	return row;
 }

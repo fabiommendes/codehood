@@ -434,7 +434,7 @@ export const makeExamService = defineService<ExamT>()(() => {
 			});
 			if (!row) return missingExam(tx, filter, opts.expectedUpdatedAt);
 
-			requireAccess(examAccess(opts.actor, row), "write", "exam.update");
+			requireAccess(examAccess(opts.actor, row), "write", "exam.update", opts);
 			// An exam that is already released is returned as it is, but not to a stale caller.
 			await checkVersion(tx, "exam", { id: row.id }, opts);
 
@@ -633,7 +633,7 @@ async function writableExam(
 	});
 	if (!exam) return missingExam(tx, filter, opts.expectedUpdatedAt);
 
-	requireAccess(examAccess(opts.actor, exam), "write", action);
+	requireAccess(examAccess(opts.actor, exam), "write", action, opts);
 	return exam;
 }
 

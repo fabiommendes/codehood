@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
-import { NotFound, PreconditionFailed } from "@/core/error";
+import { InvalidData, NotFound, PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
@@ -513,6 +513,29 @@ test("rollCall.update: the attendances are in the read model, so changing them a
 	expect(removed.attendances).toEqual({});
 });
 
+test("rollCall.update: writing the same note or the same actsAsInvite again keeps the version", async () => {
+	const { rollCall, student } = await makeRollCall();
+	const marked = await db.rollCall.update(
+		{ id: rollCall.id },
+		{ actsAsInvite: true, attendances: { [student.username]: { note: "a" } } },
+		at(rollCall.updatedAt),
+	);
+	const again = await db.rollCall.update(
+		{ id: rollCall.id },
+		{ actsAsInvite: true, attendances: { [student.username]: { note: "a" } } },
+		at(marked.updatedAt),
+	);
+	expect(again.updatedAt).toEqual(marked.updatedAt);
+	const flipped = await db.rollCall.update(
+		{ id: rollCall.id },
+		{ actsAsInvite: false },
+		at(again.updatedAt),
+	);
+	expect(flipped.updatedAt.getTime()).toBeGreaterThan(
+		again.updatedAt.getTime(),
+	);
+});
+
 test("rollCall.update: a change that touches nothing keeps the version", async () => {
 	const { rollCall, student } = await makeRollCall();
 	const out = await db.rollCall.update(
@@ -648,6 +671,25 @@ test("attachment.update of a resource's file bumps the resource and shows the ne
 		resource.updatedAt.getTime(),
 	);
 	expect(JSON.stringify(after?.data)).toContain("b.txt");
+});
+
+test("attachment refuses an expectation: its rows have no version to check", async () => {
+	const { attachment } = await makeFileResource();
+	for (const expected of [new Date(), null]) {
+		await expect(
+			db.attachment.update(
+				{ id: attachment.id },
+				{ filename: "z.txt" },
+				at(expected),
+			),
+		).rejects.toBeInstanceOf(InvalidData);
+		await expect(
+			db.attachment.delete({ id: attachment.id }, at(expected)),
+		).rejects.toBeInstanceOf(InvalidData);
+	}
+	expect(await prisma.attachment.count({ where: { id: attachment.id } })).toBe(
+		1,
+	);
 });
 
 test("attachment.update to the same name changes nothing, so the resource keeps its version", async () => {

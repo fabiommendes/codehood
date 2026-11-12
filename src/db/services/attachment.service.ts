@@ -13,7 +13,7 @@ import {
 	attachmentUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
-import { touch } from "@/db/conditional-write";
+import { rejectExpectedUpdatedAt, touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
@@ -251,6 +251,7 @@ export function makeAttachmentService(
 				input: AttachmentCreate,
 				opts: ServiceOptsWithoutTx,
 			): Promise<Attachment> => {
+				rejectExpectedUpdatedAt(opts);
 				const filename = sanitizeFilename(input.filename);
 				const mimeType = mimeFor(filename);
 
@@ -358,6 +359,7 @@ export function makeAttachmentService(
 				fields: AttachmentUpdate,
 				opts: ServiceOptsWithoutTx,
 			): Promise<Attachment> => {
+				rejectExpectedUpdatedAt(opts);
 				const target = await findOne(tx, filter, opts);
 				if (!target) throw new NotFound("attachment", { id: filter.id });
 
@@ -396,6 +398,7 @@ export function makeAttachmentService(
 				filter: AttachmentPK,
 				opts: ServiceOptsWithoutTx,
 			): Promise<void> => {
+				rejectExpectedUpdatedAt(opts);
 				// The raw row, not `findOne`: an owner deleted first must not block this.
 				const target = await tx.attachment.findUnique({
 					where: { id: filter.id },
@@ -439,8 +442,9 @@ export function makeAttachmentService(
 				tx: PrismaTx,
 				type: AttachmentToType,
 				attachedToId: number,
-				_opts: ServiceOptsWithoutTx,
+				opts: ServiceOptsWithoutTx,
 			): Promise<{ deleted: number }> => {
+				rejectExpectedUpdatedAt(opts);
 				const rows = await tx.attachment.findMany({
 					where: { attachedToType: type, attachedToId },
 				});
@@ -485,6 +489,7 @@ export function makeAttachmentService(
 				input: AttachmentAttach,
 				opts: ServiceOptsWithoutTx,
 			): Promise<Attachment> => {
+				rejectExpectedUpdatedAt(opts);
 				const stored = await tx.blob.findUnique({
 					where: { hash: input.hash },
 				});

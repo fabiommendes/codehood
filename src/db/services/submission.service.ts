@@ -25,7 +25,7 @@ import {
 	submissionUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
-import { touch } from "@/db/conditional-write";
+import { rejectExpectedUpdatedAt, touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { assertResponse, type QuestionDocument, ResponseError } from "@/mdq";
@@ -168,6 +168,7 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 			input: SubmissionCreate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Submission> => {
+			rejectExpectedUpdatedAt(opts);
 			const response = valueOrNotFound(
 				"response",
 				await tx.response.findFirst({
@@ -338,6 +339,7 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 			fields: SubmissionUpdate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Submission> => {
+			rejectExpectedUpdatedAt(opts);
 			const submission = await writableSubmission(
 				tx,
 				filter,
@@ -376,6 +378,7 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 			filter: SubmissionPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
+			rejectExpectedUpdatedAt(opts);
 			const submission = await writableSubmission(
 				tx,
 				filter,

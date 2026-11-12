@@ -49,6 +49,10 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
   `updatedAt: null` (412), em `update`, `upsert` e `delete`, não com
   `NotFound`. Quando o que falta é a mãe que compõe a chave (o curso de um
   recurso), a resposta continua `NotFound`.
+- Uma linha oculta ao ator (a tentativa de outro aluno, um exame `DRAFT` visto
+  por aluno) responde igual a uma ausente, para a versão não revelar que ela
+  existe: com `Date`, as duas dão 412 com `null`; sem `Date`, as duas dão
+  `NotFound`. Uma linha visível mas não editável continua `NotAllowed`.
 - A comparação é feita em milissegundos (`getTime()`), nunca pelo texto
   gravado no SQLite: linhas antigas podem ter o `updatedAt` em outro formato.
 - A regra vale para todo service cujo modelo tem `updatedAt`. `Discipline`
