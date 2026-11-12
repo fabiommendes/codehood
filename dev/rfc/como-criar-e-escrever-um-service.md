@@ -62,6 +62,33 @@ Os tipos exatos estão em `src/db/base-service.ts`.
 deixar a violação de unicidade virar um 500. O helper `invalidIfExists`, em
 `src/db/utils.ts`, faz essa verificação.
 
+## Escrita condicional
+
+Todo `update`, `upsert` e `delete` de um modelo com `updatedAt` honra
+`opts.expectedUpdatedAt` (ADR 0013), sempre pelo helper de
+`src/db/conditional-write.ts`:
+
+- `guardRow(tx, { model, where }, opts)` confere a versão dentro da transação,
+  reivindica a linha (compare-and-swap) e devolve o próximo `updatedAt`.
+  Passe-o como `updatedAt` no `update` da própria linha: sem isso o
+  `@updatedAt` do Prisma grava só o relógio, que pode repetir dentro do mesmo
+  milissegundo. Chame em toda escrita, condicional ou não.
+- Mudou só filhos que o read model da linha mostra (tags, questões,
+  repositórios)? Chame `guardRow` na linha mãe e ignore o retorno.
+- No `upsert`, quando a linha não existe, use
+  `checkExpectedUpdatedAt(null, opts.expectedUpdatedAt)`: um `Date` falha, e
+  `null` ou ausente passa. Quando existe, `guardRow` recusa o `null`.
+- Escritas derivadas em outras linhas (como recalcular eventos) também passam
+  por `guardRow`, para a versão antiga dessas linhas ficar obsoleta.
+- Não repasse `opts` a outro service sobre outra linha: o
+  `expectedUpdatedAt` é desta.
+- Modelo sem `updatedAt` (ex.: `Edition`) chama `rejectExpectedUpdatedAt(opts)`
+  no início de cada escrita: a condição é recusada, não ignorada.
+
+`test/conditional-write-sweep.spec.ts` falha quando um service registrado em
+`db` escreve um modelo com `updatedAt` e não está em `HONORED` (com um caso
+obsoleto por escrita). `PENDING` lista os que ainda faltam e deve ficar vazia.
+
 ## REST API
 
 A maioria dos Services tem REST API (ADR 0007). Quando tiver, acrescente

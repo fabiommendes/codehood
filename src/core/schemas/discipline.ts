@@ -15,6 +15,7 @@ export const disciplineSchema = z.object({
 			},
 		}),
 	createdAt: z.date(),
+	updatedAt: z.date(),
 });
 
 export const disciplineCreate = disciplineSchema

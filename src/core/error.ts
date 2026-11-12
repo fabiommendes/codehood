@@ -13,6 +13,7 @@ import {
 	type NotAllowedAction,
 	type NotAllowedResponse,
 	type NotFoundResponse,
+	type PreconditionFailedResponse,
 	type RuleViolationResponse,
 	type TooManyRequestsResponse,
 	toJsonValueOrNothing,
@@ -403,6 +404,32 @@ export class TooManyRequests extends BaseSerializableError<TooManyRequestsRespon
 
 	protected _toJsonExtra(): Record<string, never> {
 		return {};
+	}
+}
+
+/**
+ * Thrown when a conditional write finds the row at another version than the
+ * caller expected (`ServiceOpts.expectedUpdatedAt`).
+ *
+ * Carries the row's current `updatedAt`, or `null` when the row does not
+ * exist, so the caller can reread and retry.
+ */
+export class PreconditionFailed extends BaseSerializableError<PreconditionFailedResponse> {
+	readonly code = "precondition-failed";
+	readonly status: 412 = 412;
+	readonly updatedAt: Date | null;
+
+	constructor(updatedAt: Date | null, message?: string) {
+		super(
+			message ?? m.errors_precondition_failed(),
+			"precondition-failed",
+			412,
+		);
+		this.updatedAt = updatedAt;
+	}
+
+	protected _toJsonExtra(): { updatedAt: string | null } {
+		return { updatedAt: this.updatedAt?.toISOString() ?? null };
 	}
 }
 

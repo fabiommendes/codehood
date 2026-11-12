@@ -5,6 +5,8 @@
 	"errors_internal": "Internal server error",
 	"errors_service_unavailable": "Service unavailable",
 	"errors_too_many_requests": "Too many requests",
+	"errors_precondition_failed": "Precondition failed: the record changed since it was read",
+	"errors_precondition_unsupported": "The record does not accept a version precondition",
 	"errors_report_attachment_type": "Attachments must be .png, .jpg, .jpeg or .webp images.",
 	"errors_report_attachment_size": "An attachment must be at most 2 MiB.",
 	"errors_validation": "Validation Error",

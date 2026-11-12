@@ -13,7 +13,8 @@ export type ErrorResponse =
 	| RuleViolationResponse
 	| InternalErrorResponse
 	| BadRequestResponse
-	| TooManyRequestsResponse;
+	| TooManyRequestsResponse
+	| PreconditionFailedResponse;
 
 export interface BaseErrorResponse {
 	type: "error";
@@ -91,6 +92,17 @@ export interface BadRequestResponse extends BaseErrorResponse {
 export interface TooManyRequestsResponse extends BaseErrorResponse {
 	code: "too-many-requests";
 	status: 429;
+}
+
+/**
+ * A conditional write found the row at another version than the caller
+ * expected. `updatedAt` is the row's current version in ISO 8601 with
+ * milliseconds, or `null` when the row does not exist.
+ */
+export interface PreconditionFailedResponse extends BaseErrorResponse {
+	code: "precondition-failed";
+	status: 412;
+	updatedAt: string | null;
 }
 
 /**

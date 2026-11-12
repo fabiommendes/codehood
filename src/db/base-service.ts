@@ -1,6 +1,6 @@
 import type { Actor } from "@/auth/actor";
 import type { ActionCode } from "@/core/error";
-import { NotAllowed } from "@/core/error";
+import { NotAllowed, PreconditionFailed } from "@/core/error";
 import type { PrismaClient, PrismaTx } from "./client";
 
 /**
@@ -11,6 +11,18 @@ export type ServiceOpts = {
 	tx?: PrismaTx;
 	actor: Actor;
 	validate?: "both" | "none" | "input" | "output";
+
+	/**
+	 * Makes `update`, `upsert` and `delete` conditional on the row's version
+	 * (ADR 0013), see `src/db/conditional-write.ts`.
+	 *
+	 * - `Date`: the row must exist with exactly this `updatedAt`;
+	 * - `null`: the row must not exist (only meaningful for `upsert`);
+	 * - absent: unconditional write.
+	 *
+	 * A mismatch throws `PreconditionFailed` and writes nothing.
+	 */
+	expectedUpdatedAt?: Date | null;
 };
 export type ServiceOptsWithoutTx = Omit<ServiceOpts, "tx">;
 
@@ -114,6 +126,10 @@ export interface Crud<
  * The steps run on `opts.tx` when the caller passes one, and otherwise in a
  * transaction opened on `client`, so two upserts of the same new key cannot
  * both miss the row and both create it.
+ *
+ * `opts.expectedUpdatedAt` (ADR 0013) goes to the branch that runs: `null`
+ * requires the create branch and a `Date` the update branch, and a row on the
+ * wrong side throws `PreconditionFailed` with its current `updatedAt`.
  */
 export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 	service: Crud<{
@@ -160,6 +176,7 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 		tx: args.tx,
 		actor: args.actor,
 		validate: args.validate,
+		expectedUpdatedAt: args.expectedUpdatedAt,
 	};
 
 	const pkFilter = args.pk(input);
@@ -172,12 +189,20 @@ export async function upsert<Entity, Filter, PkFilter, CreateIn, UpdateIn, In>(
 	}
 
 	if (existing) {
+		if (args.expectedUpdatedAt === null) {
+			const { updatedAt } = existing as { updatedAt?: Date };
+			throw new PreconditionFailed(updatedAt ?? null);
+		}
 		await args.assertCreatable?.(input, scoped);
 		const update = args.update
 			? args.update(input)
 			: (input as unknown as UpdateIn);
 
 		return service.update(pkFilter, update, scoped);
+	}
+
+	if (args.expectedUpdatedAt instanceof Date) {
+		throw new PreconditionFailed(null);
 	}
 
 	const create = args.create

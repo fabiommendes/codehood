@@ -5,6 +5,8 @@
 	"errors_internal": "Erro interno do servidor",
 	"errors_service_unavailable": "Serviço indisponível",
 	"errors_too_many_requests": "Muitas requisições",
+	"errors_precondition_failed": "Pré-condição falhou: o registro mudou desde que foi lido",
+	"errors_precondition_unsupported": "O registro não aceita pré-condição de versão",
 	"errors_report_attachment_type": "Os anexos devem ser imagens .png, .jpg, .jpeg ou .webp.",
 	"errors_report_attachment_size": "Um anexo deve ter no máximo 2 MiB.",
 	"errors_validation": "Erro de validação",
