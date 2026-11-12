@@ -23,6 +23,12 @@ import {
 	questionUpdate,
 } from "@/core/schemas";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -162,7 +168,7 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 				where: { courseId: course.id, slug: input.slug, status: "ARCHIVED" },
 				select: { id: true, slug: true },
 			});
-			if (archived) return applyWrite(tx, archived, input);
+			if (archived) return applyWrite(tx, archived, input, {});
 
 			const row = await tx.questionRef.create({
 				data: {
@@ -173,7 +179,7 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 					courseId: course.id,
 				},
 			});
-			return applyWrite(tx, row, input);
+			return applyWrite(tx, row, input, {});
 		},
 	});
 
@@ -351,7 +357,15 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 			}
 			if (fields.question) assertWellFormed(fields.question);
 
-			const ref = await writableRef(tx, filter, opts.actor, "question.update");
+			const ref = await writableRef(
+				tx,
+				filter,
+				opts.actor,
+				"question.update",
+				opts,
+			);
+			// Before the version is stored: a stale caller must not write one.
+			await checkVersion(tx, "questionRef", { id: ref.id }, opts);
 			if (!writable(ref.status)) {
 				throw new NotAllowed("question.update", {
 					status: 409,
@@ -359,7 +373,7 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 				});
 			}
 
-			return applyWrite(tx, ref, fields);
+			return applyWrite(tx, ref, fields, opts);
 		},
 	});
 
@@ -383,10 +397,19 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 
 			const existing = await tx.questionRef.findUnique({
 				where: { slug_courseId: { slug: input.slug, courseId: course.id } },
-				select: { status: true },
+				select: { id: true, slug: true, status: true, updatedAt: true },
 			});
-			if (!existing || !writable(existing.status)) {
+			checkExpectedUpdatedAt(
+				existing?.updatedAt ?? null,
+				opts.expectedUpdatedAt,
+			);
+			if (!existing) {
 				return create(tx, { ...input, course: course.id }, opts);
+			}
+			if (!writable(existing.status)) {
+				// The revival is a write on the row the caller just checked.
+				assertWellFormed(input.question);
+				return applyWrite(tx, existing, input, opts);
 			}
 
 			const { status, version, question, rev } = input;
@@ -412,13 +435,23 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 			filter: QuestionPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
-			const ref = await writableRef(tx, filter, opts.actor, "question.delete");
+			const ref = await writableRef(
+				tx,
+				filter,
+				opts.actor,
+				"question.delete",
+				opts,
+			);
+			await checkVersion(tx, "questionRef", { id: ref.id }, opts);
 			if (!writable(ref.status)) return;
 
-			await tx.questionRef.update({
-				where: { id: ref.id },
-				data: { status: "ARCHIVED" },
-			});
+			await guardedUpdate(
+				tx,
+				"questionRef",
+				{ id: ref.id },
+				{ status: "ARCHIVED" },
+				opts,
+			);
 		},
 	});
 
@@ -452,10 +485,11 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 					versionHash: true,
 					publicPayload: true,
 					privatePayload: true,
-					ref: { select: { slug: true } },
+					ref: { select: { id: true, slug: true, latestId: true } },
 				},
 				orderBy: { id: "asc" },
 			});
+			const shown = new Set<QuestionRefId>();
 			for (const row of rows) {
 				let document: QuestionDocument | null;
 				try {
@@ -477,6 +511,7 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 				}
 				report.upgraded++;
 				if (options.dryRun) continue;
+				if (row.ref.latestId === row.id) shown.add(row.ref.id as QuestionRefId);
 				const halves = JSON.parse(
 					JSON.stringify({
 						publicPayload: publicForm(document),
@@ -492,6 +527,8 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 					},
 				});
 			}
+			// The read model shows the latest version only.
+			for (const id of shown) await touch(tx, "questionRef", { id }, {});
 			return report;
 		},
 	});
@@ -662,19 +699,29 @@ async function writableRef(
 	filter: QuestionPK,
 	actor: ServiceOpts["actor"],
 	action: "question.update" | "question.delete",
+	opts: { expectedUpdatedAt?: Date | null },
 ) {
-	const ref = valueOrNotFound(
-		"question",
-		await tx.questionRef.findFirst({
-			where: refWhere(filter),
-			select: {
-				id: true,
-				slug: true,
-				status: true,
-				course: questionInclude().course,
-			},
-		}),
-	);
+	const found = await tx.questionRef.findFirst({
+		where: refWhere(filter),
+		select: {
+			id: true,
+			slug: true,
+			status: true,
+			course: questionInclude().course,
+		},
+	});
+	if (!found && "course" in filter) {
+		// A missing course is a 404 whatever the expectation.
+		valueOrNotFound(
+			"course",
+			await tx.course.findUnique({
+				where: courseRefWhere(filter.course),
+				select: { id: true },
+			}),
+		);
+	}
+	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const ref = valueOrNotFound("question", found);
 
 	requireAccess(
 		questionAccess(actor, ref, await isPinned(tx, ref)),
@@ -700,6 +747,7 @@ async function applyWrite(
 	tx: PrismaTx,
 	ref: { id: QuestionRefId; slug: string },
 	fields: QuestionUpdate,
+	opts: { expectedUpdatedAt?: Date | null },
 ): Promise<Question> {
 	const { question, version } = fields;
 	const latestId =
@@ -708,9 +756,11 @@ async function applyWrite(
 			: undefined;
 
 	return fromDb(
-		await tx.questionRef.update({
-			where: { id: ref.id },
-			data: {
+		await guardedUpdate(
+			tx,
+			"questionRef",
+			{ id: ref.id },
+			{
 				status: fields.status,
 				rev: fields.rev,
 				latestId,
@@ -723,8 +773,9 @@ async function applyWrite(
 					},
 				}),
 			},
-			include: questionInclude(true),
-		}),
+			opts,
+			{ include: questionInclude(true) },
+		),
 	);
 }
 

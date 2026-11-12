@@ -74,7 +74,13 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
   - `timeSlot` com `day`, `start` ou `duration` novos: os eventos do slot
     cujo horário muda;
   - `calendarEvent.delete`: os recursos ligados ao evento;
-  - `repository.delete`: os eventos que citavam o repositório.
+  - `repository.delete`: os eventos que citavam o repositório;
+  - `attachment.update` e `attachment.delete` sobre o arquivo atual de um
+    recurso: o recurso (o nome do arquivo aparece no read model, e o delete
+    anula `attachmentId`);
+  - `rollCall.checkIn` que cria uma presença: o roll call;
+  - `question.upgradeLegacyVersions`: as questões cuja versão mais recente foi
+    reescrita.
 - `rev` continua opaco e gravado pelo cliente. Ele diz quem escreveu por
   último (CLI ou não); `updatedAt` diz se alguém escreveu.
 - `If-Unmodified-Since` não serve: datas HTTP têm resolução de um segundo.

@@ -8,6 +8,16 @@ import { db } from "@/db";
 /// Sweep of the registered services for ADR 0013: a service that writes a
 /// model with `updatedAt` must honor `ServiceOpts.expectedUpdatedAt`, so a new
 /// service cannot be added without it.
+///
+/// The scan reads `src/db/**` as text, so its limits are these:
+/// - a delegate chosen at run time (`tx[model]`) is invisible; only the helper
+///   module does it, and it is not scanned;
+/// - a nested write (`update`, `delete`, `set`... inside a relation of `data`)
+///   is flagged by the name of the relation field, in any `data`, so a field
+///   name shared by two models is flagged when either of them has `updatedAt`;
+/// - raw SQL is read from the first string literal after `$executeRaw` or
+///   `$queryRaw`, so a statement built by concatenation is not;
+/// - a delegate handed to another function (`save(tx.course)`) is not followed.
 
 const WRITES = ["update", "upsert", "delete"] as const;
 type Write = (typeof WRITES)[number];
@@ -249,6 +259,119 @@ const HONORED: Record<
 			},
 		};
 	})(),
+	question: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const body = {
+				course: course.id as CourseId,
+				slug: `sw-${uniq()}`,
+				status: "PUBLISHED" as const,
+				version: "v1",
+				question: {
+					type: "multiple-choice" as const,
+					title: "Q",
+					stem: "Which one?",
+					choices: [
+						{ id: "x", text: "X", score: 1 },
+						{ id: "y", text: "Y" },
+					],
+				},
+			};
+			return { question: await db.question.create(body, FULL_ACCESS), body };
+		};
+		return {
+			update: async (v) => {
+				const { question } = await row();
+				return db.question.update(
+					{ id: question.id },
+					{ rev: "x" },
+					opts(question, v),
+				);
+			},
+			upsert: async (v) => {
+				const { question, body } = await row();
+				return db.question.upsert(
+					{ ...body, version: "v2" },
+					opts(question, v),
+				);
+			},
+			delete: async (v) => {
+				const { question } = await row();
+				return db.question.delete({ id: question.id }, opts(question, v));
+			},
+		};
+	})(),
+	gradeColumn: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const body = {
+				course: course.id as CourseId,
+				slug: `sw-${uniq()}`,
+				title: "Col",
+				kind: "NUMBER" as const,
+				position: 0,
+				values: [],
+			};
+			return { column: await db.gradeColumn.create(body, FULL_ACCESS), body };
+		};
+		return {
+			update: async (v) => {
+				const { column } = await row();
+				return db.gradeColumn.update(
+					{ id: column.id },
+					{ title: "x" },
+					opts(column, v),
+				);
+			},
+			upsert: async (v) => {
+				const { column, body } = await row();
+				return db.gradeColumn.upsert(body, opts(column, v));
+			},
+			delete: async (v) => {
+				const { column } = await row();
+				return db.gradeColumn.delete({ id: column.id }, opts(column, v));
+			},
+		};
+	})(),
+	rollCall: (() => {
+		const row = async () => {
+			const { course } = await newCourse();
+			const slot = await db.timeSlot.create(
+				{
+					course: course.id as CourseId,
+					slug: `sw-${uniq()}`,
+					day: "MONDAY",
+					start: { hour: 8, minute: 0 },
+					duration: { hours: 1 },
+				},
+				FULL_ACCESS,
+			);
+			const event = await db.calendarEvent.create(
+				{
+					course: course.id as CourseId,
+					timeSlot: slot.id,
+					week: 1,
+					title: "Class",
+				},
+				FULL_ACCESS,
+			);
+			return db.rollCall.create({ event: { id: event.id } }, FULL_ACCESS);
+		};
+		return {
+			update: async (v) => {
+				const rollCall = await row();
+				return db.rollCall.update(
+					{ id: rollCall.id },
+					{ actsAsInvite: true },
+					opts(rollCall, v),
+				);
+			},
+			delete: async (v) => {
+				const rollCall = await row();
+				return db.rollCall.delete({ id: rollCall.id }, opts(rollCall, v));
+			},
+		};
+	})(),
 };
 
 /// Services with writes on a versioned model that do not honor the option
@@ -257,12 +380,9 @@ const PENDING = new Set<string>([
 	"exam",
 	"examException",
 	"feedback",
-	"gradeColumn",
-	"question",
 	"regradeRequest",
 	"report",
 	"response",
-	"rollCall",
 	"rubric",
 ]);
 
@@ -316,25 +436,118 @@ function dbSources(dir = "src/db"): { file: string; text: string }[] {
 
 type WriteSite = { file: string; model: string; raw: boolean };
 
+/// The write methods of a Prisma delegate.
+const WRITE_METHODS = "update|updateMany|upsert|delete|deleteMany";
+
+/// The write operations of a nested relation write.
+const NESTED_WRITES =
+	"update|updateMany|upsert|delete|deleteMany|set|disconnect";
+
+type Schema = {
+	/// Table name of each versioned model (`@@map` or the model's own name).
+	tables: Map<string, string>;
+	/// For each relation field name, the models it points to.
+	relations: Map<string, Set<string>>;
+};
+
+/// Reads the tables of the versioned models and the relation fields of `prisma/schema.prisma`.
+function readSchema(versioned: Set<string>): Schema {
+	const lines = readFileSync("prisma/schema.prisma", "utf8").split("\n");
+	const names = new Set(
+		lines.flatMap((l) => l.match(/^model (\w+) \{/)?.slice(1, 2) ?? []),
+	);
+	const tables = new Map<string, string>();
+	const relations = new Map<string, Set<string>>();
+	let current = "";
+	for (const line of lines) {
+		const header = line.match(/^model (\w+) \{/);
+		if (header) {
+			current = header[1] ?? "";
+			tables.set(current, current);
+			continue;
+		}
+		const mapped = line.match(/^\s+@@map\("(\w+)"\)/);
+		if (mapped) tables.set(current, mapped[1] ?? current);
+		const field = line.match(/^\s+(\w+)\s+(\w+)(?:\[\])?\??(?:\s|$)/);
+		if (field && names.has(field[2] ?? "")) {
+			const targets = relations.get(field[1] ?? "") ?? new Set<string>();
+			targets.add(field[2] ?? "");
+			relations.set(field[1] ?? "", targets);
+		}
+	}
+	for (const model of tables.keys())
+		if (!versioned.has(model)) tables.delete(model);
+	return { tables, relations };
+}
+
+/// The text of the first string literal in `text`, or `""`.
+function firstLiteral(text: string): string {
+	const open = text.search(/[`"']/);
+	if (open < 0) return "";
+	const quote = text[open] ?? "";
+	const close = text.indexOf(quote, open + 1);
+	return close < 0 ? "" : text.slice(open + 1, close);
+}
+
 /// Every write on a versioned model in `src/db/`, wherever the file is and
 /// whatever the receiver is called: Prisma calls outside the helper (`raw`)
-/// and calls to the helper.
+/// and calls to the helper. A write that bypasses the helper without being a
+/// plain `tx.model.update(...)` is `raw` too: raw SQL, a delegate taken out of
+/// `tx` by destructuring or by index, and a nested relation write.
 function scanWrites(versioned: Set<string>): WriteSite[] {
-	const rawCall =
-		/\.([a-z]\w*)\.(?:update|updateMany|upsert|delete|deleteMany)\b/g;
+	const { tables, relations } = readSchema(versioned);
+	const models = new Map([...tables].map(([model, table]) => [table, model]));
+	const rawCall = new RegExp(
+		`\\.([a-z]\\w*)\\s*\\.\\s*(?:${WRITE_METHODS})\\b`,
+		"g",
+	);
 	const helperCall =
-		/\b(?:guardedUpdate|guardedDelete|touch)\(\s*\w+,\s*"(\w+)"/g;
+		/\b(?:guardedUpdate|guardedDelete|touch|writeCache)\(\s*\w+,\s*"(\w+)"/g;
+	const indexCall = new RegExp(
+		`\\b(?:tx|prisma|client)\\s*\\[\\s*["'](\\w+)["']\\s*\\]\\s*\\.\\s*(?:${WRITE_METHODS})\\b`,
+		"g",
+	);
+	const destructured =
+		/\bconst\s*\{([^}]*)\}\s*=\s*(?:tx|prisma|client|this\.client)\s*;/g;
+	const nested = new RegExp(
+		`\\b(\\w+)\\s*:\\s*\\{\\s*(?:${NESTED_WRITES})\\b`,
+		"g",
+	);
+	const sql = /\$(?:executeRaw|queryRaw)(?:Unsafe)?\b/g;
 	const upper = (delegate: string) =>
 		delegate.charAt(0).toUpperCase() + delegate.slice(1);
 	const writes: WriteSite[] = [];
 	for (const { file, text } of dbSources()) {
-		for (const call of text.matchAll(rawCall)) {
-			const model = upper(call[1] ?? "");
-			if (versioned.has(model)) writes.push({ file, model, raw: true });
-		}
+		const add = (model: string, raw: boolean) => {
+			if (versioned.has(model)) writes.push({ file, model, raw });
+		};
+		for (const call of text.matchAll(rawCall)) add(upper(call[1] ?? ""), true);
+		for (const call of text.matchAll(indexCall))
+			add(upper(call[1] ?? ""), true);
 		for (const call of text.matchAll(helperCall)) {
-			const model = upper(call[1] ?? "");
-			if (versioned.has(model)) writes.push({ file, model, raw: false });
+			add(upper(call[1] ?? ""), false);
+		}
+		for (const taken of text.matchAll(destructured)) {
+			for (const entry of (taken[1] ?? "").split(",")) {
+				const [key = "", alias = key] = entry
+					.split(":")
+					.map((part) => part.trim());
+				const writesIt = new RegExp(
+					`\\b${alias}\\s*\\.\\s*(?:${WRITE_METHODS})\\b`,
+				).test(text);
+				if (writesIt) add(upper(key), true);
+			}
+		}
+		for (const call of text.matchAll(nested)) {
+			for (const model of relations.get(call[1] ?? "") ?? []) add(model, true);
+		}
+		for (const call of text.matchAll(sql)) {
+			const statement = firstLiteral(
+				text.slice((call.index ?? 0) + call[0].length),
+			);
+			const hit = statement.match(/\b(?:UPDATE|DELETE\s+FROM)\s+["'`]?(\w+)/i);
+			const model = models.get(hit?.[1] ?? "");
+			if (model) add(model, true);
 		}
 	}
 	return writes;

@@ -24,6 +24,12 @@ import {
 	gradeColumnUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { Prisma, PrismaTx } from "../client";
@@ -238,7 +244,10 @@ export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 				filter,
 				opts.actor,
 				"grade-column.update",
+				opts,
 			);
+			// Before the validation and the values: a stale caller changes nothing.
+			await checkVersion(tx, "gradeColumn", { id: current.id }, opts);
 			const kind = fields.kind ?? current.kind;
 			if (fields.values) {
 				checkValuesFit(kind, fields.values);
@@ -254,15 +263,19 @@ export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 				});
 			}
 
-			await tx.gradeColumn.update({
-				where: { id: current.id },
-				data: {
+			// Always written, so a change of `values` alone still moves the version.
+			await guardedUpdate(
+				tx,
+				"gradeColumn",
+				{ id: current.id },
+				{
 					title: fields.title,
 					kind: fields.kind,
 					position: fields.position,
 					rev: fields.rev,
 				},
-			});
+				opts,
+			);
 			if (fields.values) {
 				await replaceValues(tx, current.id, kind, fields.values);
 			}
@@ -294,7 +307,10 @@ export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 				where: { courseId_slug: { courseId: course.id, slug: input.slug } },
 				select: { id: true },
 			});
-			if (!existing) return create(tx, { ...input, course: course.id }, opts);
+			if (!existing) {
+				checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+				return create(tx, { ...input, course: course.id }, opts);
+			}
 
 			const { slug: _slug, course: _course, ...fields } = input;
 			return update(tx, { id: existing.id as GradeColumnId }, fields, opts);
@@ -318,8 +334,9 @@ export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 				filter,
 				opts.actor,
 				"grade-column.delete",
+				opts,
 			);
-			await tx.gradeColumn.delete({ where: { id: current.id } });
+			await guardedDelete(tx, "gradeColumn", { id: current.id }, opts);
 		},
 	});
 
@@ -340,13 +357,13 @@ export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 			filter: GradeColumnPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<GradeColumn> => {
-			const row = valueOrNotFound(
-				"grade-column",
-				await tx.gradeColumn.findFirst({
-					where: columnWhere(filter),
-					select: columnSelect,
-				}),
-			);
+			const found = await tx.gradeColumn.findFirst({
+				where: columnWhere(filter),
+				select: columnSelect,
+			});
+			if (!found) await requireCourse(tx, filter);
+			if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+			const row = valueOrNotFound("grade-column", found);
 
 			const access = accessTo(opts.actor, row.course);
 			if (access !== "all") {
@@ -356,11 +373,16 @@ export const makeGradeColumnService = defineService<GradeColumnT>()(() => {
 					: new NotFound("grade-column");
 			}
 
-			if (!row.releasedAt) {
-				await tx.gradeColumn.update({
-					where: { id: row.id },
-					data: { releasedAt: new Date() },
-				});
+			if (row.releasedAt) {
+				await checkVersion(tx, "gradeColumn", { id: row.id }, opts);
+			} else {
+				await guardedUpdate(
+					tx,
+					"gradeColumn",
+					{ id: row.id },
+					{ releasedAt: new Date() },
+					opts,
+				);
 			}
 			return readWhole(tx, row.id);
 		},
@@ -436,19 +458,20 @@ async function writableColumn(
 	filter: GradeColumnPK,
 	actor: ServiceOptsWithoutTx["actor"],
 	action: "grade-column.update" | "grade-column.delete",
+	opts: { expectedUpdatedAt?: Date | null },
 ) {
-	const column = valueOrNotFound(
-		"grade-column",
-		await tx.gradeColumn.findFirst({
-			where: columnWhere(filter),
-			select: {
-				id: true,
-				courseId: true,
-				kind: true,
-				course: { select: { instructor: { select: { username: true } } } },
-			},
-		}),
-	);
+	const found = await tx.gradeColumn.findFirst({
+		where: columnWhere(filter),
+		select: {
+			id: true,
+			courseId: true,
+			kind: true,
+			course: { select: { instructor: { select: { username: true } } } },
+		},
+	});
+	if (!found) await requireCourse(tx, filter);
+	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const column = valueOrNotFound("grade-column", found);
 	if (!hasPerm(actor, "course.update-contents", column.course)) {
 		throw new NotAllowed(action);
 	}
@@ -479,6 +502,18 @@ function checkValuesFit(
 		];
 	});
 	if (Object.keys(errors).length > 0) throw new InvalidData(errors);
+}
+
+/// Throws `NotFound` when `filter` addresses a column by a course that does not exist.
+async function requireCourse(tx: PrismaTx, filter: GradeColumnPK) {
+	if ("id" in filter) return;
+	valueOrNotFound(
+		"course",
+		await tx.course.findUnique({
+			where: courseRefWhere(filter.course),
+			select: { id: true },
+		}),
+	);
 }
 
 /// Refuses usernames with no enrollment in the course, listing each of them.

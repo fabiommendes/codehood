@@ -31,6 +31,13 @@ import {
 } from "@/core/schemas";
 import { rollCallId } from "@/core/schemas/base";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import {
+	checkExpectedUpdatedAt,
+	checkVersion,
+	guardedDelete,
+	guardedUpdate,
+	touch,
+} from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { codeAt, generateSecret, isCodeValid } from "@/services/roll-call-code";
@@ -260,7 +267,9 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 			fields: RollCallUpdate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<RollCall> => {
-			const current = await manageable(tx, filter, opts.actor);
+			const current = await manageable(tx, filter, opts.actor, opts);
+			// Before the validation and the entries: a stale caller changes nothing.
+			await checkVersion(tx, "rollCall", { id: current.id }, opts);
 			const entries = Object.entries(fields.attendances ?? {});
 
 			const marked = entries.filter(([, entry]) => entry !== null);
@@ -270,29 +279,26 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 				marked.map(([name]) => name),
 			);
 
-			if (fields.actsAsInvite !== undefined) {
-				await tx.rollCall.update({
-					where: { id: current.id },
-					data: { actsAsInvite: fields.actsAsInvite },
-				});
-			}
-
+			let changed = false;
 			for (const [name, entry] of entries) {
 				const where = {
 					rollCallId_username: { rollCallId: current.id, username: name },
 				};
 				if (entry === null) {
-					await tx.attendance.deleteMany({
+					const removed = await tx.attendance.deleteMany({
 						where: { rollCallId: current.id, username: name },
 					});
+					changed ||= removed.count > 0;
 				} else if (await tx.attendance.findUnique({ where })) {
 					if (entry.note !== undefined) {
 						await tx.attendance.update({
 							where,
 							data: { note: entry.note },
 						});
+						changed = true;
 					}
 				} else {
+					changed = true;
 					await tx.attendance.create({
 						data: {
 							rollCallId: current.id,
@@ -302,6 +308,20 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 						},
 					});
 				}
+			}
+
+			// The attendances are part of the read model, so a change to them moves
+			// the roll call's version even when its own fields stay.
+			if (fields.actsAsInvite !== undefined) {
+				await guardedUpdate(
+					tx,
+					"rollCall",
+					{ id: current.id },
+					{ actsAsInvite: fields.actsAsInvite },
+					opts,
+				);
+			} else if (changed) {
+				await touch(tx, "rollCall", { id: current.id }, opts);
 			}
 			return readWhole(tx, current.id, opts.actor);
 		},
@@ -320,8 +340,8 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 			filter: RollCallPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<void> => {
-			const current = await manageable(tx, filter, opts.actor);
-			await tx.rollCall.delete({ where: { id: current.id } });
+			const current = await manageable(tx, filter, opts.actor, opts);
+			await guardedDelete(tx, "rollCall", { id: current.id }, opts);
 		},
 	});
 
@@ -373,7 +393,7 @@ export const makeRollCallService = defineService<RollCallT>()(() => {
 			filter: RollCallPK,
 			opts: ServiceOptsWithoutTx,
 		): Promise<z.infer<typeof currentCodeSchema>> => {
-			const current = await manageable(tx, filter, opts.actor);
+			const current = await manageable(tx, filter, opts.actor, {});
 			return codeAt(current.secret, new Date());
 		},
 	});
@@ -617,11 +637,14 @@ async function setClosesAt(
 	opts: ServiceOptsWithoutTx,
 	when: () => Date,
 ): Promise<RollCall> {
-	const current = await manageable(tx, filter, opts.actor);
-	await tx.rollCall.update({
-		where: { id: current.id },
-		data: { closesAt: when() },
-	});
+	const current = await manageable(tx, filter, opts.actor, opts);
+	await guardedUpdate(
+		tx,
+		"rollCall",
+		{ id: current.id },
+		{ closesAt: when() },
+		opts,
+	);
 	return readWhole(tx, current.id, opts.actor);
 }
 
@@ -675,14 +698,19 @@ async function rollCallWhere(
 }
 
 /// Finds the roll call a write targets, refusing an actor who may not manage it.
-async function manageable(tx: PrismaTx, filter: RollCallPK, actor: Actor) {
-	const row = valueOrNotFound(
-		"roll-call",
-		await tx.rollCall.findFirst({
-			where: await rollCallWhere(tx, filter),
-			select: { id: true, secret: true, event: { select: eventSelect } },
-		}),
-	);
+async function manageable(
+	tx: PrismaTx,
+	filter: RollCallPK,
+	actor: Actor,
+	opts: { expectedUpdatedAt?: Date | null },
+) {
+	// A missing course is a 404 whatever the expectation: `rollCallWhere` throws it.
+	const found = await tx.rollCall.findFirst({
+		where: await rollCallWhere(tx, filter),
+		select: { id: true, secret: true, event: { select: eventSelect } },
+	});
+	if (!found) checkExpectedUpdatedAt(null, opts.expectedUpdatedAt);
+	const row = valueOrNotFound("roll-call", found);
 	ensurePerm(actor, "roll-call.manage", row.event.course);
 	return row;
 }
@@ -847,6 +875,8 @@ async function markPresent(
 			},
 			select: { createdAt: true },
 		}));
+	// The new attendance is part of the roll call's read model.
+	if (!existing) await touch(tx, "rollCall", { id: target.id }, {});
 	return {
 		rollCall: { id: target.id as RollCallId },
 		courseId,

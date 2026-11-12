@@ -78,10 +78,20 @@ const row = await guardedUpdate(tx, "course", { id }, fields, opts, {
 
 await guardedDelete(tx, "course", { id }, opts); // delete
 await touch(tx, "exam", { id }, opts); // só filhos mudaram: bumpa a linha mãe
+await writeCache(tx, "repository", { id }, { zipHash }); // cache: mantém a versão
 ```
 
 - Mudou só filhos que o read model da linha mostra (tags, questões,
   repositórios)? Chame `touch` na linha mãe.
+- Gravou um valor que o read model não devolve e que dá para recalcular (o
+  `zipHash` do repositório)? Use `writeCache`: ela mantém o `updatedAt`. Um
+  bump aí faria a próxima escrita condicional de quem não leu nada de novo
+  falhar com 412.
+- Um filho de outra tabela que o read model da mãe mostra (o arquivo de um
+  recurso, uma presença de roll call) também bumpa a mãe, mesmo quando quem
+  escreve é outro service: faça `touch` na mãe, mas só se ela ainda aponta para
+  o filho. Uma escrita da própria mãe que já passou pelo helper não precisa de
+  segundo bump (o `updatedAt` devolvido ficaria velho).
 - No `upsert`, quando a linha não existe, use
   `checkExpectedUpdatedAt(null, opts.expectedUpdatedAt)`: um `Date` falha, e
   `null` ou ausente passa. Quando existe, `guardedUpdate` recusa o `null`.
@@ -100,7 +110,9 @@ await touch(tx, "exam", { id }, opts); // só filhos mudaram: bumpa a linha mãe
 
 `test/conditional-write-sweep.spec.ts` varre `src/db/` (services e arquivos
 auxiliares) e falha quando uma escrita num modelo com `updatedAt` não passa
-pelo helper, ou quando o service dono do modelo não está em `HONORED` (com um
+pelo helper (inclusive SQL cru com `UPDATE` ou `DELETE`, delegate tirado de
+`tx` por desestruturação ou índice, e escrita aninhada numa relação; os limites
+da varredura estão no topo do spec), ou quando o service dono do modelo não está em `HONORED` (com um
 caso obsoleto e um com a versão certa por escrita). `PENDING` lista os que
 ainda faltam e deve ficar vazia.
 

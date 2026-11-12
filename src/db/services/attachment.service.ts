@@ -13,6 +13,7 @@ import {
 	attachmentUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { hashBytes } from "@/utils/content-hash";
 import { sanitizeFilename } from "@/utils/filename";
@@ -118,6 +119,21 @@ export function makeAttachmentService(
 			});
 		}
 		return attachment;
+	}
+
+	/// Moves the version of the resource whose current file is `raw`: its read
+	/// model shows the file's name, and loses the file when it is deleted. A
+	/// resource that already points elsewhere (or is gone) is not touched.
+	async function touchResource(
+		tx: PrismaTx,
+		raw: { id: number; attachedToType: string; attachedToId: number },
+	): Promise<void> {
+		if (raw.attachedToType !== "RESOURCE") return;
+		const resource = await tx.resource.findFirst({
+			where: { id: raw.attachedToId, attachmentId: raw.id },
+			select: { id: true },
+		});
+		if (resource) await touch(tx, "resource", { id: resource.id }, {});
 	}
 
 	async function fromDbWithSources(raw: DbAttachment[], tx: PrismaTx) {
@@ -346,6 +362,7 @@ export function makeAttachmentService(
 					data: { filename },
 					include: attachmentInclude,
 				});
+				await touchResource(tx, updated);
 
 				const sameName = await tx.attachment.count({
 					where: { hash: target.hash, filename: target.filename },
@@ -376,6 +393,8 @@ export function makeAttachmentService(
 				});
 				if (!target) return;
 
+				// Before the delete, which clears the resource's link to it.
+				await touchResource(tx, target);
 				await tx.attachment.delete({ where: { id: target.id } });
 
 				const sameName = await tx.attachment.count({
