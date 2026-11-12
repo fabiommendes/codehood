@@ -65,29 +65,44 @@ deixar a violação de unicidade virar um 500. O helper `invalidIfExists`, em
 ## Escrita condicional
 
 Todo `update`, `upsert` e `delete` de um modelo com `updatedAt` honra
-`opts.expectedUpdatedAt` (ADR 0013), sempre pelo helper de
-`src/db/conditional-write.ts`:
+`opts.expectedUpdatedAt` (ADR 0013), sempre pelos helpers de
+`src/db/conditional-write.ts`. A escrita guardada roda no `tx` da própria
+escrita (nunca no client), com um `where` único do modelo, e o helper grava o
+`updatedAt`: não há valor para repassar.
 
-- `guardRow(tx, { model, where }, opts)` confere a versão dentro da transação,
-  reivindica a linha (compare-and-swap) e devolve o próximo `updatedAt`.
-  Passe-o como `updatedAt` no `update` da própria linha: sem isso o
-  `@updatedAt` do Prisma grava só o relógio, que pode repetir dentro do mesmo
-  milissegundo. Chame em toda escrita, condicional ou não.
+```ts
+// update: confere a versão e grava os campos com o próximo updatedAt
+const row = await guardedUpdate(tx, "course", { id }, fields, opts, {
+	include: courseInclude,
+});
+
+await guardedDelete(tx, "course", { id }, opts); // delete
+await touch(tx, "exam", { id }, opts); // só filhos mudaram: bumpa a linha mãe
+```
+
 - Mudou só filhos que o read model da linha mostra (tags, questões,
-  repositórios)? Chame `guardRow` na linha mãe e ignore o retorno.
+  repositórios)? Chame `touch` na linha mãe.
 - No `upsert`, quando a linha não existe, use
   `checkExpectedUpdatedAt(null, opts.expectedUpdatedAt)`: um `Date` falha, e
-  `null` ou ausente passa. Quando existe, `guardRow` recusa o `null`.
+  `null` ou ausente passa. Quando existe, `guardedUpdate` recusa o `null`.
+- `Date` sobre linha inexistente é `PreconditionFailed` com `updatedAt: null`.
+  Se o service procura a linha antes e daria `NotFound`, chame
+  `checkExpectedUpdatedAt(null, opts.expectedUpdatedAt)` antes do `NotFound`.
+  Sem `expectedUpdatedAt`, o `NotFound` continua.
+- Precisa de outra checagem entre a versão e a escrita (um 409 que um chamador
+  obsoleto não deve ver)? `checkVersion` só confere, sem gravar.
 - Escritas derivadas em outras linhas (como recalcular eventos) também passam
-  por `guardRow`, para a versão antiga dessas linhas ficar obsoleta.
+  por `guardedUpdate`, para a versão antiga dessas linhas ficar obsoleta.
 - Não repasse `opts` a outro service sobre outra linha: o
   `expectedUpdatedAt` é desta.
 - Modelo sem `updatedAt` (ex.: `Edition`) chama `rejectExpectedUpdatedAt(opts)`
   no início de cada escrita: a condição é recusada, não ignorada.
 
-`test/conditional-write-sweep.spec.ts` falha quando um service registrado em
-`db` escreve um modelo com `updatedAt` e não está em `HONORED` (com um caso
-obsoleto por escrita). `PENDING` lista os que ainda faltam e deve ficar vazia.
+`test/conditional-write-sweep.spec.ts` varre `src/db/` (services e arquivos
+auxiliares) e falha quando uma escrita num modelo com `updatedAt` não passa
+pelo helper, ou quando o service dono do modelo não está em `HONORED` (com um
+caso obsoleto e um com a versão certa por escrita). `PENDING` lista os que
+ainda faltam e deve ficar vazia.
 
 ## REST API
 

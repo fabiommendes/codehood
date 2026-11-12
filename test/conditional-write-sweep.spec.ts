@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { PreconditionFailed } from "@/core/error";
@@ -15,55 +15,102 @@ const STALE = new Date(0);
 let seq = 0;
 const uniq = () => `${++seq}-${Math.random().toString(36).slice(2, 7)}`;
 
-/// Services that honor the option. Each entry creates a row and runs every
-/// write of the service with a stale version; all of them must reject with
-/// `PreconditionFailed`.
+/// Which version a case sends: one that is no longer the row's, or its own.
+type Version = "stale" | "current";
+
+/// Services that honor the option. Each write creates its own row and runs
+/// with the version asked for: `stale` must reject with `PreconditionFailed`
+/// and `current` must write.
 const HONORED: Record<
 	string,
-	Partial<Record<Write, () => Promise<unknown>>>
+	Partial<Record<Write, (version: Version) => Promise<unknown>>>
 > = {
 	discipline: (() => {
 		const row = async () => {
 			const slug = `sw-d-${uniq()}`;
-			await db.discipline.create({ slug, name: slug }, FULL_ACCESS);
-			return slug;
+			return db.discipline.create({ slug, name: slug }, FULL_ACCESS);
 		};
-		const stale = { ...FULL_ACCESS, expectedUpdatedAt: STALE };
+		const opts = (d: { updatedAt: Date }, version: Version) => ({
+			...FULL_ACCESS,
+			expectedUpdatedAt: version === "stale" ? STALE : d.updatedAt,
+		});
 		return {
-			update: async () =>
-				db.discipline.update({ slug: await row() }, { name: "x" }, stale),
-			upsert: async () =>
-				db.discipline.upsert({ slug: await row(), name: "x" }, stale),
-			delete: async () => db.discipline.delete({ slug: await row() }, stale),
+			update: async (v) => {
+				const d = await row();
+				return db.discipline.update(
+					{ slug: d.slug },
+					{ name: "x" },
+					opts(d, v),
+				);
+			},
+			upsert: async (v) => {
+				const d = await row();
+				return db.discipline.upsert({ slug: d.slug, name: "x" }, opts(d, v));
+			},
+			delete: async (v) => {
+				const d = await row();
+				return db.discipline.delete({ slug: d.slug }, opts(d, v));
+			},
 		};
 	})(),
 	course: (() => {
 		const row = async () => {
-			const course = (await db.course.findMany({}, FULL_ACCESS))[0];
-			if (!course) throw new Error("the seed has no course");
-			return course;
+			const edition = `${4000 + ++seq}-1`;
+			await db.edition.create(
+				{
+					slug: edition,
+					name: edition,
+					startAt: new Date("2026-01-01"),
+					endAt: new Date("2030-12-31"),
+				},
+				FULL_ACCESS,
+			);
+			const discipline = `sw-c-${uniq()}`;
+			await db.discipline.create(
+				{ slug: discipline, name: discipline },
+				FULL_ACCESS,
+			);
+			const instructor = `sw-i-${uniq()}`;
+			await db.user.create(
+				{
+					email: `${instructor}@codehood.test`,
+					username: instructor,
+					name: instructor,
+					role: "INSTRUCTOR",
+					password: "x",
+					githubId: instructor,
+					schoolId: instructor,
+				},
+				FULL_ACCESS,
+			);
+			const startAt = new Date("2026-02-02T00:00:00Z");
+			const endAt = new Date("2026-06-01T00:00:00Z");
+			const course = await db.course.create(
+				{ discipline, instructor, edition, startAt, endAt },
+				FULL_ACCESS,
+			);
+			return {
+				course,
+				pk: { id: course.id },
+				natural: { discipline, instructor, edition, startAt, endAt },
+			};
 		};
-		const stale = { ...FULL_ACCESS, expectedUpdatedAt: STALE };
-		const pk = (c: Awaited<ReturnType<typeof row>>) => ({
-			discipline: c.discipline.slug,
-			instructor: c.instructor.username,
-			edition: c.edition.slug,
+		const opts = (c: { updatedAt: Date }, version: Version) => ({
+			...FULL_ACCESS,
+			expectedUpdatedAt: version === "stale" ? STALE : c.updatedAt,
 		});
 		return {
-			update: async () => {
-				const c = await row();
-				return db.course.update(pk(c), { description: "x" }, stale);
+			update: async (v) => {
+				const { course, pk } = await row();
+				return db.course.update(pk, { description: "x" }, opts(course, v));
 			},
-			upsert: async () => {
-				const c = await row();
-				return db.course.upsert(
-					{ ...pk(c), startAt: c.startAt, endAt: c.endAt },
-					stale,
-				);
+			upsert: async (v) => {
+				const { course, natural } = await row();
+				return db.course.upsert(natural, opts(course, v));
 			},
-			delete: async () => {
-				const c = await row();
-				return db.course.delete(pk(c), stale);
+			delete: async (v) => {
+				const { course, pk } = await row();
+				return db.course.delete(pk, opts(course, v));
 			},
 		};
 	})(),
@@ -106,23 +153,66 @@ function versionedModels(): Set<string> {
 	return models;
 }
 
+/// The service key that owns a versioned model without a service of its own.
+const OWNER: Record<string, string> = {
+	QuestionRef: "question",
+	RubricItem: "rubric",
+	AnswerEditHistory: "answerEdit",
+	AnswerEditField: "answerEdit",
+};
+
+const ownerOf = (model: string) =>
+	OWNER[model] ?? model.charAt(0).toLowerCase() + model.slice(1);
+
+/// Files under `src/db/` that are not scanned. `bootstrap.ts` seeds the dev
+/// database, and no service uses it.
+const UNSCANNED = new Set(["conditional-write.ts", "bootstrap.ts"]);
+
+function dbSources(dir = "src/db"): { file: string; text: string }[] {
+	const found: { file: string; text: string }[] = [];
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const path = `${dir}/${entry.name}`;
+		if (entry.isDirectory()) found.push(...dbSources(path));
+		else if (entry.name.endsWith(".ts") && !UNSCANNED.has(entry.name)) {
+			const text = readFileSync(path, "utf8")
+				.replace(/\/\*[\s\S]*?\*\//g, "")
+				.replace(/(^|[^:])\/\/.*$/gm, "$1");
+			found.push({ file: path, text });
+		}
+	}
+	return found;
+}
+
+type WriteSite = { file: string; model: string; raw: boolean };
+
+/// Every write on a versioned model in `src/db/`, wherever the file is and
+/// whatever the receiver is called: Prisma calls outside the helper (`raw`)
+/// and calls to the helper.
+function scanWrites(versioned: Set<string>): WriteSite[] {
+	const rawCall =
+		/\.([a-z]\w*)\.(?:update|updateMany|upsert|delete|deleteMany)\b/g;
+	const helperCall =
+		/\b(?:guardedUpdate|guardedDelete|touch)\(\s*\w+,\s*"(\w+)"/g;
+	const upper = (delegate: string) =>
+		delegate.charAt(0).toUpperCase() + delegate.slice(1);
+	const writes: WriteSite[] = [];
+	for (const { file, text } of dbSources()) {
+		for (const call of text.matchAll(rawCall)) {
+			const model = upper(call[1] ?? "");
+			if (versioned.has(model)) writes.push({ file, model, raw: true });
+		}
+		for (const call of text.matchAll(helperCall)) {
+			const model = upper(call[1] ?? "");
+			if (versioned.has(model)) writes.push({ file, model, raw: false });
+		}
+	}
+	return writes;
+}
+
 const kebab = (key: string) =>
 	key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 const sourceOf = (key: string) =>
 	readFileSync(`src/db/services/${kebab(key)}.service.ts`, "utf8");
-
-/// The versioned models the service source writes with update, upsert or delete.
-function writtenVersionedModels(key: string, versioned: Set<string>): string[] {
-	const found = new Set<string>();
-	for (const call of sourceOf(key).matchAll(
-		/\btx\.(\w+)\.(?:update|upsert|delete|updateMany|deleteMany)\b/g,
-	)) {
-		const delegate = call[1] ?? "";
-		const model = delegate.charAt(0).toUpperCase() + delegate.slice(1);
-		if (versioned.has(model)) found.add(model);
-	}
-	return [...found];
-}
 
 const writeOps = (key: string): Write[] =>
 	WRITES.filter(
@@ -135,35 +225,44 @@ const honorsOption = (key: string) => /conditional-write/.test(sourceOf(key));
 
 const keys = Object.keys(db);
 
-test("every service that writes a versioned model honors expectedUpdatedAt", () => {
-	const versioned = versionedModels();
-	const unaccounted: string[] = [];
-	for (const key of keys) {
-		if (key in EXEMPT || writeOps(key).length === 0) continue;
-		if (writtenVersionedModels(key, versioned).length === 0) continue;
-		if (key in HONORED || PENDING.has(key)) continue;
-		unaccounted.push(key);
+test("every write on a versioned model belongs to an accounted service", () => {
+	const writes = scanWrites(versionedModels());
+	const unaccounted = new Set<string>();
+	const outsideHelper = new Set<string>();
+	for (const { file, model, raw } of writes) {
+		const owner = ownerOf(model);
+		if (owner in EXEMPT) continue;
+		if (!(owner in HONORED) && !PENDING.has(owner)) {
+			unaccounted.add(`${owner} (model ${model}, ${file})`);
+		}
+		if (raw && !PENDING.has(owner)) {
+			outsideHelper.add(`${file}: ${model} written outside the helper`);
+		}
 	}
 	expect(
-		unaccounted,
+		[...unaccounted],
 		"add a HONORED entry (or PENDING, temporarily) for these services",
+	).toEqual([]);
+	expect(
+		[...outsideHelper],
+		"use guardedUpdate, guardedDelete or touch",
 	).toEqual([]);
 });
 
 test("PENDING lists only services that still need the option", () => {
-	const versioned = versionedModels();
+	const writes = scanWrites(versionedModels());
 	const rotten = [...PENDING].filter(
 		(key) =>
 			!keys.includes(key) ||
 			honorsOption(key) ||
 			writeOps(key).length === 0 ||
-			writtenVersionedModels(key, versioned).length === 0,
+			!writes.some((w) => w.raw && ownerOf(w.model) === key),
 	);
 	expect(rotten, "remove these from PENDING").toEqual([]);
 });
 
 for (const [key, ops] of Object.entries(HONORED)) {
-	test(`${key}: every write rejects a stale expectedUpdatedAt`, async () => {
+	test(`${key}: every write rejects a stale expectedUpdatedAt and takes the current one`, async () => {
 		expect(honorsOption(key), "the service source never uses the helper").toBe(
 			true,
 		);
@@ -171,8 +270,11 @@ for (const [key, ops] of Object.entries(HONORED)) {
 			writeOps(key).sort(),
 		);
 		for (const [op, run] of Object.entries(ops)) {
-			const error = await run().catch((e: unknown) => e);
-			expect(error, `${key}.${op}`).toBeInstanceOf(PreconditionFailed);
+			const stale = await run("stale").catch((e: unknown) => e);
+			expect(stale, `${key}.${op} with a stale version`).toBeInstanceOf(
+				PreconditionFailed,
+			);
+			await run("current");
 		}
 	});
 }
