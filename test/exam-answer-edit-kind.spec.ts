@@ -67,7 +67,7 @@ async function setup(page: Page) {
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: "kind-exam",
-		type: "PRACTICE",
+		type: "EXAM",
 		status: "ONGOING",
 		questions: [{ slug: "text" }, { slug: "code" }],
 	});
