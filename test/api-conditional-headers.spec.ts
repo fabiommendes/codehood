@@ -109,6 +109,36 @@ test("If-Match refuses weak ETags, lists, `*`, missing quotes and anything but t
 	}
 });
 
+test("If-Match accepts exactly one compression suffix a proxy appends to the ETag", () => {
+	for (const suffix of ["-gzip", "-zstd", "-br"]) {
+		const { expectedUpdatedAt } = readPrecondition(
+			"put",
+			headers({ "If-Match": `"${ISO}${suffix}"` }),
+			true,
+		);
+		expect((expectedUpdatedAt as Date).getTime()).toBe(Date.parse(ISO));
+	}
+	for (const suffix of [
+		"-deflate",
+		"-gzip-gzip",
+		"-GZIP",
+		"-gzip-br",
+		"-",
+		"gzip",
+	]) {
+		invalid(() =>
+			readPrecondition(
+				"put",
+				headers({ "If-Match": `"${ISO}${suffix}"` }),
+				true,
+			),
+		);
+	}
+	invalid(() =>
+		readPrecondition("put", headers({ "If-Match": `W/"${ISO}-gzip"` }), true),
+	);
+});
+
 test("If-None-Match: * becomes null on PUT only", () => {
 	expect(
 		readPrecondition("put", headers({ "If-None-Match": "*" }), true),

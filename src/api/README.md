@@ -72,7 +72,11 @@ Outside this directory:
     entity has `updatedAt`) reads `If-Match: "<updatedAt>"` and, on `PUT`,
     `If-None-Match: *` into the `expectedUpdatedAt` of its write, and answers
     the row's `ETag`. A weak ETag, a list, `*` in `If-Match`, or either header
-    on a route without version is a 400. `GET` and `POST` ignore them.
+    on a route without version is a 400. `GET` and `POST` ignore them. A
+    `-gzip`, `-zstd` or `-br` suffix a compressing proxy adds to the ETag is
+    accepted back in `If-Match`. A `GET` of an entity with `updatedAt: null`
+    (a rubric not yet written) answers no `ETag`. `rest.batch` forwards no
+    headers, so a batch cannot write conditionally.
 
 [^doc]: Imports `dynamicHandler` for its registration side effects, then turns
     `registry.definitions` into the document. It strips the `form` meta of the

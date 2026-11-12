@@ -70,6 +70,7 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
 
 ## Consequências
 
+- O `rest.batch` não repassa cabeçalhos: não há escrita condicional por batch.
 - Uma escrita derivada (recalcular eventos ao mudar o início do curso) muda o
   `updatedAt` e faz uma escrita condicional legítima falhar. O chamador relê e
   tenta de novo; nunca há sobrescrita silenciosa. Escritas que mudam o

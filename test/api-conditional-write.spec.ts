@@ -513,6 +513,32 @@ test("repository: PUT with If-None-Match on an existing slug and DELETE with a s
 	expect((await request.get(`${url}/lab1`, { headers })).status()).toBe(404);
 });
 
+test("repository: an If-Match with the compression suffix a proxy appends writes on the current version and is a 412 on a stale one", async ({
+	request,
+}) => {
+	const { headers, base } = await makeCourse(request);
+	const url = `${base}/repository`;
+	const created = await request.put(url, {
+		headers: { ...headers, "If-None-Match": "*" },
+		data: { slug: "lab1" },
+	});
+	const body = await created.json();
+	const etag = created.headers().etag as string;
+
+	await expect412(
+		await request.put(url, {
+			headers: { ...headers, "If-Match": `${STALE.slice(0, -1)}-gzip"` },
+			data: { slug: "lab1" },
+		}),
+		body.updatedAt,
+	);
+	const written = await request.put(url, {
+		headers: { ...headers, "If-Match": `${etag.slice(0, -1)}-gzip"` },
+		data: { slug: "lab1" },
+	});
+	expect(written.status()).toBe(200);
+});
+
 test("a malformed or unsupported precondition is a 400 and writes nothing", async ({
 	request,
 }) => {

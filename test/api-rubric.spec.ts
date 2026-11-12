@@ -170,6 +170,28 @@ test("A2: GET on a question with an initial rubric answers it flagged initial an
 	expect(await rubricRows(scenario)).toBe(0);
 });
 
+test("A2b: GET answers the ETag of a stored rubric and none for a rubric not yet written", async ({
+	request,
+}) => {
+	const scenario = await createRubricScenario();
+	const u = await urls(scenario);
+	const headers = await keyHeaders(scenario.instructor, "CLI", "laptop");
+
+	const unsaved = await request.get(u.rubric, { headers });
+	expect((await unsaved.json()).updatedAt).toBeNull();
+	expect(unsaved.headers().etag).toBeUndefined();
+
+	const patched = await request.patch(u.rubric, {
+		headers,
+		data: { base: "1" },
+	});
+	expect(patched.ok(), await patched.text()).toBe(true);
+	const read = await request.get(u.rubric, { headers });
+	const body = await read.json();
+	expect(body.updatedAt).not.toBeNull();
+	expect(read.headers().etag).toBe(`"${body.updatedAt}"`);
+});
+
 test("A3: an enrolled student is refused with 403 on GET and on POST item", async ({
 	request,
 }) => {

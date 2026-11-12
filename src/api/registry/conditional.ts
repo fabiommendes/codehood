@@ -14,6 +14,9 @@
  *   client error rather than a certain 412. A list and `*` are refused: a
  *   write expects one version, and "any version" is what no header means
  *   already (`PATCH` and `DELETE` answer 404 for a missing row).
+ *   A `-gzip`, `-zstd` or `-br` suffix inside the quotes is dropped first: a
+ *   proxy that compresses the response rewrites the `ETag` that way and does
+ *   not undo it on the request that sends it back.
  * - `If-None-Match` takes only `*`, and only on `PUT`: "create, never
  *   overwrite". RFC 9110 also allows a list of ETags, which on a write means
  *   "unless it is at one of these versions"; no client needs it.
@@ -33,8 +36,10 @@ export type Precondition = { expectedUpdatedAt?: Date | null };
 /// The methods whose preconditions a route reads.
 type Method = "get" | "post" | "put" | "patch" | "delete";
 
-/// A quoted instant in the one form `Date.prototype.toJSON` writes.
-const STRONG_ETAG = /^"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)"$/;
+/// A quoted instant in the one form `Date.prototype.toJSON` writes, followed by
+/// at most one of the suffixes a compressing proxy appends to a strong ETag.
+const STRONG_ETAG =
+	/^"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)(?:-gzip|-zstd|-br)?"$/;
 
 /**
  * Reads the `If-Match` and `If-None-Match` headers of a request into the

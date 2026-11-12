@@ -762,6 +762,7 @@ export const rubricApi = {
 			"Without a stored rubric, answers the question's initial rubric flagged `initial`, and writes nothing.",
 		operationId: "rubricRead",
 		tags: rubricTags,
+		versioned: true,
 		handler: async ({ actor, params }) =>
 			db.rubric.findOne(rubricKeyOf(params), { actor }),
 	}),
