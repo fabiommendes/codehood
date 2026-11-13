@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { m } from "@/i18n";
 import { isPercentScore, SCORE_ERROR } from "../score";
-import { slug } from "./base";
+import { rowVersion, slug } from "./base";
 import { blankGrade, score } from "./feedback";
 import {
 	rubricBase,
@@ -55,6 +55,8 @@ export const answerGradeRubric = answerRef.extend({
 	comment: z.string().optional(),
 	/// The pass to revise; a new pass is written without it.
 	ref: slug.optional(),
+	/// The version of the pass to revise, as the page read it. Ignored without `ref`.
+	updatedAt: rowVersion,
 });
 
 /// Addresses the question the rubric grading view works on, the way the grading pages do.
@@ -63,24 +65,39 @@ export const gradingQuestion = answerRef.omit({ submission: true }).extend({
 });
 
 /// What the grading view sends to add an item to the rubric.
-export const gradingItemAdd = gradingQuestion.extend(rubricItemCreate.shape);
+export const gradingItemAdd = gradingQuestion.extend({
+	...rubricItemCreate.shape,
+	/// The version of the rubric, as the page read it.
+	updatedAt: rowVersion,
+});
 
 /// What the grading view sends to split an item of the rubric.
 export const gradingItemSplit = gradingQuestion.extend({
 	key: rubricKey,
 	...rubricSplit.shape,
+	/// The version of the item split, as the page read it.
+	updatedAt: rowVersion,
 });
 
 /// What the grading view sends to rename a group of the rubric.
-export const gradingGroupRename = gradingQuestion.extend(
-	rubricRenameGroup.shape,
-);
+export const gradingGroupRename = gradingQuestion.extend({
+	...rubricRenameGroup.shape,
+	/// The version of the rubric, as the page read it.
+	updatedAt: rowVersion,
+});
 
 /// What the grading view sends to edit the rubric: a new base, changed items and items to delete, applied together or only counted when `dryRun`.
 export const gradingRubricEdit = gradingQuestion.extend({
 	base: rubricBase.optional(),
-	items: z.array(rubricItemUpdate.extend({ key: rubricKey })).default([]),
-	deleted: z.array(rubricKey).default([]),
+	/// The version of the rubric, as the page read it; it guards `base`.
+	updatedAt: rowVersion,
+	/// Each item carries the version of the item, as the page read it.
+	items: z
+		.array(rubricItemUpdate.extend({ key: rubricKey, updatedAt: rowVersion }))
+		.default([]),
+	deleted: z
+		.array(z.object({ key: rubricKey, updatedAt: rowVersion }))
+		.default([]),
 	/// Count the scores the change moves and write nothing.
 	dryRun: z.boolean().default(false),
 });

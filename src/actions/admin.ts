@@ -95,7 +95,7 @@ export const admin = {
 			return db.discipline.update(
 				{ slug: input.slug },
 				{ name: input.name },
-				{ actor },
+				{ actor, expectedUpdatedAt: input.updatedAt },
 			);
 		}),
 	}),

@@ -6,6 +6,7 @@
 	"errors_service_unavailable": "Service unavailable",
 	"errors_too_many_requests": "Too many requests",
 	"errors_precondition_failed": "Precondition failed: the record changed since it was read",
+	"errors_stale_edit": "Someone changed this since you opened the page. Reload the page and try again.",
 	"errors_precondition_unsupported": "The record does not accept a version precondition",
 	"errors_precondition_if_match": "If-Match takes one strong ETag: the record's updatedAt in quotes, e.g. \"2026-01-01T12:00:00.000Z\". Weak ETags, lists and * are not accepted",
 	"errors_precondition_if_none_match": "If-None-Match only accepts *, and only on PUT",

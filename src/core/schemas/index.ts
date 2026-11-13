@@ -38,6 +38,7 @@ export {
 	type ResourceId,
 	type ResponseId,
 	type RollCallId,
+	rowVersion,
 	type SessionId,
 	type Slug,
 	type SlugHash,

@@ -20,6 +20,8 @@ export interface GraderAnswer {
 	comment: string;
 	/// The `ref` of the current grade when `username` wrote it and a new write can revise it.
 	ref: string | null;
+	/// The version of the pass `ref` names as ISO text, or `null` without `ref`.
+	updatedAt: string | null;
 }
 
 /// A rubric item as the grading view shows it.
@@ -36,6 +38,8 @@ export interface GraderItem {
 	retired: boolean;
 	/// How many answers apply it.
 	uses: number;
+	/// The item's version as ISO text, `null` while the rubric is still the initial one.
+	updatedAt: string | null;
 }
 
 /// The grading view's form of a rubric item.
@@ -50,6 +54,7 @@ export function toGraderItem(item: RubricItem): GraderItem {
 		position: item.position,
 		retired: item.retiredAt !== null,
 		uses: item.uses,
+		updatedAt: item.updatedAt?.toISOString() ?? null,
 	};
 }
 
@@ -57,6 +62,8 @@ export function toGraderItem(item: RubricItem): GraderItem {
 export interface GraderState {
 	/// Credit before any item applies.
 	base: string;
+	/// The rubric's version as ISO text, `null` while it is the initial rubric.
+	updatedAt: string | null;
 	items: GraderItem[];
 	/// The answers in the order a grader goes through them.
 	answers: GraderAnswer[];
@@ -75,9 +82,14 @@ export function graderState(
 ): GraderState {
 	return {
 		base: rubric.base,
+		updatedAt: rubric.updatedAt?.toISOString() ?? null,
 		items: rubric.items.map(toGraderItem),
 		answers: gradingOrder(answers).map((answer) => {
 			const current = answer.passes[0];
+			const revisable =
+				current?.grader === username &&
+				!current.willNotGrade &&
+				current.ref !== undefined;
 			return {
 				submission: answer.submission,
 				state: answer.state,
@@ -85,12 +97,8 @@ export function graderState(
 				rubric: current?.rubric ?? [],
 				adjustment: current?.adjustment ?? "",
 				comment: current?.comment ?? "",
-				ref:
-					current?.grader === username &&
-					!current.willNotGrade &&
-					current.ref !== undefined
-						? current.ref
-						: null,
+				ref: revisable ? (current.ref ?? null) : null,
+				updatedAt: revisable ? current.updatedAt.toISOString() : null,
 			};
 		}),
 	};

@@ -61,6 +61,19 @@
   rubrica e itens passam a expô-lo. Snapshot OpenAPI e cliente da CLI
   regenerados; o cliente gerado agora envia `if_match`. `rest.batch` não
   repassa os cabeçalhos.
+- As Astro Actions que editam uma entidade enviam o `updatedAt` que a página
+  carregou (campo opcional `updatedAt`, texto ISO) e repassam como
+  `expectedUpdatedAt`; versão velha responde `PRECONDITION_FAILED` com "Alguém
+  alterou isto desde que você abriu a página", e a ilha mostra o texto. Cobre
+  `admin.updateDiscipline`, `question.updateStatus`, `report.triage`,
+  `regrade.accept` e `reject`, `grading.gradeRubric` (só ao revisar uma nota
+  com `ref`) e as de rubrica (`rubric.addItem`, `edit`, `splitItem`,
+  `renameGroup`: versão da rubrica para base, adição e renomeação, do item
+  para valor, remoção e divisão). `grading.state` devolve as versões da rubrica,
+  dos itens e da nota revisável; `question.updateStatus` e `report.triage`
+  devolvem o `updatedAt` novo, e as demais ilhas o releem. Ficam sem versão:
+  as ações de criar uma nota, `grading.willNotGrade`, os deletes de um clique e
+  `rollCall.update` (mescla por aluno e o `updatedAt` muda a cada check-in).
 - Remover uma tentativa registra em log uma linha JSON `answer-history.removed`
   (curso, prova, tentativas, campos, lotes, edits, `byteCount` e `storedBytes`
   estimado) quando ela tinha histórico de edição, e `pnpm run manage

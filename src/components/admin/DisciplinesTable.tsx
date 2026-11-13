@@ -17,6 +17,8 @@ export interface DisciplineRow {
 	slug: string;
 	name: string;
 	courseCount: number;
+	/// The version of the row as ISO text, sent back so the edit refuses a discipline that changed meanwhile.
+	updatedAt: string;
 }
 
 interface Props {
@@ -138,6 +140,7 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 								class="mt-4 flex flex-col gap-4"
 							>
 								<input type="hidden" name="slug" value={row.slug} />
+								<input type="hidden" name="updatedAt" value={row.updatedAt} />
 								<Show when={props.failedSlug === row.slug}>
 									<FormAlert error={props.editForm.error} />
 								</Show>

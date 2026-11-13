@@ -80,7 +80,7 @@ export const regrade = {
 			await db.regradeRequest.accept(
 				{ publicId: input.request, course },
 				{ score, reply: input.reply },
-				{ actor },
+				{ actor, expectedUpdatedAt: input.updatedAt },
 			);
 		}),
 	}),
@@ -98,7 +98,7 @@ export const regrade = {
 			await db.regradeRequest.reject(
 				{ publicId: input.request, course },
 				{ reply: input.reply },
-				{ actor },
+				{ actor, expectedUpdatedAt: input.updatedAt },
 			);
 		}),
 	}),

@@ -3,19 +3,28 @@ import {
 	FieldError,
 	NotAllowed,
 	NotFound,
+	PreconditionFailed,
 	TooManyRequests,
 	WeakPassword,
 } from "@/core/error";
 import { m } from "@/i18n";
 
 /// Maps the framework-agnostic service errors to the `ActionError` Astro
-/// expects, and returns any other value unchanged.
+/// expects, and returns any other value unchanged. A `PreconditionFailed`
+/// (the row changed since the page loaded it) becomes `PRECONDITION_FAILED`
+/// with the text the island shows.
 function translateServiceError(error: unknown): unknown {
 	if (error instanceof NotAllowed) {
 		return new ActionError({ code: "FORBIDDEN", message: error.message });
 	}
 	if (error instanceof NotFound) {
 		return new ActionError({ code: "NOT_FOUND", message: error.message });
+	}
+	if (error instanceof PreconditionFailed) {
+		return new ActionError({
+			code: "PRECONDITION_FAILED",
+			message: m.errors_stale_edit(),
+		});
 	}
 	if (error instanceof TooManyRequests) {
 		return new ActionError({
@@ -53,9 +62,10 @@ function fieldActionError(error: FieldError): ActionError {
 }
 
 /**
- * Wraps an Astro Action handler, translating a `NotAllowed` or a `NotFound`
- * thrown by a service (framework-agnostic, see `src/db/base-service.ts`) into
- * the `ActionError` Astro expects, `FORBIDDEN` or `NOT_FOUND`, and a
+ * Wraps an Astro Action handler, translating a `NotAllowed`, a `NotFound` or a
+ * `PreconditionFailed` thrown by a service (framework-agnostic, see
+ * `src/db/base-service.ts`) into the `ActionError` Astro expects, `FORBIDDEN`,
+ * `NOT_FOUND` or `PRECONDITION_FAILED`, and a
  * `FieldError` into an input error on its field. Any other thrown value
  * passes through unchanged.
  */

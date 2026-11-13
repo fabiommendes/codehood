@@ -5,6 +5,7 @@ import {
 	feedbackId,
 	publicId,
 	regradeRequestId,
+	rowVersion,
 	slug,
 	submissionId,
 	username,
@@ -141,8 +142,9 @@ export const regradeRequestRef = examParams.extend({
 	request: z.string().min(1),
 });
 
-/// What the instructor's accept form sends: the percentage as typed (0 to 100) and the reply.
+/// What the instructor's accept form sends: the percentage as typed (0 to 100), the reply and the version of the request the page loaded.
 export const regradeAcceptForm = regradeRequestRef.extend({
+	updatedAt: rowVersion,
 	score: z
 		.string({ error: SCORE_ERROR })
 		.refine(isPercentScore, SCORE_ERROR)
@@ -150,7 +152,8 @@ export const regradeAcceptForm = regradeRequestRef.extend({
 	reply: regradeReply,
 });
 
-/// What the instructor's reject form sends.
+/// What the instructor's reject form sends, with the version of the request the page loaded.
 export const regradeRejectForm = regradeRequestRef.extend({
+	updatedAt: rowVersion,
 	reply: regradeReply,
 });

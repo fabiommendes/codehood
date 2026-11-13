@@ -102,8 +102,9 @@ function ReportCard(props: {
 		setBusy(true);
 		setError(undefined);
 		const trimmed = note().trim();
-		const { error: failure } = await actions.report.triage({
+		const { data, error: failure } = await actions.report.triage({
 			publicId: props.row.publicId,
+			updatedAt: props.row.updatedAt,
 			status: status(),
 			kind: kind(),
 			note: trimmed === "" ? null : trimmed,
@@ -118,6 +119,7 @@ function ReportCard(props: {
 			status: status(),
 			kind: kind(),
 			note: trimmed === "" ? null : trimmed,
+			updatedAt: data.updatedAt.toISOString(),
 		});
 	}
 

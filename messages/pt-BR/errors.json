@@ -6,6 +6,7 @@
 	"errors_service_unavailable": "Serviço indisponível",
 	"errors_too_many_requests": "Muitas requisições",
 	"errors_precondition_failed": "Pré-condição falhou: o registro mudou desde que foi lido",
+	"errors_stale_edit": "Alguém alterou isto desde que você abriu a página. Recarregue a página e tente de novo.",
 	"errors_precondition_unsupported": "O registro não aceita pré-condição de versão",
 	"errors_precondition_if_match": "If-Match aceita um único ETag forte: o updatedAt do registro entre aspas, por exemplo \"2026-01-01T12:00:00.000Z\". ETags fracos, listas e * não são aceitos",
 	"errors_precondition_if_none_match": "If-None-Match só aceita *, e só em PUT",

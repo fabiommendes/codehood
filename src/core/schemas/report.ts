@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { m } from "@/i18n";
-import { buffer, mimeType, publicId, reportId, username } from "./base";
+import {
+	buffer,
+	mimeType,
+	publicId,
+	reportId,
+	rowVersion,
+	username,
+} from "./base";
 import { courseNaturalKey, courseRef } from "./course";
 
 /// The shortest message a report may carry, in characters after trimming.
@@ -160,8 +167,11 @@ export const reportForm = z.object({
 		.optional(),
 });
 
-/// What the triage form sends, addressing the report by its `publicId`.
-export const reportTriageForm = reportUpdate.extend({ publicId: publicId });
+/// What the triage form sends, addressing the report by its `publicId`, with the version it was loaded at.
+export const reportTriageForm = reportUpdate.extend({
+	publicId: publicId,
+	updatedAt: rowVersion,
+});
 
 /// Addresses one report by its `publicId`.
 export const reportRef = z.object({ publicId: publicId });

@@ -16,6 +16,8 @@ export interface ReportRow {
 	course: string | null;
 	attachments: { filename: string; url: string }[];
 	createdAt: string;
+	/// The version of the report as ISO text, sent back by the triage form.
+	updatedAt: string;
 }
 
 /// The report `report` as a {@link ReportRow}.
@@ -38,6 +40,7 @@ export function toReportRow(report: Report): ReportRow {
 			url,
 		})),
 		createdAt: report.createdAt.toISOString(),
+		updatedAt: report.updatedAt.toISOString(),
 	};
 }
 

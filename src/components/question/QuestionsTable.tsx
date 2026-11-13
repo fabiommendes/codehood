@@ -9,6 +9,7 @@ import {
 	onMount,
 	Show,
 } from "solid-js";
+import FormAlert from "@/components/form/FormAlert";
 import Badge from "@/components/ui/Badge";
 import Table, {
 	type ColumnConfig,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/table-sort";
 import type { QuestionType } from "@/core/schemas";
 import type { Question } from "@/db/services/question.service";
+import { errorMessage } from "@/forms/field-errors";
 import { locale, m } from "@/i18n";
 import { webNext } from "@/services/question-status";
 import {
@@ -172,6 +174,11 @@ export default function QuestionsTable(props: Props): JSX.Element {
 		Record<string, Question["status"]>
 	>({});
 	const [pendingSlugs, setPendingSlugs] = createSignal<Set<string>>(new Set());
+	/// The `updatedAt` each write returned, by slug: the version the next write expects.
+	const [versionOverrides, setVersionOverrides] = createSignal<
+		Record<string, Date>
+	>({});
+	const [failure, setFailure] = createSignal<string | null>(null);
 
 	let typeMenuRoot: HTMLDivElement | undefined;
 	let tagMenuRoot: HTMLDivElement | undefined;
@@ -180,10 +187,14 @@ export default function QuestionsTable(props: Props): JSX.Element {
 	/// top — the base every filter/sort/render reads from instead of the raw prop.
 	const effectiveQuestions = createMemo(() => {
 		const overrides = statusOverrides();
+		const versions = versionOverrides();
 		if (Object.keys(overrides).length === 0) return props.questions;
 		return props.questions.map((question) => {
 			const status = overrides[question.slug];
-			return status === undefined ? question : { ...question, status };
+			const updatedAt = versions[question.slug];
+			return status === undefined
+				? question
+				: { ...question, status, updatedAt: updatedAt ?? question.updatedAt };
 		});
 	});
 
@@ -305,18 +316,26 @@ export default function QuestionsTable(props: Props): JSX.Element {
 
 		setPendingSlugs((current) => new Set(current).add(question.slug));
 		setStatusOverrides((current) => ({ ...current, [question.slug]: next }));
+		setFailure(null);
 
-		const { error } = await actions.question.updateStatus({
+		const { data, error } = await actions.question.updateStatus({
 			discipline: props.discipline,
 			course: props.course,
 			slug: question.slug,
 			status: next,
+			updatedAt: question.updatedAt.toISOString(),
 		});
 
 		if (error) {
 			setStatusOverrides((current) => ({
 				...current,
 				[question.slug]: previous,
+			}));
+			setFailure(errorMessage(error));
+		} else {
+			setVersionOverrides((current) => ({
+				...current,
+				[question.slug]: data.updatedAt,
 			}));
 		}
 
@@ -484,6 +503,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 
 	return (
 		<div class="mt-4 flex flex-col gap-4">
+			<FormAlert error={failure() ?? undefined} />
 			<div class="flex flex-wrap items-center gap-3">
 				<div class="join">
 					<For each={STATUS_OPTIONS}>

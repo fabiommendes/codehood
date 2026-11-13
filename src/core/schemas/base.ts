@@ -175,6 +175,15 @@ export const instant = z
 	])
 	.openapi({ type: "string", format: "date-time" });
 
+/**
+ * The `updatedAt` of the row an edit form was loaded from, sent back as the
+ * version the write expects (ADR 0013).
+ *
+ * Absent means an unconditional write. A hidden form field carries it as the
+ * ISO text of {@link instant}; a JSON body may carry the same text.
+ */
+export const rowVersion = instant.optional();
+
 export const buffer = z
 	.custom<Buffer>((v) => Buffer.isBuffer(v), "Expected a Buffer")
 	.openapi({ type: "string", format: "binary" });

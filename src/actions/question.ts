@@ -21,7 +21,10 @@ export const question = {
 		input: questionStatusUpdate,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const course = parseCourseParams(input);
+			const course = parseCourseParams({
+				discipline: input.discipline,
+				course: input.course,
+			});
 
 			const existing = await db.question.findOne(
 				{ course, slug: input.slug, public: false },
@@ -43,17 +46,17 @@ export const question = {
 						version: existing.version,
 						question: existing.question,
 					},
-					{ actor },
+					{ actor, expectedUpdatedAt: input.updatedAt },
 				);
-				return { status: updated.status };
+				return { status: updated.status, updatedAt: updated.updatedAt };
 			}
 
 			const updated = await db.question.update(
 				{ course, slug: input.slug },
 				{ status: input.status },
-				{ actor },
+				{ actor, expectedUpdatedAt: input.updatedAt },
 			);
-			return { status: updated.status };
+			return { status: updated.status, updatedAt: updated.updatedAt };
 		}),
 	}),
 };

@@ -9,10 +9,12 @@ import type { GradingTarget } from "./grading-target";
 
 export interface NewRubricItemProps {
 	target: GradingTarget;
+	/// The rubric's version as ISO text, `null` while it is the initial rubric.
+	updatedAt: string | null;
 	/// The id of the `datalist` that suggests group paths.
 	groupList: string;
 	/// Called with the item the server created.
-	onCreated: (item: GraderItem) => void;
+	onCreated: (item: GraderItem) => void | Promise<void>;
 }
 
 /**
@@ -49,6 +51,7 @@ export default function NewRubricItem(props: NewRubricItemProps): JSX.Element {
 			text: text().trim(),
 			value: value().trim(),
 			group: group().trim() === "" ? null : group().trim(),
+			updatedAt: props.updatedAt ?? undefined,
 		});
 		setBusy(false);
 		if (error) {

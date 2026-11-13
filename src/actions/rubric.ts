@@ -28,7 +28,14 @@ export const rubric = {
 		input: gradingItemAdd,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { discipline: _d, course: _c, exam, question, ...item } = input;
+			const {
+				discipline: _d,
+				course: _c,
+				exam,
+				question,
+				updatedAt,
+				...item
+			} = input;
 			const created = await db.rubric.createItem(
 				{
 					course: parseCourseParams({
@@ -39,7 +46,7 @@ export const rubric = {
 					question,
 				},
 				item,
-				{ actor },
+				{ actor, expectedUpdatedAt: updatedAt },
 			);
 			return toGraderItem(created);
 		}),
@@ -62,14 +69,28 @@ export const rubric = {
 			const pk = { course, exam: input.exam, question: input.question };
 
 			const write = async (tx: PrismaTx): Promise<void> => {
+				// Each write carries the version of the row the page loaded: the
+				// rubric for the base, the item for an item. Writing one row moves
+				// the rubric's version, so the base goes first.
 				if (input.base !== undefined) {
-					await db.rubric.update(pk, { base: input.base }, { actor, tx });
+					await db.rubric.update(
+						pk,
+						{ base: input.base },
+						{ actor, tx, expectedUpdatedAt: input.updatedAt },
+					);
 				}
-				for (const { key, ...patch } of input.items) {
-					await db.rubric.updateItem({ ...pk, key }, patch, { actor, tx });
+				for (const { key, updatedAt, ...patch } of input.items) {
+					await db.rubric.updateItem({ ...pk, key }, patch, {
+						actor,
+						tx,
+						expectedUpdatedAt: updatedAt,
+					});
 				}
-				for (const key of input.deleted) {
-					await db.rubric.deleteItem({ ...pk, key }, { actor, tx });
+				for (const { key, updatedAt } of input.deleted) {
+					await db.rubric.deleteItem(
+						{ ...pk, key },
+						{ actor, tx, expectedUpdatedAt: updatedAt },
+					);
 				}
 			};
 			if (!input.dryRun) {
@@ -117,7 +138,7 @@ export const rubric = {
 		input: gradingItemSplit,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { key, children, exam, question } = input;
+			const { key, children, exam, question, updatedAt } = input;
 			const created = await db.rubric.splitItem(
 				{
 					course: parseCourseParams({
@@ -129,7 +150,7 @@ export const rubric = {
 					key,
 				},
 				{ children },
-				{ actor },
+				{ actor, expectedUpdatedAt: updatedAt },
 			);
 			return created.map(toGraderItem);
 		}),
@@ -150,7 +171,7 @@ export const rubric = {
 					question: input.question,
 				},
 				{ from: input.from, to: input.to },
-				{ actor },
+				{ actor, expectedUpdatedAt: input.updatedAt },
 			);
 		}),
 	}),

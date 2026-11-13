@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls/constants";
-import "./base";
 import { m } from "@/i18n";
+import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls/constants";
+import { rowVersion } from "./base";
 
 export const disciplineSchema = z.object({
 	slug: z.string().min(1),
@@ -38,11 +38,13 @@ export const disciplineCreate = disciplineSchema
 			}),
 	});
 
-/// The edit form: the discipline's name, keyed by the (read-only) slug.
-export const disciplineEdit = disciplineSchema.pick({
-	slug: true,
-	name: true,
-});
+/// The edit form: the discipline's name, keyed by the (read-only) slug, and the version the form was loaded at.
+export const disciplineEdit = disciplineSchema
+	.pick({
+		slug: true,
+		name: true,
+	})
+	.extend({ updatedAt: rowVersion });
 
 export const disciplineUpdate = disciplineSchema
 	.pick({

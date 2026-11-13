@@ -185,6 +185,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 			adjustment: adjustment().trim() === "" ? undefined : adjustment().trim(),
 			comment: comment(),
 			ref: answer.ref ?? undefined,
+			updatedAt: answer.updatedAt ?? undefined,
 		});
 		if (error) {
 			setBusy(false);
@@ -204,7 +205,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 		setArmed(null);
 	}
 
-	function onCreated(item: GraderItem): void {
+	async function onCreated(item: GraderItem): Promise<void> {
 		setState({ ...state(), items: [...state().items, item] });
 		setKeys(
 			choose(
@@ -214,6 +215,8 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 			),
 		);
 		setAdding(false);
+		// The new item moved the rubric's version: a later write needs the new one.
+		await refresh();
 	}
 
 	function onKeyDown(event: KeyboardEvent): void {
@@ -397,6 +400,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 						<RubricEditor
 							target={props.target}
 							base={state().base}
+							updatedAt={state().updatedAt}
 							items={state().items.filter((item) => !item.retired)}
 							groupList={GROUP_LIST}
 							onChanged={async () => {
@@ -408,6 +412,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 					<Show when={adding()}>
 						<NewRubricItem
 							target={props.target}
+							updatedAt={state().updatedAt}
 							groupList={GROUP_LIST}
 							onCreated={onCreated}
 						/>

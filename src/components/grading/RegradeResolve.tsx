@@ -14,6 +14,8 @@ export interface RegradeResolveProps {
 	exam: string;
 	/// The `publicId` of the open request.
 	request: string;
+	/// The request's `updatedAt` as ISO text, the version the page loaded.
+	updatedAt?: string;
 }
 
 /**
@@ -32,12 +34,14 @@ export default function RegradeResolve(
 		exam: props.exam,
 		request: props.request,
 	};
+	/// The version the page loaded, when it passed one.
+	const version = props.updatedAt ? { updatedAt: props.updatedAt } : {};
 	const [rejectError, setRejectError] = createSignal<string | undefined>();
 	const [rejecting, setRejecting] = createSignal(false);
 	const form = createSchemaForm(regradeAcceptForm, {
 		id: `regrade-${props.request}`,
 		action: actions.regrade.accept,
-		hidden: target,
+		hidden: { ...target, ...version },
 		onSuccess: () => window.location.reload(),
 	});
 
@@ -52,6 +56,7 @@ export default function RegradeResolve(
 		setRejectError(undefined);
 		const { error } = await actions.regrade.reject({
 			...target,
+			...version,
 			reply: parsed.data.reply,
 		});
 		if (error) {

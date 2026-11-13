@@ -65,7 +65,11 @@ export const grading = {
 					adjustment: input.adjustment ?? null,
 					feedback: text ? text : null,
 				},
-				{ actor },
+				{
+					actor,
+					// Only a pass the page loaded has a version: a new one has none.
+					expectedUpdatedAt: input.ref ? input.updatedAt : undefined,
+				},
 			);
 		}),
 	}),

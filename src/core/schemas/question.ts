@@ -2,7 +2,7 @@ import { z } from "zod";
 import { type QuestionType as MdqQuestionType, questionDocument } from "@/mdq";
 import { publicQuestionSchema } from "@/mdq/public-schema";
 import type { AssertEqual } from "@/utils/types";
-import { questionRefId, rev, slug } from "./base";
+import { questionRefId, rev, rowVersion, slug } from "./base";
 import { courseRef } from "./course";
 
 export const questionSchema = z.object({
@@ -106,12 +106,13 @@ export const questionType = z.enum([
 export type QuestionType = z.infer<typeof questionType>;
 true satisfies AssertEqual<QuestionType, MdqQuestionType>;
 
-/// The question bank's status control: a question by URL segments and the status to move it to.
+/// The question bank's status control: a question by URL segments, the status to move it to and the version the table last read.
 export const questionStatusUpdate = z.object({
 	discipline: z.string().min(1),
 	course: z.string().min(1),
 	slug: z.string().min(1),
 	status: questionStatus,
+	updatedAt: rowVersion,
 });
 
 /// The default of `meta.attempts`.

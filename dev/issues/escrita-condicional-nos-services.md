@@ -57,8 +57,11 @@ PUT".
 7. Feito: `CRUD()` (`src/api/`) lê `If-Match` e `If-None-Match: *` em `PUT`, `PATCH`
    e `DELETE`, e os declara no OpenAPI. Regenerar o snapshot e o cliente da
    CLI com `pnpm run openapi:cli`.
-8. As Astro Actions que editam uma entidade enviam o `updatedAt` carregado
-   pela página.
+8. Feito: as Astro Actions que editam uma entidade enviam o `updatedAt`
+   carregado pela página (`rowVersion` em `src/core/schemas/base.ts`;
+   `PreconditionFailed` vira `PRECONDITION_FAILED` em `src/actions/helpers.ts`).
+   Ficam sem versão: criação de nota (`grading.grade`, `gradeBlanks`),
+   `grading.willNotGrade`, deletes de um clique e `rollCall.update`.
 9. Atualizar `dev/rfc/como-criar-e-escrever-um-service.md` com a regra.
 
 ## Restrições

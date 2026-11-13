@@ -54,10 +54,16 @@ export const report = {
 	 */
 	triage: defineAction({
 		input: reportTriageForm,
-		handler: withServiceErrors(async ({ publicId, ...update }, context) => {
-			const actor = requireUser(context);
-			await db.report.update({ publicId }, update, { actor });
-		}),
+		handler: withServiceErrors(
+			async ({ publicId, updatedAt, ...update }, context) => {
+				const actor = requireUser(context);
+				const updated = await db.report.update({ publicId }, update, {
+					actor,
+					expectedUpdatedAt: updatedAt,
+				});
+				return { updatedAt: updated.updatedAt };
+			},
+		),
 	}),
 
 	/**

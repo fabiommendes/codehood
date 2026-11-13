@@ -11,6 +11,8 @@ import type { GradingTarget } from "./grading-target";
 export interface RubricEditorProps {
 	target: GradingTarget;
 	base: string;
+	/// The rubric's version as ISO text, `null` while it is the initial rubric.
+	updatedAt: string | null;
 	/// The items that can still be edited, retired ones left out.
 	items: GraderItem[];
 	/// The id of the `datalist` that suggests group paths.
@@ -103,7 +105,13 @@ export default function RubricEditor(props: RubricEditorProps): JSX.Element {
 			if (diff.value !== undefined && !isNumberInRange(diff.value, -1, 1)) {
 				return refuse(m.grades_grader_value_invalid());
 			}
-			if (Object.keys(diff).length > 0) items.push({ key: item.key, ...diff });
+			if (Object.keys(diff).length > 0) {
+				items.push({
+					key: item.key,
+					...diff,
+					updatedAt: item.updatedAt ?? undefined,
+				});
+			}
 		}
 		const newBase = base()?.trim();
 		if (newBase !== undefined && !isNumberInRange(newBase, 0, 1)) {
@@ -112,8 +120,13 @@ export default function RubricEditor(props: RubricEditorProps): JSX.Element {
 		return {
 			base:
 				newBase !== undefined && newBase !== props.base ? newBase : undefined,
+			updatedAt: props.updatedAt ?? undefined,
 			items,
-			deleted: deleted(),
+			deleted: deleted().map((key) => ({
+				key,
+				updatedAt:
+					props.items.find((item) => item.key === key)?.updatedAt ?? undefined,
+			})),
 		};
 	}
 
@@ -333,6 +346,7 @@ export default function RubricEditor(props: RubricEditorProps): JSX.Element {
 
 			<RenameGroup
 				target={props.target}
+				updatedAt={props.updatedAt}
 				groupList={props.groupList}
 				onDone={props.onChanged}
 			/>
@@ -403,6 +417,7 @@ function SplitItem(props: {
 			...props.target,
 			key: props.item.key,
 			children: typed,
+			updatedAt: props.item.updatedAt ?? undefined,
 		});
 		setBusy(false);
 		if (error) {
@@ -476,6 +491,7 @@ function SplitItem(props: {
 /// The form that moves a group, and everything under it, to another path.
 function RenameGroup(props: {
 	target: GradingTarget;
+	updatedAt: string | null;
 	groupList: string;
 	onDone: () => Promise<void>;
 }): JSX.Element {
@@ -492,6 +508,7 @@ function RenameGroup(props: {
 			...props.target,
 			from: from(),
 			to: to(),
+			updatedAt: props.updatedAt ?? undefined,
 		});
 		if (error) {
 			setFailure(errorMessage(error));
