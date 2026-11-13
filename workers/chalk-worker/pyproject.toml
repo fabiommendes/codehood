@@ -36,6 +36,8 @@ module-root = ""
 # in workers/chalk-worker/, next to cli/.
 [tool.uv.sources]
 codehood-cli = { path = "../../cli", editable = true }
+# chalk-grader is not on PyPI yet: use the checkout of the chalk repository.
+chalk-grader = { path = "../../../../edu/chalk/packages/chalk-grader", editable = true }
 
 [tool.ruff]
 line-length = 100
