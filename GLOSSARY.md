@@ -172,6 +172,14 @@ Type: domain
 A student's membership in a [Course](#course), with an ACTIVE or DROPPED status.
 Only active enrollments grant access to course contents.
 
+## Envio
+
+Also: send
+Type: domain
+
+A [Submission](#submission) of kind `SUBMIT` or `FINAL` to a code question,
+which goes to a [Worker](#worker). An autosave is not an envio.
+
 ## Event
 
 Type: domain
@@ -329,6 +337,14 @@ One attempt at a [Practice](#exam)-type [Exam](#exam). A student may take as
 many as they like, so each gets its own [Response](#response), told apart by
 the session's start time. A graded exam has no practice session and exactly one
 response.
+
+## Pré-teste
+
+Also: pretest
+Type: domain
+
+A test case of a public region worth `[0]` in a code question. Failing one
+returns the [Envio](#envio) to the student at no cost.
 
 ## Public id
 
@@ -543,6 +559,14 @@ an authored slug (stable when the hour moves) and an optional title for the
 syllabus line. Concrete dated meetings are its [Events](#event). A slot may
 have none: office hours are a titled slot with no events.
 
+## Trabalho de correção
+
+Also: grading job
+Type: domain
+
+One [Envio](#envio) in the queue of a [Worker](#worker), a `GradingJob`. Held
+under a lease while a worker grades it.
+
 ## User
 
 Type: domain
@@ -551,6 +575,13 @@ An account, holding a [Role](#role), a unique username, and external handles
 (github id, school id) collected at invite acceptance. The username is immutable
 because it is the foreign key courses reference for the instructor and a path
 segment of every [Course URL](#course-url) that instructor owns.
+
+## Worker
+
+Type: platform
+
+A process outside the server that runs the tests of a code question and
+returns the runner report. Authenticates with a `BOT` [API key](#api-key).
 
 ---
 

@@ -4,6 +4,24 @@
 
 ### Added
 
+- Questões `code` corrigidas por workers externos (lado servidor). O servidor
+  hospeda o tipo `code` do mdq; `meta.worker`, `meta.attempts` e
+  `meta.penalty` vão para `QuestionRef`, e o push recusa fonte de teste sem
+  `text` e item manual de rubrica com valor. `response.submit` e a Action
+  `exam.answer` aceitam `kind: "SUBMIT"`, que cria um `GradingJob` na
+  transação do save: trabalho `QUEUED` anterior é cancelado, `CLAIMED` recusa
+  com 409, envios esgotados recusam com 409 fora de `PRACTICE`, e nada disso
+  faz um autosave falhar. Fechar a tentativa promove o último autosave a
+  `FINAL`; tentativa cujo prazo venceu é promovida no próximo `claim`. Fila em
+  `GradingJobService` e em `POST /api/grading-jobs/claim`,
+  `/{submission}/renew`, `/fail` e `/result`, só para chave `BOT`, com lease
+  (120 s, máximo 600 s) e `FAILED` depois de 3 falhas. O runner report vira
+  `PRETEST_FAILED` (sem custo) ou nota por `scoreCode`, num feedback do bot.
+  A nota da questão é `max(score_i - penalty x e_i)` com piso 0, em
+  `src/services/exam-result.ts`. Um pass humano fecha o trabalho aberto.
+  Actions `gradingJob.summary`, `requeueFailed` e `forStudent`. O seed traz a
+  questão `elm-soma` em `cs101` com envios em cada estado.
+
 - Card do curso na sidebar. A página passa `nav` ao `AppLayout` (tipos em
   `src/utils/course-nav.ts`, no máximo dois níveis) e o card toma o lugar da
   linha do curso: código, aba, contexto (título da prova) e links em
