@@ -1,50 +1,67 @@
 ---
 type: issue
-status: backlog
-tags: [questions, mdq, grading]
+status: todo
+tags: [questions, mdq, exam, answer-history, code]
+relatedTo: [teste-de-carga-da-prova]
 kind: feature
-priority: medium
+priority: high
 created: 2026-11-11
 creator: claude
 ---
 
-# Suporte ao tipo `code` do mdq
+# Questões `code` do mdq fora do monitor de edição
 
-O pacote `mdq` ganhou o tipo de questão `code` (`mdq-js/CHANGELOG.md`,
-"Unreleased"). O Codehood a recusa por enquanto: `questionDocument`
-(`src/mdq/index.ts`) rejeita o documento com a mensagem `Question type "code"
-is not supported yet.`, na criação e na atualização (API REST, sync da CLI e
-service). `QuestionDocument` e os mapas por tipo (`questionTypeLabels`,
-`FACTORIES`, `publicQuestionSchema`) não incluem `code`.
+O Codehood já aceita o tipo `code` do mdq: a questão é corrigida por workers
+externos (`CHANGELOG.md`, "Questões `code` corrigidas por workers externos"),
+abre no editor da prova (`CodeAnswer`) e é semeada em `src/db/bootstrap.ts`
+(`seedExternalGradingExams`). Falta uma parte: o monitor de edição.
 
-Não confundir com a redação com código (`essay` com `content: code`), que
-continua como está.
+## Problema
 
-## O que falta para suportar
+O histórico de edição das respostas
+(`dev/rfc/historico-de-edicao-de-respostas-abertas.md`) segue só questões
+`essay`, o que inclui a redação com código (`essay` + `content: code`,
+`CodeEssayAnswer`) mas deixa de fora o tipo `code`:
 
-- Retirar `code` de `UNSUPPORTED_QUESTION_TYPES` e do `Exclude` em
-  `QuestionDocument`; o compilador aponta os mapas por tipo que passam a
-  exigir a entrada (rótulo e mensagem i18n em `messages/*`, factory, schema
-  público).
-- Forma pública: `publicForm` de uma questão `code` exige os testes com texto
-  (`resolveTests`) e expõe `publicTests` (regiões de exemplo) e `template`.
-  Os testes ligados por link (`file`/`origin`) precisam ser resolvidos a partir
-  do repositório do curso antes de gravar a questão.
-- UI de resposta: o componente `Code` de `mdq/solid` já existe; falta ligá-lo
-  em `ExamQuestion` e no preview, e guardar a resposta (rascunho, envio).
-- Relatório do runner: a nota vem de `scoreCode` com um `CodeGrading`
-  (relatório de testes mais itens manuais da rubrica). O runner no cliente
-  (`dev/rfc/ambiente-de-execucao-no-cliente.md`) precisa produzir esse
-  relatório no formato esperado e ele precisa ser gravado com a submissão.
-  `scoreResponse` recebe o argumento `grading` para esse tipo.
-- Monitor de edição: o histórico de edição das respostas
-  (`dev/rfc/historico-de-edicao-de-respostas-abertas.md`) segue hoje só questões
-  `essay`. Ao aceitar `code`, a página de prova deve alimentá-lo também com as
-  edições da resposta de código.
-- Correção: a página de correção deve mostrar o gabarito (`referenceSolution`),
-  a rubrica completa (`fullRubric`), e deixar o professor marcar os itens
-  manuais. Uma resposta sem relatório fica pendente (`NotAutoGradable`).
-- Relação com a redação com código: decidir se `essay` + `content: code`
-  continua separada ou se migra para `code` quando houver testes.
-- `src/db/bootstrap.ts`: semear questões `code` em cada estado.
-- Testes: unit para o serviço e a pontuação, e2e para responder e corrigir.
+- `historyQuestions` em `src/components/exam/ExamAttempt.tsx` filtra
+  `entry.question.type === "essay"`, então o adapter nunca é ligado às
+  questões `code`;
+- `recordEdit`, no mesmo arquivo, retorna cedo quando `type !== "essay"`.
+
+O RFC deixou o `code` para "quando o Codehood passar a aceitá-lo". Ele passou
+a aceitar, mas o monitor não acompanhou. Na `teste2-elm` (2026-11-13), toda a
+prova era de questões `code`, e nenhuma edição foi registrada: só ficaram as
+respostas salvas pelo autosave e os envios.
+
+É nas questões de código que deve estar boa parte das colas com IA (texto
+colado de uma vez, saltos grandes sem digitação), que é justamente o que o
+histórico de edição existe para mostrar. Sem ele, a ferramenta não cobre o
+caso que mais importa.
+
+## O que fazer
+
+- Incluir as questões `code` em `historyQuestions` e em `recordEdit`.
+- Conferir que `CodeAnswer` passa cada edição por `change()` com o
+  `userEvent` do CodeMirror (digitação, colagem, desfazer), como faz
+  `CodeEssayAnswer`, para que `kindOfUserEvent` classifique as entradas.
+- Conferir que o envio (`SUBMIT`) não interfere no histórico: o envio grava
+  a mesma resposta que o autosave, e o histórico continua depois dele.
+- `removeSettledHistory` e a página do resumo do histórico
+  (`answer-edit-summary`) devem cobrir as questões `code`.
+- `src/db/bootstrap.ts`: semear histórico numa questão `code` (por exemplo
+  na `test-elm`), com digitação e uma colagem, para que a página do
+  professor mostre o caso.
+- Testes: e2e de uma prova com questão `code` e o switch ligado, conferindo
+  que as edições chegam ao servidor, com a colagem classificada como tal.
+
+## Efeito na carga
+
+Respostas de código são longas e editadas o tempo todo, então ligar o monitor
+nelas aumenta as escritas por aluno durante a prova. O teste de carga
+(`teste-de-carga-da-prova.md`) deve medir o cenário de monitoramento com o
+histórico ligado nas questões `code`.
+
+## Em aberto
+
+- Decidir se a redação com código (`essay` + `content: code`) continua
+  separada ou migra para `code` quando houver testes.
