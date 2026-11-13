@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import { FULL_ACCESS } from "@/auth/actor";
-import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { persistedResponseFactory } from "@/fixtures/response.factory";
+import { sumCode } from "@/mdq/fixtures";
 import { examResult, resultPolicy } from "@/services/exam-result";
 import type { ExamTiming } from "@/services/exam-state";
 import {
@@ -13,6 +14,12 @@ import {
 	type GradingFeedback,
 } from "@/services/grading";
 import { loadExamGrading } from "@/utils/load-grading";
+import {
+	enroll,
+	makeCourse,
+	makeExam,
+	tag,
+} from "./conditional-write-exam-support";
 
 // The counting answer of a `code` question agrees with `examResult`: same
 // verdict and state, and the answer is the send that counts.
@@ -266,39 +273,86 @@ test("property: verdict and state agree with examResult", () => {
 });
 
 //
-// The loader the grading screen reads, on the seeded database.
+// The loader the grading screen reads. The rows are built here: some unit
+// specs empty the worker's database, so the seed may be gone.
 //
 
-test("loadExamGrading: seeded `test-elm` answers agree with examResult", async () => {
-	const course = await seededCourse();
-	for (const username of ["hopper", "thompson"]) {
-		const student = await db.user.findOne({ username }, FULL_ACCESS);
-		await db.response.finish(
-			{ course: course.id, exam: "test-elm" },
-			{ actor: student as NonNullable<typeof student> },
-		);
-	}
-	const ada = await db.user.findOne({ username: "ada" }, FULL_ACCESS);
-	const loaded = await loadExamGrading(
-		course.id,
-		"test-elm",
-		ada as NonNullable<typeof ada>,
+test("loadExamGrading: the answers of a code question agree with examResult", async () => {
+	const { course, instructor } = await makeCourse();
+	const slug = tag("code-");
+	await db.question.create(
+		{
+			course: course.id,
+			slug,
+			status: "PUBLISHED",
+			version: "1",
+			rev: null,
+			question: { ...sumCode, meta: { worker: "elm-test" } },
+		},
+		FULL_ACCESS,
 	);
+	const exam = await makeExam(course.id, { questions: [{ slug }] });
+	const ref = await prisma.questionRef.findFirstOrThrow({
+		where: { courseId: course.id, slug },
+	});
+
+	/// A finished attempt whose sends were graded with `scores`, oldest first.
+	const attemptWith = async (scores: string[]) => {
+		const student = await enroll(course.id);
+		const response = await persistedResponseFactory.create({
+			course: course.id,
+			exam: exam.slug,
+			author: student.username,
+		});
+		const row = await prisma.response.findUniqueOrThrow({
+			where: { publicId: response.publicId },
+		});
+		for (const [index, score] of scores.entries()) {
+			const submission = await prisma.submission.create({
+				data: {
+					publicId: tag("sub"),
+					responseId: row.id,
+					questionId: ref.id,
+					kind: "SUBMIT",
+					payload: "code",
+					createdAt: new Date(Date.now() - 100_000 + index * 1000),
+					gradingJob: { create: { worker: "elm-test", state: "DONE" } },
+				},
+			});
+			await prisma.feedback.create({
+				data: {
+					ref: "bot",
+					botId: "bot",
+					submissionId: submission.id,
+					score,
+				},
+			});
+		}
+		await db.response.finish(
+			{ course: course.id, exam: exam.slug },
+			{ actor: student },
+		);
+		return student.username;
+	};
+	const improved = await attemptWith(["0.667", "1"]);
+	const worsened = await attemptWith(["1", "0.5"]);
+
+	const loaded = await loadExamGrading(course.id, exam.slug, instructor);
 	expect(loaded).not.toBeNull();
 	const { answers, attempts, feedback } = loaded as NonNullable<typeof loaded>;
 	const policy = resultPolicy("EXAM", {});
 	const seen = new Map<string, CountingAnswer>();
 	for (const answer of answers) {
-		if (answer.question === "elm-soma") seen.set(answer.author, answer);
+		if (answer.question === slug) seen.set(answer.author, answer);
 	}
 
-	for (const author of ["hopper", "thompson"]) {
+	for (const author of [improved, worsened]) {
 		const attempt = attempts.find((a) => a.author === author);
 		const answer = seen.get(author);
 		expect(attempt, author).toBeDefined();
 		expect(answer, author).toBeDefined();
 		const [expected] = examResult(
-			["elm-soma"],
+			[slug],
 			(attempt as NonNullable<typeof attempt>).submissions,
 			feedback,
 			policy,
@@ -309,17 +363,7 @@ test("loadExamGrading: seeded `test-elm` answers agree with examResult", async (
 			expected?.status === "graded" ? expected.submission : answer?.submission,
 		);
 	}
-	expect(seen.get("hopper")?.state).toBe("graded");
-	expect(seen.get("hopper")?.verdict).toBeCloseTo(0.8);
+	expect(seen.get(improved)?.state).toBe("graded");
+	expect(seen.get(improved)?.verdict).toBeCloseTo(0.8);
+	expect(seen.get(worsened)?.verdict).toBe(1);
 });
-
-/// The seeded course that holds the `test-elm` exam.
-/// The course of the seeded `test-elm` exam, read by slug: a listing is paged, and other specs add courses.
-async function seededCourse(): Promise<{ id: CourseId }> {
-	const exam = await prisma.exam.findFirst({
-		where: { slug: "test-elm" },
-		select: { courseId: true },
-	});
-	if (!exam) throw new Error("the seeded database has no `test-elm` exam");
-	return { id: exam.courseId as CourseId };
-}
