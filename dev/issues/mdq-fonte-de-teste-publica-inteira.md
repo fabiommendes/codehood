@@ -39,4 +39,4 @@ decisão do host que o mdq não descreve, e outro host pode decidir diferente.
 ## Enquanto não muda
 
 O servidor decide em `src/utils/pretest-sources.ts` e entrega pelo
-`QuestionService.pretests`. Uma fonte com região oculta nunca sai inteira.
+`QuestionService.codeAnswer`. Uma fonte com região oculta nunca sai inteira.
