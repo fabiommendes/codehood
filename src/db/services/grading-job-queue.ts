@@ -13,6 +13,11 @@ import { guardedUpdate } from "@/db/conditional-write";
 import { m } from "@/i18n";
 import { DEFAULT_CODE_ATTEMPTS, spentAttempts } from "@/services/code-grading";
 import type { Prisma, PrismaTx } from "../client";
+import {
+	attemptTimedOut,
+	examTimingSelect,
+	loadExceptionTiming,
+} from "./submission.service";
 
 /// The (attempt, question) pair a send belongs to, with the question's send policy.
 export interface SendTarget {
@@ -183,6 +188,122 @@ export async function promoteFinalSends(
 			if (error instanceof NotAllowed && error.status === 409) continue;
 			console.error(
 				`attempt ${response.id}: could not send the last autosave of question ${question.id}`,
+				error,
+			);
+		}
+	}
+}
+
+/// Which attempts {@link promoteExpiredSends} looks at.
+export interface ExpiredScope {
+	/// Only courses this user teaches.
+	instructor: string;
+	/// Only questions graded by one of these workers.
+	workers: string[];
+	/// Narrows the courses, e.g. by discipline or edition.
+	course?: Prisma.CourseWhereInput;
+	/// Only the exam with this slug.
+	exam?: string;
+	/// Narrows the questions by slug.
+	questions?: string[];
+}
+
+/// The newest submission of a question is an autosave that differs from the last send.
+const UNSENT_AUTOSAVE_SQL = `
+	s.kind = 'AUTOSAVE'
+	AND NOT EXISTS (
+		SELECT 1 FROM Submission t
+		WHERE t.responseId = s.responseId AND t.questionId = s.questionId AND t.id > s.id
+	)
+	AND s.payload IS NOT (
+		SELECT t.payload FROM Submission t
+		WHERE t.responseId = s.responseId AND t.questionId = s.questionId
+			AND t.kind IN ('SUBMIT', 'FINAL')
+		ORDER BY t.id DESC LIMIT 1
+	)`;
+
+/**
+ * Sends the last autosave of every attempt whose time ran out and was never closed, so a student who did not press "send" still gets graded.
+ *
+ * Practice attempts and attempts that would still take an autosave are left alone. A failure on one attempt is logged and the others go on.
+ */
+export async function promoteExpiredSends(
+	tx: PrismaTx,
+	scope: ExpiredScope,
+	now: Date = new Date(),
+): Promise<void> {
+	// An exam that is neither completed nor timed has no deadline to run out.
+	const exams = await tx.exam.findMany({
+		where: {
+			...(scope.exam ? { slug: scope.exam } : {}),
+			type: { not: "PRACTICE" },
+			status: { in: ["ONGOING", "SCHEDULED", "COMPLETED"] },
+			OR: [{ status: "COMPLETED" }, { durationMs: { not: null } }],
+			course: { ...scope.course, instructorId: scope.instructor },
+			questionsForExams: {
+				some: {
+					questionRef: {
+						worker: { in: scope.workers },
+						...(scope.questions ? { slug: { in: scope.questions } } : {}),
+					},
+				},
+			},
+		},
+		select: { id: true, ...examTimingSelect },
+	});
+	if (exams.length === 0) return;
+
+	const examIds = exams.map((exam) => exam.id);
+	const marks = (list: unknown[]) => list.map(() => "?").join(", ");
+	const questionFilter = scope.questions
+		? `AND q.slug IN (${marks(scope.questions)})`
+		: "";
+	const candidates = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+		`SELECT DISTINCT r.id AS id
+		FROM ResponseRef r
+		JOIN Submission s ON s.responseId = r.id
+		JOIN QuestionRef q ON q.id = s.questionId
+		WHERE r.acceptingSubmissions = 1
+			AND r.examId IN (${marks(examIds)})
+			AND q.worker IN (${marks(scope.workers)})
+			${questionFilter}
+			AND ${UNSENT_AUTOSAVE_SQL}`,
+		...examIds,
+		...scope.workers,
+		...(scope.questions ?? []),
+	);
+	if (candidates.length === 0) return;
+
+	const responses = await tx.response.findMany({
+		where: { id: { in: candidates.map((row) => Number(row.id)) } },
+		select: { id: true, createdAt: true, examId: true, authorId: true },
+	});
+	const examOf = new Map(exams.map((exam) => [exam.id, exam]));
+	for (const response of responses) {
+		try {
+			const exam = examOf.get(response.examId);
+			if (!exam) continue;
+			const exception = await loadExceptionTiming(
+				tx,
+				response.examId,
+				response.authorId,
+			);
+			if (
+				!attemptTimedOut(
+					{ createdAt: response.createdAt, exam },
+					now,
+					exception,
+				)
+			) {
+				continue;
+			}
+			await promoteFinalSends(tx, {
+				id: response.id as ResponseId,
+				practice: false,
+			});
+		} catch (error) {
+			console.error(
+				`attempt ${response.id}: could not send the last autosave of an expired attempt`,
 				error,
 			);
 		}

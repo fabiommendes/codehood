@@ -519,6 +519,36 @@ export function assertExamOpen(
 }
 
 /**
+ * Whether the time of the attempt ran out for good: its exam window or its own deadline passed, beyond {@link EXAM_ANSWER_GRACE_MS}.
+ *
+ * It applies the clock rules of {@link assertAcceptingSubmissions}, and is false for an exam that is not open yet or has no deadline.
+ */
+export function attemptTimedOut(
+	response: {
+		createdAt: Date;
+		exam: Prisma.ExamGetPayload<{ select: typeof examTimingSelect }>;
+	},
+	now: Date,
+	exception: ExceptionTiming | null = null,
+): boolean {
+	const timing = viewerTiming(examTimingFromDb(response.exam), exception);
+	const graced = new Date(now.getTime() - EXAM_ANSWER_GRACE_MS);
+	switch (examPhase(timing, now)) {
+		case "closed":
+			return examPhase(timing, graced) === "closed";
+		case "open": {
+			const deadline = attemptDeadline(timing, {
+				...response,
+				acceptingSubmissions: true,
+			});
+			return deadline !== null && graced > deadline;
+		}
+		default:
+			return false;
+	}
+}
+
+/**
  * Refuses a submission against a closed response, an exam that is not open,
  * or a response whose deadline passed more than {@link EXAM_ANSWER_GRACE_MS} ago.
  *

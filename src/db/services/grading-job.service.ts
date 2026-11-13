@@ -55,6 +55,7 @@ import {
 	makeFeedbackService,
 	releasedToStudents,
 } from "./feedback.service";
+import { promoteExpiredSends } from "./grading-job-queue";
 
 //
 // Type definitions
@@ -112,7 +113,7 @@ export const makeGradingJobService = defineService()((client) => {
 	 * Gives back the jobs whose lease ran out, then takes up to `limit` queued
 	 * jobs of the listed workers for the bot, oldest first.
 	 *
-	 * Only courses the key's owner teaches count. A job another claim took
+	 * Only courses the key's owner teaches count. First it sends the last autosave of the attempts that timed out unsent. A job another claim took
 	 * first is skipped.
 	 *
 	 * @throws {@link NotAllowed} The actor is not authenticated by a `BOT` key.
@@ -137,6 +138,22 @@ export const makeGradingJobService = defineService()((client) => {
 			const courseUrl =
 				input.course === undefined ? null : parseUrl(input.course);
 			if (courseUrl !== null && courseUrl.instructor !== owner) return [];
+
+			await promoteExpiredSends(tx, {
+				instructor: owner,
+				workers: input.workers,
+				...(input.questions ? { questions: input.questions } : {}),
+				...(input.exam ? { exam: input.exam } : {}),
+				course: {
+					...(input.discipline ? { disciplineSlug: input.discipline } : {}),
+					...(courseUrl
+						? {
+								disciplineSlug: courseUrl.discipline,
+								editionSlug: courseUrl.edition,
+							}
+						: {}),
+				},
+			});
 
 			const rows = await tx.gradingJob.findMany({
 				where: {
