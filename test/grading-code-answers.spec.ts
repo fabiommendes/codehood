@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import { FULL_ACCESS } from "@/auth/actor";
+import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
+import { prisma } from "@/db/client";
 import { examResult, resultPolicy } from "@/services/exam-result";
 import type { ExamTiming } from "@/services/exam-state";
 import {
@@ -312,14 +314,12 @@ test("loadExamGrading: seeded `test-elm` answers agree with examResult", async (
 });
 
 /// The seeded course that holds the `test-elm` exam.
-async function seededCourse() {
-	const courses = await db.course.findMany({}, FULL_ACCESS);
-	for (const course of courses) {
-		const found = await db.exam.findOne(
-			{ course: course.id, slug: "test-elm" },
-			FULL_ACCESS,
-		);
-		if (found) return course;
-	}
-	throw new Error("the seeded database has no `test-elm` exam");
+/// The course of the seeded `test-elm` exam, read by slug: a listing is paged, and other specs add courses.
+async function seededCourse(): Promise<{ id: CourseId }> {
+	const exam = await prisma.exam.findFirst({
+		where: { slug: "test-elm" },
+		select: { courseId: true },
+	});
+	if (!exam) throw new Error("the seeded database has no `test-elm` exam");
+	return { id: exam.courseId as CourseId };
 }
