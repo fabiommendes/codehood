@@ -1,0 +1,27 @@
+---
+/** The statement of a code question and its model answer, highlighted like the students' code. */
+import { type CodeQuestion, firstFencedCode } from "mdq";
+import { m } from "@/i18n";
+import { highlightCode } from "@/utils/highlight-code";
+import { renderMarkdown } from "@/utils/markdown";
+
+interface Props {
+	question: CodeQuestion;
+}
+
+const { question } = Astro.props;
+const key = question.answerKey ? firstFencedCode(question.answerKey) : null;
+const keyHtml = key ? await highlightCode(key, question.language ?? null) : "";
+---
+
+<div class="prose prose-sm max-w-none" set:html={renderMarkdown(question.stem)} />
+{key && (
+  <div class="mt-4">
+    <p class="text-sm font-semibold text-muted">{m.grades_code_model_answer()}</p>
+    <div
+      class="mt-2 overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+      data-model-answer
+      set:html={keyHtml}
+    />
+  </div>
+)}

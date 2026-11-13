@@ -6,6 +6,9 @@ import AnswerControls from "@/components/grading/AnswerControls";
 import AnswerDistributionSection from "@/components/grading/AnswerDistribution.astro";
 import AnswerKey from "@/components/grading/AnswerKey";
 import AppliedItems from "@/components/grading/AppliedItems";
+import CodeAnswerKey from "@/components/grading/CodeAnswerKey.astro";
+import CodeQueue from "@/components/grading/CodeQueue.astro";
+import CodeSends from "@/components/grading/CodeSends.astro";
 import RubricGrader from "@/components/grading/RubricGrader";
 import { db } from "@/db";
 import { m } from "@/i18n";
@@ -31,7 +34,7 @@ const {
 } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug);
 if ("redirect" in result) return result.redirect;
-const { course, href, exam, questions, answers } = result;
+const { course, href, exam, questions, answers, attempts } = result;
 
 const position = questions.indexOf(questionSlug ?? "");
 if (!questionSlug || position < 0) return Astro.rewrite("/404");
@@ -99,6 +102,51 @@ const regradesHref = `${href}/exams/${exam.slug}/regrades`;
 
 const listView = wantsList(Astro.url);
 
+// A code question that goes to a worker also shows its queue and the sends of each answer.
+const worker =
+	doc.type === "code" && typeof doc.meta?.worker === "string" ? doc : null;
+const queue = worker
+	? await db.gradingJob.summary(
+			{ course: course.id, exam: exam.slug, question: questionSlug },
+			{ actor },
+		)
+	: null;
+/// The sends of each answer of the question, by the answer's submission.
+const sendsOf = new Map<
+	string,
+	Awaited<ReturnType<typeof db.gradingJob.forInstructor>>[string]
+>();
+if (worker) {
+	const responseOf = new Map(
+		answers
+			.filter((answer) => answer.question === questionSlug)
+			.flatMap((answer) => {
+				const attempt = attempts.find((entry) =>
+					entry.submissions.some((sent) => sent.publicId === answer.submission),
+				);
+				return attempt ? [[answer.submission, attempt.publicId] as const] : [];
+			}),
+	);
+	const responses = [...new Set(responseOf.values())];
+	// One call per 500 answers, the most the service reads at once.
+	const reads = [];
+	for (let start = 0; start < responses.length; start += 500) {
+		reads.push(
+			db.gradingJob.forInstructor(
+				{
+					question: questionSlug,
+					responses: responses.slice(start, start + 500),
+				},
+				{ actor },
+			),
+		);
+	}
+	const read = Object.assign({}, ...(await Promise.all(reads)));
+	for (const [submission, response] of responseOf) {
+		if (read[response]) sendsOf.set(submission, read[response]);
+	}
+}
+
 const { pending, resolved } = answersTo(questionSlug, answers);
 const ownAnswers = answers.filter((answer) => answer.question === questionSlug);
 // The rubric is read for the one-at-a-time view only; the list never starts one.
@@ -160,7 +208,7 @@ const shown = (
           <section class="mt-6">
             <h3 class="text-lg font-semibold">{m.grades_question_correct_answer()}</h3>
             <div class="mt-3 rounded-box border border-base-300 bg-base-100 p-6">
-              <AnswerKey client:load question={doc} />
+              {doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} />}
             </div>
           </section>
         ) : (
@@ -175,7 +223,7 @@ const shown = (
           <summary class="cursor-pointer px-4 py-2 text-sm font-medium">{m.grades_grader_questions()}</summary>
           <div class="p-4">
             {hasKey ? (
-              <AnswerKey client:load question={doc} />
+              doc.type === "code" ? <CodeAnswerKey question={doc} /> : <AnswerKey client:load question={doc} />
             ) : (
               <div class="prose prose-sm max-w-none" set:html={statementHtml} />
             )}
@@ -183,6 +231,14 @@ const shown = (
         </details>
       )
     }
+
+    {queue && (
+      <CodeQueue
+        summary={queue}
+        target={{ discipline: discipline!, course: courseSegment!, exam: exam.slug, question: questionSlug }}
+        now={new Date()}
+      />
+    )}
 
     {listView && distribution && <AnswerDistributionSection distribution={distribution} />}
 
@@ -203,6 +259,7 @@ const shown = (
                   )}
                   {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
                   <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} />
+                  {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
                   {answer.passes
                     .filter((pass) => pass.bot !== null)
                     .slice(0, 1)
@@ -248,12 +305,13 @@ const shown = (
                 )}
                 {names && <p class="font-medium">{studentNames.get(answer.author) ?? answer.author}</p>}
                 <Answer question={asked} payload={answer.payload as AnswerPayload} result={result} submission={answer.submission} reviewLabel={names ? (studentNames.get(answer.author) ?? answer.author) : label} />
+                {worker && sendsOf.has(answer.submission) && <CodeSends sends={sendsOf.get(answer.submission)!} question={worker} />}
 
                 {!isPending && (
                   <>
                     <p class="mt-4 text-lg font-semibold">
                       {answer.state === "graded" && answer.verdict !== null
-                        ? formatScore(answer.verdict)
+                        ? formatScore(sendsOf.get(answer.submission)?.submissions.find((sent) => sent.counts)?.discounted ?? answer.verdict)
                         : m.grades_question_not_graded()}
                     </p>
                     {answer.passes.length > 0 && (

@@ -395,9 +395,10 @@ const showQuestions =
 // The pretest sources of each code question, only while the student can answer.
 const pretests: Record<string, PretestSource[]> = {};
 const exampleHtml: Record<string, string[]> = {};
-// The sends of each code question that goes to a worker, by question slug.
+// The sends of each code question that goes to a worker, by question slug, while answering and in the review.
 const codeSends: Record<string, CodeSends> = {};
-if (state.kind === "in-progress") {
+const answering = state.kind === "in-progress";
+if (answering || (state.kind === "results" && attempt)) {
 	await Promise.all(
 		studentQuestions.map(async ({ slug, version, question }) => {
 			if (question.type !== "code") return;
@@ -405,8 +406,10 @@ if (state.kind === "in-progress") {
 				{ course: course.id, slug, version },
 				{ actor },
 			);
-			pretests[slug] = context.pretests;
-			exampleHtml[slug] = await highlightExamples(question);
+			if (answering) {
+				pretests[slug] = context.pretests;
+				exampleHtml[slug] = await highlightExamples(question);
+			}
 			if (!context.sendable || !attempt) return;
 			const sent = await db.gradingJob.forStudent(
 				{ response: attempt.publicId, question: slug },

@@ -35,5 +35,8 @@
 	"code_send_done": "Graded",
 	"code_send_sent": "Sent",
 	"code_send_score": "Score {score}",
-	"code_send_cancelled": "Canceled"
+	"code_send_cancelled": "Canceled",
+	"code_review_sends": "Submissions",
+	"code_send_counts": "Counts",
+	"code_send_discounted": "With discount {score}"
 }

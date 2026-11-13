@@ -35,5 +35,8 @@
 	"code_send_done": "Corrigido",
 	"code_send_sent": "Enviado",
 	"code_send_score": "Nota {score}",
-	"code_send_cancelled": "Cancelado"
+	"code_send_cancelled": "Cancelado",
+	"code_review_sends": "Envios",
+	"code_send_counts": "Vale",
+	"code_send_discounted": "Com desconto {score}"
 }

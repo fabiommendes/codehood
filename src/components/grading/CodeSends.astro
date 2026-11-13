@@ -1,0 +1,119 @@
+---
+/**
+ * The sends of one code answer as the instructor reads them: the job state,
+ * the score and its discount, which send counts, and every case of the
+ * worker's report with the hidden ones marked.
+ */
+import type { CodeQuestion } from "mdq";
+import type { GradingJobInstructorView } from "@/db/services/grading-job.service";
+import { m } from "@/i18n";
+import { formatScore } from "@/services/exam-result";
+import { formatDateTime } from "@/utils/schedule-time";
+import { instructorReport } from "./code-report";
+
+type Sends = GradingJobInstructorView[string];
+
+interface Props {
+	/// What `db.gradingJob.forInstructor` read for the answer.
+	sends: Sends;
+	question: CodeQuestion;
+}
+
+const { sends, question } = Astro.props;
+const counting = sends.submissions.find((sent) => sent.counts);
+
+const states: Record<string, () => string> = {
+	QUEUED: () => m.code_send_queued(),
+	CLAIMED: () => m.code_send_claimed(),
+	FAILED: () => m.code_send_failed(),
+	CANCELLED: () => m.code_send_cancelled(),
+};
+/// The state of a send in words, from its job and its status.
+const stateOf = (sent: Sends["submissions"][number]): string =>
+	sent.jobState === "DONE"
+		? sent.status === "PRETEST_FAILED"
+			? m.code_send_pretest_failed()
+			: m.code_send_done()
+		: (states[sent.jobState ?? ""]?.() ?? m.code_send_sent());
+const verdictBadge = (verdict: string): string =>
+	verdict === "pass"
+		? "badge-success"
+		: verdict === "skipped"
+			? "badge-ghost"
+			: "badge-error";
+---
+
+<section aria-label={m.grades_code_sends_title()} data-code-sends class="mt-4 flex flex-col gap-2">
+  <div class="flex flex-wrap items-baseline gap-x-3">
+    <h4 class="text-sm font-semibold">{m.grades_code_sends_title()}</h4>
+    {counting?.discounted !== undefined && (
+      <span class="font-semibold" data-question-score>{m.grades_code_sends_score({ score: formatScore(counting.discounted) })}</span>
+    )}
+    {sends.penalty > 0 && <span class="text-xs text-muted">{m.grades_code_sends_penalty({ penalty: sends.penalty })}</span>}
+  </div>
+
+  <ol class="m-0 flex list-none flex-col gap-2 p-0">
+    {sends.submissions.map((sent, index) => {
+      const view = sent.report === undefined ? undefined : instructorReport(question, sent.report);
+      return (
+        <li
+          class:list={["flex flex-col gap-2 rounded-box border px-3 py-2 text-sm", sent.counts ? "border-success/60 bg-success/5" : "border-base-300"]}
+          data-send
+          data-job-state={sent.jobState ?? "none"}
+          data-counts={sent.counts ? "true" : undefined}
+        >
+          <div class="flex flex-wrap items-baseline gap-x-3">
+            <span class="font-semibold">{m.code_send_title({ n: index + 1 })}</span>
+            <span class="text-muted" data-send-status>{stateOf(sent)}</span>
+            <span class="text-xs text-muted">{formatDateTime(sent.createdAt)}</span>
+            {sent.score !== undefined && <span class="font-semibold" data-send-score>{m.grades_code_send_score({ score: formatScore(sent.score) })}</span>}
+            {sent.discounted !== undefined && sent.discounted !== sent.score && (
+              <span class="text-muted" data-send-discounted>{m.grades_code_send_discounted({ score: formatScore(sent.discounted) })}</span>
+            )}
+            {sent.counts && <span class="badge badge-success badge-soft badge-sm" data-send-counts>{m.grades_code_send_counts()}</span>}
+          </div>
+
+          {sent.lastError && <p class="m-0 font-mono text-xs whitespace-pre-wrap break-all text-error">{m.grades_code_send_error({ error: sent.lastError })}</p>}
+
+          {view === undefined && sent.jobState === "DONE" && <p class="m-0 text-muted">{m.grades_code_send_no_report()}</p>}
+          {view?.kind === "invalid" && <p class="m-0 text-error">{m.grades_code_send_invalid({ message: view.message })}</p>}
+          {view?.kind === "report" && (
+            <>
+              {view.build && <pre class="m-0 max-h-60 overflow-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">{view.build}</pre>}
+              {view.message && <p class="m-0 text-xs text-muted">{view.message}</p>}
+              {view.cases.length > 0 && (
+                <ul aria-label={m.grades_code_send_cases()} class="m-0 flex list-none flex-col divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 p-0">
+                  {view.cases.map((item, caseIndex) => (
+                    <li class="flex flex-col gap-1 px-3 py-2" data-case data-hidden={item.hidden ? "true" : "false"} data-verdict={item.verdict}>
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span class:list={["badge badge-soft badge-sm", verdictBadge(item.verdict)]}>{item.verdict}</span>
+                        <span class="font-mono text-xs">{item.id ?? m.code_case_untitled({ n: caseIndex + 1 })}</span>
+                        <span class:list={["badge badge-outline badge-xs", item.hidden ? "badge-warning" : "badge-ghost"]}>{item.hidden ? m.grades_code_send_hidden() : m.grades_code_send_public()}</span>
+                        {item.message && <span class="text-base-content/80">{item.message}</span>}
+                      </div>
+                      {(item.expected !== undefined || item.actual !== undefined) && (
+                        <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono text-xs">
+                          {item.expected !== undefined && (<><dt class="text-muted">{m.code_case_expected()}</dt><dd class="m-0 whitespace-pre-wrap break-all">{item.expected}</dd></>)}
+                          {item.actual !== undefined && (<><dt class="text-muted">{m.code_case_actual()}</dt><dd class="m-0 whitespace-pre-wrap break-all">{item.actual}</dd></>)}
+                        </dl>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {view.items && (
+                <ul class="m-0 flex list-none flex-col gap-1 p-0" data-send-items>
+                  {view.items.map((item) => (
+                    <li data-passed={item.passed ? "true" : "false"}>
+                      <span class={item.passed ? "text-success" : "text-error"}>{item.passed ? "✓" : "✗"} {item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </li>
+      );
+    })}
+  </ol>
+</section>

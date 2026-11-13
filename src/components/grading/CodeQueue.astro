@@ -1,0 +1,78 @@
+---
+/**
+ * The grading queue of a code question: the jobs by state, the failures with
+ * their last error, a button that requeues them and when each worker key was
+ * last seen.
+ */
+import type { GradingJobSummary } from "@/db/services/grading-job.service";
+import { m } from "@/i18n";
+import { formatRelative } from "@/utils/relative-time";
+import { formatDateTime } from "@/utils/schedule-time";
+import RequeueFailed from "./RequeueFailed";
+
+interface Props {
+	summary: GradingJobSummary;
+	/// The course's URL segments, the exam and the question, as the grading actions take them.
+	target: {
+		discipline: string;
+		course: string;
+		exam: string;
+		question: string;
+	};
+	now: Date;
+}
+
+const { summary, target, now } = Astro.props;
+const states = [
+	["QUEUED", m.grades_code_queue_queued()],
+	["CLAIMED", m.grades_code_queue_claimed()],
+	["DONE", m.grades_code_queue_done()],
+	["FAILED", m.grades_code_queue_failed()],
+	["CANCELLED", m.grades_code_queue_cancelled()],
+] as const;
+---
+
+<section aria-label={m.grades_code_queue_title()} data-code-queue class="mt-6 rounded-box border border-base-300 bg-base-100 p-4">
+  <h3 class="text-lg font-semibold">{m.grades_code_queue_title()}</h3>
+
+  <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+    {states.map(([state, label]) => (
+      <div data-queue-state={state}>
+        <dt class="text-xs text-muted">{label}</dt>
+        <dd class="m-0 text-xl font-semibold" data-count>{summary.counts[state] ?? 0}</dd>
+      </div>
+    ))}
+  </dl>
+
+  {summary.failures.length > 0 && (
+    <div class="mt-4">
+      <h4 class="text-sm font-semibold">{m.grades_code_queue_failures()}</h4>
+      <ul class="m-0 mt-2 flex list-none flex-col gap-2 p-0" data-queue-failures>
+        {summary.failures.map((failure) => (
+          <li class="rounded-box bg-error/5 px-3 py-2 text-sm" data-failure>
+            <p class="font-medium">{m.grades_code_queue_failure({ student: failure.student, attempts: failure.attempts })}</p>
+            <p class="m-0 font-mono text-xs whitespace-pre-wrap break-all text-error">{failure.lastError ?? m.grades_code_queue_no_error()}</p>
+          </li>
+        ))}
+      </ul>
+      <div class="mt-3">
+        <RequeueFailed client:load {...target} />
+      </div>
+    </div>
+  )}
+
+  <p class="mt-4 text-xs text-muted" data-worker-seen>
+    {summary.keys.length === 0
+      ? m.grades_code_queue_no_keys()
+      : summary.keys.map((key, index) => (
+          <>
+            {index > 0 && " · "}
+            <span title={key.lastUsedAt ? formatDateTime(key.lastUsedAt) : undefined}>
+              {key.lastUsedAt
+                ? m.grades_code_queue_seen({ name: key.name, when: formatRelative(key.lastUsedAt, now) })
+                : m.grades_code_queue_never_seen({ name: key.name })}
+            </span>
+          </>
+        ))}
+  </p>
+</section>

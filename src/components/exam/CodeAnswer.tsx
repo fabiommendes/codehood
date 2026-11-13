@@ -427,13 +427,29 @@ function sendStatus(sent: SentView): string {
 	}
 }
 
-/// One send: its state, and, once the worker graded it, the public cases, the compiler message, the score and the rubric items the exam shows.
-function SendRow(props: { sent: SentView; n: number }): JSX.Element {
+/// How a graded send weighs in the score of the question, once the exam shows it.
+export interface SendWeight {
+	score: number;
+	/// The score after the discount for the earlier sends below 1.
+	discounted: number;
+	/// Whether this send is the one that sets the question's score.
+	counts: boolean;
+}
+
+/// One send: its state, and, once the worker graded it, the public cases, the compiler message, the score (and its discount, with `weight`) and the rubric items the exam shows.
+export function SendRow(props: {
+	sent: SentView;
+	n: number;
+	weight?: SendWeight;
+}): JSX.Element {
 	const report = () => props.sent.report;
+	const score = () => props.weight?.score ?? report()?.score;
 	return (
 		<li
 			class="flex flex-col gap-2 rounded-box border border-base-300 px-3 py-2 text-sm"
+			classList={{ "border-success/60 bg-success/5": props.weight?.counts }}
 			data-send
+			data-counts={props.weight?.counts ? "true" : undefined}
 			data-job-state={props.sent.jobState ?? "none"}
 		>
 			<div class="flex flex-wrap items-baseline gap-x-3">
@@ -443,12 +459,33 @@ function SendRow(props: { sent: SentView; n: number }): JSX.Element {
 				<span class="text-muted" data-send-status>
 					{sendStatus(props.sent)}
 				</span>
-				<Show when={report()?.score}>
-					{(score) => (
-						<span class="font-semibold" data-send-score>
-							{m.code_send_score({ score: String(round(score())) })}
+				<Show when={score() !== undefined}>
+					<span class="font-semibold" data-send-score>
+						{m.code_send_score({ score: String(round(score() as number)) })}
+					</span>
+				</Show>
+				<Show
+					when={
+						props.weight && props.weight.discounted !== props.weight.score
+							? props.weight
+							: undefined
+					}
+				>
+					{(weight) => (
+						<span class="text-muted" data-send-discounted>
+							{m.code_send_discounted({
+								score: String(round(weight().discounted)),
+							})}
 						</span>
 					)}
+				</Show>
+				<Show when={props.weight?.counts}>
+					<span
+						class="badge badge-success badge-soft badge-sm"
+						data-send-counts
+					>
+						{m.code_send_counts()}
+					</span>
 				</Show>
 			</div>
 			<Show when={report()?.build}>

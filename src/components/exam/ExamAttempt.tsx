@@ -42,6 +42,7 @@ import {
 } from "./answer-payload";
 import { CodeAnswer } from "./CodeAnswer";
 import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
+import CodeSendsReview from "./CodeSendsReview";
 import {
 	browserDraftStore,
 	compareDraft,
@@ -1240,6 +1241,24 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 														: undefined
 												}
 											/>
+											<Show
+												when={
+													kind() === "results"
+														? allSends()[entry.slug]
+														: undefined
+												}
+											>
+												{(sends) => (
+													<CodeSendsReview
+														sends={sends()}
+														attempts={
+															props.result?.questions.find(
+																(outcome) => outcome.question === entry.slug,
+															)?.codeAttempts
+														}
+													/>
+												)}
+											</Show>
 											<div class="self-end sm:hidden">{clearButton()}</div>
 											<Show when={kind() === "results" && props.result}>
 												{(result) => (
