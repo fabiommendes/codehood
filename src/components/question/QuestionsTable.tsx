@@ -63,6 +63,7 @@ const TYPE_OPTIONS = [
 	"short-answer",
 	"fill-in",
 	"ordering",
+	"code",
 ] as const;
 true satisfies AssertEqual<(typeof TYPE_OPTIONS)[number], QuestionType>;
 

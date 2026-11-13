@@ -6,7 +6,7 @@
  * else the public half of a published question, and nothing of a draft.
  */
 import { isDeepStrictEqual } from "node:util";
-import type { z } from "zod";
+import { z } from "zod";
 import { accessError, questionAccess, requireAccess } from "@/auth/access";
 import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
@@ -14,6 +14,7 @@ import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { QuestionRefId } from "@/core/schemas";
 import {
+	codeQuestionMeta,
 	questionCreate,
 	questionFilter,
 	questionFindOneFilter,
@@ -645,10 +646,7 @@ function fromDbPublic(row: DbQuestionPublic): QuestionPublic {
 		rev: row.rev,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
-		question: latest.publicPayload as unknown as Exclude<
-			PublicQuestion,
-			{ type: "code" }
-		>,
+		question: latest.publicPayload as unknown as PublicQuestion,
 	};
 }
 
@@ -767,6 +765,7 @@ async function applyWrite(
 				latestId,
 				...(question && {
 					type: toDbType(question.type),
+					...workerColumns(question),
 					// A push replaces the tag set wholesale.
 					questionTags: {
 						deleteMany: {},
@@ -844,6 +843,19 @@ async function writeVersion(
  * breaks one of these rules is a question nobody can answer.
  */
 function assertWellFormed(data: Question["question"]): void {
+	if (data.type === "code") {
+		const meta = codeQuestionMeta.safeParse(data.meta);
+		if (!meta.success) {
+			throw InvalidData.fromZodError(
+				new z.ZodError(
+					meta.error.issues.map((issue) => ({
+						...issue,
+						path: ["meta", ...issue.path],
+					})),
+				),
+			);
+		}
+	}
 	const problems = questionProblems(data);
 	if (problems.length === 0) return;
 
@@ -853,6 +865,18 @@ function assertWellFormed(data: Question["question"]): void {
 		},
 		{ message: problems.map((p) => `${p.code}: ${p.message}`).join("; ") },
 	);
+}
+
+/// The worker columns of `QuestionRef` for `question`: its effective `meta` for a code question, null for any other type.
+function workerColumns(question: Question["question"]): {
+	worker: string | null;
+	attempts: number | null;
+	penalty: string | null;
+} {
+	if (question.type !== "code") {
+		return { worker: null, attempts: null, penalty: null };
+	}
+	return codeQuestionMeta.parse(question.meta);
 }
 
 /** The Prisma enum spelling of an MDQ question type. */

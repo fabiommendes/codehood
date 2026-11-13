@@ -172,6 +172,8 @@ function previewResult(
 	response: unknown,
 ): PreviewResult {
 	const correct = correctResponses(question) as PreviewResult["correct"];
+	// Only a runner report scores a code response, and a preview has none.
+	if (question.type === "code") return { pending: true, correct };
 	try {
 		return { ...scoreResponse(question, response), correct };
 	} catch (error) {

@@ -9,6 +9,7 @@
  * under test, keeping the defect visible at the call site.
  */
 import type {
+	CodeQuestion,
 	EssayQuestion,
 	FillInQuestion,
 	MultipleChoiceQuestion,
@@ -47,6 +48,11 @@ export function trueFalse(
 /** Builds an essay document, supplying its discriminator. */
 export function essay(data: Omit<EssayQuestion, "type">): EssayQuestion {
 	return { type: "essay", ...data };
+}
+
+/** Builds a code document, supplying its discriminator. */
+export function code(data: Omit<CodeQuestion, "type">): CodeQuestion {
+	return { type: "code", ...data };
 }
 
 /** Builds a numeric document, supplying its discriminator. */
@@ -227,6 +233,35 @@ export const fibonacciOrdering: OrderingQuestion = ordering({
 	incorrectFeedback: "Print before you advance the pair.",
 });
 
+/// A code question with a public example, a hidden test, a manual item worth 0 and a reference solution.
+export const sumCode: CodeQuestion = code({
+	id: "sum-function",
+	title: "Sum function",
+	stem: "Write a function `add(a, b)` that returns the sum of its arguments.",
+	language: "python",
+	file: "sum.py",
+	template: "```python\ndef add(a, b):\n    pass\n```",
+	tests: [
+		{
+			format: "pytest",
+			text: [
+				"from sum import add",
+				"",
+				"# mdq: [+1] {example} Adds small numbers",
+				"def test_small():",
+				"    assert add(1, 2) == 3",
+				"",
+				"# mdq: [+2] Adds large numbers",
+				"def test_secret_hidden_case():",
+				"    assert add(10**9, 10**9) == 2 * 10**9",
+				"",
+			].join("\n"),
+		},
+	],
+	rubric: [{ binding: "manual", text: "Readable code", value: 0 }],
+	answerKey: "```python\ndef add(a, b):\n    return a + b\n```",
+});
+
 /**
  * One well-formed document of every MDQ type, for tests that must cover
  * the whole union.
@@ -243,4 +278,5 @@ export const everyQuestionType = [
 	capitalShortAnswer,
 	brasiliaFillIn,
 	fibonacciOrdering,
+	sumCode,
 ] as const satisfies readonly QuestionDocument[];

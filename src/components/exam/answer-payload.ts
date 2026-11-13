@@ -11,6 +11,7 @@ export function isTextEntry(type: string): boolean {
 	return (
 		type === "short-answer" ||
 		type === "essay" ||
+		type === "code" ||
 		type === "numeric" ||
 		type === "fill-in"
 	);

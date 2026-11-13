@@ -19,6 +19,7 @@ import {
 	numericAnswerShape,
 	OrderingContent,
 	OrderingLine,
+	type PublicCodeQuestion,
 	type PublicEssayQuestion,
 	type PublicFillInQuestion,
 	type PublicMultipleChoiceQuestion,
@@ -147,6 +148,22 @@ export const publicOrderingSchema = z.object({
 	pool: z.array(OrderingLine),
 });
 
+const publicTest = z.object({
+	format: z.string(),
+	text: z.string(),
+	firstLine: z.number().int(),
+	example: z.boolean(),
+});
+
+export const publicCodeSchema = z.object({
+	...base,
+	type: z.literal("code"),
+	template: z.string().optional(),
+	language: z.string().optional(),
+	file: z.string().optional(),
+	publicTests: z.array(publicTest).optional(),
+});
+
 /** The public form of every question type. */
 export const publicQuestionSchema = z.discriminatedUnion("type", [
 	publicMultipleChoiceSchema,
@@ -157,6 +174,7 @@ export const publicQuestionSchema = z.discriminatedUnion("type", [
 	publicEssaySchema,
 	publicFillInSchema,
 	publicOrderingSchema,
+	publicCodeSchema,
 ]);
 
 true satisfies AssertEqual<
@@ -190,4 +208,8 @@ true satisfies AssertEqual<
 true satisfies AssertEqual<
 	z.infer<typeof publicOrderingSchema>,
 	PublicOrderingQuestion
+>;
+true satisfies AssertEqual<
+	z.infer<typeof publicCodeSchema>,
+	PublicCodeQuestion
 >;

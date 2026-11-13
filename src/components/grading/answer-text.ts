@@ -37,11 +37,12 @@ export function displayAnswer(
 	switch (type) {
 		case "short-answer":
 		case "essay":
+		case "code":
 		case "numeric":
 			return {
 				kind: "text",
 				text: responseText(payload),
-				multiline: type === "essay",
+				multiline: type === "essay" || type === "code",
 			};
 		default:
 			return { kind: "view" };

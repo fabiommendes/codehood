@@ -12,6 +12,7 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
 import {
+	code,
 	essay,
 	fillIn,
 	multipleChoice,
@@ -22,6 +23,7 @@ import {
 	trueFalse,
 } from "./fixtures";
 import type {
+	CodeQuestion as Code,
 	EssayQuestion as Essay,
 	FillInQuestion as FillIn,
 	MultipleChoiceQuestion as MultipleChoice,
@@ -200,6 +202,21 @@ export const orderingFactory = Factory.define<Ordering>(({ sequence }) =>
 	}),
 );
 
+export const codeFactory = Factory.define<Code>(({ sequence }) =>
+	code({
+		id: id("code", sequence),
+		title: faker.lorem.words(3),
+		stem: stem(),
+		language: "python",
+		tests: [
+			{
+				format: "pytest",
+				text: "# mdq: [+1] Works\ndef test_works():\n    assert True\n",
+			},
+		],
+	}),
+);
+
 /// The factory for each question type, so a missing type is a compile error.
 const FACTORIES: {
 	[K in Question["type"]]: Factory<Extract<Question, { type: K }>>;
@@ -212,6 +229,7 @@ const FACTORIES: {
 	"short-answer": shortAnswerFactory,
 	"fill-in": fillInFactory,
 	ordering: orderingFactory,
+	code: codeFactory,
 };
 
 /// The question types in a fixed order, so `questionFactory` cycles predictably.
@@ -224,6 +242,7 @@ const TYPES = [
 	"short-answer",
 	"fill-in",
 	"ordering",
+	"code",
 ] as const satisfies readonly Question["type"][];
 
 /**

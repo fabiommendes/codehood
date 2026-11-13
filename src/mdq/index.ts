@@ -5,11 +5,13 @@
  * module only adds the few checks a service needs before writing.
  */
 import {
+	type CodeQuestion,
 	type Diagnostic,
 	type PublicQuestion as MdqPublicQuestion,
 	publicForm as mdqPublicForm,
 	modelDiagnostics,
 	NotAutoGradable,
+	parseTextResponse,
 	Question,
 	scoreResponse,
 } from "mdq";
@@ -17,6 +19,7 @@ import {
 export type {
 	BlankScore,
 	ChoiceBlank,
+	CodeQuestion,
 	Diagnostic,
 	EssayQuestion,
 	FillInQuestion,
@@ -33,6 +36,7 @@ export type {
 	OrderingResponse,
 	PublicBlank,
 	PublicChoice,
+	PublicCodeQuestion,
 	PublicEssayQuestion,
 	PublicFillInQuestion,
 	PublicMultipleChoiceQuestion,
@@ -40,6 +44,7 @@ export type {
 	PublicNumericQuestion,
 	PublicOrderingQuestion,
 	PublicShortAnswerQuestion,
+	PublicTest,
 	PublicTrueFalseQuestion,
 	QuestionResponse,
 	QuestionScore,
@@ -60,28 +65,11 @@ export {
 	withIds,
 } from "mdq";
 
-/// The mdq types this server cannot host yet: no answer UI, runner report or grading for them.
-export const UNSUPPORTED_QUESTION_TYPES = ["code"] as const;
+/** A question document of any mdq type. */
+export const questionDocument = Question;
 
-/** A question document of a type this server hosts, which is every mdq type but `code`. */
-export type QuestionDocument = Exclude<
-	Question,
-	{ type: (typeof UNSUPPORTED_QUESTION_TYPES)[number] }
->;
-
-/** The message of the validation error that refuses a question of an unsupported type. */
-export const UNSUPPORTED_TYPE_MESSAGE =
-	'Question type "code" is not supported yet.';
-
-/**
- * Validates a question document of any hosted type and refuses an mdq type this
- * server cannot grade, so none is ever stored.
- */
-export const questionDocument = Question.refine(
-	(question): question is QuestionDocument =>
-		!(UNSUPPORTED_QUESTION_TYPES as readonly string[]).includes(question.type),
-	{ message: UNSUPPORTED_TYPE_MESSAGE, path: ["type"] },
-);
+/** A question document of any mdq type. */
+export type QuestionDocument = Question;
 
 /** The type of a question document. */
 export type QuestionType = QuestionDocument["type"];
@@ -89,29 +77,42 @@ export type QuestionType = QuestionDocument["type"];
 /** The public form of a question document. */
 export type PublicQuestion = MdqPublicQuestion;
 
-/// The public form of a hosted question, which is never a `code` one.
-type HostedPublicQuestion = Exclude<PublicQuestion, { type: "code" }>;
-
-/// The public form matching the type of `Q`, whichever hosted types `Q` covers.
-type PublicFormOf<Q extends QuestionDocument> = Extract<
-	HostedPublicQuestion,
-	{ type: Q["type"] }
->;
-
-/**
- * The public form of a question document, as mdq's `publicForm` but typed
- * without the `code` type, which this server refuses.
- */
-export const publicForm = mdqPublicForm as <Q extends QuestionDocument>(
-	question: Q,
-) => PublicFormOf<Q>;
+/** The public form of a question document, as mdq's `publicForm`. */
+export const publicForm = mdqPublicForm;
 
 /**
  * The rules of the mdq spec that `question` breaks beyond its schema, such as a
  * fill-in stem naming a blank it never defines.
  */
 export function questionProblems(question: QuestionDocument): Diagnostic[] {
-	return modelDiagnostics(question).filter((d) => d.severity === "error");
+	return [
+		...modelDiagnostics(question).filter((d) => d.severity === "error"),
+		...(question.type === "code" ? codeProblems(question) : []),
+	];
+}
+
+/// What this server demands of a code question beyond the mdq model rules: resolved test sources and no manual item that counts.
+function codeProblems(question: CodeQuestion): Diagnostic[] {
+	const problems: Diagnostic[] = [];
+	for (const [index, source] of (question.tests ?? []).entries()) {
+		if (source.text !== undefined) continue;
+		problems.push({
+			severity: "error",
+			code: "unresolved-test-source",
+			message: `tests[${index}] (${source.origin ?? source.format}) is not resolved: it has no text`,
+			path: ["tests", index],
+		});
+	}
+	for (const [index, item] of (question.rubric ?? []).entries()) {
+		if ((item.value ?? 1) === 0) continue;
+		problems.push({
+			severity: "error",
+			code: "manual-rubric-item-with-value",
+			message: `rubric[${index}] is a manual item worth ${item.value ?? 1}, but only manual items worth 0 are accepted`,
+			path: ["rubric", index],
+		});
+	}
+	return problems;
 }
 
 /**
@@ -128,6 +129,11 @@ export function assertResponse(
 	response: unknown,
 ): void {
 	if (response === null) return;
+	// A code response is the content of the file; the grading is not the server's.
+	if (question.type === "code") {
+		parseTextResponse(response);
+		return;
+	}
 	try {
 		scoreResponse(question, response);
 	} catch (error) {
