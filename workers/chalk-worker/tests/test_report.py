@@ -6,7 +6,7 @@ from fractions import Fraction
 from hashlib import sha256
 
 from chalk_grader import disqualification as dq
-from chalk_grader.graded import Graded
+from chalk_grader.graded import CaseResult, Graded
 from conftest import SOLUTION
 from mdq.models import RunnerReport
 
@@ -20,8 +20,17 @@ EXPECTED = {
 }
 
 
+def cases(results: dict, expected=EXPECTED) -> tuple[CaseResult, ...]:
+    return tuple(
+        CaseResult(key, name, results.get(key, "(not run)") is None, results.get(key, "(not run)"))
+        for key, name in expected.items()
+    )
+
+
 def run(graded: Graded, results: dict | None) -> RunnerReport:
-    return to_report(Run(graded=graded, results=results, expected=EXPECTED), _q(), SOLUTION)
+    if results is not None:
+        graded = graded._replace(cases=cases(results))
+    return to_report(Run(graded=graded, expected=EXPECTED), _q(), SOLUTION)
 
 
 def _q():
@@ -65,10 +74,8 @@ def test_cases_the_student_added_are_ignored() -> None:
 
 def test_case_without_a_line_is_omitted() -> None:
     expected = EXPECTED | {("Pre pre", "ghost"): "ghost"}
-    graded = Graded(Fraction(1))
-    report = to_report(
-        Run(graded=graded, results={k: None for k in expected}, expected=expected), _q(), SOLUTION
-    )
+    graded = Graded(Fraction(1), cases=cases({k: None for k in expected}, expected))
+    report = to_report(Run(graded=graded, expected=expected), _q(), SOLUTION)
     assert len(report.cases) == 4
 
 

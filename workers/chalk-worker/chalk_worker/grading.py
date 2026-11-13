@@ -10,20 +10,19 @@ from __future__ import annotations
 
 import json
 import shutil
-from dataclasses import dataclass, field
 from hashlib import sha256
 from importlib import resources
 from pathlib import Path
 from typing import Any
 
 from chalk_grader import models
-from chalk_grader.profile_grader import Prepared, ProfileGrader, resolve_profile
-from chalk_grader.profiles import PrepareError, junit_results
+from chalk_grader.profile_grader import ProfileGrader, resolve_profile
+from chalk_grader.profiles import PrepareError
 from chalk_grader.task import Task
 from mdq.models import CodeQuestion, RunnerReport
 
 from .locate import elm_module
-from .report import Run, TestKey, to_report
+from .report import Run, to_report
 
 __all__ = ["PROFILE_BY_LANGUAGE", "QuestionGrader", "ReferenceError", "question_hash"]
 
@@ -45,34 +44,6 @@ def question_hash(question: CodeQuestion) -> str:
     """
     doc = question.model_dump(by_alias=True, exclude_none=True, mode="json")
     return sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()
-
-
-@dataclass(frozen=True)
-class _CapturingGrader(ProfileGrader):
-    """
-    A profile grader that keeps the outcome of each test of its last run.
-    """
-
-    _results: list[dict[TestKey, str | None] | None] = field(
-        default_factory=list, compare=False, repr=False
-    )
-
-    def _reader(self, prepared: Prepared):
-        inner = super()._reader(prepared)
-
-        def read(path: Path, extra):
-            self._results.clear()
-            try:
-                results, _ = junit_results(path.read_text(errors="replace"))
-            except Exception:  # an invalid report is the inner reader's to judge
-                results = None
-            self._results.append(results)
-            return inner(path, extra)
-
-        return read
-
-    def last_results(self) -> dict[TestKey, str | None] | None:
-        return self._results[0] if self._results else None
 
 
 class QuestionGrader:
@@ -97,7 +68,7 @@ class QuestionGrader:
             raise ReferenceError(f"no profile for language {language!r}")
         self._answer = _answer_path(language, question.file or "")
         self._template = workdir / "template"
-        self._grader = _CapturingGrader(
+        self._grader = ProfileGrader(
             script=None,
             task=Task(question.id or "question", "codehood", root=workdir, template=self._template),
             conf=models.Autograder(
@@ -141,8 +112,7 @@ class QuestionGrader:
         """
         graded = self._grader("answer", answer)
         expected = self._grader.prepare().tests
-        run = Run(graded=graded, results=self._grader.last_results(), expected=expected)
-        return to_report(run, self.question, answer)
+        return to_report(Run(graded=graded, expected=expected), self.question, answer)
 
 
 def _answer_path(language: str, file: str) -> str:

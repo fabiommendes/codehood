@@ -10,7 +10,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "chalk-grader>=0.1.0",
+    "chalk-grader>=0.2.0",
     "codehood-cli",
     "typer>=0.27.2",
 ]

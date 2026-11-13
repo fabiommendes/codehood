@@ -42,10 +42,9 @@ class Run:
     What a run of the profile grader left behind.
     """
 
+    #: The grade, with the outcome of each expected test in `cases` when the
+    #: run produced a test report.
     graded: Graded | None
-    #: Outcome of each test of the JUnit report: None when it passed, else
-    #: the failure message. None when the run produced no report.
-    results: Mapping[TestKey, str | None] | None
     #: The tests of the reference run, which the answer is held to.
     expected: Mapping[TestKey, str]
 
@@ -67,18 +66,20 @@ def to_report(run: Run, question: CodeQuestion, answer: str) -> RunnerReport:
     if score == dq.Timeout():
         cases = _cases(run, question, lambda _: ("timeout", "time limit exceeded"))
         return RunnerReport(status="completed", cases=cases, **base)
-    if not isinstance(score, Fraction | int) or run.results is None:
+    if not isinstance(score, Fraction | int) or graded.cases is None:
         return RunnerReport(
             status="runner-error", cases=[], message=graded.feedback or "grading failed", **base
         )
 
-    results = run.results
+    outcome = {case.key: case for case in graded.cases}
 
     def verdict(key: TestKey) -> tuple[str, str | None]:
-        if key not in results:
+        case = outcome.get(key)
+        if case is None:
             return "fail", "not run"
-        message = results[key]
-        return ("pass", None) if message is None else ("fail", message[:MAX_MESSAGE] or None)
+        if case.passed:
+            return "pass", None
+        return "fail", (case.message or "")[:MAX_MESSAGE] or None
 
     return RunnerReport(status="completed", cases=_cases(run, question, verdict), **base)
 
