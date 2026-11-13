@@ -9,6 +9,10 @@
 import { scoreValue } from "@/core/score";
 import type { Feedback } from "@/db/services/feedback.service";
 import type { Submission } from "@/db/services/submission.service";
+import {
+	codeQuestionScore,
+	DEFAULT_CODE_PENALTY,
+} from "@/services/code-grading";
 
 /// The part of a grading pass the result depends on.
 export type ResultFeedback = Pick<
@@ -23,12 +27,36 @@ export type QuestionOutcomeStatus =
 	| "unanswered"
 	| "not-graded";
 
-/// The part of a submission the result depends on. A missing `status` reads as `PENDING_GRADE`.
+/// The part of a submission the result depends on. A missing `status` reads as `PENDING_GRADE`, a missing `kind` as `AUTOSAVE`.
 export type ResultSubmission = Pick<
 	Submission,
 	"publicId" | "question" | "createdAt"
 > &
-	Partial<Pick<Submission, "status" | "id">>;
+	Partial<Pick<Submission, "status" | "id">> & {
+		kind?: "AUTOSAVE" | "SUBMIT" | "FINAL";
+		/// A submission the student sent for grading may carry a `PRETEST_FAILED` status.
+		status?: Submission["status"] | "PRETEST_FAILED";
+	};
+
+/// What the result needs to know about the exam to score `code` questions.
+export interface ResultPolicy {
+	/// A `PRACTICE` exam has no discount for earlier wrong submissions.
+	practice?: boolean;
+	/// The discount per earlier wrong submission of each `code` question, by slug. Missing: 0.2.
+	codePenalty?: Record<string, number>;
+}
+
+/// One graded submission of a `code` question and how it weighs in the score.
+export interface CodeAttemptOutcome {
+	/// The submission's `publicId`.
+	submission: string;
+	/// Its current verdict, before any discount.
+	score: number;
+	/// Its score after the discount for earlier wrong submissions, floored at 0.
+	discounted: number;
+	/// Whether this is the submission that gives the question's score.
+	counts: boolean;
+}
 
 /**
  * Whether submission `a` counts over `b`: the newer one, the higher id breaking a tie in the timestamp.
@@ -77,6 +105,8 @@ export interface QuestionOutcome {
 	rubricItems?: NonNullable<Feedback["rubricItems"]>;
 	/// Every non-empty written comment on the answer, newest first.
 	comments: string[];
+	/// The graded submissions of a `code` question, oldest first. Absent for other questions.
+	codeAttempts?: CodeAttemptOutcome[];
 }
 
 export interface ExamResult {
@@ -101,16 +131,31 @@ export interface ExamResult {
  *
  * @params questions The exam's question slugs, in exam order.
  * @params submissions Every submission of the attempt, any order.
+ * A question with `SUBMIT` or `FINAL` submissions is a `code` question sent for
+ * grading: its score comes from all of them (see `codeQuestionScore`), not
+ * from the newest alone. Autosaves do not count then.
+ *
  * @params feedback The feedback the viewer may see on those submissions.
+ * @params policy How the exam discounts `code` submissions; defaults apply when missing.
  */
 export function examResult(
 	questions: string[],
 	submissions: ResultSubmission[],
 	feedback: ResultFeedback[],
+	policy: ResultPolicy = {},
 ): ExamResult {
-	const outcomes = questions.map((slug) =>
-		outcomeOf(slug, submissions, feedback),
-	);
+	const outcomes = questions.map((slug) => {
+		const sent = submissions.filter(
+			(submission) =>
+				submission.question === slug &&
+				(submission.kind === "SUBMIT" || submission.kind === "FINAL"),
+		);
+		if (sent.length === 0) return outcomeOf(slug, submissions, feedback);
+		const penalty = policy.practice
+			? 0
+			: (policy.codePenalty?.[slug] ?? DEFAULT_CODE_PENALTY);
+		return codeOutcomeOf(slug, sent, feedback, penalty);
+	});
 	return { questions: outcomes, total: totalOf(outcomes) };
 }
 
@@ -166,6 +211,92 @@ function outcomeOf(
 		...(passes[0]?.blanks ? { blanks: passes[0].blanks } : {}),
 		...(passes[0]?.rubricItems ? { rubricItems: passes[0].rubricItems } : {}),
 		comments,
+	};
+}
+
+/// The outcome of a `code` question from its `SUBMIT` and `FINAL` submissions.
+function codeOutcomeOf(
+	slug: string,
+	sent: ResultSubmission[],
+	feedback: ResultFeedback[],
+	penalty: number,
+): QuestionOutcome {
+	const passesOf = (submission: ResultSubmission) =>
+		newestPassesFirst(
+			feedback.filter((entry) => entry.submission === submission.publicId),
+		);
+	const commentsOf = (submission: ResultSubmission) =>
+		passesOf(submission)
+			.map((entry) => entry.feedback)
+			.filter((text): text is string => !!text?.trim());
+	const chronological = [...sent].sort((a, b) =>
+		isNewerSubmission(a, b) ? 1 : -1,
+	);
+	const newest = chronological[chronological.length - 1] as ResultSubmission;
+	const live = chronological.filter(
+		(submission) =>
+			submission.status !== "WILL_NOT_GRADE" &&
+			submission.status !== "PRETEST_FAILED",
+	);
+
+	if (live.length === 0) {
+		const last = chronological.filter(
+			(submission) => submission.status !== "WILL_NOT_GRADE",
+		);
+		const shown = last[last.length - 1] ?? newest;
+		return {
+			question: slug,
+			submission: shown.publicId,
+			status: last.length === 0 ? "not-graded" : "graded",
+			score: last.length === 0 ? null : 0,
+			comments: commentsOf(shown),
+		};
+	}
+
+	const verdicts = live.map((submission) => {
+		const passes = passesOf(submission);
+		return {
+			submission,
+			pass: passes[0],
+			score: passes[0] ? scoreValue(passes[0].score) : null,
+		};
+	});
+	const waiting = verdicts.filter((entry) => entry.score === null);
+	if (waiting.length > 0) {
+		const shown = (waiting[waiting.length - 1] as (typeof verdicts)[number])
+			.submission;
+		return {
+			question: slug,
+			submission: shown.publicId,
+			status: "pending",
+			score: null,
+			comments: commentsOf(shown),
+		};
+	}
+
+	const result = codeQuestionScore(
+		verdicts.map((entry) => entry.score as number),
+		penalty,
+	);
+	const counting = verdicts[
+		result.counting as number
+	] as (typeof verdicts)[number];
+	return {
+		question: slug,
+		submission: counting.submission.publicId,
+		status: "graded",
+		score: result.score,
+		...(counting.pass?.blanks ? { blanks: counting.pass.blanks } : {}),
+		...(counting.pass?.rubricItems
+			? { rubricItems: counting.pass.rubricItems }
+			: {}),
+		comments: commentsOf(counting.submission),
+		codeAttempts: verdicts.map((entry, index) => ({
+			submission: entry.submission.publicId,
+			score: entry.score as number,
+			discounted: result.discounted[index] as number,
+			counts: index === result.counting,
+		})),
 	};
 }
 
