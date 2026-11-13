@@ -12,6 +12,7 @@ import type { courseGradesSchema } from "@/core/schemas";
 import type { Enrollment } from "@/db/services/enrollment.service";
 import type { Exam } from "@/db/services/exam.service";
 import type { GradeColumn } from "@/db/services/grade-column.service";
+import type { ResultPolicy } from "./exam-result";
 import {
 	type ExceptionTiming,
 	examPhase,
@@ -104,6 +105,8 @@ export interface GradesTableOptions {
 	 * is `missed` only once their own window has closed.
 	 */
 	exceptions?: ReadonlyMap<string, ReadonlyMap<string, ExceptionTiming>>;
+	/// How each exam discounts `code` submissions, as `loadResultPolicy` returns it.
+	policy?: (exam: Exam) => ResultPolicy;
 }
 
 /**
@@ -152,6 +155,7 @@ export function gradesTable(
 			listed,
 			now,
 			exceptions,
+			options.policy?.(exam),
 		);
 		const byAuthor = new Map(rows.map((row) => [row.author, row]));
 		return listed.map((student): GradeCell => {

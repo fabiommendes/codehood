@@ -7,6 +7,7 @@ import AnswerEditSummary from "@/components/grading/AnswerEditSummary.astro";
 import AppliedItems from "@/components/grading/AppliedItems";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
 import { db } from "@/db";
+import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm } from "@/mdq";
@@ -47,6 +48,8 @@ const [students, stored] = await Promise.all([
 ]);
 const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
 
+const policy = (await loadResultPolicy(course.id))(exam);
+
 // The results table builds its row the same way, so the two never disagree.
 const [row] = attemptRows(
 	exam,
@@ -56,6 +59,7 @@ const [row] = attemptRows(
 	students,
 	now,
 	exceptions,
+	policy,
 );
 if (!row) return Astro.rewrite("/404");
 const closed = row.state === "submitted";
@@ -96,7 +100,7 @@ const edits = await db.answerEdit.summary(
 const editSummaries = new Map(
 	edits.questions.map((entry) => [entry.question, entry.summary]),
 );
-const outcomes = examResult(questions, attempt.submissions, feedback);
+const outcomes = examResult(questions, attempt.submissions, feedback, policy);
 
 const rows = outcomes.questions.map((outcome, index) => {
 	const doc = docs.get(outcome.question);

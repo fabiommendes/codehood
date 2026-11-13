@@ -46,6 +46,19 @@ export interface ResultPolicy {
 	codePenalty?: Record<string, number>;
 }
 
+/**
+ * The {@link ResultPolicy} of an exam of `type`, given the discount of each `code` question by slug.
+ *
+ * @example
+ * resultPolicy("PRACTICE", {}) // { practice: true, codePenalty: {} }
+ */
+export function resultPolicy(
+	type: string,
+	codePenalty: Record<string, number>,
+): ResultPolicy {
+	return { practice: type === "PRACTICE", codePenalty };
+}
+
 /// One graded submission of a `code` question and how it weighs in the score.
 export interface CodeAttemptOutcome {
 	/// The submission's `publicId`.

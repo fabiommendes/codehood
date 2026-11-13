@@ -36,7 +36,7 @@ import {
 } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
-import { examResult } from "@/services/exam-result";
+import { examResult, resultPolicy } from "@/services/exam-result";
 import { regradeBlocker, regradeBlockerMessage } from "@/services/regrade";
 import type { Prisma, PrismaTx } from "../client";
 import {
@@ -159,7 +159,7 @@ function byQueueOrder(a: DbRegradeRequest, b: DbRegradeRequest): number {
 const contestedSelect = {
 	id: true,
 	questionId: true,
-	question: { select: { slug: true } },
+	question: { select: { slug: true, penalty: true } },
 	regradeRequest: { select: { id: true } },
 	response: {
 		select: {
@@ -189,6 +189,7 @@ const contestedSelect = {
 					id: true,
 					publicId: true,
 					status: true,
+					kind: true,
 					createdAt: true,
 					questionId: true,
 					feedbacks: {
@@ -353,6 +354,13 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 							submission: entry.publicId,
 						})),
 					),
+					resultPolicy(response.exam.type, {
+						...(contested.question.penalty === null
+							? {}
+							: {
+									[contested.question.slug]: Number(contested.question.penalty),
+								}),
+					}),
 				).questions;
 				if (!outcome) throw new Error("examResult returned no outcome");
 

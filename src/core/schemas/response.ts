@@ -9,7 +9,12 @@ import {
 	username,
 } from "./base";
 import { courseRef } from "./course";
-import { responseRef, submissionPayload, submissionSchema } from "./submission";
+import {
+	responseRef,
+	submissionKindRequested,
+	submissionPayload,
+	submissionSchema,
+} from "./submission";
 
 export const responsePK = responseRef;
 
@@ -115,6 +120,8 @@ export const responseSubmit = z.object({
 	author: username.optional(),
 
 	payload: submissionPayload,
+	/// `SUBMIT` sends a `code` answer to its worker. Defaults to `AUTOSAVE`.
+	kind: submissionKindRequested.optional(),
 	startedAt: instant.nullish(),
 	automaticallyTriggered: z.boolean().optional(),
 });

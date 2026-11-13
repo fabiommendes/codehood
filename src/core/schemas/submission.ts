@@ -18,6 +18,12 @@ export const submissionStatus = z.enum([
 	"PRETEST_FAILED",
 ]);
 
+/// How a submission came to exist: typed (`AUTOSAVE`), sent for grading (`SUBMIT`) or the last autosave promoted when the attempt closed (`FINAL`).
+export const submissionKind = z.enum(["AUTOSAVE", "SUBMIT", "FINAL"]);
+
+/// The kinds a client may ask for; `FINAL` is only ever made by closing the attempt.
+export const submissionKindRequested = z.enum(["AUTOSAVE", "SUBMIT"]);
+
 /**
  * A student's response to one question, as mdq `docs/responses.md` defines it,
  * or `null` for a skipped question.
@@ -57,6 +63,8 @@ export const submissionSchema = z.object({
 	question: slug,
 
 	status: submissionStatus,
+	/// Server state: how the submission came to exist.
+	kind: submissionKind,
 	automaticallyTriggered: z.boolean(),
 	payload: submissionPayload,
 
@@ -73,6 +81,7 @@ export const submissionCreate = submissionSchema
 		response: true,
 		question: true,
 		createdAt: true,
+		kind: true,
 	})
 	.extend({
 		response: responseRef,

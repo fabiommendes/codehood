@@ -28,6 +28,7 @@ import {
 } from "@/db/conditional-write";
 import { courseAccess } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
+import { loadResultPolicy } from "@/db/result-policy";
 import { courseContentsWhere } from "@/db/services/course.service";
 import { m } from "@/i18n";
 import { type ExamResult, examResult } from "@/services/exam-result";
@@ -574,6 +575,8 @@ async function attemptResults(
 				select: {
 					publicId: true,
 					createdAt: true,
+					kind: true,
+					status: true,
 					question: { select: { slug: true } },
 					feedbacks: {
 						select: { score: true, feedback: true, updatedAt: true },
@@ -583,6 +586,7 @@ async function attemptResults(
 		},
 	});
 	const slugs = exam.questionsForExams.map((q) => q.questionRef.slug);
+	const policy = (await loadResultPolicy(exam.courseId, tx))(exam);
 	return attempts.map(({ submissions }) =>
 		examResult(
 			slugs,
@@ -590,6 +594,7 @@ async function attemptResults(
 			submissions.flatMap((s) =>
 				s.feedbacks.map((f) => ({ ...f, submission: s.publicId })),
 			),
+			policy,
 		),
 	);
 }

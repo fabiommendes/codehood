@@ -7,6 +7,7 @@ import {
 	type Exam,
 	type Feedback,
 } from "@/db";
+import { loadResultPolicy } from "@/db/result-policy";
 import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradesTable,
@@ -172,7 +173,7 @@ export async function loadGrades(
 	actor: UserActor,
 	now: Date,
 ): Promise<CourseGrades> {
-	const [exams, students, attempts, feedback, columns, exceptions] =
+	const [exams, students, attempts, feedback, columns, exceptions, policy] =
 		await Promise.all([
 			db.exam.findMany({ course }, { actor }),
 			loadStudents(course, actor),
@@ -180,13 +181,16 @@ export async function loadGrades(
 			db.feedback.findMany({ course }, { actor }),
 			db.gradeColumn.findMany({ course }, { actor }),
 			loadCourseExceptions(course),
+			loadResultPolicy(course),
 		]);
 	const table = gradesTable(exams, students, attempts, feedback, now, {
 		exceptions,
+		policy,
 	});
 	const csvTable = gradesTable(exams, students, attempts, feedback, now, {
 		withDropped: true,
 		exceptions,
+		policy,
 	});
 	return {
 		table,

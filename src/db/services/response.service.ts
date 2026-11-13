@@ -54,6 +54,7 @@ import {
 	valueOrNotFound,
 } from "../utils";
 import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
+import { enqueueGradingJob, promoteFinalSends } from "./grading-job-queue";
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
@@ -314,6 +315,12 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			if (fields.acceptingSubmissions === true) {
 				await assertReopenable(tx, response);
 			}
+			if (
+				fields.acceptingSubmissions === false &&
+				response.acceptingSubmissions
+			) {
+				await promoteFinalSends(tx, sendsOf(response));
+			}
 
 			const row = await guardedUpdate(
 				tx,
@@ -365,6 +372,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			if (input.acceptingSubmissions && !row.acceptingSubmissions) {
 				ensurePerm(opts.actor, "response.update", responseTarget(row));
 				await assertReopenable(tx, row);
+			}
+
+			if (!input.acceptingSubmissions && row.acceptingSubmissions) {
+				await promoteFinalSends(tx, sendsOf(row));
 			}
 
 			// The expectation was checked against this very row when it was resolved.
@@ -476,6 +487,8 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			);
 			if (!row.acceptingSubmissions) return fromDb(row);
 
+			await promoteFinalSends(tx, sendsOf(row));
+
 			// The student's own call: it never carries an expectation, and must not fail on one.
 			const updated = await guardedUpdate(
 				tx,
@@ -535,16 +548,40 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				input.payload,
 			);
 
-			await invalidIfExists(tx.submission.create, {
-				data: {
-					publicId: generateToken(9),
-					responseId: row.id,
-					questionId: question.id,
-					payload: input.payload as Prisma.InputJsonValue,
-					startedAt: input.startedAt ?? null,
-					automaticallyTriggered: input.automaticallyTriggered ?? false,
-				},
-			});
+			if (input.kind === "SUBMIT") {
+				if (question.type !== "CODE" || !question.worker) {
+					throw new InvalidData({
+						kind: [{ code: "invalid", message: m.errors_code_not_sendable() }],
+					});
+				}
+				await enqueueGradingJob(
+					tx,
+					{
+						responseId: row.id,
+						questionId: question.id,
+						attempts: question.attempts,
+						practice: row.exam.type === "PRACTICE",
+					},
+					question.worker,
+					{
+						kind: "SUBMIT",
+						payload: input.payload as Prisma.InputJsonValue,
+						startedAt: input.startedAt,
+						automaticallyTriggered: input.automaticallyTriggered,
+					},
+				);
+			} else {
+				await invalidIfExists(tx.submission.create, {
+					data: {
+						publicId: generateToken(9),
+						responseId: row.id,
+						questionId: question.id,
+						payload: input.payload as Prisma.InputJsonValue,
+						startedAt: input.startedAt ?? null,
+						automaticallyTriggered: input.automaticallyTriggered ?? false,
+					},
+				});
+			}
 
 			// The submissions are part of the response, so appending one moves its
 			// version. A student's save carries no expectation and never fails on one.
@@ -577,6 +614,11 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 export type ResponseService = ReturnType<typeof makeResponseService>;
 
 // Private utilities -----------------------------------------------------------
+
+/// The attempt as {@link promoteFinalSends} reads it.
+function sendsOf(row: { id: ResponseId; exam: { type: string } }) {
+	return { id: row.id, practice: row.exam.type === "PRACTICE" };
+}
 
 /// The `where` matching whichever of the primary keys `filter` carries, within its course if it names one.
 function responseWhere(filter: ResponsePK): Prisma.ResponseWhereInput {

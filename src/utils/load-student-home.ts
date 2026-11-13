@@ -1,5 +1,6 @@
 import type { UserActor } from "@/auth/actor";
 import { db } from "@/db";
+import { loadResultPolicy } from "@/db/result-policy";
 import { examResult } from "@/services/exam-result";
 import { examSchedule, released } from "@/services/exam-state";
 import {
@@ -40,7 +41,7 @@ export async function loadStudentHome(
 				code: course.discipline.slug,
 				name: course.discipline.name,
 			};
-			const [exams, attempts, feedback, exceptions, requests] =
+			const [exams, attempts, feedback, exceptions, requests, policyOf] =
 				await Promise.all([
 					db.exam.findMany({ course: course.id }, { actor }),
 					db.response.findMany(
@@ -56,6 +57,7 @@ export async function loadStudentHome(
 						{ course: course.id, author: actor.username },
 						{ actor },
 					),
+					loadResultPolicy(course.id),
 				]);
 
 			const homeExams: HomeExam[] = exams.map((exam) => {
@@ -73,6 +75,7 @@ export async function loadStudentHome(
 									exam.questions.map((question) => question.slug),
 									attempt.submissions,
 									feedback,
+									policyOf(exam),
 								)
 							: null,
 				};

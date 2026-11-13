@@ -8,7 +8,7 @@
  */
 
 import { correctResponses, type QuestionDocument } from "@/mdq";
-import { examResult } from "./exam-result";
+import { examResult, type ResultPolicy } from "./exam-result";
 import {
 	attemptOf,
 	type ExamTiming,
@@ -87,6 +87,7 @@ export interface QuestionStats extends QueueEntry {
  * @params attempts The exam's non-practice attempts.
  * @params feedback Every grading pass on the exam, released or not.
  * @params exceptions The exam's exceptions, by username, as in `countingAnswers`.
+ * @params policy How the exam discounts `code` submissions, as in `examResult`.
  */
 export function questionStats(
 	exam: ExamTiming,
@@ -95,6 +96,7 @@ export function questionStats(
 	feedback: GradingFeedback[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
+	policy: ResultPolicy = {},
 ): QuestionStats[] {
 	const answers = countingAnswers(
 		exam,
@@ -105,7 +107,15 @@ export function questionStats(
 		exceptions,
 	);
 	const closedAttempts = closedAttemptCount(exam, attempts, now, exceptions);
-	const rows = scoreRows(exam, questions, attempts, feedback, now, exceptions);
+	const rows = scoreRows(
+		exam,
+		questions,
+		attempts,
+		feedback,
+		now,
+		exceptions,
+		policy,
+	);
 	const disc = questions.map((_, position) => discrimination(rows, position));
 	return gradingQueue(questions, answers).map((entry, index) => {
 		const verdicts = answers
@@ -148,13 +158,14 @@ function scoreRows(
 	feedback: GradingFeedback[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming>,
+	policy: ResultPolicy,
 ): number[][] {
 	const rows: number[][] = [];
 	const schedule = examSchedule(exam, exceptions);
 	for (const attempt of attempts) {
 		if (!isFinished(attemptOf(schedule, attempt.author, attempt, now)))
 			continue;
-		const result = examResult(questions, attempt.submissions, feedback);
+		const result = examResult(questions, attempt.submissions, feedback, policy);
 		if (result.total === null) continue;
 		rows.push(result.questions.map((outcome) => outcome.score ?? 0));
 	}

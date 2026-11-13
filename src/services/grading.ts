@@ -14,6 +14,7 @@ import {
 	examResult,
 	isNewerSubmission,
 	newestPassesFirst,
+	type ResultPolicy,
 } from "./exam-result";
 import {
 	attemptOf,
@@ -362,6 +363,7 @@ export interface AttemptRow {
  * @params feedback Every grading pass on the exam, released or not.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
+ * @params policy How the exam discounts `code` submissions, as in `examResult`.
  */
 export function attemptRows(
 	exam: ExamTiming,
@@ -371,6 +373,7 @@ export function attemptRows(
 	students: GradedStudent[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
+	policy: ResultPolicy = {},
 ): AttemptRow[] {
 	const schedule = examSchedule(exam, exceptions);
 	const studentsByUsername = new Map(
@@ -411,7 +414,7 @@ export function attemptRows(
 			questions: questions.length,
 			pending: closed ? (pendingByAuthor.get(attempt.author) ?? 0) : 0,
 			total: closed
-				? examResult(questions, attempt.submissions, feedback).total
+				? examResult(questions, attempt.submissions, feedback, policy).total
 				: null,
 			startedAt: attempt.createdAt,
 		};

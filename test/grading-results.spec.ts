@@ -65,6 +65,7 @@ function submission(
 		response: "response-1",
 		question,
 		status: "PENDING_GRADE",
+		kind: "AUTOSAVE",
 		automaticallyTriggered: false,
 		payload: { answer: publicId },
 		startedAt: null,

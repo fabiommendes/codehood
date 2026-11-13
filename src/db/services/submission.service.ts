@@ -584,7 +584,14 @@ export async function resolveExamQuestion(
 		"question",
 		await tx.questionRef.findFirst({
 			where: { courseId, slug },
-			select: { id: true, slug: true, latestId: true },
+			select: {
+				id: true,
+				slug: true,
+				latestId: true,
+				type: true,
+				worker: true,
+				attempts: true,
+			},
 		}),
 	);
 
@@ -650,6 +657,7 @@ export function fromDb(row: SubmissionFromDbRow): Submission {
 		response: row.response.publicId,
 		question: row.question.slug,
 		status: row.status,
+		kind: row.kind,
 		automaticallyTriggered: row.automaticallyTriggered,
 		payload: row.payload as Submission["payload"],
 		startedAt: row.startedAt,
