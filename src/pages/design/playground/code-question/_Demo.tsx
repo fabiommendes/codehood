@@ -1,6 +1,7 @@
 import type { PublicCodeQuestion } from "mdq";
-import { type JSX, onMount } from "solid-js";
+import { type Accessor, createSignal, type JSX, onMount } from "solid-js";
 import { CodeAnswer } from "@/components/exam/CodeAnswer";
+import type { CodeSends } from "@/components/exam/code-sends";
 import type {
 	ReportCase,
 	RunnerReport,
@@ -22,6 +23,39 @@ const pass = (id: string, message: string): ReportCase => ({
 	id,
 	message,
 });
+
+/// What the fake submit does: send, refuse because the sends ran out, or never finish.
+export type SubmitScenario = "ok" | "exhausted" | "sending";
+
+/// A fake `onSubmit` that answers as `scenario` says and, when it sends, adds a queued send to `sends`.
+function fakeSubmit(
+	scenario: SubmitScenario,
+	sends: Accessor<CodeSends>,
+	setSends: (sends: CodeSends) => void,
+) {
+	return (_code: string): Promise<void> =>
+		new Promise((resolve, reject) => {
+			if (scenario === "sending") return;
+			setTimeout(() => {
+				if (scenario === "exhausted") {
+					reject(new Error("You have no sends left for this question"));
+					return;
+				}
+				const current = sends();
+				setSends({
+					...current,
+					submissions: [
+						...current.submissions,
+						{
+							submission: `s${current.submissions.length}`,
+							jobState: "QUEUED",
+						},
+					],
+				});
+				resolve();
+			}, 600);
+		});
+}
 
 /// A fake `runTests` that answers after a short delay as `scenario` says.
 function fake(scenario: Scenario) {
@@ -85,9 +119,18 @@ export default function Demo(props: {
 	pretests: PretestSource[];
 	scenario: Scenario;
 	autorun: boolean;
+	exampleHtml: readonly string[];
+	/// Shows the submit button with a fake queue, and presses it on mount when `press` is set; none leaves the button out.
+	submit?: { scenario: SubmitScenario; sends: CodeSends; press: boolean };
 }): JSX.Element {
+	const [sends, setSends] = createSignal<CodeSends>(
+		props.submit?.sends ?? { used: 0, limit: null, submissions: [] },
+	);
 	let root!: HTMLDivElement;
 	onMount(() => {
+		if (props.submit?.press) {
+			root.querySelector<HTMLButtonElement>("[data-action=submit]")?.click();
+		}
 		if (props.autorun) {
 			root
 				.querySelector<HTMLButtonElement>("[data-action=run-pretests]")
@@ -99,6 +142,11 @@ export default function Demo(props: {
 			<CodeAnswer
 				question={props.question}
 				pretests={props.pretests}
+				exampleHtml={props.exampleHtml}
+				onSubmit={
+					props.submit && fakeSubmit(props.submit.scenario, sends, setSends)
+				}
+				sends={props.submit ? sends() : undefined}
 				value={null}
 				onChange={() => {}}
 				runTests={fake(props.scenario)}

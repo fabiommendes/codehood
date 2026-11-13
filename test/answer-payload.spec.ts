@@ -23,3 +23,12 @@ test("text erased down to blanks is saved as no answer", () => {
 		size: null,
 	});
 });
+
+test("a code answer is shown as a code block in the question's language", () => {
+	expect(displayAnswer("code", "main = 1", { highlight: "elm" })).toEqual({
+		kind: "code",
+		text: "main = 1",
+		highlight: "elm",
+	});
+	expect(displayAnswer("code", "  ").kind).toBe("empty");
+});

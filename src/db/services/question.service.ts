@@ -42,6 +42,7 @@ import {
 import { upgradeLegacyQuestion } from "@/mdq/legacy";
 import { type QuestionStatus, writable } from "@/services/question-status";
 import type { JSONValue } from "@/typing/concrete-types";
+import { type PretestSource, pretestSources } from "@/utils/pretest-sources";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
 import { courseContentsWhere } from "./course.service";
@@ -255,6 +256,58 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 			return fromDb(
 				pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
 			);
+		},
+	});
+
+	/**
+	 * What a student's page needs to show a code question beyond its public form: the pretest sources, and whether answers go to a worker.
+	 *
+	 * Read access is the one of `findOne`, but the sources come from the private
+	 * document: only what `pretestSources` lets out leaves the service, never the
+	 * answer key or a hidden test. Any other type, or a question the actor
+	 * cannot read, has no sources and no worker.
+	 */
+	const codeAnswer = op({
+		transaction: false,
+		args: [questionFindOneFilter],
+		returns: z.object({
+			pretests: z.array(z.object({ format: z.string(), text: z.string() })),
+			sendable: z.boolean(),
+		}),
+		run: async (
+			tx: PrismaTx,
+			filter: QuestionFindOneFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<CodeAnswerContext> => {
+			const none = { pretests: [], sendable: false };
+			const row = await tx.questionRef.findFirst({
+				where: refWhere(filter),
+				include: questionInclude(),
+			});
+			if (!row) return none;
+			const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+			const error = accessError(access, "read", "question.read");
+			if (error instanceof NotFound) return none;
+			if (error) throw error;
+
+			const pinned = await findPinnedVersion(tx, row.id, filter.version, true);
+			const fullRow = valueOrNotFound(
+				"question",
+				await tx.questionRef.findUnique({
+					where: { id: row.id },
+					include: pinned
+						? { ...questionInclude(true), latest: false }
+						: questionInclude(true),
+				}),
+			);
+			const { question } = fromDb(
+				pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
+			);
+			if (question.type !== "code") return none;
+			return {
+				pretests: pretestSources(question),
+				sendable: workerColumns(question).worker !== null,
+			};
 		},
 	});
 
@@ -537,6 +590,7 @@ const buildQuestionService = defineService<QuestionT>()(() => {
 	return {
 		create,
 		findOne,
+		codeAnswer,
 		findMany,
 		update,
 		upsert,
@@ -553,6 +607,12 @@ export type LegacyUpgradeReport = {
 	upgraded: number;
 	current: number;
 	failed: { id: number; slug: string; reason: string }[];
+};
+
+/// What `codeAnswer` tells the page about a code question.
+export type CodeAnswerContext = {
+	pretests: PretestSource[];
+	sendable: boolean;
 };
 
 /// The service `buildQuestionService` makes, with `findOne` and `findMany` overloaded on `filter.public` to narrow the view they return.

@@ -8,16 +8,19 @@ import {
 	Switch,
 } from "solid-js";
 import { isAnswered } from "@/components/exam/answer-payload";
+import { CodeAnswer } from "@/components/exam/CodeAnswer";
 import { m } from "@/i18n";
 import {
 	correctResponses,
 	NotAutoGradable,
+	type PublicCodeQuestion,
 	publicForm,
 	type QuestionDocument,
 	ResponseError,
 	scoreBlanks,
 	scoreResponse,
 } from "@/mdq";
+import { pretestSources } from "@/utils/pretest-sources";
 import { ResetIcon, SubmitIcon } from "./icons";
 import { AnyQuestionView, type AnyQuestionViewProps, mdqMessages } from "./mdq";
 
@@ -33,6 +36,10 @@ export interface QuestionPreviewProps {
 	tab?: Accessor<PreviewTab>;
 	/** Leaves the score badge out of the key tab, where it only restates that the key is right. */
 	hideScore?: boolean;
+	/** Origin of the runner iframe the pretests of a code question run in; null when the server has none. */
+	runnerOrigin?: string | null;
+	/** The highlighted HTML of the example tests of a code question, from `highlightExamples`. */
+	exampleHtml?: readonly string[];
 }
 
 /** Which of the two ways an instructor can look at the question is on screen. */
@@ -82,6 +89,8 @@ export default function QuestionPreview(
 				question={props.data}
 				tab={tab}
 				hideScore={props.hideScore}
+				runnerOrigin={props.runnerOrigin ?? null}
+				exampleHtml={props.exampleHtml}
 			/>
 		</div>
 	);
@@ -137,6 +146,8 @@ interface TypePreviewProps {
 	question: QuestionDocument;
 	tab: Accessor<PreviewTab>;
 	hideScore?: boolean;
+	runnerOrigin: string | null;
+	exampleHtml?: readonly string[];
 }
 
 /// What the review mode of a view takes as `result`.
@@ -194,6 +205,9 @@ function previewResult(
 
 function TypePreview(props: TypePreviewProps): JSX.Element {
 	const publicQ = createMemo(() => publicForm(props.question));
+	const pretests = createMemo(() =>
+		props.question.type === "code" ? pretestSources(props.question) : [],
+	);
 	const key = createMemo(() => keyResponse(props.question));
 	const keyResult = createMemo(() => previewResult(props.question, key()));
 
@@ -210,6 +224,16 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 
 	return (
 		<Switch>
+			<Match when={props.tab() === "student" && publicQ().type === "code"}>
+				<CodeAnswer
+					question={publicQ() as PublicCodeQuestion}
+					pretests={pretests()}
+					runnerOrigin={props.runnerOrigin}
+					exampleHtml={props.exampleHtml}
+					value={null}
+					onChange={() => {}}
+				/>
+			</Match>
 			<Match when={props.tab() === "student"}>
 				<div class="flex flex-col gap-3">
 					<AnyQuestionView

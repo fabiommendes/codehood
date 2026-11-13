@@ -1,7 +1,6 @@
 {
 	"code_answer_label": "Sua solução",
 	"code_examples_title": "Exemplos",
-	"code_example_from_line": "linha {line}",
 	"code_pretest_run": "Rodar pré-testes",
 	"code_pretest_running": "Rodando pré-testes…",
 	"code_pretest_hint": "Os pré-testes são os testes públicos. A nota vem do envio.",
@@ -21,5 +20,20 @@
 	"code_verdict_error": "Erro",
 	"code_verdict_timeout": "Tempo esgotado",
 	"code_verdict_resource_limit": "Acima do limite",
-	"code_verdict_skipped": "Ignorado"
+	"code_verdict_skipped": "Ignorado",
+	"code_example_summary": "Teste de exemplo, a partir da linha {line}",
+	"code_submit": "Enviar",
+	"code_submit_sending": "Enviando…",
+	"code_submit_sent": "Enviado, aguardando correção.",
+	"code_submit_used": "{used} envios usados",
+	"code_submit_used_of": "{used} de {limit} envios usados",
+	"code_send_title": "Envio {n}",
+	"code_send_queued": "Aguardando o corretor",
+	"code_send_claimed": "Em correção",
+	"code_send_failed": "A correção falhou e será tentada de novo",
+	"code_send_pretest_failed": "Um pré-teste falhou, este envio não gastou tentativa",
+	"code_send_done": "Corrigido",
+	"code_send_sent": "Enviado",
+	"code_send_score": "Nota {score}",
+	"code_send_cancelled": "Cancelado"
 }

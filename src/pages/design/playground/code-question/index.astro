@@ -4,10 +4,12 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseQuestion, publicForm, resolveTests } from "mdq";
+import type { CodeSends } from "@/components/exam/code-sends";
 import PageKicker from "@/components/PageKicker.astro";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { highlightExamples } from "@/utils/highlight-examples";
 import { pretestSources } from "@/utils/pretest-sources";
-import Demo, { type Scenario } from "./_Demo";
+import Demo, { type Scenario, type SubmitScenario } from "./_Demo";
 
 export const prerender = false;
 
@@ -32,9 +34,108 @@ texts["Pre.elm"] =
 const question = resolveTests(parsed, texts);
 const pub = publicForm(question);
 const pretests = pretestSources(question);
+const exampleHtml = await highlightExamples(pub);
 
-const scenarios: { id: Scenario; title: string; autorun: boolean }[] = [
+const scenarios: {
+	id: Scenario;
+	title: string;
+	autorun: boolean;
+	submit?: { scenario: SubmitScenario; sends: CodeSends; press: boolean };
+}[] = [
 	{ id: "pass", title: "All pass", autorun: true },
+	{
+		id: "pass",
+		title: "Submit: sent (0 of 4 used)",
+		autorun: false,
+		submit: {
+			scenario: "ok",
+			press: true,
+			sends: { used: 0, limit: 4, submissions: [] },
+		},
+	},
+	{
+		id: "pass",
+		title: "Submit: refused, none left",
+		autorun: false,
+		submit: {
+			scenario: "exhausted",
+			press: true,
+			sends: {
+				used: 4,
+				limit: 4,
+				submissions: [{ submission: "a", jobState: "DONE" }],
+			},
+		},
+	},
+	{
+		id: "pass",
+		title: "Submit: sending",
+		autorun: false,
+		submit: {
+			scenario: "sending",
+			press: true,
+			sends: { used: 0, limit: 4, submissions: [] },
+		},
+	},
+	{
+		id: "pass",
+		title: "Sends: every state",
+		autorun: false,
+		submit: {
+			scenario: "ok",
+			press: false,
+			sends: {
+				used: 2,
+				limit: 4,
+				submissions: [
+					{ submission: "a", jobState: "FAILED" },
+					{
+						submission: "b",
+						jobState: "DONE",
+						report: {
+							outcome: "pretest-failed",
+							publicCases: [
+								{
+									source: 0,
+									line: 9,
+									verdict: "fail",
+									id: "um",
+									message: "Soma a lista vazia e um elemento",
+								},
+							],
+						},
+					},
+					{
+						submission: "c",
+						jobState: "DONE",
+						report: {
+							outcome: "graded",
+							score: 0.8,
+							publicCases: [
+								{
+									source: 0,
+									line: 9,
+									verdict: "pass",
+									id: "um",
+									message: "Soma a lista vazia e um elemento",
+								},
+							],
+							items: [
+								{ text: "Soma a lista vazia e um elemento", passed: true },
+								{
+									text: "Soma listas longas",
+									passed: false,
+									feedback: "Veja a recursao.",
+								},
+							],
+						},
+					},
+					{ submission: "d", jobState: "CLAIMED" },
+					{ submission: "e", jobState: "QUEUED" },
+				],
+			},
+		},
+	},
 	{ id: "fail", title: "Some fail", autorun: true },
 	{ id: "build-error", title: "Build error", autorun: true },
 	{ id: "runner-error", title: "Runner error", autorun: true },
@@ -60,7 +161,7 @@ const scenarios: { id: Scenario; title: string; autorun: boolean }[] = [
           <section class="flex min-w-0 flex-col gap-2">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">{scenario.title}</h2>
             <div class="rounded-box border border-base-300 bg-base-100 p-4">
-              <Demo client:load question={pub} pretests={pretests} scenario={scenario.id} autorun={scenario.autorun} />
+              <Demo client:load question={pub} pretests={pretests} scenario={scenario.id} autorun={scenario.autorun} exampleHtml={exampleHtml} submit={scenario.submit} />
             </div>
           </section>
         ))

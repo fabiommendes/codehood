@@ -34,10 +34,15 @@ const shown = displayAnswer(
 	payload,
 	question.type === "essay"
 		? { content: question.content, highlight: question.highlight }
-		: undefined,
+		: question.type === "code"
+			? { highlight: question.language }
+			: undefined,
 );
 const runLanguage =
-	shown.kind === "code" && submission && RUNNER_ORIGIN !== null
+	shown.kind === "code" &&
+	question.type === "essay" &&
+	submission &&
+	RUNNER_ORIGIN !== null
 		? runnerLanguage(shown.highlight)
 		: null;
 const codeHtml =

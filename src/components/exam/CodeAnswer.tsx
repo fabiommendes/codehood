@@ -20,6 +20,7 @@ import { m } from "@/i18n";
 import { languageLabel } from "@/runner/languages";
 import type { PretestSource } from "@/utils/pretest-sources";
 import { createEditor, type RunnerEditor } from "../runner/editor";
+import { EDITOR_FOCUS_RING, EDITOR_SURFACE } from "../runner/editor-surface";
 import {
 	type ReportCase,
 	type RunnerReport,
@@ -27,6 +28,7 @@ import {
 	type Verdict,
 } from "../runner/run-tests";
 import { type PretestSummary, summarizeReport } from "./code-pretest";
+import type { CodeSends, SentView } from "./code-sends";
 
 export interface CodeAnswerProps {
 	/// The public form: the stem, the `template`, the `language`, the `file`
@@ -40,6 +42,14 @@ export interface CodeAnswerProps {
 	value: string | null;
 	/// Called with the full code after each edit, and the editor's user event behind it when known.
 	onChange: (code: string, userEvent?: string) => void;
+	/// Origin of the runner frame (`RUNNER_ORIGIN`); null when the server has none.
+	runnerOrigin?: string | null;
+	/// The highlighted HTML of each example test, in the order of the `{example}` tests of `question.publicTests`, from `highlightExamples`. Trusted: never user HTML. Plain text shows without it.
+	exampleHtml?: readonly string[];
+	/// Sends the code to the grading queue, or rejects with the reason it was refused. The host passes it only for a question with a worker, and saves the answer first.
+	onSubmit?: (code: string) => Promise<void>;
+	/// The counter and the list of sends shown under the editor, kept up to date by the host.
+	sends?: CodeSends;
 	/// Runs the pretests; the browser runner by default. Tests inject their own.
 	runTests?: typeof runBrowserTests;
 }
@@ -88,6 +98,11 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 	const [code, setCode] = createSignal(props.value ?? template);
 	const [ready, setReady] = createSignal(false);
 	const [state, setState] = createSignal<PretestState>({ kind: "idle" });
+	const [sending, setSending] = createSignal(false);
+	const [notice, setNotice] = createSignal<{
+		kind: "sent" | "refused";
+		text: string;
+	} | null>(null);
 	let editorParent!: HTMLDivElement;
 	let editor: RunnerEditor | null = null;
 	let disposed = false;
@@ -131,6 +146,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		try {
 			const report = await (props.runTests ?? runBrowserTests)(
 				{
+					runnerOrigin: props.runnerOrigin ?? null,
 					language: props.question.language ?? "",
 					file: filename,
 					answer: ranCode,
@@ -146,6 +162,23 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		}
 	}
 
+	async function submit(): Promise<void> {
+		if (!props.onSubmit || sending()) return;
+		setSending(true);
+		setNotice(null);
+		try {
+			await props.onSubmit(code());
+			setNotice({ kind: "sent", text: m.code_submit_sent() });
+		} catch (error) {
+			const text = error instanceof Error ? error.message : String(error);
+			setNotice({ kind: "refused", text });
+		} finally {
+			setSending(false);
+		}
+	}
+
+	const exhausted = () =>
+		props.sends?.limit != null && props.sends.used >= props.sends.limit;
 	const running = () => state().kind === "running";
 	const stale = () => {
 		const current = state();
@@ -171,32 +204,29 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 						{m.code_examples_title()}
 					</h3>
 					<For each={examples}>
-						{(example) => (
-							<div
-								class="overflow-hidden rounded-box border border-base-300 bg-base-200/50"
+						{(example, index) => (
+							<details
+								class="collapse collapse-arrow overflow-hidden rounded-box border border-base-300 bg-base-200/50"
 								data-example
 								data-format={example.format}
 							>
-								<div class="border-b border-base-300 px-3 py-1 text-xs text-muted">
-									{m.code_example_from_line({
+								<summary class="collapse-title min-h-0 px-3 py-2 text-xs text-muted">
+									{m.code_example_summary({
 										line: String(example.firstLine),
 									})}
+								</summary>
+								<div class="collapse-content p-0">
+									<div
+										class={`${EDITOR_SURFACE} [&_pre]:text-[13px] [&_pre]:leading-5`}
+									>
+										<ExampleCode
+											text={example.text}
+											firstLine={example.firstLine}
+											html={props.exampleHtml?.[index()]}
+										/>
+									</div>
 								</div>
-								<pre class="m-0 overflow-x-auto py-2 font-mono text-xs leading-5">
-									<code>
-										<For each={example.text.split("\n")}>
-											{(line, index) => (
-												<div class="flex">
-													<span class="w-10 shrink-0 select-none pr-3 text-right tabular-nums text-base-content/40">
-														{example.firstLine + index()}
-													</span>
-													<span class="whitespace-pre pr-3">{line}</span>
-												</div>
-											)}
-										</For>
-									</code>
-								</pre>
-							</div>
+							</details>
 						)}
 					</For>
 				</section>
@@ -224,23 +254,84 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 							</Show>
 							{running() ? m.code_pretest_running() : m.code_pretest_run()}
 						</button>
+						<Show when={props.onSubmit}>
+							<button
+								type="button"
+								class="btn btn-primary btn-sm"
+								data-action="submit"
+								disabled={sending() || exhausted()}
+								onClick={() => void submit()}
+							>
+								<Show when={sending()}>
+									<span class="loading loading-spinner loading-xs" />
+								</Show>
+								{sending() ? m.code_submit_sending() : m.code_submit()}
+							</button>
+						</Show>
 					</div>
 				</div>
-				<Show when={!ready()}>
-					<pre
-						class="m-0 min-h-24 overflow-x-auto bg-base-100 px-3 py-2 font-mono text-sm leading-5"
-						data-editor-static
+				<div class={EDITOR_FOCUS_RING}>
+					<div
+						class={`${EDITOR_SURFACE} max-h-96 [font-variant-ligatures:none]`}
 					>
-						<code>{code()}</code>
-					</pre>
-				</Show>
-				<div ref={editorParent} class={ready() ? "" : "hidden"} data-editor />
+						<Show when={!ready()}>
+							<ExampleCode
+								text={code()}
+								firstLine={1}
+								html={undefined}
+								attributes={{ "data-editor-static": "" }}
+							/>
+						</Show>
+						<div
+							ref={editorParent}
+							class={ready() ? "" : "hidden"}
+							data-editor
+						/>
+					</div>
+				</div>
 				<div class="border-t border-base-300 bg-base-200/50 px-3 py-1.5 text-xs text-muted">
 					{props.pretests.length === 0
 						? m.code_pretest_none()
 						: m.code_pretest_hint()}
 				</div>
 			</div>
+
+			<Show when={props.onSubmit}>
+				<div
+					class="flex flex-wrap items-baseline gap-x-3 text-sm"
+					role="status"
+					aria-live="polite"
+					data-submit-status={notice()?.kind ?? "idle"}
+				>
+					<span class="text-muted" data-submit-count>
+						{props.sends?.limit == null
+							? m.code_submit_used({ used: String(props.sends?.used ?? 0) })
+							: m.code_submit_used_of({
+									used: String(props.sends.used),
+									limit: String(props.sends.limit),
+								})}
+					</span>
+					<Show when={notice()}>
+						{(current) => (
+							<span
+								class={
+									current().kind === "sent" ? "text-success" : "text-error"
+								}
+							>
+								{current().text}
+							</span>
+						)}
+					</Show>
+				</div>
+			</Show>
+
+			<Show when={props.sends && props.sends.submissions.length > 0}>
+				<ol class="m-0 flex list-none flex-col gap-2 p-0" data-sends>
+					<For each={props.sends?.submissions}>
+						{(sent, index) => <SendRow sent={sent} n={index() + 1} />}
+					</For>
+				</ol>
+			</Show>
 
 			<div role="status" aria-live="polite" data-pretest-result>
 				<Show when={state()} keyed>
@@ -267,6 +358,151 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 			</div>
 		</div>
 	);
+}
+
+/// Code with line numbers starting at `firstLine`: the server-highlighted `html` when given, plain text otherwise.
+function ExampleCode(props: {
+	text: string;
+	firstLine: number;
+	html: string | undefined;
+	attributes?: Record<string, string>;
+}): JSX.Element {
+	const lines = () => props.text.split("\n");
+	const style = () => ({
+		"--digits": String(String(props.firstLine + lines().length - 1).length),
+		"counter-reset": `runner-line ${props.firstLine - 1}`,
+	});
+	return (
+		<Show
+			when={props.html}
+			fallback={
+				<pre
+					class="m-0 px-0 py-2 whitespace-pre [font-variant-ligatures:none]"
+					data-line-numbers
+					style={style()}
+					{...props.attributes}
+				>
+					<code>
+						<For each={lines()}>
+							{(line) => (
+								<>
+									<span class="line">{line}</span>
+									{"\n"}
+								</>
+							)}
+						</For>
+					</code>
+				</pre>
+			}
+		>
+			{(html) => (
+				<div
+					class="[font-variant-ligatures:none] [&_pre]:m-0 [&_pre]:overflow-visible [&_pre]:bg-transparent [&_pre]:px-0 [&_pre]:py-2"
+					data-line-numbers
+					style={style()}
+					innerHTML={html()}
+				/>
+			)}
+		</Show>
+	);
+}
+
+/// The state of a send in words, from its job and what the worker made of it.
+function sendStatus(sent: SentView): string {
+	switch (sent.jobState) {
+		case "QUEUED":
+			return m.code_send_queued();
+		case "CLAIMED":
+			return m.code_send_claimed();
+		case "FAILED":
+			return m.code_send_failed();
+		case "CANCELLED":
+			return m.code_send_cancelled();
+		case "DONE":
+			return sent.report?.outcome === "pretest-failed"
+				? m.code_send_pretest_failed()
+				: m.code_send_done();
+		default:
+			return m.code_send_sent();
+	}
+}
+
+/// One send: its state, and, once the worker graded it, the public cases, the compiler message, the score and the rubric items the exam shows.
+function SendRow(props: { sent: SentView; n: number }): JSX.Element {
+	const report = () => props.sent.report;
+	return (
+		<li
+			class="flex flex-col gap-2 rounded-box border border-base-300 px-3 py-2 text-sm"
+			data-send
+			data-job-state={props.sent.jobState ?? "none"}
+		>
+			<div class="flex flex-wrap items-baseline gap-x-3">
+				<span class="font-semibold">
+					{m.code_send_title({ n: String(props.n) })}
+				</span>
+				<span class="text-muted" data-send-status>
+					{sendStatus(props.sent)}
+				</span>
+				<Show when={report()?.score}>
+					{(score) => (
+						<span class="font-semibold" data-send-score>
+							{m.code_send_score({ score: String(round(score())) })}
+						</span>
+					)}
+				</Show>
+			</div>
+			<Show when={report()?.build}>
+				{(build) => (
+					<pre class="m-0 max-h-60 overflow-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
+						{build()}
+					</pre>
+				)}
+			</Show>
+			<Show when={(report()?.publicCases.length ?? 0) > 0}>
+				<ul
+					class="m-0 flex list-none flex-col divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 p-0"
+					aria-label={m.code_result_cases()}
+				>
+					<For each={report()?.publicCases}>
+						{(item, index) => (
+							<CaseRow
+								item={{ ...item, verdict: item.verdict as Verdict }}
+								n={index() + 1}
+							/>
+						)}
+					</For>
+				</ul>
+			</Show>
+			<Show when={report()?.items}>
+				{(items) => (
+					<ul class="m-0 flex list-none flex-col gap-1 p-0" data-send-items>
+						<For each={items()}>
+							{(item) => (
+								<li
+									class="flex flex-col"
+									data-passed={item.passed ? "true" : "false"}
+								>
+									<span class={item.passed ? "text-success" : "text-error"}>
+										{item.passed ? "✓" : "✗"} {item.text}
+									</span>
+									<Show when={item.feedback}>
+										{(feedback) => (
+											<span class="pl-4 text-xs text-muted">{feedback()}</span>
+										)}
+									</Show>
+								</li>
+							)}
+						</For>
+					</ul>
+				)}
+			</Show>
+		</li>
+	);
+}
+
+/// The score without the float noise of a discount.
+function round(score: number): number {
+	return Math.round(score * 100) / 100;
 }
 
 /// The status line and one row per case of a finished run.

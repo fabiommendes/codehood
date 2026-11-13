@@ -762,7 +762,7 @@ const UNGUARDED: Record<string, string> = {
 			"report.attachment",
 			"report.countOpen",
 			"rubric.preview",
-			"question.pretests",
+			"question.codeAnswer",
 		].map((op) => [op, "reads"]),
 	),
 	"repository.zip":

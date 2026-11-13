@@ -33,6 +33,7 @@ import {
 	restartNote as languageRestartNote,
 } from "@/runner/languages";
 import { createEditor, type RunnerEditor } from "./editor";
+import { EDITOR_FOCUS_RING, EDITOR_SURFACE } from "./editor-surface";
 import {
 	canRun,
 	type IdeEvent,
@@ -793,7 +794,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			    In a snippet the wrapper is daisyUI's code mockup, with its dots
 			    and without the gap it puts before each `pre`. */}
 			<div
-				class={`relative after:pointer-events-none after:absolute after:inset-0 after:z-[300] after:rounded-[inherit] after:transition-shadow after:content-[''] focus-within:after:shadow-[inset_0_0_0_1px_#569cd666,inset_0_0_14px_#569cd633] ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code overflow-hidden bg-[#1e1e1e] pt-3 pb-1 text-[#d4d4d4] before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
+				class={`${EDITOR_FOCUS_RING} ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code overflow-hidden bg-[#1e1e1e] pt-3 pb-1 text-[#d4d4d4] before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
 			>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
@@ -836,7 +837,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 					</div>
 				</Show>
 				<div
-					class={`relative overflow-auto bg-[#1e1e1e] font-mono text-[13px] leading-5 text-[#d4d4d4] ${props.compact ? "max-h-56" : "max-h-96"}`}
+					class={`${EDITOR_SURFACE} ${props.compact ? "max-h-56" : "max-h-96"}`}
 				>
 					<Show when={!editorReady()}>
 						{/* biome-ignore lint/a11y/useSemanticElements: a read-only code view, replaced by the editor on first focus */}

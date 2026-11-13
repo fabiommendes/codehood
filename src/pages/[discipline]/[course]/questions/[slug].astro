@@ -3,11 +3,13 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import QuestionPreview from "@/components/question/QuestionPreview";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
+import { RUNNER_ORIGIN } from "@/core/constants";
 import { db } from "@/db";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { questionProblems } from "@/mdq";
+import { publicForm, questionProblems } from "@/mdq";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { highlightExamples } from "@/utils/highlight-examples";
 import { loadCourse } from "@/utils/load-course";
 import {
 	questionStatusLabels,
@@ -36,6 +38,9 @@ if (!question) return Astro.rewrite("/404");
 const { question: doc } = question;
 
 const problems = questionProblems(doc);
+const preview = publicForm(doc);
+const exampleHtml =
+	preview.type === "code" ? await highlightExamples(preview) : [];
 ---
 
 <AppLayout title={m.questions_detail_page_title({ title: doc.title ?? question.slug })}
@@ -101,7 +106,7 @@ const problems = questionProblems(doc);
     </section>
 
     <section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
-      <QuestionPreview client:load data={doc} />
+      <QuestionPreview client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} />
     </section>
   </main>
 </AppLayout>

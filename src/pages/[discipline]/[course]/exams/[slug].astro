@@ -3,6 +3,7 @@ import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import AnswerHistorySwitch from "@/components/exam/AnswerHistorySwitch";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
+import { type CodeSends, sendsOf } from "@/components/exam/code-sends";
 import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamExceptions, {
 	type ExceptionRow,
@@ -16,6 +17,7 @@ import ReleasedScore from "@/components/ReleasedScore.astro";
 import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
 import type { ExamExceptionView, Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
+import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { shufflePool } from "@/mdq/shuffle";
@@ -46,11 +48,13 @@ import {
 	formatDuration,
 } from "@/utils/exam-display";
 import { examNav } from "@/utils/exam-nav";
+import { highlightExamples } from "@/utils/highlight-examples";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadStudents } from "@/utils/load-grading";
 import { loadReviews } from "@/utils/load-review";
 import { renderMarkdown } from "@/utils/markdown";
+import type { PretestSource } from "@/utils/pretest-sources";
 import {
 	durationToMinutes,
 	formatDateTime,
@@ -175,8 +179,9 @@ if (canManage && exam.type !== "PRACTICE") {
 	students = loadedStudents;
 	storedExceptions = loadedExceptions;
 	const slugs = exam.questions.map((question) => question.slug);
+	const policy = (await loadResultPolicy(course.id))(exam);
 	const results = attempts.map((entry) =>
-		examResult(slugs, entry.submissions, feedback),
+		examResult(slugs, entry.submissions, feedback, policy),
 	);
 	releaseBlocker = blockerOf(schedule, results, now);
 	canRelease = releaseBlocker === null;
@@ -188,8 +193,17 @@ if (canManage && exam.type !== "PRACTICE") {
 		students,
 		now,
 		exceptions,
+		policy,
 	);
-	statsRows = questionStats(exam, slugs, attempts, feedback, now, exceptions);
+	statsRows = questionStats(
+		exam,
+		slugs,
+		attempts,
+		feedback,
+		now,
+		exceptions,
+		policy,
+	);
 	for (const pinned of staffQuestions) {
 		if (pinned.question.title) {
 			questionTitles.set(pinned.slug, pinned.question.title);
@@ -304,6 +318,7 @@ const examOutcome =
 					{ course: course.id, exam: slug, author: actor.username },
 					{ actor },
 				),
+				(await loadResultPolicy(course.id))(exam),
 			)
 		: undefined;
 
@@ -377,6 +392,30 @@ const showQuestions =
 	state.kind === "in-progress" ||
 	state.kind === "submitted" ||
 	state.kind === "results";
+// The pretest sources of each code question, only while the student can answer.
+const pretests: Record<string, PretestSource[]> = {};
+const exampleHtml: Record<string, string[]> = {};
+// The sends of each code question that goes to a worker, by question slug.
+const codeSends: Record<string, CodeSends> = {};
+if (state.kind === "in-progress") {
+	await Promise.all(
+		studentQuestions.map(async ({ slug, version, question }) => {
+			if (question.type !== "code") return;
+			const context = await db.question.codeAnswer(
+				{ course: course.id, slug, version },
+				{ actor },
+			);
+			pretests[slug] = context.pretests;
+			exampleHtml[slug] = await highlightExamples(question);
+			if (!context.sendable || !attempt) return;
+			const sent = await db.gradingJob.forStudent(
+				{ response: attempt.publicId, question: slug },
+				{ actor },
+			);
+			codeSends[slug] = sendsOf(sent);
+		}),
+	);
+}
 const latestAnswers: Record<string, AnswerPayload> = {};
 const answeredAt: Record<string, string> = {};
 for (const submission of attempt?.submissions ?? []) {
@@ -529,6 +568,9 @@ for (const submission of attempt?.submissions ?? []) {
             regrades={questionRegrades}
             codeRun={codeRun.allowed}
             runnerOrigin={RUNNER_ORIGIN}
+            pretests={pretests}
+            exampleHtml={exampleHtml}
+            codeSends={codeSends}
             username={actor.username}
             answeredAt={answeredAt}
             graceMs={EXAM_ANSWER_GRACE_MS}

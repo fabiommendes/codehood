@@ -19,7 +19,8 @@ export type AnswerDisplay =
  * is `empty`.
  *
  * An essay whose `content` is `"code"` is `code` instead, with the question's
- * `highlight` tag, which may name a language with no runner.
+ * `highlight` tag, which may name a language with no runner. A `code` question
+ * is `code` too, with its `language` as the `highlight`.
  */
 export function displayAnswer(
 	type: string,
@@ -27,6 +28,13 @@ export function displayAnswer(
 	essay?: { content?: string; highlight?: string },
 ): AnswerDisplay {
 	if (!isAnswered(type, payload)) return { kind: "empty" };
+	if (type === "code") {
+		return {
+			kind: "code",
+			text: responseText(payload),
+			highlight: essay?.highlight ?? null,
+		};
+	}
 	if (type === "essay" && essay?.content === "code") {
 		return {
 			kind: "code",
@@ -37,12 +45,11 @@ export function displayAnswer(
 	switch (type) {
 		case "short-answer":
 		case "essay":
-		case "code":
 		case "numeric":
 			return {
 				kind: "text",
 				text: responseText(payload),
-				multiline: type === "essay" || type === "code",
+				multiline: type === "essay",
 			};
 		default:
 			return { kind: "view" };

@@ -31,6 +31,7 @@ import {
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
+import type { PretestSource } from "@/utils/pretest-sources";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import {
@@ -39,12 +40,14 @@ import {
 	isTextEntry,
 	toSaved,
 } from "./answer-payload";
+import { CodeAnswer } from "./CodeAnswer";
 import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
 import {
 	browserDraftStore,
 	compareDraft,
 	measureClockOffset,
 } from "./code-draft";
+import { type CodeSends, hasPendingSend, sendsOf } from "./code-sends";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { retryDelay } from "./save-retry";
 import { questionList, unansweredWarning } from "./unanswered-warning";
@@ -74,6 +77,12 @@ export interface ExamAttemptProps {
 	codeRun?: boolean;
 	/// Origin of the runner iframe; null when the server has none.
 	runnerOrigin?: string | null;
+	/// The sources the browser runs as pretests of each code question, by question slug.
+	pretests?: Record<string, PretestSource[]>;
+	/// The highlighted HTML of each code question's example tests, by question slug.
+	exampleHtml?: Record<string, string[]>;
+	/// The sends of each code question that goes to a worker, by question slug; a question without an entry has no submit button.
+	codeSends?: Record<string, CodeSends>;
 	/// The viewing student, which keys their local code drafts.
 	username?: string;
 	/// When the server saved each answer, by question slug (ISO), for the draft conflict panel.
@@ -94,6 +103,9 @@ const SLOW_SAVE_MS = 400;
 
 /// How long before the deadline a newer local draft is saved for the student.
 const DRAFT_SAVE_LEAD_SECONDS = 10;
+
+/// How long the page waits between two reads of the sends that still wait for a worker.
+const SENDS_POLL_MS = 5000;
 
 /// How long typing pauses before a text answer is saved.
 const SAVE_DELAY_MS = 500;
@@ -403,6 +415,60 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			if (kind() === "in-progress") void flush();
 		}, retryDelay(failures));
 	}
+
+	/// The sends of each code question as the page counts them, after the ones this page made.
+	const [sendsNow, setSendsNow] = createSignal<Record<string, CodeSends>>({});
+
+	/// The sends of every code question that goes to a worker, as the server last told this page.
+	const allSends = (): Record<string, CodeSends> => ({
+		...props.codeSends,
+		...sendsNow(),
+	});
+
+	/// Saves the pending answers, then sends the code of `slug` to its worker; throws the reason it was refused.
+	async function submitCode(slug: string, code: string): Promise<void> {
+		if (!(await flush())) throw new Error(m.exams_attempt_connection_failed());
+		const { data, error } = await actions.exam.answer({
+			...target,
+			question: slug,
+			payload: code,
+			kind: "SUBMIT",
+		});
+		if (error) throw new Error(errorMessage(error));
+		if (data.sends) {
+			const sends = sendsOf(data.sends);
+			setSendsNow((current) => ({ ...current, [slug]: sends }));
+		} else {
+			await refreshSends([slug]);
+		}
+	}
+
+	/// Asks the server for the sends of `slugs` again, ignoring a question it cannot read.
+	async function refreshSends(slugs: string[]): Promise<void> {
+		if (!props.attempt) return;
+		const attempt = props.attempt;
+		await Promise.all(
+			slugs.map(async (slug) => {
+				const { data } = await actions.gradingJob.forStudent({
+					response: attempt,
+					question: slug,
+				});
+				if (data) {
+					setSendsNow((current) => ({ ...current, [slug]: sendsOf(data) }));
+				}
+			}),
+		);
+	}
+
+	/// While a send waits for its worker, asks for the sends every few seconds; it stops when none is pending or the page goes away.
+	createEffect(() => {
+		const waiting = Object.entries(allSends())
+			.filter(([, sends]) => hasPendingSend(sends))
+			.map(([slug]) => slug);
+		if (waiting.length === 0 || kind() !== "in-progress") return;
+		const timer = setInterval(() => void refreshSends(waiting), SENDS_POLL_MS);
+		onCleanup(() => clearInterval(timer));
+	});
 
 	/// Sends what is pending now, instead of waiting out the retry delay.
 	function retryNow(): void {
@@ -1159,6 +1225,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 														userEvent,
 													)
 												}
+												pretests={props.pretests?.[entry.slug]}
+												exampleHtml={props.exampleHtml?.[entry.slug]}
+												sends={allSends()[entry.slug]}
+												onSubmit={(code) => submitCode(entry.slug, code)}
+												runnerOrigin={props.runnerOrigin ?? null}
 												code={
 													kind() === "in-progress"
 														? codeContext(entry.slug, entry.question, {
@@ -1715,6 +1786,16 @@ interface AnswerFieldProps {
 	onChange: (payload: AnswerPayload, userEvent?: string) => void;
 	/// Set for a code question being answered: it gets the editor instead of the textarea.
 	code?: CodeAnswerContext;
+	/// The pretest sources of an MDQ `code` question, from the server.
+	pretests?: readonly PretestSource[];
+	/// The highlighted example tests of an MDQ `code` question, from the server.
+	exampleHtml?: readonly string[];
+	/// The sends of a code question that goes to a worker; without it the question has no submit button.
+	sends?: CodeSends;
+	/// Sends the code of the question to its worker.
+	onSubmit?: (code: string) => Promise<void>;
+	/// Origin of the runner iframe the pretests run in.
+	runnerOrigin?: string | null;
 }
 
 /// What a code question in answer mode needs besides the question itself.
@@ -1742,6 +1823,33 @@ function codeLanguageOf(
 
 /// One question in answer mode, frozen on the student's saved answer, or reviewed with its marks.
 function AnswerField(props: AnswerFieldProps): JSX.Element {
+	return (
+		<Show
+			when={
+				props.question.type === "code" && !props.readonly && !props.review
+					? props.question
+					: undefined
+			}
+			fallback={<EssayOrOtherField {...props} />}
+		>
+			{(question) => (
+				<CodeAnswer
+					question={question()}
+					pretests={props.pretests ?? []}
+					exampleHtml={props.exampleHtml}
+					onSubmit={props.sends ? props.onSubmit : undefined}
+					sends={props.sends}
+					runnerOrigin={props.runnerOrigin ?? null}
+					value={typeof props.payload === "string" ? props.payload : null}
+					onChange={(code, userEvent) => props.onChange(code, userEvent)}
+				/>
+			)}
+		</Show>
+	);
+}
+
+/// Every question that is not an MDQ `code` question being answered.
+function EssayOrOtherField(props: AnswerFieldProps): JSX.Element {
 	return (
 		<Show
 			when={
