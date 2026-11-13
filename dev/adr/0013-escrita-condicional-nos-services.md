@@ -64,7 +64,10 @@ sem aviso. O mesmo vale para duas abas da web gravando a mesma entidade.
   montá-lo a partir do campo `updatedAt` de qualquer read model, inclusive de
   uma listagem. A falha responde `412 Precondition Failed`.
 - As Astro Actions que editam uma entidade enviam o `updatedAt` que a página
-  carregou.
+  carregou. Ficam sem versão as que não gravam um formulário carregado:
+  criação de nota, `grading.willNotGrade` e deletes de um clique. O
+  `rollCall.update` também fica sem: cada check-in muda a versão da chamada,
+  e a ação só acrescenta ou remove presenças.
 - O cabeçalho é opcional. Um cliente que não o envia continua com
   last-write-wins.
 

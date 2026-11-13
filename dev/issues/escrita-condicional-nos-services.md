@@ -62,6 +62,10 @@ PUT".
    `PreconditionFailed` vira `PRECONDITION_FAILED` em `src/actions/helpers.ts`).
    Ficam sem versão: criação de nota (`grading.grade`, `gradeBlanks`),
    `grading.willNotGrade`, deletes de um clique e `rollCall.update`.
+   Falta: `exam.saveException` (o diálogo de exceção é um formulário
+   carregado; editar manda a versão, adicionar manda `null`). Ficou para
+   depois da prova de 2026-11-13 para não mexer no fluxo da prova antes da
+   release.
 9. Atualizar `dev/rfc/como-criar-e-escrever-um-service.md` com a regra.
 
 ## Restrições
