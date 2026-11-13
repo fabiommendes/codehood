@@ -15,6 +15,7 @@ export const submissionStatus = z.enum([
 	"WILL_NOT_GRADE",
 	"GRADED_AUTOMATICALLY",
 	"GRADED_MANUALLY",
+	"PRETEST_FAILED",
 ]);
 
 /**

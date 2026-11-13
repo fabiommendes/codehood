@@ -724,6 +724,7 @@ enum QuestionType {
   SHORT_ANSWER
   FILL_IN
   ORDERING
+  CODE
 }
 
 /// A QuestionRef is the main entity representing a unique question in the system.
@@ -756,6 +757,17 @@ model QuestionRef {
   /// Revision marker supplied by the writer, opaque to the server.
   rev String?
 
+  /// External worker that grades this question, from `meta.worker`. Null
+  /// when the question is graded by hand.
+  worker String?
+
+  /// Graded submissions allowed per attempt, from `meta.attempts`.
+  attempts Int?
+
+  /// Discount per earlier wrong submission, a decimal string in [0, 1],
+  /// from `meta.penalty`.
+  penalty String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -770,6 +782,7 @@ model QuestionRef {
   answerEditFields   AnswerEditField[]
 
   @@unique([slug, courseId])
+  @@index([worker])
 }
 
 model QuestionData {
@@ -825,6 +838,18 @@ enum SubmissionStatus {
   WILL_NOT_GRADE
   GRADED_AUTOMATICALLY
   GRADED_MANUALLY
+  /// A pretest failed; the student may send again at no cost.
+  PRETEST_FAILED
+}
+
+/// How a submission came to exist.
+enum SubmissionKind {
+  /// Saved while the student types. Never graded by a worker.
+  AUTOSAVE
+  /// Sent by the student; may spend one of the question's attempts.
+  SUBMIT
+  /// The last autosave, promoted when the attempt closed.
+  FINAL
 }
 
 /// One student's attempt at an exam. Collects the submissions they make for
@@ -877,6 +902,8 @@ model Submission {
 
   status SubmissionStatus @default(PENDING_GRADE)
 
+  kind SubmissionKind @default(AUTOSAVE)
+
   responseId Int
   response   Response @relation(fields: [responseId], references: [id])
 
@@ -885,12 +912,50 @@ model Submission {
 
   payload Json
 
+  /// The worker's runner report (mdq runner-report schema).
+  runnerReport Json?
+
   /// When the student started working on this submission. Not always available.
   startedAt DateTime?
   createdAt DateTime  @default(now())
 
   feedbacks      Feedback[]
   regradeRequest RegradeRequest?
+  gradingJob     GradingJob?
+}
+
+/// One SUBMIT or FINAL submission waiting for an external worker.
+model GradingJob {
+  id           Int        @id @default(autoincrement())
+  submissionId Int        @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /// Copied from `QuestionRef.worker` when the job is created.
+  worker String
+
+  state GradingJobState @default(QUEUED)
+
+  /// Bot name of the API key holding the lease.
+  claimedBy  String?
+  leaseUntil DateTime?
+
+  /// Infrastructure failures so far; FAILED past the limit.
+  attempts  Int     @default(0)
+  lastError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([worker, state])
+}
+
+enum GradingJobState {
+  QUEUED
+  CLAIMED
+  DONE
+  FAILED
+  /// Replaced by a newer submission before any worker claimed it.
+  CANCELLED
 }
 
 /// Feedback provided for a submission, either by a human grader or an 
