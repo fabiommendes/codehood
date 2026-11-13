@@ -11,7 +11,8 @@
  *    the last release and checks it for data loss.
  * 3. The gate: `pnpm run lint` and `pnpm test`.
  * 4. Bumps `package.json`, turns the changelog's "Unreleased" section into the
- *    version's, commits as `release: vX.Y.Z` and tags `vX.Y.Z`.
+ *    version's, regenerates the CLI's OpenAPI snapshot, commits as
+ *    `release: vX.Y.Z` and tags `vX.Y.Z`.
  *
  * `--dry-run` stops after the gate. Nothing is pushed.
  */
@@ -122,11 +123,16 @@ writeFileSync(
 	),
 );
 
+// The CLI's OpenAPI snapshot carries the version, so every bump makes it stale.
+run("OpenAPI", "pnpm", ["run", "openapi:cli"]);
+
 run("Commit", "git", [
 	"add",
 	"package.json",
 	"CHANGELOG.md",
 	"prisma/migrations",
+	"cli/resources/openapi/codehood.json",
+	"cli/codehood/api/generated.py",
 ]);
 run("Commit", "git", ["commit", "--quiet", "-m", `release: ${tag}`]);
 run("Tag", "git", ["tag", "--annotate", tag, "-m", `Codehood ${version}`]);
