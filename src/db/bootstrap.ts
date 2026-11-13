@@ -3017,7 +3017,7 @@ const ELM_ANSWERS = {
 
 type ElmVerdict = "pass" | "fail";
 
-/// The runner report of the example question: the two public cases of `Pre.elm`, then the two hidden ones of `Hidden.elm`.
+/// The runner report of the example question, with case ids as the worker writes them: the two public cases of `Pre.elm`, then the two hidden ones of `Hidden.elm`.
 function elmReport(verdicts: {
 	empty: ElmVerdict;
 	one: ElmVerdict;
@@ -3036,7 +3036,7 @@ function elmReport(verdicts: {
 			{
 				source: 0,
 				line: 12,
-				id: "vazia",
+				id: "Pre pre::vazia",
 				verdict: verdicts.empty,
 				duration: 0.004,
 				...(verdicts.empty === "fail" ? failure("0", "1") : {}),
@@ -3044,7 +3044,7 @@ function elmReport(verdicts: {
 			{
 				source: 0,
 				line: 13,
-				id: "um",
+				id: "Pre pre::um",
 				verdict: verdicts.one,
 				duration: 0.003,
 				...(verdicts.one === "fail" ? failure("7", "0") : {}),
@@ -3052,7 +3052,7 @@ function elmReport(verdicts: {
 			{
 				source: 1,
 				line: 12,
-				id: "longa",
+				id: "Hidden hidden::longa",
 				verdict: verdicts.long,
 				duration: 0.006,
 				...(verdicts.long === "fail" ? failure("55", "1") : {}),
@@ -3060,7 +3060,7 @@ function elmReport(verdicts: {
 			{
 				source: 1,
 				line: 14,
-				id: "negativos",
+				id: "Hidden hidden::negativos",
 				verdict: verdicts.negatives,
 				duration: 0.004,
 				...(verdicts.negatives === "fail" ? failure("-3", "0") : {}),
