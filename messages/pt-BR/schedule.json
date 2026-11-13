@@ -61,5 +61,6 @@
 	"schedule_calendar_nothing_month": "Nada agendado neste mês.",
 	"schedule_calendar_events_in": "Agenda de {month}",
 	"schedule_feed_name": "Codehood — {name}",
-	"schedule_calendar_subscribe": "Assinar no seu calendário"
+	"schedule_calendar_subscribe": "Assinar no seu calendário",
+	"schedule_nav_past_weeks": "Semanas passadas"
 }

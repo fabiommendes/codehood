@@ -28,7 +28,7 @@ function keys(tabs: readonly CourseTab[]): string[] {
 	return tabs.map((t) => t.key);
 }
 
-test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Students, Grades, in that order", () => {
+test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Students, Grades, Reports, in that order", () => {
 	const tabs = courseTabs(course, ref, owner as Actor);
 
 	expect(tabs.map((t) => t.label)).toEqual([
@@ -39,6 +39,7 @@ test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Stud
 		"Questions",
 		"Students",
 		"Grades",
+		"Reports",
 	]);
 	expect(keys(tabs)).toEqual([
 		"home",
@@ -48,6 +49,7 @@ test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Stud
 		"questions",
 		"students",
 		"grades",
+		"reports",
 	]);
 });
 

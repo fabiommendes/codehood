@@ -9,6 +9,7 @@ import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { resourceGroupId, resourcesNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 import { RESOURCE_ACTION_ICONS, RESOURCE_ICONS } from "@/utils/resource-icons";
 import { resourceDetail } from "@/utils/resource-kind";
@@ -42,6 +43,7 @@ function code(text: string): string {
 
 <AppLayout title={m.courses_resources_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
+  nav={resourcesNav(href, groups)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />
@@ -73,7 +75,7 @@ function code(text: string): string {
     <div class="mt-8 flex flex-col gap-6">
       {
         groups.map((group) => (
-          <section>
+          <section id={resourceGroupId(group.type)} class="scroll-mt-20">
             <h3 class="text-sm font-semibold tracking-wide text-muted uppercase">
               {group.label}
             </h3>

@@ -15,6 +15,7 @@ import { calendarEntries } from "@/services/calendar-entries";
 import { courseSchedule } from "@/services/course-schedule";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { scheduleNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import {
@@ -104,6 +105,7 @@ function weekSpan(weeks: { week: number }[]): string {
 
 <AppLayout title={m.schedule_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
+  nav={scheduleNav(href, { past, ahead }, foldPast)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="schedule" />

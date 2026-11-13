@@ -87,9 +87,11 @@ test("student: take an exam", async ({ page }) => {
 	await test.step("the Exams tab labels each exam by the clock, never by the stored status", async () => {
 		await page.goto(`${href}/exams`);
 
-		await expect(page.getByText(open.title)).toBeVisible();
-		await expect(page.getByText(upcoming.title)).toBeVisible();
-		await expect(page.getByText(closed.title)).toBeVisible();
+		await expect(page.getByRole("main").getByText(open.title)).toBeVisible();
+		await expect(
+			page.getByRole("main").getByText(upcoming.title),
+		).toBeVisible();
+		await expect(page.getByRole("main").getByText(closed.title)).toBeVisible();
 
 		// A closed exam the student never attempted is "Missed" to them.
 		await expect(page.getByText("Missed", { exact: true })).toBeVisible();

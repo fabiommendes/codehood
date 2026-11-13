@@ -9,7 +9,12 @@
   linha do curso: código, aba, contexto (título da prova) e links em
   acordeão; o item atual vira texto e os links para a própria página viram
   âncoras marcadas pelo scroll. Ligado na página da prova (`examNav`), que
-  perde o link "Voltar para avaliações".
+  perde o link "Voltar para avaliações", e nas abas de provas (uma seção por
+  tipo), recursos (um item por grupo) e agenda (um item por semana, as
+  passadas num acordeão), em `src/utils/course-tabs-nav.ts`. Provas práticas
+  não ganham links de correção nem de revisões.
+- A aba Relatos do curso perde o contador de abertos: era uma consulta a cada
+  página do curso. O número segue na home do professor.
 
 - Escrita condicional (ADR 0013). Toda escrita de um service cujo modelo tem
   `updatedAt` aceita `expectedUpdatedAt` e falha com `PreconditionFailed`

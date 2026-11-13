@@ -1361,6 +1361,20 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
+	await db.exam.create(
+		{
+			course: cs101.id,
+			slug: "practice-recursion",
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Practice: recursion",
+			description: "Ungraded practice, open until the end of the term.",
+			tags: ["recursion", "practice"],
+			questions: [{ slug: "recursion-basics", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedCodeExam(cs101.id, { hopper, hamilton, liskov, bob });

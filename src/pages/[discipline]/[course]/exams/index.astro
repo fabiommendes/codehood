@@ -16,6 +16,7 @@ import {
 	released,
 } from "@/services/exam-state";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { examsNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 
@@ -81,6 +82,7 @@ if (!canWrite) {
 
 <AppLayout title={m.exams_list_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
+  nav={examsNav(href, canWrite ? exams : groups.flatMap((group) => group.exams))}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />

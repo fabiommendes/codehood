@@ -14,6 +14,8 @@ export interface ExamNavInput {
 	sections: readonly { id: string; label: string }[];
 	/// The actor manages the course: grading and regrades join the overview.
 	manage: boolean;
+	/// Practice exams have no grading nor regrades pages.
+	practice?: boolean;
 	/// Answers waiting for a grade.
 	pending?: number;
 	/// Regrade requests still open.
@@ -28,22 +30,26 @@ export function examNav(input: ExamNavInput): CourseNav {
 	}));
 	const entries: NavEntry[] = input.manage
 		? [
-				{
-					label: m.nav_exam_overview(),
-					href: input.href,
-					children: sections,
-				},
-				{
-					label: m.nav_crumb_grading(),
-					href: `${input.href}/grading`,
-					meta: input.pending || undefined,
-				},
-				{
-					label: m.grades_regrade_page_title(),
-					href: `${input.href}/regrades`,
-					meta: input.regrades || undefined,
-				},
+				{ label: input.title, href: input.href, children: sections },
+				...(input.practice
+					? []
+					: [
+							{
+								label: m.nav_crumb_grading(),
+								href: `${input.href}/grading`,
+								meta: input.pending || undefined,
+							},
+							{
+								label: m.grades_regrade_page_title(),
+								href: `${input.href}/regrades`,
+								meta: input.regrades || undefined,
+							},
+						]),
 			]
 		: sections;
-	return { context: input.title, sections: [{ entries }] };
+	// The manager's first entry already carries the title.
+	return {
+		context: input.manage ? undefined : input.title,
+		sections: [{ entries }],
+	};
 }

@@ -374,8 +374,8 @@ test("student: follow the course schedule", async ({ page }) => {
 	await page.goto(`${hrefOf(course)}/schedule`);
 
 	await test.step("weekly meetings and every dated occurrence are listed", async () => {
-		await expect(page.getByText("Week 1")).toBeVisible();
-		await expect(page.getByText("Week 2")).toBeVisible();
+		await expect(page.getByRole("main").getByText("Week 1")).toBeVisible();
+		await expect(page.getByRole("main").getByText("Week 2")).toBeVisible();
 		await expect(page.getByText("Kickoff")).toBeVisible();
 		await expect(
 			page.getByText("Course overview and expectations."),

@@ -391,6 +391,7 @@ for (const submission of attempt?.submissions ?? []) {
     href: `${href}/exams/${exam.slug}`,
     title: exam.title,
     manage: canManage,
+    practice: exam.type === "PRACTICE",
     pending: canManage ? pendingAnswers : undefined,
     regrades: canManage ? openRegrades : undefined,
     sections: [
