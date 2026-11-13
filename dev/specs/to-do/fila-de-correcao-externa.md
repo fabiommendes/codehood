@@ -194,13 +194,15 @@ pronto, o teste usa `essay` sem worker e é corrigido com `autograde`.
   pré-teste falha, 0.6, 1.0 → `max(0.6, 1.0 − 0.2) = 0.8`. Um pass humano
   num envio substitui a nota do bot naquele envio (o pass mais novo vale).
   Fica em `src/services/exam-result.ts`; os outros tipos não mudam.
-- R13. ⚠️ Em aberto (B1): numa prova em sala, o professor quer que a nota
-  chegue só depois de finalizar; a decisão vem da sessão `codehood-ui`. Texto
-  provisório: o aluno vê na hora o resultado de cada envio, mesmo em `EXAM`:
-  pré-testes, casos públicos com o veredito e a mensagem, itens da rubrica
-  ✓/✗ com o feedback, e a fração. Dos casos ocultos vê só o item. O total da
-  prova segue a regra de liberação atual. Para um envio único, o professor
-  usa `attempts: 1`.
+- R13. O que o aluno vê de um envio corrigido pelo worker:
+  - pré-testes e casos públicos (veredito e mensagem): na hora, sempre;
+  - nota e itens da rubrica (✓/✗ com o feedback; dos casos ocultos, só o
+    item): em `PRACTICE`, na hora; em `EXAM` e `QUIZ` com `attempts` > 1, na
+    hora, porque sem ela o aluno não sabe se reenvia nem entende o desconto;
+    em `EXAM` e `QUIZ` com `attempts: 1`, pela regra de liberação da prova,
+    como nos outros tipos de questão.
+  O total da prova segue a regra de liberação atual. R22 e R24 seguem esta
+  regra.
 
 ### Fila
 
