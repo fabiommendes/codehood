@@ -65,6 +65,7 @@
 	"errors_question_archived": "A questão \"{slug}\" está arquivada e não pode ser alterada",
 	"errors_question_version_conflict": "A versão \"{version}\" de \"{slug}\" já tem outro conteúdo",
 	"errors_grading_job_not_held": "Este trabalho de correção não está com esta chave",
+	"errors_grading_job_one_course": "As respostas pertencem a cursos diferentes",
 	"errors_grading_job_closed": "Este trabalho de correção já foi encerrado",
 	"errors_release_not_an_exam": "Somente uma prova (EXAM) tem as notas liberadas manualmente",
 	"errors_release_not_closed": "Somente uma avaliação encerrada pode ter as notas liberadas",

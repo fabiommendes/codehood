@@ -1,6 +1,10 @@
 import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
-import { gradingJobStudentQuery, gradingQuestion } from "@/core/schemas";
+import {
+	gradingJobInstructorQuery,
+	gradingJobStudentQuery,
+	gradingQuestion,
+} from "@/core/schemas";
 import { db } from "@/db";
 import { parseCourseParams } from "@/urls";
 import { withServiceErrors } from "./helpers";
@@ -50,6 +54,17 @@ export const gradingJob = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return db.gradingJob.forStudent(input, { actor });
+		}),
+	}),
+
+	/**
+	 * Reads the sent submissions of one question for a batch of answers, with grades and raw reports (instructor only).
+	 */
+	forInstructor: defineAction({
+		input: gradingJobInstructorQuery,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			return db.gradingJob.forInstructor(input, { actor });
 		}),
 	}),
 };

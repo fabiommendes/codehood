@@ -65,6 +65,7 @@
 	"errors_question_archived": "Question \"{slug}\" is archived and cannot be written to",
 	"errors_question_version_conflict": "Version \"{version}\" of \"{slug}\" already holds different content",
 	"errors_grading_job_not_held": "This grading job is not held by this key",
+	"errors_grading_job_one_course": "The answers belong to different courses",
 	"errors_grading_job_closed": "This grading job is already closed",
 	"errors_release_not_an_exam": "Only an EXAM has its grades released by hand",
 	"errors_release_not_closed": "Only a closed exam can have its grades released",

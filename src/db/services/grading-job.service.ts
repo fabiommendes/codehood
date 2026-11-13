@@ -22,6 +22,8 @@ import {
 	gradingJobClaim,
 	gradingJobFail,
 	gradingJobFailed,
+	gradingJobInstructorQuery,
+	gradingJobInstructorView,
 	gradingJobQueue,
 	gradingJobRenew,
 	gradingJobRenewed,
@@ -35,6 +37,7 @@ import {
 	MAX_JOB_ATTEMPTS,
 	publicId,
 } from "@/core/schemas";
+import { scoreValue } from "@/core/score";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { touch } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
@@ -42,11 +45,17 @@ import { m } from "@/i18n";
 import type { CodeQuestion, QuestionDocument } from "@/mdq";
 import {
 	DEFAULT_CODE_ATTEMPTS,
+	DEFAULT_CODE_PENALTY,
 	decideReport,
 	type SentSubmission,
 	spentAttempts,
 	studentReportView,
 } from "@/services/code-grading";
+import {
+	examResult,
+	newestPassesFirst,
+	resultPolicy,
+} from "@/services/exam-result";
 import { parseCourseParams } from "@/urls";
 import type { Prisma, PrismaTx } from "../client";
 import { courseRefWhere, valueOrNotFound } from "../utils";
@@ -68,6 +77,10 @@ export type GradingJobStudentQuery = z.infer<typeof gradingJobStudentQuery>;
 export type Job = z.infer<typeof gradingJobSchema>;
 export type GradingJobResult = z.infer<typeof gradingJobResult>;
 export type GradingJobSummary = z.infer<typeof gradingJobSummary>;
+export type GradingJobInstructorQuery = z.infer<
+	typeof gradingJobInstructorQuery
+>;
+export type GradingJobInstructorView = z.infer<typeof gradingJobInstructorView>;
 export type GradingJobStudentView = z.infer<typeof gradingJobStudentView>;
 
 /// What a job needs from its submission, response, exam and course.
@@ -501,7 +514,162 @@ export const makeGradingJobService = defineService()((client) => {
 		},
 	});
 
-	return { claim, renew, fail, complete, requeueFailed, summary, forStudent };
+	/**
+	 * The sent submissions of one question for each of the listed answers, with job state, score, discount, the submission that counts and the raw runner report.
+	 *
+	 * @throws {@link NotFound} An answer or the question does not exist.
+	 * @throws {@link NotAllowed} The actor does not teach the course of an answer.
+	 * @throws {@link InvalidData} The answers belong to different courses.
+	 */
+	const forInstructor = op({
+		transaction: false,
+		args: [gradingJobInstructorQuery],
+		returns: gradingJobInstructorView,
+		run: async (
+			tx: PrismaTx,
+			input: GradingJobInstructorQuery,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradingJobInstructorView> => {
+			if (input.responses.length === 0) return {};
+			const responses = await tx.response.findMany({
+				where: { publicId: { in: input.responses } },
+				select: {
+					id: true,
+					publicId: true,
+					exam: {
+						select: {
+							type: true,
+							courseId: true,
+							course: {
+								select: {
+									id: true,
+									instructor: { select: { username: true } },
+								},
+							},
+						},
+					},
+				},
+			});
+			const found = new Set(responses.map((row) => row.publicId));
+			if (input.responses.some((id) => !found.has(id))) {
+				throw new NotFound("response");
+			}
+			const courses = new Map(
+				responses.map((row) => [row.exam.courseId, row.exam.course]),
+			);
+			for (const course of courses.values()) {
+				ensurePerm(opts.actor, "grading-job.manage", course);
+			}
+			if (courses.size > 1) {
+				throw new InvalidData({
+					responses: [
+						{ code: "invalid", message: m.errors_grading_job_one_course() },
+					],
+				});
+			}
+
+			const question = valueOrNotFound(
+				"question",
+				await tx.questionRef.findFirst({
+					where: {
+						courseId: responses[0]?.exam.courseId as number,
+						slug: input.question,
+					},
+					select: { id: true, attempts: true, penalty: true },
+				}),
+			);
+			const rows = await tx.submission.findMany({
+				where: {
+					responseId: { in: responses.map((row) => row.id) },
+					questionId: question.id,
+					kind: { in: ["SUBMIT", "FINAL"] },
+				},
+				select: {
+					id: true,
+					publicId: true,
+					responseId: true,
+					kind: true,
+					status: true,
+					createdAt: true,
+					runnerReport: true,
+					gradingJob: { select: { state: true, lastError: true } },
+					feedbacks: {
+						select: { score: true, feedback: true, updatedAt: true },
+					},
+				},
+				orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+			});
+
+			const attempts = question.attempts ?? DEFAULT_CODE_ATTEMPTS;
+			const result: GradingJobInstructorView = {};
+			for (const response of responses) {
+				const practice = response.exam.type === "PRACTICE";
+				const own = rows.filter((row) => row.responseId === response.id);
+				const policy = resultPolicy(response.exam.type, {
+					...(question.penalty === null
+						? {}
+						: { [input.question]: Number(question.penalty) }),
+				});
+				const [outcome] = examResult(
+					[input.question],
+					own.map((row) => ({ ...row, question: input.question })),
+					own.flatMap((row) =>
+						row.feedbacks.map((pass) => ({
+							...pass,
+							submission: row.publicId,
+						})),
+					),
+					policy,
+				).questions;
+				const weighed = new Map(
+					(outcome?.codeAttempts ?? []).map((entry) => [
+						entry.submission,
+						entry,
+					]),
+				);
+				result[response.publicId] = {
+					attempts,
+					penalty: practice
+						? 0
+						: (policy.codePenalty?.[input.question] ?? DEFAULT_CODE_PENALTY),
+					submissions: own.map((row) => {
+						const pass = newestPassesFirst(row.feedbacks)[0];
+						const score = pass ? scoreValue(pass.score) : null;
+						const weight = weighed.get(row.publicId);
+						return {
+							submission: row.publicId,
+							kind: row.kind,
+							createdAt: row.createdAt,
+							jobState: row.gradingJob?.state ?? null,
+							...(row.gradingJob?.lastError
+								? { lastError: row.gradingJob.lastError }
+								: {}),
+							status: row.status,
+							...(score === null ? {} : { score }),
+							...(weight
+								? { discounted: weight.discounted, counts: weight.counts }
+								: {}),
+							...(row.runnerReport === null
+								? {}
+								: { report: row.runnerReport }),
+						};
+					}),
+				};
+			}
+			return result;
+		},
+	});
+
+	return {
+		claim,
+		renew,
+		fail,
+		complete,
+		requeueFailed,
+		summary,
+		forStudent,
+		forInstructor,
+	};
 });
 
 /** The service, as built by {@link makeGradingJobService}. */

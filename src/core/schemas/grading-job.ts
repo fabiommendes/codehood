@@ -173,3 +173,38 @@ export const gradingJobStudentView = z.object({
 		}),
 	),
 });
+
+/// Names the question and the answers whose sent submissions an instructor reads, all of one course.
+export const gradingJobInstructorQuery = z.object({
+	question: slug,
+	responses: z.array(publicId).max(500),
+});
+
+/// The sent submissions of one answer to a question, as the instructor sees them.
+export const gradingJobInstructorView = z.record(
+	z.string(),
+	z.object({
+		/// Graded submissions allowed in an attempt.
+		attempts: z.number().int(),
+		/// Discount per earlier wrong submission; 0 in a practice exam.
+		penalty: z.number(),
+		submissions: z.array(
+			z.object({
+				submission: publicId,
+				kind: submissionKind,
+				createdAt: z.date(),
+				jobState: gradingJobState.nullable(),
+				lastError: z.string().optional(),
+				status: submissionStatus,
+				/// The submission's grade in `[-1, 1]`, before the discount.
+				score: z.number().optional(),
+				/// The grade after the discount for earlier wrong submissions, floored at 0.
+				discounted: z.number().optional(),
+				/// Whether this submission gives the question's score.
+				counts: z.boolean().optional(),
+				/// The runner report as the worker sent it, hidden cases included.
+				report: gradingJobReport.optional(),
+			}),
+		),
+	}),
+);
