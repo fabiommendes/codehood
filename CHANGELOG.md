@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- A "Visão do estudante" da página da prova do professor usa a moldura
+  (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
+  aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento
+  do servidor. As respostas ficam só na página: nada é salvo, enviado ou
+  guardado como rascunho. `ExamQuestionsList` e `ExamQuestion` saíram.
+
 ## 0.4.0 (2026-11-13)
 
 ### Added

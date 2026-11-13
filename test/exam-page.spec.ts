@@ -58,6 +58,35 @@ test("the instructor's exam page keeps the answer key toggle and has no student 
 	await expect(page.getByRole("button", { name: "Start exam" })).toHaveCount(0);
 });
 
+test("the instructor's student view frames the question as the attempt does and can be answered without saving", async ({
+	page,
+}) => {
+	const { course, href } = await setup();
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "midterm",
+		status: "ONGOING",
+		questions: [{ slug: "capital" }],
+	});
+
+	await logInAs(page, course.instructor);
+	await page.goto(`${href}/exams/midterm`);
+
+	const question = page.getByRole("region", { name: "Question 1" });
+	await expect(
+		question.getByRole("heading", { name: "Capital of Brazil" }),
+	).toBeVisible();
+	const choice = question.getByRole("radio", { name: "Brasília" });
+	await choice.check();
+	await expect(choice).toBeChecked();
+
+	// The answer survives a trip to the key and back, and never reaches the database.
+	await page.getByRole("tab", { name: "Correct answer" }).click();
+	await page.getByRole("tab", { name: "Student view" }).click();
+	await expect(choice).toBeChecked();
+	expect(await prisma.response.count()).toBe(0);
+});
+
 test("the instructor's exam page shows a pinned ordering question", async ({
 	page,
 }) => {

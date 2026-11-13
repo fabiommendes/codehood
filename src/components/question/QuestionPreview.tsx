@@ -30,8 +30,8 @@ export interface QuestionPreviewProps {
 	data: QuestionDocument;
 	/**
 	 * Drives the tab from outside instead of this component's own signal, and
-	 * hides its tab bar — for a caller like `ExamQuestionsList` that puts one
-	 * shared toggle above several previews rather than one per question.
+	 * hides its tab bar, for a caller like `ExamPreview` or `AnswerKey` that
+	 * shows only one of the tabs.
 	 * Omit it to keep the standalone behavior (own signal, own tab bar).
 	 */
 	tab?: Accessor<PreviewTab>;

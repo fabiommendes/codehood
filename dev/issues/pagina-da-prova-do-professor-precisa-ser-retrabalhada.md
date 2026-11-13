@@ -49,6 +49,9 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
 7. **A "visão do estudante" não é a do estudante.** A renderização que o
    professor vê não usa o mesmo componente que o estudante usa ao fazer a
    prova, então o que o professor confere não garante o que o aluno vai ver.
+   **Resolvido:** a prévia usa `QuestionFrame` e `AnswerField`, os mesmos
+   da tentativa, e aceita respostas sem salvar. Ficam de fora a barra da
+   tentativa, o cronômetro e o envio de código ao worker (item 8).
 8. **Não dá para simular a prova antes de aplicar.** O professor deveria
    poder fazer a prova como um estudante (mesmo componente, mesmos widgets,
    envio e correção automática), sem afetar notas nem estatísticas, para saber

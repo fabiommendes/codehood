@@ -59,6 +59,8 @@ export interface CodeEssayAnswerProps {
 	/// Code the editor starts with when there is no answer and no draft.
 	/// Reserved for starter code from the question; nothing sets it yet.
 	starterCode?: string;
+	/// False keeps no local draft at all, for an answer that is never saved (the instructor's preview).
+	keepDraft?: boolean;
 }
 
 /**
@@ -99,7 +101,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 
 	onMount(() => {
 		try {
-			store = draftStore(window.localStorage);
+			if (props.keepDraft !== false) store = draftStore(window.localStorage);
 		} catch {
 			// Storage unavailable (privacy mode): no drafts, the autosave remains.
 		}

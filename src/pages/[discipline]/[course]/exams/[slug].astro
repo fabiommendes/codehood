@@ -8,7 +8,9 @@ import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamExceptions, {
 	type ExceptionRow,
 } from "@/components/exam/ExamExceptions";
-import ExamQuestionsList from "@/components/exam/ExamQuestionsList";
+import ExamPreview, {
+	type PreviewQuestion,
+} from "@/components/exam/ExamPreview";
 import type { QuestionRegrade } from "@/components/exam/RegradeControls";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
@@ -101,9 +103,9 @@ const preambleHtml =
 		? renderMarkdown(exam.preamble)
 		: null;
 
-// Staff read the pinned questions with their answer keys, a student only their
-// public form, both at the version the exam pins; each list stays empty for the
-// other side. A slug that no longer resolves is dropped rather than shown blank.
+// Staff read the pinned questions with their answer keys, everyone their public
+// form, both at the version the exam pins. A slug that no longer resolves is
+// dropped rather than shown blank.
 const staffQuestions = canManage
 	? found(
 			await Promise.all(
@@ -116,18 +118,17 @@ const staffQuestions = canManage
 			),
 		)
 	: [];
-const studentQuestions = canManage
-	? []
-	: found(
-			await Promise.all(
-				exam.questions.map(({ slug, version }) =>
-					db.question.findOne(
-						{ course: course.id, slug, version, public: true },
-						{ actor },
-					),
-				),
+const publicQuestions = found(
+	await Promise.all(
+		exam.questions.map(({ slug, version }) =>
+			db.question.findOne(
+				{ course: course.id, slug, version, public: true },
+				{ actor },
 			),
-		);
+		),
+	),
+);
+const studentQuestions = canManage ? [] : publicQuestions;
 
 /// The questions that resolved, without their database ids.
 function found<Q extends Question | QuestionPublic>(
@@ -425,6 +426,35 @@ if (answering || (state.kind === "results" && attempt)) {
 		}),
 	);
 }
+// The preview shuffles like an attempt does, with a seed of its own.
+const previewQuestions: PreviewQuestion[] = staffQuestions.flatMap((staff) => {
+	const shown = publicQuestions.find((entry) => entry.slug === staff.slug);
+	return shown
+		? [
+				{
+					slug: staff.slug,
+					question: shufflePool(shown.question, `preview:${staff.slug}`),
+					key: staff.question,
+				},
+			]
+		: [];
+});
+const previewPretests: Record<string, PretestSource[]> = {};
+const previewExampleHtml: Record<string, string[]> = {};
+await Promise.all(
+	staffQuestions.map(async ({ slug, version }) => {
+		const shown = previewQuestions.find((entry) => entry.slug === slug);
+		if (shown?.question.type !== "code") return;
+		previewPretests[slug] = (
+			await db.question.codeAnswer(
+				{ course: course.id, slug, version },
+				{ actor },
+			)
+		).pretests;
+		previewExampleHtml[slug] = await highlightExamples(shown.question);
+	}),
+);
+
 const latestAnswers: Record<string, AnswerPayload> = {};
 const answeredAt: Record<string, string> = {};
 for (const submission of attempt?.submissions ?? []) {
@@ -628,9 +658,16 @@ for (const submission of attempt?.submissions ?? []) {
       canManage && (
         <section id="questions" class="mt-8 scroll-mt-20">
           <h2 class="text-lg font-semibold">{m.exams_detail_questions_heading()}</h2>
-          {staffQuestions.length > 0 ? (
+          {previewQuestions.length > 0 ? (
             <div class="mt-3">
-              <ExamQuestionsList questions={staffQuestions} client:load />
+              <ExamPreview
+                client:load
+                questions={previewQuestions}
+                pretests={previewPretests}
+                exampleHtml={previewExampleHtml}
+                codeRun={codeRun.allowed}
+                runnerOrigin={RUNNER_ORIGIN}
+              />
             </div>
           ) : (
             <p class="mt-3 text-sm text-muted">{m.exams_detail_no_questions()}</p>

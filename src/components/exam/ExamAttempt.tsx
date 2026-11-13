@@ -1,5 +1,4 @@
 import { actions } from "astro:actions";
-import type { LanguageId } from "@codehood/runner/protocol";
 import {
 	createEffect,
 	createSignal,
@@ -14,11 +13,9 @@ import {
 } from "solid-js";
 import FormAlert from "@/components/form/FormAlert";
 import AppliedItems from "@/components/grading/AppliedItems";
-import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
-import { locale, m } from "@/i18n";
-import { runnerLanguage } from "@/runner/languages";
+import { m } from "@/i18n";
 import type { AnswerEditAdapter } from "@/services/answer-edits/adapter";
 import {
 	kindOfInputType,
@@ -35,13 +32,16 @@ import type { PretestSource } from "@/utils/pretest-sources";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
 import {
+	AnswerField,
+	type CodeAnswerContext,
+	codeLanguageOf,
+} from "./AnswerField";
+import {
 	type AnswerPayload,
 	isAnswered,
 	isTextEntry,
 	toSaved,
 } from "./answer-payload";
-import { CodeAnswer } from "./CodeAnswer";
-import { CodeEssayAnswer, type CodeEssayAnswerProps } from "./CodeEssayAnswer";
 import CodeSendsReview from "./CodeSendsReview";
 import {
 	browserDraftStore,
@@ -49,6 +49,7 @@ import {
 	measureClockOffset,
 } from "./code-draft";
 import { type CodeSends, hasPendingSend, sendsOf } from "./code-sends";
+import { formatPoints, QuestionFrame, weightOf } from "./QuestionFrame";
 import RegradeControls, { type QuestionRegrade } from "./RegradeControls";
 import { retryDelay } from "./save-retry";
 import { questionList, unansweredWarning } from "./unanswered-warning";
@@ -145,9 +146,6 @@ function timeClass(seconds: number): string {
 	if (seconds <= 5 * 60) return "text-warning";
 	return "";
 }
-
-/// Where a question lands when its number is picked: below the top bar and the attempt bar.
-const QUESTION_SCROLL_MARGIN = "scroll-mt-48";
 
 /**
  * A student's side of an exam page: the one action their state allows, and the questions.
@@ -1142,60 +1140,15 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										? "text-base-content"
 										: "text-base-content/50";
 							return (
-								<section
-									id={`question-${index() + 1}`}
-									aria-label={m.exams_attempt_question_label({
-										number: index() + 1,
-									})}
-									class={`grid gap-x-4 sm:grid-cols-[4.5rem_1fr] sm:grid-rows-[auto_1fr] ${QUESTION_SCROLL_MARGIN}`}
-								>
-									{/* The number stays in view while a long question scrolls past. */}
-									<div class="hidden sm:col-start-1 sm:row-start-2 sm:block">
-										<div class="sticky top-48 text-right">
-											<QuestionNumber
-												number={index() + 1}
-												tone={tone()}
-												class="block text-4xl"
-											/>
-											<Show when={weighted()}>
-												<p class="mt-2 text-xs text-muted">
-													{m.exams_attempt_points_label()}
-												</p>
-												<p class="text-sm font-semibold tabular-nums">
-													{m.exams_attempt_points_value({
-														points: formatPoints(shareOf(entry.question)),
-													})}
-												</p>
-											</Show>
-											<div class="mt-3">{clearButton()}</div>
-										</div>
-									</div>
-									{/* A file-folder tab: as wide as the title, its right edge slanted. */}
-									<header class="relative z-10 inline-flex min-w-1/3 max-w-[calc(100%-1.5rem)] items-baseline gap-3 justify-self-start sm:col-start-2 py-2 pr-6 pl-6">
-										<span
-											aria-hidden="true"
-											class="absolute inset-y-0 left-0 right-2 -z-10 rounded-tl-[18px_8px] bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
-										/>
-										<span
-											aria-hidden="true"
-											class="absolute inset-y-0 -right-3 -z-10 w-9 origin-bottom skew-x-[18deg] rounded-tr-xl bg-linear-to-b from-base-300 to-[color-mix(in_oklab,var(--color-base-300)_75%,var(--color-base-200))] shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-base-100)_70%,transparent)]"
-										/>
-										<QuestionNumber
-											number={index() + 1}
-											tone={tone()}
-											class="text-xl sm:hidden"
-										/>
-										<h3 class="min-w-0 truncate font-display text-base font-semibold text-shadow-[0_0_3px_var(--color-base-100),0_0_10px_var(--color-base-100),0_0_18px_var(--color-base-100)]">
-											{entry.question.title ??
-												m.exams_attempt_question_label({ number: index() + 1 })}
-										</h3>
-										<Show when={weighted()}>
-											<span class="whitespace-nowrap text-xs tabular-nums sm:hidden">
-												{m.exams_attempt_points({
-													points: formatPoints(shareOf(entry.question)),
-												})}
-											</span>
-										</Show>
+								<QuestionFrame
+									number={index() + 1}
+									title={entry.question.title}
+									tone={tone()}
+									points={
+										weighted() ? formatPoints(shareOf(entry.question)) : null
+									}
+									side={clearButton}
+									status={
 										<Show when={kind() === "in-progress"}>
 											<SaveState
 												failed={failed()}
@@ -1205,96 +1158,84 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 												answered={answered()}
 											/>
 										</Show>
-									</header>
-									<div class="card card-border min-w-0 overflow-hidden rounded-tl-none! bg-base-200/25 shadow-sm sm:col-start-2">
-										{/* focusout bubbles, so leaving any control of the question saves it. */}
-										<div
-											class="card-body"
-											onFocusOut={() => saveNow(entry.slug)}
-											onBeforeInput={(event) =>
-												announceInput(entry.slug, event)
-											}
-										>
-											<AnswerField
-												question={entry.question}
-												payload={answers()[entry.slug]}
-												readonly={kind() !== "in-progress" || closing()}
-												review={
-													kind() === "results"
-														? props.reviews?.[entry.slug]
-														: undefined
-												}
-												onChange={(payload, userEvent) =>
-													change(
-														entry.slug,
-														entry.question.type,
-														payload,
-														userEvent,
-													)
-												}
-												pretests={props.pretests?.[entry.slug]}
-												exampleHtml={props.exampleHtml?.[entry.slug]}
-												sends={allSends()[entry.slug]}
-												onSubmit={(code) => submitCode(entry.slug, code)}
-												runnerOrigin={props.runnerOrigin ?? null}
-												code={
-													kind() === "in-progress"
-														? codeContext(entry.slug, entry.question, {
-																failed: failed(),
-																slow: slowSave(),
-																unsaved: unsaved().has(entry.slug),
-															})
-														: undefined
+									}
+									onFocusOut={() => saveNow(entry.slug)}
+									onBeforeInput={(event) => announceInput(entry.slug, event)}
+								>
+									<AnswerField
+										question={entry.question}
+										payload={answers()[entry.slug]}
+										readonly={kind() !== "in-progress" || closing()}
+										review={
+											kind() === "results"
+												? props.reviews?.[entry.slug]
+												: undefined
+										}
+										onChange={(payload, userEvent) =>
+											change(
+												entry.slug,
+												entry.question.type,
+												payload,
+												userEvent,
+											)
+										}
+										pretests={props.pretests?.[entry.slug]}
+										exampleHtml={props.exampleHtml?.[entry.slug]}
+										sends={allSends()[entry.slug]}
+										onSubmit={(code) => submitCode(entry.slug, code)}
+										runnerOrigin={props.runnerOrigin ?? null}
+										code={
+											kind() === "in-progress"
+												? codeContext(entry.slug, entry.question, {
+														failed: failed(),
+														slow: slowSave(),
+														unsaved: unsaved().has(entry.slug),
+													})
+												: undefined
+										}
+									/>
+									<Show
+										when={
+											kind() === "results" ? allSends()[entry.slug] : undefined
+										}
+									>
+										{(sends) => (
+											<CodeSendsReview
+												sends={sends()}
+												attempts={
+													props.result?.questions.find(
+														(outcome) => outcome.question === entry.slug,
+													)?.codeAttempts
 												}
 											/>
-											<Show
-												when={
-													kind() === "results"
-														? allSends()[entry.slug]
-														: undefined
-												}
-											>
-												{(sends) => (
-													<CodeSendsReview
-														sends={sends()}
-														attempts={
-															props.result?.questions.find(
-																(outcome) => outcome.question === entry.slug,
-															)?.codeAttempts
-														}
-													/>
+										)}
+									</Show>
+									<Show when={kind() === "results" && props.result}>
+										{(result) => (
+											<Outcome
+												outcome={result().questions.find(
+													(outcome) => outcome.question === entry.slug,
 												)}
-											</Show>
-											<div class="self-end sm:hidden">{clearButton()}</div>
-											<Show when={kind() === "results" && props.result}>
-												{(result) => (
-													<Outcome
-														outcome={result().questions.find(
-															(outcome) => outcome.question === entry.slug,
-														)}
-														regrade={props.regrades?.[entry.slug]}
-														target={target}
-													/>
-												)}
-											</Show>
-											{/* A lost session has its own notice above. */}
-											<Show
-												when={
-													saveErrors()[entry.slug] !== undefined &&
-													!sessionLost()
-												}
-											>
-												<p role="alert" class="text-sm text-error">
-													{saveErrors()[entry.slug]
-														? m.exams_attempt_save_error({
-																message: saveErrors()[entry.slug] ?? "",
-															})
-														: m.exams_attempt_save_error_unknown()}
-												</p>
-											</Show>
-										</div>
-									</div>
-								</section>
+												regrade={props.regrades?.[entry.slug]}
+												target={target}
+											/>
+										)}
+									</Show>
+									{/* A lost session has its own notice above. */}
+									<Show
+										when={
+											saveErrors()[entry.slug] !== undefined && !sessionLost()
+										}
+									>
+										<p role="alert" class="text-sm text-error">
+											{saveErrors()[entry.slug]
+												? m.exams_attempt_save_error({
+														message: saveErrors()[entry.slug] ?? "",
+													})
+												: m.exams_attempt_save_error_unknown()}
+										</p>
+									</Show>
+								</QuestionFrame>
 							);
 						}}
 					</For>
@@ -1633,31 +1574,6 @@ function waterLevel(weight: number, mean: number): number {
 	return ratio / (1 + ratio);
 }
 
-/// The weight a question declares, 1 when it declares none.
-function weightOf(question: QuestionPublic["question"]): number {
-	return question.weight ?? 1;
-}
-
-/// "Q3", the label students and instructors use to refer to a question.
-function QuestionNumber(props: {
-	number: number;
-	tone: string;
-	class?: string;
-}): JSX.Element {
-	return (
-		<span
-			class={`font-display font-semibold leading-none tracking-tight ${props.tone} ${props.class ?? ""}`}
-		>
-			{m.exams_attempt_question_short({ number: props.number })}
-		</span>
-	);
-}
-
-/// A part of the total as points out of 100, up to one decimal: `15`, `7.5`.
-function formatPoints(share: number): string {
-	return (share * 100).toLocaleString(locale, { maximumFractionDigits: 1 });
-}
-
 /**
  * One question's save state while answering; nothing until it has an answer.
  *
@@ -1797,127 +1713,6 @@ function Outcome(props: {
 						/>
 					</Show>
 				</div>
-			)}
-		</Show>
-	);
-}
-
-interface AnswerFieldProps {
-	question: QuestionPublic["question"];
-	payload: AnswerPayload | undefined;
-	readonly: boolean;
-	/// The answer's marks and feedback, shown in `review` mode; the score is the outcome's, below.
-	review?: ReviewResult;
-	onChange: (payload: AnswerPayload, userEvent?: string) => void;
-	/// Set for a code question being answered: it gets the editor instead of the textarea.
-	code?: CodeAnswerContext;
-	/// The pretest sources of an MDQ `code` question, from the server.
-	pretests?: readonly PretestSource[];
-	/// The highlighted example tests of an MDQ `code` question, from the server.
-	exampleHtml?: readonly string[];
-	/// The sends of a code question that goes to a worker; without it the question has no submit button.
-	sends?: CodeSends;
-	/// Sends the code of the question to its worker.
-	onSubmit?: (code: string) => Promise<void>;
-	/// Origin of the runner iframe the pretests run in.
-	runnerOrigin?: string | null;
-}
-
-/// What a code question in answer mode needs besides the question itself.
-type CodeAnswerContext = Pick<
-	CodeEssayAnswerProps,
-	| "language"
-	| "value"
-	| "valueSavedAt"
-	| "clockOffsetMs"
-	| "save"
-	| "codeRun"
-	| "runnerOrigin"
-	| "draft"
-	| "onConflict"
->;
-
-/// The runner language of an essay question whose answer is code a driver runs, or null.
-function codeLanguageOf(
-	question: QuestionPublic["question"],
-): LanguageId | null {
-	return question.type === "essay" && question.content === "code"
-		? runnerLanguage(question.highlight)
-		: null;
-}
-
-/// One question in answer mode, frozen on the student's saved answer, or reviewed with its marks.
-function AnswerField(props: AnswerFieldProps): JSX.Element {
-	return (
-		<Show
-			when={
-				props.question.type === "code" && !props.readonly && !props.review
-					? props.question
-					: undefined
-			}
-			fallback={<EssayOrOtherField {...props} />}
-		>
-			{(question) => (
-				<CodeAnswer
-					question={question()}
-					pretests={props.pretests ?? []}
-					exampleHtml={props.exampleHtml}
-					onSubmit={props.sends ? props.onSubmit : undefined}
-					sends={props.sends}
-					runnerOrigin={props.runnerOrigin ?? null}
-					value={typeof props.payload === "string" ? props.payload : null}
-					onChange={(code, userEvent) => props.onChange(code, userEvent)}
-				/>
-			)}
-		</Show>
-	);
-}
-
-/// Every question that is not an MDQ `code` question being answered.
-function EssayOrOtherField(props: AnswerFieldProps): JSX.Element {
-	return (
-		<Show
-			when={
-				props.code &&
-				!props.readonly &&
-				!props.review &&
-				props.question.type === "essay"
-					? props.code
-					: undefined
-			}
-			fallback={
-				<AnyQuestionView
-					question={props.question}
-					value={props.payload ?? null}
-					onChange={props.onChange}
-					mode={
-						props.review ? "review" : props.readonly ? "readonly" : "answer"
-					}
-					result={props.review}
-					hideScore
-					messages={mdqMessages}
-				/>
-			}
-		>
-			{(code) => (
-				<CodeEssayAnswer
-					stem={props.question.type === "essay" ? props.question.stem : ""}
-					epilogue={
-						props.question.type === "essay"
-							? props.question.epilogue
-							: undefined
-					}
-					language={code().language}
-					value={code().value}
-					valueSavedAt={code().valueSavedAt}
-					clockOffsetMs={code().clockOffsetMs}
-					onChange={props.onChange}
-					save={code().save}
-					codeRun={code().codeRun}
-					runnerOrigin={code().runnerOrigin}
-					draft={code().draft}
-					onConflict={code().onConflict}
-				/>
 			)}
 		</Show>
 	);
