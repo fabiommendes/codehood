@@ -45,18 +45,15 @@ wheels = [
 [[package]]
 name = "chalk-grader"
 version = "0.2.0"
-source = { editable = "../../../../edu/chalk/packages/chalk-grader" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gitignore-lib" },
     { name = "pydantic" },
     { name = "rich" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "gitignore-lib", specifier = ">=0.1.1" },
-    { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "rich", specifier = ">=15.0.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/d3/2a/a056814eb36ee8b4e4b74f5f3e9e4d64120a18d6ab33b534ccbff547c619/chalk_grader-0.2.0.tar.gz", hash = "sha256:66994c2347bf52417e68882eaf7593f200dfa8fdf49419cbf1c3694f2595c8d3", size = 49882, upload-time = "2026-11-13T03:33:03.214Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/6f/7e0c323ea751fb04a5ded476298f6715d66ba09ca07786972018f4b0c3ea/chalk_grader-0.2.0-py3-none-any.whl", hash = "sha256:ffebd91bf0ff453b068c3750558af2006779fefd02dcb99cb4d59a0b36019fa6", size = 60663, upload-time = "2026-11-13T03:33:01.976Z" },
 ]
 
 [[package]]
@@ -77,7 +74,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "chalk-grader", editable = "../../../../edu/chalk/packages/chalk-grader" },
+    { name = "chalk-grader", specifier = ">=0.2.0" },
     { name = "codehood-cli", editable = "../../cli" },
     { name = "typer", specifier = ">=0.27.2" },
 ]

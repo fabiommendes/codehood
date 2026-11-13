@@ -44,9 +44,8 @@ Caches live in `$XDG_CACHE_HOME/chalk-worker`.
 ## Development
 
 The worker lives in the codehood repository as a git subtree in
-`workers/chalk-worker/`, and depends on `codehood-cli` from `../../cli` and,
-until it is on PyPI, on `chalk-grader` from a checkout of the chalk
-repository next to codehood (`~/git/edu/chalk`).
+`workers/chalk-worker/`, and depends on `codehood-cli` from `../../cli` and
+on `chalk-grader` from PyPI.
 
 ```sh
 uv run ruff check && uv run pytest
