@@ -20,7 +20,11 @@ uv run ruff check && uv run pytest
 
 - Repositório próprio, incluído no codehood como subtree em
   `workers/chalk-worker/`. Depende de `codehood-cli` por caminho
-  (`../../cli`), então só resolve dentro do checkout do codehood.
+  (`../../cli`), então só resolve dentro do checkout do codehood. Sincronizar
+  com o repositório próprio só quando o humano pedir, a partir da raiz do
+  codehood:
+  `git subtree push --prefix=workers/chalk-worker git@github.com:fabiommendes/chalk-worker.git main`
+  (ou `subtree pull` com os mesmos argumentos).
 - Desenho: RFC "Worker de correção do codehood (modelo pull)" no repositório
   do chalk (`dev/rfc/worker-de-correcao-do-codehood-modelo-pull.md`) e RFC
   `dev/rfc/fila-de-correcao-externa.md` do codehood (fila `GradingJob`,
