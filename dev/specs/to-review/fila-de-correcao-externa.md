@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [grading, bots, workers, exams, runner, elm, mdq]
 relatedTo: [fila-de-correcao-externa, runner-de-correcao, runner-elm, auto-grading, chaves-de-api-com-escopo]
 created: 2026-11-12

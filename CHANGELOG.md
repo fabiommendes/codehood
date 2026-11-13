@@ -4,7 +4,7 @@
 
 ### Added
 
-- Questões `code` corrigidas por workers externos (lado servidor). O servidor
+- Questões `code` corrigidas por workers externos. O servidor
   hospeda o tipo `code` do mdq; `meta.worker`, `meta.attempts` e
   `meta.penalty` vão para `QuestionRef`, e o push recusa fonte de teste sem
   `text` e item manual de rubrica com valor. `response.submit` e a Action
@@ -19,8 +19,20 @@
   `PRETEST_FAILED` (sem custo) ou nota por `scoreCode`, num feedback do bot.
   A nota da questão é `max(score_i - penalty x e_i)` com piso 0, em
   `src/services/exam-result.ts`. Um pass humano fecha o trabalho aberto.
-  Actions `gradingJob.summary`, `requeueFailed` e `forStudent`. O seed traz a
-  questão `elm-soma` em `cs101` com envios em cada estado.
+  Actions `gradingJob.summary`, `requeueFailed`, `forStudent` e
+  `forInstructor`. Um lease vencido não bloqueia novo envio. Nas telas de
+  correção, a resposta que conta de uma questão `code` é o envio que dá a
+  nota, com o desconto. Na prova, a questão `code` abre no editor com o
+  `template`, mostra os testes públicos, roda os pré-testes no navegador
+  (modo de teste do plugin Elm) antes de enviar, e mostra o contador de
+  envios, o estado da fila e o resultado de cada envio; a revisão lista os
+  envios com nota e desconto. A correção da questão ganha o painel da fila
+  (contagem por estado, falhas com `lastError`, reenfileirar, worker visto há
+  quanto tempo) e o report por caso de cada envio. A CLI resolve as fontes de
+  teste linkadas no push e ganha o cliente das rotas da fila. O
+  `workers/chalk-worker` faz claim, corrige em sandbox com o `chalk-grader`,
+  renova o lease e devolve o runner report. O seed traz a questão `elm-soma`
+  em `cs101` com envios em cada estado.
 
 - Card do curso na sidebar. A página passa `nav` ao `AppLayout` (tipos em
   `src/utils/course-nav.ts`, no máximo dois níveis) e o card toma o lugar da

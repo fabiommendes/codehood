@@ -15,7 +15,7 @@ levada para lá.
 
 ## Problema
 
-O pré-teste no navegador (`dev/specs/to-do/fila-de-correcao-externa.md`, R23)
+O pré-teste no navegador (`dev/specs/to-review/fila-de-correcao-externa.md`, R23)
 manda ao runner o texto inteiro de uma fonte de teste, quando todas as regiões
 dela são públicas. O mdq diz outra coisa: as linhas antes da primeira anotação
 (os imports) não pertencem a nenhuma região e são privadas
