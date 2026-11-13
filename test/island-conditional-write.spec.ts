@@ -181,3 +181,33 @@ test("rubric grader: revising a saved answer twice in a row works, a second tab 
 	await expect(b.getByText(STALE_TEXT)).toBeVisible();
 	expect((await passes())[0]?.score).toBe("0");
 });
+
+test("rubric editor: two value changes in a row on one page both go through", async ({
+	browser,
+}) => {
+	const { scenario, url } = await gradingWorld();
+	const tab = await (await browser.newContext()).newPage();
+	await logInAs(tab, scenario.instructor);
+	await tab.goto(url);
+	await tab.getByRole("button", { name: "Edit rubric" }).click();
+
+	const row = tab
+		.getByRole("list", { name: "Rubric items" })
+		.getByRole("listitem")
+		.filter({ hasText: "Clear naming" });
+	const stored = async () =>
+		(
+			await prisma.rubricItem.findFirstOrThrow({
+				where: { key: "naming", rubric: { examId: scenario.exam.id } },
+			})
+		).value;
+
+	await row.getByRole("textbox", { name: "Value" }).fill("0.3");
+	await tab.getByRole("button", { name: "Apply changes" }).click();
+	await expect.poll(stored).toBe("0.3");
+
+	await row.getByRole("textbox", { name: "Value" }).fill("0.4");
+	await tab.getByRole("button", { name: "Apply changes" }).click();
+	await expect.poll(stored).toBe("0.4");
+	await expect(tab.getByText(STALE_TEXT)).toHaveCount(0);
+});

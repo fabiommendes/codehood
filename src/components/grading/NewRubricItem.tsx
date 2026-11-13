@@ -53,12 +53,14 @@ export default function NewRubricItem(props: NewRubricItemProps): JSX.Element {
 			group: group().trim() === "" ? null : group().trim(),
 			updatedAt: props.updatedAt ?? undefined,
 		});
-		setBusy(false);
 		if (error) {
+			setBusy(false);
 			setFailure(errorMessage(error));
 			return;
 		}
-		props.onCreated(data);
+		// Stay busy until the parent has read the rubric again: the next write needs its new version.
+		await props.onCreated(data);
+		setBusy(false);
 	}
 
 	return (

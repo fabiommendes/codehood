@@ -306,8 +306,15 @@ async function stateOf(
 	const state = await call(request, "grading.state", headers, target);
 	expect(state.status, state.text).toBe(200);
 	return state.body as {
+		base: string;
 		updatedAt: string | null;
-		items: { key: string; updatedAt: string | null }[];
+		items: {
+			key: string;
+			group: string | null;
+			value: string;
+			retired: boolean;
+			updatedAt: string | null;
+		}[];
 		answers: {
 			submission: string;
 			ref: string | null;
@@ -327,6 +334,8 @@ test("rubric actions: a stale version answers 412, the state carries the version
 	const a = state.items.find((item) => item.key === "a");
 	expect(a?.updatedAt).not.toBeNull();
 
+	const before = JSON.stringify(state);
+
 	// Every action refuses a stale version with the text of the island.
 	for (const [name, data] of [
 		["rubric.addItem", { text: "New", value: "0.1" }],
@@ -344,11 +353,21 @@ test("rubric actions: a stale version answers 412, the state carries the version
 		expect(stale.status, `${name} ${JSON.stringify(data)}`).toBe(412);
 		expect(stale.text).toContain(STALE_TEXT);
 	}
-	expect((await stateOf(request, headers, target)).items).toHaveLength(2);
+	// Nothing was written, not even by the actions that failed after another write of their own.
+	expect(JSON.stringify(await stateOf(request, headers, target))).toBe(before);
 
-	// The item's own version guards an item edit, not the rubric's.
+	// Moving another item moves the rubric too, so the rubric version the page
+	// loaded is old now. The item's own version, not the rubric's, guards an
+	// item edit, so this one still goes through with both on the wire.
+	const b = state.items.find((item) => item.key === "b");
+	const other = await call(request, "rubric.edit", headers, {
+		...target,
+		items: [{ key: "b", value: "0.3", updatedAt: b?.updatedAt }],
+	});
+	expect(other.status, other.text).toBe(200);
 	const itemEdit = await call(request, "rubric.edit", headers, {
 		...target,
+		updatedAt: state.updatedAt,
 		items: [{ key: "a", value: "0.4", updatedAt: a?.updatedAt }],
 	});
 	expect(itemEdit.status, itemEdit.text).toBe(200);
@@ -388,6 +407,32 @@ test("rubric actions: a stale version answers 412, the state carries the version
 		updatedAt: last.updatedAt,
 	});
 	expect(renamed.status, renamed.text).toBe(200);
+});
+
+test("rubric.edit: base, items and deletions together, each with its fresh version, are written", async ({
+	request,
+}) => {
+	const { scenario, target } = await rubricWorld();
+	const headers = await bearer(request, scenario.instructor.username, PASSWORD);
+	const state = await stateOf(request, headers, target);
+	const version = (key: string) =>
+		state.items.find((item) => item.key === key)?.updatedAt;
+
+	const edit = await call(request, "rubric.edit", headers, {
+		...target,
+		base: "0.1",
+		updatedAt: state.updatedAt,
+		items: [{ key: "a", value: "0.4", updatedAt: version("a") }],
+		deleted: [{ key: "b", updatedAt: version("b") }],
+	});
+	expect(edit.status, edit.text).toBe(200);
+
+	const after = await stateOf(request, headers, target);
+	expect(after.base).toBe("0.1");
+	expect(after.items.find((item) => item.key === "a")?.value).toBe("0.4");
+	expect(after.items.some((item) => item.key === "b" && !item.retired)).toBe(
+		false,
+	);
 });
 
 test("grading.gradeRubric: the version of the pass revised guards the save, a new pass takes none", async ({
