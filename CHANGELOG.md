@@ -74,6 +74,12 @@
   devolvem o `updatedAt` novo, e as demais ilhas o releem. Ficam sem versão:
   as ações de criar uma nota, `grading.willNotGrade`, os deletes de um clique e
   `rollCall.update` (mescla por aluno e o `updatedAt` muda a cada check-in).
+
+- O Markdown aceita comentários HTML (`<!-- -->`, que somem do resultado) e as
+  tags `details` (com `open`), `summary`, `kbd`, `sup`, `sub`, `mark` e `br`.
+  O HTML final passa por `sanitize-html` com lista explícita de tags,
+  atributos e protocolos (`http`, `https`, `mailto`, relativos); a política e a
+  ordem das transformações estão em `src/utils/markdown.ts`.
 - Remover uma tentativa registra em log uma linha JSON `answer-history.removed`
   (curso, prova, tentativas, campos, lotes, edits, `byteCount` e `storedBytes`
   estimado) quando ela tinha histórico de edição, e `pnpm run manage
