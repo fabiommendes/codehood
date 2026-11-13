@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
-import { InvalidData } from "@/core/error";
+import { FieldError, InvalidData } from "@/core/error";
 import { db, type Edition, type EditionCreate } from "@/db";
 import { type PersistParams, serviceOpts } from "./support";
 
@@ -49,7 +49,9 @@ export const persistedEditionFactory = Factory.define<
 			try {
 				return await db.edition.create(input, serviceOpts(transientParams));
 			} catch (error) {
-				const taken = error instanceof InvalidData && "slug" in error.errors;
+				const taken =
+					(error instanceof FieldError && error.field === "slug") ||
+					(error instanceof InvalidData && "slug" in error.errors);
 				if (params.slug || !taken || attempt === SLUG_ATTEMPTS) throw error;
 				input = { ...input, slug: fakeEditionSlug() };
 			}
