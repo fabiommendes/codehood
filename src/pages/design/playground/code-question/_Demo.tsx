@@ -124,7 +124,12 @@ export default function Demo(props: {
 	submit?: { scenario: SubmitScenario; sends: CodeSends; press: boolean };
 }): JSX.Element {
 	const [sends, setSends] = createSignal<CodeSends>(
-		props.submit?.sends ?? { used: 0, limit: null, submissions: [] },
+		props.submit?.sends ?? {
+			used: 0,
+			limit: null,
+			submissions: [],
+			penalty: 0,
+		},
 	);
 	let root!: HTMLDivElement;
 	onMount(() => {
