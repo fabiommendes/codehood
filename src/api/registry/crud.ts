@@ -513,7 +513,8 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	}): Promise<Entity[]> {
 		const { actor, body, params } = args;
 
-		const rawFilter = { ...body, ...this.parseListUrlParams(params) };
+		const fromUrl = this.parseListUrlParams(params);
+		const rawFilter = { ...body, ...fromUrl };
 
 		if (this.filterSchema === null)
 			throw new ImproperBehavior(
@@ -524,7 +525,9 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 			this.filterSchema.safeParse(rawFilter),
 		);
 
-		return this.service.findMany(validated, { actor });
+		// The query schema leaves out what the path already fixes (the parent
+		// of a nested collection), so parsing drops it: put it back.
+		return this.service.findMany({ ...fromUrl, ...validated }, { actor });
 	}
 
 	/**

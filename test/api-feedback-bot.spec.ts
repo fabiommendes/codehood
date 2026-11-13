@@ -281,3 +281,48 @@ test("notes can be changed through PUT on an existing pass", async ({
 	const pass = await (await request.get(`${url}/auto-1`, { headers })).json();
 	expect(pass.notes).toBe("second");
 });
+
+test("listing the feedback of a submission returns only the passes of that submission", async ({
+	request,
+}) => {
+	const { instructor, submission, url } = await makeSubmission();
+	const headers = await loginHeaders(request, instructor.username);
+	// A second submission of the same answer, with no feedback of its own.
+	const row = await prisma.submission.findUniqueOrThrow({
+		where: { publicId: submission.publicId },
+	});
+	const other = await prisma.submission.create({
+		data: {
+			publicId: tag("sub"),
+			responseId: row.responseId,
+			questionId: row.questionId,
+			payload: row.payload ?? "x",
+		},
+	});
+	const otherUrl = url.replace(submission.publicId, other.publicId);
+
+	const written = await request.post(url, {
+		headers,
+		data: { ref: "chalk", score: "1/1" },
+	});
+	expect(written.status()).toBe(200);
+
+	const own = await request.get(url, { headers });
+	expect(own.status()).toBe(200);
+	expect((await own.json()).map((p: { ref: string }) => p.ref)).toEqual([
+		"chalk",
+	]);
+
+	const empty = await request.get(otherUrl, { headers });
+	expect(empty.status()).toBe(200);
+	expect(await empty.json()).toEqual([]);
+
+	await request.post(otherUrl, {
+		headers,
+		data: { ref: "other", score: "0/1" },
+	});
+	const second = await request.get(otherUrl, { headers });
+	expect(
+		(await second.json()).map((p: { submission: string }) => p.submission),
+	).toEqual([other.publicId]);
+});

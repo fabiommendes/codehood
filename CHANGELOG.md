@@ -233,6 +233,10 @@
 
 ### Fixed
 
+- `GET /api/course/.../submission/{publicId}/feedback` devolvia o feedback de
+  todas as submissões do curso: o filtro da query descartava a submissão do
+  caminho. A listagem de uma coleção aninhada agora mantém o que o caminho
+  fixa (`src/api/registry/crud.ts`).
 - Exam attempt: when the session ends mid-exam (logout elsewhere, password
   reset, cookie cleared), the page shows a persistent notice with a link that
   opens the login in a new tab and returns to the exam; the typed answers stay
