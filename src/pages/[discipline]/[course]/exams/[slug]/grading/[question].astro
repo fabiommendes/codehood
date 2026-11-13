@@ -311,7 +311,7 @@ const shown = (
                   <>
                     <p class="mt-4 text-lg font-semibold">
                       {answer.state === "graded" && answer.verdict !== null
-                        ? formatScore(sendsOf.get(answer.submission)?.submissions.find((sent) => sent.counts)?.discounted ?? answer.verdict)
+                        ? formatScore(answer.verdict)
                         : m.grades_question_not_graded()}
                     </p>
                     {answer.passes.length > 0 && (
