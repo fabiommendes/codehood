@@ -110,6 +110,8 @@ function libraryMarks(
 	response: unknown,
 	grades: Record<string, BlankGrade>,
 ): { score?: number; feedback: readonly string[]; blanks?: BlankScores } {
+	// A code question is scored from a runner report, never from the response.
+	if (question.type === "code") return { feedback: [] };
 	try {
 		const scored = scoreResponse(question, response);
 		return {
