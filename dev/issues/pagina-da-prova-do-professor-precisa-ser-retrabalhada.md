@@ -42,7 +42,25 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    `exam.releaseGrades`. Clientes como o chalk e o worker não conseguem fechar o
    ciclo sem passar pela web.
 
+6. **A página junta informação demais e sem relação.** Configuração da prova,
+   exceções, resultados, estatísticas por questão, liberação de notas e a
+   visão do estudante convivem na mesma página. Ela precisa ser dividida em
+   páginas (ou abas com rota própria), cada uma com um propósito.
+7. **A "visão do estudante" não é a do estudante.** A renderização que o
+   professor vê não usa o mesmo componente que o estudante usa ao fazer a
+   prova, então o que o professor confere não garante o que o aluno vai ver.
+8. **Não dá para simular a prova antes de aplicar.** O professor deveria
+   poder fazer a prova como um estudante (mesmo componente, mesmos widgets,
+   envio e correção automática), sem afetar notas nem estatísticas, para saber
+   se ela funciona antes de abrir para a turma.
+
 ## Direção
+
+- Dividir a página por tarefa: preparar (configuração, questões, exceções),
+  aplicar (andamento, tentativas abertas), corrigir (pendências por questão,
+  correção automática) e resultados (notas, estatísticas, liberação).
+- A pré-visualização do professor usa o componente real da prova. Um modo de
+  simulação grava uma tentativa marcada como de teste, fora das notas.
 
 - Mostrar sempre o estado da liberação: liberada, liberável ou bloqueada, e
   por quê (com contagem do que falta).
