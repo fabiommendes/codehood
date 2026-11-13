@@ -237,6 +237,30 @@ test("a SUBMIT is refused with 409 while the previous job is CLAIMED, writing no
 	expect((await jobsOf(ctx)).map((j) => j.state)).toEqual(["CLAIMED"]);
 });
 
+test("a SUBMIT replaces a CLAIMED job whose lease ran out, and a live lease still refuses", async () => {
+	const ctx = await setup();
+	await ctx.save("a", "SUBMIT");
+	await setLastJob(ctx, "CLAIMED");
+	const [job] = await jobsOf(ctx);
+	if (!job) throw new Error("no job");
+
+	await prisma.gradingJob.update({
+		where: { id: job.id },
+		data: { leaseUntil: new Date(Date.now() + 60_000) },
+	});
+	await expect(ctx.save("b", "SUBMIT")).rejects.toMatchObject({ status: 409 });
+
+	await prisma.gradingJob.update({
+		where: { id: job.id },
+		data: { leaseUntil: new Date(Date.now() - 1_000) },
+	});
+	await ctx.save("b", "SUBMIT");
+	expect((await jobsOf(ctx)).map((j) => j.state)).toEqual([
+		"CANCELLED",
+		"QUEUED",
+	]);
+});
+
 //
 // Sends left
 //

@@ -70,7 +70,8 @@ export async function countSpentSends(
 
 /**
  * Stores a `SUBMIT` or `FINAL` submission together with its queued job, and
- * cancels the job a worker has not claimed yet for the same question.
+ * cancels the job no worker holds for the same question: one still queued, or
+ * one whose lease ran out.
  *
  * Returns the id of the new submission.
  *
@@ -90,9 +91,13 @@ export async function enqueueGradingJob(
 				questionId: target.questionId,
 			},
 		},
-		select: { id: true, state: true },
+		select: { id: true, state: true, leaseUntil: true },
 	});
-	if (open.some((job) => job.state === "CLAIMED")) {
+	const now = new Date();
+	// A lease that ran out no longer holds the job: the worker is gone or late.
+	const held = (job: (typeof open)[number]) =>
+		job.state === "CLAIMED" && !(job.leaseUntil && job.leaseUntil <= now);
+	if (open.some(held)) {
 		throw new NotAllowed("response.submit", {
 			status: 409,
 			message: m.errors_code_send_waiting(),
