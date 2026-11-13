@@ -35,7 +35,10 @@ const leaseMs = z
 	.default(DEFAULT_LEASE_MS);
 
 /// A worker slug, as `meta.worker` of a code question.
-export const workerName = z.string().regex(/^[a-z0-9-]{1,40}$/);
+export const workerName = z
+	.string()
+	.regex(/^[a-z0-9-]{1,40}$/)
+	.openapi({ example: "elm-test" });
 
 /// What a worker asks for when it pulls jobs. `course` is the Course URL without the leading slash.
 export const gradingJobClaim = z.object({
