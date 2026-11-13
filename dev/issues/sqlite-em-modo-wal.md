@@ -40,7 +40,11 @@ fatores, mas sem métricas não foi possível confirmar.
 
   O `journal_mode` usa `$queryRawUnsafe` porque devolve uma linha. O
   `busy_timeout` só passa a importar com mais de um processo, mas é inofensivo
-  com um só.
+  com um só. Cuidado ao chegar a vários processos: como o `better-sqlite3` é
+  síncrono, esperar a trava de escrita de outro processo congela o event loop
+  por até `busy_timeout` ms. O valor deve ficar bem abaixo do timeout do
+  Caddy, e as transações de escrita devem ser curtas (relato de caso:
+  [neotoma#2280](https://github.com/markmhendrickson/neotoma/issues/2280)).
 - Em WAL com `synchronous=NORMAL`, o commit só acrescenta ao `-wal`, e o
   `fsync` acontece no checkpoint. Risco aceito: uma queda de energia ou do
   kernel pode perder os últimos commits, sem corromper o banco. Se só o
