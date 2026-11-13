@@ -105,6 +105,7 @@ export function questionStats(
 		feedback,
 		now,
 		exceptions,
+		policy,
 	);
 	const closedAttempts = closedAttemptCount(exam, attempts, now, exceptions);
 	const rows = scoreRows(

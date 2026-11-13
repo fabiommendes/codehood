@@ -11,9 +11,11 @@ import type { Feedback } from "@/db/services/feedback.service";
 import type { Response } from "@/db/services/response.service";
 import type { Submission } from "@/db/services/submission.service";
 import {
+	type CodeAttemptOutcome,
 	examResult,
 	isNewerSubmission,
 	newestPassesFirst,
+	type QuestionOutcome,
 	type ResultPolicy,
 } from "./exam-result";
 import {
@@ -57,7 +59,7 @@ export interface GradingPass {
 /// The prefix of the `ref` of a pass that marks an answer will-not-grade.
 export const WILL_NOT_GRADE_REF = "wng-";
 
-/// The newest submission a student made to one question within a closed attempt.
+/// The answer a student gave to one question within a closed attempt: its newest submission, or for a `code` question the sent one that counts.
 export interface CountingAnswer {
 	/// The submission's `publicId`.
 	submission: string;
@@ -76,6 +78,8 @@ export interface CountingAnswer {
 	review?: true;
 	/// Every pass on this submission, newest first (by `updatedAt`).
 	passes: GradingPass[];
+	/// The graded submissions of a `code` question with how each weighs in the verdict. Absent for other answers.
+	codeAttempts?: CodeAttemptOutcome[];
 }
 
 /// How one question of the exam stands in the grading queue.
@@ -121,6 +125,11 @@ export type GradingFeedback = Pick<
  * progress are left out. Per attempt and question only the newest submission
  * counts, and submissions to a question outside `questions` are ignored.
  *
+ * A question with `SUBMIT` or `FINAL` submissions is a `code` question sent
+ * for grading: its state and verdict are the ones `examResult` gives it, and
+ * the answer is the sent submission that counts when it is `graded`, the
+ * newest sent one otherwise. Autosaves are never the answer then.
+ *
  * An answer whose submission status is `WILL_NOT_GRADE` is `not-graded`.
  * Otherwise it is `graded` when its newest pass has a score, and `pending`
  * when it has none.
@@ -131,6 +140,7 @@ export type GradingFeedback = Pick<
  * @params questions The exam's question slugs.
  * @params feedback Every grading pass on the exam, released or not.
  * @params exceptions The exam's exceptions, by username.
+ * @params policy How the exam discounts `code` submissions, as in `examResult`.
  */
 export function countingAnswers(
 	exam: ExamTiming,
@@ -139,6 +149,7 @@ export function countingAnswers(
 	feedback: GradingFeedback[],
 	now: Date,
 	exceptions: ReadonlyMap<string, ExceptionTiming> = new Map(),
+	policy: ResultPolicy = {},
 ): CountingAnswer[] {
 	const schedule = examSchedule(exam, exceptions);
 	const passesBySubmission = new Map<string, GradingFeedback[]>();
@@ -153,48 +164,21 @@ export function countingAnswers(
 		if (!isFinished(attemptOf(schedule, attempt.author, attempt, now)))
 			continue;
 
-		const newest = new Map<string, GradingAttempt["submissions"][number]>();
+		const byQuestion = new Map<string, GradingAttempt["submissions"]>();
 		for (const submission of attempt.submissions) {
 			if (!questions.includes(submission.question)) continue;
-			const current = newest.get(submission.question);
-			if (!current || isNewerSubmission(submission, current)) {
-				newest.set(submission.question, submission);
-			}
+			const list = byQuestion.get(submission.question);
+			if (list) list.push(submission);
+			else byQuestion.set(submission.question, [submission]);
 		}
 
-		for (const submission of newest.values()) {
-			const passes = newestPassesFirst(
-				passesBySubmission.get(submission.publicId) ?? [],
-			);
-			const newestPass = passes[0];
-			const verdict =
-				submission.status === "WILL_NOT_GRADE" || !newestPass
-					? null
-					: scoreValue(newestPass.score);
-			const state: AnswerState =
-				submission.status === "WILL_NOT_GRADE"
-					? "not-graded"
-					: verdict === null
-						? "pending"
-						: "graded";
+		for (const [question, submissions] of byQuestion) {
+			const answer = isCodeSent(submissions)
+				? codeAnswer(question, submissions, passesBySubmission, policy)
+				: newestAnswer(submissions, passesBySubmission);
 			answers.push({
-				id: submission.id,
-				answer: {
-					submission: submission.publicId,
-					question: submission.question,
-					author: attempt.author,
-					payload: submission.payload,
-					createdAt: submission.createdAt,
-					state,
-					verdict,
-					...(verdict !== null && newestPass?.blanks
-						? { blanks: newestPass.blanks }
-						: {}),
-					...(state === "graded" && newestPass?.review === true
-						? { review: true as const }
-						: {}),
-					passes: passes.map(toGradingPass),
-				},
+				id: answer.id,
+				answer: { ...answer.answer, author: attempt.author },
 			});
 		}
 	}
@@ -206,6 +190,113 @@ export function countingAnswers(
 				a.id - b.id,
 		)
 		.map(({ answer }) => answer);
+}
+
+/// The submissions of a question that were sent for grading: only a `code` question has them.
+function sentOf<T extends { kind?: string }>(submissions: readonly T[]): T[] {
+	return submissions.filter(
+		(submission) => submission.kind === "SUBMIT" || submission.kind === "FINAL",
+	);
+}
+
+/// Whether any of the submissions was sent for grading.
+function isCodeSent(submissions: readonly { kind?: string }[]): boolean {
+	return sentOf(submissions).length > 0;
+}
+
+type StoredSubmission = GradingAttempt["submissions"][number];
+
+/// The answer of a question, from the submission that stands for it, before the author is known.
+function buildAnswer(
+	submission: StoredSubmission,
+	state: AnswerState,
+	verdict: number | null,
+	passesBySubmission: ReadonlyMap<string, GradingFeedback[]>,
+	extra: Partial<CountingAnswer> = {},
+): { id: number; answer: Omit<CountingAnswer, "author"> } {
+	const passes = newestPassesFirst(
+		passesBySubmission.get(submission.publicId) ?? [],
+	);
+	const newestPass = passes[0];
+	return {
+		id: submission.id,
+		answer: {
+			submission: submission.publicId,
+			question: submission.question,
+			payload: submission.payload,
+			createdAt: submission.createdAt,
+			state,
+			verdict,
+			...(verdict !== null && newestPass?.blanks
+				? { blanks: newestPass.blanks }
+				: {}),
+			...(state === "graded" && newestPass?.review === true
+				? { review: true as const }
+				: {}),
+			passes: passes.map(toGradingPass),
+			...extra,
+		},
+	};
+}
+
+/// The answer of a question with no sent submission: its newest submission, judged by its newest pass.
+function newestAnswer(
+	submissions: StoredSubmission[],
+	passesBySubmission: ReadonlyMap<string, GradingFeedback[]>,
+) {
+	const submission = submissions.reduce((newest, current) =>
+		isNewerSubmission(current, newest) ? current : newest,
+	);
+	const newestPass = newestPassesFirst(
+		passesBySubmission.get(submission.publicId) ?? [],
+	)[0];
+	const verdict =
+		submission.status === "WILL_NOT_GRADE" || !newestPass
+			? null
+			: scoreValue(newestPass.score);
+	const state: AnswerState =
+		submission.status === "WILL_NOT_GRADE"
+			? "not-graded"
+			: verdict === null
+				? "pending"
+				: "graded";
+	return buildAnswer(submission, state, verdict, passesBySubmission);
+}
+
+/// The answer of a `code` question with sent submissions: the state and verdict `examResult` gives, on the submission that counts.
+function codeAnswer(
+	question: string,
+	submissions: StoredSubmission[],
+	passesBySubmission: ReadonlyMap<string, GradingFeedback[]>,
+	policy: ResultPolicy,
+) {
+	const outcome = examResult(
+		[question],
+		submissions,
+		submissions.flatMap(
+			(submission) => passesBySubmission.get(submission.publicId) ?? [],
+		),
+		policy,
+	).questions[0] as QuestionOutcome;
+	const sent = sentOf(submissions);
+	const newestSent = sent.reduce((newest, current) =>
+		isNewerSubmission(current, newest) ? current : newest,
+	);
+	const shown =
+		outcome.status === "graded"
+			? (sent.find(
+					(submission) => submission.publicId === outcome.submission,
+				) ?? newestSent)
+			: newestSent;
+	return buildAnswer(
+		shown,
+		outcome.status === "graded" || outcome.status === "pending"
+			? outcome.status
+			: "not-graded",
+		outcome.score,
+		passesBySubmission,
+		outcome.codeAttempts ? { codeAttempts: outcome.codeAttempts } : {},
+	);
 }
 
 /// The grading page's view of one stored pass.

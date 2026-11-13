@@ -8,6 +8,7 @@ import {
 	type Feedback,
 } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
+import { resultPolicy } from "@/services/exam-result";
 import type { ExceptionTiming } from "@/services/exam-state";
 import {
 	type GradesTable,
@@ -97,7 +98,7 @@ export async function loadExamGrading(
 		: null;
 	if (!exam || (exam.type === "PRACTICE" && !options.practice)) return null;
 
-	const [attempts, feedback, courseExceptions] = await Promise.all([
+	const [attempts, feedback, courseExceptions, stored] = await Promise.all([
 		db.response.findMany(
 			{
 				course,
@@ -108,7 +109,13 @@ export async function loadExamGrading(
 		),
 		db.feedback.findMany({ course, exam: exam.slug }, { actor }),
 		loadCourseExceptions(course),
+		db.course.findOne(typeof course === "number" ? { id: course } : course, {
+			actor,
+		}),
 	]);
+	const policy = stored
+		? (await loadResultPolicy(stored.id))(exam)
+		: resultPolicy(exam.type, {});
 	const exceptions = courseExceptions.get(exam.slug) ?? new Map();
 	const questions = exam.questions.map((question) => question.slug);
 
@@ -122,6 +129,7 @@ export async function loadExamGrading(
 			feedback,
 			new Date(),
 			exceptions,
+			policy,
 		),
 		attempts,
 		feedback,
