@@ -27,25 +27,33 @@ query ou um commit lento trava o servidor inteiro.
 
 **Turso**
 
-- "Turso" pode ser duas coisas: o serviço/libSQL (fork do SQLite, com
-  `@libsql/client` e um adapter Prisma oficial) ou a reescrita do SQLite em
-  Rust (antigo Limbo), com I/O assíncrono e escrita concorrente (MVCC).
-  Qual delas era a sugestão? Qual o grau de maturidade de cada uma hoje?
-- Para arquivo local, o `@libsql/client` bloqueia o event loop como o
-  `better-sqlite3` ou faz as queries fora da thread principal?
-- Algum dos dois permite escritas concorrentes de verdade (mais de um
-  escritor), ou só tira o bloqueio do event loop?
-- O Prisma 7 suporta o Turso novo, ou só o libSQL? O que não funciona
-  (migrations, `$transaction` interativa, tipos `Json`)?
-- Implica sair da VPS para um serviço gerenciado, ou roda local/embutido?
-  Custo, latência e backup em cada caso.
+O alvo é a reescrita do SQLite em Rust (antigo Limbo), com I/O assíncrono e
+escrita concorrente (MVCC), não o serviço libSQL (fork do SQLite com
+`@libsql/client`).
+
+- Qual o grau de maturidade dela hoje (beta, produção)? Quais recursos do
+  SQLite ainda faltam?
+- O binding de Node faz as queries fora da thread principal, ou ainda
+  bloqueia o event loop?
+- A escrita concorrente (MVCC) já funciona com vários processos ou conexões
+  no mesmo arquivo? Com quais garantias?
+- O Prisma 7 tem adapter para ela? O que não funciona (migrations,
+  `$transaction` interativa, tipos `Json`)? Se não houver adapter oficial,
+  quanto custa escrever um?
+- Roda local/embutido na VPS, ou empurra para um serviço gerenciado? Como
+  fica o backup?
 
 **Bun**
 
+O humano buscou só sobre o Prisma, e a busca indicava que funciona no Bun, mas
+sem evidência concreta. Tudo abaixo está por conferir.
+
+- O Prisma 7 roda no Bun de verdade? Com qual adapter de SQLite? Há exemplo
+  oficial ou issue confirmando?
 - O Astro 7 roda em Bun com `@astrojs/node`, ou precisa de outro adapter?
-  O que quebra (Vite, middleware, Prisma, Playwright, `node:*` usados)?
+  O que quebra (Vite, middleware, Playwright, `node:*` usados)?
 - O `bun:sqlite` é síncrono como o `better-sqlite3`. O ganho viria do runtime
-  mais rápido, não de concorrência. Tem adapter Prisma para ele?
+  mais rápido, não de concorrência.
 - Bun facilita vários processos (por exemplo `reusePort`) melhor que o
   `cluster` do Node?
 
