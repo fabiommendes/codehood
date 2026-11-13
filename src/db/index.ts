@@ -19,6 +19,7 @@ import { makeExamService } from "./services/exam.service";
 import { makeExamExceptionService } from "./services/exam-exception.service";
 import { makeFeedbackService } from "./services/feedback.service";
 import { makeGradeColumnService } from "./services/grade-column.service";
+import { makeGradingJobService } from "./services/grading-job.service";
 import { checkRedeemable, makeInviteService } from "./services/invite.service";
 import { makePassphraseService } from "./services/passphrase.service";
 import { makeQuestionService } from "./services/question.service";
@@ -299,6 +300,7 @@ export const db = {
 	examException: makeExamExceptionService(),
 	feedback: feedbackService,
 	gradeColumn: makeGradeColumnService(),
+	gradingJob: makeGradingJobService(),
 	invite: { ...makeInviteService(), checkRedeemable },
 	passphrase: makePassphraseService(),
 	question: makeQuestionService(),

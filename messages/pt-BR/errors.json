@@ -64,6 +64,8 @@
 	"errors_question_version_together": "`question` e `version` devem ser informados juntos",
 	"errors_question_archived": "A questão \"{slug}\" está arquivada e não pode ser alterada",
 	"errors_question_version_conflict": "A versão \"{version}\" de \"{slug}\" já tem outro conteúdo",
+	"errors_grading_job_not_held": "Este trabalho de correção não está com esta chave",
+	"errors_grading_job_closed": "Este trabalho de correção já foi encerrado",
 	"errors_release_not_an_exam": "Somente uma prova (EXAM) tem as notas liberadas manualmente",
 	"errors_release_not_closed": "Somente uma avaliação encerrada pode ter as notas liberadas",
 	"errors_release_exception_open": "Um aluno com exceção ainda pode responder esta prova",
@@ -162,5 +164,8 @@
 	"errors_rubric_group_lookalike": "O grupo \"{to}\" difere do grupo existente \"{existing}\" só por maiúsculas ou espaços",
 	"errors_feedback_score_and_rubric": "Envie `score` ou `rubric`, não os dois",
 	"errors_feedback_score_required": "`score` ou `rubric` é obrigatório",
-	"errors_feedback_adjustment_needs_rubric": "`adjustment` exige uma correção feita pela rubrica"
+	"errors_feedback_adjustment_needs_rubric": "`adjustment` exige uma correção feita pela rubrica",
+	"errors_code_send_waiting": "Aguarde a correção do envio anterior",
+	"errors_code_sends_spent": "Você não tem mais envios para esta questão",
+	"errors_code_not_sendable": "Esta questão não é enviada a um worker: só aceita salvamentos"
 }

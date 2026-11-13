@@ -303,3 +303,26 @@ export function studentReportView(
 		),
 	};
 }
+
+/** A sent submission as far as the attempt count is concerned. */
+export interface SentSubmission {
+	kind: "AUTOSAVE" | "SUBMIT" | "FINAL";
+	status: string;
+	/// The state of its grading job, `null` when it has none.
+	jobState: string | null;
+}
+
+/**
+ * How many of a student's attempts a question's submissions have spent.
+ *
+ * A `SUBMIT` or `FINAL` whose job is done spends one, unless it failed its
+ * pretest, which the student may fix and send again at no cost.
+ */
+export function spentAttempts(submissions: readonly SentSubmission[]): number {
+	return submissions.filter(
+		(s) =>
+			s.kind !== "AUTOSAVE" &&
+			s.jobState === "DONE" &&
+			s.status !== "PRETEST_FAILED",
+	).length;
+}

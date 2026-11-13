@@ -58,6 +58,7 @@ export * from "./exam";
 export * from "./exam-exception";
 export * from "./feedback";
 export * from "./grade-column";
+export * from "./grading-job";
 export * from "./invite";
 export * from "./passphrase";
 export * from "./question";

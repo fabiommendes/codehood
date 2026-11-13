@@ -64,6 +64,8 @@
 	"errors_question_version_together": "`question` and `version` go together",
 	"errors_question_archived": "Question \"{slug}\" is archived and cannot be written to",
 	"errors_question_version_conflict": "Version \"{version}\" of \"{slug}\" already holds different content",
+	"errors_grading_job_not_held": "This grading job is not held by this key",
+	"errors_grading_job_closed": "This grading job is already closed",
 	"errors_release_not_an_exam": "Only an EXAM has its grades released by hand",
 	"errors_release_not_closed": "Only a closed exam can have its grades released",
 	"errors_release_exception_open": "A student with an exception can still answer this exam",
@@ -162,5 +164,8 @@
 	"errors_rubric_group_lookalike": "Group \"{to}\" differs from the existing group \"{existing}\" only by case or spaces",
 	"errors_feedback_score_and_rubric": "Send either `score` or `rubric`, not both",
 	"errors_feedback_score_required": "Either `score` or `rubric` is required",
-	"errors_feedback_adjustment_needs_rubric": "`adjustment` needs a pass graded with the rubric"
+	"errors_feedback_adjustment_needs_rubric": "`adjustment` needs a pass graded with the rubric",
+	"errors_code_send_waiting": "Wait for the previous send to be graded before sending again",
+	"errors_code_sends_spent": "You have no sends left for this question",
+	"errors_code_not_sendable": "This question is not sent to a worker: it only takes autosaves"
 }

@@ -58,6 +58,9 @@ type ExtraPerms =
 	| "exam.manage-exceptions"
 	| "rubric.read"
 	| "rubric.write"
+	| "grading-job.work"
+	| "grading-job.manage"
+	| "grading-job.read"
 	| "api-key.manage"
 	| "calendar-feed.manage"
 	| "session.manage"
@@ -125,6 +128,9 @@ export interface CourseWithEnrollment {
 	instructor: { username: string };
 	enrollments: { username: UserId }[] | UserId[];
 }
+
+/// The API key an actor authenticated with: `bot` is the name of a `BOT` key, absent for a session or a `CLI` key.
+export type BotKeyTarget = { bot?: string | undefined };
 
 /// A single user's enrollment in a course.
 export type EnrollmentTarget = { course: CourseTarget; user: UserTarget };
@@ -460,6 +466,31 @@ const PERMISSIONS = {
 		other: (actor, target) => isCourseOwner(actor, target),
 		audit: auditCourse,
 	} satisfies PermDef<CourseTarget>,
+
+	// GRADING JOBS ---------------------------------------------------------------
+	// Rule: only an actor authenticated by a BOT API key takes, renews, fails
+	// and completes grading jobs. Sessions and CLI keys never do, and SYSTEM
+	// has no bot name to hold a lease under. Which courses a key may serve is
+	// the service's rule: the key's owner must teach them.
+	"grading-job.work": {
+		system: false,
+		other: (_actor, key) => key.bot !== undefined,
+		audit: (key) => ({ bot: key.bot ?? null }),
+	} satisfies PermDef<BotKeyTarget>,
+
+	// Rule: the course's instructor sees the queue of a question and puts its
+	// failed jobs back. No admin branch, matching `feedback.create`.
+	"grading-job.manage": {
+		other: (actor, target) => isCourseOwner(actor, target),
+		audit: auditCourse,
+	} satisfies PermDef<CourseTarget>,
+
+	// Rule: a student sees the state of the submissions of their own answer.
+	// The instructor reads them through the grading pages, not through this.
+	"grading-job.read": {
+		other: (actor, target) => target.author.username === actor.username,
+		audit: auditResponse,
+	} satisfies PermDef<ResponseWithCourse>,
 
 	// REGRADE --------------------------------------------------------------------
 	// Rule: the author of the attempt asks for a regrade of their own answer

@@ -762,6 +762,7 @@ const UNGUARDED: Record<string, string> = {
 			"report.attachment",
 			"report.countOpen",
 			"rubric.preview",
+			"question.pretests",
 		].map((op) => [op, "reads"]),
 	),
 	"repository.zip":
@@ -793,6 +794,8 @@ const EXEMPT: Record<string, string> = {
 		"its model has no updatedAt: every write calls rejectExpectedUpdatedAt, and it only touches its response",
 	answerEdit:
 		"no public update/upsert/delete; append is a compare-and-swap on AnswerEditField.revision",
+	gradingJob:
+		"no public update/upsert/delete; every transition is a compare-and-swap on the job's state and holder",
 };
 
 /// Models of `prisma/schema.prisma` that have an `updatedAt` column.

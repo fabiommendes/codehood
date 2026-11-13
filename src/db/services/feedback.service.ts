@@ -612,7 +612,7 @@ async function resolveGradableSubmission(
 	return submission;
 }
 
-/// Sets a submission's status to reflect who graded it last: a user or a bot, moving the version of the response that shows it.
+/// Sets a submission's status to reflect who graded it last: a user or a bot, moving the version of the response that shows it, and closes its open grading job when a user graded.
 async function markGraded(
 	tx: PrismaTx,
 	submission: Pick<DbSubmission, "id" | "responseId" | "status">,
@@ -625,6 +625,16 @@ async function markGraded(
 	});
 	if (status !== submission.status) {
 		await touch(tx, "response", { id: submission.responseId }, {});
+	}
+	// A person's grade settles the submission: a worker's report would arrive late.
+	if (graderId !== null) {
+		await tx.gradingJob.updateMany({
+			where: {
+				submissionId: submission.id,
+				state: { in: ["QUEUED", "CLAIMED"] },
+			},
+			data: { state: "DONE", leaseUntil: null },
+		});
 	}
 }
 
