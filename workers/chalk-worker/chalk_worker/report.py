@@ -16,7 +16,7 @@ from chalk_grader.graded import Graded
 from mdq.models import CodeQuestion, ReportCase, RunnerReport
 
 from . import __version__
-from .locate import locate_elm
+from .locate import elm_module, locate_elm
 
 __all__ = ["Run", "clean_build", "to_report"]
 
@@ -129,9 +129,10 @@ def _cases(
         status, message = verdict(key)
         source, line = where
         fields = {"message": message} if message else {}
-        cases.append(
-            ReportCase(source=source, line=line, verdict=status, id=name or key[1], **fields)
-        )
+        # The generated module of an examples block is an implementation
+        # detail: its tests are shown by the name of the example alone.
+        shown = key[1] if elm_module(texts[source]) is None else name or key[1]
+        cases.append(ReportCase(source=source, line=line, verdict=status, id=shown, **fields))
     return cases
 
 

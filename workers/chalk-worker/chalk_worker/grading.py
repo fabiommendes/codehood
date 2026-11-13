@@ -22,6 +22,7 @@ from chalk_grader.profiles import PrepareError
 from chalk_grader.task import Task
 from mdq.models import CodeQuestion, RunnerReport
 
+from .examples import ExampleError, examples_module, module_name
 from .locate import elm_module
 from .report import Run, to_report
 
@@ -92,7 +93,7 @@ class QuestionGrader:
             ),
             name=profile,
             profile=resolve_profile(profile, profiles or {}),
-            solution=question.reference_solution,
+            solution=_with_header(language, self._answer, question.reference_solution),
             cache_dir=workdir.parent / "cache",
         )
 
@@ -127,7 +128,7 @@ class QuestionGrader:
         Raises:
             PrepareError, OSError, RuntimeError: the infrastructure failed.
         """
-        graded = self._grader("answer", answer)
+        graded = self._grader("answer", _with_header(self.question.language, self._answer, answer))
         expected = self._grader.prepare().tests
         crashed = graded.score == dq.Error() and self._reference_passes(answer)
         run = Run(graded=graded, expected=expected, crashed=crashed)
@@ -141,7 +142,9 @@ class QuestionGrader:
         reference = self.question.reference_solution
         if reference is None or reference == answer:
             return False
-        graded = self._grader("answer", reference)
+        graded = self._grader(
+            "answer", _with_header(self.question.language, self._answer, reference)
+        )
         cases = graded.cases or ()
         return bool(cases) and graded.score == 1 and all(case.passed for case in cases)
 
@@ -152,6 +155,17 @@ def _answer_path(language: str, file: str) -> str:
     return f"src/{file}" if language == "elm" else file
 
 
+def _with_header[T: (str, None)](language: str | None, path: str, text: T) -> T:
+    """
+    The Elm source with a `module <File> exposing (..)` header when it has
+    none, so an answer may be only the declarations. Other languages and
+    sources that declare a module are left alone.
+    """
+    if language != "elm" or text is None or elm_module(text) is not None:
+        return text
+    return f"module {Path(path).stem} exposing (..)\n\n{text}"  # type: ignore[return-value]
+
+
 def _write_template(question: CodeQuestion, template: Path) -> None:
     if template.exists():
         shutil.rmtree(template)
@@ -160,12 +174,18 @@ def _write_template(question: CodeQuestion, template: Path) -> None:
     (template / "elm.json").write_text(elm_json)
     names: set[str] = set()
     for index, source in enumerate(question.tests):
-        module = elm_module(source.text or "")
+        text = source.text or ""
+        module = elm_module(text)
         if module is None:
-            raise ReferenceError(f"test source {index} has no `module` header")
+            answer_module = Path(question.file or "").stem
+            try:
+                text = examples_module(text, index, answer_module)
+            except ExampleError as e:
+                raise ReferenceError(f"test source {index}: {e}") from None
+            module = module_name(index)
         if module in names:
             raise ReferenceError(f"two test sources declare module {module}")
         names.add(module)
         path = template / "tests" / (module.replace(".", "/") + ".elm")
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(source.text or "")
+        path.write_text(text)

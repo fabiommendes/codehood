@@ -43,6 +43,18 @@ How a job is graded:
    reference solution that fails a test spends the retries of every job of
    the question, so the instructor sees them as failed.
 
+Test sources of an Elm question may be written as examples instead of a test
+module: a fenced block with no `module` header whose lines are all
+`expr ==> value` (a `-- comment` is optional, and is added to the test name).
+Each line becomes an `elm-test` case named after the line, and the answer is
+imported as the module of `file` (`Main.elm` is `Main`). Without annotations
+the block is one hidden item of the rubric, whose cases share its value. An
+invalid line fails the question (with the line number), never the student.
+`Float` values are compared with `Expect.equal`, so rounding can fail a case:
+write a module with `Expect.within` for those. An answer with no `module`
+header gets `module <File> exposing (..)` prepended, which shifts the line
+numbers of compiler errors by two.
+
 Caches live in `$XDG_CACHE_HOME/chalk-worker`.
 
 ## Development

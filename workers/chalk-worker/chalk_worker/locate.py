@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
+from .examples import locate_example, module_name
+
 __all__ = ["elm_module", "locate_elm"]
 
 _MODULE = re.compile(r"^(?:port\s+|effect\s+)?module\s+([A-Z][\w.]*)", re.MULTILINE)
@@ -38,6 +40,9 @@ def locate_elm(sources: Sequence[str], classname: str, name: str) -> tuple[int, 
     """
     module, _, path = classname.partition(" ")
     for index, text in enumerate(sources):
+        if elm_module(text) is None and module == module_name(index):
+            line = locate_example(text, name)
+            return None if line is None else (index, line)
         if elm_module(text) != module:
             continue
         lines = text.splitlines()
