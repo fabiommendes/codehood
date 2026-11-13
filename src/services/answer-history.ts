@@ -5,6 +5,8 @@
 import { ANSWER_HISTORY_LATE_MS, EXAM_ANSWER_GRACE_MS } from "@/core/constants";
 import type { Exam } from "@/db/services/exam.service";
 
+export { isHistoryField } from "./answer-edits/fields";
+
 /// What the rule needs from an exam. `answerHistory` is null until an
 /// instructor flips the switch on the exam page.
 export interface AnswerHistorySetting {
@@ -46,23 +48,6 @@ export async function readAnswerHistory(
 	} catch {
 		return undefined;
 	}
-}
-
-/**
- * Whether the edit history follows `field` of a question of `questionType`.
- *
- * The single place that decides which answers have a history: the `answer`
- * field of an essay, which includes code essays.
- *
- * @example
- * isHistoryField("essay", "answer"); // true
- * isHistoryField("multiple-choice", "answer"); // false
- */
-export function isHistoryField(
-	questionType: string | undefined,
-	field: string,
-): boolean {
-	return field === "answer" && questionType === "essay";
 }
 
 /// Whether the edit history still takes batches of an attempt, and how late they are.

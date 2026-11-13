@@ -46,9 +46,12 @@ A primeira entrega não atribui probabilidade de fraude nem aplica penalidades.
 ### Decidido em 2026-11-11
 
 - Escopo (Q2): `essay` e código. Respostas curtas (`short-answer`) e lacunas
-  (`fill-in`) ficam de fora. A página segue só questões `essay`, o que inclui a
-  redação de código de `CodeEssayAnswer`. O tipo `code` do mdq entra no escopo
-  quando o Codehood passar a aceitá-lo.
+  (`fill-in`) ficam de fora. A página segue questões `essay`, o que inclui a
+  redação de código de `CodeEssayAnswer`, e questões `code` do mdq
+  (`CodeAnswer`), cujo histórico parte do `template`. A regra fica em
+  `isHistoryField` (`src/services/answer-edits/fields.ts`), que o servidor e a
+  página compartilham. Em aberto: se a redação com código continua separada ou
+  migra para `code` quando houver testes.
 - Acesso e retenção (Q3): só quem corrige a prova lê o histórico; o aluno não vê o
   próprio na primeira versão. O servidor o guarda enquanto a tentativa existir e o
   apaga com ela. A cópia no navegador do aluno é temporária: apagada quando o
@@ -677,9 +680,8 @@ limite gera estado explícito de histórico incompleto; não truncar silenciosam
 
 ## Integração futura com MDQ
 
-O tipo `code` do mdq ainda é recusado pelo Codehood (ver
-`dev/issues/suporte-ao-tipo-code-do-mdq.md`). Quando passar a ser aceito, o
-monitor deve cobri-lo, como cobre o `essay` de código.
+O monitor cobre o tipo `code` do mdq como cobre o `essay` de código: o
+`CodeAnswer` repassa o `userEvent` do CodeMirror a cada edição.
 
 Adicionar pontos de extensão para editores de texto e código arbitrários no
 renderer, preservando os componentes padrão quando nenhuma extensão for passada.

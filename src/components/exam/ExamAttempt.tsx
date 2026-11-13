@@ -17,6 +17,7 @@ import type { Exam, QuestionPublic } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
 import type { AnswerEditAdapter } from "@/services/answer-edits/adapter";
+import { isHistoryField } from "@/services/answer-edits/fields";
 import {
 	kindOfInputType,
 	kindOfUserEvent,
@@ -44,6 +45,7 @@ import {
 	isTextEntry,
 	toSaved,
 } from "./answer-payload";
+import { codeTemplateOf } from "./CodeAnswer";
 import CodeSendsReview from "./CodeSendsReview";
 import {
 	browserDraftStore,
@@ -128,6 +130,11 @@ const SAVE_TIMEOUT_MS = 15_000;
 
 /// The shortest time between two prompt retries triggered by the student coming back to a tab whose session ended.
 const SESSION_KICK_MIN_MS = 5000;
+
+/// What the editor of `question` shows while it has no answer: the template of a code question, nothing otherwise.
+function blankAnswerOf(question: QuestionPublic["question"]): string {
+	return question.type === "code" ? codeTemplateOf(question) : "";
+}
 
 /// How long the page waits for the history's last flush after a finished attempt, whatever the monitor does.
 const HISTORY_FINAL_WAIT_MS = 2000;
@@ -512,9 +519,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	let history: AnswerEditAdapter | null = null;
 	let historyStopped = false;
 
-	/// The questions whose typed answer the history follows: essays, which include code essays.
+	/// The questions whose typed answer the history follows: essays, which include code essays, and code questions.
 	const historyQuestions = () =>
-		props.questions.filter((entry) => entry.question.type === "essay");
+		props.questions.filter((entry) =>
+			isHistoryField(entry.question.type, "answer"),
+		);
 
 	/// Runs `action` on the history adapter, swallowing any failure: the history may lose edits, never hold up an answer.
 	function withHistory(action: (adapter: AnswerEditAdapter) => void): void {
@@ -556,7 +565,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 	): void {
 		const announced = announcedInputs.get(slug);
 		announcedInputs.delete(slug);
-		if (!history || type !== "essay") return;
+		if (!history || !isHistoryField(type, "answer")) return;
 		const text = edited ?? "";
 		if (typeof text !== "string") return;
 		withHistory((adapter) =>
@@ -604,7 +613,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 						withHistory((it) =>
 							it.attach(
 								{ questionId: entry.slug, field: "answer" },
-								typeof text === "string" ? text : "",
+								typeof text === "string" ? text : blankAnswerOf(entry.question),
 							),
 						);
 					}

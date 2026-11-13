@@ -3353,6 +3353,8 @@ async function seedExternalGradingExams(
 		data: { leaseUntil: new Date(Date.now() + 30 * 24 * 3_600_000) },
 	});
 
+	await seedElmEditHistory(course, exam, question, students.hopper);
+
 	// The first send is cancelled by the second, which waits in the queue.
 	await send(exam, students.ritchie, ELM_ANSWERS.unfinished);
 	await send(exam, students.ritchie, ELM_ANSWERS.positives);
@@ -3374,6 +3376,78 @@ async function seedExternalGradingExams(
 		where: { name: "runner" },
 		data: { lastUsedAt: new Date(Date.now() - 2 * 60_000) },
 	});
+}
+
+/**
+ * Seeds the edit history of `student` on the Elm code question of `exam`: the
+ * body typed over the template, then replaced by a pasted line, which ends on
+ * the answer the student sent last.
+ */
+async function seedElmEditHistory(
+	course: Course["id"],
+	exam: string,
+	question: string,
+	student: User,
+): Promise<void> {
+	const { publicId } = await prisma.response.findFirstOrThrow({
+		where: {
+			authorId: student.username,
+			exam: { courseId: course, slug: exam },
+		},
+		select: { publicId: true },
+	});
+	const now = Date.now();
+	// The attempt opened before the typing the server saw.
+	await prisma.response.update({
+		where: { publicId },
+		data: { createdAt: new Date(now - 10 * 60_000) },
+	});
+	const program = new SeededTyping(
+		student,
+		{ course, exam, attempt: publicId },
+		question,
+	);
+	program.text = ELM_ANSWERS.template;
+	const body = ELM_ANSWERS.template.indexOf("    0\n") + 4;
+	const typed = "List.sum (List.filter (\\x -> x > 0) xs)";
+	let at = body;
+	let when = 6_000;
+	const words = (typed.match(/\S+\s*/g) ?? []).map((word) => {
+		const edit: SeededEdit = {
+			position: at,
+			deleteCount: 0,
+			insertedText: word,
+			startMs: when,
+			durationMs: 80 * word.length,
+		};
+		at += word.length;
+		when += 400 + 80 * word.length;
+		return edit;
+	});
+	await program.type("tab-1", new Date(now - 4 * 60_000), [
+		{
+			position: body,
+			deleteCount: 1,
+			insertedText: "",
+			startMs: 5_000,
+			durationMs: 60,
+			kind: "delete",
+		},
+		...words,
+	]);
+	await program.type("tab-1", new Date(now - 2 * 60_000), [
+		{
+			position: body,
+			deleteCount: typed.length,
+			insertedText: "List.foldl (+) 0 xs",
+			startMs: 95_000,
+			durationMs: 40,
+			kind: "paste",
+		},
+	]);
+	if (program.text !== ELM_ANSWERS.correct) {
+		throw new Error("[seed] the Elm edit history does not end on the answer.");
+	}
 }
 
 /// Seeds `test-trees` in `cs201`, closed two days ago and graded on delivery, with its grades still to release.

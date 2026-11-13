@@ -86,6 +86,20 @@ test("R36: the exam with histories follows at least two essay questions (text an
 	expect(exams.some(({ summary }) => summary.questions.length >= 2)).toBe(true);
 });
 
+test("an attempt at the Elm exam has a complete history with a paste on its code question", async () => {
+	const elm = (await allSummaries()).filter(
+		({ exam }) => exam.slug === "test-03",
+	);
+	const code = elm.flatMap(({ summary }) =>
+		summary.questions.filter(({ question }) => question === "elm-soma"),
+	);
+	expect(
+		code.some(
+			({ summary }) => summary.state === "complete" && summary.pastes.count > 0,
+		),
+	).toBe(true);
+});
+
 test("R36: some attempt has a gap by rebase", async () => {
 	const found = (await allSummaries()).filter(({ summary }) =>
 		summary.questions.some(({ summary: s }) =>

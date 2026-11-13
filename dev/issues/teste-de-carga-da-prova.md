@@ -36,10 +36,9 @@ separar os suspeitos, nesta ordem:
    - `exam.start` / `exam.finish` e a renovação de sessão
      (`SESSION_KICK_MIN_MS`).
 
-   Na `teste2-elm` o histórico não seguia as questões `code`
-   (`suporte-ao-tipo-code-do-mdq.md`), então lá só havia autosave. A carga
-   deve medir o monitor ligado nas questões `code`, como ele vai estar nas
-   próximas provas.
+   Na `teste2-elm` o histórico ainda não seguia as questões `code`, então lá
+   só havia autosave. Agora segue, e a carga deve medir o monitor ligado
+   nelas, como ele vai estar nas próximas provas.
 2. **Fila de correção:**
    - escrita: envios (`SUBMIT`), `claim`, renovação de reserva, `result`,
      `fail`;

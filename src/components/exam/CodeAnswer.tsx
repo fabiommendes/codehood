@@ -68,6 +68,11 @@ export interface CodeAnswerProps {
 	attachmentUrl?: AttachmentListProps["url"];
 }
 
+/** The code the editor of `question` starts with while there is no answer: the first fenced block of its `template`, or nothing. */
+export function codeTemplateOf(question: PublicCodeQuestion): string {
+	return question.template ? (firstFencedCode(question.template) ?? "") : "";
+}
+
 /// The last pretest run, as the component shows it.
 type PretestState =
 	| { kind: "idle" }
@@ -102,9 +107,7 @@ function verdictClass(verdict: Verdict): string {
 export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 	const language = props.question.language as LanguageId;
 	const filename = props.question.file ?? "";
-	const template = props.question.template
-		? (firstFencedCode(props.question.template) ?? "")
-		: "";
+	const template = codeTemplateOf(props.question);
 	const examples = (props.question.publicTests ?? []).filter(
 		(test) => test.example,
 	);

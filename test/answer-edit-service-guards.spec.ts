@@ -203,9 +203,10 @@ test.describe("answerHistoryWindow", () => {
 });
 
 test.describe("isHistoryField", () => {
-	test("only the answer of an essay has a history", () => {
+	test("only the answer of an essay or a code question has a history", () => {
 		expect(isHistoryField("essay", "answer")).toBe(true);
 		expect(isHistoryField("essay", "notes")).toBe(false);
+		expect(isHistoryField("code", "answer")).toBe(true);
 		expect(isHistoryField("multiple-choice", "answer")).toBe(false);
 		expect(isHistoryField(undefined, "answer")).toBe(false);
 	});

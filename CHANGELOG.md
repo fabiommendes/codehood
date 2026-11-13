@@ -125,6 +125,13 @@
   por `enrollment.manage`, como o detalhe (spec
   `dev/specs/to-review/card-de-navegacao-do-curso.md`).
 
+- O histórico de edição segue as questões `code` do mdq, além das `essay`.
+  `isHistoryField` sai para `src/services/answer-edits/fields.ts`, de onde a
+  página da prova e o serviço leem a mesma regra. O histórico de uma questão
+  `code` parte do `template` que o editor mostra, para que o template não
+  apareça como texto digitado. O seed dá à `hopper`, na `test-03`, um
+  histórico com digitação e colagem.
+
 ### Changed
 
 - A aba "Estudantes" do professor reúne turma, notas e presença: a aba
