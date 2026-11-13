@@ -264,3 +264,50 @@ test.describe("existing markdown", () => {
 		);
 	});
 });
+
+test.describe("size limits", () => {
+	/// Generous ceiling: the pathological inputs took seconds, these take milliseconds.
+	const CEILING_MS = 1_000;
+
+	function timed<T>(run: () => T): { result: T; ms: number } {
+		const start = performance.now();
+		const result = run();
+		return { result, ms: performance.now() - start };
+	}
+
+	test("a huge nested document comes out escaped and fast", () => {
+		const { result, ms } = timed(() => renderMarkdown("<em>".repeat(100_000)));
+		expect(ms).toBeLessThan(CEILING_MS);
+		expect(result).toContain("&lt;em&gt;");
+		expect(result).not.toContain("<em>");
+	});
+
+	test("a huge nested inline fragment and body come out escaped and fast", () => {
+		const inline = timed(() => renderMarkdownInline("<em>".repeat(100_000)));
+		const body = timed(() => renderMarkdownBody("<div>".repeat(100_000)));
+		expect(inline.ms).toBeLessThan(CEILING_MS);
+		expect(body.ms).toBeLessThan(CEILING_MS);
+		expect(inline.result).not.toContain("<em>");
+		expect(body.result).not.toContain("<div>");
+	});
+
+	test("the worst nesting that still takes the html path is fast", () => {
+		const nested = timed(() => renderMarkdown("<em>".repeat(1_900)));
+		const flat = timed(() => renderMarkdown("<b>x</b>".repeat(900)));
+		const wide = timed(() => renderMarkdown(`${"a ".repeat(49_000)}<em>`));
+		expect(nested.ms).toBeLessThan(CEILING_MS);
+		expect(flat.ms).toBeLessThan(CEILING_MS);
+		expect(wide.ms).toBeLessThan(CEILING_MS);
+		expect(nested.result).toContain("<em>");
+	});
+
+	test("an oversized text still renders markdown and run blocks", () => {
+		const html = renderMarkdown(
+			`**b**\n\n\`\`\`js run\n1\n\`\`\`\n\n${"x".repeat(100_001)}`,
+		);
+		expect(html).toContain("<strong>b</strong>");
+		expect(html).toContain(
+			'<div class="code-runner-block" data-language="javascript">',
+		);
+	});
+});

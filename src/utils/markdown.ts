@@ -21,7 +21,9 @@
  * - Anything else (scripts, `on*` handlers, `style`, forms, frames, SVG,
  *   MathML) is discarded together with its content.
  *
- * Order of the transformations:
+ * Texts over the size or tag count limits below skip everything that follows
+ * and are rendered with `html: false`, so author HTML comes out escaped.
+ * Otherwise, the order of the transformations is:
  *
  * 1. MarkdownIt renders the text with `html: true`. The runner blocks it
  *    generates carry a `class` and a `data-language` that the policy does not
@@ -40,12 +42,6 @@ import { m } from "@/i18n";
 import { runnerLanguage } from "@/runner/languages";
 import { highlightCode } from "./highlight-code";
 
-/// The project's only MarkdownIt instance.
-///
-/// `html: true` lets authors write comments and the tags of the policy, and
-/// is only safe because every render goes through `sanitize`.
-const md = new MarkdownIt({ html: true, linkify: true, typographer: true });
-
 /// Wrapper class of a ```js run block whose language has a driver. Same
 /// value as `CODE_RUNNER_BLOCK_CLASS` of `mount-blocks.ts`, which cannot be
 /// imported here because it pulls in the widget.
@@ -59,34 +55,72 @@ type RenderEnv = { nonce?: string };
 
 function nonceOf(env: unknown): string {
 	const nonce = (env as RenderEnv | undefined)?.nonce;
-	if (!nonce) throw new Error("markdown rendered without a nonce");
+	if (nonce === undefined) throw new Error("markdown rendered without a nonce");
 	return nonce;
 }
 
-const defaultFence = md.renderer.rules.fence;
+/// A MarkdownIt with the project's options and the run block rule. `html` is
+/// only safe when the output goes through `sanitize`.
+function createParser(html: boolean): InstanceType<typeof MarkdownIt> {
+	const parser = new MarkdownIt({ html, linkify: true, typographer: true });
+	const defaultFence = parser.renderer.rules.fence;
 
-/// Fenced blocks with `run` after the language become runnable placeholders,
-/// or a static block with a note when no driver runs the language. The
-/// language attribute comes from `runnerLanguage()`, never from the info
-/// string, and the code stays escaped.
-md.renderer.rules.fence = (tokens, idx, options, env, self) => {
-	const token = tokens[idx];
-	if (!token) return "";
-	const [tag, ...flags] = md.utils.unescapeAll(token.info).trim().split(/\s+/);
-	if (!flags.includes("run")) {
-		return (
-			defaultFence?.(tokens, idx, options, env, self) ??
-			self.renderToken(tokens, idx, options)
-		);
+	// Fenced blocks with `run` after the language become runnable placeholders,
+	// or a static block with a note when no driver runs the language. The
+	// language attribute comes from `runnerLanguage()`, never from the info
+	// string, and the code stays escaped.
+	parser.renderer.rules.fence = (tokens, idx, options, env, self) => {
+		const token = tokens[idx];
+		if (!token) return "";
+		const [tag, ...flags] = parser.utils
+			.unescapeAll(token.info)
+			.trim()
+			.split(/\s+/);
+		if (!flags.includes("run")) {
+			return (
+				defaultFence?.(tokens, idx, options, env, self) ??
+				self.renderToken(tokens, idx, options)
+			);
+		}
+		const nonce = nonceOf(env);
+		const pre = `<pre><code>${parser.utils.escapeHtml(token.content)}</code></pre>`;
+		const language = runnerLanguage(tag);
+		if (language === null) {
+			return `<div class="${nonce}${RUNNER_UNAVAILABLE_CLASS}">${pre}<p class="${nonce}text-xs ${nonce}text-muted">${parser.utils.escapeHtml(m.runner_block_unavailable())}</p></div>\n`;
+		}
+		return `<div class="${nonce}${RUNNER_BLOCK_CLASS}" data-${nonce}language="${language}">${pre}</div>\n`;
+	};
+	return parser;
+}
+
+/// Renders authored text with HTML, sanitized after.
+const md = createParser(true);
+
+/// Renders text as it was before HTML was accepted: author HTML comes out
+/// escaped, and there is nothing to sanitize. It takes the texts that are too
+/// large for the sanitizer.
+const plainMd = createParser(false);
+
+/// Largest document, in characters, that takes the HTML path. The sanitizer
+/// is quadratic in the nesting depth of its input, and past this size a
+/// document of nested tags costs it seconds.
+const MAX_HTML_DOCUMENT_LENGTH = 100_000;
+
+/// Same limit for inline fragments, which are a line or a title.
+const MAX_HTML_INLINE_LENGTH = 10_000;
+
+/// Most tag openings a text may have to take the HTML path, whatever its size.
+const MAX_HTML_TAGS = 2_000;
+
+/// Whether `text` is small and flat enough for the sanitizer.
+function takesHtmlPath(text: string, maxLength: number): boolean {
+	if (text.length > maxLength) return false;
+	let tags = 0;
+	for (let at = text.indexOf("<"); at !== -1; at = text.indexOf("<", at + 1)) {
+		if (++tags > MAX_HTML_TAGS) return false;
 	}
-	const nonce = nonceOf(env);
-	const pre = `<pre><code>${md.utils.escapeHtml(token.content)}</code></pre>`;
-	const language = runnerLanguage(tag);
-	if (language === null) {
-		return `<div class="${nonce}${RUNNER_UNAVAILABLE_CLASS}">${pre}<p class="${nonce}text-xs ${nonce}text-muted">${md.utils.escapeHtml(m.runner_block_unavailable())}</p></div>\n`;
-	}
-	return `<div class="${nonce}${RUNNER_BLOCK_CLASS}" data-${nonce}language="${language}">${pre}</div>\n`;
-};
+	return true;
+}
 
 /// Tags of inline fragments: no block may appear where a line of text does.
 const INLINE_TAGS = [
@@ -212,6 +246,9 @@ export async function highlightRunnerBlocks(html: string): Promise<string> {
 
 /** Renders a Markdown string as a block of sanitized HTML. */
 export function renderMarkdown(text: string): string {
+	if (!takesHtmlPath(text, MAX_HTML_DOCUMENT_LENGTH)) {
+		return plainMd.render(text, { nonce: "" });
+	}
 	const nonce = newNonce();
 	return sanitize(md.render(text, { nonce }), nonce, false);
 }
@@ -221,21 +258,26 @@ export function renderMarkdown(text: string): string {
  * a level-one heading that opens it.
  */
 export function renderMarkdownBody(text: string): string {
-	const nonce = newNonce();
+	const plain = !takesHtmlPath(text, MAX_HTML_DOCUMENT_LENGTH);
+	const parser = plain ? plainMd : md;
+	const nonce = plain ? "" : newNonce();
 	const env: RenderEnv = { nonce };
-	const tokens = md.parse(text, env);
+	const tokens = parser.parse(text, env);
 	const opensWithTitle =
 		tokens[0]?.type === "heading_open" && tokens[0].tag === "h1";
-	const html = md.renderer.render(
+	const html = parser.renderer.render(
 		opensWithTitle ? tokens.slice(3) : tokens,
-		md.options,
+		parser.options,
 		env,
 	);
-	return sanitize(html, nonce, false);
+	return plain ? html : sanitize(html, nonce, false);
 }
 
 /** Renders a Markdown string as a single inline fragment, with no wrapping `<p>`. */
 export function renderMarkdownInline(text: string): string {
+	if (!takesHtmlPath(text, MAX_HTML_INLINE_LENGTH)) {
+		return plainMd.renderInline(text, { nonce: "" });
+	}
 	const nonce = newNonce();
 	return sanitize(md.renderInline(text, { nonce }), nonce, true);
 }

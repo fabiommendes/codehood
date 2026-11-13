@@ -463,9 +463,9 @@ for (const submission of attempt?.submissions ?? []) {
 
     {
       exam.description && (
-        <p class="mt-4 text-sm text-base-content/70">
-          {descriptionHtml ? <span set:html={descriptionHtml} /> : exam.description}
-        </p>
+        <div class="mt-4 text-sm text-base-content/70">
+          {descriptionHtml ? <Fragment set:html={descriptionHtml} /> : <p>{exam.description}</p>}
+        </div>
       )
     }
 
