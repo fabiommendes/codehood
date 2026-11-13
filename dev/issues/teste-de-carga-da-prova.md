@@ -89,7 +89,33 @@ Duas opções, possivelmente combinadas:
   as linhas lentas de `tempo-dos-services-no-log.md`, as métricas periódicas
   de `metricas-de-performance-no-servidor.md` (memória, atraso do event loop,
   fila) e o tempo de correção do worker.
-- Um relatório no fim: p50/p95/p99 e erros por action, por cenário.
+- **Memória, amostrada a cada segundo durante todo o teste:** do processo do
+  servidor (`rss`, `heapUsed`, `heapTotal`, `external` de
+  `process.memoryUsage()`, ou o `VmRSS` de `/proc/<pid>/status` quando medido
+  de fora) e da máquina (memória livre, swap, page cache). Uma série que
+  cresce sem voltar ao fim da carga indica vazamento. Swap em uso indica que
+  a memória da VPS é o limite.
+- **Disco:** latência de `fsync` e I/O wait durante o teste (`iostat -x` ou
+  `/proc/pressure/io`), porque o commit síncrono do SQLite é um dos
+  suspeitos.
+- Um relatório no fim: p50/p95/p99 e erros por action, por cenário, com os
+  gráficos de memória, atraso do event loop e I/O ao longo do tempo.
+
+### Máquina local × VPS
+
+O servidor roda num núcleo só (um event loop), então o r2d2 não tem muito
+mais CPU útil que a VPS: só a diferença de velocidade por núcleo. Para que o
+resultado local valha para a VPS:
+
+- Limitar o servidor aos recursos da VPS com
+  `systemd-run --user --scope -p MemoryMax=<RAM da VPS> -p CPUQuota=<núcleos×100>% node dist/server/entry.mjs`.
+  Rodar o gerador de carga e o worker fora desse limite, para não disputarem
+  com o servidor.
+- O disco é a maior diferença: NVMe local contra disco virtual da VPS, com
+  `fsync` possivelmente uma ordem de grandeza mais lento. Medir o `fsync` nas
+  duas (por exemplo `fio --fsync=1` ou `pg_test_fsync`) e registrar no
+  relatório. Se o gargalo for o disco, só o teste na VPS (ou numa igual)
+  confirma.
 
 ### Cenários
 
