@@ -15,13 +15,27 @@ function fakeUsername(sequence: number): string {
 	return `${base || "user"}-${sequence}`.slice(0, 31);
 }
 
+/**
+ * A random address with a random suffix in its local part.
+ *
+ * Faker draws from a small set of names, few enough that a whole suite run
+ * draws the same address twice, and the email is unique.
+ */
+function fakeEmail(): string {
+	const [local, domain] = faker.internet
+		.email({ provider: "codehood.test" })
+		.toLowerCase()
+		.split("@");
+	return `${local}.${faker.string.alphanumeric(8).toLowerCase()}@${domain}`;
+}
+
 function buildUser(sequence: number, params: Partial<UserCreate>): UserCreate {
 	const username = params.username ?? fakeUsername(sequence);
 
 	return {
 		username,
 		name: faker.person.fullName(),
-		email: faker.internet.email({ provider: "codehood.test" }).toLowerCase(),
+		email: fakeEmail(),
 		role: "STUDENT",
 		password: faker.internet.password({ length: 12 }),
 		// Required for non-admin roles; harmless when overridden to "ADMIN".
