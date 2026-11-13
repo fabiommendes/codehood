@@ -9,7 +9,7 @@ from conftest import job_doc
 from mdq.models import RunnerReport
 
 from chalk_worker.client import Conflict
-from chalk_worker.grading import ReferenceError
+from chalk_worker.grading import PrepareFailed, ReferenceError
 from chalk_worker.loop import Filters, Worker
 
 
@@ -40,14 +40,19 @@ class FakeServer:
 
 
 class FakeGrader:
-    def __init__(self, delay: float = 0, error: Exception | None = None) -> None:
+    def __init__(
+        self, delay: float = 0, error: Exception | None = None, prepare_failures: int = 0
+    ) -> None:
         self.delay = delay
         self.error = error
+        self.prepare_failures = prepare_failures
         self.prepared = 0
         self.graded: list[str] = []
 
     def prepare(self) -> None:
         self.prepared += 1
+        if self.prepared <= self.prepare_failures:
+            raise PrepareFailed("cannot download elm/html")
         if isinstance(self.error, ReferenceError):
             raise self.error
 
@@ -106,6 +111,29 @@ def test_broken_reference_fails_every_job_of_the_question_without_grading() -> N
     assert all("reference" in e for _, e, _ in server.fails)
     assert grader.prepared == 1
     assert grader.graded == []
+
+
+def test_prepare_failure_gives_the_batch_back_without_retry() -> None:
+    server = FakeServer([[job_doc(submission="a"), job_doc(submission="b")], [job_doc()]])
+    grader = FakeGrader(prepare_failures=1)
+    assert worker(server, grader).run(once=True) == 0
+    assert [(s, retry) for s, _, retry in server.fails] == [("a", False), ("b", False)]
+    assert "elm/html" in server.fails[0][1]
+    assert grader.prepared == 1
+    assert len(server.claims) == 1
+
+
+def test_prepare_failure_is_tried_again_on_the_next_claim() -> None:
+    server = FakeServer([[job_doc(submission="a")], [job_doc(submission="a")]])
+    grader = FakeGrader(prepare_failures=1)
+    w = worker(server, grader)
+    log: list[str] = []
+    w.log = log.append
+    threading.Timer(0.3, w.stop).start()
+    w.run()
+    assert grader.prepared == 2
+    assert set(server.results) == {"a"}
+    assert any("waiting" in line for line in log)
 
 
 def test_unparsable_job_fails_with_retry() -> None:

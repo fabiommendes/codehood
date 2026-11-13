@@ -24,7 +24,13 @@ from mdq.models import CodeQuestion, RunnerReport
 from .locate import elm_module
 from .report import Run, to_report
 
-__all__ = ["PROFILE_BY_LANGUAGE", "QuestionGrader", "ReferenceError", "question_hash"]
+__all__ = [
+    "PROFILE_BY_LANGUAGE",
+    "PrepareFailed",
+    "QuestionGrader",
+    "ReferenceError",
+    "question_hash",
+]
 
 #: The chalk-grader profile of each language a question may declare.
 PROFILE_BY_LANGUAGE = {"elm": "elm-test"}
@@ -34,6 +40,14 @@ class ReferenceError(ValueError):
     """
     The question cannot be graded: it has no reference solution, the profile
     cannot run it, or the reference solution fails a test.
+    """
+
+
+class PrepareFailed(RuntimeError):
+    """
+    The profile could not be prepared on this machine: a package download
+    failed, a tool is missing, or the tests do not compile. It may pass on
+    the next try, so it is not held against the question.
     """
 
 
@@ -87,6 +101,7 @@ class QuestionGrader:
 
         Raises:
             ReferenceError: the question cannot be graded.
+            PrepareFailed: the profile could not be prepared on this machine.
         """
         if self.question.reference_solution is None:
             raise ReferenceError("the question has no reference solution (answer key)")
@@ -94,7 +109,7 @@ class QuestionGrader:
         try:
             self._grader.prepare()
         except (PrepareError, OSError, RuntimeError) as e:
-            raise ReferenceError(f"cannot prepare the profile: {e}") from None
+            raise PrepareFailed(f"cannot prepare the profile: {e}") from None
         if not self._grader.prepare().tests:
             raise ReferenceError("the reference run found no tests")
         report = self.grade(self.question.reference_solution)

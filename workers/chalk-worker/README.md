@@ -33,6 +33,11 @@ How a job is graded:
 3. A build error is a `build-error` report, a timeout of the run times out
    every case, and a failure of the infrastructure calls `fail` so the job
    returns to the queue.
+4. When the project cannot be built (a package download fails, a tool is
+   missing), the batch goes back to the queue without spending its retries
+   and the worker waits before claiming again; `--once` stops there. A
+   reference solution that fails a test spends the retries of every job of
+   the question, so the instructor sees them as failed.
 
 Caches live in `$XDG_CACHE_HOME/chalk-worker`.
 

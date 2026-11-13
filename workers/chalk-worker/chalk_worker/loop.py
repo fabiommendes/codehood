@@ -14,7 +14,7 @@ import httpx
 from mdq.models import CodeQuestion, RunnerReport
 
 from .client import ApiError, Conflict
-from .grading import ReferenceError, question_hash
+from .grading import PrepareFailed, ReferenceError, question_hash
 from .job import Job, JobError, parse_job
 
 __all__ = ["Filters", "Worker"]
@@ -117,8 +117,20 @@ class Worker:
                 if self._stop.is_set():
                     self._give_back(jobs[index:])
                     break
-                self._process(data)
+                try:
+                    self._process(data)
+                except PrepareFailed as e:
+                    self.log(f"{e}")
+                    self._give_back(jobs[index:], f"worker cannot grade now: {e}")
+                    break
                 done += 1
+            else:
+                continue
+            if once or self._stop.is_set():
+                break
+            self.log(f"waiting {wait:.0f}s before claiming again")
+            self._stop.wait(wait)
+            wait = min(wait * 2, MAX_POLL)
         return done
 
     def _process(self, data: dict[str, Any]) -> None:
@@ -142,6 +154,12 @@ class Worker:
         self._send(job, report, time.monotonic() - started)
 
     def _grader(self, question: CodeQuestion) -> Grader | ReferenceError:
+        """
+        The prepared grader of a question, or why it cannot be graded.
+
+        Raises:
+            PrepareFailed: the profile could not be prepared; nothing is cached.
+        """
         key = question_hash(question)
         if key not in self._graders:
             try:
@@ -179,11 +197,11 @@ class Worker:
         except (ApiError, httpx.HTTPError) as e:
             self.log(f"{submission}: could not report the failure: {e}")
 
-    def _give_back(self, jobs: Sequence[dict[str, Any]]) -> None:
+    def _give_back(self, jobs: Sequence[dict[str, Any]], reason: str = "worker stopping") -> None:
         for data in jobs:
             submission = str(data.get("submission", "?"))
             try:
-                self.server.fail(submission, "worker stopping", False)
+                self.server.fail(submission, reason[:MAX_ERROR], False)
             except (ApiError, httpx.HTTPError) as e:
                 self.log(f"{submission}: could not give back: {e}")
 
