@@ -8,7 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Frame, Page } from "@playwright/test";
-import type { RunnerToAppMessage } from "../protocol";
+import type { RunMode, RunnerToAppMessage } from "../protocol";
 
 export type RunnerMessage = RunnerToAppMessage;
 
@@ -142,7 +142,7 @@ export async function waitFor(
 /// Options of a run started by the harness.
 export interface StartOptions {
 	runId?: string;
-	mode?: "script" | "repl";
+	mode?: RunMode;
 	extra?: Record<string, unknown>;
 }
 
@@ -162,7 +162,7 @@ export function runMessage(
 	runId: string,
 	code: string,
 	language: Language = "fake",
-	mode: "script" | "repl" = "script",
+	mode: RunMode = "script",
 	extra: Record<string, unknown> = {},
 ) {
 	const entry = ENTRY[language] ?? `main.${language}`;

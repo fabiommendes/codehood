@@ -16,5 +16,5 @@ export const languageId = z
 	.max(32)
 	.regex(/^[a-z][a-z0-9-]*$/);
 
-/** How a driver runs the files: once from the entry file, or as a read-eval-print loop. */
-export const runMode = z.enum(["script", "repl"] satisfies RunMode[]);
+/** How a driver runs the files; see `RunMode`. */
+export const runMode = z.enum(["script", "repl", "test"] satisfies RunMode[]);

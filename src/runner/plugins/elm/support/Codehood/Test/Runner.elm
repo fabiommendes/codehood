@@ -1,4 +1,4 @@
-port module Codehood.Test.Runner exposing (run)
+port module Codehood.Test.Runner exposing (run, runJson)
 
 {-| Runs a test suite and reports it, in the style of `elm-test`, through the
 `report` port: the whole text and the exit code (0 when every test passed,
@@ -7,6 +7,7 @@ port module Codehood.Test.Runner exposing (run)
 
 import Codehood.Test.Format as Format
 import Codehood.Test.Highlightable as Highlightable exposing (Highlightable)
+import Json.Encode as Encode
 import Random
 import Test exposing (Test)
 import Test.Runner exposing (Runner, SeededRunners(..))
@@ -38,6 +39,84 @@ run suite =
         , update = \seed model -> ( model, report (execute seed suite) )
         , subscriptions = \_ -> start identity
         }
+
+
+{-| Like `run`, but the report is JSON: `{"cases": [...]}`, or
+`{"invalid": "..."}` when the suite is not valid. Each case has `labels`
+(outermost first, the test name last) and a `verdict` (`pass`, `fail` or
+`skipped`); a failed case also has `message`, and `expected` and `actual`
+for an equality. The exit code is 0.
+-}
+runJson : Test -> Program () () Int
+runJson suite =
+    Platform.worker
+        { init = \_ -> ( (), Cmd.none )
+        , update = \seed model -> ( model, report { output = executeJson seed suite, code = 0 } )
+        , subscriptions = \_ -> start identity
+        }
+
+
+executeJson : Int -> Test -> String
+executeJson seed suite =
+    let
+        cases runners =
+            Encode.object [ ( "cases", Encode.list caseJson runners ) ]
+    in
+    Encode.encode 0
+        (case Test.Runner.fromTest fuzzRuns (Random.initialSeed seed) suite of
+            Plain runners ->
+                cases runners
+
+            Only runners ->
+                cases runners
+
+            Skipping runners ->
+                cases runners
+
+            Invalid message ->
+                Encode.object [ ( "invalid", Encode.string message ) ]
+        )
+
+
+caseJson : Runner -> Encode.Value
+caseJson runner =
+    let
+        expectations =
+            runner.run ()
+
+        failures =
+            List.filterMap Test.Runner.getFailureReason expectations
+
+        labels =
+            ( "labels", Encode.list Encode.string (List.reverse runner.labels) )
+
+        plain expected actual =
+            ( String.concat (List.map (Highlightable.resolve { fromHighlighted = identity, fromPlain = identity }) expected)
+            , String.concat (List.map (Highlightable.resolve { fromHighlighted = identity, fromPlain = identity }) actual)
+            )
+    in
+    case failures of
+        [] ->
+            Encode.object [ labels, ( "verdict", Encode.string "pass" ) ]
+
+        first :: _ ->
+            if List.all Test.Runner.isTodo expectations then
+                Encode.object [ labels, ( "verdict", Encode.string "skipped" ) ]
+
+            else
+                Encode.object
+                    ([ labels
+                     , ( "verdict", Encode.string "fail" )
+                     , ( "message", Encode.string (String.join "\n\n" (List.map (\f -> Format.format plain f.description f.reason) failures)) )
+                     ]
+                        ++ (case first.reason of
+                                Test.Runner.Failure.Equality expected actual ->
+                                    [ ( "expected", Encode.string expected ), ( "actual", Encode.string actual ) ]
+
+                                _ ->
+                                    []
+                           )
+                    )
 
 
 type alias Outcome =

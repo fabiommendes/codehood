@@ -26,7 +26,7 @@ let loaded: { elm: GuidaElm; cache: Map<string, Uint8Array> } | null = null;
 
 export const elmDriver: Driver = {
 	language: "elm",
-	modes: ["repl", "script"],
+	modes: ["repl", "script", "test"],
 
 	async load(ctx: LoadContext) {
 		const url = ctx.runtimeUrl(runtimePath(guida, "guida.mjs"));

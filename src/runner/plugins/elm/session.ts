@@ -120,7 +120,10 @@ function runSuite(code: string, ctx: RunContext): Promise<number> {
  * `cache` (the files the build packed).
  *
  * Resolves with the exit code: 1 when it does not compile, 2 when a test
- * fails, 0 otherwise (and after the REPL, in `repl` mode).
+ * fails, 0 otherwise (and after the REPL, in `repl` mode). In `test` mode the
+ * entry is the test source and stdout is the JSON of `runJson`: the code is 0
+ * whatever the tests do, 1 when it does not compile, 3 when the entry has no
+ * `tests`.
  */
 export async function runElm(
 	elm: GuidaElm,
@@ -138,6 +141,11 @@ export async function runElm(
 	const entrySource = ctx.files[ctx.entry] ?? "";
 	const module = moduleName(entrySource);
 	const withTests = declaresTests(entrySource);
+	const testMode = ctx.mode === "test";
+	if (testMode && !withTests) {
+		ctx.stderr(`${ctx.entry} does not declare \`tests\`.\n`);
+		return 3;
+	}
 	const fileOf = (path: string) => {
 		const full = fs.resolve(path);
 		const prefix = `${PROJECT_DIR}/${SOURCE_DIR}/`;
@@ -158,7 +166,7 @@ export async function runElm(
 	if (withTests) {
 		fs.write(
 			`${PROJECT_DIR}/${SOURCE_DIR}/${TEST_MAIN_MODULE}.elm`,
-			testMainSource(module),
+			testMainSource(module, testMode),
 		);
 	}
 	let errors = "";
@@ -202,6 +210,8 @@ export async function runElm(
 		const code = fs.read(TESTS_JS);
 		if (!code) throw new Error("The compiler wrote no test suite.");
 		status = await runSuite(new TextDecoder().decode(code), ctx);
+		// The JSON report carries the results; a failing test is not a failure of the run.
+		if (testMode) status = 0;
 	} else if (ctx.mode === "script") {
 		ctx.stdout(`Compiled ${ctx.entry}, no tests to run.\n`);
 	}

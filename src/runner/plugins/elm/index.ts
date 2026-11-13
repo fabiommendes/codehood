@@ -13,7 +13,7 @@ export default function elm() {
 		extension: "elm",
 		// File names must match module names.
 		defaultFilename: "Main.elm",
-		modes: ["repl", "script"],
+		modes: ["repl", "script", "test"],
 		defaultMode: "repl",
 		label: { en: "Elm" },
 		notes: {

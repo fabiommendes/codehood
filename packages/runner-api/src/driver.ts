@@ -12,8 +12,17 @@
 /** Id of a language, as its plugin declares it, e.g. `python`. */
 export type LanguageId = string;
 
-/** How a driver runs the files: once from the entry file, or as a read-eval-print loop. */
-export type RunMode = "script" | "repl";
+/**
+ * How a driver runs the files: once from the entry file, as a
+ * read-eval-print loop, or as a test run.
+ *
+ * In `test` mode `entry` is a test source and the other files are the
+ * program under test. The driver writes the results of the cases to stdout
+ * as JSON (its shape is the language's own) and exits 0 when it ran them,
+ * pass or fail; a program that does not build exits 1 with the compiler's
+ * message on stderr.
+ */
+export type RunMode = "script" | "repl" | "test";
 
 /**
  * A problem the driver found at a place in the source, e.g. a syntax error.

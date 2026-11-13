@@ -49,8 +49,13 @@ export const STUFF_DIR = "guida-stuff";
 /// Module the driver generates to run a suite; never one of the student's.
 export const TEST_MAIN_MODULE = "CodehoodTestMain";
 
-/** Source of the module that runs `tests` of `module`, written to `SOURCE_DIR`. */
-export function testMainSource(module: string): string {
+/**
+ * Source of the module that runs `tests` of `module`, written to `SOURCE_DIR`.
+ *
+ * With `json`, the suite reports as JSON (`Codehood.Test.Runner.runJson`)
+ * instead of terminal text.
+ */
+export function testMainSource(module: string, json = false): string {
 	return [
 		`module ${TEST_MAIN_MODULE} exposing (main)`,
 		"",
@@ -58,7 +63,7 @@ export function testMainSource(module: string): string {
 		`import ${module}`,
 		"",
 		"",
-		`main = Codehood.Test.Runner.run ${module}.tests`,
+		`main = Codehood.Test.Runner.${json ? "runJson" : "run"} ${module}.tests`,
 		"",
 	].join("\n");
 }

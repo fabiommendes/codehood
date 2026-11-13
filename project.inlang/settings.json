@@ -13,6 +13,7 @@
 			"./messages/{locale}/admin.json",
 			"./messages/{locale}/attendance.json",
 			"./messages/{locale}/auth.json",
+			"./messages/{locale}/code.json",
 			"./messages/{locale}/common.json",
 			"./messages/{locale}/courses.json",
 			"./messages/{locale}/emails.json",
