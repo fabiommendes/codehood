@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { deflateSync } from "node:zlib";
+import { type CodeQuestion, parse, resolveTests } from "mdq";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hashToken } from "@/auth/token";
 import { DEVELOPMENT, MAX_ANSWER_HISTORY_TEXT_BYTES } from "@/core/constants";
@@ -1378,6 +1381,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
 	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
+	await seedExternalGradingExams(cs101.id, ada, {
+		hopper,
+		hamilton,
+		liskov,
+		bob,
+		knuth: cohort[0] as User,
+		ritchie: cohort[1] as User,
+		thompson: cohort[2] as User,
+		backus: cohort[3] as User,
+	});
 	await seedRunnableCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
 	await seedRubricExam(
 		cs101.id,
@@ -2970,6 +2983,295 @@ async function seedCodeExam(
 		{ status: "COMPLETED" },
 		FULL_ACCESS,
 	);
+}
+
+/// The directory of the Elm example question, the one the grading worker's example course also uses.
+const ELM_EXAMPLE_DIR = "workers/chalk-worker/example/questions/elm";
+
+/// The example question with its linked test sources resolved, as the CLI pushes it.
+function elmExampleQuestion(): CodeQuestion {
+	const dir = path.resolve(process.cwd(), ELM_EXAMPLE_DIR);
+	const read = (file: string) => readFileSync(path.join(dir, file), "utf8");
+	const question = parse(read("soma.md"), { kind: "question" }) as CodeQuestion;
+	const texts = Object.fromEntries(
+		(question.tests ?? []).flatMap((source) =>
+			source.origin ? [[source.origin, read(source.origin)]] : [],
+		),
+	);
+	return resolveTests(question, texts);
+}
+
+/// Elm answers to the example question, from a correct one to a template left as it came.
+const ELM_ANSWERS = {
+	template:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    0\n",
+	firstOnly:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    case xs of\n        [] ->\n            0\n\n        x :: _ ->\n            x\n",
+	positives:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    List.sum (List.filter (\\x -> x > 0) xs)\n",
+	correct:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    List.foldl (+) 0 xs\n",
+	unfinished:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    List.fol",
+};
+
+type ElmVerdict = "pass" | "fail";
+
+/// The runner report of the example question: the two public cases of `Pre.elm`, then the two hidden ones of `Hidden.elm`.
+function elmReport(verdicts: {
+	empty: ElmVerdict;
+	one: ElmVerdict;
+	long: ElmVerdict;
+	negatives: ElmVerdict;
+}): object {
+	const failure = (expected: string, actual: string) => ({
+		message: `Expected ${expected} but got ${actual}`,
+		expected,
+		actual,
+	});
+	return {
+		status: "completed",
+		runner: { name: "chalk-worker", version: "0.1.0", language: "elm" },
+		cases: [
+			{
+				source: 0,
+				line: 12,
+				id: "vazia",
+				verdict: verdicts.empty,
+				duration: 0.004,
+				...(verdicts.empty === "fail" ? failure("0", "1") : {}),
+			},
+			{
+				source: 0,
+				line: 13,
+				id: "um",
+				verdict: verdicts.one,
+				duration: 0.003,
+				...(verdicts.one === "fail" ? failure("7", "0") : {}),
+			},
+			{
+				source: 1,
+				line: 12,
+				id: "longa",
+				verdict: verdicts.long,
+				duration: 0.006,
+				...(verdicts.long === "fail" ? failure("55", "1") : {}),
+			},
+			{
+				source: 1,
+				line: 14,
+				id: "negativos",
+				verdict: verdicts.negatives,
+				duration: 0.004,
+				...(verdicts.negatives === "fail" ? failure("-3", "0") : {}),
+			},
+		],
+	};
+}
+
+/**
+ * Seeds an open `EXAM` and a `PRACTICE` that send an Elm question to a grading worker, with a student in each state of the queue.
+ *
+ * The bot `runner` (`ada`'s key) grades through the job service, so scores,
+ * feedback and statuses come from the real code. Exam: `bob` waits in the
+ * queue, `liskov` is being corrected (the lease outlasts a dev session),
+ * `hopper` has a partial grade and then a full one, `hamilton` failed the
+ * pretest, `knuth` hit the worker failure limit, `ritchie` replaced a
+ * cancelled send, `thompson` spent every send, and `backus` only autosaved.
+ * The dev student has several corrected sends in the practice.
+ */
+async function seedExternalGradingExams(
+	course: Course["id"],
+	instructor: User,
+	students: {
+		hopper: User;
+		hamilton: User;
+		liskov: User;
+		bob: User;
+		knuth: User;
+		ritchie: User;
+		thompson: User;
+		backus: User;
+	},
+): Promise<void> {
+	const exam = "test-elm";
+	const practice = "practice-elm";
+	const question = "elm-soma";
+	const worker = "elm-test";
+	const devStudent = await db.user.findOne(
+		{ username: DEV_STUDENT_USERNAME },
+		FULL_ACCESS,
+	);
+	if (!devStudent) throw new Error("The dev student account is missing.");
+	const bot = { actor: { ...instructor, bot: "runner" } };
+
+	await db.question.create(
+		{
+			course,
+			slug: question,
+			status: "PUBLISHED",
+			version: "v1",
+			question: elmExampleQuestion(),
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 7: Elm",
+			description: "A code answer corrected by an external worker.",
+			tags: ["elm"],
+			questions: [{ slug: question, version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: practice,
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Practice: Elm",
+			description: "Send as many times as you like.",
+			tags: ["elm", "practice"],
+			questions: [{ slug: question, version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+
+	/// Sends `payload` and returns the new submission's id.
+	const send = async (
+		examSlug: string,
+		student: User,
+		payload: string,
+	): Promise<string> => {
+		const response = await db.response.submit(
+			{ course, exam: examSlug, question, payload, kind: "SUBMIT" },
+			{ actor: student },
+		);
+		return response.submissions.at(-1)?.publicId ?? "";
+	};
+	/// Has the bot claim the only queued job, which must be `submission`'s.
+	const claim = async (submission: string): Promise<void> => {
+		const [job] = await db.gradingJob.claim(
+			{ workers: [worker], limit: 1 },
+			bot,
+		);
+		if (job?.submission !== submission) {
+			throw new Error(
+				`[seed] the bot claimed ${job?.submission}, not ${submission}.`,
+			);
+		}
+	};
+	/// Sends `payload`, then has the bot correct it with `verdicts`.
+	const sendAndGrade = async (
+		examSlug: string,
+		student: User,
+		payload: string,
+		verdicts: Parameters<typeof elmReport>[0],
+	): Promise<void> => {
+		const submission = await send(examSlug, student, payload);
+		await claim(submission);
+		await db.gradingJob.complete(submission, elmReport(verdicts), bot);
+	};
+	const all = (verdict: ElmVerdict) => ({
+		empty: verdict,
+		one: verdict,
+		long: verdict,
+		negatives: verdict,
+	});
+	const partial = {
+		empty: "pass",
+		one: "pass",
+		long: "pass",
+		negatives: "fail",
+	} as const;
+	const noHidden = {
+		empty: "pass",
+		one: "pass",
+		long: "fail",
+		negatives: "fail",
+	} as const;
+
+	// Corrected sends first: a claim takes the oldest queued job, so the jobs
+	// that stay queued are sent last.
+	await sendAndGrade(exam, students.hopper, ELM_ANSWERS.positives, partial);
+	await sendAndGrade(exam, students.hopper, ELM_ANSWERS.correct, all("pass"));
+
+	const failedPretest = await send(
+		exam,
+		students.hamilton,
+		ELM_ANSWERS.template,
+	);
+	await claim(failedPretest);
+	await db.gradingJob.complete(
+		failedPretest,
+		elmReport({ ...all("pass"), one: "fail" }),
+		bot,
+	);
+
+	for (const [payload, verdicts] of [
+		[ELM_ANSWERS.firstOnly, noHidden],
+		[ELM_ANSWERS.positives, partial],
+		[ELM_ANSWERS.firstOnly, noHidden],
+		[ELM_ANSWERS.positives, partial],
+	] as const) {
+		await sendAndGrade(exam, students.thompson, payload, verdicts);
+	}
+
+	for (const [payload, verdicts] of [
+		[ELM_ANSWERS.firstOnly, noHidden],
+		[ELM_ANSWERS.positives, partial],
+		[ELM_ANSWERS.correct, all("pass")],
+	] as const) {
+		await sendAndGrade(practice, devStudent, payload, verdicts);
+	}
+
+	const crashing = await send(exam, students.knuth, ELM_ANSWERS.correct);
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		await claim(crashing);
+		await db.gradingJob.fail(
+			crashing,
+			{
+				error: "elm-test exited with status 137 (killed, out of memory)",
+				retry: true,
+			},
+			bot,
+		);
+	}
+
+	const claimed = await send(exam, students.liskov, ELM_ANSWERS.positives);
+	await claim(claimed);
+	// A long lease, so the page shows the send as being corrected through a dev session.
+	await prisma.gradingJob.updateMany({
+		where: { submission: { publicId: claimed } },
+		data: { leaseUntil: new Date(Date.now() + 30 * 24 * 3_600_000) },
+	});
+
+	// The first send is cancelled by the second, which waits in the queue.
+	await send(exam, students.ritchie, ELM_ANSWERS.unfinished);
+	await send(exam, students.ritchie, ELM_ANSWERS.positives);
+	await send(exam, students.bob, ELM_ANSWERS.correct);
+
+	await db.response.submit(
+		{
+			course,
+			exam,
+			question,
+			author: students.backus.username,
+			payload: ELM_ANSWERS.unfinished,
+		},
+		{ actor: students.backus },
+	);
+
+	// The professor's page shows when the worker was last seen.
+	await prisma.apiKey.updateMany({
+		where: { name: "runner" },
+		data: { lastUsedAt: new Date(Date.now() - 2 * 60_000) },
+	});
 }
 
 /**
