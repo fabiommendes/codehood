@@ -383,3 +383,38 @@ test("gradingJob actions: the instructor reads the queue and requeues failures, 
 	});
 	expect(forbidden.status()).toBe(403);
 });
+
+test("exam.answer with SUBMIT queues the send and answers with the sends of the question, an autosave does not", async ({
+	request,
+}) => {
+	const w = await world();
+	const student = await loginHeaders(request, w.student.username);
+	const answer = (kind?: "SUBMIT") =>
+		request.post("/_actions/exam.answer", {
+			headers: student,
+			data: {
+				discipline: w.discipline,
+				course: w.courseSegment,
+				exam: w.exam.slug,
+				question: w.question,
+				payload: "def add(a, b): return a + b + 0",
+				...(kind ? { kind } : {}),
+			},
+		});
+
+	const autosaved = await answer();
+	expect(autosaved.ok(), await autosaved.text()).toBe(true);
+	expect(await autosaved.text()).not.toContain("attemptsLeft");
+
+	const sent = await answer("SUBMIT");
+	expect(sent.ok(), await sent.text()).toBe(true);
+	const text = await sent.text();
+	expect(text).toContain("attemptsLeft");
+	expect(text).toContain("QUEUED");
+
+	const states = await prisma.gradingJob.findMany({
+		where: { submission: { response: { publicId: w.response } } },
+		orderBy: { id: "asc" },
+	});
+	expect(states.map((job) => job.state)).toEqual(["CANCELLED", "QUEUED"]);
+});

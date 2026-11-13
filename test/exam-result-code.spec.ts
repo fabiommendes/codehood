@@ -166,3 +166,42 @@ test("examResult code: a submission marked will-not-grade is left out", () => {
 
 	expect(result.questions[0]).toMatchObject({ score: 0.5, submission: "b" });
 });
+
+test("examResult code: a score below zero counts as zero, discounted or not", () => {
+	const result = examResult(
+		["q"],
+		[sent("b", 2)],
+		[pass("b", "-1", 5)],
+		POLICY,
+	);
+
+	expect(result.questions[0]).toMatchObject({ status: "graded", score: 0 });
+	expect(result.questions[0]?.codeAttempts).toEqual([
+		{ submission: "b", score: -1, discounted: 0, counts: true },
+	]);
+});
+
+test("examResult code: the discount of later submissions follows the grade a human gave, not the bot's", () => {
+	const result = examResult(
+		["q"],
+		[sent("b", 2), sent("c", 3)],
+		[pass("b", "1/2", 5), pass("b", "1", 9), pass("c", "1", 6)],
+		POLICY,
+	);
+
+	expect(result.questions[0]?.codeAttempts).toEqual([
+		{ submission: "b", score: 1, discounted: 1, counts: true },
+		{ submission: "c", score: 1, discounted: 1, counts: false },
+	]);
+});
+
+test("examResult code: every earlier wrong submission costs one discount", () => {
+	const result = examResult(
+		["q"],
+		[sent("a", 1), sent("b", 2), sent("c", 3)],
+		[pass("a", "1/2", 5), pass("b", "1/2", 6), pass("c", "1", 7)],
+		POLICY,
+	);
+
+	expect(result.questions[0]).toMatchObject({ score: 0.6, submission: "c" });
+});

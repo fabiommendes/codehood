@@ -1,13 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import { db, type schema } from "@/db";
-import { prisma } from "@/db/client";
+import { PrismaClient, prisma } from "@/db/client";
+import { makeResponseService } from "@/db/services/response.service";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import { sumCode } from "@/mdq/fixtures";
+import { makeQuestion } from "./conditional-write-exam-support";
 
 // Sending a `code` answer to a worker, and what closing the attempt does to
 // the last autosave. Autosave must never be touched by any of it.
@@ -500,4 +503,188 @@ test("closing twice promotes once", async () => {
 	expect(
 		(await submissionsOf(ctx)).filter((s) => s.kind === "FINAL"),
 	).toHaveLength(1);
+});
+
+//
+// A failure while sending
+//
+
+/// Adds a second `code` question, graded by `worker`, to the exam of `ctx`.
+async function addCodeQuestion(ctx: Ctx, worker: string): Promise<string> {
+	const slug = tag("code-");
+	await db.question.create(
+		{
+			course: ctx.course.id,
+			slug,
+			status: "PUBLISHED",
+			version: "1",
+			rev: null,
+			question: { ...sumCode, meta: { worker } },
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.update(
+		{ course: ctx.course.id, slug: ctx.exam.slug },
+		{ questions: [{ slug: ctx.slug }, { slug }] },
+		FULL_ACCESS,
+	);
+	return slug;
+}
+
+/// Runs `run` while the database refuses every grading job of `worker`.
+async function refusingJobsOf(worker: string, run: () => Promise<void>) {
+	const trigger = tag("refuse");
+	await prisma.$executeRawUnsafe(
+		`CREATE TRIGGER ${trigger} BEFORE INSERT ON GradingJob WHEN NEW.worker = '${worker}' BEGIN SELECT RAISE(ABORT, 'job refused'); END`,
+	);
+	try {
+		await run();
+	} finally {
+		await prisma.$executeRawUnsafe(`DROP TRIGGER ${trigger}`);
+	}
+}
+
+/// Runs `run` and returns what it wrote to `console.error`.
+async function loggedErrors(run: () => Promise<void>): Promise<unknown[][]> {
+	const logged: unknown[][] = [];
+	const original = console.error;
+	console.error = (...args: unknown[]) => {
+		logged.push(args);
+	};
+	try {
+		await run();
+	} finally {
+		console.error = original;
+	}
+	return logged;
+}
+
+for (const order of ["first", "last"] as const) {
+	test(`closing sends the other questions when the send of the one that comes ${order} fails`, async () => {
+		const refused = tag("w");
+		const ctx = await setup({
+			meta: { worker: order === "first" ? refused : "elm-test" },
+		});
+		const second = await addCodeQuestion(
+			ctx,
+			order === "first" ? "elm-test" : refused,
+		);
+		const [broken, working] =
+			order === "first" ? [ctx.slug, second] : [second, ctx.slug];
+		for (const slug of [ctx.slug, second]) {
+			await db.response.submit(ctx.input("typed", undefined, slug), {
+				actor: ctx.student,
+			});
+		}
+
+		let closed: { acceptingSubmissions: boolean } | undefined;
+		const logged = await loggedErrors(() =>
+			refusingJobsOf(refused, async () => {
+				closed = await ctx.finish();
+			}),
+		);
+
+		expect(closed?.acceptingSubmissions).toBe(false);
+		expect(logged).toHaveLength(1);
+		const kinds = async (slug: string) =>
+			(
+				await prisma.submission.findMany({
+					where: { response: { examId: ctx.exam.id }, question: { slug } },
+					orderBy: { id: "asc" },
+				})
+			).map((s) => s.kind);
+		expect(await kinds(working)).toEqual(["AUTOSAVE", "FINAL"]);
+		expect(await kinds(broken)).toEqual(["AUTOSAVE"]);
+		const jobs = await jobsOf(ctx);
+		expect(jobs.map((j) => j.worker)).toEqual(["elm-test"]);
+	});
+}
+
+test("a SUBMIT whose job cannot be written stores no submission", async () => {
+	const refused = tag("w");
+	const ctx = await setup({ meta: { worker: refused } });
+	await ctx.save("draft");
+
+	await refusingJobsOf(refused, async () => {
+		await expect(ctx.save("a", "SUBMIT")).rejects.toBeDefined();
+	});
+
+	expect((await submissionsOf(ctx)).map((s) => s.kind)).toEqual(["AUTOSAVE"]);
+	expect(await jobsOf(ctx)).toHaveLength(0);
+});
+
+//
+// Questions are independent, and an autosave stays cheap
+//
+
+test("a SUBMIT neither cancels nor waits for the job of another question", async () => {
+	const ctx = await setup();
+	const other = await addCodeQuestion(ctx, "elm-test");
+	await ctx.save("a", "SUBMIT");
+	await setLastJob(ctx, "CLAIMED");
+
+	await db.response.submit(ctx.input("b", "SUBMIT", other), {
+		actor: ctx.student,
+	});
+	await db.response.submit(ctx.input("c", "SUBMIT", other), {
+		actor: ctx.student,
+	});
+
+	expect((await jobsOf(ctx)).map((j) => j.state)).toEqual([
+		"CLAIMED",
+		"CANCELLED",
+		"QUEUED",
+	]);
+});
+
+test("a SUBMIT does not spend the sends of another question", async () => {
+	const ctx = await setup({ meta: { worker: "w", attempts: 1 } });
+	const other = await addCodeQuestion(ctx, "w");
+	await ctx.save("a", "SUBMIT");
+	await setLastJob(ctx, "DONE", "GRADED_AUTOMATICALLY");
+
+	await expect(
+		db.response.submit(ctx.input("b", "SUBMIT", other), {
+			actor: ctx.student,
+		}),
+	).resolves.toBeDefined();
+});
+
+test("an autosave of a code question runs no more queries than one of an essay", async () => {
+	const ctx = await setup();
+	const essay = await makeQuestion(ctx.course.id);
+	await db.exam.update(
+		{ course: ctx.course.id, slug: ctx.exam.slug },
+		{ questions: [{ slug: ctx.slug }, { slug: essay.slug }] },
+		FULL_ACCESS,
+	);
+	let queries = 0;
+	const counting = new PrismaClient({
+		adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "" }),
+		log: [{ emit: "event", level: "query" }],
+	});
+	counting.$on("query", () => {
+		queries += 1;
+	});
+	const service = makeResponseService(counting);
+	const autosave = async (slug: string) => {
+		await service.submit(ctx.input("typed", undefined, slug), {
+			actor: ctx.student,
+		});
+		const before = queries;
+		await service.submit(ctx.input("typed again", undefined, slug), {
+			actor: ctx.student,
+		});
+		return queries - before;
+	};
+
+	try {
+		const forEssay = await autosave(essay.slug);
+		const forCode = await autosave(ctx.slug);
+
+		expect(forEssay).toBeGreaterThan(0);
+		expect(forCode).toBeLessThanOrEqual(forEssay);
+	} finally {
+		await counting.$disconnect();
+	}
 });

@@ -191,6 +191,17 @@ export async function promoteFinalSends(
 			);
 		} catch (error) {
 			if (error instanceof NotAllowed && error.status === 409) continue;
+			// The send may have written its submission before the job failed: take it back.
+			await tx.submission
+				.deleteMany({
+					where: {
+						responseId: response.id,
+						questionId: question.id,
+						kind: "FINAL",
+						gradingJob: null,
+					},
+				})
+				.catch(() => undefined);
 			console.error(
 				`attempt ${response.id}: could not send the last autosave of question ${question.id}`,
 				error,

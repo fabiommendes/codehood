@@ -437,6 +437,80 @@ test("claim: refused to a session, a CLI key and SYSTEM", async () => {
 	}
 });
 
+test("claim: the lease lasts 120 s by default and 600 s at most", async () => {
+	const w = await world();
+	await enqueue(w);
+	await enqueue(w);
+	const bot = botOf(w.instructor);
+
+	const before = Date.now();
+	const [byDefault] = await db.gradingJob.claim({ ...ALL, limit: 1 }, bot);
+	const [longest] = await db.gradingJob.claim(
+		{ ...ALL, limit: 1, leaseMs: 600_000 },
+		bot,
+	);
+
+	const lease = (job: { leaseUntil: string } | undefined) =>
+		new Date(job?.leaseUntil ?? "").getTime();
+	expect(lease(byDefault)).toBeGreaterThanOrEqual(before + 120_000);
+	expect(lease(byDefault)).toBeLessThanOrEqual(Date.now() + 120_000);
+	expect(lease(longest)).toBeGreaterThanOrEqual(before + 600_000);
+	expect(lease(longest)).toBeLessThanOrEqual(Date.now() + 600_000);
+});
+
+test("claim: a job another claimer took after it was read is skipped, not taken over", async () => {
+	const w = await world();
+	const first = await enqueue(w);
+	const second = await enqueue(w);
+	const rival = new Date(Date.now() + 60_000);
+
+	const jobs = await prisma.$transaction(async (tx) => {
+		let stolen = false;
+		// The rival's claim lands between this claim's read and its writes.
+		const model = new Proxy(tx.gradingJob, {
+			get(target, key) {
+				const value = Reflect.get(target, key);
+				if (typeof value !== "function") return value;
+				if (key !== "findMany") return value.bind(target);
+				return async (...args: unknown[]) => {
+					const rows = await (
+						value as (...a: unknown[]) => Promise<{ id: number }[]>
+					).apply(target, args);
+					if (!stolen && rows[0]) {
+						stolen = true;
+						await target.update({
+							where: { id: rows[0].id },
+							data: { state: "CLAIMED", claimedBy: "rival", leaseUntil: rival },
+						});
+					}
+					return rows;
+				};
+			},
+		});
+		const racing = new Proxy(tx, {
+			get(target, key) {
+				if (key === "gradingJob") return model;
+				const value = Reflect.get(target, key);
+				return typeof value === "function" ? value.bind(target) : value;
+			},
+		});
+		return db.gradingJob.claim(ALL, {
+			...botOf(w.instructor, "late"),
+			tx: racing,
+		});
+	});
+
+	expect(jobs.map((j) => j.submission)).toEqual([second]);
+	expect(await jobOf(first)).toMatchObject({
+		state: "CLAIMED",
+		claimedBy: "rival",
+	});
+	expect(await jobOf(second)).toMatchObject({
+		state: "CLAIMED",
+		claimedBy: "late",
+	});
+});
+
 //
 // renew
 //
@@ -455,6 +529,20 @@ test("renew: the holder extends the lease", async () => {
 
 	expect(new Date(leaseUntil).getTime()).toBeGreaterThan(Date.now() + 290_000);
 	expect((await jobOf(sub)).leaseUntil?.toISOString()).toBe(leaseUntil);
+});
+
+test("renew: the lease lasts 120 s by default", async () => {
+	const w = await world();
+	const sub = await enqueue(w);
+	const bot = botOf(w.instructor);
+	await db.gradingJob.claim({ ...ALL, leaseMs: 1_000 }, bot);
+
+	const before = Date.now();
+	const { leaseUntil } = await db.gradingJob.renew(sub, {}, bot);
+
+	const lease = new Date(leaseUntil).getTime();
+	expect(lease).toBeGreaterThanOrEqual(before + 120_000);
+	expect(lease).toBeLessThanOrEqual(Date.now() + 120_000);
 });
 
 test("renew, fail and complete: 409 for a bot that does not hold the lease", async () => {
@@ -806,6 +894,23 @@ test("a human pass leaves failed and cancelled jobs as they are", async () => {
 
 	expect((await jobOf(failed)).state).toBe("FAILED");
 	expect((await jobOf(cancelled)).state).toBe("CANCELLED");
+});
+
+test("a pass by a bot leaves a queued job as it is", async () => {
+	const w = await world();
+	const sub = await enqueue(w);
+
+	await db.feedback.create(
+		{
+			submission: { publicId: sub },
+			ref: "other-bot",
+			bot: "other-bot",
+			score: "1",
+		},
+		FULL_ACCESS,
+	);
+
+	expect((await jobOf(sub)).state).toBe("QUEUED");
 });
 
 //

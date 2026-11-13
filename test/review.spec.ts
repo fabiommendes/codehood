@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { capitalChoice, plateauFillIn } from "@/mdq/fixtures";
+import { capitalChoice, plateauFillIn, sumCode } from "@/mdq/fixtures";
 import { blanksScore, pendingBlanks, reviewResult } from "@/services/review";
 
 const question = plateauFillIn;
@@ -52,4 +52,20 @@ test("blanksScore combines the blank grades with the blanks the library scores",
 		}),
 	).toThrow(RangeError);
 	expect(() => blanksScore(question, unmatched, {})).toThrow();
+});
+
+test("a code question is never scored from the answer, whatever the answer is", () => {
+	for (const answer of [sumCode.answerKey, "", null, 42, { a: 1 }]) {
+		expect(() => reviewResult(sumCode, answer, { score: null })).not.toThrow();
+		expect(reviewResult(sumCode, answer, { score: null })).toEqual({
+			pending: true,
+		});
+	}
+});
+
+test("a code question shows the stored score with no library feedback", () => {
+	expect(reviewResult(sumCode, "def add(a, b): ...", { score: 0.8 })).toEqual({
+		score: 0.8,
+		feedback: [],
+	});
 });

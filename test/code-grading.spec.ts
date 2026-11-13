@@ -105,6 +105,36 @@ test("decideReport: a hidden failure does not fail the pretest", () => {
 	expect(decision.outcome).toBe("graded");
 });
 
+test("decideReport: a failing public case worth points is graded, not a failed pretest", () => {
+	const question = {
+		...QUESTION,
+		tests: [
+			{
+				format: "pytest",
+				text: [
+					"# mdq: [0] {public} Runs the example", // 1
+					"def test_example(): ...", // 2
+					"",
+					"# mdq: [+2] {public} Shows the sum", // 4
+					"def test_sum(): ...", // 5
+				].join("\n"),
+			},
+		],
+	};
+	const input = {
+		status: "completed",
+		cases: [
+			{ source: 0, line: 2, verdict: "pass" },
+			{ source: 0, line: 5, verdict: "fail" },
+		],
+	};
+
+	expect(decideReport(question, input)).toMatchObject({
+		outcome: "graded",
+		score: 0,
+	});
+});
+
 test("decideReport: the score is the fraction of the rubric that passed", () => {
 	const decision = decideReport(
 		QUESTION,
@@ -183,6 +213,11 @@ test("codeQuestionScore: 0.6 then 1.0 with penalty 0.2 is 0.8", () => {
 	expect(result.score).toBe(0.8);
 	expect(result.counting).toBe(1);
 	expect(result.discounted).toEqual([0.6, 0.8]);
+});
+
+test("codeQuestionScore: equal discounted scores count the earliest submission", () => {
+	expect(codeQuestionScore([1, 1], 0.5).counting).toBe(0);
+	expect(codeQuestionScore([0.5, 0.7], 0.2).counting).toBe(0);
 });
 
 test("codeQuestionScore: the first submission keeps its grade when it is the best", () => {
@@ -346,6 +381,28 @@ test("studentReportView: the grade is hidden in a one-attempt exam until release
 	expect(hidden.items).toBeUndefined();
 	expect(hidden.score).toBeUndefined();
 	expect(released.score).toBe(1);
+});
+
+test("studentReportView: a practice session shows the grade even with one attempt", () => {
+	const view = studentReportView(QUESTION, report(ALL_PASS), {
+		mode: "PRACTICE",
+		attempts: 1,
+		released: false,
+	});
+
+	expect(view.score).toBe(1);
+	expect(view.items).toHaveLength(3);
+});
+
+test("studentReportView: a quiz with one attempt hides the grade until released", () => {
+	const view = studentReportView(QUESTION, report(ALL_PASS), {
+		mode: "QUIZ",
+		attempts: 1,
+		released: false,
+	});
+
+	expect(view.score).toBeUndefined();
+	expect(view.items).toBeUndefined();
 });
 
 test("studentReportView: an exam with several attempts shows the grade at once", () => {
