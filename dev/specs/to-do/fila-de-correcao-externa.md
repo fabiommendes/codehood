@@ -52,13 +52,15 @@ pronto, o teste usa `essay` sem worker e é corrigido com `autograde`.
   forma pública do mdq, com `language`, `file`, `template` e `publicTests`).
 - R2. Push de uma questão `code` é recusado (400, mensagem clara) quando:
   uma fonte de teste não está resolvida (sem `text`); há item manual de
-  valor diferente de 0 em `## [rubric]` (fica para depois); falta
-  `meta.worker`.
+  valor diferente de 0 em `## [rubric]` (fica para depois).
+  Sem `meta.worker`, a questão `code` é válida e fica para correção manual
+  (ou pelo `autograde`): nenhum `GradingJob` é criado e `SUBMIT` não se
+  aplica, só autosave. Serve para questões só com pré-testes no navegador.
 - R3. Worker e política em `meta`, sem mudar o mdq:
 
   ```yaml
   meta:
-    worker: elm-test   # slug [a-z0-9-], 1 a 40; obrigatório em `code`
+    worker: elm-test   # slug [a-z0-9-], 1 a 40; opcional (R2)
     attempts: 4        # inteiro >= 1; padrão 4
     penalty: 0.2       # decimal em [0, 1]; padrão 0.2
   ```
@@ -79,8 +81,8 @@ pronto, o teste usa `essay` sem worker e é corrigido com `autograde`.
 
   model QuestionRef {
     // campos atuais
-    /// External worker that grades this question, from `meta.worker`. Set
-    /// for every CODE question; null for the others.
+    /// External worker that grades this question, from `meta.worker`. Null
+    /// when the question is graded by hand.
     worker   String?
     /// Graded submissions allowed per attempt, from `meta.attempts`.
     attempts Int?
@@ -155,8 +157,8 @@ pronto, o teste usa `essay` sem worker e é corrigido com `autograde`.
 ### Envio (`response.submit`)
 
 - R6. A resposta de uma questão `code` é uma string, o conteúdo do arquivo
-  (mdq). `response.submit` aceita `kind: "SUBMIT"` (padrão `AUTOSAVE`). Um
-  `SUBMIT` cria o `GradingJob` na mesma transação do save. Nenhuma chamada
+  (mdq). `response.submit` aceita `kind: "SUBMIT"` (padrão `AUTOSAVE`) só
+  em questão com worker (sem worker: 400). Um `SUBMIT` cria o `GradingJob` na mesma transação do save. Nenhuma chamada
   externa no caminho do save.
 - R7. Envio com trabalho `QUEUED` na mesma (resposta, questão): o trabalho
   antigo vira `CANCELLED` e não conta envio. Com trabalho `CLAIMED`: recusa
@@ -192,7 +194,9 @@ pronto, o teste usa `essay` sem worker e é corrigido com `autograde`.
   pré-teste falha, 0.6, 1.0 → `max(0.6, 1.0 − 0.2) = 0.8`. Um pass humano
   num envio substitui a nota do bot naquele envio (o pass mais novo vale).
   Fica em `src/services/exam-result.ts`; os outros tipos não mudam.
-- R13. O aluno vê na hora o resultado de cada envio, mesmo em `EXAM`:
+- R13. ⚠️ Em aberto (B1): numa prova em sala, o professor quer que a nota
+  chegue só depois de finalizar; a decisão vem da sessão `codehood-ui`. Texto
+  provisório: o aluno vê na hora o resultado de cada envio, mesmo em `EXAM`:
   pré-testes, casos públicos com o veredito e a mensagem, itens da rubrica
   ✓/✗ com o feedback, e a fração. Dos casos ocultos vê só o item. O total da
   prova segue a regra de liberação atual. Para um envio único, o professor
@@ -318,8 +322,11 @@ pronto, o teste usa `essay` sem worker e é corrigido com `autograde`.
   limites.
 - R30. O worker converte o resultado do `chalk-grader` num runner report
   válido: `source` e `line` de cada caso por um localizador do formato de
-  teste. Em Elm, a linha do literal `test "<nome>"` (ou `fuzz`) na fonte; um
-  caso sem linha encontrada sai sem `line` e vai para o log. Build error →
+  teste. Em Elm, o `classname` do JUnit é `<Módulo> <describes>` e o `name`
+  é o nome do teste: o módulo dá a fonte (linha `module <Módulo>`) e a linha
+  é a do literal `test "<nome>"` (ou `fuzz*`, `todo`), desempatada pelo
+  `describe` mais interno. `line` é obrigatório no report, então um caso sem
+  linha encontrada é omitido (o mdq permite) e vai para o log. Build error →
   `build-error`; falha de sandbox ou perfil → `runner-error`. O runner é
   `{"name": "chalk-worker", ...}`.
 - R31. Partida e cache: na primeira vez que vê uma questão (por hash do
