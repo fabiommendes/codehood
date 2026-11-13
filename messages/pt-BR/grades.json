@@ -95,6 +95,9 @@
 		}
 	],
 	"grades_queue_no_answers": "Sem respostas",
+	"grades_queue_jobs_queued": "{count} na fila",
+	"grades_queue_jobs_done": "{count} corrigidos",
+	"grades_queue_jobs_failed": "{count} com falha",
 	"grades_queue_done": "Nada mais a corrigir.",
 	"grades_queue_questions": "Questões",
 	"grades_question_title": "{question} · Correção · {exam}",

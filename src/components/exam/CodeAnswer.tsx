@@ -7,6 +7,7 @@ import type { LanguageId } from "@codehood/runner/protocol";
 import { firstFencedCode, type PublicCodeQuestion } from "mdq";
 import { Markdown } from "mdq/solid";
 import {
+	createMemo,
 	createSignal,
 	For,
 	type JSX,
@@ -28,7 +29,7 @@ import {
 	type Verdict,
 } from "../runner/run-tests";
 import { type PretestSummary, summarizeReport } from "./code-pretest";
-import type { CodeSends, SentView } from "./code-sends";
+import { type CodeSends, nextSendWorth, type SentView } from "./code-sends";
 
 export interface CodeAnswerProps {
 	/// The public form: the stem, the `template`, the `language`, the `file`
@@ -103,6 +104,8 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		kind: "sent" | "refused";
 		text: string;
 	} | null>(null);
+	/// Read once under the component, since the host's prop is a getter that builds a memo each time it is read, and a click has no owner to hold it.
+	const onSubmit = createMemo(() => props.onSubmit);
 	let editorParent!: HTMLDivElement;
 	let editor: RunnerEditor | null = null;
 	let disposed = false;
@@ -163,11 +166,12 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 	}
 
 	async function submit(): Promise<void> {
-		if (!props.onSubmit || sending()) return;
+		const send = onSubmit();
+		if (!send || sending()) return;
 		setSending(true);
 		setNotice(null);
 		try {
-			await props.onSubmit(code());
+			await send(code());
 			setNotice({ kind: "sent", text: m.code_submit_sent() });
 		} catch (error) {
 			const text = error instanceof Error ? error.message : String(error);
@@ -177,6 +181,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		}
 	}
 
+	const nextWorth = () => (props.sends ? nextSendWorth(props.sends) : null);
 	const exhausted = () =>
 		props.sends?.limit != null && props.sends.used >= props.sends.limit;
 	const running = () => state().kind === "running";
@@ -254,7 +259,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 							</Show>
 							{running() ? m.code_pretest_running() : m.code_pretest_run()}
 						</button>
-						<Show when={props.onSubmit}>
+						<Show when={onSubmit()}>
 							<button
 								type="button"
 								class="btn btn-primary btn-sm"
@@ -296,7 +301,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 				</div>
 			</div>
 
-			<Show when={props.onSubmit}>
+			<Show when={onSubmit()}>
 				<div
 					class="flex flex-wrap items-baseline gap-x-3 text-sm"
 					role="status"
@@ -311,6 +316,11 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 									limit: String(props.sends.limit),
 								})}
 					</span>
+					<Show when={nextWorth() !== null}>
+						<span class="text-muted" data-submit-worth>
+							{m.code_submit_worth({ worth: String(nextWorth()) })}
+						</span>
+					</Show>
 					<Show when={notice()}>
 						{(current) => (
 							<span
@@ -490,7 +500,7 @@ export function SendRow(props: {
 			</div>
 			<Show when={report()?.build}>
 				{(build) => (
-					<pre class="m-0 max-h-60 overflow-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
+					<pre class="m-0 overflow-x-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
 						{build()}
 					</pre>
 				)}
@@ -563,7 +573,7 @@ function PretestResult(props: {
 			</div>
 			<Show when={buildMessage(summary())}>
 				{(message) => (
-					<pre class="m-0 max-h-60 overflow-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
+					<pre class="m-0 overflow-x-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
 						{message()}
 					</pre>
 				)}

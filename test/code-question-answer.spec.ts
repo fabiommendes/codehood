@@ -177,6 +177,10 @@ test("a question without a worker has no submit button", async ({ page }) => {
 });
 
 test("a send is accepted and queued for the worker", async ({ page }) => {
+	const warnings: string[] = [];
+	page.on("console", (message) => {
+		if (message.type() === "warning") warnings.push(message.text());
+	});
 	const meta = { worker: "elm-test", attempts: 2 };
 	await page.goto(await setup(page, { type: "QUIZ", meta }));
 	await expect(submitStatus(page)).toContainText("0 of 2");
@@ -198,6 +202,7 @@ test("a send is accepted and queued for the worker", async ({ page }) => {
 	await expect(row).toHaveAttribute("data-job-state", "CLAIMED", {
 		timeout: 15_000,
 	});
+	expect(warnings.filter((text) => text.includes("createRoot"))).toEqual([]);
 });
 
 test("a send is refused with the reason once the attempts are spent", async ({

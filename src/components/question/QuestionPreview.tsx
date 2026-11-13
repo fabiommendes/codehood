@@ -1,3 +1,4 @@
+import { Markdown } from "mdq/solid";
 import {
 	type Accessor,
 	createMemo,
@@ -40,6 +41,8 @@ export interface QuestionPreviewProps {
 	runnerOrigin?: string | null;
 	/** The highlighted HTML of the example tests of a code question, from `highlightExamples`. */
 	exampleHtml?: readonly string[];
+	/** The highlighted HTML of the model answer of a code question, from `highlightCode`. Trusted: never user HTML. */
+	keyHtml?: string;
 }
 
 /** Which of the two ways an instructor can look at the question is on screen. */
@@ -91,6 +94,7 @@ export default function QuestionPreview(
 				hideScore={props.hideScore}
 				runnerOrigin={props.runnerOrigin ?? null}
 				exampleHtml={props.exampleHtml}
+				keyHtml={props.keyHtml}
 			/>
 		</div>
 	);
@@ -148,6 +152,7 @@ interface TypePreviewProps {
 	hideScore?: boolean;
 	runnerOrigin: string | null;
 	exampleHtml?: readonly string[];
+	keyHtml?: string;
 }
 
 /// What the review mode of a view takes as `result`.
@@ -255,6 +260,27 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 						onCheck={check}
 						onReset={reset}
 					/>
+				</div>
+			</Match>
+			<Match when={props.tab() === "key" && publicQ().type === "code"}>
+				<div class="flex flex-col gap-4" data-code-key>
+					<div class="mdq-stem">
+						<Markdown text={(publicQ() as PublicCodeQuestion).stem} />
+					</div>
+					<Show when={props.keyHtml}>
+						{(html) => (
+							<div>
+								<p class="text-sm font-semibold text-muted">
+									{m.grades_code_model_answer()}
+								</p>
+								<div
+									class="mt-2 overflow-x-auto rounded-box bg-base-200 p-4 text-sm text-base-content [&_.shiki]:!m-0 [&_.shiki]:!bg-transparent [&_.shiki_span]:!bg-transparent"
+									data-model-answer
+									innerHTML={html()}
+								/>
+							</div>
+						)}
+					</Show>
 				</div>
 			</Match>
 			<Match when={props.tab() === "key"}>

@@ -79,7 +79,7 @@ const verdictBadge = (verdict: string): string =>
           {view?.kind === "invalid" && <p class="m-0 text-error">{m.grades_code_send_invalid({ message: view.message })}</p>}
           {view?.kind === "report" && (
             <>
-              {view.build && <pre class="m-0 max-h-60 overflow-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">{view.build}</pre>}
+              {view.build && <pre class="m-0 overflow-x-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">{view.build}</pre>}
               {view.message && <p class="m-0 text-xs text-muted">{view.message}</p>}
               {view.cases.length > 0 && (
                 <ul aria-label={m.grades_code_send_cases()} class="m-0 flex list-none flex-col divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 p-0">

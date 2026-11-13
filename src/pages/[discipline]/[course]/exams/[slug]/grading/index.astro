@@ -26,9 +26,41 @@ const stored = await db.question.findMany(
 );
 const bySlug = new Map(stored.map((entry) => [entry.slug, entry.question]));
 
+/// The job counts of the code questions that go to a worker, by question slug.
+const jobCounts = new Map(
+	await Promise.all(
+		questions.flatMap((slug) => {
+			const doc = bySlug.get(slug);
+			return doc?.type === "code" && typeof doc.meta?.worker === "string"
+				? [
+						db.gradingJob
+							.summary(
+								{ course: course.id, exam: exam.slug, question: slug },
+								{ actor },
+							)
+							.then((summary) => [slug, summary.counts] as const),
+					]
+				: [];
+		}),
+	),
+);
+
 const queue = gradingQueue(questions, answers);
 const rows = queue.map((entry) => {
 	const doc = bySlug.get(entry.question);
+	const jobs = jobCounts.get(entry.question);
+	const jobLines = jobs
+		? [
+				(jobs.QUEUED ?? 0) + (jobs.CLAIMED ?? 0) > 0 &&
+					m.grades_queue_jobs_queued({
+						count: (jobs.QUEUED ?? 0) + (jobs.CLAIMED ?? 0),
+					}),
+				(jobs.DONE ?? 0) > 0 &&
+					m.grades_queue_jobs_done({ count: jobs.DONE ?? 0 }),
+				(jobs.FAILED ?? 0) > 0 &&
+					m.grades_queue_jobs_failed({ count: jobs.FAILED ?? 0 }),
+			].filter(Boolean)
+		: [];
 	const counts = [
 		entry.pending > 0 && m.grades_queue_pending({ count: entry.pending }),
 		(entry.review ?? 0) > 0 &&
@@ -42,7 +74,11 @@ const rows = queue.map((entry) => {
 		title: doc?.title ?? entry.question,
 		type: doc ? questionTypeLabels[doc.type] : null,
 		counts:
-			counts.length > 0 ? counts.join(" · ") : m.grades_queue_no_answers(),
+			counts.length > 0
+				? counts.join(" · ")
+				: jobLines.length > 0
+					? jobLines.join(" · ")
+					: m.grades_queue_no_answers(),
 	};
 });
 

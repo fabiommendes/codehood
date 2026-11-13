@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { hasPendingSend, sendsOf } from "@/components/exam/code-sends";
+import {
+	hasPendingSend,
+	nextSendWorth,
+	sendsOf,
+} from "@/components/exam/code-sends";
 
 const send = (
 	jobState: "QUEUED" | "CLAIMED" | "DONE" | "FAILED" | "CANCELLED" | null,
@@ -31,4 +35,14 @@ test("only a queued or claimed send keeps the page asking", () => {
 	expect(hasPendingSend(of("DONE", "FAILED", null))).toBe(false);
 	expect(hasPendingSend(of("DONE", "QUEUED"))).toBe(true);
 	expect(hasPendingSend(of("CLAIMED"))).toBe(true);
+});
+
+test("the next send is worth what the earlier ones leave, and a practice exam discounts nothing", () => {
+	const read = { attempts: 4, attemptsLeft: 3, submissions: [] };
+	expect(nextSendWorth(sendsOf(read, 0.2))).toBe(0.8);
+	expect(nextSendWorth(sendsOf({ ...read, attemptsLeft: 0 }, 0.3))).toBe(0);
+	expect(nextSendWorth(sendsOf(read, 0))).toBeNull();
+	expect(
+		nextSendWorth(sendsOf({ ...read, attemptsLeft: null }, 0.2)),
+	).toBeNull();
 });

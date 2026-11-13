@@ -437,7 +437,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		});
 		if (error) throw new Error(errorMessage(error));
 		if (data.sends) {
-			const sends = sendsOf(data.sends);
+			const sends = sendsOf(data.sends, allSends()[slug]?.penalty);
 			setSendsNow((current) => ({ ...current, [slug]: sends }));
 		} else {
 			await refreshSends([slug]);
@@ -455,7 +455,13 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 					question: slug,
 				});
 				if (data) {
-					setSendsNow((current) => ({ ...current, [slug]: sendsOf(data) }));
+					setSendsNow((current) => ({
+						...current,
+						[slug]: sendsOf(
+							data,
+							current[slug]?.penalty ?? allSends()[slug]?.penalty,
+						),
+					}));
 				}
 			}),
 		);

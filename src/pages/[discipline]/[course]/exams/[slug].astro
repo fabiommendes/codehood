@@ -22,6 +22,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { shufflePool } from "@/mdq/shuffle";
 import { effectiveAnswerHistory } from "@/services/answer-history";
+import { DEFAULT_CODE_PENALTY } from "@/services/code-grading";
 import { effectiveCodeRun } from "@/services/code-run";
 import { examResult } from "@/services/exam-result";
 import {
@@ -397,6 +398,8 @@ const pretests: Record<string, PretestSource[]> = {};
 const exampleHtml: Record<string, string[]> = {};
 // The sends of each code question that goes to a worker, by question slug, while answering and in the review.
 const codeSends: Record<string, CodeSends> = {};
+const codePenalties =
+	(await loadResultPolicy(course.id))(exam).codePenalty ?? {};
 const answering = state.kind === "in-progress";
 if (answering || (state.kind === "results" && attempt)) {
 	await Promise.all(
@@ -415,7 +418,10 @@ if (answering || (state.kind === "results" && attempt)) {
 				{ response: attempt.publicId, question: slug },
 				{ actor },
 			);
-			codeSends[slug] = sendsOf(sent);
+			codeSends[slug] = sendsOf(
+				sent,
+				codePenalties[slug] ?? DEFAULT_CODE_PENALTY,
+			);
 		}),
 	);
 }

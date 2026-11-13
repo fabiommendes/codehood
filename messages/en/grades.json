@@ -95,6 +95,9 @@
 		}
 	],
 	"grades_queue_no_answers": "No answers",
+	"grades_queue_jobs_queued": "{count} in queue",
+	"grades_queue_jobs_done": "{count} graded",
+	"grades_queue_jobs_failed": "{count} failed",
 	"grades_queue_done": "Nothing left to grade.",
 	"grades_queue_questions": "Questions",
 	"grades_question_title": "{question} · Grading · {exam}",

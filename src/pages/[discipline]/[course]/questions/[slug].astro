@@ -1,4 +1,5 @@
 ---
+import { firstFencedCode } from "mdq";
 import CourseHeader from "@/components/CourseHeader.astro";
 import QuestionPreview from "@/components/question/QuestionPreview";
 import Alert from "@/components/ui/Alert";
@@ -9,6 +10,7 @@ import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm, questionProblems } from "@/mdq";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { highlightCode } from "@/utils/highlight-code";
 import { highlightExamples } from "@/utils/highlight-examples";
 import { loadCourse } from "@/utils/load-course";
 import {
@@ -41,6 +43,12 @@ const problems = questionProblems(doc);
 const preview = publicForm(doc);
 const exampleHtml =
 	preview.type === "code" ? await highlightExamples(preview) : [];
+const answerKey =
+	doc.type === "code" && doc.answerKey ? firstFencedCode(doc.answerKey) : null;
+const keyHtml =
+	doc.type === "code" && answerKey
+		? await highlightCode(answerKey, doc.language ?? null)
+		: undefined;
 ---
 
 <AppLayout title={m.questions_detail_page_title({ title: doc.title ?? question.slug })}
@@ -106,7 +114,7 @@ const exampleHtml =
     </section>
 
     <section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
-      <QuestionPreview client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} />
+      <QuestionPreview client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} keyHtml={keyHtml} />
     </section>
   </main>
 </AppLayout>
