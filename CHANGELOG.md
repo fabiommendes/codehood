@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 (2026-11-13)
+
 ### Added
 
 - Questões `code` corrigidas por workers externos. O servidor
