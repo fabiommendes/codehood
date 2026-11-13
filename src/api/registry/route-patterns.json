@@ -343,6 +343,30 @@
 		]
 	},
 	{
+		"pattern": "/api/grading-jobs/[submission]/fail",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/grading-jobs/[submission]/renew",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/grading-jobs/[submission]/result",
+		"methods": [
+			"post"
+		]
+	},
+	{
+		"pattern": "/api/grading-jobs/claim",
+		"methods": [
+			"post"
+		]
+	},
+	{
 		"pattern": "/api/health",
 		"methods": [
 			"get"

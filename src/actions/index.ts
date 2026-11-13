@@ -7,6 +7,7 @@ import { course } from "./course";
 import { exam } from "./exam";
 import { gradeColumn } from "./grade-column";
 import { grading } from "./grading";
+import { gradingJob } from "./grading-job";
 import { profile } from "./profile";
 import { question } from "./question";
 import { regrade } from "./regrade";
@@ -26,6 +27,7 @@ export const server = {
 	exam,
 	gradeColumn,
 	grading,
+	gradingJob,
 	question,
 	regrade,
 	report,

@@ -7,6 +7,7 @@ import { type HttpMethods, readPattern } from "./route";
 // before the dynamic handler is invoked.
 export * as api from "..";
 export * as auth from "../auth";
+export * as gradingJob from "../grading-job";
 export * as health from "../health";
 
 /**
