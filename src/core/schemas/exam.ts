@@ -11,7 +11,7 @@ import {
 	username,
 } from "./base";
 import { courseRef } from "./course";
-import { submissionPayload } from "./submission";
+import { submissionKindRequested, submissionPayload } from "./submission";
 
 export const examStatus = z.enum([
 	"DRAFT",
@@ -154,6 +154,7 @@ export const examSetAnswerHistory = examParams.extend({ enabled: z.boolean() });
 export const examAnswer = examParams.extend({
 	question: z.string().min(1),
 	payload: submissionPayload,
+	kind: submissionKindRequested.optional(),
 });
 
 /// Reopens one student's attempt at an exam, addressed by URL segments.

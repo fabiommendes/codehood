@@ -35,18 +35,26 @@ export const exam = {
 	 * Records the actor's answer to one question of their open attempt.
 	 *
 	 * Answers with the server clock and, when it can be read, the exam's
-	 * effective answer-history switch.
+	 * effective answer-history switch. A `SUBMIT` also answers with the sends
+	 * of the question, so the page needs no second call for the counter.
 	 */
 	answer: defineAction({
 		input: examAnswer,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
-			const { payload, question, ...rest } = input;
+			const { payload, question, kind, ...rest } = input;
 			const course = parseCourseParams(rest);
-			await db.response.submit(
-				{ course, exam: input.exam, question, payload },
+			const response = await db.response.submit(
+				{ course, exam: input.exam, question, payload, kind },
 				{ actor },
 			);
+			// Read only after the save, and never allowed to fail it.
+			const sends =
+				kind === "SUBMIT"
+					? await db.gradingJob
+							.forStudent({ response: response.publicId, question }, { actor })
+							.catch(() => undefined)
+					: undefined;
 			// Read only after the save, and never allowed to fail it.
 			const answerHistory = await readAnswerHistory(() =>
 				db.exam.findOne({ course, slug: input.exam }, { actor }),
@@ -55,6 +63,7 @@ export const exam = {
 			return {
 				serverNow: Date.now(),
 				...(answerHistory === undefined ? {} : { answerHistory }),
+				...(sends === undefined ? {} : { sends }),
 			};
 		}),
 	}),
