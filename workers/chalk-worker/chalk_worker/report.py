@@ -5,6 +5,7 @@ Turn a chalk-grader run into an mdq runner report.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -17,7 +18,7 @@ from mdq.models import CodeQuestion, ReportCase, RunnerReport
 from . import __version__
 from .locate import locate_elm
 
-__all__ = ["Run", "to_report"]
+__all__ = ["Run", "clean_build", "to_report"]
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +36,18 @@ BUILD_PREFIX = "The code does not compile:"
 #: Longest message of a case, in characters.
 MAX_MESSAGE = 2000
 
+#: Message of every case when the answer crashed the test runner.
+CRASHED = "the tests did not run: the answer compiles but crashes when loaded"
+
+#: Lines of compiler progress that say nothing about the answer.
+_PROGRESS = re.compile(
+    r"^\s*$|^(Starting downloads|Verifying dependencies|Dependencies ready|Compiling \.\.\.)"
+    r"|^\s*●"
+)
+
+#: The temporary directory chalk-grader builds the answer in.
+_ANSWER_DIR = re.compile(r"/\S*?chalk-answer-[^/\s]*/")
+
 
 @dataclass(frozen=True)
 class Run:
@@ -47,6 +60,9 @@ class Run:
     graded: Graded | None
     #: The tests of the reference run, which the answer is held to.
     expected: Mapping[TestKey, str]
+    #: The run failed without a test report while the reference solution
+    #: still passes, so the answer itself broke the test runner.
+    crashed: bool = False
 
 
 def to_report(run: Run, question: CodeQuestion, answer: str) -> RunnerReport:
@@ -61,11 +77,16 @@ def to_report(run: Run, question: CodeQuestion, answer: str) -> RunnerReport:
 
     score = graded.score
     if score == dq.BuildError() or score == dq.InvalidInput():
-        build = (graded.feedback or "").removeprefix(BUILD_PREFIX).strip() or None
+        build = clean_build((graded.feedback or "").removeprefix(BUILD_PREFIX)) or None
         return RunnerReport(status="build-error", cases=[], build=build, **base)
     if score == dq.Timeout():
         cases = _cases(run, question, lambda _: ("timeout", "time limit exceeded"))
         return RunnerReport(status="completed", cases=cases, **base)
+    if run.crashed:
+        detail = (graded.feedback or "").strip()
+        message = f"{CRASHED} ({detail})" if detail else CRASHED
+        cases = _cases(run, question, lambda _: ("error", message[:MAX_MESSAGE]))
+        return RunnerReport(status="completed", cases=cases, message=message, **base)
     if not isinstance(score, Fraction | int) or graded.cases is None:
         return RunnerReport(
             status="runner-error", cases=[], message=graded.feedback or "grading failed", **base
@@ -82,6 +103,16 @@ def to_report(run: Run, question: CodeQuestion, answer: str) -> RunnerReport:
         return "fail", (case.message or "")[:MAX_MESSAGE] or None
 
     return RunnerReport(status="completed", cases=_cases(run, question, verdict), **base)
+
+
+def clean_build(text: str) -> str:
+    """
+    The compiler output without progress lines and with paths relative to
+    the project, as the student wrote them.
+    """
+    lines = [line for line in text.splitlines() if not _PROGRESS.match(line)]
+    first = next((i for i, line in enumerate(lines) if line.strip()), len(lines))
+    return _ANSWER_DIR.sub("", "\n".join(lines[first:])).strip()
 
 
 def _cases(

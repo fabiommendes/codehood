@@ -30,9 +30,13 @@ How a job is graded:
 2. The answer is graded with the profile of its `language`. Each JUnit case
    is located in the sources (`source`, `line`) so the server can tell which
    rubric item owns it; a case not found is left out of the report.
-3. A build error is a `build-error` report, a timeout of the run times out
+3. A build error is a `build-error` report (compiler output without the
+   progress lines and the worker's paths), a timeout of the run times out
    every case, and a failure of the infrastructure calls `fail` so the job
-   returns to the queue.
+   returns to the queue. A run that leaves no test report is graded again
+   with the reference solution: when that still passes, the answer crashed
+   the test runner (e.g. `Debug.todo` in a top-level value) and every case
+   is an `error`; otherwise it is a failure of the infrastructure.
 4. When the project cannot be built (a package download fails, a tool is
    missing), the batch goes back to the queue without spending its retries
    and the worker waits before claiming again; `--once` stops there. A

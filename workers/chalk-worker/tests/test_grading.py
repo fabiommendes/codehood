@@ -3,6 +3,8 @@ Grading with the real elm-test profile. Slow: the first prepare downloads
 the Elm packages.
 """
 
+from pathlib import Path
+
 import pytest
 from conftest import SOLUTION, needs_elm, question_doc
 from mdq.models import CodeQuestion
@@ -13,6 +15,8 @@ pytestmark = needs_elm
 
 WRONG = SOLUTION.replace("List.sum xs", "List.foldl (+) 1 xs")
 BROKEN = SOLUTION.replace("List.sum xs", "List.sum xs +")
+#: Compiles, but crashes when the test runner loads the module.
+CRASH = SOLUTION.replace("soma xs =\n    List.sum xs", 'soma =\n    Debug.todo "later"')
 NEGATIVES = SOLUTION.replace("List.sum xs", "List.sum (List.filter (\\x -> x > 0) xs)")
 
 
@@ -53,6 +57,21 @@ def test_build_error(grader) -> None:
     assert report.build
 
 
+def test_build_error_hides_the_progress_and_the_workdir(grader) -> None:
+    report = grader.grade(BROKEN)
+    assert "Verifying dependencies" not in report.build
+    assert "/tmp/" not in report.build and "chalk-answer" not in report.build
+    assert "src/Main.elm" in report.build
+
+
+def test_answer_that_crashes_the_runner_errs_every_case(grader) -> None:
+    report = grader.grade(CRASH)
+    assert report.status == "completed"
+    assert set(verdicts(report).values()) == {"error"}
+    assert len(report.cases) == 4
+    assert "did not run" in (report.cases[0].message or "")
+
+
 def test_reference_that_fails_is_refused(tmp_path) -> None:
     doc = question_doc(answerKey=f"```elm\n{WRONG}```\n")
     g = QuestionGrader(CodeQuestion.model_validate(doc), tmp_path, sandbox="none")
@@ -66,3 +85,9 @@ def test_question_without_reference_is_refused(tmp_path) -> None:
     g = QuestionGrader(CodeQuestion.model_validate(doc), tmp_path, sandbox="none")
     with pytest.raises(ReferenceError):
         g.prepare()
+
+
+def test_relative_workdir_is_made_absolute(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    g = QuestionGrader(CodeQuestion.model_validate(question_doc()), Path("cache/q"))
+    assert g.workdir == tmp_path / "cache" / "q"

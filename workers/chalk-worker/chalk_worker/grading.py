@@ -15,6 +15,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from chalk_grader import disqualification as dq
 from chalk_grader import models
 from chalk_grader.profile_grader import ProfileGrader, resolve_profile
 from chalk_grader.profiles import PrepareError
@@ -75,6 +76,7 @@ class QuestionGrader:
         profiles: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.question = question
+        workdir = workdir.absolute()
         self.workdir = workdir
         language = question.language or ""
         profile = PROFILE_BY_LANGUAGE.get(language)
@@ -127,7 +129,21 @@ class QuestionGrader:
         """
         graded = self._grader("answer", answer)
         expected = self._grader.prepare().tests
-        return to_report(Run(graded=graded, expected=expected), self.question, answer)
+        crashed = graded.score == dq.Error() and self._reference_passes(answer)
+        run = Run(graded=graded, expected=expected, crashed=crashed)
+        return to_report(run, self.question, answer)
+
+    def _reference_passes(self, answer: str) -> bool:
+        """
+        Whether the reference solution still passes every test, which tells
+        an answer that broke the test runner from a broken environment.
+        """
+        reference = self.question.reference_solution
+        if reference is None or reference == answer:
+            return False
+        graded = self._grader("answer", reference)
+        cases = graded.cases or ()
+        return bool(cases) and graded.score == 1 and all(case.passed for case in cases)
 
 
 def _answer_path(language: str, file: str) -> str:

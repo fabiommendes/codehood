@@ -27,10 +27,10 @@ def cases(results: dict, expected=EXPECTED) -> tuple[CaseResult, ...]:
     )
 
 
-def run(graded: Graded, results: dict | None) -> RunnerReport:
+def run(graded: Graded, results: dict | None, *, crashed: bool = False) -> RunnerReport:
     if results is not None:
         graded = graded._replace(cases=cases(results))
-    return to_report(Run(graded=graded, expected=EXPECTED), _q(), SOLUTION)
+    return to_report(Run(graded=graded, expected=EXPECTED, crashed=crashed), _q(), SOLUTION)
 
 
 def _q():
@@ -103,6 +103,15 @@ def test_infrastructure_error_is_a_runner_error() -> None:
     report = run(Graded(dq.Error(), feedback="sandbox died"), None)
     assert report.status == "runner-error"
     assert report.message == "sandbox died"
+
+
+def test_crash_of_the_answer_errs_every_case() -> None:
+    report = run(
+        Graded(dq.Error(), feedback="Invalid JUnit report: no element"), None, crashed=True
+    )
+    assert report.status == "completed"
+    assert set(verdicts(report).values()) == {"error"}
+    assert len(report.cases) == 4
 
 
 def test_completed_without_captured_results_is_a_runner_error() -> None:
