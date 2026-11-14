@@ -47,7 +47,7 @@ export function examPhaseBadgeClass(phase: ExamPhase): string {
  *
  * @example
  * examBadge("open", { kind: "submitted" }); // { label: m.exams_badge_awaiting_grading(), ... }
- * examBadge("open"); // { label: "Open now", className: "badge-success" }
+ * examBadge("open"); // { label: "Open", className: "badge-success" }
  */
 export function examBadge(
 	phase: ExamPhase,

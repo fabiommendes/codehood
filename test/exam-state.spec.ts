@@ -243,7 +243,7 @@ test("examPhaseLabels: human text for every phase", () => {
 	expect(examPhaseLabels).toEqual({
 		draft: "Draft",
 		upcoming: "Upcoming",
-		open: "Open now",
+		open: "Open",
 		closed: "Closed",
 		archived: "Archived",
 	});

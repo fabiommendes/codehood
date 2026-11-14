@@ -97,7 +97,9 @@ test("student: take an exam", async ({ page }) => {
 		await expect(page.getByText("Missed", { exact: true })).toBeVisible();
 		await expect(page.getByText("Closed", { exact: true })).toHaveCount(0);
 		// The section headings already say open and upcoming; no badge repeats them.
-		await expect(page.getByText("Open now", { exact: true })).toHaveCount(0);
+		await expect(
+			section(page, "Open").getByText("Open", { exact: true }),
+		).toHaveCount(1);
 		await expect(
 			section(page, "Upcoming").getByText("Upcoming", { exact: true }),
 		).toHaveCount(1);
@@ -134,7 +136,7 @@ test("student: take an exam", async ({ page }) => {
 	await test.step("an open exam offers Start exam and nothing to answer yet", async () => {
 		await page.goto(`${href}/exams/${open.slug}`);
 
-		await expect(page.getByText("Open now", { exact: true })).toBeVisible();
+		await expect(page.getByText("Open", { exact: true })).toBeVisible();
 		await expect(
 			page.getByRole("button", { name: "Start exam" }),
 		).toBeVisible();
@@ -210,7 +212,7 @@ test("student: take an exam", async ({ page }) => {
 		await expect(
 			page.getByText("Awaiting grading", { exact: true }),
 		).toBeVisible();
-		await expect(page.getByText("Open now", { exact: true })).toHaveCount(0);
+		await expect(page.getByText("Open", { exact: true })).toHaveCount(0);
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeDisabled();
 		await expect(page.getByRole("radio", { name: "Brasília" })).toBeChecked();
 		await expect(page.getByRole("textbox")).toHaveCount(0);
@@ -777,7 +779,7 @@ test("student: Answer an exam with the extra time I was granted", async ({
 
 	await test.step("the exam page shows the student's own extra time", async () => {
 		await expect(page.getByText(/30 min for you/)).toBeVisible();
-		await expect(page.getByText("Open now", { exact: true })).toBeVisible();
+		await expect(page.getByText("Open", { exact: true })).toBeVisible();
 	});
 
 	await test.step("the exam is open for them: they start it and the answer is accepted after the class's deadline", async () => {

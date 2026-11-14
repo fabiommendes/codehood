@@ -26,7 +26,7 @@ for (const [state, label] of [
 test("the phase label carries through for a viewer with no finished attempt", () => {
 	const phases: [ExamPhase, string][] = [
 		["upcoming", "Upcoming"],
-		["open", "Open now"],
+		["open", "Open"],
 		["closed", "Closed"],
 	];
 	for (const [phase, label] of phases) {

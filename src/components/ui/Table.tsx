@@ -46,6 +46,9 @@ interface TableProps<T> {
 	tableClass?: string;
 	/// Classes for a row, such as dimming one that no longer counts.
 	rowClass?: (row: T) => string | undefined;
+	/// Classes every body row takes to stand out under the pointer; a light
+	/// tint by default, `false` or `""` to turn it off.
+	hoverClass?: string | false;
 	/// Renders the first column's cells as row headers (`<th scope="row">`).
 	rowHeader?: boolean;
 	/// Keeps the first column in view while the table scrolls sideways.
@@ -57,6 +60,11 @@ const STICKY_HEAD =
 	"sticky left-0 z-10 bg-[color-mix(in_oklab,var(--color-base-200)_50%,var(--color-base-100))]";
 /// A sticky body cell, opaque over what scrolls under it.
 const STICKY_CELL = "sticky left-0 z-10 bg-base-100";
+/// The default row highlight under the pointer.
+const ROW_HOVER = "hover:bg-base-200/40";
+/// The same highlight made opaque, for a sticky cell of the hovered row.
+const STICKY_CELL_HOVER =
+	"group-hover/row:bg-[color-mix(in_oklab,var(--color-base-200)_40%,var(--color-base-100))]";
 
 /// Joins the truthy class names.
 const classes = (...names: (string | false | undefined)[]): string =>
@@ -76,6 +84,8 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 			props.class,
 		);
 	const sticky = (index: number) => props.stickyFirst === true && index === 0;
+	const hover = () =>
+		props.hoverClass === undefined ? ROW_HOVER : props.hoverClass;
 
 	return (
 		<div class={containerClass()}>
@@ -147,11 +157,17 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 						}
 					>
 						{(row) => (
-							<tr class={props.rowClass?.(row)}>
+							<tr
+								class={classes(
+									hover() && `group/row ${hover()}`,
+									props.rowClass?.(row),
+								)}
+							>
 								<For each={props.columns}>
 									{(column, index) => {
 										const cellClass = classes(
 											sticky(index()) && STICKY_CELL,
+											sticky(index()) && hover() && STICKY_CELL_HOVER,
 											column.class,
 										);
 										return props.rowHeader && index() === 0 ? (
