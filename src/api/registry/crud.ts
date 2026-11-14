@@ -545,6 +545,7 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 		return {
 			items: await this.service.findMany(filter, { actor }),
 			next: null,
+			prev: null,
 		};
 	}
 

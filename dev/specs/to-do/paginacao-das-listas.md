@@ -20,21 +20,26 @@ As listas da API e das páginas carregam a tabela inteira. `GET /api/course`,
 Toda rota `GET` de lista (19 hoje) responde com um envelope:
 
 ```json
-{ "items": [...], "next": "3w5e11264sgsg" }
+{ "items": [...], "next": "3w5e11264sgsg", "prev": null }
 ```
 
-- `items`: a página, na ordem padrão da tabela.
+- `items`: a página, na ordem padrão da tabela, qualquer que seja o sentido
+  em que se chegou a ela.
 - `next`: cursor da página seguinte, ou `null` na última.
+- `prev`: cursor da página anterior, ou `null` na primeira.
 - O envelope é um objeto para poder crescer (`related`, `total`) sem quebrar
   o formato outra vez.
 
 Rotas paginadas aceitam, além do filtro:
 
 - `limit`: tamanho da página, de 1 a 500. Padrão 100.
-- `after`: o `next` de uma resposta anterior. Um cursor inválido é `400`.
+- `after`: o `next` de uma resposta anterior.
+- `before`: o `prev` de uma resposta anterior. Não vale junto com `after`.
 
-Uma rota ainda não paginada devolve tudo com `next: null` e não declara
-`limit` nem `after`. Quem consome deve sempre seguir `next` até `null`.
+Um cursor inválido, ou os dois juntos, é `400`.
+
+Uma rota ainda não paginada devolve tudo com `next` e `prev` nulos e não
+declara `limit`, `after` nem `before`. Quem consome deve sempre seguir `next` até `null`.
 
 ## Decisões
 
@@ -52,9 +57,13 @@ Uma rota ainda não paginada devolve tudo com `next: null` e não declara
    páginas. Se a API precisar, entra como campo opcional do envelope.
 5. **O service monta a página.** A entidade não carrega `id`, então só o
    service sabe o cursor. Um service paginado ganha
-   `findPage(filter & { limit?, after? }) → { items, next }`. `findMany`
+   `findPage(filter & { limit?, after?, before? }) → { items, next, prev }`.
+   `seekOf` e `cutPage` (`src/utils/cursor.ts`) cuidam dos dois sentidos. `findMany`
    continua devolvendo array para os usos internos e some de cada service
    quando o último uso sem limite sair.
+8. **As páginas montam os links com `pageLinks` e `cursorParams`**
+   (`src/utils/page-links.ts`), que entregam `prevHref` e `nextHref` ao
+   `PaginatedTable` e preservam os outros parâmetros da URL.
 6. **A camada REST só embrulha.** `findManyHandler` chama `findPage` quando o
    service tem, e senão devolve `{ items: await findMany(), next: null }`.
 7. **Quebra a CLI instalada.** Aceito: o snapshot do OpenAPI, o cliente gerado

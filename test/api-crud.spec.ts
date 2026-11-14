@@ -87,7 +87,7 @@ for (const resource of OPTIONAL_FILTER_RESOURCES) {
 		});
 		expect(res.status()).toBe(200);
 		const body = await res.json();
-		expect(Object.keys(body).sort()).toEqual(["items", "next"]);
+		expect(Object.keys(body).sort()).toEqual(["items", "next", "prev"]);
 		expect(Array.isArray(body.items)).toBe(true);
 	});
 }
@@ -312,7 +312,7 @@ test("a query filter that matches nothing returns an empty page, not everything"
 		},
 	);
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual({ items: [], next: null });
+	expect(await res.json()).toEqual({ items: [], next: null, prev: null });
 });
 
 test("?active=false is honored as false, not truthy — a naive Boolean('false') would wrongly read it as true", async ({
@@ -333,7 +333,11 @@ test("?active=false is honored as false, not truthy — a naive Boolean('false')
 		{ headers: authHeader(token) },
 	);
 	expect(activeOnly.status()).toBe(200);
-	expect(await activeOnly.json()).toEqual({ items: [], next: null });
+	expect(await activeOnly.json()).toEqual({
+		items: [],
+		next: null,
+		prev: null,
+	});
 
 	// ...while `active=false` must NOT be coerced into the boolean `true`
 	// (which is what `Boolean("false")` — the classic bug — would do): the
@@ -368,7 +372,7 @@ test("a value needing escaping (space, &, #, and a quote) round-trips exactly th
 		headers: authHeader(token),
 	});
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual({ items: [], next: null });
+	expect(await res.json()).toEqual({ items: [], next: null, prev: null });
 });
 
 test("an injection-shaped filter value returns an empty result, never the whole table", async ({
@@ -390,7 +394,7 @@ test("an injection-shaped filter value returns an empty result, never the whole 
 	// literal (non-matching) string comparison — never a 500, and never the
 	// full table.
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual({ items: [], next: null });
+	expect(await res.json()).toEqual({ items: [], next: null, prev: null });
 });
 
 for (const key of [
@@ -483,7 +487,7 @@ test("GET /api/course?limit=1 answers one course and the cursor of the next page
 	});
 	expect(res.status()).toBe(200);
 	const page = (await res.json()) as ListPage<CourseItem>;
-	expect(Object.keys(page).sort()).toEqual(["items", "next"]);
+	expect(Object.keys(page).sort()).toEqual(["items", "next", "prev"]);
 	expect(page.items).toHaveLength(1);
 	expect(typeof page.next).toBe("string");
 	expect(page.next).not.toBe("");
@@ -559,14 +563,18 @@ test("a list route that does not page answers every row and a null next", async 
 		headers: authHeader(token),
 	});
 	expect(one.status()).toBe(200);
-	expect(await one.json()).toEqual({ items: [discipline], next: null });
+	expect(await one.json()).toEqual({
+		items: [discipline],
+		next: null,
+		prev: null,
+	});
 
 	const all = await request.get("/api/discipline", {
 		headers: authHeader(token),
 	});
 	expect(all.status()).toBe(200);
 	const body = (await all.json()) as ListPage<{ slug: string }>;
-	expect(Object.keys(body).sort()).toEqual(["items", "next"]);
+	expect(Object.keys(body).sort()).toEqual(["items", "next", "prev"]);
 	expect(body.next).toBeNull();
 	expect(body.items.map((item) => item.slug)).toContain(slug);
 });

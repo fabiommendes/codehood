@@ -311,5 +311,5 @@ test("a listing of a course the actor cannot read is empty, not refused", async 
 
 	const listed = await request.get(url, { headers });
 	expect(listed.status()).toBe(200);
-	expect(await listed.json()).toEqual({ items: [], next: null });
+	expect(await listed.json()).toEqual({ items: [], next: null, prev: null });
 });

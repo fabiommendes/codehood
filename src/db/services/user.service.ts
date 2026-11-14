@@ -9,7 +9,6 @@ import { ensurePerm } from "@/auth/permissions";
 import { SCHOOL_ID_PATTERN } from "@/core/constants";
 import { FieldError, NotAllowed, NotFound, WeakPassword } from "@/core/error";
 import {
-	PAGE_LIMIT_DEFAULT,
 	type Page,
 	type PageParams,
 	pageOf,
@@ -26,7 +25,7 @@ import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
-import { cutPage } from "@/utils/cursor";
+import { cutPage, seekOf } from "@/utils/cursor";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
 import { makeSessionService } from "./session.service";
 
@@ -182,7 +181,7 @@ export const makeUserService = defineService<UserT>()((client) => {
 	/**
 	 * Lists one page of the users `actor` may read, by username.
 	 *
-	 * The cursor is the username of the last user of the page.
+	 * A cursor is the username of the user at that end of the page.
 	 */
 	const findPage = op({
 		transaction: false,
@@ -193,20 +192,26 @@ export const makeUserService = defineService<UserT>()((client) => {
 			by: UserFilter & PageParams,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Page<User>> => {
-			const limit = by.limit ?? by.take ?? PAGE_LIMIT_DEFAULT;
+			const seek = seekOf({ ...by, limit: by.limit ?? by.take });
 			const rows = await tx.user.findMany({
 				where: {
 					AND: [
 						listWhere(by, opts.actor),
-						by.after ? { username: { gt: by.after } } : {},
+						seek.cursor === undefined
+							? {}
+							: {
+									username: seek.back
+										? { lt: seek.cursor }
+										: { gt: seek.cursor },
+								},
 					],
 				},
-				orderBy: { username: "asc" },
-				take: limit + 1,
+				orderBy: { username: seek.back ? "desc" : "asc" },
+				take: seek.limit + 1,
 			});
 			for (const user of rows) ensurePerm(opts.actor, "user.read", user);
-			const { page, next } = cutPage(rows, limit, (row) => row.username);
-			return { items: page.map(toUser), next };
+			const { page, next, prev } = cutPage(rows, seek, (row) => row.username);
+			return { items: page.map(toUser), next, prev };
 		},
 	});
 

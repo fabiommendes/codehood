@@ -175,10 +175,10 @@
   papéis. Antes carregavam todos os cursos da instância em toda página. Um
   curso que o admin visita sem participar continua com o cartão na barra.
 
-- **Quebra a API REST:** toda rota de lista responde `{ items, next }` em vez
-  de um array. `GET /api/course` e `GET /api/user` são paginadas por cursor
-  (`limit`, padrão 100 e máximo 500, e `after`); as outras 17 devolvem tudo
-  com `next: null` até serem paginadas. O cursor de curso é o id mascarado
+- **Quebra a API REST:** toda rota de lista responde `{ items, next, prev }`
+  em vez de um array. `GET /api/course` e `GET /api/user` são paginadas por cursor
+  (`limit`, padrão 100 e máximo 500, e `after` ou `before`); as outras 17
+  devolvem tudo com os dois cursores nulos até serem paginadas. O cursor de curso é o id mascarado
   (`src/utils/cursor.ts`), o de usuário é o `username`. `GET /api/user` não
   aceita mais `take`. Os services paginados ganham `findPage` e `count`;
   `findMany` continua devolvendo array. A CLI segue `next` em toda lista.

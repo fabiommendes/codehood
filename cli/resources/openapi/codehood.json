@@ -8776,11 +8776,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -9181,11 +9186,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -10078,6 +10088,15 @@
             "required": false,
             "name": "after",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
           }
         ],
         "responses": {
@@ -10198,11 +10217,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -10921,11 +10945,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -11363,11 +11392,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -12010,11 +12044,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -13694,11 +13733,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -14411,11 +14455,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -15800,11 +15849,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -16150,11 +16204,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -16549,11 +16608,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -17059,11 +17123,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -17809,11 +17878,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -22199,11 +22273,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -36092,11 +36171,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -37140,11 +37224,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -37824,11 +37913,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -39218,11 +39312,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }
@@ -40111,6 +40210,15 @@
             "required": false,
             "name": "after",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
           }
         ],
         "responses": {
@@ -40144,11 +40252,16 @@
                     "next": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "prev": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "items",
-                    "next"
+                    "next",
+                    "prev"
                   ]
                 }
               }

@@ -387,6 +387,7 @@ export const repositoryApi = {
 				{ actor },
 			),
 			next: null,
+			prev: null,
 		}),
 	}),
 	findOne: GET(`${repositoryPath}/[slug]`, {

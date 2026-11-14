@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { SYSTEM } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import type { Page } from "@/core/schemas";
+import type { Page, PageParams } from "@/core/schemas";
 import { db } from "@/db";
-import { cutPage, decodeCursor, encodeCursor } from "@/utils/cursor";
+import { cutPage, decodeCursor, encodeCursor, seekOf } from "@/utils/cursor";
+import { cursorParams, pageLinks } from "@/utils/page-links";
 
 const opts = { actor: SYSTEM } as const;
 
@@ -38,10 +39,69 @@ test.describe("cursor", () => {
 			expect(() => decodeCursor(text)).toThrow(InvalidData);
 	});
 
-	test("a full read cuts the extra row off and points past the last one kept", () => {
-		expect(cutPage([1, 2, 3], 2, String)).toEqual({ page: [1, 2], next: "2" });
-		expect(cutPage([1, 2], 2, String)).toEqual({ page: [1, 2], next: null });
-		expect(cutPage([], 2, String)).toEqual({ page: [], next: null });
+	test("a forward read cuts the extra row off and points past the last one kept", () => {
+		const first = { limit: 2, back: false, cursor: undefined };
+		expect(cutPage([1, 2, 3], first, String)).toEqual({
+			page: [1, 2],
+			next: "2",
+			prev: null,
+		});
+		expect(cutPage([1, 2], first, String)).toEqual({
+			page: [1, 2],
+			next: null,
+			prev: null,
+		});
+		expect(cutPage([], first, String)).toEqual({
+			page: [],
+			next: null,
+			prev: null,
+		});
+		expect(cutPage([3, 4], { ...first, cursor: "2" }, String)).toEqual({
+			page: [3, 4],
+			next: null,
+			prev: "3",
+		});
+	});
+
+	test("a backward read comes back in list order, with a next to return by", () => {
+		const back = { limit: 2, back: true, cursor: "5" };
+		expect(cutPage([4, 3, 2], back, String)).toEqual({
+			page: [3, 4],
+			next: "4",
+			prev: "3",
+		});
+		expect(cutPage([2, 1], back, String)).toEqual({
+			page: [1, 2],
+			next: "2",
+			prev: null,
+		});
+	});
+
+	test("asking for both directions at once is refused", () => {
+		expect(() => seekOf({ after: "a", before: "b" })).toThrow(InvalidData);
+		expect(seekOf({})).toEqual({ limit: 100, back: false, cursor: undefined });
+		expect(seekOf({ before: "b", limit: 3 })).toEqual({
+			limit: 3,
+			back: true,
+			cursor: "b",
+		});
+	});
+
+	test("the links of a pager keep the filters and swap the cursor", () => {
+		const url = new URL("http://x/admin/users?role=ADMIN&after=old");
+		expect(pageLinks(url, { next: "n", prev: "p" })).toEqual({
+			nextHref: "/admin/users?role=ADMIN&after=n",
+			prevHref: "/admin/users?role=ADMIN&before=p",
+		});
+		expect(pageLinks(url, { next: null, prev: null })).toEqual({
+			nextHref: undefined,
+			prevHref: undefined,
+		});
+		expect(cursorParams(url)).toEqual({ after: "old" });
+		expect(cursorParams(new URL("http://x/?before=b&after=a"))).toEqual({
+			before: "b",
+		});
+		expect(cursorParams(new URL("http://x/"))).toEqual({ after: undefined });
 	});
 });
 
@@ -73,6 +133,40 @@ test.describe("paginated lists", () => {
 		expect(await db.course.count({}, opts)).toBe(
 			(await db.course.findMany({}, opts)).length,
 		);
+	});
+
+	test("walking back from the last page of courses and of users returns every page in order", async () => {
+		const lists: {
+			page: (params: PageParams) => Promise<Page<unknown>>;
+			key: (item: unknown) => unknown;
+		}[] = [
+			{
+				page: (params: PageParams) => db.course.findPage(params, opts),
+				key: (item: unknown) => (item as { id: number }).id,
+			},
+			{
+				page: (params: PageParams) => db.user.findPage(params, opts),
+				key: (item: unknown) => (item as { username: string }).username,
+			},
+		];
+		for (const { page, key } of lists) {
+			const forward: unknown[][] = [];
+			let current = await page({ limit: 2 });
+			expect(current.prev).toBeNull();
+			forward.push(current.items.map(key));
+			while (current.next !== null) {
+				current = await page({ limit: 2, after: current.next });
+				forward.push(current.items.map(key));
+			}
+			expect(forward.length).toBeGreaterThan(1);
+
+			const backward = [current.items.map(key)];
+			while (current.prev !== null) {
+				current = await page({ limit: 2, before: current.prev });
+				backward.unshift(current.items.map(key));
+			}
+			expect(backward).toEqual(forward);
+		}
 	});
 
 	test("a course cursor that is not one is refused", async () => {

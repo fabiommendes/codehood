@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import { InvalidData } from "@/core/error";
+import { PAGE_LIMIT_DEFAULT, type PageParams } from "@/core/schemas";
 
 const MODULUS = 1n << 64n;
 const MASK = MODULUS - 1n;
@@ -31,7 +32,10 @@ export function encodeCursor(id: number): string {
  *
  * @throws {@link InvalidData} When `cursor` was not made by {@link encodeCursor}.
  */
-export function decodeCursor(cursor: string): number {
+export function decodeCursor(
+	cursor: string,
+	param: "after" | "before" = "after",
+): number {
 	if (/^[0-9a-z]{1,13}$/.test(cursor)) {
 		let masked = 0n;
 		for (const digit of cursor)
@@ -41,31 +45,90 @@ export function decodeCursor(cursor: string): number {
 			if (id <= BigInt(Number.MAX_SAFE_INTEGER)) return Number(id);
 		}
 	}
-	throw invalidCursor();
+	throw invalidCursor(param);
 }
 
-/** The error a list answers to an `after` it cannot read. */
-export function invalidCursor(): InvalidData {
+/** The error a list answers to a cursor it cannot read, sent as `param`. */
+export function invalidCursor(
+	param: "after" | "before" = "after",
+): InvalidData {
 	return InvalidData.fromZodError(
 		new z.ZodError([
-			{ code: "custom", path: ["after"], message: "Invalid cursor" },
+			{ code: "custom", path: [param], message: "Invalid cursor" },
 		]),
 	);
 }
 
+/// Where a page starts: past `cursor` going forward, or behind it when `back`.
+export interface Seek {
+	limit: number;
+	back: boolean;
+	cursor: string | undefined;
+}
+
 /**
- * Cuts `rows`, read one past the page size, into a page and the cursor of the next.
+ * Reads where the page asked by `params` starts.
+ *
+ * A service then reads `limit + 1` rows past the cursor, in the order of the
+ * list, or behind it in reverse order when `back`, and hands them to {@link cutPage}.
+ *
+ * @throws {@link InvalidData} When `params` has both `after` and `before`.
+ */
+export function seekOf(params: PageParams): Seek {
+	if (params.after !== undefined && params.before !== undefined)
+		throw InvalidData.fromZodError(
+			new z.ZodError([
+				{
+					code: "custom",
+					path: ["before"],
+					message: "Give either `after` or `before`, not both",
+				},
+			]),
+		);
+	return {
+		limit: params.limit ?? PAGE_LIMIT_DEFAULT,
+		back: params.before !== undefined,
+		cursor: params.before ?? params.after,
+	};
+}
+
+/**
+ * Cuts `rows`, read one past the page size from `seek`, into a page in list
+ * order and the cursors of its neighbours.
  *
  * @example
- * const rows = await tx.thing.findMany({ take: limit + 1, orderBy: { id: "asc" } });
- * const { page, next } = cutPage(rows, limit, (row) => encodeCursor(row.id));
+ * const seek = seekOf(filter);
+ * const rows = await tx.thing.findMany({
+ *   where: seek.cursor ? { id: seek.back ? { lt: id } : { gt: id } } : {},
+ *   orderBy: { id: seek.back ? "desc" : "asc" },
+ *   take: seek.limit + 1,
+ * });
+ * const { page, next, prev } = cutPage(rows, seek, (row) => encodeCursor(row.id));
  */
 export function cutPage<Row>(
 	rows: Row[],
-	limit: number,
-	cursorOf: (last: Row) => string,
-): { page: Row[]; next: string | null } {
-	if (rows.length <= limit) return { page: rows, next: null };
-	const page = rows.slice(0, limit);
-	return { page, next: cursorOf(page[page.length - 1] as Row) };
+	seek: Seek,
+	cursorOf: (row: Row) => string,
+): { page: Row[]; next: string | null; prev: string | null } {
+	const more = rows.length > seek.limit;
+	const page = rows.slice(0, seek.limit);
+	if (seek.back) page.reverse();
+	const first = page[0];
+	const last = page[page.length - 1];
+	if (first === undefined || last === undefined)
+		return { page, next: null, prev: null };
+
+	// The side the page was reached from has rows: the cursor came from one.
+	const cameFrom = seek.cursor !== undefined;
+	return seek.back
+		? {
+				page,
+				next: cameFrom ? cursorOf(last) : null,
+				prev: more ? cursorOf(first) : null,
+			}
+		: {
+				page,
+				next: more ? cursorOf(last) : null,
+				prev: cameFrom ? cursorOf(first) : null,
+			};
 }

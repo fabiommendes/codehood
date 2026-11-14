@@ -248,7 +248,7 @@ test("GET list query cannot redirect to another course", async ({
 	}).toString();
 	const res = await request.get(`${mine.url}?${qs}`, { headers: mine.headers });
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual({ items: [], next: null });
+	expect(await res.json()).toEqual({ items: [], next: null, prev: null });
 });
 
 test("service findMany narrows by exams within a course given by id", async () => {

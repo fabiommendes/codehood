@@ -93,7 +93,7 @@ def test_a_function_without_after_cannot_follow_a_cursor():
     """
 
     def stale_list() -> generated.ListUserResponse:
-        return generated.ListUserResponse(items=[], next="c1")
+        return generated.ListUserResponse(items=[], next="c1", prev=None)
 
     with pytest.raises(TypeError, match="after"):
         read_all(stale_list)

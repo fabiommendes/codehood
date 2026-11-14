@@ -316,7 +316,7 @@ test("listing the feedback of a submission returns only the passes of that submi
 
 	const empty = await request.get(otherUrl, { headers });
 	expect(empty.status()).toBe(200);
-	expect(await empty.json()).toEqual({ items: [], next: null });
+	expect(await empty.json()).toEqual({ items: [], next: null, prev: null });
 
 	await request.post(otherUrl, {
 		headers,

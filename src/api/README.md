@@ -18,12 +18,13 @@ views, in order, without internal HTTP or a global transaction. It excludes
 login/logout, multipart and pages outside the registry. See
 [the contract](../../dev/specs/to-review/rest-batch.md) for limits and examples.
 
-A list route answers `{ items, next }`: one page and the cursor of the
-following one, `null` on the last. `CRUD()` pages a resource whose service has
-`findPage`, and its list then takes `limit` (default 100, at most 500) and
-`after`; the others answer everything with `next: null`. A client follows
-`next` until `null` on every list. The cursor is made in the service, with
-`src/utils/cursor.ts`, because the entity does not carry the row id.
+A list route answers `{ items, next, prev }`: one page and the cursors of the
+pages around it, `null` where the list ends. `CRUD()` pages a resource whose
+service has `findPage`, and its list then takes `limit` (default 100, at most
+500) and either `after` or `before`; the others answer everything with both
+cursors `null`. A client follows `next` until `null` on every list. The
+cursors are made in the service, with `src/utils/cursor.ts`, because the
+entity does not carry the row id.
 
 This file maps where each piece lives.
 

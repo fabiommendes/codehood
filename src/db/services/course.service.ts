@@ -16,7 +16,6 @@ import {
 	coursePK,
 	courseSchema,
 	courseUpdate,
-	PAGE_LIMIT_DEFAULT,
 	type Page,
 	type PageParams,
 	pageOf,
@@ -31,7 +30,7 @@ import {
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
-import { cutPage, decodeCursor, encodeCursor } from "@/utils/cursor";
+import { cutPage, decodeCursor, encodeCursor, seekOf } from "@/utils/cursor";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { recomputeEventTimes } from "../event-times";
 import { invalidIfExists, valueOrNotFound } from "../utils";
@@ -209,7 +208,7 @@ const buildCourseService = defineService<CourseT>()(() => {
 	/**
 	 * Lists one page of the courses `actor` may read, oldest first.
 	 *
-	 * @throws {@link InvalidData} When `filter.after` is not a cursor of this list.
+	 * @throws {@link InvalidData} When `filter.after` or `filter.before` is not a cursor of this list.
 	 */
 	const findPage = op({
 		transaction: false,
@@ -220,29 +219,38 @@ const buildCourseService = defineService<CourseT>()(() => {
 			filter: CourseFilter & PageParams,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Page<Course>> => {
-			const limit = filter.limit ?? PAGE_LIMIT_DEFAULT;
+			const seek = seekOf(filter);
+			const id =
+				seek.cursor === undefined
+					? undefined
+					: (decodeCursor(
+							seek.cursor,
+							seek.back ? "before" : "after",
+						) as CourseId);
 			const rows = await tx.course.findMany({
 				where: {
 					AND: [
 						listWhere(filter, opts.actor),
-						filter.after
-							? { id: { gt: decodeCursor(filter.after) as CourseId } }
-							: {},
+						id === undefined ? {} : { id: seek.back ? { lt: id } : { gt: id } },
 					],
 				},
 				include: courseInclude,
-				orderBy: { id: "asc" },
-				take: limit + 1,
+				orderBy: { id: seek.back ? "desc" : "asc" },
+				take: seek.limit + 1,
 			});
 			for (const row of rows) {
 				if (!hasPerm(opts.actor, "course.read", row)) {
 					throw new NotAllowed("course.read");
 				}
 			}
-			const { page, next } = cutPage(rows, limit, (row) =>
+			const { page, next, prev } = cutPage(rows, seek, (row) =>
 				encodeCursor(row.id),
 			);
-			return { items: page.map((row) => fromDb(row, opts.actor)), next };
+			return {
+				items: page.map((row) => fromDb(row, opts.actor)),
+				next,
+				prev,
+			};
 		},
 	});
 

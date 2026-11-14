@@ -660,11 +660,13 @@ class GradeColumnCreate(Model):
 class ListDisciplineResponse(Model):
     items: list[Discipline]
     next: str | None
+    prev: str | None
 
 
 class ListEditionResponse(Model):
     items: list[Edition]
     next: str | None
+    prev: str | None
 
 
 class ListQuestionResponseItemsItem2QuestionCode(Model):
@@ -1103,6 +1105,7 @@ class ListQuestionResponseItemsItemQuestionTrueFalse(Model):
 class ListUserResponse(Model):
     items: list[User]
     next: str | None
+    prev: str | None
 
 
 class ReadRollCallResponse(Model):
@@ -1120,6 +1123,7 @@ class ReadRollCallResponse(Model):
 class RepositoryListResponse(Model):
     items: list[Repository]
     next: str | None
+    prev: str | None
 
 
 class Resource(Model):
@@ -1283,16 +1287,19 @@ class CourseGradesResponse(Model):
 class ListCourseResponse(Model):
     items: list[Course]
     next: str | None
+    prev: str | None
 
 
 class ListExamResponse(Model):
     items: list[Exam]
     next: str | None
+    prev: str | None
 
 
 class ListGradeColumnResponse(Model):
     items: list[GradeColumn]
     next: str | None
+    prev: str | None
 
 
 class ListQuestionResponseItemsItem2QuestionFillIn(Model):
@@ -1355,16 +1362,19 @@ class ListQuestionResponseItemsItemQuestionFillIn(Model):
 class ListResourceResponse(Model):
     items: list[Resource]
     next: str | None
+    prev: str | None
 
 
 class ListRollCallResponse(Model):
     items: list[ReadRollCallResponse]
     next: str | None
+    prev: str | None
 
 
 class ListTimeslotResponse(Model):
     items: list[TimeSlot]
     next: str | None
+    prev: str | None
 
 
 class JobsItem(Model):
@@ -1394,6 +1404,7 @@ class JobsItem(Model):
 class ListCalendarEventResponse(Model):
     items: list[CalendarEvent]
     next: str | None
+    prev: str | None
 
 
 class ListQuestionResponseItemsItem(Model):
@@ -1487,6 +1498,7 @@ class ClaimGradingJobsResponse(Model):
 class ListQuestionResponse(Model):
     items: list[ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2]
     next: str | None
+    prev: str | None
 
 
 class GradeReleaseRefused(CodehoodAPIError):
@@ -2284,6 +2296,7 @@ def list_course(
     edition: str | None = None,
     limit: int | None = None,
     after: str | None = None,
+    before: str | None = None,
     client: httpx.Client | None = None,
 ) -> ListCourseResponse:
     """
@@ -2299,6 +2312,7 @@ def list_course(
                 "edition": edition,
                 "limit": limit,
                 "after": after,
+                "before": before,
             }
         ),
         headers=auth_headers(client),
@@ -2524,6 +2538,7 @@ def list_user(
     usernames: list[str] | None = None,
     limit: int | None = None,
     after: str | None = None,
+    before: str | None = None,
     client: httpx.Client | None = None,
 ) -> ListUserResponse:
     """
@@ -2532,7 +2547,9 @@ def list_user(
     client = client if client is not None else get_client()
     response = client.get(
         "/api/user",
-        params=query_params({"usernames": usernames, "limit": limit, "after": after}),
+        params=query_params(
+            {"usernames": usernames, "limit": limit, "after": after, "before": before}
+        ),
         headers=auth_headers(client),
     )
     if response.status_code == 200:
