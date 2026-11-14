@@ -5,6 +5,7 @@
 	"code_pretest_running": "Rodando pré-testes…",
 	"code_pretest_hint": "Os pré-testes são os testes públicos. A nota vem do envio.",
 	"code_pretest_none": "Esta questão não tem pré-testes.",
+	"code_pretest_no_runner": "A execução de código está desligada nesta instância, então os pré-testes não podem rodar.",
 	"code_pretest_stale": "Resultado de uma versão anterior do código",
 	"code_result_passed": "Os {total} pré-testes passaram",
 	"code_result_failed": "{failed} de {total} pré-testes falharam",

@@ -4,7 +4,13 @@
  */
 
 import { RunnerHost, RunnerUnavailable } from "@codehood/runner/host";
-import { elmCases, elmModule, parseSuite, stripAnsi } from "./test-report";
+import {
+	elmCases,
+	elmModule,
+	parseSuite,
+	stripAnsi,
+	withModuleHeader,
+} from "./test-report";
 
 /// One verdict of the report; only `pass` passes.
 export type Verdict =
@@ -110,7 +116,10 @@ async function runSource(
 		{
 			language: "elm",
 			mode: "test",
-			files: { [run.file]: run.answer, [entry]: text },
+			files: {
+				[run.file]: withModuleHeader("elm", run.file, run.answer),
+				[entry]: text,
+			},
 			entry,
 		},
 		{

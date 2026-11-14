@@ -32,7 +32,11 @@ import {
 	runTests as runBrowserTests,
 	type Verdict,
 } from "../runner/run-tests";
-import { type PretestSummary, summarizeReport } from "./code-pretest";
+import {
+	type PretestSummary,
+	pretestOffReason,
+	summarizeReport,
+} from "./code-pretest";
 import { type CodeSends, nextSendWorth, type SentView } from "./code-sends";
 
 export interface CodeAnswerProps {
@@ -149,7 +153,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 	});
 
 	async function runPretests(): Promise<void> {
-		if (state().kind === "running" || props.pretests.length === 0) return;
+		if (state().kind === "running" || offReason() !== null) return;
 		controller = new AbortController();
 		const { signal } = controller;
 		const ranCode = code();
@@ -193,6 +197,8 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 	const exhausted = () =>
 		props.sends?.limit != null && props.sends.used >= props.sends.limit;
 	const running = () => state().kind === "running";
+	const offReason = () =>
+		pretestOffReason(props.pretests.length, props.runnerOrigin);
 	const stale = () => {
 		const current = state();
 		return (
@@ -263,7 +269,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 							type="button"
 							class="btn btn-soft btn-success btn-sm"
 							data-action="run-pretests"
-							disabled={running() || props.pretests.length === 0}
+							disabled={running() || offReason() !== null}
 							onClick={() => void runPretests()}
 						>
 							<Show when={running()}>
@@ -306,10 +312,15 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 						/>
 					</div>
 				</div>
-				<div class="border-t border-base-300 bg-base-200/50 px-3 py-1.5 text-xs text-muted">
-					{props.pretests.length === 0
-						? m.code_pretest_none()
-						: m.code_pretest_hint()}
+				<div
+					class="border-t border-base-300 bg-base-200/50 px-3 py-1.5 text-xs text-muted"
+					data-pretest-hint={offReason() ?? "on"}
+				>
+					{offReason() === "no-runner"
+						? m.code_pretest_no_runner()
+						: offReason() === "no-pretests"
+							? m.code_pretest_none()
+							: m.code_pretest_hint()}
 				</div>
 			</div>
 

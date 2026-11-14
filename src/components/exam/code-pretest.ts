@@ -28,3 +28,16 @@ export function summarizeReport(report: RunnerReport): PretestSummary {
 		? { kind: "passed", total }
 		: { kind: "failed", failed, total };
 }
+
+/**
+ * Why the pretest button is off, or null when it can run.
+ *
+ * Without a runner the button stays disabled, since the run could only fail.
+ */
+export function pretestOffReason(
+	pretestCount: number,
+	runnerOrigin: string | null | undefined,
+): "no-runner" | "no-pretests" | null {
+	if (!runnerOrigin) return "no-runner";
+	return pretestCount === 0 ? "no-pretests" : null;
+}

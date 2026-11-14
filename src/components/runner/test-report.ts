@@ -118,6 +118,23 @@ export function elmModule(text: string): string | null {
 	return match?.[1] ?? null;
 }
 
+/**
+ * The Elm answer with a `module <Module> exposing (..)` header when it has
+ * none, so an answer may be only the declarations.
+ *
+ * The module comes from `file`: `Foo/Bar.elm` is `Foo.Bar`. Other languages
+ * and answers that declare a module are returned as they are.
+ */
+export function withModuleHeader(
+	language: string,
+	file: string,
+	answer: string,
+): string {
+	if (language !== "elm" || elmModule(answer) !== null) return answer;
+	const module = file.replace(/\.elm$/, "").replaceAll("/", ".");
+	return `module ${module} exposing (..)\n\n${answer}`;
+}
+
 /** Removes the ANSI escapes the compiler uses for color. */
 export function stripAnsi(text: string): string {
 	// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escapes

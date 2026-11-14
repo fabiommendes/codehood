@@ -5,6 +5,7 @@
 	"code_pretest_running": "Running pretests…",
 	"code_pretest_hint": "Pretests are the public tests. The grade comes from the submission.",
 	"code_pretest_none": "This question has no pretests.",
+	"code_pretest_no_runner": "Code execution is off on this instance, so pretests cannot run.",
 	"code_pretest_stale": "Result of an earlier version of the code",
 	"code_result_passed": "All {total} pretests passed",
 	"code_result_failed": "{failed} of {total} pretests failed",
