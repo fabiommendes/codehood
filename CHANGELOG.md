@@ -32,6 +32,11 @@
 
 ### Changed
 
+- A aba "Estudantes" do professor reúne turma, notas e presença: a aba
+  "Notas" saiu da faixa, e o card do curso na sidebar liga as três páginas
+  (`studentsNav`). As URLs não mudaram. Para o aluno, a página de presença
+  segue sem card e sem aba ativa.
+
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento

@@ -4,6 +4,7 @@ import {
 	resourcesNav,
 	scheduleNav,
 	scheduleWeekId,
+	studentsNav,
 } from "@/utils/course-tabs-nav";
 
 const href = "/cs101/ada_2026-2";
@@ -61,5 +62,16 @@ test.describe("examsNav", () => {
 
 	test("no exams, no sections", () => {
 		expect(examsNav(href, []).sections).toEqual([]);
+	});
+});
+
+test.describe("studentsNav", () => {
+	test("links the roster, the grades and the attendance, in that order", () => {
+		const entries = studentsNav(href).sections[0]?.entries;
+		expect(entries).toEqual([
+			{ label: "Roster", href: `${href}/roster` },
+			{ label: "Grades", href: `${href}/grades` },
+			{ label: "Attendance", href: `${href}/attendance` },
+		]);
 	});
 });

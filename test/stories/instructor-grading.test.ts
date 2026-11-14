@@ -321,10 +321,15 @@ test("instructor: see the whole class's results", async ({ page }) => {
 	]);
 	await logInAs(page, teacher);
 
-	await test.step("the Grades tab of the course opens the class's results", async () => {
+	await test.step("the Students tab leads to the class's results through the course card", async () => {
 		await page.goto(href);
 		await expect(page).toHaveURL(href);
-		await page.getByRole("tab", { name: "Grades", exact: true }).click();
+		await page.getByRole("tab", { name: "Students", exact: true }).click();
+		await expect(page).toHaveURL(`${href}/roster`);
+		await page
+			.locator("[data-course-card]")
+			.getByRole("link", { name: "Grades", exact: true })
+			.click();
 
 		await expect(page).toHaveURL(`${href}/grades`);
 		await expect(

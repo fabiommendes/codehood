@@ -28,7 +28,7 @@ function keys(tabs: readonly CourseTab[]): string[] {
 	return tabs.map((t) => t.key);
 }
 
-test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Students, Grades, Reports, in that order", () => {
+test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Students, Reports, in that order", () => {
 	const tabs = courseTabs(course, ref, owner as Actor);
 
 	expect(tabs.map((t) => t.label)).toEqual([
@@ -38,7 +38,6 @@ test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Stud
 		"Schedule",
 		"Questions",
 		"Students",
-		"Grades",
 		"Reports",
 	]);
 	expect(keys(tabs)).toEqual([
@@ -48,7 +47,6 @@ test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Stud
 		"schedule",
 		"questions",
 		"students",
-		"grades",
 		"reports",
 	]);
 });
@@ -68,14 +66,10 @@ test("instructor: the questions and students tabs carry the right hrefs", () => 
 	});
 });
 
-test("instructor: the grades tab leads to the course's grades page", () => {
+test("no actor gets a grades tab: grades live under the students tab", () => {
 	const tabs = courseTabs(course, ref, owner as Actor);
 
-	expect(tabs.find((t) => (t.key as string) === "grades")).toEqual({
-		key: "grades",
-		label: "Grades",
-		href: `${courseHref(ref)}/grades`,
-	});
+	expect(keys(tabs)).not.toContain("grades");
 });
 
 test("no actor gets a manage tab", () => {
@@ -124,6 +118,5 @@ test("the pinning test: the instructor tabs appear iff enrollment.manage agrees,
 
 		expect(tabs.includes("questions"), name).toBe(allowed);
 		expect(tabs.includes("students"), name).toBe(allowed);
-		expect(tabs.includes("grades"), name).toBe(allowed);
 	}
 });

@@ -1,7 +1,8 @@
 ---
+import { hasPerm } from "@/auth/permissions";
 // A course's roll call attendance. The service scopes the report: the
-// instructor sees every student, a student only their own row. No tab links
-// here (see src/urls/README.md); it is reached from Grades and the course home.
+// instructor sees every student, a student only their own row. For the
+// instructor it belongs to the students tab, linked from the course card.
 import AttendanceTable from "@/components/attendance/AttendanceTable";
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
@@ -10,6 +11,7 @@ import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { attendanceCsvRows } from "@/services/attendance-table";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { studentsNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -17,19 +19,21 @@ export const prerender = false;
 const { discipline, course: courseSegment } = Astro.params;
 const result = await loadCourse(Astro, discipline, courseSegment);
 if ("redirect" in result) return result.redirect;
-const { course } = result;
+const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
+const manages = hasPerm(actor, "enrollment.manage", course);
 const report = await db.rollCall.courseAttendance(course.id, { actor });
 const csvFilename = `attendance-${course.discipline.slug}-${course.edition.slug}.csv`;
 ---
 
 <AppLayout title={m.attendance_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
+  nav={manages ? studentsNav(href) : undefined}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
-    <CourseHeader course={course} />
+    <CourseHeader course={course} active={manages ? "students" : undefined} />
 
     <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-2xl font-bold">{m.attendance_page_heading()}</h2>

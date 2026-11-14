@@ -481,7 +481,7 @@ test("grades: on a narrow screen the table scrolls inside its wrapper, the page 
 // Tabs
 //
 
-test("grades: the instructor's tabs have Grades before Reports, Grades the current one; a student does not get it", async ({
+test("grades: the page sits under the Students tab and the course card links roster, grades and attendance; a student gets neither", async ({
 	page,
 }) => {
 	const { teacher, course, href } = await setup("gr9");
@@ -497,12 +497,22 @@ test("grades: the instructor's tabs have Grades before Reports, Grades the curre
 		"Schedule",
 		"Questions",
 		"Students",
-		"Grades",
 		"Reports",
 	]);
 	await expect(
-		page.getByRole("tab", { name: "Grades", selected: true }),
-	).toHaveAttribute("href", `${href}/grades`);
+		page.getByRole("tab", { name: "Students", selected: true }),
+	).toHaveAttribute("href", `${href}/roster`);
+	const card = page.locator("[data-course-card]");
+	await expect(card.getByText("Students", { exact: true })).toBeVisible();
+	await expect(card.getByRole("link", { name: "Roster" })).toHaveAttribute(
+		"href",
+		`${href}/roster`,
+	);
+	await expect(card.locator("span[aria-current=page]")).toHaveText("Grades");
+	await expect(card.getByRole("link", { name: "Attendance" })).toHaveAttribute(
+		"href",
+		`${href}/attendance`,
+	);
 
 	await page.context().clearCookies();
 	await logInAs(page, ana);
@@ -510,7 +520,7 @@ test("grades: the instructor's tabs have Grades before Reports, Grades the curre
 
 	await expect(page).toHaveURL(href);
 	await expect(page.getByRole("tab", { name: "Home" })).toBeVisible();
-	await expect(page.getByRole("tab", { name: "Grades" })).toHaveCount(0);
+	await expect(page.getByRole("tab", { name: "Students" })).toHaveCount(0);
 	await expect(page.getByRole("tab")).toHaveText([
 		"Home",
 		"Exams",

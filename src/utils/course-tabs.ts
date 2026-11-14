@@ -18,7 +18,6 @@ export type CourseTabKey =
 	| "repositories"
 	| "questions"
 	| "students"
-	| "grades"
 	| "reports";
 
 export interface CourseTab {
@@ -31,10 +30,11 @@ export interface CourseTab {
  * Everyone gets `home`/`exams`/`resources`/`schedule`, in that order, so
  * "it's the third tab" means the same thing to a student and an instructor
  * looking at the same course. `repositories` follows them when `hasRepositories`
- * (the actor can see at least one repository of the course). The instructor's tabs (`questions`, `students`, `grades`, `reports`) are appended, never
+ * (the actor can see at least one repository of the course). The instructor's tabs (`questions`, `students`, `reports`) are appended, never
  * interleaved, exactly when the actor has `enrollment.manage` — the same
  * predicate `loadCourse({ manage: true })` runs on `/roster` and `/grades`,
- * so a visible tab never 403s.
+ * so a visible tab never 403s. Grades and attendance belong to `students`:
+ * the course card in the sidebar links them.
  */
 export function courseTabs(
 	course: CourseTarget,
@@ -75,11 +75,6 @@ export function courseTabs(
 				key: "students",
 				label: COURSE_TAB_LABELS.roster,
 				href: `${href}/roster`,
-			},
-			{
-				key: "grades",
-				label: COURSE_TAB_LABELS.grades,
-				href: `${href}/grades`,
 			},
 			{
 				key: "reports",

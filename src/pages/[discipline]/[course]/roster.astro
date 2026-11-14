@@ -17,6 +17,7 @@ import { actionForm, formState } from "@/forms/form-state";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { studentsNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 
 export const prerender = false;
@@ -140,6 +141,7 @@ const csvRows = [
 
 <AppLayout title={m.courses_roster_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
+  nav={studentsNav(href)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="students" />

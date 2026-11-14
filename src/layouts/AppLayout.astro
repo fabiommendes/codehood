@@ -82,10 +82,16 @@ const reportContentPage =
 	);
 
 // The course card: the course and tab from the URL, the rest from `nav`.
-const tabSegment =
+// Pages without a tab of their own show the tab they belong to.
+const TAB_OF_PAGE: Record<string, string> = {
+	grades: "roster",
+	attendance: "roster",
+};
+const pageSegment =
 	reportCourseHref === null
 		? ""
 		: (Astro.url.pathname.slice(reportCourseHref.length).split("/")[1] ?? "");
+const tabSegment = TAB_OF_PAGE[pageSegment] ?? pageSegment;
 const card =
 	nav && reportCourse && reportCourseHref
 		? {

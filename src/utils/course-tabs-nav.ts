@@ -1,5 +1,5 @@
 /**
- * The course card links of the resources, schedule and exams tabs. Each page
+ * The course card links of the resources, schedule, exams and students tabs. Each page
  * builds its card from data it already loaded; `markCourseNav` finds where
  * the reader is.
  */
@@ -69,6 +69,24 @@ export function scheduleNav(
 			]
 		: [...weeks.past, ...weeks.ahead].map(link);
 	return { sections: [{ entries }] };
+}
+
+/**
+ * Links to the pages of the students tab: the roster, the grades and the
+ * attendance of the class. Every one of those pages passes the same value.
+ */
+export function studentsNav(href: string): CourseNav {
+	return {
+		sections: [
+			{
+				entries: [
+					{ label: m.nav_students_roster(), href: `${href}/roster` },
+					{ label: m.nav_course_tab_grades(), href: `${href}/grades` },
+					{ label: m.attendance_page_heading(), href: `${href}/attendance` },
+				],
+			},
+		],
+	};
 }
 
 const EXAM_TYPE_ORDER = ["EXAM", "QUIZ", "PRACTICE"] as const;
