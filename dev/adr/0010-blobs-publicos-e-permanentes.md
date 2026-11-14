@@ -51,3 +51,11 @@ um PDF público, da apostila do ano passado ou de um arquivo que o aluno já tem
   (`src/api/index.ts:408`): saber o hash já dá acesso aos bytes.
 - `manage import-resources` lembra a regra ao final de cada importação
   (`src/commands/import-resources.ts:128-131`).
+
+## Adendo (2026-11-13): anexos de questões e provas
+
+Um blob de anexo de questão ou de prova também é servido por `/files/<hash>`,
+com a mesma regra. O sigilo vem de o hash nunca chegar ao aluno: nenhum read
+model de aluno, página de aluno ou cabeçalho de resposta (ETag incluso) contém
+o sha256 de um anexo. O aluno baixa o anexo só pelas rotas da prova, que
+conferem a janela de abertura.

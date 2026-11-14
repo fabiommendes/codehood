@@ -225,6 +225,7 @@ enum AttachmentOwner {
   QUESTION
   REPORT
   REPOSITORY
+  EXAM
 }
 
 /// One use of a Blob by one owner, carrying the filename and mime type that
@@ -801,6 +802,9 @@ model QuestionData {
   /// The whole question document, answer key, per-choice scores, feedback and
   /// instructor comments included. Grading reads only this column.
   privatePayload Json
+  /// Map from file name to sha256 of each link attachment of this version.
+  /// Null when the version has no link attachments.
+  files Json?
 
   createdAt DateTime @default(now())
 
@@ -1225,6 +1229,12 @@ model Exam {
 
   /// Revision marker supplied by the writer, opaque to the server.
   rev String?
+
+  /// The `attachments` list of the exam's MDQ document, with `origin` per entry.
+  attachments Json?
+  /// Map from file name to sha256 of each link attachment of the exam's
+  /// questions, same shape as `QuestionData.files`.
+  files Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -202,6 +202,9 @@ export function makeAttachmentService(
 			case "QUESTION": {
 				throw new NotImplemented("question attachments");
 			}
+			case "EXAM": {
+				throw new NotImplemented("exam attachments");
+			}
 			case "REPORT": {
 				const report = await tx.report.findUnique({
 					where: { id: raw.attachedToId as ReportId },
