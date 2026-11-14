@@ -162,8 +162,6 @@
 	"courses_roster_invite_revoked": "Invite revoked.",
 	"courses_roster_add_student": "Add student",
 	"courses_roster_passphrase": "Passphrase",
-	"courses_roster_invite_link": "Invite link",
-	"courses_roster_revoke_invites": "Revoke invites",
 	"courses_roster_students_heading": "Students",
 	"courses_roster_enrolled_count": [
 		{
@@ -188,7 +186,6 @@
 	"courses_roster_copied": "Copied!",
 	"courses_roster_cancel": "Cancel",
 	"courses_roster_add": "Add",
-	"courses_roster_close": "Close",
 	"courses_roster_passphrase_body": "Read this out in class. Live for 5 minutes, then it's gone.",
 	"courses_roster_passphrase_live_until": "live until {time}",
 	"courses_roster_passphrase_none": "No active passphrase. Generate one below.",

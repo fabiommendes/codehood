@@ -162,8 +162,6 @@
 	"courses_roster_invite_revoked": "Convite revogado.",
 	"courses_roster_add_student": "Adicionar estudante",
 	"courses_roster_passphrase": "Frase-senha",
-	"courses_roster_invite_link": "Link de convite",
-	"courses_roster_revoke_invites": "Revogar convites",
 	"courses_roster_students_heading": "Estudantes",
 	"courses_roster_enrolled_count": [
 		{
@@ -188,7 +186,6 @@
 	"courses_roster_copied": "Copiado!",
 	"courses_roster_cancel": "Cancelar",
 	"courses_roster_add": "Adicionar",
-	"courses_roster_close": "Fechar",
 	"courses_roster_passphrase_body": "Leia em aula. Vale por 5 minutos e depois some.",
 	"courses_roster_passphrase_live_until": "válida até {time}",
 	"courses_roster_passphrase_none": "Nenhuma frase-senha ativa. Gere uma abaixo.",
