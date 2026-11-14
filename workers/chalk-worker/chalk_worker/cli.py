@@ -8,7 +8,9 @@ import fcntl
 import os
 import signal
 import sys
+import threading
 import tomllib
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import IO, Annotated, Any
@@ -88,6 +90,11 @@ def run(
     """
     if exam and discipline:
         raise typer.BadParameter("use --exam or --discipline, not both")
+    on_terminal = sys.stdin.isatty() and sys.stdout.isatty()
+    if tui is None:
+        tui = on_terminal
+    elif tui and not on_terminal:
+        raise typer.BadParameter("--tui needs a terminal on stdin and stdout; use --no-tui")
     config = _course_config(Path.cwd())
     url = server or config.get("server", {}).get("url")
     if not url:
@@ -100,8 +107,6 @@ def run(
     root = cache_dir or _default_cache()
     _cache_lock = _lock_cache(root)  # held until the process exits
     jobs = jobs or os.process_cpu_count() or 1
-    if tui is None:
-        tui = sys.stdin.isatty() and sys.stdout.isatty()
 
     def make_grader(question: CodeQuestion) -> QuestionGrader:
         return QuestionGrader(
@@ -141,13 +146,40 @@ def run(
 def _run_tui(loop: Worker, once: bool, subtitle: str) -> None:
     from .tui import WorkerApp
 
-    done = WorkerApp(loop, once=once, subtitle=subtitle).run()
+    app = WorkerApp(loop, once=once, subtitle=subtitle)
+
+    hung_up = threading.Event()
+
+    def hangup(_signum: int, _frame: Any) -> None:
+        # The terminal is gone, and the display may block writing to it: let
+        # the jobs in progress end, then leave without it. Again: at once.
+        if app.finished.is_set():
+            _exit(0)
+        if hung_up.is_set():
+            _exit(130)
+        hung_up.set()
+        loop.stop()
+        threading.Thread(target=lambda: (app.finished.wait(), _exit(0)), daemon=True).start()
+
+    signal.signal(signal.SIGHUP, hangup)
+    done = app.run()
+    if app.error is not None:
+        traceback.print_exception(app.error)
+        _log(f"the claim loop failed: {type(app.error).__name__}: {app.error}")
+        _exit(1)
     if done is None:
         # Aborted with jobs in progress: their leases run out on the server.
+        # Leave now, without waiting for the grading threads; the sandboxes
+        # of their runs die with this process.
         _log("aborted")
-        sys.stderr.flush()
-        os._exit(130)
+        _exit(130)
     _log(f"{done} jobs processed")
+
+
+def _exit(code: int) -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
 
 
 def _bytes(text: str, option: str) -> int:

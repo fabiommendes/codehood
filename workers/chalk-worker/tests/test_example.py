@@ -7,7 +7,7 @@ from pathlib import Path
 
 import mdq
 import pytest
-from conftest import needs_elm
+from conftest import needs_elm, prepare
 
 from chalk_worker.grading import QuestionGrader
 
@@ -25,7 +25,7 @@ def question():
 @pytest.fixture(scope="module")
 def grader(question, tmp_path_factory) -> QuestionGrader:
     g = QuestionGrader(question, tmp_path_factory.mktemp("example"), sandbox="none")
-    g.prepare()
+    prepare(g)
     return g
 
 

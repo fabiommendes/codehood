@@ -4,6 +4,8 @@ from pathlib import Path
 import pytest
 from mdq.models import CodeQuestion
 
+from chalk_worker.grading import PrepareFailed, QuestionGrader
+
 HAS_ELM = bool(shutil.which("elm") and shutil.which("elm-test") and shutil.which("node"))
 
 needs_elm = pytest.mark.skipif(not HAS_ELM, reason="elm, elm-test and node needed")
@@ -85,3 +87,17 @@ def question() -> CodeQuestion:
 @pytest.fixture(scope="session")
 def elm_cache(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("elm-cache")
+
+
+def prepare(grader: QuestionGrader) -> None:
+    """
+    Prepare a grader, skipping the test when the Elm packages cannot be
+    downloaded: they come from package.elm-lang.org and GitHub, and elm does
+    not retry, so a DNS hiccup fails the download.
+    """
+    try:
+        grader.prepare()
+    except PrepareFailed as e:
+        if any(m in str(e) for m in ("package.elm-lang.org", "PROBLEM DOWNLOADING")):
+            pytest.skip(f"cannot download the elm packages: {e}")
+        raise

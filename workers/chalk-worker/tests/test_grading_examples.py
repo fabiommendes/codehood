@@ -4,7 +4,7 @@ real elm-test profile.
 """
 
 import pytest
-from conftest import needs_elm
+from conftest import needs_elm, prepare
 from mdq.models import CodeQuestion
 
 from chalk_worker.grading import QuestionGrader, ReferenceError
@@ -57,7 +57,7 @@ def question(text: str = EXAMPLES, **overrides) -> CodeQuestion:
 @pytest.fixture(scope="module")
 def grader(tmp_path_factory) -> QuestionGrader:
     g = QuestionGrader(question(), tmp_path_factory.mktemp("work"), sandbox="none")
-    g.prepare()
+    prepare(g)
     return g
 
 

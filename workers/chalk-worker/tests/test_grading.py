@@ -6,7 +6,7 @@ the Elm packages.
 from pathlib import Path
 
 import pytest
-from conftest import SOLUTION, needs_elm, question_doc
+from conftest import SOLUTION, needs_elm, prepare, question_doc
 from mdq.models import CodeQuestion
 
 from chalk_worker.grading import QuestionGrader, ReferenceError
@@ -24,7 +24,7 @@ NEGATIVES = SOLUTION.replace("List.sum xs", "List.sum (List.filter (\\x -> x > 0
 def grader(tmp_path_factory) -> QuestionGrader:
     q = CodeQuestion.model_validate(question_doc())
     g = QuestionGrader(q, tmp_path_factory.mktemp("work"), sandbox="none")
-    g.prepare()
+    prepare(g)
     return g
 
 
@@ -107,7 +107,7 @@ NESTED_BOMB = SOLUTION.replace(
 def test_answer_past_the_memory_budget_errs_every_case(tmp_path: Path, answer: str) -> None:
     q = CodeQuestion.model_validate(question_doc())
     g = QuestionGrader(q, tmp_path / "work", sandbox="none", memory=256 * 1024**2)
-    g.prepare()
+    prepare(g)
     report = g.grade(answer)
     assert report.status == "completed"
     assert {c.verdict for c in report.cases} == {"error"}

@@ -29,6 +29,12 @@ def test_without_key_refuses(monkeypatch) -> None:
     assert cli.BOT_KEY_VAR in result.output
 
 
+def test_tui_needs_a_terminal() -> None:
+    result = runner.invoke(app, ["--server", "http://x", "--tui", "--once"])
+    assert result.exit_code != 0
+    assert "--tui needs a terminal" in result.output
+
+
 def test_course_of_codehood_toml(tmp_path: Path) -> None:
     (tmp_path / "codehood.toml").write_text(
         '[course]\ndiscipline = "cs101"\ninstructor = "ada"\nedition = "2026-1"\n'

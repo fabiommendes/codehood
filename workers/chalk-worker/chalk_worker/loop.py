@@ -346,7 +346,10 @@ class Worker:
                 self._say(f"question {question.id}: {e}")
                 self._graders[key] = e
             except PrepareFailed as e:
-                self._say(f"{e}")
+                # Dozens of lines of the tools: the display shows the first;
+                # the log and the job given back carry them all.
+                self.status.log(next(iter(str(e).splitlines()), "cannot prepare the question"))
+                self.log(str(e))
                 with self._lock:
                     self._unprepared[key] = e
                     self._backoff = True

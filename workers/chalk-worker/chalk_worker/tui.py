@@ -6,6 +6,10 @@ a few times a second.
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import signal
+import threading
 import time
 from datetime import datetime
 
@@ -41,7 +45,12 @@ PHASE_STYLE = {
 class WorkerApp(App[int]):
     """
     Runs a worker and shows what it does. The result of the app is the
-    number of jobs processed, or None when the user aborted.
+    number of jobs processed, or None when the user aborted or the loop
+    failed; then `error` holds the loop's exception, if any.
+
+    SIGTERM and SIGINT stop the worker as `q` does: the first one after the
+    jobs in progress, the second one at once. `finished` is set once the
+    loop has left, for whoever cannot wait for the app, as on a hangup.
     """
 
     TITLE = "chalk-worker"
@@ -49,7 +58,7 @@ class WorkerApp(App[int]):
     #summary { height: auto; padding: 0 1; background: $boost; }
     #slots { height: auto; max-height: 40%; }
     #finished { height: 1fr; }
-    #log { height: 8; border-top: solid $primary-background; }
+    #log { height: 25%; min-height: 3; border-top: solid $primary-background; }
     .label { padding: 0 1; color: $text-muted; text-style: bold; }
     """
     BINDINGS = [
@@ -65,8 +74,16 @@ class WorkerApp(App[int]):
         self.sub_title = subtitle
         self._seen_line = 0
         self._shown_finished: Finished | None = None
+        self._finished_count = 0
         self._stopping = False
         self._done: int | None = None
+        self._log_handler = _StatusHandler(worker)
+        self._signals: list[signal.Signals] = []
+        self._left = False
+        #: The exception that ended the worker's loop, if one did.
+        self.error: BaseException | None = None
+        #: Set when the worker's loop has left, by a return or an exception.
+        self.finished = threading.Event()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -83,14 +100,52 @@ class WorkerApp(App[int]):
         slots = self.query_one("#slots", DataTable)
         slots.add_columns("#", "student", "question", "exam", "phase", "time")
         finished = self.query_one("#finished", DataTable)
+        finished.add_column("#", key="n")
         finished.add_columns("at", "student", "question", "outcome", "score", "time")
-        self.run_worker(self._run, thread=True, exit_on_error=True)
+        logging.getLogger().addHandler(self._log_handler)
+        loop = asyncio.get_running_loop()
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(signum, self.action_stop)
+            except (ValueError, RuntimeError):  # not the main thread
+                continue
+            self._signals.append(signum)
+        # A thread of its own, not a Textual worker: those run in the
+        # executor of the event loop, which the exit of the app waits for,
+        # so an abort would wait for the jobs in progress.
+        threading.Thread(target=self._run, name="claim-loop", daemon=True).start()
         self.set_interval(REFRESH, self.refresh_view)
         self.refresh_view()
 
+    def on_unmount(self) -> None:
+        self._left = True
+        logging.getLogger().removeHandler(self._log_handler)
+        loop = asyncio.get_running_loop()
+        for signum in self._signals:
+            loop.remove_signal_handler(signum)
+        self._signals.clear()
+
     def _run(self) -> None:
-        done = self.worker.run(once=self.once)
-        self.call_from_thread(self._worker_done, done)
+        try:
+            done = self.worker.run(once=self.once)
+        except BaseException as e:  # a bug of the loop: leave, saying why
+            self.finished.set()
+            self._from_thread(self._worker_failed, e)
+            return
+        self.finished.set()
+        self._from_thread(self._worker_done, done)
+
+    def _from_thread(self, callback, *args) -> None:
+        if self._left:
+            return
+        try:
+            self.call_from_thread(callback, *args)
+        except RuntimeError:  # the app has already left
+            pass
+
+    def _worker_failed(self, error: BaseException) -> None:
+        self.error = error
+        self.exit(None)
 
     def _worker_done(self, done: int) -> None:
         self._done = done
@@ -155,38 +210,92 @@ class WorkerApp(App[int]):
         return text
 
     def _fill_slots(self, snapshot: Snapshot) -> None:
+        # Updated in place: clearing the table would scroll it back to the top.
         table = self.query_one("#slots", DataTable)
-        table.clear()
         now = time.monotonic()
-        for index, job in enumerate(snapshot.slots, 1):
+        columns = list(table.columns)
+        for index, job in enumerate(snapshot.slots):
             if job is None:
-                table.add_row(str(index), Text("idle", style="dim"), "", "", "", "")
+                cells = [str(index + 1), Text("idle", style="dim"), "", "", "", ""]
+            else:
+                cells = [
+                    str(index + 1),
+                    job.student,
+                    job.question,
+                    job.exam,
+                    Text(job.phase, style=PHASE_STYLE.get(job.phase, "")),
+                    _duration(now - job.started),
+                ]
+            key = str(index)
+            if index >= table.row_count:
+                table.add_row(*cells, key=key)
                 continue
-            table.add_row(
-                str(index),
-                job.student,
-                job.question,
-                job.exam,
-                Text(job.phase, style=PHASE_STYLE.get(job.phase, "")),
-                _duration(now - job.started),
-            )
+            for column, cell in zip(columns, cells, strict=True):
+                if table.get_cell(key, column) != cell:
+                    table.update_cell(key, column, cell, update_width=True)
 
     def _fill_finished(self, snapshot: Snapshot) -> None:
         last = snapshot.finished[-1] if snapshot.finished else None
         if last is self._shown_finished:
             return
+        new = _after(snapshot.finished, self._shown_finished)
         self._shown_finished = last
         table = self.query_one("#finished", DataTable)
-        table.clear()
-        for job in reversed(snapshot.finished[-SHOWN_FINISHED:]):
+        before = self._finished_count
+        self._finished_count += len(new)
+        oldest = self._finished_count - SHOWN_FINISHED
+        for n, job in enumerate(new, before + 1):
+            if n <= oldest:
+                continue
             table.add_row(
+                n,
                 f"{datetime.fromtimestamp(job.at):%H:%M:%S}",
                 job.student,
                 job.question,
                 Text(job.outcome, style=_outcome_style(job.outcome)),
                 job.score or "",
                 f"{job.seconds:.1f}s",
+                key=str(n),
             )
+        for n in range(max(1, before - SHOWN_FINISHED + 1), oldest + 1):
+            if str(n) in table.rows:
+                table.remove_row(str(n))
+        # Newest first; a sort keeps the scroll, unlike a clear.
+        table.sort("n", reverse=True)
+        if table.scroll_y > 0:
+            # Keep the rows in view where they were, below the new ones.
+            added = min(len(new), SHOWN_FINISHED)
+            self.call_after_refresh(table.scroll_relative, y=added, animate=False)
+
+
+class _StatusHandler(logging.Handler):
+    """
+    Sends the warnings of the libraries, such as chalk-grader, to the log of
+    the display, which would otherwise hide them.
+    """
+
+    def __init__(self, worker: Worker) -> None:
+        super().__init__(logging.WARNING)
+        self.worker = worker
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            lines = record.getMessage().splitlines()
+            first = lines[0] if lines else ""
+            self.worker.status.log(f"{record.levelname.lower()}: {record.name}: {first}")
+        except Exception:
+            self.handleError(record)
+
+
+def _after(finished: tuple[Finished, ...], last: Finished | None) -> tuple[Finished, ...]:
+    """
+    The jobs of `finished` after `last`, or all of them when `last` is not
+    there any longer.
+    """
+    for index in range(len(finished) - 1, -1, -1):
+        if finished[index] is last:
+            return finished[index + 1 :]
+    return finished
 
 
 def _outcome_style(outcome: str) -> str:

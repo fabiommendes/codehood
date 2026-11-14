@@ -202,6 +202,18 @@ def test_prepare_failure_is_tried_again_after_a_wait() -> None:
     assert any("waiting" in line for line in log)
 
 
+def test_prepare_failure_shows_its_first_line_and_logs_it_all() -> None:
+    server = FakeServer(jobs("a"))
+    grader = FakeGrader()
+    grader.prepare = lambda: (_ for _ in ()).throw(PrepareFailed("elm failed\nline 2\nline 3"))
+    log: list[str] = []
+    w = worker(server, grader, log=log.append)
+    w.run(once=True)
+    assert "elm failed\nline 2\nline 3" in log
+    assert [line for _, line in w.status.lines_after(0)] == ["elm failed"]
+    assert "line 3" in server.fails[0][1]
+
+
 def test_unparsable_job_fails_with_retry() -> None:
     bad = job_doc(submission="a")
     bad["question"] = {"id": "q", "type": "essay", "stem": "s"}
