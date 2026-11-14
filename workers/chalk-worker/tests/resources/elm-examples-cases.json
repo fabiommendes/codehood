@@ -22,8 +22,8 @@
 		"<expectation> for `expr ~= value`: Expect.within (Expect.AbsoluteOrRelative 1.0e-9 1.0e-6) (value) (expr)",
 		"expr and value are the text on each side of the operator with spaces and tabs at the ends removed, after the inline comment is cut.",
 		"Cases keep source order. `module` has every case; `publicModule` only the cases of {public}/{example} regions (same imports), and is null when there is none.",
-		"`error.line` is the line of the source (from 1) that the error points to, or null for `no-cases`. `error.kind` is one of: invalid-line, late-import, duplicate-name, no-cases, empty-region.",
-		"duplicate-name points to the second case with the name; empty-region points to the item line of the annotation."
+		"`error.line` is the line of the source (from 1) that the error points to, or null for `no-cases`. `error.kind` is one of: invalid-line, invalid-annotation, late-import, duplicate-name, no-cases, empty-region.",
+		"duplicate-name points to the second case with the name; empty-region points to the item line of the annotation. invalid-annotation points to the first line the MDQ scan reports as a problem."
 	],
 	"entries": [
 		{
@@ -284,6 +284,96 @@
 			"error": {
 				"line": 1,
 				"kind": "empty-region"
+			}
+		},
+		{
+			"name": "an item with an unknown modifier is an error, not a silent region break",
+			"input": "-- mdq: [0] {example} Ex\nf 1 ==> 2\n-- mdq: [+3] {manual} Priv\nf 9 ==> 10\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "an item with a blank criterion is an error",
+			"input": "-- mdq: [0] {example} Ex\nf 1 ==> 2\n-- mdq: [+3]\nf 9 ==> 10\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "a value with spaces inside the brackets is an error",
+			"input": "-- mdq: [0] {example} Ex\nf 1 ==> 2\n-- mdq: [ 3 ] x\nf 9 ==> 10\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "a criterion that starts with a link reference is an error",
+			"input": "-- mdq: [0] {example} Ex\nf 1 ==> 2\n-- mdq: [+3] [slug] x\nf 9 ==> 10\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "a repeated modifier is an error",
+			"input": "-- mdq: [0] {example} Ex\nf 1 ==> 2\n-- mdq: {public} {public} x\nf 9 ==> 10\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "a private item followed by a blank-criterion public item is an error",
+			"input": "-- mdq: [+1] Priv\nf 1 ==> 1\n-- mdq: [0] {public}\nf 2 ==> 2\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "a feedback line with no item before it is an error",
+			"input": "-- mdq: > confira\nf 1 ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 1,
+				"kind": "invalid-annotation"
+			}
+		},
+		{
+			"name": "a triple-quoted string is not supported",
+			"input": "\"\"\"a\"b\"\"\" ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 1,
+				"kind": "invalid-line"
+			}
+		},
+		{
+			"name": "an apostrophe after a non-ASCII letter is not a char literal",
+			"input": "fé'a ==> b' ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 1,
+				"kind": "invalid-line"
 			}
 		}
 	]

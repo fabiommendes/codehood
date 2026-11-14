@@ -29,12 +29,12 @@ export function pretestSources(question: CodeQuestion): PretestSource[] {
 	return (question.tests ?? []).flatMap((source, index) => {
 		if (
 			question.language === "elm" &&
-			question.file !== undefined &&
 			source.format === "elm" &&
 			source.origin === undefined &&
 			source.text !== undefined &&
 			elmModule(source.text) === null
 		) {
+			if (question.file === undefined) return [];
 			const text = examplesModule(source.text, index, question.file);
 			return text === null ? [] : [{ format: "elm", text }];
 		}

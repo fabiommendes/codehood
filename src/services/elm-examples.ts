@@ -23,6 +23,7 @@ interface ParsedCase extends ElmExampleCase {
 /** Why an examples block is invalid. */
 export type ElmExamplesErrorKind =
 	| "invalid-line"
+	| "invalid-annotation"
 	| "late-import"
 	| "duplicate-name"
 	| "no-cases"
@@ -121,6 +122,14 @@ function elmString(text: string): string {
 /// The imports and cases of a block.
 function parseBlock(text: string): { imports: string[]; cases: ParsedCase[] } {
 	const scan = scanAnnotations(text);
+	const [problem] = scan.problems;
+	if (problem) {
+		throw new ElmExamplesError(
+			`line ${problem.line}: ${problem.message}`,
+			problem.line,
+			"invalid-annotation",
+		);
+	}
 	const imports: string[] = [];
 	const cases: ParsedCase[] = [];
 	const names = new Set<string>();
@@ -194,7 +203,9 @@ function parseCase(
 ): ParsedCase {
 	const invalid = () =>
 		new ElmExamplesError(
-			`line ${number}: expected "expr ==> value" or "expr ~= value"`,
+			`line ${number}: expected "expr ==> value" or "expr ~= value"${
+				line.includes('"""') ? " (triple-quoted strings are not supported)" : ""
+			}`,
 			number,
 			"invalid-line",
 		);
@@ -220,7 +231,10 @@ function outsideLiterals(text: string, token: string): number[] {
 	let i = 0;
 	while (i < text.length) {
 		const ch = text[i] as string;
-		if (ch === '"' || (ch === "'" && !/[\w']/.test(text[i - 1] ?? ""))) {
+		if (
+			ch === '"' ||
+			(ch === "'" && !/[\p{L}\p{N}_']/u.test(lastChar(text, i)))
+		) {
 			i = literalEnd(text, i);
 		} else if (text.startsWith(token, i)) {
 			found.push(i);
@@ -230,6 +244,11 @@ function outsideLiterals(text: string, token: string): number[] {
 		}
 	}
 	return found;
+}
+
+/// The character before position `at`, as a whole code point, or "" at the start.
+function lastChar(text: string, at: number): string {
+	return Array.from(text.slice(Math.max(0, at - 2), at)).pop() ?? "";
 }
 
 /// The index after the literal that opens at `start`, or the text length when unterminated.

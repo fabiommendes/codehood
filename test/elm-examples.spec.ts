@@ -96,3 +96,8 @@ test("elmAnswerModule drops .elm and turns folders into dots", () => {
 	expect(elmAnswerModule("Foo/Bar.elm")).toBe("Foo.Bar");
 	expect(elmAnswerModule("A/B/C.elm")).toBe("A.B.C");
 });
+
+test("an unsupported triple-quoted string says so in the error message", () => {
+	const error = thrown(() => elmExampleCases('"""a"b""" ==> 1\n'));
+	expect((error as ElmExamplesError).message).toMatch(/triple-quoted/);
+});

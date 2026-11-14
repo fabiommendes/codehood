@@ -181,3 +181,14 @@ test("a runner error, or a completed report with no case, is a runner error", ()
 		message: "",
 	});
 });
+
+test("an examples block is never sent raw when the question has no file", () => {
+	const parsed = parseQuestion(
+		EXAMPLES_DOCUMENT.replace(
+			"BLOCK",
+			"-- mdq: [0] {public} A\nmedia [] ==> 0",
+		).replace("file: Main.elm\n", ""),
+	);
+	if (parsed.type !== "code") throw new Error("not a code question");
+	expect(pretestSources(parsed)).toEqual([]);
+});

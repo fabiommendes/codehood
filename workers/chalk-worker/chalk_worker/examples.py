@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from mdq._parser import scan_annotations
+
 __all__ = [
     "Example",
     "ExampleError",
@@ -33,20 +35,17 @@ OPERATORS = {
 }
 
 type ErrorKind = Literal[
-    "invalid-line", "late-import", "duplicate-name", "no-cases", "empty-region"
+    "invalid-line",
+    "invalid-annotation",
+    "late-import",
+    "duplicate-name",
+    "no-cases",
+    "empty-region",
 ]
 
 #: The `ANNOTATION_START` terminal of the MDQ spec (`docs/question-types/code.md`,
 #: "Annotations"), anchored at the start of a line. mdq-py does not expose it.
 _ANNOTATION_START = re.compile(r"[ \t!-/:-@\[-`{-~]*mdq:")
-
-#: The value of a rubric item, as in `docs/references/rubric.md`.
-_VALUE = re.compile(r"\[[+-]?(?:[1-9][0-9]*|0)(?:\.[0-9]+)?\](?![(\[])[ \t]*")
-
-_MODIFIER = re.compile(r"\{([a-z]+(?:-[a-z]+)*)\}[ \t]*")
-
-#: Line endings of MDQ (CommonMark), and nothing else.
-_LINE_END = re.compile(r"\r\n|\r|\n")
 
 
 class ExampleError(ValueError):
@@ -162,52 +161,21 @@ def _string(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def _lines(text: str) -> list[str]:
-    """
-    The lines of a text as MDQ numbers them: a final line ending starts no line.
-    """
-    if not text:
-        return []
-    lines = _LINE_END.split(text)
-    if _LINE_END.search(text[-2:]) and lines[-1] == "":
-        lines.pop()
-    return lines
-
-
-def _item_is_public(rest: str) -> bool | None:
-    """
-    Whether the text after `mdq:` is a public item, or None when it is
-    feedback or a comment line.
-    """
-    rest = rest.lstrip(" \t")
-    if rest.startswith(">") or (rest.startswith("!") and not rest.startswith("![")):
-        return None
-    if value := _VALUE.match(rest):
-        rest = rest[value.end() :]
-    modifiers: list[str] = []
-    while found := _MODIFIER.match(rest):
-        modifiers.append(found[1])
-        rest = rest[found.end() :]
-    return "public" in modifiers or "example" in modifiers
-
-
 def _parse(text: str) -> tuple[list[str], list[Example]]:
     """
     The `import` lines and the cases of a block.
     """
+    scan = scan_annotations(text)
+    if scan.problems:
+        problem = scan.problems[0]
+        raise ExampleError(
+            f"line {problem.line}: {problem.message}", problem.line, "invalid-annotation"
+        )
     imports: list[str] = []
     cases: list[Example] = []
     names: set[str] = set()
-    public = False
-    #: Line of the item whose region has no case yet.
-    open_item: int | None = None
-    for number, line in enumerate(_lines(text), start=1):
-        if marker := _ANNOTATION_START.match(line):
-            item = _item_is_public(line[marker.end() :])
-            if item is not None:
-                if open_item is not None:
-                    raise _empty_region(open_item)
-                open_item, public = number, item
+    for number, line in enumerate(scan.lines, start=1):
+        if _ANNOTATION_START.match(line):
             continue
         if not line.strip(" \t") or line.lstrip(" \t").startswith("--"):
             continue
@@ -218,16 +186,18 @@ def _parse(text: str) -> tuple[list[str], list[Example]]:
                 )
             imports.append(line.rstrip(" \t"))
             continue
-        case = _parse_case(line, number, public)
+        region = next((it for it in reversed(scan.items) if it.line <= number), None)
+        case = _parse_case(line, number, region is not None and region.public)
         if case.name in names:
             raise ExampleError(
                 f"line {number}: duplicate case {case.name!r}", number, "duplicate-name"
             )
         names.add(case.name)
         cases.append(case)
-        open_item = None
-    if open_item is not None:
-        raise _empty_region(open_item)
+    for item in scan.items:
+        first = item.line + item.annotation_lines
+        if not any(first <= c.line <= item.end for c in cases):
+            raise _empty_region(item.line)
     if not cases:
         raise ExampleError("the block has no case", None, "no-cases")
     return imports, cases
@@ -243,18 +213,19 @@ def _parse_case(line: str, number: int, public: bool) -> Example:
     comment = line[comments[0] + 2 :].strip(" \t") if comments else ""
     found = [(op, at) for op in OPERATORS for at in _outside_literals(code, op)]
     if len(found) != 1:
-        raise _invalid(number)
+        raise _invalid(number, line)
     operator, at = found[0]
     expr = code[:at].strip(" \t")
     value = code[at + len(operator) :].strip(" \t")
     if not expr or not value:
-        raise _invalid(number)
+        raise _invalid(number, line)
     return Example(number, operator, expr, value, comment, public)
 
 
-def _invalid(number: int) -> ExampleError:
+def _invalid(number: int, line: str) -> ExampleError:
+    hint = " (triple-quoted strings are not supported)" if '"""' in line else ""
     return ExampleError(
-        f"line {number}: expected `expr ==> value` or `expr ~= value`", number, "invalid-line"
+        f"line {number}: expected `expr ==> value` or `expr ~= value`{hint}", number, "invalid-line"
     )
 
 

@@ -366,3 +366,38 @@ test("questionProblems flags an old document with a bad examples block", () => {
 	);
 	expect(problems.map((p) => p.code)).toContain("invalid-elm-examples");
 });
+
+test("a fenced non-elm source without module header in an Elm question is flagged", () => {
+	const problems = questionProblems(
+		elmDoc([{ format: "python", text: "print(1)\n" }]),
+	);
+	expect(problems.map((p) => p.code)).toContain(
+		"elm-test-source-without-module",
+	);
+	expect(
+		questionProblems(
+			elmDoc([{ format: "python", text: "module Foo exposing (tests)\n" }]),
+		).map((p) => p.code),
+	).not.toContain("elm-test-source-without-module");
+});
+
+test("two sources that declare the same module are flagged", () => {
+	const dup = (name: string) => ({
+		format: "elm",
+		origin: `${name}.elm`,
+		text: MODULE,
+	});
+	const problems = questionProblems(elmDoc([dup("A"), dup("B")]));
+	expect(problems.map((p) => p.code)).toContain("elm-module-collision");
+	expect(problems.map((p) => p.path)).toContainEqual(["tests", 1]);
+});
+
+test("an examples block in an Elm question with no file is flagged", () => {
+	const doc = { ...elmDoc([{ format: "elm", text: EXAMPLES }]) } as Doc & {
+		file?: string;
+	};
+	delete doc.file;
+	expect(questionProblems(doc).map((p) => p.code)).toContain(
+		"elm-examples-without-file",
+	);
+});

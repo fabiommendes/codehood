@@ -138,19 +138,29 @@ function codeProblems(question: CodeQuestion): Diagnostic[] {
 
 /**
  * The author mistakes of the test sources of an Elm question: an invalid
- * examples block, a linked source with no `module` header, and an `Examples<i>`
- * module that collides with the answer module or with another source's module.
+ * examples block (or one with no `file` to import), a source with no `module`
+ * header that is linked or not Elm, and two sources whose modules collide
+ * with each other or with the answer module.
  *
  * Syntax only, and a source with no text is skipped.
  */
 export function elmTestSourceProblems(question: CodeQuestion): Diagnostic[] {
-	if (question.language !== "elm" || question.file === undefined) return [];
+	if (question.language !== "elm") return [];
 	const sources = (question.tests ?? []).flatMap((source, index) =>
-		source.format === "elm" && source.text !== undefined
-			? [{ index, text: source.text, linked: source.origin !== undefined }]
+		source.text !== undefined
+			? [
+					{
+						index,
+						text: source.text,
+						format: source.format,
+						linked: source.origin !== undefined,
+						module: elmModule(source.text),
+					},
+				]
 			: [],
 	);
-	const answer = elmAnswerModule(question.file);
+	const answer =
+		question.file === undefined ? null : elmAnswerModule(question.file);
 	const problems: Diagnostic[] = [];
 	const report = (code: string, index: number, message: string) =>
 		problems.push({
@@ -159,15 +169,34 @@ export function elmTestSourceProblems(question: CodeQuestion): Diagnostic[] {
 			message: `tests[${index}]: ${message}`,
 			path: ["tests", index],
 		});
-	for (const { index, text, linked } of sources) {
-		if (elmModule(text) !== null) continue;
-		if (linked) {
+	for (const { index, text, format, linked, module } of sources) {
+		if (module !== null) {
+			const first = sources.find((other) => other.module === module);
+			if (first && first.index !== index) {
+				report(
+					"elm-module-collision",
+					index,
+					`the module ${module} is also declared by tests[${first.index}]`,
+				);
+			}
+			continue;
+		}
+		if (linked || format !== "elm") {
 			report(
 				"elm-test-source-without-module",
 				index,
-				"a linked Elm source needs a `module` header",
+				linked
+					? "a linked Elm source needs a `module` header"
+					: `a ${format} source of an Elm question needs a \`module\` header`,
 			);
 			continue;
+		}
+		if (answer === null) {
+			report(
+				"elm-examples-without-file",
+				index,
+				"an examples block needs the question to declare its `file`",
+			);
 		}
 		try {
 			elmExampleCases(text);
@@ -178,7 +207,7 @@ export function elmTestSourceProblems(question: CodeQuestion): Diagnostic[] {
 		}
 		const name = `Examples${index}`;
 		const other = sources.find(
-			(source) => source.index !== index && elmModule(source.text) === name,
+			(source) => source.index !== index && source.module === name,
 		);
 		if (name === answer || other) {
 			const target = other
