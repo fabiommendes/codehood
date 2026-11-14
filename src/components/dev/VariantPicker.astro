@@ -1,0 +1,70 @@
+---
+/**
+ * A row of buttons that shows one variant of a catalogue entry and hides the rest, with the choice kept in the query string.
+ *
+ * The page renders every variant on the server, each in an element with
+ * `data-variant-group` set to `group` and `data-variant` set to its key, and
+ * hides all but `selected`. A click swaps the `hidden` attribute and writes
+ * `?<group>=<key>` with `history.replaceState`, so a link points to the state.
+ *
+ * @example
+ * <VariantPicker group="results" selected="graded" variants={[
+ *   { key: "pending", label: "Waiting for grades" },
+ *   { key: "graded", label: "Everything graded" },
+ * ]} />
+ * <div data-variant-group="results" data-variant="pending" hidden>...</div>
+ * <div data-variant-group="results" data-variant="graded">...</div>
+ */
+export interface Props {
+	/// Query parameter and `data-variant-group` value; unique within the page.
+	group: string;
+	/// Variants in display order.
+	variants: readonly { key: string; label: string }[];
+	/// Key of the variant shown on load.
+	selected: string;
+}
+
+const { group, variants, selected } = Astro.props;
+---
+
+<div class="join mb-4 flex-wrap" role="group" aria-label="Variant" data-variant-picker={group}>
+  {
+    variants.map((variant) => (
+      <button
+        type="button"
+        class:list={["join-item btn btn-sm", variant.key === selected && "btn-active btn-primary"]}
+        aria-pressed={variant.key === selected ? "true" : "false"}
+        data-variant-key={variant.key}
+      >
+        {variant.label}
+      </button>
+    ))
+  }
+</div>
+
+<script>
+	/// Shows the variant `key` of `group`, marks its button and records it in the URL.
+	function select(picker: HTMLElement, key: string) {
+		const group = picker.dataset.variantPicker ?? "";
+		for (const pane of document.querySelectorAll<HTMLElement>(
+			`[data-variant-group="${CSS.escape(group)}"]`,
+		)) {
+			pane.hidden = pane.dataset.variant !== key;
+		}
+		for (const button of picker.querySelectorAll<HTMLElement>("[data-variant-key]")) {
+			const on = button.dataset.variantKey === key;
+			button.setAttribute("aria-pressed", String(on));
+			button.classList.toggle("btn-active", on);
+			button.classList.toggle("btn-primary", on);
+		}
+		const url = new URL(window.location.href);
+		url.searchParams.set(group, key);
+		history.replaceState(history.state, "", url);
+	}
+
+	document.addEventListener("click", (event) => {
+		const button = (event.target as Element | null)?.closest<HTMLElement>("[data-variant-key]");
+		const picker = button?.closest<HTMLElement>("[data-variant-picker]");
+		if (button && picker) select(picker, button.dataset.variantKey ?? "");
+	});
+</script>
