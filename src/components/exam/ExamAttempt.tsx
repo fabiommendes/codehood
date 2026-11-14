@@ -461,27 +461,24 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		return data.duplicate ? "duplicate" : undefined;
 	}
 
-	/// Asks the server for the sends of `slugs` again, ignoring a question it cannot read.
+	/// Asks the server for the sends of `slugs` again in one request, ignoring a question it cannot read.
 	async function refreshSends(slugs: string[]): Promise<void> {
 		if (!props.attempt) return;
-		const attempt = props.attempt;
-		await Promise.all(
-			slugs.map(async (slug) => {
-				const { data } = await actions.gradingJob.forStudent({
-					response: attempt,
-					question: slug,
-				});
-				if (data) {
-					setSendsNow((current) => ({
-						...current,
-						[slug]: sendsOf(
-							data,
-							current[slug]?.penalty ?? allSends()[slug]?.penalty,
-						),
-					}));
-				}
-			}),
-		);
+		const { data } = await actions.gradingJob.forStudentQuestions({
+			response: props.attempt,
+			questions: slugs,
+		});
+		if (!data) return;
+		setSendsNow((current) => {
+			const next = { ...current };
+			for (const [slug, view] of Object.entries(data)) {
+				next[slug] = sendsOf(
+					view,
+					current[slug]?.penalty ?? allSends()[slug]?.penalty,
+				);
+			}
+			return next;
+		});
 	}
 
 	/// While a send waits for its worker, asks for the sends every few seconds; it stops when none is pending or the page goes away.

@@ -34,6 +34,7 @@ import {
 	guardedUpdate,
 	touch,
 } from "@/db/conditional-write";
+import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { released } from "@/services/exam-state";
@@ -61,8 +62,9 @@ export type FeedbackPK = z.infer<typeof feedbackPK>;
 export type FeedbackUpdate = z.infer<typeof feedbackUpdate>;
 
 /// The relations needed to compute the exam's release, shared by every query
-/// that has to resolve a submission's course and release rule.
-export function examReleaseSelect() {
+/// that has to resolve a submission's course and release rule. With `actor`,
+/// only the enrollment a permission check on that actor reads is loaded.
+export function examReleaseSelect(actor?: Actor) {
 	return {
 		...examTimingSelect,
 		gradesReleasedAt: true,
@@ -73,10 +75,13 @@ export function examReleaseSelect() {
 		course: {
 			select: {
 				instructor: { select: { username: true } },
-				enrollments: {
-					where: { status: "ACTIVE" as const },
-					select: { username: true },
-				},
+				enrollments:
+					actor === undefined
+						? {
+								where: { status: "ACTIVE" as const },
+								select: { username: true },
+							}
+						: enrollmentsOf(actor),
 			},
 		},
 	} satisfies Prisma.ExamSelect;

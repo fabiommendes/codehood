@@ -23,6 +23,7 @@ import {
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { ResponseId } from "@/core/schemas";
 import {
+	responseAnswered,
 	responseCreate,
 	responseFilter,
 	responseFinish,
@@ -43,10 +44,13 @@ import {
 	guardedUpdate,
 	touch,
 } from "@/db/conditional-write";
+import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
+import { effectiveAnswerHistory } from "@/services/answer-history";
 import {
 	canReopen,
+	type ExceptionTiming,
 	examSchedule,
 	hiddenFromStudents,
 } from "@/services/exam-state";
@@ -100,17 +104,15 @@ export interface ObjectiveGradingLine {
 }
 export type ResponsePK = z.infer<typeof responsePK>;
 export type ResponseSubmit = z.infer<typeof responseSubmit>;
+export type ResponseAnswered = z.infer<typeof responseAnswered>;
 export type ResponseUpdate = z.infer<typeof responseUpdate>;
 
-/// The course shape the permission predicates need for a response write.
-function courseSelect() {
+/// The course shape the permission predicates need for a response write: of its enrollments, only those of `actor` and `authors`.
+function courseSelect(actor: Actor, ...authors: string[]) {
 	return {
 		id: true,
 		instructor: { select: { username: true } },
-		enrollments: {
-			where: { status: "ACTIVE" as const },
-			select: { username: true },
-		},
+		enrollments: enrollmentsOf(actor, ...authors),
 	} satisfies Prisma.CourseSelect;
 }
 
@@ -118,14 +120,14 @@ function courseSelect() {
  * The relations `fromDb` needs to shape a response entity, plus the course's
  * instructor and enrollments a permission check needs on the same row.
  */
-function responseInclude() {
+function responseInclude(actor: Actor) {
 	return {
 		exam: {
 			select: {
 				...examTimingSelect,
 				slug: true,
 				courseId: true,
-				course: { select: courseSelect() },
+				course: { select: courseSelect(actor) },
 			},
 		},
 		submissions: {
@@ -141,6 +143,9 @@ function responseInclude() {
 type DbResponse = Prisma.ResponseGetPayload<{
 	include: ReturnType<typeof responseInclude>;
 }>;
+
+/// An attempt with its exam and course but none of its submissions, which grow with every autosave.
+type DbAttempt = Awaited<ReturnType<typeof resolveOrCreateAttempt>>["attempt"];
 
 /// The CRUD shape of the response service.
 type ResponseT = {
@@ -207,7 +212,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					acceptingSubmissions: input.acceptingSubmissions ?? true,
 					closedAt: input.acceptingSubmissions === false ? new Date() : null,
 				},
-				include: responseInclude(),
+				include: responseInclude(opts.actor),
 			});
 
 			return fromDb(row);
@@ -232,7 +237,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 		): Promise<Response | null> => {
 			const row = await tx.response.findFirst({
 				where: responseWhere(filter),
-				include: responseInclude(),
+				include: responseInclude(opts.actor),
 			});
 			if (!row) return null;
 
@@ -265,7 +270,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				"course",
 				await tx.course.findUnique({
 					where: courseRefWhere(filter.course),
-					select: courseSelect(),
+					select: courseSelect(opts.actor),
 				}),
 			);
 
@@ -295,7 +300,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 							? { authorId: filter.author }
 							: {}),
 				},
-				include: responseInclude(),
+				include: responseInclude(opts.actor),
 				orderBy: { createdAt: "asc" },
 			});
 
@@ -361,7 +366,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					closedAt: closedAtAfter(response, fields.acceptingSubmissions),
 				},
 				opts,
-				{ include: responseInclude() },
+				{ include: responseInclude(opts.actor) },
 			);
 
 			if (fields.acceptingSubmissions === false) {
@@ -391,7 +396,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			input: ResponseCreate,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Response> => {
-			const row = await resolveOrCreateAttempt(
+			const { attempt: row } = await resolveOrCreateAttempt(
 				tx,
 				input,
 				opts.actor,
@@ -399,7 +404,14 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				opts.expectedUpdatedAt,
 			);
 
-			if (input.acceptingSubmissions === undefined) return fromDb(row);
+			if (input.acceptingSubmissions === undefined) {
+				return fromDb(
+					await tx.response.findUniqueOrThrow({
+						where: { id: row.id },
+						include: responseInclude(opts.actor),
+					}),
+				);
+			}
 
 			// Only the course's instructor reopens a closed attempt, and only while the student can still answer.
 			if (input.acceptingSubmissions && !row.acceptingSubmissions) {
@@ -421,7 +433,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					closedAt: closedAtAfter(row, input.acceptingSubmissions),
 				},
 				{},
-				{ include: responseInclude() },
+				{ include: responseInclude(opts.actor) },
 			);
 			return fromDb(
 				input.acceptingSubmissions ? updated : await gradeOnClose(tx, updated),
@@ -491,7 +503,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				"course",
 				await tx.course.findUnique({
 					where: courseRefWhere(input.course),
-					select: courseSelect(),
+					select: courseSelect(opts.actor),
 				}),
 			);
 			const authorId = resolveAuthorId(input.author, opts.actor);
@@ -517,7 +529,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					where: {
 						authorId_examId_slotKey: { authorId, examId: exam.id, slotKey: 0 },
 					},
-					include: responseInclude(),
+					include: responseInclude(opts.actor),
 				}),
 			);
 			if (!row.acceptingSubmissions) return fromDb(row);
@@ -531,7 +543,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				{ id: row.id },
 				{ acceptingSubmissions: false, closedAt: new Date() },
 				{},
-				{ include: responseInclude() },
+				{ include: responseInclude(opts.actor) },
 			);
 			return fromDb(await gradeOnClose(tx, updated));
 		},
@@ -615,7 +627,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				"course",
 				await tx.course.findUnique({
 					where: courseRefWhere(input.course),
-					select: courseSelect(),
+					select: courseSelect(
+						opts.actor,
+						...(input.author === undefined ? [] : [input.author]),
+					),
 				}),
 			);
 			if (input.author === undefined) {
@@ -694,7 +709,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 						examId: exam.id,
 						preview: true,
 					},
-					include: responseInclude(),
+					include: responseInclude(opts.actor),
 				}),
 			);
 		},
@@ -725,79 +740,41 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			input: ResponseSubmit,
 			opts: ServiceOptsWithoutTx,
 		): Promise<Response & { duplicate: boolean }> => {
-			const row = await resolveOrCreateAttempt(
-				tx,
-				{
-					course: input.course,
-					exam: input.exam,
-					author: input.author,
-				},
-				opts.actor,
-				"response.submit",
-				undefined,
-			);
-
-			assertAcceptingSubmissions(
-				row,
-				new Date(),
-				await loadExceptionTiming(tx, row.examId, row.authorId),
-			);
-			const question = await resolveExamQuestion(
-				tx,
-				row.exam.courseId,
-				row.examId,
-				input.question,
-				input.payload,
-			);
-
-			let duplicate = false;
-			if (input.kind === "SUBMIT") {
-				if (question.type !== "CODE" || !question.worker) {
-					throw new InvalidData({
-						kind: [{ code: "invalid", message: m.errors_code_not_sendable() }],
-					});
-				}
-				({ duplicate } = await enqueueGradingJob(
-					tx,
-					{
-						responseId: row.id,
-						questionId: question.id,
-						attempts: question.attempts,
-						practice: isPractice(row),
-					},
-					question.worker,
-					{
-						kind: "SUBMIT",
-						payload: input.payload as Prisma.InputJsonValue,
-						startedAt: input.startedAt,
-						automaticallyTriggered: input.automaticallyTriggered,
-					},
-				));
-			} else {
-				await invalidIfExists(tx.submission.create, {
-					data: {
-						publicId: generateToken(9),
-						responseId: row.id,
-						questionId: question.id,
-						payload: input.payload as Prisma.InputJsonValue,
-						startedAt: input.startedAt ?? null,
-						automaticallyTriggered: input.automaticallyTriggered ?? false,
-					},
-				});
-			}
-
-			// The submissions are part of the response, so appending one moves its
-			// version. A student's save carries no expectation and never fails on one.
-			if (!duplicate) await touch(tx, "response", { id: row.id }, {});
-
+			const { row, duplicate } = await appendSubmission(tx, input, opts.actor);
 			const updated = valueOrNotFound(
 				"response",
 				await tx.response.findUnique({
 					where: { id: row.id },
-					include: responseInclude(),
+					include: responseInclude(opts.actor),
 				}),
 			);
 			return { ...fromDb(updated), duplicate };
+		},
+	});
+
+	/**
+	 * Appends a submission as `submit` does, answering only with what the exam page reads back instead of the whole attempt.
+	 *
+	 * @throws {@link NotFound} If the course, exam or question does not exist.
+	 * @throws {@link InvalidData}
+	 * If the attempt is closed, the exam is not open, the question is not in
+	 * the exam, or the payload does not fit it.
+	 * @throws {@link NotAllowed} If `actor` may not write the author's work.
+	 */
+	const answer = op({
+		args: [responseSubmit],
+		returns: responseAnswered,
+		run: async (
+			tx: PrismaTx,
+			input: ResponseSubmit,
+			opts: ServiceOptsWithoutTx,
+		): Promise<ResponseAnswered> => {
+			const { row, duplicate } = await appendSubmission(tx, input, opts.actor);
+			return {
+				response: row.publicId,
+				answerHistory: effectiveAnswerHistory(row.exam),
+				duplicate,
+			};
 		},
 	});
 
@@ -813,6 +790,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 		settleExpired,
 		restartPreview,
 		submit,
+		answer,
 	};
 });
 
@@ -820,6 +798,77 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 export type ResponseService = ReturnType<typeof makeResponseService>;
 
 // Private utilities -----------------------------------------------------------
+
+/// Appends one submission of a question to the attempt it belongs to, opening the attempt when there is none, and returns that attempt.
+async function appendSubmission(
+	tx: PrismaTx,
+	input: ResponseSubmit,
+	actor: Actor,
+): Promise<{ row: DbAttempt; duplicate: boolean }> {
+	const { attempt: row, exception } = await resolveOrCreateAttempt(
+		tx,
+		{ course: input.course, exam: input.exam, author: input.author },
+		actor,
+		"response.submit",
+		undefined,
+	);
+
+	assertAcceptingSubmissions(
+		row,
+		new Date(),
+		exception === undefined
+			? await loadExceptionTiming(tx, row.examId, row.authorId)
+			: exception,
+	);
+	const question = await resolveExamQuestion(
+		tx,
+		row.exam.courseId,
+		row.examId,
+		input.question,
+		input.payload,
+	);
+
+	let duplicate = false;
+	if (input.kind === "SUBMIT") {
+		if (question.type !== "CODE" || !question.worker) {
+			throw new InvalidData({
+				kind: [{ code: "invalid", message: m.errors_code_not_sendable() }],
+			});
+		}
+		({ duplicate } = await enqueueGradingJob(
+			tx,
+			{
+				responseId: row.id,
+				questionId: question.id,
+				attempts: question.attempts,
+				practice: isPractice(row),
+			},
+			question.worker,
+			{
+				kind: "SUBMIT",
+				payload: input.payload as Prisma.InputJsonValue,
+				startedAt: input.startedAt,
+				automaticallyTriggered: input.automaticallyTriggered,
+			},
+		));
+	} else {
+		await invalidIfExists(tx.submission.create, {
+			data: {
+				publicId: generateToken(9),
+				responseId: row.id,
+				questionId: question.id,
+				payload: input.payload as Prisma.InputJsonValue,
+				startedAt: input.startedAt ?? null,
+				automaticallyTriggered: input.automaticallyTriggered ?? false,
+			},
+		});
+	}
+
+	// The submissions are part of the response, so appending one moves its
+	// version. A student's save carries no expectation and never fails on one.
+	if (!duplicate) await touch(tx, "response", { id: row.id }, {});
+	return { row, duplicate };
+}
 
 /// The attempt as {@link promoteFinalSends} reads it. A simulation sends as a practice attempt does.
 function sendsOf(row: {
@@ -852,7 +901,7 @@ function responseWhere(filter: ResponsePK): Prisma.ResponseWhereInput {
 /// Refuses to reopen `response` when its author's personal window closed or its deadline passed.
 async function assertReopenable(
 	tx: PrismaTx,
-	response: DbResponse,
+	response: Omit<DbResponse, "submissions">,
 ): Promise<void> {
 	const exception = await loadExceptionTiming(
 		tx,
@@ -947,7 +996,7 @@ async function writableResponse(
 ): Promise<DbResponse> {
 	const row = await tx.response.findFirst({
 		where: responseWhere(filter),
-		include: responseInclude(),
+		include: responseInclude(actor),
 	});
 	if (!row) {
 		// A missing row is a 412 for a caller that expected one, unless its course is missing too.
@@ -1016,7 +1065,7 @@ async function prepareAttempt(
 		"course",
 		await tx.course.findUnique({
 			where: courseRefWhere(input.course),
-			select: courseSelect(),
+			select: courseSelect(actor, ...(input.author ? [input.author] : [])),
 		}),
 	);
 
@@ -1024,7 +1073,12 @@ async function prepareAttempt(
 		"exam",
 		await tx.exam.findUnique({
 			where: { courseId_slug: { courseId: course.id, slug: input.exam } },
-			select: { id: true, slug: true, ...examTimingSelect },
+			select: {
+				id: true,
+				slug: true,
+				answerHistory: true,
+				...examTimingSelect,
+			},
 		}),
 	);
 
@@ -1098,21 +1152,29 @@ async function resolveOrCreateAttempt(
 	actor: Actor,
 	perm: "response.create" | "response.submit",
 	expected: Date | null | undefined,
-): Promise<DbResponse> {
+) {
 	const { course, exam, authorId, preview } = await prepareAttempt(
 		tx,
 		input,
 		actor,
 		perm,
 	);
+	// Read once here; `undefined` when the actor writes the course and no clock applies.
+	let exception: ExceptionTiming | null | undefined;
 	if (!hasPerm(actor, "course.update-contents", course)) {
+		exception = await loadExceptionTiming(tx, exam.id, authorId);
 		assertExamOpen(
 			exam,
 			new Date(),
-			await loadExceptionTiming(tx, exam.id, authorId),
+			exception,
 			perm === "response.submit" ? EXAM_ANSWER_GRACE_MS : 0,
 		);
 	}
+	// The exam and course are already loaded, so the attempt is read as a bare row.
+	const withExam = <Row extends { updatedAt: Date }>(row: Row) => ({
+		attempt: { ...row, exam: { ...exam, courseId: course.id, course } },
+		exception,
+	});
 
 	// A simulation has one slot on any exam, and no session window.
 	if (exam.type !== "PRACTICE" || preview) {
@@ -1120,18 +1182,23 @@ async function resolveOrCreateAttempt(
 			where: {
 				authorId_examId_slotKey: { authorId, examId: exam.id, slotKey: 0 },
 			},
-			include: responseInclude(),
 		});
 		if (existing) {
 			checkExpectedUpdatedAt(existing.updatedAt, expected);
-			return existing;
+			return withExam(existing);
 		}
 
 		checkExpectedUpdatedAt(null, expected);
-		return invalidIfExists(tx.response.create, {
-			data: { publicId: generateToken(9), authorId, examId: exam.id, preview },
-			include: responseInclude(),
-		});
+		return withExam(
+			await invalidIfExists(tx.response.create, {
+				data: {
+					publicId: generateToken(9),
+					authorId,
+					examId: exam.id,
+					preview,
+				},
+			}),
+		);
 	}
 
 	const windowStart = dateToSlotKey(
@@ -1140,23 +1207,23 @@ async function resolveOrCreateAttempt(
 	const existing = await tx.response.findFirst({
 		where: { authorId, examId: exam.id, slotKey: { gte: windowStart } },
 		orderBy: { slotKey: "desc" },
-		include: responseInclude(),
 	});
 	if (existing) {
 		checkExpectedUpdatedAt(existing.updatedAt, expected);
-		return existing;
+		return withExam(existing);
 	}
 
 	checkExpectedUpdatedAt(null, expected);
-	return invalidIfExists(tx.response.create, {
-		data: {
-			publicId: generateToken(9),
-			authorId,
-			examId: exam.id,
-			slotKey: dateToSlotKey(input.practiceSession ?? new Date()),
-		},
-		include: responseInclude(),
-	});
+	return withExam(
+		await invalidIfExists(tx.response.create, {
+			data: {
+				publicId: generateToken(9),
+				authorId,
+				examId: exam.id,
+				slotKey: dateToSlotKey(input.practiceSession ?? new Date()),
+			},
+		}),
+	);
 }
 
 /// The `closedAt` to write when `row` is set to `accepting`: now on closing an open attempt, `null` on reopening, and `undefined` (untouched) otherwise, so a second close keeps the first instant.
@@ -1208,7 +1275,8 @@ async function gradeOnClose(
 		"response",
 		await tx.response.findUnique({
 			where: { id: row.id },
-			include: responseInclude(),
+			// The caller already checked the write, so no enrollment is read.
+			include: responseInclude(SYSTEM),
 		}),
 	);
 }

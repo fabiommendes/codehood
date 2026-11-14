@@ -239,7 +239,10 @@ const buildExamService = (deps: Deps) =>
 			): Promise<Exam | null> => {
 				const row = await tx.exam.findFirst({
 					where: examWhere(filter),
-					include: examInclude(),
+					// SYSTEM passes every check without enrollments, so it loads none.
+					include: examInclude(
+						opts.actor === SYSTEM ? "" : opts.actor.username,
+					),
 				});
 				if (!row) return null;
 

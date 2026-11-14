@@ -626,3 +626,141 @@ test("response.finish() by an instructor of another course is NotFound", async (
 			.acceptingSubmissions,
 	).toBe(true);
 });
+
+test("response.answer() appends a submission and names the attempt it went to", async () => {
+	const { course, student, exam, question, attempt } = await withAttempt();
+
+	const saved = await db.response.answer(
+		{
+			course: course.id,
+			exam: exam.slug,
+			question: question.slug,
+			payload: null,
+		},
+		{ actor: student },
+	);
+
+	expect(saved.response).toBe(attempt.publicId);
+	expect(
+		await prisma.submission.count({ where: { responseId: attempt.id } }),
+	).toBe(2);
+});
+
+test("response.answer() opens the attempt of a student who has none", async () => {
+	const { course, student, question } = await setup();
+	const exam = await makeExam(course.id, question.slug);
+
+	const saved = await db.response.answer(
+		{
+			course: course.id,
+			exam: exam.slug,
+			question: question.slug,
+			payload: null,
+		},
+		{ actor: student },
+	);
+
+	const attempt = await prisma.response.findUniqueOrThrow({
+		where: { publicId: saved.response },
+		include: { submissions: true },
+	});
+	expect(attempt.authorId).toBe(student.username);
+	expect(attempt.submissions).toHaveLength(1);
+});
+
+test("response.answer() answers with the effective answer-history switch of the exam", async () => {
+	const { course, student, question } = await setup();
+	const save = async (exam: { id: number; slug: string }) =>
+		db.response.answer(
+			{
+				course: course.id,
+				exam: exam.slug,
+				question: question.slug,
+				payload: null,
+			},
+			{ actor: student },
+		);
+
+	const graded = await makeExam(course.id, question.slug, { type: "EXAM" });
+	expect((await save(graded)).answerHistory).toBe(true);
+
+	const practice = await makeExam(course.id, question.slug, {
+		type: "PRACTICE",
+	});
+	expect((await save(practice)).answerHistory).toBe(false);
+
+	await prisma.exam.update({
+		where: { id: graded.id },
+		data: { answerHistory: false },
+	});
+	expect((await save(graded)).answerHistory).toBe(false);
+});
+
+test("response.answer() is refused after finish(), as submit() is", async () => {
+	const { course, student, exam, question, attempt } = await withAttempt();
+	await db.response.finish(
+		{ course: course.id, exam: exam.slug },
+		{ actor: student },
+	);
+
+	await expect(
+		db.response.answer(
+			{
+				course: course.id,
+				exam: exam.slug,
+				question: question.slug,
+				payload: null,
+			},
+			{ actor: student },
+		),
+	).rejects.toBeInstanceOf(InvalidData);
+	expect(
+		await prisma.submission.count({ where: { responseId: attempt.id } }),
+	).toBe(1);
+});
+
+test("response.answer() refuses a student who is not enrolled in the course", async () => {
+	const { course, question } = await setup();
+	const exam = await makeExam(course.id, question.slug);
+	const outsider = await persistedUserFactory.create({ role: "STUDENT" });
+
+	await expect(
+		db.response.answer(
+			{
+				course: course.id,
+				exam: exam.slug,
+				question: question.slug,
+				payload: null,
+			},
+			{ actor: outsider },
+		),
+	).rejects.toThrow();
+	expect(
+		await prisma.response.count({ where: { authorId: outsider.username } }),
+	).toBe(0);
+});
+
+test("response.submit() by the instructor on behalf of a student checks the student's enrollment, not the instructor's", async () => {
+	const { course, instructor, student, question } = await setup();
+	const exam = await makeExam(course.id, question.slug);
+	const input = {
+		course: course.id,
+		exam: exam.slug,
+		question: question.slug,
+		payload: null,
+	};
+
+	const saved = await db.response.submit(
+		{ ...input, author: student.username },
+		{ actor: instructor },
+	);
+	expect(saved.author).toBe(student.username);
+
+	const outsider = await persistedUserFactory.create({ role: "STUDENT" });
+	await expect(
+		db.response.submit(
+			{ ...input, author: outsider.username },
+			{ actor: instructor },
+		),
+	).rejects.toBeInstanceOf(InvalidData);
+});

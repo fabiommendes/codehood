@@ -146,8 +146,11 @@ const defineApiKeyService = defineService<ApiKeyT>()(() => {
 	return { create, findOne, findMany, delete: remove };
 });
 
+/// How far behind the last request `ApiKey.lastUsedAt` may fall.
+export const LAST_USED_RESOLUTION_MS = 60_000;
+
 /**
- * Looks up the API key matching `token` and stamps its `lastUsedAt`.
+ * Looks up the API key matching `token` and stamps its `lastUsedAt`, at most once per {@link LAST_USED_RESOLUTION_MS}.
  *
  * Takes no actor and is not an operation of the service: the raw token is the
  * credential, and validating one is how the caller's identity gets
@@ -166,10 +169,15 @@ export async function validateApiKey(
 	});
 	if (!apiKey) return null;
 
-	await db.apiKey.update({
-		where: { id: apiKey.id },
-		data: { lastUsedAt: new Date() },
-	});
+	// A bot authenticates on every request, and each stamp is a commit of its own.
+	const now = new Date();
+	const stampedAt = apiKey.lastUsedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+	if (now.getTime() - stampedAt >= LAST_USED_RESOLUTION_MS) {
+		await db.apiKey.update({
+			where: { id: apiKey.id },
+			data: { lastUsedAt: now },
+		});
+	}
 
 	return apiKey;
 }

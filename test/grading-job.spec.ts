@@ -1154,3 +1154,67 @@ test("forStudent: a student sees only their own submissions", async () => {
 		),
 	).rejects.toBeInstanceOf(NotFound);
 });
+
+/// A second code question of the course of `w`, with one send of the student in `state`.
+async function secondQuestion(w: World, state: JobState) {
+	const slug = await pushCode(w.course.id);
+	const row = await prisma.questionRef.findFirstOrThrow({
+		where: { courseId: w.course.id, slug },
+	});
+	const submission = await sentBy({ ...w, questionId: row.id }, state);
+	return { slug, submission };
+}
+
+test("forStudentQuestions: reads several questions at once, each as forStudent reads it", async () => {
+	const w = await world({ meta: { attempts: 3 } });
+	await sentBy(w, "DONE", GRADED);
+	await sentBy(w, "QUEUED");
+	const other = await secondQuestion(w, "CLAIMED");
+
+	const views = await db.gradingJob.forStudentQuestions(
+		{ response: w.response.publicId, questions: [w.question, other.slug] },
+		asStudent(w),
+	);
+
+	expect(Object.keys(views).sort()).toEqual([w.question, other.slug].sort());
+	expect(views[w.question]).toEqual(
+		await db.gradingJob.forStudent(lookup(w), asStudent(w)),
+	);
+	expect(views[other.slug]).toEqual(
+		await db.gradingJob.forStudent(
+			{ response: w.response.publicId, question: other.slug },
+			asStudent(w),
+		),
+	);
+	expect(views[other.slug]?.submissions.map((s) => s.submission)).toEqual([
+		other.submission,
+	]);
+});
+
+test("forStudentQuestions: leaves out a slug that names no question, and a question never sent comes empty", async () => {
+	const w = await world();
+
+	const views = await db.gradingJob.forStudentQuestions(
+		{ response: w.response.publicId, questions: [w.question, "no-such"] },
+		asStudent(w),
+	);
+
+	expect(Object.keys(views)).toEqual([w.question]);
+	expect(views[w.question]?.submissions).toEqual([]);
+});
+
+test("forStudentQuestions: a student reads only their own answer", async () => {
+	const w = await world();
+	const classmate = await enroll(w.course.id);
+	const query = { response: w.response.publicId, questions: [w.question] };
+
+	await expect(
+		db.gradingJob.forStudentQuestions(query, actorOf(classmate)),
+	).rejects.toBeInstanceOf(NotAllowed);
+	await expect(
+		db.gradingJob.forStudentQuestions(
+			{ ...query, response: "missing" },
+			asStudent(w),
+		),
+	).rejects.toBeInstanceOf(NotFound);
+});

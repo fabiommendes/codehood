@@ -29,27 +29,6 @@ export function effectiveAnswerHistory(exam: AnswerHistorySetting): boolean {
 	return exam.answerHistory ?? exam.type !== "PRACTICE";
 }
 
-/**
- * The effective answer-history switch of the exam `read` finds, or `undefined` when it cannot be read.
- *
- * Any failure, thrown or a missing exam, is swallowed: the value rides along
- * with a saved answer and must never be the reason the save fails.
- *
- * @example
- * await readAnswerHistory(async () => ({ type: "EXAM", answerHistory: null })); // true
- * await readAnswerHistory(async () => { throw new Error("down"); }); // undefined
- */
-export async function readAnswerHistory(
-	read: () => Promise<AnswerHistorySetting | null>,
-): Promise<boolean | undefined> {
-	try {
-		const exam = await read();
-		return exam ? effectiveAnswerHistory(exam) : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
 /// Whether the edit history still takes batches of an attempt, and how late they are.
 export type AnswerHistoryWindow =
 	| { open: true; lateMs: number | null }

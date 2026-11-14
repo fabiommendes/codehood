@@ -12,7 +12,7 @@ import {
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import type { FillUndefineds } from "@/typing";
-import { type PrismaTx, prisma } from "../client";
+import { type PrismaTx, prisma, type Role } from "../client";
 
 export type { SessionId } from "@/core/schemas";
 
@@ -100,17 +100,31 @@ export type SessionService = ReturnType<typeof makeSessionService>;
  * A plain function rather than a service operation (ADR 0005): it takes no
  * actor because the raw token is the credential, and validating one is how an
  * actor's identity gets established in the first place. Returns the session
- * with its `user` joined in; the middleware assigns that straight to
- * `Astro.locals.user`.
+ * with the `username`, `name` and `role` of its `user`, from which the
+ * middleware builds the actor.
  */
 export async function validateSession(token: string, opts?: { tx?: PrismaTx }) {
 	const client = opts?.tx ?? prisma;
 	const tokenHash = hashToken(token);
-	const session = await client.session.findUnique({
-		where: { tokenHash },
-		include: { user: true },
-	});
-	if (!session) return null;
+	// One joined read: this runs on every request, and an `include` would cost a second query.
+	const [row] = await client.$queryRaw<
+		{
+			id: number;
+			expiresAt: Date | string | number;
+			username: string;
+			name: string;
+			role: Role;
+		}[]
+	>`
+		SELECT s.id, s.expiresAt, u.username, u.name, u.role
+		FROM Session s JOIN User u ON u.username = s.username
+		WHERE s.tokenHash = ${tokenHash}`;
+	if (!row) return null;
+	const session = {
+		id: row.id as SessionId,
+		expiresAt: new Date(row.expiresAt),
+		user: { username: row.username, name: row.name, role: row.role },
+	};
 
 	if (session.expiresAt < new Date()) {
 		await client.session.deleteMany({ where: { id: session.id } });

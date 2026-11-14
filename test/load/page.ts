@@ -262,23 +262,19 @@ export class ExamPage {
 	}
 
 	private async refreshSends(slugs: string[]): Promise<void> {
-		await Promise.all(
-			slugs.map(async (slug) => {
-				try {
-					const { data } = await this.http.action("gradingJob.forStudent", {
-						response: this.attempt,
-						question: slug,
-					});
-					if (data)
-						this.updateSends(
-							slug,
-							sendsOf(data as Parameters<typeof sendsOf>[0]),
-						);
-				} catch {
-					// The next poll asks again.
-				}
-			}),
-		);
+		try {
+			const { data } = await this.http.action(
+				"gradingJob.forStudentQuestions",
+				{ response: this.attempt, questions: slugs },
+			);
+			if (!data) return;
+			const views = data as Record<string, Parameters<typeof sendsOf>[0]>;
+			for (const [slug, view] of Object.entries(views)) {
+				this.updateSends(slug, sendsOf(view));
+			}
+		} catch {
+			// The next poll asks again.
+		}
 	}
 
 	/// Polls the sends that wait for a worker every `SENDS_POLL_MS`, as the page's effect does.

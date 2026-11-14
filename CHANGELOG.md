@@ -238,6 +238,21 @@ nula.
   `GradingJob (state, leaseUntil)` e `QuestionRef (courseId)`. O teste de
   carga aceita `--history N`, que enche o banco com autosaves de uma prova
   antiga; sem isso ele não reproduzia o problema.
+- Custo por requisição durante a prova. A página consulta os envios
+  pendentes de todas as questões numa requisição só
+  (`gradingJob.forStudentQuestions`), em vez de uma por questão a cada 5 s, e
+  o servidor só lê o documento da questão quando há relatório para mostrar.
+  As regras de permissão da prova carregam só a matrícula do ator
+  (`enrollmentsOf`), não a turma inteira. `validateApiKey` grava
+  `ApiKey.lastUsedAt` no máximo uma vez por minuto, não em toda requisição
+  do worker.
+- Custo de salvar uma resposta. A action `exam.answer` usa
+  `response.answer`, que grava como `response.submit` mas devolve só a
+  tentativa e a chave `answerHistory`: o save deixa de reler a prova inteira
+  e de carregar todas as submissões da tentativa duas vezes (custo que
+  crescia a cada autosave), e lê curso, prova e exceção uma vez só. Um envio
+  de código cai de 46 para 22 queries. `validateSession` lê sessão e usuário
+  numa query. `readAnswerHistory` saiu.
 
 ## 0.4.0 (2026-11-13)
 

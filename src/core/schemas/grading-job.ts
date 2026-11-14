@@ -177,6 +177,18 @@ export const gradingJobStudentView = z.object({
 	),
 });
 
+/// Names the answer and the questions whose submissions a student looks up at once.
+export const gradingJobStudentBatchQuery = z.object({
+	response: publicId,
+	questions: z.array(slug).max(200),
+});
+
+/// The `gradingJobStudentView` of each question, keyed by its slug.
+export const gradingJobStudentBatchView = z.record(
+	z.string(),
+	gradingJobStudentView,
+);
+
 /// Names the question and the answers whose sent submissions an instructor reads, all of one course.
 export const gradingJobInstructorQuery = z.object({
 	question: slug,

@@ -31,6 +31,8 @@ import {
 	gradingJobRequeued,
 	gradingJobResult,
 	gradingJobSchema,
+	gradingJobStudentBatchQuery,
+	gradingJobStudentBatchView,
 	gradingJobStudentQuery,
 	gradingJobStudentView,
 	gradingJobSummary,
@@ -83,6 +85,12 @@ export type GradingJobInstructorQuery = z.infer<
 >;
 export type GradingJobInstructorView = z.infer<typeof gradingJobInstructorView>;
 export type GradingJobStudentView = z.infer<typeof gradingJobStudentView>;
+export type GradingJobStudentBatchQuery = z.infer<
+	typeof gradingJobStudentBatchQuery
+>;
+export type GradingJobStudentBatchView = z.infer<
+	typeof gradingJobStudentBatchView
+>;
 
 /// What a job needs from its submission, response, exam and course.
 const jobInclude = {
@@ -432,89 +440,31 @@ export const makeGradingJobService = defineService()((client) => {
 			input: GradingJobStudentQuery,
 			opts: ServiceOptsWithoutTx,
 		): Promise<GradingJobStudentView> => {
-			const response = valueOrNotFound(
-				"response",
-				await tx.response.findUnique({
-					where: { publicId: input.response },
-					select: {
-						id: true,
-						authorId: true,
-						preview: true,
-						exam: {
-							select: { id: true, ...examReleaseSelect() },
-						},
-					},
-				}),
+			const views = await studentViews(
+				tx,
+				{ response: input.response, questions: [input.question] },
+				opts.actor,
 			);
-			const { exam } = response;
-			ensurePerm(opts.actor, "grading-job.read", {
-				id: response.id,
-				author: { username: response.authorId },
-				course: exam.course,
-			});
-
-			const question = valueOrNotFound(
-				"question",
-				await tx.questionRef.findFirst({
-					where: { courseId: exam.courseId, slug: input.question },
-					select: { id: true, latestId: true, attempts: true },
-				}),
-			);
-			const rows = await tx.submission.findMany({
-				where: {
-					responseId: response.id,
-					questionId: question.id,
-					kind: { in: ["SUBMIT", "FINAL"] },
-				},
-				select: {
-					publicId: true,
-					kind: true,
-					status: true,
-					createdAt: true,
-					runnerReport: true,
-					gradingJob: { select: { state: true } },
-				},
-				orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-			});
-
-			const attempts = question.attempts ?? DEFAULT_CODE_ATTEMPTS;
-			const document = await codeDocument(tx, {
-				examId: exam.id,
-				question,
-			});
-			const visibility = {
-				// A simulation shows its grades like a practice exam does.
-				mode: response.preview ? "PRACTICE" : exam.type,
-				attempts,
-				released: releasedToStudents(exam, new Date()),
-			};
-			const sent: SentSubmission[] = rows.map((row) => ({
-				kind: row.kind,
-				status: row.status,
-				jobState: row.gradingJob?.state ?? null,
-			}));
-			return {
-				attempts,
-				attemptsLeft:
-					response.preview || exam.type === "PRACTICE"
-						? null
-						: Math.max(0, attempts - spentAttempts(sent)),
-				submissions: rows.map((row) => {
-					const view =
-						row.gradingJob?.state === "DONE" && row.runnerReport !== null
-							? reportView(document, row.runnerReport, visibility)
-							: undefined;
-					return {
-						submission: row.publicId,
-						kind: row.kind,
-						createdAt: row.createdAt,
-						jobState: row.gradingJob?.state ?? null,
-						status: row.status,
-						...(view ? { report: view } : {}),
-					};
-				}),
-			};
+			return valueOrNotFound("question", views[input.question]);
 		},
+	});
+
+	/**
+	 * The same as `forStudent` for several questions of one answer, keyed by question slug; a slug that names no question of the course is left out.
+	 *
+	 * @throws {@link NotFound} No such answer.
+	 * @throws {@link NotAllowed} The actor is not the author of the answer.
+	 */
+	const forStudentQuestions = op({
+		transaction: false,
+		args: [gradingJobStudentBatchQuery],
+		returns: gradingJobStudentBatchView,
+		run: (
+			tx: PrismaTx,
+			input: GradingJobStudentBatchQuery,
+			opts: ServiceOptsWithoutTx,
+		): Promise<GradingJobStudentBatchView> =>
+			studentViews(tx, input, opts.actor),
 	});
 
 	/**
@@ -671,6 +621,7 @@ export const makeGradingJobService = defineService()((client) => {
 		requeueFailed,
 		summary,
 		forStudent,
+		forStudentQuestions,
 		forInstructor,
 	};
 });
@@ -755,6 +706,103 @@ async function giveUp(
 		...(state === "QUEUED" ? { claimedBy: null } : {}),
 	});
 	return state;
+}
+
+/// What the author of an answer sees of their sends of each of `questions`, by slug; unknown slugs are left out.
+async function studentViews(
+	tx: PrismaTx,
+	input: GradingJobStudentBatchQuery,
+	actor: Actor,
+): Promise<GradingJobStudentBatchView> {
+	const response = valueOrNotFound(
+		"response",
+		await tx.response.findUnique({
+			where: { publicId: input.response },
+			select: {
+				id: true,
+				authorId: true,
+				preview: true,
+				exam: { select: { id: true, ...examReleaseSelect(actor) } },
+			},
+		}),
+	);
+	const { exam } = response;
+	ensurePerm(actor, "grading-job.read", {
+		id: response.id,
+		author: { username: response.authorId },
+		course: exam.course,
+	});
+
+	const questions = await tx.questionRef.findMany({
+		where: { courseId: exam.courseId, slug: { in: input.questions } },
+		select: { id: true, slug: true, latestId: true, attempts: true },
+	});
+	const rows = await tx.submission.findMany({
+		where: {
+			responseId: response.id,
+			questionId: { in: questions.map((question) => question.id) },
+			kind: { in: ["SUBMIT", "FINAL"] },
+		},
+		select: {
+			questionId: true,
+			publicId: true,
+			kind: true,
+			status: true,
+			createdAt: true,
+			runnerReport: true,
+			gradingJob: { select: { state: true } },
+		},
+		orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+	});
+	const released = releasedToStudents(exam, new Date());
+
+	const views: GradingJobStudentBatchView = {};
+	for (const question of questions) {
+		const own = rows.filter((row) => row.questionId === question.id);
+		const attempts = question.attempts ?? DEFAULT_CODE_ATTEMPTS;
+		const visibility = {
+			// A simulation shows its grades like a practice exam does.
+			mode: response.preview ? "PRACTICE" : exam.type,
+			attempts,
+			released,
+		};
+		const reported = own.some(
+			(row) => row.gradingJob?.state === "DONE" && row.runnerReport !== null,
+		);
+		// The document is only read to show a report, and most polls find none yet.
+		const document = reported
+			? await codeDocument(tx, { examId: exam.id, question })
+			: undefined;
+		const sent: SentSubmission[] = own.map((row) => ({
+			kind: row.kind,
+			status: row.status,
+			jobState: row.gradingJob?.state ?? null,
+		}));
+		views[question.slug] = {
+			attempts,
+			attemptsLeft:
+				response.preview || exam.type === "PRACTICE"
+					? null
+					: Math.max(0, attempts - spentAttempts(sent)),
+			submissions: own.map((row) => {
+				const view =
+					document &&
+					row.gradingJob?.state === "DONE" &&
+					row.runnerReport !== null
+						? reportView(document, row.runnerReport, visibility)
+						: undefined;
+				return {
+					submission: row.publicId,
+					kind: row.kind,
+					createdAt: row.createdAt,
+					jobState: row.gradingJob?.state ?? null,
+					status: row.status,
+					...(view ? { report: view } : {}),
+				};
+			}),
+		};
+	}
+	return views;
 }
 
 /// The private document of the version of the question that the exam pins, or the latest.

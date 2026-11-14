@@ -31,6 +31,7 @@ import {
 	guardedUpdate,
 	touch,
 } from "@/db/conditional-write";
+import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import {
@@ -94,16 +95,14 @@ export type QuestionView = Question | QuestionPublic;
  * `course.update-contents` get the safe shape for free.
  */
 function questionInclude<Private extends boolean = false>(
+	actor: Actor,
 	includePrivate: Private = false as Private,
 ) {
 	return {
 		course: {
 			select: {
 				instructor: { select: { username: true } },
-				enrollments: {
-					where: { status: "ACTIVE" as const },
-					select: { username: true },
-				},
+				enrollments: enrollmentsOf(actor),
 			},
 		},
 		latest: {
@@ -239,7 +238,7 @@ const buildQuestionService = (deps: Deps) =>
 				// be in the query yet.
 				const row = await tx.questionRef.findFirst({
 					where: refWhere(filter),
-					include: questionInclude(),
+					include: questionInclude(opts.actor),
 				});
 
 				if (!row) return null;
@@ -281,8 +280,8 @@ const buildQuestionService = (deps: Deps) =>
 					await tx.questionRef.findUnique({
 						where: { id: row.id },
 						include: pinned
-							? { ...questionInclude(true), latest: false }
-							: questionInclude(true),
+							? { ...questionInclude(opts.actor, true), latest: false }
+							: questionInclude(opts.actor, true),
 					}),
 				);
 				return fromDb(
@@ -314,7 +313,7 @@ const buildQuestionService = (deps: Deps) =>
 				const none = { pretests: [], sendable: false };
 				const row = await tx.questionRef.findFirst({
 					where: refWhere(filter),
-					include: questionInclude(),
+					include: questionInclude(opts.actor),
 				});
 				if (!row) return none;
 				const access = questionAccess(opts.actor, row, await isPinned(tx, row));
@@ -333,8 +332,8 @@ const buildQuestionService = (deps: Deps) =>
 					await tx.questionRef.findUnique({
 						where: { id: row.id },
 						include: pinned
-							? { ...questionInclude(true), latest: false }
-							: questionInclude(true),
+							? { ...questionInclude(opts.actor, true), latest: false }
+							: questionInclude(opts.actor, true),
 					}),
 				);
 				const { question } = fromDb(
@@ -369,10 +368,7 @@ const buildQuestionService = (deps: Deps) =>
 						select: {
 							id: true,
 							instructor: { select: { username: true } },
-							enrollments: {
-								where: { status: "ACTIVE" as const },
-								select: { username: true },
-							},
+							enrollments: enrollmentsOf(opts.actor),
 						},
 					}),
 				);
@@ -407,7 +403,7 @@ const buildQuestionService = (deps: Deps) =>
 				if (isPublic) {
 					const rows = await tx.questionRef.findMany({
 						where,
-						include: questionInclude(false),
+						include: questionInclude(opts.actor, false),
 						orderBy: { slug: "asc" },
 					});
 					return rows.map(fromDbPublic);
@@ -415,7 +411,7 @@ const buildQuestionService = (deps: Deps) =>
 
 				const rows = await tx.questionRef.findMany({
 					where,
-					include: questionInclude(true),
+					include: questionInclude(opts.actor, true),
 					orderBy: { slug: "asc" },
 				});
 				return rows.map(fromDb);
@@ -654,7 +650,7 @@ const buildQuestionService = (deps: Deps) =>
 				const notFound = () => new NotFound("attachment");
 				const ref = await tx.questionRef.findFirst({
 					where: { publicId: pk.publicId },
-					include: questionInclude(),
+					include: questionInclude(opts.actor),
 				});
 				if (
 					!ref ||
@@ -869,7 +865,7 @@ async function writableRef(
 			id: true,
 			slug: true,
 			status: true,
-			course: questionInclude().course,
+			course: questionInclude(actor).course,
 		},
 	});
 	if (!found && "course" in filter) {
@@ -959,7 +955,8 @@ async function applyWrite(
 				}),
 			},
 			opts,
-			{ include: questionInclude(true) },
+			// The caller already checked the write, so no enrollment is read.
+			{ include: questionInclude(SYSTEM, true) },
 		),
 	);
 	if (files) {

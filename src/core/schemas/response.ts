@@ -166,3 +166,13 @@ export const responseSubmit = z.object({
 export const responseSubmitted = responseSchema.extend({
 	duplicate: z.boolean(),
 });
+
+/// What the exam page reads back after saving an answer.
+export const responseAnswered = z.object({
+	/// The attempt the answer went to, by `publicId`.
+	response: publicId,
+	/// Whether the browser records the edit history of open answers in the exam.
+	answerHistory: z.boolean(),
+	/// Whether the code sent was already sent, so nothing was queued or spent.
+	duplicate: z.boolean(),
+});

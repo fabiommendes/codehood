@@ -2,6 +2,7 @@ import { defineAction } from "astro:actions";
 import { requireUser } from "@/auth/require-user";
 import {
 	gradingJobInstructorQuery,
+	gradingJobStudentBatchQuery,
 	gradingJobStudentQuery,
 	gradingQuestion,
 } from "@/core/schemas";
@@ -54,6 +55,17 @@ export const gradingJob = {
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			return db.gradingJob.forStudent(input, { actor });
+		}),
+	}),
+
+	/**
+	 * Reads what `forStudent` does for several questions of one answer at once, keyed by question slug.
+	 */
+	forStudentQuestions: defineAction({
+		input: gradingJobStudentBatchQuery,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			return db.gradingJob.forStudentQuestions(input, { actor });
 		}),
 	}),
 

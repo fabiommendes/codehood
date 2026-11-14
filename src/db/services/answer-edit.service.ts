@@ -54,6 +54,7 @@ import {
 	MAX_ANSWER_EDIT_GAP_REASON,
 } from "@/core/schemas/answer-edit";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
+import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import type { EditTuple } from "@/services/answer-edits/codec";
 import {
@@ -241,7 +242,7 @@ export const makeAnswerEditService = defineService()(() => {
 					course: {
 						select: {
 							instructor: { select: { username: true } },
-							enrollments: { select: { username: true } },
+							enrollments: enrollmentsOf(opts.actor),
 						},
 					},
 				},

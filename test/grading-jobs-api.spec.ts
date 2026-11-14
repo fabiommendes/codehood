@@ -377,6 +377,13 @@ test("gradingJob actions: the instructor reads the queue and requeues failures, 
 	expect(own.ok(), await own.text()).toBe(true);
 	expect(await own.text()).toContain(w.submission);
 
+	const batch = await request.post("/_actions/gradingJob.forStudentQuestions", {
+		headers: student,
+		data: { response: w.response, questions: [w.question] },
+	});
+	expect(batch.ok(), await batch.text()).toBe(true);
+	expect(await batch.text()).toContain(w.submission);
+
 	const forbidden = await request.post("/_actions/gradingJob.summary", {
 		headers: student,
 		data: queue,

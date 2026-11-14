@@ -69,3 +69,6 @@ prompt/
 
 # disposable copies of seed repositories (pnpm run db:seed:cli)
 tmp/
+
+# Elm build caches
+elm-stuff/

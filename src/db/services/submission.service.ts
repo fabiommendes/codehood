@@ -26,6 +26,7 @@ import {
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt, touch } from "@/db/conditional-write";
+import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { assertResponse, type QuestionDocument, ResponseError } from "@/mdq";
@@ -297,10 +298,7 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 					select: {
 						id: true,
 						instructor: { select: { username: true } },
-						enrollments: {
-							where: { status: "ACTIVE" as const },
-							select: { username: true },
-						},
+						enrollments: enrollmentsOf(opts.actor),
 					},
 				}),
 			);

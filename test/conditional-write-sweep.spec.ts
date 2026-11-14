@@ -715,6 +715,18 @@ const STUDENT_PATH: Record<string, Record<string, () => Promise<unknown>>> = {
 					stale(student),
 				);
 			},
+			answer: async () => {
+				const { course, exam, question, student } = await makeAttempt();
+				return db.response.answer(
+					{
+						course: course.id,
+						exam: exam.slug,
+						question: question.slug,
+						payload: "a",
+					},
+					stale(student),
+				);
+			},
 			finish: async () => {
 				const { course, exam, question, student } = await makeAttempt();
 				const input = { course: course.id, exam: exam.slug };

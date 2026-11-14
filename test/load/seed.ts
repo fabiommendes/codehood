@@ -15,6 +15,7 @@ import { hashToken } from "@/auth/token";
 import type { CourseId } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { localDateOf } from "@/utils/schedule-time";
 import {
 	answerOf,
 	CODE_QUESTIONS,
@@ -53,8 +54,8 @@ await db.edition.create(
 	{
 		slug: LOAD.edition,
 		name: LOAD.edition,
-		startAt: new Date(now.getTime() - 30 * 86_400_000),
-		endAt: new Date(now.getTime() + 90 * 86_400_000),
+		startDate: localDateOf(new Date(now.getTime() - 30 * 86_400_000)),
+		endDate: localDateOf(new Date(now.getTime() + 90 * 86_400_000)),
 	},
 	FULL_ACCESS,
 );
@@ -64,8 +65,8 @@ const course = await db.course.create(
 		instructor: instructor.username,
 		edition: LOAD.edition,
 		description: "Load test of an exam.",
-		startAt: new Date(now.getTime() - 30 * 86_400_000),
-		endAt: new Date(now.getTime() + 90 * 86_400_000),
+		startDate: localDateOf(new Date(now.getTime() - 30 * 86_400_000)),
+		endDate: localDateOf(new Date(now.getTime() + 90 * 86_400_000)),
 	},
 	FULL_ACCESS,
 );

@@ -10,10 +10,7 @@ import {
 	examSetAnswerHistory,
 } from "@/core/schemas";
 import { db } from "@/db";
-import {
-	effectiveAnswerHistory,
-	readAnswerHistory,
-} from "@/services/answer-history";
+import { effectiveAnswerHistory } from "@/services/answer-history";
 import { parseCourseParams } from "@/urls";
 import { parseLocalDateTime, toDuration } from "@/utils/schedule-time";
 import { withServiceErrors } from "./helpers";
@@ -46,7 +43,7 @@ export const exam = {
 	/**
 	 * Records the actor's answer to one question of their open attempt.
 	 *
-	 * Answers with the server clock and, when it can be read, the exam's
+	 * Answers with the server clock and the exam's
 	 * effective answer-history switch. A `SUBMIT` also answers with the sends
 	 * of the question, so the page needs no second call for the counter.
 	 */
@@ -56,7 +53,7 @@ export const exam = {
 			const actor = requireUser(context);
 			const { payload, question, kind, ...rest } = input;
 			const course = parseCourseParams(rest);
-			const response = await db.response.submit(
+			const saved = await db.response.answer(
 				{ course, exam: input.exam, question, payload, kind },
 				{ actor },
 			);
@@ -64,18 +61,14 @@ export const exam = {
 			const sends =
 				kind === "SUBMIT"
 					? await db.gradingJob
-							.forStudent({ response: response.publicId, question }, { actor })
+							.forStudent({ response: saved.response, question }, { actor })
 							.catch(() => undefined)
 					: undefined;
-			// Read only after the save, and never allowed to fail it.
-			const answerHistory = await readAnswerHistory(() =>
-				db.exam.findOne({ course, slug: input.exam }, { actor }),
-			);
 			// The page measures its clock offset from this stamp.
 			return {
 				serverNow: Date.now(),
-				duplicate: response.duplicate,
-				...(answerHistory === undefined ? {} : { answerHistory }),
+				duplicate: saved.duplicate,
+				answerHistory: saved.answerHistory,
 				...(sends === undefined ? {} : { sends }),
 			};
 		}),

@@ -38,7 +38,7 @@ export function clientRhythm() {
 		saveDelayMs: constant(CLIENT_SOURCES.attempt, "SAVE_DELAY_MS"),
 		/// A save unanswered for this long counts as a failed connection.
 		saveTimeoutMs: constant(CLIENT_SOURCES.attempt, "SAVE_TIMEOUT_MS"),
-		/// Interval of `gradingJob.forStudent` while a send waits for its worker.
+		/// Interval of `gradingJob.forStudentQuestions` while a send waits for its worker.
 		sendsPollMs: constant(CLIENT_SOURCES.attempt, "SENDS_POLL_MS"),
 		/// Longest the page waits for the history's last flush.
 		historyFinalWaitMs: constant(
@@ -84,5 +84,5 @@ export const STUDENT_ACTIONS = [
 	"exam.answer",
 	"exam.finish",
 	"exam.start",
-	"gradingJob.forStudent",
+	"gradingJob.forStudentQuestions",
 ].sort();
