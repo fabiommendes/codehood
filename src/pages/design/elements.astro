@@ -1,11 +1,13 @@
 ---
 import BrandSquares from "@/components/BrandSquares.astro";
+import PaginatedTableDemo from "@/components/design/PaginatedTableDemo";
 import ListRow from "@/components/ListRow.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import PaginatedTable from "@/components/ui/PaginatedTable";
 import Table from "@/components/ui/Table";
 import Tabs from "@/components/ui/Tabs.astro";
 import DesignLayout from "@/layouts/DesignLayout.astro";
@@ -45,6 +47,7 @@ const tableColumns = [
 	{
 		title: "Name",
 		class: "font-medium",
+		sortKey: "name",
 		render: (row: (typeof tableRows)[number]) => row.name,
 	},
 	{ title: "Kind", render: (row: (typeof tableRows)[number]) => row.kind },
@@ -264,6 +267,28 @@ const tabItems = [
       row.
     </p>
     <Table columns={tableColumns} data={tableRows} />
+  </section>
+
+  <section class="mb-14">
+    <h2 class="mb-2 text-xl font-semibold">PaginatedTable</h2>
+    <p class="mb-5 text-sm text-muted">
+      <code class="font-mono">{`<PaginatedTable columns={...} data={...} pageSize={20} />`}</code>:
+      takes every prop of <code class="font-mono">Table</code>. Given every
+      row, it pages them in the browser and returns to the first page when the
+      sort changes.
+    </p>
+    <PaginatedTableDemo client:load />
+    <p class="mt-8 mb-5 text-sm text-muted">
+      <code class="font-mono">{`<PaginatedTable ... cursor={{ prevHref, nextHref, total }} />`}</code>:
+      the server sent one page; the pager links to its neighbours, and headers
+      with <code class="font-mono">sortHref</code> sort through the URL.
+    </p>
+    <PaginatedTable
+      columns={tableColumns}
+      data={tableRows}
+      cursor={{ prevHref: "?cursor=a", nextHref: "?cursor=c", total: 20000 }}
+      sortHref={(key) => `?sort=${key}`}
+    />
   </section>
 
   <section class="mb-14">

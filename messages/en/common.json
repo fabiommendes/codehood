@@ -6,5 +6,11 @@
 	"common_light_theme": "Light theme",
 	"common_attachments": "Attachments",
 	"common_table_empty": "Nothing to show.",
-	"common_attachment_show_code": "Show code"
+	"common_attachment_show_code": "Show code",
+	"common_pagination_label": "Pages",
+	"common_pagination_previous": "Previous",
+	"common_pagination_next": "Next",
+	"common_pagination_page": "Page {page}",
+	"common_pagination_range": "{from}–{to} of {total}",
+	"common_pagination_total": "{total} in all"
 }

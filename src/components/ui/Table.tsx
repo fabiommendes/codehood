@@ -28,7 +28,8 @@ export interface TableSort {
 	direction: "asc" | "desc";
 }
 
-interface TableProps<T> {
+/** Props of {@link Table}; `PaginatedTable` takes the same ones. */
+export interface TableProps<T> {
 	columns: ColumnConfig<T>[];
 	data: T[];
 	class?: string;
@@ -42,6 +43,11 @@ interface TableProps<T> {
 	sort?: TableSort;
 	/** Called with a column's `sortKey` when that column's header is clicked; headers stay plain while `data` has fewer than two rows. */
 	onSort?: (key: string) => void;
+	/**
+	 * Builds the link a column's header follows to sort by its `sortKey`, for
+	 * tables sorted on the server; takes precedence over `onSort`.
+	 */
+	sortHref?: (key: string) => string;
 	/// Classes for the `<table>` itself, such as `min-w-max` for a wide matrix that scrolls.
 	tableClass?: string;
 	/// Classes for a row, such as dimming one that no longer counts.
@@ -99,10 +105,18 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 							{(column, index) => {
 								const sortable = () =>
 									column.sortKey !== undefined &&
-									props.onSort !== undefined &&
+									(props.onSort !== undefined ||
+										props.sortHref !== undefined) &&
 									props.data.length > 1;
 								const active = () =>
 									sortable() && props.sort?.key === column.sortKey;
+								const indicator = () => (
+									<Show when={active()}>
+										<span aria-hidden="true">
+											{props.sort?.direction === "asc" ? "▲" : "▼"}
+										</span>
+									</Show>
+								);
 								return (
 									<th
 										scope="col"
@@ -119,22 +133,33 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 										}
 									>
 										<Show when={sortable()} fallback={column.title}>
-											<button
-												type="button"
-												class="inline-flex items-center gap-1"
-												onClick={() => {
-													if (column.sortKey !== undefined) {
-														props.onSort?.(column.sortKey);
-													}
-												}}
+											<Show
+												when={props.sortHref}
+												fallback={
+													<button
+														type="button"
+														class="inline-flex items-center gap-1"
+														onClick={() => {
+															if (column.sortKey !== undefined) {
+																props.onSort?.(column.sortKey);
+															}
+														}}
+													>
+														{column.title}
+														{indicator()}
+													</button>
+												}
 											>
-												{column.title}
-												<Show when={active()}>
-													<span aria-hidden="true">
-														{props.sort?.direction === "asc" ? "▲" : "▼"}
-													</span>
-												</Show>
-											</button>
+												{(sortHref) => (
+													<a
+														href={sortHref()(column.sortKey ?? "")}
+														class="inline-flex items-center gap-1"
+													>
+														{column.title}
+														{indicator()}
+													</a>
+												)}
+											</Show>
 										</Show>
 									</th>
 								);
