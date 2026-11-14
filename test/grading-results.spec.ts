@@ -537,7 +537,7 @@ test("results: a submitted attempt with one pending answer reads its progress, a
 	);
 });
 
-test("results: with no attempt the section says so, with no table and no grading link", async ({
+test("results: with no attempt the table says so, with no sorting and no grading link", async ({
 	page,
 }) => {
 	const { teacher, course, href } = await setup("rs2");
@@ -550,8 +550,9 @@ test("results: with no attempt the section says so, with no table and no grading
 
 	await expect(page).toHaveURL(`${href}/exams/midterm`);
 	await expect(resultsHeading(page)).toBeVisible();
-	await expect(page.getByText("No attempts yet.")).toBeVisible();
-	await expect(page.getByRole("table")).toHaveCount(0);
+	const results = page.getByRole("table", { name: "Results" });
+	await expect(results.getByRole("cell")).toHaveText("No attempts yet.");
+	await expect(results.getByRole("button")).toHaveCount(0);
 	await expect(
 		page.getByRole("link", { name: /Grade answers|Review grades/ }),
 	).toHaveCount(0);

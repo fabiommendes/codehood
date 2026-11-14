@@ -771,7 +771,7 @@ test("instructor: find the questions that need rework", async ({ page }) => {
 
 		// Question, Answered, Blank, Average, Correct, Discrimination, To grade.
 		await expect(cells("Best fruit")).toHaveText([
-			"Best fruit",
+			"Q1. Best fruit",
 			"8",
 			"0",
 			"50%",

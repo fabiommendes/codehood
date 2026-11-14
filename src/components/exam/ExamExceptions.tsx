@@ -3,6 +3,7 @@ import { createSignal, For, type JSX, Show } from "solid-js";
 import { createSchemaForm } from "@/components/form/create-schema-form";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
+import Table, { type ColumnConfig } from "@/components/ui/Table";
 import { examExceptionSave } from "@/core/schemas";
 import { errorMessage } from "@/forms/field-errors";
 import { m } from "@/i18n";
@@ -15,7 +16,7 @@ export interface ExceptionRow {
 	extra: string | null;
 	/// The new date, formatted, or `null` when the exam's own date stands.
 	date: string | null;
-	/// The student's personal window, formatted, or `null` when it has no end.
+	/// When the student may take the exam, start to end with the extra time, or `null` when it has no end.
 	window: string | null;
 	note: string | null;
 	extraMinutes: number | null;
@@ -31,6 +32,13 @@ export interface ExamExceptionsProps {
 	/// The students an exception may be granted to.
 	students: { username: string; name: string }[];
 	rows: ExceptionRow[];
+}
+
+/// What the exception changes, as "+30 min · rescheduled"; the new date itself shows only when there is no window to carry it.
+function changesOf(row: ExceptionRow): string {
+	const date =
+		row.date && (row.window ? m.exams_exceptions_rescheduled() : row.date);
+	return [row.extra, date].filter(Boolean).join(" · ");
 }
 
 /**
@@ -124,58 +132,94 @@ export default function ExamExceptions(
 
 	const student = () => form.field("username");
 
+	const columns: ColumnConfig<ExceptionRow>[] = [
+		{
+			title: m.exams_exceptions_col_student(),
+			render: (row) => (
+				<>
+					<div class="font-medium">{row.name}</div>
+					<Show when={row.note}>
+						<div class="text-xs text-muted">{row.note}</div>
+					</Show>
+				</>
+			),
+		},
+		{
+			title: m.exams_exceptions_col_window(),
+			render: (row) => {
+				const changes = changesOf(row);
+				return (
+					<Show when={row.window} fallback={changes}>
+						<div class="whitespace-nowrap tabular-nums">{row.window}</div>
+						<div class="text-xs text-muted">{changes}</div>
+					</Show>
+				);
+			},
+		},
+		{
+			title: m.exams_exceptions_col_actions(),
+			class: "text-right",
+			headerClass: "text-right",
+			render: (row) => (
+				<div class="flex justify-end gap-1">
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-sm"
+						aria-label={m.exams_exceptions_edit_for({ name: row.name })}
+						title={m.exams_exceptions_edit()}
+						onClick={() => openEdit(row)}
+					>
+						<svg
+							aria-hidden="true"
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+						>
+							<path
+								d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4Zm9-13 4 4"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
+					</button>
+					<button
+						type="button"
+						class="btn btn-square btn-ghost btn-sm text-error"
+						aria-label={m.exams_exceptions_remove_for({ name: row.name })}
+						title={m.exams_exceptions_remove()}
+						onClick={() => openRemove(row)}
+					>
+						<svg
+							aria-hidden="true"
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+						>
+							<path
+								d="M4 7h16M10 11v6m4-6v6M5 7l1 12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-12M9 7V4h6v3"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
+					</button>
+				</div>
+			),
+		},
+	];
+
 	return (
 		<div class="flex flex-col gap-4">
-			<Show
-				when={props.rows.length > 0}
-				fallback={
-					<p class="text-sm text-muted">{m.exams_exceptions_empty()}</p>
-				}
-			>
-				<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
-					<table class="table">
-						<thead>
-							<tr>
-								<th>{m.exams_exceptions_col_student()}</th>
-								<th>{m.exams_exceptions_col_extra()}</th>
-								<th>{m.exams_exceptions_col_date()}</th>
-								<th>{m.exams_exceptions_col_window()}</th>
-								<th>{m.exams_exceptions_col_note()}</th>
-								<th />
-							</tr>
-						</thead>
-						<tbody>
-							<For each={props.rows}>
-								{(row) => (
-									<tr>
-										<td class="font-medium">{row.name}</td>
-										<td>{row.extra}</td>
-										<td>{row.date}</td>
-										<td>{row.window}</td>
-										<td>{row.note}</td>
-										<td class="flex justify-end gap-2">
-											<button
-												type="button"
-												class="btn btn-ghost btn-sm"
-												onClick={() => openEdit(row)}
-											>
-												{m.exams_exceptions_edit()}
-											</button>
-											<button
-												type="button"
-												class="btn btn-ghost btn-sm text-error"
-												onClick={() => openRemove(row)}
-											>
-												{m.exams_exceptions_remove()}
-											</button>
-										</td>
-									</tr>
-								)}
-							</For>
-						</tbody>
-					</table>
-				</div>
-			</Show>
+			<Table
+				columns={columns}
+				data={props.rows}
+				empty={m.exams_exceptions_empty()}
+			/>
 
 			<div>
 				<button type="button" class="btn btn-primary btn-sm" onClick={openAdd}>

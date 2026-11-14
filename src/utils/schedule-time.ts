@@ -154,6 +154,29 @@ export function formatDateTime(
 }
 
 /**
+ * Renders the span from `start` to `end` like {@link formatDateTime}, writing the shared day only once.
+ *
+ * @example
+ * formatDateTimeRange(start, end); // "Mon, Sep 28, 14:00 – 15:30"
+ */
+export function formatDateTimeRange(
+	start: Date,
+	end: Date,
+	opts?: Intl.DateTimeFormatOptions,
+): string {
+	return new Intl.DateTimeFormat(locale, {
+		timeZone: SERVER_TZ,
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+		hourCycle: "h23",
+		...opts,
+	}).formatRange(start, end);
+}
+
+/**
  * Format minutes from midnight to human readable hour.
  *
  * Example: `formatTime(870) -> "14:30"`.

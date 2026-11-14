@@ -1,5 +1,6 @@
 import type { JSX } from "solid-js";
 import { For, Show } from "solid-js";
+import { m } from "@/i18n";
 
 /**
  * Describes one column: its header text, how to render a row's cell, and the
@@ -30,9 +31,15 @@ interface TableProps<T> {
 	columns: ColumnConfig<T>[];
 	data: T[];
 	class?: string;
+	/// The table's accessible name, for when no visible caption labels it.
+	label?: string;
+	/// Lifts the table off the page with a subtle drop shadow; on by default.
+	shadow?: boolean;
+	/// What the body shows when `data` is empty; a generic "nothing to show" by default.
+	empty?: JSX.Element;
 	/** Current sort state; drives the direction indicator and `aria-sort` on the active header. */
 	sort?: TableSort;
-	/** Called with a column's `sortKey` when that column's header is clicked. */
+	/** Called with a column's `sortKey` when that column's header is clicked; headers stay plain while `data` has fewer than two rows. */
 	onSort?: (key: string) => void;
 }
 
@@ -46,6 +53,7 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 	const containerClass = () =>
 		[
 			"overflow-x-auto rounded-box border border-base-300 bg-base-100",
+			props.shadow !== false && "shadow-sm",
 			props.class,
 		]
 			.filter(Boolean)
@@ -53,13 +61,15 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 
 	return (
 		<div class={containerClass()}>
-			<table class="table">
-				<thead>
+			<table class="table" aria-label={props.label}>
+				<thead class="bg-base-200/50">
 					<tr class="uppercase">
 						<For each={props.columns}>
 							{(column) => {
 								const sortable = () =>
-									column.sortKey !== undefined && props.onSort !== undefined;
+									column.sortKey !== undefined &&
+									props.onSort !== undefined &&
+									props.data.length > 1;
 								const active = () =>
 									sortable() && props.sort?.key === column.sortKey;
 								return (
@@ -98,7 +108,19 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 					</tr>
 				</thead>
 				<tbody>
-					<For each={props.data}>
+					<For
+						each={props.data}
+						fallback={
+							<tr>
+								<td
+									colSpan={props.columns.length}
+									class="py-6 text-center text-sm text-muted"
+								>
+									{props.empty ?? m.common_table_empty()}
+								</td>
+							</tr>
+						}
+					>
 						{(row) => (
 							<tr>
 								<For each={props.columns}>

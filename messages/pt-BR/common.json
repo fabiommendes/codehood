@@ -5,5 +5,6 @@
 	"common_dark_theme": "Tema escuro",
 	"common_light_theme": "Tema claro",
 	"common_attachments": "Anexos",
+	"common_table_empty": "Nada para mostrar.",
 	"common_attachment_show_code": "Ver código"
 }

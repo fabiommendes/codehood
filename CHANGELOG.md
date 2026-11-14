@@ -37,6 +37,15 @@
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento
   do servidor. As respostas ficam só na página: nada é salvo, enviado ou
   guardado como rascunho. `ExamQuestionsList` e `ExamQuestion` saíram.
+- As tabelas de resultados, estatísticas e exceções da página da prova usam
+  `ui.Table`. Resultados e estatísticas ordenam por qualquer coluna, e a
+  questão aparece como `Qn. título`, ordenada pela ordem da prova. A tabela
+  de exceções tem três colunas: o aluno com a observação abaixo, o horário
+  efetivo com o que mudou abaixo (`+30 min · remarcada`) e ações em ícones.
+- `ui.Table` tem cabeçalho em `base-200/50`, sombra opcional (`shadow`),
+  mensagem de tabela vazia (`empty`) e só ordena com duas linhas ou mais.
+- `/design/components` mostra uma instância por componente, com botões que
+  trocam a variante e gravam a escolha na URL (`VariantPicker`).
 
 ## 0.4.0 (2026-11-13)
 
