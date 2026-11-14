@@ -4,6 +4,13 @@
 
 ### Added
 
+- Página de configurações do curso (`<curso>/settings`), ligada pelo card do
+  curso na home do professor. Mostra os dados do curso só para leitura, com o
+  arquivo do repositório de onde cada um vem, reúne passphrase, link de
+  convite e convites da turma (que saíram dos dialogs do roster) e traz os
+  comandos `codehood init` e `codehood login` preenchidos para o curso. Spec
+  em `dev/specs/to-review/configuracoes-do-curso.md`.
+
 - Pré-testes de questões Elm por exemplos. Um bloco `elm` sem cabeçalho
   `module` em `## [tests]` é um bloco de exemplos (`expr ==> valor`,
   `expr ~= valor` para `Float`, comentário inline no nome do caso, `import`

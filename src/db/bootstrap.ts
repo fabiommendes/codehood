@@ -1462,6 +1462,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	await seedRegradeExam(cs101.id, ada, { hopper, hamilton });
 	await seedRepositories(cs101.id);
+	await seedClassroomInvites(cs101.id, ada);
 
 	// An ended course in the past edition, so admin views keep an expired one.
 	const ended = await db.course.create(
@@ -2126,6 +2127,37 @@ function labCalculadoraFiles(subtracao: string): DemoFile[] {
 }
 
 /// Seeds the demo repositories of cs101 and cites `lab-calculadora` from two of its meetings.
+/// Two classroom invite links on the settings page: one in use, one expired.
+async function seedClassroomInvites(
+	course: Course["id"],
+	instructor: User,
+): Promise<void> {
+	const createdBy = { username: instructor.username, name: instructor.name };
+	await db.invite.create(
+		{
+			kind: "CLASSROOM",
+			invitedRole: "STUDENT",
+			email: null,
+			course,
+			maxUses: 40,
+			createdBy,
+		},
+		FULL_ACCESS,
+	);
+	await db.invite.create(
+		{
+			kind: "CLASSROOM",
+			invitedRole: "STUDENT",
+			email: null,
+			course,
+			maxUses: null,
+			createdBy,
+			expiresInMs: -7 * 24 * 60 * 60 * 1000,
+		},
+		FULL_ACCESS,
+	);
+}
+
 async function seedRepositories(course: Course["id"]): Promise<void> {
 	const lab = await db.repository.upsert(
 		{ course, slug: "lab-calculadora" },

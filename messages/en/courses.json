@@ -210,5 +210,21 @@
 	"courses_resource_group_files": "Files",
 	"courses_resource_group_links": "Links",
 	"courses_resource_group_notes": "Notes",
-	"courses_resource_group_snippets": "Snippets"
+	"courses_resource_group_snippets": "Snippets",
+	"courses_settings_page_title": "Settings · {discipline}",
+	"courses_settings_course_heading": "Course",
+	"courses_settings_course_intro": "Read only. These come from the course repository and change with codehood push.",
+	"courses_settings_discipline": "Discipline",
+	"courses_settings_edition": "Edition",
+	"courses_settings_instructor": "Instructor",
+	"courses_settings_start": "Start",
+	"courses_settings_end": "End",
+	"courses_settings_description": "Description",
+	"courses_settings_no_description": "No description.",
+	"courses_settings_from_file": "from {file}",
+	"courses_settings_fixed": "set when the course was created",
+	"courses_settings_enrollment_heading": "Joining the class",
+	"courses_settings_cli_heading": "CLI",
+	"courses_settings_cli_intro": "Create the course repository and log in from inside it.",
+	"courses_roster_settings_link": "Passphrase and invite links are in Settings."
 }

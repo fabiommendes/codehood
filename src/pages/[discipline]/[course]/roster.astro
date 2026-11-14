@@ -1,20 +1,13 @@
 ---
-import { actions } from "astro:actions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import CsvDownload from "@/components/CsvDownload.astro";
 import Field from "@/components/form/Field";
-import FormAlert from "@/components/form/FormAlert";
 import StudentsTable from "@/components/StudentsTable";
-import Alert from "@/components/ui/Alert";
-import {
-	enrollmentAdd,
-	inviteClassroom,
-	passphraseGenerate,
-} from "@/core/schemas";
+import { enrollmentAdd } from "@/core/schemas";
 import { db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
-import { actionForm, formState } from "@/forms/form-state";
-import { locale, m } from "@/i18n";
+import { formState } from "@/forms/form-state";
+import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { studentsNav } from "@/utils/course-tabs-nav";
@@ -40,80 +33,11 @@ const courseParams = {
 	course: `${course.instructor.username}_${course.edition.slug}`,
 };
 
-const revokeResult = Astro.getActionResult(actions.admin.revokeInvite);
-const passphraseResult = Astro.getActionResult(
-	actions.course.generatePassphrase,
-);
-
-// createClassroomInvite has no `accept: "form"` (see src/actions/auth.ts) — a plain
-// <form action={actions.auth.createClassroomInvite}> would send a body Astro can't
-// parse against that shape. Handling the POST manually (formData in, Astro.callAction
-// out) is the same workaround invite.astro used before it folded into manage.astro,
-// then here. The `_action` guard matters here: other forms on this page post to
-// actions referenced directly as their `action`, which Astro resolves back to this
-// same page URL with `?_action=<name>` rather than to a separate endpoint. Without
-// the guard, submitting one of those would also run this block.
-let inviteUrl: string | null = null;
-let inviteError: string | null = null;
-if (Astro.request.method === "POST" && !Astro.url.searchParams.has("_action")) {
-	const formData = await Astro.request.formData();
-	const maxUsesRaw = formData.get("maxUses");
-	const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
-
-	const { data, error } = await Astro.callAction(
-		actions.auth.createClassroomInvite,
-		{ ...courseParams, maxUses },
-	);
-
-	if (error) {
-		inviteError =
-			errorMessage(error) || m.courses_roster_invite_login_required();
-	} else {
-		inviteUrl = new URL(`/invite/${data.token}`, Astro.url).toString();
-	}
-}
-
 const addStudentForm = formState(enrollmentAdd, undefined, {
 	id: "add-student",
 });
-const passphraseForm = await actionForm(
-	Astro,
-	actions.course.generatePassphrase,
-	passphraseGenerate,
-	{ id: "custom-passphrase" },
-);
-const inviteForm = formState(inviteClassroom, undefined, { id: "invite" });
-
 const students = await db.enrollment.findMany({ course: course.id }, { actor });
-const invites = await db.invite.findMany(
-	{ course: course.id, kind: "CLASSROOM" },
-	{ actor },
-);
-const activePassphrases = await db.passphrase.findMany(
-	{ course: course.id, active: true },
-	{ actor },
-);
-const currentPassphrase = activePassphrases[0] ?? null;
 
-function formatDate(date: Date): string {
-	return date.toLocaleDateString(locale, {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
-}
-
-function formatTime(date: Date | string): string {
-	return new Date(date).toLocaleTimeString(locale, {
-		hour: "2-digit",
-		minute: "2-digit",
-		second: "2-digit",
-		hourCycle: "h23",
-	});
-}
-
-const RENEW_ICON =
-	"M4 12a8 8 0 0 1 14.93-4M20 4v5h-5 M20 12a8 8 0 0 1-14.93 4M4 20v-5h5";
 const COPY_ICON =
 	"M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
 const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
@@ -152,17 +76,6 @@ const csvRows = [
         {m.courses_roster_add_intro()}
       </p>
 
-      <FormAlert error={inviteError ?? undefined} class="mt-4" />
-      <FormAlert error={revokeResult?.error && errorMessage(revokeResult.error)} class="mt-4" />
-      {
-        revokeResult && !revokeResult.error && (
-          <Alert variant="success" class="mt-4">
-            <span>{m.courses_roster_invite_revoked()}</span>
-          </Alert>
-        )
-      }
-      <FormAlert error={passphraseResult?.error && errorMessage(passphraseResult.error)} class="mt-4" />
-
       <div class="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
@@ -171,28 +84,10 @@ const csvRows = [
         >
           {m.courses_roster_add_student()}
         </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          data-open-dialog="passphrase-dialog"
-        >
-          {m.courses_roster_passphrase()}
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          data-open-dialog="invite-link-dialog"
-        >
-          {m.courses_roster_invite_link()}
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          data-open-dialog="revoke-invites-dialog"
-        >
-          {m.courses_roster_revoke_invites()}
-        </button>
       </div>
+      <p class="mt-3 text-sm text-muted">
+        <a href={`${href}/settings`} class="link link-primary">{m.courses_roster_settings_link()}</a>
+      </p>
     </section>
 
     <div class="divider mt-8"></div>
@@ -286,8 +181,7 @@ const csvRows = [
       </div>
     </div>
 
-    {/* No `method`/`action`: the submit handler below owns it. A native POST
-        here would hit the page's own handler, which mints a classroom invite. */}
+    {/* No `method`/`action`: the submit handler below owns it. */}
     <form id="add-student-form" class="mt-4">
       <input type="hidden" name="discipline" value={courseParams.discipline} />
       <input type="hidden" name="course" value={courseParams.course} />
@@ -308,254 +202,10 @@ const csvRows = [
   </form>
 </dialog>
 
-<dialog id="passphrase-dialog" class="modal">
-  <div class="modal-box">
-    <form method="dialog">
-      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
-        ✕
-      </button>
-    </form>
-    <h3 class="text-lg font-bold">{m.courses_roster_passphrase()}</h3>
-    <p class="mt-1 text-sm text-muted">
-      {m.courses_roster_passphrase_body()}
-    </p>
-
-    <div id="passphrase-error" class="alert alert-error mt-4" hidden>
-      <span></span>
-    </div>
-
-    <div
-      class="mt-6 flex flex-col items-center gap-2 rounded-box bg-base-200 py-10"
-    >
-      <span
-        id="passphrase-value"
-        class:list={[
-          "font-mono text-6xl font-bold tracking-[0.3em]",
-          currentPassphrase ? "text-primary" : "text-base-content/25",
-        ]}
-      >
-        {currentPassphrase?.value ?? "——————"}
-      </span>
-      <p id="passphrase-meta" class="text-xs text-muted">
-        {
-          currentPassphrase
-            ? m.courses_roster_passphrase_live_until({
-                time: formatTime(currentPassphrase.expiresAt),
-              })
-            : m.courses_roster_passphrase_none()
-        }
-      </p>
-    </div>
-
-    <form
-      method="post"
-      action={actions.course.generatePassphrase}
-      id="passphrase-form"
-      class="mt-4"
-    >
-      <input type="hidden" name="discipline" value={courseParams.discipline} />
-      <input type="hidden" name="course" value={courseParams.course} />
-      <details class="collapse collapse-arrow">
-        <summary class="collapse-title min-h-0 px-0 py-2 text-sm font-medium"
-          >{m.courses_roster_advanced()}</summary
-        >
-        <div class="collapse-content px-0">
-          <Field {...passphraseForm.field("value")} class="font-mono uppercase" />
-        </div>
-      </details>
-    </form>
-
-    <div class="modal-action">
-      <form method="dialog">
-        <button class="btn btn-ghost">{m.courses_roster_cancel()}</button>
-      </form>
-      <button
-        type="submit"
-        form="passphrase-form"
-        class="btn btn-primary btn-square"
-        aria-label={m.courses_roster_renew_label()}
-        title={m.courses_roster_renew()}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path
-            d={RENEW_ICON}
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </svg>
-      </button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button>{m.courses_close_backdrop()}</button>
-  </form>
-</dialog>
-
-<dialog id="invite-link-dialog" class="modal">
-  <div class="modal-box">
-    <form method="dialog">
-      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
-        ✕
-      </button>
-    </form>
-    <h3 class="text-lg font-bold">{m.courses_roster_invite_title()}</h3>
-    <p class="mt-1 text-sm text-muted">
-      {m.courses_roster_invite_body()}
-    </p>
-
-    <div id="invite-error" class="alert alert-error mt-4" hidden>
-      <span></span>
-    </div>
-
-    <div id="invite-url-row" class="join mt-4 w-full" hidden={!inviteUrl}>
-      <input
-        type="text"
-        readonly
-        value={inviteUrl ?? ""}
-        class="input join-item w-full font-mono text-sm"
-        id="invite-url"
-      />
-      <button
-        type="button"
-        class="btn btn-primary join-item"
-        id="copy-invite-url"
-        aria-label={m.courses_roster_copy_invite()}
-        title={m.courses_roster_copy()}
-      >
-        <svg
-          id="copy-invite-url-icon"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <path
-            d={COPY_ICON}
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </svg>
-      </button>
-    </div>
-
-    <form
-      method="POST"
-      action={Astro.url.pathname}
-      id="invite-form"
-      class="mt-4"
-    >
-      <Field {...inviteForm.field("maxUses")} />
-    </form>
-
-    <div class="modal-action">
-      <form method="dialog">
-        <button class="btn btn-ghost">{m.courses_roster_cancel()}</button>
-      </form>
-      <button type="submit" form="invite-form" class="btn btn-primary">
-        {m.courses_roster_generate()}
-      </button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button>{m.courses_close_backdrop()}</button>
-  </form>
-</dialog>
-
-<dialog id="revoke-invites-dialog" class="modal">
-  <div class="modal-box">
-    <form method="dialog">
-      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
-        ✕
-      </button>
-    </form>
-    <h3 class="text-lg font-bold">{m.courses_roster_revoke_title()}</h3>
-    <p class="mt-1 text-sm text-muted">
-      {m.courses_roster_revoke_body()}
-    </p>
-
-    <div id="revoke-error" class="alert alert-error mt-4" hidden>
-      <span></span>
-    </div>
-
-    <div id="revoke-invites-list" class="mt-4 flex flex-col gap-3">
-      {
-        invites.length === 0 ? (
-          <p class="text-sm text-muted">{m.courses_roster_no_invites()}</p>
-        ) : (
-          invites.map((invite) => {
-            const expired = invite.expiresAt < new Date();
-            return (
-              <div
-                class="card card-border bg-base-100"
-                data-invite-id={invite.publicId}
-              >
-                <div class="card-body flex-row items-center gap-4 py-3">
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium">
-                      {formatDate(invite.createdAt)}
-                    </p>
-                    <p class="text-xs text-muted">
-                      {m.courses_roster_invite_used({
-                        used: invite.redemptions,
-                        max: invite.maxUses ?? "∞",
-                      })}{" · "}
-                      <span class={expired ? "text-error" : ""}>
-                        {expired
-                          ? m.courses_roster_invite_expired()
-                          : m.courses_roster_invite_expires({
-                              date: formatDate(invite.expiresAt),
-                            })}
-                      </span>
-                    </p>
-                  </div>
-                  <form
-                    method="post"
-                    action={actions.admin.revokeInvite}
-                    data-role="revoke-invite"
-                  >
-                    <input type="hidden" name="publicId" value={invite.publicId} />
-                    <button
-                      type="submit"
-                      class="btn btn-outline btn-error btn-sm"
-                    >
-                      {m.courses_roster_revoke()}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            );
-          })
-        )
-      }
-    </div>
-
-    <div class="modal-action">
-      <form method="dialog">
-        <button class="btn btn-ghost">{m.courses_roster_close()}</button>
-      </form>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button>{m.courses_close_backdrop()}</button>
-  </form>
-</dialog>
-
-<input type="hidden" id="course-discipline" value={courseParams.discipline} />
-<input type="hidden" id="course-segment" value={courseParams.course} />
-
 <script>
   import { actions } from "astro:actions";
   import { errorMessage } from "@/forms/field-errors";
-  import { locale, m } from "@/i18n";
-
-  const discipline = (
-    document.getElementById("course-discipline") as HTMLInputElement
-  ).value;
-  const course = (
-    document.getElementById("course-segment") as HTMLInputElement
-  ).value;
+  import { m } from "@/i18n";
 
   // Mirrors COPY_ICON/CHECK_ICON in the frontmatter — duplicated here since a
   // processed <script> (needed for the astro:actions import) can't read
@@ -563,15 +213,6 @@ const csvRows = [
   const COPY_ICON =
     "M9 9.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z M6 14.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1";
   const CHECK_ICON = "m5 12.5 4.5 4.5L19 7.5";
-
-  function formatTime(iso: string | Date): string {
-    return new Date(iso).toLocaleTimeString(locale, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hourCycle: "h23",
-    });
-  }
 
   function showError(box: HTMLElement, message: string) {
     const span = box.querySelector("span");
@@ -641,102 +282,5 @@ const csvRows = [
     addStudentForm.reset();
   });
 
-  // Passphrase: renew without leaving the dialog open, so the instructor can
-  // keep it on screen for students to read.
-  const passphraseForm = document.getElementById(
-    "passphrase-form",
-  ) as HTMLFormElement | null;
-  const passphraseValue = document.getElementById("passphrase-value");
-  const passphraseMeta = document.getElementById("passphrase-meta");
-  const passphraseError = document.getElementById("passphrase-error");
-
-  passphraseForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (passphraseError) passphraseError.hidden = true;
-    const { data, error } = await actions.course.generatePassphrase(
-      new FormData(passphraseForm),
-    );
-    if (error) {
-      if (passphraseError) showError(passphraseError, errorMessage(error));
-      return;
-    }
-    if (passphraseValue) {
-      passphraseValue.textContent = data.value;
-      passphraseValue.classList.remove("text-base-content/25");
-      passphraseValue.classList.add("text-primary");
-    }
-    if (passphraseMeta)
-      passphraseMeta.textContent = m.courses_roster_passphrase_live_until({
-        time: formatTime(data.expiresAt),
-      });
-    passphraseForm.reset();
-  });
-
-  // Invite link: same deal — generating a link keeps the dialog open so it's
-  // right there to copy.
-  const inviteForm = document.getElementById(
-    "invite-form",
-  ) as HTMLFormElement | null;
-  const inviteUrlRow = document.getElementById("invite-url-row");
-  const inviteUrlInput = document.getElementById(
-    "invite-url",
-  ) as HTMLInputElement | null;
-  const inviteError = document.getElementById("invite-error");
-
-  inviteForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (inviteError) inviteError.hidden = true;
-    const maxUsesRaw = new FormData(inviteForm).get("maxUses");
-    const maxUses = maxUsesRaw ? Number(maxUsesRaw) : undefined;
-    const { data, error } = await actions.auth.createClassroomInvite({
-      discipline,
-      course,
-      maxUses,
-    });
-    if (error) {
-      if (inviteError)
-        showError(
-          inviteError,
-          errorMessage(error) || m.courses_roster_something_wrong(),
-        );
-      return;
-    }
-    if (inviteUrlInput)
-      inviteUrlInput.value = new URL(
-        `/invite/${data.token}`,
-        window.location.origin,
-      ).toString();
-    if (inviteUrlRow) inviteUrlRow.hidden = false;
-  });
-
-  wireCopyButton("copy-invite-url", "invite-url");
   wireCopyButton("copy-personal-invite-url", "personal-invite-url");
-
-  // Revoke invites: revoking one keeps the dialog open with the rest of the
-  // list still there — it only closes itself once the last invite is gone.
-  const revokeList = document.getElementById("revoke-invites-list");
-  const revokeDialog = document.getElementById(
-    "revoke-invites-dialog",
-  ) as HTMLDialogElement | null;
-  const revokeError = document.getElementById("revoke-error");
-
-  revokeList?.addEventListener("submit", async (event) => {
-    const form = event.target;
-    if (
-      !(form instanceof HTMLFormElement) ||
-      form.dataset.role !== "revoke-invite"
-    )
-      return;
-    event.preventDefault();
-    if (revokeError) revokeError.hidden = true;
-    const { error } = await actions.admin.revokeInvite(new FormData(form));
-    if (error) {
-      if (revokeError) showError(revokeError, errorMessage(error));
-      return;
-    }
-    form.closest("[data-invite-id]")?.remove();
-    if (!revokeList.querySelector("[data-invite-id]")) {
-      revokeDialog?.close();
-    }
-  });
 </script>

@@ -86,9 +86,10 @@ test.describe("studentsNav", () => {
 });
 
 test.describe("homeNav", () => {
-	test("links the content reports", () => {
+	test("links the content reports and the settings", () => {
 		expect(homeNav(href).sections[0]?.entries).toEqual([
 			{ label: "Reports", href: `${href}/reports` },
+			{ label: "Settings", href: `${href}/settings` },
 		]);
 	});
 });

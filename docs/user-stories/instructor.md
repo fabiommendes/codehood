@@ -25,6 +25,19 @@ teach, whether resources, schedule or exams, links to it, while their students
 see only that nothing is published yet.
 
 
+### Check a course's settings
+
+    status: implemented
+
+Instructor wants to confirm what the server holds for a course and set up a
+new machine for it. They open Settings from the course card on the course
+home and see the discipline, edition, instructor, dates and description, each
+with the file of the course repository it comes from, since those change with
+a push and not on the page. The same page gives the `codehood init` command
+already filled in for this course, and `codehood login`, ready to copy. Only
+the course's own instructor reaches it.
+
+
 ### Create a new course
 
     status: todo
@@ -169,8 +182,8 @@ creates the account already enrolled when it is redeemed.
 
     status: implemented
 
-Instructor does not want to type forty email addresses. They generate a classroom
-invite for the course, optionally capped at a number of seats, and post the link
+Instructor does not want to type forty email addresses. From the course settings
+they generate a classroom invite for the course, optionally capped at a number of seats, and post the link
 once, and anyone holding it joins as a student. When they realise they posted it
 in the wrong channel they revoke it and it stops working immediately, while the
 students who already joined stay joined.
@@ -202,7 +215,7 @@ zero.
 
 Instructor is in front of the class on day one and wants everyone actually
 present enrolled before they leave. They generate a short passphrase for the
-course from the Students tab, put it on the projector and read it out. Students in
+course from the course settings, put it on the projector and read it out. Students in
 the room type it in and are enrolled, and the code expires a few minutes later so
 it does not become a link that circulates all term.
 

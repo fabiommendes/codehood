@@ -79,8 +79,7 @@ test("instructor: hand out one join link for the whole class", async ({
 	await logInAs(page, instructor);
 
 	await test.step("instructor generates a link capped at 5 seats", async () => {
-		await page.goto(`${href}/roster`);
-		await page.getByRole("button", { name: "Invite link" }).click();
+		await page.goto(`${href}/settings`);
 		await fillField(page, "Limit to N uses (optional)", "5");
 		await page.getByRole("button", { name: "Generate link" }).click();
 	});
@@ -88,8 +87,9 @@ test("instructor: hand out one join link for the whole class", async ({
 	const link = page.locator("#invite-url");
 	await expect(link).toHaveValue(/\/invite\/.+/);
 
+	const url = await link.inputValue();
+
 	await test.step("and anyone holding it is offered a place in the class", async () => {
-		const url = await link.inputValue();
 		// "Anyone" in the story means someone with no account and no session.
 		await page.context().clearCookies();
 		await page.goto(url);
@@ -107,6 +107,20 @@ test("instructor: hand out one join link for the whole class", async ({
 	);
 	expect(invites).toHaveLength(1);
 	expect(invites[0]?.maxUses).toBe(5);
+
+	await test.step("revoking it stops the link working", async () => {
+		await logInAs(page, instructor);
+		await page.goto(`${href}/settings`);
+		const list = page.getByRole("list", { name: "Classroom invites" });
+		await expect(list.getByRole("listitem")).toHaveCount(1);
+		await list.getByRole("button", { name: "Revoke" }).click();
+		await expect(list.getByRole("listitem")).toHaveCount(0);
+		await expect(page.getByText("No classroom invites yet.")).toBeVisible();
+
+		await page.context().clearCookies();
+		await page.goto(url);
+		await expect(page.getByText("invited you to")).toHaveCount(0);
+	});
 });
 
 test("instructor: Enroll the room with a passphrase", async ({ page }) => {
@@ -125,8 +139,7 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 	const code = page.locator("#passphrase-value");
 
 	await test.step("before day one there is no code to read out", async () => {
-		await page.goto(`${href}/roster`);
-		await page.getByRole("button", { name: "Passphrase" }).click();
+		await page.goto(`${href}/settings`);
 		await expect(
 			page.getByText("No active passphrase. Generate one below."),
 		).toBeVisible();
@@ -141,8 +154,7 @@ test("instructor: Enroll the room with a passphrase", async ({ page }) => {
 	const value = await code.textContent();
 
 	await test.step("reading it out again shows the same code, not a new one", async () => {
-		await page.goto(`${href}/roster`);
-		await page.getByRole("button", { name: "Passphrase" }).click();
+		await page.goto(`${href}/settings`);
 		await expect(code).toHaveText(value as string);
 	});
 

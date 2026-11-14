@@ -76,13 +76,14 @@ export function scheduleNav(
 	return { sections: [{ entries }] };
 }
 
-/** Links to the instructor's pages of the home tab: the content reports. */
+/** Links to the instructor's pages of the home tab: the content reports and the settings. */
 export function homeNav(href: string): CourseNav {
 	return {
 		sections: [
 			{
 				entries: [
 					{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
+					{ label: m.nav_course_settings(), href: `${href}/settings` },
 				],
 			},
 		],
