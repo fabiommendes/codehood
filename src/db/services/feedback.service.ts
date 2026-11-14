@@ -115,6 +115,40 @@ type DbFeedback = Prisma.FeedbackGetPayload<{
 	include: ReturnType<typeof feedbackInclude>;
 }>;
 
+/// Passes read per query in a listing, so that the relations loaded with them stay under the limit of SQL parameters.
+const FEEDBACK_CHUNK = 500;
+
+/// The ids of the passes made in a course, in listing order, on the students' attempts or on the simulations, optionally of one exam or one author.
+///
+/// It walks from the exams of the course down to their passes, so its cost follows the course and not the size of `Feedback`.
+async function feedbackIdsOfCourse(
+	tx: PrismaTx,
+	courseId: number,
+	only: { exam?: string; author?: string; preview: boolean },
+): Promise<number[]> {
+	const params: (number | string)[] = [courseId, only.preview ? 1 : 0];
+	let narrow = "";
+	if (only.exam !== undefined) {
+		narrow += " AND e.slug = ?";
+		params.push(only.exam);
+	}
+	if (only.author !== undefined) {
+		narrow += " AND r.authorId = ?";
+		params.push(only.author);
+	}
+	const rows = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
+		`SELECT f.id AS id
+		FROM Exam e
+		CROSS JOIN ResponseRef r ON r.examId = e.id
+		CROSS JOIN Submission s ON s.responseId = r.id
+		CROSS JOIN Feedback f ON f.submissionId = s.id
+		WHERE e.courseId = ? AND r.preview = ?${narrow}
+		ORDER BY f.submissionId, f.createdAt, f.id`,
+		...params,
+	);
+	return rows.map((row) => Number(row.id));
+}
+
 type ExamRelease = DbFeedback["submission"]["response"]["exam"];
 
 /// The CRUD shape of the service.
@@ -257,35 +291,45 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 			const owner = isCourseOwner(opts.actor, course);
 			const restrictTo = restrictToAuthor(opts.actor, owner, filter.author);
 
-			const rows = await tx.feedback.findMany({
-				where: {
-					submission: {
-						response: {
-							preview: filter.preview ?? false,
-							exam: {
-								courseId: course.id,
-								...(filter.exam ? { slug: filter.exam } : {}),
-							},
-							...(restrictTo
-								? { authorId: restrictTo }
-								: filter.author
-									? { authorId: filter.author }
-									: {}),
-						},
-						...(filter.question ? { question: { slug: filter.question } } : {}),
-						...(filter.submission ? submissionRefWhere(filter.submission) : {}),
-					},
-					...(filter.grader ? { graderId: filter.grader } : {}),
-					...(filter.bot ? { botId: filter.bot } : {}),
-					...(filter.automated !== undefined
-						? filter.automated
-							? { botId: { not: null } }
-							: { graderId: { not: null } }
-						: {}),
-				},
-				include: feedbackInclude(),
-				orderBy: [{ submissionId: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+			const ids = await feedbackIdsOfCourse(tx, course.id, {
+				exam: filter.exam,
+				author: restrictTo ?? filter.author,
+				preview: filter.preview ?? false,
 			});
+			const rows: DbFeedback[] = [];
+			for (let start = 0; start < ids.length; start += FEEDBACK_CHUNK) {
+				const chunk = await tx.feedback.findMany({
+					where: {
+						id: { in: ids.slice(start, start + FEEDBACK_CHUNK) },
+						...(filter.question || filter.submission
+							? {
+									submission: {
+										...(filter.question
+											? { question: { slug: filter.question } }
+											: {}),
+										...(filter.submission
+											? submissionRefWhere(filter.submission)
+											: {}),
+									},
+								}
+							: {}),
+						...(filter.grader ? { graderId: filter.grader } : {}),
+						...(filter.bot ? { botId: filter.bot } : {}),
+						...(filter.automated !== undefined
+							? filter.automated
+								? { botId: { not: null } }
+								: { graderId: { not: null } }
+							: {}),
+					},
+					include: feedbackInclude(),
+					orderBy: [
+						{ submissionId: "asc" },
+						{ createdAt: "asc" },
+						{ id: "asc" },
+					],
+				});
+				rows.push(...chunk);
+			}
 
 			const now = new Date();
 			return rows
