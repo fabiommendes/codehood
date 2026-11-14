@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [elm, code, pretest, grading, chalk-worker, runner]
 relatedTo: [fila-de-correcao-externa, pre-testes-elm-e2e]
 created: 2026-11-14

@@ -1412,6 +1412,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedOpenQuiz(cs101.id);
 	await seedAttachments(cs101.id);
 	await seedCodeAnswerExams(cs101.id);
+	await seedElmPretestExam(cs101.id);
 	await seedAnswerEditHistoryExams(cs101.id, {
 		hopper,
 		hamilton,
@@ -2473,6 +2474,188 @@ async function seedCodeAnswerExams(course: Course["id"]): Promise<void> {
 			allowCodeRun: true,
 			tags: ["javascript"],
 			questions,
+		},
+		FULL_ACCESS,
+	);
+}
+
+/// The Elm question whose tests are an examples block: `{example}`, `{public}` and private regions.
+const ELM_EXAMPLES_QUESTION = [
+	"---",
+	"id: elm-sequences",
+	"title: Sequences and averages",
+	"type: code",
+	"language: elm",
+	"file: Main.elm",
+	"meta:",
+	"  worker: elm-test",
+	"---",
+	"",
+	"Define `collatzLength`, the number of terms of the Collatz sequence that starts at `n` (0 when `n` is not positive), and `media`, the average of a list of numbers (0 for the empty list).",
+	"",
+	"[code]",
+	"",
+	"## [template]",
+	"",
+	"```elm",
+	"module Main exposing (..)",
+	"",
+	"",
+	"collatzLength : Int -> Int",
+	"collatzLength n =",
+	"    0",
+	"",
+	"",
+	"media : List Float -> Float",
+	"media xs =",
+	"    0",
+	"```",
+	"",
+	"## [tests]",
+	"",
+	"```elm",
+	"-- mdq: [0] {example} Examples from the statement",
+	"collatzLength 5 ==> 6",
+	"collatzLength -42 ==> 0 -- negative numbers have length zero",
+	"",
+	"-- mdq: [+2] {public} Average",
+	"media [ 7, 8 ] ~= 7.5",
+	"media [] ~= 0 -- the empty list averages to zero",
+	"",
+	"-- mdq: [+3] Long sequences",
+	"collatzLength 27 ==> 112",
+	"collatzLength 1 ==> 1",
+	"```",
+	"",
+].join("\n");
+
+/// The Elm question whose tests are linked modules in the course style: `import Main as S`.
+const ELM_MODULE_QUESTION = [
+	"---",
+	"id: elm-vowels",
+	"title: Counting vowels",
+	"type: code",
+	"language: elm",
+	"file: Main.elm",
+	"meta:",
+	"  worker: elm-test",
+	"---",
+	"",
+	"Define `countVowels`, the number of vowels (`a`, `e`, `i`, `o`, `u`, in either case) in a string.",
+	"",
+	"[code]",
+	"",
+	"## [template]",
+	"",
+	"```elm",
+	"module Main exposing (..)",
+	"",
+	"",
+	"countVowels : String -> Int",
+	"countVowels text =",
+	"    0",
+	"```",
+	"",
+	"## [tests]",
+	"",
+	"[Public](XPublic.elm)",
+	"",
+	"[Private](XPrivate.elm)",
+	"",
+].join("\n");
+
+/// The linked test sources of {@link ELM_MODULE_QUESTION}.
+const ELM_MODULE_TESTS = {
+	"XPublic.elm": [
+		"module XPublic exposing (tests)",
+		"",
+		"import Expect",
+		"import Main as S",
+		"import Test exposing (Test, describe, test)",
+		"",
+		"",
+		"-- mdq: [0] {example} Examples from the statement",
+		"",
+		"",
+		"tests : Test",
+		"tests =",
+		'    describe "Examples"',
+		'        [ test "one vowel" <| \\_ -> Expect.equal 1 (S.countVowels "sky and")',
+		'        , test "empty string" <| \\_ -> Expect.equal 0 (S.countVowels "")',
+		"        ]",
+		"",
+	].join("\n"),
+	"XPrivate.elm": [
+		"module XPrivate exposing (tests)",
+		"",
+		"import Expect",
+		"import Main as S",
+		"import Test exposing (Test, describe, test)",
+		"",
+		"",
+		"-- mdq: [1] Upper case and repeated vowels",
+		"",
+		"",
+		"tests : Test",
+		"tests =",
+		'    describe "Hidden"',
+		'        [ test "upper case" <| \\_ -> Expect.equal 3 (S.countVowels "AEIxyz")',
+		'        , test "repeated" <| \\_ -> Expect.equal 4 (S.countVowels "banana!a")',
+		"        ]",
+		"",
+	].join("\n"),
+};
+
+/**
+ * Seeds an open practice exam with two Elm questions whose pretests run in the browser.
+ *
+ * One takes an examples block (`{example}`, a scored `{public}` and a private
+ * region) and the other linked test modules. The answer keys are, for the
+ * examples block:
+ *
+ * ```elm
+ * collatzLength n =
+ *     if n < 1 then 0
+ *     else if n == 1 then 1
+ *     else 1 + collatzLength (if modBy 2 n == 0 then n // 2 else 3 * n + 1)
+ *
+ * media xs =
+ *     if List.isEmpty xs then 0 else List.sum xs / toFloat (List.length xs)
+ * ```
+ *
+ * and for the modules, a fold over `String.toList` that counts the vowels.
+ */
+async function seedElmPretestExam(course: Course["id"]): Promise<void> {
+	const examples = parse(ELM_EXAMPLES_QUESTION, {
+		kind: "question",
+	}) as CodeQuestion;
+	const modules = resolveTests(
+		parse(ELM_MODULE_QUESTION, { kind: "question" }) as CodeQuestion,
+		ELM_MODULE_TESTS,
+	);
+	for (const [slug, question] of [
+		["elm-sequences", examples],
+		["elm-vowels", modules],
+	] as const) {
+		await db.question.create(
+			{ course, slug, status: "PUBLISHED", version: "v1", question },
+			FULL_ACCESS,
+		);
+	}
+	await db.exam.create(
+		{
+			course,
+			slug: "practice-elm-pretests",
+			type: "PRACTICE",
+			status: "ONGOING",
+			title: "Practice: Elm pretests",
+			description:
+				"Two Elm questions with browser pretests: an examples block and linked test modules.",
+			tags: ["elm", "practice"],
+			questions: [
+				{ slug: "elm-sequences", version: "v1" },
+				{ slug: "elm-vowels", version: "v1" },
+			],
 		},
 		FULL_ACCESS,
 	);

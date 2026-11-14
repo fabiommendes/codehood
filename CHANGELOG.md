@@ -4,6 +4,19 @@
 
 ### Added
 
+- Pré-testes de questões Elm por exemplos. Um bloco `elm` sem cabeçalho
+  `module` em `## [tests]` é um bloco de exemplos (`expr ==> valor`,
+  `expr ~= valor` para `Float`, comentário inline no nome do caso, `import`
+  antes do primeiro caso), com anotações `mdq:` para a rubrica. O formato tem
+  duas implementações, `src/services/elm-examples.ts` e o `chalk-worker`, que
+  rodam a mesma tabela de casos. O navegador roda como pré-teste só os casos
+  das regiões `{public}` e `{example}`, sem receber os privados. A escrita da
+  questão (e `questionProblems`) recusa bloco inválido, fonte linkada sem
+  `module` e `Examples<i>` em colisão. Sem runner na instância, o botão de
+  pré-testes fica desabilitado e a tela avisa. A prova `practice-elm-pretests`
+  do seed tem uma questão de cada tipo. Guia do autor em
+  `docs/authoring/elm-tests.md`.
+
 - Anexos de questões e provas (`## [attachments]` do mdq). Um anexo por link
   vira blob com uma linha `Attachment` do `QuestionRef` ou da `Exam`; o mapa
   `nome -> sha256` de cada versão fica em `QuestionData.files` (e em
