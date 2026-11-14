@@ -397,16 +397,28 @@ test("instructor: Read the course's attendance", async ({ page }) => {
 		await expect(page).toHaveURL(`${href}/attendance`);
 	});
 
-	await test.step("the table has a cell for every student and meeting, `-` before enrollment", async () => {
+	await test.step("the table has a cell for every student and meeting, a dash before enrollment", async () => {
 		await expect(page.getByRole("columnheader")).toHaveText([
 			"Student",
 			"Present",
 			"Total",
 			"%",
+			/^\d\d\/\d\d$/,
+			/^\d\d\/\d\d$/,
+			/^\d\d\/\d\d$/,
+		]);
+		for (const [i, title] of [
 			"ra-Intro",
 			"ra-Loops",
 			"ra-Recursion",
-		]);
+		].entries()) {
+			await expect(
+				page
+					.getByRole("columnheader")
+					.nth(4 + i)
+					.locator("span"),
+			).toHaveAttribute("title", title);
+		}
 		await expectRow(page, "Ana Prado", [
 			"3",
 			"3",
@@ -423,12 +435,12 @@ test("instructor: Read the course's attendance", async ({ page }) => {
 			"Present",
 			"Present",
 		]);
-		// Held before Lia enrolled: shown as `-`, still counted in the total.
+		// Held before Lia enrolled: shown as a dash, still counted in the total.
 		await expectRow(page, "Lia Late", [
 			"1",
 			"3",
 			"33%",
-			"-",
+			"Not enrolled yet",
 			"Present",
 			"Absent",
 		]);
@@ -482,9 +494,11 @@ function studentRow(page: Page, name: string): Locator {
 async function expectRow(page: Page, name: string, cells: string[]) {
 	const row = page.getByRole("row").filter({ hasText: name });
 	const all = row.getByRole("cell");
-	await expect(all.first()).toContainText(name);
+	await expect(row.getByRole("rowheader")).toContainText(name);
 	for (const [i, text] of cells.entries()) {
-		await expect(all.nth(i + 1)).toHaveText(text);
+		// Present, total and percent are text; each meeting is an icon named by its word.
+		if (i < 3) await expect(all.nth(i)).toHaveText(text);
+		else await expect(all.nth(i).getByRole("img")).toHaveAccessibleName(text);
 	}
 }
 

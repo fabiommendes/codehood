@@ -303,9 +303,9 @@ export default function RollCallManager(
 				</div>
 			</section>
 
-			<div class="overflow-hidden rounded-box border border-base-content/15">
+			<div class="overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
 				<table class="table table-fixed">
-					<thead>
+					<thead class="bg-base-200/50">
 						<tr>
 							<th class="px-3 sm:px-4">{m.attendance_table_col_student()}</th>
 							<th class="w-24 px-2 sm:w-28">

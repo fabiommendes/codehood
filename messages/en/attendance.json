@@ -3,6 +3,7 @@
 	"attendance_table_label": "Attendance",
 	"attendance_table_cell_present": "Present",
 	"attendance_table_cell_absent": "Absent",
+	"attendance_table_cell_before_enrollment": "Not enrolled yet",
 	"attendance_table_col_student": "Student",
 	"attendance_table_col_present": "Present",
 	"attendance_table_col_total": "Total",

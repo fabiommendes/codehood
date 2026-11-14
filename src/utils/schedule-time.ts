@@ -153,6 +153,15 @@ export function formatDateTime(
 	}).format(instant);
 }
 
+/** Renders the day of `instant` in `SERVER_TZ` as a numeric day and month in the locale's order, e.g. "28/09". */
+export function formatDayMonth(instant: Date): string {
+	return new Intl.DateTimeFormat(locale, {
+		timeZone: SERVER_TZ,
+		day: "2-digit",
+		month: "2-digit",
+	}).format(instant);
+}
+
 /**
  * Renders the span from `start` to `end` like {@link formatDateTime}, writing the shared day only once.
  *

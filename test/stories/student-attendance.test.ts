@@ -179,10 +179,22 @@ test("student: Check in to class", async ({ page }) => {
 			"Present",
 			"Total",
 			"%",
+			/^\d\d\/\d\d$/,
+			/^\d\d\/\d\d$/,
+			/^\d\d\/\d\d$/,
+		]);
+		for (const [i, title] of [
 			"sa-Arrays",
 			"sa-Sorting",
 			"sa-Hashing",
-		]);
+		].entries()) {
+			await expect(
+				page
+					.getByRole("columnheader")
+					.nth(4 + i)
+					.locator("span"),
+			).toHaveAttribute("title", title);
+		}
 		const own = page.getByRole("row").filter({ hasText: "Ana Prado" });
 		const cells = own.getByRole("cell");
 		for (const [i, text] of [
@@ -193,7 +205,10 @@ test("student: Check in to class", async ({ page }) => {
 			"Present",
 			"Absent",
 		].entries()) {
-			await expect(cells.nth(i + 1)).toHaveText(text);
+			// Present, total and percent are text; each meeting is an icon named by its word.
+			if (i < 3) await expect(cells.nth(i)).toHaveText(text);
+			else
+				await expect(cells.nth(i).getByRole("img")).toHaveAccessibleName(text);
 		}
 		await expect(
 			page.getByRole("row").filter({ hasText: "Otto Hall" }),

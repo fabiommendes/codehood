@@ -12,7 +12,8 @@ import { m } from "@/i18n";
  * column built for the wrong row type is a compile error, not a blank cell.
  */
 export interface ColumnConfig<T> {
-	title: string;
+	/// Header content; usually text, markup when the header needs a hint or a link.
+	title: JSX.Element;
 	class?: string;
 	headerClass?: string;
 	render: (row: T) => JSX.Element;
@@ -41,7 +42,25 @@ interface TableProps<T> {
 	sort?: TableSort;
 	/** Called with a column's `sortKey` when that column's header is clicked; headers stay plain while `data` has fewer than two rows. */
 	onSort?: (key: string) => void;
+	/// Classes for the `<table>` itself, such as `min-w-max` for a wide matrix that scrolls.
+	tableClass?: string;
+	/// Classes for a row, such as dimming one that no longer counts.
+	rowClass?: (row: T) => string | undefined;
+	/// Renders the first column's cells as row headers (`<th scope="row">`).
+	rowHeader?: boolean;
+	/// Keeps the first column in view while the table scrolls sideways.
+	stickyFirst?: boolean;
 }
+
+/// The header's tint made opaque, so a sticky header cell hides what scrolls under it.
+const STICKY_HEAD =
+	"sticky left-0 z-10 bg-[color-mix(in_oklab,var(--color-base-200)_50%,var(--color-base-100))]";
+/// A sticky body cell, opaque over what scrolls under it.
+const STICKY_CELL = "sticky left-0 z-10 bg-base-100";
+
+/// Joins the truthy class names.
+const classes = (...names: (string | false | undefined)[]): string =>
+	names.filter(Boolean).join(" ");
 
 /**
  * A `<table>` driven entirely by data: callers hand it `columns` (what each
@@ -51,21 +70,23 @@ interface TableProps<T> {
  */
 export default function Table<T>(props: TableProps<T>): JSX.Element {
 	const containerClass = () =>
-		[
+		classes(
 			"overflow-x-auto rounded-box border border-base-300 bg-base-100",
 			props.shadow !== false && "shadow-sm",
 			props.class,
-		]
-			.filter(Boolean)
-			.join(" ");
+		);
+	const sticky = (index: number) => props.stickyFirst === true && index === 0;
 
 	return (
 		<div class={containerClass()}>
-			<table class="table" aria-label={props.label}>
+			<table
+				class={classes("table", props.tableClass)}
+				aria-label={props.label}
+			>
 				<thead class="bg-base-200/50">
 					<tr class="uppercase">
 						<For each={props.columns}>
-							{(column) => {
+							{(column, index) => {
 								const sortable = () =>
 									column.sortKey !== undefined &&
 									props.onSort !== undefined &&
@@ -74,7 +95,11 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 									sortable() && props.sort?.key === column.sortKey;
 								return (
 									<th
-										class={column.headerClass}
+										scope="col"
+										class={classes(
+											sticky(index()) && STICKY_HEAD,
+											column.headerClass,
+										)}
 										aria-sort={
 											active()
 												? props.sort?.direction === "asc"
@@ -122,11 +147,21 @@ export default function Table<T>(props: TableProps<T>): JSX.Element {
 						}
 					>
 						{(row) => (
-							<tr>
+							<tr class={props.rowClass?.(row)}>
 								<For each={props.columns}>
-									{(column) => (
-										<td class={column.class}>{column.render(row)}</td>
-									)}
+									{(column, index) => {
+										const cellClass = classes(
+											sticky(index()) && STICKY_CELL,
+											column.class,
+										);
+										return props.rowHeader && index() === 0 ? (
+											<th scope="row" class={cellClass}>
+												{column.render(row)}
+											</th>
+										) : (
+											<td class={cellClass}>{column.render(row)}</td>
+										);
+									}}
 								</For>
 							</tr>
 						)}
