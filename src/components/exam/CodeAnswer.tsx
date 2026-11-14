@@ -650,20 +650,20 @@ function CaseRow(props: { item: ReportCase; n: number }): JSX.Element {
 			class="flex flex-col gap-1 px-3 py-2 text-sm"
 			data-verdict={props.item.verdict}
 		>
-			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+			<div class="flex items-start justify-between gap-2">
+				<span class="min-w-0 font-mono text-xs break-words">
+					{props.item.id ?? m.code_case_untitled({ n: String(props.n) })}
+				</span>
 				<span
-					class={`badge badge-soft badge-sm ${verdictClass(props.item.verdict)}`}
+					class={`badge badge-soft badge-sm shrink-0 ${verdictClass(props.item.verdict)}`}
 				>
 					{VERDICT_LABEL[props.item.verdict]()}
-				</span>
-				<span class="font-mono text-xs">
-					{props.item.id ?? m.code_case_untitled({ n: String(props.n) })}
 				</span>
 			</div>
 			<Show when={props.item.message}>
 				{(message) => (
 					<pre
-						class="m-0 overflow-x-auto font-mono text-xs leading-5 whitespace-pre-wrap text-base-content/80"
+						class="m-0 overflow-x-auto rounded-box bg-base-200/60 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap text-base-content/80"
 						data-case-message
 					>
 						{message()}
