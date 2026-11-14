@@ -31,11 +31,39 @@ __all__ = [
     "PrepareFailed",
     "QuestionGrader",
     "ReferenceError",
+    "profile_overrides",
     "question_hash",
 ]
 
 #: The chalk-grader profile of each language a question may declare.
 PROFILE_BY_LANGUAGE = {"elm": "elm-test"}
+
+MiB = 1024 * 1024
+
+#: Memory of an elm-test run besides the heap of node: the compiler, node
+#: itself and the files of the run (measured: about 110 MiB).
+ELM_OVERHEAD = 128 * MiB
+
+#: The test step of the elm-test profile with one worker thread. elm-test
+#: starts one per core by default, each with a heap of its own, and the
+#: worker already grades one answer per core.
+ELM_TEST_COMMAND = (
+    '{node} {elm_test} --compiler {elm} --seed 1 --workers 1 --report junit > "$CHALK_RESULT"'
+)
+
+
+def profile_overrides(memory: int | None = None) -> dict[str, dict[str, Any]]:
+    """
+    The built-in profiles as the worker runs them. With `memory`, the
+    bytes a run may take, node's heap is capped so that an answer that
+    allocates without end crashes on its own, which is an `error` of every
+    case, instead of taking the memory of the machine.
+    """
+    elm: dict[str, Any] = {"extends": "elm-test", "test": {"command": ELM_TEST_COMMAND}}
+    if memory:
+        heap = max(64, (memory - ELM_OVERHEAD) // MiB)
+        elm["env"] = {"NODE_OPTIONS": f"--max-old-space-size={heap}"}
+    return {"elm-test": elm}
 
 
 class ReferenceError(ValueError):
@@ -64,7 +92,9 @@ def question_hash(question: CodeQuestion) -> str:
 
 class QuestionGrader:
     """
-    Grades answers to one question, preparing its project once.
+    Grades answers to one question, preparing its project once. `memory`
+    caps what a run may take (see `profile_overrides`); `profiles` replaces
+    the overrides of the worker.
     """
 
     def __init__(
@@ -74,6 +104,7 @@ class QuestionGrader:
         *,
         sandbox: str | None = None,
         timeout: float | None = None,
+        memory: int | None = None,
         profiles: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.question = question
@@ -92,7 +123,9 @@ class QuestionGrader:
                 profile=profile, answer=self._answer, sandbox=sandbox, timeout=timeout
             ),
             name=profile,
-            profile=resolve_profile(profile, profiles or {}),
+            profile=resolve_profile(
+                profile, profiles if profiles is not None else profile_overrides(memory)
+            ),
             solution=_with_header(language, question.file, question.reference_solution),
             cache_dir=workdir.parent / "cache",
         )

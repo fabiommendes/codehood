@@ -13,12 +13,38 @@ only. Languages: Elm (`elm-test`; needs `node`, `elm` and `elm-test`).
 ```sh
 CODEHOOD_BOT_KEY=<key> chalk-worker [--server <url>] [--worker elm-test]
     [--exam <slug> | --discipline <slug> | --course <discipline>/<user>_<edition>]
-    [--poll 10] [--batch 4] [--lease 120] [--once]
+    [--jobs N] [--memory 512MiB] [--memory-reserve 512MiB]
+    [--poll 10] [--lease 120] [--once] [--tui/--no-tui]
 ```
 
 Inside a course folder, the server and the course come from `codehood.toml`.
-`--once` grades what is queued and exits. `SIGINT`/`SIGTERM` finish the job in
-progress and give the others back.
+`--once` grades what is queued and exits.
+
+The worker grades `--jobs` answers at once (default: the number of cores),
+each in a thread that runs the profile's tools. It claims only as many jobs
+as it has free slots (at most `--batch` per claim), so no claimed job waits
+for a slot while its lease runs out; the lease is renewed from the claim on.
+Each question is prepared once, by the first job that needs it; the other
+jobs of the question wait for it. A cache directory serves one worker at a
+time: a second worker on the same `--cache-dir` refuses to start.
+
+`--memory` is the budget of one job. A job starts only while the available
+memory of the machine (`MemAvailable`), less `--memory-reserve`, holds it on
+top of the budgets of the jobs in progress, so the slots in use shrink when
+memory runs short. In Elm the budget caps node's heap (`NODE_OPTIONS`), so
+an answer that allocates without end crashes on its own and errs every case;
+`elm-test` runs with one worker thread, since the worker already grades one
+answer per core. Other processes of a run have no memory limit yet: a
+per-run cgroup is proposed in chalk-grader. Do not run the worker inside a
+`systemd-run --scope -p MemoryMax=...`: when the scope runs out of memory,
+systemd stops all of it, the worker included.
+
+On a terminal the worker shows a UI ([Textual](https://textual.textualize.io/))
+with the slots, the jobs finished and the log; `p` pauses and resumes the
+claims, `q` stops claiming and quits after the jobs in progress (again to
+abort). With `--once` the UI stays open when the queue is empty, until `q`.
+`--no-tui` logs lines to stderr instead, where `SIGINT`/`SIGTERM` finish the
+jobs in progress and exit.
 
 How a job is graded:
 
@@ -38,8 +64,9 @@ How a job is graded:
    the test runner (e.g. `Debug.todo` in a top-level value) and every case
    is an `error`; otherwise it is a failure of the infrastructure.
 4. When the project cannot be built (a package download fails, a tool is
-   missing), the batch goes back to the queue without spending its retries
-   and the worker waits before claiming again; `--once` stops there. A
+   missing), the jobs of the question go back to the queue without spending
+   their retries and the worker waits before claiming again; `--once` stops
+   claiming there. A
    reference solution that fails a test spends the retries of every job of
    the question, so the instructor sees them as failed.
 

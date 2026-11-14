@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from chalk_worker import cli
@@ -42,3 +44,27 @@ def test_engine_is_importable() -> None:
     from chalk_grader.profile_grader import resolve_profile
 
     assert resolve_profile("elm-test").description
+
+
+def test_cache_dir_takes_one_worker(tmp_path: Path) -> None:
+    first = cli._lock_cache(tmp_path / "cache")
+    try:
+        with pytest.raises(typer.BadParameter, match="another chalk-worker"):
+            cli._lock_cache(tmp_path / "cache")
+    finally:
+        first.close()
+    cli._lock_cache(tmp_path / "cache").close()
+
+
+def test_help_shows_jobs_and_tui() -> None:
+    result = runner.invoke(app, ["--help"])
+    assert "--jobs" in result.output
+    assert "--tui" in result.output
+
+
+def test_sizes() -> None:
+    assert cli._bytes("512MiB", "--memory") == 512 * 1024**2
+    assert cli._bytes("1GB", "--memory") == 10**9
+    assert cli._bytes("0", "--memory") == 0
+    with pytest.raises(typer.BadParameter, match="--memory"):
+        cli._bytes("lots", "--memory")

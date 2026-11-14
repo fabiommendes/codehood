@@ -91,3 +91,23 @@ def test_relative_workdir_is_made_absolute(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     g = QuestionGrader(CodeQuestion.model_validate(question_doc()), Path("cache/q"))
     assert g.workdir == tmp_path / "cache" / "q"
+
+
+#: Allocates without end, in a list and in a nested structure.
+LIST_BOMB = SOLUTION.replace("List.sum xs", "List.length (List.repeat 100000000 xs)")
+NESTED_BOMB = SOLUTION.replace(
+    "soma xs =\n    List.sum xs",
+    "soma xs =\n    grow (N []) 0\n\n\ntype T\n    = N (List T)\n\n\n"
+    "grow : T -> Int -> Int\ngrow t n =\n    if n < 0 then\n        0\n\n    else\n"
+    "        grow (N [ t, t, N [ t ] ]) (n + 1)\n",
+)
+
+
+@pytest.mark.parametrize("answer", [LIST_BOMB, NESTED_BOMB], ids=["list", "nested"])
+def test_answer_past_the_memory_budget_errs_every_case(tmp_path: Path, answer: str) -> None:
+    q = CodeQuestion.model_validate(question_doc())
+    g = QuestionGrader(q, tmp_path / "work", sandbox="none", memory=256 * 1024**2)
+    g.prepare()
+    report = g.grade(answer)
+    assert report.status == "completed"
+    assert {c.verdict for c in report.cases} == {"error"}

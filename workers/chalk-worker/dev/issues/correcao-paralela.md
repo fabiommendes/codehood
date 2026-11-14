@@ -1,6 +1,6 @@
 ---
 type: issue
-status: todo
+status: done
 tags: [performance, grading, cache]
 kind: enhancement
 priority: medium
@@ -48,11 +48,28 @@ sem trava.
 
 ## Critérios de aceitação
 
-- [ ] `chalk-worker --exam X` usa todos os núcleos sem configuração extra.
+- [x] `chalk-worker --exam X` usa todos os núcleos sem configuração extra.
 - [ ] Com `--jobs 4`, uma fila de 40 envios termina em cerca de ¼ do tempo de
-  `--jobs 1`.
-- [ ] Dois processos `chalk-worker` com o mesmo `--cache-dir` não corrompem o
-  cache: o segundo espera pela trava ou falha com uma mensagem clara.
-- [ ] Ctrl+C com o pool cheio termina os envios em andamento e devolve os
-  reservados que ainda não começaram.
-- [ ] Testes cobrem a trava do cache e o pool com `--jobs 2`.
+  `--jobs 1`. (Medido só no `QuestionGrader`, sem servidor: 8 correções Elm
+  em 49 s em sequência e 7,7 s com 8 threads, mesmos resultados. Falta medir
+  numa fila real.)
+- [x] Dois processos `chalk-worker` com o mesmo `--cache-dir` não corrompem o
+  cache: o segundo falha com uma mensagem clara.
+- [x] Ctrl+C com o pool cheio termina os envios em andamento e devolve os
+  reservados que ainda não começaram. (Nenhum fica reservado sem começar: o
+  laço só reserva o número de slots livres.)
+- [x] Testes cobrem a trava do cache e o pool com `--jobs 2`.
+
+## Como ficou
+
+- Threads (`ThreadPoolExecutor`), não processos: a correção roda em
+  subprocessos (`elm make`, `elm-test`, bwrap), então o GIL não limita. Cada
+  `grade` do `chalk-grader` usa um diretório temporário próprio e o cache de
+  pacotes já é preenchido sob `flock`, então um `QuestionGrader` preparado
+  corrige várias respostas ao mesmo tempo, sem slots nem cópias do template.
+- O `prepare` de cada questão roda sob uma trava por questão; os outros
+  envios da questão esperam (fase `waiting` na TUI).
+- A reserva é renovada desde o início do envio, inclusive durante o
+  `prepare`, que antes rodava sem renovação.
+- Estado em `chalk_worker/status.py`, lido pela TUI (`chalk_worker/tui.py`,
+  Textual) a cada 0,25 s; `p` pausa as reservas, `q` para.

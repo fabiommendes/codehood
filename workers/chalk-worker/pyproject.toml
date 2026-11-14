@@ -12,6 +12,7 @@ requires-python = ">=3.13"
 dependencies = [
     "chalk-grader>=0.2.0",
     "codehood-cli",
+    "textual>=8.2",
     "typer>=0.27.2",
 ]
 

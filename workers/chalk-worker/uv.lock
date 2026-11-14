@@ -63,6 +63,7 @@ source = { editable = "." }
 dependencies = [
     { name = "chalk-grader" },
     { name = "codehood-cli" },
+    { name = "textual" },
     { name = "typer" },
 ]
 
@@ -76,6 +77,7 @@ dev = [
 requires-dist = [
     { name = "chalk-grader", specifier = ">=0.2.0" },
     { name = "codehood-cli", editable = "../../cli" },
+    { name = "textual", specifier = ">=8.2" },
     { name = "typer", specifier = ">=0.27.2" },
 ]
 
