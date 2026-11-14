@@ -3,5 +3,7 @@
 	"common_download_csv": "Download CSV",
 	"common_set_up_cli": "Set up the CLI",
 	"common_dark_theme": "Dark theme",
-	"common_light_theme": "Light theme"
+	"common_light_theme": "Light theme",
+	"common_attachments": "Attachments",
+	"common_attachment_show_code": "Show code"
 }

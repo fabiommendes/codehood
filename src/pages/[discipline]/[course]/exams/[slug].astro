@@ -15,6 +15,7 @@ import type { QuestionRegrade } from "@/components/exam/RegradeControls";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import ExamResults from "@/components/grading/ExamResults.astro";
 import QuestionStatsTable from "@/components/grading/QuestionStats.astro";
+import AttachmentList from "@/components/question/AttachmentList";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
 import type { ExamExceptionView, Question, QuestionPublic } from "@/db";
@@ -44,6 +45,7 @@ import {
 } from "@/services/grading";
 import { type QuestionStats, questionStats } from "@/services/question-stats";
 import { regradeBlocker } from "@/services/regrade";
+import { examAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import {
 	examBadge,
@@ -514,6 +516,13 @@ for (const submission of attempt?.submissions ?? []) {
       )
     }
 
+    <div class="mt-4">
+      <AttachmentList
+        attachments={exam.attachments}
+        url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug, name)}
+      />
+    </div>
+
     {
       canManage && pendingAnswers > 0 && (
         <div
@@ -667,6 +676,8 @@ for (const submission of attempt?.submissions ?? []) {
                 exampleHtml={previewExampleHtml}
                 codeRun={codeRun.allowed}
                 runnerOrigin={RUNNER_ORIGIN}
+                course={`${discipline}/${courseSegment}`}
+                exam={slug}
               />
             </div>
           ) : (

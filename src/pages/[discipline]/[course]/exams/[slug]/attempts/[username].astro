@@ -6,6 +6,7 @@ import Answer from "@/components/grading/Answer.astro";
 import AnswerEditSummary from "@/components/grading/AnswerEditSummary.astro";
 import AppliedItems from "@/components/grading/AppliedItems";
 import { attemptTotalLabel } from "@/components/grading/attempt-total";
+import AttachmentList from "@/components/question/AttachmentList";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
@@ -21,6 +22,7 @@ import {
 } from "@/services/exam-state";
 import { attemptRows } from "@/services/grading";
 import { reviewResult } from "@/services/review";
+import { questionAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
 import { loadGrading, loadStudents } from "@/utils/load-grading";
@@ -47,6 +49,8 @@ const [students, stored] = await Promise.all([
 	db.question.findMany({ course: course.id, public: false }, { actor }),
 ]);
 const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
+const versions = new Map(stored.map((entry) => [entry.slug, entry.version]));
+const publicIds = new Map(stored.map((entry) => [entry.slug, entry.publicId]));
 
 const policy = (await loadResultPolicy(course.id))(exam);
 
@@ -118,6 +122,12 @@ const rows = outcomes.questions.map((outcome, index) => {
 		outcome,
 		title: doc?.title ?? outcome.question,
 		asked: doc ? publicForm(doc) : null,
+		attachmentUrl: (name: string) => {
+			const publicId = publicIds.get(outcome.question);
+			return publicId
+				? questionAttachmentUrl(publicId, name, versions.get(outcome.question))
+				: null;
+		},
 		counting,
 		edits: editSummaries.get(outcome.question),
 		review:
@@ -194,10 +204,11 @@ const stateLabel = (status: string, score: number | null): string => {
 
     <div class="mt-8 flex flex-col gap-6">
       {
-        rows.map(({ label, outcome, title, asked, counting, review, edits: editSummary }) => (
+        rows.map(({ label, outcome, title, asked, attachmentUrl, counting, review, edits: editSummary }) => (
           <article id={counting ? `answer-${counting.publicId}` : undefined} aria-label={label} class="card card-border bg-base-100">
             <div class="card-body">
               <h3 class="text-lg font-semibold">{title}</h3>
+              <AttachmentList attachments={asked?.attachments} url={attachmentUrl} />
               {counting && answeredAfterDeadline(deadline, counting.createdAt) && (
                 <span class="badge badge-warning badge-sm">{m.exams_attempt_answered_late({ seconds: Math.round((counting.createdAt.getTime() - deadline!.getTime()) / 1000) })}</span>
               )}

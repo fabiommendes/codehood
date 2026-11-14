@@ -7,6 +7,10 @@
 import type { LanguageId } from "@codehood/runner/protocol";
 import { Markdown } from "mdq/solid";
 import { createEffect, createSignal, type JSX, onMount, Show } from "solid-js";
+import {
+	AttachmentList,
+	type AttachmentListProps,
+} from "@/components/question/AttachmentList";
 import { m } from "@/i18n";
 import { formatDateTime } from "@/utils/schedule-time";
 import { CodeRunner } from "../runner/CodeRunner";
@@ -56,6 +60,10 @@ export interface CodeEssayAnswerProps {
 	onConflict: (
 		conflict: { newer: "draft" | "server"; draftCode: string } | null,
 	) => void;
+	/// The files the question attaches, listed under the stem.
+	attachments?: AttachmentListProps["attachments"];
+	/// The download URL of an attachment by name; null when the page has none.
+	attachmentUrl?: AttachmentListProps["url"];
 	/// Code the editor starts with when there is no answer and no draft.
 	/// Reserved for starter code from the question; nothing sets it yet.
 	starterCode?: string;
@@ -203,6 +211,10 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 			<div class="mdq-stem">
 				<Markdown text={props.stem} />
 			</div>
+			<AttachmentList
+				attachments={props.attachments}
+				url={props.attachmentUrl ?? (() => null)}
+			/>
 
 			<Show
 				when={conflict()}

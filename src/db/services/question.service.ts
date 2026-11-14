@@ -60,7 +60,10 @@ import {
 	prisma,
 } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
-import type { AttachmentService } from "./attachment.service";
+import {
+	type AttachmentService,
+	assertBlobsAvailable,
+} from "./attachment.service";
 import type { BlobService } from "./blob.service";
 import { courseContentsWhere } from "./course.service";
 
@@ -796,6 +799,7 @@ function fromDb(row: DbQuestion): Question {
 
 	return {
 		id: row.id,
+		publicId: row.publicId,
 		slug: row.slug,
 		status: row.status,
 		version: latest.versionHash,
@@ -1003,18 +1007,7 @@ async function prepareFiles(
 	const blobs = fields.blobs ?? {};
 	assertBlobsMatch(blobs, files);
 
-	const unsent = [...new Set(Object.values(files))].filter(
-		(h) => !(h in blobs),
-	);
-	if (unsent.length > 0) {
-		const live = await tx.blob.findMany({
-			where: { hash: { in: unsent }, deletedAt: null },
-			select: { hash: true },
-		});
-		const present = new Set(live.map((b) => b.hash));
-		const missing = unsent.find((hash) => !present.has(hash));
-		if (missing) throw new NotFound("blob", { id: missing });
-	}
+	await assertBlobsAvailable(tx, files, blobs);
 	return files;
 }
 

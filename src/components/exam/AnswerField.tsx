@@ -1,5 +1,9 @@
 import type { LanguageId } from "@codehood/runner/protocol";
 import { type JSX, Show } from "solid-js";
+import {
+	AttachmentList,
+	type AttachmentListProps,
+} from "@/components/question/AttachmentList";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { QuestionPublic } from "@/db";
 import { runnerLanguage } from "@/runner/languages";
@@ -29,6 +33,8 @@ export interface AnswerFieldProps {
 	onSubmit?: (code: string) => Promise<void>;
 	/// Origin of the runner iframe the pretests run in.
 	runnerOrigin?: string | null;
+	/// The download URL of an attachment of the question by name; without it the list has no download links.
+	attachmentUrl?: AttachmentListProps["url"];
 }
 
 /// What a code question in answer mode needs besides the question itself.
@@ -75,6 +81,8 @@ export function AnswerField(props: AnswerFieldProps): JSX.Element {
 					sends={props.sends}
 					runnerOrigin={props.runnerOrigin ?? null}
 					value={typeof props.payload === "string" ? props.payload : null}
+					attachments={question().attachments}
+					attachmentUrl={props.attachmentUrl}
 					onChange={(code, userEvent) => props.onChange(code, userEvent)}
 				/>
 			)}
@@ -95,17 +103,23 @@ function EssayOrOtherField(props: AnswerFieldProps): JSX.Element {
 					: undefined
 			}
 			fallback={
-				<AnyQuestionView
-					question={props.question}
-					value={props.payload ?? null}
-					onChange={props.onChange}
-					mode={
-						props.review ? "review" : props.readonly ? "readonly" : "answer"
-					}
-					result={props.review}
-					hideScore
-					messages={mdqMessages}
-				/>
+				<>
+					<AnyQuestionView
+						question={props.question}
+						value={props.payload ?? null}
+						onChange={props.onChange}
+						mode={
+							props.review ? "review" : props.readonly ? "readonly" : "answer"
+						}
+						result={props.review}
+						hideScore
+						messages={mdqMessages}
+					/>
+					<AttachmentList
+						attachments={props.question.attachments}
+						url={props.attachmentUrl ?? (() => null)}
+					/>
+				</>
 			}
 		>
 			{(code) => (
@@ -116,6 +130,8 @@ function EssayOrOtherField(props: AnswerFieldProps): JSX.Element {
 							? props.question.epilogue
 							: undefined
 					}
+					attachments={props.question.attachments}
+					attachmentUrl={props.attachmentUrl}
 					language={code().language}
 					value={code().value}
 					valueSavedAt={code().valueSavedAt}

@@ -1410,6 +1410,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		cohort,
 	);
 	await seedOpenQuiz(cs101.id);
+	await seedAttachments(cs101.id);
 	await seedCodeAnswerExams(cs101.id);
 	await seedAnswerEditHistoryExams(cs101.id, {
 		hopper,
@@ -1482,6 +1483,195 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	console.log(
 		`[dev] created demo courses cs101/${ada.username}_${live.slug} and cs201/${alan.username}_${live.slug}, plus the ended cs101/${ada.username}_${past.slug}.`,
+	);
+}
+
+/// A one-page PDF with one line of Helvetica text, with exact xref offsets.
+function minimalPdf(line: string): Buffer {
+	const stream = `BT /F1 18 Tf 72 720 Td (${line}) Tj ET`;
+	const objects = [
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+		`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+	];
+	let pdf = "%PDF-1.4\n";
+	const offsets = objects.map((body, i) => {
+		const offset = pdf.length;
+		pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
+		return offset;
+	});
+	const xref = pdf.length;
+	pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+	for (const offset of offsets) {
+		pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+	}
+	pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+	return Buffer.from(pdf, "latin1");
+}
+
+/**
+ * Seeds question and exam attachments: fenced and linked files, a linked PDF,
+ * a question whose linked CSV changes between versions, an exam open to the
+ * dev student with its own files, and a scheduled exam that keeps them shut.
+ */
+async function seedAttachments(course: Course["id"]): Promise<void> {
+	const csv = Buffer.from("x,y\n1,2\n3,5\n", "utf8");
+	const csvHash = hashBytes(csv);
+	const csvV2 = Buffer.from("x,y\n1,2\n3,5\n4,7\n", "utf8");
+	const csvV2Hash = hashBytes(csvV2);
+	const pdf = minimalPdf("Reference sheet: recursion lab");
+	const pdfHash = hashBytes(pdf);
+	const values = Buffer.from("n,fact\n0,1\n1,1\n2,2\n3,6\n", "utf8");
+	const valuesHash = hashBytes(values);
+	const schedule = Buffer.from("day,room\n1,A1\n2,B2\n", "utf8");
+	const scheduleHash = hashBytes(schedule);
+
+	await db.question.create(
+		{
+			course,
+			slug: "csv-attachments",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "multiple-choice",
+				title: "Reading the data file",
+				stem: "Look at the attached `data.csv`. Which row has the largest `y`?",
+				tags: ["attachments"],
+				attachments: [
+					{
+						name: "notes.txt",
+						format: "txt",
+						text: "Each row is one measurement.",
+					},
+					{ name: "data.csv", format: "csv", origin: "data.csv" },
+				],
+				choices: [
+					{ id: "row-2", text: "Row 2", score: 1 },
+					{ id: "row-1", text: "Row 1" },
+				],
+			},
+			files: { "data.csv": csvHash },
+			blobs: { [csvHash]: csv },
+		},
+		FULL_ACCESS,
+	);
+	await db.question.create(
+		{
+			course,
+			slug: "pdf-attachment",
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "multiple-choice",
+				title: "Reading the reference sheet",
+				stem: "The attached PDF is the reference sheet for this lab. Which tool does it name?",
+				tags: ["attachments"],
+				attachments: [
+					{ name: "reference.pdf", format: "pdf", origin: "reference.pdf" },
+				],
+				choices: [
+					{ id: "sheet", text: "The reference sheet", score: 1 },
+					{ id: "none", text: "No tool" },
+				],
+			},
+			files: { "reference.pdf": pdfHash },
+			blobs: { [pdfHash]: pdf },
+		},
+		FULL_ACCESS,
+	);
+
+	// The stem stays the same; only the linked CSV changes between versions.
+	const versioned = {
+		type: "multiple-choice" as const,
+		title: "Growth of the table",
+		stem: "Read the attached `table.csv`. Which row has the largest `y` in the latest data?",
+		tags: ["attachments"],
+		attachments: [{ name: "table.csv", format: "csv", origin: "table.csv" }],
+		choices: [
+			{ id: "row-3", text: "Row 3", score: 1 },
+			{ id: "row-1", text: "Row 1" },
+		],
+	};
+	await db.question.create(
+		{
+			course,
+			slug: "csv-versions",
+			status: "PUBLISHED",
+			version: "v1",
+			question: versioned,
+			files: { "table.csv": csvHash },
+			blobs: { [csvHash]: csv },
+		},
+		FULL_ACCESS,
+	);
+	await db.question.upsert(
+		{
+			course,
+			slug: "csv-versions",
+			status: "PUBLISHED",
+			version: "v2",
+			question: versioned,
+			files: { "table.csv": csvV2Hash },
+			blobs: { [csvV2Hash]: csvV2 },
+		},
+		FULL_ACCESS,
+	);
+
+	await db.exam.create(
+		{
+			course,
+			slug: "quiz-attachments",
+			type: "QUIZ",
+			status: "ONGOING",
+			title: "Quiz 4: reading data",
+			description: "Questions that come with files, and the exam's own files.",
+			preamble: "Download the files before you answer.",
+			duration: { minutes: 45 },
+			tags: ["attachments"],
+			questions: [
+				{ slug: "csv-attachments", version: "v1" },
+				{ slug: "pdf-attachment", version: "v1" },
+			],
+			attachments: [
+				{
+					name: "formulas.txt",
+					format: "txt",
+					text: "factorial(n) = n * factorial(n - 1), with factorial(0) = 1.",
+				},
+				{ name: "values.csv", format: "csv", origin: "values.csv" },
+			],
+			files: { "values.csv": valuesHash },
+			blobs: { [valuesHash]: values },
+		},
+		FULL_ACCESS,
+	);
+
+	// Two weeks out, like quiz-03: the attachments stay 404 until it opens.
+	await db.exam.create(
+		{
+			course,
+			slug: "quiz-scheduled-attachments",
+			type: "QUIZ",
+			status: "SCHEDULED",
+			title: "Quiz 5: scheduled files",
+			description:
+				"Opens in a week; its files are not downloadable before that.",
+			scheduledAt: toInstant(
+				localDateOf(new Date(Date.now() + 7 * 24 * 3600 * 1000)),
+				14 * 60,
+			),
+			duration: { minutes: 30 },
+			tags: ["attachments"],
+			questions: [{ slug: "csv-attachments", version: "v1" }],
+			attachments: [
+				{ name: "schedule.csv", format: "csv", origin: "schedule.csv" },
+			],
+			files: { "schedule.csv": scheduleHash },
+			blobs: { [scheduleHash]: schedule },
+		},
+		FULL_ACCESS,
 	);
 }
 

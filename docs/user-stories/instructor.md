@@ -238,6 +238,20 @@ not: a button on each row publishes, archives or moves the question back to
 draft.
 
 
+### Preview the files attached to a question and an exam
+
+    status: todo
+    url: /[discipline]/[course]/questions/[question]
+
+Instructor pushed a question and an exam that come with files and wants to see
+what students will get. The question page lists the question's files under its
+statement, and the exam page lists the exam's files under its instructions and
+each question's files under that question, even before the exam opens. A
+question without files shows no list. Every file downloads from the page. When
+the question was rewritten after the exam pinned it, the exam still offers the
+files of the version it pinned, while the question page offers the newest ones.
+
+
 ### Browse the exam list
 
     status: web

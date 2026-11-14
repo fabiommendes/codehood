@@ -37,8 +37,17 @@ import {
 import { z } from "zod";
 import type { AssertEqual } from "@/utils/types";
 
+/// An attachment as a student sees it: the author's `origin` stays out.
+const publicAttachment = z.object({
+	name: z.string().min(1),
+	format: z.string().min(1),
+	text: z.string().optional(),
+	label: z.string().optional(),
+});
+
 /// The base fields every public form copies.
 const base = {
+	attachments: z.array(publicAttachment).optional(),
 	id: questionBaseShape.id,
 	uuid: questionBaseShape.uuid,
 	title: questionBaseShape.title,

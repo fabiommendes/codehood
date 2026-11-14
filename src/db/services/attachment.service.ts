@@ -46,6 +46,29 @@ export type AttachmentPK = z.infer<typeof attachmentPK>;
 export type AttachmentUpdate = z.infer<typeof attachmentUpdate>;
 export type AttachmentToType = z.infer<typeof attachmentToType>;
 
+/**
+ * Checks that every hash of `files` is a live blob or arrives in `blobs`.
+ *
+ * @throws {@link NotFound} With the first hash that is neither.
+ */
+export async function assertBlobsAvailable(
+	tx: PrismaTx,
+	files: Record<string, string>,
+	blobs: Record<string, Buffer>,
+): Promise<void> {
+	const unsent = [...new Set(Object.values(files))].filter(
+		(hash) => !(hash in blobs),
+	);
+	if (unsent.length === 0) return;
+	const live = await tx.blob.findMany({
+		where: { hash: { in: unsent }, deletedAt: null },
+		select: { hash: true },
+	});
+	const present = new Set(live.map((b) => b.hash));
+	const missing = unsent.find((hash) => !present.has(hash));
+	if (missing) throw new NotFound("blob", { id: missing });
+}
+
 type DbAttachment = Prisma.AttachmentGetPayload<{
 	include: typeof attachmentInclude;
 }>;

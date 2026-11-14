@@ -1,12 +1,24 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import { type Course, db } from "@/db";
+import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
+import {
+	attachmentsWith,
+	blobOf,
+	createQuestion,
+	download,
+	filesOf,
+	isAbove,
+	link,
+} from "./attachment-support";
 import { logInAs, resetDatabase, seedUser } from "./helpers";
 
 test.beforeEach(resetDatabase);
+
+const MINUTE = 60_000;
 
 test("student: see the exams assigned to me", async ({ page }) => {
 	const student = await seedUser({ role: "STUDENT", username: "exam-student" });
@@ -125,6 +137,127 @@ test("student: see the exams assigned to me", async ({ page }) => {
 		await expect(
 			page.getByRole("heading", { name: "Practice", exact: true }),
 		).toHaveCount(0);
+	});
+});
+
+test("student: use the files attached to an exam question", async ({
+	page,
+}) => {
+	const student = await seedUser({ role: "STUDENT", username: "file-reader" });
+	const course = await persistedCourseFactory.create();
+	await enroll(course.id, student.username);
+	const href = hrefOf(course);
+	const apiBase = `/api/course${href}`;
+
+	const csv = blobOf("city,pop\nRecife,1\n");
+	const sheet = blobOf("formula,value\nE,mc2\n");
+	const stem = "Which city has the smallest population in the dataset?";
+	const preamble = "Read all the instructions before you start.";
+	const snippet = 'print("hello attachments")';
+	const question = await createQuestion({
+		course: course.id,
+		slug: "q-data",
+		version: "v1",
+		stem,
+		attachments: [
+			link("cities.csv"),
+			{ name: "helper.py", format: "py", text: snippet },
+		],
+		blobs: { "cities.csv": csv },
+	});
+	const publicId = (
+		await prisma.questionRef.findFirstOrThrow({
+			where: { courseId: course.id, slug: "q-data" },
+		})
+	).publicId;
+	await db.exam.create(
+		{
+			course: course.id,
+			slug: "files-exam",
+			title: "Files exam",
+			type: "EXAM",
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() + 3 * 24 * 60 * MINUTE),
+			duration: { hours: 2 },
+			preamble,
+			questions: [{ slug: question.slug }],
+			attachments: [link("formulas.csv")],
+			...filesOf({ "formulas.csv": sheet }),
+		} as Parameters<typeof db.exam.create>[0],
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, student);
+
+	await test.step("before the exam opens there is no list and no download", async () => {
+		await page.goto(`${href}/exams/files-exam`);
+
+		await expect(page.getByText(preamble)).toBeVisible();
+		await expect(
+			page.getByRole("region", { name: "Attachments", exact: true }),
+		).toHaveCount(0);
+		await expect(page.getByText("formulas.csv")).toHaveCount(0);
+		await expect(page.getByText("cities.csv")).toHaveCount(0);
+
+		for (const url of [
+			`${apiBase}/exam/files-exam/attachment/formulas.csv`,
+			`${apiBase}/exam/files-exam/question/q-data/attachment/cities.csv`,
+			`/api/question/${publicId}/attachment/cities.csv`,
+		]) {
+			expect((await page.request.get(url)).status(), url).toBe(404);
+		}
+	});
+
+	await db.exam.update(
+		{ course: course.id, slug: "files-exam" },
+		{ scheduledAt: new Date(Date.now() - 10 * MINUTE) },
+		FULL_ACCESS,
+	);
+
+	await test.step("once open, the exam's files sit under its instructions and download", async () => {
+		await page.goto(`${href}/exams/files-exam`);
+
+		const list = attachmentsWith(page, "formulas.csv");
+		await expect(list).toBeVisible();
+		expect(await isAbove(page.getByText(preamble), list)).toBe(true);
+
+		const saved = await download(page, list, "formulas.csv");
+		expect(saved.filename).toBe("formulas.csv");
+		expect(saved.bytes.equals(sheet.bytes)).toBe(true);
+	});
+
+	await test.step("the question lists its files under the statement", async () => {
+		await page.getByRole("button", { name: "Start exam" }).click();
+		await expect(page.getByText(stem)).toBeVisible();
+
+		const list = attachmentsWith(page, "cities.csv");
+		await expect(list).toBeVisible();
+		await expect(list.getByRole("link", { name: "helper.py" })).toBeVisible();
+		expect(await isAbove(page.getByText(stem), list)).toBe(true);
+	});
+
+	await test.step("a linked file downloads with its original name", async () => {
+		const saved = await download(
+			page,
+			attachmentsWith(page, "cities.csv"),
+			"cities.csv",
+		);
+		expect(saved.filename).toBe("cities.csv");
+		expect(saved.bytes.equals(csv.bytes)).toBe(true);
+	});
+
+	await test.step("an inline file downloads too, and its code is readable in a collapsed block", async () => {
+		const list = attachmentsWith(page, "cities.csv");
+
+		const saved = await download(page, list, "helper.py");
+		expect(saved.filename).toBe("helper.py");
+		expect(saved.bytes.toString("utf8")).toBe(snippet);
+
+		const block = list.locator("details").filter({ hasText: "hello" });
+		await expect(block).toHaveCount(1);
+		await expect(block.getByText(snippet)).toBeHidden();
+		await block.locator("summary").click();
+		await expect(block.getByText(snippet)).toBeVisible();
 	});
 });
 

@@ -34,7 +34,10 @@ import {
 import { courseAccess } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { loadResultPolicy } from "@/db/result-policy";
-import type { AttachmentService } from "@/db/services/attachment.service";
+import {
+	type AttachmentService,
+	assertBlobsAvailable,
+} from "@/db/services/attachment.service";
 import type { BlobService } from "@/db/services/blob.service";
 import { courseContentsWhere } from "@/db/services/course.service";
 import { m } from "@/i18n";
@@ -1129,18 +1132,7 @@ async function prepareAttachments(
 	const blobs = fields.blobs ?? {};
 	assertBlobsMatch(blobs, files);
 
-	const unsent = [...new Set(Object.values(files))].filter(
-		(h) => !(h in blobs),
-	);
-	if (unsent.length > 0) {
-		const live = await tx.blob.findMany({
-			where: { hash: { in: unsent }, deletedAt: null },
-			select: { hash: true },
-		});
-		const present = new Set(live.map((b) => b.hash));
-		const missing = unsent.find((hash) => !present.has(hash));
-		if (missing) throw new NotFound("blob", { id: missing });
-	}
+	await assertBlobsAvailable(tx, files, blobs);
 	return { list: attachments, files };
 }
 

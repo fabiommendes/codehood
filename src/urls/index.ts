@@ -15,3 +15,5 @@ export * from "./parsing";
 export function courseHref(ref: CourseNaturalKey): string {
 	return `/${ref.discipline}/${ref.instructor}_${ref.edition}`;
 }
+
+export * from "./attachments";

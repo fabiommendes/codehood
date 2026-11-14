@@ -28,6 +28,7 @@ import {
 } from "@/services/exam-result";
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
+import { examQuestionAttachmentUrl } from "@/urls";
 import type { PretestSource } from "@/utils/pretest-sources";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
@@ -1184,6 +1185,14 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										sends={allSends()[entry.slug]}
 										onSubmit={(code) => submitCode(entry.slug, code)}
 										runnerOrigin={props.runnerOrigin ?? null}
+										attachmentUrl={(name) =>
+											examQuestionAttachmentUrl(
+												`${props.discipline}/${props.course}`,
+												props.exam,
+												entry.slug,
+												name,
+											)
+										}
 										code={
 											kind() === "in-progress"
 												? codeContext(entry.slug, entry.question, {

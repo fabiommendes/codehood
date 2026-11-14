@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { locale, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { publicForm, questionProblems } from "@/mdq";
+import { questionAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { highlightCode } from "@/utils/highlight-code";
 import { highlightExamples } from "@/utils/highlight-examples";
@@ -39,6 +40,13 @@ const question = await db.question.findOne(
 if (!question) return Astro.rewrite("/404");
 const { question: doc } = question;
 
+const { publicId } = question;
+const attachmentUrls = Object.fromEntries(
+	(doc.attachments ?? []).map(({ name }) => [
+		name,
+		questionAttachmentUrl(publicId, name, question.version),
+	]),
+);
 const problems = questionProblems(doc);
 const preview = publicForm(doc);
 const exampleHtml =
@@ -114,7 +122,7 @@ const keyHtml =
     </section>
 
     <section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
-      <QuestionPreview client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} keyHtml={keyHtml} />
+      <QuestionPreview client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} keyHtml={keyHtml} attachmentUrls={attachmentUrls} />
     </section>
   </main>
 </AppLayout>

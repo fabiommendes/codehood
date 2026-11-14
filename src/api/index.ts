@@ -113,22 +113,29 @@ export const editionApi = CRUD("/api/edition", {
 	service: db.edition,
 });
 
+/// Hands the file parts of a multipart write to the service as `blobs`, by sha256.
+function inlineBlobs<B>(body: B, files: Record<string, Buffer>): B {
+	return { ...body, blobs: files };
+}
+
 export const examApi = CRUD("/api/course/[discipline]/[course]/exam", {
 	name: "Exam",
 	plural: "Exams",
 	keySegment: "/[slug]",
 
-	entity: schema.examSchema.omit({ id: true }).extend({
+	entity: schema.examFullSchema.omit({ id: true }).extend({
 		questions: z.array(schema.examQuestionSchema.omit({ id: true })),
 	}),
-	create: schema.examCreate.omit({ course: true }),
-	update: schema.examUpdate,
+	create: schema.examWriteCreate.omit({ course: true, blobs: true }),
+	update: schema.examWriteUpdate.omit({ blobs: true }),
 	filter: schema.examFilterBase,
 	scope: courseScope,
 	key: schema.examPK,
 
 	tags: ["Exams"],
 	service: db.exam,
+
+	withFiles: inlineBlobs,
 
 	parseKeyParams(params) {
 		return { course: parseCourseParams(params), slug: params.slug as string };
@@ -472,11 +479,11 @@ export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
 	// `db.question` reads return either the full document or its public half
 	// (`QuestionView`), so the API entity mirrors that union, minus `id`.
 	entity: z.union([
-		schema.questionSchema.omit({ id: true }),
+		schema.questionFullSchema.omit({ id: true }),
 		schema.questionPublicSchema.omit({ id: true }),
 	]),
-	create: schema.questionCreate.omit({ course: true }),
-	update: schema.questionUpdate,
+	create: schema.questionWriteCreate.omit({ course: true, blobs: true }),
+	update: schema.questionWriteUpdate.omit({ blobs: true }),
 	filter: schema.questionFilterBase,
 	scope: courseScope,
 	key: schema.questionPK,
@@ -484,6 +491,8 @@ export const questionApi = CRUD("/api/course/[discipline]/[course]/question", {
 
 	tags: ["Questions"],
 	service: db.question,
+
+	withFiles: inlineBlobs,
 
 	parseKeyParams(params) {
 		return { course: parseCourseParams(params), slug: params.slug as string };

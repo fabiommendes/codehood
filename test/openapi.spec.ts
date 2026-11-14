@@ -191,3 +191,58 @@ for (const path of courseScopedCollections) {
 		expect(queryNames).not.toContain("edition");
 	});
 }
+
+type Json = Record<string, unknown>;
+
+test("C5: question and exam writes take JSON or multipart, carry files (and attachments for exams) and never blobs", () => {
+	const document = buildOpenApiDocument();
+	const paths = document.paths ?? {};
+	const deref = (schema: unknown): Json => {
+		const ref = (schema as { $ref?: string } | undefined)?.$ref;
+		if (!ref) return (schema ?? {}) as Json;
+		const name = ref.replace("#/components/schemas/", "");
+		return (document.components?.schemas?.[name] ?? {}) as Json;
+	};
+	const writes = (resource: "question" | "exam") => {
+		const collection = paths[`/api/course/{discipline}/{course}/${resource}`];
+		const item = paths[`/api/course/{discipline}/{course}/${resource}/{slug}`];
+		return {
+			POST: collection?.post,
+			PUT: collection?.put,
+			PATCH: item?.patch,
+		};
+	};
+
+	for (const resource of ["question", "exam"] as const) {
+		for (const [method, operation] of Object.entries(writes(resource))) {
+			const label = `${resource} ${method}`;
+			const content =
+				(operation?.requestBody as { content?: Record<string, unknown> })
+					?.content ?? {};
+			expect(Object.keys(content).sort(), label).toEqual(
+				expect.arrayContaining(["application/json", "multipart/form-data"]),
+			);
+			const schema = deref(
+				(content["application/json"] as { schema?: unknown } | undefined)
+					?.schema,
+			);
+			const properties = (schema.properties ?? {}) as Json;
+			expect(Object.keys(properties), label).toContain("files");
+			expect(Object.keys(properties), label).not.toContain("blobs");
+			expect(JSON.stringify(properties.question ?? {}), label).not.toContain(
+				'"files"',
+			);
+			if (resource === "exam") {
+				expect(Object.keys(properties), label).toContain("attachments");
+			} else {
+				expect(Object.keys(properties), label).not.toContain("attachments");
+			}
+			expect(JSON.stringify(operation), label).not.toContain('"blobs"');
+		}
+	}
+
+	const documentSchema = JSON.stringify(
+		document.components?.schemas?.Question ?? {},
+	);
+	expect(documentSchema).not.toContain('"blobs"');
+});

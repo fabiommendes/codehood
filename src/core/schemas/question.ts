@@ -39,9 +39,11 @@ export const questionUpdate = questionCreate
 /// Map from the name of a link attachment to the sha256 of its bytes.
 export const questionFiles = z.record(z.string().min(1), blobHash);
 
-/// The authored question as the service returns it: the document plus, for the
-/// versions that have link attachments, the blob each name resolves to.
+/// The authored question as the service returns it: the document, the public id
+/// its attachment route is keyed by and, for the versions that have link
+/// attachments, the blob each name resolves to.
 export const questionFullSchema = questionSchema.extend({
+	publicId: z.string().min(1),
 	files: questionFiles.optional(),
 });
 

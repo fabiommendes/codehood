@@ -17,6 +17,10 @@ import {
 	Show,
 	Switch,
 } from "solid-js";
+import {
+	AttachmentList,
+	type AttachmentListProps,
+} from "@/components/question/AttachmentList";
 import { m } from "@/i18n";
 import { languageLabel } from "@/runner/languages";
 import type { PretestSource } from "@/utils/pretest-sources";
@@ -53,6 +57,10 @@ export interface CodeAnswerProps {
 	sends?: CodeSends;
 	/// Runs the pretests; the browser runner by default. Tests inject their own.
 	runTests?: typeof runBrowserTests;
+	/// The files the question attaches, listed under the stem.
+	attachments?: AttachmentListProps["attachments"];
+	/// The download URL of an attachment by name; null when the page has none.
+	attachmentUrl?: AttachmentListProps["url"];
 }
 
 /// The last pretest run, as the component shows it.
@@ -202,6 +210,10 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 			<div class="mdq-stem">
 				<Markdown text={props.question.stem} />
 			</div>
+			<AttachmentList
+				attachments={props.attachments}
+				url={props.attachmentUrl ?? (() => null)}
+			/>
 
 			<Show when={examples.length > 0}>
 				<section class="flex flex-col gap-2" data-code-examples>

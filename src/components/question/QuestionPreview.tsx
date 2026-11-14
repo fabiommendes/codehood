@@ -22,6 +22,7 @@ import {
 	scoreResponse,
 } from "@/mdq";
 import { pretestSources } from "@/utils/pretest-sources";
+import { AttachmentList, type AttachmentListProps } from "./AttachmentList";
 import { ResetIcon, SubmitIcon } from "./icons";
 import { AnyQuestionView, type AnyQuestionViewProps, mdqMessages } from "./mdq";
 
@@ -43,6 +44,8 @@ export interface QuestionPreviewProps {
 	exampleHtml?: readonly string[];
 	/** The highlighted HTML of the model answer of a code question, from `highlightCode`. Trusted: never user HTML. */
 	keyHtml?: string;
+	/** The download URL of each attachment of the question by name, which an island can take as a prop; a name without one has no download link. */
+	attachmentUrls?: Readonly<Record<string, string>>;
 }
 
 /** Which of the two ways an instructor can look at the question is on screen. */
@@ -95,6 +98,7 @@ export default function QuestionPreview(
 				runnerOrigin={props.runnerOrigin ?? null}
 				exampleHtml={props.exampleHtml}
 				keyHtml={props.keyHtml}
+				attachmentUrl={(name) => props.attachmentUrls?.[name] ?? null}
 			/>
 		</div>
 	);
@@ -153,6 +157,7 @@ interface TypePreviewProps {
 	runnerOrigin: string | null;
 	exampleHtml?: readonly string[];
 	keyHtml?: string;
+	attachmentUrl: AttachmentListProps["url"];
 }
 
 /// What the review mode of a view takes as `result`.
@@ -237,6 +242,8 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 					exampleHtml={props.exampleHtml}
 					value={null}
 					onChange={() => {}}
+					attachments={publicQ().attachments}
+					attachmentUrl={props.attachmentUrl}
 				/>
 			</Match>
 			<Match when={props.tab() === "student"}>
@@ -248,6 +255,10 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 						onChange={setValue}
 						result={result()}
 						messages={mdqMessages}
+					/>
+					<AttachmentList
+						attachments={publicQ().attachments}
+						url={props.attachmentUrl}
 					/>
 					<SimulateControls
 						disabled={
@@ -267,6 +278,10 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 					<div class="mdq-stem">
 						<Markdown text={(publicQ() as PublicCodeQuestion).stem} />
 					</div>
+					<AttachmentList
+						attachments={publicQ().attachments}
+						url={props.attachmentUrl}
+					/>
 					<Show when={props.keyHtml}>
 						{(html) => (
 							<div>
@@ -284,14 +299,20 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 				</div>
 			</Match>
 			<Match when={props.tab() === "key"}>
-				<AnyQuestionView
-					question={publicQ()}
-					mode="review"
-					hideScore={props.hideScore}
-					value={key()}
-					result={keyResult()}
-					messages={mdqMessages}
-				/>
+				<div class="flex flex-col gap-3">
+					<AnyQuestionView
+						question={publicQ()}
+						mode="review"
+						hideScore={props.hideScore}
+						value={key()}
+						result={keyResult()}
+						messages={mdqMessages}
+					/>
+					<AttachmentList
+						attachments={publicQ().attachments}
+						url={props.attachmentUrl}
+					/>
+				</div>
 			</Match>
 		</Switch>
 	);

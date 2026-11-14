@@ -6,6 +6,15 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
 import {
+	attachmentsWith,
+	blobOf,
+	createQuestion,
+	download,
+	filesOf,
+	isAbove,
+	link,
+} from "./attachment-support";
+import {
 	fillField,
 	futureDate,
 	logInAs,
@@ -17,6 +26,134 @@ import {
 test.beforeEach(resetDatabase);
 
 const MINUTE = 60_000;
+
+test("instructor: preview the files attached to a question and an exam", async ({
+	page,
+}) => {
+	const course = await persistedCourseFactory.create();
+	const href = courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	});
+	const oldCsv = blobOf("version,1\nold,1\n");
+	const newCsv = blobOf("version,2\nnew,2\n");
+	const sheet = blobOf("formula,value\nE,mc2\n");
+	const snippet = 'print("hello attachments")';
+	const preamble = "Read all the instructions before you start.";
+	const attachments = (csv: string) => [
+		link(csv),
+		{ name: "helper.py", format: "py", text: snippet },
+	];
+
+	await createQuestion({
+		course: course.id,
+		slug: "plain",
+		version: "v1",
+		stem: "A question that comes with nothing.",
+		attachments: [],
+		blobs: {},
+	});
+	await createQuestion({
+		course: course.id,
+		slug: "with-files",
+		version: "v1",
+		stem: "Analyse the attached dataset.",
+		attachments: attachments("data.csv"),
+		blobs: { "data.csv": oldCsv },
+	});
+	await db.question.update(
+		{ course: course.id, slug: "with-files" },
+		{
+			version: "v2",
+			question: {
+				type: "multiple-choice",
+				title: "with-files",
+				stem: "Analyse the attached dataset.",
+				choices: [
+					{ id: "a", text: "Alpha", score: 1 },
+					{ id: "b", text: "Beta" },
+				],
+				attachments: attachments("data.csv"),
+			},
+			...filesOf({ "data.csv": newCsv }),
+		} as Parameters<typeof db.question.update>[1],
+		FULL_ACCESS,
+	);
+	// Closed to students for days: the author sees the files anyway.
+	await db.exam.create(
+		{
+			course: course.id,
+			slug: "files-exam",
+			title: "Files exam",
+			type: "EXAM",
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() + 3 * 24 * 60 * MINUTE),
+			duration: { hours: 2 },
+			preamble,
+			questions: [{ slug: "with-files", version: "v1" }, { slug: "plain" }],
+			attachments: [link("formulas.csv")],
+			...filesOf({ "formulas.csv": sheet }),
+		} as Parameters<typeof db.exam.create>[0],
+		FULL_ACCESS,
+	);
+
+	await logInAs(page, course.instructor);
+
+	await test.step("a question without files shows no list", async () => {
+		await page.goto(`${href}/questions/plain`);
+
+		await expect(
+			page.getByText("A question that comes with nothing."),
+		).toBeVisible();
+		await expect(
+			page.getByRole("region", { name: "Attachments", exact: true }),
+		).toHaveCount(0);
+	});
+
+	await test.step("the question page lists the newest files under the statement and downloads them", async () => {
+		await page.goto(`${href}/questions/with-files`);
+
+		const list = attachmentsWith(page, "data.csv");
+		await expect(list).toBeVisible();
+		expect(
+			await isAbove(page.getByText("Analyse the attached dataset."), list),
+		).toBe(true);
+
+		const saved = await download(page, list, "data.csv");
+		expect(saved.filename).toBe("data.csv");
+		expect(saved.bytes.equals(newCsv.bytes)).toBe(true);
+
+		const block = list.locator("details").filter({ hasText: "hello" });
+		await expect(block.getByText(snippet)).toBeHidden();
+		await block.locator("summary").click();
+		await expect(block.getByText(snippet)).toBeVisible();
+	});
+
+	await test.step("the exam page lists the exam's files under its instructions before it opens", async () => {
+		await page.goto(`${href}/exams/files-exam`);
+
+		const list = attachmentsWith(page, "formulas.csv");
+		await expect(list).toBeVisible();
+		expect(await isAbove(page.getByText(preamble), list)).toBe(true);
+
+		const saved = await download(page, list, "formulas.csv");
+		expect(saved.bytes.equals(sheet.bytes)).toBe(true);
+	});
+
+	await test.step("the exam preview offers the files of the version the exam pinned", async () => {
+		const list = attachmentsWith(page, "data.csv");
+		await expect(list).toBeVisible();
+		// The question without files adds no list of its own.
+		await expect(
+			page.getByRole("region", { name: "Attachments", exact: true }),
+		).toHaveCount(2);
+
+		const saved = await download(page, list, "data.csv");
+		expect(saved.filename).toBe("data.csv");
+		expect(saved.bytes.equals(oldCsv.bytes)).toBe(true);
+	});
+});
 
 test("instructor: browse the question bank", async ({ page }) => {
 	const course = await persistedCourseFactory.create();

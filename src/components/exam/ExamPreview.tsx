@@ -3,6 +3,7 @@ import QuestionPreview from "@/components/question/QuestionPreview";
 import type { QuestionPublic } from "@/db";
 import { m } from "@/i18n";
 import type { QuestionDocument } from "@/mdq";
+import { examQuestionAttachmentUrl } from "@/urls";
 import type { PretestSource } from "@/utils/pretest-sources";
 import { AnswerField, codeLanguageOf } from "./AnswerField";
 import type { AnswerPayload } from "./answer-payload";
@@ -26,6 +27,9 @@ export interface ExamPreviewProps {
 	codeRun?: boolean;
 	/// Origin of the runner iframe; null when the server has none.
 	runnerOrigin?: string | null;
+	/// `<discipline>/<course>` and the exam slug, which the attachment downloads hang off.
+	course: string;
+	exam: string;
 }
 
 type Tab = "student" | "key";
@@ -84,17 +88,37 @@ export default function ExamPreview(props: ExamPreviewProps): JSX.Element {
 								pretests={props.pretests?.[entry.slug]}
 								exampleHtml={props.exampleHtml?.[entry.slug]}
 								runnerOrigin={props.runnerOrigin ?? null}
+								attachmentUrl={attachmentUrl(entry)}
 								code={codeContext(entry)}
 							/>
 						</div>
 						<Show when={tab() === "key"}>
-							<QuestionPreview data={entry.key} tab={() => "key"} />
+							<QuestionPreview
+								data={entry.key}
+								tab={() => "key"}
+								attachmentUrls={attachmentUrls(entry)}
+							/>
 						</Show>
 					</QuestionFrame>
 				)}
 			</For>
 		</div>
 	);
+
+	/// The download URL of each attachment of the version of a question the exam pins.
+	function attachmentUrl(entry: PreviewQuestion) {
+		return (name: string) =>
+			examQuestionAttachmentUrl(props.course, props.exam, entry.slug, name);
+	}
+
+	function attachmentUrls(entry: PreviewQuestion) {
+		return Object.fromEntries(
+			(entry.question.attachments ?? []).map(({ name }) => [
+				name,
+				attachmentUrl(entry)(name),
+			]),
+		);
+	}
 
 	/// The code editor context of an essay answered with code, with a save that never happens.
 	function codeContext(entry: PreviewQuestion) {

@@ -259,6 +259,20 @@ other exam, with the countdown running to their own deadline. A classmate with
 no exception sees the same exam closed.
 
 
+### Use the files attached to an exam question
+
+    status: todo
+    url: /<discipline>/<course>/exams/<exam>
+
+Student opens an exam whose questions come with files, such as a dataset to
+analyse or a starter program. Before the exam opens, the page shows no
+attachments and the download links answer "not found", so nothing leaks early.
+Once it is open, the exam's own attachments show up under its instructions and
+each question lists its files right below the statement. They download with
+their original names, and a file the instructor wrote inline shows its code in a
+collapsed block that the student can open and read without downloading.
+
+
 ### Practice questions outside an exam
 
     status: todo
