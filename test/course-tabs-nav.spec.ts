@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
 	examsNav,
+	homeNav,
 	resourcesNav,
 	scheduleNav,
 	scheduleWeekId,
@@ -80,6 +81,14 @@ test.describe("studentsNav", () => {
 			{ label: "Roster", href: `${href}/roster` },
 			{ label: "Grades", href: `${href}/grades` },
 			{ label: "Attendance", href: `${href}/attendance` },
+		]);
+	});
+});
+
+test.describe("homeNav", () => {
+	test("links the content reports", () => {
+		expect(homeNav(href).sections[0]?.entries).toEqual([
+			{ label: "Reports", href: `${href}/reports` },
 		]);
 	});
 });

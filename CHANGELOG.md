@@ -40,6 +40,10 @@
 - A aba "Repositórios" saiu da faixa: os repositórios ficam sob "Materiais",
   com um link no fim do card do curso quando há algum visível.
 
+- Nova ordem das abas do curso: Início, Agenda, Estudantes, Materiais,
+  Avaliações, Questões (Estudantes e Questões só para o professor). A aba
+  "Relatos" saiu: o card do curso na home do professor liga os relatos.
+
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento

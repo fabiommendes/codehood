@@ -17,6 +17,7 @@ import type { ExceptionTiming } from "@/services/exam-state";
 import { formatGradeValue } from "@/services/grades-table";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { eventKindLabel } from "@/utils/calendar-event-display";
+import { homeNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadInstructorHome } from "@/utils/load-instructor-home";
@@ -165,6 +166,7 @@ const nextEvents = await db.calendarEvent.findMany(
 
 <AppLayout title={course.discipline.name}
   trail={breadcrumbs(Astro.url, { course })}
+  nav={hasPerm(actor, "enrollment.manage", course) ? homeNav(href) : undefined}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     {

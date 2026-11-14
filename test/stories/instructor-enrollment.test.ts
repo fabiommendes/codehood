@@ -25,12 +25,11 @@ test("instructor: see who is enrolled", async ({ page }) => {
 		expect((await page.goto(`${href}/roster`))?.status()).toBe(200);
 		await expect(page.getByRole("tab")).toHaveText([
 			"Home",
-			"Exams",
-			"Resources",
 			"Schedule",
-			"Questions",
 			"Students",
-			"Reports",
+			"Resources",
+			"Exams",
+			"Questions",
 		]);
 		await expect(
 			page.getByRole("tab", { name: "Students", exact: true }),

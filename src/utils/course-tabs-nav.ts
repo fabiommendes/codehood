@@ -1,5 +1,5 @@
 /**
- * The course card links of the resources, schedule, exams and students tabs. Each page
+ * The course card links of the home, resources, schedule, exams and students tabs. Each page
  * builds its card from data it already loaded; `markCourseNav` finds where
  * the reader is.
  */
@@ -74,6 +74,19 @@ export function scheduleNav(
 			]
 		: [...weeks.past, ...weeks.ahead].map(link);
 	return { sections: [{ entries }] };
+}
+
+/** Links to the instructor's pages of the home tab: the content reports. */
+export function homeNav(href: string): CourseNav {
+	return {
+		sections: [
+			{
+				entries: [
+					{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
+				],
+			},
+		],
+	};
 }
 
 /**

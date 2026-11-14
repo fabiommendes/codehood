@@ -99,9 +99,9 @@ test("student: Find a course repository", async ({ page }) => {
 		await page.goto(href);
 		await expect(page.getByRole("tab")).toHaveText([
 			"Home",
-			"Exams",
-			"Resources",
 			"Schedule",
+			"Resources",
+			"Exams",
 		]);
 		await page.getByRole("tab", { name: "Resources", exact: true }).click();
 		await repositoriesLink.click();

@@ -28,26 +28,24 @@ function keys(tabs: readonly CourseTab[]): string[] {
 	return tabs.map((t) => t.key);
 }
 
-test("instructor: the tabs are Home, Exams, Resources, Schedule, Questions, Students, Reports, in that order", () => {
+test("instructor: the tabs are Home, Schedule, Students, Resources, Exams, Questions, in that order", () => {
 	const tabs = courseTabs(course, ref, owner as Actor);
 
 	expect(tabs.map((t) => t.label)).toEqual([
 		"Home",
-		"Exams",
-		"Resources",
 		"Schedule",
-		"Questions",
 		"Students",
-		"Reports",
+		"Resources",
+		"Exams",
+		"Questions",
 	]);
 	expect(keys(tabs)).toEqual([
 		"home",
-		"exams",
-		"resources",
 		"schedule",
-		"questions",
 		"students",
-		"reports",
+		"resources",
+		"exams",
+		"questions",
 	]);
 });
 
@@ -70,6 +68,7 @@ test("no actor gets a grades tab: grades live under the students tab", () => {
 	const tabs = courseTabs(course, ref, owner as Actor);
 
 	expect(keys(tabs)).not.toContain("grades");
+	expect(keys(tabs)).not.toContain("reports");
 });
 
 test("no actor gets a manage tab", () => {
@@ -91,15 +90,15 @@ test("no actor gets a manage tab", () => {
 test("student: the questions, students and grades tabs are absent", () => {
 	const tabs = keys(courseTabs(course, ref, student as Actor));
 
-	expect(tabs).toEqual(["home", "exams", "resources", "schedule"]);
+	expect(tabs).toEqual(["home", "schedule", "resources", "exams"]);
 });
 
 test("a non-owning admin gets no instructor tabs: enrollment.manage is the course's own instructor", () => {
 	expect(keys(courseTabs(course, ref, admin as Actor))).toEqual([
 		"home",
-		"exams",
-		"resources",
 		"schedule",
+		"resources",
+		"exams",
 	]);
 });
 

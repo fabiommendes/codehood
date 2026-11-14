@@ -5,6 +5,8 @@ import ReportQueue from "@/components/report/ReportQueue";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { homeNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
 import { parseReportFilters } from "@/utils/report-filters";
 import { toReportRow } from "@/utils/report-row";
@@ -16,7 +18,7 @@ const result = await loadCourse(Astro, discipline, courseSegment, {
 	manage: true,
 });
 if ("redirect" in result) return result.redirect;
-const { course } = result;
+const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: loadCourse({ manage: true }) already required Astro.locals.actor.
 const actor = Astro.locals.actor!;
@@ -32,9 +34,13 @@ const reports = await db.report.findMany(
 );
 ---
 
-<AppLayout title={m.report_course_title()}>
+<AppLayout
+	title={m.report_course_title()}
+	trail={breadcrumbs(Astro.url, { course })}
+	nav={homeNav(href)}
+>
 	<main class="mx-auto max-w-4xl px-4 py-10">
-		<CourseHeader course={course} active="reports" />
+		<CourseHeader course={course} active="home" />
 
 		<p class="mb-6 max-w-xl text-muted">{m.report_course_intro()}</p>
 

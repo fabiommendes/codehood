@@ -16,8 +16,7 @@ export type CourseTabKey =
 	| "resources"
 	| "schedule"
 	| "questions"
-	| "students"
-	| "reports";
+	| "students";
 
 export interface CourseTab {
 	key: CourseTabKey;
@@ -26,14 +25,14 @@ export interface CourseTab {
 }
 
 /**
- * Everyone gets `home`/`exams`/`resources`/`schedule`, in that order, so
- * "it's the third tab" means the same thing to a student and an instructor
- * looking at the same course. Repositories belong to `resources`: the course
- * card in the sidebar links them. The instructor's tabs (`questions`, `students`, `reports`) are appended, never
- * interleaved, exactly when the actor has `enrollment.manage` — the same
- * predicate `loadCourse({ manage: true })` runs on `/roster` and `/grades`,
- * so a visible tab never 403s. Grades and attendance belong to `students`:
- * the course card in the sidebar links them.
+ * The tabs are Home, Schedule, Students, Resources, Exams and Questions, in
+ * that order; Students and Questions only when the actor has
+ * `enrollment.manage`, the same predicate `loadCourse({ manage: true })` runs
+ * on `/roster` and `/grades`, so a visible tab never 403s.
+ *
+ * Pages without a tab of their own belong to one and are linked from the
+ * course card in the sidebar: grades and attendance to Students,
+ * repositories to Resources, reports to Home.
  */
 export function courseTabs(
 	course: CourseTarget,
@@ -41,38 +40,20 @@ export function courseTabs(
 	actor: Actor,
 ): readonly CourseTab[] {
 	const href = courseHref(ref);
-	const tabs: CourseTab[] = [
-		{ key: "home", label: m.nav_course_tab_home(), href },
-		{ key: "exams", label: COURSE_TAB_LABELS.exams, href: `${href}/exams` },
-		{
-			key: "resources",
-			label: COURSE_TAB_LABELS.resources,
-			href: `${href}/resources`,
-		},
-		{
-			key: "schedule",
-			label: COURSE_TAB_LABELS.schedule,
-			href: `${href}/schedule`,
-		},
+	const manages = hasPerm(actor, "enrollment.manage", course);
+	const tab = (key: CourseTabKey, label: string, path: string): CourseTab => ({
+		key,
+		label,
+		href: `${href}${path}`,
+	});
+	return [
+		tab("home", m.nav_course_tab_home(), ""),
+		tab("schedule", COURSE_TAB_LABELS.schedule, "/schedule"),
+		...(manages ? [tab("students", COURSE_TAB_LABELS.roster, "/roster")] : []),
+		tab("resources", COURSE_TAB_LABELS.resources, "/resources"),
+		tab("exams", COURSE_TAB_LABELS.exams, "/exams"),
+		...(manages
+			? [tab("questions", COURSE_TAB_LABELS.questions, "/questions")]
+			: []),
 	];
-	if (hasPerm(actor, "enrollment.manage", course)) {
-		tabs.push(
-			{
-				key: "questions",
-				label: COURSE_TAB_LABELS.questions,
-				href: `${href}/questions`,
-			},
-			{
-				key: "students",
-				label: COURSE_TAB_LABELS.roster,
-				href: `${href}/roster`,
-			},
-			{
-				key: "reports",
-				label: COURSE_TAB_LABELS.reports,
-				href: `${href}/reports`,
-			},
-		);
-	}
-	return tabs;
 }

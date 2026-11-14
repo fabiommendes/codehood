@@ -41,8 +41,11 @@ test("instructor: triage the content reports of my course", async ({
 	await logInAs(page, instructor);
 	await page.goto(href);
 
-	await test.step("the Reports tab lists the open content reports", async () => {
-		await page.getByRole("tab", { name: "Reports", exact: true }).click();
+	await test.step("the course card on the home links the open content reports", async () => {
+		await page
+			.locator("[data-course-card]")
+			.getByRole("link", { name: "Reports", exact: true })
+			.click();
 		await expect(page).toHaveURL(new RegExp(`${href}/reports`));
 		await expect(page.getByRole("article")).toHaveCount(2);
 		await expect(page.getByText("The calendar is not loading")).toHaveCount(0);

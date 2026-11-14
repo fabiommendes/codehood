@@ -492,12 +492,11 @@ test("grades: the page sits under the Students tab and the course card links ros
 
 	await expect(page.getByRole("tab")).toHaveText([
 		"Home",
-		"Exams",
-		"Resources",
 		"Schedule",
-		"Questions",
 		"Students",
-		"Reports",
+		"Resources",
+		"Exams",
+		"Questions",
 	]);
 	await expect(
 		page.getByRole("tab", { name: "Students", selected: true }),
@@ -523,9 +522,9 @@ test("grades: the page sits under the Students tab and the course card links ros
 	await expect(page.getByRole("tab", { name: "Students" })).toHaveCount(0);
 	await expect(page.getByRole("tab")).toHaveText([
 		"Home",
-		"Exams",
-		"Resources",
 		"Schedule",
+		"Resources",
+		"Exams",
 	]);
 });
 
