@@ -89,11 +89,6 @@ caseJson runner =
 
         labels =
             ( "labels", Encode.list Encode.string (List.reverse runner.labels) )
-
-        plain expected actual =
-            ( String.concat (List.map (Highlightable.resolve { fromHighlighted = identity, fromPlain = identity }) expected)
-            , String.concat (List.map (Highlightable.resolve { fromHighlighted = identity, fromPlain = identity }) actual)
-            )
     in
     case failures of
         [] ->
@@ -107,7 +102,7 @@ caseJson runner =
                 Encode.object
                     ([ labels
                      , ( "verdict", Encode.string "fail" )
-                     , ( "message", Encode.string (String.join "\n\n" (List.map (\f -> Format.format plain f.description f.reason) failures)) )
+                     , ( "message", Encode.string (String.join "\n\n" (List.map (\f -> Format.format highlight f.description f.reason) failures)) )
                      ]
                         ++ (case first.reason of
                                 Test.Runner.Failure.Equality expected actual ->

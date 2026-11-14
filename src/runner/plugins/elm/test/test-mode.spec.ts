@@ -97,10 +97,31 @@ test.describe("elm test mode", () => {
 			expected: "7",
 			actual: "0",
 		});
-		// The message is plain text: no escapes of the terminal report.
+		// Numbers are never diffed, so the message has no highlight.
 		expect(um.message).toBeTruthy();
 		expect(um.message).not.toContain("\x1b");
 		expect(() => parseReport(result)).not.toThrow();
+	});
+
+	test("the message marks in red where expected and actual differ", async ({
+		page,
+	}) => {
+		const h = await loadFrame(page);
+		const lists = `module Lists exposing (tests)
+
+import Expect
+import Main exposing (soma)
+import Test exposing (Test, test)
+
+
+tests : Test
+tests =
+    test "lista" <| \\_ -> Expect.equal [ 1, 7, 3 ] [ 1, soma [ 7 ], 3 ]
+`;
+		const result = await report(h, WRONG, [lists]);
+		const [lista] = result.cases as { verdict: string; message?: string }[];
+		expect(lista?.verdict).toBe("fail");
+		expect(lista?.message).toContain("\x1b[31m");
 	});
 
 	test("an answer that does not compile is a build error", async ({ page }) => {
