@@ -43,9 +43,8 @@ test("admin: triage the reports queue", async ({ page }) => {
 	await test.step("the queue narrows by type", async () => {
 		await page
 			.getByRole("group", { name: "Filter by type", exact: true })
-			.locator("select")
-			.selectOption({ label: "Bug" });
-		await page.getByRole("button", { name: "Filter" }).click();
+			.getByRole("link", { name: "Bug", exact: true })
+			.click();
 		await expect(page.getByRole("article")).toHaveCount(1);
 	});
 
@@ -75,13 +74,12 @@ test("admin: triage the reports queue", async ({ page }) => {
 	await test.step("a resolved report keeps the note it was triaged with", async () => {
 		await page
 			.getByRole("group", { name: "Filter by status", exact: true })
-			.locator("select")
-			.selectOption({ label: "Resolved" });
+			.getByRole("link", { name: "Resolved", exact: true })
+			.click();
 		await page
 			.getByRole("group", { name: "Filter by type", exact: true })
-			.locator("select")
-			.selectOption({ label: "All" });
-		await page.getByRole("button", { name: "Filter" }).click();
+			.getByRole("link", { name: "All", exact: true })
+			.click();
 		await expect(page.getByRole("article")).toHaveCount(2);
 		const item = page
 			.getByRole("article")

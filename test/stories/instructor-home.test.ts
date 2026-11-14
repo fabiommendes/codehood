@@ -332,6 +332,57 @@ test("instructor: see what needs my attention", async ({ page }) => {
 	});
 });
 
+test("instructor: find my way around a course home", async ({ page }) => {
+	const teacher = await seedUser({ role: "INSTRUCTOR", username: "prof" });
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	for (let i = 1; i <= 7; i++) {
+		await persistedExamFactory.create({
+			course: course.id,
+			slug: `quiz-${i}`,
+			title: `Quiz ${i}`,
+			type: "QUIZ",
+			status: "SCHEDULED",
+			scheduledAt: new Date(Date.now() + i * 24 * 60 * MINUTE),
+		});
+	}
+
+	await logInAs(page, teacher);
+	await page.goto(hrefOf(course));
+
+	await test.step("the exams section stops at the limit and links to the full list", async () => {
+		const exams = section(page, "Exams");
+		await expect(exams.getByRole("link", { name: /Quiz \d/ })).toHaveCount(5);
+		await expect(exams.getByRole("link", { name: /Quiz 1\b/ })).toBeVisible();
+		await expect(exams.getByRole("link", { name: /Quiz 6/ })).toHaveCount(0);
+		await expect(
+			exams.getByRole("link", { name: "View all →", exact: true }),
+		).toHaveAttribute("href", `${hrefOf(course)}/exams`);
+	});
+
+	await test.step("the sections come in the order schedule, exams, resources", async () => {
+		const headings = await page.locator("main section h2").allTextContents();
+		expect(headings).toEqual(["Schedule", "Exams", "Resources"]);
+	});
+
+	await test.step("the sidebar links each section of the page, then the instructor pages", async () => {
+		const card = page.locator("[data-course-card]");
+		await expect(
+			card.getByRole("link", { name: "Schedule", exact: true }),
+		).toHaveAttribute("href", "#schedule");
+		await expect(
+			card.getByRole("link", { name: "Exams", exact: true }),
+		).toHaveAttribute("href", "#exams");
+		await expect(
+			card.getByRole("link", { name: "Resources", exact: true }),
+		).toHaveAttribute("href", "#resources");
+		await expect(
+			card.getByRole("link", { name: "Reports", exact: true }),
+		).toBeVisible();
+	});
+});
+
 //
 // Utilities
 //

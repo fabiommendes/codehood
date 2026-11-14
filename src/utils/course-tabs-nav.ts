@@ -5,7 +5,7 @@
  */
 
 import { m } from "@/i18n";
-import type { CourseNav, NavEntry } from "./course-nav";
+import type { CourseNav, NavEntry, NavSection } from "./course-nav";
 import { examTypeLabels } from "./exam-display";
 
 /** The id of the section of the resources page that holds one kind of resource. */
@@ -76,16 +76,31 @@ export function scheduleNav(
 	return { sections: [{ entries }] };
 }
 
-/** Links to the instructor's pages of the home tab: the content reports and the settings. */
-export function homeNav(href: string): CourseNav {
+/**
+ * Links to the instructor's pages of the home tab: the content reports and the
+ * settings. The home page also passes `sections`, the ones it shows, which
+ * come first as links to the page's own sections.
+ */
+export function homeNav(
+	href: string,
+	sections: readonly { id: string; label: string }[] = [],
+): CourseNav {
+	const pages: NavSection = {
+		entries: [
+			{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
+			{ label: m.nav_course_settings(), href: `${href}/settings` },
+		],
+	};
+	if (sections.length === 0) return { sections: [pages] };
 	return {
 		sections: [
 			{
-				entries: [
-					{ label: m.nav_course_tab_reports(), href: `${href}/reports` },
-					{ label: m.nav_course_settings(), href: `${href}/settings` },
-				],
+				entries: sections.map(({ id, label }) => ({
+					label,
+					href: `${href}#${id}`,
+				})),
 			},
+			pages,
 		],
 	};
 }

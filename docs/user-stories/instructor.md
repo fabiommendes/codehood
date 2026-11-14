@@ -83,6 +83,17 @@ they also take a course as a student, those items appear on the same page,
 marked with the course they belong to.
 
 
+### Find my way around a course home
+
+    status: implemented
+    url: /[discipline]/[course]
+
+Instructor opens a course and wants to reach the schedule, the exams or the
+resources without scrolling. The sections come in that order, the sidebar links
+to each of them, and the exams section previews a few exams and links to the
+full list.
+
+
 ### See the sync status of a course
 
     status: todo

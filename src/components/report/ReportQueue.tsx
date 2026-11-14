@@ -124,8 +124,8 @@ function ReportCard(props: {
 	}
 
 	return (
-		<article class="card card-border bg-base-100">
-			<div class="card-body gap-3">
+		<article class="rounded-box border border-base-300 bg-base-100 shadow-sm">
+			<div class="flex flex-col gap-3 p-5">
 				<header class="flex flex-wrap items-center gap-2 text-sm">
 					<span class="badge badge-outline">
 						{REPORT_KIND_LABELS[props.row.kind]()}

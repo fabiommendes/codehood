@@ -100,6 +100,9 @@ const examPreview = courseHomeExams(
 	now,
 	{ withDrafts: canWrite, exceptions: ownExceptions },
 );
+/// How many exams the home previews; the Exams tab lists them all.
+const EXAMS_SHOWN = 5;
+const shownExams = examPreview.exams.slice(0, EXAMS_SHOWN);
 
 // A student's own grades: the service already narrows a student's read to the
 // released columns and their own value.
@@ -162,11 +165,18 @@ const nextEvents = await db.calendarEvent.findMany(
 	{ courseIds: [course.id], from: startOfLocalDay(now), limit: 3 },
 	{ actor },
 );
+
+// The instructor's sidebar links to the sections the page shows, in page order.
+const sectionLinks = [
+	{ id: "schedule", label: m.nav_course_tab_schedule() },
+	...(shownExams.length > 0 ? [{ id: "exams", label: examPreview.title }] : []),
+	{ id: "resources", label: m.nav_course_tab_resources() },
+];
 ---
 
 <AppLayout title={course.discipline.name}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={hasPerm(actor, "enrollment.manage", course) ? homeNav(href) : undefined}
+  nav={hasPerm(actor, "enrollment.manage", course) ? homeNav(href, sectionLinks) : undefined}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     {
@@ -225,84 +235,7 @@ const nextEvents = await db.calendarEvent.findMany(
       )
     }
 
-    {
-      examPreview.exams.length > 0 && (
-        <section class="mt-10">
-          <SectionHeader title={examPreview.title} href={`${href}/exams`} />
-
-          <div class="mt-4 flex flex-col gap-3">
-            {examPreview.exams.map(({ exam, pending }) => (
-              <ExamRow exam={exam} href={href} pending={pending} exception={ownExceptions.get(exam.slug)} />
-            ))}
-          </div>
-        </section>
-      )
-    }
-
-    {
-      gradeColumns.length > 0 && (
-        <section class="mt-10" aria-label={m.nav_course_tab_grades()}>
-          <SectionHeader title={m.nav_course_tab_grades()} />
-
-          <ul aria-label={m.nav_course_tab_grades()} class="mt-4 flex flex-col gap-3">
-            {gradeColumns.map((column) => {
-              const value = column.values[0]?.value;
-              return (
-                <li class="flex items-baseline justify-between gap-4 rounded-box border border-base-300 bg-base-100 px-4 py-3">
-                  <span class="font-medium">{column.title}</span>
-                  <span class={value === undefined ? "text-sm text-muted" : "font-medium"}>
-                    {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )
-    }
-
-    <section class="mt-10">
-      <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
-
-      {
-        resources.length === 0 ? (
-          <p class="mt-4 text-sm text-muted">
-            {eventResources.size > 0 ? (
-              <span
-                set:html={m.courses_resources_on_schedule({
-                  schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
-                })}
-              />
-            ) : canWrite ? (
-              <>
-                {m.courses_home_no_resources_instructor()} <CliSetupLink />
-              </>
-            ) : (
-              m.courses_home_no_resources_student()
-            )}
-          </p>
-        ) : (
-          <div class="mt-4 flex flex-col gap-3">
-            {newestResources.map((resource) => (
-              <ListRow
-                href={resourceHref(resource, href)}
-                download={
-                  resource.data.type === "FILE"
-                    ? fileDownloadName(resource, resource.data)
-                    : undefined
-                }
-                external={resource.data.type === "LINK"}
-              >
-                <p class="font-medium">{resource.title}</p>
-                <p class="text-sm text-muted">{resourceDetail(resource)}</p>
-              </ListRow>
-            ))}
-          </div>
-        )
-      }
-    </section>
-
-    <section class="mt-10">
+    <section id="schedule" class="mt-10 scroll-mt-20">
       <SectionHeader title={m.nav_course_tab_schedule()} href={`${href}/schedule`} />
 
       {
@@ -355,6 +288,83 @@ const nextEvents = await db.calendarEvent.findMany(
               )}
             </div>
           </>
+        )
+      }
+    </section>
+
+    {
+      examPreview.exams.length > 0 && (
+        <section id="exams" class="mt-10 scroll-mt-20">
+          <SectionHeader title={examPreview.title} href={`${href}/exams`} />
+
+          <div class="mt-4 flex flex-col gap-3">
+            {shownExams.map(({ exam, pending }) => (
+              <ExamRow exam={exam} href={href} pending={pending} exception={ownExceptions.get(exam.slug)} />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
+      gradeColumns.length > 0 && (
+        <section class="mt-10" aria-label={m.nav_course_tab_grades()}>
+          <SectionHeader title={m.nav_course_tab_grades()} />
+
+          <ul aria-label={m.nav_course_tab_grades()} class="mt-4 flex flex-col gap-3">
+            {gradeColumns.map((column) => {
+              const value = column.values[0]?.value;
+              return (
+                <li class="flex items-baseline justify-between gap-4 rounded-box border border-base-300 bg-base-100 px-4 py-3">
+                  <span class="font-medium">{column.title}</span>
+                  <span class={value === undefined ? "text-sm text-muted" : "font-medium"}>
+                    {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )
+    }
+
+    <section id="resources" class="mt-10 scroll-mt-20">
+      <SectionHeader title={m.nav_course_tab_resources()} href={`${href}/resources`} />
+
+      {
+        resources.length === 0 ? (
+          <p class="mt-4 text-sm text-muted">
+            {eventResources.size > 0 ? (
+              <span
+                set:html={m.courses_resources_on_schedule({
+                  schedule: `<a href="${escapeHtml(href)}/schedule" class="link">${escapeHtml(m.courses_resources_schedule_link())}</a>`,
+                })}
+              />
+            ) : canWrite ? (
+              <>
+                {m.courses_home_no_resources_instructor()} <CliSetupLink />
+              </>
+            ) : (
+              m.courses_home_no_resources_student()
+            )}
+          </p>
+        ) : (
+          <div class="mt-4 flex flex-col gap-3">
+            {newestResources.map((resource) => (
+              <ListRow
+                href={resourceHref(resource, href)}
+                download={
+                  resource.data.type === "FILE"
+                    ? fileDownloadName(resource, resource.data)
+                    : undefined
+                }
+                external={resource.data.type === "LINK"}
+              >
+                <p class="font-medium">{resource.title}</p>
+                <p class="text-sm text-muted">{resourceDetail(resource)}</p>
+              </ListRow>
+            ))}
+          </div>
         )
       }
     </section>

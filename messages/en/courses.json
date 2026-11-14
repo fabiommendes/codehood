@@ -157,12 +157,9 @@
 	"courses_leave_error": "Something went wrong. Try again.",
 	"courses_leave_submit": "Leave course",
 	"courses_roster_page_title": "Students · {discipline}",
-	"courses_roster_add_heading": "Add students",
-	"courses_roster_add_intro": "Three ways for a student to join: add them by name, hand out a shareable link, or read a passphrase out in class.",
 	"courses_roster_invite_revoked": "Invite revoked.",
 	"courses_roster_add_student": "Add student",
 	"courses_roster_passphrase": "Passphrase",
-	"courses_roster_students_heading": "Students",
 	"courses_roster_enrolled_count": [
 		{
 			"declarations": [
@@ -178,7 +175,7 @@
 		}
 	],
 	"courses_roster_empty": "No students enrolled yet.",
-	"courses_roster_add_body": "Someone who already has an account is enrolled right away. For an email with no account yet, you get a single-use invite link that creates the account and enrolls it.",
+	"courses_roster_add_body": "Existing accounts are enrolled right away. An email with no account gets a one-time invite link.",
 	"courses_roster_no_account": "No account yet. Send {email} this link:",
 	"courses_roster_copy_invite": "Copy invite link",
 	"courses_roster_copy": "Copy",
@@ -223,5 +220,5 @@
 	"courses_settings_enrollment_heading": "Joining the class",
 	"courses_settings_cli_heading": "CLI",
 	"courses_settings_cli_intro": "Create the course repository and log in from inside it.",
-	"courses_roster_settings_link": "Passphrase and invite links are in Settings."
+	"courses_roster_settings_link": "Invite links and passphrase"
 }

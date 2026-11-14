@@ -92,4 +92,19 @@ test.describe("homeNav", () => {
 			{ label: "Settings", href: `${href}/settings` },
 		]);
 	});
+
+	test("puts the sections of the home page before the pages", () => {
+		const nav = homeNav(href, [
+			{ id: "schedule", label: "Schedule" },
+			{ id: "exams", label: "Exams" },
+		]);
+		expect(nav.sections[0]?.entries).toEqual([
+			{ label: "Schedule", href: `${href}#schedule` },
+			{ label: "Exams", href: `${href}#exams` },
+		]);
+		expect(nav.sections[1]?.entries.map((e) => e.label)).toEqual([
+			"Reports",
+			"Settings",
+		]);
+	});
 });

@@ -1,6 +1,11 @@
 ---
-// The filter form of a report queue: status and type, sent as a query string.
-import { reportKind, reportStatus } from "@/core/schemas";
+// The filters of a report queue: one button group per filter, each button a link that sets it in the query string.
+import {
+	type ReportKind,
+	type ReportStatus,
+	reportKind,
+	reportStatus,
+} from "@/core/schemas";
 import { m } from "@/i18n";
 import { ALL_REPORTS, type ReportFilters } from "@/utils/report-filters";
 import { REPORT_KIND_LABELS, REPORT_STATUS_LABELS } from "@/utils/report-row";
@@ -12,36 +17,60 @@ interface Props {
 }
 
 const { filters, hideKind = false } = Astro.props;
+
+/// The queue's URL with `status` and `kind` replaced; `kind` is left out when unset or hidden.
+function hrefWith(
+	status: ReportStatus | null,
+	kind: ReportKind | null,
+): string {
+	const params = new URLSearchParams({ status: status ?? ALL_REPORTS });
+	if (kind && !hideKind) params.set("kind", kind);
+	return `?${params}`;
+}
+
+const statusOptions = [
+	...reportStatus.options.map((value) => ({
+		value,
+		label: REPORT_STATUS_LABELS[value](),
+	})),
+	{ value: null, label: m.report_filter_all() },
+];
+const kindOptions = [
+	{ value: null, label: m.report_filter_all() },
+	...reportKind.options.map((value) => ({
+		value,
+		label: REPORT_KIND_LABELS[value](),
+	})),
+];
 ---
 
-<form method="GET" class="mb-6 flex flex-wrap items-end gap-4">
-  <fieldset class="fieldset">
-    <legend class="fieldset-legend"><label for="report-filter-status">{m.report_filter_status()}</label></legend>
-    <select name="status" id="report-filter-status" class="select">
-      {
-        reportStatus.options.map((option) => (
-          <option value={option} selected={filters.status === option}>
-            {REPORT_STATUS_LABELS[option]()}
-          </option>
-        ))
-      }
-      <option value={ALL_REPORTS} selected={filters.status === null}>{m.report_filter_all()}</option>
-    </select>
-  </fieldset>
+<div class="mb-6 flex flex-wrap items-end gap-4">
+  <div role="group" aria-label={m.report_filter_status()} class="join">
+    {
+      statusOptions.map((option) => (
+        <a
+          href={hrefWith(option.value, filters.kind)}
+          class:list={["btn join-item", filters.status === option.value && "btn-active"]}
+          aria-current={filters.status === option.value ? "true" : undefined}
+        >
+          {option.label}
+        </a>
+      ))
+    }
+  </div>
   {
     !hideKind && (
-      <fieldset class="fieldset">
-        <legend class="fieldset-legend"><label for="report-filter-kind">{m.report_filter_type()}</label></legend>
-        <select name="kind" id="report-filter-kind" class="select">
-          <option value={ALL_REPORTS} selected={filters.kind === null}>{m.report_filter_all()}</option>
-          {reportKind.options.map((option) => (
-            <option value={option} selected={filters.kind === option}>
-              {REPORT_KIND_LABELS[option]()}
-            </option>
-          ))}
-        </select>
-      </fieldset>
+      <div role="group" aria-label={m.report_filter_type()} class="join">
+        {kindOptions.map((option) => (
+          <a
+            href={hrefWith(filters.status, option.value)}
+            class:list={["btn join-item", filters.kind === option.value && "btn-active"]}
+            aria-current={filters.kind === option.value ? "true" : undefined}
+          >
+            {option.label}
+          </a>
+        ))}
+      </div>
     )
   }
-  <button type="submit" class="btn">{m.report_filter_apply()}</button>
-</form>
+</div>
