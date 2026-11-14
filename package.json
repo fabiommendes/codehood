@@ -39,6 +39,7 @@
 		"test:plugins": "playwright test -c src/runner/plugins/playwright.config.ts",
 		"test:scheme": "pnpm --filter @codehood/runner-scheme test",
 		"test-ui": "tsx test/run.ts --ui",
+		"load": "ENVIRONMENT=prod tsx test/load/run.ts",
 		"ui-report": "playwright show-report",
 		"lint:fix": "biome check --write .",
 		"lint": "biome ci . && tsx scripts/i18n-check.ts && pnpm run typecheck && pnpm run stories --check",

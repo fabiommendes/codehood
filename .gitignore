@@ -5,6 +5,7 @@ dist/
 test/.tmp/
 packages/*/test/.tmp/
 test-results/
+.load/
 playwright-report/
 coverage/
 
