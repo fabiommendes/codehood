@@ -10,7 +10,7 @@ import ReportDialog from "@/components/report/ReportDialog";
 import ThemeToggle from "@/components/ThemeToggle.astro";
 import { db } from "@/db";
 import { m } from "@/i18n";
-import { courseHref } from "@/urls";
+import { courseHref, parseCourseSegment } from "@/urls";
 import {
 	breadcrumbs,
 	COURSE_TAB_LABELS,
@@ -33,7 +33,9 @@ const { title, trail, nav } = Astro.props;
 const crumbs = trail ?? breadcrumbs(Astro.url, { page: title });
 const user = Astro.locals.actor;
 
-const userCourses = user ? await db.course.findMany({}, { actor: user }) : [];
+const userCourses = user
+	? await db.course.findMany({ member: user.username }, { actor: user })
+	: [];
 const courses = user
 	? userCourses.map((course) => ({
 			code: course.discipline.slug,
@@ -50,7 +52,7 @@ const courses = user
 // The course the page belongs to, for the report dialog, and whether the page
 // is about the course's material (the tabs whose content a report may be about).
 const CONTENT_TABS = new Set(["questions", "exams", "resources"]);
-const reportCourse = user
+const memberCourse = user
 	? (userCourses.find((course) => {
 			const href = courseHref({
 				discipline: course.discipline.slug,
@@ -62,6 +64,20 @@ const reportCourse = user
 			);
 		}) ?? null)
 	: null;
+// An admin may open a course without taking part in it.
+const { discipline: disciplineParam, course: courseParam } = Astro.params;
+const visitedKey =
+	user && !memberCourse && disciplineParam && courseParam
+		? parseCourseSegment(courseParam)
+		: null;
+const reportCourse =
+	memberCourse ??
+	(user && visitedKey && disciplineParam
+		? await db.course.findOne(
+				{ discipline: disciplineParam, ...visitedKey },
+				{ actor: user },
+			)
+		: null);
 const reportCourseHref = reportCourse
 	? courseHref({
 			discipline: reportCourse.discipline.slug,

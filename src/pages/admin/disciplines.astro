@@ -43,14 +43,7 @@ const failedSlug = updateResult?.error
 	: undefined;
 
 const disciplines = await db.discipline.findMany({}, { actor });
-const courses = await db.course.findMany({}, { actor });
-const courseCounts = new Map<string, number>();
-for (const course of courses) {
-	courseCounts.set(
-		course.discipline.slug,
-		(courseCounts.get(course.discipline.slug) ?? 0) + 1,
-	);
-}
+const courseCounts = await db.course.countBy("discipline", { actor });
 
 const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
 	slug: discipline.slug,

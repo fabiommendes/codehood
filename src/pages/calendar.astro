@@ -31,7 +31,7 @@ export const prerender = false;
 const actor = Astro.locals.actor;
 if (!actor) return Astro.redirect("/login");
 
-const courses = await db.course.findMany({}, { actor });
+const courses = await db.course.findMany({ member: actor.username }, { actor });
 const courseIds = courses.map((c) => c.id);
 
 // A per-course color dot, cycling through a fixed palette so the same course

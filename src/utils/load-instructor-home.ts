@@ -34,9 +34,7 @@ export async function loadInstructorHome(
 ): Promise<InstructorHome & { regrades: RegradeQueueItem[] }> {
 	const courses = only
 		? [only]
-		: (await db.course.findMany({}, { actor })).filter(
-				(course) => course.instructor.username === actor.username,
-			);
+		: await db.course.findMany({ instructor: actor.username }, { actor });
 
 	const codes = courses.map((course) => course.discipline.slug);
 	const repeated = new Set(

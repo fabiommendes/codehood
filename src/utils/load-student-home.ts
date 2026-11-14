@@ -26,9 +26,9 @@ export async function loadStudentHome(
 	actor: UserActor,
 	now: Date,
 ): Promise<StudentHome & { regrades: HomeRegrade[] }> {
-	const courses = (await db.course.findMany({}, { actor })).filter(
-		(course) => course.instructor.username !== actor.username,
-	);
+	const courses = (
+		await db.course.findMany({ member: actor.username }, { actor })
+	).filter((course) => course.instructor.username !== actor.username);
 
 	const perCourse = await Promise.all(
 		courses.map(async (course) => {

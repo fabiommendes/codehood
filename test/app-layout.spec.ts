@@ -89,6 +89,35 @@ test("on a course page the sidebar marks that course as the current page", async
 	);
 });
 
+test("an admin sees in the sidebar only the courses they take part in, and still gets the card of one they visit", async ({
+	page,
+}) => {
+	const admin = await seedUser({ role: "ADMIN" });
+	const taught = await persistedCourseFactory.create({
+		instructor: admin.username,
+	});
+	const other = await persistedCourseFactory.create({});
+
+	const entry = (code: string) =>
+		page.locator(".drawer-side a").filter({ hasText: code });
+
+	await logInAs(page, admin);
+	await page.goto("/home");
+	await expect(entry(taught.discipline.slug)).toHaveCount(1);
+	await expect(entry(other.discipline.slug)).toHaveCount(0);
+	await expect(page.locator("main")).not.toContainText(other.discipline.name);
+
+	await page.goto("/calendar");
+	await expect(page.locator("main")).not.toContainText(other.discipline.name);
+
+	await page.goto(
+		`/${other.discipline.slug}/${other.instructor.username}_${other.edition.slug}/exams`,
+	);
+	await expect(page.locator("[data-course-card]")).toContainText(
+		other.discipline.slug,
+	);
+});
+
 test("the footer names the version and links to the source code", async ({
 	page,
 }) => {

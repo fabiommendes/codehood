@@ -47,19 +47,16 @@ const editionFormState = await actionForm(
 	{ id: "new-edition" },
 );
 
-const [users, courses, disciplines, editions, invites] = await Promise.all([
-	db.user.findMany({}, { actor }),
-	db.course.findMany({}, { actor }),
-	db.discipline.findMany({}, { actor }),
-	db.edition.findMany({}, { actor }),
-	db.invite.findMany({ kind: "PERSONAL" }, { actor }),
-]);
+const [userCounts, courseCount, disciplines, editions, invites] =
+	await Promise.all([
+		db.user.countByRole({ actor }),
+		db.course.count({}, { actor }),
+		db.discipline.findMany({}, { actor }),
+		db.edition.findMany({}, { actor }),
+		db.invite.findMany({ kind: "PERSONAL" }, { actor }),
+	]);
 
-const userCounts = {
-	ADMIN: users.filter((u) => u.role === "ADMIN").length,
-	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
-	STUDENT: users.filter((u) => u.role === "STUDENT").length,
-};
+const userCount = userCounts.ADMIN + userCounts.INSTRUCTOR + userCounts.STUDENT;
 
 const liveEditions = editions.filter((e) => isEditionOpen(e)).length;
 
@@ -111,7 +108,7 @@ const editionCreatedParts = editionResult?.data
     >
       <div class="stat">
         <div class="stat-title">{m.admin_overview_stat_users()}</div>
-        <div class="stat-value text-2xl">{users.length}</div>
+        <div class="stat-value text-2xl">{userCount}</div>
         <div class="stat-desc">
           {m.admin_overview_admins({ count: userCounts.ADMIN })} · {
             m.admin_overview_instructors({ count: userCounts.INSTRUCTOR })
@@ -120,7 +117,7 @@ const editionCreatedParts = editionResult?.data
       </div>
       <div class="stat">
         <div class="stat-title">{m.admin_overview_stat_courses()}</div>
-        <div class="stat-value text-2xl">{courses.length}</div>
+        <div class="stat-value text-2xl">{courseCount}</div>
         <div class="stat-desc">{m.admin_overview_across_disciplines({ count: disciplines.length })}</div>
       </div>
       <div class="stat">

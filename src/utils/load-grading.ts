@@ -59,7 +59,7 @@ export async function loadGrading(
 	discipline: string | undefined,
 	courseSegment: string | undefined,
 	examSlug: string | undefined,
-	options: { practice?: boolean } = {},
+	options: { practice?: boolean; author?: string } = {},
 ): Promise<LoadGradingResult> {
 	const result = await loadCourse(Astro, discipline, courseSegment, {
 		manage: true,
@@ -86,6 +86,7 @@ export type ExamGrading = Omit<
  * Loads the exam's attempts, grading passes and counting answers, or `null` for an exam that does not exist or is a practice exam.
  *
  * With `options.practice` a practice exam loads too, with all of its attempts.
+ * With `options.author` only the attempts and passes of that student load.
  *
  * Does not check who `actor` is: the services it reads through do.
  */
@@ -93,7 +94,7 @@ export async function loadExamGrading(
 	course: Parameters<typeof db.examException.findMany>[0]["course"],
 	examSlug: string | undefined,
 	actor: UserActor,
-	options: { practice?: boolean } = {},
+	options: { practice?: boolean; author?: string } = {},
 ): Promise<ExamGrading | null> {
 	const exam = examSlug
 		? await db.exam.findOne({ course, slug: examSlug }, { actor })
@@ -109,10 +110,14 @@ export async function loadExamGrading(
 				course,
 				exam: exam.slug,
 				practice: exam.type === "PRACTICE" ? undefined : false,
+				author: options.author,
 			},
 			{ actor },
 		),
-		db.feedback.findMany({ course, exam: exam.slug }, { actor }),
+		db.feedback.findMany(
+			{ course, exam: exam.slug, author: options.author },
+			{ actor },
+		),
 		loadCourseExceptions(course),
 		db.course.findOne(typeof course === "number" ? { id: course } : course, {
 			actor,

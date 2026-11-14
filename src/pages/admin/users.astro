@@ -46,11 +46,7 @@ const users = (await db.user.findMany(
 	{ actor: Astro.locals.actor },
 )) as Array<User & { createdAt: Date }>;
 
-const counts = {
-	ADMIN: users.filter((u) => u.role === "ADMIN").length,
-	INSTRUCTOR: users.filter((u) => u.role === "INSTRUCTOR").length,
-	STUDENT: users.filter((u) => u.role === "STUDENT").length,
-};
+const counts = await db.user.countByRole({ actor: Astro.locals.actor });
 
 // The account-created message split around the username, which is rendered apart.
 const [createdBefore, createdAfter] = splitAtSlot(

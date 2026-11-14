@@ -40,6 +40,7 @@ export const prerender = false;
 const { discipline, course: courseSegment, slug, username } = Astro.params;
 const result = await loadGrading(Astro, discipline, courseSegment, slug, {
 	practice: true,
+	author: username,
 });
 if ("redirect" in result) return result.redirect;
 const { course, href, exam, questions, attempts, feedback, exceptions } =
@@ -53,7 +54,10 @@ const actor = Astro.locals.actor!;
 const now = new Date();
 const [students, stored] = await Promise.all([
 	loadStudents(course.id, actor),
-	db.question.findMany({ course: course.id, public: false }, { actor }),
+	db.question.findMany(
+		{ course: course.id, public: false, slugs: questions },
+		{ actor },
+	),
 ]);
 const docs = new Map(stored.map((entry) => [entry.slug, entry.question]));
 const versions = new Map(stored.map((entry) => [entry.slug, entry.version]));

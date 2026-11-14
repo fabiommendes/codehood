@@ -132,6 +132,30 @@
   apareça como texto digitado. O seed dá à `hopper`, na `test-03`, um
   histórico com digitação e colagem.
 
+- Log de performance do servidor (`src/perf/`), ligado por padrão em
+  produção (`PERF_LOG`). Uma linha JSON por requisição (`request`) com padrão
+  da rota, status, duração, tempo e número de queries no SQLite, espera pelo
+  mutex de transação, chamada de service mais lenta, tipo de credencial e
+  usuário; nunca URL, corpo ou credencial. O tempo de banco é medido no
+  adapter do SQLite, então cobre `$queryRaw` e o `COMMIT`. Uma query ou uma
+  chamada de service acima do limiar ganha linha própria (`slow-query`,
+  `slow-service`), assim como um event loop parado (`stall`, com o último
+  service visto). A cada minuto, `process` traz memória, CPU, atraso do event
+  loop, totais do intervalo, tempo de `COMMIT`, tamanho do banco e a fila de
+  correção (`gradingJob.totals`). A resposta leva `X-Request-Id`, e o id que o
+  proxy mandar é mantido. Os services recebem o nome da chave em `db`
+  (`nameServices`), sem mudar cada `defineService`. Custo medido: abaixo do
+  ruído entre rodadas num build de produção (~1,4 ms por requisição com e sem
+  o log) e ~0,7 µs por chamada de service. Ver "Performance log" no
+  `README.md`.
+
+- `pnpm run test:perf` roda o `e2e` duas vezes com o log de performance
+  ligado, no banco do seed e no mesmo banco com dados em massa
+  (`test/fill/`, ~827 mil linhas em 7 s na escala 1, em cursos `bulk-*`
+  próprios), e relata as rotas cujo tempo de SQLite cresceu e as SQL lentas
+  só no banco cheio (`test/perf/`). `TEST_PERF_LOG` e `TEST_FILL` fazem cada
+  metade à parte. Achados em `dev/issues/consultas-que-crescem-com-o-banco.md`.
+
 ### Changed
 
 - A aba "Estudantes" do professor reúne turma, notas e presença: a aba
@@ -145,6 +169,20 @@
 - Nova ordem das abas do curso: Início, Agenda, Estudantes, Materiais,
   Avaliações, Questões (Estudantes e Questões só para o professor). A aba
   "Relatos" saiu: o card do curso na home do professor liga os relatos.
+
+- A barra lateral, a `/home` e o `/calendar` mostram ao admin só os cursos de
+  que ele participa (leciona ou está matriculado), como já era para os outros
+  papéis. Antes carregavam todos os cursos da instância em toda página. Um
+  curso que o admin visita sem participar continua com o cartão na barra.
+
+- **Quebra a API REST:** toda rota de lista responde `{ items, next }` em vez
+  de um array. `GET /api/course` e `GET /api/user` são paginadas por cursor
+  (`limit`, padrão 100 e máximo 500, e `after`); as outras 17 devolvem tudo
+  com `next: null` até serem paginadas. O cursor de curso é o id mascarado
+  (`src/utils/cursor.ts`), o de usuário é o `username`. `GET /api/user` não
+  aceita mais `take`. Os services paginados ganham `findPage` e `count`;
+  `findMany` continua devolvendo array. A CLI segue `next` em toda lista.
+  Contrato em `dev/specs/to-do/paginacao-das-listas.md`.
 
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
@@ -226,6 +264,26 @@ schema antigo: as seis linhas saíram com `YYYY-MM-DD` válido e nenhuma ficou
 nula.
 
 ### Fixed
+
+- As páginas de admin contam em vez de carregar: `/admin` usa
+  `user.countByRole` e `course.count`, `/admin/disciplines` e
+  `/admin/editions` usam `course.countBy`. Com 300 cursos e 5 mil usuários,
+  `/admin` foi de 162 ms para 5–8 ms de SQLite e as outras duas de 60–70 ms
+  para 1–3 ms. A página de uma tentativa carrega só as respostas e os
+  feedbacks daquele aluno, e só as questões da prova, em vez da prova e do
+  banco inteiros.
+
+- Listar os feedbacks de um curso ou de uma prova não percorre mais a tabela
+  `Feedback` inteira: `feedback.findMany` parte das provas do curso
+  (85 ms → menos de 1 ms com 160 mil feedbacks no banco). Índices novos em
+  `Feedback.rubricId`, `Submission.questionId`,
+  `QuestionsForExam.questionRefId`, `Rubric.questionRefId`,
+  `AnswerEditField.questionId` e `QuestionRef.latestId`, que eram varridas ao
+  editar uma rubrica ou apagar uma questão.
+
+- O `op` das linhas `slow-query` nomeia a chamada de service que rodou a
+  consulta também quando a página chama services em paralelo; antes nomeava a
+  última chamada iniciada.
 
 - O servidor travava durante uma prova com workers corrigindo a fila (502 e
   timeouts na `teste2-elm`). `Submission` não tinha índice por tentativa e
