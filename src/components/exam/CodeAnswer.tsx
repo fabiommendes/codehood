@@ -659,10 +659,17 @@ function CaseRow(props: { item: ReportCase; n: number }): JSX.Element {
 				<span class="font-mono text-xs">
 					{props.item.id ?? m.code_case_untitled({ n: String(props.n) })}
 				</span>
-				<Show when={props.item.message}>
-					{(message) => <span class="text-base-content/80">{message()}</span>}
-				</Show>
 			</div>
+			<Show when={props.item.message}>
+				{(message) => (
+					<pre
+						class="m-0 overflow-x-auto font-mono text-xs leading-5 whitespace-pre-wrap text-base-content/80"
+						data-case-message
+					>
+						{message()}
+					</pre>
+				)}
+			</Show>
 			<Show
 				when={
 					props.item.expected !== undefined || props.item.actual !== undefined
