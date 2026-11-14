@@ -7,6 +7,8 @@
  */
 import type { ZodType } from "zod";
 import { ImproperBehavior, InvalidData } from "@/core/error";
+import { beginServiceCall, endServiceCall } from "@/perf/service";
+import { runAsOp } from "@/perf/state";
 import { type SchemaItem, validateArgs } from "@/utils/validate";
 import type {
 	CrudT,
@@ -158,10 +160,10 @@ export function defineService<
 	) =>
 		(client: PrismaClient = prisma): Service<O> => {
 			const service: Record<string, unknown> = {};
+			const label = { name: "service" };
 			for (const [name, operation] of Object.entries(build(client))) {
 				const direct = withoutTransaction.has(operation);
-				service[name] = (...args: unknown[]) => {
-					const opts = args[args.length - 1] as ServiceOpts;
+				const run = (args: unknown[], opts: ServiceOpts) => {
 					if (direct) {
 						const { tx, ...scoped } = opts ?? ({} as ServiceOpts);
 						return operation(tx ?? client, ...args.slice(0, -1), scoped);
@@ -170,7 +172,40 @@ export function defineService<
 						operation(tx, ...args.slice(0, -1), scoped),
 					);
 				};
+				const method = (...args: unknown[]) => {
+					const opts = args[args.length - 1] as ServiceOpts;
+					const call = beginServiceCall(
+						`${label.name}.${name}`,
+						opts?.tx !== undefined,
+						opts?.actor,
+					);
+					if (!call) return run(args, opts);
+					const result = runAsOp(call.op, run, args, opts);
+					endServiceCall(call, result);
+					return result;
+				};
+				labels.set(method, label);
+				service[name] = method;
 			}
 			return service as Service<O>;
 		};
+}
+
+/// The name each service method reports in the performance log.
+const labels = new WeakMap<object, { name: string }>();
+
+/**
+ * Names the services of a registry after their keys, for the performance log.
+ *
+ * A service that is in no registry reports as `service`.
+ *
+ * @example
+ * nameServices({ course: makeCourseService() }); // logs `course.findOne`
+ */
+export function nameServices(registry: Record<string, object>): void {
+	for (const [name, service] of Object.entries(registry))
+		for (const method of Object.values(service)) {
+			const label = typeof method === "function" && labels.get(method);
+			if (label) label.name = name;
+		}
 }

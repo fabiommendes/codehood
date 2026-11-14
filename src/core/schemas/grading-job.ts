@@ -128,6 +128,14 @@ export const gradingJobSummary = z.object({
 	),
 });
 
+/// Row counts of the grading queue across every course.
+export const gradingJobTotals = z.object({
+	submissions: z.number().int().min(0),
+	jobs: z.record(gradingJobState, z.number().int().min(0)),
+	/// Claimed jobs whose lease has not run out.
+	leases: z.number().int().min(0),
+});
+
 /// Names the answer and question whose submissions a student looks up.
 export const gradingJobStudentQuery = z.object({
 	response: publicId,

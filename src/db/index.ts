@@ -5,6 +5,7 @@
  */
 export * as schema from "@/core/schemas";
 
+import { nameServices } from "./define-service";
 import { makeAnswerEditService } from "./services/answer-edit.service";
 import { makeApiKeyService } from "./services/api-key.service";
 import { makeAttachmentService } from "./services/attachment.service";
@@ -316,3 +317,5 @@ export const db = {
 	timeSlot: makeTimeSlotService(),
 	user: makeUserService(),
 } as const;
+
+nameServices(db);

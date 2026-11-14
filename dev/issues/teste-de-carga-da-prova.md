@@ -2,7 +2,7 @@
 type: issue
 status: todo
 tags: [performance, load-test, exam, grading-bot, e2e]
-relatedTo: [metricas-de-performance-no-servidor, tempo-dos-services-no-log, sqlite-em-modo-wal, pre-testes-elm-e2e]
+relatedTo: [metricas-de-performance-no-servidor, sqlite-em-modo-wal, pre-testes-elm-e2e]
 kind: feature
 priority: high
 created: 2026-11-13

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import {
 	E2E_WORKERS,
@@ -50,11 +51,18 @@ const unitConfig = defineConfig({
 /// One server per worker, each with its own database and blobs, all running
 /// the build `test/run.ts` made.
 const E2E_SERVER_COUNT = currentScope() === "e2e" ? E2E_WORKERS : 0;
+/// `TEST_PERF_LOG`: an existing directory the servers write their performance log to, one file each.
+const PERF_LOG_DIR = process.env.TEST_PERF_LOG
+	? path.resolve(process.env.TEST_PERF_LOG)
+	: null;
+
 const E2E_SERVERS = Array.from({ length: E2E_SERVER_COUNT }, (_, index) => {
 	const slot = e2eSlot(index);
 	prepareE2eSlot(slot);
 	return {
-		command: `node ${TEST_DIST_DIR}/server/entry.mjs`,
+		command: PERF_LOG_DIR
+			? `exec node ${TEST_DIST_DIR}/server/entry.mjs >> ${PERF_LOG_DIR}/server-${slot.port}.jsonl`
+			: `node ${TEST_DIST_DIR}/server/entry.mjs`,
 		url: slot.baseUrl,
 		reuseExistingServer: false,
 		timeout: 60_000,
@@ -73,6 +81,7 @@ const E2E_SERVERS = Array.from({ length: E2E_SERVER_COUNT }, (_, index) => {
 			// Reads the values above from the environment.
 			CODEHOOD_CONFIG: "test/codehood.config.ts",
 			PORT: String(slot.port),
+			...(PERF_LOG_DIR ? { PERF_LOG: "1" } : {}),
 		},
 	};
 });

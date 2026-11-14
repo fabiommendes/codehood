@@ -5,6 +5,7 @@ import { InvalidData, NotAllowed } from "@/core/error";
 import type { ErrorResponse } from "@/core/error-response";
 import { responseFromException } from "@/core/error-server";
 import { m } from "@/i18n";
+import { noteRpcMethod } from "@/perf/state";
 
 export { readEnvelope } from "./read-envelope";
 
@@ -167,6 +168,7 @@ export async function dispatch(
 				message: m.errors_rpc_no_such_method({ method: request.data.method }),
 			},
 		});
+	noteRpcMethod(request.data.method);
 
 	// The authentication gate runs before the handler and before params are
 	// validated, so an anonymous caller cannot use error messages to probe the

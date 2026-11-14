@@ -3,6 +3,9 @@ import { APP_CSP, requestSide } from "@codehood/runner/server/routing";
 import { hasPerm } from "@/auth/permissions";
 import { clearSessionCookie } from "@/auth/session-cookie";
 import { db } from "@/db";
+import { startProcessMonitor } from "@/perf/process";
+import { measureRequest } from "@/perf/request";
+import { SYSTEM } from "./auth/actor";
 import * as env from "./core/constants";
 import { RUNNER_ORIGIN, SESSION_COOKIE } from "./core/constants";
 
@@ -192,7 +195,16 @@ export const bufferHtmlMiddleware = defineMiddleware(async (_context, next) => {
 	});
 });
 
+startProcessMonitor(() => db.gradingJob.totals({ actor: SYSTEM }));
+
+/**
+ * Writes the performance line of each request and makes every service call
+ * and SQL statement under it count towards that line.
+ */
+export const perfMiddleware = defineMiddleware(measureRequest);
+
 const COMMON_MIDDLEWARES = [
+	perfMiddleware,
 	runnerOriginMiddleware,
 	credentialConflictMiddleware,
 	sessionMiddleware,

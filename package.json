@@ -35,6 +35,7 @@
 		"test": "tsx test/run.ts",
 		"test:unit": "tsx test/run.ts --scope=unit",
 		"test:e2e": "tsx test/run.ts --scope=e2e",
+		"test:perf": "tsx test/perf/run.ts",
 		"test:runner": "playwright test -c packages/runner/playwright.config.ts",
 		"test:plugins": "playwright test -c src/runner/plugins/playwright.config.ts",
 		"test:scheme": "pnpm --filter @codehood/runner-scheme test",

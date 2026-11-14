@@ -178,6 +178,72 @@ fail. The server trusts the proxy's `X-Forwarded-*` headers only for the
 `instance.publicUrl` host; with a wrong one, form posts fail Astro's origin
 check and every client has the proxy's IP.
 
+### Performance log
+
+In production the server writes its performance to stdout as JSON lines, next
+to its other events, so `journalctl -u codehood -o cat | jq` reads them. The
+code is `src/perf/`.
+
+| `event`        | When                                             | Main fields |
+| :------------- | :----------------------------------------------- | :---------- |
+| `request`      | Every request that reaches Astro                 | `id`, `route` (method and route pattern, never the URL), `status`, `ms`, `db` and `queries` (SQLite time and statements), `txWait`, `services`, `slowest`/`slowestMs`, `auth` (`session`, `cli`, `bot`, `anon`), `user`, `inFlight` |
+| `slow-query`   | A SQL statement at or above `PERF_SLOW_QUERY_MS` | `ms`, `sql` (placeholders, no values), `op`, `id`, `route` |
+| `slow-service` | A service call at or above `PERF_SLOW_SERVICE_MS`| `op` (`course.findMany`), `ms`, `nested`, `actor`, `id`, `route` |
+| `stall`        | The event loop was held for `PERF_STALL_MS`      | `ms`, and the `op`, `id` and `route` last seen at work |
+| `process`      | Every `PERF_INTERVAL_S`                          | `rssMb`, `heapMb`, `cpu`, `loopBusy`, `loopP50`/`loopP99`/`loopMax`, the interval's `requests`, `errors`, `queries`, `db`, `slowestQuery`, `txWaitMax`, `commits`/`commitP99`/`commitMax`, `dbBytes`, `walBytes`, `submissions`, `jobs` by state, `leases` |
+
+The `op` of a `slow-query` is the service call that ran the statement, the
+innermost when calls nest, also when a page calls services in parallel. One
+exception: outside a transaction Prisma runs the `findUnique` of one tick as a
+batch, and each statement of the batch carries the `op` of the call that asked
+first.
+
+| Variable               | Default               | Meaning                                  |
+| :--------------------- | :-------------------- | :--------------------------------------- |
+| `PERF_LOG`             | on when `ENVIRONMENT=prod` | `1` or `0` turns the whole log on or off |
+| `PERF_SLOW_QUERY_MS`   | 100                   | Threshold of `slow-query`                |
+| `PERF_SLOW_SERVICE_MS` | 100                   | Threshold of `slow-service`              |
+| `PERF_STALL_MS`        | 200                   | Threshold of `stall`                     |
+| `PERF_INTERVAL_S`      | 60                    | Seconds between two `process` lines      |
+
+How to read it:
+
+- SQLite runs synchronously, so `db` is time the event loop was held, and one
+  slow statement makes every request in flight slow. Start from `slow-query`,
+  `stall` and `loopMax`, and only then look at the `ms` of each route.
+- `ms` is wall time: it includes waiting for a busy loop. `slowestMs` includes
+  the nested calls and the wait for the transaction mutex (`txWait`).
+- `commitP99` is the cost of the disk's `fsync`.
+- Static files are served before Astro and have no line.
+
+```sh
+# The slowest routes between 15:20 and 15:40.
+journalctl -u codehood -o cat --since 15:20 --until 15:40 \
+  | jq -sc 'map(select(.event == "request")) | group_by(.route)
+      | map({route: .[0].route, n: length, max: (map(.ms) | max),
+             db: (map(.db) | add)}) | sort_by(-.max) | .[:10][]'
+```
+
+Every response carries its `id` in `X-Request-Id`, and a request that arrives
+with that header keeps the id. Let the proxy mint it and log its own view, to
+tell a 502 of the proxy from a slow answer of the app. With Caddy:
+
+```
+codehood.example {
+	log {
+		output file /var/log/caddy/codehood.log
+		format json
+	}
+	reverse_proxy 127.0.0.1:4321 {
+		header_up X-Request-Id {http.request.uuid}
+	}
+}
+```
+
+The access log has `duration` and the upstream's status; add
+`{http.request.uuid}` to it with a `log_append request_id {http.request.uuid}`
+directive.
+
 ### Runner languages
 
 Each language of the code runner is a plugin, listed in `runner.languages`.

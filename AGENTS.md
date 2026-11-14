@@ -151,6 +151,7 @@ run `pnpm run typecheck` yourself rather than trusting a green Biome run.
 | `pnpm run test:unit`| Run the specs that need no server. See below  |
 | `pnpm run test:e2e` | Run the specs that drive the server under test|
 | `pnpm run test`     | Run both scopes, `unit` first                 |
+| `pnpm run test:perf`| Run `e2e` on the seeded and on a full database, compare the routes |
 | `pnpm run lint`     | Run linter, typecheck, and story coverage     |
 | `pnpm run manage`   | Run management CLI commands                   |
 | `pnpm run db:seed`  | Seed the dev database                         |
@@ -234,6 +235,23 @@ a task done.
 rtk pnpm exec tsx test/run.ts --only-changed       # affected by the working tree
 rtk pnpm exec tsx test/run.ts --only-changed=main  # affected since main
 rtk pnpm run test:unit --only-changed              # the same, without building the server
+```
+
+### Performance of the suite
+
+`TEST_PERF_LOG=<dir>` makes each `e2e` server write its performance log
+(`src/perf/`, see "Performance log" in `README.md`) to `<dir>/server-<port>.jsonl`;
+the directory must exist. `TEST_FILL=<scale>` adds bulk data in courses of its
+own (`test/fill/`) to the seeded database before the run. `pnpm run test:perf`
+does both runs and reports the routes whose time in SQLite grew, with the
+statements that were slow only on the full database: a route that grows
+depends on the size of a whole table, which usually means a missing index.
+Results go to `.perf/<time>/`. Run it after adding a query, a table or an index.
+
+```bash
+rtk pnpm run test:perf                               # whole e2e scope, twice (~8 min)
+rtk pnpm run test:perf --scale 0.2 test/foo.spec.ts  # some specs, less data
+pnpm exec tsx test/perf/report.ts <dir> [<full dir>] # read one run, or compare two
 ```
 
 The default suite runs on Chromium. `TEST_BROWSERS` changes that:

@@ -6,6 +6,7 @@ test/.tmp/
 packages/*/test/.tmp/
 test-results/
 .load/
+.perf/
 playwright-report/
 coverage/
 

@@ -204,6 +204,16 @@ execSync("node_modules/.bin/tsx prisma/seed.ts", {
 	stdio: "inherit",
 });
 
+// `TEST_FILL=<scale>` adds bulk data in courses of its own to the seeded
+// database, before the workers copy it: the same specs then run against full
+// tables, which shows the queries that depend on the size of the whole table.
+if (process.env.TEST_FILL) {
+	execSync(
+		`node_modules/.bin/tsx test/fill/fill.ts --url "${TEST_DATABASE_URL}" --scale ${Number(process.env.TEST_FILL)}`,
+		{ env: process.env, stdio: "inherit" },
+	);
+}
+
 // `--rtk` and `--scope` are consumed here rather than forwarded: they select
 // how Playwright is launched, not how it runs.
 const forwarded = process.argv.slice(2);

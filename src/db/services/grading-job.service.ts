@@ -36,6 +36,7 @@ import {
 	gradingJobStudentQuery,
 	gradingJobStudentView,
 	gradingJobSummary,
+	gradingJobTotals,
 	MAX_JOB_ATTEMPTS,
 	publicId,
 } from "@/core/schemas";
@@ -613,6 +614,29 @@ export const makeGradingJobService = defineService()((client) => {
 		},
 	});
 
+	/**
+	 * Counts the submissions, the jobs by state and the leases in force, across every course.
+	 *
+	 * @throws {@link NotAllowed} The actor does not manage the system.
+	 */
+	const totals = op({
+		transaction: false,
+		returns: gradingJobTotals,
+		run: async (tx: PrismaTx, opts: ServiceOptsWithoutTx) => {
+			ensurePerm(opts.actor, "system.manage");
+			const [submissions, grouped, leases] = await Promise.all([
+				tx.submission.count(),
+				tx.gradingJob.groupBy({ by: ["state"], _count: { _all: true } }),
+				tx.gradingJob.count({
+					where: { state: "CLAIMED", leaseUntil: { gt: new Date() } },
+				}),
+			]);
+			const jobs = { QUEUED: 0, CLAIMED: 0, DONE: 0, FAILED: 0, CANCELLED: 0 };
+			for (const row of grouped) jobs[row.state] = row._count._all;
+			return { submissions, jobs, leases };
+		},
+	});
+
 	return {
 		claim,
 		renew,
@@ -620,6 +644,7 @@ export const makeGradingJobService = defineService()((client) => {
 		complete,
 		requeueFailed,
 		summary,
+		totals,
 		forStudent,
 		forStudentQuestions,
 		forInstructor,
