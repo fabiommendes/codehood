@@ -81,6 +81,69 @@ test("a question without tests has no pretests", () => {
 	expect(pretestSources(parsed)).toEqual([]);
 });
 
+const EXAMPLES_DOCUMENT = `---
+id: media
+type: code
+language: elm
+file: Main.elm
+---
+Stem.
+
+[code]
+
+## [tests]
+
+\`\`\`elm
+BLOCK
+\`\`\`
+`;
+
+function examplesQuestion(block: string) {
+	const parsed = parseQuestion(EXAMPLES_DOCUMENT.replace("BLOCK", block));
+	if (parsed.type !== "code") throw new Error("not a code question");
+	return parsed;
+}
+
+test("an examples block yields its module with the public cases only", () => {
+	const sources = pretestSources(
+		examplesQuestion(
+			[
+				"-- mdq: [0] {example} Shown",
+				"media [ 6, 8 ] ==> 7 -- inline",
+				"",
+				"-- mdq: [1] {public} Also shown",
+				"media [] ==> 0",
+				"",
+				"-- mdq: [1] Hidden",
+				"media [ 9 ] ==> 99999",
+			].join("\n"),
+		),
+	);
+	expect(sources).toHaveLength(1);
+	const [source] = sources as [(typeof sources)[number]];
+	expect(source.format).toBe("elm");
+	expect(source.text).toContain("module Examples0 exposing (tests)");
+	expect(source.text).toContain("import Main exposing (..)");
+	expect(source.text).toContain("media [ 6, 8 ] ==> 7 (inline)");
+	expect(source.text).toContain("media [] ==> 0");
+	expect(source.text).not.toContain("99999");
+	expect(source.text).not.toContain("mdq:");
+});
+
+test("an examples block with no public case is not a pretest", () => {
+	expect(
+		pretestSources(
+			examplesQuestion("-- mdq: [1] Hidden\nmedia [ 9 ] ==> 99999"),
+		),
+	).toEqual([]);
+});
+
+test("an invalid examples block is not a pretest", () => {
+	expect(
+		pretestSources(examplesQuestion("-- mdq: [1] {public} Bad\nnonsense")),
+	).toEqual([]);
+});
+
 const pass: ReportCase = { source: 0, verdict: "pass" };
 
 test("a report with only passes passes", () => {

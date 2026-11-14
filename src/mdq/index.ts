@@ -4,6 +4,7 @@
  * Documents, public forms, responses and scores all follow the mdq spec; this
  * module only adds the few checks a service needs before writing.
  */
+
 import {
 	attachmentFieldRules,
 	type CodeQuestion,
@@ -17,6 +18,12 @@ import {
 	Question,
 	scoreResponse,
 } from "mdq";
+import { elmModule } from "@/components/runner/test-report";
+import {
+	ElmExamplesError,
+	elmAnswerModule,
+	elmExampleCases,
+} from "@/services/elm-examples";
 
 export type {
 	BlankScore,
@@ -125,6 +132,64 @@ function codeProblems(question: CodeQuestion): Diagnostic[] {
 			message: `rubric[${index}] is a manual item worth ${item.value ?? 1}, but only manual items worth 0 are accepted`,
 			path: ["rubric", index],
 		});
+	}
+	return [...problems, ...elmTestSourceProblems(question)];
+}
+
+/**
+ * The author mistakes of the test sources of an Elm question: an invalid
+ * examples block, a linked source with no `module` header, and an `Examples<i>`
+ * module that collides with the answer module or with another source's module.
+ *
+ * Syntax only, and a source with no text is skipped.
+ */
+export function elmTestSourceProblems(question: CodeQuestion): Diagnostic[] {
+	if (question.language !== "elm" || question.file === undefined) return [];
+	const sources = (question.tests ?? []).flatMap((source, index) =>
+		source.format === "elm" && source.text !== undefined
+			? [{ index, text: source.text, linked: source.origin !== undefined }]
+			: [],
+	);
+	const answer = elmAnswerModule(question.file);
+	const problems: Diagnostic[] = [];
+	const report = (code: string, index: number, message: string) =>
+		problems.push({
+			severity: "error",
+			code,
+			message: `tests[${index}]: ${message}`,
+			path: ["tests", index],
+		});
+	for (const { index, text, linked } of sources) {
+		if (elmModule(text) !== null) continue;
+		if (linked) {
+			report(
+				"elm-test-source-without-module",
+				index,
+				"a linked Elm source needs a `module` header",
+			);
+			continue;
+		}
+		try {
+			elmExampleCases(text);
+		} catch (error) {
+			if (!(error instanceof ElmExamplesError)) throw error;
+			report("invalid-elm-examples", index, error.message);
+			continue;
+		}
+		const name = `Examples${index}`;
+		const other = sources.find(
+			(source) => source.index !== index && elmModule(source.text) === name,
+		);
+		if (name === answer || other) {
+			const target = other
+				? `the module of tests[${other.index}]`
+				: "the answer module";
+			report(
+				"elm-module-collision",
+				index,
+				`the generated module ${name} collides with ${target}`,
+			);
+		}
 	}
 	return problems;
 }

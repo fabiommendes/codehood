@@ -5,7 +5,12 @@ import type { CourseId, QuestionRefId } from "@/core/schemas";
 import { codeQuestionMeta, questionCreate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
-import { assertResponse, publicForm, ResponseError } from "@/mdq";
+import {
+	assertResponse,
+	publicForm,
+	questionProblems,
+	ResponseError,
+} from "@/mdq";
 import { codeFactory } from "@/mdq/factory";
 import { sumCode } from "@/mdq/fixtures";
 import { publicQuestionSchema } from "@/mdq/public-schema";
@@ -282,4 +287,82 @@ test("the response to a code question is the content of the file", () => {
 	expect(() => assertResponse(sumCode, null)).not.toThrow();
 	expect(() => assertResponse(sumCode, 42)).toThrow(ResponseError);
 	expect(() => assertResponse(sumCode, { a: 1 })).toThrow(ResponseError);
+});
+
+// Elm test sources: examples blocks and linked modules.
+
+const elmDoc = (tests: unknown): Doc =>
+	({
+		...sumCode,
+		language: "elm",
+		file: "Main.elm",
+		tests,
+	}) as Doc;
+
+const EXAMPLES = "-- mdq: [0] {public} Shown\nmedia [ 6, 8 ] ==> 7\n";
+const MODULE =
+	"module Mod exposing (tests)\n\n-- mdq: [0] {public} x\ntests = 1\n";
+
+test("a valid examples block and a linked module are accepted", async () => {
+	await push(
+		elmDoc([
+			{ format: "elm", text: EXAMPLES },
+			{ format: "elm", origin: "Mod.elm", text: MODULE },
+		]),
+	);
+});
+
+test("an invalid examples block is refused with its source and line", async () => {
+	const text = "-- mdq: [0] {public} Shown\nmedia [ 6, 8 ] ==> 7\nnonsense\n";
+	const err = await push(
+		elmDoc([{ format: "elm", origin: undefined, text }]),
+	).catch((e: unknown) => e);
+	expect(err).toBeInstanceOf(InvalidData);
+	expect((err as InvalidData).message).toMatch(/tests\[0\]/);
+	expect((err as InvalidData).message).toMatch(/line 3/);
+});
+
+test("a linked Elm source without module header is refused", async () => {
+	const err = await push(
+		elmDoc([{ format: "elm", origin: "Mod.elm", text: "tests = 1\n" }]),
+	).catch((e: unknown) => e);
+	expect(err).toBeInstanceOf(InvalidData);
+	expect((err as InvalidData).message).toMatch(/tests\[0\].*module/);
+});
+
+test("an examples block whose module collides is refused", async () => {
+	const collides = (module: string) =>
+		push(
+			elmDoc([
+				{ format: "elm", text: EXAMPLES },
+				{
+					format: "elm",
+					origin: "Mod.elm",
+					text: MODULE.replace("module Mod", `module ${module}`),
+				},
+			]),
+		).catch((e: unknown) => e);
+	// Examples0 is the block's own name: a module called Examples0 collides.
+	const err = await collides("Examples0");
+	expect(err).toBeInstanceOf(InvalidData);
+	expect((err as InvalidData).message).toMatch(/Examples0/);
+	const answer = await push({
+		...elmDoc([{ format: "elm", text: EXAMPLES }]),
+		file: "Examples0.elm",
+	} as Doc).catch((e: unknown) => e);
+	expect(answer).toBeInstanceOf(InvalidData);
+});
+
+test("questionProblems skips an unresolved linked Elm source", () => {
+	const problems = questionProblems(
+		elmDoc([{ format: "elm", origin: "Mod.elm" }]),
+	).filter((p) => p.code !== "unresolved-test-source");
+	expect(problems).toEqual([]);
+});
+
+test("questionProblems flags an old document with a bad examples block", () => {
+	const problems = questionProblems(
+		elmDoc([{ format: "elm", text: "nonsense\n" }]),
+	);
+	expect(problems.map((p) => p.code)).toContain("invalid-elm-examples");
 });
