@@ -1,0 +1,290 @@
+{
+	"_layout": [
+		"Generated module, byte for byte (lines joined with \\n, file ends with one \\n):",
+		"  module Examples<index> exposing (tests)",
+		"  <blank>",
+		"  import Expect",
+		"  import Test",
+		"  import <Answer> exposing (..)",
+		"  <each import line of the block, in order, as written with trailing spaces and tabs removed>",
+		"  <blank>",
+		"  <blank>",
+		"  tests : Test.Test",
+		"  tests =",
+		"      Test.concat",
+		"          [ Test.test \"<name>\" (\\_ -> <expectation>)",
+		"          , Test.test \"<name>\" (\\_ -> <expectation>)",
+		"          ]",
+		"Indentation is 4 spaces for `Test.concat` and 8 for the `[`, `,` and `]` lines. The first case opens with `[ `, the others with `, `.",
+		"<Answer>: answerFile without `.elm`, `/` replaced by `.` (Main.elm -> Main, Foo/Bar.elm -> Foo.Bar).",
+		"<name>: the R5 name inside an Elm string literal: `\\` becomes `\\\\` and `\"` becomes `\\\"`; every other character is copied as is.",
+		"<expectation> for `expr ==> value`: Expect.equal (value) (expr)",
+		"<expectation> for `expr ~= value`: Expect.within (Expect.AbsoluteOrRelative 1.0e-9 1.0e-6) (value) (expr)",
+		"expr and value are the text on each side of the operator with spaces and tabs at the ends removed, after the inline comment is cut.",
+		"Cases keep source order. `module` has every case; `publicModule` only the cases of {public}/{example} regions (same imports), and is null when there is none.",
+		"`error.line` is the line of the source (from 1) that the error points to, or null for `no-cases`. `error.kind` is one of: invalid-line, late-import, duplicate-name, no-cases, empty-region.",
+		"duplicate-name points to the second case with the name; empty-region points to the item line of the annotation."
+	],
+	"entries": [
+		{
+			"name": "author guide example: imports, {example}, {public}, private region, inline comment, ~=, negative argument",
+			"input": "import Dict\n\n-- mdq: [0] {example} Exemplos do enunciado\ncollatzLength 5 ==> 6\ncollatzLength -42 ==> 0 -- negativos têm comprimento zero\n\n-- mdq: [+2] {public} Média\nmedia [ 7, 8 ] ~= 7.5\n\n-- mdq: [+3] Sequências longas\ncollatzLength 27 ==> 112\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "collatzLength 5 ==> 6",
+					"line": 4,
+					"public": true
+				},
+				{
+					"name": "collatzLength -42 ==> 0 (negativos têm comprimento zero)",
+					"line": 5,
+					"public": true
+				},
+				{
+					"name": "media [ 7, 8 ] ~= 7.5",
+					"line": 8,
+					"public": true
+				},
+				{
+					"name": "collatzLength 27 ==> 112",
+					"line": 11,
+					"public": false
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\nimport Dict\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"collatzLength 5 ==> 6\" (\\_ -> Expect.equal (6) (collatzLength 5))\n        , Test.test \"collatzLength -42 ==> 0 (negativos têm comprimento zero)\" (\\_ -> Expect.equal (0) (collatzLength -42))\n        , Test.test \"media [ 7, 8 ] ~= 7.5\" (\\_ -> Expect.within (Expect.AbsoluteOrRelative 1.0e-9 1.0e-6) (7.5) (media [ 7, 8 ]))\n        , Test.test \"collatzLength 27 ==> 112\" (\\_ -> Expect.equal (112) (collatzLength 27))\n        ]\n",
+			"publicModule": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\nimport Dict\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"collatzLength 5 ==> 6\" (\\_ -> Expect.equal (6) (collatzLength 5))\n        , Test.test \"collatzLength -42 ==> 0 (negativos têm comprimento zero)\" (\\_ -> Expect.equal (0) (collatzLength -42))\n        , Test.test \"media [ 7, 8 ] ~= 7.5\" (\\_ -> Expect.within (Expect.AbsoluteOrRelative 1.0e-9 1.0e-6) (7.5) (media [ 7, 8 ]))\n        ]\n"
+		},
+		{
+			"name": "no annotation: implicit item, every case private; literals hide -- and ==>; char with a quote; nested answer file",
+			"input": "String.length \"a -- b\" ==> 6\nString.length \"x ==> y\" ==> 7 -- seta\nf '\"' ==> \"\\\"\" -- aspas\n",
+			"answerFile": "Foo/Bar.elm",
+			"index": 2,
+			"cases": [
+				{
+					"name": "String.length \"a -- b\" ==> 6",
+					"line": 1,
+					"public": false
+				},
+				{
+					"name": "String.length \"x ==> y\" ==> 7 (seta)",
+					"line": 2,
+					"public": false
+				},
+				{
+					"name": "f '\"' ==> \"\\\"\" (aspas)",
+					"line": 3,
+					"public": false
+				}
+			],
+			"module": "module Examples2 exposing (tests)\n\nimport Expect\nimport Test\nimport Foo.Bar exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"String.length \\\"a -- b\\\" ==> 6\" (\\_ -> Expect.equal (6) (String.length \"a -- b\"))\n        , Test.test \"String.length \\\"x ==> y\\\" ==> 7 (seta)\" (\\_ -> Expect.equal (7) (String.length \"x ==> y\"))\n        , Test.test \"f '\\\"' ==> \\\"\\\\\\\"\\\" (aspas)\" (\\_ -> Expect.equal (\"\\\"\") (f '\"'))\n        ]\n",
+			"publicModule": null
+		},
+		{
+			"name": "a comment with mdq: after a letter is not an annotation; feedback lines are skipped; importance is a case, not an import",
+			"input": "-- mdq: [1] {public} Públicos\n-- mdq: > confira os sinais\nf 1 ==> 1\n-- ver mdq: não é anotação\nimportance 3 ==> 4\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "f 1 ==> 1",
+					"line": 3,
+					"public": true
+				},
+				{
+					"name": "importance 3 ==> 4",
+					"line": 5,
+					"public": true
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        , Test.test \"importance 3 ==> 4\" (\\_ -> Expect.equal (4) (importance 3))\n        ]\n",
+			"publicModule": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        , Test.test \"importance 3 ==> 4\" (\\_ -> Expect.equal (4) (importance 3))\n        ]\n"
+		},
+		{
+			"name": "a line that looks like a case but the MDQ reads as an annotation opens a private region",
+			"input": "-- mdq: [1] {public} Públicos\nf 1 ==> 1\n\"mdq:\" ++ \"x\" ==> \"mdq:x\"\nf 2 ==> 2\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "f 1 ==> 1",
+					"line": 2,
+					"public": true
+				},
+				{
+					"name": "f 2 ==> 2",
+					"line": 4,
+					"public": false
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        , Test.test \"f 2 ==> 2\" (\\_ -> Expect.equal (2) (f 2))\n        ]\n",
+			"publicModule": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        ]\n"
+		},
+		{
+			"name": "cases before the first annotation are private",
+			"input": "f 0 ==> 0\n-- mdq: [1] {public} P\nf 1 ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "f 0 ==> 0",
+					"line": 1,
+					"public": false
+				},
+				{
+					"name": "f 1 ==> 1",
+					"line": 3,
+					"public": true
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 0 ==> 0\" (\\_ -> Expect.equal (0) (f 0))\n        , Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        ]\n",
+			"publicModule": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        ]\n"
+		},
+		{
+			"name": "lines end at \\r\\n and \\r; a final line ending adds no line",
+			"input": "-- mdq: {example} E\r\nf 1 ==> 1\r\n\r\nf 2 ==> 2\rf 3 ==> 3\r\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "f 1 ==> 1",
+					"line": 2,
+					"public": true
+				},
+				{
+					"name": "f 2 ==> 2",
+					"line": 4,
+					"public": true
+				},
+				{
+					"name": "f 3 ==> 3",
+					"line": 5,
+					"public": true
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        , Test.test \"f 2 ==> 2\" (\\_ -> Expect.equal (2) (f 2))\n        , Test.test \"f 3 ==> 3\" (\\_ -> Expect.equal (3) (f 3))\n        ]\n",
+			"publicModule": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        , Test.test \"f 2 ==> 2\" (\\_ -> Expect.equal (2) (f 2))\n        , Test.test \"f 3 ==> 3\" (\\_ -> Expect.equal (3) (f 3))\n        ]\n"
+		},
+		{
+			"name": "U+2028 and form feed do not end a line",
+			"input": "-- mdq: {public} P\nString.length \"a\u2028b\" ==> 3\n-- nota\fsegue\nf 1 ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "String.length \"a\u2028b\" ==> 3",
+					"line": 2,
+					"public": true
+				},
+				{
+					"name": "f 1 ==> 1",
+					"line": 4,
+					"public": true
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"String.length \\\"a\u2028b\\\" ==> 3\" (\\_ -> Expect.equal (3) (String.length \"a\u2028b\"))\n        , Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        ]\n",
+			"publicModule": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"String.length \\\"a\u2028b\\\" ==> 3\" (\\_ -> Expect.equal (3) (String.length \"a\u2028b\"))\n        , Test.test \"f 1 ==> 1\" (\\_ -> Expect.equal (1) (f 1))\n        ]\n"
+		},
+		{
+			"name": "name normalization: ends trimmed, one space around the operator, inner spaces kept; negative value",
+			"input": "  f   1==>-2   -- dois  \n\tg 1~=2.0\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"cases": [
+				{
+					"name": "f   1 ==> -2 (dois)",
+					"line": 1,
+					"public": false
+				},
+				{
+					"name": "g 1 ~= 2.0",
+					"line": 2,
+					"public": false
+				}
+			],
+			"module": "module Examples0 exposing (tests)\n\nimport Expect\nimport Test\nimport Main exposing (..)\n\n\ntests : Test.Test\ntests =\n    Test.concat\n        [ Test.test \"f   1 ==> -2 (dois)\" (\\_ -> Expect.equal (-2) (f   1))\n        , Test.test \"g 1 ~= 2.0\" (\\_ -> Expect.within (Expect.AbsoluteOrRelative 1.0e-9 1.0e-6) (2.0) (g 1))\n        ]\n",
+			"publicModule": null
+		},
+		{
+			"name": "an arrow cut by the comment leaves no operator",
+			"input": "f 0 ==> 0\nf 1 --> 2\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 2,
+				"kind": "invalid-line"
+			}
+		},
+		{
+			"name": "a block comment is not supported",
+			"input": "{- comentário -}\nf 1 ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 1,
+				"kind": "invalid-line"
+			}
+		},
+		{
+			"name": "two operators on one line",
+			"input": "f 1 ==> 1 ~= 1.0\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 1,
+				"kind": "invalid-line"
+			}
+		},
+		{
+			"name": "an operator needs text on both sides",
+			"input": "f 1 ==> 1\n==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 2,
+				"kind": "invalid-line"
+			}
+		},
+		{
+			"name": "an import after the first case",
+			"input": "import Dict\nf 1 ==> 1\nimport Set\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 3,
+				"kind": "late-import"
+			}
+		},
+		{
+			"name": "two cases with the same normalized name",
+			"input": "f 1 ==> 1\nf 1==>1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 2,
+				"kind": "duplicate-name"
+			}
+		},
+		{
+			"name": "no case at all",
+			"input": "-- só comentário\n\nimport Dict\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": null,
+				"kind": "no-cases"
+			}
+		},
+		{
+			"name": "an annotated region without a case",
+			"input": "-- mdq: [1] {public} A\n-- mdq: [2] B\nf 1 ==> 1\n",
+			"answerFile": "Main.elm",
+			"index": 0,
+			"error": {
+				"line": 1,
+				"kind": "empty-region"
+			}
+		}
+	]
+}

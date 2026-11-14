@@ -39,14 +39,14 @@ collatzLength n =
 WRONG = SOLUTION.replace("if n <= 0 then\n        0", "if n == 0 then\n        0")
 
 
-def question(tests: str = EXAMPLES, **overrides) -> CodeQuestion:
+def question(text: str = EXAMPLES, **overrides) -> CodeQuestion:
     doc = {
         "id": "elm-collatz",
         "type": "code",
         "stem": "Collatz.",
         "language": "elm",
         "file": "Main.elm",
-        "tests": [{"format": "elm", "text": tests}],
+        "tests": [{"format": "elm", "text": text}],
         "answerKey": f"```elm\n{SOLUTION}```\n",
         "meta": {"worker": "elm-test"},
     }
@@ -84,6 +84,31 @@ def test_wrong_answer_fails_only_the_right_example(grader) -> None:
 def test_answer_with_its_own_header_still_works(grader) -> None:
     report = grader.grade("module Main exposing (collatzLength)\n\n" + SOLUTION)
     assert {c.verdict for c in report.cases} == {"pass"}
+
+
+@pytest.mark.parametrize(
+    ("tests", "match"),
+    [
+        ([{"format": "python", "text": "f 1 ==> 1\n"}], "needs a module header"),
+        (
+            [{"format": "elm", "text": "f 1 ==> 1\n", "origin": "t.elm"}],
+            "no module header",
+        ),
+        (
+            [
+                {"format": "elm", "text": "f 1 ==> 1\n"},
+                {"format": "elm", "text": "module Examples0 exposing (tests)\n"},
+            ],
+            "collides",
+        ),
+    ],
+)
+def test_sources_that_are_not_examples_or_modules_are_question_errors(
+    tmp_path, tests, match
+) -> None:
+    g = QuestionGrader(question(tests=tests), tmp_path, sandbox="none")
+    with pytest.raises(ReferenceError, match=match):
+        g.prepare()
 
 
 def test_invalid_line_is_an_error_of_the_question(tmp_path) -> None:

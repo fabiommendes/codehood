@@ -44,16 +44,34 @@ How a job is graded:
    the question, so the instructor sees them as failed.
 
 Test sources of an Elm question may be written as examples instead of a test
-module: a fenced block with no `module` header whose lines are all
-`expr ==> value` (a `-- comment` is optional, and is added to the test name).
-Each line becomes an `elm-test` case named after the line, and the answer is
-imported as the module of `file` (`Main.elm` is `Main`). Without annotations
-the block is one hidden item of the rubric, whose cases share its value. An
-invalid line fails the question (with the line number), never the student.
-`Float` values are compared with `Expect.equal`, so rounding can fail a case:
-write a module with `Expect.within` for those. An answer with no `module`
-header gets `module <File> exposing (..)` prepended, which shifts the line
-numbers of compiler errors by two.
+module: a fenced block (no `origin`) of format `elm` with no `module` header.
+A linked file, or a block of another format, with no `module` header is an
+error of the question. One line per case, in this order:
+
+- an `mdq:` annotation line (same rule as the MDQ lexer) is a rubric item
+  with its regions, feedback and `{public}`/`{example}`;
+- blank lines and lines with only a `--` comment are ignored;
+- `import X` lines, only before the first case, are copied to the generated
+  module;
+- `expr ==> value` is `Expect.equal`, and `expr ~= value` is `Expect.within`
+  with an absolute or relative tolerance (`1.0e-9`, `1.0e-6`), for scalar
+  `Float` only. An inline `-- comment` (outside string and character
+  literals) goes into the test name. Exactly one operator per line;
+- anything else, including `{- -}` comments, is an error.
+
+The test name is `expr ==> value (comment)`, normalized to one space around
+the operator, and must be unique in the block. Lines are split only on `\n`,
+`\r` and `\r\n`. Cases before the first annotation fall in a hidden implicit
+item. The generated module is `Examples<i>` (`i` is the index of the source),
+exposes `tests` (`Test.concat`, no `describe`) and imports the answer as
+`exposing (..)`; the answer module is `file` without `.elm`, `/` replaced by
+`.`. `Examples<i>` must not collide with the answer module or another source.
+An invalid block fails the question (with the line number), never the
+student. An answer with no `module` header gets
+`module <Answer> exposing (..)` prepended, which shifts the line numbers of
+compiler errors by two. The format has a twin in TypeScript in codehood
+(`src/services/elm-examples.ts`); both run
+`tests/resources/elm-examples-cases.json`.
 
 Caches live in `$XDG_CACHE_HOME/chalk-worker`.
 

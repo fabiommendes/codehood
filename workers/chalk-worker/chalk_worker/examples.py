@@ -1,55 +1,88 @@
 """
-Elm tests written as examples, one `expr ==> value` per line.
+Elm tests written as examples, one `expr ==> value` or `expr ~= value` per line.
 
-A test source of an Elm question that has no `module` header and holds only
-examples is turned into an elm-test module. Each example becomes a test named
-after its line, so the name reaches the student as feedback.
+A fenced test source of an Elm question that has no `module` header is an
+examples block, turned into an elm-test module. The format has a twin in
+TypeScript (`src/services/elm-examples.ts` of codehood), and both run the
+table `tests/resources/elm-examples-cases.json`.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from typing import Literal
 
 __all__ = [
     "Example",
     "ExampleError",
+    "answer_module",
+    "example_cases",
     "examples_module",
     "locate_example",
     "module_name",
-    "parse_examples",
 ]
 
 #: Prefix of the name of the generated module, followed by the source index.
 MODULE_PREFIX = "Examples"
 
-ARROW = "==>"
+#: The operators of a case, with the matcher each one generates.
+OPERATORS = {
+    "==>": "Expect.equal",
+    "~=": "Expect.within (Expect.AbsoluteOrRelative 1.0e-9 1.0e-6)",
+}
+
+type ErrorKind = Literal[
+    "invalid-line", "late-import", "duplicate-name", "no-cases", "empty-region"
+]
+
+#: The `ANNOTATION_START` terminal of the MDQ spec (`docs/question-types/code.md`,
+#: "Annotations"), anchored at the start of a line. mdq-py does not expose it.
+_ANNOTATION_START = re.compile(r"[ \t!-/:-@\[-`{-~]*mdq:")
+
+#: The value of a rubric item, as in `docs/references/rubric.md`.
+_VALUE = re.compile(r"\[[+-]?(?:[1-9][0-9]*|0)(?:\.[0-9]+)?\](?![(\[])[ \t]*")
+
+_MODIFIER = re.compile(r"\{([a-z]+(?:-[a-z]+)*)\}[ \t]*")
+
+#: Line endings of MDQ (CommonMark), and nothing else.
+_LINE_END = re.compile(r"\r\n|\r|\n")
 
 
 class ExampleError(ValueError):
     """
-    A line of an examples block is not `expr ==> value`. It is a mistake of
-    the question author, never of a student.
+    An examples block breaks the format. It is a mistake of the question
+    author, never of a student.
     """
+
+    def __init__(self, message: str, line: int | None, kind: ErrorKind) -> None:
+        super().__init__(message)
+        #: The line of the block, from 1, or None when the error has no line.
+        self.line = line
+        self.kind = kind
 
 
 @dataclass(frozen=True)
 class Example:
     """
-    One `expr ==> value` line.
+    One case of an examples block.
     """
 
     #: The line of the source, from 1.
     line: int
+    operator: str
     expr: str
     value: str
     comment: str = ""
+    #: Whether the case is in a `{public}` or `{example}` region.
+    public: bool = False
 
     @property
     def name(self) -> str:
         """
-        The name of the test: the line itself, with the comment in parentheses.
+        The name of the test the student sees: `expr ==> value (comment)`.
         """
-        base = f"{self.expr} {ARROW} {self.value}"
+        base = f"{self.expr} {self.operator} {self.value}"
         return f"{base} ({self.comment})" if self.comment else base
 
 
@@ -60,55 +93,67 @@ def module_name(index: int) -> str:
     return f"{MODULE_PREFIX}{index}"
 
 
-def parse_examples(text: str) -> list[Example]:
+def answer_module(file: str) -> str:
     """
-    The examples of a block. Blank lines and lines with only a `--` comment
-    are skipped.
+    The module of an Elm answer file: `Foo/Bar.elm` is `Foo.Bar`.
+    """
+    return file.removesuffix(".elm").replace("/", ".")
+
+
+def example_cases(text: str) -> list[Example]:
+    """
+    The cases of an examples block, in source order.
 
     Raises:
-        ExampleError: a line is not an example, or there is none.
+        ExampleError: the block is invalid.
     """
-    found: list[Example] = []
-    for number, line in enumerate(text.splitlines(), start=1):
-        body, comment = _split_comment(line, number)
-        if not body.strip():
-            continue
-        parts = _split_arrow(body, number)
-        found.append(Example(number, parts[0], parts[1], comment))
-    if not found:
-        raise ExampleError("no `expr ==> value` example")
-    return found
+    return _parse(text)[1]
 
 
-def examples_module(text: str, index: int, answer_module: str) -> str:
+def examples_module(
+    text: str, index: int, answer_file: str, public_only: bool = False
+) -> str | None:
     """
-    The elm-test module of an examples block, importing the answer module.
+    The elm-test module of an examples block, importing the answer module, or
+    None when `public_only` is set and no case is public.
 
     Raises:
-        ExampleError: see `parse_examples`.
+        ExampleError: the block is invalid.
     """
-    tests = "\n        , ".join(
-        f"test {_string(e.name)} <|\n            \\_ -> Expect.equal ({e.value}) ({e.expr})"
-        for e in parse_examples(text)
-    )
-    return (
-        f"module {module_name(index)} exposing (suite)\n\n"
-        "import Expect\n"
-        f"import {answer_module} exposing (..)\n"
-        "import Test exposing (Test, describe, test)\n\n\n"
-        "suite : Test\n"
-        "suite =\n"
-        '    describe "examples"\n'
-        f"        [ {tests}\n        ]\n"
-    )
+    imports, cases = _parse(text)
+    chosen = [c for c in cases if c.public] if public_only else cases
+    if not chosen:
+        return None
+    entries = [
+        f"        {'[' if i == 0 else ','} Test.test {_string(c.name)} "
+        f"(\\_ -> {OPERATORS[c.operator]} ({c.value}) ({c.expr}))"
+        for i, c in enumerate(chosen)
+    ]
+    lines = [
+        f"module {module_name(index)} exposing (tests)",
+        "",
+        "import Expect",
+        "import Test",
+        f"import {answer_module(answer_file)} exposing (..)",
+        *imports,
+        "",
+        "",
+        "tests : Test.Test",
+        "tests =",
+        "    Test.concat",
+        *entries,
+        "        ]",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def locate_example(text: str, name: str) -> int | None:
     """
-    The line of the example of a block whose test is called `name`.
+    The line of the case of a block whose test is called `name`.
     """
     try:
-        return next((e.line for e in parse_examples(text) if e.name == name), None)
+        return next((e.line for e in example_cases(text) if e.name == name), None)
     except ExampleError:
         return None
 
@@ -117,51 +162,131 @@ def _string(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def _scan(line: str, number: int):
+def _lines(text: str) -> list[str]:
     """
-    Yield (position, char) of the characters of `line` outside string and
-    character literals.
+    The lines of a text as MDQ numbers them: a final line ending starts no line.
     """
-    i = 0
-    n = len(line)
-    while i < n:
-        c = line[i]
-        if line.startswith('"""', i):
-            end = line.find('"""', i + 3)
-            if end < 0:
-                raise ExampleError(f"line {number}: unterminated multi-line string")
-            i = end + 3
-        elif c == '"':
-            i += 1
-            while i < n and line[i] != '"':
-                i += 2 if line[i] == "\\" else 1
-            if i >= n:
-                raise ExampleError(f"line {number}: unterminated string")
-            i += 1
-        elif c == "'" and not (i > 0 and (line[i - 1].isalnum() or line[i - 1] in "_'")):
-            i += 1
-            while i < n and line[i] != "'":
-                i += 2 if line[i] == "\\" else 1
-            if i >= n:
-                raise ExampleError(f"line {number}: unterminated character literal")
-            i += 1
-        else:
-            yield i, c
-            i += 1
+    if not text:
+        return []
+    lines = _LINE_END.split(text)
+    if _LINE_END.search(text[-2:]) and lines[-1] == "":
+        lines.pop()
+    return lines
 
 
-def _split_comment(line: str, number: int) -> tuple[str, str]:
-    for i, _ in _scan(line, number):
-        if line.startswith("--", i):
-            return line[:i], line[i + 2 :].strip()
-    return line, ""
+def _item_is_public(rest: str) -> bool | None:
+    """
+    Whether the text after `mdq:` is a public item, or None when it is
+    feedback or a comment line.
+    """
+    rest = rest.lstrip(" \t")
+    if rest.startswith(">") or (rest.startswith("!") and not rest.startswith("![")):
+        return None
+    if value := _VALUE.match(rest):
+        rest = rest[value.end() :]
+    modifiers: list[str] = []
+    while found := _MODIFIER.match(rest):
+        modifiers.append(found[1])
+        rest = rest[found.end() :]
+    return "public" in modifiers or "example" in modifiers
 
 
-def _split_arrow(body: str, number: int) -> tuple[str, str]:
-    at = [i for i, _ in _scan(body, number) if body.startswith(ARROW, i)]
-    if len(at) != 1:
-        raise ExampleError(f"line {number}: expected `expr {ARROW} value`, found {body.strip()!r}")
-    expr, value = body[: at[0]].strip(), body[at[0] + len(ARROW) :].strip()
+def _parse(text: str) -> tuple[list[str], list[Example]]:
+    """
+    The `import` lines and the cases of a block.
+    """
+    imports: list[str] = []
+    cases: list[Example] = []
+    names: set[str] = set()
+    public = False
+    #: Line of the item whose region has no case yet.
+    open_item: int | None = None
+    for number, line in enumerate(_lines(text), start=1):
+        if marker := _ANNOTATION_START.match(line):
+            item = _item_is_public(line[marker.end() :])
+            if item is not None:
+                if open_item is not None:
+                    raise _empty_region(open_item)
+                open_item, public = number, item
+            continue
+        if not line.strip(" \t") or line.lstrip(" \t").startswith("--"):
+            continue
+        if re.match(r"import[ \t]", line):
+            if cases:
+                raise ExampleError(
+                    f"line {number}: import after the first case", number, "late-import"
+                )
+            imports.append(line.rstrip(" \t"))
+            continue
+        case = _parse_case(line, number, public)
+        if case.name in names:
+            raise ExampleError(
+                f"line {number}: duplicate case {case.name!r}", number, "duplicate-name"
+            )
+        names.add(case.name)
+        cases.append(case)
+        open_item = None
+    if open_item is not None:
+        raise _empty_region(open_item)
+    if not cases:
+        raise ExampleError("the block has no case", None, "no-cases")
+    return imports, cases
+
+
+def _empty_region(line: int) -> ExampleError:
+    return ExampleError(f"line {line}: the annotated region has no case", line, "empty-region")
+
+
+def _parse_case(line: str, number: int, public: bool) -> Example:
+    comments = _outside_literals(line, "--")
+    code = line[: comments[0]] if comments else line
+    comment = line[comments[0] + 2 :].strip(" \t") if comments else ""
+    found = [(op, at) for op in OPERATORS for at in _outside_literals(code, op)]
+    if len(found) != 1:
+        raise _invalid(number)
+    operator, at = found[0]
+    expr = code[:at].strip(" \t")
+    value = code[at + len(operator) :].strip(" \t")
     if not expr or not value:
-        raise ExampleError(f"line {number}: `{ARROW}` needs an expression on each side")
-    return expr, value
+        raise _invalid(number)
+    return Example(number, operator, expr, value, comment, public)
+
+
+def _invalid(number: int) -> ExampleError:
+    return ExampleError(
+        f"line {number}: expected `expr ==> value` or `expr ~= value`", number, "invalid-line"
+    )
+
+
+def _outside_literals(text: str, token: str) -> list[int]:
+    """
+    The positions of `token` in `text` outside string and character literals.
+    An unterminated literal runs to the end of the text.
+    """
+    found: list[int] = []
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c == '"' or (
+            c == "'" and not (i > 0 and (text[i - 1].isalnum() or text[i - 1] in "_'"))
+        ):
+            i = _literal_end(text, i)
+        elif text.startswith(token, i):
+            found.append(i)
+            i += len(token)
+        else:
+            i += 1
+    return found
+
+
+def _literal_end(text: str, start: int) -> int:
+    quote = text[start]
+    i = start + 1
+    while i < len(text):
+        if text[i] == "\\":
+            i += 2
+        elif text[i] == quote:
+            return i + 1
+        else:
+            i += 1
+    return len(text)
