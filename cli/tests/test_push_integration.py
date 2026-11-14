@@ -40,6 +40,7 @@ from typer.testing import CliRunner
 
 from codehood.api import base as base_module
 from codehood.api import generated
+from codehood.api.pages import read_all
 from codehood.cli.base import app
 from codehood.models.repo import CourseIdentity, RepoConfig, ServerConfig
 from codehood.repo import MACHINE_DIR, write_repo
@@ -135,8 +136,8 @@ def course_repo_with_questions(course_repo: Path) -> Path:
 
 
 def _slugs(client: httpx.Client) -> set[str]:
-    resources = generated.list_resource(
-        discipline=DISCIPLINE, course=COURSE, client=client
+    resources = read_all(
+        generated.list_resource, discipline=DISCIPLINE, course=COURSE, client=client
     )
     return {resource.slug for resource in resources}
 
@@ -151,7 +152,8 @@ def _question_slugs(client: httpx.Client, *, archived: bool = False) -> set[str]
     what "the server holds these questions" means to the CLI; pass
     `archived=True` to see the tombstones too.
     """
-    questions = generated.list_question(
+    questions = read_all(
+        generated.list_question,
         discipline=DISCIPLINE,
         course=COURSE,
         statuses=None if archived else ["DRAFT", "PUBLISHED"],
@@ -161,13 +163,18 @@ def _question_slugs(client: httpx.Client, *, archived: bool = False) -> set[str]
 
 
 def _time_slot_slugs(client: httpx.Client) -> set[str]:
-    slots = generated.list_timeslot(discipline=DISCIPLINE, course=COURSE, client=client)
+    slots = read_all(
+        generated.list_timeslot, discipline=DISCIPLINE, course=COURSE, client=client
+    )
     return {slot.slug for slot in slots}
 
 
 def _calendar_event_keys(client: httpx.Client) -> set[tuple[int, str]]:
-    events = generated.list_calendar_event(
-        discipline=DISCIPLINE, course=COURSE, client=client
+    events = read_all(
+        generated.list_calendar_event,
+        discipline=DISCIPLINE,
+        course=COURSE,
+        client=client,
     )
     return {(event.week, event.time_slot.slug) for event in events}
 
@@ -239,7 +246,8 @@ def test_push_questions_matches_the_repository_exactly_and_reconverges(
 
 
 def _exam_status(client: httpx.Client) -> dict[str, str]:
-    exams = generated.list_exam(
+    exams = read_all(
+        generated.list_exam,
         discipline=DISCIPLINE,
         course=COURSE,
         statuses=["DRAFT", "SCHEDULED", "ONGOING", "COMPLETED"],
@@ -336,8 +344,8 @@ def test_push_attaches_a_linked_resource_to_its_lesson_and_reconverges(
 
     server_resources = {
         resource.slug: resource
-        for resource in generated.list_resource(
-            discipline=DISCIPLINE, course=COURSE, client=client
+        for resource in read_all(
+            generated.list_resource, discipline=DISCIPLINE, course=COURSE, client=client
         )
     }
     event = server_resources["hello"].event
@@ -424,8 +432,11 @@ def _resource(client: httpx.Client, slug: str) -> generated.Resource:
 def _resource_slugs(client: httpx.Client) -> set[str]:
     return {
         r.slug
-        for r in generated.list_resource(
-            discipline=DISCIPLINE, course=SCRATCH, client=client
+        for r in read_all(
+            generated.list_resource,
+            discipline=DISCIPLINE,
+            course=SCRATCH,
+            client=client,
         )
     }
 
@@ -712,8 +723,11 @@ def test_a_server_edit_of_an_event_with_a_roll_call_survives_a_push_and_blocks_t
     def roll_calls() -> set[tuple[int, str]]:
         return {
             (r.week, r.time_slot)
-            for r in generated.list_roll_call(
-                discipline=DISCIPLINE, course=SCRATCH, client=client
+            for r in read_all(
+                generated.list_roll_call,
+                discipline=DISCIPLINE,
+                course=SCRATCH,
+                client=client,
             )
         }
 

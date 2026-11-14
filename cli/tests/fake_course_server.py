@@ -14,6 +14,7 @@ import json
 from collections.abc import Callable
 
 import httpx
+from pages import page
 
 DISCIPLINE = "cs101"
 COURSE = "ada_2026-1"
@@ -91,7 +92,7 @@ class FakeCourseServer:
             f"{BASE}/roll-call",
             f"{BASE}/repository",
         ):
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if path == f"{BASE}/resource":
             return self.resource_collection(request)
         if path == f"{BASE}/time-slot":
@@ -116,7 +117,7 @@ class FakeCourseServer:
 
     def resource_collection(self, request: httpx.Request) -> httpx.Response:
         if request.method == "GET":
-            return httpx.Response(200, json=list(self.resources.values()))
+            return httpx.Response(200, json=page(self.resources.values()))
         body = json.loads(request.content)
         stored = {
             "createdAt": "2026-01-01T00:00:00Z",
@@ -130,7 +131,7 @@ class FakeCourseServer:
         from test_cli_push import _timeslot_json
 
         if request.method == "GET":
-            return httpx.Response(200, json=list(self.time_slots.values()))
+            return httpx.Response(200, json=page(self.time_slots.values()))
         body = json.loads(request.content)
         stored = _timeslot_json(
             body["slug"],
@@ -147,7 +148,7 @@ class FakeCourseServer:
         from test_cli_push import _calendar_event_json
 
         if request.method == "GET":
-            return httpx.Response(200, json=list(self.events.values()))
+            return httpx.Response(200, json=page(self.events.values()))
         body = json.loads(request.content)
         slot = self.time_slots.get(body["timeSlot"])
         stored = _calendar_event_json(

@@ -9,10 +9,15 @@ import { ensurePerm } from "@/auth/permissions";
 import { SCHOOL_ID_PATTERN } from "@/core/constants";
 import { FieldError, NotAllowed, NotFound, WeakPassword } from "@/core/error";
 import {
+	PAGE_LIMIT_DEFAULT,
+	type Page,
+	type PageParams,
+	pageOf,
+	pageParams,
 	passwordChange,
 	passwordReset,
 	userCreate,
-	type userFilter,
+	userFilter,
 	userPK,
 	userSchema,
 	userUpdate,
@@ -21,6 +26,7 @@ import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
+import { cutPage } from "@/utils/cursor";
 import type { User as DbUser, Prisma, PrismaTx } from "../client";
 import { makeSessionService } from "./session.service";
 
@@ -164,17 +170,72 @@ export const makeUserService = defineService<UserT>()((client) => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<User[]> => {
 			const users = await tx.user.findMany({
-				where: {
-					AND: [
-						by.usernames ? { username: { in: by.usernames } } : {},
-						userWhere(opts.actor),
-					],
-				},
+				where: listWhere(by, opts.actor),
 				orderBy: { createdAt: "desc" },
 				take: by.take,
 			});
 			for (const user of users) ensurePerm(opts.actor, "user.read", user);
 			return users.map(toUser);
+		},
+	});
+
+	/**
+	 * Lists one page of the users `actor` may read, by username.
+	 *
+	 * The cursor is the username of the last user of the page.
+	 */
+	const findPage = op({
+		transaction: false,
+		args: [userFilter.extend(pageParams.shape)],
+		returns: pageOf(userSchema),
+		run: async (
+			tx: PrismaTx,
+			by: UserFilter & PageParams,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Page<User>> => {
+			const limit = by.limit ?? by.take ?? PAGE_LIMIT_DEFAULT;
+			const rows = await tx.user.findMany({
+				where: {
+					AND: [
+						listWhere(by, opts.actor),
+						by.after ? { username: { gt: by.after } } : {},
+					],
+				},
+				orderBy: { username: "asc" },
+				take: limit + 1,
+			});
+			for (const user of rows) ensurePerm(opts.actor, "user.read", user);
+			const { page, next } = cutPage(rows, limit, (row) => row.username);
+			return { items: page.map(toUser), next };
+		},
+	});
+
+	/** Counts the users `actor` may read that match `by`. */
+	const count = op({
+		transaction: false,
+		args: [userFilter],
+		run: async (
+			tx: PrismaTx,
+			by: UserFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<number> => tx.user.count({ where: listWhere(by, opts.actor) }),
+	});
+
+	/** Counts the users `actor` may read, by role. */
+	const countByRole = op({
+		transaction: false,
+		run: async (
+			tx: PrismaTx,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Record<User["role"], number>> => {
+			const groups = await tx.user.groupBy({
+				by: ["role"],
+				where: userWhere(opts.actor),
+				_count: { _all: true },
+			});
+			const counts = { ADMIN: 0, INSTRUCTOR: 0, STUDENT: 0 };
+			for (const group of groups) counts[group.role] = group._count._all;
+			return counts;
 		},
 	});
 
@@ -370,6 +431,9 @@ export const makeUserService = defineService<UserT>()((client) => {
 		create,
 		findOne,
 		findMany,
+		findPage,
+		count,
+		countByRole,
 		update,
 		upsert,
 		delete: remove,
@@ -401,6 +465,16 @@ async function writePassword(
 //
 // Auxiliary functions
 //
+
+/// The users that match `by` among those `actor` may read.
+function listWhere(by: UserFilter, actor: Actor): Prisma.UserWhereInput {
+	return {
+		AND: [
+			by.usernames ? { username: { in: by.usernames } } : {},
+			userWhere(actor),
+		],
+	};
+}
 
 /** Prisma `where` fragment implementing the same rule as the `user.read` permission. */
 export function userWhere(actor: Actor): Prisma.UserWhereInput {

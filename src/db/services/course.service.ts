@@ -16,6 +16,11 @@ import {
 	coursePK,
 	courseSchema,
 	courseUpdate,
+	PAGE_LIMIT_DEFAULT,
+	type Page,
+	type PageParams,
+	pageOf,
+	pageParams,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
@@ -26,6 +31,7 @@ import {
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import type { FillUndefineds } from "@/typing";
+import { cutPage, decodeCursor, encodeCursor } from "@/utils/cursor";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
 import { recomputeEventTimes } from "../event-times";
 import { invalidIfExists, valueOrNotFound } from "../utils";
@@ -82,6 +88,33 @@ type CourseT = {
 	filter: CourseFilter;
 	update: CourseUpdate;
 };
+
+/// The courses that match `filter` among those `actor` may read.
+function listWhere(
+	filter: CourseFilter,
+	actor: Actor,
+): Prisma.CourseWhereInput {
+	return {
+		AND: [
+			filter.instructor ? { instructorId: filter.instructor } : {},
+			filter.discipline ? { disciplineSlug: filter.discipline } : {},
+			filter.edition ? { editionSlug: filter.edition } : {},
+			filter.member
+				? {
+						OR: [
+							{ instructorId: filter.member },
+							{
+								enrollments: {
+									some: { username: filter.member, status: "ACTIVE" },
+								},
+							},
+						],
+					}
+				: {},
+			courseWhere(actor),
+		],
+	};
+}
 
 const buildCourseService = defineService<CourseT>()(() => {
 	/**
@@ -160,26 +193,7 @@ const buildCourseService = defineService<CourseT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<Course[]> => {
 			const rows = await tx.course.findMany({
-				where: {
-					AND: [
-						filter.instructor ? { instructorId: filter.instructor } : {},
-						filter.discipline ? { disciplineSlug: filter.discipline } : {},
-						filter.edition ? { editionSlug: filter.edition } : {},
-						filter.member
-							? {
-									OR: [
-										{ instructorId: filter.member },
-										{
-											enrollments: {
-												some: { username: filter.member, status: "ACTIVE" },
-											},
-										},
-									],
-								}
-							: {},
-						courseWhere(opts.actor),
-					],
-				},
+				where: listWhere(filter, opts.actor),
 				include: courseInclude,
 				orderBy: { createdAt: "desc" },
 			});
@@ -189,6 +203,76 @@ const buildCourseService = defineService<CourseT>()(() => {
 				}
 			}
 			return rows.map((row) => fromDb(row, opts.actor));
+		},
+	});
+
+	/**
+	 * Lists one page of the courses `actor` may read, oldest first.
+	 *
+	 * @throws {@link InvalidData} When `filter.after` is not a cursor of this list.
+	 */
+	const findPage = op({
+		transaction: false,
+		args: [courseFilter.extend(pageParams.shape)],
+		returns: pageOf(courseSchema),
+		run: async (
+			tx: PrismaTx,
+			filter: CourseFilter & PageParams,
+			opts: ServiceOptsWithoutTx,
+		): Promise<Page<Course>> => {
+			const limit = filter.limit ?? PAGE_LIMIT_DEFAULT;
+			const rows = await tx.course.findMany({
+				where: {
+					AND: [
+						listWhere(filter, opts.actor),
+						filter.after
+							? { id: { gt: decodeCursor(filter.after) as CourseId } }
+							: {},
+					],
+				},
+				include: courseInclude,
+				orderBy: { id: "asc" },
+				take: limit + 1,
+			});
+			for (const row of rows) {
+				if (!hasPerm(opts.actor, "course.read", row)) {
+					throw new NotAllowed("course.read");
+				}
+			}
+			const { page, next } = cutPage(rows, limit, (row) =>
+				encodeCursor(row.id),
+			);
+			return { items: page.map((row) => fromDb(row, opts.actor)), next };
+		},
+	});
+
+	/** Counts the courses `actor` may read that match `filter`. */
+	const count = op({
+		transaction: false,
+		args: [courseFilter],
+		run: async (
+			tx: PrismaTx,
+			filter: CourseFilter,
+			opts: ServiceOptsWithoutTx,
+		): Promise<number> =>
+			tx.course.count({ where: listWhere(filter, opts.actor) }),
+	});
+
+	/** Counts the courses `actor` may read under each discipline or edition, by slug. */
+	const countBy = op({
+		transaction: false,
+		run: async (
+			tx: PrismaTx,
+			key: "discipline" | "edition",
+			opts: ServiceOptsWithoutTx,
+		): Promise<Map<string, number>> => {
+			const column = key === "discipline" ? "disciplineSlug" : "editionSlug";
+			const groups = await tx.course.groupBy({
+				by: [column],
+				where: courseWhere(opts.actor),
+				_count: { _all: true },
+			});
+			return new Map(groups.map((group) => [group[column], group._count._all]));
 		},
 	});
 
@@ -294,7 +378,17 @@ const buildCourseService = defineService<CourseT>()(() => {
 		},
 	});
 
-	return { create, findOne, findMany, update, upsert, delete: remove };
+	return {
+		create,
+		findOne,
+		findMany,
+		findPage,
+		count,
+		countBy,
+		update,
+		upsert,
+		delete: remove,
+	};
 });
 
 /** The course service of `client` (the shared client by default). */

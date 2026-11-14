@@ -144,9 +144,9 @@ test("GET lists a course's events and GET <week>/<slot> reads one", async ({
 
 	const list = await request.get(url, { headers });
 	expect(list.status()).toBe(200);
-	expect((await list.json()).map((e: { week: number }) => e.week)).toEqual([
-		0, 2,
-	]);
+	expect(
+		(await list.json()).items.map((e: { week: number }) => e.week),
+	).toEqual([0, 2]);
 
 	const one = await request.get(`${url}/2/mon`, { headers });
 	expect(one.status()).toBe(200);
@@ -163,7 +163,7 @@ test("the listing is scoped to the course in the path, not to every course the a
 
 	const headers = await tokenFor(request, mine.instructor.username);
 	const listed = await (await request.get(mine.url, { headers })).json();
-	expect(listed.map((e: { title: string }) => e.title)).toEqual(["mine"]);
+	expect(listed.items.map((e: { title: string }) => e.title)).toEqual(["mine"]);
 });
 
 test("the API addresses a slot by slug only, while the service still takes its id", async ({
@@ -244,7 +244,9 @@ test("PUT creates on the first call and updates the same event on the next, taki
 	expect(again.status()).toBe(200);
 	expect((await again.json()).title).toBe("second");
 
-	expect(await (await request.get(url, { headers })).json()).toHaveLength(1);
+	expect(
+		(await (await request.get(url, { headers })).json()).items,
+	).toHaveLength(1);
 });
 
 test("status codes: 400 a malformed segment or week, 404 no course or no event, 403 a course the actor cannot see", async ({
@@ -309,5 +311,5 @@ test("a listing of a course the actor cannot read is empty, not refused", async 
 
 	const listed = await request.get(url, { headers });
 	expect(listed.status()).toBe(200);
-	expect(await listed.json()).toEqual([]);
+	expect(await listed.json()).toEqual({ items: [], next: null });
 });

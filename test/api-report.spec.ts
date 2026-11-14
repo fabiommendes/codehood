@@ -80,7 +80,7 @@ test("local triage: pull the OPEN reports, PATCH one, and it does not come back"
 	const pulled = await request.get(queueUrl, { headers: asAdmin });
 	expect(pulled.status()).toBe(200);
 	expect(
-		(await pulled.json()).map((r: { publicId: string }) => r.publicId),
+		(await pulled.json()).items.map((r: { publicId: string }) => r.publicId),
 	).toEqual([report.publicId, second.publicId]);
 
 	const patched = await request.patch(`/api/report/${report.publicId}`, {
@@ -96,7 +96,7 @@ test("local triage: pull the OPEN reports, PATCH one, and it does not come back"
 
 	const again = await request.get(queueUrl, { headers: asAdmin });
 	expect(
-		(await again.json()).map((r: { publicId: string }) => r.publicId),
+		(await again.json()).items.map((r: { publicId: string }) => r.publicId),
 	).toEqual([second.publicId]);
 
 	const byKind = await request.get(
@@ -104,7 +104,7 @@ test("local triage: pull the OPEN reports, PATCH one, and it does not come back"
 		{ headers: asAdmin },
 	);
 	expect(
-		(await byKind.json()).map((r: { publicId: string }) => r.publicId),
+		(await byKind.json()).items.map((r: { publicId: string }) => r.publicId),
 	).toEqual([second.publicId]);
 
 	const mine = await request.get(`/api/report/${report.publicId}`, {

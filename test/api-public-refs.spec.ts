@@ -398,7 +398,9 @@ test("submission list filter's response takes { publicId } over the API; respons
 	);
 	expect(byPublicId.status()).toBe(200);
 	expect(
-		(await byPublicId.json()).map((s: { publicId: string }) => s.publicId),
+		(await byPublicId.json()).items.map(
+			(s: { publicId: string }) => s.publicId,
+		),
 	).toEqual([chain.submission.publicId]);
 
 	const byNumericId = await request.get(
@@ -411,7 +413,7 @@ test("submission list filter's response takes { publicId } over the API; respons
 		expect((await byNumericId.json()).code).toBe("invalid-data");
 	} else {
 		expect(byNumericId.status()).toBe(200);
-		const publicIds = (await byNumericId.json()).map(
+		const publicIds = (await byNumericId.json()).items.map(
 			(s: { publicId: string }) => s.publicId,
 		);
 		// "Ignored" means the request behaves as if `response` were never

@@ -163,7 +163,9 @@ test("T5-01 GET on the collection lists roll calls with week, timeSlot and atten
 
 	const list = await request.get(url, { headers });
 	expect(list.status()).toBe(200);
-	const [item, ...rest] = await list.json();
+	const { items, next } = await list.json();
+	expect(next).toBeNull();
+	const [item, ...rest] = items;
 	expect(rest).toHaveLength(0);
 	expect(item).toMatchObject({ week: WEEK, timeSlot: "mon" });
 	expect(Object.keys(item.attendances).sort()).toEqual(
@@ -256,7 +258,7 @@ test("T5-05 a student reads only their own entry and cannot PATCH or DELETE", as
 	const { url, itemUrl, attendanceUrl, rollCall, a, b, c } = await makeCourse();
 	const headers = await tokenFor(request, a.username);
 
-	const list = await (await request.get(url, { headers })).json();
+	const list = (await (await request.get(url, { headers })).json()).items;
 	expect(Object.keys(list[0].attendances)).toEqual([a.username]);
 	const one = await (await request.get(itemUrl, { headers })).json();
 	expect(Object.keys(one.attendances)).toEqual([a.username]);

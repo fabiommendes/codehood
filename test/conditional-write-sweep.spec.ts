@@ -741,7 +741,7 @@ const STUDENT_PATH: Record<string, Record<string, () => Promise<unknown>>> = {
 };
 
 /// Public operations of a honored service that have no case above, with the
-/// reason. `findOne` and `findMany` are reads everywhere.
+/// reason. `findOne`, `findMany`, `findPage` and `count` are reads everywhere.
 const UNGUARDED: Record<string, string> = {
 	...Object.fromEntries(
 		[
@@ -804,7 +804,14 @@ const UNGUARDED: Record<string, string> = {
 };
 
 /// Operations that read in every service.
-const READS = new Set(["findOne", "findMany"]);
+const READS = new Set([
+	"findOne",
+	"findMany",
+	"findPage",
+	"countBy",
+	"countByRole",
+	"count",
+]);
 
 /// Services with writes on a versioned model that do not honor the option
 /// yet. Remove a name when its service does; the test fails if it stays. A new

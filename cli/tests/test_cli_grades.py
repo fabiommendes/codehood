@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 import httpx
 import pytest
+from pages import page
 from typer.testing import CliRunner
 
 from codehood.api import base as base_module
@@ -108,7 +109,7 @@ class FakeServer:
 
         if path == f"{BASE}/grade-column":
             if method == "GET":
-                return httpx.Response(200, json=list(self.columns.values()))
+                return httpx.Response(200, json=page(self.columns.values()))
             body = json.loads(request.content)
             self.columns[body["slug"]] = {
                 **body,
@@ -129,7 +130,7 @@ class FakeServer:
         if method == "GET" and path == BASE:
             return httpx.Response(200, json=_course_json())
         if method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if path == "/api/course":
             return httpx.Response(200, json=_course_json())
         if path == f"{BASE}/time-slot":

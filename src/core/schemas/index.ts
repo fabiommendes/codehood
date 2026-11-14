@@ -63,6 +63,7 @@ export * from "./feedback";
 export * from "./grade-column";
 export * from "./grading-job";
 export * from "./invite";
+export * from "./page";
 export * from "./passphrase";
 export * from "./question";
 export * from "./regrade-request";

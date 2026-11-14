@@ -145,17 +145,17 @@ def _calendar_defaults(request: httpx.Request) -> httpx.Response | None:
     call, so callers can fall through to their own branches.
     """
     if request.url.path == f"{BASE}/roll-call" and request.method == "GET":
-        return httpx.Response(200, json=[])
+        return httpx.Response(200, json=page([]))
     if request.url.path == f"{BASE}/repository" and request.method == "GET":
-        return httpx.Response(200, json=[])
+        return httpx.Response(200, json=page([]))
     if request.url.path == f"{BASE}/time-slot":
         if request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "PUT":
             return httpx.Response(200, json=_timeslot_json())
     if request.url.path == f"{BASE}/calendar-event":
         if request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "PUT":
             return httpx.Response(200, json=_calendar_event_json())
     return None
@@ -286,7 +286,7 @@ def _fresh_server_handler(calls: list[tuple[str, str]]):
         if request.url.path == BASE and request.method == "GET":
             return httpx.Response(404, json={"message": "not found"})
         if request.url.path == f"{BASE}/resource" and request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == COURSE_COLLECTION and request.method == "PUT":
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource" and request.method == "PUT":
@@ -295,7 +295,7 @@ def _fresh_server_handler(calls: list[tuple[str, str]]):
         if (response := _calendar_defaults(request)) is not None:
             return response
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
     return handler
@@ -318,9 +318,9 @@ def test_dry_run_performs_zero_writes(repo, monkeypatch):
         if request.url.path == BASE:
             return httpx.Response(404, json={"message": "not found"})
         if request.url.path == f"{BASE}/resource":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     _install_transport(monkeypatch, handler)
@@ -347,45 +347,49 @@ def test_dry_run_prints_a_warning_for_a_cancelled_events_pinned_slot(repo, monke
         if request.url.path == BASE:
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/repository":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/time-slot":
             return httpx.Response(
                 200,
-                json=[
-                    _timeslot_json("mon"),
-                    _timeslot_json(
-                        "wed",
-                        day="WEDNESDAY",
-                        start={"hour": 9, "minute": 0},
-                        duration={"hours": 1, "minutes": 0},
-                    ),
-                ],
+                json=page(
+                    [
+                        _timeslot_json("mon"),
+                        _timeslot_json(
+                            "wed",
+                            day="WEDNESDAY",
+                            start={"hour": 9, "minute": 0},
+                            duration={"hours": 1, "minutes": 0},
+                        ),
+                    ]
+                ),
             )
         if request.url.path == f"{BASE}/roll-call":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/calendar-event":
             return httpx.Response(
                 200,
-                json=[
-                    _calendar_event_json(),
-                    _calendar_event_json(
-                        week=2,
-                        time_slot_slug="wed",
-                        kind="CANCELLED",
-                        title="Midterm",
-                        description=None,
-                        ref="ref-cancelled",
-                    ),
-                ],
+                json=page(
+                    [
+                        _calendar_event_json(),
+                        _calendar_event_json(
+                            week=2,
+                            time_slot_slug="wed",
+                            kind="CANCELLED",
+                            title="Midterm",
+                            description=None,
+                            ref="ref-cancelled",
+                        ),
+                    ]
+                ),
             )
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
     _install_transport(monkeypatch, handler)
@@ -418,17 +422,19 @@ def test_no_prune_reports_deletion_without_executing_it(repo, monkeypatch):
             # A resource the server has that the local repo no longer does.
             return httpx.Response(
                 200,
-                json=[
-                    _local_resource_json(repo),
-                    _resource_json("stale-handout", "server-only-ref"),
-                ],
+                json=page(
+                    [
+                        _local_resource_json(repo),
+                        _resource_json("stale-handout", "server-only-ref"),
+                    ]
+                ),
             )
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question" and request.method == "GET":
             # `fetch_server_state` now also reads questions; this repo
             # fixture has none, so nothing is planned for them either way.
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == COURSE_COLLECTION and request.method == "PUT":
             return httpx.Response(200, json=_course_json())
         if (
@@ -439,7 +445,7 @@ def test_no_prune_reports_deletion_without_executing_it(repo, monkeypatch):
         if (response := _calendar_defaults(request)) is not None:
             return response
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
     _seed_base(repo, resources=[_resource_json("stale-handout", "server-only-ref")])
@@ -469,13 +475,13 @@ def test_a_failed_operation_exits_nonzero_but_still_runs_the_rest(repo, monkeypa
         if request.url.path == BASE and request.method == "GET":
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource" and request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == COURSE_COLLECTION and request.method == "PUT":
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question" and request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/time-slot" and request.method == "PUT":
             return httpx.Response(500, json={"message": "server error"})
         if request.url.path == f"{BASE}/resource" and request.method == "PUT":
@@ -484,7 +490,7 @@ def test_a_failed_operation_exits_nonzero_but_still_runs_the_rest(repo, monkeypa
         if (response := _calendar_defaults(request)) is not None:
             return response
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
     _install_transport(monkeypatch, handler)
@@ -547,7 +553,7 @@ def test_a_failed_course_upsert_stops_the_push_without_a_cascade_of_errors(
                 400, json={"message": "the edition does not accept new courses"}
             )
         if request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(
             f"sent after the course failed: {request.method} {request.url}"
         )
@@ -583,9 +589,9 @@ def test_dry_run_prints_question_ops(repo_with_question, monkeypatch):
         if request.url.path == BASE:
             return httpx.Response(404, json={"message": "not found"})
         if request.url.path == f"{BASE}/resource":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     _install_transport(monkeypatch, handler)
@@ -606,20 +612,22 @@ def test_no_prune_skips_question_deletions(repo_with_question, monkeypatch):
         if request.url.path == f"{BASE}/resource" and request.method == "GET":
             return httpx.Response(
                 200,
-                json=[_local_resource_json(repo_with_question)],
+                json=page([_local_resource_json(repo_with_question)]),
             )
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question" and request.method == "GET":
             # `big-o` is local, `stale-warmup` is server-only -- the local
             # question is unchanged, so only `stale-warmup` is a deletion
             # candidate.
             return httpx.Response(
                 200,
-                json=[
-                    _local_question_json(repo_with_question),
-                    _question_json("stale-warmup", "md5:server-only"),
-                ],
+                json=page(
+                    [
+                        _local_question_json(repo_with_question),
+                        _question_json("stale-warmup", "md5:server-only"),
+                    ]
+                ),
             )
         if request.url.path == COURSE_COLLECTION and request.method == "PUT":
             return httpx.Response(200, json=_course_json())
@@ -631,7 +639,7 @@ def test_no_prune_skips_question_deletions(repo_with_question, monkeypatch):
         if (response := _calendar_defaults(request)) is not None:
             return response
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
     _seed_base(
@@ -668,20 +676,20 @@ def test_a_failed_question_operation_exits_nonzero_but_still_runs_the_rest(
         if request.url.path == BASE and request.method == "GET":
             return httpx.Response(404, json={"message": "not found"})
         if request.url.path == f"{BASE}/resource" and request.method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == COURSE_COLLECTION and request.method == "PUT":
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource" and request.method == "PUT":
             slug = json.loads(request.content)["slug"]
             return httpx.Response(200, json=_resource_json(slug, "whatever"))
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question" and request.method == "PUT":
             return httpx.Response(500, json={"message": "server error"})
         if (response := _calendar_defaults(request)) is not None:
             return response
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.method} {request.url}")
 
     _install_transport(monkeypatch, handler)
@@ -733,19 +741,19 @@ def _roll_call_server_handler(repo, calls: list[tuple[str, str]]):
         if path == BASE and method == "GET":
             return httpx.Response(200, json=_course_json())
         if path == f"{BASE}/resource" and method == "GET":
-            return httpx.Response(200, json=[_local_resource_json(repo)])
+            return httpx.Response(200, json=page([_local_resource_json(repo)]))
         if path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if path == f"{BASE}/question" and method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if path == f"{BASE}/time-slot" and method == "GET":
-            return httpx.Response(200, json=[_timeslot_json("mon")])
+            return httpx.Response(200, json=page([_timeslot_json("mon")]))
         if path == f"{BASE}/calendar-event" and method == "GET":
-            return httpx.Response(200, json=[_calendar_event_json(week=5)])
+            return httpx.Response(200, json=page([_calendar_event_json(week=5)]))
         if path == f"{BASE}/roll-call" and method == "GET":
-            return httpx.Response(200, json=[_roll_call_json(5, "mon", 32)])
+            return httpx.Response(200, json=page([_roll_call_json(5, "mon", 32)]))
         if path == f"{BASE}/grade-column" and method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if method == "DELETE" and path in (
             f"{BASE}/roll-call/5/mon",
             f"{BASE}/calendar-event/5/mon",
@@ -851,25 +859,25 @@ def _server_with(
         if path == BASE and method == "GET":
             return httpx.Response(200, json=_course_json())
         if path == f"{BASE}/resource" and method == "GET":
-            return httpx.Response(200, json=resources or [])
+            return httpx.Response(200, json=page(resources or []))
         if path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if path == f"{BASE}/question" and method == "GET":
-            return httpx.Response(200, json=questions or [])
+            return httpx.Response(200, json=page(questions or []))
         if path == COURSE_COLLECTION and method == "PUT":
             return httpx.Response(200, json=_course_json())
         if path == f"{BASE}/resource" and method == "PUT":
             slug = json.loads(request.content)["slug"]
             return httpx.Response(200, json=_resource_json(slug, "whatever"))
         if path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if path == f"{BASE}/question" and method == "PUT":
             slug = json.loads(request.content)["slug"]
             return httpx.Response(200, json=_question_json(slug, "whatever"))
         if (response := _calendar_defaults(request)) is not None:
             return response
         if method == "GET" and path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {method} {request.url}")
 
     return handler
@@ -1122,6 +1130,7 @@ def test_no_unconsumed_prints_nothing(repo, monkeypatch):
 # Three-way sync: the base, `Pull` and a failed write
 #
 from fake_course_server import FakeCourseServer
+from pages import page
 
 BASE_FILES = ("course", "resources", "questions", "time_slots", "calendar_events")
 

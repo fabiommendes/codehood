@@ -228,6 +228,78 @@ class Instructor(Model):
     username: str
 
 
+class ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem(Model):
+    name: str
+    format: str
+    text: str | None = None
+    label: str | None = None
+
+
+class ListQuestionResponseItemsItem2QuestionFillInBlanksItemNumeric(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    type: Literal["numeric"]
+    unit: str | None = None
+    domain: Literal["integer", "decimal", "fraction"]
+    decimal_places: int | None = Field(default=None, alias="decimalPlaces")
+
+
+class ListQuestionResponseItemsItem2QuestionMultipleChoiceChoicesItem(Model):
+    id: str
+    text: str
+
+
+class ListQuestionResponseItemsItem2QuestionShortAnswerPreAcceptItem(Model):
+    pattern: str
+    feedback: str | None = None
+
+
+class ListQuestionResponseItemsItemQuestionCodeRubricItem(Model):
+    value: float | None = None
+    binding: Literal["manual"]
+    text: str
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class ListQuestionResponseItemsItemQuestionMultipleChoiceChoicesItem(Model):
+    id: str | None = None
+    text: str
+    score: float | None = None
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class ListQuestionResponseItemsItemQuestionMultipleSelectionChoicesItem(Model):
+    id: str | None = None
+    text: str
+    correct: bool
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class ListQuestionResponseItemsItemQuestionOrderingAcceptItem(Model):
+    lines: list[list[int | str]]
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem(Model):
+    pattern: str
+    feedback: str | None = None
+    comment: str | None = None
+
+
+class ListQuestionResponseItemsItemQuestionTrueFalseChoicesItem(Model):
+    id: str | None = None
+    text: str
+    correct: bool
+    marker: str | None = None
+    feedback: str | None = None
+    comment: str | None = None
+
+
 class LoginRequest(Model):
     login: str
     password: str
@@ -250,76 +322,14 @@ class PublicTestsItem(Model):
     example: bool
 
 
-class Question2QuestionCodeRubricItem(Model):
-    value: float | None = None
-    binding: Literal["manual"]
-    text: str
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class Question2QuestionMultipleChoiceChoicesItem(Model):
-    id: str | None = None
-    text: str
-    score: float | None = None
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class Question2QuestionMultipleSelectionChoicesItem(Model):
-    id: str | None = None
-    text: str
-    correct: bool
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class Question2QuestionOrderingAcceptItem(Model):
-    lines: list[list[int | str]]
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class Question2QuestionShortAnswerAcceptItem(Model):
-    pattern: str
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class Question2QuestionTrueFalseChoicesItem(Model):
-    id: str | None = None
-    text: str
-    correct: bool
-    marker: str | None = None
-    feedback: str | None = None
-    comment: str | None = None
-
-
-class Question3QuestionCodeAttachmentsItem(Model):
-    name: str
-    format: str
-    text: str | None = None
-    label: str | None = None
-
-
-class Question3QuestionFillInBlanksItemNumeric(Model):
+class ReadRollCallResponseShape(Model):
     model_config = ConfigDict(populate_by_name=True)
 
-    id: str
-    type: Literal["numeric"]
-    unit: str | None = None
-    domain: Literal["integer", "decimal", "fraction"]
-    decimal_places: int | None = Field(default=None, alias="decimalPlaces")
-
-
-class Question3QuestionMultipleChoiceChoicesItem(Model):
-    id: str
-    text: str
-
-
-class Question3QuestionShortAnswerPreAcceptItem(Model):
-    pattern: str
-    feedback: str | None = None
+    source: Literal["CODE", "MANUAL"]
+    joined: Literal["ENROLLMENT", "ACCOUNT", None] | None
+    note: str | None
+    shared_with: list[str] = Field(alias="sharedWith")
+    created_at: str = Field(alias="createdAt")
 
 
 class RenewGradingJobRequest(Model):
@@ -384,16 +394,6 @@ class ResourceDataFile(Model):
     mime_type: str = Field(alias="mimeType")
     filename: str
     type: Literal["FILE"]
-
-
-class RollCallShape(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    source: Literal["CODE", "MANUAL"]
-    joined: Literal["ENROLLMENT", "ACCOUNT", None] | None
-    note: str | None
-    shared_with: list[str] = Field(alias="sharedWith")
-    created_at: str = Field(alias="createdAt")
 
 
 class RubricItem(Model):
@@ -657,7 +657,207 @@ class GradeColumnCreate(Model):
     values: list[ValuesItem]
 
 
-class Question2QuestionCode(Model):
+class ListDisciplineResponse(Model):
+    items: list[Discipline]
+    next: str | None
+
+
+class ListEditionResponse(Model):
+    items: list[Edition]
+    next: str | None
+
+
+class ListQuestionResponseItemsItem2QuestionCode(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["code"]
+    template: str | None = None
+    language: str | None = None
+    file: str | None = None
+    public_tests: list[PublicTestsItem] | None = Field(
+        default=None, alias="publicTests"
+    )
+
+
+class ListQuestionResponseItemsItem2QuestionEssay(Model):
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["essay"]
+    content: Literal["code", "text", "plain"] | None = None
+    highlight: str | None = None
+
+
+class ListQuestionResponseItemsItem2QuestionFillInBlanksItemMultipleChoice(Model):
+    id: str
+    type: Literal["multiple-choice"]
+    choices: list[ListQuestionResponseItemsItem2QuestionMultipleChoiceChoicesItem]
+
+
+class ListQuestionResponseItemsItem2QuestionFillInBlanksItemShortAnswer(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    type: Literal["short-answer"]
+    unmatched: Literal["manual", "incorrect"]
+    pre_accept: (
+        list[str | ListQuestionResponseItemsItem2QuestionShortAnswerPreAcceptItem]
+        | None
+    ) = Field(default=None, alias="preAccept")
+    pre_reject: (
+        list[str | ListQuestionResponseItemsItem2QuestionShortAnswerPreAcceptItem]
+        | None
+    ) = Field(default=None, alias="preReject")
+
+
+class ListQuestionResponseItemsItem2QuestionMultipleChoice(Model):
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["multiple-choice"]
+    shuffle: bool | Literal["inherit"] | None = None
+    grading: Literal["partial", "symmetric", "inherit"] | None = None
+    choices: list[ListQuestionResponseItemsItem2QuestionMultipleChoiceChoicesItem]
+
+
+class ListQuestionResponseItemsItem2QuestionMultipleSelection(Model):
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["multiple-selection"]
+    shuffle: bool | Literal["inherit"] | None = None
+    grading: Literal["partial", "all-or-nothing", "symmetric", "inherit"] | None = None
+    choices: list[ListQuestionResponseItemsItem2QuestionMultipleChoiceChoicesItem]
+
+
+class ListQuestionResponseItemsItem2QuestionNumeric(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["numeric"]
+    unit: str | None = None
+    domain: Literal["integer", "decimal", "fraction"]
+    decimal_places: int | None = Field(default=None, alias="decimalPlaces")
+
+
+class ListQuestionResponseItemsItem2QuestionOrdering(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["ordering"]
+    content: Literal["code", "text"]
+    highlight: str | None = None
+    indentation: Literal["fixed", "lenient", "strict"] | None = None
+    unmatched: Literal["manual", "incorrect"]
+    normalizations: list[Literal["dedent", "skip-blanks"]] | None = None
+    max_level: int | None = Field(default=None, alias="maxLevel")
+    pool: list[list[int | str]]
+
+
+class ListQuestionResponseItemsItem2QuestionShortAnswer(Model):
+    model_config = ConfigDict(populate_by_name=True)
+
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["short-answer"]
+    diacritics: Literal["fold", "keep"] | None = None
+    unmatched: Literal["manual", "incorrect"]
+    pre_accept: (
+        list[str | ListQuestionResponseItemsItem2QuestionShortAnswerPreAcceptItem]
+        | None
+    ) = Field(default=None, alias="preAccept")
+    pre_reject: (
+        list[str | ListQuestionResponseItemsItem2QuestionShortAnswerPreAcceptItem]
+        | None
+    ) = Field(default=None, alias="preReject")
+
+
+class ListQuestionResponseItemsItem2QuestionTrueFalse(Model):
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["true-false"]
+    shuffle: bool | Literal["inherit"] | None = None
+    grading: (
+        Literal["partial", "no-mistakes", "all-or-nothing", "symmetric", "inherit"]
+        | None
+    ) = None
+    choices: list[ListQuestionResponseItemsItem2QuestionMultipleChoiceChoicesItem]
+
+
+class ListQuestionResponseItemsItemQuestionCode(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -677,12 +877,12 @@ class Question2QuestionCode(Model):
     language: str | None = None
     file: str | None = None
     tests: list[TestsItem] | None = None
-    rubric: list[Question2QuestionCodeRubricItem] | None = None
+    rubric: list[ListQuestionResponseItemsItemQuestionCodeRubricItem] | None = None
     template: str | None = None
     answer_key: str | None = Field(default=None, alias="answerKey")
 
 
-class Question2QuestionEssay(Model):
+class ListQuestionResponseItemsItemQuestionEssay(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -704,13 +904,13 @@ class Question2QuestionEssay(Model):
     answer_key: str | None = Field(default=None, alias="answerKey")
 
 
-class Question2QuestionFillInBlanksItemMultipleChoice(Model):
+class ListQuestionResponseItemsItemQuestionFillInBlanksItemMultipleChoice(Model):
     id: str
     type: Literal["multiple-choice"]
-    choices: list[Question2QuestionMultipleChoiceChoicesItem]
+    choices: list[ListQuestionResponseItemsItemQuestionMultipleChoiceChoicesItem]
 
 
-class Question2QuestionFillInBlanksItemNumeric(Model):
+class ListQuestionResponseItemsItemQuestionFillInBlanksItemNumeric(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     answer: float | str
@@ -723,23 +923,27 @@ class Question2QuestionFillInBlanksItemNumeric(Model):
     incorrect_feedback: str | None = Field(default=None, alias="incorrectFeedback")
 
 
-class Question2QuestionFillInBlanksItemShortAnswer(Model):
+class ListQuestionResponseItemsItemQuestionFillInBlanksItemShortAnswer(Model):
     model_config = ConfigDict(populate_by_name=True)
 
-    accept: list[str | Question2QuestionShortAnswerAcceptItem] | None = None
-    reject: list[str | Question2QuestionShortAnswerAcceptItem] | None = None
-    pre_accept: list[str | Question2QuestionShortAnswerAcceptItem] | None = Field(
-        default=None, alias="preAccept"
-    )
-    pre_reject: list[str | Question2QuestionShortAnswerAcceptItem] | None = Field(
-        default=None, alias="preReject"
-    )
+    accept: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = None
+    reject: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = None
+    pre_accept: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = Field(default=None, alias="preAccept")
+    pre_reject: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = Field(default=None, alias="preReject")
     id: str
     type: Literal["short-answer"]
     incorrect_feedback: str | None = Field(default=None, alias="incorrectFeedback")
 
 
-class Question2QuestionMultipleChoice(Model):
+class ListQuestionResponseItemsItemQuestionMultipleChoice(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -756,12 +960,12 @@ class Question2QuestionMultipleChoice(Model):
     meta: dict[str, object | None] | None = None
     attachments: list[ExamCreateAttachmentsItem] | None = None
     type: Literal["multiple-choice"]
-    choices: list[Question2QuestionMultipleChoiceChoicesItem]
+    choices: list[ListQuestionResponseItemsItemQuestionMultipleChoiceChoicesItem]
     grading: Literal["partial", "symmetric", "inherit"] | None = None
     shuffle: bool | Literal["inherit"] | None = None
 
 
-class Question2QuestionMultipleSelection(Model):
+class ListQuestionResponseItemsItemQuestionMultipleSelection(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -778,12 +982,12 @@ class Question2QuestionMultipleSelection(Model):
     meta: dict[str, object | None] | None = None
     attachments: list[ExamCreateAttachmentsItem] | None = None
     type: Literal["multiple-selection"]
-    choices: list[Question2QuestionMultipleSelectionChoicesItem]
+    choices: list[ListQuestionResponseItemsItemQuestionMultipleSelectionChoicesItem]
     grading: Literal["partial", "all-or-nothing", "symmetric", "inherit"] | None = None
     shuffle: bool | Literal["inherit"] | None = None
 
 
-class Question2QuestionNumeric(Model):
+class ListQuestionResponseItemsItemQuestionNumeric(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -808,7 +1012,7 @@ class Question2QuestionNumeric(Model):
     incorrect_feedback: str | None = Field(default=None, alias="incorrectFeedback")
 
 
-class Question2QuestionOrdering(Model):
+class ListQuestionResponseItemsItemQuestionOrdering(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -827,8 +1031,8 @@ class Question2QuestionOrdering(Model):
     type: Literal["ordering"]
     lines: list[list[int | str]]
     extra: list[list[int | str]] | None = None
-    accept: list[Question2QuestionOrderingAcceptItem] | None = None
-    reject: list[Question2QuestionOrderingAcceptItem] | None = None
+    accept: list[ListQuestionResponseItemsItemQuestionOrderingAcceptItem] | None = None
+    reject: list[ListQuestionResponseItemsItemQuestionOrderingAcceptItem] | None = None
     content: Literal["code", "text"]
     highlight: str | None = None
     indentation: Literal["fixed", "lenient", "strict"] | None = None
@@ -837,7 +1041,7 @@ class Question2QuestionOrdering(Model):
     normalizations: list[Literal["dedent", "skip-blanks"]] | None = None
 
 
-class Question2QuestionShortAnswer(Model):
+class ListQuestionResponseItemsItemQuestionShortAnswer(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -853,21 +1057,25 @@ class Question2QuestionShortAnswer(Model):
     weight: float | None = None
     meta: dict[str, object | None] | None = None
     attachments: list[ExamCreateAttachmentsItem] | None = None
-    accept: list[str | Question2QuestionShortAnswerAcceptItem] | None = None
-    reject: list[str | Question2QuestionShortAnswerAcceptItem] | None = None
-    pre_accept: list[str | Question2QuestionShortAnswerAcceptItem] | None = Field(
-        default=None, alias="preAccept"
-    )
-    pre_reject: list[str | Question2QuestionShortAnswerAcceptItem] | None = Field(
-        default=None, alias="preReject"
-    )
+    accept: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = None
+    reject: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = None
+    pre_accept: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = Field(default=None, alias="preAccept")
+    pre_reject: (
+        list[str | ListQuestionResponseItemsItemQuestionShortAnswerAcceptItem] | None
+    ) = Field(default=None, alias="preReject")
     type: Literal["short-answer"]
     diacritics: Literal["fold", "keep"] | None = None
     unmatched: Literal["manual", "incorrect"] | None = None
     incorrect_feedback: str | None = Field(default=None, alias="incorrectFeedback")
 
 
-class Question2QuestionTrueFalse(Model):
+class ListQuestionResponseItemsItemQuestionTrueFalse(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -884,7 +1092,7 @@ class Question2QuestionTrueFalse(Model):
     meta: dict[str, object | None] | None = None
     attachments: list[ExamCreateAttachmentsItem] | None = None
     type: Literal["true-false"]
-    choices: list[Question2QuestionTrueFalseChoicesItem]
+    choices: list[ListQuestionResponseItemsItemQuestionTrueFalseChoicesItem]
     grading: (
         Literal["partial", "no-mistakes", "all-or-nothing", "symmetric", "inherit"]
         | None
@@ -892,174 +1100,26 @@ class Question2QuestionTrueFalse(Model):
     shuffle: bool | Literal["inherit"] | None = None
 
 
-class Question3QuestionCode(Model):
+class ListUserResponse(Model):
+    items: list[User]
+    next: str | None
+
+
+class ReadRollCallResponse(Model):
     model_config = ConfigDict(populate_by_name=True)
 
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["code"]
-    template: str | None = None
-    language: str | None = None
-    file: str | None = None
-    public_tests: list[PublicTestsItem] | None = Field(
-        default=None, alias="publicTests"
-    )
+    week: int
+    time_slot: str = Field(alias="timeSlot")
+    acts_as_invite: bool = Field(alias="actsAsInvite")
+    closes_at: str = Field(alias="closesAt")
+    attendances: dict[str, ReadRollCallResponseShape]
+    created_at: str = Field(alias="createdAt")
+    updated_at: str = Field(alias="updatedAt")
 
 
-class Question3QuestionEssay(Model):
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["essay"]
-    content: Literal["code", "text", "plain"] | None = None
-    highlight: str | None = None
-
-
-class Question3QuestionFillInBlanksItemMultipleChoice(Model):
-    id: str
-    type: Literal["multiple-choice"]
-    choices: list[Question3QuestionMultipleChoiceChoicesItem]
-
-
-class Question3QuestionFillInBlanksItemShortAnswer(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    id: str
-    type: Literal["short-answer"]
-    unmatched: Literal["manual", "incorrect"]
-    pre_accept: list[str | Question3QuestionShortAnswerPreAcceptItem] | None = Field(
-        default=None, alias="preAccept"
-    )
-    pre_reject: list[str | Question3QuestionShortAnswerPreAcceptItem] | None = Field(
-        default=None, alias="preReject"
-    )
-
-
-class Question3QuestionMultipleChoice(Model):
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["multiple-choice"]
-    shuffle: bool | Literal["inherit"] | None = None
-    grading: Literal["partial", "symmetric", "inherit"] | None = None
-    choices: list[Question3QuestionMultipleChoiceChoicesItem]
-
-
-class Question3QuestionMultipleSelection(Model):
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["multiple-selection"]
-    shuffle: bool | Literal["inherit"] | None = None
-    grading: Literal["partial", "all-or-nothing", "symmetric", "inherit"] | None = None
-    choices: list[Question3QuestionMultipleChoiceChoicesItem]
-
-
-class Question3QuestionNumeric(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["numeric"]
-    unit: str | None = None
-    domain: Literal["integer", "decimal", "fraction"]
-    decimal_places: int | None = Field(default=None, alias="decimalPlaces")
-
-
-class Question3QuestionOrdering(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["ordering"]
-    content: Literal["code", "text"]
-    highlight: str | None = None
-    indentation: Literal["fixed", "lenient", "strict"] | None = None
-    unmatched: Literal["manual", "incorrect"]
-    normalizations: list[Literal["dedent", "skip-blanks"]] | None = None
-    max_level: int | None = Field(default=None, alias="maxLevel")
-    pool: list[list[int | str]]
-
-
-class Question3QuestionShortAnswer(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["short-answer"]
-    diacritics: Literal["fold", "keep"] | None = None
-    unmatched: Literal["manual", "incorrect"]
-    pre_accept: list[str | Question3QuestionShortAnswerPreAcceptItem] | None = Field(
-        default=None, alias="preAccept"
-    )
-    pre_reject: list[str | Question3QuestionShortAnswerPreAcceptItem] | None = Field(
-        default=None, alias="preReject"
-    )
-
-
-class Question3QuestionTrueFalse(Model):
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["true-false"]
-    shuffle: bool | Literal["inherit"] | None = None
-    grading: (
-        Literal["partial", "no-mistakes", "all-or-nothing", "symmetric", "inherit"]
-        | None
-    ) = None
-    choices: list[Question3QuestionMultipleChoiceChoicesItem]
+class RepositoryListResponse(Model):
+    items: list[Repository]
+    next: str | None
 
 
 class Resource(Model):
@@ -1082,18 +1142,6 @@ class ResourceCreate(Model):
     description: str | None = None
     event: Event | None = None
     data: DataLink | ResourceCreateDataFile | DataCode | DataMd
-
-
-class RollCall(Model):
-    model_config = ConfigDict(populate_by_name=True)
-
-    week: int
-    time_slot: str = Field(alias="timeSlot")
-    acts_as_invite: bool = Field(alias="actsAsInvite")
-    closes_at: str = Field(alias="closesAt")
-    attendances: dict[str, RollCallShape]
-    created_at: str = Field(alias="createdAt")
-    updated_at: str = Field(alias="updatedAt")
 
 
 class Rubric(Model):
@@ -1232,7 +1280,48 @@ class CourseGradesResponse(Model):
     students: list[CourseGradesResponseStudentsItem]
 
 
-class Question2QuestionFillIn(Model):
+class ListCourseResponse(Model):
+    items: list[Course]
+    next: str | None
+
+
+class ListExamResponse(Model):
+    items: list[Exam]
+    next: str | None
+
+
+class ListGradeColumnResponse(Model):
+    items: list[GradeColumn]
+    next: str | None
+
+
+class ListQuestionResponseItemsItem2QuestionFillIn(Model):
+    attachments: (
+        list[ListQuestionResponseItemsItem2QuestionCodeAttachmentsItem] | None
+    ) = None
+    id: str | None = None
+    uuid: str | None = None
+    title: str | None = None
+    stem: str
+    epilogue: str | None = None
+    tags: list[str] | None = None
+    locale: str | None = None
+    weight: float | None = None
+    type: Literal["fill-in"]
+    shuffle: bool | Literal["inherit"] | None = None
+    grading: (
+        Literal["partial", "no-mistakes", "all-or-nothing", "symmetric", "inherit"]
+        | None
+    ) = None
+    diacritics: Literal["fold", "keep"] | None = None
+    blanks: list[
+        ListQuestionResponseItemsItem2QuestionFillInBlanksItemMultipleChoice
+        | ListQuestionResponseItemsItem2QuestionFillInBlanksItemShortAnswer
+        | ListQuestionResponseItemsItem2QuestionFillInBlanksItemNumeric
+    ]
+
+
+class ListQuestionResponseItemsItemQuestionFillIn(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     field_schema: str | None = Field(default=None, alias="$schema")
@@ -1250,9 +1339,9 @@ class Question2QuestionFillIn(Model):
     attachments: list[ExamCreateAttachmentsItem] | None = None
     type: Literal["fill-in"]
     blanks: list[
-        Question2QuestionFillInBlanksItemMultipleChoice
-        | Question2QuestionFillInBlanksItemShortAnswer
-        | Question2QuestionFillInBlanksItemNumeric
+        ListQuestionResponseItemsItemQuestionFillInBlanksItemMultipleChoice
+        | ListQuestionResponseItemsItemQuestionFillInBlanksItemShortAnswer
+        | ListQuestionResponseItemsItemQuestionFillInBlanksItemNumeric
     ]
     grading: (
         Literal["partial", "no-mistakes", "all-or-nothing", "symmetric", "inherit"]
@@ -1263,28 +1352,19 @@ class Question2QuestionFillIn(Model):
     unmatched: Literal["manual", "incorrect"] | None = None
 
 
-class Question3QuestionFillIn(Model):
-    attachments: list[Question3QuestionCodeAttachmentsItem] | None = None
-    id: str | None = None
-    uuid: str | None = None
-    title: str | None = None
-    stem: str
-    epilogue: str | None = None
-    tags: list[str] | None = None
-    locale: str | None = None
-    weight: float | None = None
-    type: Literal["fill-in"]
-    shuffle: bool | Literal["inherit"] | None = None
-    grading: (
-        Literal["partial", "no-mistakes", "all-or-nothing", "symmetric", "inherit"]
-        | None
-    ) = None
-    diacritics: Literal["fold", "keep"] | None = None
-    blanks: list[
-        Question3QuestionFillInBlanksItemMultipleChoice
-        | Question3QuestionFillInBlanksItemShortAnswer
-        | Question3QuestionFillInBlanksItemNumeric
-    ]
+class ListResourceResponse(Model):
+    items: list[Resource]
+    next: str | None
+
+
+class ListRollCallResponse(Model):
+    items: list[ReadRollCallResponse]
+    next: str | None
+
+
+class ListTimeslotResponse(Model):
+    items: list[TimeSlot]
+    next: str | None
 
 
 class JobsItem(Model):
@@ -1294,15 +1374,15 @@ class JobsItem(Model):
     kind: Literal["SUBMIT", "FINAL"]
     worker: str
     question: (
-        Question2QuestionMultipleChoice
-        | Question2QuestionMultipleSelection
-        | Question2QuestionTrueFalse
-        | Question2QuestionNumeric
-        | Question2QuestionShortAnswer
-        | Question2QuestionEssay
-        | Question2QuestionFillIn
-        | Question2QuestionOrdering
-        | Question2QuestionCode
+        ListQuestionResponseItemsItemQuestionMultipleChoice
+        | ListQuestionResponseItemsItemQuestionMultipleSelection
+        | ListQuestionResponseItemsItemQuestionTrueFalse
+        | ListQuestionResponseItemsItemQuestionNumeric
+        | ListQuestionResponseItemsItemQuestionShortAnswer
+        | ListQuestionResponseItemsItemQuestionEssay
+        | ListQuestionResponseItemsItemQuestionFillIn
+        | ListQuestionResponseItemsItemQuestionOrdering
+        | ListQuestionResponseItemsItemQuestionCode
     )
     exam: str
     course: str
@@ -1311,7 +1391,12 @@ class JobsItem(Model):
     lease_until: str = Field(alias="leaseUntil")
 
 
-class Question2(Model):
+class ListCalendarEventResponse(Model):
+    items: list[CalendarEvent]
+    next: str | None
+
+
+class ListQuestionResponseItemsItem(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     slug: str
@@ -1321,21 +1406,21 @@ class Question2(Model):
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
     question: (
-        Question2QuestionMultipleChoice
-        | Question2QuestionMultipleSelection
-        | Question2QuestionTrueFalse
-        | Question2QuestionNumeric
-        | Question2QuestionShortAnswer
-        | Question2QuestionEssay
-        | Question2QuestionFillIn
-        | Question2QuestionOrdering
-        | Question2QuestionCode
+        ListQuestionResponseItemsItemQuestionMultipleChoice
+        | ListQuestionResponseItemsItemQuestionMultipleSelection
+        | ListQuestionResponseItemsItemQuestionTrueFalse
+        | ListQuestionResponseItemsItemQuestionNumeric
+        | ListQuestionResponseItemsItemQuestionShortAnswer
+        | ListQuestionResponseItemsItemQuestionEssay
+        | ListQuestionResponseItemsItemQuestionFillIn
+        | ListQuestionResponseItemsItemQuestionOrdering
+        | ListQuestionResponseItemsItemQuestionCode
     )
     public_id: str = Field(alias="publicId")
     files: dict[str, str] | None = None
 
 
-class Question3(Model):
+class ListQuestionResponseItemsItem2(Model):
     model_config = ConfigDict(populate_by_name=True)
 
     slug: str
@@ -1345,15 +1430,15 @@ class Question3(Model):
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
     question: (
-        Question3QuestionMultipleChoice
-        | Question3QuestionMultipleSelection
-        | Question3QuestionTrueFalse
-        | Question3QuestionNumeric
-        | Question3QuestionShortAnswer
-        | Question3QuestionEssay
-        | Question3QuestionFillIn
-        | Question3QuestionOrdering
-        | Question3QuestionCode
+        ListQuestionResponseItemsItem2QuestionMultipleChoice
+        | ListQuestionResponseItemsItem2QuestionMultipleSelection
+        | ListQuestionResponseItemsItem2QuestionTrueFalse
+        | ListQuestionResponseItemsItem2QuestionNumeric
+        | ListQuestionResponseItemsItem2QuestionShortAnswer
+        | ListQuestionResponseItemsItem2QuestionEssay
+        | ListQuestionResponseItemsItem2QuestionFillIn
+        | ListQuestionResponseItemsItem2QuestionOrdering
+        | ListQuestionResponseItemsItem2QuestionCode
     )
 
 
@@ -1363,15 +1448,15 @@ class QuestionCreate(Model):
     version: str
     rev: str | None = None
     question: (
-        Question2QuestionMultipleChoice
-        | Question2QuestionMultipleSelection
-        | Question2QuestionTrueFalse
-        | Question2QuestionNumeric
-        | Question2QuestionShortAnswer
-        | Question2QuestionEssay
-        | Question2QuestionFillIn
-        | Question2QuestionOrdering
-        | Question2QuestionCode
+        ListQuestionResponseItemsItemQuestionMultipleChoice
+        | ListQuestionResponseItemsItemQuestionMultipleSelection
+        | ListQuestionResponseItemsItemQuestionTrueFalse
+        | ListQuestionResponseItemsItemQuestionNumeric
+        | ListQuestionResponseItemsItemQuestionShortAnswer
+        | ListQuestionResponseItemsItemQuestionEssay
+        | ListQuestionResponseItemsItemQuestionFillIn
+        | ListQuestionResponseItemsItemQuestionOrdering
+        | ListQuestionResponseItemsItemQuestionCode
     )
     files: dict[str, str] | None = None
 
@@ -1381,15 +1466,15 @@ class UpdateQuestionRequest(Model):
     version: str | None = None
     rev: str | None = None
     question: (
-        Question2QuestionMultipleChoice
-        | Question2QuestionMultipleSelection
-        | Question2QuestionTrueFalse
-        | Question2QuestionNumeric
-        | Question2QuestionShortAnswer
-        | Question2QuestionEssay
-        | Question2QuestionFillIn
-        | Question2QuestionOrdering
-        | Question2QuestionCode
+        ListQuestionResponseItemsItemQuestionMultipleChoice
+        | ListQuestionResponseItemsItemQuestionMultipleSelection
+        | ListQuestionResponseItemsItemQuestionTrueFalse
+        | ListQuestionResponseItemsItemQuestionNumeric
+        | ListQuestionResponseItemsItemQuestionShortAnswer
+        | ListQuestionResponseItemsItemQuestionEssay
+        | ListQuestionResponseItemsItemQuestionFillIn
+        | ListQuestionResponseItemsItemQuestionOrdering
+        | ListQuestionResponseItemsItemQuestionCode
         | None
     ) = None
     files: dict[str, str] | None = None
@@ -1397,6 +1482,11 @@ class UpdateQuestionRequest(Model):
 
 class ClaimGradingJobsResponse(Model):
     jobs: list[JobsItem]
+
+
+class ListQuestionResponse(Model):
+    items: list[ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2]
+    next: str | None
 
 
 class GradeReleaseRefused(CodehoodAPIError):
@@ -1732,7 +1822,7 @@ def create_question(
     course: str,
     body: QuestionCreate,
     client: httpx.Client | None = None,
-) -> Question2 | Question3:
+) -> ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2:
     """
     Creates a new Question.
     """
@@ -1745,7 +1835,9 @@ def create_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(Question2 | Question3).validate_python(response.json())
+        return TypeAdapter(
+            ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2
+        ).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2165,7 +2257,7 @@ def list_calendar_event(
     weeks: list[int] | None = None,
     limit: int | None = None,
     client: httpx.Client | None = None,
-) -> list[CalendarEvent]:
+) -> ListCalendarEventResponse:
     """
     Find multiple Calendar Events.
     """
@@ -2180,7 +2272,7 @@ def list_calendar_event(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[CalendarEvent]).validate_python(response.json())
+        return ListCalendarEventResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2190,8 +2282,10 @@ def list_course(
     instructor: str | None = None,
     discipline: str | None = None,
     edition: str | None = None,
+    limit: int | None = None,
+    after: str | None = None,
     client: httpx.Client | None = None,
-) -> list[Course]:
+) -> ListCourseResponse:
     """
     Find multiple Courses.
     """
@@ -2199,19 +2293,25 @@ def list_course(
     response = client.get(
         "/api/course",
         params=query_params(
-            {"instructor": instructor, "discipline": discipline, "edition": edition}
+            {
+                "instructor": instructor,
+                "discipline": discipline,
+                "edition": edition,
+                "limit": limit,
+                "after": after,
+            }
         ),
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Course]).validate_python(response.json())
+        return ListCourseResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def list_discipline(
     *, slugs: list[str] | None = None, client: httpx.Client | None = None
-) -> list[Discipline]:
+) -> ListDisciplineResponse:
     """
     Find multiple Disciplines.
     """
@@ -2222,7 +2322,7 @@ def list_discipline(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Discipline]).validate_python(response.json())
+        return ListDisciplineResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2232,7 +2332,7 @@ def list_edition(
     slugs: list[str] | None = None,
     active: bool | None = None,
     client: httpx.Client | None = None,
-) -> list[Edition]:
+) -> ListEditionResponse:
     """
     Find multiple Editions.
     """
@@ -2243,7 +2343,7 @@ def list_edition(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Edition]).validate_python(response.json())
+        return ListEditionResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2258,7 +2358,7 @@ def list_exam(
     types: list[Literal["PRACTICE", "QUIZ", "EXAM"]] | None = None,
     tags: list[str] | None = None,
     client: httpx.Client | None = None,
-) -> list[Exam]:
+) -> ListExamResponse:
     """
     Find multiple Exams.
     """
@@ -2273,14 +2373,14 @@ def list_exam(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Exam]).validate_python(response.json())
+        return ListExamResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def list_grade_column(
     *, discipline: str, course: str, client: httpx.Client | None = None
-) -> list[GradeColumn]:
+) -> ListGradeColumnResponse:
     """
     Find multiple Grade Columns.
     """
@@ -2292,7 +2392,7 @@ def list_grade_column(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[GradeColumn]).validate_python(response.json())
+        return ListGradeColumnResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2320,7 +2420,7 @@ def list_question(
     tags: list[str] | None = None,
     public: bool | None = None,
     client: httpx.Client | None = None,
-) -> list[Question2 | Question3]:
+) -> ListQuestionResponse:
     """
     Find multiple Questions.
     """
@@ -2341,7 +2441,7 @@ def list_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Question2 | Question3]).validate_python(response.json())
+        return ListQuestionResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2353,7 +2453,7 @@ def list_resource(
     types: list[Literal["LINK", "FILE", "CODE", "MD"]] | None = None,
     slugs: list[str] | None = None,
     client: httpx.Client | None = None,
-) -> list[Resource]:
+) -> ListResourceResponse:
     """
     Find multiple Resources.
     """
@@ -2366,14 +2466,14 @@ def list_resource(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Resource]).validate_python(response.json())
+        return ListResourceResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
 
 def list_roll_call(
     *, discipline: str, course: str, client: httpx.Client | None = None
-) -> list[RollCall]:
+) -> ListRollCallResponse:
     """
     Find multiple Roll Calls.
     """
@@ -2385,7 +2485,7 @@ def list_roll_call(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[RollCall]).validate_python(response.json())
+        return ListRollCallResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2401,7 +2501,7 @@ def list_timeslot(
     ]
     | None = None,
     client: httpx.Client | None = None,
-) -> list[TimeSlot]:
+) -> ListTimeslotResponse:
     """
     Find multiple Time Slots.
     """
@@ -2414,7 +2514,7 @@ def list_timeslot(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[TimeSlot]).validate_python(response.json())
+        return ListTimeslotResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2422,20 +2522,21 @@ def list_timeslot(
 def list_user(
     *,
     usernames: list[str] | None = None,
-    take: int | None = None,
+    limit: int | None = None,
+    after: str | None = None,
     client: httpx.Client | None = None,
-) -> list[User]:
+) -> ListUserResponse:
     """
     Find multiple Users.
     """
     client = client if client is not None else get_client()
     response = client.get(
         "/api/user",
-        params=query_params({"usernames": usernames, "take": take}),
+        params=query_params({"usernames": usernames, "limit": limit, "after": after}),
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[User]).validate_python(response.json())
+        return ListUserResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2584,7 +2685,7 @@ def read_question(
     slug: str,
     public: bool | None = None,
     client: httpx.Client | None = None,
-) -> Question2 | Question3:
+) -> ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2:
     """
     Find a single Question.
     """
@@ -2597,7 +2698,9 @@ def read_question(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(Question2 | Question3).validate_python(response.json())
+        return TypeAdapter(
+            ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2
+        ).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2628,7 +2731,7 @@ def read_roll_call(
     week: str,
     time_slot: str,
     client: httpx.Client | None = None,
-) -> RollCall:
+) -> ReadRollCallResponse:
     """
     Find a single Roll Call.
     """
@@ -2640,7 +2743,7 @@ def read_roll_call(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return RollCall.model_validate(response.json())
+        return ReadRollCallResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -2745,7 +2848,7 @@ def repository_delete(
 
 def repository_list(
     *, discipline: str, course: str, client: httpx.Client | None = None
-) -> list[Repository]:
+) -> RepositoryListResponse:
     """
     Find multiple Repositories.
     """
@@ -2757,7 +2860,7 @@ def repository_list(
         headers=auth_headers(client),
     )
     if response.status_code == 200:
-        return TypeAdapter(list[Repository]).validate_python(response.json())
+        return RepositoryListResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -3237,7 +3340,7 @@ def update_question(
     if_match: str | None = None,
     body: UpdateQuestionRequest,
     client: httpx.Client | None = None,
-) -> Question2 | Question3:
+) -> ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2:
     """
     Update a single Question.
     """
@@ -3255,7 +3358,9 @@ def update_question(
             PreconditionFailed.Payload.model_validate(response.json()),
         )
     if response.status_code == 200:
-        return TypeAdapter(Question2 | Question3).validate_python(response.json())
+        return TypeAdapter(
+            ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2
+        ).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -3300,7 +3405,7 @@ def update_roll_call(
     if_match: str | None = None,
     body: UpdateRollCallRequest,
     client: httpx.Client | None = None,
-) -> RollCall:
+) -> ReadRollCallResponse:
     """
     Update a single Roll Call.
     """
@@ -3318,7 +3423,7 @@ def update_roll_call(
             PreconditionFailed.Payload.model_validate(response.json()),
         )
     if response.status_code == 200:
-        return RollCall.model_validate(response.json())
+        return ReadRollCallResponse.model_validate(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 
@@ -3560,7 +3665,7 @@ def upsert_question(
     if_none_match: Literal["*"] | None = None,
     body: QuestionCreate,
     client: httpx.Client | None = None,
-) -> Question2 | Question3:
+) -> ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2:
     """
     Upsert a single Question. Creates if it does not exist, update otherwise.
     """
@@ -3581,7 +3686,9 @@ def upsert_question(
             PreconditionFailed.Payload.model_validate(response.json()),
         )
     if response.status_code == 200:
-        return TypeAdapter(Question2 | Question3).validate_python(response.json())
+        return TypeAdapter(
+            ListQuestionResponseItemsItem | ListQuestionResponseItemsItem2
+        ).validate_python(response.json())
     response.raise_for_status()
     raise CodehoodAPIError(response.status_code, Model())
 

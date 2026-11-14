@@ -94,9 +94,9 @@ test("GET lists a course's resources and GET <slug> reads one, by natural key", 
 
 	const list = await request.get(url, { headers });
 	expect(list.status()).toBe(200);
-	expect((await list.json()).map((r: { slug: string }) => r.slug)).toEqual([
-		"syllabus",
-	]);
+	expect(
+		(await list.json()).items.map((r: { slug: string }) => r.slug),
+	).toEqual(["syllabus"]);
 
 	const one = await request.get(`${url}/syllabus`, { headers });
 	expect(one.status()).toBe(200);
@@ -155,7 +155,7 @@ test("POST ignores a courseId in the body: the path names the course", async ({
 	// The resource landed under this course, not `other`'s: it shows up on
 	// this course's list and 404s under the other course's path.
 	expect(
-		(await (await request.get(url, { headers })).json()).map(
+		(await (await request.get(url, { headers })).json()).items.map(
 			(r: { slug: string }) => r.slug,
 		),
 	).toContain("pinned");
@@ -266,7 +266,7 @@ test("PUT creates on the first call and updates the same resource on the next, t
 		title: "After",
 	});
 
-	const list = await (await request.get(url, { headers })).json();
+	const list = (await (await request.get(url, { headers })).json()).items;
 	expect(list).toHaveLength(1);
 });
 
@@ -318,7 +318,7 @@ test("POST and PUT with an event key attach the resource, GET returns the event,
 	expect((await read.json()).event).toEqual(expected);
 
 	const listed = await request.get(url, { headers });
-	expect((await listed.json())[0].event).toEqual(expected);
+	expect((await listed.json()).items[0].event).toEqual(expected);
 
 	const put = await request.put(url, {
 		headers,

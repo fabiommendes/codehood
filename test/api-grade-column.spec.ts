@@ -167,7 +167,9 @@ test("a second PUT with the same slug replaces title, position, rev and the valu
 	const column = await (await request.get(`${url}/final`, { headers })).json();
 	expect(column).toMatchObject({ title: "Renamed", position: 4, rev: "r2" });
 	expect(column.values).toEqual([{ username: a.username, value: 9 }]);
-	expect(await (await request.get(url, { headers })).json()).toHaveLength(1);
+	expect(
+		(await (await request.get(url, { headers })).json()).items,
+	).toHaveLength(1);
 });
 
 test("PATCH with only a title keeps the values, and DELETE removes the column", async ({
@@ -273,7 +275,7 @@ test("an enrolled student lists released columns with their own value, gets 404 
 
 	const list = await request.get(url, { headers });
 	expect(list.status()).toBe(200);
-	const listed = await list.json();
+	const listed = (await list.json()).items;
 	expect(listed.map((c: { slug: string }) => c.slug)).toEqual(["shown"]);
 	expect(listed[0].values).toEqual([{ username: a.username, value: 10 }]);
 

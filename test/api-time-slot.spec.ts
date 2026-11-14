@@ -93,9 +93,9 @@ test("GET lists a course's time slots and GET <slug> reads one", async ({
 
 	const list = await request.get(url, { headers });
 	expect(list.status()).toBe(200);
-	expect((await list.json()).map((s: { slug: string }) => s.slug)).toEqual([
-		"mon",
-	]);
+	expect(
+		(await list.json()).items.map((s: { slug: string }) => s.slug),
+	).toEqual(["mon"]);
 
 	const one = await request.get(`${url}/mon`, { headers });
 	expect(one.status()).toBe(200);
@@ -156,7 +156,7 @@ test("POST ignores a courseId in the body: the path names the course", async ({
 	// The slot landed under this course, not `other`'s: it shows up on this
 	// course's list and 404s under the other course's path.
 	expect(
-		(await (await request.get(url, { headers })).json()).map(
+		(await (await request.get(url, { headers })).json()).items.map(
 			(s: { slug: string }) => s.slug,
 		),
 	).toContain("pinned");
@@ -265,5 +265,5 @@ test("PUT creates on the first call and updates the same time slot on the next, 
 	expect((await again.json()).start).toEqual({ hour: 9, minute: 0 });
 
 	const list = await (await request.get(url, { headers })).json();
-	expect(list).toHaveLength(1);
+	expect(list.items).toHaveLength(1);
 });

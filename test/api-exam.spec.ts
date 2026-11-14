@@ -222,10 +222,12 @@ test("GET narrows the list with ?exams=", async ({ request }) => {
 		headers,
 	});
 	expect(res.status()).toBe(200);
-	expect((await res.json()).map((e: { slug: string }) => e.slug)).toEqual([
+	const body = await res.json();
+	expect(body.items.map((e: { slug: string }) => e.slug)).toEqual([
 		"alpha",
 		"gamma",
 	]);
+	expect(body.next).toBeNull();
 });
 
 test("GET list query cannot redirect to another course", async ({
@@ -246,7 +248,7 @@ test("GET list query cannot redirect to another course", async ({
 	}).toString();
 	const res = await request.get(`${mine.url}?${qs}`, { headers: mine.headers });
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual([]);
+	expect(await res.json()).toEqual({ items: [], next: null });
 });
 
 test("service findMany narrows by exams within a course given by id", async () => {

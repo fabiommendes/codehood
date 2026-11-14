@@ -377,12 +377,17 @@ function repositoryKey(params: Record<string, string>) {
 
 export const repositoryApi = {
 	findMany: GET(repositoryPath, {
-		out: repositoryEntity.array(),
+		out: schema.pageOf(repositoryEntity),
 		summary: "Find multiple Repositories.",
 		operationId: "repositoryList",
 		tags: repositoryTags,
-		handler: async ({ actor, params }) =>
-			db.repository.findMany({ course: parseCourseParams(params) }, { actor }),
+		handler: async ({ actor, params }) => ({
+			items: await db.repository.findMany(
+				{ course: parseCourseParams(params) },
+				{ actor },
+			),
+			next: null,
+		}),
 	}),
 	findOne: GET(`${repositoryPath}/[slug]`, {
 		out: repositoryEntity,
@@ -793,7 +798,7 @@ export const userApi = {
 		entity: schema.userSchema.pick({ username: true, name: true }),
 		create: schema.userCreate,
 		update: schema.userUpdate,
-		filter: schema.userFilter,
+		filter: schema.userFilter.omit({ take: true }),
 		key: schema.userPK,
 		tags: userTags,
 		service: db.user,

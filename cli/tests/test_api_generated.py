@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from pages import page
 
 from codehood.api import generated
 from codehood.api.base import save_token
@@ -98,7 +99,7 @@ def test_list_resource_with_no_filters_sends_no_query_string(logged_in):
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.query.decode())
-        return httpx.Response(200, json=[])
+        return httpx.Response(200, json=page([]))
 
     client = httpx.Client(
         base_url="http://localhost:4321", transport=httpx.MockTransport(handler)
@@ -112,7 +113,7 @@ def test_list_resource_sends_the_filters_it_was_given(logged_in):
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.query.decode())
-        return httpx.Response(200, json=[])
+        return httpx.Response(200, json=page([]))
 
     client = httpx.Client(
         base_url="http://localhost:4321", transport=httpx.MockTransport(handler)

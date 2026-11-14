@@ -240,7 +240,7 @@ test("resource: the updatedAt of a listing, in quotes, works as If-Match, and DE
 		(await request.put(url, { headers, data: link("notes") })).status(),
 	).toBe(200);
 
-	const [listed] = await (await request.get(url, { headers })).json();
+	const [listed] = (await (await request.get(url, { headers })).json()).items;
 	const updated = await request.put(url, {
 		headers: { ...headers, "If-Match": quoted(listed) },
 		data: link("notes", "Notes v2"),
@@ -349,7 +349,7 @@ test("question: PUT with If-None-Match, PATCH with a stale and a listed If-Match
 		createdBody.updatedAt,
 	);
 
-	const [listed] = await (await request.get(url, { headers })).json();
+	const [listed] = (await (await request.get(url, { headers })).json()).items;
 	const patched = await request.patch(`${url}/q1`, {
 		headers: { ...headers, "If-Match": quoted(listed) },
 		data: { status: "DRAFT" },

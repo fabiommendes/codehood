@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 
 import httpx
 import pytest
+from pages import page
 from server_entries import placeholder, plan_from_server, realize
 from typer.testing import CliRunner
 
@@ -943,11 +944,11 @@ def test_fetch_server_state_reads_each_resource_s_event_key():
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/resource"):
-            return httpx.Response(200, json=listing)
+            return httpx.Response(200, json=page(listing))
         if request.url.path.endswith(("/question", "/exam", "/time-slot")):
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path.endswith(("/calendar-event", "/grade-column")):
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         return httpx.Response(200, json=_course_json())
 
     client = httpx.Client(
@@ -976,10 +977,10 @@ def test_dry_run_reports_the_resource_whose_server_event_was_lost(
         path = request.url.path
         if path.endswith("/resource"):
             return httpx.Response(
-                200, json=[_server_resource_json(local.slug, local.ref, None)]
+                200, json=page([_server_resource_json(local.slug, local.ref, None)])
             )
         if path.endswith(("/question", "/exam", "/grade-column")):
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if (response := _calendar_defaults(request)) is not None:
             return response
         return httpx.Response(

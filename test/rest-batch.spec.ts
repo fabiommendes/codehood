@@ -62,8 +62,11 @@ test("rest.batch reuses REST output schemas, static paths and query coercion", a
 	expect(response.result[0].body.passwordHash).toBeUndefined();
 	expect(response.result[0].body.id).toBeUndefined();
 	expect(
-		response.result[1].body.map((row: { username: string }) => row.username),
+		response.result[1].body.items.map(
+			(row: { username: string }) => row.username,
+		),
 	).toEqual([user.username]);
+	expect(response.result[1].body.next).toBeNull();
 });
 
 test("rest.batch supports every registered verb and commits successes around failures in order", async ({

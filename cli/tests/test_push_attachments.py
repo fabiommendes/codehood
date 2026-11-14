@@ -17,6 +17,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from pages import page
 from typer.testing import CliRunner
 
 from codehood.api import base as base_module
@@ -528,7 +529,7 @@ class FakeServer:
         if method == "GET" and path == BASE:
             return httpx.Response(404, json={"message": "not found"})
         if method == "GET":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         assert body is not None, (method, path)
         if path == "/api/course" or path.endswith(f"/{COURSE}") and method == "PUT":
             return httpx.Response(200, json=course_json())
@@ -879,7 +880,7 @@ class StatefulServer(FakeServer):
                 "files": body.get("files"),
             }
         elif method == "GET" and path == f"{BASE}/question":
-            return httpx.Response(200, json=list(self.stored.values()))
+            return httpx.Response(200, json=page(self.stored.values()))
         return response
 
 

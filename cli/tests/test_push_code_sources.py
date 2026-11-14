@@ -13,6 +13,7 @@ import httpx
 import mdq
 import pytest
 from mdq.models import CodeQuestion
+from pages import page
 from typer.testing import CliRunner
 
 from codehood.api import base as base_module
@@ -250,7 +251,7 @@ def test_push_does_not_report_a_linked_test_file_as_not_pushed(tmp_path, monkeyp
             if request.method == "GET" and request.url.path.endswith(
                 ("/resource", "/grade-column", "/question", "/exam")
             ):
-                return httpx.Response(200, json=[])
+                return httpx.Response(200, json=page([]))
             return httpx.Response(404, json={"message": "not found"})
 
         return httpx.Client(

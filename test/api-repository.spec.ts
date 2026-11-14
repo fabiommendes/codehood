@@ -204,9 +204,9 @@ test.describe("push flow", () => {
 
 		const many = await api.get(setup.api);
 		expect(many.status()).toBe(200);
-		expect((await many.json()).map((r: { slug: string }) => r.slug)).toContain(
-			slug,
-		);
+		expect(
+			(await many.json()).items.map((r: { slug: string }) => r.slug),
+		).toContain(slug);
 	});
 
 	test("a repeated commit of the same tree keeps the head", async ({
@@ -369,7 +369,7 @@ test.describe("permissions", () => {
 		);
 
 		const list = await (await api.get(setup.api)).json();
-		const slugs = list.map((r: { slug: string }) => r.slug);
+		const slugs = list.items.map((r: { slug: string }) => r.slug);
 
 		expect(slugs).toContain(committed);
 		expect(slugs).not.toContain(empty);

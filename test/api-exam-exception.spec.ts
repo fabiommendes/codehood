@@ -147,7 +147,7 @@ test("a second PUT for the same student updates the exception instead of adding 
 		expect(res.status()).toBe(200);
 	}
 
-	const list = await (await request.get(url, { headers })).json();
+	const list = (await (await request.get(url, { headers })).json()).items;
 	expect(list).toHaveLength(1);
 	expect(list[0].extraTime).toMatchObject({ minutes: 45 });
 });
@@ -168,7 +168,7 @@ test("GET on the collection lists the exceptions of the exam by username, note i
 		});
 	}
 
-	const list = await (await request.get(url, { headers })).json();
+	const list = (await (await request.get(url, { headers })).json()).items;
 	expect(list.map((e: { username: string }) => e.username)).toEqual(
 		[student.username, classmate.username].sort(),
 	);
@@ -273,7 +273,7 @@ test("a student reads their own exception without the note, cannot see a classma
 		(await request.get(`${url}/${classmate.username}`, { headers })).status(),
 	).toBe(404);
 
-	const list = await (await request.get(url, { headers })).json();
+	const list = (await (await request.get(url, { headers })).json()).items;
 	expect(list.map((e: { username: string }) => e.username)).toEqual([
 		student.username,
 	]);

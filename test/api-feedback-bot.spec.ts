@@ -236,7 +236,8 @@ test("notes written by the instructor and by their BOT key come back to them, an
 	expect(byHuman.status()).toBe(200);
 	const asInstructor = await request.get(`${url}/manual-1`, { headers: human });
 	expect((await asInstructor.json()).notes).toBe("own note");
-	const listed = await (await request.get(url, { headers: bot })).json();
+	const listed = (await (await request.get(url, { headers: bot })).json())
+		.items;
 	expect(listed.map((p: { notes: string }) => p.notes).sort()).toEqual(
 		[secret, "own note"].sort(),
 	);
@@ -309,13 +310,13 @@ test("listing the feedback of a submission returns only the passes of that submi
 
 	const own = await request.get(url, { headers });
 	expect(own.status()).toBe(200);
-	expect((await own.json()).map((p: { ref: string }) => p.ref)).toEqual([
+	expect((await own.json()).items.map((p: { ref: string }) => p.ref)).toEqual([
 		"chalk",
 	]);
 
 	const empty = await request.get(otherUrl, { headers });
 	expect(empty.status()).toBe(200);
-	expect(await empty.json()).toEqual([]);
+	expect(await empty.json()).toEqual({ items: [], next: null });
 
 	await request.post(otherUrl, {
 		headers,
@@ -323,6 +324,8 @@ test("listing the feedback of a submission returns only the passes of that submi
 	});
 	const second = await request.get(otherUrl, { headers });
 	expect(
-		(await second.json()).map((p: { submission: string }) => p.submission),
+		(await second.json()).items.map(
+			(p: { submission: string }) => p.submission,
+		),
 	).toEqual([other.publicId]);
 });

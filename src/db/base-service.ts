@@ -1,4 +1,5 @@
 import type { Actor } from "@/auth/actor";
+import type { Page, PageParams } from "@/core/schemas";
 import type { PrismaTx } from "./client";
 
 /**
@@ -47,6 +48,17 @@ export interface FindMany<Filter, Out> {
 	 * Find all entities that match the input filters.
 	 */
 	findMany<Opt extends ServiceOpts>(filter: Filter, opts: Opt): Promise<Out[]>;
+}
+
+export interface FindPage<Filter, Out> {
+	/**
+	 * Find one page of the entities that match the input filters, in the
+	 * default order of the table.
+	 */
+	findPage<Opt extends ServiceOpts>(
+		filter: Filter & PageParams,
+		opts: Opt,
+	): Promise<Page<Out>>;
 }
 
 export interface Update<Pk, In, Out> {

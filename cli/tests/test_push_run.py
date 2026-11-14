@@ -19,6 +19,7 @@ from pathlib import Path
 import httpx
 import mdq
 import pytest
+from pages import page
 
 from codehood.api import base as base_module
 from codehood.grades import ExamResult
@@ -232,21 +233,23 @@ def test_fetch_server_state_reports_course_and_resource_refs():
         if request.url.path == f"{BASE}/resource":
             return httpx.Response(
                 200,
-                json=[
-                    _resource_json("week1-slides", "ref-a"),
-                    _resource_json("week1-notes", "ref-b"),
-                ],
+                json=page(
+                    [
+                        _resource_json("week1-slides", "ref-a"),
+                        _resource_json("week1-notes", "ref-b"),
+                    ]
+                ),
             )
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/time-slot":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/calendar-event":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
@@ -266,24 +269,26 @@ def test_fetch_server_state_reports_question_versions():
         if request.url.path == BASE:
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question":
             return httpx.Response(
                 200,
-                json=[
-                    _question_json("week1-big-o", "md5:aaa"),
-                    _question_json("week1-sorting", "md5:bbb", status="HIDDEN"),
-                    _question_json("week1-draft", "md5:ccc", status="DRAFT"),
-                ],
+                json=page(
+                    [
+                        _question_json("week1-big-o", "md5:aaa"),
+                        _question_json("week1-sorting", "md5:bbb", status="HIDDEN"),
+                        _question_json("week1-draft", "md5:ccc", status="DRAFT"),
+                    ]
+                ),
             )
         if request.url.path == f"{BASE}/time-slot":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/calendar-event":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
@@ -306,16 +311,18 @@ def test_fetch_server_state_keeps_a_null_question_rev_null():
         if request.url.path == BASE:
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question":
             return httpx.Response(
                 200,
-                json=[
-                    _question_json("old", "md5:aaa", rev=None),
-                    _question_json("new", "md5:bbb", rev="md5:other"),
-                ],
+                json=page(
+                    [
+                        _question_json("old", "md5:aaa", rev=None),
+                        _question_json("new", "md5:bbb", rev="md5:other"),
+                    ]
+                ),
             )
-        return httpx.Response(200, json=[])
+        return httpx.Response(200, json=page([]))
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
 
@@ -336,7 +343,7 @@ def test_fetch_server_state_course_missing_skips_the_question_listing():
         if request.url.path == BASE:
             return httpx.Response(404, json={"message": "not found"})
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
@@ -354,7 +361,7 @@ def test_fetch_server_state_course_missing_skips_the_calendar_listings():
         if request.url.path == BASE:
             return httpx.Response(404, json={"message": "not found"})
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
@@ -374,20 +381,22 @@ def test_fetch_server_state_recomputes_time_slot_refs_locally():
         if request.url.path == BASE:
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/time-slot":
             return httpx.Response(
                 200,
-                json=[_timeslot_json("mon", "MONDAY", 14, 0, 2, 0, title="Lecture")],
+                json=page(
+                    [_timeslot_json("mon", "MONDAY", 14, 0, 2, 0, title="Lecture")]
+                ),
             )
         if request.url.path == f"{BASE}/calendar-event":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
@@ -426,7 +435,7 @@ def test_fetch_server_state_reads_every_entity_from_its_listing():
         }
         if request.url.path == BASE:
             return httpx.Response(200, json=_course_json())
-        return httpx.Response(200, json=listings[request.url.path])
+        return httpx.Response(200, json=page(listings[request.url.path]))
 
     fetch_server_state(DISCIPLINE, COURSE, _client(handler))
     assert sorted(paths) == sorted(
@@ -443,54 +452,84 @@ def test_fetch_server_state_reads_every_entity_from_its_listing():
     )
 
 
+def test_fetch_server_state_follows_the_cursor_of_the_question_listing():
+    """
+    The plain-JSON question listing follows `next` like the generated ones,
+    keeping its filters on every page.
+    """
+    seen: list[tuple[str, str | None, list[str]]] = []
+    pages = {
+        (f"{BASE}/question", None): page([_question_json("q1", "v")], next="q1"),
+        (f"{BASE}/question", "q1"): page([_question_json("q2", "v")]),
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == BASE:
+            return httpx.Response(200, json=_course_json())
+        after = request.url.params.get("after")
+        statuses = request.url.params.get_list("statuses")
+        seen.append((request.url.path, after, statuses))
+        return httpx.Response(200, json=pages.get((request.url.path, after), page([])))
+
+    state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
+
+    assert sorted(state.questions) == ["q1", "q2"]
+    questions = [entry for entry in seen if entry[0] == f"{BASE}/question"]
+    assert [after for _, after, _ in questions] == [None, "q1"]
+    assert questions[0][2] != []
+    assert questions[1][2] == questions[0][2]
+
+
 def test_fetch_server_state_reports_calendar_events_as_markers():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == BASE:
             return httpx.Response(200, json=_course_json())
         if request.url.path == f"{BASE}/resource":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/exam":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/question":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/time-slot":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/roll-call":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         if request.url.path == f"{BASE}/calendar-event":
             return httpx.Response(
                 200,
-                json=[
-                    _calendar_event_json(
-                        0,
-                        "mon",
-                        "MONDAY",
-                        14,
-                        0,
-                        2,
-                        0,
-                        "Intro",
-                        "Welcome.",
-                        kind="REGULAR",
-                        ref="ref-a",
-                    ),
-                    _calendar_event_json(
-                        3,
-                        "mon",
-                        "MONDAY",
-                        14,
-                        0,
-                        2,
-                        0,
-                        "Midterm break",
-                        None,
-                        kind="CANCELLED",
-                        ref="ref-b",
-                    ),
-                ],
+                json=page(
+                    [
+                        _calendar_event_json(
+                            0,
+                            "mon",
+                            "MONDAY",
+                            14,
+                            0,
+                            2,
+                            0,
+                            "Intro",
+                            "Welcome.",
+                            kind="REGULAR",
+                            ref="ref-a",
+                        ),
+                        _calendar_event_json(
+                            3,
+                            "mon",
+                            "MONDAY",
+                            14,
+                            0,
+                            2,
+                            0,
+                            "Midterm break",
+                            None,
+                            kind="CANCELLED",
+                            ref="ref-b",
+                        ),
+                    ]
+                ),
             )
         if request.method == "GET" and request.url.path == f"{BASE}/grade-column":
-            return httpx.Response(200, json=[])
+            return httpx.Response(200, json=page([]))
         raise AssertionError(f"unexpected request: {request.url}")
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
@@ -1337,12 +1376,16 @@ def test_fetch_server_state_lists_the_live_exams_with_their_status():
             seen["statuses"] = request.url.params.get_list("statuses")
             return httpx.Response(
                 200,
-                json=[
-                    _exam_json("mid"),
-                    _exam_json("fin", "ONGOING", duration={"hours": 2, "minutes": 0}),
-                ],
+                json=page(
+                    [
+                        _exam_json("mid"),
+                        _exam_json(
+                            "fin", "ONGOING", duration={"hours": 2, "minutes": 0}
+                        ),
+                    ]
+                ),
             )
-        return httpx.Response(200, json=[])
+        return httpx.Response(200, json=page([]))
 
     state = fetch_server_state(DISCIPLINE, COURSE, _client(handler))
 

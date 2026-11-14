@@ -258,7 +258,7 @@ test("REST: an exam carries gradesReleasedAt, null by default", async ({
 	expect(await read.json()).toHaveProperty("gradesReleasedAt", null);
 
 	const list = await request.get(url, { headers });
-	const [only] = await list.json();
+	const [only] = (await list.json()).items;
 	expect(only).toHaveProperty("gradesReleasedAt", null);
 });
 
@@ -279,7 +279,7 @@ test("REST: an exam reads back the gradesReleasedAt set through Prisma", async (
 	expect((await read.json()).gradesReleasedAt).toBe(RELEASED.toISOString());
 
 	const list = await request.get(url, { headers });
-	const [only] = await list.json();
+	const [only] = (await list.json()).items;
 	expect(only.gradesReleasedAt).toBe(RELEASED.toISOString());
 });
 

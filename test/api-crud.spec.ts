@@ -78,7 +78,7 @@ function authHeader(token: string) {
 }
 
 for (const resource of OPTIONAL_FILTER_RESOURCES) {
-	test(`GET /api/${resource} returns 200 with a JSON array`, async ({
+	test(`GET /api/${resource} returns 200 with a page of items`, async ({
 		request,
 	}) => {
 		const token = await adminToken(request);
@@ -86,7 +86,9 @@ for (const resource of OPTIONAL_FILTER_RESOURCES) {
 			headers: authHeader(token),
 		});
 		expect(res.status()).toBe(200);
-		expect(Array.isArray(await res.json())).toBe(true);
+		const body = await res.json();
+		expect(Object.keys(body).sort()).toEqual(["items", "next"]);
+		expect(Array.isArray(body.items)).toBe(true);
 	});
 }
 
@@ -97,7 +99,7 @@ for (const resource of OPTIONAL_FILTER_RESOURCES) {
 //
 // `createdBy` (a username), not `createdById`: `dev/specs/to-do/api-no-raw-ids.md`
 // renames it because the value it carries is a username, not a raw id.
-test("GET /api/api-key?createdBy=<username> returns 200 with a JSON array", async ({
+test("GET /api/api-key?createdBy=<username> returns 200 with a page of items", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -107,7 +109,7 @@ test("GET /api/api-key?createdBy=<username> returns 200 with a JSON array", asyn
 		{ headers: authHeader(token) },
 	);
 	expect(owner.status()).toBe(200);
-	const [ownerUser] = await owner.json();
+	const [ownerUser] = (await owner.json()).items;
 	expect(ownerUser.username).toBe(instructor.username);
 
 	const res = await request.get(
@@ -117,7 +119,9 @@ test("GET /api/api-key?createdBy=<username> returns 200 with a JSON array", asyn
 		},
 	);
 	expect(res.status()).toBe(200);
-	expect(Array.isArray(await res.json())).toBe(true);
+	const body = await res.json();
+	expect(Array.isArray(body.items)).toBe(true);
+	expect(body.next).toBeNull();
 });
 
 // A course is addressed by its natural key, the same `<discipline>/<username>_<edition>`
@@ -133,7 +137,7 @@ test("GET /api/course/[discipline]/[course] resolves a course by its natural key
 	const token = await adminToken(request);
 	const list = await request.get("/api/course", { headers: authHeader(token) });
 	expect(list.status()).toBe(200);
-	const [course] = await list.json();
+	const [course] = (await list.json()).items;
 	expect(course).toBeTruthy();
 
 	const res = await request.get(
@@ -195,7 +199,7 @@ for (const [resource, pkField] of [
 			headers: authHeader(token),
 		});
 		expect(list.status()).toBe(200);
-		const [first] = await list.json();
+		const [first] = (await list.json()).items;
 		expect(first).toBeTruthy();
 
 		const res = await request.get(
@@ -240,7 +244,7 @@ test("POST /api/course accepts ISO dates for startDate/endDate", async ({
 
 // Calendar events live under their course: the listing has no "every course"
 // form over the API, so the course segments are the whole filter here.
-test("GET /api/course/<discipline>/<course>/calendar-event returns 200 with a JSON array", async ({
+test("GET /api/course/<discipline>/<course>/calendar-event returns 200 with a page of items", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -248,7 +252,9 @@ test("GET /api/course/<discipline>/<course>/calendar-event returns 200 with a JS
 		headers: authHeader(token),
 	});
 	expect(res.status()).toBe(200);
-	expect(Array.isArray(await res.json())).toBe(true);
+	const body = await res.json();
+	expect(Array.isArray(body.items)).toBe(true);
+	expect(body.next).toBeNull();
 });
 
 // The guard that would have caught bug (b) — and the `[slug]` segment mismatch
@@ -291,10 +297,11 @@ test("a query filter that matches narrows the list to only the matching row", as
 	});
 	expect(res.status()).toBe(200);
 	const body = await res.json();
-	expect(body.map((d: { slug: string }) => d.slug)).toEqual([slugA]);
+	expect(body.items.map((d: { slug: string }) => d.slug)).toEqual([slugA]);
+	expect(body.next).toBeNull();
 });
 
-test("a query filter that matches nothing returns an empty array, not everything", async ({
+test("a query filter that matches nothing returns an empty page, not everything", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -305,7 +312,7 @@ test("a query filter that matches nothing returns an empty array, not everything
 		},
 	);
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual([]);
+	expect(await res.json()).toEqual({ items: [], next: null });
 });
 
 test("?active=false is honored as false, not truthy — a naive Boolean('false') would wrongly read it as true", async ({
@@ -326,7 +333,7 @@ test("?active=false is honored as false, not truthy — a naive Boolean('false')
 		{ headers: authHeader(token) },
 	);
 	expect(activeOnly.status()).toBe(200);
-	expect(await activeOnly.json()).toEqual([]);
+	expect(await activeOnly.json()).toEqual({ items: [], next: null });
 
 	// ...while `active=false` must NOT be coerced into the boolean `true`
 	// (which is what `Boolean("false")` — the classic bug — would do): the
@@ -338,7 +345,8 @@ test("?active=false is honored as false, not truthy — a naive Boolean('false')
 	);
 	expect(inactiveAllowed.status()).toBe(200);
 	const body = await inactiveAllowed.json();
-	expect(body.map((e: { slug: string }) => e.slug)).toEqual([slug]);
+	expect(body.items.map((e: { slug: string }) => e.slug)).toEqual([slug]);
+	expect(body.next).toBeNull();
 });
 
 test("a value needing escaping (space, &, #, and a quote) round-trips exactly through the query string", async ({
@@ -360,7 +368,7 @@ test("a value needing escaping (space, &, #, and a quote) round-trips exactly th
 		headers: authHeader(token),
 	});
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual([]);
+	expect(await res.json()).toEqual({ items: [], next: null });
 });
 
 test("an injection-shaped filter value returns an empty result, never the whole table", async ({
@@ -372,7 +380,7 @@ test("an injection-shaped filter value returns an empty result, never the whole 
 	const everything = await request.get("/api/discipline", {
 		headers: authHeader(token),
 	});
-	expect((await everything.json()).length).toBeGreaterThan(0);
+	expect((await everything.json()).items.length).toBeGreaterThan(0);
 
 	const qs = new URLSearchParams({ slugs: "' OR 1=1--" }).toString();
 	const res = await request.get(`/api/discipline?${qs}`, {
@@ -382,7 +390,7 @@ test("an injection-shaped filter value returns an empty result, never the whole 
 	// literal (non-matching) string comparison — never a 500, and never the
 	// full table.
 	expect(res.status()).toBe(200);
-	expect(await res.json()).toEqual([]);
+	expect(await res.json()).toEqual({ items: [], next: null });
 });
 
 for (const key of [
@@ -422,4 +430,182 @@ test("POST /api/course refuses a course date that carries a time", async ({
 		},
 	});
 	expect(res.status()).toBe(400);
+});
+
+/// One page of a list route, as the REST API answers it.
+type ListPage<Item> = { items: Item[]; next: string | null };
+
+type CourseItem = {
+	discipline: { slug: string };
+	instructor: { username: string };
+	edition: { slug: string };
+};
+
+/// The natural key of a course of a list, which names it apart from every other.
+function courseKey(course: CourseItem): string {
+	return `${course.discipline.slug}/${course.instructor.username}_${course.edition.slug}`;
+}
+
+/// Reads a whole list by following `next` from the first page to the last.
+async function walkList<Item>(
+	request: import("@playwright/test").APIRequestContext,
+	token: string,
+	path: string,
+	limit: number,
+): Promise<{ items: Item[]; pages: number }> {
+	const items: Item[] = [];
+	let after: string | null = null;
+	for (let pages = 1; ; pages++) {
+		const query = new URLSearchParams({ limit: String(limit) });
+		if (after !== null) query.set("after", after);
+		const separator = path.includes("?") ? "&" : "?";
+		const res = await request.get(`${path}${separator}${query}`, {
+			headers: authHeader(token),
+		});
+		expect(res.status()).toBe(200);
+		const page = (await res.json()) as ListPage<Item>;
+		expect(page.items.length).toBeLessThanOrEqual(limit);
+		items.push(...page.items);
+		if (page.next === null) return { items, pages };
+		expect(page.items).toHaveLength(limit);
+		after = page.next;
+	}
+}
+
+test("GET /api/course?limit=1 answers one course and the cursor of the next page", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	await persistedCourseFactory.create();
+
+	const res = await request.get("/api/course?limit=1", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(200);
+	const page = (await res.json()) as ListPage<CourseItem>;
+	expect(Object.keys(page).sort()).toEqual(["items", "next"]);
+	expect(page.items).toHaveLength(1);
+	expect(typeof page.next).toBe("string");
+	expect(page.next).not.toBe("");
+});
+
+test("following next from page to page reads every course once, in the order of a single page", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	await persistedCourseFactory.create();
+	await persistedCourseFactory.create();
+
+	const whole = await walkList<CourseItem>(request, token, "/api/course", 500);
+	expect(whole.pages).toBe(1);
+	const keys = whole.items.map(courseKey);
+	expect(keys.length).toBeGreaterThanOrEqual(3);
+	expect(new Set(keys).size).toBe(keys.length);
+
+	const oneByOne = await walkList<CourseItem>(request, token, "/api/course", 1);
+	expect(oneByOne.items.map(courseKey)).toEqual(keys);
+	expect(oneByOne.pages).toBe(keys.length);
+
+	const inPairs = await walkList<CourseItem>(request, token, "/api/course", 2);
+	expect(inPairs.items.map(courseKey)).toEqual(keys);
+	expect(inPairs.pages).toBe(Math.ceil(keys.length / 2));
+});
+
+test("GET /api/course with a filter pages only the courses that match it", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	const discipline = world.discipline.slug;
+	const { items } = await walkList<CourseItem>(
+		request,
+		token,
+		`/api/course?discipline=${discipline}`,
+		1,
+	);
+	expect(items.map(courseKey)).toEqual([worldPath()]);
+});
+
+test("GET /api/course?after=<not a cursor> is a 400", async ({ request }) => {
+	const token = await adminToken(request);
+	const res = await request.get("/api/course?after=garbage", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(400);
+});
+
+for (const limit of [0, 501]) {
+	test(`GET /api/course?limit=${limit} is a 400`, async ({ request }) => {
+		const token = await adminToken(request);
+		const res = await request.get(`/api/course?limit=${limit}`, {
+			headers: authHeader(token),
+		});
+		expect(res.status()).toBe(400);
+	});
+}
+
+test("a list route that does not page answers every row and a null next", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	const slug = `qa-page-${Date.now().toString().slice(-8)}`;
+	const created = await request.post("/api/discipline", {
+		headers: authHeader(token),
+		data: { slug, name: `QA ${slug}` },
+	});
+	expect(created.ok()).toBe(true);
+	const discipline = await created.json();
+
+	const one = await request.get(`/api/discipline?slugs=${slug}`, {
+		headers: authHeader(token),
+	});
+	expect(one.status()).toBe(200);
+	expect(await one.json()).toEqual({ items: [discipline], next: null });
+
+	const all = await request.get("/api/discipline", {
+		headers: authHeader(token),
+	});
+	expect(all.status()).toBe(200);
+	const body = (await all.json()) as ListPage<{ slug: string }>;
+	expect(Object.keys(body).sort()).toEqual(["items", "next"]);
+	expect(body.next).toBeNull();
+	expect(body.items.map((item) => item.slug)).toContain(slug);
+});
+
+test("GET /api/user?limit=2 pages the users by username, ascending", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	await seedUser({ role: "STUDENT" });
+	await seedUser({ role: "STUDENT" });
+
+	const res = await request.get("/api/user?limit=2", {
+		headers: authHeader(token),
+	});
+	expect(res.status()).toBe(200);
+	const first = (await res.json()) as ListPage<{ username: string }>;
+	expect(first.items).toHaveLength(2);
+	expect(typeof first.next).toBe("string");
+
+	const whole = await walkList<{ username: string }>(
+		request,
+		token,
+		"/api/user",
+		500,
+	);
+	const usernames = whole.items.map((user) => user.username);
+	expect(whole.pages).toBe(1);
+	expect(usernames).toEqual([...usernames].sort());
+	expect(new Set(usernames).size).toBe(usernames.length);
+	expect(first.items.map((user) => user.username)).toEqual(
+		usernames.slice(0, 2),
+	);
+
+	const inPairs = await walkList<{ username: string }>(
+		request,
+		token,
+		"/api/user",
+		2,
+	);
+	expect(inPairs.items.map((user) => user.username)).toEqual(usernames);
+	expect(inPairs.pages).toBe(Math.ceil(usernames.length / 2));
 });

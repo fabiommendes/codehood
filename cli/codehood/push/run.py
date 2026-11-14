@@ -21,11 +21,13 @@ from typing import Protocol, cast
 from urllib.parse import quote
 
 import httpx
-from pydantic import JsonValue, TypeAdapter
+from pydantic import JsonValue
 
 from ..api import generated
 from ..api.base import CodehoodAPIError, auth_headers, query_params
+from ..api.pages import read_all
 from ..grades import ExamResult, ExamState
+from ..models.base import Model
 from .base import BaseEntry, BaseState
 from .exam import ExamStatus
 from .grades import ServerStudent
@@ -192,8 +194,11 @@ class HttpRepositoryApi:
         """
         See `RepositoryApi.list_trees`.
         """
-        items = generated.repository_list(
-            discipline=self.discipline, course=self.course, client=self.client
+        items = read_all(
+            generated.repository_list,
+            discipline=self.discipline,
+            course=self.course,
+            client=self.client,
         )
         return {item.slug: item.tree for item in items}
 
@@ -289,7 +294,8 @@ def fetch_server_state(
     `.../grade-column`; `.../roll-call` adds each event's attendance count.
     The listings carry whole bodies, so each entity becomes a `RemoteEntry`
     (see `project.py`) without a request of its own: a course costs six
-    requests, seven when it has events, plus the repository listing.
+    listings, seven when it has events, plus the repository listing, each
+    one request per page.
     `repositories` gives `slug -> tree`; without it no repository is listed.
 
     A time slot carries no `ref` column server-side, so its entry has no
@@ -308,31 +314,38 @@ def fetch_server_state(
             raise
         return ServerState(course_exists=False)
 
-    resources = generated.list_resource(
-        discipline=discipline, course=course, client=client
+    resources = read_all(
+        generated.list_resource, discipline=discipline, course=course, client=client
     )
     questions = _list_questions(discipline, course, client)
-    exams = generated.list_exam(
+    exams = read_all(
+        generated.list_exam,
         discipline=discipline,
         course=course,
         statuses=["DRAFT", "SCHEDULED", "ONGOING", "COMPLETED"],
         client=client,
     )
-    time_slots = generated.list_timeslot(
-        discipline=discipline, course=course, client=client
+    time_slots = read_all(
+        generated.list_timeslot, discipline=discipline, course=course, client=client
     )
-    calendar_events = generated.list_calendar_event(
-        discipline=discipline, course=course, client=client
+    calendar_events = read_all(
+        generated.list_calendar_event,
+        discipline=discipline,
+        course=course,
+        client=client,
     )
-    grade_columns = generated.list_grade_column(
-        discipline=discipline, course=course, client=client
+    grade_columns = read_all(
+        generated.list_grade_column, discipline=discipline, course=course, client=client
     )
     # A roll call hangs off a calendar event, so none can exist without one.
     roll_calls = (
         {
             (roll_call.week, roll_call.time_slot): len(roll_call.attendances)
-            for roll_call in generated.list_roll_call(
-                discipline=discipline, course=course, client=client
+            for roll_call in read_all(
+                generated.list_roll_call,
+                discipline=discipline,
+                course=course,
+                client=client,
             )
         }
         if calendar_events
@@ -1192,13 +1205,36 @@ def _list_questions(
     which is what `plan_sync`'s convergence (a second push plans nothing)
     requires.
     """
+    return read_all(_question_page, discipline, course, client)
+
+
+class _QuestionPage(Model):
+    """
+    One page of `GET .../question`, its items kept as plain JSON.
+    """
+
+    items: list[dict[str, JsonValue]]
+    next: str | None
+
+
+def _question_page(
+    discipline: str, course: str, client: httpx.Client, after: str | None = None
+) -> _QuestionPage:
+    """
+    One page of `GET .../question` with the live statuses, starting after `after`.
+
+    Raises:
+        httpx.HTTPStatusError: When the server refuses the request.
+    """
     response = client.get(
         f"/api/course/{discipline}/{course}/question",
-        params=query_params({"statuses": ["DRAFT", "PUBLISHED", "HIDDEN"]}),
+        params=query_params(
+            {"statuses": ["DRAFT", "PUBLISHED", "HIDDEN"], "after": after}
+        ),
         headers=auth_headers(client),
     )
     response.raise_for_status()
-    return TypeAdapter(list[dict[str, JsonValue]]).validate_python(response.json())
+    return _QuestionPage.model_validate(response.json())
 
 
 def _server_question(item: dict[str, JsonValue]) -> ServerQuestion:

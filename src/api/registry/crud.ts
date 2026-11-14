@@ -7,11 +7,13 @@ import {
 	type JSONValue,
 	NotFound,
 } from "@/core/error";
+import { type Page, pageOf, pageParams } from "@/core/schemas";
 import type {
 	Create,
 	Delete,
 	FindMany,
 	FindOne,
+	FindPage,
 	Update,
 	Upsert,
 } from "@/db/base-service";
@@ -99,6 +101,7 @@ export type CrudRouteOptions<
 
 	service: FindOne<KeyT, EntityT> &
 		FindMany<FilterT & ScopeT, EntityT> &
+		Partial<FindPage<FilterT & ScopeT, EntityT>> &
 		Create<CreateT & CreateExtra, EntityT> &
 		Update<KeyT, UpdateT, EntityT> &
 		Delete<KeyT> &
@@ -194,6 +197,7 @@ type CrudOptions<
 	upsert?: UpsertFlag;
 	service: FindOne<KeyT, EntityT> &
 		FindMany<FilterT & ScopeT, EntityT> &
+		Partial<FindPage<FilterT & ScopeT, EntityT>> &
 		Delete<KeyT> &
 		// Not distributed over `ZodX | null`, and `CreateExtra` comes from the
 		// path parsers only, never inferred from the service it should check.
@@ -226,6 +230,10 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 	private pathWithKey: string;
 	private has: { [key: string]: true | undefined };
 	private filterSchema: ZodType<Filter & Scope> | null;
+	/// The query string of the list: the filter, and `limit` and `after` when the service pages.
+	private querySchema: ZodType<Filter> | null;
+	/// Whether the service answers the list one page at a time.
+	private paged: boolean;
 	/// Whether the entity has an `updatedAt`: its single-row routes then read
 	/// `If-Match`/`If-None-Match` and answer an `ETag` (ADR 0013).
 	private versioned: boolean;
@@ -278,6 +286,11 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 		// additional data required by the schema
 		// biome-ignore lint/suspicious/noExplicitAny: type eventually lands in the correct one
 		let filterSchema: any = this.options.filter;
+		this.paged = typeof this.options.service.findPage === "function";
+		if (filterSchema && this.paged) {
+			filterSchema = filterSchema.extend(pageParams.shape);
+		}
+		this.querySchema = filterSchema;
 		if (filterSchema && this.options.scope) {
 			filterSchema = filterSchema.extend(this.options.scope?.shape);
 		}
@@ -387,8 +400,8 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 				this.options.filter &&
 				GET(this.path, {
 					operationId: this.operationId("list"),
-					in: this.options.filter,
-					out: this.options.entity.array(),
+					in: this.querySchema ?? undefined,
+					out: pageOf(this.options.entity),
 					summary: `Find multiple ${this.namePlural}.`,
 					tags: this.options.tags,
 					errors: this.errors("list"),
@@ -510,7 +523,7 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 		actor: UserActor;
 		body: Filter;
 		params: Record<string, string>;
-	}): Promise<Entity[]> {
+	}): Promise<Page<Entity>> {
 		const { actor, body, params } = args;
 
 		const fromUrl = this.parseListUrlParams(params);
@@ -527,7 +540,12 @@ class CRUDApi<Entity, Create, Filter, Key, Update, Scope, CreateExtra> {
 
 		// The query schema leaves out what the path already fixes (the parent
 		// of a nested collection), so parsing drops it: put it back.
-		return this.service.findMany({ ...fromUrl, ...validated }, { actor });
+		const filter = { ...fromUrl, ...validated };
+		if (this.service.findPage) return this.service.findPage(filter, { actor });
+		return {
+			items: await this.service.findMany(filter, { actor }),
+			next: null,
+		};
 	}
 
 	/**
