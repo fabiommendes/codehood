@@ -30,6 +30,11 @@ const all = await db.resource.findMany({ course: course.id }, { actor });
 const { general: resources, byEvent } = splitByEvent(all);
 const hasEventResources = byEvent.size > 0;
 const groups = groupResourcesByType(resources);
+// The service already hides uncommitted repositories from whoever may not write.
+const repositories = await db.repository.findMany(
+	{ course: course.id },
+	{ actor },
+);
 
 // Blob URLs carry no auth check of their own (ADR 0010); this page's referrer
 // still shouldn't leak into every link it hands out.
@@ -43,7 +48,7 @@ function code(text: string): string {
 
 <AppLayout title={m.courses_resources_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={resourcesNav(href, groups)}
+  nav={resourcesNav(href, groups, repositories.length)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />

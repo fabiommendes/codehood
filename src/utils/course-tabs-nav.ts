@@ -18,7 +18,10 @@ export function scheduleWeekId(week: number): string {
 	return `week-${week}`;
 }
 
-/** Links to the resource groups of the resources page, one per group in page order. */
+/**
+ * Links to the resource groups of the resources page, one per group in page
+ * order, then to the repositories page when the actor sees any repository.
+ */
 export function resourcesNav(
 	href: string,
 	groups: readonly {
@@ -26,19 +29,21 @@ export function resourcesNav(
 		label: string;
 		resources: readonly unknown[];
 	}[],
+	repositories = 0,
 ): CourseNav {
 	const base = `${href}/resources`;
-	return {
-		sections: [
-			{
-				entries: groups.map((group) => ({
-					label: group.label,
-					href: `${base}#${resourceGroupId(group.type)}`,
-					meta: group.resources.length,
-				})),
-			},
-		],
-	};
+	const entries: NavEntry[] = groups.map((group) => ({
+		label: group.label,
+		href: `${base}#${resourceGroupId(group.type)}`,
+		meta: group.resources.length,
+	}));
+	if (repositories > 0)
+		entries.push({
+			label: m.nav_course_tab_repositories(),
+			href: `${href}/repositories`,
+			meta: repositories,
+		});
+	return { sections: [{ entries }] };
 }
 
 /**

@@ -13,8 +13,8 @@ import {
  * UI contract assumed by these stories (en build; the spec leaves the wording
  * open, so the implementation should use these strings).
  *
- * Course tabs
- *   - A tab (role "tab") "Repositories" (after "Schedule") to `<course>/repositories`.
+ * Course card (`[data-course-card]`) on the resources tab
+ *   - A link "Repositories" to `<course>/repositories`.
  *
  * Repository page (`<course>/repositories/<slug>`)
  *   - Heading with the repository title (H1 of the root README, or the slug).
@@ -44,8 +44,11 @@ test("instructor: Share a repository with the class", async ({ page }) => {
 	await logInAs(page, instructor);
 
 	await test.step("a repository without a commit shows the instructor it is waiting", async () => {
-		await page.goto(href);
-		await page.getByRole("tab", { name: "Repositories", exact: true }).click();
+		await page.goto(`${href}/resources`);
+		await page
+			.locator("[data-course-card]")
+			.getByRole("link", { name: "Repositories" })
+			.click();
 		await page.getByRole("link", { name: "ir-lab" }).click();
 
 		await expect(page.getByText("Awaiting the first push")).toBeVisible();

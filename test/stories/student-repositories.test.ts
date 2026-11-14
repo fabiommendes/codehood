@@ -16,9 +16,10 @@ import {
  * UI contract assumed by these stories (en build; the spec leaves the wording
  * open, so the implementation should use these strings).
  *
- * Course tabs
- *   - A tab (role "tab") "Repositories" (exact), shown to a student only when the course
- *     has a repository with a commit.
+ * Course card (`[data-course-card]`) on the resources tab
+ *   - A link "Repositories" to `<course>/repositories`, shown to a student only
+ *     when the course has a repository with a commit. There is no Repositories
+ *     tab: the repositories page marks Resources as the current tab.
  *
  * Repositories tab (`<course>/repositories`)
  *   - One link per repository named after its title (H1 of the root README);
@@ -64,25 +65,29 @@ test("student: Find a course repository", async ({ page }) => {
 	const slot = await persistedTimeSlotFactory.create({ course: course.id });
 	await logInAs(page, student);
 
-	await test.step("a course without repositories has no Repositories tab", async () => {
-		await page.goto(href);
+	const card = page.locator("[data-course-card]");
+	const repositoriesLink = card.getByRole("link", {
+		name: "Repositories",
+	});
+
+	await test.step("a course without repositories has no Repositories link", async () => {
+		await page.goto(`${href}/resources`);
 		await expect(
-			page.getByRole("tab", { name: "Schedule", exact: true }),
+			page.getByRole("tab", { name: "Resources", selected: true }),
 		).toBeVisible();
-		await expect(
-			page.getByRole("tab", { name: "Repositories", exact: true }),
-		).toHaveCount(0);
+		await expect(repositoriesLink).toHaveCount(0);
 	});
 
-	await test.step("a repository still waiting for its first push does not create the tab", async () => {
+	await test.step("a repository still waiting for its first push does not create the link", async () => {
 		await createRepository(course.id, "sf-pending", instructor);
-		await page.goto(href);
+		await page.goto(`${href}/resources`);
 		await expect(
-			page.getByRole("tab", { name: "Repositories", exact: true }),
-		).toHaveCount(0);
+			page.getByRole("tab", { name: "Resources", selected: true }),
+		).toBeVisible();
+		await expect(repositoriesLink).toHaveCount(0);
 	});
 
-	await test.step("the tab lists a repository with its title and last commit", async () => {
+	await test.step("the Resources tab leads to a repository with its title and last commit", async () => {
 		await pushTree(
 			course.id,
 			"sf-lab",
@@ -97,9 +102,13 @@ test("student: Find a course repository", async ({ page }) => {
 			"Exams",
 			"Resources",
 			"Schedule",
-			"Repositories",
 		]);
-		await page.getByRole("tab", { name: "Repositories", exact: true }).click();
+		await page.getByRole("tab", { name: "Resources", exact: true }).click();
+		await repositoriesLink.click();
+		await expect(page).toHaveURL(`${href}/repositories`);
+		await expect(
+			page.getByRole("tab", { name: "Resources", selected: true }),
+		).toBeVisible();
 
 		await expect(
 			page.getByRole("link", { name: "Calculator Lab" }),

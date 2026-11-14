@@ -20,6 +20,14 @@ test.describe("resourcesNav", () => {
 			{ label: "Notes", href: `${href}/resources#group-md`, meta: 1 },
 		]);
 	});
+
+	test("ends with the repositories page when the actor sees any", () => {
+		const entries = resourcesNav(href, [], 2).sections[0]?.entries;
+		expect(entries).toEqual([
+			{ label: "Repositories", href: `${href}/repositories`, meta: 2 },
+		]);
+		expect(resourcesNav(href, []).sections[0]?.entries).toEqual([]);
+	});
 });
 
 test.describe("scheduleNav", () => {

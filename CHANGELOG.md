@@ -37,6 +37,9 @@
   (`studentsNav`). As URLs não mudaram. Para o aluno, a página de presença
   segue sem card e sem aba ativa.
 
+- A aba "Repositórios" saiu da faixa: os repositórios ficam sob "Materiais",
+  com um link no fim do card do curso quando há algum visível.
+
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento
