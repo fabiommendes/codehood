@@ -6,6 +6,7 @@ the Elm packages.
 from pathlib import Path
 
 import pytest
+from chalk_grader import cgroup
 from conftest import SOLUTION, needs_elm, prepare, question_doc
 from mdq.models import CodeQuestion
 
@@ -103,8 +104,13 @@ NESTED_BOMB = SOLUTION.replace(
 )
 
 
+@pytest.mark.skipif(
+    cgroup.controller() is not None, reason="with a cgroup: see test_cgroup.py (memory-limit)"
+)
 @pytest.mark.parametrize("answer", [LIST_BOMB, NESTED_BOMB], ids=["list", "nested"])
-def test_answer_past_the_memory_budget_errs_every_case(tmp_path: Path, answer: str) -> None:
+def test_without_cgroup_the_heap_of_node_errs_every_case(tmp_path: Path, answer: str) -> None:
+    # The budget is node's heap alone, with no RLIMIT_AS, so the answer
+    # crashes node instead of taking the memory of the machine.
     q = CodeQuestion.model_validate(question_doc())
     g = QuestionGrader(q, tmp_path / "work", sandbox="none", memory=256 * 1024**2)
     prepare(g)

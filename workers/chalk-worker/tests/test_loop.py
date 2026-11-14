@@ -5,6 +5,7 @@ The claim loop, with a fake server and a fake grader.
 import threading
 import time
 
+from chalk_grader.script_runner import RunError, RunKilled
 from conftest import job_doc, question_doc
 from mdq.models import RunnerReport
 
@@ -168,6 +169,39 @@ def test_infrastructure_error_fails_with_retry() -> None:
     assert (submission, retry) == ("a", True)
     assert "sandbox died" in error
     assert server.results == {}
+
+
+def test_run_error_gives_the_job_back_with_retry_and_no_grade() -> None:
+    server = FakeServer(jobs("a", "b"))
+    log: list[str] = []
+    grader = FakeGrader(error=RunError("cannot start the run of joao: no cgroup"))
+    w = worker(server, grader, log=log.append)
+    assert w.run(once=True) == 2
+    assert sorted((s, r) for s, _, r in server.fails) == [("a", True), ("b", True)]
+    assert all("not graded" in e and "no cgroup" in e for _, e, _ in server.fails)
+    assert server.results == {}
+    assert any("not graded" in line for line in log)
+    assert w.status.snapshot().failed == 2
+
+
+def test_run_killed_by_the_system_waits_before_claiming_again() -> None:
+    server = FakeServer(jobs("a", "b"))
+    grader = FakeGrader(error=RunKilled("the system killed a process, twice"))
+    log: list[str] = []
+    w = worker(server, grader, log=log.append)
+    threading.Timer(0.3, w.stop).start()
+    w.run()
+    assert sorted((s, r) for s, _, r in server.fails) == [("a", True), ("b", True)]
+    assert server.results == {}
+    assert any("waiting" in line for line in log)
+
+
+def test_run_killed_stops_claiming_once() -> None:
+    server = FakeServer(jobs("a", "b"))
+    grader = FakeGrader(error=RunKilled("the system killed a process, twice"))
+    worker(server, grader).run(once=True)
+    assert [s for s, _, _ in server.fails] == ["a"]
+    assert len(server.claims) == 1
 
 
 def test_broken_reference_fails_every_job_of_the_question_without_grading() -> None:

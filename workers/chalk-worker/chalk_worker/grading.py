@@ -13,12 +13,12 @@ import shutil
 from hashlib import sha256
 from importlib import resources
 from pathlib import Path
-from typing import Any
 
 from chalk_grader import disqualification as dq
 from chalk_grader import models
 from chalk_grader.profile_grader import ProfileGrader, resolve_profile
 from chalk_grader.profiles import PrepareError
+from chalk_grader.script_runner import RunError
 from chalk_grader.task import Task
 from mdq.models import CodeQuestion, RunnerReport
 
@@ -31,8 +31,8 @@ __all__ = [
     "PrepareFailed",
     "QuestionGrader",
     "ReferenceError",
-    "profile_overrides",
     "question_hash",
+    "run_vars",
 ]
 
 #: The chalk-grader profile of each language a question may declare.
@@ -40,30 +40,20 @@ PROFILE_BY_LANGUAGE = {"elm": "elm-test"}
 
 MiB = 1024 * 1024
 
-#: Memory of an elm-test run besides the heap of node: the compiler, node
-#: itself and the files of the run (measured: about 110 MiB).
-ELM_OVERHEAD = 128 * MiB
 
-#: The test step of the elm-test profile with one worker thread. elm-test
-#: starts one per core by default, each with a heap of its own, and the
-#: worker already grades one answer per core.
-ELM_TEST_COMMAND = (
-    '{node} {elm_test} --compiler {elm} --seed 1 --workers 1 --report junit > "$CHALK_RESULT"'
-)
-
-
-def profile_overrides(memory: int | None = None) -> dict[str, dict[str, Any]]:
+def run_vars(memory: int | None = None) -> dict[str, str]:
     """
-    The built-in profiles as the worker runs them. With `memory`, the
-    bytes a run may take, node's heap is capped so that an answer that
-    allocates without end crashes on its own, which is an `error` of every
-    case, instead of taking the memory of the machine.
+    The profile variables of a job with `memory` bytes: its runs get that
+    much memory (the `memory.max` of their cgroup, and node's heap in Elm).
+
+    The budget goes in as the profile's own `vars.memory_mib`, not as
+    `limits.memory`: without a delegated cgroup chalk-grader turns
+    `limits.memory` into `RLIMIT_AS`, and node does not start with an
+    address space below about 1.4 GiB, so every Elm run would fail.
     """
-    elm: dict[str, Any] = {"extends": "elm-test", "test": {"command": ELM_TEST_COMMAND}}
-    if memory:
-        heap = max(64, (memory - ELM_OVERHEAD) // MiB)
-        elm["env"] = {"NODE_OPTIONS": f"--max-old-space-size={heap}"}
-    return {"elm-test": elm}
+    if not memory:
+        return {}
+    return {"memory_mib": str(max(1, memory // MiB))}
 
 
 class ReferenceError(ValueError):
@@ -76,7 +66,8 @@ class ReferenceError(ValueError):
 class PrepareFailed(RuntimeError):
     """
     The profile could not be prepared on this machine: a package download
-    failed, a tool is missing, or the tests do not compile. It may pass on
+    failed, a tool is missing, the tests do not compile, or the system
+    killed the run of the reference solution. It may pass on
     the next try, so it is not held against the question.
     """
 
@@ -93,8 +84,8 @@ def question_hash(question: CodeQuestion) -> str:
 class QuestionGrader:
     """
     Grades answers to one question, preparing its project once. `memory`
-    caps what a run may take (see `profile_overrides`); `profiles` replaces
-    the overrides of the worker.
+    is what each run may take (see `run_vars`); without it, the profile's
+    default holds (512 MiB in Elm).
     """
 
     def __init__(
@@ -105,7 +96,6 @@ class QuestionGrader:
         sandbox: str | None = None,
         timeout: float | None = None,
         memory: int | None = None,
-        profiles: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.question = question
         workdir = workdir.absolute()
@@ -120,12 +110,14 @@ class QuestionGrader:
             script=None,
             task=Task(question.id or "question", "codehood", root=workdir, template=self._template),
             conf=models.Autograder(
-                profile=profile, answer=self._answer, sandbox=sandbox, timeout=timeout
+                profile=profile,
+                answer=self._answer,
+                sandbox=sandbox,
+                timeout=timeout,
+                vars=run_vars(memory),
             ),
             name=profile,
-            profile=resolve_profile(
-                profile, profiles if profiles is not None else profile_overrides(memory)
-            ),
+            profile=resolve_profile(profile),
             solution=_with_header(language, question.file, question.reference_solution),
             cache_dir=workdir.parent / "cache",
         )
@@ -148,8 +140,16 @@ class QuestionGrader:
             raise PrepareFailed(f"cannot prepare the profile: {e}") from None
         if not self._grader.prepare().tests:
             raise ReferenceError("the reference run found no tests")
-        report = self.grade(self.question.reference_solution)
+        try:
+            report = self.grade(self.question.reference_solution)
+        except RunError as e:
+            raise PrepareFailed(f"cannot run the reference solution: {e}") from None
         failed = [c.id for c in report.cases if c.verdict != "pass"]
+        if any(c.verdict == "resource-limit" for c in report.cases):
+            raise ReferenceError(
+                "the reference solution goes past the memory of a run; "
+                "give the worker more --memory"
+            )
         if report.status != "completed" or failed:
             detail = report.build or report.message or ", ".join(str(f) for f in failed)
             raise ReferenceError(f"the reference solution does not pass: {report.status} {detail}")
@@ -159,6 +159,9 @@ class QuestionGrader:
         The runner report of an answer.
 
         Raises:
+            RunError: a run failed for a reason that is not the answer's
+                fault, such as `RunKilled` when the system's OOM killer
+                stopped it twice; the answer is not graded.
             PrepareError, OSError, RuntimeError: the infrastructure failed.
         """
         graded = self._grader(

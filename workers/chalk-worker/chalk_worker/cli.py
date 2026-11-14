@@ -17,11 +17,14 @@ from typing import IO, Annotated, Any
 
 import pydantic
 import typer
+from chalk_grader import cgroup
 from mdq.models import CodeQuestion
 
 from .client import WorkerClient
 from .grading import QuestionGrader, question_hash
 from .loop import Filters, Worker
+
+MiB = 1024 * 1024
 
 app = typer.Typer(add_completion=False)
 
@@ -64,12 +67,14 @@ def run(
     memory: Annotated[
         str,
         typer.Option(
-            help="Memory one job may take, as in 512MiB, or 0 for no limit. Jobs start "
-            "only while the available memory holds them."
+            help="Memory each run of a job may take, as in 512MiB (with a delegated cgroup, "
+            "a run that goes past it is stopped: resource-limit); jobs start only while the "
+            "available memory holds them. 0: the profile's default, and no check of the "
+            "available memory."
         ),
     ] = "512MiB",
     memory_reserve: Annotated[
-        str, typer.Option(help="Memory left to the rest of the machine.")
+        str, typer.Option(help="Memory left to the rest of the machine when starting jobs.")
     ] = "512MiB",
     sandbox: Annotated[
         str | None, typer.Option(help="Sandbox of the runs: bwrap (default) or none.")
@@ -127,14 +132,26 @@ def run(
         reserve=reserve,
     )
     workers = ", ".join(worker or ["elm-test"])
+    limited, limits = _limits_note(per_job)
+    loop.status.log(limits)
     if tui:
-        _run_tui(loop, once, f"{workers} · {jobs} slots · {url}")
+        shown = "run limits on" if limited else "NO run limits"
+        _run_tui(loop, once, f"{workers} · {jobs} slots · {shown} · {url}")
         return
+
+    _log(limits if limited else f"warning: {limits}")
+
+    def abort(signum: int, _frame: Any) -> None:
+        # The runs in progress live in cgroups of their own: kill them first.
+        if (runs := cgroup.controller()) is not None:
+            runs.kill_all()
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
 
     def stop(signum: int, _frame: Any) -> None:
         _log("stopping after the jobs in progress (again to abort)")
         loop.stop()
-        signal.signal(signum, signal.SIG_DFL)
+        signal.signal(signum, abort)
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
@@ -169,17 +186,32 @@ def _run_tui(loop: Worker, once: bool, subtitle: str) -> None:
         _exit(1)
     if done is None:
         # Aborted with jobs in progress: their leases run out on the server.
-        # Leave now, without waiting for the grading threads; the sandboxes
-        # of their runs die with this process.
+        # Leave now, without waiting for the grading threads.
         _log("aborted")
         _exit(130)
     _log(f"{done} jobs processed")
 
 
 def _exit(code: int) -> None:
+    # os._exit skips atexit, so the runs left in their cgroups are killed here.
+    if (runs := cgroup.controller()) is not None:
+        runs.kill_all()
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(code)
+
+
+def _limits_note(memory: int | None) -> tuple[bool, str]:
+    """
+    Whether runs have a cgroup of their own, with a line that says so.
+    """
+    if cgroup.controller() is None:
+        return False, (
+            "runs have no memory or process limit: no delegated cgroup (start the worker "
+            "where the systemd of the user answers; see the README)"
+        )
+    budget = f"{memory // MiB} MiB" if memory else "the profile's default memory"
+    return True, f"each run in a cgroup of its own, with {budget}"
 
 
 def _bytes(text: str, option: str) -> int:
@@ -239,4 +271,11 @@ def _log(line: str) -> None:
 
 
 def main() -> None:
+    if "--help" not in sys.argv:
+        # Every command grades. Under a scope with Delegate=yes, each run
+        # gets a cgroup with its memory and process limits.
+        cgroup.reexec_delegated()
+        # Before any thread or process: the setup of the cgroups gives up
+        # when the delegated cgroup has other processes.
+        cgroup.controller()
     app()

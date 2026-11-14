@@ -28,16 +28,47 @@ Each question is prepared once, by the first job that needs it; the other
 jobs of the question wait for it. A cache directory serves one worker at a
 time: a second worker on the same `--cache-dir` refuses to start.
 
-`--memory` is the budget of one job. A job starts only while the available
-memory of the machine (`MemAvailable`), less `--memory-reserve`, holds it on
-top of the budgets of the jobs in progress, so the slots in use shrink when
-memory runs short. In Elm the budget caps node's heap (`NODE_OPTIONS`), so
-an answer that allocates without end crashes on its own and errs every case;
-`elm-test` runs with one worker thread, since the worker already grades one
-answer per core. Other processes of a run have no memory limit yet: a
-per-run cgroup is proposed in chalk-grader. Do not run the worker inside a
-`systemd-run --scope -p MemoryMax=...`: when the scope runs out of memory,
-systemd stops all of it, the worker included.
+`--memory` is the memory of each run of a job (default 512 MiB; the build
+and the tests are runs of their own). It is also the budget of the job when
+starting jobs: a job starts only while the available memory of the machine
+(`MemAvailable`), less `--memory-reserve`, holds it on top of the budgets of
+the jobs in progress, so the slots in use shrink when memory runs short.
+`--memory 0` leaves the profile's default (512 MiB in Elm) and does not look
+at the available memory.
+
+### Limits of the runs
+
+With a delegated cgroup v2, each run gets a cgroup of its own (chalk-grader
+0.3 or later): `memory.max` is `--memory`, without swap, with a process limit,
+and the whole run is killed when it goes past them, without touching the
+worker or the other runs. An answer that allocates without end gets
+`resource-limit` in every case, with "The answer used more than N MiB of
+memory.". In Elm, `--memory` is also node's heap, and `elm-test` runs with one
+worker thread, since the worker already grades one answer per core.
+
+The worker gets the cgroup by running itself again, on start, under
+`systemd-run --user --scope -p Delegate=yes`, so it needs the systemd of the
+user. A desktop session has it. Over ssh, it lives only while the user has a
+session, unless lingering is on:
+
+```sh
+loginctl enable-linger $USER
+```
+
+The worker says which case holds when it starts (in the log, or in the title
+of the UI: `run limits on` or `NO run limits`). Without the systemd of the
+user (ssh without lingering, cron, a container) or without cgroup v2, runs
+have no memory or process limit: the budget is only node's heap in Elm, so
+an answer that allocates without end crashes node and errs every case, and
+the other processes of a run are not limited. There is no `RLIMIT_AS`
+fallback: node does not start with an address space below about 1.4 GiB.
+
+When the system's OOM killer (not the run's own limit) kills a run twice,
+or the run cannot be started in its cgroup, the answer is not graded: the job
+goes back to the queue spending one of its retries, the log says why, and,
+after an OOM kill, the worker waits before claiming again. Do not run the
+worker inside a `systemd-run --scope -p MemoryMax=...`: when that scope runs
+out of memory, systemd stops all of it, the worker included.
 
 On a terminal the worker shows a UI ([Textual](https://textual.textualize.io/))
 with the slots, the jobs finished and the log; `p` pauses and resumes the
@@ -62,13 +93,16 @@ How a job is graded:
    returns to the queue. A run that leaves no test report is graded again
    with the reference solution: when that still passes, the answer crashed
    the test runner (e.g. `Debug.todo` in a top-level value) and every case
-   is an `error`; otherwise it is a failure of the infrastructure.
+   is an `error`; otherwise it is a failure of the infrastructure. A run
+   that goes past its memory is `resource-limit` in every case (see Limits
+   of the runs).
 4. When the project cannot be built (a package download fails, a tool is
    missing), the jobs of the question go back to the queue without spending
    their retries and the worker waits before claiming again; `--once` stops
-   claiming there. A
-   reference solution that fails a test spends the retries of every job of
-   the question, so the instructor sees them as failed.
+   claiming there. The same holds when the system kills the run of the
+   reference solution. A reference solution that fails a test, or that goes
+   past `--memory`, spends the retries of every job of the question, so the
+   instructor sees them as failed.
 
 Test sources of an Elm question may be written as examples instead of a test
 module: a fenced block (no `origin`) of format `elm` with no `module` header.
@@ -113,4 +147,12 @@ uv run ruff check && uv run pytest
 ```
 
 The Elm tests download packages on the first run and are skipped without
-`elm`, `elm-test` and `node`. `example/` holds a course with one question.
+`elm`, `elm-test` and `node`. The tests of the cgroups (`tests/test_cgroup.py`)
+need a delegated scope and the pytest of the virtualenv, not `uv run` (uv
+would share the scope):
+
+```sh
+systemd-run --user --scope --quiet --collect -p Delegate=yes \
+    .venv/bin/python -m pytest tests/test_cgroup.py
+```
+ `example/` holds a course with one question.

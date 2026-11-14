@@ -99,6 +99,20 @@ def test_timeout_of_the_whole_run_times_out_every_case() -> None:
     assert len(report.cases) == 4
 
 
+def test_memory_limit_of_the_run_limits_every_case() -> None:
+    feedback = "The answer used more than 512 MiB of memory."
+    report = run(Graded(dq.MemoryLimit(), feedback=feedback), None)
+    assert report.status == "completed"
+    assert set(verdicts(report).values()) == {"resource-limit"}
+    assert {c.message for c in report.cases} == {feedback}
+    assert len(report.cases) == 4
+
+
+def test_memory_limit_without_feedback_says_so() -> None:
+    report = run(Graded(dq.MemoryLimit()), None)
+    assert {c.message for c in report.cases} == {"memory limit exceeded"}
+
+
 def test_infrastructure_error_is_a_runner_error() -> None:
     report = run(Graded(dq.Error(), feedback="sandbox died"), None)
     assert report.status == "runner-error"

@@ -73,3 +73,9 @@ sem trava.
   `prepare`, que antes rodava sem renovação.
 - Estado em `chalk_worker/status.py`, lido pela TUI (`chalk_worker/tui.py`,
   Textual) a cada 0,25 s; `p` pausa as reservas, `q` para.
+- Memória (2026-11-14): cada envio conta `--memory` na admissão por
+  `MemAvailable` (menos `--memory-reserve`). Com o `chalk-grader` 0.3, cada
+  execução roda num cgroup próprio com `memory.max` = `--memory` (o worker se
+  reexecuta sob `systemd-run --user --scope -p Delegate=yes`); o paliativo
+  `profile_overrides` saiu. Ver a fase 4 do RFC
+  `dev/rfc/limites-de-memoria-e-processos-por-correcao.md` do chalk.

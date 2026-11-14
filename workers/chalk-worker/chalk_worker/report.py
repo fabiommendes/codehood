@@ -39,6 +39,10 @@ MAX_MESSAGE = 2000
 #: Message of every case when the answer crashed the test runner.
 CRASHED = "the tests did not run: the answer compiles but crashes when loaded"
 
+#: Message of every case when the run went past its memory, if chalk-grader
+#: says nothing (it says "The answer used more than N MiB of memory.").
+MEMORY_LIMIT = "memory limit exceeded"
+
 #: Lines of compiler progress that say nothing about the answer.
 _PROGRESS = re.compile(
     r"^\s*$|^(Starting downloads|Verifying dependencies|Dependencies ready|Compiling \.\.\.)"
@@ -81,6 +85,10 @@ def to_report(run: Run, question: CodeQuestion, answer: str) -> RunnerReport:
         return RunnerReport(status="build-error", cases=[], build=build, **base)
     if score == dq.Timeout():
         cases = _cases(run, question, lambda _: ("timeout", "time limit exceeded"))
+        return RunnerReport(status="completed", cases=cases, **base)
+    if score == dq.MemoryLimit():
+        message = (graded.feedback or "").strip() or MEMORY_LIMIT
+        cases = _cases(run, question, lambda _: ("resource-limit", message[:MAX_MESSAGE]))
         return RunnerReport(status="completed", cases=cases, **base)
     if run.crashed:
         detail = (graded.feedback or "").strip()

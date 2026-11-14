@@ -16,6 +16,14 @@ português.
 uv run ruff check && uv run pytest
 ```
 
+Os testes de cgroup (`tests/test_cgroup.py`) só rodam num escopo delegado,
+com o pytest do venv direto (o `uv run` dividiria o escopo):
+
+```sh
+systemd-run --user --scope --quiet --collect -p Delegate=yes \
+    .venv/bin/python -m pytest tests/test_cgroup.py
+```
+
 ## Contexto
 
 - Repositório próprio, incluído no codehood como subtree em

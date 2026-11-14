@@ -44,16 +44,16 @@ wheels = [
 
 [[package]]
 name = "chalk-grader"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gitignore-lib" },
     { name = "pydantic" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/2a/a056814eb36ee8b4e4b74f5f3e9e4d64120a18d6ab33b534ccbff547c619/chalk_grader-0.2.0.tar.gz", hash = "sha256:66994c2347bf52417e68882eaf7593f200dfa8fdf49419cbf1c3694f2595c8d3", size = 49882, upload-time = "2026-11-13T03:33:03.214Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/d7/9a0d91c16788480c6eb7970e8fc7880b6836b1a04e37b1dfaae26419d278/chalk_grader-0.3.0.tar.gz", hash = "sha256:1bf28370599e0a2541ffe90023a9be4c6064eeb8fc6f13f908195f3b85bf25e1", size = 57972, upload-time = "2026-11-14T17:58:31.231Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/6f/7e0c323ea751fb04a5ded476298f6715d66ba09ca07786972018f4b0c3ea/chalk_grader-0.2.0-py3-none-any.whl", hash = "sha256:ffebd91bf0ff453b068c3750558af2006779fefd02dcb99cb4d59a0b36019fa6", size = 60663, upload-time = "2026-11-13T03:33:01.976Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/1d/31d1207d8103e66f2529f5996031f627a713d309762cb1d8e0bf389c1b65/chalk_grader-0.3.0-py3-none-any.whl", hash = "sha256:b671b9216b5f11a73175a77fb4502e70bd0cc2725fbaa113a0d9c4a6ff73f047", size = 69167, upload-time = "2026-11-14T17:58:30.192Z" },
 ]
 
 [[package]]
@@ -75,7 +75,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "chalk-grader", specifier = ">=0.2.0" },
+    { name = "chalk-grader", specifier = ">=0.3.0" },
     { name = "codehood-cli", editable = "../../cli" },
     { name = "textual", specifier = ">=8.2" },
     { name = "typer", specifier = ">=0.27.2" },
@@ -241,7 +241,7 @@ wheels = [
 
 [[package]]
 name = "mdq"
-version = "0.2.1"
+version = "0.2.0"
 source = { editable = "../../../mdq/mdq-py" }
 dependencies = [
     { name = "linkify-it-py" },

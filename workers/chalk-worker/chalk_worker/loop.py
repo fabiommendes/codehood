@@ -22,6 +22,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Protocol
 
 import httpx
+from chalk_grader.script_runner import RunError, RunKilled
 from mdq.models import CodeQuestion, RunnerReport
 
 from .client import ApiError, Conflict
@@ -309,6 +310,15 @@ class Worker:
             self.status.update(slot, phase="grading")
             try:
                 report = grader.grade(job.answer)
+            except RunError as e:
+                # Not the answer's fault: the job goes back to the queue,
+                # spending one of its retries, and the student gets no grade.
+                self._fail(submission, f"not graded, the run failed on this machine: {e}")
+                if isinstance(e, RunKilled):
+                    # The machine is short of memory: wait before claiming more.
+                    with self._lock:
+                        self._backoff = True
+                return ("failed", None)
             except Exception as e:  # the sandbox, the profile or the disk
                 self._fail(submission, f"{type(e).__name__}: {e}")
                 return ("failed", None)
