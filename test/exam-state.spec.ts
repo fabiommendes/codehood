@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fc from "fast-check";
 import type { ExamResult, QuestionOutcomeStatus } from "@/services/exam-result";
+import * as examState from "@/services/exam-state";
 import {
 	type AttemptTiming,
 	answeredAfterDeadline,
@@ -1212,4 +1213,70 @@ test("answeredAfterDeadline: only an answer strictly after the deadline is late"
 	).toBe(true);
 	expect(answeredAfterDeadline(deadline, deadline)).toBe(false);
 	expect(answeredAfterDeadline(null, deadline)).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// attachmentsOpen
+
+test("B1: attachmentsOpen is false for a draft and an archived exam, even after the date", () => {
+	for (const status of ["DRAFT", "ARCHIVED"] as const) {
+		const exam = timed({ status });
+		expect(examState.attachmentsOpen(exam, null, at(-60))).toBe(false);
+		expect(examState.attachmentsOpen(exam, null, at(30))).toBe(false);
+		expect(examState.attachmentsOpen(exam, null, at(600))).toBe(false);
+	}
+});
+
+test("B2: a scheduled exam opens its attachments on the date and keeps them after the window", () => {
+	const exam = timed();
+	expect(
+		examState.attachmentsOpen(exam, null, new Date(START.getTime() - 1)),
+	).toBe(false);
+	expect(examState.attachmentsOpen(exam, null, START)).toBe(true);
+	expect(examState.attachmentsOpen(exam, null, at(60))).toBe(true);
+	expect(examState.attachmentsOpen(exam, null, at(600))).toBe(true);
+});
+
+test("B2: a scheduled exam without a date never opens its attachments", () => {
+	const exam = timed({ scheduledAt: null });
+	expect(examState.attachmentsOpen(exam, null, at(-60))).toBe(false);
+	expect(examState.attachmentsOpen(exam, null, at(600))).toBe(false);
+});
+
+test("B3: an exception that postpones the date keeps the attachments closed for that student only", () => {
+	const exam = timed();
+	const makeup: ExceptionTiming = { extraTime: null, scheduledAt: at(24 * 60) };
+
+	expect(examState.attachmentsOpen(exam, null, at(30))).toBe(true);
+	expect(examState.attachmentsOpen(exam, makeup, at(30))).toBe(false);
+	expect(examState.attachmentsOpen(exam, makeup, at(24 * 60 - 1))).toBe(false);
+	expect(examState.attachmentsOpen(exam, makeup, at(24 * 60))).toBe(true);
+});
+
+test("B3: an exception that moves the date earlier opens the attachments earlier for that student", () => {
+	const exam = timed();
+	const early: ExceptionTiming = { extraTime: null, scheduledAt: at(-60) };
+
+	expect(examState.attachmentsOpen(exam, null, at(-30))).toBe(false);
+	expect(examState.attachmentsOpen(exam, early, at(-30))).toBe(true);
+});
+
+test("B4: a practice exam and an ongoing exam have open attachments", () => {
+	expect(
+		examState.attachmentsOpen(
+			timed({ type: "PRACTICE", scheduledAt: null }),
+			null,
+			at(0),
+		),
+	).toBe(true);
+	expect(
+		examState.attachmentsOpen(
+			timed({ status: "ONGOING", scheduledAt: null }),
+			null,
+			at(0),
+		),
+	).toBe(true);
+	expect(
+		examState.attachmentsOpen(untimed({ status: "ONGOING" }), null, at(600)),
+	).toBe(true);
 });

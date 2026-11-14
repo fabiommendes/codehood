@@ -108,6 +108,21 @@ export function examPhase(exam: ExamTiming, now: Date): ExamPhase {
 	return isPastWindow(exam, now) ? "closed" : "open";
 }
 
+/**
+ * Whether the student holding `exception` may see and download the attachments of `exam` at `now`.
+ *
+ * True once the exam is `open` for them and after it `closed`, so a draft,
+ * an archived or a not yet opened exam keeps them back.
+ */
+export function attachmentsOpen(
+	exam: BaseTiming,
+	exception: ExceptionTiming | null,
+	now: Date,
+): boolean {
+	const phase = examPhase(personalTiming(exam, exception), now);
+	return phase === "open" || phase === "closed";
+}
+
 /// The length of the answering window, `duration + extraTime`, or `null` when untimed.
 function windowMs(exam: ExamTiming): number | null {
 	if (!exam.duration) return null;

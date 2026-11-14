@@ -15,13 +15,14 @@ import { InvalidData, NotAllowed, NotFound } from "@/core/error";
 import type { QuestionRefId } from "@/core/schemas";
 import {
 	codeQuestionMeta,
-	questionCreate,
+	questionAttachmentPK,
 	questionFilter,
 	questionFindOneFilter,
+	questionFullSchema,
 	questionPK,
 	questionPublicSchema,
-	questionSchema,
-	questionUpdate,
+	questionWriteCreate,
+	questionWriteUpdate,
 } from "@/core/schemas";
 import type { ServiceOpts, ServiceOptsWithoutTx } from "@/db/base-service";
 import {
@@ -40,11 +41,27 @@ import {
 	withIds,
 } from "@/mdq";
 import { upgradeLegacyQuestion } from "@/mdq/legacy";
+import {
+	assertBlobsMatch,
+	assertFencedWithinLimit,
+	filesColumn,
+	type QuestionFiles,
+	resolveFiles,
+	sameFiles,
+} from "@/services/question-files";
 import { type QuestionStatus, writable } from "@/services/question-status";
 import type { JSONValue } from "@/typing/concrete-types";
+import { mimeFor } from "@/utils/mime";
 import { type PretestSource, pretestSources } from "@/utils/pretest-sources";
-import type { Prisma, PrismaTx } from "../client";
+import {
+	type Prisma,
+	type PrismaClient,
+	type PrismaTx,
+	prisma,
+} from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
+import type { AttachmentService } from "./attachment.service";
+import type { BlobService } from "./blob.service";
 import { courseContentsWhere } from "./course.service";
 
 export { questionStatus, questionType } from "@/core/schemas";
@@ -53,14 +70,16 @@ export type { QuestionRefId };
 //
 // Type definitions
 //
-export type Question = z.infer<typeof questionSchema>;
+export type Question = z.infer<typeof questionFullSchema>;
 export type QuestionPublic = z.infer<typeof questionPublicSchema>;
-export type QuestionCreate = z.infer<typeof questionCreate>;
+export type QuestionCreate = z.infer<typeof questionWriteCreate>;
 export type QuestionFilter = z.infer<typeof questionFilter>;
 export type QuestionPK = z.infer<typeof questionPK>;
 /// A primary key plus the stored version to read, as `findOne` takes it.
 export type QuestionFindOneFilter = z.infer<typeof questionFindOneFilter>;
-export type QuestionUpdate = z.infer<typeof questionUpdate>;
+export type QuestionUpdate = z.infer<typeof questionWriteUpdate>;
+/// A question attachment to download: the question and the version label.
+export type QuestionAttachmentPK = z.infer<typeof questionAttachmentPK>;
 
 /** What a read returns: the authored document, or the student-safe half. */
 export type QuestionView = Question | QuestionPublic;
@@ -92,6 +111,7 @@ function questionInclude<Private extends boolean = false>(
 				versionHash: true,
 				publicPayload: true,
 				privatePayload: includePrivate,
+				files: includePrivate,
 			},
 		},
 		questionTags: { select: { tag: true } },
@@ -115,6 +135,7 @@ function findPinnedVersion(
 	versionHash: string;
 	publicPayload: Prisma.JsonValue;
 	privatePayload: Prisma.JsonValue;
+	files: Prisma.JsonValue;
 } | null>;
 function findPinnedVersion(
 	tx: PrismaTx,
@@ -135,11 +156,12 @@ async function findPinnedVersion(
 			versionHash: true,
 			publicPayload: true,
 			privatePayload: includePrivate,
+			files: includePrivate,
 		},
 	});
 }
 
-const questionView = questionSchema.or(questionPublicSchema);
+const questionView = questionFullSchema.or(questionPublicSchema);
 
 /// The CRUD shape of the question service.
 type QuestionT = {
@@ -150,454 +172,537 @@ type QuestionT = {
 	update: QuestionUpdate;
 };
 
-const buildQuestionService = defineService<QuestionT>()(() => {
-	/**
-	 * Creates a question and its first version, or revives an archived one
-	 * under the same slug.
-	 */
-	const create = op({
-		args: [questionCreate],
-		returns: questionSchema,
-		run: async (
-			tx: PrismaTx,
-			input: QuestionCreate,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Question> => {
-			assertWellFormed(input.question);
-			const course = await writableCourse(tx, input.course, opts.actor);
+/// What the question service needs besides the database: the ledger of attachments and the byte store.
+type Deps = { attachments: AttachmentService; blob: BlobService };
 
-			const archived = await tx.questionRef.findFirst({
-				where: { courseId: course.id, slug: input.slug, status: "ARCHIVED" },
-				select: { id: true, slug: true },
-			});
-			if (archived) return applyWrite(tx, archived, input, {});
+const buildQuestionService = (deps: Deps) =>
+	defineService<QuestionT>()(() => {
+		/**
+		 * Creates a question and its first version, or revives an archived one
+		 * under the same slug.
+		 */
+		const create = op({
+			args: [questionWriteCreate],
+			returns: questionFullSchema,
+			run: async (
+				tx: PrismaTx,
+				input: QuestionCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Question> => {
+				assertWellFormed(input.question);
+				const course = await writableCourse(tx, input.course, opts.actor);
 
-			const row = await tx.questionRef.create({
-				data: {
-					publicId: generateToken(9),
-					slug: input.slug,
-					status: input.status,
-					type: toDbType(input.question.type),
-					courseId: course.id,
-				},
-			});
-			return applyWrite(tx, row, input, {});
-		},
-	});
+				const archived = await tx.questionRef.findFirst({
+					where: { courseId: course.id, slug: input.slug, status: "ARCHIVED" },
+					select: { id: true, slug: true },
+				});
+				if (archived)
+					return applyWrite(tx, deps, archived, input, opts.actor, {});
 
-	/**
-	 * Finds a question by id, public id, or its `(course, slug)` natural key.
-	 *
-	 * `filter.public` picks the view (see `questionFindOneQuery`); asking for
-	 * the whole document without the right to see it throws `NotAllowed`, and
-	 * a draft, hidden or archived question is `null` for anyone but its author.
-	 *
-	 * `filter.version` picks the stored version by its `versionHash`, as an
-	 * exam pins it; left out or `null`, the read returns the latest. Every
-	 * field of the result but `question` and `version` describes the
-	 * question as it is now (status, rev, timestamps). A version the question
-	 * never had falls back to the latest.
-	 */
-	const findOne = op({
-		transaction: false,
-		args: [questionFindOneFilter],
-		returns: questionView.nullable(),
-		run: async (
-			tx: PrismaTx,
-			filter: QuestionFindOneFilter,
-			opts: ServiceOptsWithoutTx,
-		): Promise<QuestionView | null> => {
-			// Resolved with the public-safe include: at this point `actor` hasn't
-			// been checked against the course, so `latest.privatePayload` must not
-			// be in the query yet.
-			const row = await tx.questionRef.findFirst({
-				where: refWhere(filter),
-				include: questionInclude(),
-			});
+				const row = await tx.questionRef.create({
+					data: {
+						publicId: generateToken(9),
+						slug: input.slug,
+						status: input.status,
+						type: toDbType(input.question.type),
+						courseId: course.id,
+					},
+				});
+				return applyWrite(tx, deps, row, input, opts.actor, {});
+			},
+		});
 
-			if (!row) return null;
+		/**
+		 * Finds a question by id, public id, or its `(course, slug)` natural key.
+		 *
+		 * `filter.public` picks the view (see `questionFindOneQuery`); asking for
+		 * the whole document without the right to see it throws `NotAllowed`, and
+		 * a draft, hidden or archived question is `null` for anyone but its author.
+		 *
+		 * `filter.version` picks the stored version by its `versionHash`, as an
+		 * exam pins it; left out or `null`, the read returns the latest. Every
+		 * field of the result but `question` and `version` describes the
+		 * question as it is now (status, rev, timestamps). A version the question
+		 * never had falls back to the latest.
+		 */
+		const findOne = op({
+			transaction: false,
+			args: [questionFindOneFilter],
+			returns: questionView.nullable(),
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionFindOneFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<QuestionView | null> => {
+				// Resolved with the public-safe include: at this point `actor` hasn't
+				// been checked against the course, so `latest.privatePayload` must not
+				// be in the query yet.
+				const row = await tx.questionRef.findFirst({
+					where: refWhere(filter),
+					include: questionInclude(),
+				});
 
-			// An outsider is refused whatever the status, so a hidden slug cannot
-			// be told from a published one; a draft, hidden or archived question
-			// is missing for a non-author, unless an exam still pins it.
-			const access = questionAccess(opts.actor, row, await isPinned(tx, row));
-			const error = accessError(access, "read", "question.read");
-			if (error instanceof NotFound) return null;
-			if (error) throw error;
+				if (!row) return null;
 
-			const full = access === "write";
-			if (filter.public === false && !full) {
-				throw new NotAllowed("question.read");
-			}
-			if (filter.public || !full) {
+				// An outsider is refused whatever the status, so a hidden slug cannot
+				// be told from a published one; a draft, hidden or archived question
+				// is missing for a non-author, unless an exam still pins it.
+				const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+				const error = accessError(access, "read", "question.read");
+				if (error instanceof NotFound) return null;
+				if (error) throw error;
+
+				const full = access === "write";
+				if (filter.public === false && !full) {
+					throw new NotAllowed("question.read");
+				}
+				if (filter.public || !full) {
+					const pinned = await findPinnedVersion(
+						tx,
+						row.id,
+						filter.version,
+						false,
+					);
+					return fromDbPublic(
+						pinned ? ({ ...row, latest: pinned } as typeof row) : row,
+					);
+				}
+
+				// Only now, with the full view granted, does the query touching
+				// `privatePayload` get sent.
 				const pinned = await findPinnedVersion(
 					tx,
 					row.id,
 					filter.version,
-					false,
+					true,
 				);
-				return fromDbPublic(
-					pinned ? ({ ...row, latest: pinned } as typeof row) : row,
-				);
-			}
-
-			// Only now, with the full view granted, does the query touching
-			// `privatePayload` get sent.
-			const pinned = await findPinnedVersion(tx, row.id, filter.version, true);
-			const fullRow = valueOrNotFound(
-				"question",
-				await tx.questionRef.findUnique({
-					where: { id: row.id },
-					include: pinned
-						? { ...questionInclude(true), latest: false }
-						: questionInclude(true),
-				}),
-			);
-			return fromDb(
-				pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
-			);
-		},
-	});
-
-	/**
-	 * What a student's page needs to show a code question beyond its public form: the pretest sources, and whether answers go to a worker.
-	 *
-	 * Read access is the one of `findOne`, but the sources come from the private
-	 * document: only what `pretestSources` lets out leaves the service, never the
-	 * answer key or a hidden test. Any other type, or a question the actor
-	 * cannot read, has no sources and no worker.
-	 */
-	const codeAnswer = op({
-		transaction: false,
-		args: [questionFindOneFilter],
-		returns: z.object({
-			pretests: z.array(z.object({ format: z.string(), text: z.string() })),
-			sendable: z.boolean(),
-		}),
-		run: async (
-			tx: PrismaTx,
-			filter: QuestionFindOneFilter,
-			opts: ServiceOptsWithoutTx,
-		): Promise<CodeAnswerContext> => {
-			const none = { pretests: [], sendable: false };
-			const row = await tx.questionRef.findFirst({
-				where: refWhere(filter),
-				include: questionInclude(),
-			});
-			if (!row) return none;
-			const access = questionAccess(opts.actor, row, await isPinned(tx, row));
-			const error = accessError(access, "read", "question.read");
-			if (error instanceof NotFound) return none;
-			if (error) throw error;
-
-			const pinned = await findPinnedVersion(tx, row.id, filter.version, true);
-			const fullRow = valueOrNotFound(
-				"question",
-				await tx.questionRef.findUnique({
-					where: { id: row.id },
-					include: pinned
-						? { ...questionInclude(true), latest: false }
-						: questionInclude(true),
-				}),
-			);
-			const { question } = fromDb(
-				pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
-			);
-			if (question.type !== "code") return none;
-			return {
-				pretests: pretestSources(question),
-				sendable: workerColumns(question).worker !== null,
-			};
-		},
-	});
-
-	/**
-	 * Lists the questions of one course, narrowed to what `actor` may see.
-	 *
-	 * `filter.public` picks the view, as in `findOne`.
-	 */
-	const findMany = op({
-		transaction: false,
-		args: [questionFilter],
-		returns: questionView.array(),
-		run: async (
-			tx: PrismaTx,
-			filter: QuestionFilter,
-			opts: ServiceOptsWithoutTx,
-		): Promise<QuestionView[]> => {
-			const course = valueOrNotFound(
-				"course",
-				await tx.course.findUnique({
-					where: courseRefWhere(filter.course),
-					select: {
-						id: true,
-						instructor: { select: { username: true } },
-						enrollments: {
-							where: { status: "ACTIVE" as const },
-							select: { username: true },
-						},
-					},
-				}),
-			);
-
-			if (!hasPerm(opts.actor, "course.read-contents", course)) {
-				throw new NotAllowed("question.read");
-			}
-
-			const full = hasPerm(opts.actor, "course.update-contents", course);
-			const isPublic = filter.public ?? !full;
-			if (filter.public === false && !full) {
-				throw new NotAllowed("question.read");
-			}
-
-			const where = {
-				AND: [
-					questionWhere(opts.actor, isPublic),
-					{
-						courseId: course.id,
-						...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
-						...(filter.statuses ? { status: { in: filter.statuses } } : {}),
-						...(filter.types
-							? { type: { in: filter.types.map(toDbType) } }
-							: {}),
-						...(filter.tags
-							? { questionTags: { some: { tag: { in: filter.tags } } } }
-							: {}),
-					},
-				],
-			} satisfies Prisma.QuestionRefWhereInput;
-
-			if (isPublic) {
-				const rows = await tx.questionRef.findMany({
-					where,
-					include: questionInclude(false),
-					orderBy: { slug: "asc" },
-				});
-				return rows.map(fromDbPublic);
-			}
-
-			const rows = await tx.questionRef.findMany({
-				where,
-				include: questionInclude(true),
-				orderBy: { slug: "asc" },
-			});
-			return rows.map(fromDb);
-		},
-	});
-
-	/**
-	 * Appends a version when `question` changes, and repoints `latest`.
-	 *
-	 * Stored versions are never rewritten: an exam may be pinned to any of
-	 * them. A `status` change alone produces no version, and an archived
-	 * question is refused, since a sync must not silently write to an archived
-	 * natural key; `create` or `upsert` revive it.
-	 */
-	const update = op({
-		args: [questionPK, questionUpdate],
-		returns: questionSchema,
-		run: async (
-			tx: PrismaTx,
-			filter: QuestionPK,
-			fields: QuestionUpdate,
-			opts: ServiceOptsWithoutTx,
-		): Promise<Question> => {
-			if ((fields.question === undefined) !== (fields.version === undefined)) {
-				throw new InvalidData({
-					[fields.question ? "version" : "question"]: [
-						{ code: "missing", message: m.errors_question_version_together() },
-					],
-				});
-			}
-			if (fields.question) assertWellFormed(fields.question);
-
-			const ref = await writableRef(
-				tx,
-				filter,
-				opts.actor,
-				"question.update",
-				opts,
-			);
-			// Before the version is stored: a stale caller must not write one.
-			await checkVersion(tx, "questionRef", { id: ref.id }, opts);
-			if (!writable(ref.status)) {
-				throw new NotAllowed("question.update", {
-					status: 409,
-					message: m.errors_question_archived({ slug: ref.slug }),
-				});
-			}
-
-			return applyWrite(tx, ref, fields, opts);
-		},
-	});
-
-	/**
-	 * Upserts a question keyed on its `(course, slug)` natural key.
-	 *
-	 * An archived question under that key takes the create branch, which
-	 * revives it.
-	 */
-	const upsert = op({
-		args: [questionCreate],
-		returns: questionSchema,
-		run: async (
-			tx: PrismaTx,
-			input: QuestionCreate,
-			opts: ServiceOptsWithoutTx,
-		): Promise<QuestionView> => {
-			// Checked up front so both branches refuse a non-author the same way,
-			// without telling them whether the question exists.
-			const course = await writableCourse(tx, input.course, opts.actor);
-
-			const existing = await tx.questionRef.findUnique({
-				where: { slug_courseId: { slug: input.slug, courseId: course.id } },
-				select: { id: true, slug: true, status: true, updatedAt: true },
-			});
-			checkExpectedUpdatedAt(
-				existing?.updatedAt ?? null,
-				opts.expectedUpdatedAt,
-			);
-			if (!existing) {
-				return create(tx, { ...input, course: course.id }, opts);
-			}
-			if (!writable(existing.status)) {
-				// The revival is a write on the row the caller just checked.
-				assertWellFormed(input.question);
-				return applyWrite(tx, existing, input, opts);
-			}
-
-			const { status, version, question, rev } = input;
-			return update(
-				tx,
-				{ course: course.id, slug: input.slug },
-				{ status, version, question, rev },
-				opts,
-			);
-		},
-	});
-
-	/**
-	 * Archives a question rather than removing it, since responses reference it.
-	 *
-	 * The row stays readable through an exam that references it, and only
-	 * `create` or `upsert` bring it back.
-	 */
-	const remove = op({
-		args: [questionPK],
-		run: async (
-			tx: PrismaTx,
-			filter: QuestionPK,
-			opts: ServiceOptsWithoutTx,
-		): Promise<void> => {
-			const ref = await writableRef(
-				tx,
-				filter,
-				opts.actor,
-				"question.delete",
-				opts,
-			);
-			await checkVersion(tx, "questionRef", { id: ref.id }, opts);
-			if (!writable(ref.status)) return;
-
-			await guardedUpdate(
-				tx,
-				"questionRef",
-				{ id: ref.id },
-				{ status: "ARCHIVED" },
-				opts,
-			);
-		},
-	});
-
-	/**
-	 * Rewrites every version stored in the 0.2 format (split halves, older mdq
-	 * fields) as the current document and its public form.
-	 *
-	 * A version already in the current format is left alone, so running it
-	 * again changes nothing. `dryRun` reports without writing. An upgraded
-	 * version is relabelled with {@link LEGACY_VERSION_SUFFIX}: its label
-	 * digested the source the old parser read, and the next push of that
-	 * unchanged source must append a version rather than clash with this one.
-	 *
-	 * @throws NotAllowed when the actor lacks `system.manage`.
-	 */
-	const upgradeLegacyVersions = op({
-		run: async (
-			tx: PrismaTx,
-			options: { dryRun?: boolean },
-			opts: ServiceOptsWithoutTx,
-		): Promise<LegacyUpgradeReport> => {
-			ensurePerm(opts.actor, "system.manage");
-			const report: LegacyUpgradeReport = {
-				upgraded: 0,
-				current: 0,
-				failed: [],
-			};
-			const rows = await tx.questionData.findMany({
-				select: {
-					id: true,
-					versionHash: true,
-					publicPayload: true,
-					privatePayload: true,
-					ref: { select: { id: true, slug: true, latestId: true } },
-				},
-				orderBy: { id: "asc" },
-			});
-			const shown = new Set<QuestionRefId>();
-			for (const row of rows) {
-				let document: QuestionDocument | null;
-				try {
-					document = upgradeLegacyQuestion(
-						row.publicPayload as JSONValue,
-						row.privatePayload as JSONValue,
-					);
-				} catch (error) {
-					report.failed.push({
-						id: row.id,
-						slug: row.ref.slug,
-						reason: error instanceof Error ? error.message : String(error),
-					});
-					continue;
-				}
-				if (!document) {
-					report.current++;
-					continue;
-				}
-				report.upgraded++;
-				if (options.dryRun) continue;
-				if (row.ref.latestId === row.id) shown.add(row.ref.id as QuestionRefId);
-				const halves = JSON.parse(
-					JSON.stringify({
-						publicPayload: publicForm(document),
-						privatePayload: document,
+				const fullRow = valueOrNotFound(
+					"question",
+					await tx.questionRef.findUnique({
+						where: { id: row.id },
+						include: pinned
+							? { ...questionInclude(true), latest: false }
+							: questionInclude(true),
 					}),
 				);
-				await tx.questionData.update({
-					where: { id: row.id },
-					data: {
-						...halves,
-						stem: document.stem,
-						versionHash: `${row.versionHash}${LEGACY_VERSION_SUFFIX}`,
-					},
-				});
-			}
-			// The read model shows the latest version only.
-			for (const id of shown) await touch(tx, "questionRef", { id }, {});
-			return report;
-		},
-	});
+				return fromDb(
+					pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
+				);
+			},
+		});
 
-	return {
-		create,
-		findOne,
-		codeAnswer,
-		findMany,
-		update,
-		upsert,
-		delete: remove,
-		upgradeLegacyVersions,
-	};
-});
+		/**
+		 * What a student's page needs to show a code question beyond its public form: the pretest sources, and whether answers go to a worker.
+		 *
+		 * Read access is the one of `findOne`, but the sources come from the private
+		 * document: only what `pretestSources` lets out leaves the service, never the
+		 * answer key or a hidden test. Any other type, or a question the actor
+		 * cannot read, has no sources and no worker.
+		 */
+		const codeAnswer = op({
+			transaction: false,
+			args: [questionFindOneFilter],
+			returns: z.object({
+				pretests: z.array(z.object({ format: z.string(), text: z.string() })),
+				sendable: z.boolean(),
+			}),
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionFindOneFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<CodeAnswerContext> => {
+				const none = { pretests: [], sendable: false };
+				const row = await tx.questionRef.findFirst({
+					where: refWhere(filter),
+					include: questionInclude(),
+				});
+				if (!row) return none;
+				const access = questionAccess(opts.actor, row, await isPinned(tx, row));
+				const error = accessError(access, "read", "question.read");
+				if (error instanceof NotFound) return none;
+				if (error) throw error;
+
+				const pinned = await findPinnedVersion(
+					tx,
+					row.id,
+					filter.version,
+					true,
+				);
+				const fullRow = valueOrNotFound(
+					"question",
+					await tx.questionRef.findUnique({
+						where: { id: row.id },
+						include: pinned
+							? { ...questionInclude(true), latest: false }
+							: questionInclude(true),
+					}),
+				);
+				const { question } = fromDb(
+					pinned ? { ...fullRow, latest: pinned } : (fullRow as DbQuestion),
+				);
+				if (question.type !== "code") return none;
+				return {
+					pretests: pretestSources(question),
+					sendable: workerColumns(question).worker !== null,
+				};
+			},
+		});
+
+		/**
+		 * Lists the questions of one course, narrowed to what `actor` may see.
+		 *
+		 * `filter.public` picks the view, as in `findOne`.
+		 */
+		const findMany = op({
+			transaction: false,
+			args: [questionFilter],
+			returns: questionView.array(),
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<QuestionView[]> => {
+				const course = valueOrNotFound(
+					"course",
+					await tx.course.findUnique({
+						where: courseRefWhere(filter.course),
+						select: {
+							id: true,
+							instructor: { select: { username: true } },
+							enrollments: {
+								where: { status: "ACTIVE" as const },
+								select: { username: true },
+							},
+						},
+					}),
+				);
+
+				if (!hasPerm(opts.actor, "course.read-contents", course)) {
+					throw new NotAllowed("question.read");
+				}
+
+				const full = hasPerm(opts.actor, "course.update-contents", course);
+				const isPublic = filter.public ?? !full;
+				if (filter.public === false && !full) {
+					throw new NotAllowed("question.read");
+				}
+
+				const where = {
+					AND: [
+						questionWhere(opts.actor, isPublic),
+						{
+							courseId: course.id,
+							...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
+							...(filter.statuses ? { status: { in: filter.statuses } } : {}),
+							...(filter.types
+								? { type: { in: filter.types.map(toDbType) } }
+								: {}),
+							...(filter.tags
+								? { questionTags: { some: { tag: { in: filter.tags } } } }
+								: {}),
+						},
+					],
+				} satisfies Prisma.QuestionRefWhereInput;
+
+				if (isPublic) {
+					const rows = await tx.questionRef.findMany({
+						where,
+						include: questionInclude(false),
+						orderBy: { slug: "asc" },
+					});
+					return rows.map(fromDbPublic);
+				}
+
+				const rows = await tx.questionRef.findMany({
+					where,
+					include: questionInclude(true),
+					orderBy: { slug: "asc" },
+				});
+				return rows.map(fromDb);
+			},
+		});
+
+		/**
+		 * Appends a version when `question` changes, and repoints `latest`.
+		 *
+		 * Stored versions are never rewritten: an exam may be pinned to any of
+		 * them. A `status` change alone produces no version, and an archived
+		 * question is refused, since a sync must not silently write to an archived
+		 * natural key; `create` or `upsert` revive it.
+		 */
+		const update = op({
+			args: [questionPK, questionWriteUpdate],
+			returns: questionFullSchema,
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionPK,
+				fields: QuestionUpdate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Question> => {
+				if (
+					(fields.question === undefined) !==
+					(fields.version === undefined)
+				) {
+					throw new InvalidData({
+						[fields.question ? "version" : "question"]: [
+							{
+								code: "missing",
+								message: m.errors_question_version_together(),
+							},
+						],
+					});
+				}
+				if (fields.question) assertWellFormed(fields.question);
+
+				const ref = await writableRef(
+					tx,
+					filter,
+					opts.actor,
+					"question.update",
+					opts,
+				);
+				// Before the version is stored: a stale caller must not write one.
+				await checkVersion(tx, "questionRef", { id: ref.id }, opts);
+				if (!writable(ref.status)) {
+					throw new NotAllowed("question.update", {
+						status: 409,
+						message: m.errors_question_archived({ slug: ref.slug }),
+					});
+				}
+
+				return applyWrite(tx, deps, ref, fields, opts.actor, opts);
+			},
+		});
+
+		/**
+		 * Upserts a question keyed on its `(course, slug)` natural key.
+		 *
+		 * An archived question under that key takes the create branch, which
+		 * revives it.
+		 */
+		const upsert = op({
+			args: [questionWriteCreate],
+			returns: questionFullSchema,
+			run: async (
+				tx: PrismaTx,
+				input: QuestionCreate,
+				opts: ServiceOptsWithoutTx,
+			): Promise<QuestionView> => {
+				// Checked up front so both branches refuse a non-author the same way,
+				// without telling them whether the question exists.
+				const course = await writableCourse(tx, input.course, opts.actor);
+
+				const existing = await tx.questionRef.findUnique({
+					where: { slug_courseId: { slug: input.slug, courseId: course.id } },
+					select: { id: true, slug: true, status: true, updatedAt: true },
+				});
+				checkExpectedUpdatedAt(
+					existing?.updatedAt ?? null,
+					opts.expectedUpdatedAt,
+				);
+				if (!existing) {
+					return create(tx, { ...input, course: course.id }, opts);
+				}
+				if (!writable(existing.status)) {
+					// The revival is a write on the row the caller just checked.
+					assertWellFormed(input.question);
+					return applyWrite(tx, deps, existing, input, opts.actor, opts);
+				}
+
+				const { status, version, question, rev, files, blobs } = input;
+				return update(
+					tx,
+					{ course: course.id, slug: input.slug },
+					{ status, version, question, rev, files, blobs },
+					opts,
+				);
+			},
+		});
+
+		/**
+		 * Archives a question rather than removing it, since responses reference it.
+		 *
+		 * The row stays readable through an exam that references it, and only
+		 * `create` or `upsert` bring it back.
+		 */
+		const remove = op({
+			args: [questionPK],
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionPK,
+				opts: ServiceOptsWithoutTx,
+			): Promise<void> => {
+				const ref = await writableRef(
+					tx,
+					filter,
+					opts.actor,
+					"question.delete",
+					opts,
+				);
+				await checkVersion(tx, "questionRef", { id: ref.id }, opts);
+				if (!writable(ref.status)) return;
+
+				await guardedUpdate(
+					tx,
+					"questionRef",
+					{ id: ref.id },
+					{ status: "ARCHIVED" },
+					opts,
+				);
+			},
+		});
+
+		/**
+		 * Rewrites every version stored in the 0.2 format (split halves, older mdq
+		 * fields) as the current document and its public form.
+		 *
+		 * A version already in the current format is left alone, so running it
+		 * again changes nothing. `dryRun` reports without writing. An upgraded
+		 * version is relabelled with {@link LEGACY_VERSION_SUFFIX}: its label
+		 * digested the source the old parser read, and the next push of that
+		 * unchanged source must append a version rather than clash with this one.
+		 *
+		 * @throws NotAllowed when the actor lacks `system.manage`.
+		 */
+		const upgradeLegacyVersions = op({
+			run: async (
+				tx: PrismaTx,
+				options: { dryRun?: boolean },
+				opts: ServiceOptsWithoutTx,
+			): Promise<LegacyUpgradeReport> => {
+				ensurePerm(opts.actor, "system.manage");
+				const report: LegacyUpgradeReport = {
+					upgraded: 0,
+					current: 0,
+					failed: [],
+				};
+				const rows = await tx.questionData.findMany({
+					select: {
+						id: true,
+						versionHash: true,
+						publicPayload: true,
+						privatePayload: true,
+						ref: { select: { id: true, slug: true, latestId: true } },
+					},
+					orderBy: { id: "asc" },
+				});
+				const shown = new Set<QuestionRefId>();
+				for (const row of rows) {
+					let document: QuestionDocument | null;
+					try {
+						document = upgradeLegacyQuestion(
+							row.publicPayload as JSONValue,
+							row.privatePayload as JSONValue,
+						);
+					} catch (error) {
+						report.failed.push({
+							id: row.id,
+							slug: row.ref.slug,
+							reason: error instanceof Error ? error.message : String(error),
+						});
+						continue;
+					}
+					if (!document) {
+						report.current++;
+						continue;
+					}
+					report.upgraded++;
+					if (options.dryRun) continue;
+					if (row.ref.latestId === row.id)
+						shown.add(row.ref.id as QuestionRefId);
+					const halves = JSON.parse(
+						JSON.stringify({
+							publicPayload: publicForm(document),
+							privatePayload: document,
+						}),
+					);
+					await tx.questionData.update({
+						where: { id: row.id },
+						data: {
+							...halves,
+							stem: document.stem,
+							versionHash: `${row.versionHash}${LEGACY_VERSION_SUFFIX}`,
+						},
+					});
+				}
+				// The read model shows the latest version only.
+				for (const id of shown) await touch(tx, "questionRef", { id }, {});
+				return report;
+			},
+		});
+
+		/**
+		 * The bytes, mime type and name of the attachment `name` of a question, at
+		 * the version `pk.version` or the latest.
+		 *
+		 * Only whoever reads the whole question may download it; a student gets
+		 * the attachments through the exam that pins the version. A fenced
+		 * attachment is served from the document, a link from the blob of `files`.
+		 *
+		 * @throws {@link NotFound} If the question, the version or the attachment
+		 * does not exist, or the actor may not read the whole question.
+		 */
+		const attachment = op({
+			transaction: false,
+			args: [questionAttachmentPK, z.string()],
+			run: async (
+				tx: PrismaTx,
+				pk: QuestionAttachmentPK,
+				name: string,
+				opts: ServiceOptsWithoutTx,
+			): Promise<{ bytes: Buffer; mimeType: string; filename: string }> => {
+				const notFound = () => new NotFound("attachment");
+				const ref = await tx.questionRef.findFirst({
+					where: { publicId: pk.publicId },
+					include: questionInclude(),
+				});
+				if (
+					!ref ||
+					questionAccess(opts.actor, ref, await isPinned(tx, ref)) !== "write"
+				) {
+					throw notFound();
+				}
+
+				const version = await tx.questionData.findFirst({
+					where: pk.version
+						? { refId: ref.id, versionHash: pk.version }
+						: { id: ref.latestId ?? -1 },
+					select: { privatePayload: true, files: true },
+				});
+				const entry = (
+					version?.privatePayload as unknown as QuestionDocument | undefined
+				)?.attachments?.find((a) => a.name === name);
+				if (!version || !entry) throw notFound();
+
+				if (entry.text !== undefined) {
+					return {
+						bytes: Buffer.from(entry.text, "utf-8"),
+						mimeType: "text/plain; charset=utf-8",
+						filename: entry.name,
+					};
+				}
+				const hash = (version.files as QuestionFiles | null)?.[name];
+				const stored = hash
+					? await tx.blob.findUnique({ where: { hash } })
+					: null;
+				const bytes = stored && (await deps.blob.readBlob(stored));
+				if (!bytes) throw notFound();
+				return { bytes, mimeType: mimeFor(entry.name), filename: entry.name };
+			},
+		});
+
+		return {
+			create,
+			findOne,
+			codeAnswer,
+			attachment,
+			findMany,
+			update,
+			upsert,
+			delete: remove,
+			upgradeLegacyVersions,
+		};
+	});
 
 /// Appended to the label of a version rewritten by `upgradeLegacyVersions`.
 export const LEGACY_VERSION_SUFFIX = "+from-0.2";
@@ -616,7 +721,7 @@ export type CodeAnswerContext = {
 };
 
 /// The service `buildQuestionService` makes, with `findOne` and `findMany` overloaded on `filter.public` to narrow the view they return.
-type QuestionServiceBuilt = ReturnType<typeof buildQuestionService>;
+type QuestionServiceBuilt = ReturnType<ReturnType<typeof buildQuestionService>>;
 
 /** The question service, as built by {@link makeQuestionService}. */
 export type QuestionService = Omit<
@@ -650,11 +755,19 @@ export type QuestionService = Omit<
 	};
 };
 
-/** The question service of `client` (the shared client by default). */
+/**
+ * The question service of `client` (the shared client by default), storing
+ * the bytes of link attachments through `blob` and recording their use in
+ * `attachments`.
+ */
 export const makeQuestionService = (
-	...args: Parameters<typeof buildQuestionService>
+	attachments: AttachmentService,
+	blob: BlobService,
+	client: PrismaClient = prisma,
 ): QuestionService =>
-	buildQuestionService(...args) as unknown as QuestionService;
+	buildQuestionService({ attachments, blob })(
+		client,
+	) as unknown as QuestionService;
 
 //
 // Auxiliary functions
@@ -691,6 +804,7 @@ function fromDb(row: DbQuestion): Question {
 		updatedAt: row.updatedAt,
 		// The private column holds the whole document, validated on the way in.
 		question: latest.privatePayload as unknown as QuestionDocument,
+		...(latest.files ? { files: latest.files as QuestionFiles } : {}),
 	};
 }
 
@@ -801,20 +915,31 @@ async function isPinned(
 	);
 }
 
-/** Writes `fields` onto `ref`, appending a version when `question` is given. */
+/**
+ * Writes `fields` onto `ref`, appending a version when `question` is given.
+ *
+ * The attachment rules are checked before anything is stored, and the bytes
+ * and rows of the version's links follow it in the same transaction.
+ */
 async function applyWrite(
 	tx: PrismaTx,
+	deps: Deps,
 	ref: { id: QuestionRefId; slug: string },
 	fields: QuestionUpdate,
+	actor: Actor,
 	opts: { expectedUpdatedAt?: Date | null },
 ): Promise<Question> {
 	const { question, version } = fields;
-	const latestId =
+	const files =
 		question && version
-			? await writeVersion(tx, ref, { version, question })
+			? await prepareFiles(tx, ref.id, version, question, fields)
+			: undefined;
+	const latestId =
+		question && version && files
+			? await writeVersion(tx, ref, { version, question, files })
 			: undefined;
 
-	return fromDb(
+	const written = fromDb(
 		await guardedUpdate(
 			tx,
 			"questionRef",
@@ -837,6 +962,80 @@ async function applyWrite(
 			{ include: questionInclude(true) },
 		),
 	);
+	if (files) {
+		await storeFiles(tx, deps, ref.id, files, fields.blobs ?? {}, actor);
+	}
+	return written;
+}
+
+/**
+ * The `files` the version `version` of a question will store, once every rule
+ * on them holds: see `resolveFiles`, plus that each hash is a live blob or
+ * arrives in `fields.blobs`.
+ *
+ * Without `fields.files`, the names that are still links keep the hashes of
+ * the version with the same label or, if there is none, of the latest.
+ */
+async function prepareFiles(
+	tx: PrismaTx,
+	refId: QuestionRefId,
+	version: string,
+	question: Question["question"],
+	fields: Pick<QuestionUpdate, "files" | "blobs">,
+): Promise<QuestionFiles> {
+	let inherited: QuestionFiles | null = null;
+	if (fields.files === undefined) {
+		const sameLabel = await tx.questionData.findUnique({
+			where: { refId_versionHash: { refId, versionHash: version } },
+			select: { files: true },
+		});
+		const latest =
+			sameLabel ??
+			(
+				await tx.questionRef.findUnique({
+					where: { id: refId },
+					select: { latest: { select: { files: true } } },
+				})
+			)?.latest;
+		inherited = (latest?.files as QuestionFiles | null | undefined) ?? null;
+	}
+	const files = resolveFiles(question, fields.files, inherited);
+	const blobs = fields.blobs ?? {};
+	assertBlobsMatch(blobs, files);
+
+	const unsent = [...new Set(Object.values(files))].filter(
+		(h) => !(h in blobs),
+	);
+	if (unsent.length > 0) {
+		const live = await tx.blob.findMany({
+			where: { hash: { in: unsent }, deletedAt: null },
+			select: { hash: true },
+		});
+		const present = new Set(live.map((b) => b.hash));
+		const missing = unsent.find((hash) => !present.has(hash));
+		if (missing) throw new NotFound("blob", { id: missing });
+	}
+	return files;
+}
+
+/// Stores the bytes the write sent and records, for each name of `files`, a use of its blob by the question, charging `actor`.
+async function storeFiles(
+	tx: PrismaTx,
+	deps: Deps,
+	refId: QuestionRefId,
+	files: QuestionFiles,
+	blobs: Record<string, Buffer>,
+	actor: Actor,
+): Promise<void> {
+	for (const bytes of Object.values(blobs)) {
+		await deps.blob.create({ bytes }, { tx, actor: SYSTEM });
+	}
+	for (const [filename, hash] of Object.entries(files)) {
+		await deps.attachments.attach(
+			{ hash, filename, attachedTo: { type: "QUESTION", id: refId } },
+			{ tx, actor },
+		);
+	}
 }
 
 /**
@@ -849,7 +1048,7 @@ async function applyWrite(
 async function writeVersion(
 	tx: PrismaTx,
 	ref: { id: number; slug: string },
-	input: Pick<Question, "version" | "question">,
+	input: Pick<Question, "version" | "question"> & { files: QuestionFiles },
 ): Promise<number> {
 	// The ids are written into the stored document, since responses address
 	// choices by id and grading never derives them. Round-tripped through JSON
@@ -867,12 +1066,22 @@ async function writeVersion(
 
 	const existing = await tx.questionData.findUnique({
 		where: { refId_versionHash: { refId: ref.id, versionHash: input.version } },
-		select: { id: true, publicPayload: true, privatePayload: true },
+		select: {
+			id: true,
+			publicPayload: true,
+			privatePayload: true,
+			files: true,
+		},
 	});
 
 	if (existing) {
-		const { id, ...stored } = existing;
-		if (isDeepStrictEqual(stored, halves)) return id;
+		const { id, files, ...stored } = existing;
+		if (
+			isDeepStrictEqual(stored, halves) &&
+			sameFiles(files as QuestionFiles | null, input.files)
+		) {
+			return id;
+		}
 
 		throw new NotAllowed("question.update", {
 			status: 409,
@@ -889,6 +1098,7 @@ async function writeVersion(
 			versionHash: input.version,
 			title: document.title ?? ref.slug,
 			stem: document.stem,
+			files: filesColumn(input.files),
 			...halves,
 		},
 	});
@@ -916,6 +1126,7 @@ function assertWellFormed(data: Question["question"]): void {
 			);
 		}
 	}
+	assertFencedWithinLimit(data);
 	const problems = questionProblems(data);
 	if (problems.length === 0) return;
 

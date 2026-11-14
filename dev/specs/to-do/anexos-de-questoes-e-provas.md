@@ -85,15 +85,12 @@ aluno baixe o anexo de uma prova antes de ela abrir para ele.
   O update substitui a lista: na mesma transação, cria as linhas novas e apaga
   as linhas `EXAM` cujo (hash, nome) saiu. Trocar anexo de prova aberta é
   permitido; o aluno vê a lista atual.
-- **R11.** Exclusão. O dono polimórfico não cascateia, então todo caminho que
-  apaga de vez uma `Exam` ou um `QuestionRef`, inclusive apagar o curso, chama
-  `attachment.detach` com o dono certo, no mesmo padrão que esses caminhos já
-  usam para `RESOURCE`. Hoje `course.delete` deixa a cascata agir e a coleta
-  do GC (`blob.service.ts`, `collectGarbage`) limpa as linhas órfãs: o mesmo
-  vale aqui, e a coleta precisa reconhecer órfãos `QUESTION` e `EXAM`.
-  `question.delete` e `exam.delete` só arquivam e não soltam nada: versões
-  antigas continuam baixáveis. Teste: depois de apagar o curso e rodar a
-  coleta, os blobs só dele somem e um blob citado por outro curso fica.
+- **R11.** Exclusão. Hoje nenhum caminho apaga de vez uma `Exam` ou um
+  `QuestionRef`: `question.delete` e `exam.delete` só arquivam, e
+  `course.delete` é recusado pela FK quando o curso tem prova ou questão. Por
+  isso esta spec não chama `detach`: arquivar não solta nada e as versões
+  antigas continuam baixáveis. Quem criar um caminho de exclusão definitiva
+  chama `attachment.detach` com o dono certo.
 - **R12.** Janela de anexo para o aluno: a função pura
   `attachmentsOpen(exam: ExamTiming, exception, now): boolean` em
   `src/services/exam-state.ts`, usada por R13 e R14, é
@@ -123,7 +120,9 @@ aluno baixe o anexo de uma prova antes de ela abrir para ele.
   - um anexo cercado é servido do payload como `text/plain; charset=utf-8`; um
     link, pelo blob de `files[name]`;
   - negado ou inexistente é `NotFound` (404), sem distinguir os dois;
-  - `filename` é o nome exato do MDQ, não o sanitizado. Teste com `%20`
+  - `filename` é o nome exato do MDQ, não o sanitizado. Nome fora de ASCII vai
+    no `Content-Disposition` também como `filename*` (RFC 5987), em
+    `src/utils/blob-response.ts`. Teste com `%20`
     literal no nome (`%2520` na URL), unicode e maiúsculas distintas.
 
 ### REST
@@ -175,8 +174,9 @@ aluno baixe o anexo de uma prova antes de ela abrir para ele.
   questão e calcula o sha256 de cada um. Receita da versão: os bytes dos
   anexos entram depois das fontes de `[tests]`, na ordem do documento, cada um
   precedido de `b"\0"`, como as fontes. Questão sem link mantém a versão byte a
-  byte igual à de hoje (teste). Arquivo ausente é erro do push daquela questão,
-  no estilo de `QuestionSourceError`.
+  byte igual à de hoje (teste). Arquivo ausente é `QuestionSourceError` (ou
+  irmão no mesmo estilo) e, como hoje, recusa o push inteiro antes de qualquer
+  requisição.
 - **R22.** Questão inline de prova: os links são relativos ao arquivo da prova;
   o JSON canônico que gera a versão ganha a chave `files` (mapa `nome ->
   sha256`, ordenado por nome) só quando há link, para não mudar a versão das
@@ -184,14 +184,17 @@ aluno baixe o anexo de uma prova antes de ela abrir para ele.
 - **R23.** Prova: os anexos da prova, relativos ao arquivo da prova, vão em
   `attachments` e `files`; o aviso que ignora `exam.attachments` sai. A CLI
   manda sempre os dois campos, `attachments: []` e `files: {}` quando a prova
-  não tem anexo, para que apagar a seção limpe o servidor. O mapa `files`
-  entra no `exam_rev` só quando há anexo.
+  não tem anexo, para que apagar a seção limpe o servidor. O mapa `files` e a lista
+  `attachments` entram no `exam_rev` só quando há anexo: o `rev` de uma prova
+  sem anexo não muda.
 - **R24.** Envio: um único `POST /api/blob/missing` por push com todos os
   hashes; as questões (inline e incluídas) sobem antes da prova; cada PUT vai
   em multipart com só os blobs que faltam e ainda não subiram neste push, ou em
-  JSON quando não falta nenhum. Antes de enviar, a CLI recusa localmente um
-  arquivo maior que `MAX_UPLOAD_BYTES` (16 MiB); um 413 do servidor vira erro
-  daquela questão ou prova, com o limite e o maior arquivo na mensagem.
+  JSON quando não falta nenhum. Antes de qualquer requisição, a CLI recusa
+  o push inteiro se um anexo passa de `MAX_UPLOAD_BYTES` (16 MiB), como em
+  R21. Um 413 do servidor vira erro daquela questão ou prova
+  (`OpResult(ok=False)`), com o limite e o maior arquivo na mensagem, e o push
+  segue com as outras operações.
 - **R25.** O push real contra o dev server, como pede `cli/AGENTS.md`, faz
   parte da tarefa.
 

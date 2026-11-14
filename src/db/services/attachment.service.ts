@@ -1,8 +1,13 @@
 import type { z } from "zod";
 import { SYSTEM, type UserActor } from "@/auth/actor";
 import { BLOB_QUOTA_BY_ROLE } from "@/core/constants";
-import { NotAllowed, NotFound, NotImplemented } from "@/core/error";
-import type { ReportId, RepositoryId } from "@/core/schemas";
+import { NotAllowed, NotFound } from "@/core/error";
+import type {
+	ExamId,
+	QuestionRefId,
+	ReportId,
+	RepositoryId,
+} from "@/core/schemas";
 import {
 	attachmentAttach,
 	attachmentCreate,
@@ -200,10 +205,29 @@ export function makeAttachmentService(
 				return resource && { ...resource, type: "RESOURCE" };
 			}
 			case "QUESTION": {
-				throw new NotImplemented("question attachments");
+				const question = await tx.questionRef.findUnique({
+					where: { id: raw.attachedToId as QuestionRefId },
+					select: {
+						id: true,
+						slug: true,
+						latest: { select: { title: true } },
+					},
+				});
+				return (
+					question && {
+						type: "QUESTION",
+						id: question.id,
+						slug: question.slug,
+						title: question.latest?.title ?? question.slug,
+					}
+				);
 			}
 			case "EXAM": {
-				throw new NotImplemented("exam attachments");
+				const exam = await tx.exam.findUnique({
+					where: { id: raw.attachedToId as ExamId },
+					select: { id: true, slug: true, title: true },
+				});
+				return exam && { type: "EXAM", ...exam };
 			}
 			case "REPORT": {
 				const report = await tx.report.findUnique({

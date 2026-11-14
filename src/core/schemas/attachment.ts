@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
 	attachmentId,
 	buffer,
+	examId,
 	mimeType,
 	publicId,
 	reportId,
@@ -24,6 +25,7 @@ export const attachmentSchema = z.object({
 	attachedTo: z.union([
 		z.lazy(() => attachedToResource),
 		z.lazy(() => attachedToQuestion),
+		z.lazy(() => attachedToExam),
 		z.lazy(() => attachedToReport),
 		z.lazy(() => attachedToRepository),
 	]),
@@ -33,6 +35,7 @@ export const attachmentSchema = z.object({
 export const attachmentToType = z.enum([
 	"RESOURCE",
 	"QUESTION",
+	"EXAM",
 	"REPORT",
 	"REPOSITORY",
 ]);
@@ -48,6 +51,13 @@ export const attachedToQuestion = z.object({
 	type: z.literal("QUESTION"),
 	title: z.string().min(1),
 	id: z.number().int(), //TODO: questionId
+	slug: z.string().min(1),
+});
+
+export const attachedToExam = z.object({
+	type: z.literal("EXAM"),
+	title: z.string().min(1),
+	id: examId,
 	slug: z.string().min(1),
 });
 
@@ -73,6 +83,7 @@ export const attachmentCreate = attachmentSchema
 		attachedTo: z.union([
 			attachedToResource.pick({ type: true, id: true }),
 			attachedToQuestion.pick({ type: true, id: true }),
+			attachedToExam.pick({ type: true, id: true }),
 			attachedToReport.pick({ type: true, id: true }),
 			attachedToRepository.pick({ type: true, id: true }),
 		]),

@@ -2,7 +2,8 @@ import { z } from "zod";
 import { type QuestionType as MdqQuestionType, questionDocument } from "@/mdq";
 import { publicQuestionSchema } from "@/mdq/public-schema";
 import type { AssertEqual } from "@/utils/types";
-import { questionRefId, rev, rowVersion, slug } from "./base";
+import { buffer, questionRefId, rev, rowVersion, slug } from "./base";
+import { blobHash } from "./blob";
 import { courseRef } from "./course";
 
 export const questionSchema = z.object({
@@ -34,6 +35,36 @@ export const questionCreate = questionSchema
 export const questionUpdate = questionCreate
 	.omit({ slug: true, course: true })
 	.partial();
+
+/// Map from the name of a link attachment to the sha256 of its bytes.
+export const questionFiles = z.record(z.string().min(1), blobHash);
+
+/// The authored question as the service returns it: the document plus, for the
+/// versions that have link attachments, the blob each name resolves to.
+export const questionFullSchema = questionSchema.extend({
+	files: questionFiles.optional(),
+});
+
+/// Input of a question write, with the bytes the service stores. `blobs`
+/// (sha256 to bytes) is for the REST hook that reads multipart parts: the REST
+/// schema of a write omits it.
+const questionWriteFields = {
+	files: questionFiles.optional(),
+	blobs: z.record(blobHash, buffer).optional(),
+};
+
+/// The key of a question attachment download: the question by public id, at a
+/// version label, or the latest when absent.
+export const questionAttachmentPK = z.object({
+	publicId: z.string().min(1),
+	version: z.string().min(1).nullish(),
+});
+
+/// The `questionCreate` the service takes: `files` and `blobs` on top.
+export const questionWriteCreate = questionCreate.extend(questionWriteFields);
+
+/// The `questionUpdate` the service takes: `files` and `blobs` on top.
+export const questionWriteUpdate = questionUpdate.extend(questionWriteFields);
 
 /**
  * Which view a read returns: `true` forces the public half, `false` demands

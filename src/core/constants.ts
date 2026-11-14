@@ -172,6 +172,9 @@ export const RESOURCE_ROOT = config.storage.resourceRoot;
 export const ATTACHMENT_LINK_MODE = config.storage.attachmentLinkMode;
 export type AttachmentLinkMode = typeof ATTACHMENT_LINK_MODE;
 
+/// The most the `text` of the fenced attachments of one question may sum to, in UTF-8 bytes.
+export const MAX_FENCED_ATTACHMENT_BYTES = 256 * 1024;
+
 /**
  * Total bytes each role may have attached, `null` for unlimited.
  *

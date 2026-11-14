@@ -1,6 +1,8 @@
+import { Attachment } from "mdq";
 import { z } from "zod";
 import { m } from "@/i18n";
 import {
+	buffer,
 	courseId,
 	duration,
 	examId,
@@ -10,6 +12,7 @@ import {
 	slug,
 	username,
 } from "./base";
+import { blobHash } from "./blob";
 import { courseRef } from "./course";
 import { submissionKindRequested, submissionPayload } from "./submission";
 
@@ -81,6 +84,25 @@ export const examSchema = z.object({
 	updatedAt: z.date(),
 });
 
+/// An attachment as an exam read returns it: with its `origin` for whoever writes the exam, without it for a student.
+export const examAttachmentView = z.object({
+	name: z.string().min(1),
+	format: z.string().min(1),
+	text: z.string().optional(),
+	origin: z.string().min(1).optional(),
+	label: z.string().optional(),
+});
+
+/// Map from the name of a link attachment to the sha256 of its bytes.
+export const examFiles = z.record(z.string().min(1), blobHash);
+
+/// The exam as the service returns it: `attachments` is empty for a student
+/// before the exam opens, and `files` is only there for whoever writes the exam.
+export const examFullSchema = examSchema.extend({
+	attachments: z.array(examAttachmentView).optional(),
+	files: examFiles.optional(),
+});
+
 export const examCreate = examSchema
 	.omit({
 		id: true,
@@ -114,6 +136,19 @@ export const examUpdate = examCreate
 	.omit({ slug: true, course: true })
 	.extend({ extraTime: duration.nullish() })
 	.partial();
+
+/// What an exam write carries about its attachments. `blobs` (sha256 to bytes) is for the REST hook that reads multipart parts.
+const examWriteFields = {
+	attachments: z.array(Attachment).optional(),
+	files: examFiles.optional(),
+	blobs: z.record(blobHash, buffer).optional(),
+};
+
+/// The `examCreate` the service takes: the attachments and their bytes on top.
+export const examWriteCreate = examCreate.extend(examWriteFields);
+
+/// The `examUpdate` the service takes: the attachments and their bytes on top.
+export const examWriteUpdate = examUpdate.extend(examWriteFields);
 
 export const examPK = z.union([
 	z.object({ id: examId }),
