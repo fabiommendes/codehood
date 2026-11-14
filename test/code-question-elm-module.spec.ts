@@ -171,8 +171,32 @@ test("a module with `import Main as S` runs, and an answer with no header gets o
 		timeout: 120_000,
 	});
 	await expect(page.locator("[data-verdict=fail]").first()).toBeVisible();
+	// A failing case title is bold red; a passing one is not.
+	await expect(
+		page.locator("[data-verdict=fail] [data-case-id]").first(),
+	).toHaveClass(/font-bold.*text-error/);
+	await expect(
+		page.locator("[data-verdict=pass] [data-case-id]").first(),
+	).not.toHaveClass(/text-error/);
 	await expect(page.locator("[data-verdict=pass]").first()).toBeVisible();
 
 	// The private source stays out of the page and out of the run.
 	expect(await page.content()).not.toContain("caso-privado-secreto");
+});
+
+test("a compiler error keeps its colors in the report", async ({ page }) => {
+	test.setTimeout(180_000);
+	await page.goto(await setup(page));
+	await expect(page.locator("[data-code-editor] .cm-content")).toBeVisible();
+	await write(page, "media : List Int -> Int\nmedia notas =\n    notas + )\n");
+	await page.locator("[data-action=run-pretests]").click();
+	await expect(result(page)).toHaveAttribute("data-status", "build-error", {
+		timeout: 120_000,
+	});
+	const build = result(page).locator("pre").first();
+	await expect(build.locator("span[data-ansi]").first()).toBeVisible();
+	expect(await build.innerText()).not.toContain("\x1b");
+	await expect(
+		build.locator("span[class*=text-], span[style*=color]").first(),
+	).toBeVisible();
 });

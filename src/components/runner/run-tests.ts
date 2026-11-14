@@ -8,7 +8,6 @@ import {
 	elmCases,
 	elmModule,
 	parseSuite,
-	stripAnsi,
 	withModuleHeader,
 } from "./test-report";
 
@@ -154,13 +153,13 @@ async function runSource(
 		if (exit.reason === "exited" && exit.code === 1) {
 			return {
 				kind: "report",
-				report: failed("build-error", stripAnsi(stderr).trim()),
+				report: failed("build-error", stderr.trim()),
 			};
 		}
 		return reason(
 			exit.message ??
 				(exit.reason === "exited"
-					? stripAnsi(stderr).trim() || `The runner exited with ${exit.code}.`
+					? stderr.trim() || `The runner exited with ${exit.code}.`
 					: `The runner stopped: ${exit.reason}.`),
 		);
 	} finally {

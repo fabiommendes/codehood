@@ -24,6 +24,7 @@ import {
 import { m } from "@/i18n";
 import { languageLabel } from "@/runner/languages";
 import type { PretestSource } from "@/utils/pretest-sources";
+import { AnsiText } from "../runner/AnsiText";
 import { createEditor, type RunnerEditor } from "../runner/editor";
 import { EDITOR_FOCUS_RING, EDITOR_SURFACE } from "../runner/editor-surface";
 import {
@@ -524,7 +525,7 @@ export function SendRow(props: {
 			<Show when={report()?.build}>
 				{(build) => (
 					<pre class="m-0 overflow-x-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
-						{build()}
+						<AnsiText text={build()} />
 					</pre>
 				)}
 			</Show>
@@ -597,12 +598,16 @@ function PretestResult(props: {
 			<Show when={buildMessage(summary())}>
 				{(message) => (
 					<pre class="m-0 overflow-x-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">
-						{message()}
+						<AnsiText text={message()} />
 					</pre>
 				)}
 			</Show>
 			<Show when={summary().kind === "runner-error" && props.report.message}>
-				{(message) => <p class="text-xs text-muted">{message()}</p>}
+				{(message) => (
+					<p class="text-xs text-muted whitespace-pre-wrap">
+						<AnsiText text={message()} />
+					</p>
+				)}
 			</Show>
 			<Show when={props.report.status === "completed"}>
 				<ul
@@ -651,7 +656,10 @@ function CaseRow(props: { item: ReportCase; n: number }): JSX.Element {
 			data-verdict={props.item.verdict}
 		>
 			<div class="flex items-start justify-between gap-2">
-				<span class="min-w-0 font-mono text-xs break-words">
+				<span
+					class={`min-w-0 font-mono text-xs break-words ${props.item.verdict === "pass" ? "" : "font-bold text-error"}`}
+					data-case-id
+				>
 					{props.item.id ?? m.code_case_untitled({ n: String(props.n) })}
 				</span>
 				<span
@@ -666,7 +674,7 @@ function CaseRow(props: { item: ReportCase; n: number }): JSX.Element {
 						class="m-0 overflow-x-auto rounded-box bg-base-200/60 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap text-base-content/80"
 						data-case-message
 					>
-						{message()}
+						<AnsiText text={message()} />
 					</pre>
 				)}
 			</Show>
