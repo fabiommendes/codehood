@@ -309,6 +309,29 @@ test("B6: a link without a hash and files without attachments are refused; only 
 	expect(await blobRow(h.hash)).toBeNull();
 });
 
+test("B6b: two attachments with the same name are InvalidData, storing nothing", async () => {
+	const ctx = await setup();
+	const h = blob();
+
+	const error = await refusal(
+		createExam(ctx, {
+			attachments: [NOTES, { ...NOTES, text: "other" }],
+		}),
+	);
+	const linked = await refusal(
+		createExam(ctx, {
+			slug: "dup-links",
+			attachments: [link("a.csv"), link("a.csv")],
+			files: { "a.csv": h.hash },
+			blobs: { [h.hash]: h.bytes },
+		}),
+	);
+
+	expect(error).toBeInstanceOf(InvalidData);
+	expect(linked).toBeInstanceOf(InvalidData);
+	expect(await blobRow(h.hash)).toBeNull();
+});
+
 test("B7: an update without attachments and files keeps the list, the map and the rows", async () => {
 	const ctx = await setup();
 	const { made, write } = filesFor("a.csv");

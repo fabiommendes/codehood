@@ -54,7 +54,7 @@ export function blobSecurityHeaders(): Record<string, string> {
 	};
 }
 
-/// A 404 with the blob security headers, the same for a missing and a denied file.
+/** A 404 with the blob security headers, the same for a missing and a denied file. */
 export function notFoundResponse(): Response {
 	return new Response("Not found", {
 		status: 404,

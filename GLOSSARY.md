@@ -47,11 +47,16 @@ the key's owner.
 
 Type: domain
 
-One use of a [Blob](#blob) by one owner — a [Resource](#resource) or
-[Question](#question) — carrying the filename and MIME type that use is served
-under, and the [User](#user) charged for the bytes. The owner is polymorphic,
-so a new kind of owner needs no change to blob storage. The last attachment
-leaving a blob makes it collectable.
+One use of a [Blob](#blob) by one owner — a [Resource](#resource),
+[Question](#question), [Exam](#exam), [Report](#report) or
+[Repository](#repository) — carrying the filename and MIME type that use is
+served under, and the [User](#user) charged for the bytes. The owner is
+polymorphic, so a new kind of owner needs no change to blob storage. The last
+attachment leaving a blob makes it collectable.
+
+In MDQ, an attachment is a file that a question or an exam gives to the
+student, declared in its `## [attachments]` section. A linked one is stored as
+an Attachment of the question or exam; a fenced one lives in the document.
 
 ## Attendance
 

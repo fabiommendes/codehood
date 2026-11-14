@@ -46,29 +46,6 @@ export type AttachmentPK = z.infer<typeof attachmentPK>;
 export type AttachmentUpdate = z.infer<typeof attachmentUpdate>;
 export type AttachmentToType = z.infer<typeof attachmentToType>;
 
-/**
- * Checks that every hash of `files` is a live blob or arrives in `blobs`.
- *
- * @throws {@link NotFound} With the first hash that is neither.
- */
-export async function assertBlobsAvailable(
-	tx: PrismaTx,
-	files: Record<string, string>,
-	blobs: Record<string, Buffer>,
-): Promise<void> {
-	const unsent = [...new Set(Object.values(files))].filter(
-		(hash) => !(hash in blobs),
-	);
-	if (unsent.length === 0) return;
-	const live = await tx.blob.findMany({
-		where: { hash: { in: unsent }, deletedAt: null },
-		select: { hash: true },
-	});
-	const present = new Set(live.map((b) => b.hash));
-	const missing = unsent.find((hash) => !present.has(hash));
-	if (missing) throw new NotFound("blob", { id: missing });
-}
-
 type DbAttachment = Prisma.AttachmentGetPayload<{
 	include: typeof attachmentInclude;
 }>;
@@ -584,6 +561,88 @@ export function makeAttachmentService(
 		});
 
 		/**
+		 * Checks that every hash of `files` is a live blob or arrives in `blobs`.
+		 *
+		 * @throws {@link NotFound} With the first hash that is neither.
+		 */
+		const assertBlobsAvailable = op({
+			transaction: false,
+			run: async (
+				tx: PrismaTx,
+				files: Record<string, string>,
+				blobs: Record<string, Buffer>,
+				_opts: ServiceOptsWithoutTx,
+			): Promise<void> => {
+				const unsent = Object.values(files).filter((hash) => !(hash in blobs));
+				const [missing] = await blob.missing(unsent, { tx, actor: SYSTEM });
+				if (missing) throw new NotFound("blob", { id: missing });
+			},
+		});
+
+		/**
+		 * Records a use of each blob of `files` (name to hash) by `owner`.
+		 *
+		 * A hash that arrives in `blobs` is stored through `create`, which checks
+		 * the name and the quota before the bytes reach the disk; any other is
+		 * attached through `attach`.
+		 *
+		 * @throws {@link NotAllowed} If the bytes would put the actor over quota.
+		 * @throws {@link NotFound} If a hash is neither sent nor a live blob.
+		 */
+		const attachFiles = op({
+			run: async (
+				tx: PrismaTx,
+				owner: AttachmentCreate["attachedTo"],
+				files: Record<string, string>,
+				blobs: Record<string, Buffer>,
+				opts: ServiceOptsWithoutTx,
+			): Promise<void> => {
+				for (const [filename, hash] of Object.entries(files)) {
+					const buffer = blobs[hash];
+					if (buffer)
+						await create(tx, { buffer, filename, attachedTo: owner }, opts);
+					else await attach(tx, { hash, filename, attachedTo: owner }, opts);
+				}
+			},
+		});
+
+		/**
+		 * Deletes the attachments of `owner` whose (hash, filename) is not in
+		 * `keep` (name to hash).
+		 *
+		 * No blob is tombstoned, so a file that moves to another owner in the same
+		 * write survives; the garbage collector reaps what stays unattached. A name
+		 * no sibling shares is unlinked from the blob's directory.
+		 */
+		const detachExcept = op({
+			run: async (
+				tx: PrismaTx,
+				owner: AttachmentCreate["attachedTo"],
+				keep: Record<string, string>,
+				opts: ServiceOptsWithoutTx,
+			): Promise<void> => {
+				rejectExpectedUpdatedAt(opts);
+				const kept = new Set(
+					Object.entries(keep).map(
+						([name, hash]) => `${hash}\0${sanitizeFilename(name)}`,
+					),
+				);
+				const rows = await tx.attachment.findMany({
+					where: { attachedToType: owner.type, attachedToId: owner.id },
+					select: { id: true, hash: true, filename: true },
+				});
+				for (const row of rows) {
+					if (kept.has(`${row.hash}\0${row.filename}`)) continue;
+					await tx.attachment.delete({ where: { id: row.id } });
+					const sameName = await tx.attachment.count({
+						where: { hash: row.hash, filename: row.filename },
+					});
+					if (sameName === 0) await blob.unlink(row.hash, row.filename);
+				}
+			},
+		});
+
+		/**
 		 * Attachments of a specific resource.
 		 */
 		const allAttachedTo = op({
@@ -663,6 +722,9 @@ export function makeAttachmentService(
 			delete: remove,
 			attach,
 			detach,
+			assertBlobsAvailable,
+			attachFiles,
+			detachExcept,
 			allAttachedTo,
 			usageBytes,
 			assertWithinQuota,

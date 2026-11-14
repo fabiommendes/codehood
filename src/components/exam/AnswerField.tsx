@@ -103,23 +103,23 @@ function EssayOrOtherField(props: AnswerFieldProps): JSX.Element {
 					: undefined
 			}
 			fallback={
-				<>
-					<AnyQuestionView
-						question={props.question}
-						value={props.payload ?? null}
-						onChange={props.onChange}
-						mode={
-							props.review ? "review" : props.readonly ? "readonly" : "answer"
-						}
-						result={props.review}
-						hideScore
-						messages={mdqMessages}
-					/>
-					<AttachmentList
-						attachments={props.question.attachments}
-						url={props.attachmentUrl ?? (() => null)}
-					/>
-				</>
+				<AnyQuestionView
+					question={props.question}
+					value={props.payload ?? null}
+					onChange={props.onChange}
+					mode={
+						props.review ? "review" : props.readonly ? "readonly" : "answer"
+					}
+					result={props.review}
+					hideScore
+					messages={mdqMessages}
+					afterStem={
+						<AttachmentList
+							attachments={props.question.attachments}
+							url={props.attachmentUrl ?? (() => null)}
+						/>
+					}
+				/>
 			}
 		>
 			{(code) => (

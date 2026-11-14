@@ -3,16 +3,21 @@
  * are links, how big the fenced ones are, and whether the bytes sent along
  * match the hashes that cite them.
  */
+
+import { SYSTEM } from "@/auth/actor";
 import { MAX_FENCED_ATTACHMENT_BYTES } from "@/core/constants";
-import { InvalidData } from "@/core/error";
+import { InvalidData, NotFound } from "@/core/error";
+import type { PrismaTx } from "@/db/client";
+import type { BlobService } from "@/db/services/blob.service";
 import type { QuestionDocument } from "@/mdq";
 import { hashBytes } from "@/utils/content-hash";
+import { mimeFor } from "@/utils/mime";
 
 /// Anything that holds the `attachments` of an MDQ document: a question or an exam.
 export type WithAttachments = Pick<QuestionDocument, "attachments">;
 
 /// Map from the name of a link attachment to the sha256 of its bytes.
-export type QuestionFiles = Record<string, string>;
+export type AttachmentFiles = Record<string, string>;
 
 /// An error on one field of the write, in the shape `InvalidData` takes.
 function invalid(field: string, message: string): InvalidData {
@@ -62,9 +67,9 @@ export function assertFencedWithinLimit(
  */
 export function resolveFiles(
 	question: WithAttachments,
-	given: QuestionFiles | undefined,
-	inherited: QuestionFiles | null,
-): QuestionFiles {
+	given: AttachmentFiles | undefined,
+	inherited: AttachmentFiles | null,
+): AttachmentFiles {
 	const links = linkAttachmentNames(question);
 	const files = given ?? pick(inherited ?? {}, links);
 
@@ -82,7 +87,7 @@ export function resolveFiles(
 }
 
 /// The entries of `files` whose names are in `names`.
-function pick(files: QuestionFiles, names: string[]): QuestionFiles {
+function pick(files: AttachmentFiles, names: string[]): AttachmentFiles {
 	return Object.fromEntries(
 		Object.entries(files).filter(([name]) => names.includes(name)),
 	);
@@ -96,7 +101,7 @@ function pick(files: QuestionFiles, names: string[]): QuestionFiles {
  */
 export function assertBlobsMatch(
 	blobs: Record<string, Buffer>,
-	files: QuestionFiles,
+	files: AttachmentFiles,
 ): void {
 	const cited = new Set(Object.values(files));
 	for (const [hash, bytes] of Object.entries(blobs)) {
@@ -109,17 +114,51 @@ export function assertBlobsMatch(
 	}
 }
 
-/// A `files` map as a column holds it: `null` for none.
-export function filesColumn(files: QuestionFiles): QuestionFiles | undefined {
+/** A `files` map as a column holds it: `undefined` for none, which leaves the column unset. */
+export function filesColumn(
+	files: AttachmentFiles,
+): AttachmentFiles | undefined {
 	return Object.keys(files).length > 0 ? files : undefined;
 }
 
-/// Whether two `files` maps are the same, `null` and `{}` counting as equal.
+/** Whether two `files` maps are the same, `null` and `{}` counting as equal. */
 export function sameFiles(
-	a: QuestionFiles | null | undefined,
-	b: QuestionFiles | null | undefined,
+	a: AttachmentFiles | null | undefined,
+	b: AttachmentFiles | null | undefined,
 ): boolean {
 	const x = Object.entries(a ?? {}).sort(([p], [q]) => p.localeCompare(q));
 	const y = Object.entries(b ?? {}).sort(([p], [q]) => p.localeCompare(q));
 	return JSON.stringify(x) === JSON.stringify(y);
+}
+
+/**
+ * The bytes of the attachment `name` among `attachments`: a fenced one comes
+ * from its text, a link from the blob `files` maps its name to.
+ *
+ * @throws {@link NotFound} If there is no such attachment or its blob is gone.
+ */
+export async function serveAttachmentFile(
+	blob: BlobService,
+	tx: PrismaTx,
+	attachments: WithAttachments["attachments"] | null | undefined,
+	files: AttachmentFiles | null | undefined,
+	name: string,
+): Promise<{ bytes: Buffer; mimeType: string; filename: string }> {
+	const entry = attachments?.find((a) => a.name === name);
+	if (!entry) throw new NotFound("attachment");
+
+	if (entry.text !== undefined) {
+		return {
+			bytes: Buffer.from(entry.text, "utf-8"),
+			mimeType: "text/plain; charset=utf-8",
+			filename: entry.name,
+		};
+	}
+	const hash = files?.[name];
+	const stored = hash
+		? await blob.findOne({ hash }, { tx, actor: SYSTEM })
+		: null;
+	const bytes = stored && (await blob.readBlob(stored));
+	if (!bytes) throw new NotFound("attachment");
+	return { bytes, mimeType: mimeFor(entry.name), filename: entry.name };
 }

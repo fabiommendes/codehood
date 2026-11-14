@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- Anexos de questões e provas (`## [attachments]` do mdq). Um anexo por link
+  vira blob com uma linha `Attachment` do `QuestionRef` ou da `Exam`; o mapa
+  `nome -> sha256` de cada versão fica em `QuestionData.files` (e em
+  `Exam.files`, com a lista em `Exam.attachments`). A escrita de questão e de
+  prova aceita multipart com as partes nomeadas pelo sha256, e a web herda os
+  hashes da versão anterior. O aluno baixa só pelas rotas da prova, que
+  conferem a janela (`attachmentsOpen`, com `ExamException`); o hash nunca
+  sai num read model de aluno. Lista de anexos abaixo do enunciado na
+  tentativa, no preview, na página da questão e na correção, e abaixo do
+  preâmbulo da prova. A CLI lê os links, inclui os bytes na versão, faz um
+  `blob/missing` por push e só manda os blobs que faltam. A mdq-js ganhou o
+  porte dos anexos e o slot `afterStem`.
+
 ### Changed
 
 - A "Visão do estudante" da página da prova do professor usa a moldura

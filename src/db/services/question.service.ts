@@ -42,16 +42,16 @@ import {
 } from "@/mdq";
 import { upgradeLegacyQuestion } from "@/mdq/legacy";
 import {
+	type AttachmentFiles,
 	assertBlobsMatch,
 	assertFencedWithinLimit,
 	filesColumn,
-	type QuestionFiles,
 	resolveFiles,
 	sameFiles,
-} from "@/services/question-files";
+	serveAttachmentFile,
+} from "@/services/attachment-files";
 import { type QuestionStatus, writable } from "@/services/question-status";
 import type { JSONValue } from "@/typing/concrete-types";
-import { mimeFor } from "@/utils/mime";
 import { type PretestSource, pretestSources } from "@/utils/pretest-sources";
 import {
 	type Prisma,
@@ -60,10 +60,7 @@ import {
 	prisma,
 } from "../client";
 import { courseRefWhere, valueOrNotAllowed, valueOrNotFound } from "../utils";
-import {
-	type AttachmentService,
-	assertBlobsAvailable,
-} from "./attachment.service";
+import type { AttachmentService } from "./attachment.service";
 import type { BlobService } from "./blob.service";
 import { courseContentsWhere } from "./course.service";
 
@@ -672,25 +669,14 @@ const buildQuestionService = (deps: Deps) =>
 						: { id: ref.latestId ?? -1 },
 					select: { privatePayload: true, files: true },
 				});
-				const entry = (
-					version?.privatePayload as unknown as QuestionDocument | undefined
-				)?.attachments?.find((a) => a.name === name);
-				if (!version || !entry) throw notFound();
-
-				if (entry.text !== undefined) {
-					return {
-						bytes: Buffer.from(entry.text, "utf-8"),
-						mimeType: "text/plain; charset=utf-8",
-						filename: entry.name,
-					};
-				}
-				const hash = (version.files as QuestionFiles | null)?.[name];
-				const stored = hash
-					? await tx.blob.findUnique({ where: { hash } })
-					: null;
-				const bytes = stored && (await deps.blob.readBlob(stored));
-				if (!bytes) throw notFound();
-				return { bytes, mimeType: mimeFor(entry.name), filename: entry.name };
+				if (!version) throw notFound();
+				return serveAttachmentFile(
+					deps.blob,
+					tx,
+					(version.privatePayload as unknown as QuestionDocument).attachments,
+					version.files as AttachmentFiles | null,
+					name,
+				);
 			},
 		});
 
@@ -808,7 +794,7 @@ function fromDb(row: DbQuestion): Question {
 		updatedAt: row.updatedAt,
 		// The private column holds the whole document, validated on the way in.
 		question: latest.privatePayload as unknown as QuestionDocument,
-		...(latest.files ? { files: latest.files as QuestionFiles } : {}),
+		...(latest.files ? { files: latest.files as AttachmentFiles } : {}),
 	};
 }
 
@@ -934,9 +920,19 @@ async function applyWrite(
 	opts: { expectedUpdatedAt?: Date | null },
 ): Promise<Question> {
 	const { question, version } = fields;
+	if (
+		!(question && version) &&
+		(fields.files !== undefined || Object.keys(fields.blobs ?? {}).length > 0)
+	) {
+		const message = "`files` and `blobs` need the `question` and `version`.";
+		throw new InvalidData(
+			{ files: [{ code: "invalid", message }] },
+			{ message },
+		);
+	}
 	const files =
 		question && version
-			? await prepareFiles(tx, ref.id, version, question, fields)
+			? await prepareFiles(tx, deps, actor, ref.id, version, question, fields)
 			: undefined;
 	const latestId =
 		question && version && files
@@ -967,7 +963,12 @@ async function applyWrite(
 		),
 	);
 	if (files) {
-		await storeFiles(tx, deps, ref.id, files, fields.blobs ?? {}, actor);
+		await deps.attachments.attachFiles(
+			{ type: "QUESTION", id: ref.id },
+			files,
+			fields.blobs ?? {},
+			{ tx, actor },
+		);
 	}
 	return written;
 }
@@ -982,12 +983,14 @@ async function applyWrite(
  */
 async function prepareFiles(
 	tx: PrismaTx,
+	deps: Deps,
+	actor: Actor,
 	refId: QuestionRefId,
 	version: string,
 	question: Question["question"],
 	fields: Pick<QuestionUpdate, "files" | "blobs">,
-): Promise<QuestionFiles> {
-	let inherited: QuestionFiles | null = null;
+): Promise<AttachmentFiles> {
+	let inherited: AttachmentFiles | null = null;
 	if (fields.files === undefined) {
 		const sameLabel = await tx.questionData.findUnique({
 			where: { refId_versionHash: { refId, versionHash: version } },
@@ -1001,34 +1004,14 @@ async function prepareFiles(
 					select: { latest: { select: { files: true } } },
 				})
 			)?.latest;
-		inherited = (latest?.files as QuestionFiles | null | undefined) ?? null;
+		inherited = (latest?.files as AttachmentFiles | null | undefined) ?? null;
 	}
 	const files = resolveFiles(question, fields.files, inherited);
 	const blobs = fields.blobs ?? {};
 	assertBlobsMatch(blobs, files);
 
-	await assertBlobsAvailable(tx, files, blobs);
+	await deps.attachments.assertBlobsAvailable(files, blobs, { tx, actor });
 	return files;
-}
-
-/// Stores the bytes the write sent and records, for each name of `files`, a use of its blob by the question, charging `actor`.
-async function storeFiles(
-	tx: PrismaTx,
-	deps: Deps,
-	refId: QuestionRefId,
-	files: QuestionFiles,
-	blobs: Record<string, Buffer>,
-	actor: Actor,
-): Promise<void> {
-	for (const bytes of Object.values(blobs)) {
-		await deps.blob.create({ bytes }, { tx, actor: SYSTEM });
-	}
-	for (const [filename, hash] of Object.entries(files)) {
-		await deps.attachments.attach(
-			{ hash, filename, attachedTo: { type: "QUESTION", id: refId } },
-			{ tx, actor },
-		);
-	}
 }
 
 /**
@@ -1041,7 +1024,7 @@ async function storeFiles(
 async function writeVersion(
 	tx: PrismaTx,
 	ref: { id: number; slug: string },
-	input: Pick<Question, "version" | "question"> & { files: QuestionFiles },
+	input: Pick<Question, "version" | "question"> & { files: AttachmentFiles },
 ): Promise<number> {
 	// The ids are written into the stored document, since responses address
 	// choices by id and grading never derives them. Round-tripped through JSON
@@ -1071,7 +1054,7 @@ async function writeVersion(
 		const { id, files, ...stored } = existing;
 		if (
 			isDeepStrictEqual(stored, halves) &&
-			sameFiles(files as QuestionFiles | null, input.files)
+			sameFiles(files as AttachmentFiles | null, input.files)
 		) {
 			return id;
 		}

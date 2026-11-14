@@ -5,7 +5,9 @@
  * module only adds the few checks a service needs before writing.
  */
 import {
+	attachmentFieldRules,
 	type CodeQuestion,
+	checkUniqueAttachmentNames,
 	type Diagnostic,
 	type PublicQuestion as MdqPublicQuestion,
 	publicForm as mdqPublicForm,
@@ -88,6 +90,18 @@ export function questionProblems(question: QuestionDocument): Diagnostic[] {
 	return [
 		...modelDiagnostics(question).filter((d) => d.severity === "error"),
 		...(question.type === "code" ? codeProblems(question) : []),
+	];
+}
+
+/**
+ * The rules of the mdq spec that a list of attachments breaks beyond its
+ * schema: duplicate names, and a name or format that disagrees with the origin.
+ */
+export function attachmentProblems(attachments: unknown): Diagnostic[] {
+	const duplicate = checkUniqueAttachmentNames(attachments);
+	return [
+		...attachmentFieldRules(attachments),
+		...(duplicate ? [duplicate] : []),
 	];
 }
 

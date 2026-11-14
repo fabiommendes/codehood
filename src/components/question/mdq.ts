@@ -28,6 +28,8 @@ export interface AnyQuestionViewProps {
 	onChange?: (response: never) => void;
 	mode?: QuestionMode;
 	hideScore?: boolean;
+	/// Rendered right after the stem.
+	afterStem?: JSX.Element;
 	/// `correct` is a list of correct responses, or the correct responses per blank of a fill-in question.
 	result?:
 		| (QuestionScore & { correct?: CorrectResponses })

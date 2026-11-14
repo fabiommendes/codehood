@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [mdq, attachments, blobs, questions, exams, cli]
 relatedTo: [blob-upload-and-gc, mdq-biblioteca, historico-de-edicao-no-servidor]
 created: 2026-11-13
@@ -213,6 +213,11 @@ aluno baixe o anexo de uma prova antes de ela abrir para ele.
   `CHANGELOG.md` recebe a entrada.
 
 ## Fora do escopo
+
+- Liberar cota de anexos de questão. Cada par (hash, nome) que uma versão
+  traz fica cobrado enquanto o `QuestionRef` existir, porque as versões são
+  imutáveis e continuam baixáveis: dez edições de um CSV de 10 MB cobram
+  100 MB. Aceito na v1.
 
 - Pull dos anexos pela CLI (sync de volta para a pasta do professor). A rota
   `question.attachment` já serve ao professor qualquer versão.

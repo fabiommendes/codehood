@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import type { z } from "zod";
 import { FULL_ACCESS } from "@/auth/actor";
@@ -531,6 +532,33 @@ test("A14: a write that would exceed the author's quota is refused, with no vers
 	).toBe(0);
 	expect(await blobRow(bigHash)).toBeNull();
 	expect(await prisma.attachment.count({ where: { hash: bigHash } })).toBe(0);
+	expect(existsSync(db.blob.blobPath(bigHash))).toBe(false);
+});
+
+test("A14b: `files` or `blobs` without `question` and `version` are refused, not ignored", async () => {
+	const ctx = await setup();
+	await create(ctx, docWith(NOTES));
+	const h = blob();
+
+	const noQuestion = await refusal(
+		db.question.update(
+			{ course: ctx.course.id, slug: "q1" },
+			{ files: { "data.csv": h.hash }, blobs: { [h.hash]: h.bytes } },
+			ctx.opts,
+		),
+	);
+	const noVersion = await refusal(
+		db.question.update(
+			{ course: ctx.course.id, slug: "q1" },
+			{ blobs: { [h.hash]: h.bytes } },
+			ctx.opts,
+		),
+	);
+
+	expect(noQuestion).toBeInstanceOf(InvalidData);
+	expect(noVersion).toBeInstanceOf(InvalidData);
+	expect(await blobRow(h.hash)).toBeNull();
+	expect(existsSync(db.blob.blobPath(h.hash))).toBe(false);
 });
 
 // -----------------------------------------------------------------------------

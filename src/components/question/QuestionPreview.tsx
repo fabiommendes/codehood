@@ -255,10 +255,12 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 						onChange={setValue}
 						result={result()}
 						messages={mdqMessages}
-					/>
-					<AttachmentList
-						attachments={publicQ().attachments}
-						url={props.attachmentUrl}
+						afterStem={
+							<AttachmentList
+								attachments={publicQ().attachments}
+								url={props.attachmentUrl}
+							/>
+						}
 					/>
 					<SimulateControls
 						disabled={
@@ -307,10 +309,12 @@ function TypePreview(props: TypePreviewProps): JSX.Element {
 						value={key()}
 						result={keyResult()}
 						messages={mdqMessages}
-					/>
-					<AttachmentList
-						attachments={publicQ().attachments}
-						url={props.attachmentUrl}
+						afterStem={
+							<AttachmentList
+								attachments={publicQ().attachments}
+								url={props.attachmentUrl}
+							/>
+						}
 					/>
 				</div>
 			</Match>

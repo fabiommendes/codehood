@@ -34,13 +34,20 @@ import {
 import { courseAccess } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
 import { loadResultPolicy } from "@/db/result-policy";
-import {
-	type AttachmentService,
-	assertBlobsAvailable,
-} from "@/db/services/attachment.service";
+import type { AttachmentService } from "@/db/services/attachment.service";
 import type { BlobService } from "@/db/services/blob.service";
 import { courseContentsWhere } from "@/db/services/course.service";
 import { m } from "@/i18n";
+import { attachmentProblems } from "@/mdq";
+import {
+	type AttachmentFiles,
+	assertBlobsMatch,
+	assertFencedWithinLimit,
+	filesColumn,
+	resolveFiles,
+	serveAttachmentFile,
+	type WithAttachments,
+} from "@/services/attachment-files";
 import { type ExamResult, examResult } from "@/services/exam-result";
 import {
 	attachmentsOpen,
@@ -52,16 +59,6 @@ import {
 	releaseBlocker,
 	viewerTiming,
 } from "@/services/exam-state";
-import {
-	assertBlobsMatch,
-	assertFencedWithinLimit,
-	filesColumn,
-	type QuestionFiles,
-	resolveFiles,
-	type WithAttachments,
-} from "@/services/question-files";
-import { sanitizeFilename } from "@/utils/filename";
-import { mimeFor } from "@/utils/mime";
 import {
 	DbNull,
 	type Prisma,
@@ -164,7 +161,7 @@ const buildExamService = (deps: Deps) =>
 					course.id,
 					input.questions,
 				);
-				const attachments = await prepareAttachments(tx, input);
+				const attachments = await prepareAttachments(tx, deps, input, opts);
 
 				const row = await invalidIfExists(tx.exam.create.bind(tx.exam), {
 					data: {
@@ -186,15 +183,17 @@ const buildExamService = (deps: Deps) =>
 								: opts.actor.username,
 						examTags: { create: (input.tags ?? []).map((tag) => ({ tag })) },
 						questionsForExams: { create: questions },
-						...(attachments && {
-							attachments: attachments.list as Prisma.InputJsonValue,
-							files: filesColumn(attachments.files),
-						}),
+						...(attachments && attachmentColumns(attachments)),
 					},
 					include: examInclude(),
 				});
 				if (attachments) {
-					await storeAttachments(tx, deps, row.id, attachments, input, opts);
+					await deps.attachments.attachFiles(
+						{ type: "EXAM", id: row.id as ExamId },
+						attachments.files,
+						input.blobs ?? {},
+						{ ...opts, tx },
+					);
 				}
 
 				return fromDb(row, "full");
@@ -376,7 +375,7 @@ const buildExamService = (deps: Deps) =>
 				const questions = fields.questions
 					? await resolveQuestions(tx, exam.courseId, fields.questions)
 					: undefined;
-				const attachments = await prepareAttachments(tx, fields);
+				const attachments = await prepareAttachments(tx, deps, fields, opts);
 
 				// A new date only makes sense in a window, so the duration stays while one exists.
 				if (fields.duration === null) {
@@ -423,20 +422,23 @@ const buildExamService = (deps: Deps) =>
 						...(questions && {
 							questionsForExams: { deleteMany: {}, create: questions },
 						}),
-						...(attachments && {
-							attachments:
-								attachments.list.length > 0
-									? (attachments.list as Prisma.InputJsonValue)
-									: DbNull,
-							files: filesColumn(attachments.files) ?? DbNull,
-						}),
+						...(attachments && attachmentColumns(attachments)),
 					},
 					opts,
 					{ include: examInclude() },
 				);
 				if (attachments) {
-					await storeAttachments(tx, deps, exam.id, attachments, fields, opts);
-					await dropStaleAttachments(tx, deps, exam.id, attachments.files);
+					const owner = { type: "EXAM" as const, id: exam.id as ExamId };
+					await deps.attachments.attachFiles(
+						owner,
+						attachments.files,
+						fields.blobs ?? {},
+						{ ...opts, tx },
+					);
+					await deps.attachments.detachExcept(owner, attachments.files, {
+						...opts,
+						tx,
+					});
 				}
 
 				return fromDb(row, "full");
@@ -631,11 +633,11 @@ const buildExamService = (deps: Deps) =>
 				opts: ServiceOptsWithoutTx,
 			): Promise<DownloadedAttachment> => {
 				const row = await downloadableExam(tx, filter, opts.actor);
-				return serveAttachment(
+				return serveAttachmentFile(
+					deps.blob,
 					tx,
-					deps,
 					row.attachments as Attachment[] | null,
-					row.files as QuestionFiles | null,
+					row.files as AttachmentFiles | null,
 					name,
 				);
 			},
@@ -678,11 +680,11 @@ const buildExamService = (deps: Deps) =>
 				const document = version.privatePayload as unknown as
 					| WithAttachments
 					| undefined;
-				return serveAttachment(
+				return serveAttachmentFile(
+					deps.blob,
 					tx,
-					deps,
 					document?.attachments ?? null,
-					version.files as QuestionFiles | null,
+					version.files as AttachmentFiles | null,
 					name,
 				);
 			},
@@ -983,7 +985,7 @@ type DownloadedAttachment = {
 };
 
 /// What an exam write says about its attachments, once every rule on them holds.
-type PreparedAttachments = { list: Attachment[]; files: QuestionFiles };
+type PreparedAttachments = { list: Attachment[]; files: AttachmentFiles };
 
 /**
  * The attachment view of `actor` for each of `rows`, keyed by exam id.
@@ -1070,36 +1072,6 @@ async function latestId(
 }
 
 /**
- * The bytes of the attachment `name` among `attachments`: a fenced one comes
- * from its text, a link from the blob `files` maps its name to.
- *
- * @throws {@link NotFound} If there is no such attachment or its blob is gone.
- */
-async function serveAttachment(
-	tx: PrismaTx,
-	deps: Deps,
-	attachments: WithAttachments["attachments"] | null,
-	files: QuestionFiles | null,
-	name: string,
-): Promise<DownloadedAttachment> {
-	const entry = attachments?.find((a) => a.name === name);
-	if (!entry) throw new NotFound("attachment");
-
-	if (entry.text !== undefined) {
-		return {
-			bytes: Buffer.from(entry.text, "utf-8"),
-			mimeType: "text/plain; charset=utf-8",
-			filename: entry.name,
-		};
-	}
-	const hash = files?.[name];
-	const stored = hash ? await tx.blob.findUnique({ where: { hash } }) : null;
-	const bytes = stored && (await deps.blob.readBlob(stored));
-	if (!bytes) throw new NotFound("attachment");
-	return { bytes, mimeType: mimeFor(entry.name), filename: entry.name };
-}
-
-/**
  * What the write says about the exam's attachments, or `undefined` when it
  * leaves them alone.
  *
@@ -1112,7 +1084,9 @@ async function serveAttachment(
  */
 async function prepareAttachments(
 	tx: PrismaTx,
+	deps: Deps,
 	fields: Pick<ExamWriteCreate, "attachments" | "files" | "blobs">,
+	opts: ServiceOptsWithoutTx,
 ): Promise<PreparedAttachments | undefined> {
 	const { attachments, files: given } = fields;
 	if (attachments === undefined) {
@@ -1127,60 +1101,47 @@ async function prepareAttachments(
 		);
 	}
 
+	assertAttachmentRules(attachments);
 	assertFencedWithinLimit({ attachments }, "attachments");
 	const files = resolveFiles({ attachments }, given ?? {}, null);
 	const blobs = fields.blobs ?? {};
 	assertBlobsMatch(blobs, files);
 
-	await assertBlobsAvailable(tx, files, blobs);
+	await deps.attachments.assertBlobsAvailable(files, blobs, {
+		tx,
+		actor: opts.actor,
+	});
 	return { list: attachments, files };
 }
 
-/// Stores the bytes the write sent and records a use of each blob of `files` by the exam, charging the actor.
-async function storeAttachments(
-	tx: PrismaTx,
-	deps: Deps,
-	examId: number,
-	prepared: PreparedAttachments,
-	fields: Pick<ExamWriteCreate, "blobs">,
-	opts: ServiceOptsWithoutTx,
-): Promise<void> {
-	for (const bytes of Object.values(fields.blobs ?? {})) {
-		await deps.blob.create({ bytes }, { tx, actor: SYSTEM });
-	}
-	for (const [filename, hash] of Object.entries(prepared.files)) {
-		await deps.attachments.attach(
-			{ hash, filename, attachedTo: { type: "EXAM", id: examId as ExamId } },
-			{ tx, actor: opts.actor },
-		);
-	}
+/// The columns of an exam write that carries `prepared`: `DbNull` for an empty list or map, so create and update store the same.
+function attachmentColumns(prepared: PreparedAttachments) {
+	return {
+		attachments:
+			prepared.list.length > 0
+				? (prepared.list as Prisma.InputJsonValue)
+				: DbNull,
+		files: filesColumn(prepared.files) ?? DbNull,
+	};
 }
 
-/// Deletes the `EXAM` rows of the exam whose (hash, name) is no longer in `files`, leaving their blobs to the garbage collector.
-async function dropStaleAttachments(
-	tx: PrismaTx,
-	deps: Deps,
-	examId: number,
-	files: QuestionFiles,
-): Promise<void> {
-	const kept = new Set(
-		Object.entries(files).map(
-			([name, hash]) => `${hash}\0${sanitizeFilename(name)}`,
-		),
+/**
+ * Refuses a list of attachments that breaks the mdq rules beyond its schema.
+ *
+ * @throws {@link InvalidData}
+ */
+function assertAttachmentRules(attachments: Attachment[]): void {
+	const problems = attachmentProblems(attachments);
+	if (problems.length === 0) return;
+	throw new InvalidData(
+		{
+			attachments: problems.map((p) => ({
+				code: "invalid",
+				message: p.message,
+			})),
+		},
+		{ message: problems.map((p) => `${p.code}: ${p.message}`).join("; ") },
 	);
-	const rows = await tx.attachment.findMany({
-		where: { attachedToType: "EXAM", attachedToId: examId },
-		select: { id: true, hash: true, filename: true },
-	});
-	for (const row of rows) {
-		if (kept.has(`${row.hash}\0${row.filename}`)) continue;
-		await tx.attachment.delete({ where: { id: row.id } });
-		const sameName = await tx.attachment.count({
-			where: { hash: row.hash, filename: row.filename },
-		});
-		// The blob stays for the garbage collector, as in `detach`.
-		if (sameName === 0) await deps.blob.unlink(row.hash, row.filename);
-	}
 }
 
 /// `attachments` without the `origin` a student must not see, which is also where the sha256 of a link would be derived from.
@@ -1191,7 +1152,7 @@ function publicAttachments(list: Attachment[]) {
 /** Converts a database row into the exam entity, showing its attachments as `view` says. */
 function fromDb(row: DbExam, view: AttachmentView): Exam {
 	const list = (row.attachments as Attachment[] | null) ?? [];
-	const files = row.files as QuestionFiles | null;
+	const files = row.files as AttachmentFiles | null;
 	return {
 		id: row.id as ExamId,
 		slug: row.slug,
