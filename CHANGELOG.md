@@ -225,6 +225,20 @@ guardar milissegundos desde a época (inteiro), use
 schema antigo: as seis linhas saíram com `YYYY-MM-DD` válido e nenhuma ficou
 nula.
 
+### Fixed
+
+- O servidor travava durante uma prova com workers corrigindo a fila (502 e
+  timeouts na `teste2-elm`). `Submission` não tinha índice por tentativa e
+  questão, e o `claim` procurava autosaves não enviados varrendo a tabela
+  inteira uma vez por linha, de forma síncrona: com 48 mil submissões cada
+  `claim` segurava o event loop por 2 s. `Submission` ganha o índice
+  `(responseId, questionId)`, e a busca (`unsentAutosaveSql`) parte das
+  tentativas abertas e lê só a submissão mais nova de cada questão. Também
+  ganham índice `Enrollment (courseId, status)`, `ResponseRef (examId)`,
+  `GradingJob (state, leaseUntil)` e `QuestionRef (courseId)`. O teste de
+  carga aceita `--history N`, que enche o banco com autosaves de uma prova
+  antiga; sem isso ele não reproduzia o problema.
+
 ## 0.4.0 (2026-11-13)
 
 ### Added

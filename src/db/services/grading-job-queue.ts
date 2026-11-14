@@ -272,19 +272,45 @@ export interface ExpiredScope {
 	questions?: string[];
 }
 
-/// The newest submission of a question is an autosave that differs from the last send.
-const UNSENT_AUTOSAVE_SQL = `
-	s.kind = 'AUTOSAVE'
-	AND NOT EXISTS (
-		SELECT 1 FROM Submission t
-		WHERE t.responseId = s.responseId AND t.questionId = s.questionId AND t.id > s.id
-	)
-	AND s.payload IS NOT (
-		SELECT t.payload FROM Submission t
-		WHERE t.responseId = s.responseId AND t.questionId = s.questionId
-			AND t.kind IN ('SUBMIT', 'FINAL')
-		ORDER BY t.id DESC LIMIT 1
-	)`;
+/// A list of `count` SQL placeholders.
+const placeholders = (count: number) => Array(count).fill("?").join(", ");
+
+/// The SQL that finds the open attempts of some exams holding an unsent autosave: the newest submission of a worker's question is an autosave that differs from the last send.
+///
+/// It walks the attempts and probes the newest submission of each question through the index on `(responseId, questionId)`, so its cost follows the open attempts and not the size of `Submission`. Its parameters are the exam ids, the workers and then the question slugs.
+export function unsentAutosaveSql(count: {
+	exams: number;
+	workers: number;
+	questions?: number;
+}): string {
+	const questionFilter =
+		count.questions === undefined
+			? ""
+			: `AND q.slug IN (${placeholders(count.questions)})`;
+	return `
+		SELECT r.id AS id
+		FROM ResponseRef r
+		WHERE r.acceptingSubmissions = 1
+			AND ${realAttemptSql("r")}
+			AND r.examId IN (${placeholders(count.exams)})
+			AND EXISTS (
+				SELECT 1
+				FROM QuestionRef q
+				JOIN Submission s ON s.id = (
+					SELECT max(t.id) FROM Submission t
+					WHERE t.responseId = r.id AND t.questionId = q.id
+				)
+				WHERE q.worker IN (${placeholders(count.workers)})
+					${questionFilter}
+					AND s.kind = 'AUTOSAVE'
+					AND s.payload IS NOT (
+						SELECT t.payload FROM Submission t
+						WHERE t.responseId = r.id AND t.questionId = q.id
+							AND t.kind IN ('SUBMIT', 'FINAL')
+						ORDER BY t.id DESC LIMIT 1
+					)
+			)`;
+}
 
 /**
  * Sends the last autosave of every attempt whose time ran out and was never closed, so a student who did not press "send" still gets graded.
@@ -318,21 +344,12 @@ export async function promoteExpiredSends(
 	if (exams.length === 0) return;
 
 	const examIds = exams.map((exam) => exam.id);
-	const marks = (list: unknown[]) => list.map(() => "?").join(", ");
-	const questionFilter = scope.questions
-		? `AND q.slug IN (${marks(scope.questions)})`
-		: "";
 	const candidates = await tx.$queryRawUnsafe<{ id: number | bigint }[]>(
-		`SELECT DISTINCT r.id AS id
-		FROM ResponseRef r
-		JOIN Submission s ON s.responseId = r.id
-		JOIN QuestionRef q ON q.id = s.questionId
-		WHERE r.acceptingSubmissions = 1
-			AND ${realAttemptSql("r")}
-			AND r.examId IN (${marks(examIds)})
-			AND q.worker IN (${marks(scope.workers)})
-			${questionFilter}
-			AND ${UNSENT_AUTOSAVE_SQL}`,
+		unsentAutosaveSql({
+			exams: examIds.length,
+			workers: scope.workers.length,
+			...(scope.questions ? { questions: scope.questions.length } : {}),
+		}),
 		...examIds,
 		...scope.workers,
 		...(scope.questions ?? []),

@@ -363,6 +363,8 @@ model Enrollment {
   createdAt DateTime @default(now())
 
   @@unique([username, courseId])
+  /// The permission rules list the active enrollments of a course on nearly every request.
+  @@index([courseId, status])
 }
 
 enum GradeColumnKind {
@@ -785,6 +787,7 @@ model QuestionRef {
   answerEditFields   AnswerEditField[]
 
   @@unique([slug, courseId])
+  @@index([courseId])
   @@index([worker])
 }
 
@@ -899,6 +902,7 @@ model Response {
   editHistory AnswerEditHistory?
 
   @@unique([authorId, examId, slotKey])
+  @@index([examId])
   @@map("ResponseRef")
 }
 
@@ -933,6 +937,10 @@ model Submission {
   feedbacks      Feedback[]
   regradeRequest RegradeRequest?
   gradingJob     GradingJob?
+
+  /// Every read of an answer asks for the submissions of one question in one
+  /// attempt; SQLite indexes no foreign key by itself.
+  @@index([responseId, questionId])
 }
 
 /// One SUBMIT or FINAL submission waiting for an external worker.
@@ -958,6 +966,8 @@ model GradingJob {
   updatedAt DateTime @updatedAt
 
   @@index([worker, state])
+  /// Every claim looks for the leases that ran out.
+  @@index([state, leaseUntil])
 }
 
 enum GradingJobState {
@@ -1212,11 +1222,11 @@ model Exam {
   preamble    String?
   format      TextFormat @default(MARKDOWN)
 
-  scheduledAt DateTime?
-  durationMs  Int?
+  scheduledAt   DateTime?
+  durationMs    Int?
   /// Whether students may run code in answer mode. Null follows the exam
   /// type: on for PRACTICE, off for QUIZ and EXAM. Review mode ignores it.
-  allowCodeRun Boolean?
+  allowCodeRun  Boolean?
   /// Whether the browser records the edit history of open answers. Null follows
   /// the exam type: on for EXAM and QUIZ, off for PRACTICE. Server-side state
   /// the course repository must not set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
@@ -1224,7 +1234,7 @@ model Exam {
   /// Extra time granted on top of durationMs, extending the window for every
   /// student alike (src/services/exam-state.ts). Server-side state the course
   /// repository must not set (dev/adr/0011-contrato-de-sync-entre-cli-e-servidor.md).
-  extraTimeMs Int       @default(0)
+  extraTimeMs   Int       @default(0)
 
   /// When the instructor released this exam's grades to its students. Null
   /// until they do. Only consulted for an `EXAM`: a `PRACTICE` releases a
@@ -1370,8 +1380,8 @@ model AnswerEditHistory {
   response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
 
   /// Totals over every stored batch and gap, checked against the per-attempt limits.
-  editCount Int @default(0)
-  byteCount Int @default(0)
+  editCount    Int       @default(0)
+  byteCount    Int       @default(0)
   /// When a per-attempt limit was reached; no batch is stored after it.
   incompleteAt DateTime?
 
@@ -1390,9 +1400,9 @@ model AnswerEditField {
   question   QuestionRef       @relation(fields: [questionId], references: [id], onDelete: Cascade)
   field      String
 
-  text     String
-  revision Int    @default(0)
-  nextSeq  Int    @default(0)
+  text         String
+  revision     Int       @default(0)
+  nextSeq      Int       @default(0)
   /// When this field stopped taking batches because its text outgrew the limit.
   incompleteAt DateTime?
 
@@ -1449,7 +1459,7 @@ model AnswerEditGap {
   reason     String
   /// Id the browser gave the marker, so a retried item does not store it twice.
   clientId   String?
-  receivedAt DateTime @default(now())
+  receivedAt DateTime        @default(now())
 
   @@unique([fieldId, clientId])
   @@index([fieldId])

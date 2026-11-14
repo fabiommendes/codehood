@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, type UserActor } from "@/auth/actor";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { unsentAutosaveSql } from "@/db/services/grading-job-queue";
 import { persistedResponseFactory } from "@/fixtures/response.factory";
 import { sumCode } from "@/mdq/fixtures";
 import {
@@ -226,4 +227,46 @@ test("an attempt of a worker that was not asked for is not sent", async () => {
 
 	expect(jobs).toEqual([]);
 	expect(await finals(w)).toBe(0);
+});
+
+// Every claim and every poll of a student reads the submissions of one
+// question; a scan of the table freezes the server once it holds a few exams.
+
+/// The steps of the query plan SQLite picks for `sql`.
+async function planOf(sql: string, ...params: unknown[]): Promise<string[]> {
+	const rows = await prisma.$queryRawUnsafe<{ detail: string }[]>(
+		`EXPLAIN QUERY PLAN ${sql}`,
+		...params,
+	);
+	return rows.map((row) => row.detail);
+}
+
+const scansSubmissions = (plan: string[]) =>
+	plan.some((step) => /^SCAN (s|t|Submission)\b/.test(step));
+
+test("the submissions of a question in an attempt are found by index", async () => {
+	const plan = await planOf(
+		"SELECT id FROM Submission WHERE responseId = ? AND questionId = ?",
+		1,
+		1,
+	);
+	expect(scansSubmissions(plan), plan.join("\n")).toBe(false);
+});
+
+test("the search for unsent autosaves never scans the submissions", async () => {
+	for (const questions of [undefined, 2]) {
+		const sql = unsentAutosaveSql({
+			exams: 2,
+			workers: 1,
+			...(questions ? { questions } : {}),
+		});
+		const plan = await planOf(
+			sql,
+			1,
+			2,
+			"elm-test",
+			...(questions ? ["a", "b"] : []),
+		);
+		expect(scansSubmissions(plan), plan.join("\n")).toBe(false);
+	}
 });
