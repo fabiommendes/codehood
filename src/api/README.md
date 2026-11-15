@@ -24,7 +24,10 @@ service has `findPage`, and its list then takes `limit` (default 100, at most
 500) and either `after` or `before`; the others answer everything with both
 cursors `null`. A client follows `next` until `null` on every list. The
 cursors are made in the service, with `src/utils/cursor.ts`, because the
-entity does not carry the row id.
+entity does not carry the row id. A list a service can order by more than one
+column (questions) keeps the column value and the row id in the cursor, and
+refuses with `400` a cursor made under another order; over REST such a list
+comes in its default order.
 
 This file maps where each piece lives.
 

@@ -74,6 +74,26 @@ declara `limit`, `after` nem `before`. Quem consome deve sempre seguir `next` at
     que mantém `limit` e o cursor: o resultado da action volta na mesma
     página da lista, e o diálogo de uma linha que falhou reabre nela. Uma
     linha criada pode cair em outra página; a mensagem de sucesso basta.
+11. **Ordem variável: cursor composto.** Um service que ordena por mais de
+    uma coluna recebe `sort: { field, direction }` no `findPage`
+    (`question`: `slug`, o padrão, `title`, `status`, `type`, `updated`). O
+    cursor é o par (valor da coluna, id da linha), para que valores
+    repetidos não pulem nem repitam linhas: a página seguinte é
+    `col > v OR (col = v AND id > último)` com `ORDER BY col, id`, espelhado
+    na ordem decrescente e no `before`. `encodeKeyCursor`, `decodeKeyCursor`,
+    `pairWhere` e `scanDirection` (`src/utils/cursor.ts`) servem a qualquer
+    service. O cursor segue opaco e carrega a ordem (`status:asc`): usado
+    em outra ordem é `400`, como um cursor inválido. O Prisma só compara
+    enum por igualdade, então `status` e `type` listam os nomes além do
+    cursor (`in`). O título ordena pela relação `latest.title`, sem SQL
+    cru; texto compara byte a byte e enum pelo nome guardado. Uma questão
+    sem `latest` (estado que só existe dentro da criação) não aparece na
+    página nem na contagem. Pela REST a lista sai na ordem padrão: `sort`
+    não é parâmetro da API.
+12. **Filtros e ordem da página ficam na URL** e vão ao service. Mudar
+    filtro ou ordem leva à primeira página (o cursor sai da URL). O que o
+    filtro oferece (as tags do banco de questões) vem de uma leitura
+    estreita do service (`question.tags`), não da página carregada.
 6. **A camada REST só embrulha.** `findManyHandler` chama `findPage` quando o
    service tem, e senão devolve `{ items: await findMany(), next: null }`.
 7. **Quebra a CLI instalada.** Aceito: o snapshot do OpenAPI, o cliente gerado
@@ -129,9 +149,11 @@ e `test/list-pagination.spec.ts`.
 
 **Dentro de um curso.**
 
-10. `/questions`: `QuestionsTable` filtra, ordena e monta o menu de tags no
-    cliente sobre o banco inteiro. Os filtros precisam ir para a URL (o
-    service já aceita `statuses`, `types`, `tags`).
+10. [x] `/questions`: `question.findPage` com `sort`, `count` e `tags`;
+    filtros e ordenação na URL (`src/utils/question-list-query.ts`). A
+    coluna de tags só filtra. Feito em 2026-11-15, o que também paginou a
+    lista REST de questões. Testes em `test/question-pages.spec.ts` e
+    `test/question-bank-page.spec.ts`.
 11. `/roster` e `/attendance`: o CSV e os totais precisam do conjunto inteiro.
 12. `/resources`: agrupado por tipo e por evento.
 13. `/exams`: `ExamsTable` ordena no cliente.

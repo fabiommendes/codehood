@@ -12,13 +12,15 @@ import { type Actor, SYSTEM } from "@/auth/actor";
 import { ensurePerm, hasPerm } from "@/auth/permissions";
 import { generateToken } from "@/auth/token";
 import { InvalidData, NotAllowed, NotFound } from "@/core/error";
-import type { QuestionRefId } from "@/core/schemas";
+import type { Page, QuestionRefId, QuestionSortField } from "@/core/schemas";
 import {
 	codeQuestionMeta,
+	pageOf,
 	questionAttachmentPK,
 	questionFilter,
 	questionFindOneFilter,
 	questionFullSchema,
+	questionPageFilter,
 	questionPK,
 	questionPublicSchema,
 	questionWriteCreate,
@@ -33,6 +35,10 @@ import {
 } from "@/db/conditional-write";
 import { enrollmentsOf } from "@/db/course-access";
 import { defineService, op } from "@/db/define-service";
+import {
+	QuestionStatus as DbQuestionStatus,
+	QuestionType as DbQuestionType,
+} from "@/generated/prisma/enums";
 import { m } from "@/i18n";
 import {
 	type PublicQuestion,
@@ -53,6 +59,16 @@ import {
 } from "@/services/attachment-files";
 import { type QuestionStatus, writable } from "@/services/question-status";
 import type { JSONValue } from "@/typing/concrete-types";
+import {
+	cutPage,
+	decodeKeyCursor,
+	encodeKeyCursor,
+	invalidCursor,
+	type PairComparison,
+	pairWhere,
+	scanDirection,
+	seekOf,
+} from "@/utils/cursor";
 import { type PretestSource, pretestSources } from "@/utils/pretest-sources";
 import {
 	type Prisma,
@@ -75,6 +91,8 @@ export type Question = z.infer<typeof questionFullSchema>;
 export type QuestionPublic = z.infer<typeof questionPublicSchema>;
 export type QuestionCreate = z.infer<typeof questionWriteCreate>;
 export type QuestionFilter = z.infer<typeof questionFilter>;
+/// A {@link QuestionFilter} plus where a page starts and its order.
+export type QuestionPageFilter = z.infer<typeof questionPageFilter>;
 export type QuestionPK = z.infer<typeof questionPK>;
 /// A primary key plus the stored version to read, as `findOne` takes it.
 export type QuestionFindOneFilter = z.infer<typeof questionFindOneFilter>;
@@ -114,6 +132,18 @@ function questionInclude<Private extends boolean = false>(
 			},
 		},
 		questionTags: { select: { tag: true } },
+	} satisfies Prisma.QuestionRefInclude;
+}
+
+/// The include of {@link questionInclude}, plus the title a page orders by.
+function pageInclude<Private extends boolean>(
+	actor: Actor,
+	includePrivate: Private,
+) {
+	const include = questionInclude(actor, includePrivate);
+	return {
+		...include,
+		latest: { select: { ...include.latest.select, title: true } },
 	} satisfies Prisma.QuestionRefInclude;
 }
 
@@ -361,44 +391,7 @@ const buildQuestionService = (deps: Deps) =>
 				filter: QuestionFilter,
 				opts: ServiceOptsWithoutTx,
 			): Promise<QuestionView[]> => {
-				const course = valueOrNotFound(
-					"course",
-					await tx.course.findUnique({
-						where: courseRefWhere(filter.course),
-						select: {
-							id: true,
-							instructor: { select: { username: true } },
-							enrollments: enrollmentsOf(opts.actor),
-						},
-					}),
-				);
-
-				if (!hasPerm(opts.actor, "course.read-contents", course)) {
-					throw new NotAllowed("question.read");
-				}
-
-				const full = hasPerm(opts.actor, "course.update-contents", course);
-				const isPublic = filter.public ?? !full;
-				if (filter.public === false && !full) {
-					throw new NotAllowed("question.read");
-				}
-
-				const where = {
-					AND: [
-						questionWhere(opts.actor, isPublic),
-						{
-							courseId: course.id,
-							...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
-							...(filter.statuses ? { status: { in: filter.statuses } } : {}),
-							...(filter.types
-								? { type: { in: filter.types.map(toDbType) } }
-								: {}),
-							...(filter.tags
-								? { questionTags: { some: { tag: { in: filter.tags } } } }
-								: {}),
-						},
-					],
-				} satisfies Prisma.QuestionRefWhereInput;
+				const { where, isPublic } = await listScope(tx, filter, opts.actor);
 
 				if (isPublic) {
 					const rows = await tx.questionRef.findMany({
@@ -415,6 +408,124 @@ const buildQuestionService = (deps: Deps) =>
 					orderBy: { slug: "asc" },
 				});
 				return rows.map(fromDb);
+			},
+		});
+
+		/**
+		 * Lists one page of the questions of a course that `actor` may see,
+		 * ordered by `filter.sort` and by `slug` when it is left out.
+		 *
+		 * `filter.public` picks the view, as in `findOne`. A question that has no
+		 * version yet is left out.
+		 *
+		 * @throws {@link InvalidData} When `filter.after` or `filter.before` is not
+		 * a cursor of this list in this order.
+		 */
+		const findPage = op({
+			transaction: false,
+			args: [questionPageFilter],
+			returns: pageOf(questionView),
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionPageFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<Page<QuestionView>> => {
+				const scope = await listScope(tx, filter, opts.actor);
+				const sort = filter.sort ?? { field: "slug", direction: "asc" };
+				const column = SORT_COLUMNS[sort.field];
+				const order = `${sort.field}:${sort.direction}`;
+				const seek = seekOf(filter);
+				const key =
+					seek.cursor === undefined
+						? undefined
+						: decodeKeyCursor(
+								seek.cursor,
+								order,
+								seek.back ? "before" : "after",
+							);
+				if (
+					key !== undefined &&
+					(typeof key.value === "number") !== (column.numeric ?? false)
+				)
+					throw invalidCursor(seek.back ? "before" : "after");
+				const direction = scanDirection(sort.direction, seek);
+				const query = {
+					where: {
+						AND: [
+							scope.where,
+							HAS_VERSION,
+							key === undefined
+								? {}
+								: pairWhere(key.value, key.id, direction, column.where),
+						],
+					},
+					orderBy: [column.orderBy(direction), { id: direction }],
+					take: seek.limit + 1,
+				} satisfies Prisma.QuestionRefFindManyArgs;
+				const cursorOf = (row: SortableRow) =>
+					encodeKeyCursor(order, { value: column.value(row), id: row.id });
+
+				if (scope.isPublic) {
+					const rows = await tx.questionRef.findMany({
+						...query,
+						include: pageInclude(opts.actor, false),
+					});
+					const { page, next, prev } = cutPage(rows, seek, cursorOf);
+					return { items: page.map(fromDbPublic), next, prev };
+				}
+
+				const rows = await tx.questionRef.findMany({
+					...query,
+					include: pageInclude(opts.actor, true),
+				});
+				const { page, next, prev } = cutPage(rows, seek, cursorOf);
+				return { items: page.map(fromDb), next, prev };
+			},
+		});
+
+		/** Counts the questions {@link findPage} lists for `filter`, across every page. */
+		const count = op({
+			transaction: false,
+			args: [questionFilter],
+			returns: z.number().int(),
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<number> => {
+				const { where } = await listScope(tx, filter, opts.actor);
+				return tx.questionRef.count({ where: { AND: [where, HAS_VERSION] } });
+			},
+		});
+
+		/**
+		 * Lists every tag carried by the questions of a course that `actor` may
+		 * see, in alphabetical order.
+		 *
+		 * Only `filter.course` and `filter.public` narrow it: the other filters
+		 * of the list are ignored, so the answer names what a list can be filtered by.
+		 */
+		const tags = op({
+			transaction: false,
+			args: [questionFilter],
+			returns: z.string().array(),
+			run: async (
+				tx: PrismaTx,
+				filter: QuestionFilter,
+				opts: ServiceOptsWithoutTx,
+			): Promise<string[]> => {
+				const { where } = await listScope(
+					tx,
+					{ course: filter.course, public: filter.public },
+					opts.actor,
+				);
+				const rows = await tx.questionTags.findMany({
+					where: { question: { AND: [where, HAS_VERSION] } },
+					distinct: ["tag"],
+					select: { tag: true },
+					orderBy: { tag: "asc" },
+				});
+				return rows.map((row) => row.tag);
 			},
 		});
 
@@ -682,6 +793,9 @@ const buildQuestionService = (deps: Deps) =>
 			codeAnswer,
 			attachment,
 			findMany,
+			findPage,
+			count,
+			tags,
 			update,
 			upsert,
 			delete: remove,
@@ -711,7 +825,7 @@ type QuestionServiceBuilt = ReturnType<ReturnType<typeof buildQuestionService>>;
 /** The question service, as built by {@link makeQuestionService}. */
 export type QuestionService = Omit<
 	QuestionServiceBuilt,
-	"findOne" | "findMany"
+	"findOne" | "findMany" | "findPage"
 > & {
 	findOne: {
 		(
@@ -737,6 +851,20 @@ export type QuestionService = Omit<
 			opts: ServiceOpts,
 		): Promise<Question[]>;
 		(filter: QuestionFilter, opts: ServiceOpts): Promise<QuestionView[]>;
+	};
+	findPage: {
+		(
+			filter: QuestionPageFilter & { public: true },
+			opts: ServiceOpts,
+		): Promise<Page<QuestionPublic>>;
+		(
+			filter: QuestionPageFilter & { public: false },
+			opts: ServiceOpts,
+		): Promise<Page<Question>>;
+		(
+			filter: QuestionPageFilter,
+			opts: ServiceOpts,
+		): Promise<Page<QuestionView>>;
 	};
 };
 
@@ -772,6 +900,136 @@ export function questionWhere(
 
 	return {
 		OR: [owned, { status: "PUBLISHED", course: courseContentsWhere(actor) }],
+	};
+}
+
+/// Leaves out a question that has no version yet, which no view can show.
+const HAS_VERSION = {
+	latestId: { not: null },
+} satisfies Prisma.QuestionRefWhereInput;
+
+/// What a page reads of a row to make its cursor.
+type SortableRow = Pick<DbQuestionPublic, "id" | "slug" | "status" | "type"> & {
+	updatedAt: Date;
+	latest: { title: string } | null;
+};
+
+/// How a cursor value compares to a column.
+type CursorComparison = PairComparison<string | number>;
+
+/// How a page orders by one column: its place in `orderBy` and in the
+/// `where` past a cursor, and the value a cursor keeps of it.
+type SortColumn = {
+	orderBy: (
+		direction: "asc" | "desc",
+	) => Prisma.QuestionRefOrderByWithRelationInput;
+	where: (comparison: CursorComparison) => Prisma.QuestionRefWhereInput;
+	value: (row: SortableRow) => string | number;
+	/// Whether the cursor keeps a number, and text otherwise.
+	numeric?: true;
+};
+
+/// The condition on an enum column, which Prisma compares only for equality:
+/// the names past the cursor are listed instead.
+function enumPast<Name extends string>(
+	names: Record<string, Name>,
+	comparison: CursorComparison,
+): Name | { in: Name[] } {
+	if ("equals" in comparison) return comparison.equals as Name;
+	return {
+		in: Object.values(names).filter((name) =>
+			"gt" in comparison ? name > comparison.gt : name < comparison.lt,
+		),
+	};
+}
+
+/// The columns a page can be ordered by. Text compares byte by byte, as
+/// SQLite stores it, and an enum by its stored name.
+const SORT_COLUMNS: Record<QuestionSortField, SortColumn> = {
+	slug: {
+		orderBy: (slug) => ({ slug }),
+		where: (slug) => ({ slug: slug as PairComparison<string> }),
+		value: (row) => row.slug,
+	},
+	title: {
+		orderBy: (title) => ({ latest: { title } }),
+		where: (title) => ({
+			latest: { title: title as PairComparison<string> },
+		}),
+		value: (row) => row.latest?.title ?? "",
+	},
+	status: {
+		orderBy: (status) => ({ status }),
+		where: (past) => ({ status: enumPast(DbQuestionStatus, past) }),
+		value: (row) => row.status,
+	},
+	type: {
+		orderBy: (type) => ({ type }),
+		where: (past) => ({ type: enumPast(DbQuestionType, past) }),
+		value: (row) => row.type,
+	},
+	updated: {
+		orderBy: (updatedAt) => ({ updatedAt }),
+		where: (past) => {
+			const [[side, time] = []] = Object.entries(past);
+			return { updatedAt: { [side ?? "equals"]: new Date(time ?? 0) } };
+		},
+		value: (row) => row.updatedAt.getTime(),
+		numeric: true,
+	},
+};
+
+/**
+ * The `where` of the questions of `filter.course` that `actor` may list, and
+ * the view the list returns.
+ *
+ * @throws {@link NotFound} When the course does not exist.
+ * @throws {@link NotAllowed} When `actor` may not read the contents of the
+ * course, or asks for the whole documents without the right to see them.
+ */
+async function listScope(
+	tx: PrismaTx,
+	filter: QuestionFilter,
+	actor: Actor,
+): Promise<{ where: Prisma.QuestionRefWhereInput; isPublic: boolean }> {
+	const course = valueOrNotFound(
+		"course",
+		await tx.course.findUnique({
+			where: courseRefWhere(filter.course),
+			select: {
+				id: true,
+				instructor: { select: { username: true } },
+				enrollments: enrollmentsOf(actor),
+			},
+		}),
+	);
+
+	if (!hasPerm(actor, "course.read-contents", course)) {
+		throw new NotAllowed("question.read");
+	}
+
+	const full = hasPerm(actor, "course.update-contents", course);
+	const isPublic = filter.public ?? !full;
+	if (filter.public === false && !full) {
+		throw new NotAllowed("question.read");
+	}
+
+	return {
+		isPublic,
+		where: {
+			AND: [
+				questionWhere(actor, isPublic),
+				{
+					courseId: course.id,
+					...(filter.slugs ? { slug: { in: filter.slugs } } : {}),
+					...(filter.statuses ? { status: { in: filter.statuses } } : {}),
+					...(filter.types ? { type: { in: filter.types.map(toDbType) } } : {}),
+					...(filter.tags
+						? { questionTags: { some: { tag: { in: filter.tags } } } }
+						: {}),
+				},
+			],
+		},
 	};
 }
 

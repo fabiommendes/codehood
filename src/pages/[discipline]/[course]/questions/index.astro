@@ -5,7 +5,10 @@ import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { listUrl, readPage } from "@/utils/list-page";
 import { loadCourse } from "@/utils/load-course";
+import { pageLinks } from "@/utils/page-links";
+import { readQuestionListQuery } from "@/utils/question-list-query";
 
 export const prerender = false;
 
@@ -19,10 +22,34 @@ const { course, href } = result;
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
 
-const questions = await db.question.findMany(
-	{ course: course.id, public: false },
-	{ actor },
-);
+const here = listUrl(Astro.url);
+const bank = { course: course.id, public: false } as const;
+const asked = readQuestionListQuery(here.searchParams);
+
+// A tag no question carries any more filters nothing.
+const tags = await db.question.tags(bank, { actor });
+const query = {
+	...asked,
+	tags: asked.tags.filter((tag) => tags.includes(tag)),
+};
+function some<Item>(items: Item[]): Item[] | undefined {
+	return items.length > 0 ? items : undefined;
+}
+const filter = {
+	...bank,
+	statuses: some(query.statuses),
+	types: some(query.types),
+	tags: some(query.tags),
+};
+const filtered = Boolean(filter.statuses || filter.types || filter.tags);
+
+const [page, total, bankTotal] = await Promise.all([
+	readPage(here, (params) =>
+		db.question.findPage({ ...filter, sort: query.sort, ...params }, { actor }),
+	),
+	db.question.count(filter, { actor }),
+	filtered ? db.question.count(bank, { actor }) : undefined,
+]);
 
 // The course's URL segments, read off the loaded course — see roster.astro's
 // `courseParams` for why not `Astro.params` directly.
@@ -42,7 +69,12 @@ const courseParams = {
     <p class="mt-1 text-sm text-muted">{course.discipline.name}</p>
 
     <QuestionsTable
-      questions={questions.map(({ id: _id, ...q }) => q)}
+      questions={page.items.map(({ id: _id, ...q }) => q)}
+      cursor={{ ...pageLinks(here, page), total }}
+      bankTotal={bankTotal ?? total}
+      tags={tags}
+      query={query}
+      search={here.search}
       href={href}
       discipline={courseParams.discipline}
       course={courseParams.course}

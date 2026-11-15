@@ -59,6 +59,100 @@ export function invalidCursor(
 	);
 }
 
+/// The key of a row in a list ordered by a column and then by row id: the
+/// value of that column and the id that breaks its ties.
+export interface PairKey {
+	value: string | number;
+	id: number;
+}
+
+/**
+ * The cursor that stands for the row of `key` in the list ordered as `order`.
+ *
+ * `order` names the column and the direction of the list, so that a cursor
+ * is only read back by the list that made it.
+ *
+ * @example
+ * encodeKeyCursor("status:asc", { value: "DRAFT", id: 12 });
+ */
+export function encodeKeyCursor(order: string, key: PairKey): string {
+	const text = JSON.stringify([order, key.value, encodeCursor(key.id)]);
+	return Buffer.from(text, "utf8").toString("base64url");
+}
+
+/**
+ * The key a cursor of the list ordered as `order` stands for.
+ *
+ * @throws {@link InvalidData} When `cursor` was not made by
+ * {@link encodeKeyCursor}, or was made for another order.
+ */
+export function decodeKeyCursor(
+	cursor: string,
+	order: string,
+	param: "after" | "before" = "after",
+): PairKey {
+	let parts: unknown;
+	try {
+		parts = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+	} catch {
+		throw invalidCursor(param);
+	}
+	if (!Array.isArray(parts) || parts.length !== 3) throw invalidCursor(param);
+	const [madeFor, value, id] = parts;
+	if (
+		madeFor !== order ||
+		(typeof value !== "string" && typeof value !== "number") ||
+		typeof id !== "string"
+	)
+		throw invalidCursor(param);
+	return { value, id: decodeCursor(id, param) };
+}
+
+/// How one side of a {@link pairWhere} compares a column to the cursor.
+export type PairComparison<Value> =
+	| { gt: Value }
+	| { lt: Value }
+	| { equals: Value };
+
+/**
+ * The Prisma `where` of the rows past `key`, in a scan ordered `direction` by
+ * a column and then by `id`.
+ *
+ * Rows that repeat the value of the cursor are told apart by their id, so a
+ * page never skips or repeats one of them.
+ *
+ * @example
+ * const direction = scanDirection("desc", seek);
+ * const rows = await tx.thing.findMany({
+ *   where: key ? pairWhere(key.value, key.id, direction, (status) => ({ status })) : {},
+ *   orderBy: [{ status: direction }, { id: direction }],
+ *   take: seek.limit + 1,
+ * });
+ *
+ * @param column Builds the condition that compares the ordered column.
+ */
+export function pairWhere<Value, Where>(
+	value: Value,
+	id: number,
+	direction: "asc" | "desc",
+	column: (comparison: PairComparison<Value>) => Where,
+): { OR: [Where, { AND: [Where, { id: { gt: number } | { lt: number } }] }] } {
+	const past = direction === "asc" ? { gt: value } : { lt: value };
+	const pastId = direction === "asc" ? { gt: id } : { lt: id };
+	return {
+		OR: [column(past), { AND: [column({ equals: value }), { id: pastId }] }],
+	};
+}
+
+/** The direction a query scans a list ordered `direction` to read the page of `seek`. */
+export function scanDirection(
+	direction: "asc" | "desc",
+	seek: Seek,
+): "asc" | "desc" {
+	if (!seek.back) return direction;
+	return direction === "asc" ? "desc" : "asc";
+}
+
 /// Where a page starts: past `cursor` going forward, or behind it when `back`.
 export interface Seek {
 	limit: number;

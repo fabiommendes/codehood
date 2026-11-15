@@ -2451,6 +2451,9 @@ def list_question(
     | None = None,
     tags: list[str] | None = None,
     public: bool | None = None,
+    limit: int | None = None,
+    after: str | None = None,
+    before: str | None = None,
     client: httpx.Client | None = None,
 ) -> ListQuestionResponse:
     """
@@ -2468,6 +2471,9 @@ def list_question(
                 "types": types,
                 "tags": tags,
                 "public": public,
+                "limit": limit,
+                "after": after,
+                "before": before,
             }
         ),
         headers=auth_headers(client),

@@ -5,6 +5,7 @@ import type { AssertEqual } from "@/utils/types";
 import { buffer, questionRefId, rev, rowVersion, slug } from "./base";
 import { blobHash } from "./blob";
 import { courseRef } from "./course";
+import { pageParams } from "./page";
 
 export const questionSchema = z.object({
 	slug: slug,
@@ -122,6 +123,29 @@ export const questionFilterBase = z.object({
 });
 
 export const questionFilter = questionFilterBase.extend({ course: courseRef });
+
+/// The columns a page of questions can be ordered by.
+export const questionSortField = z.enum([
+	"slug",
+	"title",
+	"status",
+	"type",
+	"updated",
+]);
+export type QuestionSortField = z.infer<typeof questionSortField>;
+
+/// The order of a page of questions: a column and its direction.
+export const questionSort = z.object({
+	field: questionSortField,
+	direction: z.enum(["asc", "desc"]),
+});
+export type QuestionSort = z.infer<typeof questionSort>;
+
+/// What a page of questions takes: the filter of the list, where the page starts and its order, by `slug` ascending when left out.
+export const questionPageFilter = questionFilter.extend({
+	...pageParams.shape,
+	sort: questionSort.optional(),
+});
 
 export const questionStatus = questionSchema.shape.status;
 

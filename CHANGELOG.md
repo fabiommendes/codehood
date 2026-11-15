@@ -203,6 +203,21 @@
   da mais recente para a mais antiga. `discipline` e `edition` ganham
   `findPage` e `count`.
 
+- O banco de questões do professor (`/<curso>/questions`) lê uma página por
+  vez do servidor. Filtros (`status`, `type`, `tags`) e ordenação (`sort`,
+  `dir`) ficam na URL e vão ao service; mudar um deles volta à primeira
+  página. As colunas título, tipo, status e atualização ordenam; a de tags
+  só filtra. Tipo e status ordenam pelo nome guardado no banco e o título
+  byte a byte, não mais pelo rótulo traduzido. O menu de tags vem de
+  `question.tags`, com as tags do banco inteiro. `question` ganha `findPage`
+  (com `sort`: `slug`, `title`, `status`, `type` ou `updated`, nos dois
+  sentidos), `count` e `tags`. O cursor é o par (valor da coluna ordenada,
+  id), feito com `encodeKeyCursor`, `pairWhere` e `scanDirection` de
+  `src/utils/cursor.ts`; ele carrega a ordem, e usado em outra é `400`.
+
+- **Muda a API REST:** a lista `GET` de questões de um curso é paginada por cursor,
+  com `limit`, `after` e `before`, em ordem de slug.
+
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento
