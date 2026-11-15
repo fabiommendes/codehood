@@ -7,13 +7,18 @@ import {
 	editionPK,
 	editionSchema,
 	editionUpdate,
+	type Page,
+	type PageParams,
+	pageOf,
+	pageParams,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
+import { cutPage, seekOf } from "@/utils/cursor";
 import { isDateWithin, todayIn } from "@/utils/schedule-time";
-import type { PrismaTx } from "../client";
+import type { Prisma, PrismaTx } from "../client";
 
 //
 // Type definitions
@@ -35,7 +40,7 @@ type EditionT = {
 
 /**
  * Every user sees every edition — they are labels on courses, not secrets —
- * so `findOne`/`findMany` carry no permission rule.
+ * so the reads carry no permission rule.
  *
  * Only the writes carry a rule, because an edition slug occupies part of the
  * course URL namespace and is shared by every instructor teaching that term.
@@ -104,20 +109,54 @@ export const makeEditionService = defineService<EditionT>()(() => {
 			tx: PrismaTx,
 			filter: EditionFilter,
 			_opts: ServiceOptsWithoutTx,
-		): Promise<Edition[]> => {
-			const today = todayIn();
-			return tx.edition.findMany({
+		): Promise<Edition[]> =>
+			tx.edition.findMany({
+				where: listWhere(filter),
+				orderBy: { slug: "desc" },
+			}),
+	});
+
+	/**
+	 * Lists one page of the editions, by slug with the latest first.
+	 *
+	 * A cursor is the slug of the edition at that end of the page.
+	 */
+	const findPage = op({
+		transaction: false,
+		args: [editionFilter.extend(pageParams.shape)],
+		returns: pageOf(editionSchema),
+		run: async (
+			tx: PrismaTx,
+			filter: EditionFilter & PageParams,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Page<Edition>> => {
+			const seek = seekOf(filter);
+			const rows = await tx.edition.findMany({
 				where: {
 					AND: [
-						filter.slugs ? { slug: { in: filter.slugs } } : {},
-						filter.active
-							? { startDate: { lte: today }, endDate: { gte: today } }
-							: {},
+						listWhere(filter),
+						seek.cursor === undefined
+							? {}
+							: { slug: seek.back ? { gt: seek.cursor } : { lt: seek.cursor } },
 					],
 				},
-				orderBy: { slug: "desc" },
+				orderBy: { slug: seek.back ? "asc" : "desc" },
+				take: seek.limit + 1,
 			});
+			const { page, next, prev } = cutPage(rows, seek, (row) => row.slug);
+			return { items: page, next, prev };
 		},
+	});
+
+	/** Counts the editions that match `filter`. */
+	const count = op({
+		transaction: false,
+		args: [editionFilter],
+		run: async (
+			tx: PrismaTx,
+			filter: EditionFilter,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<number> => tx.edition.count({ where: listWhere(filter) }),
 	});
 
 	/**
@@ -226,11 +265,33 @@ export const makeEditionService = defineService<EditionT>()(() => {
 		},
 	});
 
-	return { create, findOne, findMany, update, upsert, delete: remove };
+	return {
+		create,
+		findOne,
+		findMany,
+		findPage,
+		count,
+		update,
+		upsert,
+		delete: remove,
+	};
 });
 
 /** The edition service, as built by {@link makeEditionService}. */
 export type EditionService = ReturnType<typeof makeEditionService>;
+
+/// The editions that match `filter`; `active` means open right now.
+function listWhere(filter: EditionFilter): Prisma.EditionWhereInput {
+	const today = todayIn();
+	return {
+		AND: [
+			filter.slugs ? { slug: { in: filter.slugs } } : {},
+			filter.active
+				? { startDate: { lte: today }, endDate: { gte: today } }
+				: {},
+		],
+	};
+}
 
 function assertWindow(startDate: string, endDate: string): void {
 	if (startDate > endDate) {

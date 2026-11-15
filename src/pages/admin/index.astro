@@ -7,7 +7,7 @@ import InvitesTable from "@/components/admin/InvitesTable";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { disciplineCreate, editionForm, invitePersonal } from "@/core/schemas";
-import { db, type Invite, isEditionOpen } from "@/db";
+import { db, type Invite } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
@@ -47,28 +47,35 @@ const editionFormState = await actionForm(
 	{ id: "new-edition" },
 );
 
-const [userCounts, courseCount, disciplines, editions, invites] =
-	await Promise.all([
-		db.user.countByRole({ actor }),
-		db.course.count({}, { actor }),
-		db.discipline.findMany({}, { actor }),
-		db.edition.findMany({}, { actor }),
-		db.invite.findMany({ kind: "PERSONAL" }, { actor }),
-	]);
+/// Disciplines named in the overview before the rest is summed up as a count.
+const SAMPLE_SIZE = 3;
+
+const [
+	userCounts,
+	courseCount,
+	disciplineCount,
+	disciplineSampled,
+	editionCount,
+	liveEditions,
+	invites,
+] = await Promise.all([
+	db.user.countByRole({ actor }),
+	db.course.count({}, { actor }),
+	db.discipline.count({}, { actor }),
+	db.discipline.findPage({ limit: SAMPLE_SIZE }, { actor }),
+	db.edition.count({}, { actor }),
+	db.edition.count({ active: true }, { actor }),
+	db.invite.findMany({ kind: "PERSONAL" }, { actor }),
+]);
 
 const userCount = userCounts.ADMIN + userCounts.INSTRUCTOR + userCounts.STUDENT;
 
-const liveEditions = editions.filter((e) => isEditionOpen(e)).length;
-
-const sampleList = disciplines
-	.slice(0, 3)
-	.map((d) => d.slug)
-	.join(", ");
+const sampleList = disciplineSampled.items.map((d) => d.slug).join(", ");
 const disciplineSample =
-	disciplines.length > 3
+	disciplineCount > SAMPLE_SIZE
 		? m.admin_overview_disciplines_more({
 				list: sampleList,
-				count: disciplines.length - 3,
+				count: disciplineCount - SAMPLE_SIZE,
 			})
 		: sampleList;
 
@@ -118,16 +125,16 @@ const editionCreatedParts = editionResult?.data
       <div class="stat">
         <div class="stat-title">{m.admin_overview_stat_courses()}</div>
         <div class="stat-value text-2xl">{courseCount}</div>
-        <div class="stat-desc">{m.admin_overview_across_disciplines({ count: disciplines.length })}</div>
+        <div class="stat-desc">{m.admin_overview_across_disciplines({ count: disciplineCount })}</div>
       </div>
       <div class="stat">
         <div class="stat-title">{m.admin_overview_stat_disciplines()}</div>
-        <div class="stat-value text-2xl">{disciplines.length}</div>
+        <div class="stat-value text-2xl">{disciplineCount}</div>
         <div class="stat-desc">{disciplineSample || m.admin_overview_none_yet()}</div>
       </div>
       <div class="stat">
         <div class="stat-title">{m.admin_overview_stat_editions()}</div>
-        <div class="stat-value text-2xl">{editions.length}</div>
+        <div class="stat-value text-2xl">{editionCount}</div>
         <div class="stat-desc">{m.admin_overview_live_now({ count: liveEditions })}</div>
       </div>
     </div>

@@ -3,11 +3,14 @@ import { type JSX, Show } from "solid-js";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import Badge from "@/components/ui/Badge";
-import Table, { type ColumnConfig } from "@/components/ui/Table";
+import PaginatedTable from "@/components/ui/PaginatedTable";
+import type { CursorPage } from "@/components/ui/Pagination";
+import type { ColumnConfig } from "@/components/ui/Table";
 import type { editionForm } from "@/core/schemas";
 import type { FormState } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
 import type { IsoDate } from "@/typing/iso-date";
+import { actionHref } from "@/utils/list-page";
 import { formatIsoDate } from "@/utils/schedule-time";
 
 /**
@@ -26,7 +29,12 @@ export interface EditionRow {
 }
 
 interface Props {
+	/// One page of the editions.
 	editions: EditionRow[];
+	/// Links to the pages around this one, and the editions in all.
+	cursor: CursorPage;
+	/// The query of the page, which the forms of a row post back to.
+	search: string;
 	/// State of the edit form, as read from the action result of the page.
 	editForm: FormState<typeof editionForm>;
 	/// The slug whose edit failed, so only that row shows the errors and the typed values.
@@ -123,7 +131,7 @@ export default function EditionsTable(props: Props): JSX.Element {
 
 					<form
 						method="post"
-						action={actions.admin.deleteEdition}
+						action={actionHref(actions.admin.deleteEdition, props.search)}
 						class="inline"
 					>
 						<input type="hidden" name="slug" value={row.slug} />
@@ -173,7 +181,7 @@ export default function EditionsTable(props: Props): JSX.Element {
 							</h3>
 							<form
 								method="post"
-								action={actions.admin.updateEdition}
+								action={actionHref(actions.admin.updateEdition, props.search)}
 								class="mt-4 flex flex-col gap-4"
 							>
 								<input type="hidden" name="slug" value={row.slug} />
@@ -199,5 +207,12 @@ export default function EditionsTable(props: Props): JSX.Element {
 		},
 	];
 
-	return <Table columns={columns} data={props.editions} class="mt-8" />;
+	return (
+		<PaginatedTable
+			columns={columns}
+			data={props.editions}
+			cursor={props.cursor}
+			class="mt-8"
+		/>
+	);
 }

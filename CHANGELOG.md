@@ -184,6 +184,25 @@
   `findMany` continua devolvendo array. A CLI segue `next` em toda lista.
   Contrato em `dev/specs/to-do/paginacao-das-listas.md`.
 
+- `/admin/courses`, `/admin/users`, `/admin/disciplines`, `/admin/editions` e
+  `/courses` mostram uma página de 50 linhas lida pelo servidor
+  (`PaginatedTable` com cursor; na grade de `/courses`, `CursorPagination`),
+  com o total ao lado dos links. `?limit=` (1 a 500) troca o tamanho da
+  página e segue nos links: `?limit=2` mostra a paginação com os dados do
+  seed. Os formulários dessas páginas postam para a URL em que estão
+  (`actionHref`), então o resultado volta na mesma página da lista. Um cursor
+  ilegível, ou que leva a uma página vazia, mostra a primeira página
+  (`readPage`, em `src/utils/list-page.ts`). `/admin/users` passa a ordenar
+  por `username` (antes, os mais recentes primeiro) e `/admin/disciplines`
+  por slug (antes, por nome). `/admin` conta disciplinas, edições e edições
+  abertas em vez de carregá-las.
+
+- **Muda a API REST:** `GET /api/discipline` e `GET /api/edition` são
+  paginadas por cursor, com `limit`, `after` e `before`. O cursor é o slug.
+  Disciplinas saem por slug crescente (antes, por nome); edições continuam
+  da mais recente para a mais antiga. `discipline` e `edition` ganham
+  `findPage` e `count`.
+
 - A "Visão do estudante" da página da prova do professor usa a moldura
   (`QuestionFrame`) e os campos de resposta (`AnswerField`) da tentativa do
   aluno, extraídos de `ExamAttempt`, com a forma pública e o embaralhamento

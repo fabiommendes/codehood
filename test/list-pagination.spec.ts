@@ -2,8 +2,11 @@ import { expect, test } from "@playwright/test";
 import { SYSTEM } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
 import type { Page, PageParams } from "@/core/schemas";
-import { db } from "@/db";
+import { db, isEditionOpen } from "@/db";
+import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
+import { persistedEditionFactory } from "@/fixtures/edition.factory";
 import { cutPage, decodeCursor, encodeCursor, seekOf } from "@/utils/cursor";
+import { actionHref, listUrl, pageLimit, readPage } from "@/utils/list-page";
 import { cursorParams, pageLinks } from "@/utils/page-links";
 
 const opts = { actor: SYSTEM } as const;
@@ -135,7 +138,9 @@ test.describe("paginated lists", () => {
 		);
 	});
 
-	test("walking back from the last page of courses and of users returns every page in order", async () => {
+	test("walking back from the last page of each paginated list returns every page in order", async () => {
+		await persistedDisciplineFactory.createList(2);
+		await persistedEditionFactory.createList(2);
 		const lists: {
 			page: (params: PageParams) => Promise<Page<unknown>>;
 			key: (item: unknown) => unknown;
@@ -147,6 +152,14 @@ test.describe("paginated lists", () => {
 			{
 				page: (params: PageParams) => db.user.findPage(params, opts),
 				key: (item: unknown) => (item as { username: string }).username,
+			},
+			{
+				page: (params: PageParams) => db.discipline.findPage(params, opts),
+				key: (item: unknown) => (item as { slug: string }).slug,
+			},
+			{
+				page: (params: PageParams) => db.edition.findPage(params, opts),
+				key: (item: unknown) => (item as { slug: string }).slug,
 			},
 		];
 		for (const { page, key } of lists) {
@@ -234,5 +247,129 @@ test.describe("paginated lists", () => {
 			(await db.course.countBy("discipline", { actor: outsider as never }))
 				.size,
 		).toBe(0);
+	});
+
+	test("the pages of disciplines cover every discipline once, by slug", async () => {
+		await persistedDisciplineFactory.createList(3);
+		const all = await db.discipline.findMany({}, opts);
+		const slugs = all.map((discipline) => discipline.slug).sort();
+
+		for (const limit of [1, 2, all.length, all.length + 1]) {
+			const { items, pages } = await walk((after) =>
+				db.discipline.findPage({ limit, after }, opts),
+			);
+			expect(items.map((discipline) => discipline.slug)).toEqual(slugs);
+			expect(pages).toBe(Math.max(1, Math.ceil(all.length / limit)));
+		}
+		expect(await db.discipline.count({}, opts)).toBe(all.length);
+	});
+
+	test("the pages of editions cover every edition once, the latest slug first", async () => {
+		await persistedEditionFactory.createList(3);
+		const all = await db.edition.findMany({}, opts);
+		const slugs = all.map((edition) => edition.slug);
+		expect(slugs).toEqual([...slugs].sort().reverse());
+
+		for (const limit of [1, 2, all.length + 1]) {
+			const { items, pages } = await walk((after) =>
+				db.edition.findPage({ limit, after }, opts),
+			);
+			expect(items.map((edition) => edition.slug)).toEqual(slugs);
+			expect(pages).toBe(Math.max(1, Math.ceil(all.length / limit)));
+		}
+		expect(await db.edition.count({}, opts)).toBe(all.length);
+	});
+
+	test("a page of disciplines or editions keeps the filter and the count agrees with it", async () => {
+		const disciplines = await persistedDisciplineFactory.createList(3);
+		const slugs = disciplines.map((discipline) => discipline.slug);
+		const some = await walk((after) =>
+			db.discipline.findPage({ slugs, limit: 2, after }, opts),
+		);
+		expect(some.items.map((discipline) => discipline.slug)).toEqual(
+			[...slugs].sort(),
+		);
+		expect(await db.discipline.count({ slugs }, opts)).toBe(3);
+
+		const open = (await db.edition.findMany({}, opts)).filter((edition) =>
+			isEditionOpen(edition),
+		);
+		expect(open.length).toBeGreaterThan(0);
+		const active = await walk((after) =>
+			db.edition.findPage({ active: true, limit: 1, after }, opts),
+		);
+		expect(active.items.map((edition) => edition.slug)).toEqual(
+			open.map((edition) => edition.slug),
+		);
+		expect(await db.edition.count({ active: true }, opts)).toBe(open.length);
+	});
+
+	test("a student pages over the same disciplines and editions as an admin", async () => {
+		const student = {
+			username: "nobody-enrolled",
+			name: "Nobody",
+			role: "STUDENT" as const,
+		};
+		const actor = { actor: student as never };
+		for (const list of [db.discipline, db.edition]) {
+			const mine = await list.findPage({ limit: 500 }, actor);
+			const everything = await list.findPage({ limit: 500 }, opts);
+			expect(mine).toEqual(everything);
+			expect(await list.count({}, actor)).toBe(await list.count({}, opts));
+		}
+	});
+});
+
+test.describe("list pages", () => {
+	test("the page size of a list page comes from its URL, within bounds", () => {
+		const limit = (query: string) =>
+			pageLimit(new URL(`http://x/list${query}`));
+		expect(limit("")).toBe(50);
+		expect(limit("?limit=2")).toBe(2);
+		expect(limit("?limit=0")).toBe(1);
+		expect(limit("?limit=9999")).toBe(500);
+		for (const bad of ["?limit=", "?limit=-3", "?limit=2.5", "?limit=many"])
+			expect(limit(bad)).toBe(50);
+	});
+
+	test("a form posts back to the place in the list it was shown at", () => {
+		const posted = new URL(
+			"http://x/admin/users?_action=admin.createUser&after=bob&limit=2",
+		);
+		const here = listUrl(posted);
+		expect(here.search).toBe("?after=bob&limit=2");
+		expect(posted.searchParams.has("_action")).toBe(true);
+		expect(actionHref("?_action=admin.forceLogout", here.search)).toBe(
+			"?_action=admin.forceLogout&after=bob&limit=2",
+		);
+		expect(actionHref("?_action=admin.forceLogout", "")).toBe(
+			"?_action=admin.forceLogout",
+		);
+		expect(pageLinks(here, { next: "carol", prev: null }).nextHref).toBe(
+			"/admin/users?limit=2&after=carol",
+		);
+	});
+
+	test("a cursor past the last row, or that is not one, reads the first page", async () => {
+		const first = await db.user.findPage({ limit: 2 }, opts);
+		const find = (params: PageParams) => db.user.findPage(params, opts);
+
+		const stranded = await readPage(
+			new URL("http://x/admin/users?limit=2&after=~~~~"),
+			find,
+		);
+		expect(stranded).toEqual(first);
+
+		const courses = (params: PageParams) => db.course.findPage(params, opts);
+		expect(
+			await readPage(new URL("http://x/courses?limit=1&before=NOPE"), courses),
+		).toEqual(await db.course.findPage({ limit: 1 }, opts));
+
+		const second = await readPage(
+			new URL(`http://x/admin/users?limit=2&after=${first.next}`),
+			find,
+		);
+		expect(second.prev).not.toBeNull();
+		expect(second.items[0]?.username).not.toBe(first.items[0]?.username);
 	});
 });

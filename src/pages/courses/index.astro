@@ -2,10 +2,13 @@
 import EmptyState from "@/components/EmptyState.astro";
 import PageKicker from "@/components/PageKicker.astro";
 import Alert from "@/components/ui/Alert";
+import { CursorPagination } from "@/components/ui/Pagination";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { courseHref } from "@/urls";
+import { listUrl, readPage } from "@/utils/list-page";
+import { pageLinks } from "@/utils/page-links";
 
 export const prerender = false;
 
@@ -18,7 +21,11 @@ const justLeft = Astro.url.searchParams.has("left");
 // No "my courses" filter needed: the actor already is one. This returns
 // exactly what that user may see — courses they teach plus courses they're
 // enrolled in — which is precisely the definition of their course list.
-const courses = await db.course.findMany({}, { actor });
+const [page, total] = await Promise.all([
+	readPage(Astro.url, (params) => db.course.findPage(params, { actor })),
+	db.course.count({}, { actor }),
+]);
+const courses = page.items;
 ---
 
 <AppLayout title={isAdmin ? m.courses_list_all_title() : m.courses_list_my_title()}>
@@ -93,6 +100,7 @@ const courses = await db.course.findMany({}, { actor });
             );
           })}
         </div>
+        <CursorPagination {...pageLinks(listUrl(Astro.url), page)} total={total} />
       )
     }
   </main>

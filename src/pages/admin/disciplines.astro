@@ -14,12 +14,15 @@ import { errorMessage } from "@/forms/field-errors";
 import { actionForm, submittedValues } from "@/forms/form-state";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { actionHref, listUrl, readPage } from "@/utils/list-page";
+import { pageLinks } from "@/utils/page-links";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
 // TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
 if (!Astro.locals.actor) return Astro.redirect("/login");
 const actor = Astro.locals.actor;
+const here = listUrl(Astro.url);
 
 const createResult = Astro.getActionResult(actions.admin.createDiscipline);
 const updateResult = Astro.getActionResult(actions.admin.updateDiscipline);
@@ -42,10 +45,13 @@ const failedSlug = updateResult?.error
 	? (await submittedValues(Astro.request)).slug
 	: undefined;
 
-const disciplines = await db.discipline.findMany({}, { actor });
-const courseCounts = await db.course.countBy("discipline", { actor });
+const [page, total, courseCounts] = await Promise.all([
+	readPage(Astro.url, (params) => db.discipline.findPage(params, { actor })),
+	db.discipline.count({}, { actor }),
+	db.course.countBy("discipline", { actor }),
+]);
 
-const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
+const disciplineRows: DisciplineRow[] = page.items.map((discipline) => ({
 	slug: discipline.slug,
 	name: discipline.name,
 	courseCount: courseCounts.get(discipline.slug) ?? 0,
@@ -74,7 +80,7 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
         <h2 class="card-title">{m.admin_new_discipline()}</h2>
         <form
           method="POST"
-          action={actions.admin.createDiscipline}
+          action={actionHref(actions.admin.createDiscipline, here.search)}
           class="mt-2 flex flex-wrap items-start gap-4"
         >
           <FormAlert error={createForm.error} class="w-full" />
@@ -117,6 +123,8 @@ const disciplineRows: DisciplineRow[] = disciplines.map((discipline) => ({
 
     <DisciplinesTable
       disciplines={disciplineRows}
+      cursor={{ ...pageLinks(here, page), total }}
+      search={here.search}
       editForm={editForm}
       failedSlug={failedSlug}
     />

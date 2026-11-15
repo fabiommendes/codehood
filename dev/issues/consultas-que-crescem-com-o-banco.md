@@ -66,11 +66,15 @@ Três casos de `test/admin-form-errors.spec.ts` (formulário "add user", linhas
 146, 184 e 206) falham por timeout no clique. Não investigado; a suspeita é a
 página `/admin/users` com 5 mil linhas.
 
+Resolvido em 2026-11-15: com `/admin/users` paginada os três passam no banco
+cheio. A suspeita ficou confirmada só por esse resultado; o clique em si não
+foi perfilado.
+
 ## Critérios de aceitação
 
 - [x] `feedback.findMany` por curso não percorre `Feedback` inteira.
 - [x] Índice em `Feedback.rubricId` e nas chaves estrangeiras do item 5.
-- [ ] Listas de admin e `GET /api/course`, `/api/user` paginadas.
+- [x] Listas de admin e `GET /api/course`, `/api/user` paginadas.
 - [ ] `pnpm run test:perf` sem rota de curso acima de 2× e sem falhas só no
   banco cheio.
 
@@ -96,3 +100,29 @@ em vez de carregar (162 ms → 5–8 ms e 60–70 ms → 1–3 ms). `test:perf` 
 specs de admin ainda mostra `GET /admin/users` em 18 ms (15×), que lista os 5
 mil usuários, e os três casos de `admin-form-errors` continuam falhando no
 banco cheio. Os dois dependem da tabela paginada.
+
+2026-11-15: `/admin/courses`, `/admin/users`, `/admin/disciplines`,
+`/admin/editions` e `/courses` leem uma página de 50 linhas por cursor, e
+`/admin` conta disciplinas e edições em vez de listá-las
+(`dev/specs/to-do/paginacao-das-listas.md`, itens 4 a 8). `test:perf` em
+`admin-guard`, `admin-form-errors` e `admin-list-pages`, 19 testes verdes nos
+dois bancos, mediana de SQLite em ms (seed → cheio):
+
+| Rota | seed | cheio | cresc. |
+| :-- | --: | --: | --: |
+| `GET /admin` | 1,4 | 4,2 | 3,0× |
+| `GET /admin/users` | 1,1 | 2,4 | 2,2× |
+| `GET /admin/courses` | 1,5 | 4,9 | 3,3× |
+| `GET /admin/disciplines` | 1,2 | 1,2 | 1,0× |
+| `GET /admin/editions` | 1,1 | 1,2 | 1,1× |
+| `GET /courses` | 1,1 | 1,7 | 1,5× |
+
+Nenhuma SQL lenta só no banco cheio. O que ainda cresce são as contagens
+(`countByRole` sobre os 5 mil usuários, `course.count` e `course.countBy`),
+na casa de poucos milissegundos; a rodada anterior deu 2,9 ms em
+`/admin/courses`, então a diferença entre 1,9× e 3,3× ali é ruído. Em `/admin`
+os convites pessoais ainda são carregados e filtrados em JS. Falta rodar o
+`test:perf` inteiro: um spec que cria uma linha e a procura na primeira
+página de uma dessas listas pode falhar só no banco cheio, como aconteceu
+com o caso do diálogo de disciplina em `admin-form-errors`, que agora abre a
+página pelo cursor da linha.

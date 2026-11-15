@@ -8,6 +8,10 @@ import {
 	disciplinePK,
 	disciplineSchema,
 	disciplineUpdate,
+	type Page,
+	type PageParams,
+	pageOf,
+	pageParams,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import {
@@ -19,7 +23,8 @@ import {
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
 import { DISCIPLINE_SLUG_RE, RESERVED_SLUGS } from "@/urls";
-import type { PrismaTx } from "../client";
+import { cutPage, seekOf } from "@/utils/cursor";
+import type { Prisma, PrismaTx } from "../client";
 
 //
 // Type definitions
@@ -41,7 +46,7 @@ type DisciplineT = {
 
 /**
  * Every discipline is public — there is no catalog-visibility rule — so
- * `findOne`/`findMany` carry no permission rule.
+ * the reads carry no permission rule.
  *
  * Only `create`/`update`/`delete` carry a rule, because a discipline slug
  * occupies the root URL namespace shared with every system route (see
@@ -104,9 +109,52 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 			_opts: ServiceOptsWithoutTx,
 		): Promise<Discipline[]> =>
 			tx.discipline.findMany({
-				where: filter.slugs ? { slug: { in: filter.slugs } } : undefined,
+				where: listWhere(filter),
 				orderBy: { name: "asc" },
 			}),
+	});
+
+	/**
+	 * Lists one page of the disciplines, by slug.
+	 *
+	 * A cursor is the slug of the discipline at that end of the page.
+	 */
+	const findPage = op({
+		transaction: false,
+		args: [disciplineFilter.extend(pageParams.shape)],
+		returns: pageOf(disciplineSchema),
+		run: async (
+			tx: PrismaTx,
+			filter: DisciplineFilter & PageParams,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<Page<Discipline>> => {
+			const seek = seekOf(filter);
+			const rows = await tx.discipline.findMany({
+				where: {
+					AND: [
+						listWhere(filter),
+						seek.cursor === undefined
+							? {}
+							: { slug: seek.back ? { lt: seek.cursor } : { gt: seek.cursor } },
+					],
+				},
+				orderBy: { slug: seek.back ? "desc" : "asc" },
+				take: seek.limit + 1,
+			});
+			const { page, next, prev } = cutPage(rows, seek, (row) => row.slug);
+			return { items: page, next, prev };
+		},
+	});
+
+	/** Counts the disciplines that match `filter`. */
+	const count = op({
+		transaction: false,
+		args: [disciplineFilter],
+		run: async (
+			tx: PrismaTx,
+			filter: DisciplineFilter,
+			_opts: ServiceOptsWithoutTx,
+		): Promise<number> => tx.discipline.count({ where: listWhere(filter) }),
 	});
 
 	/**
@@ -217,7 +265,16 @@ export const makeDisciplineService = defineService<DisciplineT>()(() => {
 		},
 	});
 
-	return { create, findOne, findMany, update, upsert, delete: remove };
+	return {
+		create,
+		findOne,
+		findMany,
+		findPage,
+		count,
+		update,
+		upsert,
+		delete: remove,
+	};
 });
 
 /** The discipline service, as built by {@link makeDisciplineService}. */
@@ -226,6 +283,11 @@ export type DisciplineService = ReturnType<typeof makeDisciplineService>;
 //
 // Auxiliary functions
 //
+
+/// The disciplines that match `filter`.
+function listWhere(filter: DisciplineFilter): Prisma.DisciplineWhereInput {
+	return filter.slugs ? { slug: { in: filter.slugs } } : {};
+}
 
 /**
  * Enforces the `action` permission and rejects a slug that doesn't

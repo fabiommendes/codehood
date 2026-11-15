@@ -249,7 +249,9 @@ test("discipline edit dialog: an empty name is refused on the name", async ({
 	const admin = await seedUser({ role: "ADMIN" });
 	const discipline = await persistedDisciplineFactory.create();
 	await logInAs(page, admin);
-	await page.goto("/admin/disciplines");
+	// The cursor of this list is a slug: the page after a prefix of the slug
+	// starts at the discipline, however many others the database holds.
+	await page.goto(`/admin/disciplines?after=${discipline.slug.slice(0, -1)}`);
 	await page
 		.getByRole("button", { name: `Edit ${discipline.slug}`, exact: true })
 		.click();

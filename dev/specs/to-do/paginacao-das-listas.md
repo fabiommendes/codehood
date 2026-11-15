@@ -50,7 +50,8 @@ declara `limit`, `after` nem `before`. Quem consome deve sempre seguir `next` at
    (`src/utils/cursor.ts`). Vazar um id não é crítico; a máscara só evita
    expor a contagem de linhas de graça.
 3. **`User` ordena por `username`**, que é a chave primária e já é pública. O
-   cursor é o próprio `username`.
+   cursor é o próprio `username`. `Discipline` e `Edition` fazem o mesmo com
+   o `slug`; as edições saem em ordem decrescente, a mais recente primeiro.
 4. **Sem `total` no envelope.** Custa um `COUNT` por chamada e o cursor não
    precisa dele. O total fica numa operação à parte do service,
    `count(filter)`, que a página chama junto quando quer mostrar o número de
@@ -64,6 +65,15 @@ declara `limit`, `after` nem `before`. Quem consome deve sempre seguir `next` at
 8. **As páginas montam os links com `pageLinks` e `cursorParams`**
    (`src/utils/page-links.ts`), que entregam `prevHref` e `nextHref` ao
    `PaginatedTable` e preservam os outros parâmetros da URL.
+9. **A página lê com `readPage`** (`src/utils/list-page.ts`): 50 linhas, ou o
+   `?limit=` da URL (1 a 500), que serve para ver a paginação com poucos
+   dados. Um cursor ilegível ou que leva a uma página vazia mostra a primeira
+   página, porque a página vazia não tem link de saída. Os links partem de
+   `listUrl(Astro.url)`, que tira o `_action` deixado por um POST.
+10. **Formulário de página paginada posta para `actionHref(action, search)`**,
+    que mantém `limit` e o cursor: o resultado da action volta na mesma
+    página da lista, e o diálogo de uma linha que falhou reabre nela. Uma
+    linha criada pode cair em outra página; a mensagem de sucesso basta.
 6. **A camada REST só embrulha.** `findManyHandler` chama `findPage` quando o
    service tem, e senão devolve `{ items: await findMany(), next: null }`.
 7. **Quebra a CLI instalada.** Aceito: o snapshot do OpenAPI, o cliente gerado
@@ -98,14 +108,22 @@ intervalo de datas dos eventos do `/calendar`.
 
 **Admin: tabela paginada, e contagens no lugar de listas.**
 
-4. `/admin/courses`: lista pura, a mais simples.
-5. `/courses` (`courses/index.astro:21`): grade de cartões.
-6. `/admin/users`: os totais por papel já vêm de `user.countByRole`; falta a
-   tabela.
-7. `/admin`: os contadores já usam `countByRole` e `course.count`; os
-   convites ainda são filtrados em JS.
-8. `/admin/disciplines` e `/admin/editions`: a contagem de cursos já vem de
-   `course.countBy`; falta a tabela.
+4. [x] `/admin/courses`: lista pura, a mais simples.
+5. [x] `/courses` (`courses/index.astro`): grade de cartões, com
+   `CursorPagination` abaixo.
+6. [x] `/admin/users`: tabela por `username`; o total é a soma de
+   `user.countByRole`.
+7. [x] `/admin`: disciplinas e edições por `count` (edições abertas com
+   `edition.count({ active: true })`) e amostra de três slugs com
+   `discipline.findPage({ limit: 3 })`. Os convites ainda são filtrados em
+   JS: `inviteFilter` não tem `invitedRole`, e incluí-lo muda a API.
+8. [x] `/admin/disciplines` e `/admin/editions`: `findPage` e `count` nos
+   dois services, o que também paginou `GET /api/discipline` e
+   `GET /api/edition`.
+
+Itens 4 a 8 feitos em 2026-11-15. Testes em `test/admin-list-pages.spec.ts`
+e `test/list-pagination.spec.ts`.
+
 9. `/admin/reports` e `[course]/reports`: o service descarta linhas por
    permissão depois da consulta, então uma página pode vir curta.
 

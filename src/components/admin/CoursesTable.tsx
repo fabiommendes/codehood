@@ -1,12 +1,17 @@
 import type { JSX } from "solid-js";
-import Table, { type ColumnConfig } from "@/components/ui/Table";
+import PaginatedTable from "@/components/ui/PaginatedTable";
+import type { CursorPage } from "@/components/ui/Pagination";
+import type { ColumnConfig } from "@/components/ui/Table";
 import type { Course } from "@/db";
 import { m } from "@/i18n";
 import { courseHref } from "@/urls";
 import { formatIsoDate } from "@/utils/schedule-time";
 
 interface Props {
+	/// One page of the courses.
 	courses: Course[];
+	/// Links to the pages around this one, and the courses in all.
+	cursor: CursorPage;
 }
 
 function formatTerm(row: Pick<Course, "startDate" | "endDate">): string {
@@ -78,5 +83,12 @@ export default function CoursesTable(props: Props): JSX.Element {
 		},
 	];
 
-	return <Table columns={columns} data={props.courses} class="mt-8" />;
+	return (
+		<PaginatedTable
+			columns={columns}
+			data={props.courses}
+			cursor={props.cursor}
+			class="mt-8"
+		/>
+	);
 }

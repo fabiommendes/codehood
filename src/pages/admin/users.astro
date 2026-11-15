@@ -7,16 +7,20 @@ import UsersTable from "@/components/admin/UsersTable";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import { passwordReset, userCreateForm } from "@/core/schemas";
-import { db, type User } from "@/db";
+import { db } from "@/db";
 import { errorMessage } from "@/forms/field-errors";
 import { actionForm, submittedValues } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { actionHref, listUrl, readPage } from "@/utils/list-page";
+import { pageLinks } from "@/utils/page-links";
 
 // adminMiddleware (src/middleware/admin.ts) already redirects anonymous/
 // non-admin visitors before this runs; the check below is here only so
 // TypeScript narrows `Astro.locals.user` for the calls that need an `Actor`.
 if (!Astro.locals.actor) return Astro.redirect("/login");
+const actor = Astro.locals.actor;
+const here = listUrl(Astro.url);
 
 const forceLogoutResult = Astro.getActionResult(actions.admin.forceLogout);
 const createUserResult = Astro.getActionResult(actions.admin.createUser);
@@ -41,12 +45,11 @@ const resetUsername = resetResult
 	? (await submittedValues(Astro.request)).username
 	: undefined;
 
-const users = (await db.user.findMany(
-	{},
-	{ actor: Astro.locals.actor },
-)) as Array<User & { createdAt: Date }>;
-
-const counts = await db.user.countByRole({ actor: Astro.locals.actor });
+const [page, counts] = await Promise.all([
+	readPage(Astro.url, (params) => db.user.findPage(params, { actor })),
+	db.user.countByRole({ actor }),
+]);
+const total = counts.ADMIN + counts.INSTRUCTOR + counts.STUDENT;
 
 // The account-created message split around the username, which is rendered apart.
 const [createdBefore, createdAfter] = splitAtSlot(
@@ -60,7 +63,7 @@ const [createdBefore, createdAfter] = splitAtSlot(
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="text-muted">
-        {m.admin_users_total({ count: users.length })}
+        {m.admin_users_total({ count: total })}
       </p>
       <button
         type="button"
@@ -97,7 +100,7 @@ const [createdBefore, createdAfter] = splitAtSlot(
         <h3 class="text-lg font-bold">{m.admin_users_add()}</h3>
         <form
           method="POST"
-          action={actions.admin.createUser}
+          action={actionHref(actions.admin.createUser, here.search)}
           class="mt-4 flex flex-col gap-4"
         >
           <FormAlert error={createForm.error} />
@@ -154,7 +157,9 @@ const [createdBefore, createdAfter] = splitAtSlot(
     }
 
     <UsersTable
-      users={users}
+      users={page.items}
+      cursor={{ ...pageLinks(here, page), total }}
+      search={here.search}
       resetForm={resetForm}
       failedUsername={resetResult?.error ? resetUsername : undefined}
     />

@@ -2324,7 +2324,12 @@ def list_course(
 
 
 def list_discipline(
-    *, slugs: list[str] | None = None, client: httpx.Client | None = None
+    *,
+    slugs: list[str] | None = None,
+    limit: int | None = None,
+    after: str | None = None,
+    before: str | None = None,
+    client: httpx.Client | None = None,
 ) -> ListDisciplineResponse:
     """
     Find multiple Disciplines.
@@ -2332,7 +2337,9 @@ def list_discipline(
     client = client if client is not None else get_client()
     response = client.get(
         "/api/discipline",
-        params=query_params({"slugs": slugs}),
+        params=query_params(
+            {"slugs": slugs, "limit": limit, "after": after, "before": before}
+        ),
         headers=auth_headers(client),
     )
     if response.status_code == 200:
@@ -2345,6 +2352,9 @@ def list_edition(
     *,
     slugs: list[str] | None = None,
     active: bool | None = None,
+    limit: int | None = None,
+    after: str | None = None,
+    before: str | None = None,
     client: httpx.Client | None = None,
 ) -> ListEditionResponse:
     """
@@ -2353,7 +2363,15 @@ def list_edition(
     client = client if client is not None else get_client()
     response = client.get(
         "/api/edition",
-        params=query_params({"slugs": slugs, "active": active}),
+        params=query_params(
+            {
+                "slugs": slugs,
+                "active": active,
+                "limit": limit,
+                "after": after,
+                "before": before,
+            }
+        ),
         headers=auth_headers(client),
     )
     if response.status_code == 200:

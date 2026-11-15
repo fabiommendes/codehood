@@ -2,10 +2,13 @@ import { actions } from "astro:actions";
 import { type JSX, Show } from "solid-js";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
-import Table, { type ColumnConfig } from "@/components/ui/Table";
+import PaginatedTable from "@/components/ui/PaginatedTable";
+import type { CursorPage } from "@/components/ui/Pagination";
+import type { ColumnConfig } from "@/components/ui/Table";
 import type { disciplineEdit } from "@/core/schemas";
 import type { FormState } from "@/forms/form-state";
 import { m, SLOT, splitAtSlot } from "@/i18n";
+import { actionHref } from "@/utils/list-page";
 
 /**
  * One row's worth of pre-computed display data — free of `Discipline` and
@@ -22,7 +25,12 @@ export interface DisciplineRow {
 }
 
 interface Props {
+	/// One page of the disciplines.
 	disciplines: DisciplineRow[];
+	/// Links to the pages around this one, and the disciplines in all.
+	cursor: CursorPage;
+	/// The query of the page, which the forms of a row post back to.
+	search: string;
 	/// State of the edit form, as read from the action result of the page.
 	editForm: FormState<typeof disciplineEdit>;
 	/// The slug whose edit failed, so only that row shows the errors and the typed value.
@@ -86,7 +94,7 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 
 					<form
 						method="post"
-						action={actions.admin.deleteDiscipline}
+						action={actionHref(actions.admin.deleteDiscipline, props.search)}
 						class="inline"
 					>
 						<input type="hidden" name="slug" value={row.slug} />
@@ -136,7 +144,10 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 							</h3>
 							<form
 								method="post"
-								action={actions.admin.updateDiscipline}
+								action={actionHref(
+									actions.admin.updateDiscipline,
+									props.search,
+								)}
 								class="mt-4 flex flex-col gap-4"
 							>
 								<input type="hidden" name="slug" value={row.slug} />
@@ -161,5 +172,12 @@ export default function DisciplinesTable(props: Props): JSX.Element {
 		},
 	];
 
-	return <Table columns={columns} data={props.disciplines} class="mt-8" />;
+	return (
+		<PaginatedTable
+			columns={columns}
+			data={props.disciplines}
+			cursor={props.cursor}
+			class="mt-8"
+		/>
+	);
 }

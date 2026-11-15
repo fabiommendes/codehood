@@ -3,14 +3,22 @@ import { type JSX, Show } from "solid-js";
 import Field from "@/components/form/Field";
 import FormAlert from "@/components/form/FormAlert";
 import Badge from "@/components/ui/Badge";
-import Table, { type ColumnConfig } from "@/components/ui/Table";
+import PaginatedTable from "@/components/ui/PaginatedTable";
+import type { CursorPage } from "@/components/ui/Pagination";
+import type { ColumnConfig } from "@/components/ui/Table";
 import type { passwordReset } from "@/core/schemas";
 import type { User } from "@/db";
 import type { FormState } from "@/forms/form-state";
 import { locale, m } from "@/i18n";
+import { actionHref } from "@/utils/list-page";
 
 interface Props {
+	/// One page of the users.
 	users: User[];
+	/// Links to the pages around this one, and the users in all.
+	cursor: CursorPage;
+	/// The query of the page, which the forms of a row post back to.
+	search: string;
 	/// State of the password reset form, as read from the action result of the page.
 	resetForm: FormState<typeof passwordReset>;
 	/// The username whose reset failed, so only that row shows the errors.
@@ -135,7 +143,7 @@ export default function UsersTable(props: Props): JSX.Element {
 							</p>
 							<form
 								method="post"
-								action={actions.admin.resetPassword}
+								action={actionHref(actions.admin.resetPassword, props.search)}
 								class="mt-4 flex flex-col gap-4"
 							>
 								<input type="hidden" name="username" value={user.username} />
@@ -193,7 +201,7 @@ export default function UsersTable(props: Props): JSX.Element {
 							</p>
 							<form
 								method="post"
-								action={actions.admin.forceLogout}
+								action={actionHref(actions.admin.forceLogout, props.search)}
 								class="modal-action"
 							>
 								<input type="hidden" name="username" value={user.username} />
@@ -211,5 +219,12 @@ export default function UsersTable(props: Props): JSX.Element {
 		},
 	];
 
-	return <Table columns={columns} data={props.users} class="mt-8" />;
+	return (
+		<PaginatedTable
+			columns={columns}
+			data={props.users}
+			cursor={props.cursor}
+			class="mt-8"
+		/>
+	);
 }
