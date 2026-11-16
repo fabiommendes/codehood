@@ -100,6 +100,9 @@ export async function loadExamGrading(
 		: null;
 	if (!exam || (exam.type === "PRACTICE" && !options.practice)) return null;
 
+	if (exam.type !== "PRACTICE") {
+		await db.response.settleExpired({ course, exam: exam.slug }, { actor });
+	}
 	const [attempts, feedback, courseExceptions, stored] = await Promise.all([
 		db.response.findMany(
 			{

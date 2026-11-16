@@ -65,6 +65,7 @@ export async function loadExamStaffData(
 			openExceptions: 0,
 		};
 	}
+	await db.response.settleExpired({ course, exam: exam.slug }, { actor });
 	const [attempts, feedback, students, storedExceptions, regrades, policyOf] =
 		await Promise.all([
 			db.response.findMany(

@@ -6,7 +6,7 @@
  * timestamp (seconds) it started at, and reused when the student comes back
  * within {@link PRACTICE_SESSION_WINDOW_MS}.
  */
-import type { z } from "zod";
+import { z } from "zod";
 import { requireAccess, responseAccess } from "@/auth/access";
 import { type Actor, SYSTEM, type UserActor } from "@/auth/actor";
 import {
@@ -29,6 +29,7 @@ import {
 	responseGradeObjectives,
 	responsePK,
 	responseSchema,
+	responseSettleExpired,
 	responseSubmit,
 	responseUpdate,
 } from "@/core/schemas";
@@ -56,11 +57,13 @@ import {
 } from "../utils";
 import { loggingAnswerHistoryRemoval } from "./answer-edit.service";
 import { enqueueGradingJob, promoteFinalSends } from "./grading-job-queue";
-import { gradeObjectives as gradeAttempt } from "./objective-grading";
+import {
+	gradeObjectives as gradeAttempt,
+	gradeExpiredObjectives,
+} from "./objective-grading";
 import {
 	assertAcceptingSubmissions,
 	assertExamOpen,
-	attemptTimedOut,
 	examTimingFromDb,
 	examTimingSelect,
 	loadExceptionTiming,
@@ -79,6 +82,7 @@ export type ResponseCreate = z.infer<typeof responseCreate>;
 export type ResponseFilter = z.infer<typeof responseFilter>;
 export type ResponseFinish = z.infer<typeof responseFinish>;
 export type ResponseGradeObjectives = z.infer<typeof responseGradeObjectives>;
+export type ResponseSettleExpired = z.infer<typeof responseSettleExpired>;
 
 /// What `gradeObjectives` did to the attempts of one exam.
 export interface ObjectiveGradingLine {
@@ -532,6 +536,14 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	 */
 	const gradeObjectives = op({
 		args: [responseGradeObjectives],
+		returns: z.array(
+			z.object({
+				exam: z.string(),
+				attempts: z.number().int(),
+				graded: z.number().int(),
+				released: z.boolean(),
+			}),
+		),
 		run: async (
 			tx: PrismaTx,
 			input: ResponseGradeObjectives,
@@ -551,45 +563,15 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					...(input.exam ? { slug: input.exam } : {}),
 					...(input.released ? {} : { gradesReleasedAt: null }),
 				},
-				select: {
-					id: true,
-					slug: true,
-					gradesReleasedAt: true,
-					...examTimingSelect,
-				},
+				select: { id: true, slug: true, gradesReleasedAt: true },
 				orderBy: { id: "asc" },
 			});
-			const now = new Date();
 			const lines: ObjectiveGradingLine[] = [];
 			for (const exam of exams) {
-				const responses = await tx.response.findMany({
-					where: { examId: exam.id },
-					select: {
-						id: true,
-						createdAt: true,
-						authorId: true,
-						acceptingSubmissions: true,
-					},
-					orderBy: { id: "asc" },
+				const { attempts, graded } = await gradeExpiredObjectives(tx, {
+					examId: exam.id,
+					dryRun: input.dryRun,
 				});
-				let attempts = 0;
-				let graded = 0;
-				for (const response of responses) {
-					if (
-						response.acceptingSubmissions &&
-						!attemptTimedOut(
-							{ createdAt: response.createdAt, exam },
-							now,
-							await loadExceptionTiming(tx, exam.id, response.authorId),
-						)
-					) {
-						continue;
-					}
-					attempts += 1;
-					graded += await gradeAttempt(tx, response.id, {
-						dryRun: input.dryRun,
-					});
-				}
 				if (attempts === 0) continue;
 				lines.push({
 					exam: exam.slug,
@@ -599,6 +581,64 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				});
 			}
 			return lines;
+		},
+	});
+
+	/**
+	 * Grades the objective answers of the attempts of an exam whose time ran out, and returns how many answers it graded.
+	 *
+	 * It covers the attempts nobody delivered, which no flow closes by itself. An attempt still within its time is left alone, and `acceptingSubmissions` is never changed. It is idempotent: an answer that already has a grading pass is not graded again, and it returns early when no answer lacks one.
+	 *
+	 * @throws {@link NotFound} If the course or the exam does not exist.
+	 * @throws {@link NotAllowed} If the actor is not the course's instructor and `author` is not the actor.
+	 */
+	const settleExpired = op({
+		args: [responseSettleExpired],
+		returns: z.number().int().nonnegative(),
+		run: async (
+			tx: PrismaTx,
+			input: ResponseSettleExpired,
+			opts: ServiceOptsWithoutTx,
+		): Promise<number> => {
+			const course = valueOrNotFound(
+				"course",
+				await tx.course.findUnique({
+					where: courseRefWhere(input.course),
+					select: courseSelect(),
+				}),
+			);
+			if (input.author === undefined) {
+				ensurePerm(opts.actor, "course.update-contents", course);
+			} else {
+				ensurePerm(opts.actor, "response.read", {
+					author: { username: input.author },
+					course,
+				});
+			}
+			const exam = valueOrNotFound(
+				"exam",
+				await tx.exam.findUnique({
+					where: { courseId_slug: { courseId: course.id, slug: input.exam } },
+					select: { id: true },
+				}),
+			);
+			const waiting = await tx.submission.findFirst({
+				where: {
+					response: {
+						examId: exam.id,
+						...(input.author ? { authorId: input.author } : {}),
+					},
+					feedbacks: { none: {} },
+					status: { not: "WILL_NOT_GRADE" },
+				},
+				select: { id: true },
+			});
+			if (!waiting) return 0;
+			const { graded } = await gradeExpiredObjectives(tx, {
+				examId: exam.id,
+				author: input.author,
+			});
+			return graded;
 		},
 	});
 
@@ -707,6 +747,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 		delete: remove,
 		finish,
 		gradeObjectives,
+		settleExpired,
 		submit,
 	};
 });

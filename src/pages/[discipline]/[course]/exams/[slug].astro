@@ -101,20 +101,36 @@ const studentQuestions = publicQuestions;
 // A student sees the exam through their own attempt: what they may do now,
 // and, once they are in it, the questions with their latest saved answers.
 // Practice exams open a new attempt per session, so the newest one counts.
-const attempt = canManage
-	? null
-	: ((
-			await db.response.findMany(
-				{
-					course: course.id,
-					exam: slug,
-					author: actor.username,
-					practice: exam.type === "PRACTICE" ? undefined : false,
-				},
-				{ actor },
-			)
-		).at(-1) ?? null);
-const state = attemptOf(schedule, viewer, attempt, now);
+/// The student's newest attempt at the exam, or `null`.
+const readAttempt = async () =>
+	(
+		await db.response.findMany(
+			{
+				course: course.id,
+				exam: slug,
+				author: actor.username,
+				practice: exam.type === "PRACTICE" ? undefined : false,
+			},
+			{ actor },
+		)
+	).at(-1) ?? null;
+let attempt = canManage ? null : await readAttempt();
+let state = attemptOf(schedule, viewer, attempt, now);
+// An attempt that ran out of time was never closed by anyone: grade its objective answers before the student reads the result.
+if (
+	attempt &&
+	exam.type !== "PRACTICE" &&
+	(state.kind === "submitted" || state.kind === "results")
+) {
+	const settled = await db.response.settleExpired(
+		{ course: course.id, exam: slug, author: actor.username },
+		{ actor },
+	);
+	if (settled > 0) {
+		attempt = await readAttempt();
+		state = attemptOf(schedule, viewer, attempt, now);
+	}
+}
 // The instructor has no attempt of their own, so the phase is all they see.
 const badge = examBadge(phase, canManage ? undefined : state);
 

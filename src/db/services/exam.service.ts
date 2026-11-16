@@ -37,6 +37,7 @@ import { loadResultPolicy } from "@/db/result-policy";
 import type { AttachmentService } from "@/db/services/attachment.service";
 import type { BlobService } from "@/db/services/blob.service";
 import { courseContentsWhere } from "@/db/services/course.service";
+import { gradeExpiredObjectives } from "@/db/services/objective-grading";
 import { m } from "@/i18n";
 import { attachmentProblems } from "@/mdq";
 import {
@@ -555,9 +556,15 @@ const buildExamService = (deps: Deps) =>
 					}),
 					row.course.enrollments.map((enrollment) => enrollment.username),
 				);
-				const blocker =
-					releaseBlocker(schedule, [], now) ??
-					releaseBlocker(schedule, await attemptResults(tx, row), now);
+				let blocker = releaseBlocker(schedule, [], now);
+				if (!blocker) {
+					await gradeExpiredObjectives(tx, { examId: row.id });
+					blocker = releaseBlocker(
+						schedule,
+						await attemptResults(tx, row),
+						now,
+					);
+				}
 				if (blocker === "released") return exam;
 				if (blocker) {
 					throw new InvalidData({

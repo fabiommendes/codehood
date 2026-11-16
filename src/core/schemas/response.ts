@@ -125,6 +125,15 @@ export const responseGradeObjectives = z.object({
 	released: z.boolean().optional(),
 });
 
+/// The attempts `response.settleExpired` grades: all of an exam's, or one author's.
+export const responseSettleExpired = z.object({
+	course: courseRef,
+	exam: slug,
+
+	/// Every attempt of the exam when absent; a student may only name themselves.
+	author: username.optional(),
+});
+
 export const responseSubmit = z.object({
 	course: courseRef,
 	exam: slug,

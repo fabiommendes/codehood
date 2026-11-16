@@ -8,6 +8,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedQuestionFactory } from "@/fixtures/question.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
+import { idempotenceEssay } from "@/mdq/fixtures";
 
 const MINUTE = 60_000;
 
@@ -57,12 +58,28 @@ interface ExamShape {
  * The answer is written while the exam is `ONGOING`, the only time answers are
  * accepted, and the exam is moved to its final state afterwards.
  */
-async function gradedExam(shape: ExamShape = { status: "COMPLETED" }) {
+async function gradedExam(
+	shape: ExamShape = { status: "COMPLETED" },
+	options: { essay?: boolean } = {},
+) {
 	const ctx = await makeCourse();
-	const question = await persistedQuestionFactory.create({
-		course: ctx.course.id,
-		slug: tag("q-"),
-	});
+	const slug = tag("q-");
+	// An essay is never graded by the server, so its answer can wait for the instructor.
+	const question = options.essay
+		? await db.question.create(
+				{
+					course: ctx.course.id,
+					slug,
+					status: "PUBLISHED",
+					version: "1",
+					question: idempotenceEssay,
+				},
+				FULL_ACCESS,
+			)
+		: await persistedQuestionFactory.create({
+				course: ctx.course.id,
+				slug,
+			});
 	const exam = await persistedExamFactory.create({
 		course: ctx.course.id,
 		slug: tag("exam-"),
@@ -75,7 +92,7 @@ async function gradedExam(shape: ExamShape = { status: "COMPLETED" }) {
 			course: ctx.course.id,
 			exam: exam.slug,
 			question: question.slug,
-			payload: null,
+			payload: options.essay ? "Doing it twice changes nothing." : null,
 		},
 		{ actor: ctx.student },
 	);
@@ -211,7 +228,10 @@ for (const { label, shape } of notReleasable) {
 }
 
 test("releaseGrades: an answer still waiting for a grade blocks the release and changes nothing", async () => {
-	const { pk, exam, instructor, feedback } = await gradedExam();
+	const { pk, exam, instructor, feedback } = await gradedExam(
+		{ status: "COMPLETED" },
+		{ essay: true },
+	);
 	await prisma.feedback.delete({ where: { id: feedback.id } });
 
 	const error = await db.exam

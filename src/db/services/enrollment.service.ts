@@ -174,6 +174,14 @@ export const makeEnrollmentService = defineService<EnrollmentT>()(() => {
 	 */
 	const instructorEnrollments = op({
 		args: [z.object({ fix: z.boolean().optional() })],
+		returns: z.array(
+			z.object({
+				course: z.string(),
+				username: z.string(),
+				attempts: z.number().int(),
+				removed: z.boolean(),
+			}),
+		),
 		run: async (
 			tx: PrismaTx,
 			input: { fix?: boolean },
