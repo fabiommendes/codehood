@@ -5,6 +5,7 @@ import AnswerHistorySwitch from "@/components/exam/AnswerHistorySwitch";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
 import { type CodeSends, sendsOf } from "@/components/exam/code-sends";
 import ExamAttempt from "@/components/exam/ExamAttempt";
+import ExamQuestionsTable from "@/components/exam/ExamQuestionsTable.astro";
 import type { QuestionRegrade } from "@/components/exam/RegradeControls";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import AttachmentList from "@/components/question/AttachmentList";
@@ -28,6 +29,7 @@ import {
 	type GradeReleaseBlocker,
 	timingFor,
 } from "@/services/exam-state";
+import type { QuestionStats } from "@/services/question-stats";
 import { regradeBlocker } from "@/services/regrade";
 import { examAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
@@ -44,6 +46,7 @@ import { type ExamStaffData, loadExamStaffData } from "@/utils/load-exam-staff";
 import { loadReviews } from "@/utils/load-review";
 import { renderMarkdown } from "@/utils/markdown";
 import type { PretestSource } from "@/utils/pretest-sources";
+import { questionTypeLabels } from "@/utils/question-display";
 import {
 	durationToMinutes,
 	formatDateTime,
@@ -137,6 +140,38 @@ const badge = examBadge(phase, canManage ? undefined : state);
 const staff: ExamStaffData | null = canManage
 	? await loadExamStaffData(course.id, exam, actor, exceptions, now)
 	: null;
+// The instructor's table of questions: title and type from the course's own questions, statistics once an attempt closed.
+const questionRows: {
+	slug: string;
+	title: string;
+	type: string;
+	weight: number;
+}[] = [];
+let questionStats: Map<string, QuestionStats> | undefined;
+if (staff) {
+	const stored = new Map(
+		(
+			await db.question.findMany(
+				{ course: course.id, public: false },
+				{ actor },
+			)
+		).map((entry) => [entry.slug, entry.question]),
+	);
+	for (const { slug, weight } of exam.questions) {
+		const document = stored.get(slug);
+		questionRows.push({
+			slug,
+			title: document?.title || slug,
+			type: document ? questionTypeLabels[document.type] : "",
+			weight,
+		});
+	}
+	if (staff.statsRows.some((entry) => entry.answered + entry.blank > 0)) {
+		questionStats = new Map(
+			staff.statsRows.map((entry) => [entry.question, entry]),
+		);
+	}
+}
 const releaseBlocker = staff?.releaseBlocker ?? null;
 const canRelease = canManage && releaseBlocker === null;
 const pendingAnswers = staff?.pending ?? 0;
@@ -451,6 +486,8 @@ for (const submission of attempt?.submissions ?? []) {
         </section>
       )
     }
+
+    {canManage && <ExamQuestionsTable href={href} rows={questionRows} stats={questionStats} />}
 
     {
       !canManage && examOutcome?.total != null && (
