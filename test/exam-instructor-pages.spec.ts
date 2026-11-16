@@ -50,7 +50,7 @@ async function setup() {
 	return { student, course, href };
 }
 
-for (const page of ["questions", "exceptions", "results"]) {
+for (const page of ["preview", "exceptions", "results"]) {
 	test(`${page}: a student of the course gets 403`, async ({ page: tab }) => {
 		const { student, href } = await setup();
 		await logInAs(tab, student);
@@ -61,13 +61,13 @@ for (const page of ["questions", "exceptions", "results"]) {
 	});
 }
 
-test("a practice exam has the questions page but no exceptions nor results", async ({
+test("a practice exam has the preview page but no exceptions nor results", async ({
 	page,
 }) => {
 	const { course, href } = await setup();
 	await logInAs(page, course.instructor);
 
-	expect((await page.goto(`${href}/drill/questions`))?.status()).toBe(200);
+	expect((await page.goto(`${href}/drill/preview`))?.status()).toBe(200);
 	expect((await page.goto(`${href}/drill/exceptions`))?.status()).toBe(404);
 	expect((await page.goto(`${href}/drill/results`))?.status()).toBe(404);
 });
@@ -94,8 +94,8 @@ test("the exam card reaches each page of the instructor", async ({ page }) => {
 	await page.goto(`${href}/midterm`);
 	const card = page.locator("[data-course-card]");
 
-	await card.getByRole("link", { name: "Questions" }).click();
-	await expect(page).toHaveURL(`${href}/midterm/questions`);
+	await card.getByRole("link", { name: "Preview" }).click();
+	await expect(page).toHaveURL(`${href}/midterm/preview`);
 
 	await card.getByRole("link", { name: "Exceptions" }).click();
 	await expect(page).toHaveURL(`${href}/midterm/exceptions`);

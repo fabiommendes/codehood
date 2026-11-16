@@ -19,12 +19,24 @@ import { parseLocalDateTime, toDuration } from "@/utils/schedule-time";
 import { withServiceErrors } from "./helpers";
 
 export const exam = {
-	/** Opens the actor's attempt at an exam that is open now. */
+	/** Opens the actor's attempt at an exam that is open now, or the instructor's simulation of it. */
 	start: defineAction({
 		input: examParams,
 		handler: withServiceErrors(async (input, context) => {
 			const actor = requireUser(context);
 			await db.response.create(
+				{ course: parseCourseParams(input), exam: input.exam },
+				{ actor },
+			);
+		}),
+	}),
+
+	/** Replaces the instructor's simulation of an exam with a new one (instructor only). */
+	restartPreview: defineAction({
+		input: examParams,
+		handler: withServiceErrors(async (input, context) => {
+			const actor = requireUser(context);
+			await db.response.restartPreview(
 				{ course: parseCourseParams(input), exam: input.exam },
 				{ actor },
 			);

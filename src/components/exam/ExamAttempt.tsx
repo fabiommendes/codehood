@@ -96,6 +96,8 @@ export interface ExamAttemptProps {
 	attempt?: string;
 	/// Whether the exam's edit-history switch is on, as the server computed it.
 	answerHistory?: boolean;
+	/// Whether the attempt is the instructor's simulation, which counts for no grade and can be restarted.
+	preview?: boolean;
 }
 
 /// The box every state sentence of an attempt sits in.
@@ -878,6 +880,23 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		window.location.reload();
 	}
 
+	/// Discards the simulation, with its local drafts, and opens a new one.
+	async function restartPreview(): Promise<void> {
+		if (!window.confirm(m.exams_preview_restart_confirm())) return;
+		setBusy(true);
+		setFailure(null);
+		const { error } = await actions.exam.restartPreview(target);
+		if (error) {
+			setFailure(errorMessage(error));
+			setBusy(false);
+			return;
+		}
+		clearDrafts();
+		// The unsaved answers belong to the discarded simulation.
+		window.removeEventListener("beforeunload", warnBeforeUnload);
+		window.location.reload();
+	}
+
 	async function submit(): Promise<void> {
 		setBusy(true);
 		setFailure(null);
@@ -970,11 +989,35 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 			if (saved) clearDrafts();
 			else setUndelivered(unsavedNumbers());
 			setKind("submitted");
+			if (props.preview) void closePreview();
 		});
 	});
 
+	/// Closes the simulation whose time ran out, which grades it, and shows the result.
+	async function closePreview(): Promise<void> {
+		await actions.exam.finish(target);
+		window.location.reload();
+	}
+
 	return (
 		<div class="flex flex-col gap-10">
+			<Show when={props.preview}>
+				<div
+					role="status"
+					data-testid="preview-banner"
+					class="flex flex-wrap items-center justify-between gap-3 rounded-box border border-warning bg-warning/10 p-4 text-sm"
+				>
+					<span>{m.exams_preview_banner()}</span>
+					<button
+						type="button"
+						class="btn btn-sm btn-outline"
+						disabled={busy()}
+						onClick={restartPreview}
+					>
+						{m.exams_preview_restart()}
+					</button>
+				</div>
+			</Show>
 			<FormAlert error={failure() ?? undefined} />
 
 			<Switch>
@@ -1227,6 +1270,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 												)}
 												regrade={props.regrades?.[entry.slug]}
 												target={target}
+												manualKey={
+													props.preview
+														? `/${props.discipline}/${props.course}/questions/${entry.slug}`
+														: undefined
+												}
 											/>
 										)}
 									</Show>
@@ -1678,6 +1726,8 @@ function Outcome(props: {
 	outcome: QuestionOutcome | undefined;
 	regrade: QuestionRegrade | undefined;
 	target: { discipline: string; course: string; exam: string };
+	/// In a simulation, where the question's answer key is: an answer nobody grades reads "manual grading" and links to it.
+	manualKey?: string;
 }): JSX.Element {
 	return (
 		<Show when={props.outcome}>
@@ -1690,6 +1740,12 @@ function Outcome(props: {
 									{m.exams_attempt_score_label()}
 								</span>{" "}
 								{formatScore(outcome().score ?? 0)}
+							</Match>
+							<Match when={outcome().status === "pending" && props.manualKey}>
+								{m.exams_preview_manual_grading()}{" "}
+								<a href={props.manualKey} class="link font-normal">
+									{m.exams_preview_answer_key()}
+								</a>
 							</Match>
 							<Match when={outcome().status === "pending"}>
 								{m.exams_attempt_waiting()}

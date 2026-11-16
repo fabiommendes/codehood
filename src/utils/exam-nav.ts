@@ -25,7 +25,7 @@ export interface ExamNavInput {
 /**
  * Builds the course card links for every page of one exam.
  *
- * The manager gets one list: overview and questions, then exceptions,
+ * The manager gets one list: overview and preview, then exceptions,
  * grading, regrades and results (practice exams have only the first two).
  * Students get the sections of the exam page.
  */
@@ -46,8 +46,8 @@ export function examNav(input: ExamNavInput): CourseNav {
 	const entries: NavEntry[] = [
 		{ label: m.nav_exam_overview(), href: input.href },
 		{
-			label: m.exams_detail_questions_heading(),
-			href: `${input.href}/questions`,
+			label: m.nav_exam_preview(),
+			href: `${input.href}/preview`,
 		},
 	];
 	if (!input.practice)

@@ -1,0 +1,125 @@
+---
+import CourseHeader from "@/components/CourseHeader.astro";
+import ExamAttempt from "@/components/exam/ExamAttempt";
+import AttachmentList from "@/components/question/AttachmentList";
+import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
+import { db } from "@/db";
+import { m } from "@/i18n";
+import AppLayout from "@/layouts/AppLayout.astro";
+import { effectiveAnswerHistory } from "@/services/answer-history";
+import { effectiveCodeRun } from "@/services/code-run";
+import { examSchedule, previewAttemptState } from "@/services/exam-state";
+import { examAttachmentUrl } from "@/urls";
+import { breadcrumbs } from "@/utils/breadcrumbs";
+import { examNav } from "@/utils/exam-nav";
+import { loadAttemptView } from "@/utils/load-attempt-view";
+import { loadExamQuestions } from "@/utils/load-exam-questions";
+import { loadExamStaff } from "@/utils/load-exam-staff";
+import { renderMarkdown } from "@/utils/markdown";
+
+export const prerender = false;
+
+const { discipline, course: courseSegment, slug } = Astro.params;
+const result = await loadExamStaff(Astro, discipline, courseSegment, slug, {
+	practice: true,
+});
+if ("redirect" in result) return result.redirect;
+const { course, href, exam, data } = result;
+
+// biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
+const actor = Astro.locals.actor!;
+
+// The instructor answers the exam through their simulation, a response like a student's.
+const attempt =
+	(
+		await db.response.findMany(
+			{ course: course.id, exam: exam.slug, author: actor.username },
+			{ actor },
+		)
+	).find((entry) => entry.preview) ?? null;
+const now = new Date();
+const schedule = examSchedule(exam, new Map());
+const state = previewAttemptState(schedule.base, attempt, now);
+const view = await loadAttemptView({
+	course: course.id,
+	exam,
+	actor,
+	schedule,
+	attempt,
+	state,
+	publicQuestions: await loadExamQuestions(course.id, exam, true, { actor }),
+	now,
+});
+
+const preambleHtml =
+	exam.preamble && exam.format === "MARKDOWN"
+		? renderMarkdown(exam.preamble)
+		: null;
+const codeRun = effectiveCodeRun(exam);
+---
+
+<AppLayout title={`${m.nav_exam_preview()} · ${exam.title}`}
+  trail={breadcrumbs(Astro.url, { course, item: exam.title, page: m.nav_exam_preview() })}
+  nav={examNav({
+    href: `${href}/exams/${exam.slug}`,
+    title: exam.title,
+    manage: true,
+    practice: exam.type === "PRACTICE",
+    pending: data.pending,
+    regrades: data.openRegrades,
+  })}
+>
+  <main class="mx-auto max-w-4xl px-4 py-10">
+    <CourseHeader course={course} active="exams" />
+
+    <a href={`${href}/exams/${exam.slug}`} class="text-sm text-muted hover:text-primary">← {exam.title}</a>
+    <h2 class="mt-2 text-2xl font-bold">{exam.title}</h2>
+
+    {
+      exam.preamble && (
+        <div class="mt-6 rounded-box border border-base-300 bg-base-100 p-6">
+          {preambleHtml ? (
+            <div class="prose prose-sm max-w-none" set:html={preambleHtml} />
+          ) : (
+            <p class="whitespace-pre-wrap text-sm">{exam.preamble}</p>
+          )}
+        </div>
+      )
+    }
+
+    <div class="mt-4">
+      <AttachmentList
+        attachments={exam.attachments}
+        url={(name) => examAttachmentUrl(`${discipline}/${courseSegment}`, slug!, name)}
+      />
+    </div>
+
+    <section class="mt-8">
+      <ExamAttempt
+        client:load
+        preview
+        discipline={discipline!}
+        course={courseSegment!}
+        exam={exam.slug}
+        type={exam.type}
+        state={state}
+        now={now}
+        questions={view.questions}
+        answers={view.answers}
+        result={view.result}
+        reviews={view.reviews}
+        regrades={view.regrades}
+        codeRun={codeRun.allowed}
+        runnerOrigin={RUNNER_ORIGIN}
+        pretests={view.pretests}
+        exampleHtml={view.exampleHtml}
+        codeSends={view.codeSends}
+        username={actor.username}
+        answeredAt={view.answeredAt}
+        graceMs={EXAM_ANSWER_GRACE_MS}
+        attempt={attempt?.publicId}
+        answerHistory={effectiveAnswerHistory(exam)}
+      />
+    </section>
+  </main>
+</AppLayout>

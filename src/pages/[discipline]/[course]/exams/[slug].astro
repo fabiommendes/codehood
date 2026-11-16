@@ -2,24 +2,17 @@
 import { hasPerm } from "@/auth/permissions";
 import CourseHeader from "@/components/CourseHeader.astro";
 import AnswerHistorySwitch from "@/components/exam/AnswerHistorySwitch";
-import type { AnswerPayload } from "@/components/exam/answer-payload";
-import { type CodeSends, sendsOf } from "@/components/exam/code-sends";
 import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamQuestionsTable from "@/components/exam/ExamQuestionsTable.astro";
-import type { QuestionRegrade } from "@/components/exam/RegradeControls";
 import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import AttachmentList from "@/components/question/AttachmentList";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
 import { db } from "@/db";
-import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { shufflePool } from "@/mdq/shuffle";
 import { effectiveAnswerHistory } from "@/services/answer-history";
-import { DEFAULT_CODE_PENALTY } from "@/services/code-grading";
 import { effectiveCodeRun } from "@/services/code-run";
-import { examResult } from "@/services/exam-result";
 import {
 	attemptOf,
 	examPhase,
@@ -29,7 +22,6 @@ import {
 	timingFor,
 } from "@/services/exam-state";
 import type { QuestionStats } from "@/services/question-stats";
-import { regradeBlocker } from "@/services/regrade";
 import { examAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import {
@@ -38,14 +30,12 @@ import {
 	formatDuration,
 } from "@/utils/exam-display";
 import { examNav } from "@/utils/exam-nav";
-import { highlightExamples } from "@/utils/highlight-examples";
+import { loadAttemptView } from "@/utils/load-attempt-view";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
 import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { type ExamStaffData, loadExamStaffData } from "@/utils/load-exam-staff";
-import { loadReviews } from "@/utils/load-review";
 import { renderMarkdown } from "@/utils/markdown";
-import type { PretestSource } from "@/utils/pretest-sources";
 import { questionTypeLabels } from "@/utils/question-display";
 import {
 	durationToMinutes,
@@ -96,7 +86,6 @@ const preambleHtml =
 const publicQuestions = canManage
 	? []
 	: await loadExamQuestions(course.id, exam, true, { actor });
-const studentQuestions = publicQuestions;
 
 // A student sees the exam through their own attempt: what they may do now,
 // and, once they are in it, the questions with their latest saved answers.
@@ -233,118 +222,17 @@ const meta = [
 		: null,
 ].filter((part): part is string => part !== null);
 
-// Feedback reaches a student only once released, and only on their own work;
-// the service enforces both, this just asks for it when the results show.
-const examOutcome =
-	state.kind === "results" && attempt
-		? examResult(
-				exam.questions,
-				attempt.submissions,
-				await db.feedback.findMany(
-					{ course: course.id, exam: slug, author: actor.username },
-					{ actor },
-				),
-				(await loadResultPolicy(course.id))(exam),
-			)
-		: undefined;
-
-// The marks and feedback of each answer, now that the student may see them.
-const reviews =
-	examOutcome && attempt
-		? await loadReviews(
-				course.id,
-				exam.questions,
-				examOutcome,
-				attempt.submissions,
-			)
-		: undefined;
-
-// What the student may do about each answer's grade, decided by the same rule the service enforces.
-const requests =
-	examOutcome && attempt
-		? await db.regradeRequest.findMany(
-				{ course: course.id, exam: slug, author: actor.username },
-				{ actor },
-			)
-		: [];
-const questionRegrades: Record<string, QuestionRegrade> = {};
-for (const outcome of examOutcome?.questions ?? []) {
-	if (!outcome.submission || !attempt) continue;
-	const request =
-		requests.find((entry) => entry.submission === outcome.submission) ?? null;
-	questionRegrades[outcome.question] = {
-		submission: outcome.submission,
-		canRequest:
-			regradeBlocker(
-				{
-					schedule,
-					author: actor.username,
-					attempt,
-					outcome,
-					submission: outcome.submission,
-					requested: request !== null,
-				},
-				now,
-			) === null,
-		request: request && {
-			publicId: request.publicId,
-			status: request.status,
-			message: request.message,
-			reply: request.reply,
-		},
-	};
-}
-
-const attemptQuestions = studentQuestions.map(({ slug, question }) => ({
-	slug,
-	question: shufflePool(
-		question,
-		`${attempt?.publicId ?? actor.username}:${slug}`,
-	),
-}));
-// Questions stay on the server until the student is in the attempt.
-const showQuestions =
-	state.kind === "in-progress" ||
-	state.kind === "submitted" ||
-	state.kind === "results";
-// The pretest sources of each code question, only while the student can answer.
-const pretests: Record<string, PretestSource[]> = {};
-const exampleHtml: Record<string, string[]> = {};
-// The sends of each code question that goes to a worker, by question slug, while answering and in the review.
-const codeSends: Record<string, CodeSends> = {};
-const codePenalties =
-	(await loadResultPolicy(course.id))(exam).codePenalty ?? {};
-const answering = state.kind === "in-progress";
-if (answering || (state.kind === "results" && attempt)) {
-	await Promise.all(
-		studentQuestions.map(async ({ slug, version, question }) => {
-			if (question.type !== "code") return;
-			const context = await db.question.codeAnswer(
-				{ course: course.id, slug, version },
-				{ actor },
-			);
-			if (answering) {
-				pretests[slug] = context.pretests;
-				exampleHtml[slug] = await highlightExamples(question);
-			}
-			if (!context.sendable || !attempt) return;
-			const sent = await db.gradingJob.forStudent(
-				{ response: attempt.publicId, question: slug },
-				{ actor },
-			);
-			codeSends[slug] = sendsOf(
-				sent,
-				codePenalties[slug] ?? DEFAULT_CODE_PENALTY,
-			);
-		}),
-	);
-}
-const latestAnswers: Record<string, AnswerPayload> = {};
-const answeredAt: Record<string, string> = {};
-for (const submission of attempt?.submissions ?? []) {
-	latestAnswers[submission.question] = submission.payload as AnswerPayload;
-	answeredAt[submission.question] = submission.createdAt.toISOString();
-}
+const view = await loadAttemptView({
+	course: course.id,
+	exam,
+	actor,
+	schedule,
+	attempt,
+	state,
+	publicQuestions,
+	now,
+});
+const examOutcome = view.result;
 ---
 
 <AppLayout title={m.exams_detail_page_title({ title: exam.title })}
@@ -503,18 +391,18 @@ for (const submission of attempt?.submissions ?? []) {
             type={exam.type}
             state={state}
             now={now}
-            questions={showQuestions ? attemptQuestions : []}
-            answers={latestAnswers}
-            result={examOutcome}
-            reviews={reviews}
-            regrades={questionRegrades}
+            questions={view.questions}
+            answers={view.answers}
+            result={view.result}
+            reviews={view.reviews}
+            regrades={view.regrades}
             codeRun={codeRun.allowed}
             runnerOrigin={RUNNER_ORIGIN}
-            pretests={pretests}
-            exampleHtml={exampleHtml}
-            codeSends={codeSends}
+            pretests={view.pretests}
+            exampleHtml={view.exampleHtml}
+            codeSends={view.codeSends}
             username={actor.username}
-            answeredAt={answeredAt}
+            answeredAt={view.answeredAt}
             graceMs={EXAM_ANSWER_GRACE_MS}
             attempt={attempt?.publicId}
             answerHistory={effectiveAnswerHistory(exam)}

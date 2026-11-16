@@ -126,16 +126,3 @@ export function weightOf(question: QuestionPublic["question"]): number {
 export function formatPoints(share: number): string {
 	return (share * 100).toLocaleString(locale, { maximumFractionDigits: 1 });
 }
-
-/**
- * The points each question carries, in exam order, or nulls when every
- * question weighs the default 1 and weights would only add noise.
- */
-export function pointsOf(
-	questions: readonly { question: QuestionPublic["question"] }[],
-): (string | null)[] {
-	const weights = questions.map((entry) => weightOf(entry.question));
-	const total = weights.reduce((sum, weight) => sum + weight, 0);
-	if (weights.every((weight) => weight === 1)) return weights.map(() => null);
-	return weights.map((weight) => formatPoints(total > 0 ? weight / total : 0));
-}

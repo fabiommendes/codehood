@@ -4,8 +4,11 @@
 	"exams_phase_open": "Open",
 	"exams_phase_closed": "Closed",
 	"exams_phase_archived": "Archived",
-	"exams_tab_student_view": "Student view",
-	"exams_tab_correct_answer": "Correct answer",
+	"exams_preview_banner": "This is a simulation. It does not count toward any grade.",
+	"exams_preview_restart": "Restart",
+	"exams_preview_restart_confirm": "Discard this simulation and start a new one?",
+	"exams_preview_manual_grading": "Manual grading",
+	"exams_preview_answer_key": "See the answer key",
 	"exams_not_scheduled": "Not scheduled",
 	"exams_row_answers_to_grade": [
 		{

@@ -27,7 +27,7 @@ test.describe("examNav", () => {
 		expect(nav.sections).toHaveLength(1);
 		expect(nav.sections[0]?.entries.map((e) => e.label)).toEqual([
 			"Overview",
-			"Questions",
+			"Preview",
 			"Exceptions",
 			"Grading",
 			"Regrade requests",
@@ -46,7 +46,7 @@ test.describe("examNav", () => {
 	test("the manager's entries are pages of their own", () => {
 		expect(manager(false).sections[0]?.entries.map((e) => e.href)).toEqual([
 			href,
-			`${href}/questions`,
+			`${href}/preview`,
 			`${href}/exceptions`,
 			`${href}/grading`,
 			`${href}/regrades`,
@@ -62,10 +62,10 @@ test.describe("examNav", () => {
 		]);
 	});
 
-	test("practice exams have only the overview and the questions", () => {
+	test("practice exams have only the overview and the preview", () => {
 		expect(manager(true).sections[0]?.entries.map((e) => e.href)).toEqual([
 			href,
-			`${href}/questions`,
+			`${href}/preview`,
 		]);
 	});
 

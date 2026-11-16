@@ -136,7 +136,7 @@ function examSteps(
 		return steps;
 	}
 	const pageLabel = {
-		questions: m.exams_detail_questions_heading(),
+		preview: m.nav_exam_preview(),
 		exceptions: m.exams_exceptions_heading(),
 		results: m.grades_results_title(),
 		regrades: m.grades_regrade_page_title(),

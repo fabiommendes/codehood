@@ -142,14 +142,15 @@ test("instructor: preview the files attached to a question and an exam", async (
 	});
 
 	await test.step("the exam preview offers the files of the version the exam pinned", async () => {
-		await page.goto(`${href}/exams/files-exam/questions`);
+		await page.goto(`${href}/exams/files-exam/preview`);
+		await page.getByRole("button", { name: "Start exam" }).click();
 
 		const list = attachmentsWith(page, "data.csv");
 		await expect(list).toBeVisible();
-		// The question without files adds no list of its own.
+		// The exam's own list and the one question with files; the other question adds none.
 		await expect(
 			page.getByRole("region", { name: "Attachments", exact: true }),
-		).toHaveCount(1);
+		).toHaveCount(2);
 
 		const saved = await download(page, list, "data.csv");
 		expect(saved.filename).toBe("data.csv");

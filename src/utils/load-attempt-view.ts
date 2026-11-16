@@ -1,0 +1,181 @@
+import type { UserActor } from "@/auth/actor";
+import type { AnswerPayload } from "@/components/exam/answer-payload";
+import { type CodeSends, sendsOf } from "@/components/exam/code-sends";
+import type { QuestionRegrade } from "@/components/exam/RegradeControls";
+import type { CourseId } from "@/core/schemas";
+import { db, type Exam, type QuestionPublic, type Response } from "@/db";
+import { loadResultPolicy } from "@/db/result-policy";
+import { shufflePool } from "@/mdq/shuffle";
+import { DEFAULT_CODE_PENALTY } from "@/services/code-grading";
+import { type ExamResult, examResult } from "@/services/exam-result";
+import type { AttemptState, ExamSchedule } from "@/services/exam-state";
+import { regradeBlocker } from "@/services/regrade";
+import type { ReviewResult } from "@/services/review";
+import { highlightExamples } from "./highlight-examples";
+import { loadReviews } from "./load-review";
+import type { PretestSource } from "./pretest-sources";
+
+/// What `ExamAttempt` takes from the server besides the state: the questions as the attempt shows them, the saved answers and, once it may be seen, the review.
+export interface AttemptView {
+	/// The questions in exam order, shuffled by the attempt's seed; none until the author is in the attempt.
+	questions: { slug: string; question: QuestionPublic["question"] }[];
+	/// The latest saved answer per question slug.
+	answers: Record<string, AnswerPayload>;
+	/// When the server saved each answer, by question slug (ISO).
+	answeredAt: Record<string, string>;
+	/// The outcome of the exam, once the state is `results`.
+	result: ExamResult | undefined;
+	reviews: Record<string, ReviewResult> | undefined;
+	/// What the author may do about each answer's grade; empty for a simulation.
+	regrades: Record<string, QuestionRegrade>;
+	pretests: Record<string, PretestSource[]>;
+	exampleHtml: Record<string, string[]>;
+	codeSends: Record<string, CodeSends>;
+}
+
+export interface AttemptViewInput {
+	course: CourseId;
+	exam: Exam;
+	actor: UserActor;
+	schedule: ExamSchedule;
+	/// The author's attempt, or `null` before they start.
+	attempt: Response | null;
+	state: AttemptState;
+	/// The exam's questions in their public form, at the pinned versions.
+	publicQuestions: Omit<QuestionPublic, "id">[];
+	now: Date;
+}
+
+/**
+ * Loads what the page of an attempt hands to `ExamAttempt`, for the student's attempt and for the instructor's simulation alike.
+ *
+ * The questions leave the server only once the author is in the attempt.
+ * A simulation has no regrade requests, so none are read for it.
+ */
+export async function loadAttemptView(
+	input: AttemptViewInput,
+): Promise<AttemptView> {
+	const { course, exam, actor, schedule, attempt, state, now } = input;
+	const author = actor.username;
+	const preview = attempt?.preview ?? false;
+	const policy = (await loadResultPolicy(course))(exam);
+
+	const result =
+		state.kind === "results" && attempt
+			? examResult(
+					exam.questions,
+					attempt.submissions,
+					await db.feedback.findMany(
+						{ course, exam: exam.slug, author },
+						{ actor },
+					),
+					policy,
+				)
+			: undefined;
+
+	const reviews =
+		result && attempt
+			? await loadReviews(course, exam.questions, result, attempt.submissions)
+			: undefined;
+
+	const requests =
+		result && attempt && !preview
+			? await db.regradeRequest.findMany(
+					{ course, exam: exam.slug, author },
+					{ actor },
+				)
+			: [];
+	const regrades: Record<string, QuestionRegrade> = {};
+	for (const outcome of preview ? [] : (result?.questions ?? [])) {
+		if (!outcome.submission || !attempt) continue;
+		const request =
+			requests.find((entry) => entry.submission === outcome.submission) ?? null;
+		regrades[outcome.question] = {
+			submission: outcome.submission,
+			canRequest:
+				regradeBlocker(
+					{
+						schedule,
+						author,
+						attempt,
+						outcome,
+						submission: outcome.submission,
+						requested: request !== null,
+					},
+					now,
+				) === null,
+			request: request && {
+				publicId: request.publicId,
+				status: request.status,
+				message: request.message,
+				reply: request.reply,
+			},
+		};
+	}
+
+	// Questions stay on the server until the author is in the attempt.
+	const showQuestions =
+		state.kind === "in-progress" ||
+		state.kind === "submitted" ||
+		state.kind === "results";
+	const questions = showQuestions
+		? input.publicQuestions.map(({ slug, question }) => ({
+				slug,
+				question: shufflePool(
+					question,
+					`${attempt?.publicId ?? author}:${slug}`,
+				),
+			}))
+		: [];
+
+	// The pretest sources of each code question, only while the author can answer.
+	const pretests: Record<string, PretestSource[]> = {};
+	const exampleHtml: Record<string, string[]> = {};
+	// The sends of each code question that goes to a worker, while answering and in the review.
+	const codeSends: Record<string, CodeSends> = {};
+	const penalties = policy.codePenalty ?? {};
+	const answering = state.kind === "in-progress";
+	if (answering || (state.kind === "results" && attempt)) {
+		await Promise.all(
+			input.publicQuestions.map(async ({ slug, version, question }) => {
+				if (question.type !== "code") return;
+				const context = await db.question.codeAnswer(
+					{ course, slug, version },
+					{ actor },
+				);
+				if (answering) {
+					pretests[slug] = context.pretests;
+					exampleHtml[slug] = await highlightExamples(question);
+				}
+				if (!context.sendable || !attempt) return;
+				const sent = await db.gradingJob.forStudent(
+					{ response: attempt.publicId, question: slug },
+					{ actor },
+				);
+				codeSends[slug] = sendsOf(
+					sent,
+					penalties[slug] ?? DEFAULT_CODE_PENALTY,
+				);
+			}),
+		);
+	}
+
+	const answers: Record<string, AnswerPayload> = {};
+	const answeredAt: Record<string, string> = {};
+	for (const submission of attempt?.submissions ?? []) {
+		answers[submission.question] = submission.payload as AnswerPayload;
+		answeredAt[submission.question] = submission.createdAt.toISOString();
+	}
+
+	return {
+		questions,
+		answers,
+		answeredAt,
+		result,
+		reviews,
+		regrades,
+		pretests,
+		exampleHtml,
+		codeSends,
+	};
+}
