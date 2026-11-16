@@ -1346,7 +1346,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 	await seedReleasedQuiz(cs101, { hopper, hamilton });
-	await seedGradedExam(cs101.id, ada, { hopper, hamilton, liskov, bob });
 	await seedExternalGradingExams(cs101.id, ada, {
 		hopper,
 		hamilton,
@@ -1357,20 +1356,19 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		thompson: cohort[2] as User,
 		backus: cohort[3] as User,
 	});
-	await seedRunnableCodeExam(cs101.id, { hopper, hamilton, liskov, bob });
-	await seedRubricExam(
-		cs101.id,
-		ada,
-		{ hopper, hamilton, liskov, bob },
-		cohort,
-	);
-	await seedCodeAnswerExams(cs101.id);
-	await seedAnswerEditHistoryExams(cs101.id, {
+	await seedGradingShowcase(cs101.id, ada, {
 		hopper,
 		hamilton,
 		liskov,
 		bob,
+		knuth: cohort[0] as User,
+		ritchie: cohort[1] as User,
+		thompson: cohort[2] as User,
+		backus: cohort[3] as User,
 	});
+	await seedReleasedRubricExam(cs101.id, ada, { hopper, hamilton });
+	await seedHistoryOffExam(cs101.id, hopper);
+	await seedCodeAnswerExams(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
 	await seedRollCalls(cs101.id, {
 		hopper,
@@ -1381,7 +1379,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		wirth,
 	});
 
-	await seedExamExceptions(cs101.id, { hamilton, bob, liskov });
+	await seedMidtermException(cs101.id);
 	await seedQuestionStatsExam(cs101.id, [
 		hopper,
 		hamilton,
@@ -2612,236 +2610,6 @@ class SeededTyping {
 }
 
 /**
- * Seeds the exams that show every state of the instructor's edit history.
- *
- * In `history-essays` (an exam on the default switch, which records), each
- * student is one situation: hopper typed normally and pasted a block, hamilton
- * has a marker, a rebase and a final gap, liskov hit a limit, bob answered
- * with no recorded typing. `history-off` was recorded and then switched off.
- */
-async function seedAnswerEditHistoryExams(
-	course: Course["id"],
-	students: {
-		hopper: User;
-		hamilton: User;
-		liskov: User;
-		bob: User;
-	},
-): Promise<void> {
-	const { hopper, hamilton, liskov, bob } = students;
-	const text = "essay-base-case";
-	const code = "code-factorial";
-	await db.question.create(
-		{
-			course,
-			slug: text,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "The base case",
-				stem: "Explain why a recursive function needs a base case.",
-				tags: ["recursion"],
-				content: "text",
-			},
-		},
-		FULL_ACCESS,
-	);
-	await db.question.create(
-		{
-			course,
-			slug: code,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Factorial",
-				stem: "Write a function `factorial(n)` in JavaScript.",
-				tags: ["recursion"],
-				content: "code",
-				highlight: "javascript",
-			},
-		},
-		FULL_ACCESS,
-	);
-	const questions = [
-		{ slug: text, version: "v1" },
-		{ slug: code, version: "v1" },
-	];
-	for (const [slug, title] of [
-		["history-essays", "Edit history: essays"],
-		["history-off", "Edit history: recording switched off"],
-	] as const) {
-		await db.exam.create(
-			{
-				course,
-				slug,
-				type: "EXAM",
-				status: "ONGOING",
-				title,
-				description: "Open answers whose typing the browser records.",
-				duration: { hours: 2 },
-				questions,
-			},
-			FULL_ACCESS,
-		);
-	}
-	const now = Date.now();
-	/// A time `minutes` before the seed ran.
-	const ago = (minutes: number) => new Date(now - minutes * 60_000);
-	/// Opens an attempt that started `minutes` ago.
-	const attempt = async (exam: string, student: User, minutes: number) => {
-		const opened = await db.response.create(
-			{ course, exam, author: student.username },
-			{ actor: student },
-		);
-		await prisma.response.update({
-			where: { publicId: opened.publicId },
-			data: { createdAt: ago(minutes) },
-		});
-		return { course, exam, attempt: opened.publicId };
-	};
-	const finish = async (exam: string, student: User) => {
-		await db.response.finish({ course, exam }, { actor: student });
-	};
-	const save = async (
-		exam: string,
-		student: User,
-		question: string,
-		payload: string,
-	) => {
-		await db.response.submit(
-			{ course, exam, question, payload },
-			{ actor: student },
-		);
-	};
-	const definition =
-		"A recursive function calls itself, so without a base case it never stops.";
-	/// The edits of typing `insertedText` word by word from `position`, starting at `startMs`.
-	const typing = (
-		startMs: number,
-		insertedText: string,
-		position: number,
-	): SeededEdit[] => {
-		let at = position;
-		let when = startMs;
-		return (insertedText.match(/\S+\s*|\s+/g) ?? []).map((word) => {
-			const edit: SeededEdit = {
-				position: at,
-				deleteCount: 0,
-				insertedText: word,
-				startMs: when,
-				durationMs: 70,
-			};
-			at += word.length;
-			when += 300 + 50 * word.length;
-			return edit;
-		});
-	};
-
-	// Hopper: typed the text, pasted a long block, deleted a few words, then wrote the code.
-	{
-		const ref = await attempt("history-essays", hopper, 50);
-		const essay = new SeededTyping(hopper, ref, text);
-		const pasted =
-			" Every call works on a smaller input until it reaches the smallest case, where the function answers directly and the calls return one by one.";
-		await essay.type("tab-1", ago(44), [
-			...typing(1000, "A recursive function", 0),
-			...typing(
-				9000,
-				" calls itself, so without a base case it never stops.",
-				20,
-			),
-		]);
-		await essay.type("tab-1", ago(40), [
-			{
-				position: definition.length,
-				deleteCount: 0,
-				insertedText: pasted,
-				startMs: 31_000,
-				durationMs: 120,
-				kind: "paste",
-			},
-			{
-				position: 0,
-				deleteCount: 2,
-				insertedText: "",
-				startMs: 140_000,
-				durationMs: 300,
-				kind: "delete",
-			},
-		]);
-		const program = new SeededTyping(hopper, ref, code);
-		await program.type("tab-1", ago(30), [
-			...typing(200_000, "function factorial(n) {", 0),
-			...typing(
-				215_000,
-				"\n  return n <= 1 ? 1 : n * factorial(n - 1);\n}",
-				23,
-			),
-		]);
-		await save("history-essays", hopper, text, essay.text);
-		await save("history-essays", hopper, code, program.text);
-		await finish("history-essays", hopper);
-	}
-
-	// Hamilton: the browser lost input once, restarted from another text, and the saved answer has more.
-	{
-		const ref = await attempt("history-essays", hamilton, 55);
-		const essay = new SeededTyping(hamilton, ref, text);
-		await essay.type("tab-1", ago(48), [
-			...typing(1000, "The base case is the quick way out.", 0),
-		]);
-		await essay.gap("input-lost", ago(42));
-		await essay.type(
-			"tab-2",
-			ago(36),
-			typing(500, " Without it the calls never return.", 34),
-			{ reason: "rebase", text: "The base case is the slow way out." },
-		);
-		await save(
-			"history-essays",
-			hamilton,
-			text,
-			`${essay.text} It also bounds the stack.`,
-		);
-		await finish("history-essays", hamilton);
-	}
-
-	// Liskov: the text outgrew what a field records, so the history stops at the first batch.
-	{
-		const ref = await attempt("history-essays", liskov, 45);
-		const essay = new SeededTyping(liskov, ref, text);
-		await essay.type("tab-1", ago(40), typing(1000, definition, 0));
-		await essay.overflow(ago(35));
-		await save("history-essays", liskov, text, definition);
-		await finish("history-essays", liskov);
-	}
-
-	// Bob: answered, but no typing reached the server.
-	await attempt("history-essays", bob, 30);
-	await save("history-essays", bob, text, definition);
-	await finish("history-essays", bob);
-
-	// Hopper again, on the exam that is switched off afterwards: what was recorded stays.
-	{
-		const ref = await attempt("history-off", hopper, 40);
-		const essay = new SeededTyping(hopper, ref, text);
-		await essay.type("tab-1", ago(30), [
-			...typing(1000, definition, 0),
-			...typing(50_000, " It is the exit.", definition.length),
-		]);
-		await save("history-off", hopper, text, essay.text);
-		await finish("history-off", hopper);
-	}
-	await db.exam.setAnswerHistory(
-		{ course, slug: "history-off" },
-		false,
-		FULL_ACCESS,
-	);
-}
-
-/**
  * Seeds an open, timed quiz nobody has started, with one question of each answerable type.
  *
  * It has no date, so each student gets the full duration from the moment
@@ -2978,20 +2746,202 @@ async function seedOpenQuiz(course: Course["id"], knuth: User): Promise<void> {
 	});
 }
 
+/// Seeds `history-off`, an exam whose edit history was recorded and then switched off.
+async function seedHistoryOffExam(
+	course: Course["id"],
+	hopper: User,
+): Promise<void> {
+	const exam = "history-off";
+	const question = "explain-recursion";
+	const text =
+		"A recursive function calls itself, so without a base case it never stops.";
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Edit history: recording switched off",
+			description: "Open answers whose typing the browser records.",
+			duration: { hours: 2 },
+			questions: [{ slug: question, version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	const opened = await db.response.create(
+		{ course, exam, author: hopper.username },
+		{ actor: hopper },
+	);
+	await prisma.response.update({
+		where: { publicId: opened.publicId },
+		data: { createdAt: new Date(Date.now() - 40 * 60_000) },
+	});
+	const typed = new SeededTyping(
+		hopper,
+		{ course, exam, attempt: opened.publicId },
+		question,
+	);
+	await typed.type("tab-1", new Date(Date.now() - 30 * 60_000), [
+		...typingEdits(1000, text, 0),
+		...typingEdits(50_000, " It is the exit.", text.length),
+	]);
+	await db.response.submit(
+		{ course, exam, question, payload: typed.text },
+		{ actor: hopper },
+	);
+	await db.response.finish({ course, exam }, { actor: hopper });
+	await db.exam.setAnswerHistory({ course, slug: exam }, false, FULL_ACCESS);
+}
+
+/// The edits of typing `insertedText` word by word from `position`, starting at `startMs`.
+function typingEdits(
+	startMs: number,
+	insertedText: string,
+	position: number,
+): SeededEdit[] {
+	let at = position;
+	let when = startMs;
+	return (insertedText.match(/\S+\s*|\s+/g) ?? []).map((word) => {
+		const edit: SeededEdit = {
+			position: at,
+			deleteCount: 0,
+			insertedText: word,
+			startMs: when,
+			durationMs: 70,
+		};
+		at += word.length;
+		when += 300 + 50 * word.length;
+		return edit;
+	});
+}
+
+/// The rubric of the essay `prolog-caso-base`: groups three levels deep, standalone items (one negative) and a base of zero.
+async function seedEssayRubric(pk: {
+	course: Course["id"];
+	exam: string;
+	question: string;
+}): Promise<void> {
+	await db.rubric.update(pk, { base: "0" }, FULL_ACCESS);
+	const items = [
+		{
+			key: "correta",
+			group: "Recursão",
+			text: "Correta",
+			value: "0.5",
+			comment: "Cita a parada da recursão e o que ela garante.",
+			feedback: "Você explicou bem por que a recursão termina.",
+		},
+		{
+			key: "esqueceu",
+			group: "Recursão/Errada/Caso base",
+			text: "Esqueceu o caso base",
+			value: "0.2",
+			feedback: "Sem caso base a recursão não para; faltou dizer isso.",
+		},
+		{
+			key: "inacessivel",
+			group: "Recursão/Errada/Caso base",
+			text: "Caso base inacessível",
+			value: "0.3",
+			comment: "A cláusula existe, mas fica depois de uma que sempre casa.",
+			feedback:
+				"O caso base precisa vir antes da cláusula recursiva, ou a busca nunca chega nele.",
+		},
+		{
+			key: "errado",
+			group: "Recursão/Errada",
+			text: "Caso base errado",
+			value: "0.1",
+			feedback: "O caso base que você citou não cobre a lista vazia.",
+		},
+		{
+			key: "pilha",
+			group: null,
+			text: "Descreve o estouro de pilha sem o caso base",
+			value: "0.4",
+			feedback: "Boa descrição do estouro de pilha.",
+		},
+		{
+			key: "is-livre",
+			group: null,
+			text: "Usa is com variável livre",
+			value: "-0.1",
+			comment: "Exemplo com `X is Y + 1` sem Y instanciado.",
+			feedback: "O `is` exige o lado direito instanciado.",
+		},
+		{
+			key: "vaga",
+			group: null,
+			text: "Explicação vaga",
+			value: "0.2",
+			comment: "Diz que precisa parar, sem dizer como.",
+		},
+	];
+	for (const item of items) {
+		await db.rubric.createItem({ ...pk }, item, FULL_ACCESS);
+	}
+}
+
+/// What the students wrote for the essay `prolog-caso-base`.
+const CASO_BASE_TEXT = {
+	hopper:
+		"Sem o caso base, `comprimento/2` chama a si mesmo sem parar e a pilha estoura.",
+	hamilton:
+		"O caso base deveria ser `comprimento([_], 1)`, mas assim a lista vazia nunca casa. Sem ele a pilha de chamadas cresce até estourar.",
+	liskov: "Precisa para a recursão parar em algum momento.",
+	bob: "Se a lista vazia ficar sem cláusula, a consulta falha ou entra em laço. O caso base fica antes da recursiva e usa `[]`.",
+	same: "Sem a cláusula do caso base a recursão não tem onde parar, e o Prolog continua tentando até acabar a memória.",
+	other:
+		"O caso base é a resposta que não depende de chamada recursiva. Ele ancora a definição indutiva do predicado.",
+};
+
 /**
- * Seeds a closed, unreleased exam with answers in every grading state.
+ * Seeds `test-02`, an exam whose window just ended and that is being corrected.
  *
- * Gives the grading queue, the exam's results, the attempt pages and the
- * grades table something to show: answers graded by a bot and by the
- * instructor, pending ones, one marked will-not-grade, and questions left
- * unanswered. Bob also holds an exception.
+ * It holds a student in each state of the correction: objective answers
+ * graded on delivery, manual grades with a comment, a rubric in use and an
+ * initial one the exam did not copy, answers waiting equal up to spaces, one
+ * marked will-not-grade, a blank question, code to run (JavaScript, Python and
+ * Prolog), Elm sends corrected by the bot `runner`, the instructor's edit
+ * history of the typed answers, and the exceptions of the exam (`liskov` has
+ * a personal window still open, `backus` a makeup). The exam stays `ONGOING`
+ * with its window over: `COMPLETED` would not let an extra time reopen it.
  */
-async function seedGradedExam(
+async function seedGradingShowcase(
 	course: Course["id"],
 	instructor: User,
-	students: { hopper: User; hamilton: User; liskov: User; bob: User },
+	students: {
+		hopper: User;
+		hamilton: User;
+		liskov: User;
+		bob: User;
+		knuth: User;
+		ritchie: User;
+		thompson: User;
+		backus: User;
+	},
 ): Promise<void> {
-	const exam = "test-01";
+	const exam = "test-02";
+	const worker = "elm-test";
+	const bot = { actor: { ...instructor, bot: "runner" } };
+	const { hopper, hamilton, liskov, bob, knuth, ritchie, thompson, backus } =
+		students;
+	const devStudent = await db.user.findOne(
+		{ username: DEV_STUDENT_USERNAME },
+		FULL_ACCESS,
+	);
+	if (!devStudent) throw new Error("The dev student account is missing.");
+	const [basics, five, returns, blanks, essay, js, py, prolog, elm] = [
+		"recursion-basics",
+		"factorial-of-five",
+		"factorial-returns",
+		"base-case-blanks",
+		"prolog-caso-base",
+		"js-double-it",
+		"py-count-up",
+		"prolog-comprimento-de-lista",
+		"elm-soma",
+	] as const;
 
 	await db.question.create(
 		{
@@ -3012,7 +2962,7 @@ async function seedGradedExam(
 	await db.question.create(
 		{
 			course,
-			slug: "factorial-returns",
+			slug: returns,
 			status: "PUBLISHED",
 			version: "v1",
 			question: {
@@ -3033,109 +2983,548 @@ async function seedGradedExam(
 		},
 		FULL_ACCESS,
 	);
+	for (const question of [
+		{
+			slug: js,
+			title: "Double the number",
+			stem: "Read a number and print its double.",
+			language: "javascript",
+			weight: 2,
+		},
+		{
+			slug: py,
+			title: "Count up",
+			stem: "Print the numbers from 1 to `n`, one per line, where `n` is read from the input.",
+			language: "python",
+		},
+	]) {
+		await db.question.create(
+			{
+				course,
+				slug: question.slug,
+				status: "PUBLISHED",
+				version: "v1",
+				question: {
+					type: "essay",
+					title: question.title,
+					stem: question.stem,
+					tags: [question.language],
+					content: "code",
+					highlight: question.language,
+					...(question.weight ? { weight: question.weight } : {}),
+				} as never,
+			},
+			FULL_ACCESS,
+		);
+	}
+	await db.question.create(
+		{
+			course,
+			slug: prolog,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "Comprimento de uma lista em Prolog",
+				stem: "Defina `comprimento(Lista, N)` de modo que `N` seja o número de elementos de `Lista`. Não use `length/2`.",
+				tags: ["prolog"],
+				content: "code",
+				highlight: "prolog",
+			},
+		},
+		FULL_ACCESS,
+	);
+	// The question document has no rubric field, so the initial rubric is
+	// written into the stored version the way a pushed question carries it.
+	const stored = await prisma.questionData.findFirstOrThrow({
+		where: { versionHash: "v1", ref: { courseId: course, slug: prolog } },
+	});
+	await prisma.questionData.update({
+		where: { id: stored.id },
+		data: {
+			privatePayload: {
+				...(stored.privatePayload as Record<string, unknown>),
+				rubric: [
+					{
+						id: "vazia",
+						path: "Recursão/Caso base",
+						value: "0.3",
+						text: "Trata a lista vazia",
+						comment: "Basta a cláusula comprimento([], 0).",
+						feedback: "Sua solução trata a lista vazia corretamente.",
+					},
+					{
+						id: "passo",
+						path: "Recursão/Passo",
+						value: "0.5",
+						text: "Passo recursivo correto",
+						feedback: "O passo recursivo soma um ao comprimento da cauda.",
+					},
+					{
+						id: "length",
+						value: "-0.5",
+						text: "Usa length/2",
+						comment: "O enunciado proíbe o predicado embutido.",
+					},
+				],
+			},
+		},
+	});
+	await db.question.create(
+		{
+			course,
+			slug: essay,
+			status: "PUBLISHED",
+			version: "v1",
+			question: {
+				type: "essay",
+				title: "O caso base da recursão em Prolog",
+				stem: "Por que um predicado recursivo em Prolog precisa de uma cláusula para o caso base? O que acontece com `comprimento/2` sem ela?",
+				tags: ["prolog", "recursion"],
+				content: "text",
+			},
+		},
+		FULL_ACCESS,
+	);
 	await db.exam.create(
 		{
 			course,
 			slug: exam,
 			type: "EXAM",
 			status: "ONGOING",
-			title: "Test 1: recursion",
-			description: "Base cases, the call stack and recursive definitions.",
-			tags: ["recursion"],
+			title: "Test 2: recursion and code",
+			description:
+				"Objective questions, an essay corrected with a rubric, and code in four languages.",
+			tags: ["recursion", "prolog"],
 			questions: [
-				{ slug: "recursion-basics", version: "v1" },
-				{ slug: "factorial-of-five", version: "v1" },
-				{ slug: "factorial-returns", version: "v1" },
-				{ slug: "base-case-blanks", version: "v1" },
-				{ slug: "explain-recursion", version: "v1" },
-			],
+				basics,
+				five,
+				returns,
+				blanks,
+				essay,
+				js,
+				py,
+				prolog,
+				elm,
+			].map((slug) => ({ slug, version: "v1" })),
 		},
 		FULL_ACCESS,
 	);
+	const pk = { course, exam, question: essay };
+	await seedEssayRubric(pk);
 
-	// Hopper: objective answers graded when the attempt closes, the essay still pending.
-	await answerExam(course, exam, students.hopper, {
-		"recursion-basics": "base-case",
-		"factorial-of-five": 120,
-		"factorial-returns": [
-			[0, "factorial(0) returns 1"],
-			[0, "factorial(1) returns 1"],
-			[0, "factorial(2) returns 2"],
-			[0, "factorial(3) returns 6"],
-		],
-		// "lighter" matches no pattern, so the blank waits for the instructor.
-		"base-case-blanks": { stop: "base", smaller: "lighter" },
-		"explain-recursion":
-			"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
+	const now = Date.now();
+	/// A time `minutes` before the seed ran.
+	const ago = (minutes: number) => new Date(now - minutes * 60_000);
+	/// Opens an attempt that started `minutes` ago.
+	const attempt = async (student: User, minutes: number) => {
+		const opened = await db.response.create(
+			{ course, exam, author: student.username },
+			{ actor: student },
+		);
+		await prisma.response.update({
+			where: { publicId: opened.publicId },
+			data: { createdAt: ago(minutes) },
+		});
+		return { course, exam, attempt: opened.publicId };
+	};
+	/// Saves each answer of `student`; returns the submission ids by question.
+	const put = async (
+		student: User,
+		answers: Record<string, QuestionResponse>,
+	): Promise<Record<string, string>> => {
+		const ids: Record<string, string> = {};
+		for (const [question, payload] of Object.entries(answers)) {
+			const response = await db.response.submit(
+				{ course, exam, question, payload },
+				{ actor: student },
+			);
+			ids[question] = response.submissions.at(-1)?.publicId ?? "";
+		}
+		return ids;
+	};
+	const finish = async (student: User) => {
+		await db.response.finish({ course, exam }, { actor: student });
+	};
+	/// Sends an Elm answer and has the bot correct it with `verdicts`.
+	const sendElm = async (
+		student: User,
+		payload: string,
+		verdicts: Parameters<typeof elmReport>[0],
+	): Promise<void> => {
+		const response = await db.response.submit(
+			{ course, exam, question: elm, payload, kind: "SUBMIT" },
+			{ actor: student },
+		);
+		const sent = response.submissions.at(-1)?.publicId ?? "";
+		const [job] = await db.gradingJob.claim(
+			{ workers: [worker], limit: 1, exam },
+			bot,
+		);
+		if (job?.submission !== sent) {
+			throw new Error(
+				`[seed] the bot claimed ${job?.submission}, not ${sent}.`,
+			);
+		}
+		await db.gradingJob.complete(sent, elmReport(verdicts), bot);
+	};
+	const all = (verdict: ElmVerdict) => ({
+		empty: verdict,
+		one: verdict,
+		long: verdict,
+		negatives: verdict,
 	});
+	const as = { actor: instructor };
+	const listing = (...lines: string[]) => lines.join("\n");
+	const rightOrder: [number, string][] = [
+		[0, "factorial(0) returns 1"],
+		[0, "factorial(1) returns 1"],
+		[0, "factorial(2) returns 2"],
+		[0, "factorial(3) returns 6"],
+	];
+	const definition = CASO_BASE_TEXT.liskov;
 
-	// Hamilton: everything graded but the ordering, the essay by the instructor with a comment.
-	const hamilton = await answerExam(course, exam, students.hamilton, {
-		"recursion-basics": "tail-call",
-		"factorial-of-five": 100,
-		// The order of the calls, not of the returns: matches no key, so it is pending.
-		"factorial-returns": [
-			[0, "factorial(3) returns 6"],
-			[0, "factorial(2) returns 2"],
-			[0, "factorial(1) returns 1"],
-			[0, "factorial(0) returns 1"],
-		],
-		"explain-recursion":
-			"The base case is where the function returns a value directly.",
+	// Hopper: everything answered. The essay is typed, pasted into and trimmed,
+	// the rubric grades it, the JavaScript is graded by hand, and Elm went from
+	// a partial send to a full one.
+	{
+		const ref = await attempt(hopper, 50);
+		const text = new SeededTyping(hopper, ref, essay);
+		const first = `Ah, ${CASO_BASE_TEXT.hopper}`;
+		await text.type("tab-1", ago(44), [
+			...typingEdits(1000, first.slice(0, 30), 0),
+			...typingEdits(9000, first.slice(30), 30),
+		]);
+		await text.type("tab-1", ago(40), [
+			{
+				position: first.length,
+				deleteCount: 0,
+				insertedText:
+					" A cláusula `comprimento([], 0)` encerra a recursão. Cada chamada trabalha sobre uma lista menor até chegar à lista vazia, onde o predicado responde direto e as chamadas voltam uma a uma.",
+				startMs: 31_000,
+				durationMs: 120,
+				kind: "paste",
+			},
+			{
+				position: 0,
+				deleteCount: 4,
+				insertedText: "",
+				startMs: 140_000,
+				durationMs: 300,
+				kind: "delete",
+			},
+		]);
+		const program = new SeededTyping(hopper, ref, js);
+		const line = 'const n = Number(prompt("Number?"));';
+		await program.type("tab-1", ago(30), [
+			...typingEdits(200_000, line, 0),
+			...typingEdits(215_000, "\nconsole.log(n * 2);", line.length),
+		]);
+		const saved = await put(hopper, {
+			[basics]: "base-case",
+			[five]: 120,
+			[returns]: rightOrder,
+			// "lighter" matches no pattern, so the blank waits for the instructor.
+			[blanks]: { stop: "base", smaller: "lighter" },
+			[essay]: text.text,
+			[js]: program.text,
+			[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(i)",
+			[prolog]: listing(
+				"comprimento([], 0).",
+				"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+			),
+		});
+		await sendElm(hopper, ELM_ANSWERS.positives, {
+			...all("pass"),
+			negatives: "fail",
+		});
+		await sendElm(hopper, ELM_ANSWERS.correct, all("pass"));
+		await finish(hopper);
+		await db.feedback.create(
+			{
+				submission: { publicId: saved[essay] ?? "" },
+				ref: "rubric-1",
+				rubric: ["correta", "pilha"],
+				feedback: "Resposta completa.",
+			},
+			as,
+		);
+		await db.feedback.create(
+			{
+				submission: { publicId: saved[js] ?? "" },
+				ref: "manual-1",
+				score: "0.8",
+				feedback: "Right, but validate the input.",
+			},
+			as,
+		);
+	}
+
+	// Hamilton: wrong objectives, an ordering with no key, a rubric pass with an
+	// adjustment, code that fails, and an essay whose history has a marker, a
+	// rebase and a final gap.
+	{
+		const ref = await attempt(hamilton, 55);
+		const text = new SeededTyping(hamilton, ref, essay);
+		const lost = "O caso base deveria ser `comprimento([_], 1)`.";
+		await text.type("tab-1", ago(48), typingEdits(1000, lost, 0));
+		await text.gap("input-lost", ago(42));
+		const rebased = "O caso base deveria ser `comprimento([_], 1)`";
+		await text.type(
+			"tab-2",
+			ago(36),
+			typingEdits(500, ", mas assim a lista vazia nunca casa.", rebased.length),
+			{ reason: "rebase", text: rebased },
+		);
+		const saved = await put(hamilton, {
+			[basics]: "tail-call",
+			[five]: 100,
+			// The order of the calls, not of the returns: matches no key, so it is pending.
+			[returns]: [...rightOrder].reverse(),
+			[essay]: CASO_BASE_TEXT.hamilton,
+			[js]: 'const n = Number(prompt("Number?"));\nconsole.log(doubled(n));',
+			[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(j)",
+			[prolog]: listing(
+				":- use_module(library(clpfd)).",
+				"comprimento([], 0).",
+				"comprimento([_|T], N) :- N #> 0, M #= N - 1, comprimento(T, M).",
+			),
+		});
+		await sendElm(hamilton, ELM_ANSWERS.template, {
+			...all("pass"),
+			one: "fail",
+		});
+		await finish(hamilton);
+		await db.feedback.create(
+			{
+				submission: { publicId: saved[essay] ?? "" },
+				ref: "rubric-1",
+				rubric: ["errado", "pilha"],
+				adjustment: "0.2",
+				feedback: "O caso base está errado, mas o resto está bem explicado.",
+			},
+			as,
+		);
+	}
+
+	// Liskov: a blank question, a pass that uses the item split further down,
+	// code that loops, prints too much and does not load, and a history that
+	// stopped at a limit.
+	{
+		const ref = await attempt(liskov, 45);
+		const text = new SeededTyping(liskov, ref, essay);
+		await text.type("tab-1", ago(40), typingEdits(1000, definition, 0));
+		await text.overflow(ago(35));
+		const saved = await put(liskov, {
+			[basics]: "base-case",
+			[essay]: definition,
+			[js]: "let n = 1;\nwhile (true) {\n  n = n * 2;\n}",
+			[py]: "n = int(input())\nfor i in range(1, 200000):\n    print(f'line {i}: ' + 'x' * 40)",
+			[prolog]: listing(
+				"comprimento([], 0)",
+				"comprimento([_|T], N) :- N > 0, F is N *",
+			),
+		});
+		await finish(liskov);
+		await db.feedback.create(
+			{
+				submission: { publicId: saved[essay] ?? "" },
+				ref: "rubric-1",
+				rubric: ["vaga", "is-livre"],
+			},
+			as,
+		);
+	}
+
+	// Bob: the bot graded the essay with the rubric and the Prolog with notes.
+	// No typing reached the server for his answers.
+	{
+		await attempt(bob, 30);
+		const saved = await put(bob, {
+			[basics]: "tail-call",
+			[essay]: CASO_BASE_TEXT.bob,
+			[js]: 'console.log(Number(prompt("Number?")) * 2);',
+			[py]: "n = int(input())\ni = 1\nwhile True:\n    i += 1",
+			[prolog]: listing(
+				"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
+				"comprimento([], 0).",
+				"% comprimento([a, b, c], 3).",
+			),
+		});
+		await finish(bob);
+		await db.feedback.create(
+			{
+				submission: { publicId: saved[essay] ?? "" },
+				ref: "auto-1",
+				bot: "runner",
+				rubric: ["inacessivel", "pilha"],
+				notes: "Cláusulas na ordem trocada; o caso base nunca é alcançado.",
+			},
+			FULL_ACCESS,
+		);
+		await db.feedback.create(
+			{
+				submission: { publicId: saved[prolog] ?? "" },
+				ref: "auto-2",
+				score: "1",
+				bot: "runner",
+				feedback: "All tests passed.",
+				notes: "The answer hard-codes an expected output in a comment.",
+			},
+			FULL_ACCESS,
+		);
+	}
+
+	// Knuth and ritchie wrote the same essay up to spaces and stay pending;
+	// knuth delivered an empty program, which the instructor will not grade.
+	const knuthSaved = await put(knuth, {
+		[basics]: "base-case",
+		[essay]: CASO_BASE_TEXT.same,
+		[js]: "",
 	});
+	await finish(knuth);
 	await db.feedback.create(
 		{
-			submission: { publicId: hamilton["explain-recursion"] ?? "" },
-			ref: "manual-1",
-			score: "0.8",
-			feedback: "Right, but say what happens without one.",
-		},
-		{ actor: instructor },
-	);
-
-	// Liskov: one question unanswered, and an empty essay marked will-not-grade.
-	const liskov = await answerExam(course, exam, students.liskov, {
-		"recursion-basics": "base-case",
-		"explain-recursion": "",
-	});
-	await db.feedback.create(
-		{
-			submission: { publicId: liskov["explain-recursion"] ?? "" },
+			submission: { publicId: knuthSaved[js] ?? "" },
 			ref: "wng-manual-1",
 			score: "0",
 			feedback: "Submitted empty.",
 		},
-		{ actor: instructor },
+		as,
 	);
 	await db.submission.update(
-		{ publicId: liskov["explain-recursion"] ?? "" },
+		{ publicId: knuthSaved[js] ?? "" },
 		{ status: "WILL_NOT_GRADE" },
 		FULL_ACCESS,
 	);
-
-	// Bob: nothing graded yet, not even the objective answer.
-	await answerExam(course, exam, students.bob, {
-		"recursion-basics": "tail-call",
-		"explain-recursion":
-			"Recursion is when a function calls itself until it is done.",
+	await put(ritchie, {
+		[basics]: "base-case",
+		[essay]: `  ${CASO_BASE_TEXT.same.replace(", e o", ",   e o")}\n`,
 	});
+	await finish(ritchie);
+	await put(thompson, { [basics]: "base-case", [essay]: CASO_BASE_TEXT.other });
+	await finish(thompson);
+	await put(devStudent, {
+		[basics]: "base-case",
+		[five]: 120,
+		[essay]: "A base case stops the recursion, so the calls can return.",
+	});
+	await finish(devStudent);
 
+	// The window ended half an hour ago. Backus never came and has a makeup.
 	await db.exam.update(
 		{ course, slug: exam },
-		{ status: "COMPLETED" },
+		{ scheduledAt: ago(90), duration: { hours: 1 } },
 		FULL_ACCESS,
 	);
-	// An exception on an exam that still has pending answers, for the exceptions page and the card.
 	await db.examException.create(
 		{
 			course,
 			exam,
-			username: students.bob.username,
-			extraTime: { minutes: 15 },
-			note: "Needs more time",
+			username: liskov.username,
+			extraTime: { hours: 6 },
+			note: "Connection dropped",
 		},
 		FULL_ACCESS,
 	);
+	await db.examException.create(
+		{
+			course,
+			exam,
+			username: backus.username,
+			scheduledAt: new Date(now + 2 * 24 * 3_600_000),
+			note: "Missed the exam, medical note",
+		},
+		FULL_ACCESS,
+	);
+
+	// Last, so the pass above that applies "vaga" is the one to review.
+	await db.rubric.splitItem(
+		{ ...pk, key: "vaga" },
+		{
+			children: [
+				{
+					key: "so-parada",
+					group: "Explicação vaga",
+					text: "Fala só da parada",
+					value: "0.2",
+				},
+				{
+					key: "sem-motivo",
+					group: "Explicação vaga",
+					text: "Não diz por que a pilha estoura",
+					value: "0.1",
+				},
+			],
+		},
+		FULL_ACCESS,
+	);
+}
+
+/**
+ * Seeds `test-07`, an exam with released grades where the essay was graded with a rubric.
+ *
+ * Gives the student the view of a rubric: the items that were applied and
+ * their feedback.
+ */
+async function seedReleasedRubricExam(
+	course: Course["id"],
+	instructor: User,
+	students: { hopper: User; hamilton: User },
+): Promise<void> {
+	const exam = "test-07";
+	const essay = "prolog-caso-base";
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 7: rubrics",
+			description: "Grades out, one question graded with a rubric.",
+			tags: ["prolog"],
+			questions: [{ slug: essay, version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	const pk = { course, exam, question: essay };
+	await seedEssayRubric(pk);
+	const hopper = await answerExam(course, exam, students.hopper, {
+		[essay]: CASO_BASE_TEXT.hopper,
+	});
+	const hamilton = await answerExam(course, exam, students.hamilton, {
+		[essay]: CASO_BASE_TEXT.hamilton,
+	});
+	const as = { actor: instructor };
+	await db.feedback.create(
+		{
+			submission: { publicId: hopper[essay] ?? "" },
+			ref: "rubric-1",
+			rubric: ["correta", "pilha"],
+			feedback: "Resposta completa.",
+		},
+		as,
+	);
+	await db.feedback.create(
+		{
+			submission: { publicId: hamilton[essay] ?? "" },
+			ref: "rubric-1",
+			rubric: ["errado", "pilha"],
+			adjustment: "0.2",
+			feedback: "O caso base está errado, mas o resto está bem explicado.",
+		},
+		as,
+	);
+	await db.exam.update(
+		{ course, slug: exam },
+		{
+			status: "COMPLETED",
+			scheduledAt: new Date(Date.now() - 2 * 24 * 3600 * 1000),
+			duration: { hours: 1 },
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
 }
 
 /// The directory of the Elm example question, the one the grading worker's example course also uses.
@@ -3262,7 +3651,7 @@ async function seedExternalGradingExams(
 			slug: question,
 			status: "PUBLISHED",
 			version: "v1",
-			question: elmExampleQuestion(),
+			question: { ...elmExampleQuestion(), weight: 3 } as CodeQuestion,
 		},
 		FULL_ACCESS,
 	);
@@ -3403,469 +3792,8 @@ async function seedExternalGradingExams(
 	});
 }
 
-/**
- * Closes an exam with a JavaScript, a Python and a Prolog code question, so
- * the grading page can run every kind of answer and a grading runner has one
- * to correct.
- *
- * JavaScript, one answer per student: correct, throws, loops forever, reads a
- * line with `prompt`. Python: correct, a `NameError`, a long output, a loop
- * that never ends. Prolog: correct, one that leans on CLP(FD) and so inverts
- * the relation, one that does not load, and one the bot `runner` already
- * graded with notes for the instructor. All of them wait for a grade.
- */
-async function seedRunnableCodeExam(
-	course: Course["id"],
-	students: { hopper: User; hamilton: User; liskov: User; bob: User },
-): Promise<void> {
-	const exam = "test-runnable";
-	const js = "js-double-it";
-	const py = "py-count-up";
-	const prolog = "prolog-factorial-with-is";
-
-	for (const question of [
-		{
-			slug: js,
-			title: "Double the number",
-			stem: "Read a number and print its double.",
-			language: "javascript",
-		},
-		{
-			slug: py,
-			title: "Count up",
-			stem: "Print the numbers from 1 to `n`, one per line, where `n` is read from the input.",
-			language: "python",
-		},
-		{
-			slug: prolog,
-			title: "Factorial in Prolog, without CLP(FD)",
-			stem: "Define `factorial(N, F)` so that `F` is the factorial of `N`. Use `is`, not `clpfd`.",
-			language: "prolog",
-		},
-	]) {
-		await db.question.create(
-			{
-				course,
-				slug: question.slug,
-				status: "PUBLISHED",
-				version: "v1",
-				question: {
-					type: "essay",
-					title: question.title,
-					stem: question.stem,
-					tags: [question.language],
-					content: "code",
-					highlight: question.language,
-				},
-			},
-			FULL_ACCESS,
-		);
-	}
-	await db.exam.create(
-		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 6: code answers",
-			description:
-				"Code answers the grader can run (they work, fail, loop and ask for input) and a Prolog one for a grading runner.",
-			tags: ["javascript", "python", "prolog"],
-			questions: [
-				{ slug: js, version: "v1" },
-				{ slug: py, version: "v1" },
-				{ slug: prolog, version: "v1" },
-			],
-		},
-		FULL_ACCESS,
-	);
-
-	await answerExam(course, exam, students.hopper, {
-		[js]: 'const n = Number(prompt("Number?"));\nconsole.log(n * 2);',
-		[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(i)",
-		[prolog]: [
-			"factorial(0, 1).",
-			"factorial(N, F) :-",
-			"    N > 0,",
-			"    M is N - 1,",
-			"    factorial(M, G),",
-			"    F is N * G.",
-		].join("\n"),
-	});
-	await answerExam(course, exam, students.hamilton, {
-		[js]: 'const n = Number(prompt("Number?"));\nconsole.log(doubled(n));',
-		[py]: "n = int(input())\nfor i in range(1, n + 1):\n    print(j)",
-		[prolog]: [
-			":- use_module(library(clpfd)).",
-			"factorial(0, 1).",
-			"factorial(N, F) :-",
-			"    N #> 0,",
-			"    M #= N - 1,",
-			"    F #= N * G,",
-			"    factorial(M, G).",
-		].join("\n"),
-	});
-	await answerExam(course, exam, students.liskov, {
-		[js]: "let n = 1;\nwhile (true) {\n  n = n * 2;\n}",
-		[py]: "n = int(input())\nfor i in range(1, 200000):\n    print(f'line {i}: ' + 'x' * 40)",
-		[prolog]: ["factorial(0, 1)", "factorial(N, F) :- N > 0, F is N *"].join(
-			"\n",
-		),
-	});
-	const bob = await answerExam(course, exam, students.bob, {
-		[js]: 'console.log(Number(prompt("Number?")) * 2);',
-		[py]: "n = int(input())\ni = 1\nwhile True:\n    i += 1",
-		[prolog]: [
-			"factorial(0, 1).",
-			"factorial(N, F) :- N > 0, M is N - 1, factorial(M, G), F is N * G.",
-			"% factorial(10, 3628800).",
-		].join("\n"),
-	});
-	await db.feedback.create(
-		{
-			submission: { publicId: bob[prolog] ?? "" },
-			ref: "auto-1",
-			score: "1",
-			bot: "runner",
-			feedback: "All tests passed.",
-			notes: "The answer hard-codes an expected output in a comment.",
-		},
-		FULL_ACCESS,
-	);
-
-	await db.exam.update(
-		{ course, slug: exam },
-		{ status: "COMPLETED" },
-		FULL_ACCESS,
-	);
-}
-
-/**
- * Closes an exam with released grades, where one question is graded with a rubric.
- *
- * The code question carries an initial rubric in its question version and no
- * pass uses it yet. The essay question's rubric is in use: group leaves three
- * levels deep, two standalone items (one negative) and an item that was split,
- * which Liskov's pass still applies. Hopper's pass is a group leaf plus an
- * item, Hamilton's adds an adjustment, and the bot `runner` graded Bob. Three
- * answers are left pending, two of them the same text up to whitespace.
- */
-async function seedRubricExam(
-	course: Course["id"],
-	instructor: User,
-	students: { hopper: User; hamilton: User; liskov: User; bob: User },
-	cohort: User[],
-): Promise<void> {
-	const exam = "test-07";
-	const code = "prolog-comprimento-de-lista";
-	const essay = "prolog-caso-base";
-	const [knuth, ritchie, thompson, backus] = cohort;
-	if (!knuth || !ritchie || !thompson || !backus) {
-		throw new Error("The seeded cohort is too small.");
-	}
-
-	const rubric = [
-		{
-			id: "vazia",
-			path: "Recursão/Caso base",
-			value: "0.3",
-			text: "Trata a lista vazia",
-			comment: "Basta a cláusula comprimento([], 0).",
-			feedback: "Sua solução trata a lista vazia corretamente.",
-		},
-		{
-			id: "passo",
-			path: "Recursão/Passo",
-			value: "0.5",
-			text: "Passo recursivo correto",
-			feedback: "O passo recursivo soma um ao comprimento da cauda.",
-		},
-		{
-			id: "length",
-			value: "-0.5",
-			text: "Usa length/2",
-			comment: "O enunciado proíbe o predicado embutido.",
-		},
-	];
-	await db.question.create(
-		{
-			course,
-			slug: code,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Comprimento de uma lista em Prolog",
-				stem: "Defina `comprimento(Lista, N)` de modo que `N` seja o número de elementos de `Lista`. Não use `length/2`.",
-				tags: ["prolog"],
-				content: "code",
-				highlight: "prolog",
-			},
-		},
-		FULL_ACCESS,
-	);
-	// The question document has no rubric field, so the initial rubric is
-	// written into the stored version the way a pushed question carries it.
-	const stored = await prisma.questionData.findFirstOrThrow({
-		where: { versionHash: "v1", ref: { courseId: course, slug: code } },
-	});
-	await prisma.questionData.update({
-		where: { id: stored.id },
-		data: {
-			privatePayload: {
-				...(stored.privatePayload as Record<string, unknown>),
-				rubric,
-			},
-		},
-	});
-	await db.question.create(
-		{
-			course,
-			slug: essay,
-			status: "PUBLISHED",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "O caso base da recursão em Prolog",
-				stem: "Por que um predicado recursivo em Prolog precisa de uma cláusula para o caso base? O que acontece com `comprimento/2` sem ela?",
-				tags: ["prolog", "recursion"],
-				content: "text",
-			},
-		},
-		FULL_ACCESS,
-	);
-	await db.exam.create(
-		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 7: rubrics",
-			description: "Grades out, one question graded with a rubric.",
-			tags: ["prolog"],
-			questions: [
-				{ slug: code, version: "v1" },
-				{ slug: essay, version: "v1" },
-			],
-		},
-		FULL_ACCESS,
-	);
-
-	const pk = { course, exam, question: essay };
-	await db.rubric.update(pk, { base: "0" }, FULL_ACCESS);
-	const items = [
-		{
-			key: "correta",
-			group: "Recursão",
-			text: "Correta",
-			value: "0.5",
-			comment: "Cita a parada da recursão e o que ela garante.",
-			feedback: "Você explicou bem por que a recursão termina.",
-		},
-		{
-			key: "esqueceu",
-			group: "Recursão/Errada/Caso base",
-			text: "Esqueceu o caso base",
-			value: "0.2",
-			feedback: "Sem caso base a recursão não para; faltou dizer isso.",
-		},
-		{
-			key: "inacessivel",
-			group: "Recursão/Errada/Caso base",
-			text: "Caso base inacessível",
-			value: "0.3",
-			comment: "A cláusula existe, mas fica depois de uma que sempre casa.",
-			feedback:
-				"O caso base precisa vir antes da cláusula recursiva, ou a busca nunca chega nele.",
-		},
-		{
-			key: "errado",
-			group: "Recursão/Errada",
-			text: "Caso base errado",
-			value: "0.1",
-			feedback: "O caso base que você citou não cobre a lista vazia.",
-		},
-		{
-			key: "pilha",
-			group: null,
-			text: "Descreve o estouro de pilha sem o caso base",
-			value: "0.4",
-			feedback: "Boa descrição do estouro de pilha.",
-		},
-		{
-			key: "is-livre",
-			group: null,
-			text: "Usa is com variável livre",
-			value: "-0.1",
-			comment: "Exemplo com `X is Y + 1` sem Y instanciado.",
-			feedback: "O `is` exige o lado direito instanciado.",
-		},
-		{
-			key: "vaga",
-			group: null,
-			text: "Explicação vaga",
-			value: "0.2",
-			comment: "Diz que precisa parar, sem dizer como.",
-		},
-	];
-	for (const item of items) {
-		await db.rubric.createItem({ ...pk }, item, FULL_ACCESS);
-	}
-
-	const text = {
-		hopper:
-			"Sem o caso base, `comprimento/2` chama a si mesmo sem parar e a pilha estoura. A cláusula `comprimento([], 0)` encerra a recursão.",
-		hamilton:
-			"O caso base deveria ser `comprimento([_], 1)`, mas assim a lista vazia nunca casa. Sem ele a pilha de chamadas cresce até estourar.",
-		liskov: "Precisa para a recursão parar em algum momento.",
-		bob: "Se a lista vazia ficar sem cláusula, a consulta falha ou entra em laço. O caso base fica antes da recursiva e usa `[]`.",
-		same: "Sem a cláusula do caso base a recursão não tem onde parar, e o Prolog continua tentando até acabar a memória.",
-		other:
-			"O caso base é a resposta que não depende de chamada recursiva. Ele ancora a definição indutiva do predicado.",
-	};
-	const answer = (student: User, solution: string, essayText: string) =>
-		answerExam(course, exam, student, { [code]: solution, [essay]: essayText });
-	const listing = (...lines: string[]) => lines.join("\n");
-
-	const hopper = await answer(
-		students.hopper,
-		listing(
-			"comprimento([], 0).",
-			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
-		),
-		text.hopper,
-	);
-	const hamilton = await answer(
-		students.hamilton,
-		listing(
-			"comprimento([_], 1).",
-			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
-		),
-		text.hamilton,
-	);
-	const liskov = await answer(students.liskov, "length(L, N).", text.liskov);
-	const bob = await answer(
-		students.bob,
-		listing(
-			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
-			"comprimento([], 0).",
-		),
-		text.bob,
-	);
-	await answer(
-		knuth,
-		listing(
-			"comprimento([], 0).",
-			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
-		),
-		text.same,
-	);
-	await answer(
-		ritchie,
-		listing(
-			"comprimento([], 0).",
-			"comprimento([_|T], N) :- comprimento(T, M), N is M + 1.",
-		),
-		`  ${text.same.replace(", e o", ",   e o")}\n`,
-	);
-	await answer(thompson, "comprimento(L, N) :- length(L, N).", text.other);
-
-	const graded = (student: Record<string, string>) => ({
-		publicId: student[essay] ?? "",
-	});
-	const as = { actor: instructor };
-	await db.feedback.create(
-		{
-			submission: graded(hopper),
-			ref: "rubric-1",
-			rubric: ["correta", "pilha"],
-			feedback: "Resposta completa.",
-		},
-		as,
-	);
-	await db.feedback.create(
-		{
-			submission: graded(hamilton),
-			ref: "rubric-1",
-			rubric: ["errado", "pilha"],
-			adjustment: "0.2",
-			feedback: "O caso base está errado, mas o resto está bem explicado.",
-		},
-		as,
-	);
-	await db.feedback.create(
-		{
-			submission: graded(liskov),
-			ref: "rubric-1",
-			rubric: ["vaga", "is-livre"],
-		},
-		as,
-	);
-	await db.feedback.create(
-		{
-			submission: graded(bob),
-			ref: "auto-1",
-			bot: "runner",
-			rubric: ["inacessivel", "pilha"],
-			notes: "Cláusulas na ordem trocada; o caso base nunca é alcançado.",
-		},
-		FULL_ACCESS,
-	);
-
-	await db.rubric.splitItem(
-		{ ...pk, key: "vaga" },
-		{
-			children: [
-				{
-					key: "so-parada",
-					group: "Explicação vaga",
-					text: "Fala só da parada",
-					value: "0.2",
-				},
-				{
-					key: "sem-motivo",
-					group: "Explicação vaga",
-					text: "Não diz por que a pilha estoura",
-					value: "0.1",
-				},
-			],
-		},
-		FULL_ACCESS,
-	);
-
-	await db.exam.update(
-		{ course, slug: exam },
-		{
-			status: "COMPLETED",
-			scheduledAt: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-			duration: { hours: 1 },
-		},
-		FULL_ACCESS,
-	);
-	// `releaseGrades` refuses while answers wait for a grade, and this exam
-	// keeps some on purpose, so the release is stamped directly.
-	await prisma.exam.updateMany({
-		where: { courseId: course, slug: exam },
-		data: { gradesReleasedAt: new Date() },
-	});
-}
-
-/**
- * Seeds the three states an exam exception can leave an exam in.
- *
- * The dev student has 30 extra minutes on the midterm, a week ahead. Test 2 ended
- * and Bob, who missed it, has a makeup in two days, so its grades cannot be
- * released yet. Test 3's window ended half an hour ago, but Liskov has extra
- * time, so her closed attempt can still be reopened. It is an `EXAM`: a `QUIZ`
- * releases when it closes, and a released exam takes no new exception.
- */
-async function seedExamExceptions(
-	course: Course["id"],
-	students: { hamilton: User; bob: User; liskov: User },
-): Promise<void> {
-	const now = Date.now();
-	const minutes = (count: number) => new Date(now + count * 60_000);
-
+/// Gives the dev student 30 extra minutes on the midterm, a week ahead.
+async function seedMidtermException(course: Course["id"]): Promise<void> {
 	await db.examException.create(
 		{
 			course,
@@ -3873,75 +3801,6 @@ async function seedExamExceptions(
 			username: DEV_STUDENT_USERNAME,
 			extraTime: { minutes: 30 },
 			note: "Accommodation on file",
-		},
-		FULL_ACCESS,
-	);
-
-	// Answered while open, then moved into the past: an exam cannot be answered once its window is over.
-	await db.exam.create(
-		{
-			course,
-			slug: "test-02",
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 2: lists and stacks",
-			description: "Linked lists, stacks and queues.",
-			tags: ["data-structures"],
-			questions: [{ slug: "recursion-basics", version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-	await answerExam(course, "test-02", students.hamilton, {
-		"recursion-basics": "base-case",
-	});
-	await db.exam.update(
-		{ course, slug: "test-02" },
-		{
-			status: "COMPLETED",
-			scheduledAt: minutes(-5 * 24 * 60),
-			duration: { hours: 1 },
-		},
-		FULL_ACCESS,
-	);
-	await db.examException.create(
-		{
-			course,
-			exam: "test-02",
-			username: students.bob.username,
-			scheduledAt: minutes(2 * 24 * 60),
-			note: "Missed the exam, medical note",
-		},
-		FULL_ACCESS,
-	);
-
-	await db.exam.create(
-		{
-			course,
-			slug: "test-03",
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 3: recursion trees",
-			description: "Drawing call trees by hand.",
-			tags: ["recursion"],
-			questions: [{ slug: "recursion-basics", version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-	await answerExam(course, "test-03", students.liskov, {
-		"recursion-basics": "base-case",
-	});
-	await db.exam.update(
-		{ course, slug: "test-03" },
-		{ scheduledAt: minutes(-90), duration: { hours: 1 } },
-		FULL_ACCESS,
-	);
-	await db.examException.create(
-		{
-			course,
-			exam: "test-03",
-			username: students.liskov.username,
-			extraTime: { hours: 6 },
-			note: "Connection dropped",
 		},
 		FULL_ACCESS,
 	);

@@ -381,6 +381,17 @@ Cuidados para S2 a S5:
   `elm-soma` existir.
 - S2: o histórico de `quiz-js` (desligado, sem dados) sai com a prova. O caso
   de histórico desligado fica por conta de `test-03` (S5).
+- S3: `seedGradingShowcase` junta num bloco só os aspectos de `test-02`, depois
+  de `seedExternalGradingExams` (precisa de `elm-soma`), com o `claim` filtrado
+  por `exam`. `explain-recursion` e `factorial-returns` nascem ali.
+- S3: o peso 2 de `js-double-it` e o 3 de `elm-soma` estão nas próprias questões
+  (`weight`), então valem em todas as provas que as usam.
+- S3: a exceção de +15 min de bob em `test-01` antigo some: a tabela de alunos
+  da spec não a tem.
+- S3, provisório até S4 e S5: `test-07` sobrevive reduzido a uma prova liberada
+  com a dissertativa corrigida pela rubrica (hopper, hamilton), e usa a mesma
+  função de itens de `test-02` (`seedEssayRubric`). `history-off` sobrevive em
+  `seedHistoryOffExam` com `explain-recursion`. S4 e S5 apagam as duas.
 
 ## Riscos
 
