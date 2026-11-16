@@ -6,8 +6,9 @@
 # `pnpm run release` bumps them and tags `vX.Y.Z` once. The worker pins
 # `codehood-cli==X.Y.Z`, so it goes up only after the CLI is on PyPI.
 #
-# PyPI uses trusted publishing: each project lists this repository, this
-# workflow file and the "pypi" environment as a trusted publisher.
+# PyPI uses trusted publishing: each project lists this repository and this
+# workflow file as a trusted publisher, `codehood-cli` with the "pypi"
+# environment and `chalk-worker` with "pypi-worker".
 on:
   push:
     tags:
@@ -57,7 +58,9 @@ jobs:
     name: upload chalk-worker to PyPI
     needs: cli
     runs-on: ubuntu-latest
-    environment: pypi
+    # A trusted publisher is one (repository, workflow, environment) per
+    # project, so the worker publishes from an environment of its own.
+    environment: pypi-worker
     permissions:
       id-token: write
     defaults:
