@@ -606,7 +606,11 @@ h6 {
    samples of the statement around it. */
 [data-code-runner][data-mode="answer"],
 [data-code-editor] {
-	--code-border: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+	--code-border: color-mix(
+		in oklab,
+		var(--color-base-content) 40%,
+		transparent
+	);
 }
 
 @utility code-block {
