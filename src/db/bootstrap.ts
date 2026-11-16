@@ -2285,22 +2285,6 @@ async function answerExam(
 	return submissions;
 }
 
-/// Grades one submission as the auto-grading bot.
-async function botGrade(
-	submission: string | undefined,
-	score: string,
-): Promise<void> {
-	await db.feedback.create(
-		{
-			submission: { publicId: submission ?? "" },
-			ref: "auto-1",
-			score,
-			bot: "auto",
-		},
-		FULL_ACCESS,
-	);
-}
-
 /**
  * Closes the first quiz with two students' answers graded, so its results are out.
  *
@@ -2320,8 +2304,6 @@ async function seedReleasedQuiz(
 		"factorial-of-five": 120,
 		"base-case-blanks": { stop: "base", smaller: "shorter" },
 	});
-	await botGrade(hopper["recursion-basics"], "1");
-	await botGrade(hopper["factorial-of-five"], "1");
 	// "shorter" matches no pattern: the instructor graded that blank on its own.
 	await db.feedback.create(
 		{
@@ -2339,14 +2321,11 @@ async function seedReleasedQuiz(
 		FULL_ACCESS,
 	);
 
-	const hamilton = await answerExam(course, exam, students.hamilton, {
+	await answerExam(course, exam, students.hamilton, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 25,
 		"base-case-blanks": { stop: "recursive", smaller: "smaller" },
 	});
-	await botGrade(hamilton["recursion-basics"], "1");
-	await botGrade(hamilton["factorial-of-five"], "0");
-	await botGrade(hamilton["base-case-blanks"], "0");
 
 	await db.exam.update(
 		{ course, slug: exam },
@@ -3145,8 +3124,8 @@ async function seedGradedExam(
 		FULL_ACCESS,
 	);
 
-	// Hopper: objective answers graded by the bot, the essay still pending.
-	const hopper = await answerExam(course, exam, students.hopper, {
+	// Hopper: objective answers graded when the attempt closes, the essay still pending.
+	await answerExam(course, exam, students.hopper, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 120,
 		"factorial-returns": [
@@ -3160,9 +3139,6 @@ async function seedGradedExam(
 		"explain-recursion":
 			"Each call must get closer to a case it can answer without calling itself. Without it the calls never stop and the stack overflows.",
 	});
-	await botGrade(hopper["recursion-basics"], "1");
-	await botGrade(hopper["factorial-of-five"], "1");
-	await botGrade(hopper["factorial-returns"], "1");
 
 	// Hamilton: everything graded but the ordering, the essay by the instructor with a comment.
 	const hamilton = await answerExam(course, exam, students.hamilton, {
@@ -3178,8 +3154,6 @@ async function seedGradedExam(
 		"explain-recursion":
 			"The base case is where the function returns a value directly.",
 	});
-	await botGrade(hamilton["recursion-basics"], "0");
-	await botGrade(hamilton["factorial-of-five"], "0");
 	await db.feedback.create(
 		{
 			submission: { publicId: hamilton["explain-recursion"] ?? "" },
@@ -3195,7 +3169,6 @@ async function seedGradedExam(
 		"recursion-basics": "base-case",
 		"explain-recursion": "",
 	});
-	await botGrade(liskov["recursion-basics"], "1");
 	await db.feedback.create(
 		{
 			submission: { publicId: liskov["explain-recursion"] ?? "" },
@@ -4013,10 +3986,9 @@ async function seedExamExceptions(
 		},
 		FULL_ACCESS,
 	);
-	const hamilton = await answerExam(course, "test-02", students.hamilton, {
+	await answerExam(course, "test-02", students.hamilton, {
 		"recursion-basics": "base-case",
 	});
-	await botGrade(hamilton["recursion-basics"], "1");
 	await db.exam.update(
 		{ course, slug: "test-02" },
 		{
@@ -4168,84 +4140,76 @@ async function seedQuestionStatsExam(
 		FULL_ACCESS,
 	);
 
-	/// Each row: the answer and its score to every question, by student in `students` order.
-	const rows: [string, QuestionResponse, string][][] = [
+	/// Each row: the answer to every question, by student in `students` order. Closing the attempt scores them.
+	const rows: [string, QuestionResponse][][] = [
 		[
-			["fastest-sort", "merge", "1"],
-			["n-log-n", ["merge", "quick"], "1"],
-			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
-			["pivot-trap", "linearithmic", "0"],
-			["factorial-of-five", 120, "1"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "merge"],
+			["n-log-n", ["merge", "quick"]],
+			["stack-facts", { lifo: true, fifo: false, push: true }],
+			["pivot-trap", "linearithmic"],
+			["factorial-of-five", 120],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "merge", "1"],
-			["n-log-n", ["merge", "quick"], "1"],
-			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
-			["pivot-trap", "linearithmic", "0"],
-			["factorial-of-five", 120, "1"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "merge"],
+			["n-log-n", ["merge", "quick"]],
+			["stack-facts", { lifo: true, fifo: false, push: true }],
+			["pivot-trap", "linearithmic"],
+			["factorial-of-five", 120],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "merge", "1"],
-			["n-log-n", ["merge", "quick"], "1"],
-			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
-			["pivot-trap", "linearithmic", "0"],
-			["factorial-of-five", 120, "1"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "merge"],
+			["n-log-n", ["merge", "quick"]],
+			["stack-facts", { lifo: true, fifo: false, push: true }],
+			["pivot-trap", "linearithmic"],
+			["factorial-of-five", 120],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "insertion", "0"],
-			["n-log-n", ["merge"], "0.5"],
-			["stack-facts", { lifo: true, fifo: false }, "0.67"],
-			["pivot-trap", "linearithmic", "0"],
-			["factorial-of-five", 120, "1"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "insertion"],
+			["n-log-n", ["merge"]],
+			["stack-facts", { lifo: true, fifo: false }],
+			["pivot-trap", "linearithmic"],
+			["factorial-of-five", 120],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "merge", "1"],
-			["n-log-n", ["merge", "quick", "bubble"], "0.5"],
-			["stack-facts", { lifo: true, fifo: true, push: true }, "0.33"],
-			["pivot-trap", "quadratic", "1"],
-			["factorial-of-five", 120, "1"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "merge"],
+			["n-log-n", ["merge", "quick", "bubble"]],
+			["stack-facts", { lifo: true, fifo: true, push: true }],
+			["pivot-trap", "quadratic"],
+			["factorial-of-five", 120],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "bubble", "0"],
-			["n-log-n", ["merge"], "0.5"],
-			["stack-facts", { lifo: true, fifo: false, push: true }, "1"],
-			["pivot-trap", "quadratic", "1"],
-			["factorial-of-five", 100, "0"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "bubble"],
+			["n-log-n", ["merge"]],
+			["stack-facts", { lifo: true, fifo: false, push: true }],
+			["pivot-trap", "quadratic"],
+			["factorial-of-five", 100],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "bubble", "0"],
-			["n-log-n", [], "0"],
-			["stack-facts", { lifo: false, fifo: true, push: false }, "0"],
-			["pivot-trap", "quadratic", "1"],
-			["factorial-of-five", 100, "0"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "bubble"],
+			["n-log-n", []],
+			["stack-facts", { lifo: false, fifo: true, push: false }],
+			["pivot-trap", "quadratic"],
+			["factorial-of-five", 100],
+			["stack-top", "top"],
 		],
 		[
-			["fastest-sort", "bubble", "0"],
-			["n-log-n", ["bubble"], "0"],
-			["stack-facts", { lifo: false, fifo: true, push: false }, "0"],
-			["pivot-trap", "quadratic", "1"],
-			["factorial-of-five", 24, "0"],
-			["stack-top", "top", "1"],
+			["fastest-sort", "bubble"],
+			["n-log-n", ["bubble"]],
+			["stack-facts", { lifo: false, fifo: true, push: false }],
+			["pivot-trap", "quadratic"],
+			["factorial-of-five", 24],
+			["stack-top", "top"],
 		],
 	];
 	for (const [index, student] of students.entries()) {
 		const row = rows[index] ?? [];
-		const submissions = await answerExam(
-			course,
-			exam,
-			student,
-			Object.fromEntries(row.map(([slug, payload]) => [slug, payload])),
-		);
-		for (const [slug, , score] of row) {
-			await botGrade(submissions[slug], score);
-		}
+		await answerExam(course, exam, student, Object.fromEntries(row));
 	}
 
 	await db.exam.update(
@@ -4301,21 +4265,14 @@ async function seedRegradeExam(
 		"factorial-of-five": 120,
 		"fastest-sort": "bubble",
 	});
-	await botGrade(own["recursion-basics"], "0");
-	await botGrade(own["factorial-of-five"], "1");
-	await botGrade(own["fastest-sort"], "0");
 	const hopper = await answerExam(course, exam, students.hopper, {
 		"recursion-basics": "tail-call",
 		"factorial-of-five": 120,
 	});
-	await botGrade(hopper["recursion-basics"], "0");
-	await botGrade(hopper["factorial-of-five"], "1");
 	const hamilton = await answerExam(course, exam, students.hamilton, {
 		"recursion-basics": "base-case",
 		"factorial-of-five": 25,
 	});
-	await botGrade(hamilton["recursion-basics"], "1");
-	await botGrade(hamilton["factorial-of-five"], "0");
 
 	await db.exam.update(
 		{ course, slug: exam },
