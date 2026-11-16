@@ -1,8 +1,11 @@
 ---
 type: issue
 status: todo
-tags: [codehood-cli, push, calendar, resources, markdown]
+tags: [cli, push, calendar, resources, markdown]
 relatedTo: [calendar, resources]
+kind: enhancement
+priority: medium
+created: 2026-11-13
 ---
 
 # Separar os vínculos de materiais da descrição renderizada das aulas

@@ -48,7 +48,7 @@ Here are some files and folders agents might be interested in:
 | `src/typing/`              | Type utilities and branded types.                                                     |
 | `src/urls/`                | URL parsing and course reference utilities.                                           |
 | `src/utils/`               | Utility functions.                                                                    |
-| `cli/`                     | The Python CLI, a git subtree. See [CLI](#cli).                                       |
+| `cli/`                     | The Python CLI. See [CLI](#cli).                                                      |
 
 Code that does not read or write the database stays out of `src/db/`, even when
 it works on entities: domain rules (grading, exam results) go to
@@ -288,8 +288,10 @@ whenever something is actually broken.
 ## CLI
 
 `cli/` is the Codehood CLI, a Python project (uv, pytest, Textual) with its own
-conventions. It is a git subtree of
-[codehood-cli](https://github.com/fabiommendes/codehood-cli). Before any work in
+conventions. It is released with the server, at the same version: the tag
+that `pnpm run release` cuts also publishes it to PyPI as `codehood-cli`
+(`.github/workflows/publish-cli.yml`). Its issues live in `dev/issues/`,
+tagged `cli`; its specs stay in `cli/dev/specs/`. Before any work in
 `cli/`, or any server change the CLI depends on (REST endpoints, schemas, the
 OpenAPI spec), read `cli/README.md` and `cli/AGENTS.md`. Inside `cli/`, those
 files take precedence over this one.
@@ -311,9 +313,6 @@ files take precedence over this one.
 
   Server-only state (e.g. `Exam.answerHistory`) may appear in the read models,
   but the CLI never sends it: it must not exist in the create/update bodies.
-- Sync with the standalone repository only when the human asks:
-  `git subtree push --prefix=cli git@github.com:fabiommendes/codehood-cli.git main`
-  (or `subtree pull` with the same arguments).
 
 ## Documentation
 

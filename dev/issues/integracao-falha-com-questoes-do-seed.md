@@ -1,7 +1,7 @@
 ---
 type: issue
 status: backlog
-tags: [push, testes, integracao]
+tags: [cli, push, testes, integracao]
 kind: bug
 priority: low
 created: 2026-11-12

@@ -9,10 +9,13 @@
  *    allowed, so a migration edited by hand after a failed run is kept.
  * 2. `pnpm run db:migrate`: writes the migration for the schema changes since
  *    the last release and checks it for data loss.
- * 3. The gate: `pnpm run lint` and `pnpm test`.
- * 4. Bumps `package.json`, turns the changelog's "Unreleased" section into the
- *    version's, regenerates the CLI's OpenAPI snapshot, commits as
- *    `release: vX.Y.Z` and tags `vX.Y.Z`.
+ * 3. The gate: `pnpm run lint`, `pnpm test`, and the CLI's tests against the
+ *    PyPI releases of its dependencies (what the published package gets).
+ * 4. Bumps `package.json` and `cli/pyproject.toml` to the same version, turns
+ *    the "Unreleased" section of both changelogs into the version's,
+ *    regenerates the CLI's OpenAPI snapshot, commits as `release: vX.Y.Z` and
+ *    tags `vX.Y.Z`. Pushing the tag publishes the CLI to PyPI
+ *    (`.github/workflows/publish-cli.yml`).
  *
  * `--dry-run` stops after the gate. Nothing is pushed.
  */
@@ -100,6 +103,19 @@ run("Migrations", "pnpm", [
 // 3. Gate.
 run("Lint", "pnpm", ["run", "lint"]);
 run("Tests", "pnpm", ["test"]);
+run("CLI tests", "uv", [
+	"run",
+	"--directory",
+	"cli",
+	"--no-sources",
+	"--isolated",
+	"--with",
+	"pytest",
+	"--with",
+	"hypothesis",
+	"pytest",
+	"-q",
+]);
 
 if (args["dry-run"]) {
 	console.log("\n✔ Dry run: the gate passed, nothing committed.");
@@ -110,18 +126,28 @@ if (args["dry-run"]) {
 pkg.version = version;
 writeFileSync("package.json", `${JSON.stringify(pkg, null, "\t")}\n`);
 
-const changelog = readFileSync("CHANGELOG.md", "utf8");
+run("CLI version", "uv", [
+	"version",
+	"--directory",
+	"cli",
+	"--no-sync",
+	version,
+]);
+
 const today = new Date().toISOString().slice(0, 10);
-if (!changelog.includes("\n## Unreleased\n")) {
-	fail('CHANGELOG.md has no "## Unreleased" section.');
+for (const file of ["CHANGELOG.md", "cli/CHANGELOG.md"]) {
+	const changelog = readFileSync(file, "utf8");
+	if (!changelog.includes("\n## Unreleased\n")) {
+		fail(`${file} has no "## Unreleased" section.`);
+	}
+	writeFileSync(
+		file,
+		changelog.replace(
+			"\n## Unreleased\n",
+			`\n## Unreleased\n\n## ${version} (${today})\n`,
+		),
+	);
 }
-writeFileSync(
-	"CHANGELOG.md",
-	changelog.replace(
-		"\n## Unreleased\n",
-		`\n## Unreleased\n\n## ${version} (${today})\n`,
-	),
-);
 
 // The CLI's OpenAPI snapshot carries the version, so every bump makes it stale.
 run("OpenAPI", "pnpm", ["run", "openapi:cli"]);
@@ -130,6 +156,9 @@ run("Commit", "git", [
 	"add",
 	"package.json",
 	"CHANGELOG.md",
+	"cli/CHANGELOG.md",
+	"cli/pyproject.toml",
+	"cli/uv.lock",
 	"prisma/migrations",
 	"cli/resources/openapi/codehood.json",
 	"cli/codehood/api/generated.py",
@@ -137,4 +166,7 @@ run("Commit", "git", [
 run("Commit", "git", ["commit", "--quiet", "-m", `release: ${tag}`]);
 run("Tag", "git", ["tag", "--annotate", tag, "-m", `Codehood ${version}`]);
 
-console.log(`\n✔ Tagged ${tag}. Publish with: git push origin main ${tag}`);
+console.log(
+	`\n✔ Tagged ${tag}. Publish with: git push origin main ${tag}` +
+		" (the tag also publishes the CLI to PyPI)",
+);

@@ -5,6 +5,7 @@ kind: bug
 priority: medium
 tags: [cli, push, resources, python, elm]
 creator: claude
+created: 2026-11-13
 ---
 
 # Evitar a publicação acidental de caches e artefatos gerados em resources

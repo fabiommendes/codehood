@@ -4,11 +4,7 @@
  * - no argument: writes the snapshot `cli/resources/openapi/codehood.json`,
  *   then regenerates the client `cli/codehood/api/generated.py` from it
  *   (needs `uv`).
- * - a path: writes only the document there. `cli/scripts/copy-openapi.py`
- *   uses this form.
- *
- * The formatting (two-space indent, trailing newline) is the one
- * `cli/scripts/copy-openapi.py` writes, so a diff shows only real changes.
+ * - a path: writes only the document there.
  */
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";

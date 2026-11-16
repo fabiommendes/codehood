@@ -10,11 +10,8 @@ repository is organized and how to propose a change.
 | `/`       | The server: web interface and REST API      | Astro, SolidJS, Prisma and SQLite  |
 | `cli/`    | The `codehood` command line client          | Python, uv, Typer and Textual      |
 
-`cli/` is also published on its own as
-[codehood-cli](https://github.com/fabiommendes/codehood-cli), as a
-[git subtree](https://git-scm.com/book/en/v2/Git-Tools-Advanced-Merging#_subtree_merge).
-Work in this repository and open issues and pull requests here. The standalone
-repository only mirrors `cli/`.
+Both are released together, at the same version: a release tag publishes the
+CLI to PyPI as `codehood-cli`. Open issues and pull requests for either here.
 
 The CLI reads questions with [mdq](https://github.com/fabiommendes/mdq-spec),
 which it expects in a checkout next to this repository:

@@ -156,8 +156,10 @@ pnpm run package v0.2.0 --out build/ --config deploy/codehood.config.ts \
 
 - `pnpm run release <patch|minor|major|x.y.z>` writes the migration for the
   schema changes since the last release (`pnpm run db:migrate`), runs the
-  gate (`pnpm run lint`, `pnpm test`), bumps `package.json`, dates the
-  changelog's "Unreleased" section, then commits and tags `vX.Y.Z`. It stops
+  gate (`pnpm run lint`, `pnpm test`, the CLI's tests), bumps `package.json`
+  and `cli/pyproject.toml` to the same version, dates the "Unreleased"
+  section of `CHANGELOG.md` and `cli/CHANGELOG.md`, then commits and tags
+  `vX.Y.Z`. Pushing the tag publishes the CLI to PyPI. It stops
   when a migration drops tables or columns; edit the migration to keep the
   data, or pass `--allow-data-loss`.
 - `pnpm run package <tag>` builds the tag from a clean export, with the

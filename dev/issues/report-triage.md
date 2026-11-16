@@ -1,8 +1,11 @@
 ---
 type: issue
 status: todo
-tags: [codehood-cli, reports, triage]
+tags: [cli, reports, triage]
 relatedTo: [reports]
+kind: feature
+priority: medium
+created: 2026-10-26
 ---
 
 # Pull and triage user reports

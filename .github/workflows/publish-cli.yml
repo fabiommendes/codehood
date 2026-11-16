@@ -1,32 +1,44 @@
 # $schema=https://www.schemastore.org/github-workflow.json
+#
+# Publishes the CLI in `cli/` to PyPI as `codehood-cli` for every release tag.
+# The CLI shares the server's version: `pnpm run release` bumps both and tags
+# `vX.Y.Z` once.
 on:
-  release:
-    types:
-      - created
   push:
     tags:
       - "v*.*.*"
 
-name: release
+name: publish-cli
 
 jobs:
   pypi-publish:
-    name: upload release to PyPI
+    name: upload codehood-cli to PyPI
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
+    defaults:
+      run:
+        working-directory: cli
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
       - name: Set up Python
         run: uv python install
+
+      - name: Check that the tag is the CLI's version
+        run: |
+          version=$(uv version --short)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "cli/pyproject.toml is at $version, the tag is $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
 
       # mdq comes from a sibling checkout in development ([tool.uv.sources]);
       # the published package must depend on the PyPI release instead.

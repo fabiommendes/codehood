@@ -1,8 +1,11 @@
 ---
 type: issue
 status: todo
-tags: [codehood-cli, push, resources, markdown, links]
+tags: [cli, push, resources, markdown, links]
 relatedTo: [resources, questions]
+kind: bug
+priority: medium
+created: 2026-11-13
 ---
 
 # Push mantém caminhos locais nos links internos de recursos Markdown
