@@ -30,7 +30,7 @@ const { course, href } = result;
 
 // biome-ignore lint/style/noNonNullAssertion: every course page runs through loadCourse, which already required Astro.locals.user.
 const actor = Astro.locals.actor!;
-const canWrite = hasPerm(actor, "course.update-contents", course);
+const canWrite = hasPerm(actor, "enrollment.manage", course);
 
 // No `public`/`manage` flag here, unlike questions — the exam service
 // already narrows DRAFT/ARCHIVED rows to whoever may write the course's

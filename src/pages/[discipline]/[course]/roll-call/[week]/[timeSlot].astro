@@ -10,6 +10,8 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { compareStudents } from "@/services/grading";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { loadCourse } from "@/utils/load-course";
+import { loadScheduleNav } from "@/utils/load-schedule-nav";
+import { formatDateTime } from "@/utils/schedule-time";
 
 export const prerender = false;
 
@@ -51,7 +53,11 @@ const courseParams = {
 };
 ---
 
-<AppLayout title={m.attendance_roll_call_page_title({ event: event.title })} trail={breadcrumbs(Astro.url, { course })}>
+<AppLayout
+  title={m.attendance_roll_call_page_title({ event: event.title })}
+  trail={breadcrumbs(Astro.url, { course })}
+  nav={await loadScheduleNav(course, href, actor, `${m.schedule_week({ week: weekNumber })} · ${formatDateTime(event.startAt)}`)}
+>
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="schedule" />
     <h2 class="mt-8 mb-4 text-2xl font-semibold">{event.title}</h2>

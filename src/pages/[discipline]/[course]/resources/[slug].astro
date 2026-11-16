@@ -12,6 +12,7 @@ import { breadcrumbs } from "@/utils/breadcrumbs";
 import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
+import { loadScheduleNav } from "@/utils/load-schedule-nav";
 import { highlightRunnerBlocks, renderMarkdownBody } from "@/utils/markdown";
 
 export const prerender = false;
@@ -46,12 +47,11 @@ if (resource.data.type === "LINK") {
 const data = resource.data;
 
 // The card lists what the resources page does; a resource of an event belongs
-// to the schedule tab instead and has no list of its own.
+// to the schedule tab instead and shows its weeks.
 const nav = resource.event
 	? {
+			...(await loadScheduleNav(course, href, actor, resource.title)),
 			tab: m.nav_course_tab_schedule(),
-			context: resource.title,
-			sections: [],
 		}
 	: resourcesNav(
 			href,

@@ -11,13 +11,11 @@ import Alert from "@/components/ui/Alert";
 import { db, isMeeting } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
-import { calendarEntries } from "@/services/calendar-entries";
-import { courseSchedule } from "@/services/course-schedule";
 import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { scheduleNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
-import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
+import { loadSchedule } from "@/utils/load-schedule-nav";
 import {
 	durationToMinutes,
 	formatClock,
@@ -48,28 +46,14 @@ const WEEKDAY_LABEL: Record<string, () => string> = {
 
 const now = new Date();
 const slots = await db.timeSlot.findMany({ course: course.id }, { actor });
-const events = await db.calendarEvent.findMany(
-	{ courseIds: [course.id] },
-	{ actor },
+const { events, entries, past, ahead, next, foldPast } = await loadSchedule(
+	course,
+	actor,
+	now,
 );
-// The exam service already keeps drafts from students.
-const exams = await db.exam.findMany({ course: course.id }, { actor });
 const { byEvent: eventResources } = splitByEvent(
 	await db.resource.findMany({ course: course.id }, { actor }),
 );
-// Only the viewer's own exceptions: they move the dates of the student's exams.
-const exceptions = canWrite ? new Map() : await loadCourseExceptions(course.id);
-const entries = calendarEntries(
-	events,
-	exams.map((exam) => ({
-		courseId: course.id,
-		exam,
-		exception: exceptions.get(exam.slug)?.get(actor.username) ?? null,
-	})),
-);
-const { past, ahead, next } = courseSchedule(entries, course.startDate, now);
-// Folding every week away would leave an empty page once the term is over.
-const foldPast = past.length > 0 && ahead.length > 0;
 
 // One query for the whole page. Whoever manages the course sees which
 // meetings have a roll call; a student sees their own result on the past ones.
