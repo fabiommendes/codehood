@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { answerHistoryStatsCommand } from "./answer-history-stats";
+import { checkInstructorEnrollmentsCommand } from "./check-instructor-enrollments";
 import { createCourseCommand } from "./create-course";
 import { createEditionCommand } from "./create-edition";
 import { createUserCommand } from "./create-user";
@@ -22,5 +23,6 @@ manage.addCommand(importCalendarCommand);
 manage.addCommand(recomputeEventTimesCommand);
 manage.addCommand(upgradeQuestionsCommand);
 manage.addCommand(answerHistoryStatsCommand);
+manage.addCommand(checkInstructorEnrollmentsCommand);
 
 await manage.parseAsync(process.argv);

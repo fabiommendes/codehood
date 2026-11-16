@@ -38,6 +38,7 @@
 	"errors_grade_column_needs_number": "\"{username}\" precisa de um número finito.",
 	"errors_grade_column_needs_label": "\"{username}\" precisa de um rótulo de 1 a 32 caracteres.",
 	"errors_not_enrolled_in_course": "\"{username}\" não tem matrícula na turma.",
+	"errors_instructor_cannot_enroll": "\"{username}\" é instrutor da turma e não pode ser matriculado como estudante.",
 	"errors_time_slot_has_events": "O horário \"{slug}\" ainda tem {count} aula(s) e não pode ser excluído.",
 	"errors_time_slot_duration_positive": "A duração de um horário deve ser maior que zero.",
 	"errors_time_slot_past_midnight": "Um horário não pode passar da meia-noite.",

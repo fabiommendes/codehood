@@ -43,6 +43,7 @@ import { m } from "@/i18n";
 import { codeAt, generateSecret, isCodeValid } from "@/services/roll-call-code";
 import { CLAIM_TTL_MS } from "@/utils/pending-check-in";
 import type { Prisma, PrismaTx } from "../client";
+import { assertNotInstructor } from "../enrollment-guard";
 import { courseRefWhere, invalidIfExists, valueOrNotFound } from "../utils";
 
 export type { RollCallId } from "@/core/schemas";
@@ -864,6 +865,7 @@ async function markPresent(
 	let joined: "ENROLLMENT" | "ACCOUNT" | null = null;
 	if (!enrollment) {
 		if (!target.actsAsInvite) throw new CheckInError("not-enrolled");
+		await assertNotInstructor(tx, courseId, username);
 		await tx.enrollment.create({ data: { username, courseId } });
 		joined = accountCreated ? "ACCOUNT" : "ENROLLMENT";
 	}

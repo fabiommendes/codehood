@@ -67,6 +67,13 @@ Whenever a new command is created, document it in this file.
   alone; running it again changes nothing. Exits with 1 when a version cannot
   be converted, naming it.
 
+### Enrollments
+
+`manage check-instructor-enrollments [--fix]`
+: Lists the enrollments whose user is the instructor of the course, with their
+  attempt count, and exits 1 when any is left. `--fix` deletes the ones without
+  attempts; the others need a manual decision.
+
 ### Answer edit history
 
 `manage answer-history-stats <course> [exam] [--json]`

@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import { type CourseTarget, ensurePerm } from "@/auth/permissions";
 import {
 	type CourseId,
@@ -10,6 +10,7 @@ import {
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { defineService, op } from "@/db/define-service";
 import type { Prisma, PrismaTx } from "../client";
+import { assertNotInstructor } from "../enrollment-guard";
 import { courseRefWhere, valueOrNotFound } from "../utils";
 import { toUser } from "./user.service";
 
@@ -66,6 +67,7 @@ export const makeEnrollmentService = defineService<EnrollmentT>()(() => {
 		): Promise<Enrollment> => {
 			const course = await resolveCourse(tx, input.course);
 			ensurePerm(opts.actor, "enrollment.create", course.view);
+			await assertNotInstructor(tx, course.id, input.username);
 
 			const row = await tx.enrollment.upsert({
 				where: {
@@ -163,8 +165,76 @@ export const makeEnrollmentService = defineService<EnrollmentT>()(() => {
 		},
 	});
 
-	return { create, findOne, findMany, delete: remove };
+	/**
+	 * Lists the enrollments whose user teaches the course, with their attempt count.
+	 *
+	 * With `fix`, deletes those without an attempt; the others stay for a manual decision.
+	 *
+	 * @throws NotAllowed when the actor lacks `system.manage`.
+	 */
+	const instructorEnrollments = op({
+		args: [z.object({ fix: z.boolean().optional() })],
+		run: async (
+			tx: PrismaTx,
+			input: { fix?: boolean },
+			opts: ServiceOptsWithoutTx,
+		): Promise<InstructorEnrollment[]> => {
+			ensurePerm(opts.actor, "system.manage");
+			const rows = await tx.enrollment.findMany({
+				where: { user: { courses: { some: {} } } },
+				select: {
+					id: true,
+					username: true,
+					course: {
+						select: {
+							id: true,
+							instructorId: true,
+							disciplineSlug: true,
+							editionSlug: true,
+						},
+					},
+				},
+				orderBy: { id: "asc" },
+			});
+			const found: InstructorEnrollment[] = [];
+			for (const row of rows) {
+				const { course } = row;
+				if (course.instructorId !== row.username) continue;
+				const attempts = await tx.response.count({
+					where: { authorId: row.username, exam: { courseId: course.id } },
+				});
+				const removed = !!input.fix && attempts === 0;
+				if (removed) await tx.enrollment.delete({ where: { id: row.id } });
+				found.push({
+					course: `${course.disciplineSlug}/${course.instructorId}_${course.editionSlug}`,
+					username: row.username,
+					attempts,
+					removed,
+				});
+			}
+			return found;
+		},
+	});
+
+	return {
+		create,
+		findOne,
+		findMany,
+		delete: remove,
+		instructorEnrollments,
+	};
 });
+
+/// An enrollment of a course's own instructor, as `instructorEnrollments` reports it.
+export interface InstructorEnrollment {
+	/// The course as `<discipline>/<instructor>_<edition>`.
+	course: string;
+	username: string;
+	/// How many responses the user has in the course's exams.
+	attempts: number;
+	/// Whether `fix` deleted the enrollment.
+	removed: boolean;
+}
 
 /** The enrollment service, as built by {@link makeEnrollmentService}. */
 export type EnrollmentService = ReturnType<typeof makeEnrollmentService>;

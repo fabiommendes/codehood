@@ -38,6 +38,7 @@
 	"errors_grade_column_needs_number": "\"{username}\" needs a finite number.",
 	"errors_grade_column_needs_label": "\"{username}\" needs a label of 1 to 32 characters.",
 	"errors_not_enrolled_in_course": "\"{username}\" is not enrolled in the course.",
+	"errors_instructor_cannot_enroll": "\"{username}\" teaches this course and cannot be enrolled as a student.",
 	"errors_time_slot_has_events": "Slot \"{slug}\" still has {count} event(s) and cannot be deleted.",
 	"errors_time_slot_duration_positive": "A time slot's duration must be greater than zero.",
 	"errors_time_slot_past_midnight": "A time slot cannot run past midnight.",
