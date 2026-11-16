@@ -39,6 +39,7 @@ import {
 	viewerTiming,
 } from "@/services/exam-state";
 import type { Prisma, PrismaTx } from "../client";
+import { realAttempt } from "../preview-filter";
 import {
 	courseRefMatch,
 	courseRefWhere,
@@ -312,6 +313,7 @@ export const makeSubmissionService = defineService<SubmissionT>()(() => {
 			const rows = await tx.submission.findMany({
 				where: {
 					response: {
+						...realAttempt,
 						exam: {
 							courseId: course.id,
 							...(filter.exam ? { slug: filter.exam } : {}),

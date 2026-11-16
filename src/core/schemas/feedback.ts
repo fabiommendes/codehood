@@ -153,6 +153,9 @@ export const feedbackFilterBase = z.object({
 
 	/// `true` keeps only the passes a bot made, `false` only the ones a user made.
 	automated: z.boolean().optional(),
+
+	/// `true` keeps only the passes of the instructor's simulations, which are left out by default.
+	preview: z.boolean().optional(),
 });
 
 export const feedbackFilter = feedbackFilterBase.extend({ course: courseRef });

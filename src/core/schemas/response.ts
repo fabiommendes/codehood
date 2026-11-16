@@ -96,6 +96,9 @@ export const responseFilterBase = z.object({
 	practice: z.boolean().optional(),
 
 	acceptingSubmissions: z.boolean().optional(),
+
+	/// `true` keeps only the instructor's simulations, which are left out by default.
+	preview: z.boolean().optional(),
 });
 
 export const responseFilter = responseFilterBase.extend({ course: courseRef });

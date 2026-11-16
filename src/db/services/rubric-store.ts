@@ -15,6 +15,7 @@ import {
 } from "@/services/rubric";
 import type { PrismaTx } from "../client";
 import { guardedUpdate } from "../conditional-write";
+import { feedbackOfRealAttempts, realAttempt } from "../preview-filter";
 
 /// A rubric item as a stored row.
 export interface StoredItem {
@@ -152,7 +153,7 @@ export async function loadRubricPasses(
 	rubricId: number,
 ): Promise<RubricPass[]> {
 	const rows = await tx.feedback.findMany({
-		where: { rubricId },
+		where: { rubricId, ...feedbackOfRealAttempts },
 		select: {
 			id: true,
 			score: true,
@@ -243,7 +244,10 @@ export async function rubricStanding(
 	questionRefId: number,
 ): Promise<RubricStanding> {
 	const submissions = await tx.submission.findMany({
-		where: { questionId: questionRefId, response: { examId } },
+		where: {
+			questionId: questionRefId,
+			response: { ...realAttempt, examId },
+		},
 		select: {
 			id: true,
 			createdAt: true,

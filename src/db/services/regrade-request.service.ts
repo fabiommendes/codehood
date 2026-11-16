@@ -39,6 +39,7 @@ import { m } from "@/i18n";
 import { examResult, resultPolicy, unweighted } from "@/services/exam-result";
 import { regradeBlocker, regradeBlockerMessage } from "@/services/regrade";
 import type { Prisma, PrismaTx } from "../client";
+import { realAttempt } from "../preview-filter";
 import {
 	courseRefMatch,
 	courseRefWhere,
@@ -478,6 +479,7 @@ export const makeRegradeRequestService = defineService<RegradeRequestT>()(
 					where: {
 						submission: {
 							response: {
+								...realAttempt,
 								...(author === undefined ? {} : { authorId: author }),
 								exam: {
 									courseId: course.id,

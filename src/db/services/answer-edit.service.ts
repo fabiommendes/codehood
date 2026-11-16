@@ -70,6 +70,7 @@ import { attemptClosedAt, attemptDeadline } from "@/services/exam-state";
 import { courseHref } from "@/urls";
 import { logEvent } from "@/utils/log";
 import type { Prisma, PrismaClient, PrismaTx } from "../client";
+import { realAttempt, realAttemptSql } from "../preview-filter";
 import { courseRefMatch } from "../utils";
 import {
 	assertAcceptingSubmissions,
@@ -372,9 +373,12 @@ export const makeAnswerEditService = defineService()(() => {
 			const every: AnswerHistoryAttemptStats[] = [];
 			let attempts = 0;
 			for (const exam of exams) {
-				const count = await tx.response.count({ where: { examId: exam.id } });
+				const count = await tx.response.count({
+					where: { examId: exam.id, ...realAttempt },
+				});
 				const rows = await measureAnswerHistoryByAttempt(tx, {
 					exam: exam.id,
+					withoutPreviews: true,
 				});
 				lines.push({ exam: exam.slug, ...summarize(count, rows) });
 				every.push(...rows);
@@ -393,7 +397,8 @@ export const makeAnswerEditService = defineService()(() => {
 export type AnswerHistoryScope =
 	| { responseIds: ResponseId[] }
 	| { author: string }
-	| { exam: ExamId };
+	/// `withoutPreviews` leaves the instructor's simulations out, for what measures the students.
+	| { exam: ExamId; withoutPreviews?: boolean };
 
 /// What the history of one attempt holds.
 export interface AnswerHistoryAttemptStats {
@@ -487,6 +492,7 @@ export async function measureAnswerHistoryByAttempt(
 		params = [scope.author];
 	} else {
 		where = "r.examId = ?";
+		if (scope.withoutPreviews) where += ` AND ${realAttemptSql("r")}`;
 		params = [scope.exam];
 	}
 

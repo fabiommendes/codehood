@@ -67,6 +67,7 @@ import {
 	type PrismaTx,
 	prisma,
 } from "../client";
+import { realAttempt } from "../preview-filter";
 import {
 	courseRefWhere,
 	exceptionSchedule,
@@ -780,7 +781,7 @@ async function attemptResults(
 	exam: DbExam,
 ): Promise<ExamResult[]> {
 	const attempts = await tx.response.findMany({
-		where: { examId: exam.id },
+		where: { examId: exam.id, ...realAttempt },
 		select: {
 			submissions: {
 				select: {

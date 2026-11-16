@@ -13,6 +13,7 @@ import { guardedUpdate } from "@/db/conditional-write";
 import { m } from "@/i18n";
 import { DEFAULT_CODE_ATTEMPTS, spentAttempts } from "@/services/code-grading";
 import type { Prisma, PrismaTx } from "../client";
+import { realAttemptSql } from "../preview-filter";
 import {
 	attemptTimedOut,
 	examTimingSelect,
@@ -280,6 +281,7 @@ export async function promoteExpiredSends(
 		JOIN Submission s ON s.responseId = r.id
 		JOIN QuestionRef q ON q.id = s.questionId
 		WHERE r.acceptingSubmissions = 1
+			AND ${realAttemptSql("r")}
 			AND r.examId IN (${marks(examIds)})
 			AND q.worker IN (${marks(scope.workers)})
 			${questionFilter}

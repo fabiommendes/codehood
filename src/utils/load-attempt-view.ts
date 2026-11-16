@@ -66,7 +66,7 @@ export async function loadAttemptView(
 					exam.questions,
 					attempt.submissions,
 					await db.feedback.findMany(
-						{ course, exam: exam.slug, author },
+						{ course, exam: exam.slug, author, preview },
 						{ actor },
 					),
 					policy,

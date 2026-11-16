@@ -256,6 +256,7 @@ export const makeFeedbackService = defineService<FeedbackT>()(() => {
 				where: {
 					submission: {
 						response: {
+							preview: filter.preview ?? false,
 							exam: {
 								courseId: course.id,
 								...(filter.exam ? { slug: filter.exam } : {}),

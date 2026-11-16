@@ -30,13 +30,10 @@ const { course, href, exam, data } = result;
 const actor = Astro.locals.actor!;
 
 // The instructor answers the exam through their simulation, a response like a student's.
-const attempt =
-	(
-		await db.response.findMany(
-			{ course: course.id, exam: exam.slug, author: actor.username },
-			{ actor },
-		)
-	).find((entry) => entry.preview) ?? null;
+const [attempt = null] = await db.response.findMany(
+	{ course: course.id, exam: exam.slug, author: actor.username, preview: true },
+	{ actor },
+);
 const now = new Date();
 const schedule = examSchedule(exam, new Map());
 const state = previewAttemptState(schedule.base, attempt, now);

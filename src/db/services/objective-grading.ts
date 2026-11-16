@@ -9,6 +9,7 @@ import type { ExamId, ResponseId } from "@/core/schemas";
 import { touch } from "@/db/conditional-write";
 import { NotAutoGradable, ResponseError, scoreResponse } from "@/mdq";
 import type { PrismaTx } from "../client";
+import { realAttempt } from "../preview-filter";
 import { privateDocument, scoreText } from "./grading-job.service";
 import {
 	attemptTimedOut,
@@ -112,6 +113,7 @@ export async function gradeExpiredObjectives(
 	if (!exam) return { attempts: 0, graded: 0 };
 	const responses = await tx.response.findMany({
 		where: {
+			...realAttempt,
 			examId: exam.id,
 			...(options.author ? { authorId: options.author } : {}),
 		},

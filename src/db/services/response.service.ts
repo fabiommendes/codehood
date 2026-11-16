@@ -50,6 +50,7 @@ import {
 	hiddenFromStudents,
 } from "@/services/exam-state";
 import type { Prisma, PrismaTx } from "../client";
+import { realAttempt } from "../preview-filter";
 import {
 	courseRefMatch,
 	courseRefWhere,
@@ -286,6 +287,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					...(filter.acceptingSubmissions !== undefined
 						? { acceptingSubmissions: filter.acceptingSubmissions }
 						: {}),
+					preview: filter.preview ?? false,
 					...(restrictTo
 						? { authorId: restrictTo }
 						: filter.author
@@ -633,6 +635,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 			const waiting = await tx.submission.findFirst({
 				where: {
 					response: {
+						...realAttempt,
 						examId: exam.id,
 						...(input.author ? { authorId: input.author } : {}),
 					},
