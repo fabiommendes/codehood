@@ -83,12 +83,12 @@ export async function loadExamStaffData(
 	const slugs = exam.questions.map((question) => question.slug);
 	const policy = policyOf(exam);
 	const results = attempts.map((entry) =>
-		examResult(slugs, entry.submissions, feedback, policy),
+		examResult(exam.questions, entry.submissions, feedback, policy),
 	);
 	const schedule = examSchedule(exam, exceptions);
 	const resultRows = attemptRows(
 		exam,
-		slugs,
+		exam.questions,
 		attempts,
 		feedback,
 		students,

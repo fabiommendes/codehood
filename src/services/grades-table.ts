@@ -146,7 +146,7 @@ export function gradesTable(
 		const schedule = examSchedule(exam, exceptions);
 		const rows = attemptRows(
 			exam,
-			exam.questions.map((question) => question.slug),
+			exam.questions,
 			attempts.filter(
 				(attempt) =>
 					attempt.exam === exam.slug && usernames.has(attempt.author),

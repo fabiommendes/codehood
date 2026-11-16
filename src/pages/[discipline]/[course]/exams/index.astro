@@ -73,7 +73,7 @@ if (!canWrite) {
 		);
 		if (!attempt || !released(schedule, now)) continue;
 		const { total } = examResult(
-			exam.questions.map((question) => question.slug),
+			exam.questions,
 			attempt.submissions,
 			feedback,
 			policyOf(exam),

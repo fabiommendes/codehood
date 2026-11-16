@@ -46,8 +46,8 @@ function exam(slug: string, overrides: Partial<Exam> = {}): Exam {
 		rev: null,
 		tags: [],
 		questions: [
-			{ id: 1 as never, slug: "q1", version: null },
-			{ id: 2 as never, slug: "q2", version: null },
+			{ id: 1 as never, slug: "q1", version: null, weight: 1 },
+			{ id: 2 as never, slug: "q2", version: null, weight: 1 },
 		],
 		createdAt: at(-1000),
 		updatedAt: at(-1000),
@@ -58,7 +58,7 @@ function exam(slug: string, overrides: Partial<Exam> = {}): Exam {
 /// An exam with a single question `q1`.
 function single(slug: string, overrides: Partial<Exam> = {}): Exam {
 	return exam(slug, {
-		questions: [{ id: 1 as never, slug: "q1", version: null }],
+		questions: [{ id: 1 as never, slug: "q1", version: null, weight: 1 }],
 		...overrides,
 	});
 }

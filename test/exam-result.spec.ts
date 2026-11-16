@@ -362,3 +362,79 @@ for (const [score, text] of percentages) {
 		expect(formatScore(score)).toBe(text);
 	});
 }
+
+//
+// examResult: weights
+//
+
+/// An answered, graded question per `[slug, weight, score]`, in the given order.
+function weighted(rows: Array<[string, number, string | null]>) {
+	return examResult(
+		rows.map(([slug, weight]) => ({ slug, weight })),
+		rows.flatMap(([slug, , score], i) =>
+			score === null ? [] : [submission(`s${i}`, slug, i)],
+		),
+		rows.flatMap(([, , score], i) =>
+			score === null ? [] : [feedback(`s${i}`, score, i)],
+		),
+	);
+}
+
+test("examResult: the total weighs each question's score by its weight", () => {
+	const result = weighted([
+		["q1", 3, "1"],
+		["q2", 1, "0"],
+	]);
+
+	expect(result.total).toBeCloseTo(0.75, 10);
+});
+
+test("examResult: an unanswered question counts zero but keeps its weight in the denominator", () => {
+	const result = weighted([
+		["q1", 3, "1"],
+		["q2", 1, null],
+	]);
+
+	expect(result.total).toBeCloseTo(0.75, 10);
+});
+
+test("examResult: a weight of zero leaves the question out of the total", () => {
+	const result = weighted([
+		["q1", 0, "0"],
+		["q2", 2, "1"],
+	]);
+
+	expect(result.total).toBe(1);
+});
+
+test("examResult: weights that sum to zero total zero", () => {
+	const result = weighted([
+		["q1", 0, "1"],
+		["q2", 0, "1"],
+	]);
+
+	expect(result.total).toBe(0);
+});
+
+test("examResult: a pending question nulls the weighted total", () => {
+	const result = examResult(
+		[
+			{ slug: "q1", weight: 3 },
+			{ slug: "q2", weight: 1 },
+		],
+		[submission("s1", "q1", 0)],
+		[],
+	);
+
+	expect(result.total).toBeNull();
+});
+
+test("examResult: equal weights give the plain mean", () => {
+	const result = weighted([
+		["q1", 2, "1"],
+		["q2", 2, "0"],
+		["q3", 2, "1/2"],
+	]);
+
+	expect(result.total).toBeCloseTo(0.5, 10);
+});

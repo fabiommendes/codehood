@@ -61,7 +61,7 @@ const policy = (await loadResultPolicy(course.id))(exam);
 // The results table builds its row the same way, so the two never disagree.
 const [row] = attemptRows(
 	exam,
-	questions,
+	exam.questions,
 	[attempt],
 	feedback,
 	students,
@@ -108,7 +108,12 @@ const edits = await db.answerEdit.summary(
 const editSummaries = new Map(
 	edits.questions.map((entry) => [entry.question, entry.summary]),
 );
-const outcomes = examResult(questions, attempt.submissions, feedback, policy);
+const outcomes = examResult(
+	exam.questions,
+	attempt.submissions,
+	feedback,
+	policy,
+);
 
 const rows = outcomes.questions.map((outcome, index) => {
 	const doc = docs.get(outcome.question);

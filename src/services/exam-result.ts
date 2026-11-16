@@ -122,11 +122,17 @@ export interface QuestionOutcome {
 	codeAttempts?: CodeAttemptOutcome[];
 }
 
+/// An exam question as `examResult` takes it: its slug and its weight in the total.
+export interface WeightedQuestion {
+	slug: string;
+	weight: number;
+}
+
 export interface ExamResult {
 	/// One entry per exam question, in exam order.
 	questions: QuestionOutcome[];
-	/// Mean of the question scores in `[-1, 1]`, unanswered and not-graded
-	/// counting as zero; `null` while any answered question is still `pending`.
+	/// Weighted mean of the question scores in `[-1, 1]`, unanswered and
+	/// not-graded counting as zero; `null` while any answered question is still `pending`.
 	total: number | null;
 }
 
@@ -142,7 +148,7 @@ export interface ExamResult {
  * whatever feedback it has: its score is `null`, it counts as zero in the
  * total, it is not pending, and it keeps its comments.
  *
- * @params questions The exam's question slugs, in exam order.
+ * @params questions The exam's questions in exam order, with their weights. A bare slug weighs 1.
  * @params submissions Every submission of the attempt, any order.
  * A question with `SUBMIT` or `FINAL` submissions is a `code` question sent for
  * grading: its score comes from all of them (see `codeQuestionScore`), not
@@ -152,12 +158,15 @@ export interface ExamResult {
  * @params policy How the exam discounts `code` submissions; defaults apply when missing.
  */
 export function examResult(
-	questions: string[],
+	questions: readonly (string | WeightedQuestion)[],
 	submissions: ResultSubmission[],
 	feedback: ResultFeedback[],
 	policy: ResultPolicy = {},
 ): ExamResult {
-	const outcomes = questions.map((slug) => {
+	const refs = questions.map((q) =>
+		typeof q === "string" ? { slug: q, weight: 1 } : q,
+	);
+	const outcomes = refs.map(({ slug }) => {
 		const sent = submissions.filter(
 			(submission) =>
 				submission.question === slug &&
@@ -169,7 +178,13 @@ export function examResult(
 			: (policy.codePenalty?.[slug] ?? DEFAULT_CODE_PENALTY);
 		return codeOutcomeOf(slug, sent, feedback, penalty);
 	});
-	return { questions: outcomes, total: totalOf(outcomes) };
+	return {
+		questions: outcomes,
+		total: totalOf(
+			outcomes,
+			refs.map((ref) => ref.weight),
+		),
+	};
 }
 
 /// The outcome of one question: its newest submission, judged by the newest feedback on it.
@@ -313,12 +328,20 @@ function codeOutcomeOf(
 	};
 }
 
-/// The mean score, unanswered and not-graded counting as zero; `null` with no questions or any pending.
-function totalOf(outcomes: QuestionOutcome[]): number | null {
+/// The weighted mean score, unanswered and not-graded counting as zero; `null` with no questions or any pending, 0 when the weights sum to 0.
+function totalOf(
+	outcomes: QuestionOutcome[],
+	weights: readonly number[],
+): number | null {
 	if (outcomes.length === 0) return null;
 	if (outcomes.some((outcome) => outcome.status === "pending")) return null;
-	const sum = outcomes.reduce((acc, outcome) => acc + (outcome.score ?? 0), 0);
-	return sum / outcomes.length;
+	const weightSum = weights.reduce((acc, weight) => acc + weight, 0);
+	if (weightSum === 0) return 0;
+	const sum = outcomes.reduce(
+		(acc, outcome, i) => acc + (outcome.score ?? 0) * (weights[i] as number),
+		0,
+	);
+	return sum / weightSum;
 }
 
 /**

@@ -110,7 +110,7 @@ function examInclude(enrolledUser?: string) {
 		questionsForExams: {
 			select: {
 				version: true,
-				questionRef: { select: { id: true, slug: true } },
+				questionRef: { select: { id: true, slug: true, latestId: true } },
 			},
 			// Rows written before `position` existed all hold zero and keep their old order.
 			orderBy: [
@@ -196,7 +196,7 @@ const buildExamService = (deps: Deps) =>
 					);
 				}
 
-				return fromDb(row, "full");
+				return fromDb(row, "full", (await loadWeights(tx, [row])).get(row.id));
 			},
 		});
 
@@ -232,7 +232,8 @@ const buildExamService = (deps: Deps) =>
 				if (error) throw error;
 
 				const views = await attachmentViews(tx, [row], opts.actor);
-				return fromDb(row, views.get(row.id) ?? "hidden");
+				const weights = await loadWeights(tx, [row]);
+				return fromDb(row, views.get(row.id) ?? "hidden", weights.get(row.id));
 			},
 		});
 
@@ -291,7 +292,10 @@ const buildExamService = (deps: Deps) =>
 				});
 
 				const views = await attachmentViews(tx, rows, opts.actor);
-				return rows.map((row) => fromDb(row, views.get(row.id) ?? "hidden"));
+				const weights = await loadWeights(tx, rows);
+				return rows.map((row) =>
+					fromDb(row, views.get(row.id) ?? "hidden", weights.get(row.id)),
+				);
 			},
 		});
 
@@ -333,6 +337,7 @@ const buildExamService = (deps: Deps) =>
 				});
 
 				const views = await attachmentViews(tx, rows, opts.actor);
+				const weights = await loadWeights(tx, rows);
 				const result: CourseExam[] = [];
 				for (const row of rows) {
 					if (!hasPerm(opts.actor, "course.read-contents", row.course))
@@ -347,7 +352,11 @@ const buildExamService = (deps: Deps) =>
 					}
 					result.push({
 						courseId: row.courseId as CourseId,
-						exam: fromDb(row, views.get(row.id) ?? "hidden"),
+						exam: fromDb(
+							row,
+							views.get(row.id) ?? "hidden",
+							weights.get(row.id),
+						),
 					});
 				}
 				return result;
@@ -441,7 +450,7 @@ const buildExamService = (deps: Deps) =>
 					});
 				}
 
-				return fromDb(row, "full");
+				return fromDb(row, "full", (await loadWeights(tx, [row])).get(row.id));
 			},
 		});
 
@@ -520,7 +529,11 @@ const buildExamService = (deps: Deps) =>
 				// An exam that is already released is returned as it is, but not to a stale caller.
 				await checkVersion(tx, "exam", { id: row.id }, opts);
 
-				const exam = fromDb(row, "full");
+				const exam = fromDb(
+					row,
+					"full",
+					(await loadWeights(tx, [row])).get(row.id),
+				);
 				const now = new Date();
 				const schedule = exceptionSchedule(
 					exam,
@@ -548,7 +561,11 @@ const buildExamService = (deps: Deps) =>
 					opts,
 					{ include: examInclude() },
 				);
-				return fromDb(updated, "full");
+				return fromDb(
+					updated,
+					"full",
+					(await loadWeights(tx, [updated])).get(updated.id),
+				);
 			},
 		});
 
@@ -581,7 +598,7 @@ const buildExamService = (deps: Deps) =>
 					opts,
 					{ include: examInclude() },
 				);
-				return fromDb(row, "full");
+				return fromDb(row, "full", (await loadWeights(tx, [row])).get(row.id));
 			},
 		});
 
@@ -756,7 +773,11 @@ async function attemptResults(
 			},
 		},
 	});
-	const slugs = exam.questionsForExams.map((q) => q.questionRef.slug);
+	const weights = (await loadWeights(tx, [exam])).get(exam.id) ?? [];
+	const slugs = exam.questionsForExams.map((q, i) => ({
+		slug: q.questionRef.slug,
+		weight: weights[i] ?? 1,
+	}));
 	const policy = (await loadResultPolicy(exam.courseId, tx))(exam);
 	return attempts.map(({ submissions }) =>
 		examResult(
@@ -1059,6 +1080,61 @@ async function downloadableExam(
 	return row;
 }
 
+/// The `weight` a question document's public payload carries, 1 when it has none.
+function payloadWeight(payload: Prisma.JsonValue | undefined): number {
+	const weight = (payload as { weight?: unknown } | null | undefined)?.weight;
+	return typeof weight === "number" ? weight : 1;
+}
+
+/**
+ * The weight of each question of each exam in `rows`, in exam order, by exam id.
+ *
+ * It is the `weight` of the version the exam pins, or of the question's
+ * latest version when it pins none. One query serves all the rows.
+ */
+async function loadWeights(
+	tx: PrismaTx,
+	rows: readonly DbExam[],
+): Promise<Map<number, number[]>> {
+	const questions = rows.flatMap((row) => row.questionsForExams);
+	const latestIds = questions.flatMap((q) =>
+		!q.version && q.questionRef.latestId !== null
+			? [q.questionRef.latestId]
+			: [],
+	);
+	const pinned = questions.flatMap((q) =>
+		q.version ? [{ refId: q.questionRef.id, versionHash: q.version }] : [],
+	);
+	if (latestIds.length === 0 && pinned.length === 0) return new Map();
+
+	const versions = await tx.questionData.findMany({
+		where: { OR: [{ id: { in: latestIds } }, ...pinned] },
+		select: {
+			id: true,
+			refId: true,
+			versionHash: true,
+			publicPayload: true,
+		},
+	});
+	const byId = new Map<number, (typeof versions)[number]>(
+		versions.map((v) => [v.id, v]),
+	);
+	const byHash = new Map(
+		versions.map((v) => [`${v.refId}:${v.versionHash}`, v]),
+	);
+	return new Map(
+		rows.map((row) => [
+			row.id,
+			row.questionsForExams.map((q) => {
+				const version = q.version
+					? byHash.get(`${q.questionRef.id}:${q.version}`)
+					: byId.get(q.questionRef.latestId ?? -1);
+				return payloadWeight(version?.publicPayload);
+			}),
+		]),
+	);
+}
+
 /// The id of the latest version of a question, `null` when it has none.
 async function latestId(
 	tx: PrismaTx,
@@ -1150,7 +1226,11 @@ function publicAttachments(list: Attachment[]) {
 }
 
 /** Converts a database row into the exam entity, showing its attachments as `view` says. */
-function fromDb(row: DbExam, view: AttachmentView): Exam {
+function fromDb(
+	row: DbExam,
+	view: AttachmentView,
+	weights: readonly number[] = [],
+): Exam {
 	const list = (row.attachments as Attachment[] | null) ?? [];
 	const files = row.files as AttachmentFiles | null;
 	return {
@@ -1171,10 +1251,11 @@ function fromDb(row: DbExam, view: AttachmentView): Exam {
 		gradesReleasedAt: row.gradesReleasedAt,
 		rev: row.rev,
 		tags: row.examTags.map((t) => t.tag),
-		questions: row.questionsForExams.map((q) => ({
+		questions: row.questionsForExams.map((q, i) => ({
 			id: q.questionRef.id as Exam["questions"][number]["id"],
 			slug: q.questionRef.slug,
 			version: q.version,
+			weight: weights[i] ?? 1,
 		})),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

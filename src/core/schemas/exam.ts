@@ -39,6 +39,8 @@ export const examQuestionSchema = z.object({
 	id: questionRefId,
 	slug: slug,
 	version: z.string().min(1).nullable(),
+	/// What the question counts for in the exam total, from the `weight` of the version the exam uses. Output only.
+	weight: z.number().nonnegative(),
 });
 
 /// A question reference on the way in, by slug within the exam's own course.

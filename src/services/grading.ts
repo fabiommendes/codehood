@@ -17,6 +17,7 @@ import {
 	newestPassesFirst,
 	type QuestionOutcome,
 	type ResultPolicy,
+	type WeightedQuestion,
 } from "./exam-result";
 import {
 	attemptOf,
@@ -446,11 +447,11 @@ export interface AttemptRow {
 /**
  * The results of an exam, one row per attempt, sorted by the student's name.
  *
- * The total follows `examResult`: the mean of the question scores, with
+ * The total follows `examResult`: the weighted mean of the question scores, with
  * unanswered and will-not-grade questions counting as zero. Names compare
  * without regard to case, and ties fall back to the username.
  *
- * @params questions The exam's question slugs.
+ * @params questions The exam's questions with their weights, in exam order. A bare slug weighs 1.
  * @params feedback Every grading pass on the exam, released or not.
  * @params students The course's students, dropped ones included.
  * @params exceptions The exam's exceptions, by username; each attempt is `in-progress` or `submitted` by its author's personal timing, as in {@link countingAnswers}.
@@ -458,7 +459,7 @@ export interface AttemptRow {
  */
 export function attemptRows(
 	exam: ExamTiming,
-	questions: string[],
+	questions: readonly (string | WeightedQuestion)[],
 	attempts: GradingAttempt[],
 	feedback: GradingFeedback[],
 	students: GradedStudent[],
@@ -467,13 +468,14 @@ export function attemptRows(
 	policy: ResultPolicy = {},
 ): AttemptRow[] {
 	const schedule = examSchedule(exam, exceptions);
+	const slugs = questions.map((q) => (typeof q === "string" ? q : q.slug));
 	const studentsByUsername = new Map(
 		students.map((student) => [student.username, student]),
 	);
 	const pendingByAuthor = new Map<string, number>();
 	for (const answer of countingAnswers(
 		exam,
-		questions,
+		slugs,
 		attempts,
 		feedback,
 		now,
@@ -494,7 +496,7 @@ export function attemptRows(
 		const answered = new Set(
 			attempt.submissions
 				.map((submission) => submission.question)
-				.filter((slug) => questions.includes(slug)),
+				.filter((slug) => slugs.includes(slug)),
 		).size;
 		return {
 			author: attempt.author,
@@ -502,7 +504,7 @@ export function attemptRows(
 			dropped: student?.dropped ?? false,
 			state: closed ? "submitted" : "in-progress",
 			answered,
-			questions: questions.length,
+			questions: slugs.length,
 			pending: closed ? (pendingByAuthor.get(attempt.author) ?? 0) : 0,
 			total: closed
 				? examResult(questions, attempt.submissions, feedback, policy).total

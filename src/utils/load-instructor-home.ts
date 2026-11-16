@@ -84,7 +84,7 @@ export async function loadInstructorHome(
 					.map((attempt) => ({
 						attempt,
 						result: examResult(
-							exam.questions.map((question) => question.slug),
+							exam.questions,
 							attempt.submissions,
 							feedback,
 							policyOf(exam),

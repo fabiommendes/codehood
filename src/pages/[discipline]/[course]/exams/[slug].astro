@@ -208,7 +208,7 @@ const meta = [
 const examOutcome =
 	state.kind === "results" && attempt
 		? examResult(
-				exam.questions.map((question) => question.slug),
+				exam.questions,
 				attempt.submissions,
 				await db.feedback.findMany(
 					{ course: course.id, exam: slug, author: actor.username },
