@@ -392,6 +392,13 @@ Cuidados para S2 a S5:
   com a dissertativa corrigida pela rubrica (hopper, hamilton), e usa a mesma
   função de itens de `test-02` (`seedEssayRubric`). `history-off` sobrevive em
   `seedHistoryOffExam` com `explain-recursion`. S4 e S5 apagam as duas.
+- S4: `seedReleasedExam` (ex-`seedQuestionStatsExam`) cria `test-01` com os nove
+  alunos. Os pesos 3 e 2 estão em `fastest-sort` e `n-log-n`, e `stack-facts`
+  ganhou `weight: 1` explícito, porque a rede procura 3, 2 e 1 no payload.
+- S4: o pedido aceito do aluno de dev cai na dissertativa (nota 0,8), e o
+  aberto numa objetiva (`stack-facts`), que não muda nota nem estatística.
+  `test-07`, `seedWeightedExam` e `seedRegradeExam` saíram, e com eles as
+  questões `weighted-*`.
 
 ## Riscos
 

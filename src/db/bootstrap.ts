@@ -1366,7 +1366,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		thompson: cohort[2] as User,
 		backus: cohort[3] as User,
 	});
-	await seedReleasedRubricExam(cs101.id, ada, { hopper, hamilton });
 	await seedHistoryOffExam(cs101.id, hopper);
 	await seedCodeAnswerExams(cs101.id);
 	await seedGradeColumns(cs101.id, { hopper, hamilton, liskov, dijkstra });
@@ -1380,7 +1379,7 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	});
 
 	await seedMidtermException(cs101.id);
-	await seedQuestionStatsExam(cs101.id, [
+	await seedReleasedExam(cs101.id, ada, [
 		hopper,
 		hamilton,
 		...cohort,
@@ -1388,8 +1387,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		bob,
 	]);
 
-	await seedRegradeExam(cs101.id, ada, { hopper, hamilton });
-	await seedWeightedExam(cs101.id, { hopper, hamilton });
 	await seedAttachments(cs101.id);
 	await seedOpenQuiz(cs101.id, cohort[0] as User);
 	await seedPracticeAndSimulations(cs101.id, ada);
@@ -3461,72 +3458,6 @@ async function seedGradingShowcase(
 	);
 }
 
-/**
- * Seeds `test-07`, an exam with released grades where the essay was graded with a rubric.
- *
- * Gives the student the view of a rubric: the items that were applied and
- * their feedback.
- */
-async function seedReleasedRubricExam(
-	course: Course["id"],
-	instructor: User,
-	students: { hopper: User; hamilton: User },
-): Promise<void> {
-	const exam = "test-07";
-	const essay = "prolog-caso-base";
-	await db.exam.create(
-		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 7: rubrics",
-			description: "Grades out, one question graded with a rubric.",
-			tags: ["prolog"],
-			questions: [{ slug: essay, version: "v1" }],
-		},
-		FULL_ACCESS,
-	);
-	const pk = { course, exam, question: essay };
-	await seedEssayRubric(pk);
-	const hopper = await answerExam(course, exam, students.hopper, {
-		[essay]: CASO_BASE_TEXT.hopper,
-	});
-	const hamilton = await answerExam(course, exam, students.hamilton, {
-		[essay]: CASO_BASE_TEXT.hamilton,
-	});
-	const as = { actor: instructor };
-	await db.feedback.create(
-		{
-			submission: { publicId: hopper[essay] ?? "" },
-			ref: "rubric-1",
-			rubric: ["correta", "pilha"],
-			feedback: "Resposta completa.",
-		},
-		as,
-	);
-	await db.feedback.create(
-		{
-			submission: { publicId: hamilton[essay] ?? "" },
-			ref: "rubric-1",
-			rubric: ["errado", "pilha"],
-			adjustment: "0.2",
-			feedback: "O caso base está errado, mas o resto está bem explicado.",
-		},
-		as,
-	);
-	await db.exam.update(
-		{ course, slug: exam },
-		{
-			status: "COMPLETED",
-			scheduledAt: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-			duration: { hours: 1 },
-		},
-		FULL_ACCESS,
-	);
-	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
-}
-
 /// The directory of the Elm example question, the one the grading worker's example course also uses.
 const ELM_EXAMPLE_DIR = "workers/chalk-worker/example/questions/elm";
 
@@ -3807,18 +3738,31 @@ async function seedMidtermException(course: Course["id"]): Promise<void> {
 }
 
 /**
- * Seeds a closed, graded exam with released grades, answered by eight students, for the question statistics.
+ * Seeds `test-01`, the exam whose grades were released three days ago.
  *
- * It has a multiple choice with a popular distractor and a choice nobody
- * picks, a multiple selection, a true-false, a question the best students on
- * the rest of the exam miss (negative discrimination), a numeric, and one
- * everybody gets right (no variance).
+ * Nine students answered it, `students` plus the dev student. The objective
+ * questions give the statistics a multiple choice with a popular distractor
+ * and a choice nobody picks, a multiple selection, a true-false, a question
+ * the best students on the rest of the exam miss (negative discrimination),
+ * a numeric, and one everybody gets right (no variance). The first two
+ * questions weigh 3 and 2. Three students answered the essay, graded with a
+ * rubric, and the regrade requests are in each state: the dev student has an
+ * open one, an accepted one and an answer without a request, hopper's was
+ * accepted and hamilton's rejected.
  */
-async function seedQuestionStatsExam(
+async function seedReleasedExam(
 	course: Course["id"],
-	students: User[],
+	instructor: User,
+	others: User[],
 ): Promise<void> {
-	const exam = "test-04";
+	const exam = "test-01";
+	const essay = "prolog-caso-base";
+	const dev = await db.user.findOne(
+		{ username: DEV_STUDENT_USERNAME },
+		FULL_ACCESS,
+	);
+	if (!dev) throw new Error("The dev student account is missing.");
+	const students = [...others, dev];
 	const question = (
 		slug: string,
 		body: Record<string, unknown>,
@@ -3836,6 +3780,7 @@ async function seedQuestionStatsExam(
 	await question("fastest-sort", {
 		type: "multiple-choice",
 		title: "Fastest general sort",
+		weight: 3,
 		stem: "Which sort has an O(n log n) worst case?",
 		choices: [
 			{ id: "merge", text: "Merge sort", score: 1 },
@@ -3847,6 +3792,7 @@ async function seedQuestionStatsExam(
 	await question("n-log-n", {
 		type: "multiple-selection",
 		title: "O(n log n) algorithms",
+		weight: 2,
 		stem: "Select every algorithm that runs in O(n log n) on average.",
 		choices: [
 			{ id: "merge", text: "Merge sort", correct: true },
@@ -3858,6 +3804,7 @@ async function seedQuestionStatsExam(
 	await question("stack-facts", {
 		type: "true-false",
 		title: "Stack facts",
+		weight: 1,
 		stem: "Judge each statement about stacks.",
 		choices: [
 			{ id: "lifo", text: "A stack is last in, first out.", correct: true },
@@ -3889,8 +3836,9 @@ async function seedQuestionStatsExam(
 			slug: exam,
 			type: "EXAM",
 			status: "ONGOING",
-			title: "Test 4: algorithms",
-			description: "Sorting and stacks, with a question that needs rework.",
+			title: "Test 1: algorithms",
+			description:
+				"Sorting, stacks and a Prolog essay, with grades out and reviews to look at.",
 			tags: ["algorithms"],
 			questions: [
 				{ slug: "fastest-sort", version: "v1" },
@@ -3899,10 +3847,12 @@ async function seedQuestionStatsExam(
 				{ slug: "pivot-trap", version: "v1" },
 				{ slug: "factorial-of-five", version: "v1" },
 				{ slug: "stack-top", version: "v1" },
+				{ slug: essay, version: "v1" },
 			],
 		},
 		FULL_ACCESS,
 	);
+	await seedEssayRubric({ course, exam, question: essay });
 
 	/// Each row: the answer to every question, by student in `students` order. Closing the attempt scores them.
 	const rows: [string, QuestionResponse][][] = [
@@ -3970,122 +3920,125 @@ async function seedQuestionStatsExam(
 			["factorial-of-five", 24],
 			["stack-top", "top"],
 		],
+		[
+			["fastest-sort", "merge"],
+			["n-log-n", ["merge", "quick"]],
+			["stack-facts", { lifo: true, fifo: true, push: true }],
+			["pivot-trap", "linearithmic"],
+			["factorial-of-five", 120],
+			["stack-top", "top"],
+		],
 	];
+	const essays: Record<string, string> = {
+		[students[0]?.username ?? ""]: CASO_BASE_TEXT.hopper,
+		[students[1]?.username ?? ""]: CASO_BASE_TEXT.hamilton,
+		[dev.username]: CASO_BASE_TEXT.bob,
+	};
+	const submissions: Record<string, Record<string, string>> = {};
 	for (const [index, student] of students.entries()) {
-		const row = rows[index] ?? [];
-		await answerExam(course, exam, student, Object.fromEntries(row));
+		const answers: SeededAnswers = Object.fromEntries(rows[index] ?? []);
+		const text = essays[student.username];
+		if (text) answers[essay] = text;
+		submissions[student.username] = await answerExam(
+			course,
+			exam,
+			student,
+			answers,
+		);
 	}
+
+	const grade = (
+		username: string,
+		rubric: string[],
+		feedback: string,
+		adjustment?: string,
+	) =>
+		db.feedback.create(
+			{
+				submission: { publicId: submissions[username]?.[essay] ?? "" },
+				ref: "rubric-1",
+				rubric,
+				...(adjustment ? { adjustment } : {}),
+				feedback,
+			},
+			{ actor: instructor },
+		);
+	await grade(
+		students[0]?.username ?? "",
+		["correta", "pilha"],
+		"Resposta completa.",
+	);
+	await grade(
+		students[1]?.username ?? "",
+		["errado", "pilha"],
+		"O caso base está errado, mas o resto está bem explicado.",
+		"0.2",
+	);
+	await grade(
+		dev.username,
+		["correta", "vaga"],
+		"Falta dizer como a recursão para.",
+	);
 
 	await db.exam.update(
 		{ course, slug: exam },
 		{
 			status: "COMPLETED",
-			scheduledAt: new Date(Date.now() - 6 * 24 * 3600 * 1000),
+			scheduledAt: new Date(Date.now() - 3 * 24 * 3600 * 1000),
 			duration: { hours: 2 },
 		},
 		FULL_ACCESS,
 	);
 	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
-}
 
-/**
- * Seeds a released exam whose questions weigh 3, 2 and 1.
- *
- * Gives the instructor's overview its weight column and the grades a total
- * that differs from the plain average: hopper misses only the heaviest
- * question, hamilton only the lightest.
- */
-async function seedWeightedExam(
-	course: Course["id"],
-	students: { hopper: User; hamilton: User },
-): Promise<void> {
-	const exam = "test-06";
-	const weighted = async (
-		slug: string,
-		title: string,
-		weight: number,
-		right: string,
-		wrong: string,
-	): Promise<void> => {
-		await db.question.create(
-			{
-				course,
-				slug,
-				status: "PUBLISHED",
-				version: "v1",
-				question: {
-					type: "multiple-choice",
-					title,
-					stem: `${title}: pick the right answer.`,
-					tags: ["recursion"],
-					weight,
-					choices: [
-						{ id: "right", text: right, score: 1 },
-						{ id: "wrong", text: wrong },
-					],
-				} as never,
-			},
-			FULL_ACCESS,
+	const ask = (author: User, submission: string | undefined, message: string) =>
+		db.regradeRequest.create(
+			{ course, submission: submission ?? "", message },
+			{ actor: author },
 		);
-	};
-	await weighted(
-		"weighted-base-case",
-		"Why a base case",
-		3,
-		"It stops the recursion.",
-		"It speeds the recursion up.",
+	const own = submissions[dev.username] ?? {};
+	await ask(
+		dev,
+		own["stack-facts"],
+		"Push adds to the top and a stack is last in, first out, so I do not see what is wrong.",
 	);
-	await weighted(
-		"weighted-call-stack",
-		"Where calls wait",
-		2,
-		"On the call stack.",
-		"In the heap only.",
+	const ownAccepted = await ask(
+		dev,
+		own[essay],
+		"Eu disse que a recursão precisa parar; o enunciado não pedia mais que isso.",
 	);
-	await weighted(
-		"weighted-tail-call",
-		"Tail calls",
-		1,
-		"The recursive call is the last action.",
-		"The recursive call is the first action.",
-	);
-	await db.exam.create(
+	await db.regradeRequest.accept(
+		{ publicId: ownAccepted.publicId },
 		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 6: weights",
-			description: "Questions that weigh 3, 2 and 1 in the total.",
-			tags: ["recursion"],
-			questions: [
-				{ slug: "weighted-base-case", version: "v1" },
-				{ slug: "weighted-call-stack", version: "v1" },
-				{ slug: "weighted-tail-call", version: "v1" },
-			],
+			score: "0.8",
+			reply:
+				"Nota parcial: o enunciado pedia a parada, mas faltou o caso base.",
 		},
-		FULL_ACCESS,
+		{ actor: instructor },
 	);
-	await answerExam(course, exam, students.hopper, {
-		"weighted-base-case": "wrong",
-		"weighted-call-stack": "right",
-		"weighted-tail-call": "right",
-	});
-	await answerExam(course, exam, students.hamilton, {
-		"weighted-base-case": "right",
-		"weighted-call-stack": "right",
-		"weighted-tail-call": "wrong",
-	});
-	await db.exam.update(
-		{ course, slug: exam },
+	const accepted = await ask(
+		students[0] as User,
+		submissions[students[0]?.username ?? ""]?.[essay],
+		"Descrevi o caso base e o estouro de pilha, a nota deveria ser cheia.",
+	);
+	await db.regradeRequest.accept(
+		{ publicId: accepted.publicId },
 		{
-			status: "COMPLETED",
-			scheduledAt: new Date(Date.now() - 4 * 24 * 3600 * 1000),
-			duration: { hours: 1 },
+			score: "1",
+			reply: "Você tem razão, a resposta cobre tudo o que a rubrica pede.",
 		},
-		FULL_ACCESS,
+		{ actor: instructor },
 	);
-	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
+	const rejected = await ask(
+		students[1] as User,
+		submissions[students[1]?.username ?? ""]?.[essay],
+		"Meu caso base cobre listas de um elemento, deveria valer algum ponto.",
+	);
+	await db.regradeRequest.reject(
+		{ publicId: rejected.publicId },
+		{ reply: "O caso base precisa cobrir a lista vazia, então a nota fica." },
+		{ actor: instructor },
+	);
 }
 
 /**
@@ -4254,116 +4207,6 @@ async function seedPracticeAndSimulations(
 		"elm-soma",
 		ELM_ANSWERS.positives,
 		"SUBMIT",
-	);
-}
-
-/**
- * Seeds an exam whose grades were just released, with a regrade request in each state.
- *
- * The dev student has an open request on one wrong answer, an accepted one
- * on another, and can still ask for a regrade of the right one. Hopper's was
- * accepted with a new score and Hamilton's rejected.
- */
-async function seedRegradeExam(
-	course: Course["id"],
-	instructor: User,
-	students: { hopper: User; hamilton: User },
-): Promise<void> {
-	const exam = "test-05";
-	const student = await db.user.findOne(
-		{ username: DEV_STUDENT_USERNAME },
-		FULL_ACCESS,
-	);
-	if (!student) throw new Error("The dev student account is missing.");
-
-	await db.exam.create(
-		{
-			course,
-			slug: exam,
-			type: "EXAM",
-			status: "ONGOING",
-			title: "Test 5: regrades",
-			description: "Grades out, with regrade requests to look at.",
-			tags: ["recursion"],
-			questions: [
-				{ slug: "recursion-basics", version: "v1" },
-				{ slug: "factorial-of-five", version: "v1" },
-				{ slug: "fastest-sort", version: "v1" },
-			],
-		},
-		FULL_ACCESS,
-	);
-	const own = await answerExam(course, exam, student, {
-		"recursion-basics": "tail-call",
-		"factorial-of-five": 120,
-		"fastest-sort": "bubble",
-	});
-	const hopper = await answerExam(course, exam, students.hopper, {
-		"recursion-basics": "tail-call",
-		"factorial-of-five": 120,
-	});
-	const hamilton = await answerExam(course, exam, students.hamilton, {
-		"recursion-basics": "base-case",
-		"factorial-of-five": 25,
-	});
-
-	await db.exam.update(
-		{ course, slug: exam },
-		{
-			status: "COMPLETED",
-			scheduledAt: new Date(Date.now() - 3 * 24 * 3600 * 1000),
-			duration: { hours: 1 },
-		},
-		FULL_ACCESS,
-	);
-	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
-
-	const ask = (author: User, submission: string | undefined, message: string) =>
-		db.regradeRequest.create(
-			{ course, submission: submission ?? "", message },
-			{ actor: author },
-		);
-	await ask(
-		student,
-		own["recursion-basics"],
-		"I picked tail call because the function returns right away, please check.",
-	);
-	const ownAccepted = await ask(
-		student,
-		own["fastest-sort"],
-		"Bubble sort is O(n log n) with an early exit on sorted input, I think.",
-	);
-	await db.regradeRequest.accept(
-		{ publicId: ownAccepted.publicId },
-		{
-			score: "0.5",
-			reply:
-				"Partial credit: the early exit is real, but the worst case is not.",
-		},
-		{ actor: instructor },
-	);
-	const accepted = await ask(
-		students.hopper,
-		hopper["recursion-basics"],
-		"A tail call is a recursive call, so my answer should count.",
-	);
-	await db.regradeRequest.accept(
-		{ publicId: accepted.publicId },
-		{
-			score: "1",
-			reply: "You are right, the wording of the question was loose.",
-		},
-		{ actor: instructor },
-	);
-	const rejected = await ask(
-		students.hamilton,
-		hamilton["factorial-of-five"],
-		"I computed the factorial of four by mistake, can I get partial credit?",
-	);
-	await db.regradeRequest.reject(
-		{ publicId: rejected.publicId },
-		{ reply: "The question asks for five, so there is no partial credit." },
-		{ actor: instructor },
 	);
 }
 
