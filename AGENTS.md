@@ -83,6 +83,13 @@ a feature done, check that `src/db/bootstrap.ts` seeds examples that reach
 each of its states, and add them when it does not. A page that can only be
 seen after arranging rows by hand is not finished.
 
+Add a new state to an exam that already exists in the seed (`quiz-01`,
+`test-01` to `test-03`, `quiz-02`, `midterm`, `final`, `practice`,
+`cs201/test-trees`). A new exam is created only when the state fits in none of
+them (it needs another type, status or window), and the spec says why.
+`src/db/bootstrap.ts` stays at one exam per moment of the lifecycle, not one
+per feature.
+
 Once completed, move any implemented spec files to `dev/specs/to-review/` and
 update the changelog. If you find any bugs, create a new issue in `dev/issues/`.
 If the bug is simple, create a regression test and fix it. If it is complex, ask

@@ -42,7 +42,9 @@ humano aprovar a atual:
 4. **Telas e fluxos**: uma linha por tela, com quem acessa e o que faz.
 5. **CLI**: o que muda em `cli/` (leia `cli/AGENTS.md` antes).
 6. **Dados de dev**: o que `src/db/bootstrap.ts` precisa semear para cada
-   estado da funcionalidade.
+   estado da funcionalidade. Um estado novo entra numa prova que já existe no
+   seed. Só nasce prova nova quando o estado não cabe em nenhuma (outro tipo,
+   status ou janela), e o spec escreve o motivo.
 
 Em cada rodada:
 

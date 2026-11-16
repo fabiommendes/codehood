@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [seed, dev, exam, tests]
 relatedTo: [bootstrap, answer-edit-seed]
 ---

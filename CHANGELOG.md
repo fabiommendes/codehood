@@ -2,13 +2,23 @@
 
 ## Unreleased
 
+### Changed
+
+- Seed de dev enxuto. As 23 provas de `cs101` viraram 8 (`quiz-01`, `test-01`
+  liberada, `test-02` em correção, `test-03` aberta, `quiz-02`, `midterm`,
+  `final`, `practice`), mais `cs201/test-trees`, pronta para liberar. Os
+  estados do seed seguem os mesmos, e `test/seed-states.spec.ts` confere cada
+  um pelo que ele é. Acrescenta a tentativa expirada de `quiz-02` e a prova
+  pronta para liberar na home do professor (spec
+  `dev/specs/to-review/seed-enxuto.md`).
+
 ### Added
 
 - Pesos nas provas. O peso de uma questão é o `weight` do payload mdq da
   versão que a prova usa (1 sem ele), `ExamQuestion.weight` sai na leitura da
   prova e na REST, e o total é `Σ wᵢ·sᵢ / Σ wᵢ` na tabela de notas, no CSV e
   nas homes. A visão geral do professor lista as questões com `Qn`, tipo,
-  peso e, com tentativa fechada, média e discriminação. A prova `test-06` do
+  peso e, com tentativa fechada, média e discriminação. A prova `test-01` do
   seed pesa 3, 2 e 1. O `Qn` e os pontos da questão em 100 ("pontos: 25/100",
   sempre, mesmo sem pesos) aparecem na tela de responder e, no professor, na
   revisão da tentativa, na fila de correção, na página da questão (e no título
