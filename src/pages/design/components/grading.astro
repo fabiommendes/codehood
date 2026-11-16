@@ -12,7 +12,6 @@ import QuestionStats from "@/components/grading/QuestionStats";
 import RegradeResolve from "@/components/grading/RegradeResolve";
 import Card from "@/components/ui/Card";
 import { publicForm, scoreResponse } from "@/mdq";
-import { shortAnswer } from "@/mdq/fixtures";
 import type {
 	AnswerDistribution as Distribution,
 	QuestionStats as Stats,
@@ -20,6 +19,7 @@ import type {
 import ComponentsPage from "./_ComponentsPage.astro";
 import {
 	areaFunction,
+	capital,
 	capitals,
 	examTarget,
 	greenhouse,
@@ -31,11 +31,6 @@ export const prerender = false;
 // Only the sortable statistics table hydrates: it calls no action and does not
 // poll. The other islands render on the server only (no `client:*`), so buttons
 // look real but do nothing.
-
-const capital = shortAnswer({
-	stem: "What is the capital of Brazil?",
-	accept: [{ pattern: "Brasília" }],
-});
 
 /// The answers `Answer` shows, one for each way it can show one. No example has a submission, so a code answer shows highlighted and not runnable.
 const answers = [

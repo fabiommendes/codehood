@@ -1,6 +1,6 @@
 /// Fixtures shared by the theme pages of the component catalogue.
 
-import { essay, multipleChoice } from "@/mdq/fixtures";
+import { code, essay, multipleChoice, shortAnswer } from "@/mdq/fixtures";
 
 /**
  * Returns the current time and helpers that offset it, so a fixture is relative to the moment of the request.
@@ -295,4 +295,38 @@ export const areaFunction = essay({
 	content: "code",
 	highlight: "python",
 	answerKey: "import math\n\n\ndef area(r):\n    return math.pi * r**2",
+});
+
+/// A short answer with a single accepted answer.
+export const capital = shortAnswer({
+	stem: "What is the capital of Brazil?",
+	accept: [{ pattern: "Brasília" }],
+});
+
+/// A code question whose tests are all public, so the browser may run them as pretests.
+export const sumQuestion = code({
+	id: "sum-function",
+	title: "Sum function",
+	stem: "Write a function `add(a, b)` that returns the sum of its arguments.",
+	language: "python",
+	file: "sum.py",
+	template: "```python\ndef add(a, b):\n    pass\n```",
+	tests: [
+		{
+			format: "pytest",
+			text: [
+				"from sum import add",
+				"",
+				"# mdq: [+1] {example} Adds small numbers",
+				"def test_small():",
+				"    assert add(1, 2) == 3",
+				"",
+				"# mdq: [+1] {example} Adds large numbers",
+				"def test_large():",
+				"    assert add(10**9, 10**9) == 2 * 10**9",
+				"",
+			].join("\n"),
+		},
+	],
+	answerKey: "```python\ndef add(a, b):\n    return a + b\n```",
 });

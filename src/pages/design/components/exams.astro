@@ -1,5 +1,9 @@
 ---
+import AnswerFieldDemo from "@/components/design/AnswerFieldDemo";
+import CodeAnswerDemo from "@/components/design/CodeAnswerDemo";
+import QuestionFrameDemo from "@/components/design/QuestionFrameDemo";
 import VariantPicker from "@/components/dev/VariantPicker.astro";
+import ExamAttempt from "@/components/exam/ExamAttempt";
 import ExamExceptions, {
 	type ExceptionRow,
 } from "@/components/exam/ExamExceptions";
@@ -11,14 +15,25 @@ import ExamResults from "@/components/grading/ExamResults";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import type { Exam } from "@/db";
 import { m } from "@/i18n";
+import { publicForm, scoreResponse } from "@/mdq";
 import type { AttemptRow } from "@/services/grading";
+import { pretestSources } from "@/utils/pretest-sources";
 import {
 	formatDateTime,
 	formatDateTimeRange,
 	toLocalDateTimeInput,
 } from "@/utils/schedule-time";
 import ComponentsPage from "./_ComponentsPage.astro";
-import { clock, examTarget, selectVariants, someNone } from "./_fixtures";
+import {
+	capital,
+	capitals,
+	clock,
+	examTarget,
+	greenhouse,
+	selectVariants,
+	someNone,
+	sumQuestion,
+} from "./_fixtures";
 
 export const prerender = false;
 
@@ -198,12 +213,91 @@ const scoreStates = [
 	{ key: "negative", label: "Negative", score: -0.1 },
 ];
 
+//
+// Exam attempt: three questions over the states a student's page can show
+// without a clock or a server.
+//
+
+const attemptQuestions = [
+	{ slug: "capitals", weight: 2, question: publicForm(capitals) },
+	{ slug: "capital", weight: 1, question: publicForm(capital) },
+	{ slug: "greenhouse", weight: 1, question: publicForm(greenhouse) },
+] as never;
+const attemptAnswers = {
+	capitals: "sao-paulo",
+	capital: "Brasília",
+	greenhouse:
+		"The ground gives off infrared, and gases like CO2 absorb it and send part of it back down.",
+};
+const attemptResult = {
+	total: 0.1875,
+	questions: [
+		{
+			question: "capitals",
+			submission: "sub-1",
+			status: "graded",
+			score: -0.5,
+			comments: [],
+		},
+		{
+			question: "capital",
+			submission: "sub-2",
+			status: "graded",
+			score: 1,
+			comments: [],
+		},
+		{
+			question: "greenhouse",
+			submission: "sub-3",
+			status: "graded",
+			score: 0.75,
+			comments: ["Name the re-emission of the heat towards the surface."],
+		},
+	],
+};
+const attemptReviews = {
+	capitals: scoreResponse(capitals, "sao-paulo"),
+	capital: { score: 1, feedback: [] },
+	greenhouse: {
+		score: 0.75,
+		feedback: ["Name the re-emission of the heat towards the surface."],
+	},
+};
+const attemptRegrades = {
+	capitals: { submission: "sub-1", canRequest: true, request: null },
+	greenhouse: {
+		submission: "sub-3",
+		canRequest: false,
+		request: {
+			publicId: "req-3",
+			status: "OPEN",
+			message: "The answer does mention the heat going back down.",
+			reply: null,
+		},
+	},
+};
+const attemptStates = [
+	{
+		key: "not-open",
+		label: "Not open",
+		state: { kind: "not-open", opensAt: hours(26) },
+	},
+	{ key: "can-start", label: "Can start", state: { kind: "can-start" } },
+	{ key: "submitted", label: "Submitted", state: { kind: "submitted" } },
+	{ key: "results", label: "Results", state: { kind: "results" } },
+	{ key: "missed", label: "Missed", state: { kind: "missed" } },
+];
+
+/// The pretests and the example of the code question of the fixtures.
+const sumPretests = pretestSources(sumQuestion);
+
 /// The variants of each picker, keyed by its group, which is also its query parameter.
 const groups = {
 	"exam-exceptions": someNone,
 	results: resultStates,
 	release: releaseStates,
 	score: scoreStates,
+	attempt: attemptStates,
 };
 const selected = selectVariants(Astro.url, groups);
 
@@ -213,6 +307,10 @@ const sections = [
 	{ id: "exam-exceptions", label: "Exam exceptions" },
 	{ id: "results", label: "Exam results" },
 	{ id: "release", label: "Grade release" },
+	{ id: "question-frame", label: "Question frame" },
+	{ id: "answer-field", label: "Answer field" },
+	{ id: "code-answer", label: "Code answer" },
+	{ id: "attempt", label: "Exam attempt" },
 ];
 ---
 
@@ -337,6 +435,83 @@ const sections = [
           hidden={selected.score !== state.key}
         >
           <ReleasedScore score={state.score} releasedAt={minutes(-60 * 48)} />
+        </div>
+      ))
+    }
+  </section>
+
+  <section id="question-frame" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Question frame</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">QuestionFrame</code> holds each question of an attempt: the number and its points in the
+      side column, the title on the tab, the save state at the end of the tab and the answer in the card. The first
+      has a title and a Clear button, the second falls back to its number and the third has a long title and a
+      failed save.
+    </p>
+    <QuestionFrameDemo />
+  </section>
+
+  <section id="answer-field" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Answer field</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">AnswerField</code> frozen on the saved answer, and reviewed with its marks. Neither
+      can be edited.
+    </p>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div class="rounded-box border border-edge bg-base-100 p-5">
+        <h3 class="mb-3 text-sm font-semibold text-muted">Read-only</h3>
+        <AnswerFieldDemo question={publicForm(capitals)} payload="sao-paulo" />
+      </div>
+      <div class="rounded-box border border-edge bg-base-100 p-5">
+        <h3 class="mb-3 text-sm font-semibold text-muted">Review</h3>
+        <AnswerFieldDemo
+          question={publicForm(capitals)}
+          payload="sao-paulo"
+          review={scoreResponse(capitals, "sao-paulo")}
+        />
+      </div>
+    </div>
+  </section>
+
+  <section id="code-answer" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Code answer</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">CodeAnswer</code> with its editor. It hydrates, and "Run pretests" returns a made-up
+      report instead of calling a runner. Without <code class="font-mono">onSubmit</code> the answer has no submit
+      button; with <code class="font-mono">sends</code> it shows the counter and the sends under the editor.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Without sends</h3>
+    <div class="max-w-3xl rounded-box border border-edge bg-base-100 p-5">
+      <CodeAnswerDemo client:load question={publicForm(sumQuestion)} pretests={sumPretests} />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">With sends</h3>
+    <div class="max-w-3xl rounded-box border border-edge bg-base-100 p-5">
+      <CodeAnswerDemo client:load question={publicForm(sumQuestion)} pretests={sumPretests} withSends />
+    </div>
+  </section>
+
+  <section id="attempt" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Exam attempt</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ExamAttempt</code> in the states that need no clock and no server. It renders on the
+      server only, so nothing saves or polls. The state in progress has no example: its bar, autosave and edit
+      history are the client's, and the frame, answer field and code answer above cover the rest.
+    </p>
+    <VariantPicker group="attempt" variants={attemptStates} selected={selected.attempt} />
+    {
+      attemptStates.map((entry) => (
+        <div data-variant-group="attempt" data-variant={entry.key} hidden={selected.attempt !== entry.key}>
+          <ExamAttempt
+            {...examTarget}
+            type="EXAM"
+            state={entry.state as never}
+            now={now}
+            questions={attemptQuestions}
+            answers={attemptAnswers}
+            result={entry.key === "results" ? (attemptResult as never) : undefined}
+            reviews={entry.key === "results" ? (attemptReviews as never) : undefined}
+            regrades={entry.key === "results" ? (attemptRegrades as never) : undefined}
+          />
         </div>
       ))
     }

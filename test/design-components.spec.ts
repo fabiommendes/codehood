@@ -33,14 +33,18 @@ const pages: {
 	{
 		path: "exams",
 		sections: [
+			"Question frame",
+			"Answer field",
+			"Code answer",
+			"Exam attempt",
 			"Exam rows",
 			"Question labels",
 			"Exam exceptions",
 			"Exam results",
 			"Grade release",
 		],
-		// Only the sortable table hydrates; it calls no action and does not poll.
-		islands: ["ExamResults"],
+		// The sortable table and the code answers hydrate; none calls an action or polls, and the pretests return a made-up report.
+		islands: ["ExamResults", "CodeAnswerDemo"],
 	},
 	{
 		path: "grading",
