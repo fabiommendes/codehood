@@ -265,7 +265,7 @@ const sectionLinks = studentView
 
     {
       meetingNow && (
-        <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3">
+        <div class="mt-6 flex flex-wrap items-center gap-3 rounded-box border border-edge bg-base-100 px-4 py-3">
           <span class="font-medium">{meetingNow.title}</span>
           <span class="text-sm text-muted">{m.courses_home_happening_now()}</span>
           {meetingNowRollCall ? (
@@ -391,7 +391,7 @@ const sectionLinks = studentView
             {gradeColumns.map((column) => {
               const value = column.values[0]?.value;
               return (
-                <li class="flex items-baseline justify-between gap-4 rounded-box border border-base-300 bg-base-100 px-4 py-3">
+                <li class="flex items-baseline justify-between gap-4 rounded-box border border-edge bg-base-100 px-4 py-3">
                   <span class="font-medium">{column.title}</span>
                   <span class={value === undefined ? "text-sm text-muted" : "font-medium"}>
                     {value === undefined ? m.courses_home_no_grade() : formatGradeValue(value)}

@@ -21,7 +21,7 @@ const { course, active } = Astro.props;
       active && "pencil relative font-semibold",
     ]}
   >
-    <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
+    <CourseTile seed={course.href} size={18} class="ring-1 ring-edge" />
     <span class="flex-1 truncate">
       <span class="font-mono">{course.code}</span>
       <span class="text-muted"> · {course.edition}</span>

@@ -154,9 +154,9 @@ const layouts = [
       {
         ["codehood", "codehood-dark"].map((theme) =>
           SAMPLE_TRAILS.map((trail) => (
-            <div data-theme={theme} class="overflow-hidden rounded-box border border-base-300 text-base-content">
+            <div data-theme={theme} class="overflow-hidden rounded-box border border-edge text-base-content">
               <div class="navbar min-h-16 bg-base-100 p-0">
-                <div class="navbar-start w-64 shrink-0 justify-center self-stretch border-r border-base-300 px-4">
+                <div class="navbar-start w-64 shrink-0 justify-center self-stretch border-r border-edge px-4">
                   <Logo height={36} />
                 </div>
                 <div class="navbar-end w-auto min-w-0 flex-1 gap-2 px-4">
@@ -179,7 +179,7 @@ const layouts = [
         <div class="mb-4 flex flex-wrap gap-4">
           {SIDEBAR_PAGES.map(([label, path]) => (
             <figure class="grid gap-1">
-              <div data-theme={theme} class="h-[520px] overflow-hidden rounded-box border border-base-300 text-base-content">
+              <div data-theme={theme} class="h-[520px] overflow-hidden rounded-box border border-edge text-base-content">
                 <AppSidebar courses={SAMPLE_COURSES} currentPath={path} admin />
               </div>
               {theme === "codehood" && <figcaption class="text-xs text-muted">{label}</figcaption>}
@@ -193,7 +193,7 @@ const layouts = [
     <div class="grid gap-4 md:grid-cols-2">
       {
         ["codehood", "codehood-dark"].map((theme) => (
-          <div data-theme={theme} class="relative h-72 rounded-box border border-base-300 bg-base-100 p-4 text-base-content">
+          <div data-theme={theme} class="relative h-72 rounded-box border border-edge bg-base-100 p-4 text-base-content">
             <div class="flex justify-end">
               <UserMenu user={SAMPLE_USER} open />
             </div>
@@ -210,7 +210,7 @@ const layouts = [
     <div class="grid gap-4 md:grid-cols-2">
       {
         ["codehood", "codehood-dark"].map((theme) => (
-          <div data-theme={theme} class="rounded-box border border-base-300 bg-base-100 text-base-content">
+          <div data-theme={theme} class="rounded-box border border-edge bg-base-100 text-base-content">
             <AppFooter class="px-4" />
           </div>
         ))

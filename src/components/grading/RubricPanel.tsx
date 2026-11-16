@@ -79,7 +79,7 @@ function Group(
 			class="rounded-box border p-2"
 			classList={{
 				"border-primary": props.armed === props.unit.name,
-				"border-base-300": props.armed !== props.unit.name,
+				"border-edge": props.armed !== props.unit.name,
 			}}
 		>
 			<p id={titleId} class="flex items-center gap-2 text-sm font-semibold">
@@ -123,7 +123,7 @@ function Loose(
 	props: RubricPanelProps & { item: GraderItem; digit: string | null },
 ): JSX.Element {
 	return (
-		<label class="flex cursor-pointer items-center gap-2 rounded-box border border-base-300 p-2 text-sm">
+		<label class="flex cursor-pointer items-center gap-2 rounded-box border border-edge p-2 text-sm">
 			<input
 				type="checkbox"
 				class="checkbox checkbox-sm"

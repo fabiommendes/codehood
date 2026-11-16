@@ -116,7 +116,7 @@
 	}
 
 	.mdq-statement {
-		@apply flex items-center gap-3 rounded-box border border-base-300 p-3;
+		@apply flex items-center gap-3 rounded-box border border-edge p-3;
 	}
 	.mdq-statement[data-key="correct"] {
 		@apply border-success bg-success/10;
@@ -237,7 +237,7 @@
 	}
 
 	.mdq-panel {
-		@apply rounded-box border border-base-300 p-4;
+		@apply rounded-box border border-edge p-4;
 	}
 	.mdq-panel[data-tone="key"] {
 		@apply border-info/40 bg-info/5;
@@ -332,7 +332,7 @@
 		@apply select select-sm inline-flex w-auto items-center gap-1 text-left disabled:text-base-content;
 	}
 	.mdq-select-list {
-		@apply dropdown-content z-10 mt-1 flex w-max min-w-40 flex-col rounded-box border border-base-300 bg-base-100 p-1 shadow-lg;
+		@apply dropdown-content z-10 mt-1 flex w-max min-w-40 flex-col rounded-box border border-edge bg-base-100 p-1 shadow-lg;
 	}
 	.mdq-select-option {
 		@apply cursor-pointer rounded-field px-3 py-1.5 text-sm;
@@ -351,13 +351,13 @@
 		@apply flex flex-col gap-2;
 	}
 	.mdq-panel .mdq-ordering-list + .mdq-ordering-list {
-		@apply mt-3 border-t border-dashed border-base-300 pt-3;
+		@apply mt-3 border-t border-dashed border-edge pt-3;
 	}
 	.mdq-panel[data-tone="unused"] {
 		@apply border-dashed;
 	}
 	.mdq-ordering-line {
-		@apply flex items-center gap-3 rounded-box border border-base-300 bg-base-100 p-2;
+		@apply flex items-center gap-3 rounded-box border border-edge bg-base-100 p-2;
 	}
 	/* The level comes from the component as a custom property. */
 	.mdq-ordering-body {

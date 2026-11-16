@@ -34,17 +34,17 @@ const sections = nav?.sections.filter((s) => s.entries.length > 0) ?? [];
 <section
   data-course-card
   aria-label={course.code}
-  class="cut mx-4 mb-4 border border-base-300 bg-base-200/60"
+  class="cut mx-4 mb-4 border border-edge bg-base-200/60"
 >
   <a href={course.href} aria-current="page" class="flex items-center gap-2 px-4 pt-3 pb-2 text-sm hover:text-primary">
-    <CourseTile seed={course.href} size={18} class="ring-1 ring-base-300" />
+    <CourseTile seed={course.href} size={18} class="ring-1 ring-edge" />
     <span class="font-mono font-semibold">{course.code}</span>
     <span class="text-muted">· {course.edition}</span>
   </a>
 
   {
     (tab || nav?.context) && (
-      <div class="border-t border-base-300 px-4 pt-2.5 pb-2">
+      <div class="border-t border-edge px-4 pt-2.5 pb-2">
         {tab && <p class:list={["text-muted", nav?.context ? "text-xs" : "text-sm font-semibold text-base-content"]}>{tab}</p>}
         {nav?.context && <p class="mt-0.5 text-sm leading-snug font-semibold text-base-content">{nav.context}</p>}
       </div>
@@ -55,7 +55,7 @@ const sections = nav?.sections.filter((s) => s.entries.length > 0) ?? [];
     sections.length > 0 && (
       <div class="px-2 pb-2">
         {sections.map((section, index) => (
-          <div class:list={[index === 0 ? "mt-1" : "mt-2 border-t border-base-300 pt-2"]}>
+          <div class:list={[index === 0 ? "mt-1" : "mt-2 border-t border-edge pt-2"]}>
             {section.label && (
               <p class="flex justify-between px-2 pt-2 pb-1 text-[0.6875rem] font-medium tracking-wide text-muted uppercase">
                 <span>{section.label}</span>

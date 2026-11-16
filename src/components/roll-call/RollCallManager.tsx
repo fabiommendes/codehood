@@ -303,7 +303,7 @@ export default function RollCallManager(
 				</div>
 			</section>
 
-			<div class="overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+			<div class="overflow-hidden rounded-box border border-edge bg-base-100 shadow-sm">
 				<table class="table table-fixed">
 					<thead class="bg-base-200/50">
 						<tr>

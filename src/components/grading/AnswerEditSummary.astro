@@ -55,7 +55,7 @@ function duration(ms: number): string {
 const kinds = Object.entries(summary.kinds).filter(([, count]) => count > 0);
 ---
 
-<details class="collapse collapse-arrow mt-4 border border-base-300 bg-base-200" data-testid="answer-edit-history">
+<details class="collapse collapse-arrow mt-4 border border-edge bg-base-200" data-testid="answer-edit-history">
   <summary class="collapse-title text-sm font-semibold">{m.exams_edits_title()}</summary>
   <div class="collapse-content flex flex-col gap-3 text-sm">
     {!enabled && <p class="font-medium" data-testid="answer-edit-history-off">{m.exams_edits_off()}</p>}

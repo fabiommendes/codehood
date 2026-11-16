@@ -175,7 +175,7 @@ const stateLabel = (status: string, score: number | null): string => {
       {row.dropped && <span class="badge badge-outline badge-sm ml-2">{m.exams_attempt_dropped()}</span>}
     </h2>
 
-    <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-base-300 bg-base-100 p-6 sm:grid-cols-3">
+    <dl class="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 rounded-box border border-edge bg-base-100 p-6 sm:grid-cols-3">
       <div>
         <dt class="text-sm text-muted">{m.exams_attempt_started()}</dt>
         <dd class="mt-0.5 font-medium">{formatDateTime(row.startedAt, { year: "numeric" })}</dd>

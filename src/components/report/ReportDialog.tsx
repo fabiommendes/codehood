@@ -256,7 +256,7 @@ export default function ReportDialog(props: ReportDialogProps): JSX.Element {
 							<img
 								src={item().url}
 								alt={m.report_screenshot_alt()}
-								class="max-h-40 rounded-box border border-base-300"
+								class="max-h-40 rounded-box border border-edge"
 							/>
 							<button
 								type="button"
@@ -339,7 +339,7 @@ export default function ReportDialog(props: ReportDialogProps): JSX.Element {
 									<img
 										src={item.url}
 										alt={item.file.name}
-										class="max-h-24 rounded-box border border-base-300"
+										class="max-h-24 rounded-box border border-edge"
 									/>
 									<button
 										type="button"

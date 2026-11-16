@@ -29,7 +29,7 @@ const { href, count, of, unit, label, title, course } = Astro.props;
       <span class="mt-1.5 block font-mono text-[0.6875rem] uppercase leading-tight tracking-wider text-muted">{unit}</span>
     </div>
     <span class="sr-only">{label}</span>
-    <div class="min-w-0 flex-1 border-l border-base-300 pl-4">
+    <div class="min-w-0 flex-1 border-l border-edge pl-4">
       <p class="font-medium">{title}</p>
       <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted">
         <CourseTile seed={course.href} size={14} class="shrink-0" />

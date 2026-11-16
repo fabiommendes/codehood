@@ -62,7 +62,7 @@ export default function ReportQueue(props: ReportQueueProps): JSX.Element {
 			<Show
 				when={rows().length > 0}
 				fallback={
-					<p class="rounded-box border border-dashed border-base-300 p-8 text-center text-muted">
+					<p class="rounded-box border border-dashed border-edge p-8 text-center text-muted">
 						{m.report_queue_empty()}
 					</p>
 				}
@@ -124,7 +124,7 @@ function ReportCard(props: {
 	}
 
 	return (
-		<article class="rounded-box border border-base-300 bg-base-100 shadow-sm">
+		<article class="rounded-box border border-edge bg-base-100 shadow-sm">
 			<div class="flex flex-col gap-3 p-5">
 				<header class="flex flex-wrap items-center gap-2 text-sm">
 					<span class="badge badge-outline">
@@ -164,7 +164,7 @@ function ReportCard(props: {
 										<img
 											src={attachment.url}
 											alt={attachment.filename}
-											class="max-h-32 rounded-box border border-base-300"
+											class="max-h-32 rounded-box border border-edge"
 										/>
 									</a>
 								</li>

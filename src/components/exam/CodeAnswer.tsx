@@ -236,7 +236,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 					<For each={examples}>
 						{(example, index) => (
 							<details
-								class="collapse collapse-arrow overflow-hidden rounded-box border border-base-300 bg-base-200/50"
+								class="collapse collapse-arrow overflow-hidden rounded-box border border-edge bg-base-200/50"
 								data-example
 								data-format={example.format}
 							>
@@ -263,10 +263,10 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 			</Show>
 
 			<div
-				class="overflow-hidden rounded-box border border-base-300 bg-base-100"
+				class="overflow-hidden rounded-box border border-edge bg-base-100"
 				data-code-editor
 			>
-				<div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/50 px-3 py-1.5">
+				<div class="flex flex-wrap items-center gap-2 border-b border-edge bg-base-200/50 px-3 py-1.5">
 					<span class="font-mono text-xs">{filename}</span>
 					<span class="badge badge-ghost badge-xs">
 						{languageLabel(language)}
@@ -320,7 +320,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 					</div>
 				</div>
 				<div
-					class="border-t border-base-300 bg-base-200/50 px-3 py-1.5 text-xs text-muted"
+					class="border-t border-edge bg-base-200/50 px-3 py-1.5 text-xs text-muted"
 					data-pretest-hint={offReason() ?? "on"}
 				>
 					{offReason() === "no-runner"
@@ -486,7 +486,7 @@ export function SendRow(props: {
 	const score = () => props.weight?.score ?? report()?.score;
 	return (
 		<li
-			class="flex flex-col gap-2 rounded-box border border-base-300 px-3 py-2 text-sm"
+			class="flex flex-col gap-2 rounded-box border border-edge px-3 py-2 text-sm"
 			classList={{ "border-success/60 bg-success/5": props.weight?.counts }}
 			data-send
 			data-counts={props.weight?.counts ? "true" : undefined}
@@ -537,7 +537,7 @@ export function SendRow(props: {
 			</Show>
 			<Show when={(report()?.publicCases.length ?? 0) > 0}>
 				<ul
-					class="m-0 flex list-none flex-col divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 p-0"
+					class="m-0 flex list-none flex-col divide-y divide-edge overflow-hidden rounded-box border border-edge p-0"
 					aria-label={m.code_result_cases()}
 				>
 					<For each={report()?.publicCases}>
@@ -617,7 +617,7 @@ function PretestResult(props: {
 			</Show>
 			<Show when={props.report.status === "completed"}>
 				<ul
-					class="m-0 flex list-none flex-col divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 p-0"
+					class="m-0 flex list-none flex-col divide-y divide-edge overflow-hidden rounded-box border border-edge p-0"
 					aria-label={m.code_result_cases()}
 				>
 					<For each={props.report.cases}>

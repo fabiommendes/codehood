@@ -232,7 +232,7 @@ export default function ExamsTable(props: Props): JSX.Element {
 
 	return (
 		<Table
-			class="max-sm:[&_tbody_tr]:flex max-sm:[&_tbody_tr]:flex-wrap max-sm:[&_tbody_tr]:items-center max-sm:[&_tbody_tr]:gap-x-3 max-sm:[&_tbody_tr]:gap-y-1 max-sm:[&_tbody_tr]:px-4 max-sm:[&_tbody_tr]:py-3 max-sm:[&_thead]:sr-only max-sm:[&_td]:border-0 max-sm:[&_tbody_tr:not(:last-child)]:border-b max-sm:[&_tbody_tr]:border-base-300"
+			class="max-sm:[&_tbody_tr]:flex max-sm:[&_tbody_tr]:flex-wrap max-sm:[&_tbody_tr]:items-center max-sm:[&_tbody_tr]:gap-x-3 max-sm:[&_tbody_tr]:gap-y-1 max-sm:[&_tbody_tr]:px-4 max-sm:[&_tbody_tr]:py-3 max-sm:[&_thead]:sr-only max-sm:[&_td]:border-0 max-sm:[&_tbody_tr:not(:last-child)]:border-b max-sm:[&_tbody_tr]:border-edge"
 			columns={columns}
 			data={sorted()}
 			sort={tableSort()}

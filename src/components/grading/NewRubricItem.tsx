@@ -65,7 +65,7 @@ export default function NewRubricItem(props: NewRubricItemProps): JSX.Element {
 
 	return (
 		<form onSubmit={submit}>
-			<fieldset class="fieldset mt-3 gap-2 rounded-box border border-base-300 p-3">
+			<fieldset class="fieldset mt-3 gap-2 rounded-box border border-edge p-3">
 				<legend class="fieldset-legend">{m.grades_grader_new_item()}</legend>
 				<label class="flex flex-col gap-1 text-sm">
 					<span>{m.grades_grader_text()}</span>

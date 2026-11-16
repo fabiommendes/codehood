@@ -24,6 +24,7 @@
 	--color-base-content: #1f2a24;
 	--color-muted: #575f5a;
 	--color-field-border: #858c87;
+	--color-edge: #d3cab8;
 	--color-primary: #1b4b9b;
 	--color-primary-content: #ffffff;
 	--color-secondary: #f2b800;
@@ -68,6 +69,7 @@
 	--color-base-content: #e6f0ea;
 	--color-muted: #8fb3a4;
 	--color-field-border: #5f8a78;
+	--color-edge: #2e5446;
 	--color-primary: #4aa0ff;
 	--color-primary-content: #04121f;
 	--color-secondary: #ffc400;
@@ -103,6 +105,7 @@
 	   theme above sets the value. */
 	--color-muted: #575f5a;
 	--color-field-border: #858c87;
+	--color-edge: #d3cab8;
 	--font-sans: "Atkinson Hyperlegible", system-ui, sans-serif;
 	--font-display: "Fraunces Variable", Georgia, serif;
 	--font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -153,6 +156,22 @@ body {
 	.badge-xs {
 		font-size: 0.6875rem;
 	}
+}
+
+/* One color for every decorative edge: cards, tables, dividers, inline code.
+   DaisyUI draws .card-border in base-200, the page background, which leaves
+   cards on the page with no visible edge (1.1:1), and inline code in base-300
+   (1.2:1). Edge keeps about 1.5:1 on base-100 and base-200 in both themes. */
+@layer utilities {
+	:where(.card-border) {
+		border-color: var(--color-edge);
+	}
+}
+
+/* DaisyUI styles inline code in .prose inside a layer (and mdq.css copies it
+   into .mdq-markdown), so an unlayered rule outranks both. */
+:is(.prose, .mdq-markdown) :where(code):not(pre > code) {
+	border-color: var(--color-edge);
 }
 
 /* Fields share the card's background, so the border is their only edge and
@@ -419,7 +438,7 @@ h6 {
 	inset: 0;
 	z-index: -1;
 	pointer-events: none;
-	border: 1.2px solid var(--color-base-300);
+	border: 1.2px solid var(--color-edge);
 	border-radius: 12px 4px 14px 6px / 6px 14px 4px 12px;
 	filter: url(#pencil);
 }

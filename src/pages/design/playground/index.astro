@@ -32,7 +32,7 @@ const pages = Object.keys(import.meta.glob("./**/*.astro"))
     pages.length === 0 ? (
       <p class="text-sm text-base-content/60">Nothing in progress.</p>
     ) : (
-      <ul class="menu rounded-box border border-base-300 bg-base-100">
+      <ul class="menu rounded-box border border-edge bg-base-100">
         {pages.map((page) => (
           <li>
             <a href={page.href} class="font-mono text-sm">

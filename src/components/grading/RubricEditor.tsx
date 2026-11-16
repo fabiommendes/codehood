@@ -217,7 +217,7 @@ export default function RubricEditor(props: RubricEditorProps): JSX.Element {
 			>
 				<For each={props.items}>
 					{(item) => (
-						<li class="rounded-box border border-base-300 p-2 text-sm">
+						<li class="rounded-box border border-edge p-2 text-sm">
 							<p class="flex items-center gap-2">
 								<span
 									class="min-w-0 flex-1"

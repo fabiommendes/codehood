@@ -301,7 +301,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
       }
     </section>
 
-    <div class="mt-10 rounded-box border border-base-300 bg-base-100 p-3 sm:p-5">
+    <div class="mt-10 rounded-box border border-edge bg-base-100 p-3 sm:p-5">
       <div class="flex items-center justify-between">
         {
           hasPrev ? (
@@ -359,7 +359,7 @@ const monthLabel = new Intl.DateTimeFormat(locale, {
                   "flex h-14 flex-col items-center gap-1 rounded-field border p-1 text-sm sm:h-16",
                   dayEntries.length > 0
                     ? "border-primary/40 bg-primary/5 transition-colors hover:border-primary"
-                    : "border-base-300",
+                    : "border-edge",
                   isToday && "border-primary ring-1 ring-primary",
                 ]}
               >

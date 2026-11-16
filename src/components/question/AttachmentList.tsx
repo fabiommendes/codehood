@@ -26,7 +26,7 @@ export function AttachmentList(props: AttachmentListProps): JSX.Element {
 		<Show when={props.attachments && props.attachments.length > 0}>
 			<section
 				aria-label={m.common_attachments()}
-				class="my-3 rounded-box border border-base-300 bg-base-200/50 p-3"
+				class="my-3 rounded-box border border-edge bg-base-200/50 p-3"
 			>
 				<p class="mb-2 text-xs font-semibold uppercase text-muted">
 					{m.common_attachments()}

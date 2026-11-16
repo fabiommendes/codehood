@@ -136,7 +136,7 @@ const enabled = import.meta.env.DEV;
 
       const box = document.createElement("div");
       box.className =
-        "fixed right-4 bottom-4 z-[9999] w-80 max-h-[80vh] overflow-auto rounded-box border border-base-300 bg-base-100 text-base-content shadow-xl text-sm";
+        "fixed right-4 bottom-4 z-[9999] w-80 max-h-[80vh] overflow-auto rounded-box border border-edge bg-base-100 text-base-content shadow-xl text-sm";
       box.innerHTML = `
         <details open>
           <summary title="Arraste para mover" class="flex cursor-grab touch-none select-none items-center justify-between px-3 py-2 font-semibold">
@@ -201,11 +201,11 @@ const enabled = import.meta.env.DEV;
         input.addEventListener("input", () => set(p.kind === "range" ? Number(input.value) : input.value));
         if (p.kind === "color") {
           trigger.type = "button";
-          trigger.className = "h-8 w-full cursor-pointer rounded border border-base-300";
+          trigger.className = "h-8 w-full cursor-pointer rounded border border-edge";
           trigger.setAttribute("aria-label", name.textContent);
           trigger.setAttribute("aria-expanded", "false");
           const pop = document.createElement("div");
-          pop.className = "hidden flex-col gap-2 rounded border border-base-300 bg-base-200 p-2";
+          pop.className = "hidden flex-col gap-2 rounded border border-edge bg-base-200 p-2";
           const toggle = (open: boolean) => {
             pop.classList.toggle("hidden", !open);
             pop.classList.toggle("flex", open);
@@ -220,7 +220,7 @@ const enabled = import.meta.env.DEV;
               b.type = "button";
               b.title = `${g.group}: ${n} ${c}`;
               b.setAttribute("aria-label", b.title);
-              b.className = "size-5 rounded border border-base-300 hover:scale-125 transition-transform";
+              b.className = "size-5 rounded border border-edge hover:scale-125 transition-transform";
               b.style.background = c;
               b.addEventListener("click", () => {
                 set(c);

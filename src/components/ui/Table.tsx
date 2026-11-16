@@ -85,7 +85,7 @@ const classes = (...names: (string | false | undefined)[]): string =>
 export default function Table<T>(props: TableProps<T>): JSX.Element {
 	const containerClass = () =>
 		classes(
-			"overflow-x-auto rounded-box border border-base-300 bg-base-100",
+			"overflow-x-auto rounded-box border border-edge bg-base-100",
 			props.shadow !== false && "shadow-sm",
 			props.class,
 		);

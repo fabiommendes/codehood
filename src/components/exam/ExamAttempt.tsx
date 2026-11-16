@@ -1452,7 +1452,7 @@ function AttemptBar(props: AttemptBarProps): JSX.Element {
 	);
 
 	return (
-		<div class="sticky top-16 z-20 -mx-4 border-b border-base-300 bg-base-100 px-4 py-3">
+		<div class="sticky top-16 z-20 -mx-4 border-b border-edge bg-base-100 px-4 py-3">
 			<div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
 				<Show
 					when={props.seconds !== null}
@@ -1736,7 +1736,7 @@ function Outcome(props: {
 	return (
 		<Show when={props.outcome}>
 			{(outcome) => (
-				<div class="mt-2 border-t border-base-300 pt-3">
+				<div class="mt-2 border-t border-edge pt-3">
 					<p class="font-semibold">
 						<Switch>
 							<Match when={outcome().status === "graded"}>

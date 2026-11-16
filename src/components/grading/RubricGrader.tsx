@@ -328,7 +328,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 			<Show
 				when={!finished()}
 				fallback={
-					<section class="rounded-box border border-base-300 p-4">
+					<section class="rounded-box border border-edge p-4">
 						<h3 class="font-semibold">{m.grades_queue_done()}</h3>
 						<div class="mt-3 flex gap-2">
 							<a href={props.queueHref} class="btn btn-primary btn-sm">
@@ -347,7 +347,7 @@ export default function RubricGrader(props: RubricGraderProps): JSX.Element {
 			>
 				<section
 					aria-label={m.grades_grader_rubric()}
-					class="rounded-box border border-base-300 bg-base-100 p-3"
+					class="rounded-box border border-edge bg-base-100 p-3"
 				>
 					<div class="mb-2 flex items-center justify-between gap-2">
 						<h3 class="font-semibold">{m.grades_grader_rubric()}</h3>

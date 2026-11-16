@@ -696,13 +696,13 @@ const triagedReport: ReportRow = {
   <div class="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10">
     <nav aria-label="Components" class="sticky top-6 self-start max-lg:hidden">
       <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Components</p>
-      <ul class="flex flex-col gap-1 border-l border-base-300">
+      <ul class="flex flex-col gap-1 border-l border-edge">
         {
           sectionLinks.map((link) => (
             <li>
               <a
                 href={`#${link.id}`}
-                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-base-300 hover:text-base-content"
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-edge hover:text-base-content"
               >
                 {link.label}
               </a>
@@ -817,7 +817,7 @@ const triagedReport: ReportRow = {
               data-variant={state.key}
               hidden={selected.projection !== state.key}
             >
-              <div class="h-[360px] w-[640px] overflow-hidden rounded-box border border-base-300">
+              <div class="h-[360px] w-[640px] overflow-hidden rounded-box border border-edge">
                 <div class="h-[720px] w-[1280px] origin-top-left scale-50 [&>main]:h-full [&>main]:max-h-full">
                   <RollCallProjector {...projector} initial={state.initial} />
                 </div>
@@ -918,7 +918,7 @@ const triagedReport: ReportRow = {
         {
           regrades.map((state) => (
             <div
-              class="max-w-xl rounded-box border border-base-300 bg-base-100 p-4"
+              class="max-w-xl rounded-box border border-edge bg-base-100 p-4"
               data-variant-group="regrades"
               data-variant={state.key}
               hidden={selected.regrades !== state.key}
@@ -928,7 +928,7 @@ const triagedReport: ReportRow = {
           ))
         }
         <h3 class="mt-10 mb-3 text-xl font-semibold">Instructor resolving a request</h3>
-        <div class="max-w-xl rounded-box border border-base-300 bg-base-100 p-4">
+        <div class="max-w-xl rounded-box border border-edge bg-base-100 p-4">
           <RegradeResolve {...examTarget} request="req-2" />
         </div>
       </section>

@@ -568,7 +568,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const progressBar = () => (
 		<Show when={state().phase === "preparing" && state().progress}>
 			<div
-				class={`flex items-center gap-3 px-3 py-2 text-xs ${minimal ? "" : "border-b border-base-300 bg-base-200/30"}`}
+				class={`flex items-center gap-3 px-3 py-2 text-xs ${minimal ? "" : "border-b border-edge bg-base-200/30"}`}
 			>
 				<span class="shrink-0">{m.runner_downloading()}</span>
 				<progress
@@ -588,7 +588,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			{(message) => (
 				<p
 					role="status"
-					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${minimal ? "justify-center" : "border-b border-base-300 bg-base-200/30"}`}
+					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${minimal ? "justify-center" : "border-b border-edge bg-base-200/30"}`}
 				>
 					{message()}
 				</p>
@@ -602,7 +602,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			class={
 				minimal
 					? `flex flex-col transition-[padding] duration-300 ${terminalShown() ? "" : "pb-5"}`
-					: "overflow-hidden rounded-box border border-base-300 bg-base-100"
+					: "overflow-hidden rounded-box border border-edge bg-base-100"
 			}
 			data-code-runner
 			data-submission={props.submission}
@@ -610,7 +610,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			data-phase={state().phase}
 		>
 			<Show when={!minimal}>
-				<div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/50 px-3 py-1.5">
+				<div class="flex flex-wrap items-center gap-2 border-b border-edge bg-base-200/50 px-3 py-1.5">
 					{props.toolbar}
 					<Show when={position()}>
 						{(at) => (

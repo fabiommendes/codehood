@@ -223,12 +223,12 @@ const shown = (
         ) : (
           <section
             aria-label={m.grades_question_statement()}
-            class="prose prose-sm mt-6 max-w-none rounded-box border border-base-300 bg-base-100 p-6"
+            class="prose prose-sm mt-6 max-w-none rounded-box border border-edge bg-base-100 p-6"
             set:html={statementHtml}
           />
         )
       ) : (
-        <details class="mt-4 rounded-box border border-base-300 bg-base-100">
+        <details class="mt-4 rounded-box border border-edge bg-base-100">
           <summary class="cursor-pointer px-4 py-2 text-sm font-medium">{m.grades_grader_questions()}</summary>
           <div class="p-4">
             {hasKey ? (

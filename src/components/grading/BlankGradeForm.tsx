@@ -79,7 +79,7 @@ export default function BlankGradeForm(
 			<FormAlert error={error()} />
 			<For each={props.blanks}>
 				{(id, index) => (
-					<fieldset class="rounded-box border border-base-300 px-4 pb-3">
+					<fieldset class="rounded-box border border-edge px-4 pb-3">
 						<legend class="px-1 font-mono text-sm">
 							{m.grades_blank_legend({ blank: id })}
 						</legend>

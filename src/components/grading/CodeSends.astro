@@ -57,7 +57,7 @@ const verdictBadge = (verdict: string): string =>
       const view = sent.report === undefined ? undefined : instructorReport(question, sent.report);
       return (
         <li
-          class:list={["flex flex-col gap-2 rounded-box border px-3 py-2 text-sm", sent.counts ? "border-success/60 bg-success/5" : "border-base-300"]}
+          class:list={["flex flex-col gap-2 rounded-box border px-3 py-2 text-sm", sent.counts ? "border-success/60 bg-success/5" : "border-edge"]}
           data-send
           data-job-state={sent.jobState ?? "none"}
           data-counts={sent.counts ? "true" : undefined}
@@ -82,7 +82,7 @@ const verdictBadge = (verdict: string): string =>
               {view.build && <pre class="m-0 overflow-x-auto rounded-box border border-error/30 bg-error/5 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap">{view.build}</pre>}
               {view.message && <p class="m-0 text-xs text-muted">{view.message}</p>}
               {view.cases.length > 0 && (
-                <ul aria-label={m.grades_code_send_cases()} class="m-0 flex list-none flex-col divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 p-0">
+                <ul aria-label={m.grades_code_send_cases()} class="m-0 flex list-none flex-col divide-y divide-edge overflow-hidden rounded-box border border-edge p-0">
                   {view.cases.map((item, caseIndex) => (
                     <li class="flex flex-col gap-1 px-3 py-2" data-case data-hidden={item.hidden ? "true" : "false"} data-verdict={item.verdict}>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1">

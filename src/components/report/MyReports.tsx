@@ -47,7 +47,7 @@ export default function MyReports(props: MyReportsProps): JSX.Element {
 		<Show
 			when={rows().length > 0}
 			fallback={
-				<p class="rounded-box border border-dashed border-base-300 p-8 text-center text-muted">
+				<p class="rounded-box border border-dashed border-edge p-8 text-center text-muted">
 					{m.report_mine_empty()}
 				</p>
 			}
@@ -109,7 +109,7 @@ function MyReport(props: {
 											<img
 												src={attachment.url}
 												alt={attachment.filename}
-												class="max-h-32 rounded-box border border-base-300"
+												class="max-h-32 rounded-box border border-edge"
 											/>
 										</li>
 									)}

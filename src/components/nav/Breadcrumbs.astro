@@ -31,7 +31,7 @@ const { trail, static: isStatic = false } = Astro.props;
             {crumb.href ? (
               crumb.tile ? (
                 <a href={crumb.href} aria-label={crumb.label} title={crumb.label}>
-                  <CourseTile seed={crumb.tile} size={18} class="ring-1 ring-base-300" />
+                  <CourseTile seed={crumb.tile} size={18} class="ring-1 ring-edge" />
                 </a>
               ) : (
                 <a href={crumb.href}>{crumb.label}</a>

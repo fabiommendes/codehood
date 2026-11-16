@@ -499,14 +499,14 @@ const sectionLinks = [
       <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
         Question types
       </p>
-      <ul class="flex flex-col gap-1 border-l border-base-300">
+      <ul class="flex flex-col gap-1 border-l border-edge">
         {
           sectionLinks.map((link) => (
             <li>
               <a
                 href={`#${link.id}`}
                 data-section-link={link.id}
-                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-base-300 hover:text-base-content aria-current:border-primary aria-current:font-semibold aria-current:text-primary"
+                class="-ml-px block border-l-2 border-transparent py-1 pl-3 text-sm text-muted transition-colors hover:border-edge hover:text-base-content aria-current:border-primary aria-current:font-semibold aria-current:text-primary"
               >
                 {link.label}
               </a>

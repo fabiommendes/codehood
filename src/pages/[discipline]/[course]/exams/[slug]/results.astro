@@ -62,7 +62,7 @@ const examHref = `${href}/exams/${exam.slug}`;
       data.pending > 0 && (
         <div
           role="status"
-          class="mt-4 flex items-center justify-between gap-4 rounded-box border border-base-300 bg-base-200 p-4 text-sm"
+          class="mt-4 flex items-center justify-between gap-4 rounded-box border border-edge bg-base-200 p-4 text-sm"
         >
           <span>{m.exams_detail_pending_banner({ phase: examPhaseLabels[phase], count: data.pending })}</span>
           <a href={`${examHref}/grading`} class="btn btn-primary btn-sm">{m.exams_detail_grade_answers()}</a>

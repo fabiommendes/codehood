@@ -97,7 +97,7 @@ export default function ColorTuner(props: {
 			.join(" ");
 
 	return (
-		<div class="fixed right-4 bottom-4 z-50 w-80 rounded-box border border-base-300 bg-base-100 text-sm shadow-xl">
+		<div class="fixed right-4 bottom-4 z-50 w-80 rounded-box border border-edge bg-base-100 text-sm shadow-xl">
 			<button
 				type="button"
 				class="flex w-full items-center justify-between px-4 py-2 font-semibold"
@@ -106,14 +106,14 @@ export default function ColorTuner(props: {
 				Color tuner <span class="text-muted">{open() ? "−" : "+"}</span>
 			</button>
 			<Show when={open()}>
-				<div class="flex flex-col gap-3 border-t border-base-300 px-4 py-3">
+				<div class="flex flex-col gap-3 border-t border-edge px-4 py-3">
 					<For each={props.colors}>
 						{(color) => (
 							<div class="flex flex-col gap-1">
 								<span class="text-xs text-muted">{color.label}</span>
 								<div class="flex items-center gap-2">
 									<span
-										class="size-5 shrink-0 rounded border border-base-300"
+										class="size-5 shrink-0 rounded border border-edge"
 										style={{ background: `var(${color.name})` }}
 									/>
 									<select

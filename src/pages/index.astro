@@ -67,7 +67,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
 
 <Layout title={m.auth_home_title()}>
   <div class="min-h-screen text-base-content">
-    <header class="border-b border-base-300">
+    <header class="border-b border-edge">
       <div class="wrap flex items-center justify-between py-3">
         <a href="#top" aria-label={m.auth_home_logo_label()}><Logo height={40} /></a>
         <div class="flex items-center gap-2">
@@ -94,7 +94,7 @@ const features: { scene: SceneName; title: string; body: string }[] = [
 
         <div class="relative">
           <HeroScene />
-          <div class="terminal card tape tilt-r absolute border border-base-300 -bottom-6 left-2 w-64 p-4 sm:left-6 sm:w-72">
+          <div class="terminal card tape tilt-r absolute border border-edge -bottom-6 left-2 w-64 p-4 sm:left-6 sm:w-72">
             <pre><span class="prompt">$</span> codehood init
 <span class="quiet">created course/</span>
 <span class="prompt">$</span> codehood push
@@ -168,16 +168,16 @@ const features: { scene: SceneName; title: string; body: string }[] = [
             <span role="tab" class="tab">{m.auth_home_demo_tab_schedule()}</span>
           </div>
           <ul class="mt-4 grid gap-3">
-            <li class="flex items-center gap-3 rounded-field border border-base-300 p-3">
+            <li class="flex items-center gap-3 rounded-field border border-edge p-3">
               <span class="badge badge-success">{m.auth_home_demo_open_now()}</span>
               <span class="flex-1">{m.auth_home_demo_quiz3()}</span>
               <span class="btn btn-primary btn-sm">{m.auth_home_demo_start()}</span>
             </li>
-            <li class="flex items-center gap-3 rounded-field border border-base-300 p-3">
+            <li class="flex items-center gap-3 rounded-field border border-edge p-3">
               <span class="badge badge-ghost">{m.auth_home_demo_in_2_days()}</span>
               <span class="flex-1">{m.auth_home_demo_midterm()}</span>
             </li>
-            <li class="flex items-center gap-3 rounded-field border border-base-300 p-3">
+            <li class="flex items-center gap-3 rounded-field border border-edge p-3">
               <span class="badge badge-accent">{m.auth_home_demo_graded()}</span>
               <span class="flex-1">{m.auth_home_demo_quiz2()}</span>
             </li>

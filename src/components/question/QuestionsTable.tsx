@@ -535,7 +535,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 						</Show>
 					</button>
 					<Show when={typeMenuOpen()}>
-						<div class="dropdown-content z-10 mt-1 flex w-56 flex-col gap-1 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+						<div class="dropdown-content z-10 mt-1 flex w-56 flex-col gap-1 rounded-box border border-edge bg-base-100 p-2 shadow-lg">
 							<For each={TYPE_OPTIONS}>
 								{(type) => (
 									<label class="flex cursor-pointer items-center gap-2 rounded-field px-2 py-1 text-sm hover:bg-base-200">
@@ -578,7 +578,7 @@ export default function QuestionsTable(props: Props): JSX.Element {
 							</Show>
 						</button>
 						<Show when={tagMenuOpen()}>
-							<div class="dropdown-content z-10 mt-1 flex w-56 flex-col gap-1 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+							<div class="dropdown-content z-10 mt-1 flex w-56 flex-col gap-1 rounded-box border border-edge bg-base-100 p-2 shadow-lg">
 								<For each={availableTags()}>
 									{(tag) => (
 										<label class="flex cursor-pointer items-center gap-2 rounded-field px-2 py-1 text-sm hover:bg-base-200">

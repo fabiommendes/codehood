@@ -152,11 +152,11 @@ const themes = [
         <h2 class="mb-5 text-xl font-semibold">{group.title}</h2>
         <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {themes.map((theme) => (
-            <div data-theme={theme.id} class="rounded-box border border-base-300 bg-base-200 p-4">
+            <div data-theme={theme.id} class="rounded-box border border-edge bg-base-200 p-4">
               <p class="mb-3 text-sm font-semibold text-base-content">{theme.title}</p>
               <div class="flex flex-col gap-3">
                 {group.tokens.map((token) => (
-                  <div class:list={["rounded-box p-4", token.bg, token.fg, token.bg === "bg-base-300" && "border border-base-300"]}>
+                  <div class:list={["rounded-box p-4", token.bg, token.fg, token.bg === "bg-base-300" && "border border-edge"]}>
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                       <p class="font-medium">{token.name}</p>
                       <p class="text-sm">{token.role}</p>
@@ -179,7 +179,7 @@ const themes = [
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {
         themes.map((theme) => (
-          <div data-theme={theme.id} class="rounded-box border border-base-300 bg-base-200 p-4 text-base-content">
+          <div data-theme={theme.id} class="rounded-box border border-edge bg-base-200 p-4 text-base-content">
             <p class="mb-3 text-sm font-semibold">{theme.title}</p>
             <div class="card card-border bg-base-100">
               <div class="card-body gap-2">
@@ -224,14 +224,14 @@ const themes = [
       </li>
     </ul>
     <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div data-theme="codehood" class="rounded-box border border-base-300 bg-base-200 p-4">
+      <div data-theme="codehood" class="rounded-box border border-edge bg-base-200 p-4">
         <p class="mb-2 text-xs text-muted">Light, fills (correct)</p>
         <div class="flex flex-wrap gap-2">
           <span class="badge badge-secondary">secondary</span>
           <span class="badge badge-warning">warning</span>
         </div>
       </div>
-      <div data-theme="codehood" class="rounded-box border border-base-300 bg-base-200 p-4">
+      <div data-theme="codehood" class="rounded-box border border-edge bg-base-200 p-4">
         <p class="mb-2 text-xs text-muted">Light, as text (never)</p>
         <p class="text-secondary line-through">secondary text</p>
         <p class="text-warning line-through">warning text</p>
