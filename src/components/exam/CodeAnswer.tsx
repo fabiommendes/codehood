@@ -56,8 +56,8 @@ export interface CodeAnswerProps {
 	runnerOrigin?: string | null;
 	/// The highlighted HTML of each example test, in the order of the `{example}` tests of `question.publicTests`, from `highlightExamples`. Trusted: never user HTML. Plain text shows without it.
 	exampleHtml?: readonly string[];
-	/// Sends the code to the grading queue, or rejects with the reason it was refused. The host passes it only for a question with a worker, and saves the answer first.
-	onSubmit?: (code: string) => Promise<void>;
+	/// Sends the code to the grading queue, or rejects with the reason it was refused. Resolves with `"duplicate"` when that code was already sent and nothing was spent. The host passes it only for a question with a worker, and saves the answer first.
+	onSubmit?: (code: string) => Promise<"duplicate" | undefined>;
 	/// The counter and the list of sends shown under the editor, kept up to date by the host.
 	sends?: CodeSends;
 	/// Runs the pretests; the browser runner by default. Tests inject their own.
@@ -184,8 +184,14 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 		setSending(true);
 		setNotice(null);
 		try {
-			await send(code());
-			setNotice({ kind: "sent", text: m.code_submit_sent() });
+			const outcome = await send(code());
+			setNotice({
+				kind: "sent",
+				text:
+					outcome === "duplicate"
+						? m.code_submit_duplicate()
+						: m.code_submit_sent(),
+			});
 		} catch (error) {
 			const text = error instanceof Error ? error.message : String(error);
 			setNotice({ kind: "refused", text });

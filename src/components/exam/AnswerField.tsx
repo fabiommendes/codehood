@@ -30,7 +30,7 @@ export interface AnswerFieldProps {
 	/// The sends of a code question that goes to a worker; without it the question has no submit button.
 	sends?: CodeSends;
 	/// Sends the code of the question to its worker.
-	onSubmit?: (code: string) => Promise<void>;
+	onSubmit?: (code: string) => Promise<"duplicate" | undefined>;
 	/// Origin of the runner iframe the pretests run in.
 	runnerOrigin?: string | null;
 	/// The download URL of an attachment of the question by name; without it the list has no download links.

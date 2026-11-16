@@ -161,3 +161,8 @@ export const responseSubmit = z.object({
 	startedAt: instant.nullish(),
 	automaticallyTriggered: z.boolean().optional(),
 });
+
+/// What `response.submit` answers: the attempt, and whether the code sent was already sent, so nothing was queued or spent.
+export const responseSubmitted = responseSchema.extend({
+	duplicate: z.boolean(),
+});

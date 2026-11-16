@@ -74,6 +74,7 @@ export const exam = {
 			// The page measures its clock offset from this stamp.
 			return {
 				serverNow: Date.now(),
+				duplicate: response.duplicate,
 				...(answerHistory === undefined ? {} : { answerHistory }),
 				...(sends === undefined ? {} : { sends }),
 			};

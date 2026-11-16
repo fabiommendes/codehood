@@ -3235,6 +3235,11 @@ const ELM_ANSWERS = {
 		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    case xs of\n        [] ->\n            0\n\n        x :: _ ->\n            x\n",
 	positives:
 		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    List.sum (List.filter (\\x -> x > 0) xs)\n",
+	/// `firstOnly` and `positives` with a comment, for a student who sends them again: an identical send would not count.
+	firstOnlyAgain:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    -- again\n    case xs of\n        [] ->\n            0\n\n        x :: _ ->\n            x\n",
+	positivesAgain:
+		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    -- again\n    List.sum (List.filter (\\x -> x > 0) xs)\n",
 	correct:
 		"module Main exposing (soma)\n\n\nsoma : List Int -> Int\nsoma xs =\n    List.foldl (+) 0 xs\n",
 	unfinished:
@@ -3442,8 +3447,8 @@ async function seedExternalGradingExams(
 	for (const [payload, verdicts] of [
 		[ELM_ANSWERS.firstOnly, noHidden],
 		[ELM_ANSWERS.positives, partial],
-		[ELM_ANSWERS.firstOnly, noHidden],
-		[ELM_ANSWERS.positives, partial],
+		[ELM_ANSWERS.firstOnlyAgain, noHidden],
+		[ELM_ANSWERS.positivesAgain, partial],
 	] as const) {
 		await sendAndGrade(exam, students.thompson, payload, verdicts);
 	}

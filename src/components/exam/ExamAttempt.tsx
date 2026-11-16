@@ -427,8 +427,11 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		...sendsNow(),
 	});
 
-	/// Saves the pending answers, then sends the code of `slug` to its worker; throws the reason it was refused.
-	async function submitCode(slug: string, code: string): Promise<void> {
+	/// Saves the pending answers, then sends the code of `slug` to its worker; throws the reason it was refused, and answers `"duplicate"` when the server already had that code.
+	async function submitCode(
+		slug: string,
+		code: string,
+	): Promise<"duplicate" | undefined> {
 		if (!(await flush())) throw new Error(m.exams_attempt_connection_failed());
 		const { data, error } = await actions.exam.answer({
 			...target,
@@ -443,6 +446,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 		} else {
 			await refreshSends([slug]);
 		}
+		return data.duplicate ? "duplicate" : undefined;
 	}
 
 	/// Asks the server for the sends of `slugs` again, ignoring a question it cannot read.

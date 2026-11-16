@@ -114,6 +114,18 @@
   campos novos vem em seguida. Spec em
   `dev/specs/to-review/datas-de-curso-como-data.md`.
 
+### Fixed
+
+- Enviar duas vezes o mesmo código de uma questão de código não conta mais um
+  envio a mais. Se o texto é idêntico ao de qualquer envio anterior da questão
+  na tentativa (não só o último, então A, B, A não paga o terceiro) e o job
+  dele está na fila, rodando ou concluído, `response.submit` não cria submissão
+  nem job, não consome tentativa nem gera desconto, e a tela mostra "Este
+  código já foi enviado" com o resultado existente. Vale também para prática e
+  para a simulação do professor, onde evita trabalho repetido no worker. Um
+  job `FAILED` ou `CANCELLED` não tem resultado para mostrar: o reenvio
+  idêntico cria um job novo (não gasta tentativa, pois só job `DONE` gasta).
+
 ### Migração
 
 `Response.preview` é uma coluna nova, `BOOLEAN NOT NULL DEFAULT false`: a

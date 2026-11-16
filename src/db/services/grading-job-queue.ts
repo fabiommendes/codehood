@@ -69,12 +69,56 @@ export async function countSpentSends(
 	);
 }
 
+/// The text of a payload in one stable form: object keys sorted at every depth, arrays kept in order.
+function canonicalPayload(value: unknown): string {
+	const sorted = (node: unknown): unknown => {
+		if (Array.isArray(node)) return node.map(sorted);
+		if (node !== null && typeof node === "object") {
+			return Object.fromEntries(
+				Object.entries(node)
+					.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+					.map(([key, item]) => [key, sorted(item)]),
+			);
+		}
+		return node;
+	};
+	return JSON.stringify(sorted(value)) ?? "null";
+}
+
+/**
+ * The earlier send of the question whose code is the same as `payload`, if its job is still alive or finished.
+ *
+ * Any send of the attempt counts, not only the last. A send whose job `FAILED` (infrastructure) or was `CANCELLED` (replaced before it ran) has no result to show, so it never matches: sending again must queue a new job.
+ */
+async function findSentTwin(
+	tx: PrismaTx,
+	target: SendTarget,
+	payload: Prisma.InputJsonValue,
+): Promise<number | null> {
+	const wanted = canonicalPayload(payload);
+	const sent = await tx.submission.findMany({
+		where: {
+			responseId: target.responseId,
+			questionId: target.questionId,
+			kind: { in: ["SUBMIT", "FINAL"] },
+			gradingJob: { state: { in: ["QUEUED", "CLAIMED", "DONE"] } },
+		},
+		select: { id: true, payload: true },
+		orderBy: { id: "desc" },
+	});
+	return (
+		sent.find((row) => canonicalPayload(row.payload) === wanted)?.id ?? null
+	);
+}
+
 /**
  * Stores a `SUBMIT` or `FINAL` submission together with its queued job, and
  * cancels the job no worker holds for the same question: one still queued, or
  * one whose lease ran out.
  *
- * Returns the id of the new submission.
+ * When an earlier send of the question carries the same code and its job is queued, running or done, nothing is stored or cancelled, no send is spent, and that send's id comes back with `duplicate`.
+ *
+ * Returns the id of the submission that stands for the send.
  *
  * @throws {@link NotAllowed} 409, when a worker holds the previous job or the sends are spent.
  */
@@ -83,7 +127,10 @@ export async function enqueueGradingJob(
 	target: SendTarget,
 	worker: string,
 	submission: SendSubmission,
-): Promise<number> {
+): Promise<{ id: number; duplicate: boolean }> {
+	const twin = await findSentTwin(tx, target, submission.payload);
+	if (twin !== null) return { id: twin, duplicate: true };
+
 	const open = await tx.gradingJob.findMany({
 		where: {
 			state: { in: ["QUEUED", "CLAIMED"] },
@@ -138,7 +185,7 @@ export async function enqueueGradingJob(
 			{},
 		);
 	}
-	return created.id;
+	return { id: created.id, duplicate: false };
 }
 
 /**

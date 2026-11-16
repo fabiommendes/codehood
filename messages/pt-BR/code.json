@@ -27,6 +27,7 @@
 	"code_submit_worth": "O próximo envio vale até {worth}",
 	"code_submit_sending": "Enviando…",
 	"code_submit_sent": "Enviado, aguardando correção.",
+	"code_submit_duplicate": "Este código já foi enviado; mostrando o resultado anterior.",
 	"code_submit_used": "{used} envios usados",
 	"code_submit_used_of": "{used} de {limit} envios usados",
 	"code_send_title": "Envio {n}",

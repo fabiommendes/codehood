@@ -27,6 +27,7 @@
 	"code_submit_worth": "The next send is worth up to {worth}",
 	"code_submit_sending": "Sending…",
 	"code_submit_sent": "Sent, waiting to be graded.",
+	"code_submit_duplicate": "This code was already sent; showing the previous result.",
 	"code_submit_used": "{used} submissions used",
 	"code_submit_used_of": "{used} of {limit} submissions used",
 	"code_send_title": "Send {n}",

@@ -32,6 +32,7 @@ import {
 	responseSchema,
 	responseSettleExpired,
 	responseSubmit,
+	responseSubmitted,
 	responseUpdate,
 } from "@/core/schemas";
 import type { ServiceOptsWithoutTx } from "@/db/base-service";
@@ -707,6 +708,10 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	 * that both halves land together. Answering the same question again
 	 * appends a second submission rather than replacing the first.
 	 *
+	 * A `SUBMIT` whose code equals an earlier send of the question in the
+	 * attempt (see `enqueueGradingJob`) appends nothing and spends nothing; the
+	 * answer carries `duplicate: true`.
+	 *
 	 * @throws {@link InvalidData}
 	 * If the attempt is closed to new submissions, its exam is not open,
 	 * its deadline has passed, or the question is not one the exam carries.
@@ -714,12 +719,12 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 	 */
 	const submit = op({
 		args: [responseSubmit],
-		returns: responseSchema,
+		returns: responseSubmitted,
 		run: async (
 			tx: PrismaTx,
 			input: ResponseSubmit,
 			opts: ServiceOptsWithoutTx,
-		): Promise<Response> => {
+		): Promise<Response & { duplicate: boolean }> => {
 			const row = await resolveOrCreateAttempt(
 				tx,
 				{
@@ -745,13 +750,14 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 				input.payload,
 			);
 
+			let duplicate = false;
 			if (input.kind === "SUBMIT") {
 				if (question.type !== "CODE" || !question.worker) {
 					throw new InvalidData({
 						kind: [{ code: "invalid", message: m.errors_code_not_sendable() }],
 					});
 				}
-				await enqueueGradingJob(
+				({ duplicate } = await enqueueGradingJob(
 					tx,
 					{
 						responseId: row.id,
@@ -766,7 +772,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 						startedAt: input.startedAt,
 						automaticallyTriggered: input.automaticallyTriggered,
 					},
-				);
+				));
 			} else {
 				await invalidIfExists(tx.submission.create, {
 					data: {
@@ -782,7 +788,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 
 			// The submissions are part of the response, so appending one moves its
 			// version. A student's save carries no expectation and never fails on one.
-			await touch(tx, "response", { id: row.id }, {});
+			if (!duplicate) await touch(tx, "response", { id: row.id }, {});
 
 			const updated = valueOrNotFound(
 				"response",
@@ -791,7 +797,7 @@ export const makeResponseService = defineService<ResponseT>()(() => {
 					include: responseInclude(),
 				}),
 			);
-			return fromDb(updated);
+			return { ...fromDb(updated), duplicate };
 		},
 	});
 
