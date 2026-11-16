@@ -169,9 +169,25 @@ body {
 }
 
 /* DaisyUI styles inline code in .prose inside a layer (and mdq.css copies it
-   into .mdq-markdown), so an unlayered rule outranks both. */
-:is(.prose, .mdq-markdown) :where(code):not(pre > code) {
-	border-color: var(--color-edge);
+   into .mdq-markdown), so an unlayered rule outranks both. Its base-200 fill
+   vanishes on a base-200 page; a translucent tint of base-content shades
+   whatever lies under it (base-100, base-200/50, a card), darker in the light
+   theme and lighter in the dark one. Inline Markdown (choices) gets it too. */
+:is(.prose, .mdq-markdown) :where(code):not(pre > code, .code-block code) {
+	background-color: color-mix(
+		in oklab,
+		var(--color-base-content) 7%,
+		transparent
+	);
+	border: var(--border) solid var(--color-edge);
+	border-radius: var(--radius-selector);
+	padding-block: 0.1em;
+	padding-inline: 0.35em;
+	font-weight: inherit;
+}
+:is(.prose, .mdq-markdown) :where(code):not(pre > code)::before,
+:is(.prose, .mdq-markdown) :where(code):not(pre > code)::after {
+	content: none;
 }
 
 /* Fields share the card's background, so the border is their only edge and
