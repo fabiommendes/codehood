@@ -521,7 +521,9 @@ test("settleExpired and gradeObjectives grade nothing of a simulation whose time
 	);
 	expect(
 		await prisma.feedback.count({
-			where: { submission: { response: { preview: true } } },
+			where: {
+				submission: { response: { preview: true, examId: world.exam.id } },
+			},
 		}),
 	).toBe(0);
 });
@@ -563,7 +565,9 @@ test("claiming sends the unsent autosave of a student whose time ran out, and ne
 	expect(await sentBy({ preview: true })).toBe(0);
 	expect(
 		await prisma.gradingJob.count({
-			where: { submission: { response: { preview: true } } },
+			where: {
+				submission: { response: { preview: true, examId: world.exam.id } },
+			},
 		}),
 	).toBe(0);
 });
