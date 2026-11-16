@@ -98,23 +98,40 @@ Estado do código que a spec parte:
   `enrollment.service.create` (usado pela redenção de convite em
   `src/actions/auth.ts` e por `src/actions/course.ts`), a entrada por
   passphrase (`passphrase.service.ts`) e o check-in que age como convite
-  (`roll-call.service.ts`). A guarda é uma função só, em `src/db/`, chamada
-  pelos três.
+  (`roll-call.service.ts`). `enrollment.service.create` e o check-in chamam
+  a mesma guarda (`src/db/enrollment-guard.ts`). A passphrase mantém a
+  guarda equivalente que já tinha, com o erro `PassphraseError("own_course")`.
 - R2. `pnpm run manage check-instructor-enrollments` lista as matrículas em
   que `username` é o instrutor do curso, com contagem de tentativas, e sai
   com código 1 quando há alguma. Com `--fix`, remove as que não têm
   tentativa. As que têm ficam para decisão manual.
-- R3. `course.service.update`, ao trocar o instrutor para alguém matriculado
-  no curso, é recusado com a mesma mensagem.
+- R3. Removida: nenhum caminho troca o instrutor de um curso. Ele faz parte
+  da chave natural do curso, e `courseUpdate` não o aceita. Uma troca por SQL
+  direto aparece no comando de R2.
 
 ### Correção automática de objetivas
 
 - R4. Ao fechar uma tentativa (`finish`, `update`/`upsert` com
-  `acceptingSubmissions: false`, e o fechamento por tempo), o servidor
-  corrige a submissão que conta de cada questão cujo tipo `scoreResponse`
-  aceita: grava um `Feedback` sem `graderId` com a nota e marca a submissão
-  `GRADED_AUTOMATICALLY`. Questões `code`, e as que lançam `NotAutoGradable`,
-  ficam como estão.
+  `acceptingSubmissions: false`), o servidor corrige a submissão que conta de
+  cada questão cujo tipo `scoreResponse` aceita: grava um `Feedback` sem
+  `graderId` com a nota e marca a submissão `GRADED_AUTOMATICALLY`. Questões
+  `code`, e as que lançam `NotAutoGradable`, ficam como estão.
+- R4a. Nenhum fluxo fecha uma tentativa quando o tempo dela acaba. A
+  tentativa expirada e nunca entregue é corrigida por
+  `response.settleExpired({ course, exam, author? })`, que aplica R4 às
+  tentativas fechadas ou com o tempo esgotado (`attemptTimedOut`) e não mexe
+  em `acceptingSubmissions`: se o professor conceder tempo extra depois, o
+  aluno continua, e a resposta nova é corrigida na passada seguinte (R7). O
+  instrutor do curso a chama para todos; o aluno, só para si. Ela é
+  idempotente e sai cedo, com uma consulta, quando não há o que corrigir.
+- R4b. `settleExpired` é chamada por `loadExamStaffData` e `loadGrading`
+  antes de lerem as tentativas, pela página da prova do aluno para a própria
+  tentativa quando o estado é `submitted` ou `results`, e por
+  `exam.releaseGrades` dentro da transação, antes de calcular o bloqueio. O
+  comando `grade-objectives` usa o mesmo helper.
+- R4c. Limitação aceita: as homes de instrutor e aluno, a lista de provas e a
+  tabela de notas do curso não chamam `settleExpired`. Uma tentativa expirada
+  e não entregue aparece ali como pendente até alguém abrir a prova.
 - R5. Uma resposta que a biblioteca recusa (`ResponseError`) recebe 0.
 - R6. A correção usa a versão da questão que a prova fixa, a mesma de
   `reviewResult`.
@@ -167,7 +184,9 @@ Estado do código que a spec parte:
   liberação), `exam.releaseGrades`, `loadGrading` e a fila de correção,
   `courseGrades` e o CSV, as homes de instrutor e aluno, a lista de provas,
   pedidos de revisão, contagens de uso de rubrica, `answer-history-stats`,
-  `gradingJob.forInstructor`, `promoteExpiredSends`, e as listagens REST de
+  `gradingJob.forInstructor`, `promoteExpiredSends`,
+  `response.gradeObjectives` e `response.settleExpired` (a simulação é
+  corrigida ao ser entregue, nunca por eles), e as listagens REST de
   respostas, submissões e feedback.
 - R22. `feedback.create` manual numa submissão de simulação é recusado.
 
@@ -181,7 +200,7 @@ Estado do código que a spec parte:
   envio espera um worker (o estado que `CodeSends` já mostra).
 - R25. A visão geral ganha a tabela de questões: `Qn`, título com link para a
   questão no curso (onde está o gabarito), tipo, peso, média e discriminação.
-  Peso só aparece quando alguma questão tem peso diferente de 1. Média e
+  Peso aparece sempre. Média e
   discriminação só aparecem quando há tentativa fechada; a discriminação
   ausente mostra o motivo, como em `QuestionStats`.
 - R26. O card (`examNav`) troca a entrada "Questões" por "Prévia", com `href`
@@ -203,7 +222,7 @@ Estado do código que a spec parte:
   `rubric-store.ts`, `answer-edit.service.ts`, `exam.service.ts`
   (`attemptResults`): R20, R22.
 - `src/db/services/enrollment.service.ts`, `passphrase.service.ts`,
-  `roll-call.service.ts`, `course.service.ts`: R1, R3.
+  `roll-call.service.ts`, `src/db/enrollment-guard.ts`: R1.
 - `src/commands/check-instructor-enrollments.ts`,
   `src/commands/grade-objectives.ts` (novos): R2, DA1.
 - `src/actions/exam.ts`: `startPreview`, `restartPreview`; as actions de
@@ -225,6 +244,10 @@ Estado do código que a spec parte:
   lista e, com `--fix`, remove só as matrículas sem tentativa.
 - Unit, correção de objetivas: cada tipo objetivo, resposta inválida, questão
   manual intocada, idempotência, nota manual por cima, reabrir e fechar.
+- Unit, tentativa expirada: sem entrega e só com objetivas, o bloqueio de
+  liberação é `null` depois do loader; `releaseGrades` passa sem ninguém
+  abrir a página; tempo extra depois da passada corrige a resposta nova; a
+  segunda chamada não grava nada.
 - Unit, simulação: abre sem matrícula e em `DRAFT`; aluno e instrutor de
   outro curso são recusados; prazo pela duração; recomeçar apaga tudo;
   envios ilimitados; `results` ao entregar.
@@ -264,13 +287,13 @@ Estado do código que a spec parte:
 
 ## Plano de ação
 
-- T1. Recusar a matrícula do instrutor (`sonnet`, TDD). R1 a R3. Sem
+- T1. Recusar a matrícula do instrutor (`sonnet`, TDD). R1 e R2. Sem
   dependências. Pronto quando os testes dos três caminhos e do comando
   passam.
 - T2. Pesos: T1 e T2 de `pesos-e-numeros-de-questao.md` (`sonnet`, TDD). Sem
   dependências. Pronto como descrito lá, com o OpenAPI regenerado.
-- T3. Correção automática de objetivas (`opus`, TDD). R4 a R9 e o comando de
-  DA1 com `--dry-run`. Sem dependências. Pronto quando os testes de unit
+- T3. Correção automática de objetivas (`opus`, TDD). R4 a R9, com R4a a
+  R4c, e o comando de DA1 com `--dry-run`. Sem dependências. Pronto quando os testes de unit
   passam e a prova semeada só de objetivas fecha sem pendências.
 - T4. Tabela de questões na visão geral (`sonnet`). R25. Depende de T2.
 - T5. Schema e service da simulação (`opus`, TDD). R10 a R18, R22. Depende de
