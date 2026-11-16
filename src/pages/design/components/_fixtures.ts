@@ -1,5 +1,7 @@
 /// Fixtures shared by the theme pages of the component catalogue.
 
+import { essay, multipleChoice } from "@/mdq/fixtures";
+
 /**
  * Returns the current time and helpers that offset it, so a fixture is relative to the moment of the request.
  *
@@ -258,3 +260,39 @@ export const attendanceReport = (() => {
 		],
 	};
 })() as never;
+
+//
+// Question documents shared with `/design/questions`.
+//
+
+/// A multiple choice with feedback on each choice.
+export const capitals = multipleChoice({
+	stem: "Which city is the capital of Brazil?",
+	choices: [
+		{ id: "brasilia", text: "Brasília", score: 1, feedback: "Correct." },
+		{ id: "rio", text: "Rio de Janeiro", score: 0 },
+		{
+			id: "sao-paulo",
+			text: "São Paulo",
+			score: -0.5,
+			feedback: "The largest city, not the capital.",
+		},
+	],
+});
+
+/// An essay answered in prose.
+export const greenhouse = essay({
+	stem: "The atmosphere is transparent to most incoming sunlight but not to the heat the surface radiates back.\n\nDescribe how the greenhouse effect works and how it affects the climate.",
+	content: "text",
+	answerKey:
+		"Sunlight passes through the atmosphere and warms the surface, which re-radiates the energy as *infrared*. Greenhouse gases absorb part of that infrared and re-emit it downwards, keeping the lower atmosphere warmer than it would otherwise be. Raising their concentration raises the equilibrium temperature.",
+	comment: "Accept any answer that names absorption and re-emission.",
+});
+
+/// An essay answered in code.
+export const areaFunction = essay({
+	stem: "Write a function `area(r)` that returns the area of a circle of radius `r`.",
+	content: "code",
+	highlight: "python",
+	answerKey: "import math\n\n\ndef area(r):\n    return math.pi * r**2",
+});

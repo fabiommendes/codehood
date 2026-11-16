@@ -3,24 +3,70 @@ import VariantPicker from "@/components/dev/VariantPicker.astro";
 import RegradeControls, {
 	type QuestionRegrade,
 } from "@/components/exam/RegradeControls";
+import Answer from "@/components/grading/Answer.astro";
 import AnswerDistribution from "@/components/grading/AnswerDistribution.astro";
 import AppliedItems, {
 	type AppliedItem,
 } from "@/components/grading/AppliedItems";
 import QuestionStats from "@/components/grading/QuestionStats";
 import RegradeResolve from "@/components/grading/RegradeResolve";
+import Card from "@/components/ui/Card";
+import { publicForm, scoreResponse } from "@/mdq";
+import { shortAnswer } from "@/mdq/fixtures";
 import type {
 	AnswerDistribution as Distribution,
 	QuestionStats as Stats,
 } from "@/services/question-stats";
 import ComponentsPage from "./_ComponentsPage.astro";
-import { examTarget, selectVariants } from "./_fixtures";
+import {
+	areaFunction,
+	capitals,
+	examTarget,
+	greenhouse,
+	selectVariants,
+} from "./_fixtures";
 
 export const prerender = false;
 
 // Only the sortable statistics table hydrates: it calls no action and does not
 // poll. The other islands render on the server only (no `client:*`), so buttons
 // look real but do nothing.
+
+const capital = shortAnswer({
+	stem: "What is the capital of Brazil?",
+	accept: [{ pattern: "Brasília" }],
+});
+
+/// The answers `Answer` shows, one for each way it can show one. No example has a submission, so a code answer shows highlighted and not runnable.
+const answers = [
+	{
+		label: "No answer",
+		question: publicForm(capital),
+		payload: null,
+	},
+	{
+		label: "Short text",
+		question: publicForm(capital),
+		payload: "Brasília",
+	},
+	{
+		label: "Multiline text",
+		question: publicForm(greenhouse),
+		payload:
+			"The sun heats the ground, and the ground gives off infrared.\n\nGases like CO2 absorb it and send some of it back down, so the lower atmosphere stays warmer.",
+	},
+	{
+		label: "Code",
+		question: publicForm(areaFunction),
+		payload: "def area(r):\n    return 3.14159 * r * r",
+	},
+	{
+		label: "The question's own view, with the marks",
+		question: publicForm(capitals),
+		payload: "sao-paulo",
+		result: scoreResponse(capitals, "sao-paulo"),
+	},
+];
 
 const regrades: { key: string; label: string; regrade: QuestionRegrade }[] = [
 	{
@@ -314,6 +360,7 @@ const groups = {
 const selected = selectVariants(Astro.url, groups);
 
 const sections = [
+	{ id: "answers", label: "Answers" },
 	{ id: "regrades", label: "Regrades" },
 	{ id: "grading", label: "Applied items" },
 	{ id: "statistics", label: "Statistics" },
@@ -327,6 +374,24 @@ const sections = [
     between the states worth a look; the choice goes to the URL, so a link opens the same state. The statistics
     table is the exception to the server-only rendering: it hydrates, and its headers sort.
   </Fragment>
+
+  <section id="answers" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Answers</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">Answer</code> shows a saved answer as the grader reads it: text as text, code
+      highlighted, and a pick, blanks or lines through the question's own view. A code answer runs only when its
+      submission is known, which none of these has.
+    </p>
+    <div class="grid gap-5 md:grid-cols-2">
+      {
+        answers.map((example) => (
+          <Card title={example.label}>
+            <Answer question={example.question} payload={example.payload} result={example.result} />
+          </Card>
+        ))
+      }
+    </div>
+  </section>
 
   <section id="regrades" class="mb-14 scroll-mt-6">
     <h2 class="text-2xl font-bold">Regrades</h2>

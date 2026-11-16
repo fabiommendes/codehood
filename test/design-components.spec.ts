@@ -44,8 +44,9 @@ const pages: {
 	},
 	{
 		path: "grading",
-		sections: ["Regrades", "Applied items", "Statistics"],
-		islands: ["QuestionStats"],
+		sections: ["Answers", "Regrades", "Applied items", "Statistics"],
+		// The multiple choice answer shows through its own view, which hydrates and calls no action.
+		islands: ["AnswerView", "QuestionStats"],
 	},
 	{
 		path: "reports",

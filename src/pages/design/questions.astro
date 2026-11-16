@@ -30,6 +30,7 @@ import {
 	shortAnswer,
 	trueFalse,
 } from "@/mdq/fixtures";
+import { areaFunction, capitals, greenhouse } from "./components/_fixtures";
 
 export const prerender = false;
 
@@ -37,20 +38,6 @@ export const prerender = false;
 // validation. The showcase feeds the components `publicForm()` of it, and
 // computes each review result with `scoreResponse()` and `correctResponses()`
 // rather than hand-writing the payloads the components expect.
-
-const capitals = multipleChoice({
-	stem: "Which city is the capital of Brazil?",
-	choices: [
-		{ id: "brasilia", text: "Brasília", score: 1, feedback: "Correct." },
-		{ id: "rio", text: "Rio de Janeiro", score: 0 },
-		{
-			id: "sao-paulo",
-			text: "São Paulo",
-			score: -0.5,
-			feedback: "The largest city, not the capital.",
-		},
-	],
-});
 
 const markdownFixture = multipleChoice({
 	title: "Big-O of binary search",
@@ -193,21 +180,6 @@ const withheldTrueFalseResult = scoreResponse(protocols, mixedAnswer);
 //
 // Essay
 //
-
-const greenhouse = essay({
-	stem: "The atmosphere is transparent to most incoming sunlight but not to the heat the surface radiates back.\n\nDescribe how the greenhouse effect works and how it affects the climate.",
-	content: "text",
-	answerKey:
-		"Sunlight passes through the atmosphere and warms the surface, which re-radiates the energy as *infrared*. Greenhouse gases absorb part of that infrared and re-emit it downwards, keeping the lower atmosphere warmer than it would otherwise be. Raising their concentration raises the equilibrium temperature.",
-	comment: "Accept any answer that names absorption and re-emission.",
-});
-
-const areaFunction = essay({
-	stem: "Write a function `area(r)` that returns the area of a circle of radius `r`.",
-	content: "code",
-	highlight: "python",
-	answerKey: "import math\n\n\ndef area(r):\n    return math.pi * r**2",
-});
 
 const definition = essay({
 	stem: "In one sentence, define idempotence.",
