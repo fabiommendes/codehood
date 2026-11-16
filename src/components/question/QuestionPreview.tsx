@@ -51,7 +51,8 @@ export interface QuestionPreviewProps {
 /** Which of the two ways an instructor can look at the question is on screen. */
 export type PreviewTab = "student" | "key";
 
-const TABS: { id: PreviewTab; label: () => string }[] = [
+/// The two tabs, in the order the tab bar lists them.
+export const PREVIEW_TABS: { id: PreviewTab; label: () => string }[] = [
 	{ id: "student", label: m.questions_tab_student_view },
 	{ id: "key", label: m.questions_tab_correct_answer },
 ];
@@ -77,7 +78,7 @@ export default function QuestionPreview(
 		<div class="flex flex-col gap-6">
 			<Show when={!props.tab}>
 				<div role="tablist" class="tabs tabs-box w-fit">
-					{TABS.map((entry) => (
+					{PREVIEW_TABS.map((entry) => (
 						<button
 							type="button"
 							role="tab"

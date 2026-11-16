@@ -1,7 +1,7 @@
 ---
 import { firstFencedCode } from "mdq";
 import CourseHeader from "@/components/CourseHeader.astro";
-import QuestionPreview from "@/components/question/QuestionPreview";
+import QuestionPage from "@/components/question/QuestionPage";
 import Alert from "@/components/ui/Alert";
 import Badge from "@/components/ui/Badge";
 import { RUNNER_ORIGIN } from "@/core/constants";
@@ -72,7 +72,6 @@ const keyHtml =
       <span class:list={["badge badge-sm", statusBadgeClass(question.status)]}>{questionStatusLabels[question.status]}</span>
       <span class="badge badge-outline badge-sm">{questionTypeLabels[doc.type]}</span>
     </div>
-    <h2 class="mt-2 text-2xl font-bold">{doc.title ?? question.slug}</h2>
     <div class="mt-2 flex flex-wrap gap-1.5">
       {
         (doc.tags ?? []).map((tag) => (
@@ -122,8 +121,8 @@ const keyHtml =
       </dl>
     </section>
 
-    <section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
-      <QuestionPreview client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} keyHtml={keyHtml} attachmentUrls={attachmentUrls} />
+    <section class="mt-8">
+      <QuestionPage client:load data={doc} runnerOrigin={RUNNER_ORIGIN} exampleHtml={exampleHtml} keyHtml={keyHtml} attachmentUrls={attachmentUrls} />
     </section>
   </main>
 </AppLayout>
