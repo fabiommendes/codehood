@@ -3,11 +3,13 @@ import CourseHeader from "@/components/CourseHeader.astro";
 import CodeRunner from "@/components/runner/CodeRunner";
 import Badge from "@/components/ui/Badge";
 import { RUNNER_ORIGIN } from "@/core/constants";
-import { db } from "@/db";
+import { db, groupResourcesByType } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
 import { runnerLanguage } from "@/runner/languages";
+import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
 import { highlightRunnerBlocks, renderMarkdownBody } from "@/utils/markdown";
@@ -43,6 +45,25 @@ if (resource.data.type === "LINK") {
 }
 const data = resource.data;
 
+// The card lists what the resources page does; a resource of an event belongs
+// to the schedule tab instead and has no list of its own.
+const nav = resource.event
+	? {
+			tab: m.nav_course_tab_schedule(),
+			context: resource.title,
+			sections: [],
+		}
+	: resourcesNav(
+			href,
+			groupResourcesByType(
+				splitByEvent(
+					await db.resource.findMany({ course: course.id }, { actor }),
+				).general,
+			),
+			(await db.repository.findMany({ course: course.id }, { actor })).length,
+			{ context: resource.title },
+		);
+
 // A CODE resource whose language has a runner driver gets the runnable
 // widget, but only where code execution is configured.
 const runLanguage =
@@ -63,6 +84,7 @@ const bodyHtml =
 
 <AppLayout title={m.courses_resource_page_title({ resource: resource.title, discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course, item: resource.title })}
+  nav={nav}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader

@@ -48,7 +48,7 @@ function code(text: string): string {
 
 <AppLayout title={m.courses_resources_page_title({ discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course })}
-  nav={resourcesNav(href, groups, repositories.length)}
+  nav={resourcesNav(href, groups, repositories.length, { expand: true })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />

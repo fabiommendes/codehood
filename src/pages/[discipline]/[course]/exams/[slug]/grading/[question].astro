@@ -21,7 +21,11 @@ import { pendingBlanks, reviewResult } from "@/services/review";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { graderState } from "@/utils/grader-state";
 import { gradingHref, wantsList, wantsNames } from "@/utils/grading-urls";
-import { loadGrading, loadStudents } from "@/utils/load-grading";
+import {
+	gradingExamNav,
+	loadGrading,
+	loadStudents,
+} from "@/utils/load-grading";
 import { renderMarkdown } from "@/utils/markdown";
 
 export const prerender = false;
@@ -181,6 +185,7 @@ const shown = (
 
 <AppLayout title={m.grades_question_title({ question: title, exam: exam.title })}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, question: title })}
+  nav={await gradingExamNav(result, actor)}
 >
   <main class:list={["mx-auto px-4 py-10", listView ? "max-w-4xl" : "max-w-6xl"]}>
     <CourseHeader course={course} active="exams" />

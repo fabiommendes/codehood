@@ -119,22 +119,26 @@ A visão do aluno não muda.
 
 ### Card da prova
 
-Título da prova no `context`, duas seções sem rótulo:
+Título da prova no `context`, uma lista só, igual em todas as páginas da
+prova (visão geral, questões, exceções, correção e cada questão dela,
+revisões, resultados, tentativa de um aluno). De uma página para outra muda
+só a entrada marcada e quais filhos estão abertos:
 
 ```
 Visão geral
 Questões
-─────────
 Exceções
 Correção        3
 Revisões        1
 Resultados
-  Por aluno
   Por questão
+  Por aluno
 ```
 
-A primeira seção é a prova em si; a segunda, o que acontece depois de
-aplicada. PRACTICE mostra só a primeira, como hoje já esconde as outras.
+PRACTICE mostra só Visão geral e Questões. Em `results`, a estatística por
+questão vem antes dos resultados por aluno: a turma tem muito mais alunos que
+a prova tem questões, e a tabela menor primeiro evita rolar a maior para
+chegar nela.
 
 ## Correção junto
 

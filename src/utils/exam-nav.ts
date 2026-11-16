@@ -25,9 +25,9 @@ export interface ExamNavInput {
 /**
  * Builds the course card links for every page of one exam.
  *
- * The manager gets two sections: the exam itself, then what happens once it
- * is applied (practice exams have only the first). Students get the sections
- * of the exam page.
+ * The manager gets one list: overview and questions, then exceptions,
+ * grading, regrades and results (practice exams have only the first two).
+ * Students get the sections of the exam page.
  */
 export function examNav(input: ExamNavInput): CourseNav {
 	if (!input.manage) {
@@ -43,47 +43,45 @@ export function examNav(input: ExamNavInput): CourseNav {
 			],
 		};
 	}
-	const exam: NavEntry[] = [
+	const entries: NavEntry[] = [
 		{ label: m.nav_exam_overview(), href: input.href },
 		{
 			label: m.exams_detail_questions_heading(),
 			href: `${input.href}/questions`,
 		},
 	];
-	if (input.practice)
-		return { context: input.title, sections: [{ entries: exam }] };
-	const after: NavEntry[] = [
-		{
-			label: m.exams_exceptions_heading(),
-			href: `${input.href}/exceptions`,
-		},
-		{
-			label: m.nav_crumb_grading(),
-			href: `${input.href}/grading`,
-			meta: input.pending || undefined,
-		},
-		{
-			label: m.grades_regrade_page_title(),
-			href: `${input.href}/regrades`,
-			meta: input.regrades || undefined,
-		},
-		{
-			label: m.grades_results_title(),
-			href: `${input.href}/results`,
-			children: [
-				{
-					label: m.nav_exam_by_student(),
-					href: `${input.href}/results#by-student`,
-				},
-				{
-					label: m.nav_exam_by_question(),
-					href: `${input.href}/results#by-question`,
-				},
-			],
-		},
-	];
-	return {
-		context: input.title,
-		sections: [{ entries: exam }, { entries: after }],
-	};
+	if (!input.practice)
+		entries.push(
+			{
+				label: m.exams_exceptions_heading(),
+				href: `${input.href}/exceptions`,
+			},
+			{
+				label: m.nav_crumb_grading(),
+				href: `${input.href}/grading`,
+				meta: input.pending || undefined,
+				under: [`${input.href}/grading`],
+			},
+			{
+				label: m.grades_regrade_page_title(),
+				href: `${input.href}/regrades`,
+				meta: input.regrades || undefined,
+			},
+			{
+				label: m.grades_results_title(),
+				href: `${input.href}/results`,
+				under: [`${input.href}/attempts`],
+				children: [
+					{
+						label: m.nav_exam_by_question(),
+						href: `${input.href}/results#by-question`,
+					},
+					{
+						label: m.nav_exam_by_student(),
+						href: `${input.href}/results#by-student`,
+					},
+				],
+			},
+		);
+	return { context: input.title, sections: [{ entries }] };
 }

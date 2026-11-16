@@ -9,6 +9,8 @@ export interface NavLink {
 	href: string;
 	/// Short count or status shown at the end of the row.
 	meta?: string | number;
+	/// Path prefixes of the pages that belong to this entry: it is the current one on them too.
+	under?: string[];
 }
 
 /** A top-level row; its `children` fold under it, and go no deeper. */
@@ -62,6 +64,7 @@ export interface MarkedNav extends Omit<CourseNav, "sections"> {
  *
  * The path must match, and so must every query parameter the link carries;
  * extra parameters in `url` are ignored and the hash only picks a section.
+ * A link also matches any page under one of its `under` prefixes.
  * A builder can therefore hand the same `nav` to every page it covers.
  */
 export function markCourseNav(nav: CourseNav, url: URL): MarkedNav {
@@ -69,10 +72,11 @@ export function markCourseNav(nav: CourseNav, url: URL): MarkedNav {
 	const mark = (link: NavLink): MarkedLink => {
 		const target = new URL(link.href, url);
 		const samePage =
-			path(target) === path(url) &&
-			[...target.searchParams].every(
-				([key, value]) => url.searchParams.get(key) === value,
-			);
+			(path(target) === path(url) &&
+				[...target.searchParams].every(
+					([key, value]) => url.searchParams.get(key) === value,
+				)) ||
+			(link.under ?? []).some((prefix) => path(url).startsWith(prefix));
 		const anchor = samePage && target.hash !== "";
 		return {
 			...link,

@@ -12,23 +12,38 @@ import {
 const href = "/cs101/ada_2026-2";
 
 test.describe("resourcesNav", () => {
-	test("links to each group with its count", () => {
-		const nav = resourcesNav(href, [
-			{ type: "FILE", label: "Files", resources: [1, 2] },
-			{ type: "MD", label: "Notes", resources: [1] },
-		]);
-		expect(nav.sections[0]?.entries).toEqual([
+	const groups = [
+		{ type: "FILE", label: "Files", resources: [1, 2] },
+		{ type: "MD", label: "Notes", resources: [1] },
+	];
+
+	test("folds the groups under the resources entry only when expanded", () => {
+		const [entry] =
+			resourcesNav(href, groups, 0, { expand: true }).sections[0]?.entries ??
+			[];
+		expect(entry?.href).toBe(`${href}/resources`);
+		expect(entry?.children).toEqual([
 			{ label: "Files", href: `${href}/resources#group-file`, meta: 2 },
 			{ label: "Notes", href: `${href}/resources#group-md`, meta: 1 },
 		]);
+		const [plain] = resourcesNav(href, groups).sections[0]?.entries ?? [];
+		expect(plain?.children).toEqual([]);
 	});
 
 	test("ends with the repositories page when the actor sees any", () => {
 		const entries = resourcesNav(href, [], 2).sections[0]?.entries;
-		expect(entries).toEqual([
-			{ label: "Repositories", href: `${href}/repositories`, meta: 2 },
+		expect(entries?.map((e) => e.href)).toEqual([
+			`${href}/resources`,
+			`${href}/repositories`,
 		]);
-		expect(resourcesNav(href, []).sections[0]?.entries).toEqual([]);
+		expect(entries?.[1]?.meta).toBe(2);
+		expect(resourcesNav(href, []).sections[0]?.entries).toHaveLength(1);
+	});
+
+	test("carries the entity of the page as context", () => {
+		expect(resourcesNav(href, [], 0, { context: "Notes" }).context).toBe(
+			"Notes",
+		);
 	});
 });
 

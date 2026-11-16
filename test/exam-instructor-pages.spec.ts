@@ -100,7 +100,8 @@ test("the exam card reaches each page of the instructor", async ({ page }) => {
 	await card.getByRole("link", { name: "Exceptions" }).click();
 	await expect(page).toHaveURL(`${href}/midterm/exceptions`);
 
-	await card.getByText("Results", { exact: true }).click();
+	await card.getByRole("link", { name: "Results", exact: true }).click();
+	await expect(page).toHaveURL(`${href}/midterm/results`);
 	await card.getByRole("link", { name: "By question" }).click();
 	await expect(page).toHaveURL(`${href}/midterm/results#by-question`);
 });

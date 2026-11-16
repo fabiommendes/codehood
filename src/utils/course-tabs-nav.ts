@@ -19,8 +19,9 @@ export function scheduleWeekId(week: number): string {
 }
 
 /**
- * Links to the resource groups of the resources page, one per group in page
- * order, then to the repositories page when the actor sees any repository.
+ * Links to the pages of the resources tab: the resources and, when the actor
+ * sees any repository, the repositories. The groups of the resources page fold
+ * under its entry only when `expand` is set, as the other pages do not show them.
  */
 export function resourcesNav(
 	href: string,
@@ -30,20 +31,29 @@ export function resourcesNav(
 		resources: readonly unknown[];
 	}[],
 	repositories = 0,
+	here: { expand?: boolean; context?: string } = {},
 ): CourseNav {
 	const base = `${href}/resources`;
-	const entries: NavEntry[] = groups.map((group) => ({
-		label: group.label,
-		href: `${base}#${resourceGroupId(group.type)}`,
-		meta: group.resources.length,
-	}));
+	const entries: NavEntry[] = [
+		{
+			label: m.nav_course_tab_resources(),
+			href: base,
+			children: here.expand
+				? groups.map((group) => ({
+						label: group.label,
+						href: `${base}#${resourceGroupId(group.type)}`,
+						meta: group.resources.length,
+					}))
+				: [],
+		},
+	];
 	if (repositories > 0)
 		entries.push({
 			label: m.nav_course_tab_repositories(),
 			href: `${href}/repositories`,
 			meta: repositories,
 		});
-	return { sections: [{ entries }] };
+	return { context: here.context, sections: [{ entries }] };
 }
 
 /**

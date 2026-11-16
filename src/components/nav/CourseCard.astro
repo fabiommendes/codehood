@@ -69,9 +69,13 @@ const sections = nav?.sections.filter((s) => s.entries.length > 0) ?? [];
                   <li>
                     <details name="course-nav" open={entry.open} class="group">
                       <summary class:list={[row, "cursor-pointer list-none py-1.5 text-sm [&::-webkit-details-marker]:hidden", parentTone(entry)]}>
-                        <span aria-current={entry.current ? "page" : undefined} class="min-w-0 flex-1 leading-snug">
+                        <Leaf
+                          href={entry.current ? undefined : entry.href}
+                          aria-current={entry.current ? "page" : undefined}
+                          class="min-w-0 flex-1 leading-snug"
+                        >
                           {entry.label}
-                        </span>
+                        </Leaf>
                         {entry.meta !== undefined && <span class="mt-px text-xs font-normal tabular-nums text-muted">{entry.meta}</span>}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="mt-0.5 shrink-0 text-muted transition-transform group-open:rotate-180">
                           <path d="m7 10 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />

@@ -76,11 +76,11 @@ const examHref = `${href}/exams/${exam.slug}`;
       )
     }
 
-    <div id="by-student" class="scroll-mt-20">
-      <ExamResults client:load href={examHref} rows={data.resultRows} />
-    </div>
     <div id="by-question" class="scroll-mt-20">
       <QuestionStatsTable client:load href={examHref} stats={data.statsRows} titles={titles} />
+    </div>
+    <div id="by-student" class="scroll-mt-20">
+      <ExamResults client:load href={examHref} rows={data.resultRows} />
     </div>
   </main>
 </AppLayout>

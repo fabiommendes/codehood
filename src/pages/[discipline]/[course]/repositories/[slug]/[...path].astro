@@ -7,10 +7,17 @@ import CloneBox from "@/components/repository/CloneBox.astro";
 import DirListing from "@/components/repository/DirListing.astro";
 import RotateToken from "@/components/repository/RotateToken.astro";
 import { InvalidData } from "@/core/error";
-import { type Attachment, db, type RepositoryDirEntry } from "@/db";
+import {
+	type Attachment,
+	db,
+	groupResourcesByType,
+	type RepositoryDirEntry,
+} from "@/db";
 import { escapeHtml, m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
+import { splitByEvent } from "@/services/event-resources";
 import { breadcrumbs } from "@/utils/breadcrumbs";
+import { resourcesNav } from "@/utils/course-tabs-nav";
 import { highlightCode } from "@/utils/highlight-code";
 import { loadCourse } from "@/utils/load-course";
 import { renderMarkdown, renderMarkdownBody } from "@/utils/markdown";
@@ -38,6 +45,15 @@ const repository = await db.repository.findOne(
 	{ actor },
 );
 if (!repository) return Astro.rewrite("/404");
+
+const repositories = await db.repository.findMany(
+	{ course: course.id },
+	{ actor },
+);
+const resourceGroups = groupResourcesByType(
+	splitByEvent(await db.resource.findMany({ course: course.id }, { actor }))
+		.general,
+);
 
 const path = (rawPath ?? "").replace(/\/+$/, "");
 const repoHref = `${href}/repositories/${slug}`;
@@ -120,6 +136,7 @@ function code(text: string): string {
 <AppLayout
   title={m.repositories_repo_page_title({ repository: repository.title, discipline: course.discipline.name })}
   trail={breadcrumbs(Astro.url, { course, item: repository.title })}
+  nav={resourcesNav(href, resourceGroups, repositories.length, { context: repository.title })}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="resources" />

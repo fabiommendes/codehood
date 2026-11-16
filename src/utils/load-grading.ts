@@ -22,6 +22,8 @@ import {
 	countingAnswers,
 	type GradedStudent,
 } from "@/services/grading";
+import type { CourseNav } from "./course-nav";
+import { examNav } from "./exam-nav";
 import { loadCourse } from "./load-course";
 import { loadCourseExceptions } from "./load-exam-exceptions";
 
@@ -205,4 +207,33 @@ export async function loadGrades(
 		pushed: pushedGrades(table, columns),
 		csvRows: gradesCsvRows(csvTable, pushedGrades(csvTable, columns)),
 	};
+}
+
+/**
+ * The course card of an exam's grading pages: the same list every page of the exam shows.
+ *
+ * `context` replaces the exam's title when the page belongs to something else, a student's attempt.
+ */
+export async function gradingExamNav(
+	loaded: Pick<
+		Extract<LoadGradingResult, { exam: Exam }>,
+		"course" | "href" | "exam" | "answers"
+	>,
+	actor: UserActor,
+	context?: string,
+): Promise<CourseNav> {
+	const { course, href, exam, answers } = loaded;
+	const regrades = await db.regradeRequest.findMany(
+		{ course: course.id, exam: exam.slug, status: "OPEN" },
+		{ actor },
+	);
+	const nav = examNav({
+		href: `${href}/exams/${exam.slug}`,
+		title: exam.title,
+		manage: true,
+		practice: exam.type === "PRACTICE",
+		pending: answers.filter((answer) => answer.state === "pending").length,
+		regrades: regrades.length,
+	});
+	return context ? { ...nav, context } : nav;
 }

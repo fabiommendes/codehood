@@ -25,7 +25,11 @@ import { reviewResult } from "@/services/review";
 import { questionAttachmentUrl } from "@/urls";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { gradingHref } from "@/utils/grading-urls";
-import { loadGrading, loadStudents } from "@/utils/load-grading";
+import {
+	gradingExamNav,
+	loadGrading,
+	loadStudents,
+} from "@/utils/load-grading";
 import { durationToMinutes, formatDateTime } from "@/utils/schedule-time";
 
 export const prerender = false;
@@ -149,6 +153,7 @@ const stateLabel = (status: string, score: number | null): string => {
 
 <AppLayout title={`${row.name} · ${exam.title}`}
   trail={breadcrumbs(Astro.url, { course, item: exam.title, student: row.name })}
+  nav={await gradingExamNav(result, actor, row.name)}
 >
   <main class="mx-auto max-w-4xl px-4 py-10">
     <CourseHeader course={course} active="exams" />
