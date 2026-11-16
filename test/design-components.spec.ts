@@ -18,8 +18,17 @@ const pages: {
 	},
 	{
 		path: "schedule",
-		sections: ["Check-in", "Roll call", "Projection", "Open a roll call"],
-		islands: [],
+		sections: [
+			"Schedule week",
+			"Meeting rows",
+			"Attendance",
+			"Check-in",
+			"Roll call",
+			"Projection",
+			"Open a roll call",
+		],
+		// The instructor's schedule week embeds the button that opens a roll call; it calls its action only on submit.
+		islands: ["OpenRollCallDialog"],
 	},
 	{
 		path: "exams",

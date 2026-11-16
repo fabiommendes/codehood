@@ -31,6 +31,8 @@ interface Props {
 	rollCallKeys?: ReadonlySet<string>;
 	/// A student's own result in the past meetings with a roll call, by `<week>/<timeSlot>`.
 	attendance?: ReadonlyMap<string, "present" | "absent">;
+	/// The instant that decides which meetings offer a roll call; defaults to the moment of the render.
+	now?: Date;
 }
 
 const {
@@ -42,10 +44,8 @@ const {
 	rollCallManager,
 	rollCallKeys = new Set<string>(),
 	attendance = new Map<string, "present" | "absent">(),
+	now = new Date(),
 } = Astro.props;
-
-/// The instant the page is rendered, which decides the meetings offering a roll call.
-const now = new Date();
 
 /// The key a meeting's roll call is known by.
 function rollCallKey(event: { week: number; timeSlot: { slug: string } }) {

@@ -4,6 +4,7 @@ import {
 	CheckInBlocked,
 	checkInMessage,
 } from "@/actions/check-in";
+import AttendanceTable from "@/components/attendance/AttendanceTable";
 import AttendanceRefused from "@/components/check-in/AttendanceRefused.astro";
 import AttendanceResult from "@/components/check-in/AttendanceResult.astro";
 import SignUpForm from "@/components/check-in/SignUpForm.astro";
@@ -15,11 +16,24 @@ import RollCallManager, {
 import RollCallProjector, {
 	type RollCallProjectorProps,
 } from "@/components/roll-call/RollCallProjector";
+import EventRepositories from "@/components/schedule/EventRepositories.astro";
+import EventResources from "@/components/schedule/EventResources.astro";
+import ScheduleWeek from "@/components/schedule/ScheduleWeek.astro";
 import { CheckInError } from "@/core/error";
 import { escapeHtml, m } from "@/i18n";
 import { checkInQrSvg } from "@/services/roll-call-qr";
 import ComponentsPage from "./_ComponentsPage.astro";
-import { clock, openClosed, selectVariants, target } from "./_fixtures";
+import {
+	attendanceReport,
+	clock,
+	openClosed,
+	scheduleEntries,
+	scheduleResources,
+	scheduleRowRepositories,
+	scheduleRowResources,
+	selectVariants,
+	target,
+} from "./_fixtures";
 
 export const prerender = false;
 
@@ -213,7 +227,14 @@ const groups = {
 };
 const selected = selectVariants(Astro.url, groups);
 
+const courseHref = "/algorithms/ada_2026-2";
+/// A Tuesday at noon UTC: the day of the second meeting, which is still to come.
+const meetingDay = new Date(Date.UTC(2026, 9, 6, 12));
+
 const sections = [
+	{ id: "schedule-week", label: "Schedule week" },
+	{ id: "meeting-rows", label: "Meeting rows" },
+	{ id: "attendance", label: "Attendance" },
 	{ id: "check-in", label: "Check-in" },
 	{ id: "roll-call", label: "Roll call" },
 	{ id: "projection", label: "Projection" },
@@ -228,6 +249,70 @@ const sections = [
     states worth a look; the choice goes to the URL, so a link opens the same state. The islands render on the
     server only, so they do not poll, tick or call actions, and their buttons do nothing.
   </Fragment>
+
+  <section id="schedule-week" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Schedule week</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">ScheduleWeek</code> lists one week: a lecture with resources and repositories, a
+      cancelled one, a quiz marked Next, a holiday and a draft exam. The student's copy marks the roll calls the
+      student attended; the instructor's copy opens the roll call of the meeting of its day (the clock is set to that
+      Tuesday) and links the one already opened.
+    </p>
+    <h3 class="mb-3 text-xl font-semibold">Student</h3>
+    <div class="max-w-3xl">
+      <ScheduleWeek
+        week={5}
+        entries={scheduleEntries}
+        next={scheduleEntries[3]}
+        href={courseHref}
+        resources={scheduleResources}
+        attendance={new Map([
+          ["5/mon-10", "present"],
+          ["5/tue-10", "absent"],
+        ])}
+      />
+    </div>
+    <h3 class="mt-10 mb-3 text-xl font-semibold">Instructor</h3>
+    <div class="max-w-3xl">
+      <ScheduleWeek
+        week={5}
+        entries={scheduleEntries}
+        next={scheduleEntries[3]}
+        href={courseHref}
+        resources={scheduleResources}
+        rollCallManager={target}
+        rollCallKeys={new Set(["5/mon-10"])}
+        now={meetingDay}
+      />
+    </div>
+  </section>
+
+  <section id="meeting-rows" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Meeting rows</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">EventResources</code> and <code class="font-mono">EventRepositories</code> are the
+      lists under a meeting's description. A resource shows the icon of its type: file, link, note and snippet.
+    </p>
+    <div class="grid max-w-3xl gap-6 sm:grid-cols-2">
+      <div class="rounded-box border border-edge bg-base-100 p-5">
+        <h3 class="text-sm font-semibold text-muted">EventResources</h3>
+        <EventResources resources={scheduleRowResources} href={courseHref} />
+      </div>
+      <div class="rounded-box border border-edge bg-base-100 p-5">
+        <h3 class="text-sm font-semibold text-muted">EventRepositories</h3>
+        <EventRepositories repositories={scheduleRowRepositories} href={courseHref} />
+      </div>
+    </div>
+  </section>
+
+  <section id="attendance" class="mb-14 scroll-mt-6">
+    <h2 class="text-2xl font-bold">Attendance</h2>
+    <p class="mt-2 mb-6 text-sm text-muted">
+      <code class="font-mono">AttendanceTable</code>, the course's roll call report: present, absent, before the
+      student enrolled and a student who dropped.
+    </p>
+    <AttendanceTable report={attendanceReport} />
+  </section>
 
   <section id="check-in" class="mb-14 scroll-mt-6">
     <h2 class="text-2xl font-bold">Check-in</h2>
