@@ -244,6 +244,26 @@ export async function highlightRunnerBlocks(html: string): Promise<string> {
 	);
 }
 
+/// A code block of rendered and sanitized Markdown, with its language when
+/// the fence gave one. The blocks of a runner wrapper stay out of it.
+const CODE_BLOCK_PATTERN =
+	/(?<!<div class="code-runner-[^>]*>)<pre><code(?: class="language-([^"\s]*)")?>([\s\S]*?)<\/code><\/pre>/g;
+
+/**
+ * Highlights the code blocks of rendered Markdown with the site's code
+ * themes, the way `highlightQuestionCodeBlocks` does for an island.
+ */
+export async function highlightCodeBlocks(html: string): Promise<string> {
+	const blocks = [...html.matchAll(CODE_BLOCK_PATTERN)];
+	const highlighted = await Promise.all(
+		blocks.map(([, language, escaped]) =>
+			highlightCode(unescapeHtml(escaped ?? "").replace(/\n$/, ""), language),
+		),
+	);
+	let index = 0;
+	return html.replace(CODE_BLOCK_PATTERN, () => highlighted[index++] ?? "");
+}
+
 /** Renders a Markdown string as a block of sanitized HTML. */
 export function renderMarkdown(text: string): string {
 	if (!takesHtmlPath(text, MAX_HTML_DOCUMENT_LENGTH)) {

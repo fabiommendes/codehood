@@ -11,6 +11,8 @@ import { type ExamResult, examResult } from "@/services/exam-result";
 import type { AttemptState, ExamSchedule } from "@/services/exam-state";
 import { regradeBlocker } from "@/services/regrade";
 import type { ReviewResult } from "@/services/review";
+import type { CodeBlocksHtml } from "./code-blocks";
+import { highlightQuestionCodeBlocks } from "./highlight-code-blocks";
 import { highlightExamples } from "./highlight-examples";
 import { loadReviews } from "./load-review";
 import type { PretestSource } from "./pretest-sources";
@@ -34,6 +36,8 @@ export interface AttemptView {
 	regrades: Record<string, QuestionRegrade>;
 	pretests: Record<string, PretestSource[]>;
 	exampleHtml: Record<string, string[]>;
+	/// The highlighted fenced blocks of every question in `questions`.
+	codeBlocks: CodeBlocksHtml;
 	codeSends: Record<string, CodeSends>;
 }
 
@@ -184,6 +188,9 @@ export async function loadAttemptView(
 		regrades,
 		pretests,
 		exampleHtml,
+		codeBlocks: await highlightQuestionCodeBlocks(
+			questions.map((entry) => entry.question),
+		),
 		codeSends,
 	};
 }

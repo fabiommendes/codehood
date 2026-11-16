@@ -21,8 +21,10 @@ import {
 	scoreBlanks,
 	scoreResponse,
 } from "@/mdq";
+import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import { pretestSources } from "@/utils/pretest-sources";
 import { AttachmentList, type AttachmentListProps } from "./AttachmentList";
+import { CodeBlocks } from "./CodeBlocks";
 import { ResetIcon, SubmitIcon } from "./icons";
 import { AnyQuestionView, type AnyQuestionViewProps, mdqMessages } from "./mdq";
 
@@ -46,6 +48,8 @@ export interface QuestionPreviewProps {
 	keyHtml?: string;
 	/** The download URL of each attachment of the question by name, which an island can take as a prop; a name without one has no download link. */
 	attachmentUrls?: Readonly<Record<string, string>>;
+	/** The highlighted fenced blocks of the question, from `highlightQuestionCodeBlocks`. */
+	codeBlocks?: CodeBlocksHtml;
 }
 
 /** Which of the two ways an instructor can look at the question is on screen. */
@@ -92,15 +96,17 @@ export default function QuestionPreview(
 				</div>
 			</Show>
 
-			<TypePreview
-				question={props.data}
-				tab={tab}
-				hideScore={props.hideScore}
-				runnerOrigin={props.runnerOrigin ?? null}
-				exampleHtml={props.exampleHtml}
-				keyHtml={props.keyHtml}
-				attachmentUrl={(name) => props.attachmentUrls?.[name] ?? null}
-			/>
+			<CodeBlocks html={props.codeBlocks}>
+				<TypePreview
+					question={props.data}
+					tab={tab}
+					hideScore={props.hideScore}
+					runnerOrigin={props.runnerOrigin ?? null}
+					exampleHtml={props.exampleHtml}
+					keyHtml={props.keyHtml}
+					attachmentUrl={(name) => props.attachmentUrls?.[name] ?? null}
+				/>
+			</CodeBlocks>
 		</div>
 	);
 }

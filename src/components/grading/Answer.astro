@@ -12,7 +12,9 @@ import type { QuestionPublic } from "@/db";
 import { m } from "@/i18n";
 import { runnerLanguage } from "@/runner/languages";
 import type { ReviewResult } from "@/services/review";
+import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import { highlightCode } from "@/utils/highlight-code";
+import { highlightQuestionCodeBlocks } from "@/utils/highlight-code-blocks";
 import AnswerView from "./AnswerView";
 import { displayAnswer } from "./answer-text";
 
@@ -26,9 +28,12 @@ interface Props {
 	submission?: string;
 	/// What the answer's card is called when moving between code answers; none hides it.
 	reviewLabel?: string;
+	/// The highlighted fenced blocks of `question`, when the page already has them.
+	codeBlocks?: CodeBlocksHtml;
 }
 
-const { question, payload, result, submission, reviewLabel } = Astro.props;
+const { question, payload, result, submission, reviewLabel, codeBlocks } =
+	Astro.props;
 const shown = displayAnswer(
 	question.type,
 	payload,
@@ -53,6 +58,10 @@ const codeHtml =
 				runLanguage ? { theme: "vscode" } : {},
 			)
 		: "";
+const viewBlocks =
+	shown.kind === "view"
+		? (codeBlocks ?? (await highlightQuestionCodeBlocks(question)))
+		: undefined;
 ---
 
 {shown.kind === "empty" && <p class="text-muted">{m.grades_answer_none()}</p>}
@@ -86,4 +95,4 @@ const codeHtml =
     />
   )
 }
-{shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} />}
+{shown.kind === "view" && <AnswerView client:load question={question} payload={payload} result={result} codeBlocks={viewBlocks} />}

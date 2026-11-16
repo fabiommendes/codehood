@@ -1,8 +1,10 @@
 import type { JSX } from "solid-js";
 import type { AnswerPayload } from "@/components/exam/answer-payload";
+import { CodeBlocks } from "@/components/question/CodeBlocks";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { QuestionPublic } from "@/db";
 import type { ReviewResult } from "@/services/review";
+import type { CodeBlocksHtml } from "@/utils/code-blocks";
 
 export interface AnswerViewProps {
 	/// The public form of the question, as the student saw it.
@@ -11,6 +13,8 @@ export interface AnswerViewProps {
 	payload?: AnswerPayload;
 	/// The marks and feedback of the answer, shown in `review` mode without the view's own score badge.
 	result?: ReviewResult;
+	/// The highlighted fenced blocks of `question`, from `highlightQuestionCodeBlocks`.
+	codeBlocks?: CodeBlocksHtml;
 }
 
 /**
@@ -22,13 +26,15 @@ export interface AnswerViewProps {
  */
 export default function AnswerView(props: AnswerViewProps): JSX.Element {
 	return (
-		<AnyQuestionView
-			question={props.question}
-			mode={props.result ? "review" : "readonly"}
-			value={props.payload ?? null}
-			result={props.result}
-			hideScore
-			messages={mdqMessages}
-		/>
+		<CodeBlocks html={props.codeBlocks}>
+			<AnyQuestionView
+				question={props.question}
+				mode={props.result ? "review" : "readonly"}
+				value={props.payload ?? null}
+				result={props.result}
+				hideScore
+				messages={mdqMessages}
+			/>
+		</CodeBlocks>
 	);
 }

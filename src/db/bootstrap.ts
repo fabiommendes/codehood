@@ -945,7 +945,16 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await createQuestion(cs101.id, "recursion-basics", {
 		type: "multiple-choice",
 		title: "Recursion basics",
-		stem: "Which of the following is required for a recursive function to terminate?",
+		stem: [
+			"Which of the following is required for a recursive function such as `countdown` to terminate?",
+			"",
+			"```python",
+			"def countdown(n):",
+			"    if n == 0:",
+			'        return "liftoff"',
+			"    return countdown(n - 1)",
+			"```",
+		].join("\n"),
 		tags: ["recursion", "functions"],
 		choices: [
 			{ id: "base-case", text: "A base case", score: 1 },

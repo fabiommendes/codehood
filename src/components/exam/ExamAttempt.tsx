@@ -29,6 +29,7 @@ import {
 import type { AttemptState } from "@/services/exam-state";
 import type { ReviewResult } from "@/services/review";
 import { examQuestionAttachmentUrl } from "@/urls";
+import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
 import { formatRelative } from "@/utils/relative-time";
 import { formatDateTime } from "@/utils/schedule-time";
@@ -89,6 +90,8 @@ export interface ExamAttemptProps {
 	pretests?: Record<string, PretestSource[]>;
 	/// The highlighted HTML of each code question's example tests, by question slug.
 	exampleHtml?: Record<string, string[]>;
+	/// The highlighted fenced blocks of every question, from `highlightQuestionCodeBlocks`.
+	codeBlocks?: CodeBlocksHtml;
 	/// The sends of each code question that goes to a worker, by question slug; a question without an entry has no submit button.
 	codeSends?: Record<string, CodeSends>;
 	/// The viewing student, which keys their local code drafts.
@@ -1229,6 +1232,7 @@ export default function ExamAttempt(props: ExamAttemptProps): JSX.Element {
 										}
 										pretests={props.pretests?.[entry.slug]}
 										exampleHtml={props.exampleHtml?.[entry.slug]}
+										codeBlocks={props.codeBlocks}
 										sends={allSends()[entry.slug]}
 										onSubmit={(code) => submitCode(entry.slug, code)}
 										runnerOrigin={props.runnerOrigin ?? null}

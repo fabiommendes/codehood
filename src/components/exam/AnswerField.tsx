@@ -4,10 +4,12 @@ import {
 	AttachmentList,
 	type AttachmentListProps,
 } from "@/components/question/AttachmentList";
+import { CodeBlocks } from "@/components/question/CodeBlocks";
 import { AnyQuestionView, mdqMessages } from "@/components/question/mdq";
 import type { QuestionPublic } from "@/db";
 import { runnerLanguage } from "@/runner/languages";
 import type { ReviewResult } from "@/services/review";
+import type { CodeBlocksHtml } from "@/utils/code-blocks";
 import type { PretestSource } from "@/utils/pretest-sources";
 import type { AnswerPayload } from "./answer-payload";
 import { CodeAnswer } from "./CodeAnswer";
@@ -35,6 +37,8 @@ export interface AnswerFieldProps {
 	runnerOrigin?: string | null;
 	/// The download URL of an attachment of the question by name; without it the list has no download links.
 	attachmentUrl?: AttachmentListProps["url"];
+	/// The highlighted fenced blocks of the question, from `highlightQuestionCodeBlocks`.
+	codeBlocks?: CodeBlocksHtml;
 }
 
 /// What a code question in answer mode needs besides the question itself.
@@ -64,29 +68,31 @@ export function codeLanguageOf(
 /** One question in answer mode, frozen on the saved answer, or reviewed with its marks. */
 export function AnswerField(props: AnswerFieldProps): JSX.Element {
 	return (
-		<Show
-			when={
-				props.question.type === "code" && !props.readonly && !props.review
-					? props.question
-					: undefined
-			}
-			fallback={<EssayOrOtherField {...props} />}
-		>
-			{(question) => (
-				<CodeAnswer
-					question={question()}
-					pretests={props.pretests ?? []}
-					exampleHtml={props.exampleHtml}
-					onSubmit={props.sends ? props.onSubmit : undefined}
-					sends={props.sends}
-					runnerOrigin={props.runnerOrigin ?? null}
-					value={typeof props.payload === "string" ? props.payload : null}
-					attachments={question().attachments}
-					attachmentUrl={props.attachmentUrl}
-					onChange={(code, userEvent) => props.onChange(code, userEvent)}
-				/>
-			)}
-		</Show>
+		<CodeBlocks html={props.codeBlocks}>
+			<Show
+				when={
+					props.question.type === "code" && !props.readonly && !props.review
+						? props.question
+						: undefined
+				}
+				fallback={<EssayOrOtherField {...props} />}
+			>
+				{(question) => (
+					<CodeAnswer
+						question={question()}
+						pretests={props.pretests ?? []}
+						exampleHtml={props.exampleHtml}
+						onSubmit={props.sends ? props.onSubmit : undefined}
+						sends={props.sends}
+						runnerOrigin={props.runnerOrigin ?? null}
+						value={typeof props.payload === "string" ? props.payload : null}
+						attachments={question().attachments}
+						attachmentUrl={props.attachmentUrl}
+						onChange={(code, userEvent) => props.onChange(code, userEvent)}
+					/>
+				)}
+			</Show>
+		</CodeBlocks>
 	);
 }
 

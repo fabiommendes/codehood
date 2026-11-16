@@ -141,6 +141,14 @@
 
 ### Fixed
 
+- Os blocos de código cercados (```` ```python ````) do enunciado e dos demais
+  textos de uma questão saem com o realce do Shiki, nos temas claro e escuro do
+  site, em vez de um `<pre>` sem cor: na prova do aluno, na prévia da prova, na
+  página da questão, na revisão da tentativa e na correção. O servidor realça
+  os blocos (`highlightQuestionCodeBlocks`) e o island os põe no lugar pelo
+  `CodeBlockProvider` do mdq-js, então o navegador não carrega o Shiki. A
+  questão `recursion-basics` do seed ganhou um bloco em Python.
+
 - Enviar duas vezes o mesmo código de uma questão de código não conta mais um
   envio a mais. Se o texto é idêntico ao de qualquer envio anterior da questão
   na tentativa (não só o último, então A, B, A não paga o terceiro) e o job
