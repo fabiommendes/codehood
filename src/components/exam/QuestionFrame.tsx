@@ -38,11 +38,11 @@ export function QuestionFrame(props: QuestionFrameProps): JSX.Element {
 		>
 			{/* The number stays in view while a long question scrolls past. */}
 			<div class="hidden sm:col-start-1 sm:row-start-2 sm:block">
-				<div class="sticky top-20 text-right">
+				<div class="sticky top-14 text-right">
 					<QuestionNumber
 						number={props.number}
 						tone={props.tone}
-						class="block text-4xl"
+						class="block text-4xl pt-8"
 					/>
 					<Show when={props.points}>
 						{(points) => (
