@@ -65,7 +65,11 @@ async function makeSubmission() {
 		instructor: instructor.username,
 		edition: edition.slug,
 	});
-	const question = await persistedQuestionFactory.create({ course: course.id });
+	// An essay always waits for a person; the factory's default type varies.
+	const question = await persistedQuestionFactory.create(
+		{ course: course.id },
+		{ transient: { type: "essay" } },
+	);
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		status: "ONGOING",

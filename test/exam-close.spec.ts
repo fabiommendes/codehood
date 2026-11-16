@@ -48,10 +48,11 @@ async function setup(
 		instructor: instructor.username,
 		edition: await ensureEdition(),
 	});
-	const question = await persistedQuestionFactory.create({
-		course: course.id,
-		slug: tag("q-"),
-	});
+	// Objective, so closing grades it; the factory's default type varies.
+	const question = await persistedQuestionFactory.create(
+		{ course: course.id, slug: tag("q-") },
+		{ transient: { type: "multiple-choice" } },
+	);
 	const ada = await enroll(course.id);
 	const bob = await enroll(course.id);
 	const created = await persistedExamFactory.create({

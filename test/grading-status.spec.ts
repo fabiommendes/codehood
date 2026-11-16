@@ -56,10 +56,11 @@ async function enrollStudent(courseId: schema.CourseId) {
 async function makePendingSubmission() {
 	const { course, instructor } = await makeCourse();
 	const author = await enrollStudent(course.id);
-	const question = await persistedQuestionFactory.create({
-		course: course.id,
-		slug: tag("q-"),
-	});
+	// An essay always waits for a person; the factory's default type varies.
+	const question = await persistedQuestionFactory.create(
+		{ course: course.id, slug: tag("q-") },
+		{ transient: { type: "essay" } },
+	);
 	const exam = await persistedExamFactory.create({
 		course: course.id,
 		slug: tag("exam-"),
