@@ -218,7 +218,7 @@ test("a student missed an exam that is over", () => {
 	);
 });
 
-test.fixme("an exam is ready to release for an instructor", () => {
+test("an exam is ready to release for an instructor", () => {
 	const ready = Object.values(reports.homes).flatMap(
 		(home) => home.toRelease as unknown[],
 	);

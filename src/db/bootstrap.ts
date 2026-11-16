@@ -672,40 +672,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		FULL_ACCESS,
 	);
 
-	// cs201 gets its own small set, themed for data structures rather than a
-	// copy of cs101's — an empty second course would leave /admin/courses
-	// looking like resources only ever land on the first one seeded.
-	const bigOFile = Buffer.from(
-		"CS201 Cheat Sheet\n\nArray: O(1) index, O(n) insert/delete.\nLinked list: O(n) index, O(1) insert/delete at a known node.\nBalanced tree: O(log n) search/insert/delete.\nHash table: O(1) average, O(n) worst case.\n",
-	);
-	await db.resource.create(
-		{
-			course: cs201.id,
-			slug: "complexity-cheat-sheet",
-			title: "Complexity cheat sheet",
-			description: "Time complexity for the structures covered this term.",
-			data: {
-				type: "FILE",
-				buffer: bigOFile,
-				filename: "complexity-cheat-sheet.txt",
-			},
-			rev: "demo-cheatsheet-v1",
-		},
-		FULL_ACCESS,
-	);
-	await db.resource.create(
-		{
-			course: cs201.id,
-			slug: "clrs-trees",
-			title: "CLRS, chapter 12: Binary search trees",
-			data: {
-				type: "LINK",
-				url: "https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/",
-			},
-			rev: "demo-clrs-v1",
-		},
-		FULL_ACCESS,
-	);
+	// cs201 gets one resource of its own, so /admin/courses does not look like
+	// resources only ever land on the first course seeded.
 	await db.resource.create(
 		{
 			course: cs201.id,
@@ -722,22 +690,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	await db.resource.create(
-		{
-			course: cs201.id,
-			slug: "linked-list-node",
-			title: "linked_list.py",
-			data: {
-				type: "CODE",
-				language: "python",
-				content:
-					"class Node:\n    def __init__(self, value, next=None):\n        self.value = value\n        self.next = next\n",
-			},
-			rev: "demo-linkedlist-v1",
-		},
-		FULL_ACCESS,
-	);
-
 	// A weekly pattern plus a few weeks of the term calendar for each course, so
 	// /calendar, /<course>/schedule, and the course home page all have real
 	// data to render. cs101 gets a holiday and a cancelled lab so the muted/
@@ -1226,23 +1178,6 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 		},
 		FULL_ACCESS,
 	);
-	await db.question.create(
-		{
-			course: cs201.id,
-			slug: "stack-vs-queue",
-			status: "DRAFT",
-			version: "v1",
-			question: {
-				type: "essay",
-				title: "Stack vs. queue",
-				stem: "Describe a scenario where a queue is the wrong structure and a stack is the right one, or vice versa.",
-				tags: ["stacks", "queues"],
-				content: "text",
-			},
-		},
-		FULL_ACCESS,
-	);
-
 	// A blank that matches no pattern goes to the instructor, who grades it on its own.
 	await db.question.create(
 		{
@@ -1392,6 +1327,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	await seedPracticeAndSimulations(cs101.id, ada);
 	await seedRepositories(cs101.id);
 	await seedClassroomInvites(cs101.id, ada);
+
+	await seedTreesExam(cs201.id, { liskov, bob });
 
 	// An ended course in the past edition, so admin views keep an expired one.
 	const ended = await db.course.create(
@@ -3681,6 +3618,38 @@ async function seedExternalGradingExams(
 		where: { name: "runner" },
 		data: { lastUsedAt: new Date(Date.now() - 2 * 60_000) },
 	});
+}
+
+/// Seeds `test-trees` in `cs201`, closed two days ago and graded on delivery, with its grades still to release.
+async function seedTreesExam(
+	course: Course["id"],
+	students: { liskov: User; bob: User },
+): Promise<void> {
+	const exam = "test-trees";
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 1: trees",
+			description: "Closed and corrected, waiting for the grades to go out.",
+			tags: ["trees"],
+			questions: [{ slug: "bst-lookup", version: "v1" }],
+		},
+		FULL_ACCESS,
+	);
+	await answerExam(course, exam, students.liskov, { "bst-lookup": "log-n" });
+	await answerExam(course, exam, students.bob, { "bst-lookup": "n" });
+	await db.exam.update(
+		{ course, slug: exam },
+		{
+			status: "COMPLETED",
+			scheduledAt: new Date(Date.now() - 2 * 24 * 3600 * 1000),
+			duration: { hours: 1 },
+		},
+		FULL_ACCESS,
+	);
 }
 
 /// Gives the dev student 30 extra minutes on the midterm, a week ahead.

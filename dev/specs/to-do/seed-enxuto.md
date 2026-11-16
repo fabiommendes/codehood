@@ -408,6 +408,8 @@ Cuidados para S2 a S5:
   `test-03` e desliga o histórico. Hopper não entrega, para a prova seguir com
   tentativa em andamento. `js-double-it` herdou o epílogo e o link de
   `js-sum-of-evens`.
+- S6: `cs201` ficou com o recurso `when-to-use-what` (Markdown). `test-trees`
+  é criada por `seedTreesExam`, com liskov (certa) e bob (errada).
 
 ## Riscos
 
