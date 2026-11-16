@@ -297,8 +297,9 @@ whenever something is actually broken.
 
 `cli/` is the Codehood CLI, a Python project (uv, pytest, Textual) with its own
 conventions. It is released with the server, at the same version: the tag
-that `pnpm run release` cuts also publishes it to PyPI as `codehood-cli`
-(`.github/workflows/publish-cli.yml`). Its issues live in `dev/issues/`,
+that `pnpm run release` cuts also publishes it to PyPI as `codehood-cli`,
+and the grading worker in `workers/chalk-worker/` as `chalk-worker`
+(`.github/workflows/publish-python.yml`). Its issues live in `dev/issues/`,
 tagged `cli`; its specs stay in `cli/dev/specs/`. Before any work in
 `cli/`, or any server change the CLI depends on (REST endpoints, schemas, the
 OpenAPI spec), read `cli/README.md` and `cli/AGENTS.md`. Inside `cli/`, those

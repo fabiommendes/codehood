@@ -12,8 +12,8 @@
   baixa o mdq no commit de `.mdq-ref` e testa a CLI contra o PyPI a cada push.
 - A CLI sai junto com o servidor, na mesma versão. `pnpm run release` sobe
   `cli/pyproject.toml`, data `cli/CHANGELOG.md` e roda os testes da CLI com as
-  dependências do PyPI; o push da tag publica `codehood-cli` no PyPI
-  (`.github/workflows/publish-cli.yml`). O repositório `codehood-cli` deixa de
+  dependências do PyPI; o push da tag publica `codehood-cli` e, em seguida, `chalk-worker` no PyPI
+  (`.github/workflows/publish-python.yml`). O repositório `codehood-cli` deixa de
   ser espelhado, e as issues da CLI vêm para `dev/issues/` com a tag `cli`.
 - Um só estilo de código no site, para ver e para editar. Os temas de
   `src/utils/code-themes.ts` (Cerrado claro, Floresta escuro) são a fonte

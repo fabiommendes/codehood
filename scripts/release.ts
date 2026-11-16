@@ -19,8 +19,8 @@
  *    same version) to one version, turns the "Unreleased" section of both
  *    changelogs into the version's, regenerates the CLI's OpenAPI snapshot,
  *    commits as `release: vX.Y.Z` and tags `vX.Y.Z`, recording the mdq commit
- *    and versions in the tag message. Pushing the tag publishes the CLI to PyPI
- *    (`.github/workflows/publish-cli.yml`). The worker is not published.
+ *    and versions in the tag message. Pushing the tag publishes the CLI and then the
+ *    worker to PyPI (`.github/workflows/publish-python.yml`).
  *
  * `--dry-run` stops after the gate. Nothing is pushed.
  */
