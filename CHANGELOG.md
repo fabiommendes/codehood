@@ -273,6 +273,12 @@
 
 ### Fixed
 
+- Rodar um código no runner leva o terminal para a tela quando ele está
+  abaixo da dobra, depois que o painel termina de abrir. Antes a saída ficava
+  fora da vista até rolar a página, e o xterm.js, que não desenha fora da
+  viewport, nem a punha no DOM: era a causa das falhas intermitentes de
+  `test/grading-code-answer.spec.ts` sob carga.
+
 - Consultas cujo custo crescia com o banco inteiro, achadas por
   `pnpm run test:perf` (issue `consultas-que-crescem-com-o-banco`, fechada).
   A correção automática de objetivas (`exam.releaseGrades`,

@@ -209,6 +209,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	let root!: HTMLDivElement;
 	let editorParent!: HTMLDivElement;
 	let terminalParent!: HTMLDivElement;
+	/// The collapsible wrapper of the terminal, which opens with a transition.
+	let terminalPanel!: HTMLDivElement;
 	let lineInput: HTMLInputElement | undefined;
 	let runButton: HTMLButtonElement | undefined;
 	/// The user pressed Stop and the run has not ended yet.
@@ -312,6 +314,15 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 		editor?.setReadOnly(true);
 	};
 
+	/// Scrolls the terminal into view once its panel has finished opening: the
+	/// output must be seen, and xterm.js draws nothing off screen.
+	const revealTerminal = () => {
+		const opening = terminalPanel.getAnimations().map((a) => a.finished);
+		void Promise.allSettled(opening).then(() => {
+			if (!disposed) terminalParent.scrollIntoView({ block: "nearest" });
+		});
+	};
+
 	const ensureTerminal = (): Promise<RunnerTerminal> => {
 		if (terminal) return Promise.resolve(terminal);
 		setTerminalShown(true);
@@ -388,6 +399,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				return;
 			}
 			term.clear();
+			revealTerminal();
 			if (copy) term.notice(m.runner_modified_output());
 			const entry = filename();
 			const request = {
@@ -967,6 +979,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			</Show>
 
 			<div
+				ref={terminalPanel}
 				class={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${terminalShown() ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
 				inert={!terminalShown()}
 			>
@@ -1073,7 +1086,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 							ref={terminalParent}
 							role="group"
 							aria-label={m.runner_terminal_label()}
-							class={`overflow-hidden px-2 py-1 ${props.compact ? "h-20" : "h-56"}`}
+							class={`scroll-mb-8 overflow-hidden px-2 py-1 ${props.compact ? "h-20" : "h-56"}`}
 							data-terminal
 						/>
 					</div>
