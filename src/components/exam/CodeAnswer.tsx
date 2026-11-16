@@ -250,7 +250,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 								</summary>
 								<div class="collapse-content p-0">
 									<div
-										class={`${EDITOR_SURFACE} [&_pre]:text-[13px] [&_pre]:leading-5`}
+										class={`${EDITOR_SURFACE} [&_pre]:text-(length:--code-font-size) [&_pre]:leading-5`}
 									>
 										<ExampleCode
 											text={example.text}

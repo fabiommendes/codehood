@@ -108,7 +108,7 @@ export async function createEditor(
 		"&": {
 			backgroundColor: "var(--code-bg)",
 			color: "var(--code-fg)",
-			fontSize: "inherit",
+			fontSize: "var(--code-font-size)",
 		},
 		".cm-scroller": {
 			fontFamily: "inherit",

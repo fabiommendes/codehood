@@ -6,4 +6,4 @@ export const EDITOR_FOCUS_RING =
 
 /// The scrolling surface the editor, or the highlighted code that stands for it, sits on, in the colors of the site's code themes.
 export const EDITOR_SURFACE =
-	"relative overflow-auto bg-(--code-bg) font-mono text-[13px] leading-5 text-(--code-fg)";
+	"relative overflow-auto bg-(--code-bg) font-mono text-(length:--code-font-size) leading-5 text-(--code-fg)";

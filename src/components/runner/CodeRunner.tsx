@@ -794,7 +794,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			    In a snippet the wrapper is daisyUI's code mockup, with its dots
 			    and without the gap it puts before each `pre`. */}
 			<div
-				class={`${EDITOR_FOCUS_RING} ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code overflow-hidden bg-(--code-bg) pt-3 pb-1 text-(--code-fg) before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
+				class={`${EDITOR_FOCUS_RING} ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
 			>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
@@ -965,7 +965,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				inert={!terminalShown()}
 			>
 				<div
-					class={`min-h-0 overflow-hidden bg-(--code-bg) font-mono text-[13px] leading-5 text-(--code-fg) ${minimal ? "rounded-b-box" : ""} border-t border-(--code-border)`}
+					class={`min-h-0 overflow-hidden bg-(--code-bg) font-mono text-(length:--code-font-size) leading-5 text-(--code-fg) ${minimal ? "rounded-b-box" : ""} border-t border-(--code-border)`}
 				>
 					<div class="flex items-center gap-2 bg-(--code-panel) px-3 py-1 text-[11px] tracking-wide text-(--code-muted) uppercase">
 						<span>{m.runner_terminal()}</span>

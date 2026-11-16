@@ -291,7 +291,8 @@ export async function createTerminal(
 		convertEol: true,
 		cursorBlink: true,
 		fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-		fontSize: 13,
+		// `--code-font-size` (0.875rem) in pixels: xterm takes no CSS units.
+		fontSize: 14,
 		rows: 8,
 		theme: terminalTheme(siteIsDark()),
 		linkHandler: {

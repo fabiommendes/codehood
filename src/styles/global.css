@@ -582,16 +582,34 @@ h6 {
 /* The frame of every block of code the site shows: the background and text
    of the code themes (`--code-*`, src/utils/code-themes.ts), with or without
    Shiki's tokens inside. */
-@utility code-block {
-	display: block;
-	overflow-x: auto;
+:root {
+	/* One size for code everywhere: highlighted blocks, editors, terminal. */
+	--code-font-size: 0.875rem;
+	/* The code background is close to the page, so the frame lifts it a little. */
+	--code-shadow: 0 1px 2px rgb(0 0 0 / 0.07), 0 1px 4px rgb(0 0 0 / 0.05);
+}
+
+[data-theme="codehood-dark"] {
+	--code-shadow: 0 1px 3px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(0 0 0 / 0.2);
+}
+
+/* The surface under every block of code: the code themes' colors, and an edge
+   and shadow so it stands out from a page of nearly the same color. */
+@utility code-surface {
 	border: 1px solid var(--code-border);
-	border-radius: var(--radius-box);
-	padding: 0.75rem 1rem;
 	background-color: var(--code-bg);
 	color: var(--code-fg);
+	box-shadow: var(--code-shadow);
+}
+
+@utility code-block {
+	@apply code-surface;
+	display: block;
+	overflow-x: auto;
+	border-radius: var(--radius-box);
+	padding: 0.75rem 1rem;
 	font-family: var(--font-mono);
-	font-size: 13px;
+	font-size: var(--code-font-size);
 	line-height: 1.25rem;
 	font-variant-ligatures: none;
 
@@ -614,6 +632,13 @@ h6 {
 
 :is(.prose, .mdq-markdown:not([data-inline])) pre:not(.code-runner-block *) {
 	border: 1px solid var(--code-border);
+	box-shadow: var(--code-shadow);
+}
+
+/* The typography plugin shrinks `pre` and again its `code`; code keeps the
+   site's one size instead. */
+:is(.prose, .mdq-markdown) :is(pre, pre code, .code-block) {
+	font-size: var(--code-font-size);
 }
 
 /* Runnable blocks of a rendered note are widgets, not paragraphs: keep them
