@@ -11,7 +11,6 @@ import ReleaseGrades from "@/components/exam/ReleaseGrades";
 import AttachmentList from "@/components/question/AttachmentList";
 import ReleasedScore from "@/components/ReleasedScore.astro";
 import { EXAM_ANSWER_GRACE_MS, RUNNER_ORIGIN } from "@/core/constants";
-import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 import { loadResultPolicy } from "@/db/result-policy";
 import { m } from "@/i18n";
@@ -42,6 +41,7 @@ import { examNav } from "@/utils/exam-nav";
 import { highlightExamples } from "@/utils/highlight-examples";
 import { loadCourse } from "@/utils/load-course";
 import { loadCourseExceptions } from "@/utils/load-exam-exceptions";
+import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { type ExamStaffData, loadExamStaffData } from "@/utils/load-exam-staff";
 import { loadReviews } from "@/utils/load-review";
 import { renderMarkdown } from "@/utils/markdown";
@@ -95,26 +95,8 @@ const preambleHtml =
 // no longer resolves is dropped rather than shown blank.
 const publicQuestions = canManage
 	? []
-	: found(
-			await Promise.all(
-				exam.questions.map(({ slug, version }) =>
-					db.question.findOne(
-						{ course: course.id, slug, version, public: true },
-						{ actor },
-					),
-				),
-			),
-		);
+	: await loadExamQuestions(course.id, exam, true, { actor });
 const studentQuestions = publicQuestions;
-
-/// The questions that resolved, without their database ids.
-function found<Q extends Question | QuestionPublic>(
-	questions: (Q | null)[],
-): Omit<Q, "id">[] {
-	return questions
-		.filter((question): question is Q => question !== null)
-		.map(({ id: _id, ...question }) => question);
-}
 
 // A student sees the exam through their own attempt: what they may do now,
 // and, once they are in it, the questions with their latest saved answers.
@@ -140,7 +122,7 @@ const badge = examBadge(phase, canManage ? undefined : state);
 const staff: ExamStaffData | null = canManage
 	? await loadExamStaffData(course.id, exam, actor, exceptions, now)
 	: null;
-// The instructor's table of questions: title and type from the course's own questions, statistics once an attempt closed.
+// The instructor's table of questions at the version the exam pins, statistics once an attempt closed.
 const questionRows: {
 	slug: string;
 	title: string;
@@ -150,12 +132,9 @@ const questionRows: {
 let questionStats: Map<string, QuestionStats> | undefined;
 if (staff) {
 	const stored = new Map(
-		(
-			await db.question.findMany(
-				{ course: course.id, public: false },
-				{ actor },
-			)
-		).map((entry) => [entry.slug, entry.question]),
+		(await loadExamQuestions(course.id, exam, false, { actor })).map(
+			(entry) => [entry.slug, entry.question],
+		),
 	);
 	for (const { slug, weight } of exam.questions) {
 		const document = stored.get(slug);

@@ -81,7 +81,7 @@ test("the overview lists the questions with Qn, title, type and weight", async (
 	).toBeVisible();
 });
 
-test("an exam whose questions all weigh 1 shows no weight column", async ({
+test("an exam whose questions all weigh 1 still shows the weight column", async ({
 	page,
 }) => {
 	const { course, href } = await setup();
@@ -89,12 +89,61 @@ test("an exam whose questions all weigh 1 shows no weight column", async ({
 
 	await page.goto(`${href}/plain`);
 
-	await expect(
-		page.locator("[data-testid=exam-questions] tbody tr"),
-	).toHaveCount(1);
+	const rows = page.locator("[data-testid=exam-questions] tbody tr");
+	await expect(rows).toHaveCount(1);
 	await expect(
 		page.getByRole("columnheader", { name: /^(Peso|Weight)$/ }),
-	).toHaveCount(0);
+	).toBeVisible();
+	await expect(rows.nth(0).locator("td").nth(2)).toHaveText("1");
+});
+
+test("the table reads title and weight from the version the exam pins, not the latest", async ({
+	page,
+}) => {
+	const { course, href } = await setup();
+	await db.question.create(
+		{
+			status: "PUBLISHED",
+			version: "1",
+			course: course.id,
+			slug: "evolving",
+			question: {
+				...capitalChoice,
+				id: "evolving",
+				title: "Old title",
+				weight: 2,
+			},
+		},
+		FULL_ACCESS,
+	);
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "pinned",
+		type: "EXAM",
+		status: "ONGOING",
+		questions: [{ slug: "evolving", version: "1" }],
+	});
+	await db.question.update(
+		{ course: course.id, slug: "evolving" },
+		{
+			version: "2",
+			question: {
+				...capitalChoice,
+				id: "evolving",
+				title: "New title",
+				weight: 5,
+			},
+		},
+		FULL_ACCESS,
+	);
+	await logInAs(page, course.instructor);
+
+	await page.goto(`${href}/pinned`);
+
+	const row = page.locator("[data-testid=exam-questions] tbody tr").nth(0);
+	await expect(row).toContainText("Old title");
+	await expect(row).not.toContainText("New title");
+	await expect(row.locator("td").nth(2)).toHaveText("2");
 });
 
 test("average and discrimination appear only once an attempt is closed", async ({

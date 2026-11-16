@@ -4,7 +4,6 @@ import ExamPreview, {
 	type PreviewQuestion,
 } from "@/components/exam/ExamPreview";
 import { RUNNER_ORIGIN } from "@/core/constants";
-import type { Question, QuestionPublic } from "@/db";
 import { db } from "@/db";
 import { m } from "@/i18n";
 import AppLayout from "@/layouts/AppLayout.astro";
@@ -13,6 +12,7 @@ import { effectiveCodeRun } from "@/services/code-run";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { examNav } from "@/utils/exam-nav";
 import { highlightExamples } from "@/utils/highlight-examples";
+import { loadExamQuestions } from "@/utils/load-exam-questions";
 import { loadExamStaff } from "@/utils/load-exam-staff";
 import type { PretestSource } from "@/utils/pretest-sources";
 
@@ -28,37 +28,14 @@ const { course, href, exam, data } = result;
 // biome-ignore lint/style/noNonNullAssertion: loadExamStaff already redirected an anonymous visitor.
 const actor = Astro.locals.actor!;
 
-/// The questions that resolved, without their database ids.
-function found<Q extends Question | QuestionPublic>(
-	questions: (Q | null)[],
-): Omit<Q, "id">[] {
-	return questions
-		.filter((question): question is Q => question !== null)
-		.map(({ id: _id, ...question }) => question);
-}
-
 // Each pinned question at the version the exam pins, with its answer key and in
-// its public form. A slug that no longer resolves is dropped rather than shown blank.
-const staffQuestions = found(
-	await Promise.all(
-		exam.questions.map(({ slug, version }) =>
-			db.question.findOne(
-				{ course: course.id, slug, version, public: false },
-				{ actor },
-			),
-		),
-	),
-);
-const publicQuestions = found(
-	await Promise.all(
-		exam.questions.map(({ slug, version }) =>
-			db.question.findOne(
-				{ course: course.id, slug, version, public: true },
-				{ actor },
-			),
-		),
-	),
-);
+// its public form.
+const staffQuestions = await loadExamQuestions(course.id, exam, false, {
+	actor,
+});
+const publicQuestions = await loadExamQuestions(course.id, exam, true, {
+	actor,
+});
 
 const codeRun = effectiveCodeRun(exam);
 // The preview shuffles like an attempt does, with a seed of its own.

@@ -2,9 +2,8 @@
 /**
  * The questions of an exam for its instructor: number, title, type, weight and, once attempts closed, how they went.
  *
- * Weight shows only when some question differs from 1. Average and
- * discrimination show only when `stats` is given; the full table lives in the
- * results page.
+ * Average and discrimination show only when `stats` is given; the full table
+ * lives in the results page.
  */
 import { locale, m } from "@/i18n";
 import { formatScore } from "@/services/exam-result";
@@ -33,7 +32,6 @@ interface Props {
 
 const { href, rows, stats } = Astro.props;
 
-const showWeight = rows.some((row) => row.weight !== 1);
 const twoDecimals = new Intl.NumberFormat(locale, {
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2,
@@ -58,7 +56,7 @@ const gapReasons: Record<DiscriminationGap, string> = {
             <tr>
               <th scope="col">{m.grades_stats_col_question()}</th>
               <th scope="col">{m.exams_detail_questions_col_type()}</th>
-              {showWeight && <th scope="col" class="text-right">{m.exams_detail_questions_col_weight()}</th>}
+              <th scope="col" class="text-right">{m.exams_detail_questions_col_weight()}</th>
               {stats && <th scope="col" class="text-right">{m.grades_stats_col_average()}</th>}
               {stats && <th scope="col" class="text-right">{m.grades_stats_col_discrimination()}</th>}
             </tr>
@@ -74,7 +72,7 @@ const gapReasons: Record<DiscriminationGap, string> = {
                     <a href={`${href}/questions/${row.slug}`} class="link">{row.title}</a>
                   </td>
                   <td class="text-sm text-muted">{row.type}</td>
-                  {showWeight && <td class="text-right tabular-nums">{numberFormat.format(row.weight)}</td>}
+                  <td class="text-right tabular-nums">{numberFormat.format(row.weight)}</td>
                   {stats && (
                     <td class="text-right tabular-nums">
                       {entry?.average != null ? formatScore(entry.average) : ""}
