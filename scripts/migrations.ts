@@ -139,21 +139,25 @@ function replay(db: DatabaseSync, sql: string): string[] {
 	for (const statement of statements(sql)) {
 		// SQLite cannot alter most columns, so Prisma rebuilds the table:
 		// CREATE "new_X", INSERT INTO "new_X" (cols) SELECT cols FROM "X",
-		// DROP "X", RENAME "new_X" TO "X". A column of X missing from the
-		// INSERT is dropped with its data.
+		// DROP "X", RENAME "new_X" TO "X". A column of X that the SELECT never
+		// reads is dropped with its data; one it reads, even inside an
+		// expression that converts it into another column, is kept.
 		const copy = statement.match(
-			/^INSERT INTO "new_(\w+)" \(([^)]*)\) SELECT .* FROM "(\w+)"$/s,
+			/^INSERT INTO "new_(\w+)" \(([^)]*)\) SELECT (.*) FROM "(\w+)"$/s,
 		);
-		if (copy?.[1] && copy[2] !== undefined && copy[3]) {
-			redefined.add(copy[3]);
-			const kept = new Set(copy[2].split(",").map((c) => unquote(c.trim())));
-			for (const column of columnsOf(db, copy[3])) {
-				if (!kept.has(column)) losses.push(`drops column ${copy[3]}.${column}`);
+		if (copy?.[1] && copy[2] !== undefined && copy[3] && copy[4]) {
+			redefined.add(copy[4]);
+			const filled = new Set(copy[2].split(",").map((c) => unquote(c.trim())));
+			const read = new Set(
+				[...copy[3].matchAll(/"(\w+)"/g)].map((match) => match[1]),
+			);
+			for (const column of columnsOf(db, copy[4])) {
+				if (!read.has(column)) losses.push(`drops column ${copy[4]}.${column}`);
 			}
 			for (const column of requiredColumnsOf(db, `new_${copy[1]}`)) {
-				if (!kept.has(column)) {
+				if (!filled.has(column)) {
 					losses.push(
-						`fails if ${copy[3]} has rows: ${column} is required and has no default`,
+						`fails if ${copy[4]} has rows: ${column} is required and has no default`,
 					);
 				}
 			}
