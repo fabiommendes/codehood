@@ -180,7 +180,7 @@ body {
 		transparent
 	);
 	border: var(--border) solid var(--color-edge);
-	border-radius: var(--radius-selector);
+	border-radius: calc(var(--radius-selector) / 2);
 	padding-block: 0.1em;
 	padding-inline: 0.35em;
 	font-weight: inherit;
