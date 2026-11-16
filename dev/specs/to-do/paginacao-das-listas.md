@@ -181,3 +181,90 @@ testar se é vazia.
 
 Peças de UI existentes: `src/components/ui/Table.tsx` e
 `src/components/ui/table-sort.ts`, que guarda a ordenação na URL.
+
+## Retomada (handoff de 2026-11-16)
+
+Estado: itens 1 a 10 feitos e enviados ao remoto. `test:perf` inteiro (antes
+do último rebase) deixou 3 de 249 rotas acima de 2×, todas abaixo de 7 ms;
+ver o andamento em `dev/issues/consultas-que-crescem-com-o-banco.md`.
+
+### O que falta, na ordem sugerida
+
+1. **Medir antes de mexer.** Rodar `rtk pnpm run test:perf` de novo: os
+   números são de antes do rebase sobre 20 commits do remoto. Guardar a saída
+   inteira num arquivo (o relatório fica em `.perf/<hora>/report.md`, mas os
+   nomes dos specs que falham só aparecem na saída do Playwright).
+2. **`GET /<curso>/attendance` (3,8×, 1,5 → 5,7 ms) e `POST /admin` (2,4×,
+   2,6 → 6,3 ms).** São as duas rotas que ainda descumprem o critério da
+   issue. Não investigadas. Em `/admin`, os convites pessoais são carregados
+   e filtrados em JS porque `inviteFilter` não tem `invitedRole`; incluí-lo
+   muda a API. Em `/attendance`, achar a consulta que cresce com
+   `test:perf test/<spec de attendance>` e a seção "Statements slow only on
+   the full database".
+3. **Item 11, `/roster` e `/attendance`.** O CSV e os totais precisam do
+   conjunto inteiro. Caminho provável: a tabela pagina com `findPage`, os
+   totais vêm de `count`/agregações no service e o CSV continua usando
+   `findMany`. Decidir com o humano se vale: a lista é limitada pelo tamanho
+   da turma, não do banco.
+4. **Item 12, `/resources`.** Agrupado por tipo e por evento; paginar grupos
+   não é óbvio. Mesma ressalva de tamanho.
+5. **Item 13, `/exams`.** `ExamsTable` ordena no cliente. Segue o molde de
+   `/questions` (cursor composto, `sort` na URL).
+6. **`/calendar`:** os eventos ainda vêm sem intervalo de datas. Não é
+   tabela: falta um filtro de datas no service de eventos. A rota REST de
+   `calendar-event` já tem um parâmetro de filtro chamado `limit`, que vai
+   colidir com o `limit` da paginação quando ela for paginada.
+7. **Consultas mais estreitas** (último parágrafo da fila): correção, notas,
+   revisões, `attempts/[username].astro`, `CourseHeader.astro`,
+   `getting-started.astro`.
+
+Os itens 3 a 5 seguem o tamanho de um curso, não o do banco. Se a medição do
+passo 1 não os acusar, a issue pode ser fechada sem eles e este spec vai para
+`to-review/` com a fila restante registrada como trabalho futuro.
+
+### Como fazer cada página
+
+O molde está pronto; copiar, não reinventar.
+
+- Service: `findPage` e `count` com o mesmo `where`; `findMany` continua
+  devolvendo array. Exemplos: `report.service.ts` (cursor simples por id),
+  `question.service.ts` (cursor composto com `sort`), `user.service.ts`
+  (cursor é a chave pública).
+- Página: `readPage`, `listUrl`, `actionHref` (`src/utils/list-page.ts`) e
+  `pageLinks` (`src/utils/page-links.ts`); `PaginatedTable` ou
+  `CursorPagination`. Exemplos: `src/pages/admin/users.astro` e
+  `src/pages/[discipline]/[course]/questions/index.astro`.
+- Testes: `test/admin-list-pages.spec.ts`, `test/question-pages.spec.ts`,
+  `test/question-bank-page.spec.ts`. Uma operação de leitura nova que não se
+  chame `findPage` ou `count` entra no conjunto READS de
+  `test/conditional-write-sweep.spec.ts`.
+- Uma rota REST que passa a paginar muda o OpenAPI: `pnpm run openapi:cli`.
+- Um subagente por item, em sequência, com as decisões já tomadas no
+  briefing; revisar o diff, rodar lint e os specs tocados, e só então commitar.
+
+### Armadilhas vistas
+
+- **Testes que supõem banco pequeno** falham só no banco cheio: não afirmar
+  "cabe em uma página" nem percorrer a lista inteira de usuários de 2 em 2.
+- **Seletores por texto parcial** (`hasText: "@alan"`) casam com usuários de
+  fábrica de nome parecido; comparar a célula inteira.
+- **`feedbacks: { none: {} }` e filtros de relação do Prisma** agregam ou
+  varrem a tabela inteira no SQLite. Partir do pai em SQL crua, como
+  `feedbackIdsOfCourse` e `response.settleExpired`.
+- **Tudo que lê tentativas** precisa ignorar a simulação do professor
+  (`realAttempt`, `realAttemptSql` em `src/db/preview-filter.ts`).
+- **Instáveis sob carga, passam sozinhos:** `island-conditional-write`
+  (issue aberta), `grading-code-answer.spec.ts:189`,
+  `exam-answer-edit-isolation.spec.ts:483`, `exam-delivery.spec.ts:247`.
+- **O checkout vizinho `../mdq`** precisa acompanhar o remoto dele e ser
+  reconstruído (`pnpm run build` em `mdq-js`) quando o typecheck reclamar de
+  `mdq/solid`.
+
+### Achados sem dono
+
+- `report.toReport` faz uma consulta de anexos por linha.
+- `profile.astro` e `blob.service.ts` chamam `report.findMany` sem limite.
+- `sort` não é parâmetro da lista REST de questões (sempre por slug).
+- Listar os feedbacks de um curso grande custa ~100 ms fora do SQLite, pelos
+  `include` de cada linha.
+- `GET /openapi.json` gasta ~460 ms de CPU síncrona por chamada, sem cache.
