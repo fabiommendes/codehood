@@ -265,11 +265,8 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 				</section>
 			</Show>
 
-			<div
-				class="overflow-hidden rounded-box border border-edge bg-base-100"
-				data-code-editor
-			>
-				<div class="flex flex-wrap items-center gap-2 border-b border-edge bg-base-200/50 px-3 py-1.5">
+			<div class="flex flex-col" data-code-editor>
+				<div class="flex flex-wrap items-center gap-2 px-1 py-1.5">
 					<span class="font-mono text-xs">{filename}</span>
 					<span class="badge badge-ghost badge-xs">
 						{languageLabel(language)}
@@ -303,7 +300,10 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 						</Show>
 					</div>
 				</div>
-				<div class={EDITOR_FOCUS_RING}>
+				{/* daisyUI's code mockup, as in the course snippets: dots on top, none of its gap before each `pre`. */}
+				<div
+					class={`${EDITOR_FOCUS_RING} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden`}
+				>
 					<div
 						class={`${EDITOR_SURFACE} max-h-96 [font-variant-ligatures:none]`}
 					>
@@ -323,7 +323,7 @@ export function CodeAnswer(props: CodeAnswerProps): JSX.Element {
 					</div>
 				</div>
 				<div
-					class="border-t border-edge bg-base-200/50 px-3 py-1.5 text-xs text-muted"
+					class="px-1 py-1.5 text-xs text-muted"
 					data-pretest-hint={offReason() ?? "on"}
 				>
 					{offReason() === "no-runner"

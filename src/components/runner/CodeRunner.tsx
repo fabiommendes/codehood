@@ -195,6 +195,8 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	/// Course material: no toolbar, code in a window frame, a round Run under
 	/// it, and the terminal hidden until the first run.
 	const minimal = props.mode === "snippet";
+	/// The code sits in daisyUI's code mockup: course snippets and editable answers. A submission under review stays plain.
+	const framed = minimal || props.mode === "answer";
 	const [terminalShown, setTerminalShown] = createSignal(
 		!props.compact && !minimal,
 	);
@@ -568,7 +570,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 	const progressBar = () => (
 		<Show when={state().phase === "preparing" && state().progress}>
 			<div
-				class={`flex items-center gap-3 px-3 py-2 text-xs ${minimal ? "" : "border-b border-edge bg-base-200/30"}`}
+				class={`flex items-center gap-3 px-3 py-2 text-xs ${framed ? "" : "border-b border-edge bg-base-200/30"}`}
 			>
 				<span class="shrink-0">{m.runner_downloading()}</span>
 				<progress
@@ -588,7 +590,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			{(message) => (
 				<p
 					role="status"
-					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${minimal ? "justify-center" : "border-b border-edge bg-base-200/30"}`}
+					class={`flex items-center gap-2 px-3 py-2 text-xs text-base-content/70 ${framed ? (minimal ? "justify-center" : "") : "border-b border-edge bg-base-200/30"}`}
 				>
 					{message()}
 				</p>
@@ -602,7 +604,9 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			class={
 				minimal
 					? `flex flex-col transition-[padding] duration-300 ${terminalShown() ? "" : "pb-5"}`
-					: "overflow-hidden rounded-box border border-edge bg-base-100"
+					: framed
+						? "flex flex-col"
+						: "overflow-hidden rounded-box border border-edge bg-base-100"
 			}
 			data-code-runner
 			data-submission={props.submission}
@@ -610,7 +614,9 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			data-phase={state().phase}
 		>
 			<Show when={!minimal}>
-				<div class="flex flex-wrap items-center gap-2 border-b border-edge bg-base-200/50 px-3 py-1.5">
+				<div
+					class={`flex flex-wrap items-center gap-2 py-1.5 ${framed ? "px-1" : "border-b border-edge bg-base-200/50 px-3"}`}
+				>
 					{props.toolbar}
 					<Show when={position()}>
 						{(at) => (
@@ -794,7 +800,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 			    In a snippet the wrapper is daisyUI's code mockup, with its dots
 			    and without the gap it puts before each `pre`. */}
 			<div
-				class={`${EDITOR_FOCUS_RING} ${minimal ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
+				class={`${EDITOR_FOCUS_RING} ${framed ? `${terminalShown() ? "rounded-b-none" : ""} mockup-code code-surface overflow-hidden pt-3 pb-1 before:mb-2 before:ml-1 [&_pre]:before:hidden` : ""}`}
 			>
 				<Show when={minimal}>
 					<div class="absolute top-1.5 right-2 z-10 flex items-center gap-1">
@@ -965,7 +971,7 @@ export function CodeRunner(props: CodeRunnerProps): JSX.Element {
 				inert={!terminalShown()}
 			>
 				<div
-					class={`min-h-0 overflow-hidden bg-(--code-bg) font-mono text-(length:--code-font-size) leading-5 text-(--code-fg) ${minimal ? "rounded-b-box" : ""} border-t border-(--code-border)`}
+					class={`min-h-0 overflow-hidden bg-(--code-bg) font-mono text-(length:--code-font-size) leading-5 text-(--code-fg) ${framed ? "rounded-b-box border-x border-b shadow-(--code-shadow)" : ""} border-t border-(--code-border)`}
 				>
 					<div class="flex items-center gap-2 bg-(--code-panel) px-3 py-1 text-[11px] tracking-wide text-(--code-muted) uppercase">
 						<span>{m.runner_terminal()}</span>

@@ -162,7 +162,7 @@ export function CodeEssayAnswer(props: CodeEssayAnswerProps): JSX.Element {
 	const footer = () => (
 		<div
 			role="status"
-			class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge bg-base-200/50 px-3 py-1.5 text-xs"
+			class="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 py-1.5 text-xs"
 			data-code-footer
 		>
 			<Show when={!props.codeRun}>
