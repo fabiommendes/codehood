@@ -1,12 +1,19 @@
 import { expect, test } from "@playwright/test";
+import { isoDate } from "@/core/schemas";
 import type { Weekday } from "@/db";
 import {
+	addDays,
+	courseWeekZero,
 	endOf,
+	endOfDate,
 	formatDateTime,
 	formatTime,
+	isDateWithin,
 	localDateOf,
 	parseLocalDateTime,
 	slotInstant,
+	startOfDate,
+	todayIn,
 	toInstant,
 	toLocalDateTimeInput,
 	weekdayOf,
@@ -83,24 +90,13 @@ test("endOf adds minutes, and an event crossing midnight ends on the next local 
 
 test("slotInstant lands on the slot's weekday and clock time in the zone, week after week, across a DST change", () => {
 	// 2026-03-02 is a Monday; New York springs forward on 2026-03-08.
-	const courseStart = toInstant("2026-03-02", 9 * 60, NY);
-
-	const week0 = slotInstant(courseStart, "WEDNESDAY", 0, 14 * 60, NY);
-	const week1 = slotInstant(courseStart, "WEDNESDAY", 1, 14 * 60, NY);
+	const week0 = slotInstant("2026-03-02", "WEDNESDAY", 0, 14 * 60, NY);
+	const week1 = slotInstant("2026-03-02", "WEDNESDAY", 1, 14 * 60, NY);
 
 	expect(week0.getTime()).toBe(toInstant("2026-03-04", 14 * 60, NY).getTime());
 	expect(week1.getTime()).toBe(toInstant("2026-03-11", 14 * 60, NY).getTime());
 	// One hour short of a week: the clock time holds, not the elapsed time.
 	expect(week1.getTime() - week0.getTime()).toBe((7 * 24 - 1) * 3600_000);
-});
-
-test("slotInstant reads the course start's weekday in the zone, not in UTC", () => {
-	// Sunday 23:00 in Sao Paulo is already Monday in UTC.
-	const zone = "America/Sao_Paulo";
-	const courseStart = toInstant("2026-01-04", 23 * 60, zone);
-
-	const monday = slotInstant(courseStart, "MONDAY", 0, 8 * 60, zone);
-	expect(localDateOf(monday, zone)).toBe("2026-01-05");
 });
 
 test("parseLocalDateTime reads a datetime-local value as wall time in SERVER_TZ, not in the process's zone", () => {
@@ -133,28 +129,58 @@ test("a datetime-local value survives the trip through parseLocalDateTime and ba
 
 test("slotInstant counts ISO weeks: week 0 is the Monday-to-Sunday week the course starts in", () => {
 	const zone = "America/Sao_Paulo";
-	// A Wednesday, as the CLI stores it (UTC midnight) and as the web form
-	// stores it (local midnight).
-	for (const courseStart of [
-		new Date("2026-03-11T00:00:00Z"),
-		toInstant("2026-03-11", 0, zone),
-	]) {
-		const at = (day: Weekday, week: number) =>
-			localDateOf(slotInstant(courseStart, day, week, 14 * 60, zone), zone);
-		expect(at("MONDAY", 0)).toBe("2026-03-09");
-		expect(at("WEDNESDAY", 0)).toBe("2026-03-11");
-		expect(at("MONDAY", 1)).toBe("2026-03-16");
-		expect(at("FRIDAY", 1)).toBe("2026-03-20");
-	}
+	const at = (day: Weekday, week: number) =>
+		localDateOf(slotInstant("2026-03-11", day, week, 14 * 60, zone), zone); // a Wednesday
+	expect(at("MONDAY", 0)).toBe("2026-03-09");
+	expect(at("WEDNESDAY", 0)).toBe("2026-03-11");
+	expect(at("MONDAY", 1)).toBe("2026-03-16");
+	expect(at("FRIDAY", 1)).toBe("2026-03-20");
 });
 
 test("a course starting on a Sunday has week 0 on the Monday before it", () => {
 	const zone = "America/Sao_Paulo";
-	const sunday = toInstant("2026-03-15", 0, zone);
 	expect(
-		localDateOf(slotInstant(sunday, "MONDAY", 0, 14 * 60, zone), zone),
+		localDateOf(slotInstant("2026-03-15", "MONDAY", 0, 14 * 60, zone), zone),
 	).toBe("2026-03-09");
 	expect(
-		localDateOf(slotInstant(sunday, "SUNDAY", 0, 14 * 60, zone), zone),
+		localDateOf(slotInstant("2026-03-15", "SUNDAY", 0, 14 * 60, zone), zone),
 	).toBe("2026-03-15");
+});
+
+test("courseWeekZero is the Monday of the start date's ISO week, whatever weekday it starts on", () => {
+	expect(courseWeekZero("2026-03-02")).toBe("2026-03-02"); // Monday
+	expect(courseWeekZero("2026-03-04")).toBe("2026-03-02"); // Wednesday
+	expect(courseWeekZero("2026-03-07")).toBe("2026-03-02"); // Saturday
+	expect(courseWeekZero("2026-03-08")).toBe("2026-03-02"); // Sunday
+	expect(courseWeekZero("2026-03-09")).toBe("2026-03-09"); // next Monday
+	expect(courseWeekZero("2026-01-01")).toBe("2025-12-29"); // across a year
+});
+
+test("addDays steps over month and year boundaries and accepts negative counts", () => {
+	expect(addDays("2026-02-27", 2)).toBe("2026-03-01");
+	expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+	expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
+});
+
+test("todayIn reads the calendar date in the zone, so just after midnight UTC it is still yesterday in UTC-3", () => {
+	const now = new Date("2026-03-10T01:30:00Z");
+	expect(todayIn("UTC", now)).toBe("2026-03-10");
+	expect(todayIn("America/Sao_Paulo", now)).toBe("2026-03-09");
+});
+
+test("startOfDate and endOfDate bound the whole day in the zone", () => {
+	const zone = "America/Sao_Paulo";
+	expect(startOfDate(isoDate.parse("2026-03-09"), zone).toISOString()).toBe(
+		"2026-03-09T03:00:00.000Z",
+	);
+	expect(endOfDate(isoDate.parse("2026-03-09"), zone).toISOString()).toBe(
+		"2026-03-10T03:00:00.000Z",
+	);
+});
+
+test("isDateWithin includes both ends of the window", () => {
+	expect(isDateWithin("2026-03-02", "2026-03-02", "2026-03-10")).toBe(true);
+	expect(isDateWithin("2026-03-10", "2026-03-02", "2026-03-10")).toBe(true);
+	expect(isDateWithin("2026-03-11", "2026-03-02", "2026-03-10")).toBe(false);
+	expect(isDateWithin("2026-03-01", "2026-03-02", "2026-03-10")).toBe(false);
 });

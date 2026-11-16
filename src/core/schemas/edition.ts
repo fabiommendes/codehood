@@ -1,19 +1,19 @@
 import { z } from "zod";
 import "./base";
 import { m } from "@/i18n";
-import { dateInput, editionSlug, instant } from "./base";
+import { editionSlug, isoDate } from "./base";
 
 export const editionSchema = z.object({
 	slug: editionSlug,
 	name: z.string().min(1),
-	startAt: z.date(),
-	endAt: z.date(),
+	startDate: isoDate,
+	endDate: isoDate,
 	createdAt: z.date(),
 });
 
 export const editionCreate = editionSchema
 	.pick({ slug: true, name: true })
-	.extend({ startAt: instant, endAt: instant });
+	.extend({ startDate: isoDate, endDate: isoDate });
 
 /**
  * The edition form: the fields of {@link editionCreate} as the browser submits
@@ -31,19 +31,19 @@ export const editionForm = editionCreate
 				placeholder: m.forms_placeholder_edition_name(),
 			},
 		}),
-		startAt: dateInput.meta({
+		startDate: isoDate.meta({
 			form: { label: m.forms_label_edition_starts() },
 		}),
-		endAt: dateInput.meta({ form: { label: m.forms_label_edition_ends() } }),
+		endDate: isoDate.meta({ form: { label: m.forms_label_edition_ends() } }),
 	})
-	.refine((edition) => edition.endAt > edition.startAt, {
-		path: ["endAt"],
+	.refine((edition) => edition.endDate >= edition.startDate, {
+		path: ["endDate"],
 		message: m.forms_schema_edition_end_after_start(),
 	});
 
 export const editionUpdate = editionSchema
 	.pick({ name: true })
-	.extend({ startAt: instant, endAt: instant })
+	.extend({ startDate: isoDate, endDate: isoDate })
 	.partial();
 
 export const editionPK = editionSchema.pick({

@@ -38,7 +38,15 @@ export const BRANDING: Record<string, Record<string, string>[]> = {
 		{ field: "timeSlotId", from: "number", to: "TimeSlotId" },
 		{ field: "examId", from: "number", to: "ExamId" },
 	],
-	Course: [{ field: "id", from: "number", to: "CourseId" }],
+	Course: [
+		{ field: "id", from: "number", to: "CourseId" },
+		{ field: "startDate", from: "string", to: "IsoDate" },
+		{ field: "endDate", from: "string", to: "IsoDate" },
+	],
+	Edition: [
+		{ field: "startDate", from: "string", to: "IsoDate" },
+		{ field: "endDate", from: "string", to: "IsoDate" },
+	],
 	Enrollment: [
 		{ field: "id", from: "number", to: "EnrollmentId" },
 		{ field: "username", from: "number", to: "UserId" },

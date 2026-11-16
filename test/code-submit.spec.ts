@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
+import { isoDate } from "@/core/schemas";
 import { db, type schema } from "@/db";
 import { PrismaClient, prisma } from "@/db/client";
 import { makeResponseService } from "@/db/services/response.service";
@@ -25,8 +26,8 @@ async function ensureEdition(slug = "2094-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);

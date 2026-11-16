@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotFound, PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { codeAt } from "@/services/roll-call-code";
@@ -50,8 +51,8 @@ async function makeCourse() {
 		{
 			slug: edition,
 			name: edition,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2030-12-31"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2030-12-31"),
 		},
 		FULL_ACCESS,
 	);
@@ -69,8 +70,8 @@ async function makeCourse() {
 	const course = await db.course.create(
 		{
 			...natural,
-			startAt: new Date("2026-02-02T00:00:00Z"),
-			endAt: new Date("2026-06-01T00:00:00Z"),
+			startDate: isoDate.parse("2026-02-02"),
+			endDate: isoDate.parse("2026-06-01"),
 		},
 		FULL_ACCESS,
 	);

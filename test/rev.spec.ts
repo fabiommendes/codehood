@@ -48,8 +48,8 @@ const cases: RevCase[] = [
 				discipline: course.discipline.slug,
 				instructor: course.instructor.username,
 				edition: course.edition.slug,
-				startAt: course.startAt,
-				endAt: course.endAt,
+				startDate: course.startDate,
+				endDate: course.endDate,
 			};
 			return { row: course, input };
 		},

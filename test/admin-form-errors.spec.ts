@@ -67,7 +67,7 @@ test.describe("edition form", () => {
 		await submit(page, form, button);
 
 		await expect(group(page, "Ends")).toContainText(
-			"Must be after the start date.",
+			"Must not be before the start date.",
 		);
 		expect(await db.edition.findOne({ slug }, FULL_ACCESS)).toBeNull();
 	});
@@ -120,7 +120,7 @@ test.describe("edition form", () => {
 			{ slug: edition.slug },
 			FULL_ACCESS,
 		);
-		expect(stored?.startAt.getTime()).toBe(edition.startAt.getTime());
+		expect(stored?.startDate).toBe(edition.startDate);
 	});
 });
 

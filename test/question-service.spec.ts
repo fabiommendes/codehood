@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { type Actor, FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import type { questionSchema } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import type { Question, QuestionPublic } from "@/db/services/question.service";
@@ -35,8 +36,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -56,8 +57,8 @@ async function makeCourse() {
 			discipline,
 			instructor: instructor.username,
 			edition: await ensureEdition(),
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

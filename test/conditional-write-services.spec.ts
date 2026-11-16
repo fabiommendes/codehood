@@ -2,8 +2,10 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotFound, PreconditionFailed } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
+import { startOfDate } from "@/utils/schedule-time";
 
 let seq = 0;
 const uniq = () => `${++seq}-${Math.random().toString(36).slice(2, 7)}`;
@@ -136,8 +138,8 @@ async function makeCourse() {
 		{
 			slug: edition,
 			name: edition,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2030-12-31"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2030-12-31"),
 		},
 		FULL_ACCESS,
 	);
@@ -160,8 +162,8 @@ async function makeCourse() {
 			discipline: discipline.slug,
 			instructor,
 			edition,
-			startAt: new Date("2026-02-02T00:00:00Z"),
-			endAt: new Date("2026-06-01T00:00:00Z"),
+			startDate: isoDate.parse("2026-02-02"),
+			endDate: isoDate.parse("2026-06-01"),
 		},
 		FULL_ACCESS,
 	);
@@ -225,8 +227,8 @@ test("course.upsert: null creates and fails when the course exists", async () =>
 		.upsert(
 			{
 				...other,
-				startAt: new Date("2026-02-02"),
-				endAt: new Date("2026-06-01"),
+				startDate: isoDate.parse("2026-02-02"),
+				endDate: isoDate.parse("2026-06-01"),
 			},
 			{ ...FULL_ACCESS, expectedUpdatedAt: null },
 		)
@@ -242,8 +244,8 @@ test("course.upsert: null creates a course that is absent", async () => {
 		{
 			...input,
 			discipline: discipline.slug,
-			startAt: new Date("2026-02-02"),
-			endAt: new Date("2026-06-01"),
+			startDate: isoDate.parse("2026-02-02"),
+			endDate: isoDate.parse("2026-06-01"),
 		},
 		{ ...FULL_ACCESS, expectedUpdatedAt: null },
 	);
@@ -252,7 +254,11 @@ test("course.upsert: null creates a course that is absent", async () => {
 
 test("course.upsert: Date updates when right, fails when stale or absent", async () => {
 	const { course, input } = await makeCourse();
-	const body = { ...input, startAt: course.startAt, endAt: course.endAt };
+	const body = {
+		...input,
+		startDate: course.startDate,
+		endDate: course.endDate,
+	};
 	const out = await db.course.upsert(
 		{ ...body, description: "up" },
 		{ ...FULL_ACCESS, expectedUpdatedAt: course.updatedAt },
@@ -288,7 +294,7 @@ test("course.delete: stale keeps the row, right version removes it", async () =>
 	expect(await db.course.findOne(pk, FULL_ACCESS)).toBeNull();
 });
 
-test("course.update of startAt bumps the updatedAt of the events it recomputes", async () => {
+test("course.update of startDate bumps the updatedAt of the events it recomputes", async () => {
 	const { course, pk } = await makeCourse();
 	const slot = await prisma.timeSlot.create({
 		data: {
@@ -305,13 +311,13 @@ test("course.update of startAt bumps the updatedAt of the events it recomputes",
 			timeSlotId: slot.id,
 			week: 0,
 			title: "Week 1",
-			startAt: course.startAt,
+			startAt: startOfDate(course.startDate),
 			durationMin: 60,
 		},
 	});
 	await db.course.update(
 		pk,
-		{ startAt: new Date("2026-02-09T00:00:00Z") },
+		{ startDate: isoDate.parse("2026-02-09") },
 		FULL_ACCESS,
 	);
 	const after = await prisma.calendarEvent.findUniqueOrThrow({
@@ -331,8 +337,8 @@ test("edition refuses expectedUpdatedAt on update, upsert and delete", async () 
 		{
 			slug,
 			name: slug,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-12-31"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-12-31"),
 		},
 		FULL_ACCESS,
 	);
@@ -345,8 +351,8 @@ test("edition refuses expectedUpdatedAt on update, upsert and delete", async () 
 			{
 				slug,
 				name: "x",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2026-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2026-12-31"),
 			},
 			opts,
 		),

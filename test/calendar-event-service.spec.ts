@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db, type ServiceOpts } from "@/db";
 import { prisma } from "@/db/client";
 import { localDateOf, toInstant, weekdayOf } from "@/utils/schedule-time";
@@ -34,8 +35,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -57,8 +58,8 @@ async function makeCourse(instructorUsername: string) {
 			edition: editionSlug,
 			// A Monday in SERVER_TZ (09:00 local), so a MONDAY slot's week 0
 			// lands exactly on the course's start date.
-			startAt: new Date("2026-01-05T12:00:00Z"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-05"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);
@@ -155,7 +156,7 @@ test("week 0 on the course's own start weekday is the start date, not a week lat
 		opts,
 	);
 
-	expect(localDateOf(week0.startAt)).toBe(localDateOf(course.startAt));
+	expect(localDateOf(week0.startAt)).toBe(course.startDate);
 	expect(weekdayOf(week0.startAt)).toBe("MONDAY");
 });
 
@@ -625,7 +626,7 @@ test("moving a course's start moves its events with it", async () => {
 
 	await db.course.update(
 		{ id: course.id },
-		{ startAt: new Date("2026-01-12T12:00:00Z") },
+		{ startDate: isoDate.parse("2026-01-12") },
 		FULL_ACCESS,
 	);
 

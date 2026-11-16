@@ -1,5 +1,6 @@
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { type APIRequestContext, expect, test } from "./fixtures";
@@ -51,8 +52,8 @@ async function setup(opts: { timed?: boolean } = {}) {
 			{
 				slug: "2026-1",
 				name: "2026-1",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -62,8 +63,8 @@ async function setup(opts: { timed?: boolean } = {}) {
 			discipline,
 			instructor: instructor.username,
 			edition: "2026-1",
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2030-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2030-05-01"),
 		},
 		FULL_ACCESS,
 	);

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData, NotAllowed } from "@/core/error";
 import type { CalendarEventId, CourseId, RollCallId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { codeAt } from "@/services/roll-call-code";
@@ -37,8 +38,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -58,8 +59,8 @@ async function makeCourse(instructorUsername: string) {
 			instructor: instructorUsername,
 			edition: await ensureEdition(),
 			// A Monday, so a MONDAY slot's week 0 lands on the course's start.
-			startAt: new Date("2026-01-05T12:00:00Z"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-05"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

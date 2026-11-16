@@ -1,6 +1,7 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 
 export const createCourseCommand = new Command("create-course")
@@ -45,11 +46,13 @@ export const createCourseCommand = new Command("create-course")
 			const description = await input({
 				message: "Description (optional):",
 			});
-			const startAtRaw = await input({ message: "Start date (YYYY-MM-DD):" });
-			const endAtRaw = await input({ message: "End date (YYYY-MM-DD):" });
-			const startAt = new Date(startAtRaw);
-			const endAt = new Date(endAtRaw);
-			if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+			const start = isoDate.safeParse(
+				await input({ message: "Start date (YYYY-MM-DD):" }),
+			);
+			const end = isoDate.safeParse(
+				await input({ message: "End date (YYYY-MM-DD):" }),
+			);
+			if (!start.success || !end.success) {
 				console.error("Start and end dates must be valid dates (YYYY-MM-DD).");
 				process.exitCode = 1;
 				return;
@@ -62,8 +65,8 @@ export const createCourseCommand = new Command("create-course")
 						instructor: instructor,
 						edition: edition,
 						description: description || undefined,
-						startAt,
-						endAt,
+						startDate: start.data,
+						endDate: end.data,
 					},
 					FULL_ACCESS,
 				);

@@ -12,12 +12,12 @@ import { courseRefWhere, valueOrNotFound } from "./utils";
  * @throws {@link NotFound} If the course cannot be found.
  * @throws {@link NotAllowed} If `opts.actor` lacks `select.perm` on the course.
  */
-export async function courseAccess<StartAt extends boolean = true>(
+export async function courseAccess<StartDate extends boolean = true>(
 	tx: PrismaTx,
 	ref: CourseNaturalKey | CourseId,
 	opts: ServiceOptsWithoutTx,
 	select?: {
-		startAt?: StartAt;
+		startDate?: StartDate;
 		perm?: "course.read" | "course.read-contents" | "course.update-contents";
 	},
 ): Promise<
@@ -26,7 +26,7 @@ export async function courseAccess<StartAt extends boolean = true>(
 			id: true;
 			instructor: { select: { username: true } };
 			enrollments: { select: { username: true } };
-			startAt: StartAt extends true ? true : false;
+			startDate: StartDate extends true ? true : false;
 		};
 	}>
 > {
@@ -37,7 +37,7 @@ export async function courseAccess<StartAt extends boolean = true>(
 			select: {
 				id: true,
 				instructor: { select: { username: true } },
-				startAt: select?.startAt ?? true,
+				startDate: select?.startDate ?? true,
 				enrollments: {
 					where: { status: "ACTIVE" },
 					select: { username: true },

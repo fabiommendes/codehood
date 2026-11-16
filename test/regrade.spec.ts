@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
-import { REGRADE_WINDOW_DAYS } from "@/core/schemas";
+import { isoDate, REGRADE_WINDOW_DAYS } from "@/core/schemas";
 import { db, type schema } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
@@ -365,8 +365,8 @@ async function ensureEdition(slug = "2095-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);

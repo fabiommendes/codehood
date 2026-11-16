@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { type APIRequestContext, expect, test } from "./fixtures";
 import { seedUser } from "./stories/helpers";
@@ -53,8 +54,8 @@ async function makeCourse(request: APIRequestContext) {
 			{
 				slug: "2026-1",
 				name: "2026-1",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -64,8 +65,8 @@ async function makeCourse(request: APIRequestContext) {
 			discipline,
 			instructor: instructor.username,
 			edition: "2026-1",
-			startAt: new Date("2026-01-05T12:00:00Z"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-05"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);
@@ -126,8 +127,8 @@ test("course: PUT answers an ETag, a stale If-Match is a 412 with the current up
 		instructor: instructor.username,
 		edition: "2026-1",
 		description,
-		startAt: "2026-01-05T12:00:00.000Z",
-		endAt: "2026-05-01T00:00:00.000Z",
+		startDate: "2026-01-05",
+		endDate: "2026-05-01",
 	});
 
 	// No header: today's last-write-wins, now with an ETag.

@@ -131,8 +131,8 @@ type WithCause = {
  *   data: {
  *     slug: "example",
  *     name: "Example Course",
- *     startAt: new Date(),
- *     endAt: new Date(),
+ *     startDate: "2026-08-03",
+ *     endDate: "2026-12-11",
  *   },
  * });
  */

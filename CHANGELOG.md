@@ -66,6 +66,47 @@
 - `/design/components` mostra uma instância por componente, com botões que
   trocam a variante e gravam a escolha na URL (`VariantPicker`).
 
+- Início e fim de curso e de edição são datas do calendário, não instantes:
+  `Course.startAt`/`endAt` e `Edition.startAt`/`endAt` viraram
+  `startDate`/`endDate`, `String` `YYYY-MM-DD` (tipo `IsoDate`, schema
+  `isoDate`, `format: date` no OpenAPI). Um curso está em andamento enquanto
+  `startDate <= hoje <= endDate` no fuso do servidor, com o fim inclusivo, e
+  a semana 0 é a semana ISO que contém `startDate` (`courseWeekZero` não tem
+  mais fuso nem `+12h`). Isso corrige o curso que pulava uma semana aos
+  domingos e os testes de agenda e de chamada que falhavam nesse dia
+  (`story-da-chamada-falha-aos-domingos` e `testes-de-calendario-falham-no-domingo`).
+  Uma edição de um dia só é válida (`endDate >= startDate`). O snapshot do
+  OpenAPI e o client da CLI foram regenerados; o código da CLI que usa os
+  campos novos vem em seguida. Spec em
+  `dev/specs/to-review/datas-de-curso-como-data.md`.
+
+### Migração
+
+A release que levar essa mudança escreve uma migração que remove as colunas
+`startAt`/`endAt` de `Course` e `Edition`; o `prisma migrate diff` para por
+perda de dados. Edite a migração para copiar os valores antes de remover. O
+Prisma grava `DateTime` no SQLite como texto ISO (`2026-09-28T03:00:00.000+00:00`),
+e a data é a regra de hoje, válida para os dois formatos gravados (meia-noite
+local e meia-noite UTC) em fusos entre UTC-12 e UTC+12: o instante mais doze
+horas, lido em UTC.
+
+```sql
+UPDATE "Course" SET
+  "startDate" = strftime('%Y-%m-%d', "startAt", '+12 hours'),
+  "endDate"   = strftime('%Y-%m-%d', "endAt",   '+12 hours');
+UPDATE "Edition" SET
+  "startDate" = strftime('%Y-%m-%d', "startAt", '+12 hours'),
+  "endDate"   = strftime('%Y-%m-%d', "endAt",   '+12 hours');
+```
+
+Num `INSERT INTO "new_Course" ... SELECT` de `RedefineTables`, use a mesma
+expressão `strftime(...)` no lugar de `"startAt"`/`"endAt"`. Se a coluna
+guardar milissegundos desde a época (inteiro), use
+`strftime('%Y-%m-%d', "startAt" / 1000 + 43200, 'unixepoch')`; confira com
+`SELECT typeof("startAt")` antes. Testado contra uma cópia do `dev.db` com o
+schema antigo: as seis linhas saíram com `YYYY-MM-DD` válido e nenhuma ficou
+nula.
+
 ## 0.4.0 (2026-11-13)
 
 ### Added

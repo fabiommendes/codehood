@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db, type User } from "@/db";
 import { repositoryTree } from "@/fixtures/repository.factory";
 import { hashBytes } from "@/utils/content-hash";
@@ -81,8 +82,8 @@ async function makeCourse() {
 			{
 				slug: "2026-1",
 				name: "2026-1",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -92,8 +93,8 @@ async function makeCourse() {
 			discipline,
 			instructor: instructor.username,
 			edition: "2026-1",
-			startAt: new Date("2026-01-05T12:00:00Z"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-05"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

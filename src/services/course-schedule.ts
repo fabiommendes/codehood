@@ -5,6 +5,7 @@
  * Pure: the page builds the entries with `calendarEntries`.
  */
 
+import type { IsoDate } from "@/typing/iso-date";
 import {
 	courseWeekZero,
 	localDateOf,
@@ -40,7 +41,7 @@ export interface CourseSchedule {
  */
 export function courseSchedule(
 	entries: readonly CalendarEntry[],
-	courseStart: Date,
+	courseStart: IsoDate,
 	now: Date,
 ): CourseSchedule {
 	const byWeek = new Map<number, CalendarEntry[]>();
@@ -75,7 +76,7 @@ function isHeld(entry: CalendarEntry): boolean {
 }
 
 /** Returns the course week `instant` falls in, counting local calendar days from the Monday of week 0. */
-export function weekOf(instant: Date, courseStart: Date): number {
+export function weekOf(instant: Date, courseStart: IsoDate): number {
 	const monday = Date.parse(`${courseWeekZero(courseStart)}T00:00:00Z`);
 	const days = (dayNumber(instant) - monday) / DAY;
 	return Math.floor(days / 7);

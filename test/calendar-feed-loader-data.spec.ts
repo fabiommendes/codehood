@@ -6,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedUserFactory } from "@/fixtures/user.factory";
 import { loadCalendarFeed } from "@/utils/load-calendar-feed";
+import { addDays, SERVER_TZ, todayIn } from "@/utils/schedule-time";
 import { resetDatabase } from "./stories/helpers";
 
 // loadCalendarFeed: which courses, events and exams a user's feed is built from.
@@ -15,19 +16,21 @@ test.beforeEach(resetDatabase);
 const DAY = 86_400_000;
 const NOW = new Date("2026-06-01T12:00:00Z");
 
+/// The calendar date `offset` days after the day of `NOW`.
+const day = (offset: number) => addDays(todayIn(SERVER_TZ, NOW), offset);
+
 /// A course the given user teaches that ended `daysAgo` days before `NOW`.
 async function courseEnded(daysAgo: number, instructor: string) {
-	const endAt = new Date(NOW.getTime() - daysAgo * DAY);
 	return persistedCourseFactory.create({
 		instructor,
-		startAt: new Date(endAt.getTime() - 100 * DAY),
-		endAt,
+		startDate: day(-daysAgo - 100),
+		endDate: day(-daysAgo),
 	});
 }
 
 test("a course that ended more than 60 days before now is left out, one that ended exactly 60 days before stays", async () => {
 	const teacher = await persistedUserFactory.create({ role: "INSTRUCTOR" });
-	const stale = await courseEnded(60 + 1 / 86_400, teacher.username);
+	const stale = await courseEnded(60 + 1, teacher.username);
 	const edge = await courseEnded(60, teacher.username);
 	const recent = await courseEnded(10, teacher.username);
 
@@ -56,16 +59,16 @@ test("an admin gets only the courses they teach or attend, not every course", as
 	const admin = await persistedUserFactory.create({ role: "ADMIN" });
 	const taught = await courseEnded(-30, admin.username);
 	const attended = await persistedCourseFactory.create({
-		startAt: new Date(NOW.getTime() - 10 * DAY),
-		endAt: new Date(NOW.getTime() + 30 * DAY),
+		startDate: day(-10),
+		endDate: day(30),
 	});
 	await db.enrollment.create(
 		{ course: attended.id, username: admin.username },
 		FULL_ACCESS,
 	);
 	const stranger = await persistedCourseFactory.create({
-		startAt: new Date(NOW.getTime() - 10 * DAY),
-		endAt: new Date(NOW.getTime() + 30 * DAY),
+		startDate: day(-10),
+		endDate: day(30),
 	});
 	await persistedCalendarEventFactory.create({ course: stranger.id });
 
@@ -80,8 +83,8 @@ test("an admin gets only the courses they teach or attend, not every course", as
 test("a student's entries hold their course's meetings and published exams but not a draft", async () => {
 	const course = await persistedCourseFactory.create(
 		{
-			startAt: new Date(NOW.getTime() - 10 * DAY),
-			endAt: new Date(NOW.getTime() + 60 * DAY),
+			startDate: day(-10),
+			endDate: day(60),
 		},
 		{ transient: { students: 1 } },
 	);

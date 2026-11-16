@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { type CourseWithEnrollment, hasPerm } from "@/auth/permissions";
 import type { CourseId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
+import { todayIn } from "@/utils/schedule-time";
 
 let uniq = 0;
 function tag(prefix: string): string {
@@ -39,8 +41,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -55,8 +57,8 @@ async function makeCourse(instructorUsername: string, disciplineSlug?: string) {
 			discipline: disciplineSlug ?? (await makeDiscipline()),
 			instructor: instructorUsername,
 			edition: "2026-1",
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);
@@ -71,8 +73,8 @@ test("create() rejects an edition that does not exist", async () => {
 				discipline: disciplineSlug,
 				instructor: instructor.username,
 				edition: "2099-1",
-				startAt: new Date(),
-				endAt: new Date(),
+				startDate: todayIn(),
+				endDate: todayIn(),
 			},
 			FULL_ACCESS,
 		),
@@ -88,8 +90,8 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 			discipline: disciplineSlug,
 			instructor: instructor.username,
 			edition: "2026-1",
-			startAt: new Date(),
-			endAt: new Date(),
+			startDate: todayIn(),
+			endDate: todayIn(),
 		},
 		FULL_ACCESS,
 	);
@@ -99,8 +101,8 @@ test("create() rejects a duplicate discipline/instructor/edition triple", async 
 				discipline: disciplineSlug,
 				instructor: instructor.username,
 				edition: "2026-1",
-				startAt: new Date(),
-				endAt: new Date(),
+				startDate: todayIn(),
+				endDate: todayIn(),
 			},
 			FULL_ACCESS,
 		),
@@ -120,8 +122,8 @@ test("create() rejects an instructor naming a different instructor, and allows a
 				discipline: disciplineSlug,
 				instructor: instructorB.username,
 				edition: "2026-1",
-				startAt: new Date(),
-				endAt: new Date(),
+				startDate: todayIn(),
+				endDate: todayIn(),
 			},
 			{ actor: instructorA },
 		),
@@ -132,8 +134,8 @@ test("create() rejects an instructor naming a different instructor, and allows a
 			discipline: disciplineSlug,
 			instructor: instructorB.username,
 			edition: "2026-1",
-			startAt: new Date(),
-			endAt: new Date(),
+			startDate: todayIn(),
+			endDate: todayIn(),
 		},
 		{ actor: admin },
 	);
@@ -168,7 +170,7 @@ test("update, delete, and enroll throw FORBIDDEN for a student and for an instru
 		await expect(
 			db.course.update(
 				{ id: course.id },
-				{ description: "x", startAt: new Date(), endAt: new Date() },
+				{ description: "x", startDate: todayIn(), endDate: todayIn() },
 				{ actor },
 			),
 		).rejects.toThrow();
@@ -301,8 +303,8 @@ test("upsert creates on first call, updates the same course on the second, and a
 			instructor: instructor.username,
 			edition: editionSlug,
 			description: "Before",
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);
@@ -314,15 +316,15 @@ test("upsert creates on first call, updates the same course on the second, and a
 			instructor: instructor.username,
 			edition: editionSlug,
 			description: null,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-06-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-06-01"),
 		},
 		FULL_ACCESS,
 	);
 	expect(updated.id).toBe(created.id); // same key, same row
 	expect(updated.description).toBeNull(); // cleared
-	expect(updated.endAt).toEqual(new Date("2026-06-01")); // changed
-	expect(updated.startAt).toEqual(new Date("2026-01-01")); // untouched
+	expect(updated.endDate).toBe("2026-06-01"); // changed
+	expect(updated.startDate).toBe("2026-01-01"); // untouched
 
 	const matching = await db.course.findMany(
 		{
@@ -340,8 +342,8 @@ test("upsert creates on first call, updates the same course on the second, and a
 			discipline: disciplineSlug,
 			instructor: otherInstructor.username,
 			edition: editionSlug,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);
@@ -351,8 +353,8 @@ test("upsert creates on first call, updates the same course on the second, and a
 test("upsert in a closed edition succeeds for an existing course, fails for a new one, and an actor with the outside-window permission bypasses both", async () => {
 	const closedSlug = "9911";
 	const closedWindow = {
-		startAt: new Date("2020-01-01"),
-		endAt: new Date("2020-06-01"),
+		startDate: isoDate.parse("2020-01-01"),
+		endDate: isoDate.parse("2020-06-01"),
 	};
 	await db.edition.create(
 		{ slug: closedSlug, name: closedSlug, ...closedWindow },
@@ -369,8 +371,8 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 			discipline: disciplineSlug,
 			instructor: instructor.username,
 			edition: closedSlug,
-			startAt: new Date("2020-01-01"),
-			endAt: new Date("2020-05-01"),
+			startDate: isoDate.parse("2020-01-01"),
+			endDate: isoDate.parse("2020-05-01"),
 		},
 		{ actor: admin },
 	);
@@ -383,8 +385,8 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 			instructor: instructor.username,
 			edition: closedSlug,
 			description: "resynced",
-			startAt: new Date("2020-01-01"),
-			endAt: new Date("2020-05-01"),
+			startDate: isoDate.parse("2020-01-01"),
+			endDate: isoDate.parse("2020-05-01"),
 		},
 		{ actor: instructor },
 	);
@@ -400,8 +402,8 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 				discipline: disciplineSlug2,
 				instructor: instructor.username,
 				edition: closedSlug,
-				startAt: new Date("2020-01-01"),
-				endAt: new Date("2020-05-01"),
+				startDate: isoDate.parse("2020-01-01"),
+				endDate: isoDate.parse("2020-05-01"),
 			},
 			{ actor: instructor },
 		),
@@ -413,8 +415,8 @@ test("upsert in a closed edition succeeds for an existing course, fails for a ne
 			discipline: disciplineSlug2,
 			instructor: instructor.username,
 			edition: closedSlug,
-			startAt: new Date("2020-01-01"),
-			endAt: new Date("2020-05-01"),
+			startDate: isoDate.parse("2020-01-01"),
+			endDate: isoDate.parse("2020-05-01"),
 		},
 		{ actor: admin },
 	);
@@ -430,8 +432,8 @@ test("two concurrent upserts of a new course both succeed on one row", async () 
 		instructor: instructor.username,
 		edition: editionSlug,
 		description,
-		startAt: new Date("2026-01-01"),
-		endAt: new Date("2026-05-01"),
+		startDate: isoDate.parse("2026-01-01"),
+		endDate: isoDate.parse("2026-05-01"),
 	});
 
 	const [a, b] = await Promise.all([

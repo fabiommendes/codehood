@@ -6,7 +6,9 @@ import Badge from "@/components/ui/Badge";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { editionForm } from "@/core/schemas";
 import type { FormState } from "@/forms/form-state";
-import { locale, m, SLOT, splitAtSlot } from "@/i18n";
+import { m, SLOT, splitAtSlot } from "@/i18n";
+import type { IsoDate } from "@/typing/iso-date";
+import { formatIsoDate } from "@/utils/schedule-time";
 
 /**
  * One row's worth of pre-computed display data. Kept free of `Edition` and
@@ -17,8 +19,8 @@ import { locale, m, SLOT, splitAtSlot } from "@/i18n";
 export interface EditionRow {
 	slug: string;
 	name: string;
-	startAt: Date;
-	endAt: Date;
+	startDate: IsoDate;
+	endDate: IsoDate;
 	courseCount: number;
 	isLive: boolean;
 }
@@ -31,26 +33,10 @@ interface Props {
 	failedSlug?: string;
 }
 
-// startAt/endAt are calendar dates with no meaningful time-of-day but are
-// stored as UTC midnight, same as the <input type="date"> values they
-// round-trip through — format/read in UTC too, or a negative-offset server
-// timezone renders "2027-02-01" as "Jan 31".
-function formatWindow(row: Pick<EditionRow, "startAt" | "endAt">): string {
-	const short: Intl.DateTimeFormatOptions = {
-		month: "short",
-		day: "numeric",
-		timeZone: "UTC",
-	};
-	const start = row.startAt.toLocaleDateString(locale, short);
-	const end = row.endAt.toLocaleDateString(locale, {
-		...short,
-		year: "numeric",
-	});
+function formatWindow(row: Pick<EditionRow, "startDate" | "endDate">): string {
+	const start = formatIsoDate(row.startDate, { year: undefined });
+	const end = formatIsoDate(row.endDate);
 	return `${start} – ${end}`;
-}
-
-function toDateInputValue(date: Date): string {
-	return date.toISOString().slice(0, 10);
 }
 
 /// The heading of the edit dialog split around the slug, which is rendered apart.
@@ -61,13 +47,18 @@ const [EDIT_BEFORE, EDIT_AFTER] = splitAtSlot(
 export default function EditionsTable(props: Props): JSX.Element {
 	/// A field of `row`'s dialog: the stored value, or what was typed when
 	/// that row's submit failed.
-	const editField = (row: EditionRow, name: "name" | "startAt" | "endAt") => {
+	const editField = (
+		row: EditionRow,
+		name: "name" | "startDate" | "endDate",
+	) => {
 		const view = props.editForm.field(name);
 		const failed = props.failedSlug === row.slug;
 		const stored =
 			name === "name"
 				? row.name
-				: toDateInputValue(name === "startAt" ? row.startAt : row.endAt);
+				: name === "startDate"
+					? row.startDate
+					: row.endDate;
 		return {
 			...view,
 			id: `edit-edition-${row.slug}-${name}`,
@@ -190,8 +181,8 @@ export default function EditionsTable(props: Props): JSX.Element {
 									<FormAlert error={props.editForm.error} />
 								</Show>
 								<Field {...editField(row, "name")} />
-								<Field {...editField(row, "startAt")} />
-								<Field {...editField(row, "endAt")} />
+								<Field {...editField(row, "startDate")} />
+								<Field {...editField(row, "endDate")} />
 								<div class="modal-action">
 									<button type="submit" class="btn btn-primary">
 										{m.admin_save()}

@@ -4,6 +4,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import type { UserId } from "@/core/schemas";
 import { db } from "@/db";
 import { disciplineFactory } from "@/fixtures/discipline.factory";
+import { addDays, todayIn } from "@/utils/schedule-time";
 
 function actorOf(
 	username: UserId,
@@ -86,8 +87,8 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 		{
 			slug: "2201",
 			name: "2201",
-			startAt: new Date(Date.now() - 86_400_000),
-			endAt: new Date(Date.now() + 86_400_000),
+			startDate: addDays(todayIn(), -1),
+			endDate: addDays(todayIn(), 1),
 		},
 		FULL_ACCESS,
 	);
@@ -108,8 +109,8 @@ test("delete() refuses while a course uses the discipline, and succeeds once it 
 			discipline: slug,
 			instructor: instructor.username,
 			edition: "2201",
-			startAt: new Date(),
-			endAt: new Date(),
+			startDate: todayIn(),
+			endDate: todayIn(),
 		},
 		FULL_ACCESS,
 	);

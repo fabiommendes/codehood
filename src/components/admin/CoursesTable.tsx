@@ -1,27 +1,17 @@
 import type { JSX } from "solid-js";
 import Table, { type ColumnConfig } from "@/components/ui/Table";
 import type { Course } from "@/db";
-import { locale, m } from "@/i18n";
+import { m } from "@/i18n";
 import { courseHref } from "@/urls";
+import { formatIsoDate } from "@/utils/schedule-time";
 
 interface Props {
 	courses: Course[];
 }
 
-// startAt/endAt are calendar dates with no meaningful time-of-day but stored
-// as UTC midnight — format in UTC too, or a negative-offset server timezone
-// renders "2026-01-05" as "Jan 4".
-function formatTerm(row: Pick<Course, "startAt" | "endAt">): string {
-	const short: Intl.DateTimeFormatOptions = {
-		month: "short",
-		day: "numeric",
-		timeZone: "UTC",
-	};
-	const start = row.startAt.toLocaleDateString(locale, short);
-	const end = row.endAt.toLocaleDateString(locale, {
-		...short,
-		year: "numeric",
-	});
+function formatTerm(row: Pick<Course, "startDate" | "endDate">): string {
+	const start = formatIsoDate(row.startDate, { year: undefined });
+	const end = formatIsoDate(row.endDate);
 	return `${start} – ${end}`;
 }
 

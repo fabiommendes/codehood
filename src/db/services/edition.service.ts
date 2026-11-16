@@ -12,6 +12,7 @@ import type { ServiceOptsWithoutTx } from "@/db/base-service";
 import { rejectExpectedUpdatedAt } from "@/db/conditional-write";
 import { defineService, op } from "@/db/define-service";
 import { m } from "@/i18n";
+import { isDateWithin, todayIn } from "@/utils/schedule-time";
 import type { PrismaTx } from "../client";
 
 //
@@ -44,7 +45,7 @@ export const makeEditionService = defineService<EditionT>()(() => {
 	 * Creates an edition.
 	 *
 	 * Rejects a slug that doesn't match `EDITION_RE`, and a window where
-	 * `startAt` is not before `endAt`.
+	 * `startDate` is after `endDate`.
 	 */
 	const create = op({
 		args: [editionCreate],
@@ -55,15 +56,15 @@ export const makeEditionService = defineService<EditionT>()(() => {
 			opts: ServiceOptsWithoutTx,
 		): Promise<Edition> => {
 			ensurePerm(opts.actor, "edition.create");
-			assertWindow(input.startAt, input.endAt);
+			assertWindow(input.startDate, input.endDate);
 
 			try {
 				return await tx.edition.create({
 					data: {
 						slug: input.slug,
 						name: input.name,
-						startAt: input.startAt,
-						endAt: input.endAt,
+						startDate: input.startDate,
+						endDate: input.endDate,
 					},
 				});
 			} catch (error) {
@@ -104,12 +105,14 @@ export const makeEditionService = defineService<EditionT>()(() => {
 			filter: EditionFilter,
 			_opts: ServiceOptsWithoutTx,
 		): Promise<Edition[]> => {
-			const now = new Date();
+			const today = todayIn();
 			return tx.edition.findMany({
 				where: {
 					AND: [
 						filter.slugs ? { slug: { in: filter.slugs } } : {},
-						filter.active ? { startAt: { lte: now }, endAt: { gte: now } } : {},
+						filter.active
+							? { startDate: { lte: today }, endDate: { gte: today } }
+							: {},
 					],
 				},
 				orderBy: { slug: "desc" },
@@ -145,8 +148,8 @@ export const makeEditionService = defineService<EditionT>()(() => {
 				});
 			}
 			assertWindow(
-				fields.startAt ?? current.startAt,
-				fields.endAt ?? current.endAt,
+				fields.startDate ?? current.startDate,
+				fields.endDate ?? current.endDate,
 			);
 			return tx.edition.update({
 				where: { slug: filter.slug },
@@ -172,20 +175,20 @@ export const makeEditionService = defineService<EditionT>()(() => {
 		): Promise<Edition> => {
 			ensurePerm(opts.actor, "edition.create");
 			rejectExpectedUpdatedAt(opts);
-			assertWindow(input.startAt, input.endAt);
+			assertWindow(input.startDate, input.endDate);
 
 			return tx.edition.upsert({
 				where: { slug: input.slug },
 				update: {
 					name: input.name,
-					startAt: input.startAt,
-					endAt: input.endAt,
+					startDate: input.startDate,
+					endDate: input.endDate,
 				},
 				create: {
 					slug: input.slug,
 					name: input.name,
-					startAt: input.startAt,
-					endAt: input.endAt,
+					startDate: input.startDate,
+					endDate: input.endDate,
 				},
 			});
 		},
@@ -229,10 +232,10 @@ export const makeEditionService = defineService<EditionT>()(() => {
 /** The edition service, as built by {@link makeEditionService}. */
 export type EditionService = ReturnType<typeof makeEditionService>;
 
-function assertWindow(startAt: Date, endAt: Date): void {
-	if (startAt >= endAt) {
+function assertWindow(startDate: string, endDate: string): void {
+	if (startDate > endDate) {
 		throw new InvalidData({
-			endAt: [
+			endDate: [
 				{
 					code: "invalid",
 					message: m.errors_edition_window(),
@@ -242,10 +245,10 @@ function assertWindow(startAt: Date, endAt: Date): void {
 	}
 }
 
-/** Whether `edition`'s active window contains `at` (default: now). */
+/** Whether `edition`'s window contains `today` (default: today in the server's zone), both ends inclusive. */
 export function isEditionOpen(
-	edition: Pick<Edition, "startAt" | "endAt">,
-	at: Date = new Date(),
+	edition: { startDate: string; endDate: string },
+	today: string = todayIn(),
 ): boolean {
-	return edition.startAt <= at && at <= edition.endAt;
+	return isDateWithin(today, edition.startDate, edition.endDate);
 }

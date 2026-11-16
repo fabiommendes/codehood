@@ -6,8 +6,7 @@ import {
 	calendarEntries,
 } from "@/services/calendar-entries";
 import { loadCourseExceptions } from "./load-exam-exceptions";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { addDays, SERVER_TZ, todayIn } from "./schedule-time";
 
 /// How long after a course ends its entries stay in the feed.
 export const FEED_COURSE_GRACE_DAYS = 60;
@@ -25,7 +24,7 @@ export interface CalendarFeedData {
  *
  * The courses are those `owner` teaches or holds an `ACTIVE` enrollment in,
  * whatever their role (an admin gets no other course), minus those whose
- * `endAt` is more than {@link FEED_COURSE_GRACE_DAYS} days before `now`; a
+ * `endDate` is more than {@link FEED_COURSE_GRACE_DAYS} days before `now`; a
  * course that ended exactly that long ago stays. Every read runs with `owner`
  * as the actor. Meetings come from one `calendarEvent.findMany` and exams
  * from one `exam.findManyInCourses` restricted to the `SCHEDULED`, `ONGOING`
@@ -36,12 +35,12 @@ export async function loadCalendarFeed(
 	owner: UserActor,
 	now: Date,
 ): Promise<CalendarFeedData> {
-	const cutoff = now.getTime() - FEED_COURSE_GRACE_DAYS * MS_PER_DAY;
+	const cutoff = addDays(todayIn(SERVER_TZ, now), -FEED_COURSE_GRACE_DAYS);
 	const member = await db.course.findMany(
 		{ member: owner.username },
 		{ actor: owner },
 	);
-	const courses = member.filter((course) => course.endAt.getTime() >= cutoff);
+	const courses = member.filter((course) => course.endDate >= cutoff);
 	if (courses.length === 0) return { entries: [], courses: [] };
 
 	const courseIds = courses.map((course) => course.id);

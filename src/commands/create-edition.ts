@@ -1,6 +1,7 @@
 import { input } from "@inquirer/prompts";
 import { Command } from "commander";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 
 export const createEditionCommand = new Command("create-edition")
@@ -9,15 +10,13 @@ export const createEditionCommand = new Command("create-edition")
 	.option("-n, --name <name>", "display name, e.g. '2026 · first term'")
 	.action(async (slug: string, options: { name?: string }) => {
 		const name = options.name ?? (await input({ message: "Display name:" }));
-		const startAtRaw = await input({
-			message: "Open for new courses from (YYYY-MM-DD):",
-		});
-		const endAtRaw = await input({
-			message: "Open for new courses until (YYYY-MM-DD):",
-		});
-		const startAt = new Date(startAtRaw);
-		const endAt = new Date(endAtRaw);
-		if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+		const start = isoDate.safeParse(
+			await input({ message: "Open for new courses from (YYYY-MM-DD):" }),
+		);
+		const end = isoDate.safeParse(
+			await input({ message: "Open for new courses until (YYYY-MM-DD):" }),
+		);
+		if (!start.success || !end.success) {
 			console.error("Start and end dates must be valid dates (YYYY-MM-DD).");
 			process.exitCode = 1;
 			return;
@@ -25,7 +24,7 @@ export const createEditionCommand = new Command("create-edition")
 
 		try {
 			const edition = await db.edition.create(
-				{ slug, name, startAt, endAt },
+				{ slug, name, startDate: start.data, endDate: end.data },
 				FULL_ACCESS,
 			);
 			console.log(`Created edition "${edition.slug}" (${edition.name}).`);

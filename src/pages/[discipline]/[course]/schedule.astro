@@ -67,7 +67,7 @@ const entries = calendarEntries(
 		exception: exceptions.get(exam.slug)?.get(actor.username) ?? null,
 	})),
 );
-const { past, ahead, next } = courseSchedule(entries, course.startAt, now);
+const { past, ahead, next } = courseSchedule(entries, course.startDate, now);
 // Folding every week away would leave an empty page once the term is over.
 const foldPast = past.length > 0 && ahead.length > 0;
 

@@ -185,13 +185,13 @@ const { past, ahead, next } = courseSchedule(
 			exception: ownExceptions.get(exam.slug) ?? null,
 		})),
 	),
-	course.startAt,
+	course.startDate,
 	now,
 );
 /// This week of the Schedule tab, absent when nothing falls in it. It may
 /// count as past already, when every meeting in it is over.
 const thisWeek = [...past, ...ahead].find(
-	({ week }) => week === weekOf(now, course.startAt),
+	({ week }) => week === weekOf(now, course.startDate),
 );
 /// Exams already listed in this week, which the open exams leave out.
 const thisWeekExams = new Set(

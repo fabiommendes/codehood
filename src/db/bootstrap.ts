@@ -14,6 +14,7 @@ import {
 	type InputKind,
 	replayEdits,
 } from "@/services/answer-edits/codec";
+import type { IsoDate } from "@/typing/iso-date";
 import { hashBytes } from "@/utils/content-hash";
 import {
 	courseWeekZero,
@@ -207,14 +208,14 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	const live = {
 		slug: editionSlugOf(liveStart),
 		name: editionNameOf(liveStart),
-		startAt: liveStart,
-		endAt: liveEnd,
+		startDate: liveStart,
+		endDate: liveEnd,
 	};
 	const past = {
-		slug: editionSlugOf(pastStart),
-		name: editionNameOf(pastStart),
-		startAt: pastStart,
-		endAt: pastEnd,
+		slug: editionSlugOf(localDateOf(pastStart)),
+		name: editionNameOf(localDateOf(pastStart)),
+		startDate: localDateOf(pastStart),
+		endDate: localDateOf(pastEnd),
 	};
 	if (live.slug === past.slug) {
 		throw new Error(
@@ -232,8 +233,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			edition: live.slug,
 			description:
 				"A first course in programming: variables, control flow, functions, and enough data structures to get dangerous.",
-			startAt: live.startAt,
-			endAt: live.endAt,
+			startDate: live.startDate,
+			endDate: live.endDate,
 		},
 		FULL_ACCESS,
 	);
@@ -244,8 +245,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			edition: live.slug,
 			description:
 				"Arrays, linked lists, trees, and graphs, with an eye toward complexity.",
-			startAt: live.startAt,
-			endAt: live.endAt,
+			startDate: live.startDate,
+			endDate: live.endDate,
 		},
 		FULL_ACCESS,
 	);
@@ -872,13 +873,11 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 
 	// A few meetings in the coming weeks, counted from the day the seed runs,
 	// so the calendar's upcoming list and "today" always have something near.
-	const weeksSoFar = cs101.startAt
-		? Math.floor(
-				(Date.parse(`${localDateOf(new Date())}T00:00:00Z`) -
-					Date.parse(`${courseWeekZero(cs101.startAt)}T00:00:00Z`)) /
-					(7 * 24 * 3600 * 1000),
-			)
-		: 0;
+	const weeksSoFar = Math.floor(
+		(Date.parse(`${localDateOf(new Date())}T00:00:00Z`) -
+			Date.parse(`${courseWeekZero(cs101.startDate)}T00:00:00Z`)) /
+			(7 * 24 * 3600 * 1000),
+	);
 	for (const event of [
 		{
 			slot: cs101Mon,
@@ -942,9 +941,9 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	const todayWeek = [weeksSoFar - 1, weeksSoFar, weeksSoFar + 1].find(
 		(week) =>
 			week >= 0 &&
-			cs101.startAt &&
-			localDateOf(slotInstant(cs101.startAt, cs101Today.day, week, 22 * 60)) ===
-				localDateOf(new Date()),
+			localDateOf(
+				slotInstant(cs101.startDate, cs101Today.day, week, 22 * 60),
+			) === localDateOf(new Date()),
 	);
 	if (todayWeek !== undefined) {
 		await db.calendarEvent.create(
@@ -962,7 +961,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	// Every other week of the term gets a plain lecture and lab, so the schedule
 	// has a meeting in each slot from the first week to the last.
 	const totalWeeks = Math.round(
-		((cs101.endAt?.getTime() ?? 0) - (cs101.startAt?.getTime() ?? 0)) /
+		(Date.parse(`${cs101.endDate}T00:00:00Z`) -
+			Date.parse(`${cs101.startDate}T00:00:00Z`)) /
 			(7 * 24 * 3600 * 1000),
 	);
 	for (let week = 0; week < totalWeeks; week++) {
@@ -1404,8 +1404,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 			instructor: ada.username,
 			edition: past.slug,
 			description: "Last term's run of the course, already over.",
-			startAt: past.startAt,
-			endAt: past.endAt,
+			startDate: past.startDate,
+			endDate: past.endDate,
 		},
 		FULL_ACCESS,
 	);
@@ -1771,22 +1771,19 @@ async function seedReports(instructor: User, edition: string): Promise<void> {
 }
 
 /// The `YYYY-N` edition slug of the term `start` falls in: 1 up to June, 2 after.
-function editionSlugOf(start: Date): string {
-	const [year, month] = localDateOf(start).split("-").map(Number) as [
-		number,
-		number,
-	];
+function editionSlugOf(start: IsoDate): string {
+	const [year, month] = start.split("-").map(Number) as [number, number];
 	return `${year}-${month <= 6 ? 1 : 2}`;
 }
 
 /// The edition display name matching {@link editionSlugOf}.
-function editionNameOf(start: Date): string {
+function editionNameOf(start: IsoDate): string {
 	const slug = editionSlugOf(start);
 	return `${slug.slice(0, 4)} · ${slug.endsWith("1") ? "first" : "second"} term`;
 }
 
 /// Midnight (server time zone) of the Monday `weeks` weeks away from the one of `date`'s week.
-function mondayOfWeek(date: Date, weeks: number): Date {
+function mondayOfWeek(date: Date, weeks: number): IsoDate {
 	const [year, month, day] = localDateOf(date).split("-").map(Number) as [
 		number,
 		number,
@@ -1797,7 +1794,7 @@ function mondayOfWeek(date: Date, weeks: number): Date {
 	const monday = new Date(
 		Date.UTC(year, month - 1, day - sinceMonday + weeks * 7),
 	);
-	return toInstant(monday.toISOString().slice(0, 10), 0);
+	return monday.toISOString().slice(0, 10) as IsoDate;
 }
 
 /// Roll calls on three past cs101 meetings, covering the attendance states the grid shows.
@@ -2356,12 +2353,7 @@ async function seedReleasedQuiz(
 		{
 			status: "COMPLETED",
 			// The Monday lecture of the course's fourth week, long over by now.
-			scheduledAt: slotInstant(
-				cs101.startAt ?? new Date(),
-				"MONDAY",
-				3,
-				14 * 60,
-			),
+			scheduledAt: slotInstant(cs101.startDate, "MONDAY", 3, 14 * 60),
 		},
 		FULL_ACCESS,
 	);
@@ -3084,7 +3076,7 @@ async function seedOpenQuiz(course: Course["id"]): Promise<void> {
  * Gives the grading queue, the exam's results, the attempt pages and the
  * grades table something to show: answers graded by a bot and by the
  * instructor, pending ones, one marked will-not-grade, and questions left
- * unanswered.
+ * unanswered. Bob also holds an exception.
  */
 async function seedGradedExam(
 	course: Course["id"],
@@ -3229,6 +3221,17 @@ async function seedGradedExam(
 	await db.exam.update(
 		{ course, slug: exam },
 		{ status: "COMPLETED" },
+		FULL_ACCESS,
+	);
+	// An exception on an exam that still has pending answers, for the exceptions page and the card.
+	await db.examException.create(
+		{
+			course,
+			exam,
+			username: students.bob.username,
+			extraTime: { minutes: 15 },
+			note: "Needs more time",
+		},
 		FULL_ACCESS,
 	);
 }

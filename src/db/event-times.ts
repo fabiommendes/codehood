@@ -25,14 +25,14 @@ export async function recomputeEventTimes(
 			startAt: true,
 			durationMin: true,
 			timeSlot: { select: { day: true, startMin: true, durationMin: true } },
-			course: { select: { startAt: true } },
+			course: { select: { startDate: true } },
 		},
 	});
 
 	let changed = 0;
 	for (const event of events) {
 		const startAt = slotInstant(
-			event.course.startAt,
+			event.course.startDate,
 			event.timeSlot.day,
 			event.week,
 			event.timeSlot.startMin,

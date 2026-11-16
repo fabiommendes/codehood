@@ -25,6 +25,8 @@ export {
 	type FeedbackId,
 	type GradeColumnId,
 	type InviteId,
+	type IsoDate,
+	isoDate,
 	type MimeType,
 	mimeType,
 	type PassphraseId,

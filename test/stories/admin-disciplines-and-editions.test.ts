@@ -87,8 +87,8 @@ test("admin: create an edition", async ({ page }) => {
 	// Instructors can only create courses inside the window the admin just
 	// opened — that window is the part the page can't show back visually.
 	const stored = await db.edition.findOne({ slug }, FULL_ACCESS);
-	expect(stored?.startAt.toISOString().slice(0, 10)).toBe("2026-08-01");
-	expect(stored?.endAt.toISOString().slice(0, 10)).toBe("2026-12-15");
+	expect(stored?.startDate).toBe("2026-08-01");
+	expect(stored?.endDate).toBe("2026-12-15");
 });
 
 test("admin: delete an edition or discipline created by mistake", async ({

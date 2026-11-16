@@ -1,4 +1,5 @@
 import { type Actor, FULL_ACCESS, type UserActor } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db, type schema, type User } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
@@ -37,8 +38,8 @@ async function ensureEdition(slug = "2097-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);

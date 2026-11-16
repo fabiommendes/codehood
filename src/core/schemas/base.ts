@@ -150,15 +150,17 @@ export const editionSlug = z
 export type EditionSlug = z.infer<typeof editionSlug>;
 
 /**
- * A calendar date as `<input type="date">` submits it ("2026-08-01"), read as
- * UTC midnight.
+ * A calendar date as `YYYY-MM-DD`, with no time zone and no time of day.
  *
- * Unlike `z.coerce.date()`, an empty field is rejected: Astro hands a blank
- * input to the schema as `null`, which the coercion would turn into 1970-01-01.
+ * It is what `<input type="date">` submits and what a JSON body carries. A
+ * blank field is rejected (Astro hands it to the schema as `null`), and so are
+ * impossible days ("2026-02-30") and instants ("2026-08-01T13:00:00Z").
  */
-export const dateInput = z.iso
+export const isoDate = z.iso
 	.date()
-	.transform((value) => new Date(`${value}T00:00:00Z`));
+	.brand<"IsoDate">()
+	.openapi({ type: "string", format: "date", example: "2026-08-03" });
+export type { IsoDate } from "@/typing/iso-date";
 
 /**
  * A point in time an input schema accepts as a `Date` or as the ISO 8601

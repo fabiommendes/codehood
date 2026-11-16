@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedResourceFactory } from "@/fixtures/resource.factory";
+import { addDays, todayIn } from "@/utils/schedule-time";
 
 // A random suffix, not an incrementing counter: this file's own numbering
 // would otherwise collide with identically-named counters in sibling spec
@@ -54,8 +55,8 @@ test.beforeAll(async () => {
 		{
 			slug: `${1000 + Math.floor(Math.random() * 9000)}`,
 			name: "attachment-service test edition",
-			startAt: new Date(),
-			endAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+			startDate: todayIn(),
+			endDate: addDays(todayIn(), 1),
 		},
 		FULL_ACCESS,
 	);

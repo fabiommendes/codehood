@@ -7,22 +7,26 @@ import {
 	type User,
 	type UserCreate,
 } from "@/db";
+import { addDays, todayIn } from "@/utils/schedule-time";
 import { persistedDisciplineFactory } from "./discipline.factory";
 import { persistedEditionFactory } from "./edition.factory";
 import { type PersistParams, serviceOpts } from "./support";
 import { persistedUserFactory } from "./user.factory";
 
-function buildCourse(params: Partial<CourseCreate>): CourseCreate {
-	const startAt = faker.date.soon({ days: 1 });
-	const endAt = faker.date.soon({ days: 120, refDate: startAt });
+/// Takes only the fields it reads: fishery's deep partial of `CourseCreate` does not fit the branded dates.
+function buildCourse(
+	params: Pick<Partial<CourseCreate>, "discipline" | "edition" | "instructor">,
+): CourseCreate {
+	const startDate = todayIn();
+	const endDate = addDays(startDate, faker.number.int({ min: 30, max: 120 }));
 
 	return {
 		discipline: params.discipline ?? "discipline",
 		edition: params.edition ?? "edition",
 		instructor: params.instructor ?? "instructor",
 		description: faker.lorem.sentence(),
-		startAt,
-		endAt,
+		startDate,
+		endDate,
 	};
 }
 

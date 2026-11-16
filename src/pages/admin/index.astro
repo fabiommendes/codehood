@@ -444,8 +444,8 @@ const editionCreatedParts = editionResult?.data
           <FormAlert error={editionFormState.error} />
           <Field {...editionFormState.field("slug")} class="font-mono" />
           <Field {...editionFormState.field("name")} />
-          <Field {...editionFormState.field("startAt")} />
-          <Field {...editionFormState.field("endAt")} />
+          <Field {...editionFormState.field("startDate")} />
+          <Field {...editionFormState.field("endDate")} />
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">
               {m.admin_overview_create_edition()}

@@ -5,11 +5,13 @@
  * created under each address form, one list read under each address form:
  * both forms must resolve to the same course and agree on what it holds.
  */
+
 import { expect, test } from "@playwright/test";
 import type { z } from "zod";
 import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { CourseId, courseNaturalKey } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
@@ -39,8 +41,8 @@ async function ensureEdition(): Promise<string> {
 		{
 			slug,
 			name: slug,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2030-12-31"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2030-12-31"),
 		},
 		FULL_ACCESS,
 	);

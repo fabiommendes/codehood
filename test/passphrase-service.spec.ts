@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db, PassphraseError } from "@/db";
 
 let uniq = 0;
@@ -35,8 +36,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -56,8 +57,8 @@ async function makeCourse(instructorUsername: string) {
 			discipline: slug,
 			instructor: instructorUsername,
 			edition: "2026-1",
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

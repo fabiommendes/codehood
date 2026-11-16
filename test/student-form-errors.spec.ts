@@ -6,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedPassphraseFactory } from "@/fixtures/passphrase.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { codeAt } from "@/services/roll-call-code";
+import { addDays, todayIn } from "@/utils/schedule-time";
 import { expect, type Page, test } from "./fixtures";
 import {
 	fillField,
@@ -24,8 +25,6 @@ import {
 test.use({ javaScriptEnabled: false });
 test.beforeEach(resetDatabase);
 
-const DAY = 24 * 60 * 60_000;
-
 /// The field group named `label`.
 function group(page: Page, label: string) {
 	return page.getByRole("group", { name: label, exact: true });
@@ -36,8 +35,8 @@ async function openSignUpPage(page: Page) {
 	const instructor = await seedUser({ role: "INSTRUCTOR" });
 	const course = await persistedCourseFactory.create({
 		instructor: instructor.username,
-		startAt: new Date(Date.now() - 28 * DAY),
-		endAt: new Date(Date.now() + 70 * DAY),
+		startDate: addDays(todayIn(), -28),
+		endDate: addDays(todayIn(), 70),
 	});
 	const slot = await persistedTimeSlotFactory.create({
 		course: course.id,

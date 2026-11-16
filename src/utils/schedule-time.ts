@@ -16,6 +16,7 @@ import { timeZone } from "codehood:build";
 import type { ClockTime, Duration } from "@/core/schemas";
 import type { Weekday } from "@/db/";
 import { locale } from "@/i18n";
+import type { IsoDate } from "@/typing/iso-date";
 
 // This module is reachable from hydrated islands (e.g. `ExamsTable`), so it
 // runs in the browser too: `codehood:build` holds the zone the build saw
@@ -153,6 +154,25 @@ export function formatDateTime(
 	}).format(instant);
 }
 
+/**
+ * Renders a calendar date in the locale's order, e.g. "Aug 3, 2026". A date has no time zone, so none shifts it.
+ *
+ * @example
+ * formatIsoDate("2026-08-03", { year: undefined }); // "Aug 3"
+ */
+export function formatIsoDate(
+	date: string,
+	opts?: Intl.DateTimeFormatOptions,
+): string {
+	return new Intl.DateTimeFormat(locale, {
+		timeZone: "UTC",
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		...opts,
+	}).format(new Date(`${date}T00:00:00Z`));
+}
+
 /** Renders the day of `instant` in `SERVER_TZ` as a numeric day and month in the locale's order, e.g. "28/09". */
 export function formatDayMonth(instant: Date): string {
 	return new Intl.DateTimeFormat(locale, {
@@ -234,9 +254,48 @@ export function formatClock(time: ClockTime): string {
 }
 
 /** `instant`'s local calendar day in `zone` (default `SERVER_TZ`), as `YYYY-MM-DD` — for grouping a month grid. */
-export function localDateOf(instant: Date, zone: string = SERVER_TZ): string {
+export function localDateOf(instant: Date, zone: string = SERVER_TZ): IsoDate {
 	const p = partsOf(instant, zone);
-	return `${String(p.year).padStart(4, "0")}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+	return `${String(p.year).padStart(4, "0")}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}` as IsoDate;
+}
+
+/** Today's calendar date in `zone` (default `SERVER_TZ`), read at `now`. */
+export function todayIn(
+	zone: string = SERVER_TZ,
+	now: Date = new Date(),
+): IsoDate {
+	return localDateOf(now, zone);
+}
+
+/** The calendar date `days` days after `date` (before it, when negative). */
+export function addDays(date: string, days: number): IsoDate {
+	const [year, month, day] = date.split("-").map(Number) as [
+		number,
+		number,
+		number,
+	];
+	return new Date(Date.UTC(year, month - 1, day + days))
+		.toISOString()
+		.slice(0, 10) as IsoDate;
+}
+
+/** The instant `date` starts in `zone` (default `SERVER_TZ`). */
+export function startOfDate(date: IsoDate, zone: string = SERVER_TZ): Date {
+	return toInstant(date, 0, zone);
+}
+
+/** The instant after the last moment of `date` in `zone`, i.e. the start of the next day. */
+export function endOfDate(date: IsoDate, zone: string = SERVER_TZ): Date {
+	return toInstant(addDays(date, 1), 0, zone);
+}
+
+/** Whether `date` falls between `start` and `end`, both inclusive. */
+export function isDateWithin(
+	date: string,
+	start: string,
+	end: string,
+): boolean {
+	return start <= date && date <= end;
 }
 
 /** The instant `instant`'s local day starts in `SERVER_TZ`. */
@@ -293,25 +352,20 @@ export function isoWeekDay(weekday: Weekday): number {
 }
 
 /**
- * The Monday of week 0 of a course, as `YYYY-MM-DD` in `zone`.
+ * The Monday of week 0 of a course, as `YYYY-MM-DD`.
  *
  * Weeks are ISO weeks: week 0 runs from the Monday to the Sunday of the week
- * the course starts in. The start date is read twelve hours after
- * `courseStart`, because a start day is stored either at local midnight (the
- * web form) or at UTC midnight (the CLI), and both land on the intended day
- * at noon UTC for any zone within twelve hours of it. `courseStart` is a
- * date: a start stored at a later hour (a Sunday at 23:00, say) may be read
- * as the next day.
+ * `startDate` falls in.
  */
-export function courseWeekZero(
-	courseStart: Date,
-	zone: string = SERVER_TZ,
-): string {
-	const startDay = new Date(courseStart.getTime() + 12 * 3_600_000);
-	return addDays(
-		localDateOf(startDay, zone),
-		1 - isoWeekDay(weekdayOf(startDay, zone)),
-	);
+export function courseWeekZero(startDate: string): IsoDate {
+	const [year, month, day] = startDate.split("-").map(Number) as [
+		number,
+		number,
+		number,
+	];
+	const index = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+	// biome-ignore lint/style/noNonNullAssertion: getUTCDay() always returns 0-6, and WEEKDAY_ORDER has exactly 7 entries.
+	return addDays(startDate, 1 - isoWeekDay(WEEKDAY_ORDER[index]!));
 }
 
 /**
@@ -325,27 +379,15 @@ export function courseWeekZero(
  *   `SERVER_TZ`.
  */
 export function slotInstant(
-	courseStart: Date,
+	courseStart: string,
 	weekday: Weekday,
 	week: number,
 	startMin: number,
 	zone: string = SERVER_TZ,
 ): Date {
 	const day = addDays(
-		courseWeekZero(courseStart, zone),
+		courseWeekZero(courseStart),
 		isoWeekDay(weekday) - 1 + week * 7,
 	);
 	return toInstant(day, startMin, zone);
-}
-
-/// The `YYYY-MM-DD` day `days` calendar days after `date`.
-function addDays(date: string, days: number): string {
-	const [year, month, day] = date.split("-").map(Number) as [
-		number,
-		number,
-		number,
-	];
-	return new Date(Date.UTC(year, month - 1, day + days))
-		.toISOString()
-		.slice(0, 10);
 }

@@ -6,6 +6,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { courseHref } from "@/urls";
 import { fileDownloadName } from "@/utils/resource-url";
+import { addDays, todayIn } from "@/utils/schedule-time";
 import { expect, test } from "./fixtures";
 import {
 	futureDate,
@@ -24,8 +25,8 @@ test("the schedule folds the weeks already held and shows the exams among the me
 	const student = await seedUser({ role: "STUDENT" });
 	// A term that began ten weeks ago.
 	const course = await persistedCourseFactory.create({
-		startAt: new Date(Date.now() - 70 * DAY),
-		endAt: new Date(Date.now() + 70 * DAY),
+		startDate: addDays(todayIn(), -70),
+		endDate: addDays(todayIn(), 70),
 	});
 	await db.enrollment.create(
 		{ course: course.id, username: student.username },
@@ -112,8 +113,8 @@ test("a meeting lists its resources as links that behave as on the Resources tab
 }) => {
 	const student = await seedUser({ role: "STUDENT" });
 	const course = await persistedCourseFactory.create({
-		startAt: new Date(Date.now() - 70 * DAY),
-		endAt: new Date(Date.now() + 70 * DAY),
+		startDate: addDays(todayIn(), -70),
+		endDate: addDays(todayIn(), 70),
 	});
 	await db.enrollment.create(
 		{ course: course.id, username: student.username },

@@ -5,6 +5,7 @@ import {
 	hasPerm,
 	type QuestionWithCourse,
 } from "@/auth/permissions";
+import { isoDate } from "@/core/schemas";
 import { db, type User } from "@/db";
 import { prisma } from "@/db/client";
 import { courseContentsWhere, courseWhere } from "@/db/services/course.service";
@@ -95,8 +96,8 @@ async function freshCourseScope() {
 			{
 				slug: EDITION,
 				name: EDITION,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);

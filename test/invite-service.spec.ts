@@ -3,6 +3,7 @@ import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import { hasPerm } from "@/auth/permissions";
 import type { CourseId, UserId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 
 function actorOf(
@@ -46,8 +47,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -62,8 +63,8 @@ async function makeCourse(instructorUsername: UserId, tag: string) {
 			discipline: tag,
 			instructor: instructorUsername,
 			edition: await ensureEdition(),
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

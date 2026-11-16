@@ -61,7 +61,7 @@
 	"errors_discipline_slug_invalid": "\"{slug}\" is not a valid discipline slug: it must match {pattern} and not be a reserved name.",
 	"errors_edition_not_found": "No edition with slug \"{slug}\".",
 	"errors_edition_has_courses": "Edition \"{slug}\" still has {count} course(s) and cannot be deleted.",
-	"errors_edition_window": "An edition's endAt must be after its startAt.",
+	"errors_edition_window": "An edition's end date must not be before its start date.",
 	"errors_question_version_together": "`question` and `version` go together",
 	"errors_question_archived": "Question \"{slug}\" is archived and cannot be written to",
 	"errors_question_version_conflict": "Version \"{version}\" of \"{slug}\" already holds different content",

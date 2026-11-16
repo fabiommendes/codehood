@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { courseId, instant, rev, slug, username } from "./base";
+import { courseId, isoDate, rev, slug, username } from "./base";
 import { disciplineInfo } from "./discipline";
 import { editionInfo } from "./edition";
 import { userInfo } from "./user";
@@ -17,8 +17,8 @@ export const courseSchema = z.object({
 	rev: rev.nullable(),
 
 	// Dates
-	startAt: z.date(),
-	endAt: z.date(),
+	startDate: isoDate,
+	endDate: isoDate,
 	createdAt: z.date(),
 	updatedAt: z.date(),
 
@@ -44,17 +44,17 @@ export const courseCreate = courseSchema
 		edition: z.string().min(1).describe("Edition slug"),
 		description: z.string().nullish(),
 		rev: rev.nullish(),
-		startAt: instant,
-		endAt: instant,
+		startDate: isoDate,
+		endDate: isoDate,
 	});
 
 export const courseUpdate = courseSchema
 	.pick({
 		description: true,
-		startAt: true,
-		endAt: true,
+		startDate: true,
+		endDate: true,
 	})
-	.extend({ startAt: instant, endAt: instant, rev: rev.nullish() })
+	.extend({ startDate: isoDate, endDate: isoDate, rev: rev.nullish() })
 	.partial();
 
 /**

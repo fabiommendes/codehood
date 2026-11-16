@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, type UserActor } from "@/auth/actor";
 import { InvalidData, TooManyRequests } from "@/core/error";
 import {
+	isoDate,
 	REPORT_DAILY_LIMIT,
 	REPORT_MAX_ATTACHMENT_BYTES,
 } from "@/core/schemas";
@@ -32,8 +33,8 @@ async function ensureEdition(slug = "2093-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);

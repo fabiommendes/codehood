@@ -7,6 +7,7 @@ import { persistedExamFactory } from "@/fixtures/exam.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { codeAt } from "@/services/roll-call-code";
 import { courseHref } from "@/urls";
+import { addDays, todayIn } from "@/utils/schedule-time";
 import { expect, type Locator, type Page, test } from "../fixtures";
 import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
 
@@ -87,8 +88,8 @@ test("instructor: Take the roll call in class", async ({ page, browser }) => {
 	});
 	const course = await persistedCourseFactory.create({
 		instructor: instructor.username,
-		startAt: new Date(Date.now() - 28 * DAY),
-		endAt: new Date(Date.now() + 70 * DAY),
+		startDate: addDays(todayIn(), -28),
+		endDate: addDays(todayIn(), 70),
 	});
 	const href = courseHref({
 		discipline: course.discipline.slug,
@@ -314,8 +315,8 @@ test("instructor: Read the course's attendance", async ({ page }) => {
 	});
 	const course = await persistedCourseFactory.create({
 		instructor: instructor.username,
-		startAt: new Date(Date.now() - 28 * DAY),
-		endAt: new Date(Date.now() + 70 * DAY),
+		startDate: addDays(todayIn(), -28),
+		endDate: addDays(todayIn(), 70),
 	});
 	const href = courseHref({
 		discipline: course.discipline.slug,

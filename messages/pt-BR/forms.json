@@ -26,7 +26,7 @@
 	"forms_schema_discipline_slug_invalid": "Use letras minúsculas, dígitos e hífens, começando com letra (3 a 32 caracteres).",
 	"forms_schema_slug_reserved": "Este slug é reservado.",
 	"forms_placeholder_discipline_name": "Ciência da Computação",
-	"forms_schema_edition_end_after_start": "Deve ser depois da data de início.",
+	"forms_schema_edition_end_after_start": "Não pode ser antes da data de início.",
 	"forms_placeholder_edition_name": "Segundo semestre",
 	"forms_label_edition_starts": "Início",
 	"forms_label_edition_ends": "Fim",

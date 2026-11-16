@@ -1,4 +1,5 @@
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { type APIRequestContext, expect, test } from "./fixtures";
 
@@ -52,8 +53,8 @@ async function makeCourse() {
 			{
 				slug: edition,
 				name: edition,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -63,8 +64,8 @@ async function makeCourse() {
 			discipline,
 			instructor: instructor.username,
 			edition,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

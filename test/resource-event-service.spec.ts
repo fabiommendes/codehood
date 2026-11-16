@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS, SYSTEM } from "@/auth/actor";
 import { NotAllowed, NotFound } from "@/core/error";
 import type { CourseId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 
 // A random suffix, not an incrementing counter: shared test database across
@@ -32,8 +33,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -52,8 +53,8 @@ async function makeCourse(instructorUsername: string) {
 			discipline: disciplineSlug,
 			instructor: instructorUsername,
 			edition: await ensureEdition(),
-			startAt: new Date("2026-01-05T12:00:00Z"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-05"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

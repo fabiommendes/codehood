@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import type { Actor } from "@/auth/actor";
 import { FULL_ACCESS } from "@/auth/actor";
 import type { UserId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
+import { addDays, todayIn } from "@/utils/schedule-time";
 
 function actorOf(
 	username: UserId,
@@ -18,16 +20,15 @@ function tag(prefix: string): string {
 }
 
 const WINDOW = {
-	startAt: new Date("2026-01-05"),
-	endAt: new Date("2026-05-15"),
+	startDate: isoDate.parse("2026-01-05"),
+	endDate: isoDate.parse("2026-05-15"),
 };
 
 /** A window that contains now, so a course may be created in it. */
 function openWindow() {
-	const now = Date.now();
 	return {
-		startAt: new Date(now - 86_400_000),
-		endAt: new Date(now + 86_400_000),
+		startDate: addDays(todayIn(), -1),
+		endDate: addDays(todayIn(), 1),
 	};
 }
 
@@ -98,8 +99,8 @@ test("create() rejects a window that ends before it starts", async () => {
 			{
 				slug: "2103",
 				name: "2103",
-				startAt: new Date("2026-05-15"),
-				endAt: new Date("2026-01-05"),
+				startDate: isoDate.parse("2026-05-15"),
+				endDate: isoDate.parse("2026-01-05"),
 			},
 			FULL_ACCESS,
 		),
@@ -124,11 +125,11 @@ test("update() changes name and window, and needs an admin", async () => {
 
 	const updated = await db.edition.update(
 		{ slug: "2104" },
-		{ name: "2104 · renamed", endAt: new Date("2026-06-30") },
+		{ name: "2104 · renamed", endDate: isoDate.parse("2026-06-30") },
 		FULL_ACCESS,
 	);
 	expect(updated.name).toBe("2104 · renamed");
-	expect(updated.endAt).toEqual(new Date("2026-06-30"));
+	expect(updated.endDate).toBe("2026-06-30");
 });
 
 test("delete() refuses while a course uses the edition, and succeeds once it is gone", async () => {
@@ -140,8 +141,8 @@ test("delete() refuses while a course uses the edition, and succeeds once it is 
 			discipline: await makeDiscipline(),
 			instructor: instructor.username,
 			edition: slug,
-			startAt: new Date(),
-			endAt: new Date(),
+			startDate: todayIn(),
+			endDate: todayIn(),
 		},
 		FULL_ACCESS,
 	);
@@ -186,8 +187,8 @@ test("db.course.create() enforces the window for instructors but not for admins"
 				discipline: disciplineSlug,
 				instructor: instructor.username,
 				edition: slug,
-				startAt: new Date(),
-				endAt: new Date(),
+				startDate: todayIn(),
+				endDate: todayIn(),
 			},
 			{ actor: actorOf(instructor.username, "INSTRUCTOR") },
 		),
@@ -198,8 +199,8 @@ test("db.course.create() enforces the window for instructors but not for admins"
 			discipline: disciplineSlug,
 			instructor: instructor.username,
 			edition: slug,
-			startAt: new Date(),
-			endAt: new Date(),
+			startDate: todayIn(),
+			endDate: todayIn(),
 		},
 		{ actor: actorOf("admin" as UserId, "ADMIN") },
 	);
@@ -214,14 +215,19 @@ test("upsert creates on first call, updates the same row in place on the second,
 	expect(created.slug).toBe("2201-1");
 	expect(created.name).toBe("Before");
 
-	const newEndAt = new Date("2026-06-30");
+	const newEndDate = isoDate.parse("2026-06-30");
 	const updated = await db.edition.upsert(
-		{ slug: "2201-1", name: "After", startAt: WINDOW.startAt, endAt: newEndAt },
+		{
+			slug: "2201-1",
+			name: "After",
+			startDate: WINDOW.startDate,
+			endDate: newEndDate,
+		},
 		FULL_ACCESS,
 	);
 	expect(updated.name).toBe("After"); // changed
-	expect(updated.endAt).toEqual(newEndAt); // changed
-	expect(updated.startAt).toEqual(WINDOW.startAt); // untouched
+	expect(updated.endDate).toBe(newEndDate); // changed
+	expect(updated.startDate).toBe(WINDOW.startDate); // untouched
 
 	const sameSlug = await db.edition.findMany(
 		{ slugs: ["2201-1"] },

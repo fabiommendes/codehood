@@ -1,5 +1,6 @@
 import { APIS } from "@/api/registry/hook";
 import { buildOpenApiDocument } from "@/api/registry/openapi-document";
+import { isoDate } from "@/core/schemas";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedDisciplineFactory } from "@/fixtures/discipline.factory";
 import { persistedEditionFactory } from "@/fixtures/edition.factory";
@@ -208,10 +209,9 @@ for (const [resource, pkField] of [
 	});
 }
 
-// JSON has no date type, so a create/update schema that declares a bare
-// `z.date()` can never be satisfied over HTTP — the body always carries a
-// string. These POST bodies must be accepted and the dates round-tripped.
-test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
+// JSON has no date type: a course date travels as a `YYYY-MM-DD` string and
+// comes back as the same string.
+test("POST /api/course accepts ISO dates for startDate/endDate", async ({
 	request,
 }) => {
 	const token = await adminToken(request);
@@ -219,8 +219,8 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 	const edition = await persistedEditionFactory.create();
 	const instructor = await seedUser({ role: "INSTRUCTOR" });
 
-	const startAt = "2031-01-06T00:00:00.000Z";
-	const endAt = "2031-06-30T00:00:00.000Z";
+	const startDate = "2031-01-06";
+	const endDate = "2031-06-30";
 	const res = await request.post("/api/course", {
 		headers: authHeader(token),
 		data: {
@@ -228,14 +228,14 @@ test("POST /api/course accepts ISO date strings for startAt/endAt", async ({
 			instructor: instructor.username,
 			edition: edition.slug,
 			description: "created by api-crud.spec",
-			startAt,
-			endAt,
+			startDate,
+			endDate,
 		},
 	});
 	expect(res.status()).toBe(200);
 	const body = await res.json();
-	expect(new Date(body.startAt).toISOString()).toBe(startAt);
-	expect(new Date(body.endAt).toISOString()).toBe(endAt);
+	expect(body.startDate).toBe(startDate);
+	expect(body.endDate).toBe(endDate);
 });
 
 // Calendar events live under their course: the listing has no "every course"
@@ -313,12 +313,10 @@ test("?active=false is honored as false, not truthy — a naive Boolean('false')
 }) => {
 	const token = await adminToken(request);
 	// An edition whose window is fixed safely in the past, so it always reads as
-	// inactive. It is created through the service because editionCreate's
-	// `startAt`/`endAt` are `z.date()`, not `z.coerce.date()`, so a JSON `POST`
-	// body can't carry them as strings over HTTP.
+	// inactive.
 	const { slug } = await persistedEditionFactory.create({
-		startAt: new Date("2001-01-08T00:00:00.000Z"),
-		endAt: new Date("2001-06-30T00:00:00.000Z"),
+		startDate: isoDate.parse("2001-01-08"),
+		endDate: isoDate.parse("2001-06-30"),
 	});
 
 	// The edition's window is entirely in the past, so it is not "active"
@@ -404,3 +402,24 @@ for (const key of [
 		expect(({} as Record<string, unknown>).x).toBeUndefined();
 	});
 }
+
+test("POST /api/course refuses a course date that carries a time", async ({
+	request,
+}) => {
+	const token = await adminToken(request);
+	const discipline = await persistedDisciplineFactory.create();
+	const edition = await persistedEditionFactory.create();
+	const instructor = await seedUser({ role: "INSTRUCTOR" });
+
+	const res = await request.post("/api/course", {
+		headers: authHeader(token),
+		data: {
+			discipline: discipline.slug,
+			instructor: instructor.username,
+			edition: edition.slug,
+			startDate: "2031-01-06T00:00:00.000Z",
+			endDate: "2031-06-30",
+		},
+	});
+	expect(res.status()).toBe(400);
+});

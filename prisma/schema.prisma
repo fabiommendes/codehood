@@ -301,8 +301,9 @@ model Course {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  startAt DateTime
-  endAt   DateTime
+  /// Calendar dates, `YYYY-MM-DD`, with no time zone.
+  startDate String
+  endDate   String
 
   schedule           TimeSlot[]
   events             CalendarEvent[]
@@ -331,13 +332,14 @@ model Discipline {
 
 /// An academic term, managed by admins. `slug` is the token that appears in
 /// every course URL (`/cs101/ada_2026-1`), so it is immutable once courses
-/// reference it. The window (`startAt`..`endAt`) says when new courses may be
-/// created for this edition; it never affects courses that already exist.
+/// reference it. The window (`startDate`..`endDate`, calendar dates `YYYY-MM-DD`)
+/// says when new courses may be created for this edition; it never affects
+/// courses that already exist.
 model Edition {
   slug      String   @id
   name      String
-  startAt   DateTime
-  endAt     DateTime
+  startDate String
+  endDate   String
   createdAt DateTime @default(now())
 
   courses Course[]

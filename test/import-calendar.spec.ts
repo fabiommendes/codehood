@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { importCalendarCommand } from "@/commands/import-calendar";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 
 function tag(prefix: string): string {
@@ -32,8 +33,8 @@ async function makeCourse() {
 			{
 				slug: "2026-1",
 				name: "2026-1",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -43,8 +44,8 @@ async function makeCourse() {
 			discipline,
 			instructor,
 			edition: "2026-1",
-			startAt: new Date("2026-03-02T12:00:00Z"),
-			endAt: new Date("2026-07-01"),
+			startDate: isoDate.parse("2026-03-02"),
+			endDate: isoDate.parse("2026-07-01"),
 		},
 		FULL_ACCESS,
 	);

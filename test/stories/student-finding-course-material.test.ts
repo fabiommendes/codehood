@@ -8,7 +8,12 @@ import { persistedResourceFactory } from "@/fixtures/resource.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { weekOf } from "@/services/course-schedule";
 import { courseHref } from "@/urls";
-import { localDateOf, SERVER_TZ } from "@/utils/schedule-time";
+import {
+	addDays,
+	localDateOf,
+	SERVER_TZ,
+	todayIn,
+} from "@/utils/schedule-time";
 import { expect, type Page, test } from "../fixtures";
 import { futureDate, logInAs, resetDatabase, seedUser } from "./helpers";
 
@@ -102,7 +107,7 @@ test("student: read the course home page", async ({ page }) => {
 		course: course.id,
 		timeSlot: slot.id,
 		// The week of the calendar that contains today, which the home shows.
-		week: weekOf(new Date(), course.startAt),
+		week: weekOf(new Date(), course.startDate),
 		title: "Introduction to recursion",
 	});
 
@@ -500,8 +505,8 @@ test("student: follow the course schedule", async ({ page }) => {
 		// Terms that began ten weeks ago, with one and six meetings behind them.
 		for (const held of [1, 6]) {
 			const past = await persistedCourseFactory.create({
-				startAt: new Date(Date.now() - 70 * 86_400_000),
-				endAt: new Date(Date.now() + 70 * 86_400_000),
+				startDate: addDays(todayIn(), -70),
+				endDate: addDays(todayIn(), 70),
 			});
 			await enroll(past.id, student.username);
 			const pastSlot = await persistedTimeSlotFactory.create({
@@ -698,8 +703,8 @@ test("student: open the calendar on the next event", async ({ page }) => {
 
 	// A term that ended a year ago, with a single event in its first week.
 	const past = await persistedCourseFactory.create({
-		startAt: new Date(Date.now() - 400 * 86_400_000),
-		endAt: new Date(Date.now() - 300 * 86_400_000),
+		startDate: addDays(todayIn(), -400),
+		endDate: addDays(todayIn(), -300),
 	});
 	await enroll(past.id, student.username);
 	const last = await persistedCalendarEventFactory.create({

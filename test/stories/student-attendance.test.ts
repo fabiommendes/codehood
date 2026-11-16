@@ -6,6 +6,7 @@ import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedTimeSlotFactory } from "@/fixtures/time-slot.factory";
 import { codeAt } from "@/services/roll-call-code";
 import { courseHref } from "@/urls";
+import { addDays, todayIn } from "@/utils/schedule-time";
 import { expect, type Locator, type Page, test } from "../fixtures";
 import {
 	fillField,
@@ -332,8 +333,8 @@ test("student: Join the class through the roll call", async ({
 async function classroom(instructor: string) {
 	const course = await persistedCourseFactory.create({
 		instructor,
-		startAt: new Date(Date.now() - 28 * DAY),
-		endAt: new Date(Date.now() + 70 * DAY),
+		startDate: addDays(todayIn(), -28),
+		endDate: addDays(todayIn(), 70),
 	});
 	const href = courseHref({
 		discipline: course.discipline.slug,

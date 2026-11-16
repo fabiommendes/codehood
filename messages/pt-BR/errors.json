@@ -61,7 +61,7 @@
 	"errors_discipline_slug_invalid": "\"{slug}\" não é um identificador de disciplina válido: deve corresponder a {pattern} e não pode ser um nome reservado.",
 	"errors_edition_not_found": "Nenhum período letivo com o identificador \"{slug}\".",
 	"errors_edition_has_courses": "O período letivo \"{slug}\" ainda tem {count} turma(s) e não pode ser excluído.",
-	"errors_edition_window": "O fim de um período letivo deve ser posterior ao início.",
+	"errors_edition_window": "O fim de um período letivo não pode ser anterior ao início.",
 	"errors_question_version_together": "`question` e `version` devem ser informados juntos",
 	"errors_question_archived": "A questão \"{slug}\" está arquivada e não pode ser alterada",
 	"errors_question_version_conflict": "A versão \"{version}\" de \"{slug}\" já tem outro conteúdo",

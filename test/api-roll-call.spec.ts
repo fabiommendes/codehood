@@ -1,5 +1,6 @@
 import { FULL_ACCESS } from "@/auth/actor";
 import type { CourseId } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { type APIRequestContext, expect, test } from "./fixtures";
@@ -82,8 +83,8 @@ async function makeCourse() {
 			{
 				slug: "2026-1",
 				name: "2026-1",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -94,8 +95,8 @@ async function makeCourse() {
 			instructor: instructor.username,
 			edition: "2026-1",
 			// A Monday, so week 0 of a MONDAY slot is the start date.
-			startAt: new Date("2026-01-05T12:00:00Z"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-05"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

@@ -2,7 +2,7 @@
  * The dated half of a course's schedule. Writes are ownership-gated (the
  * `course.update-contents` permission); reads follow course-contents
  * visibility (`course.read-contents`). An event's time is always derived
- * from its course's `startAt`, its `week`, and its slot's day and start —
+ * from its course's `startDate`, its `week`, and its slot's day and start —
  * never authored directly.
  */
 import type { z } from "zod";
@@ -127,7 +127,7 @@ export const makeCalendarEventService = defineService<CalendarEventT>()(() => {
 			}
 
 			const timestamp = slotInstant(
-				course.startAt,
+				course.startDate,
 				slot.day,
 				input.week,
 				slot.startMin,
@@ -484,7 +484,7 @@ async function writableCourse(
 				where: courseRefWhere(ref),
 				select: {
 					id: true,
-					startAt: true,
+					startDate: true,
 					instructor: { select: { username: true } },
 				},
 			}),

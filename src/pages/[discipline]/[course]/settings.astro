@@ -18,6 +18,7 @@ import AppLayout from "@/layouts/AppLayout.astro";
 import { breadcrumbs } from "@/utils/breadcrumbs";
 import { homeNav } from "@/utils/course-tabs-nav";
 import { loadCourse } from "@/utils/load-course";
+import { formatIsoDate } from "@/utils/schedule-time";
 
 export const prerender = false;
 
@@ -124,12 +125,12 @@ const courseFields = [
 	},
 	{
 		label: m.courses_settings_start(),
-		value: formatDate(course.startAt),
+		value: formatIsoDate(course.startDate),
 		source: m.courses_settings_from_file({ file: "calendar.md" }),
 	},
 	{
 		label: m.courses_settings_end(),
-		value: formatDate(course.endAt),
+		value: formatIsoDate(course.endDate),
 		source: m.courses_settings_from_file({ file: "calendar.md" }),
 	},
 ];

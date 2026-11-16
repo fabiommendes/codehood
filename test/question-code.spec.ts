@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { FULL_ACCESS } from "@/auth/actor";
 import { InvalidData } from "@/core/error";
 import type { CourseId, QuestionRefId } from "@/core/schemas";
-import { codeQuestionMeta, questionCreate } from "@/core/schemas";
+import { codeQuestionMeta, isoDate, questionCreate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import {
@@ -24,8 +24,8 @@ async function makeCourse(): Promise<CourseId> {
 		{
 			slug: edition,
 			name: edition,
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2030-12-31"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2030-12-31"),
 		},
 		FULL_ACCESS,
 	);
@@ -52,8 +52,8 @@ async function makeCourse(): Promise<CourseId> {
 			discipline,
 			instructor: instructor.username,
 			edition,
-			startAt: new Date("2026-02-02T00:00:00Z"),
-			endAt: new Date("2026-06-01T00:00:00Z"),
+			startDate: isoDate.parse("2026-02-02"),
+			endDate: isoDate.parse("2026-06-01"),
 		},
 		FULL_ACCESS,
 	);

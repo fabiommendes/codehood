@@ -113,8 +113,8 @@ const buildCourseService = defineService<CourseT>()(() => {
 					editionSlug: input.edition,
 					description: input.description,
 					rev: input.rev,
-					startAt: input.startAt,
-					endAt: input.endAt,
+					startDate: input.startDate,
+					endDate: input.endDate,
 				},
 				include: courseInclude,
 			});
@@ -195,7 +195,7 @@ const buildCourseService = defineService<CourseT>()(() => {
 	/**
 	 * Updates a course's editable fields.
 	 *
-	 * A new `startAt` also recomputes the times of the course's events, each of
+	 * A new `startDate` also recomputes the times of the course's events, each of
 	 * which gets a new `updatedAt`.
 	 */
 	const update = op({
@@ -222,7 +222,7 @@ const buildCourseService = defineService<CourseT>()(() => {
 				{ include: courseInclude },
 			);
 			// Event times are derived from the course's start.
-			if (fields.startAt) {
+			if (fields.startDate) {
 				await recomputeEventTimes(tx, { courseId: target.id });
 			}
 			return fromDb(row, opts.actor);
@@ -388,7 +388,7 @@ async function assertCanCreateCourse(
 
 	const edition = await client.edition.findUnique({
 		where: { slug: input.edition },
-		select: { startAt: true, endAt: true },
+		select: { startDate: true, endDate: true },
 	});
 	if (!edition) {
 		throw new InvalidData({

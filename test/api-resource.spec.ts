@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { FULL_ACCESS } from "@/auth/actor";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { type APIRequestContext, expect, test } from "./fixtures";
 
@@ -53,8 +54,8 @@ async function makeCourse() {
 			{
 				slug: "2026-1",
 				name: "2026-1",
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -64,8 +65,8 @@ async function makeCourse() {
 			discipline,
 			instructor: instructor.username,
 			edition: "2026-1",
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

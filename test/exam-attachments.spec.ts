@@ -5,6 +5,7 @@ import { FULL_ACCESS } from "@/auth/actor";
 import * as constants from "@/core/constants";
 import { InvalidData, NotFound } from "@/core/error";
 import type { CourseId, questionSchema } from "@/core/schemas";
+import { isoDate } from "@/core/schemas";
 import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedUserFactory } from "@/fixtures/user.factory";
@@ -41,8 +42,8 @@ async function ensureEdition(slug = "2026-1"): Promise<string> {
 			{
 				slug,
 				name: slug,
-				startAt: new Date("2026-01-01"),
-				endAt: new Date("2030-12-31"),
+				startDate: isoDate.parse("2026-01-01"),
+				endDate: isoDate.parse("2030-12-31"),
 			},
 			FULL_ACCESS,
 		);
@@ -62,8 +63,8 @@ async function makeCourse() {
 			discipline,
 			instructor: instructor.username,
 			edition: await ensureEdition(),
-			startAt: new Date("2026-01-01"),
-			endAt: new Date("2026-05-01"),
+			startDate: isoDate.parse("2026-01-01"),
+			endDate: isoDate.parse("2026-05-01"),
 		},
 		FULL_ACCESS,
 	);

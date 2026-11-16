@@ -2,6 +2,7 @@ import { faker } from "@faker-js/faker";
 import { Factory } from "fishery";
 import { FieldError, InvalidData } from "@/core/error";
 import { db, type Edition, type EditionCreate } from "@/db";
+import { addDays, todayIn } from "@/utils/schedule-time";
 import { type PersistParams, serviceOpts } from "./support";
 
 /**
@@ -19,15 +20,18 @@ function fakeEditionSlug(): string {
 /// How many random slugs {@link persistedEditionFactory} tries before giving up.
 const SLUG_ATTEMPTS = 5;
 
-function buildEdition(params: Partial<EditionCreate>): EditionCreate {
-	const startAt = faker.date.soon({ days: 1 });
-	const endAt = faker.date.soon({ days: 180, refDate: startAt });
+/// Takes only the field it reads: fishery's deep partial of `EditionCreate` does not fit the branded dates.
+function buildEdition(
+	params: Pick<Partial<EditionCreate>, "slug">,
+): EditionCreate {
+	const startDate = todayIn();
+	const endDate = addDays(startDate, faker.number.int({ min: 30, max: 180 }));
 
 	return {
 		slug: params.slug ?? fakeEditionSlug(),
 		name: `${faker.word.adjective()} term`,
-		startAt,
-		endAt,
+		startDate,
+		endDate,
 	};
 }
 
