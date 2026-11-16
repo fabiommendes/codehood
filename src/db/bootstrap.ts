@@ -1394,6 +1394,8 @@ async function createDemoCoursesIfMissing(): Promise<void> {
 	]);
 
 	await seedRegradeExam(cs101.id, ada, { hopper, hamilton });
+	await seedWeightedExam(cs101.id, { hopper, hamilton });
+	await seedSimulatedExams(cs101.id, ada);
 	await seedRepositories(cs101.id);
 	await seedClassroomInvites(cs101.id, ada);
 
@@ -4222,6 +4224,199 @@ async function seedQuestionStatsExam(
 		FULL_ACCESS,
 	);
 	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
+}
+
+/**
+ * Seeds a released exam whose questions weigh 3, 2 and 1.
+ *
+ * Gives the instructor's overview its weight column and the grades a total
+ * that differs from the plain average: hopper misses only the heaviest
+ * question, hamilton only the lightest.
+ */
+async function seedWeightedExam(
+	course: Course["id"],
+	students: { hopper: User; hamilton: User },
+): Promise<void> {
+	const exam = "test-06";
+	const weighted = async (
+		slug: string,
+		title: string,
+		weight: number,
+		right: string,
+		wrong: string,
+	): Promise<void> => {
+		await db.question.create(
+			{
+				course,
+				slug,
+				status: "PUBLISHED",
+				version: "v1",
+				question: {
+					type: "multiple-choice",
+					title,
+					stem: `${title}: pick the right answer.`,
+					tags: ["recursion"],
+					weight,
+					choices: [
+						{ id: "right", text: right, score: 1 },
+						{ id: "wrong", text: wrong },
+					],
+				} as never,
+			},
+			FULL_ACCESS,
+		);
+	};
+	await weighted(
+		"weighted-base-case",
+		"Why a base case",
+		3,
+		"It stops the recursion.",
+		"It speeds the recursion up.",
+	);
+	await weighted(
+		"weighted-call-stack",
+		"Where calls wait",
+		2,
+		"On the call stack.",
+		"In the heap only.",
+	);
+	await weighted(
+		"weighted-tail-call",
+		"Tail calls",
+		1,
+		"The recursive call is the last action.",
+		"The recursive call is the first action.",
+	);
+	await db.exam.create(
+		{
+			course,
+			slug: exam,
+			type: "EXAM",
+			status: "ONGOING",
+			title: "Test 6: weights",
+			description: "Questions that weigh 3, 2 and 1 in the total.",
+			tags: ["recursion"],
+			questions: [
+				{ slug: "weighted-base-case", version: "v1" },
+				{ slug: "weighted-call-stack", version: "v1" },
+				{ slug: "weighted-tail-call", version: "v1" },
+			],
+		},
+		FULL_ACCESS,
+	);
+	await answerExam(course, exam, students.hopper, {
+		"weighted-base-case": "wrong",
+		"weighted-call-stack": "right",
+		"weighted-tail-call": "right",
+	});
+	await answerExam(course, exam, students.hamilton, {
+		"weighted-base-case": "right",
+		"weighted-call-stack": "right",
+		"weighted-tail-call": "wrong",
+	});
+	await db.exam.update(
+		{ course, slug: exam },
+		{
+			status: "COMPLETED",
+			scheduledAt: new Date(Date.now() - 4 * 24 * 3600 * 1000),
+			duration: { hours: 1 },
+		},
+		FULL_ACCESS,
+	);
+	await db.exam.releaseGrades({ course, slug: exam }, FULL_ACCESS);
+}
+
+/**
+ * Seeds two draft exams that the instructor simulated: one still being answered, one delivered.
+ *
+ * `simulation-open` holds objective and essay answers plus a code send that
+ * waits for a worker. In `simulation-done` the objective answers are graded
+ * on delivery, the essay shows as manual correction and the code send was
+ * corrected by the bot. Both are drafts, which students never see, and the
+ * simulations are written by the service as the instructor would.
+ */
+async function seedSimulatedExams(
+	course: Course["id"],
+	instructor: User,
+): Promise<void> {
+	const worker = "elm-test";
+	const bot = { actor: { ...instructor, bot: "runner" } };
+	const questions = [
+		{ slug: "recursion-basics", version: "v1" },
+		{ slug: "factorial-of-five", version: "v1" },
+		{ slug: "explain-recursion", version: "v1" },
+		{ slug: "elm-soma", version: "v1" },
+	];
+	const essay =
+		"A base case is where the recursion stops; without it the calls never return.";
+	for (const [slug, title] of [
+		["simulation-open", "Test 9: simulation in progress"],
+		["simulation-done", "Test 10: simulation delivered"],
+	] as const) {
+		await db.exam.create(
+			{
+				course,
+				slug,
+				type: "EXAM",
+				status: "DRAFT",
+				title,
+				description: "A draft the instructor answers as a student would.",
+				duration: { hours: 1 },
+				tags: ["recursion"],
+				questions,
+			},
+			FULL_ACCESS,
+		);
+	}
+
+	/// Answers one question of a simulation as the instructor; returns the submission id.
+	const answer = async (
+		exam: string,
+		question: string,
+		payload: QuestionResponse,
+		kind?: "SUBMIT",
+	): Promise<string> => {
+		const response = await db.response.submit(
+			{ course, exam, question, payload, ...(kind ? { kind } : {}) },
+			{ actor: instructor },
+		);
+		return response.submissions.at(-1)?.publicId ?? "";
+	};
+
+	await answer("simulation-open", "recursion-basics", "base-case");
+	await answer("simulation-open", "explain-recursion", essay);
+	await answer("simulation-open", "elm-soma", ELM_ANSWERS.positives, "SUBMIT");
+
+	await answer("simulation-done", "recursion-basics", "tail-call");
+	await answer("simulation-done", "factorial-of-five", 120);
+	await answer("simulation-done", "explain-recursion", essay);
+	const sent = await answer(
+		"simulation-done",
+		"elm-soma",
+		ELM_ANSWERS.positives,
+		"SUBMIT",
+	);
+	const [job] = await db.gradingJob.claim(
+		{ workers: [worker], limit: 1, exam: "simulation-done" },
+		bot,
+	);
+	if (job?.submission !== sent) {
+		throw new Error(`[seed] the bot claimed ${job?.submission}, not ${sent}.`);
+	}
+	await db.gradingJob.complete(
+		sent,
+		elmReport({
+			empty: "pass",
+			one: "pass",
+			long: "pass",
+			negatives: "fail",
+		}),
+		bot,
+	);
+	await db.response.finish(
+		{ course, exam: "simulation-done" },
+		{ actor: instructor },
+	);
 }
 
 /**

@@ -1,6 +1,6 @@
 ---
 type: spec
-status: to-do
+status: to-review
 tags: [exam, instructor, ui, grading, schema]
 relatedTo: [pesos-e-numeros-de-questao, card-de-navegacao-do-curso, pagina-da-prova-do-professor-precisa-ser-retrabalhada]
 ---
@@ -178,7 +178,10 @@ Estado do código que a spec parte:
   `response.preview = true`, por um fragmento `where` único exportado de
   `src/db/`. Exceções: o `claim`/`renew`/`report` do worker, a leitura dos
   envios pelo próprio autor (`gradingJob.forStudent`), o feedback lido pelo
-  autor da simulação, e as leituras por id da própria simulação.
+  autor da simulação, e as leituras por id da própria simulação. Também
+  ficam de fora, por decisão: `gradingJob.summary` e `requeueFailed` (o
+  monitor da fila do worker), que continuam mostrando os jobs de simulação,
+  porque descrevem a fila real do worker, e não as tentativas dos alunos.
 - R21. Nenhuma saída destas muda com a existência de uma simulação:
   `loadExamStaffData` (resultados, estatísticas, pendências, bloqueio de
   liberação), `exam.releaseGrades`, `loadGrading` e a fila de correção,

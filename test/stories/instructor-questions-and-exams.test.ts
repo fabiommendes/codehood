@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { prisma } from "@/db/client";
 import { persistedCourseFactory } from "@/fixtures/course.factory";
 import { persistedExamFactory } from "@/fixtures/exam.factory";
+import { capitalChoice, idempotenceEssay } from "@/mdq/fixtures";
 import { courseHref } from "@/urls";
 import { expect, test } from "../fixtures";
 import {
@@ -155,6 +156,139 @@ test("instructor: preview the files attached to a question and an exam", async (
 		const saved = await download(page, list, "data.csv");
 		expect(saved.filename).toBe("data.csv");
 		expect(saved.bytes.equals(oldCsv.bytes)).toBe(true);
+	});
+});
+
+test("instructor: simulate an exam as a student", async ({ page }) => {
+	const teacher = await seedUser({
+		role: "INSTRUCTOR",
+		username: "sim-teacher",
+		name: "Tess Simulator",
+	});
+	const ana = await seedUser({
+		role: "STUDENT",
+		username: "sim-ana",
+		name: "Ana Prado",
+	});
+	const course = await persistedCourseFactory.create({
+		instructor: teacher.username,
+	});
+	await db.enrollment.create(
+		{ course: course.id, username: ana.username },
+		FULL_ACCESS,
+	);
+	const href = `${courseHref({
+		discipline: course.discipline.slug,
+		instructor: course.instructor.username,
+		edition: course.edition.slug,
+	})}`;
+	for (const [slug, question] of [
+		["capital", capitalChoice],
+		["idempotence", idempotenceEssay],
+	] as const) {
+		await db.question.create(
+			{
+				status: "PUBLISHED",
+				version: "1",
+				course: course.id,
+				slug,
+				question,
+			},
+			FULL_ACCESS,
+		);
+	}
+	await persistedExamFactory.create({
+		course: course.id,
+		slug: "simulated",
+		title: "Simulated exam",
+		type: "EXAM",
+		status: "ONGOING",
+		duration: { hours: 1 },
+		questions: [{ slug: "capital" }, { slug: "idempotence" }],
+	});
+	await db.response.submit(
+		{
+			course: course.id,
+			exam: "simulated",
+			question: "capital",
+			payload: "brasilia",
+		},
+		{ actor: ana },
+	);
+	await db.response.finish(
+		{ course: course.id, exam: "simulated" },
+		{ actor: ana },
+	);
+	await logInAs(page, teacher);
+
+	const exam = `${href}/exams/simulated`;
+	const banner = page.getByTestId("preview-banner");
+	const choice = page
+		.getByRole("region", { name: "Question 1" })
+		.getByRole("radio", { name: "Brasília" });
+
+	await test.step("the Preview tab opens the student's screen under a banner that says it counts for nothing", async () => {
+		await page.goto(exam);
+		await page.getByRole("link", { name: "Preview" }).first().click();
+
+		await expect(page).toHaveURL(`${exam}/preview`);
+		await expect(banner).toContainText("does not count toward any grade");
+		await page.getByRole("button", { name: "Start exam" }).click();
+		await expect(choice).toBeEnabled();
+		await expect(page.getByText(/\bleft\b/).first()).toBeVisible();
+	});
+
+	await test.step("answers save as they change", async () => {
+		await choice.check();
+		await expect(
+			page.getByText("Saved", { exact: true }).first(),
+		).toBeVisible();
+		await page
+			.getByRole("region", { name: "Question 2" })
+			.getByRole("textbox")
+			.fill("Applying it twice changes nothing.");
+	});
+
+	await test.step("submitting shows the result at once, with the essay left to manual grading", async () => {
+		await page.getByRole("button", { name: "Submit exam" }).first().click();
+		await page
+			.getByRole("dialog")
+			.getByRole("button", { name: "Submit exam" })
+			.click();
+
+		await expect(
+			page.getByText("Score", { exact: true }).first(),
+		).toBeVisible();
+		await expect(page.getByText("Manual grading")).toBeVisible();
+		await expect(banner).toBeVisible();
+	});
+
+	await test.step("the simulation does not show in the exam's results nor in the course grades", async () => {
+		await page.goto(`${exam}/results`);
+		const rows = page.getByRole("row");
+		await expect(rows.filter({ hasText: "Ana Prado" })).toHaveCount(1);
+		await expect(rows.filter({ hasText: teacher.name ?? "" })).toHaveCount(0);
+
+		await page.goto(`${href}/grades`);
+		await expect(
+			page.getByRole("row").filter({ hasText: teacher.name ?? "" }),
+		).toHaveCount(0);
+	});
+
+	await test.step("restarting discards the answers and starts a new simulation", async () => {
+		await page.goto(`${exam}/preview`);
+		page.once("dialog", (dialog) => dialog.accept());
+		await page.getByRole("button", { name: "Restart" }).click();
+
+		await expect(choice).toBeEnabled();
+		await expect(choice).not.toBeChecked();
+		await expect(banner).toBeVisible();
+		await expect(
+			prisma.response.count({ where: { preview: true } }),
+		).resolves.toBe(1);
+		await expect(
+			prisma.response.count({ where: { preview: false } }),
+		).resolves.toBe(1);
 	});
 });
 

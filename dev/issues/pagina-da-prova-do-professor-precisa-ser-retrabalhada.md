@@ -34,7 +34,10 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    de cada uma estão `PENDING_GRADE` depois de a prova fechar. Isso dá o
    bloqueio `pending` do item 1. Não há na página ação para corrigir
    automaticamente as objetivas.
-   **Pendente.**
+   **Resolvido:** o servidor corrige as objetivas ao fechar a tentativa e as
+   tentativas expiradas ao abrir a prova. As respostas que já estavam
+   pendentes seguem pelo comando `manage grade-objectives`, rodado por prova
+   (spec `simulacao-e-previa-da-prova`, D14 e DA1).
 3. **A página não mostra quantas respostas faltam corrigir por questão.**
    Para chegar ao número acima foi preciso ler a REST.
    **Resolvido:** `exams/[slug]/results#by-question` tem a coluna "A corrigir"
@@ -61,13 +64,15 @@ A versão em produção é a `v0.3.2` ou anterior; conferir cada item na `main`.
    professor vê não usa o mesmo componente que o estudante usa ao fazer a
    prova, então o que o professor confere não garante o que o aluno vai ver.
    **Resolvido:** a prévia usa `QuestionFrame` e `AnswerField`, os mesmos
-   da tentativa, e aceita respostas sem salvar. Ficam de fora a barra da
-   tentativa, o cronômetro e o envio de código ao worker (item 8).
+   da tentativa, e aceita respostas sem salvar. Superado pelo item 8: a prévia
+   agora é a própria tentativa, com barra, cronômetro e envio ao worker.
 8. **Não dá para simular a prova antes de aplicar.** O professor deveria
    poder fazer a prova como um estudante (mesmo componente, mesmos widgets,
    envio e correção automática), sem afetar notas nem estatísticas, para saber
    se ela funciona antes de abrir para a turma.
-   **Pendente.**
+   **Resolvido:** a aba "Prévia" (`exams/<prova>/preview`) monta a tentativa
+   do aluno sobre uma simulação do professor, fora de notas, estatísticas e
+   fila de correção (spec `simulacao-e-previa-da-prova`).
 
 ## Direção
 

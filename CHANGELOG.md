@@ -4,6 +4,40 @@
 
 ### Added
 
+- Pesos nas provas. O peso de uma questão é o `weight` do payload mdq da
+  versão que a prova usa (1 sem ele), `ExamQuestion.weight` sai na leitura da
+  prova e na REST, e o total é `Σ wᵢ·sᵢ / Σ wᵢ` na tabela de notas, no CSV e
+  nas homes. A visão geral do professor lista as questões com `Qn`, tipo,
+  peso e, com tentativa fechada, média e discriminação. A prova `test-06` do
+  seed pesa 3, 2 e 1. Falta mostrar `Qn` e "peso N" nas demais telas (spec
+  `dev/specs/to-do/pesos-e-numeros-de-questao.md`).
+
+- Correção automática de objetivas. Ao fechar a tentativa, o servidor grava um
+  `Feedback` sem `graderId` e marca a submissão `GRADED_AUTOMATICALLY` nas
+  questões que `scoreResponse` aceita. Uma tentativa expirada e nunca
+  entregue é corrigida por `response.settleExpired` ao abrir a prova do
+  professor, a correção e a liberação das notas. As respostas que já estão
+  `PENDING_GRADE` não mudam na release, para a nota não surgir nem mudar em
+  prova liberada: `pnpm run manage grade-objectives --course <c> [--exam <e>]
+  [--dry-run] [--released]` as corrige, prova por prova.
+
+- O instrutor de um curso não pode ser matriculado nele (convite,
+  passphrase, check-in e tela de alunos recusam com `InvalidData`).
+  `pnpm run manage check-instructor-enrollments [--fix]` lista as matrículas
+  que já existem, com a contagem de tentativas, e `--fix` remove as sem
+  tentativa.
+
+- Simulação e prévia da prova. A aba "Prévia" (`exams/<prova>/preview`,
+  no lugar de `questions`, sem redirect) monta a tentativa do aluno, com
+  barra, cronômetro, autosave, histórico de edição e envio de código ao
+  worker, sobre a simulação do instrutor: uma `Response` com
+  `preview = true`, que vale em prova `DRAFT` ou `PRACTICE`, sem matrícula.
+  O resultado aparece ao entregar, e "Recomeçar" apaga e recria. A simulação
+  fica fora de resultados, estatísticas, pendências, liberação, fila de
+  correção, notas, CSV, homes, pedidos de revisão e REST. O seed traz
+  `simulation-open` e `simulation-done`. Spec em
+  `dev/specs/to-review/simulacao-e-previa-da-prova.md`.
+
 - Página de configurações do curso (`<curso>/settings`), ligada pelo card do
   curso na home do professor. Mostra os dados do curso só para leitura, com o
   arquivo do repositório de onde cada um vem, reúne passphrase, link de
@@ -82,7 +116,10 @@
 
 ### Migração
 
-A release que levar essa mudança escreve uma migração que remove as colunas
+`Response.preview` é uma coluna nova, `BOOLEAN NOT NULL DEFAULT false`: a
+migração é aditiva e as linhas existentes ficam como tentativas comuns.
+
+A release que levar a mudança das datas escreve uma migração que remove as colunas
 `startAt`/`endAt` de `Course` e `Edition`; o `prisma migrate diff` para por
 perda de dados. Edite a migração para copiar os valores antes de remover. O
 Prisma grava `DateTime` no SQLite como texto ISO (`2026-09-28T03:00:00.000+00:00`),

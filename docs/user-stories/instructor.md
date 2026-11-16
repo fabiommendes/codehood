@@ -315,6 +315,20 @@ the exam appears on its date in the course schedule and in students' calendars,
 next to the meetings, so students find it where they are already looking.
 
 
+### Simulate an exam as a student
+
+    status: web
+    url: /[discipline]/[course]/exams/[exam]/preview
+
+Instructor wants to know that an exam works before the class takes it, draft
+or not. The exam's Preview tab is the student's own screen, with the timer, the
+autosave and the submit button, under a banner that says the simulation counts
+for nothing. Submitting shows the result at once, with the essays left to
+manual grading and a link to each answer key. Restarting discards the answers
+and begins another simulation. The simulation never appears in the exam's
+results, its statistics, the grading queue or the course grades.
+
+
 ### Grade submissions by hand
 
     status: implemented
